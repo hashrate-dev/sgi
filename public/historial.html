@@ -217,176 +217,270 @@
 </head>
 
 <body>
-    <!-- Header con Logo -->
-    <div class="faja-logo">
-        <img src="images/LOGO-FACTURA.png" alt="Logo HRS">
+
+  <!-- ========================= -->
+  <!-- HEADER LOGO -->
+  <!-- ========================= -->
+  <div class="faja-logo text-center py-3 bg-white shadow-sm">
+    <img src="images/LOGO-FACTURA.png" alt="Logo HRS" style="max-height: 90px;">
+  </div>
+
+
+  <!-- ========================= -->
+  <!-- HEADER TITULO -->
+  <!-- ========================= -->
+  <nav class="navbar navbar-light bg-dark py-3 shadow-sm">
+    <div class="container">
+      <h1 class="navbar-brand fw-bold text-white mb-0">
+        📋 HISTORIAL DE FACTURAS
+      </h1>
     </div>
+  </nav>
 
-    <!-- Header -->
-    <nav class="navbar navbar-light header-fino-ancho">
-        <div class="container-fluid">
-            <h1 class="navbar-brand mb-0">📋 HISTORIAL DE FACTURAS</h1>
-        </div>
-    </nav>
 
-    <!-- Contenedor Principal -->
-    <div class="container container-main my-4">
+  <!-- ========================= -->
+  <!-- CONTENEDOR PRINCIPAL -->
+  <!-- ========================= -->
+  <div class="container container-main my-4">
 
-        <!-- Filtros -->
-        <div class="filtros-section p-4 rounded-4 shadow-sm bg-white border">
 
-            <!-- Título -->
-            <div class="d-flex align-items-center mb-3">
-                <h6 class="fw-bold mb-0">🔍 FILTROS</h6>
-            </div>
+    <!-- ========================= -->
+    <!-- FILTROS -->
+    <!-- ========================= -->
+    <div class="filtros-section p-4 rounded-4 shadow-sm bg-white border mb-4">
 
-            <!-- Fila de filtros -->
-            <div class="row g-3 align-items-end">
+      <div class="d-flex align-items-center mb-3">
+        <h6 class="fw-bold mb-0">🔍 FILTROS</h6>
+      </div>
 
-                <!-- Cliente -->
-                <div class="col-md-4">
-                    <label class="form-label small fw-bold">Cliente</label>
-                    <input type="text" class="form-control form-control-sm" id="filtroCliente"
-                        placeholder="Buscar cliente..." onkeyup="aplicarFiltros()">
-                </div>
+      <div class="row g-3 align-items-end">
 
-                <!-- Tipo -->
-                <div class="col-md-2">
-                    <label class="form-label small fw-bold">Tipo</label>
-                    <select class="form-select form-select-sm" id="filtroTipo" onchange="aplicarFiltros()">
-                        <option value="">Todos</option>
-                        <option value="Factura">Factura</option>
-                        <option value="Recibo">Recibo</option>
-                    </select>
-                </div>
-
-                <!-- Mes -->
-                <div class="col-md-3">
-                    <label class="form-label small fw-bold">Mes</label>
-                    <input type="month" class="form-control form-control-sm" id="filtroMes" onchange="aplicarFiltros()">
-                </div>
-
-                <!-- Botón Limpiar -->
-                <div class="col-md-3">
-                    <button
-                        class="btn btn-outline-dark btn-sm w-100 d-flex align-items-center justify-content-center gap-2"
-                        onclick="limpiarFiltros()">
-                        🧹 Limpiar filtros
-                    </button>
-                </div>
-
-            </div>
-        </div>
-    </div>
-
-    <!-- Tabla de Facturas -->
-    <div class="card p-3 shadow-sm">
-        <h6 class="fw-bold mb-3 border-bottom pb-2">📄 Listado de Facturas y Recibos</h6>
-        <div class="table-responsive">
-            <table class="table table-sm align-middle" style="font-size: 0.85rem;">
-                <thead class="table-dark">
-                    <tr>
-                        <th>N°</th>
-                        <th>Tipo</th>
-                        <th>Cliente</th>
-                        <th>Fecha</th>
-                        <th>Mes</th>
-                        <th>Total</th>
-                        <th class="text-center">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody id="facturasHistorialBody">
-                    <tr>
-                        <td colspan="7" class="text-center text-muted py-4">
-                            <small>No hay facturas registradas</small>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+        <!-- Cliente -->
+        <div class="col-md-4">
+          <label class="form-label small fw-bold">Cliente</label>
+          <input
+            type="text"
+            class="form-control form-control-sm"
+            id="filtroCliente"
+            placeholder="Buscar cliente..."
+            onkeyup="aplicarFiltros()"
+          >
         </div>
 
-        <!-- Botones inferiores -->
-        <div class="row mt-4 g-2">
-            <div class="col-12">
-                <div class="d-flex justify-content-between">
-                    <a href="/" class="btn btn-volver btn-sm px-4 shadow-sm py-2 fw-bold text-white"
-                        title="Volver a la página principal">← VOLVER</a>
-                    <div>
-                        <button class="btn btn-excel btn-sm px-4 me-2 shadow-sm py-2"
-                            onclick="exportarHistorialExcel()">📊 EXCEL</button>
-                        <button class="btn btn-danger btn-sm px-4 shadow-sm py-2"
-                            onclick="abrirConfirmacionBorrar()">🗑️ LIMPIAR TODO</button>
-                    </div>
-                </div>
-            </div>
+        <!-- Tipo -->
+        <div class="col-md-2">
+          <label class="form-label small fw-bold">Tipo</label>
+          <select
+            class="form-select form-select-sm"
+            id="filtroTipo"
+            onchange="aplicarFiltros()"
+          >
+            <option value="">Todos</option>
+            <option value="Factura">Factura</option>
+            <option value="Recibo">Recibo</option>
+          </select>
         </div>
-    </div>
 
-    <!-- Estadísticas -->
-    <div class="row mt-4 g-3">
+        <!-- Mes -->
         <div class="col-md-3">
-            <div class="card p-3 text-center">
-                <h6 class="text-muted small mb-2">TOTAL FACTURAS</h6>
-                <h3 class="fw-bold text-primary" id="statsFacturas">0</h3>
-            </div>
+          <label class="form-label small fw-bold">Mes</label>
+          <input
+            type="month"
+            class="form-control form-control-sm"
+            id="filtroMes"
+            onchange="aplicarFiltros()"
+          >
         </div>
+
+        <!-- Botón Limpiar -->
         <div class="col-md-3">
-            <div class="card p-3 text-center">
-                <h6 class="text-muted small mb-2">TOTAL RECIBOS</h6>
-                <h3 class="fw-bold text-success" id="statsRecibos">0</h3>
-            </div>
+          <button
+            class="btn btn-outline-dark btn-sm w-100 d-flex align-items-center justify-content-center gap-2"
+            onclick="limpiarFiltros()"
+          >
+            🧹 Limpiar filtros
+          </button>
         </div>
-        <div class="col-md-3">
-            <div class="card p-3 text-center">
-                <h6 class="text-muted small mb-2">MONTO TOTAL</h6>
-                <h3 class="fw-bold" id="statsMontoTotal">$ 0</h3>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card p-3 text-center">
-                <h6 class="text-muted small mb-2">REGISTROS</h6>
-                <h3 class="fw-bold text-info" id="statsTotal">0</h3>
-            </div>
-        </div>
-    </div>
+
+      </div>
     </div>
 
-    <!-- Faja Inferior -->
-    <div class="container-fluid p-0 faja-abajo">
-        <img src="images/FAJA-ABAJO-HRS.png" class="w-100" style="height: 50px; object-fit: cover;">
-    </div>
 
-    <!-- Modal Confirmación Borrar -->
-    <div class="modal fade" id="confirmarBorrarModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content p-4 text-center shadow border-0" style="border-radius: 15px;">
-                <div class="fs-1 mb-2">❓</div>
-                <h4 class="fw-bold">¿Borrar todo el historial?</h4>
-                <p class="text-muted small">Esta acción no se puede deshacer</p>
-                <div class="mt-3">
-                    <button class="btn btn-light px-4 me-2" data-bs-dismiss="modal">Cancelar</button>
-                    <button class="btn btn-danger px-4" onclick="confirmarBorrarHistorial()">Sí, borrar todo</button>
-                </div>
-            </div>
+    <!-- ========================= -->
+    <!-- TABLA FACTURAS -->
+    <!-- ========================= -->
+    <div class="card p-4 rounded-4 shadow-sm border-0 mb-4">
+
+      <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+        <h6 class="fw-bold mb-0">📄 Listado de Facturas y Recibos</h6>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
+
+          <thead class="table-dark">
+            <tr>
+              <th>N°</th>
+              <th>Tipo</th>
+              <th>Cliente</th>
+              <th>Fecha</th>
+              <th>Mes</th>
+              <th>Total</th>
+              <th class="text-center">Acciones</th>
+            </tr>
+          </thead>
+
+          <tbody id="facturasHistorialBody">
+            <tr>
+              <td colspan="7" class="text-center text-muted py-4">
+                <small>No hay facturas registradas</small>
+              </td>
+            </tr>
+          </tbody>
+
+        </table>
+      </div>
+
+
+      <!-- ========================= -->
+      <!-- BOTONES INFERIORES -->
+      <!-- ========================= -->
+      <div class="row mt-4 g-3 align-items-end">
+
+        <!-- Volver -->
+        <div class="col-md-4">
+          <a
+            href="/"
+            class="btn btn-dark btn-sm w-100 py-2 fw-bold shadow-sm"
+          >
+            ← VOLVER
+          </a>
         </div>
-    </div>
 
-    <!-- Modal Alerta -->
-    <div class="modal fade" id="alertaModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered modal-sm">
-            <div id="modalContentAlerta" class="modal-content text-center p-4 border-0 shadow"
-                style="border-radius: 15px;">
-                <div id="modalIcono" class="fs-2 mb-2"></div>
-                <h5 id="modalTitulo" class="fw-bold"></h5>
-                <p id="modalMensaje" class="text-muted small mb-0"></p>
-            </div>
+        <!-- Acciones -->
+        <div class="col-md-8">
+          <div class="d-flex justify-content-md-end gap-2 flex-wrap">
+
+            <button
+              class="btn btn-success btn-sm px-4 py-2 shadow-sm"
+              onclick="exportarHistorialExcel()"
+            >
+              📊 EXCEL
+            </button>
+
+            <button
+              class="btn btn-danger btn-sm px-4 py-2 shadow-sm"
+              onclick="abrirConfirmacionBorrar()"
+            >
+              🗑️ LIMPIAR TODO
+            </button>
+
+          </div>
         </div>
+
+      </div>
+
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="historial.js"></script>
+
+    <!-- ========================= -->
+    <!-- ESTADÍSTICAS -->
+    <!-- ========================= -->
+    <div class="row g-3 mb-4">
+
+      <div class="col-md-3">
+        <div class="card p-4 rounded-4 shadow-sm border-0 text-center h-100">
+          <h6 class="text-muted small mb-2">TOTAL FACTURAS</h6>
+          <h2 class="fw-bold text-primary mb-0" id="statsFacturas">0</h2>
+        </div>
+      </div>
+
+      <div class="col-md-3">
+        <div class="card p-4 rounded-4 shadow-sm border-0 text-center h-100">
+          <h6 class="text-muted small mb-2">TOTAL RECIBOS</h6>
+          <h2 class="fw-bold text-success mb-0" id="statsRecibos">0</h2>
+        </div>
+      </div>
+
+      <div class="col-md-3">
+        <div class="card p-4 rounded-4 shadow-sm border-0 text-center h-100">
+          <h6 class="text-muted small mb-2">MONTO TOTAL</h6>
+          <h2 class="fw-bold mb-0" id="statsMontoTotal">$ 0</h2>
+        </div>
+      </div>
+
+      <div class="col-md-3">
+        <div class="card p-4 rounded-4 shadow-sm border-0 text-center h-100">
+          <h6 class="text-muted small mb-2">REGISTROS</h6>
+          <h2 class="fw-bold text-info mb-0" id="statsTotal">0</h2>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <!-- ========================= -->
+  <!-- FAJA INFERIOR -->
+  <!-- ========================= -->
+  <div class="container-fluid p-0 mt-4">
+    <img
+      src="images/FAJA-ABAJO-HRS.png"
+      class="w-100"
+      style="height: 55px; object-fit: cover;"
+    >
+  </div>
+
+
+  <!-- ========================= -->
+  <!-- MODAL CONFIRMACIÓN -->
+  <!-- ========================= -->
+  <div class="modal fade" id="confirmarBorrarModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content p-4 text-center shadow border-0 rounded-4">
+
+        <div class="fs-1 mb-2">❓</div>
+        <h4 class="fw-bold">¿Borrar todo el historial?</h4>
+        <p class="text-muted small">Esta acción no se puede deshacer</p>
+
+        <div class="d-flex justify-content-center gap-2 mt-3">
+          <button class="btn btn-light px-4" data-bs-dismiss="modal">
+            Cancelar
+          </button>
+          <button class="btn btn-danger px-4" onclick="confirmarBorrarHistorial()">
+            Sí, borrar todo
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ========================= -->
+  <!-- MODAL ALERTA -->
+  <!-- ========================= -->
+  <div class="modal fade" id="alertaModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content text-center p-4 border-0 shadow rounded-4">
+
+        <div id="modalIcono" class="fs-2 mb-2"></div>
+        <h5 id="modalTitulo" class="fw-bold"></h5>
+        <p id="modalMensaje" class="text-muted small mb-0"></p>
+
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ========================= -->
+  <!-- SCRIPTS -->
+  <!-- ========================= -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="historial.js"></script>
+
 </body>
-
 </html>
