@@ -216,17 +216,6 @@
     <!-- Contenedor Principal -->
     <div class="container container-main">
         
-        <!-- Acciones Superior -->
-        <div class="acciones-top">
-            <div>
-                
-            </div>
-            <div>
-                <button class="btn btn-excel btn-sm px-4 shadow-sm py-2" onclick="exportarHistorialExcel()">📊 EXCEL</button>
-                <button class="btn btn-danger btn-sm px-4 shadow-sm py-2" onclick="abrirConfirmacionBorrar()">🗑️ LIMPIAR TODO</button>
-            </div>
-        </div>
-
         <!-- Filtros -->
         <div class="filtros-section">
             <h6 class="fw-bold mb-3">🔍 FILTROS</h6>
@@ -283,10 +272,12 @@
             <!-- Botones inferiores -->
             <div class="row mt-4 g-2">
                 <div class="col-12">
-                    <div class="text-end">
+                    <div class="d-flex justify-content-between">
                         <a href="/" class="btn btn-volver btn-sm px-4 shadow-sm py-2 fw-bold text-white" title="Volver a la página principal">← VOLVER</a>
-                        <button class="btn btn-excel btn-sm px-4 me-2 shadow-sm py-2" onclick="exportarHistorialExcel()">📊 EXCEL</button>
-                        <button class="btn btn-danger btn-sm px-4 shadow-sm py-2" onclick="abrirConfirmacionBorrar()">🗑️ LIMPIAR TODO</button>
+                        <div>
+                            <button class="btn btn-excel btn-sm px-4 me-2 shadow-sm py-2" onclick="exportarHistorialExcel()">📊 EXCEL</button>
+                            <button class="btn btn-danger btn-sm px-4 shadow-sm py-2" onclick="abrirConfirmacionBorrar()">🗑️ LIMPIAR TODO</button>
+                        </div>
                     </div>
                 </div>
             </div>
