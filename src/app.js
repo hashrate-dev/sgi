@@ -20,6 +20,11 @@ app.get('/facturacion', (req, res) => {
   res.sendFile(path.join(publicPath, 'facturacion.html'));
 });
 
+// Route for historial page
+app.get('/historial', (req, res) => {
+  res.sendFile(path.join(publicPath, 'historial.html'));
+});
+
 // Serve static files after routes
 app.use(express.static(publicPath));
 
