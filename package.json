@@ -1,8 +1,8 @@
 {
   "name": "facturacion-hrs-con-mongo",
   "version": "1.0.0",
-  "description": "��#\u0000 \u0000h\u0000a\u0000s\u0000h\u0000r\u0000a\u0000t\u0000e\u0000\r\u0000 \u0000#\u0000 \u0000h\u0000a\u0000s\u0000h\u0000r\u0000a\u0000t\u0000e\u0000\r\u0000 \u0000#\u0000 \u0000h\u0000a\u0000s\u0000h\u0000r\u0000a\u0000t\u0000e\u0000\r\u0000 \u0000",
-  "keywords": [],
+  "description": "HRS GROUP - Sistema profesional de facturación con emisión de PDF y gestión de clientes",
+  "keywords": ["facturacion", "hrs", "billing", "invoicing"],
   "homepage": "https://github.com/jlvilasoler/hashrate#readme",
   "bugs": {
     "url": "https://github.com/jlvilasoler/hashrate/issues"
