@@ -17,17 +17,39 @@
         }
         
         /* Header */
-        .faja-logo { 
-            height: 80px;
-            background-color: #ffffff;
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-bottom: 1px solid #eee;
-        }
-        .faja-logo img { width: 100%; height: 100%; object-fit: cover; object-position: center; animation: none !important; transition: none !important; }
-        
+ .faja-logo {
+    height: 80px;
+    background-color: #ffffff;
+    overflow: hidden;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-bottom: 1px solid #eee;
+
+    /* 🔥 Elimina cualquier animación aplicada al contenedor */
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+}
+
+.faja-logo img {
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
+    object-position: center;
+
+    /* 🔥 Elimina cualquier animación o transición */
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+
+    /* 🔥 Evita efectos raros de aparición */
+    opacity: 1 !important;
+}
+
         .header-fino-ancho { 
             background-color: #ffffff;
             border-bottom: 4px solid #00cc6e !important;
