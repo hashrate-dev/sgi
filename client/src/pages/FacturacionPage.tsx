@@ -42,10 +42,6 @@ export function FacturacionPage() {
   const [type, setType] = useState<ComprobanteType>("Factura");
   const [clientQuery, setClientQuery] = useState("");
   const [clientName, setClientName] = useState("INDICAR CLIENTE");
-  const [clientPhone, setClientPhone] = useState("");
-  const [clientEmail, setClientEmail] = useState("");
-  const [clientAddress, setClientAddress] = useState("");
-  const [clientCity, setClientCity] = useState("MONTEVIDEO, URUGUAY");
   const [items, setItems] = useState<LineItem[]>([]);
 
   const invoices = useMemo(() => loadInvoices(), []);
@@ -154,10 +150,6 @@ export function FacturacionPage() {
         number,
         type,
         clientName,
-        clientPhone: clientPhone.trim() || undefined,
-        clientEmail: clientEmail.trim() || undefined,
-        clientAddress: clientAddress.trim() || undefined,
-        clientCity: clientCity.trim() || undefined,
         date: dateNow,
         items,
         subtotal,
@@ -247,35 +239,6 @@ export function FacturacionPage() {
                     );
                   })}
                 </select>
-                <label className="form-label small fw-bold mt-2">Teléfono (opc.)</label>
-                <input
-                  className="form-control form-control-sm mb-1"
-                  placeholder="(+598)..."
-                  value={clientPhone}
-                  onChange={(e) => setClientPhone(e.target.value)}
-                />
-                <label className="form-label small fw-bold">Email (opc.)</label>
-                <input
-                  type="email"
-                  className="form-control form-control-sm mb-1"
-                  placeholder="email@..."
-                  value={clientEmail}
-                  onChange={(e) => setClientEmail(e.target.value)}
-                />
-                <label className="form-label small fw-bold">Dirección (opc.)</label>
-                <input
-                  className="form-control form-control-sm mb-1"
-                  placeholder="Calle, número, apto"
-                  value={clientAddress}
-                  onChange={(e) => setClientAddress(e.target.value)}
-                />
-                <label className="form-label small fw-bold">Ciudad / País (opc.)</label>
-                <input
-                  className="form-control form-control-sm"
-                  placeholder="MONTEVIDEO, URUGUAY"
-                  value={clientCity}
-                  onChange={(e) => setClientCity(e.target.value)}
-                />
               </div>
             </div>
           </div>
