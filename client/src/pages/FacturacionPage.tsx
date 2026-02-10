@@ -1,9 +1,9 @@
-import { jsPDF } from "jspdf";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { defaultClients, serviceCatalog } from "../lib/constants";
+import { generateFacturaPdf } from "../lib/generateFacturaPdf";
 import { loadInvoices, saveInvoices } from "../lib/storage";
 import type { ComprobanteType, Invoice, LineItem } from "../lib/types";
 
@@ -131,40 +131,30 @@ export function FacturacionPage() {
     }
 
     const { subtotal, discounts, total } = calcTotals(items);
-    const date = todayLocale();
+    const dateNow = new Date();
+    const dateStr = todayLocale();
     const month = items[0]!.month;
 
-    const doc = new jsPDF();
-    doc.setFontSize(20);
-    doc.text("HASHRATE SPACE", 105, 20, { align: "center" });
-    doc.setFontSize(10);
-    doc.text(`Comprobante: ${number} | Fecha: ${date}`, 20, 35);
-    doc.text(`Cliente: ${clientName}`, 20, 42);
-
-    let y = 60;
-    doc.setFont("helvetica", "bold");
-    doc.text("Detalle", 20, 55);
-    doc.text("Total", 170, 55);
-    doc.setFont("helvetica", "normal");
-
-    items.forEach((it) => {
-      const lineTotal = (it.price - it.discount) * it.quantity;
-      doc.text(it.serviceName, 20, y);
-      doc.text(`$ ${lineTotal.toFixed(2)}`, 170, y);
-      y += 8;
+    const doc = generateFacturaPdf({
+      number,
+      type,
+      clientName,
+      date: dateNow,
+      items,
+      subtotal,
+      discounts,
+      total,
     });
 
-    doc.line(20, y, 190, y);
-    doc.setFontSize(14);
-    doc.text(`TOTAL FINAL: $ ${total.toFixed(2)}`, 190, y + 12, { align: "right" });
-    doc.save(`${number}_${clientName}.pdf`);
+    const safeName = clientName.replace(/[^\w\s-]/g, "").replace(/\s+/g, " ").trim() || "cliente";
+    doc.save(`${number}_${safeName}.pdf`);
 
     const inv: Invoice = {
       id: genId(),
       number,
       type,
       clientName,
-      date,
+      date: dateStr,
       month,
       subtotal,
       discounts,
