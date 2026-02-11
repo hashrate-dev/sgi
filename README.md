@@ -1,4 +1,4 @@
-# HRS GROUP - Sistema de Facturaci?n (Modernizado)
+# HASHRATE - Facturacion HRS
 
 Este repo ahora est? modernizado como **monorepo**:
 

@@ -1,25 +1,25 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { createClient, getClients, updateClient } from "../lib/api";
+import { useNavigate } from "react-router-dom";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
+import { deleteAllClients, getClients } from "../lib/api";
 import type { Client } from "../lib/types";
+import { PageHeader } from "../components/PageHeader";
+import { showToast } from "../components/ToastNotification";
+import { useAuth } from "../contexts/AuthContext";
+import { canDeleteClientes, canEditClientes, canExport } from "../lib/auth";
 import "../styles/facturacion.css";
 
-const emptyForm = {
-  code: "",
-  name: "",
-  phone: "",
-  email: "",
-  address: "",
-  city: ""
-};
-
 export function ClientesPage() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const canDelete = user ? canDeleteClientes(user.role) : false;
+  const canEdit = user ? canEditClientes(user.role) : false;
+  const canExportData = user ? canExport(user.role) : false;
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
-  const [form, setForm] = useState(emptyForm);
-  const [editingId, setEditingId] = useState<number | string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
   function loadClients() {
     setLoading(true);
@@ -35,226 +35,242 @@ export function ClientesPage() {
     return () => clearTimeout(t);
   }, []);
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setMessage(null);
-    const payload = {
-      code: form.code.trim(),
-      name: form.name.trim(),
-      phone: form.phone.trim() || undefined,
-      email: form.email.trim() || undefined,
-      address: form.address.trim() || undefined,
-      city: form.city.trim() || undefined
-    };
-    if (!payload.code || !payload.name) {
-      setMessage({ type: "err", text: "Código y nombre son obligatorios." });
+  function handleEdit(c: Client) {
+    if (c.id == null) return;
+    navigate(`/clientes/${c.id}/edit`);
+  }
+
+  function handleNewClient() {
+    navigate("/clientes/nuevo");
+  }
+
+  function handleDeleteAll() {
+    if (!window.confirm("¿Está seguro de que desea borrar TODOS los clientes? Esta acción no se puede deshacer.")) return;
+    if (!window.confirm("Segunda confirmación: se eliminarán todos los clientes de la base. ¿Continuar?")) return;
+    deleteAllClients()
+      .then(() => {
+        loadClients();
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : "Error al borrar"));
+  }
+
+  function exportExcel() {
+    if (clients.length === 0) {
+      showToast("No hay clientes para exportar.", "warning");
       return;
     }
 
-    if (editingId !== null) {
-      updateClient(editingId, payload)
-        .then(() => {
-          setMessage({ type: "ok", text: "Cliente actualizado correctamente." });
-          setForm(emptyForm);
-          setEditingId(null);
-          loadClients();
-        })
-        .catch((err) => setMessage({ type: "err", text: err instanceof Error ? err.message : "Error al actualizar" }));
-    } else {
-      createClient(payload)
-        .then(() => {
-          setMessage({ type: "ok", text: "Cliente agregado correctamente." });
-          setForm(emptyForm);
-          loadClients();
-        })
-        .catch((err) => setMessage({ type: "err", text: err instanceof Error ? err.message : "Error al crear" }));
-    }
-  }
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Clientes");
 
-  function startEdit(c: Client) {
-    if (c.id == null) return;
-    setForm({
-      code: c.code ?? "",
-      name: c.name ?? "",
-      phone: c.phone ?? "",
-      email: c.email ?? "",
-      address: c.address ?? "",
-      city: c.city ?? ""
+    // Configurar columnas
+    ws.columns = [
+      { header: "Código", key: "code", width: 15 },
+      { header: "Nombre o Razón Social 1", key: "name", width: 35 },
+      { header: "Nombre o Razón Social 2", key: "name2", width: 35 },
+      { header: "Teléfono 1", key: "phone", width: 20 },
+      { header: "Teléfono 2", key: "phone2", width: 20 },
+      { header: "Email 1", key: "email", width: 30 },
+      { header: "Email 2", key: "email2", width: 30 },
+      { header: "Dirección 1", key: "address", width: 40 },
+      { header: "Dirección 2", key: "address2", width: 40 },
+      { header: "Ciudad / País 1", key: "city", width: 30 },
+      { header: "Ciudad / País 2", key: "city2", width: 30 }
+    ];
+
+    // Agregar datos
+    clients.forEach((client) => {
+      ws.addRow({
+        code: client.code || "",
+        name: client.name || "",
+        name2: client.name2 || "",
+        phone: client.phone || "",
+        phone2: client.phone2 || "",
+        email: client.email || "",
+        email2: client.email2 || "",
+        address: client.address || "",
+        address2: client.address2 || "",
+        city: client.city || "",
+        city2: client.city2 || ""
+      });
     });
-    setEditingId(c.id);
-    setMessage(null);
+
+    // Estilizar encabezados
+    const headerRow = ws.getRow(1);
+    headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    headerRow.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF00A652" }
+    };
+    headerRow.alignment = { vertical: "middle", horizontal: "center" };
+    headerRow.height = 25;
+
+    // Aplicar bordes a todas las celdas con datos
+    ws.eachRow((row, rowNumber) => {
+      row.eachCell((cell) => {
+        cell.border = {
+          top: { style: "thin", color: { argb: "FFE2E8F0" } },
+          left: { style: "thin", color: { argb: "FFE2E8F0" } },
+          bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
+          right: { style: "thin", color: { argb: "FFE2E8F0" } }
+        };
+        if (rowNumber > 1) {
+          cell.alignment = { vertical: "middle", horizontal: "left" };
+        }
+      });
+    });
+
+    // Generar y descargar archivo
+    wb.xlsx.writeBuffer().then((buf) => {
+      const fecha = new Date().toISOString().split("T")[0].replace(/-/g, "");
+      saveAs(new Blob([buf]), `Listado_Clientes_${fecha}.xlsx`);
+    });
   }
 
-  function cancelEdit() {
-    setForm(emptyForm);
-    setEditingId(null);
-    setMessage(null);
-  }
+  const filteredClients = clients.filter((c) => {
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      c.code?.toLowerCase().includes(searchLower) ||
+      c.name?.toLowerCase().includes(searchLower) ||
+      c.name2?.toLowerCase().includes(searchLower) ||
+      c.phone?.toLowerCase().includes(searchLower) ||
+      c.email?.toLowerCase().includes(searchLower)
+    );
+  });
 
   return (
     <div className="fact-page">
       <div className="container">
-        <header className="fact-topbar">
-          <h1>Clientes</h1>
-          <Link to="/" className="fact-back">
-            ← Volver al inicio
-          </Link>
-        </header>
+        <PageHeader title="Clientes" />
 
-        <div className="fact-layout" style={{ gridTemplateColumns: "400px 1fr" }}>
-          {/* Formulario: alta y edición */}
-          <aside className="fact-sidebar">
-            <div className="fact-card">
-              <div className="fact-card-header">
-                {editingId !== null ? "Editar cliente" : "Nuevo cliente"}
-              </div>
-              <div className="fact-card-body">
-                <form onSubmit={handleSubmit}>
-                  <div className="fact-field">
-                    <label className="fact-label">Código *</label>
-                    <input
-                      className="fact-input"
-                      value={form.code}
-                      onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-                      placeholder="Ej. C01"
-                      disabled={editingId !== null}
-                    />
-                    {editingId !== null && (
-                      <small className="text-muted">El código no se puede cambiar al editar.</small>
-                    )}
-                  </div>
-                  <div className="fact-field">
-                    <label className="fact-label">Nombre o razón social *</label>
-                    <input
-                      className="fact-input"
-                      value={form.name}
-                      onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                      placeholder="Ej. PIROTTO, PABLO"
-                    />
-                  </div>
-                  <div className="fact-field">
-                    <label className="fact-label">Teléfono</label>
-                    <input
-                      className="fact-input"
-                      type="tel"
-                      value={form.phone}
-                      onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                      placeholder="Ej. (+598) 99 123 456"
-                    />
-                  </div>
-                  <div className="fact-field">
-                    <label className="fact-label">Email</label>
-                    <input
-                      className="fact-input"
-                      type="email"
-                      value={form.email}
-                      onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                      placeholder="cliente@email.com"
-                    />
-                  </div>
-                  <div className="fact-field">
-                    <label className="fact-label">Dirección</label>
-                    <input
-                      className="fact-input"
-                      value={form.address}
-                      onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                      placeholder="Calle, número, apto"
-                    />
-                  </div>
-                  <div className="fact-field">
-                    <label className="fact-label">Ciudad / País</label>
-                    <input
-                      className="fact-input"
-                      value={form.city}
-                      onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
-                      placeholder="Ej. MONTEVIDEO, URUGUAY"
-                    />
-                  </div>
-                  {message && (
-                    <div
-                      className="fact-field"
-                      style={{
-                        padding: "0.5rem 0.75rem",
-                        borderRadius: 8,
-                        background: message.type === "ok" ? "#f0fdf4" : "#fef2f2",
-                        color: message.type === "ok" ? "#166534" : "#b91c1c",
-                        fontSize: "0.875rem"
-                      }}
-                    >
-                      {message.text}
-                    </div>
-                  )}
-                  <div className="d-flex gap-2 mt-3">
-                    <button type="submit" className="fact-btn fact-btn-primary">
-                      {editingId !== null ? "Guardar cambios" : "Agregar cliente"}
-                    </button>
-                    {editingId !== null && (
-                      <button type="button" className="fact-btn fact-btn-secondary" onClick={cancelEdit}>
-                        Cancelar
-                      </button>
-                    )}
-                  </div>
-                </form>
+        {/* Listado */}
+        <main className="fact-main" style={{ maxWidth: "100%" }}>
+          <div className="fact-card">
+            <div className="fact-card-header">
+              <div className="d-flex justify-content-between align-items-center">
+                <span>Listado de clientes ({filteredClients.length}){!canEdit && <span className="text-muted small ms-2">(solo consulta)</span>}</span>
+                {canEdit && (
+                  <button
+                    type="button"
+                    className="fact-btn fact-btn-primary"
+                    onClick={handleNewClient}
+                    style={{ fontSize: "0.8125rem", padding: "0.5rem 1rem" }}
+                  >
+                    ➕ Nuevo Cliente
+                  </button>
+                )}
               </div>
             </div>
-          </aside>
+            <div className="fact-card-body">
+              {/* Barra de búsqueda y acciones */}
+              <div className="mb-3 d-flex flex-wrap gap-2 align-items-center" style={{ justifyContent: "space-between", paddingBottom: "1rem", borderBottom: "1px solid #e2e8f0" }}>
+                <div style={{ flex: "1 1 300px", minWidth: "200px" }}>
+                  <input
+                    type="text"
+                    className="fact-input"
+                    placeholder="🔍 Buscar por código, nombre, teléfono o email..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    style={{ width: "100%" }}
+                  />
+                </div>
+                <div className="d-flex gap-2 flex-wrap">
+                  {canExportData && (
+                  <button
+                    type="button"
+                    className="fact-btn"
+                    style={{ background: "#00a652", color: "#fff" }}
+                    onClick={exportExcel}
+                    disabled={clients.length === 0}
+                  >
+                    📊 Exportar Excel
+                  </button>
+                )}
+                  {canDelete && (
+                  <button
+                    type="button"
+                    className="fact-btn"
+                    style={{ background: "#991b1b", color: "#fff" }}
+                    onClick={handleDeleteAll}
+                  >
+                    🗑️ Borrar todo
+                  </button>
+                )}
+                </div>
+              </div>
 
-          {/* Listado */}
-          <main className="fact-main">
-            <div className="fact-card">
-              <div className="fact-card-header">Listado de clientes</div>
-              <div className="fact-card-body">
                 {error && (
                   <div className="mb-3 p-3 rounded" style={{ background: "#fef2f2", color: "#b91c1c" }}>
-                    {error}. Asegurate de tener el servidor levantado (npm run dev en la raíz).
+                    {error}
+                    {typeof window !== "undefined" && (window.location?.hostname === "localhost" || window.location?.hostname === "127.0.0.1") && " Asegurate de tener el servidor levantado (npm run dev en la raíz)."}
                   </div>
                 )}
+
                 {loading ? (
                   <p className="text-muted">Cargando clientes...</p>
-                ) : clients.length === 0 ? (
+                ) : filteredClients.length === 0 ? (
                   <div className="fact-empty">
                     <div className="fact-empty-icon">👥</div>
-                    <div className="fact-empty-text">No hay clientes cargados. Agregá uno con el formulario.</div>
+                    <div className="fact-empty-text">
+                      {searchTerm ? "No se encontraron clientes con ese criterio de búsqueda." : "No hay clientes cargados. Agregá uno con el formulario."}
+                    </div>
                   </div>
                 ) : (
-                  <div className="fact-table-wrap">
-                    <table className="fact-table">
+                  <div className="clients-table-container">
+                    <table className="clients-table">
                       <thead>
                         <tr>
                           <th>Código</th>
-                          <th>Nombre</th>
-                          <th>Teléfono</th>
-                          <th>Email</th>
-                          <th style={{ width: 100 }} />
+                          <th>Nombre/Razón Social</th>
+                          <th>Contacto</th>
+                          <th>Ubicación</th>
+                          {canEdit && <th style={{ width: "100px" }}>Acciones</th>}
                         </tr>
                       </thead>
                       <tbody>
-                        {clients.map((c) => (
+                        {filteredClients.map((c) => (
                           <tr key={c.id ?? c.code}>
-                            <td className="fw-semibold">{c.code}</td>
-                            <td>{c.name}</td>
-                            <td>{c.phone ?? "—"}</td>
-                            <td>{c.email ?? "—"}</td>
+                            <td className="client-code">{c.code}</td>
+                            <td className="client-name">
+                              <div className="client-name-primary">{c.name}</div>
+                              {c.name2 && (
+                                <div className="client-name-secondary">
+                                  <span>{c.name2}</span>
+                                </div>
+                              )}
+                            </td>
+                            <td className="client-contact">
+                              {c.phone && <div>📞 {c.phone}</div>}
+                              {c.phone2 && <div className="text-muted small">📞 {c.phone2}</div>}
+                              {c.email && <div>✉️ {c.email}</div>}
+                              {c.email2 && <div className="text-muted small">✉️ {c.email2}</div>}
+                            </td>
+                            <td className="client-location">
+                              {c.address && <div>{c.address}</div>}
+                              {c.city && <div className="text-muted small">{c.city}</div>}
+                            </td>
+                            {canEdit && (
                             <td>
                               <button
                                 type="button"
                                 className="fact-btn fact-btn-secondary"
-                                style={{ padding: "0.35rem 0.75rem", fontSize: "0.8125rem" }}
-                                onClick={() => startEdit(c)}
+                                style={{ padding: "0.35rem 0.75rem", fontSize: "0.8125rem", width: "100%" }}
+                                onClick={() => handleEdit(c)}
                               >
                                 Editar
                               </button>
                             </td>
+                          )}
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
                 )}
-              </div>
             </div>
-          </main>
-        </div>
+          </div>
+        </main>
       </div>
     </div>
   );

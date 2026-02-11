@@ -1,0 +1,187 @@
+/* Home / Dashboard moderno */
+
+.hrs-home {
+  min-height: 100vh;
+  padding: 2rem 1rem 3rem;
+  background: linear-gradient(160deg, #f0fdf4 0%, #ecfdf5 25%, #ffffff 50%, #f0f9ff 100%);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+.hrs-home-container {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.hrs-home-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
+  padding: 1.25rem 1.5rem;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.hrs-home-brand {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.hrs-home-logo {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  color: #fff;
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: -0.5px;
+  border-radius: 12px;
+}
+
+.hrs-home-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.hrs-home-subtitle {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin: 0.25rem 0 0;
+  font-weight: 500;
+}
+
+.hrs-home-user {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.hrs-home-user-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.4rem 0.75rem;
+  background: #f1f5f9;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  color: #475569;
+}
+
+.hrs-home-user-email {
+  font-weight: 500;
+  color: #0f172a;
+}
+
+.hrs-home-user-role {
+  margin-left: 0.5rem;
+  padding: 0.15rem 0.5rem;
+  background: #e2e8f0;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  text-transform: capitalize;
+  color: #475569;
+}
+
+.hrs-home-logout {
+  font-size: 0.875rem;
+  color: #64748b;
+  text-decoration: none;
+  padding: 0.35rem 0.5rem;
+  border-radius: 8px;
+  transition: color 0.2s, background 0.2s;
+}
+
+.hrs-home-logout:hover {
+  color: #0f172a;
+  background: #f1f5f9;
+}
+
+.hrs-home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1.25rem;
+}
+
+.hrs-home-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 1.5rem;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.hrs-home-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  border-color: #cbd5e1;
+  color: inherit;
+}
+
+.hrs-home-card-icon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  color: #059669;
+  font-size: 1.35rem;
+  border-radius: 12px;
+  margin-bottom: 1rem;
+}
+
+.hrs-home-card:hover .hrs-home-card-icon {
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  color: #fff;
+}
+
+.hrs-home-card-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0 0 0.25rem;
+}
+
+.hrs-home-card-desc {
+  font-size: 0.8125rem;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.hrs-home-card-admin .hrs-home-card-icon {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  color: #2563eb;
+}
+
+.hrs-home-card-admin:hover .hrs-home-card-icon {
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  color: #fff;
+}
+
+@media (max-width: 576px) {
+  .hrs-home-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .hrs-home-grid {
+    grid-template-columns: 1fr;
+  }
+}

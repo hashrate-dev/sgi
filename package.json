@@ -1,7 +1,7 @@
 {
-  "name": "facturacion-hrs-con-mongo",
+  "name": "hashrate-facturacion-hrs",
   "version": "1.0.0",
-  "description": "HRS GROUP - Sistema profesional de facturación con emisión de PDF y gestión de clientes",
+  "description": "HASHRATE - Facturacion HRS - Sistema profesional de facturación con emisión de PDF y gestión de clientes",
   "keywords": [
     "facturacion",
     "hrs",

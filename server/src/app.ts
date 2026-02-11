@@ -5,8 +5,11 @@ import morgan from "morgan";
 
 import { env } from "./config/env.js";
 import { healthRouter } from "./routes/health.js";
+import { authRouter } from "./routes/auth.js";
+import { usersRouter } from "./routes/users.js";
 import { clientsRouter } from "./routes/clients.js";
 import { invoicesRouter } from "./routes/invoices.js";
+import { requireAuth } from "./middleware/auth.js";
 import { notFound } from "./middleware/notFound.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
@@ -39,13 +42,15 @@ export function createApp() {
     res.json({
       message: "API HRS Facturación",
       health: "/api/health",
-      docs: "Rutas: GET/POST /api/clients, GET/POST/DELETE /api/invoices"
+      docs: "Rutas: GET/POST/PUT/DELETE /api/clients, GET/POST/DELETE /api/invoices"
     });
   });
 
   app.use("/api", healthRouter);
-  app.use("/api", clientsRouter);
-  app.use("/api", invoicesRouter);
+  app.use("/api", authRouter);
+  app.use("/api", requireAuth, usersRouter);
+  app.use("/api", requireAuth, clientsRouter);
+  app.use("/api", requireAuth, invoicesRouter);
 
   app.use(notFound);
   app.use(errorHandler);

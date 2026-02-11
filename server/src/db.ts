@@ -36,9 +36,18 @@ CREATE TABLE IF NOT EXISTS invoice_items (
   discount REAL NOT NULL,
   FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT NOT NULL UNIQUE,
+  email TEXT UNIQUE,
+  password_hash TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('admin', 'operador', 'lector')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `);
 
-["phone", "email", "address", "city"].forEach((col) => {
+["phone", "email", "address", "city", "email2", "name2", "phone2", "address2", "city2"].forEach((col) => {
   try {
     db.exec(`ALTER TABLE clients ADD COLUMN ${col} TEXT`);
   } catch (e: unknown) {
@@ -46,3 +55,10 @@ CREATE TABLE IF NOT EXISTS invoice_items (
     if (!msg.includes("duplicate column")) throw e;
   }
 });
+
+try {
+  db.exec("ALTER TABLE users ADD COLUMN email TEXT");
+} catch (e: unknown) {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (!msg.includes("duplicate column")) throw e;
+}

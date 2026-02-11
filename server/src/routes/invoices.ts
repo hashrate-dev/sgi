@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { db } from "../db.js";
+import { requireRole } from "../middleware/auth.js";
 
 export const invoicesRouter = Router();
 
@@ -14,7 +15,7 @@ const LineItemSchema = z.object({
 
 const InvoiceCreateSchema = z.object({
   number: z.string().min(1).max(50),
-  type: z.enum(["Factura", "Recibo"]),
+  type: z.enum(["Factura", "Recibo", "Nota de Crédito"]),
   clientName: z.string().min(1).max(200),
   date: z.string().min(1).max(50),
   month: z.string().regex(/^\d{4}-\d{2}$/),
@@ -28,7 +29,7 @@ invoicesRouter.get("/invoices", (req, res) => {
   const q = z
     .object({
       client: z.string().optional(),
-      type: z.enum(["Factura", "Recibo"]).optional(),
+      type: z.enum(["Factura", "Recibo", "Nota de Crédito"]).optional(),
       month: z.string().regex(/^\d{4}-\d{2}$/).optional()
     })
     .safeParse(req.query);
@@ -63,7 +64,7 @@ invoicesRouter.get("/invoices", (req, res) => {
   res.json({ invoices });
 });
 
-invoicesRouter.post("/invoices", (req, res) => {
+invoicesRouter.post("/invoices", requireRole("admin", "operador"), (req, res) => {
   const parsed = InvoiceCreateSchema.safeParse(req.body);
   if (!parsed.success) {
     return res
@@ -116,7 +117,7 @@ invoicesRouter.post("/invoices", (req, res) => {
   }
 });
 
-invoicesRouter.delete("/invoices/:id", (req, res) => {
+invoicesRouter.delete("/invoices/:id", requireRole("admin"), (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) {
     return res.status(400).json({ error: { message: "Invalid id" } });

@@ -47,6 +47,11 @@ export type FacturaPdfData = {
   clientEmail?: string;
   clientAddress?: string;
   clientCity?: string;
+  clientName2?: string;
+  clientPhone2?: string;
+  clientEmail2?: string;
+  clientAddress2?: string;
+  clientCity2?: string;
   date: Date;
   items: LineItem[];
   subtotal: number;
@@ -82,9 +87,9 @@ const HEADER_ROW_H = 10;
 const TABLE_BORDER = { r: 226, g: 232, b: 240 };
 /** Radio solo para las 4 esquinas extremas de la tabla (mm) */
 const TABLE_RADIUS = 2;
-/** Logo hashrate: arriba a la izquierda; tamaño un poco más grande, misma proporción */
-const LOGO_WIDTH_MM = 57.75;
-const LOGO_HEIGHT_MM = 16.2;
+/** Logo hashrate: arriba a la izquierda; manteniendo proporción original */
+const LOGO_WIDTH_MM = 50; // Ancho ajustado para mejor proporción
+const LOGO_HEIGHT_MM = 14; // Altura ajustada para mantener proporción (relación ~3.57:1)
 
 /**
  * Genera el PDF de la factura con diseño HRS a color:
@@ -97,82 +102,223 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   const vencimiento = new Date(now);
   vencimiento.setDate(vencimiento.getDate() + 7);
 
-  const yTop = 10;
-  const CONTENT_WIDTH = 174;
-  const contentLeft = (PAGE_W - CONTENT_WIDTH) / 2;
-  const contentRight = contentLeft + CONTENT_WIDTH;
+  const yTop = MARGIN; // Alineado al margen superior (18mm)
+  const contentRight = PAGE_W - MARGIN + 5; // Alineado al margen derecho + 0.5 cm hacia la derecha
   const tableLeft = (PAGE_W - TABLE_W) / 2;
-  const LOGO_RIGHT = contentLeft + LOGO_WIDTH_MM + 5;
-
-  // ---------- Logo hashrate (arriba, dentro del área centrada) ----------
+  
+  // ---------- Logo hashrate (arriba, alineado exactamente al margen izquierdo y superior) ----------
   if (images?.logoBase64) {
     try {
-      doc.addImage(images.logoBase64, "PNG", contentLeft - 5, yTop, LOGO_WIDTH_MM, LOGO_HEIGHT_MM); // 0,5 cm a la izquierda
+      // Movido 1 cm (10mm) más a la izquierda desde el margen
+      const logoX = MARGIN - 10; // 18mm - 10mm = 8mm desde el borde izquierdo
+      const logoY = MARGIN; // Margen superior (18mm)
+      
+      // Usar altura fija para mantener proporción sin deformar
+      doc.addImage(
+        images.logoBase64, 
+        "PNG", 
+        logoX, 
+        logoY, 
+        LOGO_WIDTH_MM, 
+        LOGO_HEIGHT_MM
+      );
     } catch {
       // sin logo
     }
   }
+  
+  const LOGO_RIGHT = (MARGIN - 10) + LOGO_WIDTH_MM + 5; // Espacio después del logo (ajustado por la nueva posición)
+  const COMPANY_INFO_X = LOGO_RIGHT + 10; // Movido 1 cm (10mm) a la derecha desde el logo
 
   // ---------- Misma información pero al lado derecho del logo (arriba de la hoja) ----------
   // Orden: izquierda = emisor, derecha = FACTURA CREDITO + VIA CLIENTE + FECHA + TOTAL + RUC
-  let y = yTop;
-  const tipoLabel = data.type === "Factura" ? "FACTURA CREDITO" : "RECIBO";
-  doc.setFont("helvetica", "bold");
+  let y = yTop; // Comenzar desde el margen superior
+  const tipoLabel = 
+    data.type === "Factura" ? "FACTURA CREDITO" : 
+    data.type === "Recibo" ? "RECIBO" : 
+    "NOTA DE CRÉDITO";
+  doc.setFont("helvetica", "normal");
   doc.setFontSize(12);
   doc.setTextColor(0, 0, 0);
-  doc.text(EMISOR.nombre, LOGO_RIGHT, y);
+  doc.text(EMISOR.nombre, COMPANY_INFO_X, y);
   doc.setFontSize(11);
   doc.text(`${tipoLabel} - ${data.number}`, contentRight, y, { align: "right" });
   y += 5;
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text(EMISOR.direccion, LOGO_RIGHT, y);
+  doc.text(EMISOR.direccion, COMPANY_INFO_X, y);
   doc.text("VIA CLIENTE", contentRight, y, { align: "right" });
   y += 5;
 
-  doc.text(EMISOR.ciudad, LOGO_RIGHT, y);
+  doc.text(EMISOR.ciudad, COMPANY_INFO_X, y);
   doc.text("FECHA", contentRight, y, { align: "right" });
   y += 5;
 
-  doc.text(EMISOR.telefono, LOGO_RIGHT, y);
+  doc.text(EMISOR.telefono, COMPANY_INFO_X, y);
   doc.text(formatFechaTexto(now), contentRight, y, { align: "right" });
   y += 5;
 
-  doc.text(EMISOR.email, LOGO_RIGHT, y);
+  doc.text(EMISOR.email, COMPANY_INFO_X, y);
+  y += 5; // Línea en blanco antes de RUC EMISOR
+
   doc.text(EMISOR.ruc, contentRight, y, { align: "right" });
   y += 5;
   // bajar hasta debajo del encabezado (logo o texto, el que baje más) + margen
   y = Math.max(yTop + LOGO_HEIGHT_MM, y) + 8;
+  
+  // ---------- Línea horizontal gris debajo del encabezado ----------
+  // Alineada con los márgenes del contenido (tabla y clientes) - mismo margen que los nombres de clientes
+  const tableRight = tableLeft + TABLE_W; // Margen derecho de la tabla
+  doc.setDrawColor(TABLE_BORDER.r, TABLE_BORDER.g, TABLE_BORDER.b);
+  doc.setLineWidth(0.5); // Grosor de línea delgado
+  doc.line(tableLeft, y, tableRight, y); // Línea alineada con los márgenes del contenido (donde empiezan los clientes)
+  y += 4; // Espacio después de la línea
+  
   y += 20; // bajar 2 cm el bloque cliente + tabla (2 cm más arriba que antes)
 
-  // ---------- Bloque CLIENTE (arriba de la tabla verde); alineado al margen izquierdo de la tabla ----------
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.setTextColor(0, 0, 0);
-  doc.text("CLIENTE:", tableLeft, y);
-  y += 5;
-  doc.setFont("helvetica", "normal");
-  doc.text(data.clientName, tableLeft, y);
-  y += 5;
-  doc.setFontSize(9);
-  if (data.clientPhone) {
-    doc.text(data.clientPhone, tableLeft, y);
-    y += 4.5;
-  }
-  if (data.clientEmail) {
-    doc.text(data.clientEmail, tableLeft, y);
-    y += 4.5;
-  }
-  if (data.clientAddress) {
-    doc.text(data.clientAddress, tableLeft, y);
-    y += 4.5;
-  }
-  if (data.clientCity) {
-    doc.text(data.clientCity.toUpperCase(), tableLeft, y);
-    y += 4.5;
-  }
-  y += 10;
+  // ---------- Datos del cliente (arriba de la tabla verde); alineado al margen izquierdo de la tabla ----------
+  const hasText = (s?: string) => Boolean(s && s.trim());
+  const toLines = (txt: string, maxW: number): string[] => {
+    const clean = String(txt ?? "").trim();
+    if (!clean) return [];
+    // splitTextToSize maneja wrap para que entre en la columna
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    return doc.splitTextToSize(clean, maxW) as unknown as string[];
+  };
+
+  const drawClientColumn = (
+    x: number,
+    yStart: number,
+    colW: number,
+    block: { name?: string; phone?: string; email?: string; address?: string; city?: string }
+  ): number => {
+    const any =
+      hasText(block.name) ||
+      hasText(block.phone) ||
+      hasText(block.email) ||
+      hasText(block.address) ||
+      hasText(block.city);
+    if (!any) return 0; // deja la columna en blanco
+
+    let yy = yStart;
+    doc.setTextColor(0, 0, 0);
+
+    // Nombre sin negrita (wrap dentro de la columna)
+    // Si tiene guion y es largo, dividir en dos líneas sin el guion
+    if (hasText(block.name)) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+      const nameStr = String(block.name).trim();
+      const hasHyphen = nameStr.includes(" - ");
+      let nameLines: string[] = [];
+      
+      if (hasHyphen) {
+        // Dividir por " - " y quitar espacios extra
+        const parts = nameStr.split(" - ").map((p) => p.trim()).filter(Boolean);
+        if (parts.length >= 2) {
+          // Verificar si necesita más de una línea
+          const testLines = doc.splitTextToSize(nameStr, colW) as unknown as string[];
+          if (testLines.length > 1) {
+            // Usar las partes sin el guion
+            nameLines = parts;
+          } else {
+            // Si cabe en una línea, usar el nombre completo
+            nameLines = [nameStr];
+          }
+        } else {
+          nameLines = [nameStr];
+        }
+      } else {
+        // Sin guion, usar wrap normal
+        nameLines = toLines(nameStr, colW);
+      }
+      
+      for (const line of nameLines) {
+        doc.text(line, x, yy);
+        yy += 5;
+      }
+    }
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    const lineH = 5;
+    const add = (v?: string, upper = false) => {
+      if (!hasText(v)) return;
+      const text = upper ? String(v).toUpperCase() : String(v);
+      for (const line of toLines(text, colW)) {
+        doc.text(line, x, yy);
+        yy += lineH;
+      }
+    };
+
+    add(block.phone);
+    add(block.email);
+    add(block.address);
+    add(block.city, true);
+
+    return yy - yStart;
+  };
+
+  const yClientStart = y;
+  const colGap = 4; // mm entre columnas
+  const colW = (TABLE_W - colGap * 2) / 3;
+  
+  // Calcular la altura del nombre de cada cliente
+  const getClientNameHeight = (name: string | undefined): number => {
+    if (!hasText(name)) return 0;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(11);
+    const nameStr = String(name).trim();
+    const hasHyphen = nameStr.includes(" - ");
+    let nameLines: string[] = [];
+    
+    if (hasHyphen) {
+      const parts = nameStr.split(" - ").map((p) => p.trim()).filter(Boolean);
+      if (parts.length >= 2) {
+        const testLines = doc.splitTextToSize(nameStr, colW) as unknown as string[];
+        if (testLines.length > 1) {
+          nameLines = parts;
+        } else {
+          nameLines = [nameStr];
+        }
+      } else {
+        nameLines = [nameStr];
+      }
+    } else {
+      nameLines = toLines(nameStr, colW);
+    }
+    return nameLines.length * 5; // 5mm por línea
+  };
+  
+  const client1NameHeight = getClientNameHeight(data.clientName);
+
+  // Si ambos tienen nombre, alinearlos a la misma altura
+  // Si solo el primero tiene nombre, el segundo comienza después del nombre del primero
+  const yClient2Start = (hasText(data.clientName) && hasText(data.clientName2))
+    ? yClientStart // Ambos tienen nombre: misma altura
+    : yClientStart + client1NameHeight; // Solo el primero tiene nombre: segundo después
+  
+  const h1 = drawClientColumn(tableLeft, yClientStart, colW, {
+    name: data.clientName,
+    phone: data.clientPhone,
+    email: data.clientEmail,
+    address: data.clientAddress,
+    city: data.clientCity
+  });
+  
+  const h2 = drawClientColumn(tableLeft + colW + colGap, yClient2Start, colW, {
+    name: data.clientName2,
+    phone: data.clientPhone2,
+    email: data.clientEmail2,
+    address: data.clientAddress2,
+    city: data.clientCity2
+  });
+  
+  // Calcular altura máxima considerando el desplazamiento del segundo cliente
+  const hMax = Math.max(h1, h2 + (yClient2Start - yClientStart));
+  y = yClientStart + hMax;
+  if (hMax > 0) y += 10;
   y += 8; // separación antes de la tabla
   const tableTop = y;
 
@@ -221,7 +367,7 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   doc.line(tableLeft + COL_DESC + COL_PRECIO + COL_CANT, tableTop, tableLeft + COL_DESC + COL_PRECIO + COL_CANT, tableTop + tableTotalH);
   doc.line(tableLeft, tableTop + HEADER_ROW_H, tableLeft + TABLE_W, tableTop + HEADER_ROW_H);
 
-  doc.setFont("helvetica", "bold");
+  doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
   doc.setTextColor(255, 255, 255);
   doc.text("DESCRIPCION", tableLeft + 3, tableTop + 6.5);
@@ -305,7 +451,7 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   doc.line(tableLeft, datesBlockTop + datesBlockH / 2, tableLeft + TABLE_W, datesBlockTop + datesBlockH / 2);
 
   doc.setFontSize(11);
-  doc.setFont("helvetica", "bold");
+  doc.setFont("helvetica", "normal");
   doc.setTextColor(255, 255, 255);
   doc.text("FECHA DE EMISIÓN:", leftCenterX, datesBlockTop + 5, { align: "center" });
   doc.text("FECHA DE VENCIMIENTO:", rightCenterX, datesBlockTop + 5, { align: "center" });
@@ -370,7 +516,7 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   const totalCenterY = totalBoxTop + TOTAL_ROW_H / 2;
   const totalBaselineY = totalCenterY + doc.getFontSize() * 0.12;
 
-  doc.setFont("helvetica", "bold");
+  doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
   doc.setTextColor(255, 255, 255);
   doc.text("TOTAL", totalLabelCenterX, totalBaselineY, { align: "center" });
