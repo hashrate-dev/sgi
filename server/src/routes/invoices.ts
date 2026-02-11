@@ -39,7 +39,6 @@ invoicesRouter.get("/invoices", (req, res) => {
 
   const clauses: string[] = [];
   const params: unknown[] = [];
-
   if (q.data.client) {
     clauses.push("LOWER(clientName) LIKE ?");
     params.push(`%${q.data.client.toLowerCase()}%`);
@@ -57,9 +56,7 @@ invoicesRouter.get("/invoices", (req, res) => {
   const invoices = db
     .prepare(
       `SELECT id, number, type, clientName, date, month, subtotal, discounts, total
-       FROM invoices
-       ${where}
-       ORDER BY id DESC`
+       FROM invoices ${where} ORDER BY id DESC`
     )
     .all(...params);
 
@@ -75,7 +72,6 @@ invoicesRouter.post("/invoices", (req, res) => {
   }
 
   const inv = parsed.data;
-
   const insertInvoice = db.prepare(`
     INSERT INTO invoices (number, type, clientName, date, month, subtotal, discounts, total)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -97,18 +93,9 @@ invoicesRouter.post("/invoices", (req, res) => {
       inv.total
     );
     const invoiceId = info.lastInsertRowid as number;
-
     for (const item of inv.items) {
-      insertItem.run(
-        invoiceId,
-        item.service,
-        item.month,
-        item.quantity,
-        item.price,
-        item.discount
-      );
+      insertItem.run(invoiceId, item.service, item.month, item.quantity, item.price, item.discount);
     }
-
     const created = db
       .prepare(
         "SELECT id, number, type, clientName, date, month, subtotal, discounts, total FROM invoices WHERE id = ?"
@@ -120,8 +107,9 @@ invoicesRouter.post("/invoices", (req, res) => {
   try {
     const created = tx();
     res.status(201).json({ invoice: created });
-  } catch (e: any) {
-    if (e && typeof e.code === "string" && e.code.includes("SQLITE_CONSTRAINT")) {
+  } catch (e: unknown) {
+    const err = e as { code?: string };
+    if (err?.code?.includes("SQLITE_CONSTRAINT")) {
       return res.status(409).json({ error: { message: "Invoice number already exists" } });
     }
     throw e;
@@ -133,7 +121,6 @@ invoicesRouter.delete("/invoices/:id", (req, res) => {
   if (!Number.isFinite(id)) {
     return res.status(400).json({ error: { message: "Invalid id" } });
   }
-
   const stmt = db.prepare("DELETE FROM invoices WHERE id = ?");
   const info = stmt.run(id);
   if (info.changes === 0) {
@@ -141,4 +128,3 @@ invoicesRouter.delete("/invoices/:id", (req, res) => {
   }
   res.json({ ok: true });
 });
-

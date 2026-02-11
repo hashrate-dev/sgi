@@ -7,7 +7,6 @@ const EnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(8080),
   SQLITE_PATH: z.string().default("data.db"),
-  MONGODB_URI: z.string().optional(),
   CORS_ORIGIN: z.string().optional()
 });
 

@@ -1,16 +1,16 @@
-# HRS GROUP - Sistema de Facturación (Modernizado)
+# HRS GROUP - Sistema de Facturaci?n (Modernizado)
 
-Este repo ahora está modernizado como **monorepo**:
+Este repo ahora est? modernizado como **monorepo**:
 
 - `client/`: Front moderno con **Vite + React + TypeScript**
-- `server/`: Back moderno con **Express + TypeScript** (y soporte opcional para **MongoDB/Mongoose**)
+- `server/`: Back moderno con **Express + TypeScript** y **SQLite**
 
 ## Requisitos
 
 - Node.js **20+**
 - npm **9+**
 
-## Instalación
+## Instalaci?n
 
 ```bash
 npm install
@@ -25,16 +25,13 @@ npm run dev
 - Front: `http://localhost:5173`
 - API: `http://localhost:8080/api/health`
 
-## Backend (MongoDB opcional)
+## Backend (SQLite)
 
-Por defecto el backend puede arrancar sin Mongo.  
-Si querés persistencia real, creá `server/.env` basado en `server/.env.example`:
+El backend usa **SQLite** para clientes y facturas (archivo `server/data.db`). Opcionalmente configur? `.env` en la ra?z o en `server/` (ver `server/.env.example`):
 
 ```bash
-# server/.env
 NODE_ENV=development
 PORT=8080
-MONGODB_URI=mongodb://localhost:27017/facturacion_hrs
 CORS_ORIGIN=http://localhost:5173
 ```
 
@@ -44,42 +41,42 @@ CORS_ORIGIN=http://localhost:5173
 npm run build
 ```
 
-## Scripts útiles
+## Scripts ?tiles
 
 - `npm run dev`: corre `server` y `client` en paralelo
-- `npm run start`: inicia el backend compilado (producción)
+- `npm run start`: inicia el backend compilado (producci?n)
 - `npm run legacy:dev`: corre el server anterior (`src/app.js`) por compatibilidad
 
 ## Desplegar en Vercel
 
-El proyecto está listo para desplegar solo el **frontend** (client) en Vercel:
+El proyecto est? listo para desplegar solo el **frontend** (client) en Vercel:
 
 1. **Conectar el repo**
-   - Entrá en [vercel.com](https://vercel.com) e iniciá sesión.
-   - ?Add New?? ? ?Project? e importá el repositorio de GitHub/GitLab/Bitbucket.
+   - Entr? en [vercel.com](https://vercel.com) e inici? sesi?n.
+   - ?Add New?? ? ?Project? e import? el repositorio de GitHub/GitLab/Bitbucket.
 
-2. **Configuración del proyecto**
-   - **Root Directory:** dejalo en `.` (raíz del repo).
+2. **Configuraci?n del proyecto**
+   - **Root Directory:** dejalo en `.` (ra?z del repo).
    - **Build Command:** `npm run build -w client` (ya viene en `vercel.json`).
    - **Output Directory:** `client/dist` (ya viene en `vercel.json`).
    - **Install Command:** `npm install` (por defecto).
 
 3. **Deploy**
-   - Hacé clic en ?Deploy?. Vercel va a instalar dependencias, construir el client y publicar el sitio.
+   - Hac? clic en ?Deploy?. Vercel va a instalar dependencias, construir el client y publicar el sitio.
 
 4. **Para que la app funcione de punta a punta**
    - En Vercel solo se despliega el **frontend**. El backend (Express) no corre en Vercel.
-   - Para que clientes, facturas y reportes funcionen en producción:
-     1. Desplegá el **server** en otro servicio (Railway, Render, Koyeb, etc.) con Node, con `PORT`, `MONGODB_URI` (o `SQLITE_PATH`) y `CORS_ORIGIN` configurados.
-     2. En **Vercel** ? tu proyecto ? **Settings** ? **Environment Variables** agregá:
+   - Para que clientes, facturas y reportes funcionen en producci?n:
+     1. Desplegá el **server** en otro servicio (Railway, Render, Koyeb, etc.) con Node, con `PORT`, `SQLITE_PATH` (opcional) y `CORS_ORIGIN` configurados.
+     2. En **Vercel** ? tu proyecto ? **Settings** ? **Environment Variables** agreg?:
         - **Name:** `VITE_API_URL`
         - **Value:** la URL base del backend, ej. `https://tu-api.railway.app` (sin barra final).
-     3. Volvé a desplegar (Redeploy) para que el build del client use esa URL.
-   - Si no configurás `VITE_API_URL`, el sitio en Vercel carga pero las llamadas a la API fallan (no hay backend en ese dominio).
+     3. Volv? a desplegar (Redeploy) para que el build del client use esa URL.
+   - Si no configur?s `VITE_API_URL`, el sitio en Vercel carga pero las llamadas a la API fallan (no hay backend en ese dominio).
 
 ## Notas
 
-- El front ya incluye pantallas en React para **Home / Facturación / Historial / Clientes / Reportes**.
-- **Facturación** y **Historial** ya migraron la lógica principal (PDF, totales, filtros, gráfico y exportación a Excel).
-- El siguiente paso natural es reemplazar `localStorage` por la API (`/api/invoices`, `/api/clients`) cuando tengas `MONGODB_URI` configurado.
+- El front ya incluye pantallas en React para **Home / Facturaci?n / Historial / Clientes / Reportes**.
+- **Facturaci?n** y **Historial** ya migraron la l?gica principal (PDF, totales, filtros, gr?fico y exportaci?n a Excel).
+- El front usa la API (`/api/invoices`, `/api/clients`) cuando el backend est? disponible.
 

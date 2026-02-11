@@ -19,7 +19,7 @@ export function ClientesPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [form, setForm] = useState(emptyForm);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | string | null>(null);
 
   function loadClients() {
     setLoading(true);

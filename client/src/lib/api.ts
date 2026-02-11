@@ -22,8 +22,8 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   return data as T;
 }
 
-export type ClientsResponse = { clients: Array<{ id: number; code: string; name: string; phone?: string; email?: string; address?: string; city?: string }> };
-export type ClientResponse = { client: { id: number; code: string; name: string; phone?: string; email?: string; address?: string; city?: string } };
+export type ClientsResponse = { clients: Array<{ id: number | string; code: string; name: string; phone?: string; email?: string; address?: string; city?: string }> };
+export type ClientResponse = { client: { id: number | string; code: string; name: string; phone?: string; email?: string; address?: string; city?: string } };
 
 export function getClients(): Promise<ClientsResponse> {
   return api<ClientsResponse>("/api/clients");
@@ -33,6 +33,6 @@ export function createClient(body: { code: string; name: string; phone?: string;
   return api<ClientResponse>("/api/clients", { method: "POST", body: JSON.stringify(body) });
 }
 
-export function updateClient(id: number, body: { code?: string; name?: string; phone?: string; email?: string; address?: string; city?: string }): Promise<ClientResponse> {
+export function updateClient(id: number | string, body: { code?: string; name?: string; phone?: string; email?: string; address?: string; city?: string }): Promise<ClientResponse> {
   return api<ClientResponse>(`/api/clients/${id}`, { method: "PUT", body: JSON.stringify(body) });
 }

@@ -36,7 +36,6 @@ clientsRouter.post("/clients", (req, res) => {
       .status(400)
       .json({ error: { message: "Invalid body", details: parsed.error.flatten() } });
   }
-
   const d = parsed.data;
   const stmt = db.prepare(
     "INSERT INTO clients (code, name, phone, email, address, city) VALUES (?, ?, ?, ?, ?, ?)"
@@ -59,23 +58,19 @@ clientsRouter.put("/clients/:id", (req, res) => {
   if (!Number.isFinite(id)) {
     return res.status(400).json({ error: { message: "Invalid id" } });
   }
-
   const parsed = ClientUpdateSchema.safeParse(req.body);
   if (!parsed.success) {
     return res
       .status(400)
       .json({ error: { message: "Invalid body", details: parsed.error.flatten() } });
   }
-
   const existing = db.prepare("SELECT id FROM clients WHERE id = ?").get(id);
   if (!existing) {
     return res.status(404).json({ error: { message: "Cliente no encontrado" } });
   }
-
   const d = parsed.data;
   const updates: string[] = [];
   const values: unknown[] = [];
-
   if (d.code !== undefined) {
     updates.push("code = ?");
     values.push(d.code);
@@ -100,16 +95,13 @@ clientsRouter.put("/clients/:id", (req, res) => {
     updates.push("city = ?");
     values.push(d.city);
   }
-
   if (updates.length === 0) {
     const client = db.prepare(`SELECT ${selectFields} FROM clients WHERE id = ?`).get(id);
     return res.json({ client });
   }
-
   values.push(id);
-  const sql = `UPDATE clients SET ${updates.join(", ")} WHERE id = ?`;
   try {
-    db.prepare(sql).run(...values);
+    db.prepare(`UPDATE clients SET ${updates.join(", ")} WHERE id = ?`).run(...values);
     const client = db.prepare(`SELECT ${selectFields} FROM clients WHERE id = ?`).get(id);
     res.json({ client });
   } catch (e: unknown) {

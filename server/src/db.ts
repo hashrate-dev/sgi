@@ -3,7 +3,6 @@ import { env } from "./config/env";
 
 export const db = new Database(env.SQLITE_PATH);
 
-// Inicializamos tablas relacionales simples
 db.exec(`
 CREATE TABLE IF NOT EXISTS clients (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,7 +34,6 @@ CREATE TABLE IF NOT EXISTS invoice_items (
 );
 `);
 
-// Añadir columnas opcionales a clients si no existen (para factura: teléfono, email, dirección, ciudad)
 ["phone", "email", "address", "city"].forEach((col) => {
   try {
     db.exec(`ALTER TABLE clients ADD COLUMN ${col} TEXT`);
@@ -44,4 +42,3 @@ CREATE TABLE IF NOT EXISTS invoice_items (
     if (!msg.includes("duplicate column")) throw e;
   }
 });
-
