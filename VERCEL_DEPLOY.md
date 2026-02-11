@@ -40,6 +40,19 @@ En **Settings → Environment Variables** agregá:
 - Abrí la URL: deberías ver la app (login, Facturación, etc.).
 - El frontend llama a `/api` en el mismo dominio; no hace falta configurar `VITE_API_URL` para este despliegue.
 
+## Si no podés iniciar sesión (error "No se pudo conectar con el servidor")
+
+En Vercel la API serverless a veces falla (p. ej. por módulos nativos como `better-sqlite3`). **Solución recomendada:** usar el backend en **Render** y que el front en Vercel lo use:
+
+1. **Render:** Desplegá el backend (Blueprint o Web Service con Root = `server`). En **Environment** agregá:
+   - `CORS_ORIGIN` = `https://hashrateapp.vercel.app` (tu URL de Vercel, sin barra final).
+2. **Vercel:** En **Settings → Environment Variables** agregá:
+   - **Name:** exactamente `VITE_API_URL` (con VITE_ al inicio).
+   - **Value:** URL de tu servicio en Render (ej. `https://hashrate-facturacion-hrs.onrender.com`), **sin** barra final, **https**.
+   - Aplicar a **Production** (y Preview si querés).
+3. **Vercel:** **Redeploy obligatorio:** Deployments → ⋮ del último deploy → **Redeploy**. Sin esto el front sigue usando "mismo origen" y el login falla.
+4. Probá de nuevo el login. Si falla, el mensaje de error mostrará a qué URL intentó conectar: si ves "(mismo origen)" es que no se usó `VITE_API_URL` (revisá el nombre de la variable y volvé a hacer Redeploy).
+
 ## Si algo falla
 
 - **Build falla:** Revisá en Vercel los logs del build. Debe ejecutarse `npm run build` en la raíz (compila `client` y `server`).

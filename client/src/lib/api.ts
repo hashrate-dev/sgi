@@ -2,13 +2,14 @@ import { getStoredToken, clearStoredAuth } from "./auth.js";
 import type { AuthUser } from "./auth.js";
 
 const RAW = (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? "";
+const DEFAULT_RENDER_API = "https://hashrate-api.onrender.com";
 const API_BASE = (() => {
-  const s = typeof RAW === "string" ? RAW.replace(/\/+$/, "") : "";
+  const s = typeof RAW === "string" ? RAW.replace(/\/+$/, "").trim() : "";
   if (s) return s;
   if (typeof window !== "undefined") {
     const h = window.location?.hostname ?? "";
     if (h === "localhost" || h === "127.0.0.1") return "";
-    if (h.endsWith(".vercel.app")) return "";
+    if (h.endsWith(".vercel.app")) return DEFAULT_RENDER_API;
   }
   return "";
 })();
@@ -19,11 +20,18 @@ function isLocalHost(): boolean {
   return h === "localhost" || h === "127.0.0.1";
 }
 
+function getApiBaseHint(): string {
+  if (API_BASE) return API_BASE;
+  if (typeof window !== "undefined" && window.location?.origin) return window.location.origin + " (mismo origen)";
+  return "(no configurado)";
+}
+
 function getNoApiMessage(): string {
+  const hint = getApiBaseHint();
   if (isLocalHost()) {
     return "No se pudo conectar con el servidor. ¿Tenés el backend levantado? Ejecutá en la raíz del proyecto: npm run dev";
   }
-  return "No se pudo conectar con el servidor. Si el backend está en otro host (Render/Vercel), puede tardar en despertar; volvé a intentar.";
+  return `No se pudo conectar con el servidor. (URL: ${hint}). Revisá que el backend en Render esté Live y que CORS_ORIGIN sea https://hashrateapp.vercel.app`;
 }
 
 function get502Message(): string {
