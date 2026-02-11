@@ -8,13 +8,13 @@
     "billing",
     "invoicing"
   ],
-  "homepage": "https://github.com/jlvilasoler/hashrate#readme",
+  "homepage": "https://github.com/jlvilasoler/hashrate_app#readme",
   "bugs": {
-    "url": "https://github.com/jlvilasoler/hashrate/issues"
+    "url": "https://github.com/jlvilasoler/hashrate_app/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jlvilasoler/hashrate.git"
+    "url": "git+https://github.com/jlvilasoler/hashrate_app.git"
   },
   "license": "ISC",
   "author": "",
