@@ -16,9 +16,16 @@ export function createApp() {
   app.set("trust proxy", true);
 
   app.use(helmet());
+  const corsOrigin = env.CORS_ORIGIN
+    ? env.CORS_ORIGIN.split(",").map((o) => o.trim()).filter(Boolean)
+    : true;
+  const originOption =
+    Array.isArray(corsOrigin) && corsOrigin.length === 0 ? true
+    : Array.isArray(corsOrigin) && corsOrigin.length === 1 ? corsOrigin[0]!
+    : corsOrigin;
   app.use(
     cors({
-      origin: env.CORS_ORIGIN ?? true,
+      origin: originOption,
       credentials: true
     })
   );

@@ -34,3 +34,8 @@
 | Render   | CORS_ORIGIN     | https://hashrateapp.vercel.app           |
 
 Siempre **sin** barra final en las URLs.
+
+## Si no anda
+- **Front carga pero no guarda:** En Vercel tiene que existir `VITE_API_URL` y después hay que hacer **Redeploy** (el valor se usa en el build).
+- **Error de CORS en el navegador:** En Render, `CORS_ORIGIN` debe ser exactamente la URL del front (la que ves en la barra del navegador al usar la app en Vercel). Podés poner varias separadas por coma si tenés más de un dominio.
+- **Render:** En los logs del servicio deberías ver `API listening on :XXXX` y, si definiste `CORS_ORIGIN`, `CORS allowed origin: https://...`.

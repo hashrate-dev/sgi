@@ -1,7 +1,13 @@
-const API_BASE = (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? "";
+const RAW = (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? "";
+const API_BASE = typeof RAW === "string" ? RAW.replace(/\/+$/, "") : "";
 
-const NO_API_MSG =
-  "No se pudo conectar con el servidor. En Vercel solo está el frontend; para guardar datos desplegá el backend (Railway, Render, etc.) y configurá VITE_API_URL en Vercel.";
+function getNoApiMessage(): string {
+  const isLocal = typeof window !== "undefined" && window.location?.hostname === "localhost";
+  if (isLocal) {
+    return "No se pudo conectar con el servidor. ¿Tenés el backend levantado? Ejecutá en la raíz del proyecto: npm run dev";
+  }
+  return "No se pudo conectar con el servidor. En Vercel solo está el frontend; para guardar datos desplegá el backend (Railway, Render, etc.) y configurá VITE_API_URL en Vercel.";
+}
 
 export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   let res: Response;
@@ -11,11 +17,11 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
       headers: { "Content-Type": "application/json", ...options?.headers }
     });
   } catch (e) {
-    throw new Error(NO_API_MSG);
+    throw new Error(getNoApiMessage());
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    if (res.status === 404 || res.status === 502) throw new Error(NO_API_MSG);
+    if (res.status === 404 || res.status === 502) throw new Error(getNoApiMessage());
     const msg = (data as { error?: { message?: string } })?.error?.message ?? res.statusText;
     throw new Error(msg);
   }
