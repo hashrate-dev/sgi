@@ -3,12 +3,12 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 
-import { env } from "./config/env";
-import { healthRouter } from "./routes/health";
-import { clientsRouter } from "./routes/clients";
-import { invoicesRouter } from "./routes/invoices";
-import { notFound } from "./middleware/notFound";
-import { errorHandler } from "./middleware/errorHandler";
+import { env } from "./config/env.js";
+import { healthRouter } from "./routes/health.js";
+import { clientsRouter } from "./routes/clients.js";
+import { invoicesRouter } from "./routes/invoices.js";
+import { notFound } from "./middleware/notFound.js";
+import { errorHandler } from "./middleware/errorHandler.js";
 
 export function createApp() {
   const app = express();

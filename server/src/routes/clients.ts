@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { db } from "../db";
+import { db } from "../db.js";
 
 export const clientsRouter = Router();
 
