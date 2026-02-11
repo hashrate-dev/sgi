@@ -1,10 +1,8 @@
 {
   "version": 2,
-  "buildCommand": "npm run build -w client",
-  "outputDirectory": "client/dist",
+  "buildCommand": "npm run build:vercel",
+  "outputDirectory": "dist",
   "installCommand": "npm install",
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ],
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
   "framework": null
 }
