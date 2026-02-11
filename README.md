@@ -47,6 +47,18 @@ npm run build
 - `npm run start`: inicia el backend compilado (producci?n)
 - `npm run legacy:dev`: corre el server anterior (`src/app.js`) por compatibilidad
 
+## Conexi?n completa: GitHub + Vercel + Render
+
+Para que la app funcione en producci?n (front en Vercel, API en Render, c?digo en GitHub):
+
+| D?nde | Qu? hacer |
+|-------|-----------|
+| **GitHub** | Repo `hashrate_app` con el c?digo. Cada push a `main` dispara deploy en Vercel y Render. |
+| **Vercel** | Conectar el repo. **Root Directory** = `client`. Variables: **VITE_API_URL** = URL de Render (ej. `https://hashrate-api.onrender.com`), sin barra final. |
+| **Render** | Conectar el repo. Usar el Blueprint (`render.yaml`) o configurar: **Root Directory** = `server`, **Build** = `npm install && npm run build`, **Start** = `npm start`. Variable: **CORS_ORIGIN** = URL de Vercel (ej. `https://hashrateapp.vercel.app`), sin barra final. |
+
+**Orden recomendado:** 1) Conectar GitHub a Vercel y desplegar (anotar la URL de Vercel). 2) Conectar GitHub a Render y desplegar (anotar la URL de Render). 3) En Render a?adir **CORS_ORIGIN** = URL de Vercel. 4) En Vercel a?adir **VITE_API_URL** = URL de Render. 5) En Vercel hacer **Redeploy**. Despu?s de eso, la app en Vercel usar? la API de Render.
+
 ## Desplegar en Vercel
 
 El proyecto est? listo para desplegar solo el **frontend** (client) en Vercel:
@@ -56,9 +68,8 @@ El proyecto est? listo para desplegar solo el **frontend** (client) en Vercel:
    - ?Add New?? ? ?Project? e import? el repositorio de GitHub/GitLab/Bitbucket.
 
 2. **Configuraci?n del proyecto**
-   - **Root Directory:** dejalo en `.` (ra?z del repo).
-   - **Build Command:** `npm run build -w client` (ya viene en `vercel.json`).
-   - **Output Directory:** `client/dist` (ya viene en `vercel.json`).
+   - **Root Directory:** `client` (obligatorio para que coincida con `vercel.json`: build `npm run build`, output `dist`).
+   - **Build Command** y **Output Directory** ya vienen en `vercel.json`; no hace falta cambiarlos si Root Directory es `client`.
    - **Install Command:** `npm install` (por defecto).
 
 3. **Deploy**
@@ -89,7 +100,7 @@ Con el repo ya en GitHub:
 
 ## Desplegar el backend en Render
 
-El repo incluye `render.yaml` (Blueprint). En [dashboard.render.com](https://dashboard.render.com): **New** ? **Web Service** ? repo **hashrate_app**. Si Render ofrece aplicar el Blueprint, aceptá (queda Root Directory `server`, Build `npm install && npm run build`, Start `npm start`). En **Environment** agregá **CORS_ORIGIN** = tu URL de Vercel. Copiá la URL del servicio y ponela en Vercel como **VITE_API_URL**, luego Redeploy del front.
+El repo incluye `render.yaml` (Blueprint). En [dashboard.render.com](https://dashboard.render.com): **New** ? **Web Service** ? repo **hashrate_app**. Si Render ofrece aplicar el Blueprint, acept? (queda Root Directory `server`, Build `npm install && npm run build`, Start `npm start`). En **Environment** agreg? **CORS_ORIGIN** = tu URL de Vercel. Copi? la URL del servicio y ponela en Vercel como **VITE_API_URL**, luego Redeploy del front.
 
 ## Notas
 
