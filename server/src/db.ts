@@ -1,7 +1,11 @@
+import path from "node:path";
 import Database from "better-sqlite3";
 import { env } from "./config/env";
 
-export const db = new Database(env.SQLITE_PATH);
+const sqlitePath = path.isAbsolute(env.SQLITE_PATH)
+  ? env.SQLITE_PATH
+  : path.join(process.cwd(), env.SQLITE_PATH);
+export const db = new Database(sqlitePath);
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS clients (
