@@ -113,7 +113,7 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const msg = toThrow.message || "";
   if (msg === "Failed to fetch" || msg === "Load failed" || msg.includes("NetworkError") || msg === "The operation was aborted.") {
     throw new Error(
-      `No se pudo conectar con ${getApiBase() || "el servidor"}. En Vercel configurá VITE_API_URL con la URL de tu backend (Render) y redeployá.`
+      `No se pudo conectar con ${getApiBase() || "el servidor"}. Para usar tu backend: entrá a /login?api=TU_URL_RENDER (reemplazá TU_URL_RENDER por la URL de Render, ej. https://tu-servicio.onrender.com) y volvé a intentar.`
     );
   }
   throw toThrow;

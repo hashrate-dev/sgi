@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { setApiBaseUrl } from "../lib/api";
 import "../styles/facturacion.css";
 
 export function LoginPage() {
@@ -10,6 +11,15 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const apiUrl = params.get("api");
+    if (apiUrl && apiUrl.startsWith("http")) {
+      setApiBaseUrl(apiUrl);
+      window.history.replaceState({}, "", location.pathname + (location.hash || ""));
+    }
+  }, [location.search, location.pathname, location.hash]);
 
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? "/";
 
