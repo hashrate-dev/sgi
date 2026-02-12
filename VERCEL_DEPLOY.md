@@ -24,11 +24,12 @@ El proyecto está listo para desplegarse **completo** en Vercel: el frontend (Re
 ### 4. Variables de entorno (recomendado)
 En **Settings → Environment Variables** agregá:
 
-| Variable      | Valor              | Uso |
-|---------------|--------------------|-----|
-| `SQLITE_PATH` | `/tmp/data.db`     | Base de datos en disco temporal (necesario en Vercel serverless). |
-| `JWT_SECRET`  | Una frase larga y aleatoria (mín. 16 caracteres) | Firma del login. |
-| `CORS_ORIGIN` | *(opcional)* Tu URL de Vercel, ej. `https://tu-proyecto.vercel.app` | Si querés restringir CORS. |
+| Variable        | Valor              | Uso |
+|-----------------|--------------------|-----|
+| **`VITE_API_URL`** | **URL de tu backend en Render** (ej. `https://hashrate-facturacion-hrs.onrender.com`), sin barra final | **Necesaria** para que el login funcione en todos los navegadores (Chrome, Opera, etc.). El cliente la obtiene de `/api/backend-url`. |
+| `SQLITE_PATH`   | `/tmp/data.db`     | Base de datos en disco temporal (necesario en Vercel serverless). |
+| `JWT_SECRET`    | Una frase larga y aleatoria (mín. 16 caracteres) | Firma del login. |
+| `CORS_ORIGIN`   | *(opcional)* Tu URL de Vercel, ej. `https://tu-proyecto.vercel.app` | Si querés restringir CORS. |
 
 - **Importante:** `SQLITE_PATH=/tmp/data.db` hace que la base de datos se guarde en `/tmp`. En serverless los datos pueden no persistir entre despliegues o reinicios; para datos permanentes más adelante podrías usar Vercel Postgres u otra DB externa.
 
@@ -52,6 +53,10 @@ En Vercel la API serverless a veces falla (p. ej. por módulos nativos como `bet
    - Aplicar a **Production** (y Preview si querés).
 3. **Vercel:** **Redeploy obligatorio:** Deployments → ⋮ del último deploy → **Redeploy**. Sin esto el front sigue usando "mismo origen" y el login falla.
 4. Probá de nuevo el login. Si falla, el mensaje de error mostrará a qué URL intentó conectar: si ves "(mismo origen)" es que no se usó `VITE_API_URL` (revisá el nombre de la variable y volvé a hacer Redeploy).
+
+## Si en un navegador anda y en otros no (ej. Brave sí, Chrome/Opera no)
+
+La URL del backend se guarda por navegador (localStorage). En el navegador donde sí anda seguramente está guardada; en el resto se usa la URL por defecto y puede fallar. **Solución:** configurá `VITE_API_URL` en Vercel con la URL de tu backend en Render y hacé **Redeploy**. Así todos los navegadores usan esa URL desde el build y no dependen de localStorage.
 
 ## Si algo falla
 

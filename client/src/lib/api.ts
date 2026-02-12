@@ -59,6 +59,16 @@ function get502Message(): string {
 const RETRY_DELAYS_MS = [0, 4000, 10000];
 const FETCH_TIMEOUT_MS = 55000;
 
+let backendUrlFromServer: Promise<string> | null = null;
+
+function getBackendUrlFromVercel(): Promise<string> {
+  if (backendUrlFromServer) return backendUrlFromServer;
+  backendUrlFromServer = fetch("/api/backend-url", { method: "GET" })
+    .then((r) => r.json().then((d: { url?: string }) => (d?.url && typeof d.url === "string" ? d.url.trim().replace(/\/+$/, "") : "")))
+    .catch(() => "");
+  return backendUrlFromServer;
+}
+
 function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -73,7 +83,14 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const token = getStoredToken();
   const headers: Record<string, string> = { "Content-Type": "application/json", ...(options?.headers as Record<string, string>) };
   if (token) headers.Authorization = `Bearer ${token}`;
-  const base = getApiBase();
+  let base = getApiBase();
+  if (base === DEFAULT_RENDER_API && typeof window !== "undefined" && window.location?.hostname?.endsWith(".vercel.app")) {
+    const fromServer = await getBackendUrlFromVercel();
+    if (fromServer) {
+      setApiBaseUrl(fromServer);
+      base = fromServer;
+    }
+  }
   const url = `${base}${path}`;
   let lastError: Error | null = null;
   for (let i = 0; i < RETRY_DELAYS_MS.length; i++) {
