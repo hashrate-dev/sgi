@@ -37,13 +37,6 @@ function isLocalHost(): boolean {
   return h === "localhost" || h === "127.0.0.1";
 }
 
-function getApiBaseHint(): string {
-  const base = getApiBase();
-  if (base) return base;
-  if (typeof window !== "undefined" && window.location?.origin) return window.location.origin + " (mismo origen)";
-  return "(no configurado)";
-}
-
 function getNoApiMessage(): string {
   if (isLocalHost()) {
     return "No se pudo conectar con el servidor. ¿Tenés el backend levantado? Ejecutá en la raíz del proyecto: npm run dev";
