@@ -12,6 +12,7 @@ export function LoginPage() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // Plan B (oculto): /login?api=URL guarda la URL del backend en localStorage; el usuario no ve nada.
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const apiUrl = params.get("api");

@@ -1,6 +1,7 @@
 import { getStoredToken, clearStoredAuth } from "./auth.js";
 import type { AuthUser } from "./auth.js";
 
+// Plan A: localStorage (puede setearse de forma oculta con /login?api=URL), luego VITE_API_URL, luego default Render.
 const STORAGE_KEY = "hrs_api_url";
 const RAW = (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? "";
 const DEFAULT_RENDER_API = "https://hashrate-api.onrender.com";
@@ -44,17 +45,17 @@ function getApiBaseHint(): string {
 }
 
 function getNoApiMessage(): string {
-  const hint = getApiBaseHint();
   if (isLocalHost()) {
     return "No se pudo conectar con el servidor. ¿Tenés el backend levantado? Ejecutá en la raíz del proyecto: npm run dev";
   }
-  return `No se pudo conectar con el servidor. (URL: ${hint}). Revisá que el backend en Render esté Live y que CORS_ORIGIN sea https://hashrateapp.vercel.app`;
+  return "No se pudo conectar con el servidor. Volvé a intentar en unos momentos.";
 }
 
 function get502Message(): string {
-  return isLocalHost()
-    ? "No se pudo conectar con el servidor. ¿Tenés el backend levantado? Ejecutá: npm run dev"
-    : "El servidor está arrancando (Render tarda ~1 min en despertar). Volvé a intentar en un momento.";
+  if (isLocalHost()) {
+    return "No se pudo conectar con el servidor. ¿Tenés el backend levantado? Ejecutá: npm run dev";
+  }
+  return "No se pudo conectar con el servidor. Volvé a intentar en unos momentos.";
 }
 
 const RETRY_DELAYS_MS = [0, 4000, 10000];
@@ -112,9 +113,7 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const toThrow = lastError ?? new Error(getNoApiMessage());
   const msg = toThrow.message || "";
   if (msg === "Failed to fetch" || msg === "Load failed" || msg.includes("NetworkError") || msg === "The operation was aborted.") {
-    throw new Error(
-      `No se pudo conectar con ${getApiBase() || "el servidor"}. Para usar tu backend: entrá a /login?api=TU_URL_RENDER (reemplazá TU_URL_RENDER por la URL de Render, ej. https://tu-servicio.onrender.com) y volvé a intentar.`
-    );
+    throw new Error(getNoApiMessage());
   }
   throw toThrow;
 }
