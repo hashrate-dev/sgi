@@ -11,39 +11,42 @@ const authRouter = Router();
 const JWT_SECRET = env.JWT_SECRET;
 const LoginSchema = z.object({ username: z.string().min(1).max(200), password: z.string().min(1) });
 
-const ADMIN_EMAIL = "jv@hashrate.space";
-const ADMIN_PASSWORD = "admin123";
+const DEFAULT_USERS: Array<{ email: string; password: string; role: "admin" | "operador" | "lector" }> = [
+  { email: "jv@hashrate.space", password: "admin123", role: "admin" },
+  { email: "fb@hashrate.space", password: "admin123", role: "admin" },
+];
 
-/** Asegurar que el administrador jv@hashrate.space exista (crear si no existe) */
+/** Asegurar que los usuarios por defecto existan (crear si no existen) */
 function ensureDefaultUser(): void {
-  let exists = false;
-  try {
-    const byUser = db.prepare("SELECT id FROM users WHERE username = ?").get(ADMIN_EMAIL);
-    if (byUser) {
-      exists = true;
-    } else {
-      try {
-        const byEmail = db.prepare("SELECT id FROM users WHERE email = ?").get(ADMIN_EMAIL);
-        exists = !!byEmail;
-      } catch {
-        // columna email no existe
-      }
-    }
-  } catch {
-    // ignore
-  }
-  if (!exists) {
-    const hash = bcrypt.hashSync(ADMIN_PASSWORD, 10);
+  for (const { email, password, role } of DEFAULT_USERS) {
+    let exists = false;
     try {
-      db.prepare("INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)").run(ADMIN_EMAIL, ADMIN_EMAIL, hash, "admin");
+      const byUser = db.prepare("SELECT id FROM users WHERE username = ?").get(email);
+      if (byUser) exists = true;
+      else {
+        try {
+          const byEmail = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
+          exists = !!byEmail;
+        } catch {
+          /* columna email no existe */
+        }
+      }
     } catch {
-      db.prepare("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)").run(ADMIN_EMAIL, hash, "admin");
+      /* ignore */
+    }
+    if (!exists) {
+      const hash = bcrypt.hashSync(password, 10);
+      try {
+        db.prepare("INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)").run(email, email, hash, role);
+      } catch {
+        db.prepare("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)").run(email, hash, role);
+      }
     }
   }
   try {
     db.prepare("UPDATE users SET email = username WHERE email IS NULL OR email = ''").run();
   } catch {
-    // columna email puede no existir en BD muy antigua
+    /* columna email puede no existir en BD muy antigua */
   }
 }
 
