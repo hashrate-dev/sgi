@@ -113,7 +113,7 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const msg = toThrow.message || "";
   if (msg === "Failed to fetch" || msg === "Load failed" || msg.includes("NetworkError") || msg === "The operation was aborted.") {
     throw new Error(
-      `No se pudo conectar con ${getApiBase() || "el servidor"}. Configurá abajo la URL de tu backend (copiala desde Render) y volvé a intentar.`
+      `No se pudo conectar con ${getApiBase() || "el servidor"}. En Vercel configurá VITE_API_URL con la URL de tu backend (Render) y redeployá.`
     );
   }
   throw toThrow;
