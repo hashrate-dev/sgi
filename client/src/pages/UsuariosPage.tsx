@@ -285,7 +285,7 @@ export function UsuariosPage() {
                         </option>
                       ))}
                     </select>
-                    <small className="text-muted">AdministradorA: todo (incl. eliminar otros admins); AdministradorB: todo salvo eso; Operador: facturación y clientes; Lector: solo consulta.</small>
+                    <small className="text-muted">AdministradorA: todo (incl. eliminar otros admins); AdministradorB: todo salvo eso; Operador: facturación y clientes; Lector: solo consulta. Operador y Lector cambian su contraseña desde Inicio &gt; Cambiar contraseña. Cualquier Administrador (A o B) puede cambiar la contraseña de Operador, Lector o de otro admin aquí.</small>
                   </div>
                 </div>
                 <div className="modal-footer">

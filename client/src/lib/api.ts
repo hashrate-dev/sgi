@@ -184,6 +184,11 @@ export function updateUser(id: number, body: { email?: string; password?: string
   return api<UserResponse>(`/api/users/${id}`, { method: "PUT", body: JSON.stringify(body) });
 }
 
+/** Cambiar la contraseña del usuario actual (Operador, Lector o cualquier admin). */
+export function updateMyPassword(password: string): Promise<UserResponse> {
+  return api<UserResponse>("/api/users/me", { method: "PUT", body: JSON.stringify({ password }) });
+}
+
 export function deleteUser(id: number): Promise<void> {
   return api<void>(`/api/users/${id}`, { method: "DELETE" });
 }

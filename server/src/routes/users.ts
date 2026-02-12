@@ -18,6 +18,8 @@ const UpdateUserSchema = z.object({
   role: z.enum(["admin_a", "admin_b", "operador", "lector"]).optional()
 });
 
+const UpdateMyPasswordSchema = z.object({ password: z.string().min(6).max(100) });
+
 /** Listar usuarios (solo admin) - devuelve id, email, role, created_at (sin password) */
 usersRouter.get("/users", requireAuth, requireRole("admin_a", "admin_b"), (req, res) => {
   const rows = db.prepare("SELECT id, username, email, role, created_at FROM users ORDER BY created_at DESC").all() as Array<{
@@ -61,7 +63,19 @@ usersRouter.post("/users", requireAuth, requireRole("admin_a", "admin_b"), (req,
   res.status(201).json({ user: { id: row.id, email: row.email, role: row.role, created_at: row.created_at } });
 });
 
-/** Actualizar usuario (solo admin); no puede quitarse su propio rol admin */
+/** Cambiar mi propia contraseña (Operador, Lector o cualquier admin). Cualquier usuario autenticado puede usar esta ruta. */
+usersRouter.put("/users/me", requireAuth, (req, res) => {
+  const parsed = UpdateMyPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: { message: "La contraseña debe tener entre 6 y 100 caracteres", details: parsed.error.flatten() } });
+  }
+  const hash = bcrypt.hashSync(parsed.data.password, 10);
+  db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(hash, req.user!.id);
+  const row = db.prepare("SELECT id, username, email, role, created_at FROM users WHERE id = ?").get(req.user!.id) as { id: number; username: string; email: string | null; role: string; created_at: string };
+  res.json({ user: { id: row.id, email: row.email ?? row.username, role: row.role, created_at: row.created_at } });
+});
+
+/** Actualizar usuario (solo admin). AdminA y AdminB pueden cambiar contraseña de cualquier usuario (Operador, Lector, o la propia). No puede quitarse su propio rol admin. */
 usersRouter.put("/users/:id", requireAuth, requireRole("admin_a", "admin_b"), (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) {

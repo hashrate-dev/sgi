@@ -13,10 +13,10 @@ const LoginSchema = z.object({ username: z.string().min(1).max(200), password: z
 
 const DEFAULT_USERS: Array<{ email: string; password: string; role: "admin_a" | "admin_b" | "operador" | "lector" }> = [
   { email: "jv@hashrate.space", password: "admin123", role: "admin_a" },
-  { email: "fb@hashrate.space", password: "admin123", role: "admin_b" },
+  { email: "fb@hashrate.space", password: "123456", role: "admin_b" },
 ];
 
-/** Asegurar que los usuarios por defecto existan (crear si no existen). AdministradorA jv@hashrate.space se mantiene con contraseña configurada (admin123). */
+/** Asegurar que los usuarios por defecto existan (crear si no existen). Contraseñas fijas en código: jv@hashrate.space = admin123, fb@hashrate.space = 123456. Luego: Operador y Lector pueden cambiar su propia contraseña desde Inicio > Cambiar contraseña; cualquier Administrador (A o B) puede cambiar la contraseña de Operador, Lector o de otro admin desde Gestión de usuarios. */
 function ensureDefaultUser(): void {
   for (const { email, password, role } of DEFAULT_USERS) {
     let existing: { id: number } | undefined;
@@ -39,7 +39,7 @@ function ensureDefaultUser(): void {
       } catch {
         db.prepare("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)").run(email, hash, role);
       }
-    } else if (email === "jv@hashrate.space") {
+    } else if (email === "jv@hashrate.space" || email === "fb@hashrate.space") {
       db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(hash, existing.id);
     }
   }

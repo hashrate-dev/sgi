@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { updateMyPassword } from "../lib/api";
+import { showToast } from "../components/ToastNotification";
 import "../styles/hrshome.css";
 
 const menuItems: Array<{ to: string; icon: string; label: string; desc: string; roles?: string[] }> = [
@@ -11,7 +14,33 @@ const menuItems: Array<{ to: string; icon: string; label: string; desc: string; 
 
 export function HomePage() {
   const { user, logout } = useAuth();
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [saving, setSaving] = useState(false);
   const visibleMenuItems = menuItems.filter((item) => !item.roles || (user && item.roles.includes(user.role)));
+
+  function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (newPassword.length < 6) {
+      showToast("La contraseña debe tener al menos 6 caracteres.", "error");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showToast("Las contraseñas no coinciden.", "error");
+      return;
+    }
+    setSaving(true);
+    updateMyPassword(newPassword)
+      .then(() => {
+        showToast("Contraseña actualizada.", "success");
+        setShowPasswordModal(false);
+        setNewPassword("");
+        setConfirmPassword("");
+      })
+      .catch((err) => showToast(err instanceof Error ? err.message : "Error al actualizar", "error"))
+      .finally(() => setSaving(false));
+  }
 
   return (
     <div className="hrs-home">
@@ -31,6 +60,9 @@ export function HomePage() {
                 <span className="hrs-home-user-email">{user.email || user.username}</span>
                 <span className="hrs-home-user-role">{user.role}</span>
               </span>
+              <button type="button" className="btn btn-link py-0 px-2" onClick={() => setShowPasswordModal(true)} title="Cambiar mi contraseña">
+                <i className="bi bi-key" /> Cambiar contraseña
+              </button>
               <button type="button" className="hrs-home-logout btn btn-link" onClick={logout}>
                 <i className="bi bi-box-arrow-right me-1" />
                 Cerrar sesión
@@ -60,6 +92,55 @@ export function HomePage() {
           )}
         </main>
       </div>
+
+      {showPasswordModal && user && (
+        <div className="modal d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} tabIndex={-1}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Cambiar mi contraseña</h5>
+                <button type="button" className="btn-close" onClick={() => setShowPasswordModal(false)} aria-label="Cerrar" />
+              </div>
+              <form onSubmit={handleChangePassword}>
+                <div className="modal-body">
+                  <div className="mb-3">
+                    <label className="form-label">Usuario</label>
+                    <input type="text" className="form-control" value={user.email || user.username} readOnly disabled />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Nueva contraseña (mín. 6 caracteres)</label>
+                    <input
+                      type="password"
+                      className="form-control"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      required
+                      minLength={6}
+                      autoComplete="new-password"
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Confirmar nueva contraseña</label>
+                    <input
+                      type="password"
+                      className="form-control"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                      minLength={6}
+                      autoComplete="new-password"
+                    />
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowPasswordModal(false)}>Cancelar</button>
+                  <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? "Guardando..." : "Guardar"}</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
