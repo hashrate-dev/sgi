@@ -16,17 +16,15 @@ const DEFAULT_USERS: Array<{ email: string; password: string; role: "admin_a" | 
   { email: "fb@hashrate.space", password: "admin123", role: "admin_b" },
 ];
 
-/** Asegurar que los usuarios por defecto existan (crear si no existen) */
+/** Asegurar que los usuarios por defecto existan (crear si no existen). AdministradorA jv@hashrate.space se mantiene con contraseña configurada (admin123). */
 function ensureDefaultUser(): void {
   for (const { email, password, role } of DEFAULT_USERS) {
-    let exists = false;
+    let existing: { id: number } | undefined;
     try {
-      const byUser = db.prepare("SELECT id FROM users WHERE username = ?").get(email);
-      if (byUser) exists = true;
-      else {
+      existing = db.prepare("SELECT id FROM users WHERE username = ?").get(email) as { id: number } | undefined;
+      if (!existing) {
         try {
-          const byEmail = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
-          exists = !!byEmail;
+          existing = db.prepare("SELECT id FROM users WHERE email = ?").get(email) as { id: number } | undefined;
         } catch {
           /* columna email no existe */
         }
@@ -34,13 +32,15 @@ function ensureDefaultUser(): void {
     } catch {
       /* ignore */
     }
-    if (!exists) {
-      const hash = bcrypt.hashSync(password, 10);
+    const hash = bcrypt.hashSync(password, 10);
+    if (!existing) {
       try {
         db.prepare("INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)").run(email, email, hash, role);
       } catch {
         db.prepare("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)").run(email, hash, role);
       }
+    } else if (email === "jv@hashrate.space") {
+      db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(hash, existing.id);
     }
   }
   try {
