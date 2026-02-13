@@ -317,7 +317,8 @@ export function HistorialPage() {
     ws.getRow(1).font = { bold: true };
 
     wb.xlsx.writeBuffer().then((buf) => {
-      saveAs(new Blob([buf]), "Historial_Facturas.xlsx");
+      const fecha = new Date().toISOString().split("T")[0];
+      saveAs(new Blob([buf]), `Historial_Documentos_Hosting_${fecha}.xlsx`);
     });
   }
 

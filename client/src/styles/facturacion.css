@@ -424,6 +424,11 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
+/* Mismo ancho que el contenedor verde de arriba: sin padding horizontal extra */
+.facturacion-content-wrap {
+  padding: 1.5rem 0;
+}
+
 .fact-layout {
   display: grid;
   grid-template-columns: 320px 1fr;
@@ -548,6 +553,7 @@
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+  min-width: 0; /* Permite que el grid no desborde; el scroll va en fact-table-wrap */
 }
 
 .fact-section-header {
@@ -557,6 +563,10 @@
   flex-wrap: wrap;
   gap: 0.75rem;
   margin-bottom: 1.25rem;
+}
+
+.fact-section-header .fact-btn-add {
+  flex-shrink: 0;
 }
 
 .fact-section-title {
@@ -591,8 +601,10 @@
   border-radius: 12px;
   border: 1px solid #e2e8f0;
   overflow: auto;
+  overflow-x: auto;
   max-height: 380px;
   background: #fff;
+  width: 100%;
 }
 
 .fact-table {
@@ -615,27 +627,38 @@
 
 .fact-table th:nth-child(2),
 .fact-table td:nth-child(2) {
-  width: 100px; /* Mes - reducido de 112px */
+  min-width: 150px; /* Mes - espacio para "Febrero de 2026" */
+  width: 150px;
 }
 
 .fact-table th:nth-child(3),
 .fact-table td:nth-child(3) {
-  width: 80px; /* CANTIDAD */
+  min-width: 90px; /* CANTIDAD */
+  width: 90px;
 }
 
 .fact-table th:nth-child(4),
 .fact-table td:nth-child(4) {
-  width: 90px; /* PRECIO X EQ - aumentado de 68px */
+  min-width: 100px; /* PRECIO X EQ */
+  width: 100px;
 }
 
 .fact-table th:nth-child(5),
 .fact-table td:nth-child(5) {
-  width: 85px; /* DTO x EQ */
+  min-width: 90px; /* DTO x EQ */
+  width: 90px;
 }
 
 .fact-table th:nth-child(6),
 .fact-table td:nth-child(6) {
-  width: 70px; /* Total - reducido de 76px */
+  min-width: 140px; /* Total - espacio para "100.00" completo */
+  width: 140px;
+}
+
+.fact-table th:nth-child(7),
+.fact-table td:nth-child(7) {
+  min-width: 60px; /* Botón quitar ítem */
+  width: 60px;
 }
 
 .fact-table th {
@@ -714,6 +737,16 @@
   font-weight: 600;
   color: inherit;
   padding: 0.25rem 0;
+}
+
+/* Total: input de solo lectura con espacio suficiente para no truncar */
+.fact-table .fact-cell-total input[readOnly] {
+  padding: 0.5rem 0.75rem;
+  background: #f3f4f6;
+  min-width: 120px;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
 }
 
 .fact-btn-remove {

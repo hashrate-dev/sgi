@@ -141,7 +141,8 @@ export function PendientesMineriaPage() {
     });
 
     wb.xlsx.writeBuffer().then((buffer) => {
-      saveAs(new Blob([buffer]), `Facturas_Pendientes_${new Date().toISOString().split("T")[0]}.xlsx`);
+      const fecha = new Date().toISOString().split("T")[0];
+      saveAs(new Blob([buffer]), `Pendientes_Documentos_ASIC_${fecha}.xlsx`);
       showToast("Excel exportado correctamente.", "success", "Pendientes");
     });
   }

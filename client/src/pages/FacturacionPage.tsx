@@ -506,6 +506,7 @@ export function FacturacionPage() {
           }
         />
 
+        <div className="hrs-card hrs-card--rect facturacion-content-wrap">
         <div className="fact-layout">
           {/* Panel configuración */}
           <aside className="fact-sidebar">
@@ -1010,6 +1011,7 @@ export function FacturacionPage() {
               </div>
             )}
           </main>
+        </div>
         </div>
       </div>
     </div>

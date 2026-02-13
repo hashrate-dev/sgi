@@ -145,8 +145,8 @@ export function ClientesPage() {
 
     // Generar y descargar archivo
     wb.xlsx.writeBuffer().then((buf) => {
-      const fecha = new Date().toISOString().split("T")[0].replace(/-/g, "");
-      saveAs(new Blob([buf]), `Listado_Clientes_${fecha}.xlsx`);
+      const fecha = new Date().toISOString().split("T")[0];
+      saveAs(new Blob([buf]), `ClientesHRS_Activos_${fecha}.xlsx`);
     });
   }
 

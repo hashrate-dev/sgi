@@ -136,7 +136,8 @@ export function PendientesPage() {
     });
 
     wb.xlsx.writeBuffer().then((buffer) => {
-      saveAs(new Blob([buffer]), `Facturas_Pendientes_${new Date().toISOString().split("T")[0]}.xlsx`);
+      const fecha = new Date().toISOString().split("T")[0];
+      saveAs(new Blob([buffer]), `Facturas_Pendientes_Hosting_${fecha}.xlsx`);
       showToast("Excel exportado correctamente.", "success", "Pendientes");
     });
   }
