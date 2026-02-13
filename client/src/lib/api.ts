@@ -43,6 +43,17 @@ export function getApiBaseUrlForDisplay(): string {
   return getApiBase() || "(mismo origen o no configurado)";
 }
 
+/** En Vercel/hashrate.space, hace una petición a /api/health en segundo plano para "despertar" el backend en Render antes de que el usuario haga login. */
+export function wakeUpBackend(): void {
+  if (typeof window === "undefined") return;
+  const h = window.location?.hostname ?? "";
+  if (h !== "sgi-hrs.vercel.app" && h !== "sgi.hashrate.space") return;
+  const base = getApiBase();
+  if (!base) return;
+  const url = `${base}/api/health`;
+  fetch(url, { method: "GET", keepalive: true }).catch(() => {});
+}
+
 function isLocalHost(): boolean {
   if (typeof window === "undefined") return false;
   const h = window.location?.hostname ?? "";

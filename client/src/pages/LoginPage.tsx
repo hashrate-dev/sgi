@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { setApiBaseUrl } from "../lib/api";
+import { setApiBaseUrl, wakeUpBackend } from "../lib/api";
 import "../styles/facturacion.css";
 
 export function LoginPage() {
@@ -11,6 +11,11 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // Despertar el backend en Render al cargar la página (evita timeout en el primer login cuando el servicio estaba dormido).
+  useEffect(() => {
+    wakeUpBackend();
+  }, []);
 
   // Plan B (oculto): /login?api=URL guarda la URL del backend en localStorage; el usuario no ve nada.
   useEffect(() => {
