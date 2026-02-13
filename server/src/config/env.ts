@@ -9,7 +9,9 @@ const EnvSchema = z.object({
   PORT: z.coerce.number().int().positive().default(8080),
   SQLITE_PATH: z.string().default(defaultSqlitePath),
   CORS_ORIGIN: z.string().optional(),
-  JWT_SECRET: z.string().min(16).default("cambiar-en-produccion-secreto-jwt-muy-largo")
+  JWT_SECRET: z.string().min(16).default("cambiar-en-produccion-secreto-jwt-muy-largo"),
+  /** API key de Render (https://dashboard.render.com → Account Settings → API Keys). Usado para listar servicios y disparar deploy desde la app. */
+  RENDER_API_KEY: z.string().optional()
 });
 
 export type Env = z.infer<typeof EnvSchema>;

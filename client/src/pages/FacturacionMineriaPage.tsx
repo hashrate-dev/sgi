@@ -971,18 +971,21 @@ export function FacturacionMineriaPage() {
 
                   {items.length > 0 && (
                     <>
-                      <div className="fact-detail-green-totals">
-                        <div className="fact-detail-green-total fact-detail-green-total-sub">
-                          <span className="fact-detail-green-total-label">Subtotal</span>
-                          <span className="fact-detail-green-total-value">$ {totals.subtotal.toFixed(2)}</span>
+                      <div className="fact-summary-cards">
+                        <div className="fact-summary-card fact-summary-card--sub">
+                          <span className="fact-summary-card-label">Subtotal</span>
+                          <span className="fact-summary-card-currency">USD</span>
+                          <span className="fact-summary-card-value">{totals.subtotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
-                        <div className="fact-detail-green-total fact-detail-green-total-disc">
-                          <span className="fact-detail-green-total-label">Descuentos</span>
-                          <span className="fact-detail-green-total-value">− $ {totals.discounts.toFixed(2)}</span>
+                        <div className="fact-summary-card fact-summary-card--disc">
+                          <span className="fact-summary-card-label">Descuentos</span>
+                          <span className="fact-summary-card-currency">USD</span>
+                          <span className="fact-summary-card-value">− {totals.discounts.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
-                        <div className="fact-detail-green-total fact-detail-green-total-final">
-                          <span className="fact-detail-green-total-label">Total</span>
-                          <span className="fact-detail-green-total-value">$ {totals.total.toFixed(2)}</span>
+                        <div className="fact-summary-card fact-summary-card--total">
+                          <span className="fact-summary-card-label">Total</span>
+                          <span className="fact-summary-card-currency">USD</span>
+                          <span className="fact-summary-card-value">{totals.total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                       </div>
 
