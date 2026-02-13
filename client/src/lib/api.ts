@@ -131,8 +131,10 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
       // Detectar errores de CORS (generalmente "Failed to fetch" o "NetworkError")
       if (errMsg === "Failed to fetch" || errMsg.includes("NetworkError") || errMsg === "Load failed") {
         const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-        if (h === "sgi-hrs.vercel.app" || h === "sgi.hashrate.space") {
-          lastError = new Error(`Error de conexión con ${base}. Verificá que CORS en Render permita este origen y que el servicio esté activo.`);
+        if (h === "sgi-hrs.vercel.app") {
+          lastError = new Error("No se pudo conectar con el backend (proxy a Render). Verificá que el servicio sistema-gestion-interna en Render esté activo y que el deploy en Vercel tenga el proxy /api configurado.");
+        } else if (h === "sgi.hashrate.space") {
+          lastError = new Error("No se pudo conectar con el backend en Render. Verificá que el servicio esté activo y que CORS permita sgi.hashrate.space.");
         } else {
           lastError = new Error(`Error de conexión: ${errMsg}. Verificá CORS y que el backend esté activo.`);
         }
