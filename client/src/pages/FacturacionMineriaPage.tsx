@@ -739,11 +739,12 @@ export function FacturacionMineriaPage() {
           <main className="fact-main">
             <div className="fact-card">
               <div className="fact-card-body">
-                <div className="fact-section-header" style={{ marginBottom: type === "Nota de Crédito" && !relatedInvoiceId ? "1.5rem" : undefined }}>
+                <div className="facturacion-equipos-detail">
+                <div className="fact-section-header fact-section-header--equipos" style={{ marginBottom: type === "Nota de Crédito" && !relatedInvoiceId ? "1.5rem" : undefined }}>
                   <h2 className="fact-section-title">Detalle de servicios</h2>
                   <button 
                     type="button" 
-                    className="fact-btn-add" 
+                    className="fact-btn-add fact-btn-add--equipos" 
                     onClick={addItem}
                     disabled={itemsLocked || (type === "Nota de Crédito" && !relatedInvoiceId)}
                     title={itemsLocked ? "Los detalles están bloqueados porque vienen de una factura relacionada" : type === "Nota de Crédito" && !relatedInvoiceId ? "Primero debe seleccionar una factura a cancelar" : (type === "Recibo" || type === "Nota de Crédito") && relatedInvoiceId ? "Los ítems se cargaron desde la factura relacionada" : ""}
@@ -773,15 +774,15 @@ export function FacturacionMineriaPage() {
                   </div>
                 )}
 
-                <div className="fact-table-wrap">
-                  <table className="fact-table">
+                <div className="fact-table-wrap fact-table-wrap--equipos">
+                  <table className="fact-table fact-table--equipos">
                     <thead>
                       <tr>
                         <th>Equipo ASIC / Setup</th>
                         <th className="fact-cell-center">CANTIDAD</th>
                         <th className="fact-cell-center">PRECIO X EQ</th>
-                        <th className="fact-cell-center" style={{ minWidth: "140px", width: "140px" }}>Total</th>
-                        <th style={{ width: "60px", minWidth: "60px" }} />
+                        <th className="fact-cell-center">Total</th>
+                        <th />
                       </tr>
                     </thead>
                     <tbody>
@@ -805,10 +806,10 @@ export function FacturacionMineriaPage() {
                                 <select
                                   className="fact-select"
                                   style={{ 
-                                    padding: "0.4rem 0.6rem", 
+                                    padding: "0.4rem 0.5rem", 
                                     fontSize: "0.8125rem",
                                     width: "100%",
-                                    minWidth: "200px",
+                                    maxWidth: "100%",
                                     backgroundColor: itemsLocked ? "#f3f4f6" : "white",
                                     cursor: itemsLocked ? "not-allowed" : "pointer",
                                     opacity: itemsLocked ? 0.7 : 1
@@ -890,10 +891,12 @@ export function FacturacionMineriaPage() {
                                   type="number"
                                   className="fact-input"
                                   style={{ 
-                                    padding: "0.5rem", 
-                                    fontSize: "0.875rem", 
-                                    width: "6rem", 
+                                    padding: "0.4rem 0.35rem", 
+                                    fontSize: "0.8125rem", 
+                                    width: "100%",
+                                    maxWidth: "100%",
                                     textAlign: "center",
+                                    boxSizing: "border-box",
                                     backgroundColor: itemsLocked ? "#f3f4f6" : "white",
                                     cursor: itemsLocked ? "not-allowed" : "text",
                                     opacity: itemsLocked ? 0.7 : 1
@@ -918,10 +921,12 @@ export function FacturacionMineriaPage() {
                                     updateItem(idx, { price: Math.max(0, Number(e.target.value) || 0) });
                                   }}
                                   style={{ 
-                                    width: "7rem", 
-                                    padding: "0.5rem", 
-                                    fontSize: "0.875rem", 
+                                    width: "100%",
+                                    maxWidth: "100%",
+                                    padding: "0.4rem 0.35rem", 
+                                    fontSize: "0.8125rem", 
                                     textAlign: "center",
+                                    boxSizing: "border-box",
                                     backgroundColor: itemsLocked ? "#f3f4f6" : "white",
                                     cursor: itemsLocked ? "not-allowed" : "text",
                                     opacity: itemsLocked ? 0.7 : 1
@@ -932,10 +937,10 @@ export function FacturacionMineriaPage() {
                                   disabled={itemsLocked}
                                 />
                               </td>
-                              <td className="fact-cell-center fact-cell-total" style={{ minWidth: "140px", width: "140px", paddingRight: "0.75rem" }}>
-                                <input readOnly value={lineTotal.toFixed(2)} style={{ width: "100%", minWidth: "130px", padding: "0.5rem 0.75rem", fontSize: "0.875rem", backgroundColor: "#f3f4f6", textAlign: "center", boxSizing: "border-box" }} />
+                              <td className="fact-cell-center fact-cell-total">
+                                <input readOnly value={lineTotal.toFixed(2)} className="fact-input-total" />
                               </td>
-                              <td className="fact-cell-center" style={{ width: "60px", minWidth: "60px", paddingLeft: "0.5rem" }}>
+                              <td className="fact-cell-center">
                                 <button 
                                   type="button" 
                                   className="fact-btn-remove" 
@@ -965,7 +970,7 @@ export function FacturacionMineriaPage() {
 
                 {items.length > 0 && (
                   <>
-                    <div className="fact-totals">
+                    <div className="fact-totals fact-totals--equipos">
                       <div className="fact-total-box fact-total-sub">
                         <span className="fact-total-label">Subtotal</span>
                         <span className="fact-total-value">$ {totals.subtotal.toFixed(2)}</span>
@@ -980,13 +985,14 @@ export function FacturacionMineriaPage() {
                       </div>
                     </div>
 
-                    <div className="fact-actions">
-                      <button type="button" className="fact-btn fact-btn-primary" onClick={generatePdfAndSave}>
+                    <div className="fact-actions fact-actions--equipos">
+                      <button type="button" className="fact-btn fact-btn-primary fact-btn-emitir--equipos" onClick={generatePdfAndSave}>
                         Emitir
                       </button>
                     </div>
                   </>
                 )}
+                </div>
 
                 {/* Documentos emitidos en esta sesión (solo últimos 24 h); el resto sigue en Historial/Pendientes */}
                 {emittedInLast24h.length > 0 && (

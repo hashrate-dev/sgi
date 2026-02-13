@@ -5,8 +5,11 @@ import type { AuthUser } from "./auth.js";
 const STORAGE_KEY = "hrs_api_url";
 const RAW = (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? "";
 const DEFAULT_RENDER_API = "https://hashrate-api.onrender.com";
+const SGI_RENDER_API = "https://sgi.onrender.com";
 const FALLBACK_API_URLS = [
+  "https://sgi.onrender.com",
   "https://hashrate-api.onrender.com",
+  "https://sgi-api.onrender.com",
   "https://hashrate-facturacion-hrs.onrender.com",
   "https://hashrate-app.onrender.com",
 ];
@@ -20,6 +23,7 @@ function getApiBase(): string {
   if (build) return build;
   const h = window.location?.hostname ?? "";
   if (h === "localhost" || h === "127.0.0.1") return "";
+  if (h === "sgi-hrs.vercel.app") return SGI_RENDER_API;
   if (h.endsWith(".vercel.app")) return DEFAULT_RENDER_API;
   return "";
 }

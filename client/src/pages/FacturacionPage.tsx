@@ -731,8 +731,8 @@ export function FacturacionPage() {
                         <th className="fact-cell-center">CANTIDAD</th>
                         <th className="fact-cell-center">PRECIO X EQ</th>
                         <th className="fact-cell-center">DTO x EQ</th>
-                        <th className="fact-cell-center" style={{ minWidth: "140px", width: "140px" }}>Total</th>
-                        <th style={{ width: "60px", minWidth: "60px" }} />
+                        <th className="fact-cell-center">Total</th>
+                        <th />
                       </tr>
                     </thead>
                     <tbody>
@@ -756,10 +756,10 @@ export function FacturacionPage() {
                                 <select
                                   className="fact-select"
                                   style={{ 
-                                    padding: "0.4rem 0.6rem", 
+                                    padding: "0.4rem 0.5rem", 
                                     fontSize: "0.8125rem",
                                     width: "100%",
-                                    minWidth: "200px",
+                                    maxWidth: "100%",
                                     backgroundColor: itemsLocked ? "#f3f4f6" : "white",
                                     cursor: itemsLocked ? "not-allowed" : "pointer",
                                     opacity: itemsLocked ? 0.7 : 1
@@ -785,10 +785,10 @@ export function FacturacionPage() {
                                   type="month"
                                   className="fact-input"
                                   style={{ 
-                                    padding: "0.5rem", 
-                                    fontSize: "0.875rem", 
+                                    padding: "0.4rem 0.5rem", 
+                                    fontSize: "0.8125rem", 
                                     width: "100%",
-                                    minWidth: "140px",
+                                    maxWidth: "100%",
                                     backgroundColor: itemsLocked ? "#f3f4f6" : "white",
                                     cursor: itemsLocked ? "not-allowed" : "text",
                                     opacity: itemsLocked ? 0.7 : 1
@@ -807,10 +807,12 @@ export function FacturacionPage() {
                                   type="number"
                                   className="fact-input"
                                   style={{ 
-                                    padding: "0.5rem", 
-                                    fontSize: "0.875rem", 
-                                    width: "6rem", 
+                                    padding: "0.4rem 0.35rem", 
+                                    fontSize: "0.8125rem", 
+                                    width: "100%",
+                                    maxWidth: "100%",
                                     textAlign: "center",
+                                    boxSizing: "border-box",
                                     backgroundColor: itemsLocked ? "#f3f4f6" : "white",
                                     cursor: itemsLocked ? "not-allowed" : "text",
                                     opacity: itemsLocked ? 0.7 : 1
@@ -835,10 +837,12 @@ export function FacturacionPage() {
                                     updateItem(idx, { price: Math.max(0, Number(e.target.value) || 0) });
                                   }}
                                   style={{ 
-                                    width: "7rem", 
-                                    padding: "0.5rem", 
-                                    fontSize: "0.875rem", 
+                                    width: "100%",
+                                    maxWidth: "100%",
+                                    padding: "0.4rem 0.35rem", 
+                                    fontSize: "0.8125rem", 
                                     textAlign: "center",
+                                    boxSizing: "border-box",
                                     backgroundColor: itemsLocked ? "#f3f4f6" : "white",
                                     cursor: itemsLocked ? "not-allowed" : "text",
                                     opacity: itemsLocked ? 0.7 : 1
@@ -854,10 +858,12 @@ export function FacturacionPage() {
                                   type="number"
                                   className="fact-input"
                                   style={{ 
-                                    padding: "0.5rem", 
-                                    fontSize: "0.875rem", 
-                                    width: "6rem", 
+                                    padding: "0.4rem 0.35rem", 
+                                    fontSize: "0.8125rem", 
+                                    width: "100%",
+                                    maxWidth: "100%",
                                     textAlign: "center",
+                                    boxSizing: "border-box",
                                     backgroundColor: itemsLocked ? "#f3f4f6" : "white",
                                     cursor: itemsLocked ? "not-allowed" : "text",
                                     opacity: itemsLocked ? 0.7 : 1
@@ -872,10 +878,10 @@ export function FacturacionPage() {
                                   disabled={itemsLocked}
                                 />
                               </td>
-                              <td className="fact-cell-center fact-cell-total" style={{ minWidth: "140px", width: "140px", paddingRight: "0.75rem" }}>
-                                <input readOnly value={lineTotal.toFixed(2)} style={{ width: "100%", minWidth: "130px", padding: "0.5rem 0.75rem", fontSize: "0.875rem", backgroundColor: "#f3f4f6", textAlign: "center", boxSizing: "border-box" }} />
+                              <td className="fact-cell-center fact-cell-total">
+                                <input readOnly value={lineTotal.toFixed(2)} className="fact-input-total" />
                               </td>
-                              <td className="fact-cell-center" style={{ width: "60px", minWidth: "60px", paddingLeft: "0.5rem" }}>
+                              <td className="fact-cell-center">
                                 <button 
                                   type="button" 
                                   className="fact-btn-remove" 

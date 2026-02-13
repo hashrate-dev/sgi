@@ -611,63 +611,301 @@
   width: 100%;
   border-collapse: collapse;
   font-size: 0.875rem;
+  table-layout: fixed; /* Columnas proporcionales al ancho; evita overflow */
 }
 
-/* Servicio: ancho suficiente para texto completo; Mes, Precio y Total: compactos */
+/* Columnas en % para que todo entre sin scroll horizontal */
 .fact-table th:first-child,
 .fact-table td:first-child {
-  min-width: 320px;
-  width: 45%;
+  width: 28%; /* Servicio: se adapta al espacio */
+  min-width: 0;
 }
 
 .fact-table td:first-child .fact-select {
-  min-width: 100%;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   box-sizing: border-box;
 }
 
 .fact-table th:nth-child(2),
 .fact-table td:nth-child(2) {
-  min-width: 150px; /* Mes - espacio para "Febrero de 2026" */
-  width: 150px;
+  width: 14%; /* Mes */
+  min-width: 0;
 }
 
 .fact-table th:nth-child(3),
 .fact-table td:nth-child(3) {
-  min-width: 90px; /* CANTIDAD */
-  width: 90px;
+  width: 8%; /* CANTIDAD */
+  min-width: 0;
 }
 
 .fact-table th:nth-child(4),
 .fact-table td:nth-child(4) {
-  min-width: 100px; /* PRECIO X EQ */
-  width: 100px;
+  width: 10%; /* PRECIO X EQ */
+  min-width: 0;
 }
 
 .fact-table th:nth-child(5),
 .fact-table td:nth-child(5) {
-  min-width: 90px; /* DTO x EQ */
-  width: 90px;
+  width: 8%; /* DTO x EQ */
+  min-width: 0;
 }
 
 .fact-table th:nth-child(6),
 .fact-table td:nth-child(6) {
-  min-width: 140px; /* Total - espacio para "100.00" completo */
-  width: 140px;
+  width: 12%; /* Total */
+  min-width: 5rem;
 }
 
 .fact-table th:nth-child(7),
 .fact-table td:nth-child(7) {
-  min-width: 60px; /* Botón quitar ítem */
-  width: 60px;
+  width: 6%; /* Botón quitar ítem */
+  min-width: 2.5rem;
+}
+
+/* Tabla Facturación Equipos (5 columnas): más espacio por columna */
+.fact-table--equipos {
+  table-layout: fixed;
+}
+
+.fact-table--equipos th:first-child,
+.fact-table--equipos td:first-child {
+  width: 50%; /* Equipo ASIC / Setup: más ancho al tener menos columnas */
+  min-width: 0;
+}
+
+.fact-table--equipos td:first-child .fact-select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.fact-table--equipos th:nth-child(2),
+.fact-table--equipos td:nth-child(2) {
+  width: 12%; /* CANTIDAD */
+  min-width: 0;
+}
+
+.fact-table--equipos th:nth-child(3),
+.fact-table--equipos td:nth-child(3) {
+  width: 18%; /* PRECIO X EQ */
+  min-width: 0;
+}
+
+.fact-table--equipos th:nth-child(4),
+.fact-table--equipos td:nth-child(4) {
+  width: 14%; /* Total */
+  min-width: 5rem;
+}
+
+.fact-table--equipos th:nth-child(5),
+.fact-table--equipos td:nth-child(5) {
+  width: 6%; /* Botón quitar */
+  min-width: 2.5rem;
+}
+
+/* ========== Estilo premium: tabla Facturación Equipos ========== */
+.facturacion-equipos-detail .fact-section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.fact-btn-add--equipos {
+  background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+  color: #fff;
+  padding: 0.6rem 1.15rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(30, 58, 95, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.fact-btn-add--equipos:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(30, 58, 95, 0.45);
+}
+
+.fact-table-wrap--equipos {
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 166, 82, 0.12);
+  max-height: 420px;
+}
+
+.fact-table--equipos thead {
+  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+}
+
+.fact-table--equipos thead th {
+  padding: 0.85rem 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.95);
+  background: transparent;
+  border-bottom: none;
+  box-shadow: none;
+}
+
+.fact-table--equipos thead th:first-child {
+  padding-left: 1rem;
+}
+
+.fact-table--equipos tbody tr {
+  transition: background 0.2s ease;
+}
+
+.fact-table--equipos tbody tr:nth-child(even) {
+  background: #fafbfc;
+}
+
+.fact-table--equipos tbody tr:hover {
+  background: #f0fdf4 !important;
+}
+
+.fact-table--equipos td {
+  padding: 0.7rem 0.75rem;
+  border-bottom: 1px solid #eef2f5;
+  vertical-align: middle;
+}
+
+.fact-table--equipos td:first-child {
+  padding-left: 1rem;
+}
+
+.fact-table--equipos .fact-select,
+.fact-table--equipos .fact-input {
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.fact-table--equipos .fact-select:focus,
+.fact-table--equipos .fact-input:focus {
+  outline: none;
+  border-color: #00a652;
+  box-shadow: 0 0 0 3px rgba(0, 166, 82, 0.12);
+}
+
+.fact-table--equipos .fact-cell-total {
+  background: linear-gradient(90deg, rgba(0, 166, 82, 0.06) 0%, transparent 100%);
+}
+
+.fact-table--equipos .fact-input-total,
+.fact-table--equipos .fact-cell-total input {
+  background: rgba(0, 166, 82, 0.08) !important;
+  font-weight: 700;
+  color: #0f172a;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 166, 82, 0.2);
+}
+
+.fact-table--equipos .fact-btn-remove {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: #dc2626;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+
+.fact-table--equipos .fact-btn-remove:hover:not(:disabled) {
+  background: #fef2f2;
+  color: #b91c1c;
+  transform: scale(1.05);
+}
+
+.fact-table--equipos .fact-empty {
+  padding: 2.5rem 1.5rem;
+  background: #f8fafc;
+}
+
+.fact-table--equipos .fact-empty-icon {
+  font-size: 2.25rem;
+  opacity: 0.5;
+}
+
+/* Totales y botón Emitir - estilo premium equipos */
+.fact-totals--equipos {
+  gap: 1.25rem;
+  margin-top: 1.5rem;
+}
+
+.fact-totals--equipos .fact-total-box {
+  padding: 1.25rem 1.5rem;
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border: 1px solid #eef2f5;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.fact-totals--equipos .fact-total-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+
+.fact-totals--equipos .fact-total-box.fact-total-sub {
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.fact-totals--equipos .fact-total-box.fact-total-disc {
+  background: linear-gradient(180deg, #fff5f5 0%, #fee2e2 100%);
+  border-color: #fecaca;
+}
+
+.fact-totals--equipos .fact-total-box.fact-total-final {
+  background: linear-gradient(135deg, #00a652 0%, #00cc6e 50%, #00b359 100%);
+  border: none;
+  box-shadow: 0 6px 20px rgba(0, 166, 82, 0.4);
+}
+
+.fact-totals--equipos .fact-total-box.fact-total-final:hover {
+  box-shadow: 0 8px 24px rgba(0, 166, 82, 0.5);
+}
+
+.fact-totals--equipos .fact-total-value {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.fact-totals--equipos .fact-total-box.fact-total-final .fact-total-value {
+  font-size: 1.65rem;
+}
+
+.fact-actions--equipos {
+  margin-top: 1.25rem;
+  padding-top: 0.75rem;
+}
+
+.fact-btn-emitir--equipos {
+  padding: 0.75rem 2rem;
+  font-size: 1rem;
+  font-weight: 700;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #00a652 0%, #00cc6e 100%);
+  box-shadow: 0 4px 16px rgba(0, 166, 82, 0.4);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.fact-btn-emitir--equipos:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 22px rgba(0, 166, 82, 0.5);
 }
 
 .fact-table th {
-  padding: 0.75rem 0.5rem; /* Reducido de 1rem a 0.5rem horizontal */
+  padding: 0.5rem 0.35rem;
   text-align: left;
   font-weight: 600;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
   color: #64748b;
   background: #f8fafc;
   border-bottom: 1px solid #e2e8f0;
@@ -675,7 +913,8 @@
   top: 0;
   z-index: 1;
   box-shadow: 0 1px 0 #e2e8f0;
-  white-space: nowrap; /* Evitar que el texto se divida en líneas */
+  white-space: normal;
+  word-break: break-word;
 }
 
 .fact-table th:nth-child(2),
@@ -687,7 +926,7 @@
 }
 
 .fact-table td {
-  padding: 0.625rem 0.5rem; /* Reducido de 1rem a 0.5rem horizontal */
+  padding: 0.5rem 0.35rem;
   border-bottom: 1px solid #f1f5f9;
   vertical-align: middle;
 }
@@ -739,14 +978,18 @@
   padding: 0.25rem 0;
 }
 
-/* Total: input de solo lectura con espacio suficiente para no truncar */
-.fact-table .fact-cell-total input[readOnly] {
-  padding: 0.5rem 0.75rem;
+/* Total: input de solo lectura, cabe en la columna */
+.fact-table .fact-cell-total input[readOnly],
+.fact-table .fact-input-total {
+  padding: 0.4rem 0.5rem;
   background: #f3f4f6;
-  min-width: 120px;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   box-sizing: border-box;
   text-align: center;
+  font-size: 0.875rem;
+  font-weight: 600;
 }
 
 .fact-btn-remove {

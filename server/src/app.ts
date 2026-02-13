@@ -21,7 +21,12 @@ export function createApp() {
   app.use(helmet());
   const corsOrigin = env.CORS_ORIGIN
     ? env.CORS_ORIGIN.split(",").map((o) => o.trim()).filter(Boolean)
-    : ["https://hashrateapp.vercel.app", "http://localhost:5173", "http://127.0.0.1:5173"];
+    : [
+        "https://hashrateapp.vercel.app",
+        "https://sgi-hrs.vercel.app",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173"
+      ];
   const originOption =
     Array.isArray(corsOrigin) && corsOrigin.length === 0 ? true
     : Array.isArray(corsOrigin) && corsOrigin.length === 1 ? corsOrigin[0]!
