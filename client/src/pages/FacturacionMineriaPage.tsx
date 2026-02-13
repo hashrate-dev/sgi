@@ -739,19 +739,19 @@ export function FacturacionMineriaPage() {
           <main className="fact-main">
             <div className="fact-card">
               <div className="fact-card-body">
-                <div className="facturacion-equipos-detail">
-                <div className="fact-section-header fact-section-header--equipos" style={{ marginBottom: type === "Nota de Crédito" && !relatedInvoiceId ? "1.5rem" : undefined }}>
-                  <h2 className="fact-section-title">Detalle de servicios</h2>
+                <div className="facturacion-equipos-detail fact-detail-green">
+                <header className="fact-detail-green-header" style={{ marginBottom: type === "Nota de Crédito" && !relatedInvoiceId ? "1.5rem" : undefined }}>
+                  <h2 className="fact-detail-green-title">Detalle de servicios</h2>
                   <button 
                     type="button" 
-                    className="fact-btn-add fact-btn-add--equipos" 
+                    className="fact-detail-green-btn-add" 
                     onClick={addItem}
                     disabled={itemsLocked || (type === "Nota de Crédito" && !relatedInvoiceId)}
                     title={itemsLocked ? "Los detalles están bloqueados porque vienen de una factura relacionada" : type === "Nota de Crédito" && !relatedInvoiceId ? "Primero debe seleccionar una factura a cancelar" : (type === "Recibo" || type === "Nota de Crédito") && relatedInvoiceId ? "Los ítems se cargaron desde la factura relacionada" : ""}
                   >
                     + Agregar ítem
                   </button>
-                </div>
+                </header>
                 {type === "Nota de Crédito" && !relatedInvoiceId && (
                   <div style={{ padding: "1rem", backgroundColor: "#fff3cd", border: "1px solid #ffc107", borderRadius: "4px", marginBottom: "1rem" }}>
                     <small className="text-warning" style={{ fontWeight: "bold" }}>
@@ -774,30 +774,31 @@ export function FacturacionMineriaPage() {
                   </div>
                 )}
 
-                <div className="fact-table-wrap fact-table-wrap--equipos">
-                  <table className="fact-table fact-table--equipos">
-                    <thead>
-                      <tr>
-                        <th>Equipo ASIC / Setup</th>
-                        <th className="fact-cell-center">CANTIDAD</th>
-                        <th className="fact-cell-center">PRECIO X EQ</th>
-                        <th className="fact-cell-center">Total</th>
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {items.length === 0 ? (
+                <div className="fact-detail-green-body">
+                  <div className="fact-detail-green-table-wrap">
+                    <table className="fact-detail-green-table">
+                      <thead>
                         <tr>
-                          <td colSpan={5} className="fact-empty">
-                            <div className="fact-empty-icon">📋</div>
-                            <div className="fact-empty-text">
-                              {type === "Nota de Crédito" && !relatedInvoiceId
-                                ? "Primero selecciona una factura a cancelar en el panel izquierdo para cargar los ítems automáticamente"
-                                : "Agregá tu primer ítem para armar la factura"}
-                            </div>
-                          </td>
+                          <th>Equipo ASIC / Setup</th>
+                          <th>Cantidad</th>
+                          <th>Precio unit.</th>
+                          <th>Total</th>
+                          <th aria-label="Quitar" />
                         </tr>
-                      ) : (
+                      </thead>
+                      <tbody>
+                        {items.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="fact-detail-green-empty">
+                              <span className="fact-detail-green-empty-icon">📋</span>
+                              <p className="fact-detail-green-empty-text">
+                                {type === "Nota de Crédito" && !relatedInvoiceId
+                                  ? "Seleccioná una factura a cancelar en el panel izquierdo para cargar los ítems."
+                                  : "Agregá tu primer ítem para armar la factura."}
+                              </p>
+                            </td>
+                          </tr>
+                        ) : (
                         items.map((it, idx) => {
                           const lineTotal = (it.price - it.discount) * it.quantity;
                           return (
@@ -937,13 +938,13 @@ export function FacturacionMineriaPage() {
                                   disabled={itemsLocked}
                                 />
                               </td>
-                              <td className="fact-cell-center fact-cell-total">
-                                <input readOnly value={lineTotal.toFixed(2)} className="fact-input-total" />
+                              <td className="fact-cell-center fact-detail-green-cell-total">
+                                <input readOnly value={lineTotal.toFixed(2)} className="fact-detail-green-input-total" />
                               </td>
-                              <td className="fact-cell-center">
+                              <td className="fact-detail-green-cell-actions">
                                 <button 
                                   type="button" 
-                                  className="fact-btn-remove" 
+                                  className="fact-detail-green-btn-remove" 
                                   onClick={() => {
                                     if (itemsLocked) return;
                                     removeItem(idx);
@@ -964,34 +965,35 @@ export function FacturacionMineriaPage() {
                           );
                         })
                       )}
-                    </tbody>
-                  </table>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {items.length > 0 && (
+                    <>
+                      <div className="fact-detail-green-totals">
+                        <div className="fact-detail-green-total fact-detail-green-total-sub">
+                          <span className="fact-detail-green-total-label">Subtotal</span>
+                          <span className="fact-detail-green-total-value">$ {totals.subtotal.toFixed(2)}</span>
+                        </div>
+                        <div className="fact-detail-green-total fact-detail-green-total-disc">
+                          <span className="fact-detail-green-total-label">Descuentos</span>
+                          <span className="fact-detail-green-total-value">− $ {totals.discounts.toFixed(2)}</span>
+                        </div>
+                        <div className="fact-detail-green-total fact-detail-green-total-final">
+                          <span className="fact-detail-green-total-label">Total</span>
+                          <span className="fact-detail-green-total-value">$ {totals.total.toFixed(2)}</span>
+                        </div>
+                      </div>
+
+                      <div className="fact-detail-green-actions">
+                        <button type="button" className="fact-detail-green-btn-emitir" onClick={generatePdfAndSave}>
+                          Emitir documento
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
-
-                {items.length > 0 && (
-                  <>
-                    <div className="fact-totals fact-totals--equipos">
-                      <div className="fact-total-box fact-total-sub">
-                        <span className="fact-total-label">Subtotal</span>
-                        <span className="fact-total-value">$ {totals.subtotal.toFixed(2)}</span>
-                      </div>
-                      <div className="fact-total-box fact-total-disc">
-                        <span className="fact-total-label">Descuentos</span>
-                        <span className="fact-total-value">− $ {totals.discounts.toFixed(2)}</span>
-                      </div>
-                      <div className="fact-total-box fact-total-final">
-                        <span className="fact-total-label">Total</span>
-                        <span className="fact-total-value">$ {totals.total.toFixed(2)}</span>
-                      </div>
-                    </div>
-
-                    <div className="fact-actions fact-actions--equipos">
-                      <button type="button" className="fact-btn fact-btn-primary fact-btn-emitir--equipos" onClick={generatePdfAndSave}>
-                        Emitir
-                      </button>
-                    </div>
-                  </>
-                )}
                 </div>
 
                 {/* Documentos emitidos en esta sesión (solo últimos 24 h); el resto sigue en Historial/Pendientes */}

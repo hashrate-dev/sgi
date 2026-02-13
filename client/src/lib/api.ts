@@ -17,8 +17,8 @@ const FALLBACK_API_URLS = [
 function getApiBase(): string {
   if (typeof window === "undefined") return "";
   const h = window.location?.hostname ?? "";
-  // En sgi-hrs.vercel.app o sgi.hashrate.space SIEMPRE usar el backend de Render (ignorar localStorage para evitar URLs viejas)
-  if (h === "sgi-hrs.vercel.app" || h === "sgi.hashrate.space") return SGI_RENDER_API;
+  // sgi-hrs.vercel.app (canónico); sgi-seven.vercel.app tratado igual. sgi.hashrate.space también.
+  if (h === "sgi-hrs.vercel.app" || h === "sgi-seven.vercel.app" || h === "sgi.hashrate.space") return SGI_RENDER_API;
   const stored = window.localStorage.getItem(STORAGE_KEY);
   const s = typeof stored === "string" ? stored.replace(/\/+$/, "").trim() : "";
   if (s) return s;
@@ -54,7 +54,7 @@ function getNoApiMessage(): string {
     return "No se pudo conectar con el servidor. ¿Tenés el backend levantado? Ejecutá en la raíz del proyecto: npm run dev";
   }
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  if (h === "sgi-hrs.vercel.app" || h === "sgi.hashrate.space") {
+  if (h === "sgi-hrs.vercel.app" || h === "sgi-seven.vercel.app" || h === "sgi.hashrate.space") {
     return "No se pudo conectar con el backend en Render (https://sistema-gestion-interna.onrender.com). Verificá que el servicio esté activo y que CORS permita este origen.";
   }
   return "No se pudo conectar con el servidor. Volvé a intentar en unos momentos.";
@@ -65,7 +65,7 @@ function get502Message(): string {
     return "No se pudo conectar con el servidor. ¿Tenés el backend levantado? Ejecutá: npm run dev";
   }
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  if (h === "sgi-hrs.vercel.app" || h === "sgi.hashrate.space") {
+  if (h === "sgi-hrs.vercel.app" || h === "sgi-seven.vercel.app" || h === "sgi.hashrate.space") {
     return "El backend en Render (https://sistema-gestion-interna.onrender.com) está tardando en responder. Si el servicio estaba dormido, esperá 30-60 segundos y volvé a intentar.";
   }
   return "No se pudo conectar con el servidor. Volvé a intentar en unos momentos.";
@@ -112,7 +112,7 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   }
   if (!base || base.trim() === "") {
     const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-    if (h === "sgi-hrs.vercel.app" || h === "sgi.hashrate.space") {
+    if (h === "sgi-hrs.vercel.app" || h === "sgi-seven.vercel.app" || h === "sgi.hashrate.space") {
       throw new Error("No se configuró la URL del backend. Configurá VITE_API_URL=https://sistema-gestion-interna.onrender.com y hacé redeploy.");
     }
     throw new Error(getNoApiMessage());
@@ -129,7 +129,7 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
       // Detectar errores de CORS (generalmente "Failed to fetch" o "NetworkError")
       if (errMsg === "Failed to fetch" || errMsg.includes("NetworkError") || errMsg === "Load failed") {
         const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-        if (h === "sgi-hrs.vercel.app" || h === "sgi.hashrate.space") {
+        if (h === "sgi-hrs.vercel.app" || h === "sgi-seven.vercel.app" || h === "sgi.hashrate.space") {
           lastError = new Error(`Error de conexión con ${base}. Verificá que CORS en Render permita este origen y que el servicio esté activo.`);
         } else {
           lastError = new Error(`Error de conexión: ${errMsg}. Verificá CORS y que el backend esté activo.`);
