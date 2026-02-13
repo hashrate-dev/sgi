@@ -1,7 +1,7 @@
 # Backend en Render: checklist para que funcione el login en https://sgi-hrs.vercel.app
 
 Si no podés iniciar sesión en **https://sgi-hrs.vercel.app** (usuario `fb@hashrate.space` / contraseña `123456`), revisá estos puntos.  
-**Importante:** En Render usá siempre **`https://sgi-hrs.vercel.app`** en CORS_ORIGIN (no `sgi-seven.vercel.app`).
+**Importante:** En Render usá **`https://sgi-hrs.vercel.app`** en CORS_ORIGIN.
 
 ---
 

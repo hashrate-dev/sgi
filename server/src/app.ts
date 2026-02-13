@@ -19,10 +19,9 @@ export function createApp() {
   app.set("trust proxy", true);
 
   app.use(helmet());
-  // Origen canónico: sgi-hrs.vercel.app (no sgi-seven). También sgi.hashrate.space, *.vercel.app, *.hashrate.space
+  // Origen canónico: sgi-hrs.vercel.app. También sgi.hashrate.space, *.vercel.app, *.hashrate.space
   const allowedOrigins = new Set<string>([
     "https://sgi-hrs.vercel.app",
-    "https://sgi-seven.vercel.app",
     "https://sgi.hashrate.space",
     "http://sgi.hashrate.space",
     "http://localhost:5173",
