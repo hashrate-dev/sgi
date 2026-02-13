@@ -17,8 +17,9 @@ const FALLBACK_API_URLS = [
 function getApiBase(): string {
   if (typeof window === "undefined") return "";
   const h = window.location?.hostname ?? "";
-  // sgi-hrs.vercel.app (canónico); sgi-seven.vercel.app tratado igual. sgi.hashrate.space también.
-  if (h === "sgi-hrs.vercel.app" || h === "sgi-seven.vercel.app" || h === "sgi.hashrate.space") return SGI_RENDER_API;
+  // En sgi-hrs y sgi-seven usamos proxy de Vercel: peticiones a /api/* (mismo origen) → sin CORS.
+  if (h === "sgi-hrs.vercel.app" || h === "sgi-seven.vercel.app") return "";
+  if (h === "sgi.hashrate.space") return SGI_RENDER_API;
   const stored = window.localStorage.getItem(STORAGE_KEY);
   const s = typeof stored === "string" ? stored.replace(/\/+$/, "").trim() : "";
   if (s) return s;
@@ -99,8 +100,10 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json", ...(options?.headers as Record<string, string>) };
   if (token) headers.Authorization = `Bearer ${token}`;
   let base = getApiBase();
-  // Intentar obtener URL desde Vercel si estamos en Vercel y no tenemos una URL guardada en localStorage
-  if (typeof window !== "undefined" && (window.location?.hostname?.endsWith(".vercel.app") || window.location?.hostname?.endsWith(".hashrate.space"))) {
+  const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
+  const useProxy = h === "sgi-hrs.vercel.app" || h === "sgi-seven.vercel.app";
+  // En sgi-hrs/sgi-seven usamos proxy (base ""); no pedir URL al servidor. Otros *.vercel.app sí pueden.
+  if (typeof window !== "undefined" && !useProxy && (window.location?.hostname?.endsWith(".vercel.app") || window.location?.hostname?.endsWith(".hashrate.space"))) {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (!stored || stored.trim() === "") {
       const fromServer = await getBackendUrlFromVercel();
@@ -110,14 +113,13 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
       }
     }
   }
-  if (!base || base.trim() === "") {
-    const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-    if (h === "sgi-hrs.vercel.app" || h === "sgi-seven.vercel.app" || h === "sgi.hashrate.space") {
+  if ((!base || base.trim() === "") && !useProxy) {
+    if (h === "sgi.hashrate.space") {
       throw new Error("No se configuró la URL del backend. Configurá VITE_API_URL=https://sistema-gestion-interna.onrender.com y hacé redeploy.");
     }
     throw new Error(getNoApiMessage());
   }
-  const url = `${base}${path}`;
+  const url = base ? `${base}${path}` : path;
   let lastError: Error | null = null;
   for (let i = 0; i < RETRY_DELAYS_MS.length; i++) {
     if (i > 0) await delay(RETRY_DELAYS_MS[i]!);
