@@ -50,12 +50,20 @@ function getNoApiMessage(): string {
   if (isLocalHost()) {
     return "No se pudo conectar con el servidor. ¿Tenés el backend levantado? Ejecutá en la raíz del proyecto: npm run dev";
   }
+  const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
+  if (h === "sgi-hrs.vercel.app") {
+    return "No se pudo conectar con el backend en Render (https://sgi.onrender.com). Verificá que el servicio esté activo y que CORS_ORIGIN incluya https://sgi-hrs.vercel.app";
+  }
   return "No se pudo conectar con el servidor. Volvé a intentar en unos momentos.";
 }
 
 function get502Message(): string {
   if (isLocalHost()) {
     return "No se pudo conectar con el servidor. ¿Tenés el backend levantado? Ejecutá: npm run dev";
+  }
+  const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
+  if (h === "sgi-hrs.vercel.app") {
+    return "El backend en Render (https://sgi.onrender.com) está tardando en responder. Si el servicio estaba dormido, esperá 30-60 segundos y volvé a intentar.";
   }
   return "No se pudo conectar con el servidor. Volvé a intentar en unos momentos.";
 }
@@ -88,12 +96,23 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json", ...(options?.headers as Record<string, string>) };
   if (token) headers.Authorization = `Bearer ${token}`;
   let base = getApiBase();
-  if (base === DEFAULT_RENDER_API && typeof window !== "undefined" && window.location?.hostname?.endsWith(".vercel.app")) {
-    const fromServer = await getBackendUrlFromVercel();
-    if (fromServer) {
-      setApiBaseUrl(fromServer);
-      base = fromServer;
+  // Intentar obtener URL desde Vercel si estamos en Vercel y no tenemos una URL guardada en localStorage
+  if (typeof window !== "undefined" && window.location?.hostname?.endsWith(".vercel.app")) {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (!stored || stored.trim() === "") {
+      const fromServer = await getBackendUrlFromVercel();
+      if (fromServer && fromServer.trim() !== "") {
+        setApiBaseUrl(fromServer);
+        base = fromServer;
+      }
     }
+  }
+  if (!base || base.trim() === "") {
+    const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
+    if (h === "sgi-hrs.vercel.app") {
+      throw new Error("No se configuró la URL del backend. Configurá VITE_API_URL=https://sgi.onrender.com en Vercel y hacé redeploy.");
+    }
+    throw new Error(getNoApiMessage());
   }
   const url = `${base}${path}`;
   let lastError: Error | null = null;
@@ -103,7 +122,18 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
     try {
       res = await fetchWithTimeout(url, { ...options, headers }, FETCH_TIMEOUT_MS);
     } catch (e) {
-      lastError = e instanceof Error ? e : new Error(String(e));
+      const errMsg = e instanceof Error ? e.message : String(e);
+      // Detectar errores de CORS (generalmente "Failed to fetch" o "NetworkError")
+      if (errMsg === "Failed to fetch" || errMsg.includes("NetworkError") || errMsg === "Load failed") {
+        const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
+        if (h === "sgi-hrs.vercel.app") {
+          lastError = new Error(`Error de conexión con ${base}. Verificá que CORS_ORIGIN en Render incluya https://sgi-hrs.vercel.app y que el servicio esté activo.`);
+        } else {
+          lastError = new Error(`Error de conexión: ${errMsg}. Verificá CORS y que el backend esté activo.`);
+        }
+      } else {
+        lastError = e instanceof Error ? e : new Error(String(e));
+      }
       continue;
     }
     const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
