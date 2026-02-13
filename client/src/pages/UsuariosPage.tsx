@@ -27,6 +27,12 @@ function getRoleDisplayLabel(role: string, viewerRole: UserRole | undefined): st
   return ROLES.find((r) => r.value === role)?.label ?? role;
 }
 
+/** Clase CSS del badge según rol (para "Administrador" mostrado a admin_b usamos admin). */
+function getRoleBadgeClass(role: string, viewerRole: UserRole | undefined): string {
+  if (viewerRole === "admin_b" && role === "admin_a") return "role-badge role-badge--admin";
+  return `role-badge role-badge--${role}`;
+}
+
 export function UsuariosPage() {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<UserListItem[]>([]);
@@ -35,6 +41,8 @@ export function UsuariosPage() {
   const [activityLoading, setActivityLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<"new" | UserListItem | null>(null);
+  const [deleteConfirmUser, setDeleteConfirmUser] = useState<UserListItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [formEmail, setFormEmail] = useState("");
   const [formPassword, setFormPassword] = useState("");
   const [formRole, setFormRole] = useState<UserRole>("operador");
@@ -82,106 +90,136 @@ export function UsuariosPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!formEmail.trim()) {
-      showToast("El correo es obligatorio.", "error");
+      showToast("El correo es obligatorio.", "error", toastContext);
       return;
     }
     if (modal === "new" && !formPassword) {
-      showToast("La contraseña es obligatoria para nuevo usuario.", "error");
+      showToast("La contraseña es obligatoria para nuevo usuario.", "error", toastContext);
       return;
     }
     if (modal === "new" && formPassword.length < 6) {
-      showToast("La contraseña debe tener al menos 6 caracteres.", "error");
+      showToast("La contraseña debe tener al menos 6 caracteres.", "error", toastContext);
       return;
     }
     setSaving(true);
     if (modal === "new") {
       createUser({ email: formEmail.trim(), password: formPassword, role: formRole })
         .then(() => {
-          showToast("Usuario creado.", "success");
+          showToast("Usuario creado correctamente.", "success", toastContext);
           setModal(null);
           loadUsers();
         })
-        .catch((err) => showToast(err instanceof Error ? err.message : "Error al crear", "error"))
+        .catch((err) => showToast(`Error al crear usuario: ${err instanceof Error ? err.message : "Error desconocido"}`, "error", toastContext))
         .finally(() => setSaving(false));
     } else {
       const body: { email?: string; password?: string; role?: UserRole } = { email: formEmail.trim(), role: formRole };
       if (formPassword) body.password = formPassword;
       updateUser((modal as UserListItem).id, body)
         .then(() => {
-          showToast("Usuario actualizado.", "success");
+          showToast("Usuario actualizado correctamente.", "success", toastContext);
           setModal(null);
           loadUsers();
         })
-        .catch((err) => showToast(err instanceof Error ? err.message : "Error al actualizar", "error"))
+        .catch((err) => showToast(`Error al actualizar usuario: ${err instanceof Error ? err.message : "Error desconocido"}`, "error", toastContext))
         .finally(() => setSaving(false));
     }
   }
 
-  function handleDelete(u: UserListItem) {
+  function handleDeleteClick(u: UserListItem) {
     if (currentUser?.id === u.id) {
-      showToast("No puede eliminarse a sí mismo.", "error");
+      showToast("No puede eliminarse a sí mismo.", "error", toastContext);
       return;
     }
-    if (!window.confirm(`¿Eliminar al usuario ${u.email}? Esta acción no se puede deshacer.`)) return;
-    deleteUser(u.id)
+    setDeleteConfirmUser(u);
+  }
+
+  function handleDeleteConfirm() {
+    if (!deleteConfirmUser) return;
+    setDeleting(true);
+    deleteUser(deleteConfirmUser.id)
       .then(() => {
-        showToast("Usuario eliminado.", "success");
+        showToast("Usuario eliminado correctamente.", "success", toastContext);
+        setDeleteConfirmUser(null);
         loadUsers();
       })
-      .catch((err) => showToast(err instanceof Error ? err.message : "Error al eliminar", "error"));
+      .catch((err) => showToast(`Error al eliminar usuario: ${err instanceof Error ? err.message : "Error desconocido"}`, "error", toastContext))
+      .finally(() => setDeleting(false));
   }
 
   const isAdmin = currentUser?.role === "admin_a" || currentUser?.role === "admin_b";
+  const toastContext = "Gestión de usuarios";
 
   return (
-    <div className="fact-page">
-      <PageHeader title="Gestión de usuarios y permisos" showBackButton backTo="/" backText="← Volver al inicio" />
+    <div className="fact-page usuarios-page">
       <div className="container">
+        <PageHeader title="Gestión de usuarios y permisos" showBackButton backTo="/" backText="← Volver al inicio" />
         <div className="fact-card">
-          <div className="fact-card-body">
-            {!isAdmin ? (
-              <p className="text-muted">Solo los administradores pueden gestionar usuarios.</p>
-            ) : (
-              <>
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <p className="text-muted small mb-0">Usuarios identificados por correo. Roles: AdministradorA, AdministradorB, Operador o Lector.</p>
-                  <button type="button" className="fact-btn fact-btn-primary" onClick={openNew}>
-                    Nuevo usuario
-                  </button>
+          {!isAdmin ? (
+            <div className="fact-card-body">
+              <p className="text-muted mb-0">Solo los administradores pueden gestionar usuarios.</p>
+            </div>
+          ) : (
+            <>
+              <div className="fact-card-header-custom">
+                <div className="card-title-wrap">
+                  <div className="card-title-icon">
+                    <i className="bi bi-people-fill" />
+                  </div>
+                  <div>
+                    <h2>Usuarios</h2>
+                    <p className="card-subtitle">Identificados por correo. Roles: AdministradorA, AdministradorB, Operador o Lector.</p>
+                  </div>
                 </div>
+                <button type="button" className="fact-btn-new-user" onClick={openNew}>
+                  <i className="bi bi-plus-lg" />
+                  Nuevo usuario
+                </button>
+              </div>
+              <div className="fact-card-body">
                 {error && (
-                  <div className="alert alert-danger py-2 small">
+                  <div className="alert alert-danger py-2 small mb-3">
                     {error}
                   </div>
                 )}
                 {loading ? (
-                  <p className="text-muted">Cargando usuarios...</p>
+                  <div className="usuarios-loading">
+                    <div className="spinner-border" role="status" aria-label="Cargando" />
+                    <p className="mt-2 mb-0 small">Cargando usuarios...</p>
+                  </div>
                 ) : (
-                  <div className="table-responsive">
-                    <table className="table table-bordered">
+                  <div className="usuarios-table-wrap">
+                    <table className="usuarios-table">
                       <thead>
                         <tr>
                           <th>Correo</th>
                           <th>Rol</th>
                           <th>Fecha alta</th>
-                          <th className="text-center">Acciones</th>
+                          <th>Acciones</th>
                         </tr>
                       </thead>
                       <tbody>
                         {users.map((u) => (
                           <tr key={u.id}>
-                            <td>{u.email}</td>
-                            <td>{getRoleDisplayLabel(u.role, currentUser?.role)}</td>
-                            <td>{u.created_at ? new Date(u.created_at).toLocaleDateString() : "-"}</td>
-                            <td className="text-center">
-                              <button type="button" className="btn btn-sm btn-outline-primary me-1" onClick={() => openEdit(u)}>
-                                Editar
-                              </button>
-                              {currentUser && currentUser.id !== u.id && canDeleteAdminUser(currentUser.role, u.role) && (
-                                <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => handleDelete(u)}>
-                                  Eliminar
+                            <td><span className="user-email">{u.email}</span></td>
+                            <td>
+                              <span className={getRoleBadgeClass(u.role, currentUser?.role)}>
+                                {getRoleDisplayLabel(u.role, currentUser?.role)}
+                              </span>
+                            </td>
+                            <td><span className="user-date">{u.created_at ? new Date(u.created_at).toLocaleDateString("es-AR") : "—"}</span></td>
+                            <td>
+                              <div className="action-btns">
+                                <button type="button" className="btn-action btn-action--edit" onClick={() => openEdit(u)} title="Editar">
+                                  <i className="bi bi-pencil" />
+                                  Editar
                                 </button>
-                              )}
+                                {currentUser && currentUser.id !== u.id && canDeleteAdminUser(currentUser.role, u.role) && (
+                                  <button type="button" className="btn-action btn-action--danger" onClick={() => handleDeleteClick(u)} title="Eliminar">
+                                    <i className="bi bi-trash" />
+                                    Eliminar
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -189,21 +227,38 @@ export function UsuariosPage() {
                     </table>
                   </div>
                 )}
-              </>
-            )}
-          </div>
+              </div>
+            </>
+          )}
         </div>
 
         {isAdmin && (
-          <div className="fact-card mt-4">
+          <div className="fact-card activity-card mt-4">
+            <div className="fact-card-header-custom">
+              <div className="card-title-wrap">
+                <div className="card-title-icon">
+                  <i className="bi bi-activity" />
+                </div>
+                <div>
+                  <h2>Actividad de usuarios</h2>
+                  <p className="card-subtitle">Entradas y salidas al sistema, horarios y tiempo conectado.</p>
+                </div>
+              </div>
+            </div>
             <div className="fact-card-body">
-              <h3 className="h6 mb-3">Actividad de usuarios</h3>
-              <p className="text-muted small mb-3">Entradas y salidas al sistema, horarios y tiempo conectado.</p>
               {activityLoading ? (
-                <p className="text-muted">Cargando actividad...</p>
+                <div className="activity-loading">
+                  <div className="spinner-border" role="status" aria-label="Cargando" />
+                  <p className="mt-2 mb-0 small">Cargando actividad...</p>
+                </div>
+              ) : activity.length === 0 ? (
+                <div className="empty-activity">
+                  <i className="bi bi-inbox" />
+                  Sin registros aún
+                </div>
               ) : (
-                <div className="table-responsive">
-                  <table className="table table-bordered table-sm">
+                <div className="activity-table-wrap">
+                  <table className="activity-table">
                     <thead>
                       <tr>
                         <th>Usuario</th>
@@ -214,25 +269,23 @@ export function UsuariosPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {activity.length === 0 ? (
-                        <tr>
-                          <td colSpan={5} className="text-muted text-center">Sin registros aún</td>
+                      {activity.map((a) => (
+                        <tr key={a.id}>
+                          <td><span className="user-email">{a.user_email}</span></td>
+                          <td>
+                            <span className={a.event === "login" ? "event-badge event-badge--login" : "event-badge event-badge--logout"}>
+                              {a.event === "login" ? <><i className="bi bi-box-arrow-in-right" /> Entrada</> : <><i className="bi bi-box-arrow-right" /> Salida</>}
+                            </span>
+                          </td>
+                          <td>{new Date(a.created_at).toLocaleString("es-AR")}</td>
+                          <td className="activity-duration">
+                            {a.duration_seconds != null
+                              ? `${Math.floor(a.duration_seconds / 3600)}h ${Math.floor((a.duration_seconds % 3600) / 60)}min`
+                              : "—"}
+                          </td>
+                          <td><span className="activity-ip">{a.ip_address || "—"}</span></td>
                         </tr>
-                      ) : (
-                        activity.map((a) => (
-                          <tr key={a.id}>
-                            <td>{a.user_email}</td>
-                            <td>{a.event === "login" ? "Entrada" : "Salida"}</td>
-                            <td>{new Date(a.created_at).toLocaleString("es-AR")}</td>
-                            <td>
-                              {a.duration_seconds != null
-                                ? `${Math.floor(a.duration_seconds / 3600)}h ${Math.floor((a.duration_seconds % 3600) / 60)}min`
-                                : "—"}
-                            </td>
-                            <td>{a.ip_address || "—"}</td>
-                          </tr>
-                        ))
-                      )}
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -243,17 +296,32 @@ export function UsuariosPage() {
       </div>
 
       {modal && (
-        <div className="modal d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} tabIndex={-1}>
+        <div className="modal d-block professional-modal-overlay" tabIndex={-1}>
           <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">{modal === "new" ? "Nuevo usuario" : "Editar usuario"}</h5>
-                <button type="button" className="btn-close" onClick={() => setModal(null)} aria-label="Cerrar" />
+            <div className="modal-content professional-modal professional-modal-form">
+              <div className="modal-header professional-modal-header">
+                <div className="professional-modal-icon-wrapper">
+                  <svg className="professional-modal-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    {modal === "new" ? (
+                      <path d="M16 21V19C16 17.9391 15.5786 16.9217 14.8284 16.1716C14.0783 15.4214 13.0609 15 12 15H5C3.93913 15 2.92172 15.4214 2.17157 16.1716C1.42143 16.9217 1 17.9391 1 19V21M23 21V19C22.9993 18.1137 22.7044 17.2528 22.1614 16.5523C21.6184 15.8519 20.8581 15.3516 20 15.13M16 3.13C16.8604 3.35031 17.623 3.85071 18.1676 4.55232C18.7122 5.25392 19.0078 6.11683 19.0078 7.005C19.0078 7.89318 18.7122 8.75608 18.1676 9.45769C17.623 10.1593 16.8604 10.6597 16 10.88M13 7C13 9.20914 11.2091 11 9 11C6.79086 11 5 9.20914 5 7C5 4.79086 6.79086 3 9 3C11.2091 3 13 4.79086 13 7Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    ) : (
+                      <path d="M11 5H6C4.89543 5 4 5.89543 4 7V18C4 19.1046 4.89543 20 6 20H17C18.1046 20 19 19.1046 19 18V13M18.5 2.5C18.8978 2.10218 19.4374 1.87868 20 1.87868C20.5626 1.87868 21.1022 2.10218 21.5 2.5C21.8978 2.89782 22.1213 3.43739 22.1213 4C22.1213 4.56261 21.8978 5.10218 21.5 5.5L12 15L8 16L9 12L18.5 2.5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    )}
+                  </svg>
+                </div>
+                <h5 className="modal-title professional-modal-title">
+                  {modal === "new" ? "Nuevo usuario" : "Editar usuario"}
+                </h5>
+                <button type="button" className="professional-modal-close" onClick={() => setModal(null)} aria-label="Cerrar">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M18 6L6 18M6 6L18 18" strokeLinecap="round"/>
+                  </svg>
+                </button>
               </div>
               <form onSubmit={handleSubmit}>
-                <div className="modal-body">
+                <div className="modal-body professional-modal-body">
                   <div className="mb-3">
-                    <label className="form-label">Correo</label>
+                    <label className="form-label professional-modal-body .form-label">Correo</label>
                     <input
                       type="email"
                       className="form-control"
@@ -263,7 +331,7 @@ export function UsuariosPage() {
                     />
                   </div>
                   <div className="mb-3">
-                    <label className="form-label">{modal === "new" ? "Contraseña (mín. 6 caracteres)" : "Nueva contraseña (dejar en blanco para no cambiar)"}</label>
+                    <label className="form-label professional-modal-body .form-label">{modal === "new" ? "Contraseña (mín. 6 caracteres)" : "Nueva contraseña (dejar en blanco para no cambiar)"}</label>
                     <input
                       type="password"
                       className="form-control"
@@ -274,7 +342,7 @@ export function UsuariosPage() {
                     />
                   </div>
                   <div className="mb-3">
-                    <label className="form-label">Rol</label>
+                    <label className="form-label professional-modal-body .form-label">Rol</label>
                     <select className="form-select" value={formRole} onChange={(e) => setFormRole(e.target.value as UserRole)}>
                       {modal !== "new" && (modal as UserListItem).role === "admin_a" && currentUser?.role === "admin_b" && (
                         <option value="admin_a" disabled>Administrador</option>
@@ -285,18 +353,72 @@ export function UsuariosPage() {
                         </option>
                       ))}
                     </select>
-                    <small className="text-muted">AdministradorA: todo (incl. eliminar otros admins); AdministradorB: todo salvo eso; Operador: facturación y clientes; Lector: solo consulta. Operador y Lector cambian su contraseña desde Inicio &gt; Cambiar contraseña. Cualquier Administrador (A o B) puede cambiar la contraseña de Operador, Lector o de otro admin aquí.</small>
+                    <p className="modal-help mb-0 mt-2" style={{ fontSize: "0.85rem", color: "#6b7280", lineHeight: "1.5" }}>AdministradorA: todo (incl. eliminar otros admins); AdministradorB: todo salvo eso; Operador: facturación y clientes; Lector: solo consulta. Operador y Lector cambian su contraseña desde Inicio &gt; Cambiar contraseña. Cualquier Administrador (A o B) puede cambiar la contraseña de cualquier usuario aquí.</p>
                   </div>
                 </div>
-                <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary" onClick={() => setModal(null)}>
+                <div className="modal-footer professional-modal-footer">
+                  <button type="button" className="professional-btn professional-btn-secondary" onClick={() => setModal(null)}>
                     Cancelar
                   </button>
-                  <button type="submit" className="btn btn-primary" disabled={saving}>
-                    {saving ? "Guardando..." : modal === "new" ? "Crear" : "Guardar"}
+                  <button type="submit" className="professional-btn professional-btn-primary" disabled={saving}>
+                    {saving ? (
+                      <>
+                        <span className="professional-btn-spinner"></span>
+                        Guardando...
+                      </>
+                    ) : (
+                      modal === "new" ? "Crear" : "Guardar"
+                    )}
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteConfirmUser && (
+        <div className="modal d-block professional-modal-overlay" tabIndex={-1} role="dialog" aria-labelledby="deleteModalTitle" aria-modal="true">
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content professional-modal professional-modal-delete">
+              <div className="modal-header professional-modal-header">
+                <div className="professional-modal-icon-wrapper">
+                  <svg className="professional-modal-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <h5 className="modal-title professional-modal-title" id="deleteModalTitle">
+                  Eliminar usuario
+                </h5>
+                <button type="button" className="professional-modal-close" onClick={() => setDeleteConfirmUser(null)} aria-label="Cerrar">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M18 6L6 18M6 6L18 18" strokeLinecap="round"/>
+                  </svg>
+                </button>
+              </div>
+              <div className="modal-body professional-modal-body">
+                <div className="professional-modal-warning-box">
+                  Esta acción no se puede deshacer.
+                </div>
+                <p style={{ fontSize: "1rem", color: "#374151", margin: 0 }}>
+                  ¿Eliminar al usuario <strong>{deleteConfirmUser.email}</strong>?
+                </p>
+              </div>
+              <div className="modal-footer professional-modal-footer">
+                <button type="button" className="professional-btn professional-btn-secondary" onClick={() => setDeleteConfirmUser(null)} disabled={deleting}>
+                  Cancelar
+                </button>
+                <button type="button" className="professional-btn professional-btn-primary" onClick={handleDeleteConfirm} disabled={deleting}>
+                  {deleting ? (
+                    <>
+                      <span className="professional-btn-spinner"></span>
+                      Eliminando...
+                    </>
+                  ) : (
+                    "Eliminar"
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

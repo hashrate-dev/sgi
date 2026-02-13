@@ -98,6 +98,26 @@ authRouter.get("/auth/me", requireAuth, (req, res) => {
   res.json({ user: req.user });
 });
 
+/** Verificar contraseña del usuario actual autenticado */
+authRouter.post("/auth/verify-password", requireAuth, (req, res) => {
+  const parsed = z.object({ password: z.string().min(1) }).safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: { message: "Contraseña requerida" } });
+  }
+  const userId = req.user!.id;
+  let row: { password_hash: string } | undefined;
+  try {
+    row = db.prepare("SELECT password_hash FROM users WHERE id = ?").get(userId) as typeof row;
+  } catch (e) {
+    console.error("verify-password db error:", e);
+    return res.status(500).json({ error: { message: "Error al consultar usuario" } });
+  }
+  if (!row || !bcrypt.compareSync(parsed.data.password, row.password_hash)) {
+    return res.status(401).json({ error: { message: "Contraseña incorrecta" } });
+  }
+  res.json({ valid: true });
+});
+
 /** Cerrar sesión (registra evento de salida y tiempo conectado) */
 authRouter.post("/auth/logout", requireAuth, (req, res) => {
   const userId = req.user!.id;

@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { getClients } from "../lib/api";
 import { serviceCatalog } from "../lib/constants";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
-import { loadInvoices, saveInvoices } from "../lib/storage";
-import type { Client, ComprobanteType, Invoice, LineItem } from "../lib/types";
+import { loadEquiposAsic, loadInvoicesAsic, loadSetup, saveInvoicesAsic } from "../lib/storage";
+import type { Client, ComprobanteType, EquipoASIC, Invoice, LineItem, Setup } from "../lib/types";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { InvoicePreview } from "../components/InvoicePreview";
@@ -66,7 +66,7 @@ function calcTotals(items: LineItem[]) {
   return { subtotal, discounts, total };
 }
 
-export function FacturacionPage() {
+export function FacturacionMineriaPage() {
   const { user } = useAuth();
   const [type, setType] = useState<ComprobanteType>("Factura");
   const [clientQuery, setClientQuery] = useState("");
@@ -77,9 +77,18 @@ export function FacturacionPage() {
   const [paymentDate, setPaymentDate] = useState<string>("");
   const [itemsLocked, setItemsLocked] = useState(false); // Indica si los items están bloqueados por venir de factura relacionada
 
-  const [invoices, setInvoices] = useState<Invoice[]>(() => loadInvoices());
+  const [invoices, setInvoices] = useState<Invoice[]>(() => loadInvoicesAsic());
+  const [equiposAsic, setEquiposAsic] = useState<EquipoASIC[]>([]);
+  const [setups, setSetups] = useState<Setup[]>([]);
   /** Documentos emitidos en esta sesión: se muestran solo 24 h, luego se quitan de la tabla (siguen en Historial/Pendientes) */
   const [emittedInSession, setEmittedInSession] = useState<{ invoice: Invoice; emittedAt: string }[]>([]);
+
+  // Recargar desde localStorage al montar (asegura ver datos de ASIC/mineria)
+  useEffect(() => {
+    setInvoices(loadInvoicesAsic());
+    setEquiposAsic(loadEquiposAsic());
+    setSetups(loadSetup());
+  }, []);
 
   const emittedInLast24h = useMemo(() => {
     const now = Date.now();
@@ -189,8 +198,17 @@ export function FacturacionPage() {
         const loadedItems: LineItem[] = relatedInvoice.items.map((item) => {
           // Asegurar que todos los campos estén presentes y correctos
           const loadedItem: LineItem = {
-            serviceKey: item.serviceKey || "A", // Fallback si no existe
-            serviceName: item.serviceName || serviceCatalog[item.serviceKey || "A"].name,
+            // Campos para equipos ASIC
+            equipoId: item.equipoId,
+            marcaEquipo: item.marcaEquipo,
+            modeloEquipo: item.modeloEquipo,
+            procesadorEquipo: item.procesadorEquipo,
+            // Campos para Setup
+            setupId: item.setupId,
+            setupNombre: item.setupNombre,
+            // Campos para servicios de Hosting (compatibilidad hacia atrás)
+            serviceKey: item.serviceKey,
+            serviceName: item.serviceName || (item.serviceKey ? serviceCatalog[item.serviceKey]?.name : undefined),
             month: item.month || "", // Mes debe estar presente
             quantity: item.quantity || 1, // Cantidad debe ser al menos 1
             price: item.price || 0, // Precio debe estar presente
@@ -229,18 +247,47 @@ export function FacturacionPage() {
   }, [relatedInvoiceId, type, selectedClient, invoices]);
 
   function addItem() {
-    const def = serviceCatalog.A;
-    setItems((prev) => [
-      ...prev,
-      {
-        serviceKey: "A",
-        serviceName: def.name,
-        month: "",
-        quantity: 1,
-        price: def.price,
-        discount: 0
-      }
-    ]);
+    // Si hay equipos ASIC disponibles, usar el primero; sino si hay Setup, usar el primero; sino crear item vacío
+    if (equiposAsic.length > 0) {
+      const equipo = equiposAsic[0];
+      setItems((prev) => [
+        ...prev,
+        {
+          equipoId: equipo.id,
+          marcaEquipo: equipo.marcaEquipo,
+          modeloEquipo: equipo.modelo,
+          procesadorEquipo: equipo.procesador,
+          month: "",
+          quantity: 1,
+          price: equipo.precioUSD,
+          discount: 0
+        }
+      ]);
+    } else if (setups.length > 0) {
+      const setup = setups[0];
+      setItems((prev) => [
+        ...prev,
+        {
+          setupId: setup.id,
+          setupNombre: setup.nombre,
+          month: "",
+          quantity: 1,
+          price: 50, // Precio fijo de 50 USD para Setup
+          discount: 0
+        }
+      ]);
+    } else {
+      // Si no hay equipos ni Setup, crear item vacío para que el usuario seleccione manualmente
+      setItems((prev) => [
+        ...prev,
+        {
+          month: "",
+          quantity: 1,
+          price: 0,
+          discount: 0
+        }
+      ]);
+    }
   }
 
   function updateItem(idx: number, patch: Partial<LineItem>) {
@@ -252,7 +299,7 @@ export function FacturacionPage() {
   }
 
   function exportExcel() {
-    const hist = loadInvoices();
+    const hist = loadInvoicesAsic();
     if (hist.length === 0) return;
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("Historial");
@@ -268,7 +315,7 @@ export function FacturacionPage() {
     ];
     hist.forEach((inv) => ws.addRow(inv));
     ws.getRow(1).font = { bold: true };
-    wb.xlsx.writeBuffer().then((buf) => saveAs(new Blob([buf]), "HRS_Historial.xlsx"));
+    wb.xlsx.writeBuffer().then((buf) => saveAs(new Blob([buf]), "HRS_Historial_ASIC.xlsx"));
   }
 
   async function generatePdfAndSave() {
@@ -308,8 +355,13 @@ export function FacturacionPage() {
       showToast("La factura no tiene ítems cargados.", "error");
       return;
     }
-    if (items.some((it) => !it.month)) {
-      showToast("Por favor, indique el mes para todos los ítems.", "warning");
+    // Validar que todos los ítems tengan un equipo ASIC o Setup seleccionado
+    if (items.some((it) => {
+      const tieneEquipo = it.equipoId && it.marcaEquipo && it.modeloEquipo && it.procesadorEquipo;
+      const tieneSetup = it.setupId && it.setupNombre;
+      return !tieneEquipo && !tieneSetup;
+    })) {
+      showToast("Todos los ítems deben tener un equipo ASIC o Setup seleccionado.", "error");
       return;
     }
 
@@ -320,7 +372,8 @@ export function FacturacionPage() {
     const dateNow = new Date();
     const dateStr = todayLocale();
     const emissionTime = getCurrentTime();
-    const month = items[0]!.month;
+    // Para equipos ASIC, el mes no es necesario (cadena vacía)
+    const month = items[0]?.month || "";
     
     // Calcular fecha de vencimiento (fecha + 7 días)
     const dueDate = new Date(dateNow);
@@ -392,10 +445,10 @@ export function FacturacionPage() {
       relatedInvoiceId: relatedInvoice?.id,
       relatedInvoiceNumber: relatedInvoice?.number
     };
-    const hist = loadInvoices();
+    const hist = loadInvoicesAsic();
     hist.push(inv);
-    saveInvoices(hist);
-    setInvoices(loadInvoices());
+    saveInvoicesAsic(hist);
+    setInvoices(loadInvoicesAsic());
     const now = Date.now();
     const ms24h = 24 * 60 * 60 * 1000;
     setEmittedInSession((prev) => [
@@ -493,13 +546,12 @@ export function FacturacionPage() {
     <div className="fact-page">
       <div className="container">
         <PageHeader 
-          title="Facturación" 
+          title="Facturación ASIC" 
           rightContent={
             <button 
               type="button" 
               className="fact-btn fact-btn-secondary" 
               onClick={exportExcel}
-              style={{ marginRight: "0.75rem" }}
             >
               📊 Exportar Excel
             </button>
@@ -725,11 +777,9 @@ export function FacturacionPage() {
                   <table className="fact-table">
                     <thead>
                       <tr>
-                        <th>Servicio</th>
-                        <th className="fact-cell-center">Mes</th>
+                        <th>Equipo ASIC / Setup</th>
                         <th className="fact-cell-center">CANTIDAD</th>
                         <th className="fact-cell-center">PRECIO X EQ</th>
-                        <th className="fact-cell-center">DTO x EQ</th>
                         <th className="fact-cell-center" style={{ minWidth: "140px", width: "140px" }}>Total</th>
                         <th style={{ width: "60px", minWidth: "60px" }} />
                       </tr>
@@ -737,7 +787,7 @@ export function FacturacionPage() {
                     <tbody>
                       {items.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="fact-empty">
+                          <td colSpan={5} className="fact-empty">
                             <div className="fact-empty-icon">📋</div>
                             <div className="fact-empty-text">
                               {type === "Nota de Crédito" && !relatedInvoiceId
@@ -763,43 +813,77 @@ export function FacturacionPage() {
                                     cursor: itemsLocked ? "not-allowed" : "pointer",
                                     opacity: itemsLocked ? 0.7 : 1
                                   }}
-                                  value={it.serviceKey || ""}
+                                  value={it.equipoId ? `equipo_${it.equipoId}` : it.setupId ? `setup_${it.setupId}` : ""}
                                   onChange={(e) => {
                                     if (itemsLocked) return;
-                                    const key = e.target.value as LineItem["serviceKey"];
-                                    if (key && serviceCatalog[key]) {
-                                      const def = serviceCatalog[key];
-                                      updateItem(idx, { serviceKey: key, serviceName: def.name, price: def.price });
+                                    const value = e.target.value;
+                                    if (value.startsWith("equipo_")) {
+                                      const equipoId = value.replace("equipo_", "");
+                                      const equipo = equiposAsic.find((eq) => eq.id === equipoId);
+                                      if (equipo) {
+                                        updateItem(idx, {
+                                          equipoId: equipo.id,
+                                          marcaEquipo: equipo.marcaEquipo,
+                                          modeloEquipo: equipo.modelo,
+                                          procesadorEquipo: equipo.procesador,
+                                          setupId: undefined,
+                                          setupNombre: undefined,
+                                          price: equipo.precioUSD
+                                        });
+                                      }
+                                    } else if (value.startsWith("setup_")) {
+                                      const setupId = value.replace("setup_", "");
+                                      const setup = setups.find((s) => s.id === setupId);
+                                      if (setup) {
+                                        updateItem(idx, {
+                                          setupId: setup.id,
+                                          setupNombre: setup.nombre,
+                                          equipoId: undefined,
+                                          marcaEquipo: undefined,
+                                          modeloEquipo: undefined,
+                                          procesadorEquipo: undefined,
+                                          price: 50 // Precio fijo de 50 USD para Setup
+                                        });
+                                      }
+                                    } else {
+                                      // Limpiar todos los campos
+                                      updateItem(idx, {
+                                        equipoId: undefined,
+                                        marcaEquipo: undefined,
+                                        modeloEquipo: undefined,
+                                        procesadorEquipo: undefined,
+                                        setupId: undefined,
+                                        setupNombre: undefined,
+                                        price: 0
+                                      });
                                     }
                                   }}
                                   disabled={itemsLocked}
                                 >
-                                  <option value="A">{serviceCatalog.A.name}</option>
-                                  <option value="B">{serviceCatalog.B.name}</option>
-                                  <option value="C">{serviceCatalog.C.name}</option>
+                                  <option value="">Seleccionar...</option>
+                                  {equiposAsic.length > 0 && (
+                                    <optgroup label="Equipos ASIC">
+                                      {equiposAsic.map((eq) => (
+                                        <option key={eq.id} value={`equipo_${eq.id}`}>
+                                          {eq.marcaEquipo} - {eq.modelo} - {eq.procesador}
+                                        </option>
+                                      ))}
+                                    </optgroup>
+                                  )}
+                                  <optgroup label="Setup">
+                                    {setups.length > 0 ? (
+                                      setups.map((s) => (
+                                        <option key={s.id} value={`setup_${s.id}`}>
+                                          {s.nombre} - ${s.precioUSD} USD
+                                        </option>
+                                      ))
+                                    ) : (
+                                      <option value="" disabled>
+                                        No hay Setup disponibles. Agregue Setup desde Gestión de Setup.
+                                      </option>
+                                    )}
+                                  </optgroup>
                                 </select>
-                              </td>
-                              <td className="fact-cell-center">
-                                <input
-                                  type="month"
-                                  className="fact-input"
-                                  style={{ 
-                                    padding: "0.5rem", 
-                                    fontSize: "0.875rem", 
-                                    width: "100%",
-                                    minWidth: "140px",
-                                    backgroundColor: itemsLocked ? "#f3f4f6" : "white",
-                                    cursor: itemsLocked ? "not-allowed" : "text",
-                                    opacity: itemsLocked ? 0.7 : 1
-                                  }}
-                                  value={it.month}
-                                  onChange={(e) => {
-                                    if (itemsLocked) return;
-                                    updateItem(idx, { month: e.target.value });
-                                  }}
-                                  readOnly={itemsLocked}
-                                  disabled={itemsLocked}
-                                />
                               </td>
                               <td className="fact-cell-center">
                                 <input
@@ -844,29 +928,6 @@ export function FacturacionPage() {
                                   }}
                                   min={0}
                                   step="0.01"
-                                  readOnly={itemsLocked}
-                                  disabled={itemsLocked}
-                                />
-                              </td>
-                              <td className="fact-cell-center">
-                                <input
-                                  type="number"
-                                  className="fact-input"
-                                  style={{ 
-                                    padding: "0.5rem", 
-                                    fontSize: "0.875rem", 
-                                    width: "6rem", 
-                                    textAlign: "center",
-                                    backgroundColor: itemsLocked ? "#f3f4f6" : "white",
-                                    cursor: itemsLocked ? "not-allowed" : "text",
-                                    opacity: itemsLocked ? 0.7 : 1
-                                  }}
-                                  min={0}
-                                  value={it.discount}
-                                  onChange={(e) => {
-                                    if (itemsLocked) return;
-                                    updateItem(idx, { discount: Math.max(0, Number(e.target.value || 0)) });
-                                  }}
                                   readOnly={itemsLocked}
                                   disabled={itemsLocked}
                                 />

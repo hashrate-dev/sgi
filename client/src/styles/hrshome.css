@@ -3,13 +3,42 @@
 .hrs-home {
   min-height: 100vh;
   padding: 2rem 1rem 3rem;
-  background: linear-gradient(160deg, #f0fdf4 0%, #ecfdf5 25%, #ffffff 50%, #f0f9ff 100%);
+  /* Mismo fondo que Login (hrs.css) */
+  background: linear-gradient(135deg, #074025 0%, #49f227 100%);
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  position: relative;
+  overflow: hidden;
+}
+
+.hrs-home::before {
+  content: "";
+  position: fixed;
+  top: -50%;
+  right: -10%;
+  width: 500px;
+  height: 500px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  z-index: 0;
+}
+
+.hrs-home::after {
+  content: "";
+  position: fixed;
+  bottom: -20%;
+  left: -5%;
+  width: 400px;
+  height: 400px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 50%;
+  z-index: 0;
 }
 
 .hrs-home-container {
   max-width: 900px;
   margin: 0 auto;
+  position: relative;
+  z-index: 1;
 }
 
 .hrs-home-header {
@@ -25,6 +54,10 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.04);
 }
 
+.hrs-home-header > .hrs-home-user {
+  margin-left: auto; /* Empuja todo el bloque de usuario hacia la derecha */
+}
+
 .hrs-home-brand {
   display: flex;
   align-items: center;
@@ -32,17 +65,16 @@
 }
 
 .hrs-home-logo {
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
-  color: #fff;
-  font-weight: 800;
-  font-size: 1rem;
-  letter-spacing: -0.5px;
-  border-radius: 12px;
+  height: 80px; /* Aumentado a 80px */
+  width: auto;
+  max-width: 350px; /* Aumentado a 350px */
+  min-width: 120px; /* Aumentado a 120px */
+  display: block;
+  object-fit: contain;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  padding: 0;
 }
 
 .hrs-home-title {
@@ -65,6 +97,7 @@
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
+  margin-left: auto; /* Empuja el contenido hacia la derecha */
 }
 
 .hrs-home-user-badge {

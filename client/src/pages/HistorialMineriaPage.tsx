@@ -3,7 +3,7 @@ import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { getClients, verifyPassword } from "../lib/api";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
-import { loadInvoices, saveInvoices } from "../lib/storage";
+import { loadInvoicesAsic, saveInvoicesAsic } from "../lib/storage";
 import type { ComprobanteType, Invoice } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
 import { showToast } from "../components/ToastNotification";
@@ -155,9 +155,9 @@ function calculateDueDate(dateStr: string): string {
   }
 }
 
-export function HistorialPage() {
+export function HistorialMineriaPage() {
   const { user } = useAuth();
-  const [all, setAll] = useState<Invoice[]>(() => loadInvoices());
+  const [all, setAll] = useState<Invoice[]>(() => loadInvoicesAsic());
   const [qClient, setQClient] = useState("");
   const [qType, setQType] = useState<"" | ComprobanteType>("");
   const [qMonth, setQMonth] = useState("");
@@ -172,6 +172,11 @@ export function HistorialPage() {
   const MAX_PASSWORD_ATTEMPTS = 3;
   const canDelete = user ? canDeleteHistorial(user.role) : false;
   const canExportData = user ? canExport(user.role) : false;
+
+  // Recargar desde localStorage al montar (asegura ver datos de ASIC/mineria)
+  useEffect(() => {
+    setAll(loadInvoicesAsic());
+  }, []);
 
   const filtered = useMemo(() => {
     const client = qClient.trim().toLowerCase();
@@ -324,7 +329,7 @@ export function HistorialPage() {
   function removeOne(id: string) {
     const next = all.filter((i) => i.id !== id);
     setAll(next);
-    saveInvoices(next);
+    saveInvoicesAsic(next);
   }
 
   function handleClearClick() {
@@ -363,7 +368,7 @@ export function HistorialPage() {
       setClearPasswordError("");
       setPasswordAttempts(0);
       setAll([]);
-      saveInvoices([]);
+      saveInvoicesAsic([]);
       showToast("Todo el historial ha sido eliminado.", "success", "Historial");
     } catch (err) {
       const newAttempts = passwordAttempts + 1;
@@ -428,7 +433,7 @@ export function HistorialPage() {
 
       const updated = [...all, ...newInvoices];
       setAll(updated);
-      saveInvoices(updated);
+      saveInvoicesAsic(updated);
       
       if (duplicates > 0) {
         showToast(`Se importaron ${newInvoices.length} facturas. ${duplicates} ya existían y se omitieron.`, "success");
@@ -553,7 +558,7 @@ export function HistorialPage() {
   return (
     <div className="fact-page">
       <div className="container">
-        <PageHeader title="Historial" />
+        <PageHeader title="Historial ASIC" />
 
         <div className="hrs-card hrs-card--rect p-4">
           <div className="historial-filtros-outer">
@@ -638,7 +643,7 @@ export function HistorialPage() {
 
           <div className="historial-listado-wrap">
             <div className="d-flex justify-content-between align-items-center mb-2">
-            <h6 className="fw-bold m-0">📄 Documentos Detalle Historial{user && !canExportData && !canDelete ? " (solo consulta)" : ""}</h6>
+            <h6 className="fw-bold m-0">📄 Documentos ASIC{user && !canExportData && !canDelete ? " (solo consulta)" : ""}</h6>
             <div className="d-flex gap-2">
               {canDelete && (
               <button

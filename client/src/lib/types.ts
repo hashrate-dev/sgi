@@ -16,8 +16,16 @@ export type Client = {
 };
 
 export type LineItem = {
-  serviceKey: "A" | "B" | "C";
-  serviceName: string;
+  serviceKey?: "A" | "B" | "C"; // Para facturas de Hosting
+  serviceName?: string; // Para facturas de Hosting
+  // Campos para equipos ASIC:
+  equipoId?: string; // ID del equipo ASIC
+  marcaEquipo?: string; // Marca del equipo
+  modeloEquipo?: string; // Modelo del equipo
+  procesadorEquipo?: string; // Procesador del equipo
+  // Campos para Setup:
+  setupId?: string; // ID del Setup
+  setupNombre?: string; // Nombre del Setup
   month: string; // YYYY-MM
   quantity: number;
   price: number;
@@ -40,5 +48,20 @@ export type Invoice = {
   items: LineItem[];
   relatedInvoiceId?: string; // ID de la factura relacionada (para notas de crédito y recibos)
   relatedInvoiceNumber?: string; // Número de la factura relacionada (para notas de crédito y recibos)
+};
+
+export type EquipoASIC = {
+  id: string;
+  fechaIngreso: string; // Fecha de ingreso
+  marcaEquipo: string; // Marca del equipo
+  modelo: string; // Modelo
+  procesador: string; // Procesador
+  precioUSD: number; // Precio en USD
+};
+
+export type Setup = {
+  id: string;
+  nombre: string; // Nombre del Setup
+  precioUSD: number; // Precio en USD (50 o 0)
 };
 

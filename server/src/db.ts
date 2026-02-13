@@ -107,3 +107,39 @@ try {
   const msg = e instanceof Error ? e.message : String(e);
   if (!msg.includes("duplicate column")) throw e;
 }
+
+// Agregar campos de relación para recibos y notas de crédito
+try {
+  db.exec("ALTER TABLE invoices ADD COLUMN related_invoice_id INTEGER");
+} catch (e: unknown) {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (!msg.includes("duplicate column")) throw e;
+}
+
+try {
+  db.exec("ALTER TABLE invoices ADD COLUMN related_invoice_number TEXT");
+} catch (e: unknown) {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (!msg.includes("duplicate column")) throw e;
+}
+
+try {
+  db.exec("ALTER TABLE invoices ADD COLUMN payment_date TEXT");
+} catch (e: unknown) {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (!msg.includes("duplicate column")) throw e;
+}
+
+try {
+  db.exec("ALTER TABLE invoices ADD COLUMN emission_time TEXT");
+} catch (e: unknown) {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (!msg.includes("duplicate column")) throw e;
+}
+
+try {
+  db.exec("ALTER TABLE invoices ADD COLUMN due_date TEXT");
+} catch (e: unknown) {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (!msg.includes("duplicate column")) throw e;
+}

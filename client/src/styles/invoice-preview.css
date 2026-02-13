@@ -1,0 +1,457 @@
+/* Invoice Preview Styles - EXACTAMENTE igual al PDF generado */
+/* Medidas exactas del PDF: A4 = 210mm x 297mm, MARGIN = 18mm */
+
+.invoice-preview-container {
+  margin-top: 2rem;
+  padding: 0;
+  background: transparent;
+}
+
+.invoice-preview {
+  width: 210mm; /* PAGE_W */
+  min-height: 297mm; /* PAGE_H */
+  margin: 0 auto;
+  background: #ffffff;
+  padding: 18mm 20mm 18mm 16mm; /* 0.2cm a la izquierda: left 16mm, right 20mm */
+  font-family: 'Helvetica', 'Arial', sans-serif;
+  color: #000000; /* RGB(0,0,0) */
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(-3mm); /* resto de la factura 0.3 cm a la izquierda (el párrafo derecho se compensa con +3mm en company-right) */
+}
+
+/* Header con logo + empresa + RECIBO/fecha: solo este bloque 0.2cm a la derecha */
+.invoice-preview-header {
+  position: relative;
+  margin-bottom: 0;
+  margin-left: 2mm; /* 0.2 cm a la derecha (solo este bloque) */
+  padding-bottom: 0;
+}
+
+.invoice-preview-logo {
+  position: absolute;
+  left: -10mm; /* logoX = MARGIN - 10 = 18 - 10 = 8mm desde borde documento */
+  top: 0; /* logoY = MARGIN = 18mm desde arriba */
+}
+
+.invoice-preview-logo img {
+  width: 60mm; /* 50mm + 1cm, sin deformar */
+  height: 16.8mm; /* proporcional: 14 * (60/50) */
+  display: block;
+  object-fit: contain;
+}
+
+/* Espacio para logo (60mm + 5mm gap) */
+.invoice-preview-company {
+  margin-left: 65mm; /* 60mm logo + 5mm gap */
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: calc(100% - 65mm);
+}
+
+.invoice-preview-company-left {
+  margin-left: 10mm; /* COMPANY_INFO_X offset desde logo */
+}
+
+.invoice-preview-company-name {
+  font-size: 12pt; /* doc.setFontSize(12) */
+  font-weight: normal; /* doc.setFont("helvetica", "normal") */
+  color: #000000;
+  margin-bottom: 5mm; /* y += 5 */
+  line-height: 1;
+  padding: 0;
+}
+
+.invoice-preview-company-detail {
+  font-size: 9pt; /* doc.setFontSize(9) */
+  font-weight: normal;
+  color: #000000;
+  margin-bottom: 5mm; /* y += 5 */
+  line-height: 1;
+  padding: 0;
+}
+
+/* Solo este párrafo corrido a la derecha; +3mm compensa el -3mm del .invoice-preview para que este bloque quede donde estaba */
+.invoice-preview-company-right {
+  text-align: right;
+  transform: translateX(13mm); /* 10mm + 3mm: mismo lugar visual mientras el resto va 0.3cm a la izquierda */
+}
+
+.invoice-preview-type {
+  font-size: 11pt; /* doc.setFontSize(11) */
+  font-weight: normal;
+  color: #000000;
+  margin-bottom: 5mm; /* y += 5 */
+  line-height: 1;
+  padding: 0;
+}
+
+.invoice-preview-label {
+  font-size: 9pt;
+  font-weight: normal;
+  color: #000000;
+  margin-bottom: 5mm; /* y += 5 */
+  line-height: 1;
+  padding: 0;
+}
+
+.invoice-preview-value {
+  font-size: 9pt;
+  font-weight: normal;
+  color: #000000;
+  margin-bottom: 5mm; /* y += 5 */
+  line-height: 1;
+  padding: 0;
+}
+
+.invoice-preview-ruc {
+  font-size: 9pt;
+  font-weight: normal;
+  color: #000000;
+  margin-top: 5mm; /* y += 5 después de línea en blanco */
+  line-height: 1;
+  padding: 0;
+}
+
+/* Separator - Línea gris exacta del PDF */
+/* tableLeft = (PAGE_W - TABLE_W) / 2 = (210 - 187) / 2 = 11.5mm desde borde */
+/* y después del header = Math.max(yTop + LOGO_HEIGHT_MM, y) + 8 = Math.max(18 + 14, y) + 8 */
+.invoice-preview-separator {
+  height: 0.5px; /* doc.setLineWidth(0.5) */
+  background: rgb(226, 232, 240); /* TABLE_BORDER */
+  width: 187mm; /* TABLE_W */
+  margin: 8mm auto 4mm auto; /* y += 8 después header, luego y += 4 */
+  border: none;
+}
+
+/* Client Info - Posiciones exactas */
+/* y += 20 después del separator */
+/* tableLeft = 11.5mm, colW = (TABLE_W - colGap * 2) / 3 = (187 - 8) / 3 = 59.67mm */
+.invoice-preview-client {
+  width: 187mm; /* TABLE_W */
+  margin: 20mm auto 0 auto; /* y += 20 después separator */
+  display: flex;
+  gap: 4mm; /* colGap */
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+
+.invoice-preview-client-col {
+  width: calc((187mm - 8mm) / 3); /* colW */
+  flex: 0 0 calc((187mm - 8mm) / 3);
+}
+
+.invoice-preview-client-name {
+  font-size: 11pt; /* doc.setFontSize(11) */
+  font-weight: normal;
+  color: #000000;
+  margin-bottom: 5mm; /* yy += 5 por cada línea */
+  line-height: 1;
+  padding: 0;
+}
+
+.invoice-preview-client-detail {
+  font-size: 10pt; /* doc.setFontSize(10) */
+  font-weight: normal;
+  color: #000000;
+  margin-bottom: 5mm; /* lineH = 5 */
+  line-height: 1;
+  padding: 0;
+  text-transform: none;
+}
+
+.invoice-preview-client-detail:last-child {
+  text-transform: uppercase; /* add(block.city, true) */
+}
+
+/* Table - Medidas exactas del PDF */
+/* tableLeft = 11.5mm, TABLE_W = 187mm */
+.invoice-preview-table-container {
+  width: 187mm; /* TABLE_W */
+  margin: 8mm auto 6mm auto; /* y += 8 después clientes, luego y += 6 después tabla */
+  position: relative;
+}
+
+.invoice-preview-table {
+  width: 187mm; /* TABLE_W */
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 0.5px solid rgb(226, 232, 240); /* TABLE_BORDER, doc.setLineWidth(0.5) */
+  border-radius: 2mm 2mm 0 0; /* TABLE_RADIUS solo arriba */
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.invoice-preview-table thead {
+  background: rgb(0, 166, 82); /* HRS_GREEN */
+  height: 10mm; /* HEADER_ROW_H */
+}
+
+.invoice-preview-table th {
+  color: rgb(255, 255, 255); /* doc.setTextColor(255, 255, 255) */
+  font-size: 11pt; /* doc.setFontSize(11) */
+  font-weight: normal; /* doc.setFont("helvetica", "normal") */
+  padding: 0;
+  height: 10mm; /* HEADER_ROW_H */
+  vertical-align: middle;
+  border: none;
+  line-height: 1;
+}
+
+.invoice-preview-th-desc {
+  width: 95mm; /* COL_DESC */
+  text-align: left;
+  padding-left: 3mm; /* tableLeft + 3 */
+}
+
+.invoice-preview-th-precio {
+  width: 32mm; /* COL_PRECIO */
+  text-align: center;
+}
+
+.invoice-preview-th-cant {
+  width: 22mm; /* COL_CANT */
+  text-align: center;
+}
+
+.invoice-preview-th-total {
+  width: 38mm; /* COL_TOTAL */
+  text-align: center;
+}
+
+.invoice-preview-table tbody tr {
+  height: 9mm; /* ROW_H */
+  border-bottom: 0.5px solid rgb(226, 232, 240); /* TABLE_BORDER */
+}
+
+.invoice-preview-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.invoice-preview-table td {
+  font-size: 11pt; /* doc.setFontSize(11) */
+  font-weight: normal;
+  color: #000000;
+  padding: 0;
+  height: 9mm; /* ROW_H */
+  vertical-align: middle;
+  border: none;
+  line-height: 1;
+}
+
+.invoice-preview-td-desc {
+  width: 95mm; /* COL_DESC */
+  text-align: left;
+  padding-left: 3mm; /* tableLeft + 3 */
+}
+
+.invoice-preview-td-precio {
+  width: 32mm; /* COL_PRECIO */
+  text-align: center;
+}
+
+.invoice-preview-td-cant {
+  width: 22mm; /* COL_CANT */
+  text-align: center;
+}
+
+.invoice-preview-td-total {
+  width: 38mm; /* COL_TOTAL */
+  text-align: center;
+}
+
+/* Bloque de fechas - Exacto del PDF */
+/* yFechas = PAGE_H / 2 + 12 + 50 + 30 = 240.5mm desde arriba */
+/* datesBlockH = 14mm, datesBlockTop = yFechas - datesBlockH / 2 = 233.5mm */
+/* Pero en realidad viene después de la tabla con y += 6 */
+.invoice-preview-dates {
+  width: 187mm; /* TABLE_W */
+  margin: 6mm auto 0 auto; /* y += 6 después de la tabla */
+  border: 0.5px solid rgb(226, 232, 240); /* TABLE_BORDER */
+  border-radius: 2mm 2mm 0 0; /* TABLE_RADIUS solo arriba */
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.invoice-preview-dates-header {
+  background: rgb(0, 166, 82); /* HRS_GREEN */
+  height: 7mm; /* datesBlockH / 2 */
+  display: flex;
+  color: rgb(255, 255, 255);
+  font-size: 11pt;
+  font-weight: normal;
+  padding: 0;
+  line-height: 1;
+}
+
+.invoice-preview-dates-label {
+  flex: 1;
+  text-align: center;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 7mm;
+}
+
+.invoice-preview-dates-values {
+  display: flex;
+  background: #ffffff;
+  border-top: 0.5px solid rgb(226, 232, 240);
+  height: 7mm; /* datesBlockH / 2 */
+}
+
+.invoice-preview-dates-value {
+  flex: 1;
+  text-align: center;
+  padding: 0;
+  font-size: 11pt;
+  font-weight: normal;
+  color: #000000;
+  border-right: 0.5px solid rgb(226, 232, 240);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 7mm;
+  line-height: 1;
+}
+
+.invoice-preview-dates-value:last-child {
+  border-right: none;
+}
+
+/* Total al pie: contra abajo de la A4, mismo margen 18mm que los extremos de la hoja */
+.invoice-preview-total-wrap {
+  width: 187mm; /* TABLE_W - mismo que tabla y fechas */
+  margin: 0 auto;
+  margin-top: auto; /* empuja la fila TOTAL al pie de la vista previa A4 */
+  padding-bottom: 0; /* el padding 18mm de .invoice-preview ya define el margen inferior */
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+/* Total al pie - caja TOTAL + importe, alineada a la derecha con las tablas de arriba */
+.invoice-preview-total-box {
+  width: 58mm; /* TOTAL_BOX_W */
+  border: 0.5px solid rgb(226, 232, 240); /* TABLE_BORDER */
+  border-radius: 0 0 2mm 2mm; /* TABLE_RADIUS solo abajo */
+  overflow: hidden;
+  display: flex;
+  background: #ffffff;
+  height: 10mm; /* TOTAL_ROW_H */
+}
+
+.invoice-preview-total-label {
+  width: 24mm; /* TOTAL_LABEL_W */
+  background: rgb(0, 166, 82); /* HRS_GREEN */
+  color: rgb(255, 255, 255);
+  font-size: 11pt;
+  font-weight: normal;
+  padding: 0;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 10mm;
+  line-height: 1;
+}
+
+.invoice-preview-total-amount {
+  flex: 1;
+  color: #000000;
+  font-size: 11pt;
+  font-weight: normal;
+  padding: 0 4mm; /* totalAmountRight - 4mm */
+  text-align: right;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: 10mm;
+  line-height: 1;
+}
+
+/* Empty State */
+.invoice-preview-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: #999999;
+  font-size: 14pt;
+  font-weight: 500;
+}
+
+/* Asegurar layout flex */
+.invoice-preview-table-container {
+  flex-shrink: 0;
+}
+
+.invoice-preview-dates {
+  flex-shrink: 0;
+}
+
+/* Responsive - Solo para pantallas pequeñas */
+@media (max-width: 900px) {
+  .invoice-preview {
+    width: 100%;
+    max-width: 210mm;
+    padding: 10mm;
+  }
+
+  .invoice-preview-logo {
+    position: relative;
+    left: 0;
+    margin-bottom: 10mm;
+  }
+
+  .invoice-preview-company {
+    margin-left: 0;
+    flex-direction: column;
+    gap: 5mm;
+  }
+
+  .invoice-preview-company-left {
+    margin-left: 0;
+  }
+
+  .invoice-preview-company-right {
+    text-align: left;
+  }
+
+  .invoice-preview-client,
+  .invoice-preview-table-container,
+  .invoice-preview-dates,
+  .invoice-preview-separator,
+  .invoice-preview-total-wrap {
+    width: 100%;
+    max-width: 187mm;
+  }
+
+  .invoice-preview-total-wrap {
+    margin: 0 auto;
+    justify-content: flex-end;
+  }
+
+  .invoice-preview-total-box {
+    width: 100%;
+    max-width: 58mm;
+  }
+}
+
+/* Impresión */
+@media print {
+  .invoice-preview-container {
+    padding: 0;
+    margin: 0;
+  }
+
+  .invoice-preview {
+    box-shadow: none;
+    border: none;
+    margin: 0;
+    padding: 18mm 20mm 18mm 16mm; /* mismo 0.2cm a la izquierda */
+  }
+}

@@ -5,6 +5,7 @@
   padding: 1.5rem 0 3rem;
   position: relative;
   background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 30%, #f0f9f4 100%);
+  overflow-x: hidden;
 }
 
 .fact-page::before {
@@ -252,7 +253,7 @@
   position: absolute;
   bottom: -6px;
   left: 0;
-  width: 80px;
+  width: 100%;
   height: 3px;
   background: linear-gradient(90deg, #ffffff 0%, rgba(255, 255, 255, 0.5) 100%);
   border-radius: 2px;
@@ -282,7 +283,7 @@
     opacity: 1;
   }
   100% {
-    left: calc(80px - 40px);
+    left: calc(100% - 40px);
     opacity: 0.3;
   }
 }
@@ -302,7 +303,7 @@
     opacity: 0;
   }
   to {
-    width: 80px;
+    width: 100%;
     opacity: 1;
   }
 }
@@ -336,7 +337,7 @@
   }
   
   .fact-topbar-left h1::after {
-    width: 50px;
+    width: 100%;
     height: 2px;
     animation: lineExpand 0.8s ease-out 0.3s both, lineShine 3s ease-in-out infinite 1.1s;
   }
@@ -354,7 +355,7 @@
       opacity: 0;
     }
     to {
-      width: 50px;
+      width: 100%;
       opacity: 1;
     }
   }
@@ -365,7 +366,7 @@
       opacity: 1;
     }
     100% {
-      left: calc(50px - 30px);
+      left: calc(100% - 30px);
       opacity: 0.3;
     }
   }
@@ -614,21 +615,31 @@
 
 .fact-table th:nth-child(2),
 .fact-table td:nth-child(2) {
-  width: 112px; /* Mes */
+  width: 100px; /* Mes - reducido de 112px */
+}
+
+.fact-table th:nth-child(3),
+.fact-table td:nth-child(3) {
+  width: 80px; /* CANTIDAD */
 }
 
 .fact-table th:nth-child(4),
 .fact-table td:nth-child(4) {
-  width: 68px; /* Precio */
+  width: 90px; /* PRECIO X EQ - aumentado de 68px */
+}
+
+.fact-table th:nth-child(5),
+.fact-table td:nth-child(5) {
+  width: 85px; /* DTO x EQ */
 }
 
 .fact-table th:nth-child(6),
 .fact-table td:nth-child(6) {
-  width: 76px; /* Total */
+  width: 70px; /* Total - reducido de 76px */
 }
 
 .fact-table th {
-  padding: 0.75rem 1rem;
+  padding: 0.75rem 0.5rem; /* Reducido de 1rem a 0.5rem horizontal */
   text-align: left;
   font-weight: 600;
   font-size: 0.75rem;
@@ -641,6 +652,7 @@
   top: 0;
   z-index: 1;
   box-shadow: 0 1px 0 #e2e8f0;
+  white-space: nowrap; /* Evitar que el texto se divida en líneas */
 }
 
 .fact-table th:nth-child(2),
@@ -652,7 +664,7 @@
 }
 
 .fact-table td {
-  padding: 0.625rem 1rem;
+  padding: 0.625rem 0.5rem; /* Reducido de 1rem a 0.5rem horizontal */
   border-bottom: 1px solid #f1f5f9;
   vertical-align: middle;
 }
@@ -677,6 +689,24 @@
   font-weight: 600;
   color: #0f172a;
 }
+
+/* Tabla Documentos emitidos: alineación, anchos y espacio para que no se corten Fecha/Hora/Total */
+.fact-emitted-table th:first-child,
+.fact-emitted-table td:first-child { width: 4.5rem; min-width: 0; text-align: left; padding: 0.5rem 0.6rem; }
+.fact-emitted-table th:nth-child(2),
+.fact-emitted-table td:nth-child(2) { width: 5rem; min-width: 0; text-align: left; padding: 0.5rem 0.6rem; }
+.fact-emitted-table th:nth-child(3),
+.fact-emitted-table td:nth-child(3) { width: 38%; min-width: 0; text-align: left; padding: 0.5rem 0.6rem; }
+.fact-emitted-table th:nth-child(4),
+.fact-emitted-table td:nth-child(4) { width: 9rem; min-width: 9rem; text-align: left; padding: 0.5rem 0.75rem; }
+.fact-emitted-table th:nth-child(5),
+.fact-emitted-table td:nth-child(5) { width: 8rem; min-width: 8rem; text-align: left; padding: 0.5rem 0.75rem; }
+.fact-emitted-table th:nth-child(6),
+.fact-emitted-table td:nth-child(6) { width: 7rem; min-width: 7rem; text-align: right; padding: 0.5rem 0.75rem; }
+.fact-emitted-table th:nth-child(7),
+.fact-emitted-table td:nth-child(7) { width: 8rem; min-width: 0; text-align: center; padding: 0.5rem 0.6rem; }
+.fact-emitted-table th:nth-child(4),
+.fact-emitted-table th:nth-child(5) { white-space: nowrap; }
 
 .fact-table input[readOnly] {
   border: none;
@@ -869,11 +899,12 @@
   background: #fff;
 }
 
+/* Mismo verde que fondo Filtros de Historial (#2D5D46) */
 .clients-table thead {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: #f8fafc;
+  background: #2D5D46;
 }
 
 .clients-table th {
@@ -883,10 +914,10 @@
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  color: #475569;
-  border-bottom: 2px solid #e2e8f0;
+  color: #fff;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
   white-space: nowrap;
-  background: #f8fafc;
+  background: #2D5D46;
 }
 
 .clients-table th:last-child {
@@ -1063,7 +1094,7 @@
   }
   
   .fact-topbar-left h1::after {
-    width: 40px;
+    width: 100%;
     height: 2px;
     animation: lineExpand 0.8s ease-out 0.3s both, lineShine 3s ease-in-out infinite 1.1s;
   }
@@ -1081,7 +1112,7 @@
       opacity: 0;
     }
     to {
-      width: 40px;
+      width: 100%;
       opacity: 1;
     }
   }
@@ -1092,7 +1123,7 @@
       opacity: 1;
     }
     100% {
-      left: calc(40px - 25px);
+      left: calc(100% - 25px);
       opacity: 0.3;
     }
   }
@@ -1271,4 +1302,1732 @@
   font-size: 0.85em;
   font-weight: 500;
   opacity: 0.9;
+}
+
+/* ========== Página Pendientes: Filtros con estilo del header ========== */
+/* En PendientesPage: el hrs-card debe tener fondo transparente para mostrar el fondo de la página */
+.fact-page .hrs-card.hrs-card--rect {
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  backdrop-filter: none;
+}
+
+/* Mismo nivel de margen que el topbar: escapa del p-4 del card y usa el mismo padding horizontal (2rem) */
+.pendientes-filtros-outer {
+  margin-left: -1.5rem;
+  margin-right: -1.5rem;
+  margin-top: -1.5rem;
+  margin-bottom: 0;
+}
+
+/* Contenedor verde que incluye la “franja” inferior (mismo color y bordes redondeados) */
+.pendientes-filtros-container {
+  background: #2D5D46;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  padding: 1.25rem 2rem 1.5rem;
+  margin-bottom: 0;
+  position: relative;
+}
+
+/* Una sola burbuja suave en el contenedor verde */
+.pendientes-filtros-container::before {
+  content: "";
+  position: absolute;
+  top: -20%;
+  right: -22%;
+  width: 520px;
+  height: 520px;
+  background: rgba(255, 255, 255, 0.018);
+  border-radius: 50%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.pendientes-filtros-card {
+  background: transparent;
+  border: none;
+  border-radius: 16px;
+  box-shadow: none;
+  padding: 0;
+  padding-top: 0;
+  margin-bottom: 0;
+  position: relative;
+  overflow: visible;
+}
+
+/* Sin segunda burbuja: una sola en .pendientes-filtros-container */
+
+.pendientes-filtros-card h6 {
+  color: #fff;
+  border-bottom-color: rgba(255, 255, 255, 0.25) !important;
+  padding-bottom: 0.75rem;
+  margin-bottom: 1rem !important;
+  position: relative;
+  z-index: 1;
+}
+
+.pendientes-filtros-card .form-label {
+  color: rgba(255, 255, 255, 0.95);
+  z-index: 1;
+  position: relative;
+}
+
+.pendientes-filtros-card .form-control,
+.pendientes-filtros-card .form-control:focus {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  color: #1e293b;
+  position: relative;
+  z-index: 1;
+}
+
+.pendientes-filtros-card .form-control::placeholder {
+  color: #94a3b8;
+}
+
+.pendientes-filtros-card .btn-outline-secondary {
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  color: #fff;
+  border-radius: 10px;
+  font-weight: 600;
+  position: relative;
+  z-index: 1;
+}
+
+.pendientes-filtros-card .btn-outline-secondary:hover {
+  background: rgba(255, 255, 255, 0.35);
+  border-color: rgba(255, 255, 255, 0.7);
+  color: #fff;
+}
+
+/* Exportar Excel: al pasar el cursor, fondo un poco blanco como Limpiar (mismo bloque verde) */
+.pendientes-export-excel-btn:hover {
+  background: rgba(255, 255, 255, 0.35) !important;
+  border-color: rgba(255, 255, 255, 0.7);
+  color: #fff;
+}
+
+.historial-export-excel-btn:hover {
+  background: rgba(255, 255, 255, 0.35) !important;
+  border-color: rgba(255, 255, 255, 0.7);
+  color: #fff;
+}
+
+.historial-import-excel-btn:hover {
+  background: rgba(255, 255, 255, 0.35) !important;
+  border-color: rgba(255, 255, 255, 0.7);
+  color: #fff;
+}
+
+.historial-limpiar-todo-btn {
+  border-color: rgba(220, 53, 69, 0.6);
+  color: #b02a37;
+}
+.historial-limpiar-todo-btn:hover {
+  background: rgba(220, 53, 69, 0.55) !important;
+  border-color: #dc3545;
+  color: #fff;
+}
+
+/* Separación entre Filtros y Listado en Pendientes: mismo ancho que Filtros y margen con color de fondo */
+.pendientes-listado-wrap {
+  margin-top: 1.5rem;
+  margin-left: -1.5rem;
+  margin-right: -1.5rem;
+  padding: 1.25rem 2rem;
+  border-top: 2px solid #e2e8f0;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.pendientes-listado-wrap > .d-flex {
+  margin-bottom: 1rem;
+}
+
+/* Tabla Listado Pendientes: mismo contorno y encabezado que Clientes */
+.pendientes-listado-wrap .table-responsive {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  background: #fff;
+  overflow: hidden;
+}
+.pendientes-listado-wrap .table-responsive .table {
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-bottom: 0;
+  background: #fff;
+}
+.pendientes-listado-wrap .table thead.table-dark,
+.pendientes-listado-wrap .table thead.table-dark th {
+  background-color: #2D5D46 !important;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 1rem;
+}
+.pendientes-listado-wrap .table thead.table-dark tr th:first-child {
+  border-radius: 12px 0 0 0;
+}
+.pendientes-listado-wrap .table thead.table-dark tr th:last-child {
+  border-radius: 0 12px 0 0;
+}
+.pendientes-listado-wrap .table tbody td {
+  border-bottom: 1px solid #f1f5f9;
+  padding: 1rem;
+  background: #fff;
+}
+.pendientes-listado-wrap .table tbody tr:last-child td {
+  border-bottom: none;
+}
+.pendientes-listado-wrap .table tbody tr:hover td {
+  background: #f8fafc;
+}
+
+/* ========== Página Historial: mismo diseño que Pendientes (Filtros + Listado) ========== */
+.historial-filtros-outer {
+  margin-left: -1.5rem;
+  margin-right: -1.5rem;
+  margin-top: -1.5rem;
+  margin-bottom: 0;
+}
+
+.historial-filtros-container {
+  background: #2D5D46;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  padding: 1.25rem 2rem 1.5rem;
+  margin-bottom: 0;
+  position: relative;
+}
+
+.historial-filtros-container::before {
+  content: "";
+  position: absolute;
+  top: -20%;
+  right: -22%;
+  width: 520px;
+  height: 520px;
+  background: rgba(255, 255, 255, 0.018);
+  border-radius: 50%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.historial-filtros-card {
+  background: transparent;
+  border: none;
+  border-radius: 16px;
+  box-shadow: none;
+  padding: 0;
+  margin-bottom: 0;
+  position: relative;
+  overflow: visible;
+}
+
+.historial-filtros-card h6 {
+  color: #fff;
+  border-bottom-color: rgba(255, 255, 255, 0.25) !important;
+  padding-bottom: 0.75rem;
+  margin-bottom: 1rem !important;
+  position: relative;
+  z-index: 1;
+}
+
+.historial-filtros-card .form-label {
+  color: rgba(255, 255, 255, 0.95);
+  z-index: 1;
+  position: relative;
+}
+
+.historial-filtros-card .form-control,
+.historial-filtros-card .form-control:focus,
+.historial-filtros-card .form-select,
+.historial-filtros-card .form-select:focus {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  color: #1e293b;
+  position: relative;
+  z-index: 1;
+}
+
+.historial-filtros-card .form-control::placeholder {
+  color: #94a3b8;
+}
+
+.historial-filtros-card .btn-outline-secondary {
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  color: #fff;
+  border-radius: 10px;
+  font-weight: 600;
+  position: relative;
+  z-index: 1;
+}
+
+.historial-filtros-card .btn-outline-secondary:hover {
+  background: rgba(255, 255, 255, 0.35);
+  border-color: rgba(255, 255, 255, 0.7);
+  color: #fff;
+}
+
+.historial-listado-wrap {
+  margin-top: 1.5rem;
+  margin-left: -1.5rem;
+  margin-right: -1.5rem;
+  padding: 1.25rem 2rem;
+  border-top: 2px solid #e2e8f0;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.historial-listado-wrap > .d-flex {
+  margin-bottom: 1rem;
+}
+
+/* Tabla Listado Historial: mismo contorno y encabezado que Clientes */
+.historial-listado-wrap .table-responsive {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  background: #fff;
+  overflow: hidden;
+}
+.historial-listado-wrap .historial-listado-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-bottom: 0;
+  background: #fff;
+}
+.historial-listado-wrap .historial-listado-table thead.table-dark,
+.historial-listado-wrap .historial-listado-table thead.table-dark th {
+  background-color: #2D5D46 !important;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 1rem;
+}
+.historial-listado-wrap .historial-listado-table thead.table-dark tr th:first-child {
+  border-radius: 12px 0 0 0;
+}
+.historial-listado-wrap .historial-listado-table thead.table-dark tr th:last-child {
+  border-radius: 0 12px 0 0;
+}
+.historial-listado-wrap .historial-listado-table tbody td {
+  border-bottom: 1px solid #f1f5f9;
+  padding: 1rem;
+  background: #fff;
+}
+.historial-listado-wrap .historial-listado-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.historial-listado-wrap .historial-listado-table tbody tr:hover td {
+  background: #f8fafc;
+}
+
+/* ========== Página Clientes: mismo diseño de Filtros y Listado que Historial ========== */
+.clientes-filtros-outer {
+  margin-left: -1.5rem;
+  margin-right: -1.5rem;
+  margin-top: -1.5rem;
+  margin-bottom: 0;
+}
+.clientes-filtros-container {
+  background: #2D5D46;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  padding: 1.25rem 2rem 1.5rem;
+  margin-bottom: 0;
+  position: relative;
+}
+.clientes-filtros-container::before {
+  content: "";
+  position: absolute;
+  top: -20%;
+  right: -22%;
+  width: 520px;
+  height: 520px;
+  background: rgba(255, 255, 255, 0.018);
+  border-radius: 50%;
+  z-index: 0;
+  pointer-events: none;
+}
+.clientes-filtros-card {
+  background: transparent;
+  border: none;
+  border-radius: 16px;
+  box-shadow: none;
+  padding: 0;
+  margin-bottom: 0;
+  position: relative;
+  overflow: visible;
+}
+.clientes-filtros-card h6 {
+  color: #fff;
+  border-bottom-color: rgba(255, 255, 255, 0.25) !important;
+  padding-bottom: 0.75rem;
+  margin-bottom: 1rem !important;
+  position: relative;
+  z-index: 1;
+}
+.clientes-filtros-card .form-label {
+  color: rgba(255, 255, 255, 0.95);
+  z-index: 1;
+  position: relative;
+}
+.clientes-filtros-card .form-control,
+.clientes-filtros-card .form-control:focus {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  color: #1e293b;
+  position: relative;
+  z-index: 1;
+}
+.clientes-filtros-card .form-control::placeholder {
+  color: #94a3b8;
+}
+.clientes-filtros-card .btn-outline-secondary {
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  color: #fff;
+  border-radius: 10px;
+  font-weight: 600;
+  position: relative;
+  z-index: 1;
+}
+.clientes-filtros-card .btn-outline-secondary:hover {
+  background: rgba(255, 255, 255, 0.35);
+  border-color: rgba(255, 255, 255, 0.7);
+  color: #fff;
+}
+.clientes-export-excel-btn:hover {
+  background: rgba(255, 255, 255, 0.35) !important;
+  border-color: rgba(255, 255, 255, 0.7);
+  color: #fff;
+}
+.clientes-borrar-todo-btn {
+  border-color: rgba(220, 53, 69, 0.6);
+  color: #b02a37;
+}
+.clientes-borrar-todo-btn:hover {
+  background: rgba(220, 53, 69, 0.55) !important;
+  border-color: #dc3545;
+  color: #fff;
+}
+
+.clientes-listado-wrap {
+  margin-top: 1.5rem;
+  margin-left: -1.5rem;
+  margin-right: -1.5rem;
+  padding: 1.25rem 2rem;
+  border-top: 2px solid #e2e8f0;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+.clientes-listado-wrap > .d-flex {
+  margin-bottom: 1rem;
+}
+.clientes-listado-wrap .table-responsive {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  background: #fff;
+  overflow: hidden;
+}
+.clientes-listado-wrap .clientes-listado-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-bottom: 0;
+  background: #fff;
+}
+.clientes-listado-wrap .clientes-listado-table thead.table-dark,
+.clientes-listado-wrap .clientes-listado-table thead.table-dark th {
+  background-color: #2D5D46 !important;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 1rem;
+}
+.clientes-listado-wrap .clientes-listado-table thead.table-dark tr th:first-child {
+  border-radius: 12px 0 0 0;
+}
+.clientes-listado-wrap .clientes-listado-table thead.table-dark tr th:last-child {
+  border-radius: 0 12px 0 0;
+}
+.clientes-listado-wrap .clientes-listado-table tbody td {
+  border-bottom: 1px solid #f1f5f9;
+  padding: 1rem;
+  background: #fff;
+}
+.clientes-listado-wrap .clientes-listado-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.clientes-listado-wrap .clientes-listado-table tbody tr:hover td {
+  background: #f8fafc;
+}
+
+/* ========== Página Reportes: menú tipo índice + tabla facturación por cliente ========== */
+.reportes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1.25rem;
+  margin-top: 0.5rem;
+}
+.reportes-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 1.5rem;
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.reportes-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  border-color: #cbd5e1;
+  color: inherit;
+}
+.reportes-card-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  color: #059669;
+  font-size: 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 1rem;
+}
+.reportes-card:hover .reportes-card-icon {
+  background: linear-gradient(135deg, #2D5D46 0%, #059669 100%);
+  color: #fff;
+}
+.reportes-card-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0 0 0.25rem;
+}
+.reportes-card-desc {
+  font-size: 0.8125rem;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.mineria-hub-card {
+  text-decoration: none;
+  color: inherit;
+}
+
+.reportes-listado-wrap {
+  margin-top: 1.5rem;
+  margin-left: -1.5rem;
+  margin-right: -1.5rem;
+  padding: 1.25rem 2rem;
+  border-top: 2px solid #e2e8f0;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+.reportes-listado-wrap .table-responsive {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  background: #fff;
+  overflow: hidden;
+}
+.reportes-listado-wrap .reportes-listado-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-bottom: 0;
+  background: #fff;
+}
+.reportes-listado-wrap .reportes-listado-table thead.table-dark,
+.reportes-listado-wrap .reportes-listado-table thead.table-dark th {
+  background-color: #2D5D46 !important;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 1rem;
+}
+.reportes-listado-wrap .reportes-listado-table thead.table-dark tr th:first-child {
+  border-radius: 12px 0 0 0;
+}
+.reportes-listado-wrap .reportes-listado-table thead.table-dark tr th:last-child {
+  border-radius: 0 12px 0 0;
+}
+.reportes-listado-wrap .reportes-listado-table tbody td {
+  border-bottom: 1px solid #f1f5f9;
+  padding: 1rem;
+  background: #fff;
+}
+.reportes-listado-wrap .reportes-listado-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.reportes-listado-wrap .reportes-listado-table tbody tr:hover td {
+  background: #f8fafc;
+}
+
+/* Botones Acciones en Historial: más chicos, parejos y alineados en una fila */
+.historial-acciones-btns {
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0.2rem;
+}
+.historial-acciones-btns .historial-accion-btn {
+  width: 0.95rem;
+  height: 0.95rem;
+  min-width: 0.95rem;
+  min-height: 0.95rem;
+  padding: 0;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  border-radius: 3px;
+  font-size: 0.6rem;
+  flex-shrink: 0;
+}
+.historial-acciones-btns .historial-accion-btn:first-of-type {
+  background-color: #fff9c4;
+  color: #5d4037;
+  border: 1px solid #d4c44a;
+}
+.historial-acciones-btns .historial-accion-trash {
+  display: inline-block;
+  line-height: 1;
+  font-size: inherit;
+}
+.historial-acciones-btns .btn,
+.historial-acciones-btns .fact-btn {
+  transition: transform 0.15s ease;
+}
+.historial-acciones-btns .btn:hover,
+.historial-acciones-btns .fact-btn:hover {
+  transform: translateY(-1px);
+}
+
+/* ========== Página Usuarios y permisos ========== */
+/* El topbar verde usa el mismo diseño que Historial (sin overrides de padding/márgenes) */
+
+.usuarios-page .fact-card {
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 166, 82, 0.12);
+}
+
+.usuarios-page .fact-card-header-custom {
+  padding: 1.25rem 1.5rem;
+  background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.usuarios-page .fact-card-header-custom .card-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.usuarios-page .fact-card-header-custom .card-title-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #00a652 0%, #00cc6e 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  box-shadow: 0 4px 12px rgba(0, 166, 82, 0.25);
+}
+
+.usuarios-page .fact-card-header-custom h2 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.usuarios-page .fact-card-header-custom .card-subtitle {
+  font-size: 0.8125rem;
+  color: #64748b;
+  margin: 0.25rem 0 0 0;
+  font-weight: 400;
+}
+
+.usuarios-page .fact-btn-new-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #00a652 0%, #00cc6e 100%);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.2s;
+  box-shadow: 0 2px 8px rgba(0, 166, 82, 0.3);
+}
+
+.usuarios-page .fact-btn-new-user:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 166, 82, 0.35);
+}
+
+.usuarios-page .usuarios-table-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.usuarios-page .usuarios-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+.usuarios-page .usuarios-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.usuarios-page .usuarios-table th {
+  padding: 1rem 1.25rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #475569;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.usuarios-page .usuarios-table th:last-child {
+  text-align: center;
+  width: 160px;
+}
+
+.usuarios-page .usuarios-table td {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.usuarios-page .usuarios-table tbody tr {
+  transition: background 0.15s ease;
+}
+
+.usuarios-page .usuarios-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.usuarios-page .usuarios-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.usuarios-page .usuarios-table .user-email {
+  font-weight: 500;
+  color: #0f172a;
+}
+
+.usuarios-page .usuarios-table .user-date {
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+/* Badges de rol */
+.usuarios-page .role-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 9999px;
+  letter-spacing: 0.02em;
+}
+
+.usuarios-page .role-badge--admin_a {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.25);
+}
+
+.usuarios-page .role-badge--admin_b {
+  background: linear-gradient(135deg, #047857 0%, #059669 100%);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(4, 120, 87, 0.25);
+}
+
+.usuarios-page .role-badge--operador {
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(29, 78, 216, 0.2);
+}
+
+.usuarios-page .role-badge--lector {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+.usuarios-page .role-badge--admin {
+  background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.25);
+}
+
+/* Botones de acción en tabla */
+.usuarios-page .action-btns {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.usuarios-page .btn-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.2s;
+}
+
+.usuarios-page .btn-action:hover {
+  transform: translateY(-1px);
+}
+
+.usuarios-page .btn-action--edit {
+  color: #0ea5e9;
+  background: rgba(14, 165, 233, 0.08);
+  border-color: rgba(14, 165, 233, 0.3);
+}
+
+.usuarios-page .btn-action--edit:hover {
+  background: rgba(14, 165, 233, 0.15);
+  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.2);
+}
+
+.usuarios-page .btn-action--danger {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.08);
+  border-color: rgba(220, 38, 38, 0.25);
+}
+
+.usuarios-page .btn-action--danger:hover {
+  background: rgba(220, 38, 38, 0.12);
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);
+}
+
+/* Actividad de usuarios */
+.usuarios-page .activity-card .fact-card-header-custom .card-title-icon {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+}
+
+.usuarios-page .activity-table-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.usuarios-page .activity-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.usuarios-page .activity-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.usuarios-page .activity-table th {
+  padding: 0.875rem 1.25rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #475569;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.usuarios-page .activity-table td {
+  padding: 0.875rem 1.25rem;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.usuarios-page .activity-table tbody tr {
+  transition: background 0.15s ease;
+}
+
+.usuarios-page .activity-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.usuarios-page .activity-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.usuarios-page .event-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 8px;
+}
+
+.usuarios-page .event-badge--login {
+  background: rgba(0, 166, 82, 0.12);
+  color: #047857;
+  border: 1px solid rgba(0, 166, 82, 0.25);
+}
+
+.usuarios-page .event-badge--logout {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+.usuarios-page .activity-ip {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8125rem;
+  color: #64748b;
+}
+
+.usuarios-page .activity-duration {
+  font-weight: 500;
+  color: #0f172a;
+}
+
+.usuarios-page .empty-activity {
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.9375rem;
+}
+
+.usuarios-page .empty-activity .bi {
+  font-size: 2.5rem;
+  opacity: 0.5;
+  margin-bottom: 0.75rem;
+  display: block;
+}
+
+/* Modal usuarios */
+.usuarios-page .modal-content {
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+}
+
+.usuarios-page .modal-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+}
+
+.usuarios-page .modal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.usuarios-page .modal-body {
+  padding: 1.5rem;
+}
+
+.usuarios-page .modal-body .form-label {
+  font-weight: 600;
+  color: #475569;
+  font-size: 0.875rem;
+}
+
+.usuarios-page .modal-body .form-control,
+.usuarios-page .modal-body .form-select {
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  padding: 0.625rem 0.875rem;
+}
+
+.usuarios-page .modal-body .form-control:focus,
+.usuarios-page .modal-body .form-select:focus {
+  border-color: #00a652;
+  box-shadow: 0 0 0 3px rgba(0, 166, 82, 0.12);
+}
+
+.usuarios-page .modal-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+  gap: 0.75rem;
+}
+
+.usuarios-page .modal-footer .btn-primary {
+  background: linear-gradient(135deg, #00a652 0%, #00cc6e 100%);
+  border: none;
+  font-weight: 600;
+  border-radius: 10px;
+  padding: 0.5rem 1.25rem;
+}
+
+.usuarios-page .modal-help {
+  font-size: 0.8125rem;
+  color: #64748b;
+  margin-top: 0.5rem;
+  line-height: 1.45;
+}
+
+/* Modal confirmar eliminar usuario */
+.usuarios-page .usuarios-delete-modal {
+  border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+  border: 1px solid #e2e8f0;
+}
+.usuarios-page .usuarios-delete-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+.usuarios-page .usuarios-delete-modal .modal-footer .btn-danger {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 600;
+  border-radius: 10px;
+  padding: 0.5rem 1.25rem;
+}
+.usuarios-page .usuarios-delete-modal .modal-footer .btn-secondary {
+  border-radius: 10px;
+}
+
+/* Loading y estado vacío */
+.usuarios-page .usuarios-loading,
+.usuarios-page .activity-loading {
+  padding: 2rem;
+  text-align: center;
+  color: #64748b;
+}
+
+.usuarios-page .usuarios-loading .spinner-border,
+.usuarios-page .activity-loading .spinner-border {
+  width: 2rem;
+  height: 2rem;
+  border-width: 0.2em;
+  color: #00a652;
+}
+
+/* Modales de eliminación de historial - Diseño profesional */
+.historial-delete-modal-overlay {
+  background: rgba(0, 0, 0, 0.65) !important;
+  backdrop-filter: blur(4px);
+  animation: fadeInOverlay 0.2s ease-out;
+}
+
+@keyframes fadeInOverlay {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.historial-delete-modal {
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  animation: slideInModal 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  max-width: 480px;
+}
+
+@keyframes slideInModal {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.historial-delete-modal-header {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  border-bottom: 2px solid #f87171;
+  padding: 1.75rem 1.75rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  position: relative;
+}
+
+.historial-delete-modal-header::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(248, 113, 113, 0.3), transparent);
+}
+
+.historial-delete-icon-wrapper {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+  flex-shrink: 0;
+}
+
+.historial-delete-icon-wrapper.historial-delete-icon-danger {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  box-shadow: 0 4px 16px rgba(220, 38, 38, 0.4);
+}
+
+.historial-delete-icon {
+  width: 28px;
+  height: 28px;
+  color: white;
+  stroke-width: 2.5;
+}
+
+.historial-delete-modal-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #991b1b;
+  margin: 0;
+  letter-spacing: -0.02em;
+  flex: 1;
+}
+
+.historial-delete-modal-body {
+  padding: 2rem 1.75rem;
+  background: #ffffff;
+}
+
+.historial-delete-question {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 1rem;
+  line-height: 1.6;
+}
+
+.historial-delete-warning {
+  font-size: 0.95rem;
+  color: #dc2626;
+  font-weight: 500;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  background: #fef2f2;
+  border-left: 3px solid #ef4444;
+  border-radius: 6px;
+}
+
+.historial-delete-warning-text {
+  font-size: 1rem;
+  color: #374151;
+  margin-bottom: 0.5rem;
+  line-height: 1.6;
+}
+
+.historial-delete-password-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 1rem;
+  margin-top: 1.5rem;
+}
+
+.historial-delete-attempts-alert {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 2px solid #fbbf24;
+  border-radius: 10px;
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #92400e;
+  box-shadow: 0 2px 8px rgba(251, 191, 36, 0.2);
+}
+
+.historial-delete-attempts-icon {
+  width: 20px;
+  height: 20px;
+  color: #f59e0b;
+  flex-shrink: 0;
+}
+
+.historial-delete-password-input-wrapper {
+  margin-top: 0.5rem;
+}
+
+.historial-delete-password-label-input {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.historial-delete-password-input {
+  width: 100%;
+  padding: 0.875rem 1.125rem;
+  font-size: 1rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+  background: #ffffff;
+  color: #1f2937;
+}
+
+.historial-delete-password-input:focus {
+  outline: none;
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+  background: #ffffff;
+}
+
+.historial-delete-password-input:disabled {
+  background: #f9fafb;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.historial-delete-password-input-error {
+  border-color: #dc2626;
+  background: #fef2f2;
+}
+
+.historial-delete-password-input-error:focus {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+}
+
+.historial-delete-password-error {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #dc2626;
+  font-weight: 500;
+  padding-left: 0.5rem;
+}
+
+.historial-delete-modal-footer {
+  padding: 1.5rem 1.75rem;
+  background: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.historial-delete-btn-cancel,
+.historial-delete-btn-confirm {
+  padding: 0.75rem 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-width: 120px;
+}
+
+.historial-delete-btn-cancel {
+  background: #ffffff;
+  color: #6b7280;
+  border: 2px solid #e5e7eb;
+}
+
+.historial-delete-btn-cancel:hover:not(:disabled) {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: #374151;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.historial-delete-btn-confirm {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.historial-delete-btn-confirm:hover:not(:disabled) {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.4);
+}
+
+.historial-delete-btn-confirm:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.historial-delete-btn-confirm:disabled,
+.historial-delete-btn-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.historial-delete-btn-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.historial-delete-modal-password .historial-delete-modal-header {
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+  border-bottom-color: #fca5a5;
+}
+
+/* ============================================
+   SISTEMA DE MODALES PROFESIONALES UNIVERSAL
+   ============================================ */
+
+/* Overlay base para todos los modales */
+.professional-modal-overlay {
+  background: rgba(0, 0, 0, 0.65) !important;
+  backdrop-filter: blur(4px);
+  animation: fadeInOverlay 0.2s ease-out;
+}
+
+/* Contenedor base del modal */
+.professional-modal {
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  animation: slideInModal 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  max-width: 520px;
+}
+
+/* Header base con gradientes según tipo */
+.professional-modal-header {
+  padding: 1.75rem 1.75rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  position: relative;
+  border-bottom: 2px solid;
+}
+
+.professional-modal-header::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+}
+
+/* Icono wrapper */
+.professional-modal-icon-wrapper {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.professional-modal-icon {
+  width: 28px;
+  height: 28px;
+  color: white;
+  stroke-width: 2.5;
+}
+
+/* Título del modal */
+.professional-modal-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.02em;
+  flex: 1;
+}
+
+/* Body del modal */
+.professional-modal-body {
+  padding: 2rem 1.75rem;
+  background: #ffffff;
+}
+
+/* Footer del modal */
+.professional-modal-footer {
+  padding: 1.5rem 1.75rem;
+  background: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+/* Botones profesionales */
+.professional-btn {
+  padding: 0.75rem 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-width: 120px;
+}
+
+.professional-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.professional-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.professional-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.professional-btn-secondary {
+  background: #ffffff;
+  color: #6b7280;
+  border: 2px solid #e5e7eb;
+}
+
+.professional-btn-secondary:hover:not(:disabled) {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: #374151;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* ===== TIPOS DE MODALES ===== */
+
+/* Modal de ELIMINACIÓN (rojo) */
+.professional-modal-delete .professional-modal-header {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  border-bottom-color: #f87171;
+}
+
+.professional-modal-delete .professional-modal-icon-wrapper {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.professional-modal-delete .professional-modal-title {
+  color: #991b1b;
+}
+
+.professional-modal-delete .professional-btn-primary {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.professional-modal-delete .professional-btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.4);
+}
+
+/* Modal de ADVERTENCIA (amarillo/naranja) */
+.professional-modal-warning .professional-modal-header {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-bottom-color: #fbbf24;
+}
+
+.professional-modal-warning .professional-modal-icon-wrapper {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.professional-modal-warning .professional-modal-title {
+  color: #92400e;
+}
+
+.professional-modal-warning .professional-btn-primary {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.professional-modal-warning .professional-btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+  box-shadow: 0 6px 16px rgba(217, 119, 6, 0.4);
+}
+
+/* Modal de ÉXITO (verde) */
+.professional-modal-success .professional-modal-header {
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  border-bottom-color: #34d399;
+}
+
+.professional-modal-success .professional-modal-icon-wrapper {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.professional-modal-success .professional-modal-title {
+  color: #065f46;
+}
+
+.professional-modal-success .professional-btn-primary {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.professional-modal-success .professional-btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  box-shadow: 0 6px 16px rgba(5, 150, 105, 0.4);
+}
+
+/* Modal de INFORMACIÓN (azul) */
+.professional-modal-info .professional-modal-header {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  border-bottom-color: #60a5fa;
+}
+
+.professional-modal-info .professional-modal-icon-wrapper {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.professional-modal-info .professional-modal-title {
+  color: #1e40af;
+}
+
+.professional-modal-info .professional-btn-primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.professional-modal-info .professional-btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+}
+
+/* Modal de FORMULARIO (azul/gris neutro) */
+.professional-modal-form .professional-modal-header {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  border-bottom-color: #cbd5e1;
+}
+
+.professional-modal-form .professional-modal-icon-wrapper {
+  background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+  box-shadow: 0 4px 12px rgba(100, 116, 139, 0.3);
+}
+
+.professional-modal-form .professional-modal-title {
+  color: #1e293b;
+}
+
+.professional-modal-form .professional-btn-primary {
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+}
+
+.professional-modal-form .professional-btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  box-shadow: 0 6px 16px rgba(2, 132, 199, 0.4);
+}
+
+/* Inputs profesionales en modales */
+.professional-modal-body .form-control,
+.professional-modal-body .form-select {
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 0.875rem 1.125rem;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+}
+
+.professional-modal-body .form-control:focus,
+.professional-modal-body .form-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.professional-modal-body .form-label {
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+/* Spinner para botones */
+.professional-btn-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+/* Mensajes de advertencia dentro del modal */
+.professional-modal-warning-box {
+  padding: 1rem 1.25rem;
+  background: #fef2f2;
+  border-left: 3px solid #ef4444;
+  border-radius: 6px;
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
+  color: #991b1b;
+  font-weight: 500;
+}
+
+.professional-modal-info-box {
+  padding: 1rem 1.25rem;
+  background: #eff6ff;
+  border-left: 3px solid #3b82f6;
+  border-radius: 6px;
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
+  color: #1e40af;
+  font-weight: 500;
+}
+
+/* Botón cerrar mejorado */
+.professional-modal-close {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  opacity: 0.8;
+}
+
+.professional-modal-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+  opacity: 1;
+}
+
+/* ========== Notificaciones (Toast): mismo lenguaje visual que Filtros y Listado ========== */
+.hrs-toast-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.hrs-toast {
+  border: none !important;
+}
+.hrs-toast-header {
+  font-weight: 600;
+}
+.hrs-toast-body {
+  border-radius: 0 0 14px 14px;
+}
+.hrs-toast-container .hrs-toast-close {
+  filter: brightness(0) invert(1);
+  opacity: 0.9;
+}
+.hrs-toast-container .hrs-toast-close:hover {
+  opacity: 1;
 }

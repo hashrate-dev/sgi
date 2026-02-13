@@ -168,6 +168,30 @@ export function getMe(): Promise<MeResponse> {
   return api<MeResponse>("/api/auth/me");
 }
 
+/** Verificar contraseña sin cerrar sesión en caso de error 401 */
+export async function verifyPassword(password: string): Promise<{ valid: boolean }> {
+  const token = getStoredToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const base = getApiBase();
+  const url = `${base}/api/auth/verify-password`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ password }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    // No cerrar sesión, solo lanzar error
+    throw new Error((data as { error?: { message?: string } })?.error?.message ?? "Contraseña incorrecta");
+  }
+  if (!res.ok) {
+    const msg = (data as { error?: { message?: string } })?.error?.message ?? res.statusText;
+    throw new Error(msg);
+  }
+  return data as { valid: boolean };
+}
+
 export type UserListItem = { id: number; email: string; role: string; created_at: string };
 export type UsersResponse = { users: UserListItem[] };
 export type UserResponse = { user: UserListItem };

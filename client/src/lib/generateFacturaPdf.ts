@@ -73,7 +73,10 @@ const EMISOR = {
   web: "https://hashrate.space",
 };
 
-const MARGIN = 18;
+/** Márgenes superior e inferior (mm) */
+const MARGIN_TOP_BOTTOM = 22; /* 18 + 4mm: 0.4 cm más arriba y abajo */
+/** Márgenes izquierdo y derecho: más espacio en costados (0.2 cm extra por lado respecto a 22mm) */
+const MARGIN_SIDES = 26; /* 22 + 4mm: 0.2 cm más por cada costado (24→26) */
 const PAGE_W = 210;
 const PAGE_H = 297;
 const COL_DESC = 95;
@@ -102,16 +105,15 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   const vencimiento = new Date(now);
   vencimiento.setDate(vencimiento.getDate() + 7);
 
-  const yTop = MARGIN; // Alineado al margen superior (18mm)
-  const contentRight = PAGE_W - MARGIN + 5; // Alineado al margen derecho + 0.5 cm hacia la derecha
+  const yTop = MARGIN_TOP_BOTTOM;
+  const contentRight = PAGE_W - MARGIN_SIDES + 5; /* borde derecho del contenido (respeta 0.2 cm extra costado) */
   const tableLeft = (PAGE_W - TABLE_W) / 2;
   
-  // ---------- Logo hashrate (arriba, alineado exactamente al margen izquierdo y superior) ----------
+  // ---------- Logo hashrate (arriba, alineado al margen izquierdo y superior) ----------
   if (images?.logoBase64) {
     try {
-      // Movido 1 cm (10mm) más a la izquierda desde el margen
-      const logoX = MARGIN - 10; // 18mm - 10mm = 8mm desde el borde izquierdo
-      const logoY = MARGIN; // Margen superior (18mm)
+      const logoX = MARGIN_SIDES - 10; /* margen izquierdo + logo 10mm hacia el borde */
+      const logoY = MARGIN_TOP_BOTTOM;
       
       // Usar altura fija para mantener proporción sin deformar
       doc.addImage(
@@ -127,8 +129,8 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
     }
   }
   
-  const LOGO_RIGHT = (MARGIN - 10) + LOGO_WIDTH_MM + 5; // Espacio después del logo (ajustado por la nueva posición)
-  const COMPANY_INFO_X = LOGO_RIGHT + 10; // Movido 1 cm (10mm) a la derecha desde el logo
+  const LOGO_RIGHT = (MARGIN_SIDES - 10) + LOGO_WIDTH_MM + 5;
+  const COMPANY_INFO_X = LOGO_RIGHT + 10;
 
   // ---------- Misma información pero al lado derecho del logo (arriba de la hoja) ----------
   // Orden: izquierda = emisor, derecha = FACTURA CREDITO + VIA CLIENTE + FECHA + TOTAL + RUC
@@ -138,15 +140,15 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
     data.type === "Recibo" ? "RECIBO" : 
     "NOTA DE CRÉDITO";
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(12);
+  doc.setFontSize(9);
   doc.setTextColor(0, 0, 0);
   doc.text(EMISOR.nombre, COMPANY_INFO_X, y);
-  doc.setFontSize(11);
+  doc.setFontSize(9);
   doc.text(`${tipoLabel} - ${data.number}`, contentRight, y, { align: "right" });
   y += 5;
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.text(EMISOR.direccion, COMPANY_INFO_X, y);
   doc.text("VIA CLIENTE", contentRight, y, { align: "right" });
   y += 5;
@@ -208,7 +210,7 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
     // Si tiene guion y es largo, dividir en dos líneas sin el guion
     if (hasText(block.name)) {
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(11);
+      doc.setFontSize(9);
       const nameStr = String(block.name).trim();
       const hasHyphen = nameStr.includes(" - ");
       let nameLines: string[] = [];
@@ -241,7 +243,7 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
     }
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     const lineH = 5;
     const add = (v?: string, upper = false) => {
       if (!hasText(v)) return;
@@ -268,7 +270,7 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   const getClientNameHeight = (name: string | undefined): number => {
     if (!hasText(name)) return 0;
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(11);
+    doc.setFontSize(9);
     const nameStr = String(name).trim();
     const hasHyphen = nameStr.includes(" - ");
     let nameLines: string[] = [];
@@ -368,7 +370,7 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   doc.line(tableLeft, tableTop + HEADER_ROW_H, tableLeft + TABLE_W, tableTop + HEADER_ROW_H);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(11);
+  doc.setFontSize(10); /* tablas: +1pt (encabezado tabla ítems) */
   doc.setTextColor(255, 255, 255);
   doc.text("DESCRIPCION", tableLeft + 3, tableTop + 6.5);
   doc.text("PRECIO", centerPrecio, tableTop + 6.5, { align: "center" });
@@ -378,11 +380,26 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
 
   y = tableTop + HEADER_ROW_H;
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(11);
+  doc.setFontSize(10); /* tablas: +1pt (filas tabla ítems) */
 
   for (const it of data.items) {
     const lineTotalServicio = it.price * it.quantity;
-    const desc = it.month ? `${it.serviceName} - ${ymToMonthYear(it.month)}` : it.serviceName;
+    // Determinar la descripción: priorizar Setup, luego equipos ASIC, luego servicios de Hosting
+    let desc = "";
+    if (it.setupId && it.setupNombre) {
+      // Setup
+      desc = it.setupNombre;
+    } else if (it.marcaEquipo && it.modeloEquipo && it.procesadorEquipo) {
+      // Equipo ASIC
+      const equipoDesc = `${it.marcaEquipo} - ${it.modeloEquipo} - ${it.procesadorEquipo}`;
+      desc = it.month ? `${equipoDesc} - ${ymToMonthYear(it.month)}` : equipoDesc;
+    } else if (it.serviceName) {
+      // Servicio de Hosting (compatibilidad hacia atrás)
+      desc = it.month ? `${it.serviceName} - ${ymToMonthYear(it.month)}` : it.serviceName;
+    } else {
+      // Fallback
+      desc = it.month ? `Item - ${ymToMonthYear(it.month)}` : "Item";
+    }
     doc.text(desc.substring(0, 52), tableLeft + 3, y + 5.5);
     doc.text(formatUSD(it.price), centerPrecio, y + 5.5, { align: "center" });
     doc.text(String(it.quantity), centerCant, y + 5.5, { align: "center" });
@@ -394,8 +411,17 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
 
     if (it.discount > 0) {
       const discountAmount = it.discount * it.quantity;
-      const serviceLabel = it.serviceKey === "A" ? "L7" : it.serviceKey === "B" ? "L9" : "S21";
-      const descDescuento = `Descuento HASHRATE ${serviceLabel}`;
+      let descDescuento = "";
+      if (it.setupId && it.setupNombre) {
+        descDescuento = `Descuento ${it.setupNombre}`;
+      } else if (it.marcaEquipo && it.modeloEquipo) {
+        descDescuento = `Descuento ${it.marcaEquipo} ${it.modeloEquipo}`;
+      } else if (it.serviceKey) {
+        const serviceLabel = it.serviceKey === "A" ? "L7" : it.serviceKey === "B" ? "L9" : "S21";
+        descDescuento = `Descuento HASHRATE ${serviceLabel}`;
+      } else {
+        descDescuento = "Descuento";
+      }
       doc.text(descDescuento, tableLeft + 3, y + 5.5);
       doc.text("- " + formatUSD(it.discount), centerPrecio, y + 5.5, { align: "center" });
       doc.text(String(it.quantity), centerCant, y + 5.5, { align: "center" });
@@ -450,7 +476,7 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
 
   doc.line(tableLeft, datesBlockTop + datesBlockH / 2, tableLeft + TABLE_W, datesBlockTop + datesBlockH / 2);
 
-  doc.setFontSize(11);
+  doc.setFontSize(10); /* tablas fechas: +1pt (encabezados y datos) */
   doc.setFont("helvetica", "normal");
   doc.setTextColor(255, 255, 255);
   doc.text("FECHA DE EMISIÓN:", leftCenterX, datesBlockTop + 5, { align: "center" });
@@ -476,7 +502,7 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   const TOTAL_BOX_W = 58;
   const TOTAL_LABEL_W = 24;
   const totalBoxLeft = totalTableRight - TOTAL_BOX_W;
-  const yTotal = PAGE_H - MARGIN;
+  const yTotal = PAGE_H - MARGIN_TOP_BOTTOM;
   const totalBoxTop = yTotal - TOTAL_ROW_H;
   const totalBoxBottom = totalBoxTop + TOTAL_ROW_H;
   const Rt = TABLE_RADIUS;
@@ -517,7 +543,7 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   const totalBaselineY = totalCenterY + doc.getFontSize() * 0.12;
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(11);
+  doc.setFontSize(10); /* caja TOTAL: +1pt */
   doc.setTextColor(255, 255, 255);
   doc.text("TOTAL", totalLabelCenterX, totalBaselineY, { align: "center" });
 

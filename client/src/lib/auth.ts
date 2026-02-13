@@ -48,7 +48,7 @@ export function canEditClientes(role: UserRole): boolean {
 }
 
 export function canDeleteHistorial(role: UserRole): boolean {
-  return role === "admin_a" || role === "admin_b";
+  return role === "admin_a";
 }
 
 export function canDeleteClientes(role: UserRole): boolean {

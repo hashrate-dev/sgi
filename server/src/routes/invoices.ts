@@ -22,7 +22,12 @@ const InvoiceCreateSchema = z.object({
   subtotal: z.number().min(0),
   discounts: z.number().min(0),
   total: z.number().min(0),
-  items: z.array(LineItemSchema).default([])
+  items: z.array(LineItemSchema).default([]),
+  relatedInvoiceId: z.string().optional(),
+  relatedInvoiceNumber: z.string().optional(),
+  paymentDate: z.string().optional(),
+  emissionTime: z.string().optional(),
+  dueDate: z.string().optional()
 });
 
 invoicesRouter.get("/invoices", (req, res) => {
@@ -56,7 +61,9 @@ invoicesRouter.get("/invoices", (req, res) => {
   const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
   const invoices = db
     .prepare(
-      `SELECT id, number, type, clientName, date, month, subtotal, discounts, total
+      `SELECT id, number, type, clientName, date, month, subtotal, discounts, total,
+              related_invoice_id as relatedInvoiceId, related_invoice_number as relatedInvoiceNumber,
+              payment_date as paymentDate, emission_time as emissionTime, due_date as dueDate
        FROM invoices ${where} ORDER BY id DESC`
     )
     .all(...params);
@@ -74,8 +81,9 @@ invoicesRouter.post("/invoices", requireRole("admin_a", "admin_b", "operador"), 
 
   const inv = parsed.data;
   const insertInvoice = db.prepare(`
-    INSERT INTO invoices (number, type, clientName, date, month, subtotal, discounts, total)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO invoices (number, type, clientName, date, month, subtotal, discounts, total, 
+                          related_invoice_id, related_invoice_number, payment_date, emission_time, due_date)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const insertItem = db.prepare(`
     INSERT INTO invoice_items (invoice_id, service, month, quantity, price, discount)
@@ -91,7 +99,12 @@ invoicesRouter.post("/invoices", requireRole("admin_a", "admin_b", "operador"), 
       inv.month,
       inv.subtotal,
       inv.discounts,
-      inv.total
+      inv.total,
+      inv.relatedInvoiceId || null,
+      inv.relatedInvoiceNumber || null,
+      inv.paymentDate || null,
+      inv.emissionTime || null,
+      inv.dueDate || null
     );
     const invoiceId = info.lastInsertRowid as number;
     for (const item of inv.items) {
@@ -99,7 +112,10 @@ invoicesRouter.post("/invoices", requireRole("admin_a", "admin_b", "operador"), 
     }
     const created = db
       .prepare(
-        "SELECT id, number, type, clientName, date, month, subtotal, discounts, total FROM invoices WHERE id = ?"
+        `SELECT id, number, type, clientName, date, month, subtotal, discounts, total,
+                related_invoice_id as relatedInvoiceId, related_invoice_number as relatedInvoiceNumber,
+                payment_date as paymentDate, emission_time as emissionTime, due_date as dueDate
+         FROM invoices WHERE id = ?`
       )
       .get(invoiceId);
     return created;

@@ -32,6 +32,8 @@ export function ClienteEditPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   if (user && !canEdit) return <Navigate to="/clientes" replace />;
 
@@ -104,9 +106,14 @@ export function ClienteEditPage() {
       .catch((err) => setMessage({ type: "err", text: err instanceof Error ? err.message : "Error al actualizar" }));
   }
 
-  function handleDelete() {
+  function handleDeleteClick() {
+    setShowDeleteConfirm(true);
+  }
+
+  function handleDeleteConfirm() {
     if (!id) return;
-    if (!window.confirm("¿Eliminar este cliente? Esta acción no se puede deshacer.")) return;
+    setShowDeleteConfirm(false);
+    setDeleting(true);
     setMessage(null);
     deleteClient(id)
       .then(() => {
@@ -115,7 +122,10 @@ export function ClienteEditPage() {
           navigate("/clientes");
         }, 1500);
       })
-      .catch((err) => setMessage({ type: "err", text: err instanceof Error ? err.message : "Error al eliminar" }));
+      .catch((err) => {
+        setMessage({ type: "err", text: err instanceof Error ? err.message : "Error al eliminar" });
+        setDeleting(false);
+      });
   }
 
   if (loading) {
@@ -298,7 +308,7 @@ export function ClienteEditPage() {
                       type="button"
                       className="fact-btn"
                       style={{ background: "#dc2626", color: "#fff" }}
-                      onClick={handleDelete}
+                      onClick={handleDeleteClick}
                     >
                       Eliminar cliente
                     </button>
@@ -312,6 +322,54 @@ export function ClienteEditPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal Confirmación - Eliminar Cliente */}
+      {showDeleteConfirm && client && (
+        <div className="modal d-block professional-modal-overlay" tabIndex={-1}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content professional-modal professional-modal-delete">
+              <div className="modal-header professional-modal-header">
+                <div className="professional-modal-icon-wrapper">
+                  <svg className="professional-modal-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <h5 className="modal-title professional-modal-title">
+                  Eliminar Cliente
+                </h5>
+                <button type="button" className="professional-modal-close" onClick={() => setShowDeleteConfirm(false)} aria-label="Cerrar">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M18 6L6 18M6 6L18 18" strokeLinecap="round"/>
+                  </svg>
+                </button>
+              </div>
+              <div className="modal-body professional-modal-body">
+                <p style={{ fontSize: "1rem", color: "#374151", marginBottom: "1rem" }}>
+                  ¿Eliminar al cliente <strong>{client.name}</strong>?
+                </p>
+                <div className="professional-modal-warning-box">
+                  Esta acción no se puede deshacer.
+                </div>
+              </div>
+              <div className="modal-footer professional-modal-footer">
+                <button type="button" className="professional-btn professional-btn-secondary" onClick={() => setShowDeleteConfirm(false)} disabled={deleting}>
+                  Cancelar
+                </button>
+                <button type="button" className="professional-btn professional-btn-primary" onClick={handleDeleteConfirm} disabled={deleting}>
+                  {deleting ? (
+                    <>
+                      <span className="professional-btn-spinner"></span>
+                      Eliminando...
+                    </>
+                  ) : (
+                    "Eliminar"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
