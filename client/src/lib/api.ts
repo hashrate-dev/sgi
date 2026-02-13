@@ -16,14 +16,16 @@ const FALLBACK_API_URLS = [
 
 function getApiBase(): string {
   if (typeof window === "undefined") return "";
+  const h = window.location?.hostname ?? "";
+  // En sgi-hrs.vercel.app SIEMPRE usar el backend de Render (ignorar localStorage para evitar URLs viejas)
+  if (h === "sgi-hrs.vercel.app") return SGI_RENDER_API;
   const stored = window.localStorage.getItem(STORAGE_KEY);
   const s = typeof stored === "string" ? stored.replace(/\/+$/, "").trim() : "";
   if (s) return s;
   const build = typeof RAW === "string" ? RAW.replace(/\/+$/, "").trim() : "";
   if (build) return build;
-  const h = window.location?.hostname ?? "";
-  if (h === "localhost" || h === "127.0.0.1") return "";
-  if (h === "sgi-hrs.vercel.app") return SGI_RENDER_API;
+  // En localhost, usar el backend local en el puerto 8080
+  if (h === "localhost" || h === "127.0.0.1") return "http://localhost:8080";
   if (h.endsWith(".vercel.app")) return DEFAULT_RENDER_API;
   return "";
 }

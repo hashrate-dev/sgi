@@ -19,21 +19,33 @@ export function createApp() {
   app.set("trust proxy", true);
 
   app.use(helmet());
-  const corsOrigin = env.CORS_ORIGIN
-    ? env.CORS_ORIGIN.split(",").map((o) => o.trim()).filter(Boolean)
-    : [
-        "https://hashrateapp.vercel.app",
-        "https://sgi-hrs.vercel.app",
-        "http://localhost:5173",
-        "http://127.0.0.1:5173"
-      ];
-  const originOption =
-    Array.isArray(corsOrigin) && corsOrigin.length === 0 ? true
-    : Array.isArray(corsOrigin) && corsOrigin.length === 1 ? corsOrigin[0]!
-    : corsOrigin;
+  // Permitir siempre sgi-hrs.vercel.app y cualquier *.vercel.app; además los orígenes de CORS_ORIGIN y localhost
+  const allowedOrigins = new Set<string>([
+    "https://sgi-hrs.vercel.app",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://localhost:5175",
+    "http://localhost:5176",
+    "http://localhost:5177",
+    "http://localhost:5178",
+    "http://localhost:5179",
+    "http://127.0.0.1:5173"
+  ]);
+  if (env.CORS_ORIGIN) {
+    env.CORS_ORIGIN.split(",").forEach((o) => {
+      const t = o.trim().replace(/\/+$/, "");
+      if (t) allowedOrigins.add(t);
+    });
+  }
   app.use(
     cors({
-      origin: originOption,
+      origin: (origin, cb) => {
+        if (!origin) return cb(null, true);
+        if (allowedOrigins.has(origin)) return cb(null, true);
+        if (origin.endsWith(".vercel.app") && (origin.startsWith("https://") || origin.startsWith("http://"))) return cb(null, true);
+        return cb(null, false);
+      },
       credentials: true
     })
   );

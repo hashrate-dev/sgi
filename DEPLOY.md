@@ -10,7 +10,7 @@
 - [ ] **Environment Variables:**  
   `VITE_API_URL` = URL del backend en Render (ej. `https://hashrate-api.onrender.com`) **sin** barra final.
 - [ ] Después de agregar o cambiar `VITE_API_URL`, hacer **Redeploy**.
-- Anotar la URL del sitio (ej. `https://hashrateapp.vercel.app`).
+- Anotar la URL del sitio: **https://sgi-hrs.vercel.app**
 
 ## 3. Render (backend)
 - [ ] **Web Service** conectado al repo **hashrate_app**.
@@ -20,7 +20,7 @@
   - **Start Command:** `npm start`
   - **Disk:** el Blueprint incluye un disco persistente (`/data`, 1 GB) y `SQLITE_PATH=/data/data.db` para que **usuarios, clientes y toda la base de datos se conserven entre deploys**.
 - [ ] **Environment:**  
-  `CORS_ORIGIN` = URL de Vercel (ej. `https://hashrateapp.vercel.app`) **sin** barra final.  
+  `CORS_ORIGIN` = **https://sgi-hrs.vercel.app** (sin barra final).  
   Si no usás el Blueprint, agregar también `SQLITE_PATH=/data/data.db` y crear un **Disk** en Render (mount path `/data`) para no perder datos en cada deploy.
 - [ ] Anotar la URL del servicio (ej. `https://hashrate-api.onrender.com`).
 
@@ -32,8 +32,8 @@
 ## Resumen de variables
 | Servicio | Variable        | Valor (ejemplo)                          |
 |----------|-----------------|------------------------------------------|
-| Vercel   | VITE_API_URL    | https://hashrate-api.onrender.com        |
-| Render   | CORS_ORIGIN     | https://hashrateapp.vercel.app           |
+| Vercel   | VITE_API_URL    | https://sgi.onrender.com                 |
+| Render   | CORS_ORIGIN     | https://sgi-hrs.vercel.app               |
 
 Siempre **sin** barra final en las URLs.
 

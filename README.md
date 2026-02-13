@@ -55,7 +55,7 @@ Para que la app funcione en producci?n (front en Vercel, API en Render, c?digo e
 |-------|-----------|
 | **GitHub** | Repo `hashrate_app` con el c?digo. Cada push a `main` dispara deploy en Vercel y Render. |
 | **Vercel** | Conectar el repo. **Root Directory** = `client`. Variables: **VITE_API_URL** = URL de Render (ej. `https://hashrate-api.onrender.com`), sin barra final. |
-| **Render** | Conectar el repo. Usar el Blueprint (`render.yaml`) o configurar: **Root Directory** = `server`, **Build** = `npm install && npm run build`, **Start** = `npm start`. Variable: **CORS_ORIGIN** = URL de Vercel (ej. `https://hashrateapp.vercel.app`), sin barra final. |
+| **Render** | Conectar el repo. Usar el Blueprint (`render.yaml`) o configurar: **Root Directory** = `server`, **Build** = `npm install && npm run build`, **Start** = `npm start`. Variable: **CORS_ORIGIN** = **https://sgi-hrs.vercel.app** (sin barra final). |
 
 **Orden recomendado:** 1) Conectar GitHub a Vercel y desplegar (anotar la URL de Vercel). 2) Conectar GitHub a Render y desplegar (anotar la URL de Render). 3) En Render a?adir **CORS_ORIGIN** = URL de Vercel. 4) En Vercel a?adir **VITE_API_URL** = URL de Render. 5) En Vercel hacer **Redeploy**. Despu?s de eso, la app en Vercel usar? la API de Render.
 
@@ -88,7 +88,7 @@ Con el repo ya en GitHub:
    - **Build Command:** (dej? vac?o; por defecto hace `npm install` y usa el `build` del `package.json`).
    - **Start Command:** (dej? vac?o; usa `npm start`).
 4. **Variables** (pesta?a Variables):
-   - `CORS_ORIGIN` = URL de tu front en Vercel, ej. `https://hashrateapp.vercel.app` (sin barra final).
+   - `CORS_ORIGIN` = **https://sgi-hrs.vercel.app** (sin barra final).
    - `PORT` lo asigna Railway; no hace falta definirlo.
 5. **Deploy**: Railway hace build y deploy. En **Settings** ? **Networking** ? **Generate Domain** obten? la URL p?blica (ej. `https://hashrate-app-production-xxxx.up.railway.app`).
 6. En **Vercel** ? tu proyecto ? **Settings** ? **Environment Variables**:

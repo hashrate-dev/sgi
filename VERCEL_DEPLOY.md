@@ -46,7 +46,7 @@ En **Settings → Environment Variables** agregá:
 En Vercel la API serverless a veces falla (p. ej. por módulos nativos como `better-sqlite3`). **Solución recomendada:** usar el backend en **Render** y que el front en Vercel lo use:
 
 1. **Render:** Desplegá el backend (Blueprint o Web Service con Root = `server`). En **Environment** agregá:
-   - `CORS_ORIGIN` = `https://hashrateapp.vercel.app` (tu URL de Vercel, sin barra final).
+   - `CORS_ORIGIN` = `https://sgi-hrs.vercel.app` (tu URL de Vercel, sin barra final).
 2. **Vercel:** En **Settings → Environment Variables** agregá:
    - **Name:** exactamente `VITE_API_URL` (con VITE_ al inicio).
    - **Value:** URL de tu servicio en Render (ej. `https://hashrate-facturacion-hrs.onrender.com`), **sin** barra final, **https**.

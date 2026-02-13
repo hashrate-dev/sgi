@@ -15,7 +15,7 @@ El backend debe aceptar peticiones desde tu front en Vercel.
   (sin barra final; si querés varios orígenes separalos por coma).
 - Guardá y hacé **Manual Deploy** para aplicar los cambios.
 
-**Nota:** Si no definís `CORS_ORIGIN`, el servidor ya permite por defecto `https://sgi-hrs.vercel.app` y `https://hashrateapp.vercel.app`. Si la definís, tené que incluir `https://sgi-hrs.vercel.app` en la lista.
+**Nota:** Si no definís `CORS_ORIGIN`, el servidor ya permite por defecto `https://sgi-hrs.vercel.app`. Si la definís, tené que incluir `https://sgi-hrs.vercel.app` en la lista.
 
 ---
 
