@@ -19,36 +19,10 @@ export function createApp() {
   app.set("trust proxy", true);
 
   app.use(helmet());
-  // Origen canónico: sgi-hrs.vercel.app. También sgi.hashrate.space, *.vercel.app, *.hashrate.space
-  const allowedOrigins = new Set<string>([
-    "https://sgi-hrs.vercel.app",
-    "https://sgi.hashrate.space",
-    "http://sgi.hashrate.space",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:5174",
-    "http://localhost:5175",
-    "http://localhost:5176",
-    "http://localhost:5177",
-    "http://localhost:5178",
-    "http://localhost:5179",
-    "http://127.0.0.1:5173"
-  ]);
-  if (env.CORS_ORIGIN) {
-    env.CORS_ORIGIN.split(",").forEach((o) => {
-      const t = o.trim().replace(/\/+$/, "");
-      if (t) allowedOrigins.add(t);
-    });
-  }
+  // CORS: permitir cualquier origen para que login funcione desde sgi-hrs.vercel.app y sgi.hashrate.space sin depender de proxy ni de CORS_ORIGIN en Render
   app.use(
     cors({
-      origin: (origin, cb) => {
-        if (!origin) return cb(null, true);
-        if (allowedOrigins.has(origin)) return cb(null, true);
-        if (origin.endsWith(".vercel.app") && (origin.startsWith("https://") || origin.startsWith("http://"))) return cb(null, true);
-        if (origin.endsWith(".hashrate.space") && (origin.startsWith("https://") || origin.startsWith("http://"))) return cb(null, true);
-        return cb(null, false);
-      },
+      origin: true,
       credentials: true
     })
   );

@@ -17,9 +17,8 @@ const FALLBACK_API_URLS = [
 function getApiBase(): string {
   if (typeof window === "undefined") return "";
   const h = window.location?.hostname ?? "";
-  // En sgi-hrs.vercel.app usamos proxy de Vercel: peticiones a /api/* (mismo origen) → sin CORS.
-  if (h === "sgi-hrs.vercel.app") return "";
-  if (h === "sgi.hashrate.space") return SGI_RENDER_API;
+  // sgi-hrs.vercel.app y sgi.hashrate.space: siempre backend en Render (CORS en backend permite cualquier origen).
+  if (h === "sgi-hrs.vercel.app" || h === "sgi.hashrate.space") return SGI_RENDER_API;
   const stored = window.localStorage.getItem(STORAGE_KEY);
   const s = typeof stored === "string" ? stored.replace(/\/+$/, "").trim() : "";
   if (s) return s;
@@ -56,7 +55,7 @@ function getNoApiMessage(): string {
   }
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
   if (h === "sgi-hrs.vercel.app" || h === "sgi.hashrate.space") {
-    return "No se pudo conectar con el backend en Render (https://sistema-gestion-interna.onrender.com). Verificá que el servicio esté activo y que CORS permita este origen.";
+    return "No se pudo conectar con el backend en Render. Verificá que el servicio sistema-gestion-interna esté activo en dashboard.render.com (si está dormido, esperá 1 minuto).";
   }
   return "No se pudo conectar con el servidor. Volvé a intentar en unos momentos.";
 }
@@ -101,9 +100,8 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   if (token) headers.Authorization = `Bearer ${token}`;
   let base = getApiBase();
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  const useProxy = h === "sgi-hrs.vercel.app";
-  // En sgi-hrs usamos proxy (base ""); no pedir URL al servidor. Otros *.vercel.app sí pueden.
-  if (typeof window !== "undefined" && !useProxy && (window.location?.hostname?.endsWith(".vercel.app") || window.location?.hostname?.endsWith(".hashrate.space"))) {
+  const useDirectRender = h === "sgi-hrs.vercel.app" || h === "sgi.hashrate.space";
+  if (typeof window !== "undefined" && !useDirectRender && (window.location?.hostname?.endsWith(".vercel.app") || window.location?.hostname?.endsWith(".hashrate.space"))) {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (!stored || stored.trim() === "") {
       const fromServer = await getBackendUrlFromVercel();
@@ -113,13 +111,10 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
       }
     }
   }
-  if ((!base || base.trim() === "") && !useProxy) {
-    if (h === "sgi.hashrate.space") {
-      throw new Error("No se configuró la URL del backend. Configurá VITE_API_URL=https://sistema-gestion-interna.onrender.com y hacé redeploy.");
-    }
+  if (!base || base.trim() === "") {
     throw new Error(getNoApiMessage());
   }
-  const url = base ? `${base}${path}` : path;
+  const url = `${base}${path}`;
   let lastError: Error | null = null;
   for (let i = 0; i < RETRY_DELAYS_MS.length; i++) {
     if (i > 0) await delay(RETRY_DELAYS_MS[i]!);
@@ -131,10 +126,8 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
       // Detectar errores de CORS (generalmente "Failed to fetch" o "NetworkError")
       if (errMsg === "Failed to fetch" || errMsg.includes("NetworkError") || errMsg === "Load failed") {
         const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-        if (h === "sgi-hrs.vercel.app") {
-          lastError = new Error("No se pudo conectar con el backend (proxy a Render). Verificá que el servicio sistema-gestion-interna en Render esté activo y que el deploy en Vercel tenga el proxy /api configurado.");
-        } else if (h === "sgi.hashrate.space") {
-          lastError = new Error("No se pudo conectar con el backend en Render. Verificá que el servicio esté activo y que CORS permita sgi.hashrate.space.");
+        if (h === "sgi-hrs.vercel.app" || h === "sgi.hashrate.space") {
+          lastError = new Error("No se pudo conectar con el backend en Render. Verificá que el servicio sistema-gestion-interna esté activo en dashboard.render.com (si está dormido, esperá 1 minuto y reintentá).");
         } else {
           lastError = new Error(`Error de conexión: ${errMsg}. Verificá CORS y que el backend esté activo.`);
         }
