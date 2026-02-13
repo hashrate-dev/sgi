@@ -115,6 +115,10 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error(getNoApiMessage());
   }
   const url = `${base}${path}`;
+  // Debug: log la URL que estamos usando
+  if (typeof window !== "undefined" && window.location?.hostname === "sgi-hrs.vercel.app") {
+    console.log("[API] URL:", url, "| Base:", base, "| Path:", path);
+  }
   let lastError: Error | null = null;
   for (let i = 0; i < RETRY_DELAYS_MS.length; i++) {
     if (i > 0) await delay(RETRY_DELAYS_MS[i]!);
