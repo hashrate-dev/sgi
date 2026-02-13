@@ -19,9 +19,11 @@ export function createApp() {
   app.set("trust proxy", true);
 
   app.use(helmet());
-  // Permitir siempre sgi-hrs.vercel.app y cualquier *.vercel.app; además los orígenes de CORS_ORIGIN y localhost
+  // Permitir siempre sgi-hrs.vercel.app, sgi.hashrate.space, *.vercel.app, *.hashrate.space; además CORS_ORIGIN y localhost
   const allowedOrigins = new Set<string>([
     "https://sgi-hrs.vercel.app",
+    "https://sgi.hashrate.space",
+    "http://sgi.hashrate.space",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:5174",
@@ -44,6 +46,7 @@ export function createApp() {
         if (!origin) return cb(null, true);
         if (allowedOrigins.has(origin)) return cb(null, true);
         if (origin.endsWith(".vercel.app") && (origin.startsWith("https://") || origin.startsWith("http://"))) return cb(null, true);
+        if (origin.endsWith(".hashrate.space") && (origin.startsWith("https://") || origin.startsWith("http://"))) return cb(null, true);
         return cb(null, false);
       },
       credentials: true

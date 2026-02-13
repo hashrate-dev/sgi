@@ -17,8 +17,8 @@ const FALLBACK_API_URLS = [
 function getApiBase(): string {
   if (typeof window === "undefined") return "";
   const h = window.location?.hostname ?? "";
-  // En sgi-hrs.vercel.app SIEMPRE usar el backend de Render (ignorar localStorage para evitar URLs viejas)
-  if (h === "sgi-hrs.vercel.app") return SGI_RENDER_API;
+  // En sgi-hrs.vercel.app o sgi.hashrate.space SIEMPRE usar el backend de Render (ignorar localStorage para evitar URLs viejas)
+  if (h === "sgi-hrs.vercel.app" || h === "sgi.hashrate.space") return SGI_RENDER_API;
   const stored = window.localStorage.getItem(STORAGE_KEY);
   const s = typeof stored === "string" ? stored.replace(/\/+$/, "").trim() : "";
   if (s) return s;
@@ -27,6 +27,7 @@ function getApiBase(): string {
   // En localhost, usar el backend local en el puerto 8080
   if (h === "localhost" || h === "127.0.0.1") return "http://localhost:8080";
   if (h.endsWith(".vercel.app")) return DEFAULT_RENDER_API;
+  if (h.endsWith(".hashrate.space")) return SGI_RENDER_API;
   return "";
 }
 
@@ -53,8 +54,8 @@ function getNoApiMessage(): string {
     return "No se pudo conectar con el servidor. ¿Tenés el backend levantado? Ejecutá en la raíz del proyecto: npm run dev";
   }
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  if (h === "sgi-hrs.vercel.app") {
-    return "No se pudo conectar con el backend en Render (https://sgi.onrender.com). Verificá que el servicio esté activo y que CORS_ORIGIN incluya https://sgi-hrs.vercel.app";
+  if (h === "sgi-hrs.vercel.app" || h === "sgi.hashrate.space") {
+    return "No se pudo conectar con el backend en Render (https://sgi.onrender.com). Verificá que el servicio esté activo y que CORS permita este origen.";
   }
   return "No se pudo conectar con el servidor. Volvé a intentar en unos momentos.";
 }
@@ -64,7 +65,7 @@ function get502Message(): string {
     return "No se pudo conectar con el servidor. ¿Tenés el backend levantado? Ejecutá: npm run dev";
   }
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  if (h === "sgi-hrs.vercel.app") {
+  if (h === "sgi-hrs.vercel.app" || h === "sgi.hashrate.space") {
     return "El backend en Render (https://sgi.onrender.com) está tardando en responder. Si el servicio estaba dormido, esperá 30-60 segundos y volvé a intentar.";
   }
   return "No se pudo conectar con el servidor. Volvé a intentar en unos momentos.";
@@ -99,7 +100,7 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   if (token) headers.Authorization = `Bearer ${token}`;
   let base = getApiBase();
   // Intentar obtener URL desde Vercel si estamos en Vercel y no tenemos una URL guardada en localStorage
-  if (typeof window !== "undefined" && window.location?.hostname?.endsWith(".vercel.app")) {
+  if (typeof window !== "undefined" && (window.location?.hostname?.endsWith(".vercel.app") || window.location?.hostname?.endsWith(".hashrate.space"))) {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (!stored || stored.trim() === "") {
       const fromServer = await getBackendUrlFromVercel();
@@ -111,8 +112,8 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   }
   if (!base || base.trim() === "") {
     const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-    if (h === "sgi-hrs.vercel.app") {
-      throw new Error("No se configuró la URL del backend. Configurá VITE_API_URL=https://sgi.onrender.com en Vercel y hacé redeploy.");
+    if (h === "sgi-hrs.vercel.app" || h === "sgi.hashrate.space") {
+      throw new Error("No se configuró la URL del backend. Configurá VITE_API_URL=https://sgi.onrender.com y hacé redeploy.");
     }
     throw new Error(getNoApiMessage());
   }
@@ -128,8 +129,8 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
       // Detectar errores de CORS (generalmente "Failed to fetch" o "NetworkError")
       if (errMsg === "Failed to fetch" || errMsg.includes("NetworkError") || errMsg === "Load failed") {
         const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-        if (h === "sgi-hrs.vercel.app") {
-          lastError = new Error(`Error de conexión con ${base}. Verificá que CORS_ORIGIN en Render incluya https://sgi-hrs.vercel.app y que el servicio esté activo.`);
+        if (h === "sgi-hrs.vercel.app" || h === "sgi.hashrate.space") {
+          lastError = new Error(`Error de conexión con ${base}. Verificá que CORS en Render permita este origen y que el servicio esté activo.`);
         } else {
           lastError = new Error(`Error de conexión: ${errMsg}. Verificá CORS y que el backend esté activo.`);
         }
@@ -163,7 +164,7 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   }
   const msg = lastError?.message || "";
   const isConnectionError = msg === "Failed to fetch" || msg === "Load failed" || msg.includes("NetworkError") || msg === "The operation was aborted." || msg === get502Message() || msg === getNoApiMessage();
-  if (isConnectionError && typeof window !== "undefined" && window.location?.hostname?.endsWith(".vercel.app")) {
+  if (isConnectionError && typeof window !== "undefined" && (window.location?.hostname?.endsWith(".vercel.app") || window.location?.hostname?.endsWith(".hashrate.space"))) {
     const currentBase = getApiBase();
     for (const fallback of FALLBACK_API_URLS) {
       if (fallback === currentBase) continue;
