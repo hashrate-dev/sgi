@@ -6,7 +6,7 @@
 
 **Abrí en el navegador:**
 ```
-https://sgi.onrender.com/api/health
+https://sistema-gestion-interna.onrender.com/api/health
 ```
 
 **Resultados esperados:**
@@ -35,7 +35,7 @@ https://sgi.onrender.com/api/health
 **En Vercel Dashboard:**
 1. Entrá a tu proyecto **sgi-hrs** → **Settings** → **Environment Variables**
 2. Buscá la variable **`VITE_API_URL`**
-3. El valor debe ser: **`https://sgi.onrender.com`** (sin `/` final, sin `http://`)
+3. El valor debe ser: **`https://sistema-gestion-interna.onrender.com`** (sin `/` final, sin `http://`)
 4. Debe estar aplicada a **Production** (y Preview si querés)
 
 **Si no existe o está mal:**
@@ -53,7 +53,7 @@ https://sgi.onrender.com/api/health
    ```javascript
    localStorage.getItem('hrs_api_url')
    ```
-3. Debería mostrar: **`https://sgi.onrender.com`** o estar vacío (si usa la default)
+3. Debería mostrar: **`https://sistema-gestion-interna.onrender.com`** o estar vacío (si usa la default)
 
 **Si muestra otra URL:**
 - Limpiá el localStorage: `localStorage.removeItem('hrs_api_url')`
@@ -76,7 +76,7 @@ https://sgi.onrender.com/api/health
 | `502 Bad Gateway` o `503 Service Unavailable` | Backend dormido o caído | Esperar 30-60 segundos y reintentar |
 | `404 Not Found` | URL del backend incorrecta | Verificar VITE_API_URL en Vercel y redeploy |
 | `Usuario o contraseña incorrectos` | Credenciales incorrectas o usuario no existe | Verificar que el backend tenga el usuario `fb@hashrate.space` con contraseña `123456` |
-| `No se pudo conectar con el servidor` | Backend no responde | Verificar que https://sgi.onrender.com/api/health responda |
+| `No se pudo conectar con el servidor` | Backend no responde | Verificar que https://sistema-gestion-interna.onrender.com/api/health responda |
 
 ---
 
@@ -110,9 +110,9 @@ El backend crea automáticamente estos usuarios al primer login:
 
 ## Checklist rápido
 
-- [ ] Backend responde: https://sgi.onrender.com/api/health funciona
+- [ ] Backend responde: https://sistema-gestion-interna.onrender.com/api/health funciona
 - [ ] CORS_ORIGIN en Render = `https://sgi-hrs.vercel.app`
-- [ ] VITE_API_URL en Vercel = `https://sgi.onrender.com`
+- [ ] VITE_API_URL en Vercel = `https://sistema-gestion-interna.onrender.com`
 - [ ] Vercel hizo redeploy después de cambiar VITE_API_URL
 - [ ] Render hizo deploy después de cambiar CORS_ORIGIN
 - [ ] Esperaste 30-60 segundos si el backend estaba dormido
@@ -131,7 +131,7 @@ El backend crea automáticamente estos usuarios al primer login:
 
 2. **Verificá que el backend esté activo:**
    - En Render → servicio **sgi** → verifica que el estado sea **Live**
-   - Si está **Sleeping**, hacé una petición a https://sgi.onrender.com/api/health para despertarlo
+   - Si está **Sleeping**, hacé una petición a https://sistema-gestion-interna.onrender.com/api/health para despertarlo
 
 3. **Verificá la configuración de Render:**
    - Root Directory: `server`
@@ -142,7 +142,7 @@ El backend crea automáticamente estos usuarios al primer login:
 4. **Verificá la configuración de Vercel:**
    - Build Command: `npm run build`
    - Output Directory: `dist`
-   - Environment Variable: `VITE_API_URL=https://sgi.onrender.com`
+   - Environment Variable: `VITE_API_URL=https://sistema-gestion-interna.onrender.com`
 
 ---
 
@@ -152,4 +152,4 @@ Si después de seguir todos estos pasos sigue sin funcionar, compartí:
 1. El error exacto que aparece en la consola del navegador
 2. Los logs de Render (últimas 50 líneas)
 3. El valor de `localStorage.getItem('hrs_api_url')` en la consola
-4. Si https://sgi.onrender.com/api/health responde o no
+4. Si https://sistema-gestion-interna.onrender.com/api/health responde o no

@@ -27,7 +27,7 @@ El frontend debe saber la URL de tu API en Render.
 - Agregá:
   - **Name:** `VITE_API_URL` (exactamente así, con `VITE_`).
   - **Value:** la URL de tu servicio en Render, **sin** barra final.  
-    Para este proyecto (sgi-hrs): **`https://sgi.onrender.com`**
+    Para este proyecto (sgi-hrs): **`https://sistema-gestion-interna.onrender.com`**
 - Aplicá a **Production** (y Preview si querés).
 - **Redeploy:** en **Deployments** → menú ⋮ del último deploy → **Redeploy**. Sin un nuevo deploy, el front no usa la variable nueva.
 
@@ -39,7 +39,7 @@ La URL de tu API depende del nombre del servicio en Render.
 
 - Entrá a [dashboard.render.com](https://dashboard.render.com) y abrí tu **Web Service** (el backend).
 - La URL es del tipo: `https://<nombre-del-servicio>.onrender.com`.
-- Para este proyecto la URL del backend es: **`https://sgi.onrender.com`** (ponéla en `VITE_API_URL` en Vercel).
+- Para este proyecto la URL del backend es: **`https://sistema-gestion-interna.onrender.com`** (ponéla en `VITE_API_URL` en Vercel).
 
 ---
 
@@ -70,7 +70,7 @@ Si eso no carga o da error, el problema está en Render (servicio caído, build 
 | Dónde   | Qué hacer |
 |--------|-----------|
 | **Render** | Variable `CORS_ORIGIN` = `https://sgi-hrs.vercel.app`. Manual Deploy. |
-| **Vercel** | Variable `VITE_API_URL` = `https://sgi.onrender.com` (sin `/` final). **Redeploy** después. |
+| **Vercel** | Variable `VITE_API_URL` = `https://sistema-gestion-interna.onrender.com` (sin `/` final). **Redeploy** después. |
 | **Primer login** | Si el servicio estaba dormido, esperar ~1 min y reintentar. |
 
 Después de aplicar esto, probá de nuevo el login en https://sgi-hrs.vercel.app con `fb@hashrate.space` / `123456`.

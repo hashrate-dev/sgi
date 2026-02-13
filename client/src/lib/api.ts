@@ -5,9 +5,9 @@ import type { AuthUser } from "./auth.js";
 const STORAGE_KEY = "hrs_api_url";
 const RAW = (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? "";
 const DEFAULT_RENDER_API = "https://hashrate-api.onrender.com";
-const SGI_RENDER_API = "https://sgi.onrender.com";
+const SGI_RENDER_API = "https://sistema-gestion-interna.onrender.com";
 const FALLBACK_API_URLS = [
-  "https://sgi.onrender.com",
+  "https://sistema-gestion-interna.onrender.com",
   "https://hashrate-api.onrender.com",
   "https://sgi-api.onrender.com",
   "https://hashrate-facturacion-hrs.onrender.com",
@@ -55,7 +55,7 @@ function getNoApiMessage(): string {
   }
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
   if (h === "sgi-hrs.vercel.app" || h === "sgi.hashrate.space") {
-    return "No se pudo conectar con el backend en Render (https://sgi.onrender.com). Verificá que el servicio esté activo y que CORS permita este origen.";
+    return "No se pudo conectar con el backend en Render (https://sistema-gestion-interna.onrender.com). Verificá que el servicio esté activo y que CORS permita este origen.";
   }
   return "No se pudo conectar con el servidor. Volvé a intentar en unos momentos.";
 }
@@ -66,7 +66,7 @@ function get502Message(): string {
   }
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
   if (h === "sgi-hrs.vercel.app" || h === "sgi.hashrate.space") {
-    return "El backend en Render (https://sgi.onrender.com) está tardando en responder. Si el servicio estaba dormido, esperá 30-60 segundos y volvé a intentar.";
+    return "El backend en Render (https://sistema-gestion-interna.onrender.com) está tardando en responder. Si el servicio estaba dormido, esperá 30-60 segundos y volvé a intentar.";
   }
   return "No se pudo conectar con el servidor. Volvé a intentar en unos momentos.";
 }
@@ -113,7 +113,7 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   if (!base || base.trim() === "") {
     const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
     if (h === "sgi-hrs.vercel.app" || h === "sgi.hashrate.space") {
-      throw new Error("No se configuró la URL del backend. Configurá VITE_API_URL=https://sgi.onrender.com y hacé redeploy.");
+      throw new Error("No se configuró la URL del backend. Configurá VITE_API_URL=https://sistema-gestion-interna.onrender.com y hacé redeploy.");
     }
     throw new Error(getNoApiMessage());
   }

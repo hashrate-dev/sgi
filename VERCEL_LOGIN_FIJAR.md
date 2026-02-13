@@ -2,7 +2,7 @@
 
 ## Qué se corrigió en el código
 
-- En **sgi-hrs.vercel.app** el frontend **siempre** usa el backend **https://sgi.onrender.com** (ya no usa una URL guardada en el navegador que pueda estar mal).
+- En **sgi-hrs.vercel.app** el frontend **siempre** usa el backend **https://sistema-gestion-interna.onrender.com** (ya no usa una URL guardada en el navegador que pueda estar mal).
 - El backend en el código ya permite CORS desde **https://sgi-hrs.vercel.app** por defecto.
 
 ---
@@ -38,7 +38,7 @@ Si **no** tenés **CORS_ORIGIN** en Render, el código del backend ya incluye `h
 
 Probar que el backend responda:
 
-- Abrí en el navegador: **https://sgi.onrender.com/api/health**
+- Abrí en el navegador: **https://sistema-gestion-interna.onrender.com/api/health**
 - Deberías ver una respuesta JSON. Si no carga, el backend no está activo o hay un error en Render.
 
 ---
@@ -48,7 +48,7 @@ Probar que el backend responda:
 - Subí los últimos cambios a GitHub (incluido el fix del login en Vercel).
 - En **Vercel** se hace deploy automático; si no, entrá al proyecto y hacé **Redeploy** del último deployment.
 
-No es obligatorio configurar **VITE_API_URL** en Vercel para que funcione el login en sgi-hrs.vercel.app; el frontend ya usa **https://sgi.onrender.com** cuando detecta que está en ese dominio.
+No es obligatorio configurar **VITE_API_URL** en Vercel para que funcione el login en sgi-hrs.vercel.app; el frontend ya usa **https://sistema-gestion-interna.onrender.com** cuando detecta que está en ese dominio.
 
 ---
 
@@ -65,6 +65,6 @@ No es obligatorio configurar **VITE_API_URL** en Vercel para que funcione el log
 
 - Abrí la **consola** del navegador (F12 → pestaña Console).
 - Intentá hacer login y anotá el **mensaje de error** exacto.
-- Decime también si **https://sgi.onrender.com/api/health** te responde o no.
+- Decime también si **https://sistema-gestion-interna.onrender.com/api/health** te responde o no.
 
 Con eso se puede ver si el fallo es por CORS, por backend caído o por otra cosa.

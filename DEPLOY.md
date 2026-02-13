@@ -32,7 +32,7 @@
 ## Resumen de variables
 | Servicio | Variable        | Valor (ejemplo)                          |
 |----------|-----------------|------------------------------------------|
-| Vercel   | VITE_API_URL    | https://sgi.onrender.com                 |
+| Vercel   | VITE_API_URL    | https://sistema-gestion-interna.onrender.com                 |
 | Render   | CORS_ORIGIN     | https://sgi-hrs.vercel.app               |
 
 Siempre **sin** barra final en las URLs.
