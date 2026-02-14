@@ -19,7 +19,7 @@ export function PageHeader({
   title, 
   showBackButton = true, 
   backTo = "/",
-  backText = "← Volver al inicio",
+  backText = "Volver al inicio",
   rightContent,
   logoSrc: logoSrcProp 
 }: PageHeaderProps) {

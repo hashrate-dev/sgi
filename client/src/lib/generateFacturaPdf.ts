@@ -57,6 +57,10 @@ export type FacturaPdfData = {
   subtotal: number;
   discounts: number;
   total: number;
+  /** Días para fecha de vencimiento desde date (5, 6 o 7). Por defecto 7. */
+  dueDateDays?: number;
+  /** Si se reimprime un documento ya guardado, pasar la fecha de vencimiento ya calculada. */
+  dueDate?: Date;
 };
 
 export type FacturaPdfImages = {
@@ -102,8 +106,13 @@ const LOGO_HEIGHT_MM = 14; // Altura ajustada para mantener proporción (relaci�
 export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImages): jsPDF {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const now = data.date;
-  const vencimiento = new Date(now);
-  vencimiento.setDate(vencimiento.getDate() + 7);
+  const vencimiento = data.dueDate
+    ? new Date(data.dueDate)
+    : (() => {
+        const v = new Date(now);
+        v.setDate(v.getDate() + (data.dueDateDays ?? 7));
+        return v;
+      })();
 
   const yTop = MARGIN_TOP_BOTTOM;
   const contentRight = PAGE_W - MARGIN_SIDES + 5; /* borde derecho del contenido (respeta 0.2 cm extra costado) */
@@ -475,6 +484,7 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   doc.stroke();
 
   doc.line(tableLeft, datesBlockTop + datesBlockH / 2, tableLeft + TABLE_W, datesBlockTop + datesBlockH / 2);
+  doc.line(tableLeft + datesColW, datesBlockTop, tableLeft + datesColW, datesBlockTop + datesBlockH);
 
   doc.setFontSize(10); /* tablas fechas: +1pt (encabezados y datos) */
   doc.setFont("helvetica", "normal");

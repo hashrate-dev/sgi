@@ -58,6 +58,12 @@ CREATE TABLE IF NOT EXISTS user_activity (
 );
 
 CREATE INDEX IF NOT EXISTS idx_user_activity_user_created ON user_activity(user_id, created_at);
+
+CREATE TABLE IF NOT EXISTS invoice_sequences (
+  type TEXT PRIMARY KEY CHECK (type IN ('Factura', 'Recibo', 'Nota de Crédito')),
+  last_number INTEGER NOT NULL DEFAULT 1000
+);
+INSERT OR IGNORE INTO invoice_sequences (type, last_number) VALUES ('Factura', 1000), ('Recibo', 1000), ('Nota de Crédito', 1000);
 `);
 
 // Migrar roles antiguos admin -> admin_a (jv@hashrate.space) / admin_b (resto)

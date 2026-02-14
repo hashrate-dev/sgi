@@ -152,7 +152,7 @@ export function UsuariosPage() {
   return (
     <div className="fact-page usuarios-page">
       <div className="container">
-        <PageHeader title="Gestión de usuarios y permisos" showBackButton backTo="/" backText="← Volver al inicio" />
+        <PageHeader title="Gestión de usuarios y permisos" showBackButton backTo="/" backText="Volver al inicio" />
         <div className="fact-card">
           {!isAdmin ? (
             <div className="fact-card-body">

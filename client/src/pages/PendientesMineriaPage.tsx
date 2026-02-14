@@ -190,7 +190,7 @@ export function PendientesMineriaPage() {
       }
 
       const validItems = inv.items.map((item) => {
-        let serviceKey: "A" | "B" | "C" = item.serviceKey || "A";
+        let serviceKey: "A" | "B" | "C" | "D" = (item.serviceKey as "A" | "B" | "C" | "D") || "A";
         if (!item.serviceKey && item.serviceName) {
           if (item.serviceName.includes("L7") || item.serviceName.includes("L9")) {
             serviceKey = item.serviceName.includes("L9") ? "B" : "A";

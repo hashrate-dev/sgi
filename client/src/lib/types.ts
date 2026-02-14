@@ -16,7 +16,7 @@ export type Client = {
 };
 
 export type LineItem = {
-  serviceKey?: "A" | "B" | "C"; // Para facturas de Hosting
+  serviceKey?: "A" | "B" | "C" | "D"; // Para facturas de Hosting
   serviceName?: string; // Para facturas de Hosting
   // Campos para equipos ASIC:
   equipoId?: string; // ID del equipo ASIC
@@ -37,6 +37,16 @@ export type Invoice = {
   number: string; // FC1001 / RC1001 / NC1001
   type: ComprobanteType;
   clientName: string;
+  /** Datos del cliente al momento de emisión (para reimprimir PDF con datos completos) */
+  clientPhone?: string;
+  clientEmail?: string;
+  clientAddress?: string;
+  clientCity?: string;
+  clientName2?: string;
+  clientPhone2?: string;
+  clientEmail2?: string;
+  clientAddress2?: string;
+  clientCity2?: string;
   date: string;
   emissionTime?: string; // Hora de emisión (HH:MM:SS)
   dueDate?: string; // Fecha de vencimiento (fecha + 7 días)

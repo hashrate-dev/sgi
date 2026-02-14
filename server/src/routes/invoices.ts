@@ -30,6 +30,36 @@ const InvoiceCreateSchema = z.object({
   dueDate: z.string().optional()
 });
 
+const TYPE_PREFIX: Record<string, string> = {
+  "Factura": "FC",
+  "Recibo": "RC",
+  "Nota de Crédito": "NC"
+};
+
+/** GET /invoices/next-number?type=Factura|Recibo|Nota de Crédito — devuelve el siguiente número (ej. FC1001). */
+invoicesRouter.get("/invoices/next-number", requireRole("admin_a", "admin_b", "operador"), (req, res) => {
+  const q = z.object({ type: z.enum(["Factura", "Recibo", "Nota de Crédito"]) }).safeParse(req.query);
+  if (!q.success) {
+    return res.status(400).json({ error: { message: "Query inválida: type debe ser Factura, Recibo o Nota de Crédito" } });
+  }
+  const type = q.data.type;
+  const prefix = TYPE_PREFIX[type];
+
+  const getNext = db.transaction(() => {
+    const row = db.prepare("SELECT last_number FROM invoice_sequences WHERE type = ?").get(type) as { last_number: number } | undefined;
+    if (!row) return null;
+    const nextNum = row.last_number + 1;
+    db.prepare("UPDATE invoice_sequences SET last_number = ? WHERE type = ?").run(nextNum, type);
+    return `${prefix}${nextNum}`;
+  });
+
+  const number = getNext();
+  if (number === null) {
+    return res.status(500).json({ error: { message: "Secuencia no configurada para este tipo" } });
+  }
+  res.json({ number });
+});
+
 invoicesRouter.get("/invoices", (req, res) => {
   const q = z
     .object({

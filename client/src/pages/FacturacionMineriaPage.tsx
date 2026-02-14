@@ -1,7 +1,7 @@
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { useEffect, useMemo, useState } from "react";
-import { getClients } from "../lib/api";
+import { getClients, getNextInvoiceNumber } from "../lib/api";
 import { serviceCatalog } from "../lib/constants";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadEquiposAsic, loadInvoicesAsic, loadSetup, saveInvoicesAsic } from "../lib/storage";
@@ -76,8 +76,12 @@ export function FacturacionMineriaPage() {
   const [relatedInvoiceId, setRelatedInvoiceId] = useState<string>("");
   const [paymentDate, setPaymentDate] = useState<string>("");
   const [itemsLocked, setItemsLocked] = useState(false); // Indica si los items están bloqueados por venir de factura relacionada
+  /** Días para fecha de vencimiento (5, 6 o 7). Por defecto 6. */
+  const [dueDateDays, setDueDateDays] = useState<5 | 6 | 7>(6);
 
   const [invoices, setInvoices] = useState<Invoice[]>(() => loadInvoicesAsic());
+  /** Siguiente número desde el servidor; null = aún no pedido, "" = API falló (usar fallback local) */
+  const [nextNumFromApi, setNextNumFromApi] = useState<string | null>(null);
   const [equiposAsic, setEquiposAsic] = useState<EquipoASIC[]>([]);
   const [setups, setSetups] = useState<Setup[]>([]);
   /** Documentos emitidos en esta sesión: se muestran solo 24 h, luego se quitan de la tabla (siguen en Historial/Pendientes) */
@@ -108,7 +112,18 @@ export function FacturacionMineriaPage() {
       .catch(() => setClients([]));
   }, []);
 
-  const number = useMemo(() => nextNumber(type, invoices), [type, invoices]);
+  /** Pedir siguiente número al servidor al cambiar el tipo; si falla, se usa el cálculo local */
+  useEffect(() => {
+    setNextNumFromApi(null);
+    getNextInvoiceNumber(type)
+      .then((r) => setNextNumFromApi(r.number))
+      .catch(() => setNextNumFromApi(""));
+  }, [type]);
+
+  const number = useMemo(
+    () => (nextNumFromApi !== null && nextNumFromApi !== "" ? nextNumFromApi : nextNumber(type, invoices)),
+    [type, invoices, nextNumFromApi]
+  );
   const totals = useMemo(() => calcTotals(items), [items]);
 
   const visibleClients = useMemo(() => {
@@ -375,9 +390,9 @@ export function FacturacionMineriaPage() {
     // Para equipos ASIC, el mes no es necesario (cadena vacía)
     const month = items[0]?.month || "";
     
-    // Calcular fecha de vencimiento (fecha + 7 días)
+    // Calcular fecha de vencimiento según días elegidos por el usuario (5, 6 o 7)
     const dueDate = new Date(dateNow);
-    dueDate.setDate(dueDate.getDate() + 7);
+    dueDate.setDate(dueDate.getDate() + dueDateDays);
     const dueDateStr = dueDate.toLocaleDateString();
 
     let logoBase64: string | undefined;
@@ -405,7 +420,8 @@ export function FacturacionMineriaPage() {
         items,
         subtotal,
         discounts,
-        total
+        total,
+        dueDateDays
       },
       { logoBase64 }
     );
@@ -433,6 +449,15 @@ export function FacturacionMineriaPage() {
       number,
       type,
       clientName: selectedClient.name,
+      clientPhone: selectedClient.phone,
+      clientEmail: selectedClient.email,
+      clientAddress: selectedClient.address,
+      clientCity: selectedClient.city,
+      clientName2: selectedClient.name2,
+      clientPhone2: selectedClient.phone2,
+      clientEmail2: selectedClient.email2,
+      clientAddress2: selectedClient.address2,
+      clientCity2: selectedClient.city2,
       date: dateStr,
       emissionTime: emissionTime,
       dueDate: dueDateStr,
@@ -459,6 +484,22 @@ export function FacturacionMineriaPage() {
     setRelatedInvoiceId("");
     setPaymentDate("");
     setItemsLocked(false);
+    // Pedir al servidor el siguiente número para el mismo tipo (por si emite otro seguido)
+    getNextInvoiceNumber(type).then((r) => setNextNumFromApi(r.number)).catch(() => setNextNumFromApi(""));
+  }
+
+  /** Parsea fecha de vencimiento guardada (dd/mm/yyyy o ISO) para el PDF */
+  function parseDueDateStr(s: string): Date | undefined {
+    if (!s?.trim()) return undefined;
+    const d = new Date(s);
+    if (!Number.isNaN(d.getTime())) return d;
+    const parts = s.trim().split(/[/-]/);
+    if (parts.length === 3) {
+      const a = Number(parts[0]), b = Number(parts[1]), c = Number(parts[2]);
+      if (parts[0].length === 4) return new Date(a, b - 1, c);
+      return new Date(c, b - 1, a);
+    }
+    return undefined;
   }
 
   /** Descargar PDF de un documento emitido en esta sesión */
@@ -479,11 +520,21 @@ export function FacturacionMineriaPage() {
         number: inv.number,
         type: inv.type,
         clientName: inv.clientName,
+        clientPhone: inv.clientPhone,
+        clientEmail: inv.clientEmail,
+        clientAddress: inv.clientAddress,
+        clientCity: inv.clientCity,
+        clientName2: inv.clientName2,
+        clientPhone2: inv.clientPhone2,
+        clientEmail2: inv.clientEmail2,
+        clientAddress2: inv.clientAddress2,
+        clientCity2: inv.clientCity2,
         date,
         items: inv.items,
         subtotal,
         discounts,
-        total
+        total,
+        dueDate: parseDueDateStr(inv.dueDate ?? "")
       },
       { logoBase64 }
     );
@@ -510,11 +561,21 @@ export function FacturacionMineriaPage() {
         number: inv.number,
         type: inv.type,
         clientName: inv.clientName,
+        clientPhone: inv.clientPhone,
+        clientEmail: inv.clientEmail,
+        clientAddress: inv.clientAddress,
+        clientCity: inv.clientCity,
+        clientName2: inv.clientName2,
+        clientPhone2: inv.clientPhone2,
+        clientEmail2: inv.clientEmail2,
+        clientAddress2: inv.clientAddress2,
+        clientCity2: inv.clientCity2,
         date,
         items: inv.items,
         subtotal,
         discounts,
-        total
+        total,
+        dueDate: parseDueDateStr(inv.dueDate ?? "")
       },
       { logoBase64 }
     );
@@ -545,29 +606,18 @@ export function FacturacionMineriaPage() {
   return (
     <div className="fact-page">
       <div className="container">
-        <PageHeader 
-          title="Facturación ASIC" 
-          rightContent={
-            <button 
-              type="button" 
-              className="fact-btn fact-btn-secondary" 
-              onClick={exportExcel}
-            >
-              📊 Exportar Excel
-            </button>
-          }
-        />
+        <PageHeader title="Facturación Equipos" />
 
         <div className="fact-layout">
-          {/* Panel configuración */}
+          {/* Panel configuración: mismo estilo que Detalle de servicios (panel verde) */}
           <aside className="fact-sidebar">
-            <div className="fact-card">
-              <div className="fact-card-header">Nuevo documento</div>
+            <div className="fact-card fact-panel-nuevo-documento">
+              <div className="fact-panel-nuevo-documento-header"><span style={{ fontSize: "1.25em", lineHeight: 1 }}>🗂️</span> Nuevo documento</div>
               <div className="fact-card-body">
                 <div className="row g-2">
                   <div className="col-6">
                     <div className="fact-field">
-                      <label className="fact-label">Tipo de comprobante</label>
+                      <label className="fact-label"><span style={{ fontSize: "1.25em", lineHeight: 1 }}>📑</span> Tipo</label>
                       <select
                         className="fact-select"
                         value={type}
@@ -589,13 +639,32 @@ export function FacturacionMineriaPage() {
                   </div>
                   <div className="col-6">
                     <div className="fact-field">
-                      <label className="fact-label">Número</label>
+                      <label className="fact-label"><span style={{ fontSize: "1.25em", lineHeight: 1, filter: "brightness(1.3) saturate(1.1)" }}>#️⃣</span> Número</label>
                       <input className="fact-input" readOnly value={number} />
                     </div>
                   </div>
+                  {type === "Factura" && (
+                  <div className="col-12">
+                    <div className="fact-field">
+                      <label className="fact-label"><span style={{ fontSize: "1.1em" }}>📅</span> Plazo de vencimiento</label>
+                      <div className="d-flex gap-2 flex-wrap">
+                        {([5, 6, 7] as const).map((d) => (
+                          <button
+                            key={d}
+                            type="button"
+                            className={`btn btn-sm ${dueDateDays === d ? "btn-success" : "btn-outline-secondary"}`}
+                            onClick={() => setDueDateDays(d)}
+                          >
+                            {d} días
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 </div>
-                <div className="fact-field">
-                  <label className="fact-label">Cliente</label>
+                <div className="fact-field" style={{ paddingTop: "0.75rem" }}>
+                  <label className="fact-label"><span style={{ fontSize: "1.25em", lineHeight: 1 }}>👤</span> Cliente</label>
                   <input
                     className="fact-input"
                     type="text"
@@ -671,9 +740,9 @@ export function FacturacionMineriaPage() {
 
                 {/* Selector de factura relacionada para Recibo */}
                 {type === "Recibo" && (
-                  <div className="fact-field" style={{ borderTop: "2px solid #0d6efd", paddingTop: "1rem", marginTop: "1rem" }}>
-                    <label className="fact-label" style={{ fontWeight: "bold", color: "#0d6efd" }}>
-                      📄 Factura abonada (Requerido)
+                  <div className="fact-field" style={{ borderTop: "1px solid rgba(255, 255, 255, 0.25)", paddingTop: "1rem", marginTop: "1rem" }}>
+                    <label className="fact-label" style={{ fontWeight: "bold", color: "#fff" }}>
+                      <span style={{ fontSize: "1.3em", lineHeight: 1 }}>🧾</span> Factura abonada (Requerido)
                     </label>
                     {!selectedClient ? (
                       <div style={{ padding: "0.75rem", backgroundColor: "#fff3cd", border: "1px solid #ffc107", borderRadius: "4px" }}>
@@ -717,8 +786,8 @@ export function FacturacionMineriaPage() {
 
                 {/* Campo de fecha de pago para Recibo */}
                 {type === "Recibo" && (
-                  <div className="fact-field" style={{ borderTop: "2px solid #0d6efd", paddingTop: "1rem", marginTop: "1rem" }}>
-                    <label className="fact-label" style={{ fontWeight: "bold", color: "#0d6efd" }}>
+                  <div className="fact-field" style={{ borderTop: "1px solid rgba(255, 255, 255, 0.25)", paddingTop: "1rem", marginTop: "1rem" }}>
+                    <label className="fact-label" style={{ fontWeight: "bold", color: "#ffcdd2" }}>
                       📅 Fecha de pago (Requerido)
                     </label>
                     <input
@@ -739,59 +808,79 @@ export function FacturacionMineriaPage() {
           <main className="fact-main">
             <div className="fact-card">
               <div className="fact-card-body">
-                <div className="facturacion-equipos-detail fact-detail-green">
-                <header className="fact-detail-green-header" style={{ marginBottom: type === "Nota de Crédito" && !relatedInvoiceId ? "1.5rem" : undefined }}>
-                  <h2 className="fact-detail-green-title">Detalle de servicios</h2>
-                  <button 
-                    type="button" 
-                    className="fact-detail-green-btn-add" 
-                    onClick={addItem}
-                    disabled={itemsLocked || (type === "Nota de Crédito" && !relatedInvoiceId)}
-                    title={itemsLocked ? "Los detalles están bloqueados porque vienen de una factura relacionada" : type === "Nota de Crédito" && !relatedInvoiceId ? "Primero debe seleccionar una factura a cancelar" : (type === "Recibo" || type === "Nota de Crédito") && relatedInvoiceId ? "Los ítems se cargaron desde la factura relacionada" : ""}
-                  >
-                    + Agregar ítem
-                  </button>
-                </header>
-                {type === "Nota de Crédito" && !relatedInvoiceId && (
-                  <div style={{ padding: "1rem", backgroundColor: "#fff3cd", border: "1px solid #ffc107", borderRadius: "4px", marginBottom: "1rem" }}>
-                    <small className="text-warning" style={{ fontWeight: "bold" }}>
-                      ⚠️ Para crear una Nota de Crédito, primero debe seleccionar una factura a cancelar en el panel izquierdo.
-                    </small>
-                  </div>
-                )}
-                {type === "Nota de Crédito" && relatedInvoiceId && (
-                  <div style={{ padding: "0.75rem", backgroundColor: "#d1e7dd", border: "2px solid #198754", borderRadius: "4px", marginBottom: "1rem" }}>
-                    <small style={{ fontWeight: "bold", color: "#0f5132" }}>
-                      ⚠️ Nota de Crédito seleccionada para cancelar Factura correspondiente.
-                    </small>
-                  </div>
-                )}
-                {type === "Recibo" && relatedInvoiceId && (
-                  <div style={{ padding: "0.75rem", backgroundColor: "#d1e7dd", border: "2px solid #198754", borderRadius: "4px", marginBottom: "1rem" }}>
-                    <small style={{ fontWeight: "bold", color: "#0f5132" }}>
-                      🔒 Este recibo está relacionado con una factura. Los detalles están bloqueados para mantener el mismo monto que la factura original.
-                    </small>
-                  </div>
-                )}
+                <div className="fact-detail-servicios-outer">
+                  <div className="fact-detail-servicios-container">
+                    <div className="card fact-detail-servicios-card">
+                      <div className="fact-detail-servicios-header" style={{ marginBottom: type === "Nota de Crédito" && !relatedInvoiceId ? "1.5rem" : undefined }}>
+                        <h2 className="fact-detail-servicios-title"><span style={{ fontSize: "1.25em", lineHeight: 1 }}>📋</span> Detalle de servicios</h2>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
+                          <button
+                            type="button"
+                            className="fact-detail-servicios-btn-clear"
+                            onClick={() => !itemsLocked && setItems([])}
+                            disabled={itemsLocked || (type === "Nota de Crédito" && !relatedInvoiceId)}
+                            title={itemsLocked ? "Los detalles están bloqueados" : "Vaciar lista de ítems"}
+                          >
+                            🗑️ Borrar
+                          </button>
+                          <button
+                            type="button"
+                            className="fact-detail-servicios-btn-add"
+                            onClick={exportExcel}
+                            title="Exportar a Excel"
+                          >
+                            📊 Exportar Excel
+                          </button>
+                          <button
+                            type="button"
+                            className="fact-detail-servicios-btn-add"
+                            onClick={addItem}
+                            disabled={itemsLocked || (type === "Nota de Crédito" && !relatedInvoiceId)}
+                            title={itemsLocked ? "Los detalles están bloqueados porque vienen de una factura relacionada" : type === "Nota de Crédito" && !relatedInvoiceId ? "Primero debe seleccionar una factura a cancelar" : (type === "Recibo" || type === "Nota de Crédito") && relatedInvoiceId ? "Los ítems se cargaron desde la factura relacionada" : ""}
+                          >
+                            + Agregar ítem
+                          </button>
+                        </div>
+                      </div>
+                      {type === "Nota de Crédito" && !relatedInvoiceId && (
+                        <div style={{ padding: "1rem", backgroundColor: "rgba(255, 193, 7, 0.2)", border: "1px solid rgba(255, 193, 7, 0.6)", borderRadius: "10px", marginBottom: "1rem" }}>
+                          <small style={{ fontWeight: "bold", color: "#fff" }}>
+                            ⚠️ Para crear una Nota de Crédito, primero debe seleccionar una factura a cancelar en el panel izquierdo.
+                          </small>
+                        </div>
+                      )}
+                      {type === "Nota de Crédito" && relatedInvoiceId && (
+                        <div style={{ padding: "0.75rem", backgroundColor: "rgba(255, 255, 255, 0.15)", border: "1px solid rgba(255, 255, 255, 0.4)", borderRadius: "10px", marginBottom: "1rem" }}>
+                          <small style={{ fontWeight: "bold", color: "#fff" }}>
+                            ✓ Nota de Crédito seleccionada para cancelar la factura correspondiente.
+                          </small>
+                        </div>
+                      )}
+                      {type === "Recibo" && relatedInvoiceId && (
+                        <div style={{ padding: "0.75rem", backgroundColor: "rgba(255, 255, 255, 0.15)", border: "1px solid rgba(255, 255, 255, 0.4)", borderRadius: "10px", marginBottom: "1rem" }}>
+                          <small style={{ fontWeight: "bold", color: "#fff" }}>
+                            🔒 Recibo relacionado con factura. Los detalles están bloqueados.
+                          </small>
+                        </div>
+                      )}
 
-                <div className="fact-detail-green-body">
-                  <div className="fact-detail-green-table-wrap">
-                    <table className="fact-detail-green-table">
-                      <thead>
-                        <tr>
-                          <th>Equipo ASIC / Setup</th>
-                          <th>Cantidad</th>
-                          <th>Precio unit.</th>
-                          <th>Total</th>
-                          <th aria-label="Quitar" />
-                        </tr>
-                      </thead>
-                      <tbody>
+                      <div className="fact-detail-servicios-table-wrap">
+                        <table className="fact-detail-servicios-table">
+                          <thead>
+                            <tr>
+                              <th>Equipo ASIC / Setup</th>
+                              <th>Cantidad</th>
+                              <th>Precio unit.</th>
+                              <th>Total</th>
+                              <th aria-label="Quitar" />
+                            </tr>
+                          </thead>
+                          <tbody>
                         {items.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="fact-detail-green-empty">
-                              <span className="fact-detail-green-empty-icon">📋</span>
-                              <p className="fact-detail-green-empty-text">
+                            <td colSpan={5} className="fact-detail-servicios-empty">
+                              <span className="fact-detail-servicios-empty-icon">📋</span>
+                              <p className="fact-detail-servicios-empty-text">
                                 {type === "Nota de Crédito" && !relatedInvoiceId
                                   ? "Seleccioná una factura a cancelar en el panel izquierdo para cargar los ítems."
                                   : "Agregá tu primer ítem para armar la factura."}
@@ -913,50 +1002,50 @@ export function FacturacionMineriaPage() {
                                 />
                               </td>
                               <td className="fact-cell-center">
-                                <input 
-                                  type="number"
-                                  className="fact-input"
-                                  value={it.price}
-                                  onChange={(e) => {
-                                    if (itemsLocked) return;
-                                    updateItem(idx, { price: Math.max(0, Number(e.target.value) || 0) });
-                                  }}
-                                  style={{ 
-                                    width: "100%",
-                                    maxWidth: "100%",
-                                    padding: "0.4rem 0.35rem", 
-                                    fontSize: "0.8125rem", 
-                                    textAlign: "center",
-                                    boxSizing: "border-box",
-                                    backgroundColor: itemsLocked ? "#f3f4f6" : "white",
-                                    cursor: itemsLocked ? "not-allowed" : "text",
-                                    opacity: itemsLocked ? 0.7 : 1
-                                  }}
-                                  min={0}
-                                  step="0.01"
-                                  readOnly={itemsLocked}
-                                  disabled={itemsLocked}
-                                />
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", width: "100%" }}>
+                                  <input 
+                                    type="number"
+                                    className="fact-input"
+                                    value={it.price}
+                                    onChange={(e) => {
+                                      if (itemsLocked) return;
+                                      updateItem(idx, { price: Math.max(0, Number(e.target.value) || 0) });
+                                    }}
+                                    style={{ 
+                                      flex: 1,
+                                      minWidth: 0,
+                                      padding: "0.4rem 0.35rem", 
+                                      fontSize: "0.8125rem", 
+                                      textAlign: "center",
+                                      boxSizing: "border-box",
+                                      backgroundColor: itemsLocked ? "#f3f4f6" : "white",
+                                      cursor: itemsLocked ? "not-allowed" : "text",
+                                      opacity: itemsLocked ? 0.7 : 1
+                                    }}
+                                    min={0}
+                                    step="0.01"
+                                    readOnly={itemsLocked}
+                                    disabled={itemsLocked}
+                                  />
+                                  <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#64748b", flexShrink: 0 }}>USD</span>
+                                </div>
                               </td>
-                              <td className="fact-cell-center fact-detail-green-cell-total">
-                                <input readOnly value={lineTotal.toFixed(2)} className="fact-detail-green-input-total" />
+                              <td className="fact-cell-center">
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", width: "100%" }}>
+                                  <input readOnly value={lineTotal.toFixed(2)} className="fact-detail-servicios-input-total" style={{ flex: 1, minWidth: 0 }} />
+                                  <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#64748b", flexShrink: 0 }}>USD</span>
+                                </div>
                               </td>
-                              <td className="fact-detail-green-cell-actions">
-                                <button 
-                                  type="button" 
-                                  className="fact-detail-green-btn-remove" 
+                              <td>
+                                <button
+                                  type="button"
+                                  className="fact-detail-servicios-btn-remove"
                                   onClick={() => {
                                     if (itemsLocked) return;
                                     removeItem(idx);
-                                  }} 
+                                  }}
                                   title={itemsLocked ? "No se pueden eliminar ítems cuando vienen de una factura relacionada" : "Quitar ítem"}
                                   disabled={itemsLocked}
-                                  style={{ 
-                                    opacity: itemsLocked ? 0.5 : 1,
-                                    cursor: itemsLocked ? "not-allowed" : "pointer",
-                                    margin: "0",
-                                    padding: "0.35rem 0.5rem"
-                                  }}
                                 >
                                   ×
                                 </button>
@@ -965,45 +1054,43 @@ export function FacturacionMineriaPage() {
                           );
                         })
                       )}
-                      </tbody>
-                    </table>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {items.length > 0 && (
+                        <div className="fact-detail-servicios-summary">
+                          <div className="fact-summary-cards">
+                            <div className="fact-summary-card fact-summary-card--sub">
+                              <span className="fact-summary-card-label">Subtotal</span>
+                              <span className="fact-summary-card-value">{totals.subtotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              <span className="fact-summary-card-currency">USD</span>
+                            </div>
+                            <div className="fact-summary-card fact-summary-card--disc">
+                              <span className="fact-summary-card-label">Descuentos</span>
+                              <span className="fact-summary-card-value">− {totals.discounts.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              <span className="fact-summary-card-currency">USD</span>
+                            </div>
+                            <div className="fact-summary-card fact-summary-card--total">
+                              <span className="fact-summary-card-label">Total</span>
+                              <span className="fact-summary-card-value">{totals.total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              <span className="fact-summary-card-currency">USD</span>
+                            </div>
+                          </div>
+                          <button type="button" className="fact-detail-servicios-btn-emitir" onClick={generatePdfAndSave}>
+                            📄 Emitir documento
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-
-                  {items.length > 0 && (
-                    <>
-                      <div className="fact-summary-cards">
-                        <div className="fact-summary-card fact-summary-card--sub">
-                          <span className="fact-summary-card-label">Subtotal</span>
-                          <span className="fact-summary-card-currency">USD</span>
-                          <span className="fact-summary-card-value">{totals.subtotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                        </div>
-                        <div className="fact-summary-card fact-summary-card--disc">
-                          <span className="fact-summary-card-label">Descuentos</span>
-                          <span className="fact-summary-card-currency">USD</span>
-                          <span className="fact-summary-card-value">− {totals.discounts.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                        </div>
-                        <div className="fact-summary-card fact-summary-card--total">
-                          <span className="fact-summary-card-label">Total</span>
-                          <span className="fact-summary-card-currency">USD</span>
-                          <span className="fact-summary-card-value">{totals.total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                        </div>
-                      </div>
-
-                      <div className="fact-detail-green-actions">
-                        <button type="button" className="fact-detail-green-btn-emitir" onClick={generatePdfAndSave}>
-                          Emitir documento
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
                 </div>
 
                 {/* Documentos emitidos en esta sesión (solo últimos 24 h); el resto sigue en Historial/Pendientes */}
                 {emittedInLast24h.length > 0 && (
                   <div className="fact-emitted-section">
                     <h3 className="fact-section-title" style={{ marginTop: "2rem", marginBottom: "1rem" }}>
-                      Documentos emitidos en esta sesión (últimas 24 h)
+                      <span style={{ fontSize: "1.4em", lineHeight: 1 }}>📄</span> Documentos emitidos en esta sesión (últimas 24 h)
                     </h3>
                     <div className="fact-table-wrap">
                       <table className="fact-table fact-emitted-table" style={{ tableLayout: "fixed", width: "100%" }}>
@@ -1029,7 +1116,7 @@ export function FacturacionMineriaPage() {
                                 <td>{inv.clientName}</td>
                                 <td>{inv.date}</td>
                                 <td>{inv.emissionTime ?? "-"}</td>
-                                <td className="text-end">$ {totalDisplay.toFixed(2)}</td>
+                                <td>{totalDisplay.toFixed(2)} USD</td>
                                 <td className="text-center">
                                   <div className="d-flex gap-1 justify-content-center flex-wrap">
                                     <button
@@ -1063,24 +1150,32 @@ export function FacturacionMineriaPage() {
               </div>
             </div>
 
-            {/* Vista previa de la factura */}
-            {selectedClient && items.length > 0 && (
-              <div className="fact-card" style={{ marginTop: "2rem" }}>
-                <div className="fact-card-header">Vista previa de la factura</div>
-                <div className="fact-card-body">
-                  <InvoicePreview
-                    type={type}
-                    number={number}
-                    client={selectedClient}
-                    date={new Date()}
-                    items={items}
-                    subtotal={totals.subtotal}
-                    discounts={totals.discounts}
-                    total={totals.total}
-                  />
+            {/* Vista previa: siempre visible; con documento o mensaje "No hay Documento" */}
+            <div className="fact-panel-vista-previa">
+              <div className="fact-panel-vista-previa-header"><span style={{ fontSize: "1.25em", lineHeight: 1 }}>🔍</span> Vista previa</div>
+              <div className="fact-panel-vista-previa-body">
+                <div className="fact-panel-vista-previa-inner">
+                  {selectedClient && items.length > 0 ? (
+                    <InvoicePreview
+                      type={type}
+                      number={number}
+                      client={selectedClient}
+                      date={new Date()}
+                      items={items}
+                      subtotal={totals.subtotal}
+                      discounts={totals.discounts}
+                      total={totals.total}
+                      dueDateDays={dueDateDays}
+                    />
+                  ) : (
+                    <div className="fact-panel-vista-previa-empty">
+                      <span className="fact-panel-vista-previa-empty-icon" aria-hidden>📄</span>
+                      <p className="fact-panel-vista-previa-empty-text">No hay documento</p>
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
+            </div>
           </main>
         </div>
       </div>

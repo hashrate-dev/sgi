@@ -310,3 +310,10 @@ export function deleteClient(id: number | string): Promise<void> {
 export function deleteAllClients(): Promise<void> {
   return api<void>("/api/clients-all", { method: "DELETE" });
 }
+
+/** Siguiente número para Factura / Recibo / Nota de Crédito (generado en el servidor). */
+export type NextInvoiceNumberResponse = { number: string };
+
+export function getNextInvoiceNumber(type: "Factura" | "Recibo" | "Nota de Crédito"): Promise<NextInvoiceNumberResponse> {
+  return api<NextInvoiceNumberResponse>(`/api/invoices/next-number?type=${encodeURIComponent(type)}`);
+}

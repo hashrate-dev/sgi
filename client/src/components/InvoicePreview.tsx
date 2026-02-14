@@ -50,6 +50,8 @@ interface InvoicePreviewProps {
   subtotal: number;
   discounts: number;
   total: number;
+  /** Días para fecha de vencimiento (5, 6 o 7). Por defecto 6. */
+  dueDateDays?: number;
 }
 
 export function InvoicePreview({
@@ -59,6 +61,7 @@ export function InvoicePreview({
   date,
   items,
   total,
+  dueDateDays = 6,
 }: InvoicePreviewProps) {
   const [logoSrc, setLogoSrc] = useState<string | null>(null);
 
@@ -80,7 +83,7 @@ export function InvoicePreview({
     "NOTA DE CRÉDITO";
 
   const vencimiento = new Date(date);
-  vencimiento.setDate(vencimiento.getDate() + 7);
+  vencimiento.setDate(vencimiento.getDate() + dueDateDays);
 
   const hasText = (s?: string) => Boolean(s && s.trim());
 

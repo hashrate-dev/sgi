@@ -502,7 +502,7 @@ export function HistorialMineriaPage() {
       // Validar y asegurar que los items tengan la estructura correcta
       const validItems = inv.items.map((item) => {
         // Asegurar que serviceKey existe, si no, intentar inferirlo desde serviceName
-        let serviceKey: "A" | "B" | "C" = item.serviceKey || "A";
+        let serviceKey: "A" | "B" | "C" | "D" = (item.serviceKey as "A" | "B" | "C" | "D") || "A";
         if (!item.serviceKey && item.serviceName) {
           // Intentar inferir desde el nombre del servicio
           if (item.serviceName.includes("L7") || item.serviceName.includes("L9")) {

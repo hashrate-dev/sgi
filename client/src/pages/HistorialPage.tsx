@@ -19,6 +19,20 @@ function formatCurrency(value: number): string {
   return `${value.toFixed(2)} USD`;
 }
 
+/** Solo la parte numérica para mostrar en tabla con USD en línea de abajo */
+function formatCurrencyNumber(value: number): string {
+  if (value < 0) return `-${Math.abs(value).toFixed(2)}`;
+  return value.toFixed(2);
+}
+
+/** Hora sin segundos (HH:MM) para ahorrar espacio en la tabla */
+function formatTimeNoSeconds(t: string | undefined): string {
+  if (!t || t === "-") return "-";
+  const parts = String(t).trim().split(":");
+  if (parts.length >= 2) return `${parts[0]}:${parts[1]}`;
+  return t;
+}
+
 // Función auxiliar para encontrar columna en Excel por nombres posibles
 function findCol(headerRow: (string | number)[], ...names: string[]): number {
   for (let i = 1; i < headerRow.length; i++) {
@@ -119,6 +133,15 @@ async function parseExcelInvoices(file: File): Promise<Invoice[]> {
     });
   }
   return result;
+}
+
+/** Monto cobrado por ítem "4% Gastos Operativos Transferencia" (serviceKey D), si existe */
+function getCambio4Pct(inv: Invoice): number | null {
+  if (!inv.items || inv.items.length === 0) return null;
+  const total = inv.items
+    .filter((it) => it.serviceKey === "D")
+    .reduce((s, it) => s + (it.price - (it.discount || 0)) * (it.quantity || 1), 0);
+  return total === 0 ? null : total;
 }
 
 // Función para calcular fecha de vencimiento desde fecha de emisión
@@ -225,12 +248,14 @@ export function HistorialPage() {
       { header: "Cliente", key: "clientName", width: 30 },
       { header: "Fecha Emisión", key: "date", width: 18 },
       { header: "Hora Emisión", key: "emissionTime", width: 12 },
-      { header: "Fecha Vencimiento", key: "dueDate", width: 18 },
+      { header: "Fecha Venc.", key: "dueDate", width: 18 },
       { header: "Fecha Pago", key: "paymentDate", width: 18 },
       { header: "Mes", key: "month", width: 10 },
       { header: "Total (S/Desc)", key: "subtotal", width: 16 },
-      { header: "Descuento", key: "discounts", width: 12 },
+      { header: "DESC.", key: "discounts", width: 12 },
       { header: "Total", key: "total", width: 12 },
+      { header: "Total (S/TC)", key: "totalSinCambio", width: 18 },
+      { header: "TC", key: "cambio", width: 12 },
       { header: "Estado", key: "status", width: 10 }
     ];
 
@@ -251,7 +276,9 @@ export function HistorialPage() {
         discounts = -(Math.abs(inv.discounts) || 0);
       }
       const total = isNegative ? -(Math.abs(inv.total) || 0) : (inv.total || 0);
-      
+      const cambioExport = getCambio4Pct(inv) ?? 0;
+      const totalSinCambioExport = total - Math.sign(total || 1) * cambioExport;
+
       // Verificar si la operación está cerrada
       let isClosed = false;
       let isCancelledByNC = false;
@@ -299,18 +326,21 @@ export function HistorialPage() {
       } else {
         paymentDateExportCell = inv.paymentDate ? new Date(inv.paymentDate).toLocaleDateString() : "-";
       }
+      const cambioVal = getCambio4Pct(inv);
       ws.addRow({
         number: inv.number,
         type: inv.type,
         clientName: inv.clientName,
         date: inv.date,
-        emissionTime: inv.emissionTime || "-",
+        emissionTime: formatTimeNoSeconds(inv.emissionTime),
         dueDate: dueDate,
         paymentDate: paymentDateExportCell,
         month: inv.month,
         discounts: discounts,
         subtotal: subtotal,
         total: total,
+        totalSinCambio: totalSinCambioExport,
+        cambio: cambioVal != null ? `${cambioVal.toFixed(2)} USD` : "-",
         status: status
       });
     });
@@ -497,10 +527,12 @@ export function HistorialPage() {
       // Validar y asegurar que los items tengan la estructura correcta
       const validItems = inv.items.map((item) => {
         // Asegurar que serviceKey existe, si no, intentar inferirlo desde serviceName
-        let serviceKey: "A" | "B" | "C" = item.serviceKey || "A";
+        let serviceKey: "A" | "B" | "C" | "D" = (item.serviceKey as "A" | "B" | "C" | "D") || "A";
         if (!item.serviceKey && item.serviceName) {
           // Intentar inferir desde el nombre del servicio
-          if (item.serviceName.includes("L7") || item.serviceName.includes("L9")) {
+          if (item.serviceName.includes("4%") || item.serviceName.includes("Gastos Operativos Transferencia")) {
+            serviceKey = "D";
+          } else if (item.serviceName.includes("L7") || item.serviceName.includes("L9")) {
             serviceKey = item.serviceName.includes("L9") ? "B" : "A";
           } else {
             serviceKey = "C";
@@ -657,25 +689,27 @@ export function HistorialPage() {
             <table className="table table-sm align-middle historial-listado-table" style={{ fontSize: "0.85rem" }}>
               <thead className="table-dark">
                 <tr>
-                  <th className="text-start">N°</th>
-                  <th className="text-start">Tipo</th>
-                  <th className="text-start">Cliente</th>
-                  <th className="text-start">Fecha Emisión</th>
-                  <th className="text-start">Hora Emisión</th>
-                  <th className="text-start">Fecha Vencimiento</th>
-                  <th className="text-start">Fecha Pago</th>
-                  <th className="text-start">Mes</th>
-                  <th className="text-start">Total (S/Desc)</th>
-                  <th className="text-start">Descuento</th>
-                  <th className="text-start">Total</th>
-                  <th className="text-start">Estado</th>
-                  <th className="text-start">Acciones</th>
+                  <th className="text-start historial-col-num">N°</th>
+                  <th className="text-start historial-col-tipo">Tipo</th>
+                  <th className="text-start historial-col-cliente">Cliente</th>
+                  <th className="text-start historial-col-fecha-emision">Fecha<br />Emisión</th>
+                  <th className="text-start historial-col-hora">Hora<br />Emisión</th>
+                  <th className="text-start historial-col-fecha-venc">Fecha<br />Venc.</th>
+                  <th className="text-start historial-col-fecha-pago">Fecha<br />Pago</th>
+                  <th className="text-start historial-col-mes">Mes</th>
+                  <th className="text-start historial-col-total-sdesc">Total<br />(S/Desc)</th>
+                  <th className="text-start historial-col-desc">DESC.</th>
+                  <th className="text-start historial-col-total-stc">Total<br />(S/TC)</th>
+                  <th className="text-start historial-col-cambio-header">TC</th>
+                  <th className="text-start historial-col-total">Total</th>
+                  <th className="text-center historial-col-estado">Estado</th>
+                  <th className="text-center historial-col-acciones">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={13} className="text-center text-muted py-4">
+                    <td colSpan={15} className="text-center text-muted py-4">
                       <small>No hay facturas registradas</small>
                     </td>
                   </tr>
@@ -697,6 +731,8 @@ export function HistorialPage() {
                       discounts = -(Math.abs(inv.discounts) || 0);
                     }
                     const total = isNegativeType ? -(Math.abs(inv.total) || 0) : (inv.total || 0);
+                    const cambioVal = getCambio4Pct(inv) ?? 0;
+                    const totalSinCambio = total - Math.sign(total || 1) * cambioVal;
 
                     // Fecha de pago: Factura = fecha del Recibo si pagada, "Cancelada" si cancelada por NC, sino "Pendiente"; NC = fecha emisión
                     const relatedReciboForPayment = inv.type === "Factura" ? all.find((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id) : null;
@@ -737,18 +773,29 @@ export function HistorialPage() {
                     }
                     return (
                       <tr key={inv.id}>
-                        <td className="fw-bold text-start">{inv.number}</td>
-                        <td className="text-start">{inv.type === "Nota de Crédito" ? "NC" : inv.type}</td>
-                        <td className="text-start">{inv.clientName}</td>
-                        <td className="text-start">{inv.date}</td>
-                        <td className="text-start">{inv.emissionTime || "-"}</td>
-                        <td className="text-start">{dueDate}</td>
-                        <td className="text-start">{paymentDateCell}</td>
-                        <td className="text-start">{inv.month}</td>
-                        <td className="text-start">{formatCurrency(subtotal)}</td>
-                        <td className="text-start">{formatCurrency(discounts)}</td>
-                        <td className="text-start fw-bold">{formatCurrency(total)}</td>
-                        <td className="text-center">
+                        <td className="fw-bold text-start historial-col-num">{inv.number}</td>
+                        <td className="text-start historial-col-tipo">{inv.type === "Nota de Crédito" ? "NC" : inv.type}</td>
+                        <td className="text-start historial-col-cliente" title={inv.clientName}><span className="historial-cliente-nombre">{inv.clientName}</span></td>
+                        <td className="text-start historial-col-fecha-emision">{inv.date}</td>
+                        <td className="text-start historial-col-hora">{formatTimeNoSeconds(inv.emissionTime)}</td>
+                        <td className="text-start historial-col-fecha-venc">{dueDate}</td>
+                        <td className="text-start historial-col-fecha-pago">{paymentDateCell}</td>
+                        <td className="text-start historial-col-mes">
+                          {(() => {
+                            const parts = inv.month ? inv.month.split("-") : [];
+                            return parts.length >= 2 ? <>{parts[0]}<br />-{parts[1]}</> : inv.month;
+                          })()}
+                        </td>
+                        <td className="text-start historial-col-total-sdesc">{formatCurrencyNumber(subtotal)}<br />USD</td>
+                        <td className="text-start historial-col-desc">{formatCurrencyNumber(discounts)}<br />USD</td>
+                        <td className="text-start historial-col-total-stc" title="Total sin incluir ítem 4% Gastos Operativos Transferencia">
+                          {formatCurrencyNumber(totalSinCambio)}<br />USD
+                        </td>
+                        <td className="text-start historial-col-cambio" title="4% Gastos Operativos Transferencia (si aplica)">
+                          {getCambio4Pct(inv) != null ? <>{getCambio4Pct(inv)!.toFixed(2)}<br />USD</> : "-"}
+                        </td>
+                        <td className="text-start fw-bold historial-col-total">{formatCurrencyNumber(total)}<br />USD</td>
+                        <td className="text-center historial-col-estado">
                           {isClosed ? (
                             isCancelledByNC ? (
                               <span className="badge d-inline-flex" style={{ fontSize: "0.65rem", padding: "0.1rem 0.2rem", borderRadius: "50%", width: "1.05rem", height: "1.05rem", alignItems: "center", justifyContent: "center", backgroundColor: "#004085", color: "#fff" }} title={inv.type === "Nota de Crédito" ? "Nota de Crédito que cancela factura" : "Factura cancelada con Nota de Crédito"}>
@@ -767,8 +814,8 @@ export function HistorialPage() {
                             <span className="text-muted" style={{ fontSize: "0.875rem" }}>-</span>
                           )}
                         </td>
-                      <td className="text-center">
-                        <div className="d-flex gap-1 justify-content-center align-items-center flex-nowrap historial-acciones-btns">
+                        <td className="text-center historial-col-acciones">
+                          <div className="d-flex gap-1 justify-content-center align-items-center flex-nowrap historial-acciones-btns">
                           <button
                             type="button"
                             className="btn btn-sm border historial-accion-btn"
@@ -793,9 +840,9 @@ export function HistorialPage() {
                               <span className="historial-accion-trash">🗑️</span>
                             </button>
                           )}
-                        </div>
-                      </td>
-                    </tr>
+                          </div>
+                        </td>
+                      </tr>
                     );
                   })
                 )}
@@ -912,7 +959,7 @@ export function HistorialPage() {
                           <div className="col-md-4"><strong>Tipo:</strong> {inv.type}</div>
                           <div className="col-md-4"><strong>Cliente:</strong> {inv.clientName}</div>
                           <div className="col-md-4"><strong>Fecha emisión:</strong> {inv.date}</div>
-                          <div className="col-md-4"><strong>Hora emisión:</strong> {inv.emissionTime || "-"}</div>
+                          <div className="col-md-4"><strong>Hora emisión:</strong> {formatTimeNoSeconds(inv.emissionTime)}</div>
                           <div className="col-md-4"><strong>Fecha vencimiento:</strong> {dueDate}</div>
                           <div className="col-md-4"><strong>Fecha pago:</strong> {inv.paymentDate ? new Date(inv.paymentDate).toLocaleDateString() : "-"}</div>
                           <div className="col-md-4"><strong>Mes:</strong> {inv.month}</div>
