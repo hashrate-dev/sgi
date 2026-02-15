@@ -29,6 +29,7 @@
     "build": "cd client && npx tsc -b && npx vite build && cd .. && node copy-dist.cjs && npm run build -w server",
     "build:vercel": "npm run build -w client && cp -r client/dist dist",
     "start": "npm run start -w server",
+    "deploy:vercel": "node scripts/deploy-vercel.cjs",
     "legacy:dev": "nodemon ./src/app.js",
     "legacy:start": "node ./src/app.js"
   },

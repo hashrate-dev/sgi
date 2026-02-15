@@ -8,6 +8,7 @@ import {
   deleteGarantiasItemsAll,
   getGarantiasItems,
   updateGarantiaItem,
+  type GarantiasItemsResponse,
 } from "../lib/api";
 import type { ItemGarantiaAnde } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
@@ -43,7 +44,7 @@ export function GarantiasAndeItemsPage() {
 
   useEffect(() => {
     getGarantiasItems()
-      .then((r) => setItems(r.items))
+      .then((r: GarantiasItemsResponse) => setItems(r.items))
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
   }, []);

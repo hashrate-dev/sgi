@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { addGarantiaEmitted, getGarantiasEmitted, getGarantiasItems, getClients } from "../lib/api";
+import {
+  addGarantiaEmitted,
+  getGarantiasEmitted,
+  getGarantiasItems,
+  getClients,
+  type GarantiasEmittedResponse,
+  type GarantiasItemsResponse,
+  type ClientsResponse,
+} from "../lib/api";
 import { formatAmount, formatUSD } from "../lib/formatCurrency.js";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadEquiposAsic, loadSetup } from "../lib/storage";
@@ -97,19 +105,19 @@ export function GarantiaAndePage() {
 
   useEffect(() => {
     getGarantiasEmitted()
-      .then((r) => setEmittedVales(r.items as { invoice: Invoice; emittedAt: string }[]))
+      .then((r: GarantiasEmittedResponse) => setEmittedVales(r.items as { invoice: Invoice; emittedAt: string }[]))
       .catch(() => setEmittedVales([]));
   }, []);
 
   useEffect(() => {
     getGarantiasItems()
-      .then((r) => setItemsGarantia(r.items))
+      .then((r: GarantiasItemsResponse) => setItemsGarantia(r.items))
       .catch(() => setItemsGarantia([]));
   }, []);
 
   useEffect(() => {
     getClients()
-      .then((r) => setClients((r.clients ?? []) as Client[]))
+      .then((r: ClientsResponse) => setClients((r.clients ?? []) as Client[]))
       .catch(() => setClients([]));
   }, []);
 

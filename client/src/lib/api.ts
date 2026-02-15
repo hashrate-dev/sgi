@@ -317,3 +317,56 @@ export type NextInvoiceNumberResponse = { number: string };
 export function getNextInvoiceNumber(type: "Factura" | "Recibo" | "Nota de Crédito"): Promise<NextInvoiceNumberResponse> {
   return api<NextInvoiceNumberResponse>(`/api/invoices/next-number?type=${encodeURIComponent(type)}`);
 }
+
+// ——— Garantías ANDE ———
+export type GarantiasEmittedResponse = { items: Array<{ invoice: Record<string, unknown>; emittedAt: string }> };
+
+export function getGarantiasEmitted(): Promise<GarantiasEmittedResponse> {
+  return api<GarantiasEmittedResponse>("/api/garantias/emitted");
+}
+
+export function addGarantiaEmitted(invoice: Record<string, unknown>, emittedAt: string): Promise<{ ok: boolean }> {
+  return api<{ ok: boolean }>("/api/garantias/emitted", {
+    method: "POST",
+    body: JSON.stringify({ invoice, emittedAt }),
+  });
+}
+
+export function deleteGarantiaEmittedOne(invoiceNumber: string): Promise<{ ok: boolean; deleted: number }> {
+  return api<{ ok: boolean; deleted: number }>(
+    `/api/garantias/emitted/${encodeURIComponent(invoiceNumber)}`,
+    { method: "DELETE" }
+  );
+}
+
+export function deleteGarantiasEmittedAll(): Promise<{ ok: boolean; deleted: number }> {
+  return api<{ ok: boolean; deleted: number }>("/api/garantias/emitted", { method: "DELETE" });
+}
+
+export type GarantiasItemsResponse = { items: import("./types.js").ItemGarantiaAnde[] };
+
+export function getGarantiasItems(): Promise<GarantiasItemsResponse> {
+  return api<GarantiasItemsResponse>("/api/garantias/items");
+}
+
+export function createGarantiaItem(item: import("./types.js").ItemGarantiaAnde): Promise<{ ok: boolean }> {
+  return api<{ ok: boolean }>("/api/garantias/items", { method: "POST", body: JSON.stringify(item) });
+}
+
+export function updateGarantiaItem(
+  id: string,
+  item: Partial<Omit<import("./types.js").ItemGarantiaAnde, "id">>
+): Promise<{ ok: boolean }> {
+  return api<{ ok: boolean }>(`/api/garantias/items/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify(item),
+  });
+}
+
+export function deleteGarantiaItem(id: string): Promise<void> {
+  return api<void>(`/api/garantias/items/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export function deleteGarantiasItemsAll(): Promise<{ ok: boolean; deleted: number }> {
+  return api<{ ok: boolean; deleted: number }>("/api/garantias/items", { method: "DELETE" });
+}

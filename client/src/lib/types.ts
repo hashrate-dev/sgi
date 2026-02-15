@@ -26,6 +26,11 @@ export type LineItem = {
   // Campos para Setup:
   setupId?: string; // ID del Setup
   setupNombre?: string; // Nombre del Setup
+  // Campos para Garantía ANDE:
+  garantiaId?: string;
+  garantiaCodigo?: string;
+  garantiaMarca?: string;
+  garantiaModelo?: string;
   month: string; // YYYY-MM
   quantity: number;
   price: number;
@@ -73,5 +78,14 @@ export type Setup = {
   id: string;
   nombre: string; // Nombre del Setup
   precioUSD: number; // Precio en USD (50 o 0)
+};
+
+export type ItemGarantiaAnde = {
+  id: string;
+  codigo: string;
+  marca: string;
+  modelo: string;
+  fechaIngreso: string;
+  observaciones?: string;
 };
 

@@ -3,10 +3,11 @@
  * para poder usar la misma lógica en las rutas con await.
  */
 import pg from "pg";
+import type { QueryResult } from "pg";
 import { env } from "../config/env.js";
 
 const pool = new pg.Pool({
-  connectionString: env.SUPABASE_DATABASE_URL,
+  connectionString: env.SUPABASE_DATABASE_URL ?? undefined,
   max: 10,
   idleTimeoutMillis: 30000,
   // Supabase suele requerir SSL; allow fallback si no tenés certificados
@@ -38,13 +39,13 @@ function createStatement(sql: string) {
   const converted = convertPlaceholders(sql);
   return {
     get: (...params: unknown[]) =>
-      pool.query(converted, params).then((r) => r.rows[0] ?? undefined),
+      pool.query(converted, params).then((r: QueryResult) => r.rows[0] ?? undefined),
     all: (...params: unknown[]) =>
-      pool.query(converted, params).then((r) => r.rows),
+      pool.query(converted, params).then((r: QueryResult) => r.rows),
     run: (...params: unknown[]) => {
       const sqlWithReturn = ensureReturningId(sql);
       const conv = convertPlaceholders(sqlWithReturn);
-      return pool.query(conv, params).then((r) => {
+      return pool.query(conv, params).then((r: QueryResult) => {
         const id = (r.rows[0] as { id?: unknown } | undefined)?.id;
         const n = id != null ? Number(id) : NaN;
         return {
@@ -66,14 +67,14 @@ export const db = {
       const txDb = {
         prepare: (sql: string) => ({
           get: (...params: unknown[]) =>
-            client.query(convertPlaceholders(sql), params).then((r) => r.rows[0] ?? undefined),
+            client.query(convertPlaceholders(sql), params).then((r: QueryResult) => r.rows[0] ?? undefined),
           all: (...params: unknown[]) =>
-            client.query(convertPlaceholders(sql), params).then((r) => r.rows),
+            client.query(convertPlaceholders(sql), params).then((r: QueryResult) => r.rows),
           run: (...params: unknown[]) => {
             const sqlWithReturn = ensureReturningId(sql);
             return client
               .query(convertPlaceholders(sqlWithReturn), params)
-              .then((r) => {
+              .then((r: QueryResult) => {
                 const id = (r.rows[0] as { id?: unknown } | undefined)?.id;
                 const n = id != null ? Number(id) : NaN;
                 return { changes: r.rowCount ?? 0, lastInsertRowid: Number.isFinite(n) ? n : null };

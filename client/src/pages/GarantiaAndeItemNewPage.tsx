@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { createGarantiaItem, getGarantiasItems } from "../lib/api";
+import { createGarantiaItem, getGarantiasItems, type GarantiasItemsResponse } from "../lib/api";
 import type { ItemGarantiaAnde } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
 import { showToast } from "../components/ToastNotification";
@@ -43,7 +43,7 @@ export function GarantiaAndeItemNewPage() {
 
   useEffect(() => {
     getGarantiasItems()
-      .then((r) => setItems(r.items))
+      .then((r: GarantiasItemsResponse) => setItems(r.items))
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
   }, []);

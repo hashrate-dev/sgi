@@ -6,6 +6,7 @@ import {
   deleteGarantiasEmittedAll,
   getGarantiasEmitted,
   verifyPassword,
+  type GarantiasEmittedResponse,
 } from "../lib/api";
 import type { Invoice } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
@@ -40,7 +41,7 @@ export function HistorialGarantiasPage() {
 
   useEffect(() => {
     getGarantiasEmitted()
-      .then((r) => setItems(r.items as { invoice: Invoice; emittedAt: string }[]))
+      .then((r: GarantiasEmittedResponse) => setItems(r.items as { invoice: Invoice; emittedAt: string }[]))
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
   }, []);
