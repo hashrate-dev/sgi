@@ -166,25 +166,40 @@ export function FacturacionPage() {
   );
   const totals = useMemo(() => calcTotals(items), [items]);
 
-  /** Actualizar ítems "4% Gastos Operativos Transferencia" (D): el 4% se aplica solo al valor de la fila correspondiente (primer D = 4% primera fila A/B/C, etc.). */
+  /** La fila 4% se agrega manual (desde el selector de ítem). Solo actualizamos precio/cantidad de cada D (4% de la fila de servicio correspondiente) y orden: Servicio, 4%, Servicio, 4%, ... */
   useEffect(() => {
     setItems((prev) => {
-      const basePorFila = prev
-        .filter((it) => it.serviceKey === "A" || it.serviceKey === "B" || it.serviceKey === "C")
-        .map((it) => (it.price - (it.discount || 0)) * it.quantity);
-      let changed = false;
-      let dIndex = 0;
-      const next = prev.map((it) => {
-        if (it.serviceKey !== "D") return it;
-        const baseFila = basePorFila[dIndex] ?? 0;
-        dIndex += 1;
-        const qty = Math.max(1, it.quantity);
-        const newPrice = Math.round((baseFila * 0.04 * 100) / qty) / 100;
-        if (it.price === newPrice && it.discount === 0) return it;
-        changed = true;
-        return { ...it, price: newPrice, discount: 0 };
+      const serviceItems = prev.filter((it) => it.serviceKey === "A" || it.serviceKey === "B" || it.serviceKey === "C");
+      const dItems = prev.filter((it) => it.serviceKey === "D");
+      const numService = serviceItems.length;
+      const basePorFila = serviceItems.map((s) => (s.price - (s.discount || 0)) * s.quantity);
+
+      if (dItems.length === 0) return prev;
+
+      const newDItems = dItems.map((d, i) => {
+        const amount = Math.round((basePorFila[i] ?? 0) * 0.04 * 100) / 100;
+        return {
+          ...d,
+          month: serviceItems[i]?.month ?? d.month,
+          price: amount,
+          quantity: 1,
+          discount: 0
+        };
       });
-      return changed ? next : prev;
+
+      const ordered: LineItem[] = [];
+      const n = Math.max(numService, newDItems.length);
+      for (let i = 0; i < n; i++) {
+        if (serviceItems[i]) ordered.push(serviceItems[i]);
+        if (newDItems[i]) ordered.push(newDItems[i]);
+      }
+
+      if (ordered.length !== prev.length) return ordered;
+      const same = ordered.every((o, i) => {
+        const p = prev[i];
+        return p && o.serviceKey === p.serviceKey && o.price === p.price && o.quantity === p.quantity && (o.month === p.month) && (o.discount ?? 0) === (p.discount ?? 0);
+      });
+      return same ? prev : ordered;
     });
   }, [items]);
 
@@ -356,7 +371,14 @@ export function FacturacionPage() {
   }
 
   function removeItem(idx: number) {
-    setItems((prev) => prev.filter((_, i) => i !== idx));
+    setItems((prev) => {
+      const it = prev[idx];
+      const isService = it && (it.serviceKey === "A" || it.serviceKey === "B" || it.serviceKey === "C");
+      if (isService && prev[idx + 1]?.serviceKey === "D") {
+        return prev.filter((_, i) => i !== idx && i !== idx + 1);
+      }
+      return prev.filter((_, i) => i !== idx);
+    });
   }
 
   function exportExcel() {
@@ -923,7 +945,7 @@ export function FacturacionPage() {
                       <tr>
                         <th>Servicio</th>
                         <th className="fact-cell-center">Mes</th>
-                        <th className="fact-cell-center">CANTIDAD</th>
+                        <th className="fact-cell-center fact-col-cantidad">CANTIDAD</th>
                         <th className="fact-cell-center">PRECIO X EQ</th>
                         <th className="fact-cell-center">DTO x EQ</th>
                         <th className="fact-cell-center">Total</th>
@@ -1001,7 +1023,7 @@ export function FacturacionPage() {
                                   ))}
                                 </select>
                               </td>
-                              <td className="fact-cell-center">
+                              <td className="fact-cell-center fact-col-cantidad">
                                 <input
                                   type="number"
                                   className="fact-input"
@@ -1146,17 +1168,16 @@ export function FacturacionPage() {
                       📄 Documentos Emitidos
                     </h3>
                     <div className="fact-table-wrap">
-                      <table className="fact-table fact-emitted-table" style={{ tableLayout: "fixed", width: "100%", minWidth: "640px" }}>
-                        <thead>
+                      <table className="fact-table fact-emitted-table fact-emitted-table--7col" style={{ tableLayout: "fixed", width: "100%", minWidth: "640px" }}>
+                        <thead className="fact-emitted-thead">
                           <tr>
-                            <th aria-label="Marcador"></th>
-                            <th>Tipo</th>
-                            <th>Número</th>
-                            <th>Cliente</th>
-                            <th>Fecha<br />emisión</th>
-                            <th>Hora<br />emisión</th>
-                            <th>Total</th>
-                            <th>Acciones</th>
+                            <th style={{ borderLeft: "1px solid #2D5D46", borderRight: "1px solid #2D5D46" }}>Tipo</th>
+                            <th style={{ borderLeft: "1px solid #2D5D46", borderRight: "1px solid #2D5D46" }}>Número</th>
+                            <th style={{ borderLeft: "1px solid #2D5D46", borderRight: "1px solid #2D5D46" }}>Cliente</th>
+                            <th style={{ borderLeft: "1px solid #2D5D46", borderRight: "1px solid #2D5D46" }}>Fecha<br />emisión</th>
+                            <th style={{ borderLeft: "1px solid #2D5D46", borderRight: "1px solid #2D5D46" }}>Hora<br />emisión</th>
+                            <th style={{ borderLeft: "1px solid #2D5D46", borderRight: "1px solid #2D5D46" }}>Total</th>
+                            <th style={{ borderLeft: "1px solid #2D5D46", borderRight: "1px solid #2D5D46" }}>Acciones</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1164,7 +1185,6 @@ export function FacturacionPage() {
                             const inv = item.invoice;
                             return (
                               <tr key={item.invoice.id}>
-                                <td className="fact-emitted-marker" title="Documento emitido">📄</td>
                                 <td>
                                   {inv.type === "Nota de Crédito" ? "Nota C." : inv.type}
                                   {inv.type === "Recibo" && " "}

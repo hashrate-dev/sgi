@@ -153,31 +153,35 @@ export function UsuariosPage() {
     <div className="fact-page usuarios-page">
       <div className="container">
         <PageHeader title="Gestión de usuarios y permisos" showBackButton backTo="/" backText="Volver al inicio" />
-        <div className="fact-card">
-          {!isAdmin ? (
-            <div className="fact-card-body">
-              <p className="text-muted mb-0">Solo los administradores pueden gestionar usuarios.</p>
+
+        {!isAdmin ? (
+          <div className="usuarios-page-card usuarios-page-card--single">
+            <div className="usuarios-page-card-inner">
+              <div className="usuarios-page-no-access">
+                <span className="usuarios-page-no-access-icon" aria-hidden>👤</span>
+                <p className="usuarios-page-no-access-text">Solo los administradores pueden gestionar usuarios.</p>
+              </div>
             </div>
-          ) : (
-            <>
-              <div className="fact-card-header-custom">
-                <div className="card-title-wrap">
-                  <div className="card-title-icon">
-                    <i className="bi bi-people-fill" />
-                  </div>
-                  <div>
-                    <h2>Usuarios</h2>
-                    <p className="card-subtitle">Identificados por correo. Roles: AdministradorA, AdministradorB, Operador o Lector.</p>
-                  </div>
+          </div>
+        ) : (
+          <>
+            <div className="usuarios-page-card">
+              <div className="usuarios-page-header">
+                <div className="usuarios-page-header-inner">
+                  <h2 className="usuarios-page-title">
+                    <span className="usuarios-page-title-icon" aria-hidden>👥</span>
+                    Usuarios
+                  </h2>
+                  <p className="usuarios-page-subtitle">Identificados por correo. Roles: AdministradorA, AdministradorB, Operador o Lector.</p>
                 </div>
-                <button type="button" className="fact-btn-new-user" onClick={openNew}>
+                <button type="button" className="usuarios-page-btn-new" onClick={openNew}>
                   <i className="bi bi-plus-lg" />
                   Nuevo usuario
                 </button>
               </div>
-              <div className="fact-card-body">
+              <div className="usuarios-page-body">
                 {error && (
-                  <div className="alert alert-danger py-2 small mb-3">
+                  <div className="usuarios-page-alert usuarios-page-alert--danger">
                     {error}
                   </div>
                 )}
@@ -187,40 +191,106 @@ export function UsuariosPage() {
                     <p className="mt-2 mb-0 small">Cargando usuarios...</p>
                   </div>
                 ) : (
-                  <div className="usuarios-table-wrap">
-                    <table className="usuarios-table">
-                      <thead>
+                  <div className="usuarios-listado-wrap">
+                    <table className="usuarios-listado-table table table-sm align-middle">
+                      <thead className="table-dark">
                         <tr>
-                          <th>Correo</th>
-                          <th>Rol</th>
-                          <th>Fecha alta</th>
-                          <th>Acciones</th>
+                          <th className="text-start">Correo</th>
+                          <th className="text-start">Rol</th>
+                          <th className="text-start">Fecha alta</th>
+                          <th className="text-center">Acciones</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {users.map((u) => (
-                          <tr key={u.id}>
-                            <td><span className="user-email">{u.email}</span></td>
+                        {users.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="text-center text-muted py-4">
+                              <small>No hay usuarios registrados</small>
+                            </td>
+                          </tr>
+                        ) : (
+                          users.map((u) => (
+                            <tr key={u.id}>
+                              <td><span className="user-email">{u.email}</span></td>
+                              <td>
+                                <span className={getRoleBadgeClass(u.role, currentUser?.role)}>
+                                  {getRoleDisplayLabel(u.role, currentUser?.role)}
+                                </span>
+                              </td>
+                              <td><span className="user-date">{u.created_at ? new Date(u.created_at).toLocaleDateString("es-AR") : "—"}</span></td>
+                              <td className="text-center">
+                                <div className="action-btns">
+                                  <button type="button" className="btn-action btn-action--edit" onClick={() => openEdit(u)} title="Editar">
+                                    <i className="bi bi-pencil" />
+                                    Editar
+                                  </button>
+                                  {currentUser && currentUser.id !== u.id && canDeleteAdminUser(currentUser.role, u.role) && (
+                                    <button type="button" className="btn-action btn-action--danger" onClick={() => handleDeleteClick(u)} title="Eliminar">
+                                      <i className="bi bi-trash" />
+                                      Eliminar
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="usuarios-page-card usuarios-page-activity-card mt-4">
+              <div className="usuarios-page-header usuarios-page-header--activity">
+                <div className="usuarios-page-header-inner">
+                  <h2 className="usuarios-page-title">
+                    <span className="usuarios-page-title-icon usuarios-page-title-icon--activity" aria-hidden>📊</span>
+                    Actividad de usuarios
+                  </h2>
+                  <p className="usuarios-page-subtitle">Entradas y salidas al sistema, horarios y tiempo conectado.</p>
+                </div>
+              </div>
+              <div className="usuarios-page-body">
+                {activityLoading ? (
+                  <div className="activity-loading">
+                    <div className="spinner-border" role="status" aria-label="Cargando" />
+                    <p className="mt-2 mb-0 small">Cargando actividad...</p>
+                  </div>
+                ) : activity.length === 0 ? (
+                  <div className="empty-activity">
+                    <i className="bi bi-inbox" />
+                    Sin registros aún
+                  </div>
+                ) : (
+                  <div className="usuarios-activity-listado-wrap">
+                    <table className="usuarios-activity-listado-table table table-sm align-middle">
+                      <thead className="table-dark">
+                        <tr>
+                          <th className="text-start">Usuario</th>
+                          <th className="text-start">Evento</th>
+                          <th className="text-start">Fecha y hora</th>
+                          <th className="text-start">Tiempo conectado</th>
+                          <th className="text-start">Ubicación (IP)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {activity.map((a) => (
+                          <tr key={a.id}>
+                            <td><span className="user-email">{a.user_email}</span></td>
                             <td>
-                              <span className={getRoleBadgeClass(u.role, currentUser?.role)}>
-                                {getRoleDisplayLabel(u.role, currentUser?.role)}
+                              <span className={a.event === "login" ? "event-badge event-badge--login" : "event-badge event-badge--logout"}>
+                                {a.event === "login" ? <><i className="bi bi-box-arrow-in-right" /> Entrada</> : <><i className="bi bi-box-arrow-right" /> Salida</>}
                               </span>
                             </td>
-                            <td><span className="user-date">{u.created_at ? new Date(u.created_at).toLocaleDateString("es-AR") : "—"}</span></td>
-                            <td>
-                              <div className="action-btns">
-                                <button type="button" className="btn-action btn-action--edit" onClick={() => openEdit(u)} title="Editar">
-                                  <i className="bi bi-pencil" />
-                                  Editar
-                                </button>
-                                {currentUser && currentUser.id !== u.id && canDeleteAdminUser(currentUser.role, u.role) && (
-                                  <button type="button" className="btn-action btn-action--danger" onClick={() => handleDeleteClick(u)} title="Eliminar">
-                                    <i className="bi bi-trash" />
-                                    Eliminar
-                                  </button>
-                                )}
-                              </div>
+                            <td>{new Date(a.created_at).toLocaleString("es-AR")}</td>
+                            <td className="activity-duration">
+                              {a.duration_seconds != null
+                                ? `${Math.floor(a.duration_seconds / 3600)}h ${Math.floor((a.duration_seconds % 3600) / 60)}min`
+                                : "—"}
                             </td>
+                            <td><span className="activity-ip">{a.ip_address || "—"}</span></td>
                           </tr>
                         ))}
                       </tbody>
@@ -228,70 +298,8 @@ export function UsuariosPage() {
                   </div>
                 )}
               </div>
-            </>
-          )}
-        </div>
-
-        {isAdmin && (
-          <div className="fact-card activity-card mt-4">
-            <div className="fact-card-header-custom">
-              <div className="card-title-wrap">
-                <div className="card-title-icon">
-                  <i className="bi bi-activity" />
-                </div>
-                <div>
-                  <h2>Actividad de usuarios</h2>
-                  <p className="card-subtitle">Entradas y salidas al sistema, horarios y tiempo conectado.</p>
-                </div>
-              </div>
             </div>
-            <div className="fact-card-body">
-              {activityLoading ? (
-                <div className="activity-loading">
-                  <div className="spinner-border" role="status" aria-label="Cargando" />
-                  <p className="mt-2 mb-0 small">Cargando actividad...</p>
-                </div>
-              ) : activity.length === 0 ? (
-                <div className="empty-activity">
-                  <i className="bi bi-inbox" />
-                  Sin registros aún
-                </div>
-              ) : (
-                <div className="activity-table-wrap">
-                  <table className="activity-table">
-                    <thead>
-                      <tr>
-                        <th>Usuario</th>
-                        <th>Evento</th>
-                        <th>Fecha y hora</th>
-                        <th>Tiempo conectado</th>
-                        <th>Ubicación (IP)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {activity.map((a) => (
-                        <tr key={a.id}>
-                          <td><span className="user-email">{a.user_email}</span></td>
-                          <td>
-                            <span className={a.event === "login" ? "event-badge event-badge--login" : "event-badge event-badge--logout"}>
-                              {a.event === "login" ? <><i className="bi bi-box-arrow-in-right" /> Entrada</> : <><i className="bi bi-box-arrow-right" /> Salida</>}
-                            </span>
-                          </td>
-                          <td>{new Date(a.created_at).toLocaleString("es-AR")}</td>
-                          <td className="activity-duration">
-                            {a.duration_seconds != null
-                              ? `${Math.floor(a.duration_seconds / 3600)}h ${Math.floor((a.duration_seconds % 3600) / 60)}min`
-                              : "—"}
-                          </td>
-                          <td><span className="activity-ip">{a.ip_address || "—"}</span></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
+          </>
         )}
       </div>
 

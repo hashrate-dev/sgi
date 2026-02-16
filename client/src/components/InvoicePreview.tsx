@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import type { Client, ComprobanteType, LineItem } from "../lib/types";
+import { formatUSD } from "../lib/formatCurrency";
 import { recibimosMontoEnDosLineas } from "../lib/numberToWords";
 import "../styles/invoice-preview.css";
 
@@ -30,10 +31,6 @@ function formatDDMMYY(d: Date): string {
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const year = String(d.getFullYear()).slice(-2);
   return `${day}/${month}/${year}`;
-}
-
-function formatUSD(n: number): string {
-  return `${n.toFixed(2).replace(".", ",")} USD`;
 }
 
 function ymToMonthYear(ym: string): string {
@@ -250,13 +247,22 @@ export function InvoicePreview({
           </div>
         )}
 
-        {/* Recibo / Recibo Devolución: texto RECIBIMOS LA CANTIDAD DE... Factura/NC: tabla FECHA DE EMISIÓN / VENCIMIENTO */}
+        {/* Recibo / Recibo Devolución: "Recibimos la cantidad de..." o "Se devuelve la cantidad de..." */}
         {items.length > 0 && (type === "Recibo" || type === "Recibo Devolución") && (() => {
-          const { line1, line2 } = recibimosMontoEnDosLineas(total);
+          const { line1, line2 } = recibimosMontoEnDosLineas(total, type);
+          const notaGuarani = "El monto que se devuelve puede ser distinto al monto contable, debido a que se ajusta por el valor del Guaraní a la fecha.";
           return (
             <div className="invoice-preview-recibimos-block">
-              <div className="invoice-preview-recibimos-line1">{line1}</div>
-              <div className="invoice-preview-recibimos-line2">{line2}</div>
+              {type === "Recibo Devolución" ? (
+                <div className="invoice-preview-recibimos-texto-seguido">
+                  {line1} {line2} {notaGuarani}
+                </div>
+              ) : (
+                <>
+                  <div className="invoice-preview-recibimos-line1">{line1}</div>
+                  <div className="invoice-preview-recibimos-line2">{line2}</div>
+                </>
+              )}
             </div>
           );
         })()}
@@ -278,7 +284,9 @@ export function InvoicePreview({
           <div className="invoice-preview-total-wrap">
             <div className="invoice-preview-total-box">
               <div className="invoice-preview-total-label">TOTAL</div>
-              <div className="invoice-preview-total-amount">{formatUSD(total)}</div>
+              <div className="invoice-preview-total-amount">
+                {formatUSD(Math.abs(total))}
+              </div>
             </div>
           </div>
         )}

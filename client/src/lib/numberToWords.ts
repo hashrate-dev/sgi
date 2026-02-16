@@ -67,18 +67,23 @@ function toSentenceCase(str: string): string {
 }
 
 /**
- * Texto para recibo en dos líneas, minúsculas con primera letra mayúscula:
- * Línea 1: "Recibimos la cantidad de [monto en letras]"
- * Línea 2: "Dólares estadounidenses con XX/100"
+ * Texto para recibo en dos líneas, minúsculas con primera letra mayúscula.
+ * Para "Recibo": "Recibimos la cantidad de [monto]..."
+ * Para "Recibo Devolución": "Se devuelve la cantidad de [monto]..."
+ * Línea 2: "dólares estadounidenses con XX/100"
  */
-export function recibimosMontoEnDosLineas(amount: number): { line1: string; line2: string } {
+export function recibimosMontoEnDosLineas(
+  amount: number,
+  tipo?: "Recibo" | "Recibo Devolución"
+): { line1: string; line2: string } {
   const abs = Math.abs(amount);
   const entero = Math.floor(abs);
   const centavos = Math.round((abs - entero) * 100) % 100;
   const centStr = String(centavos).padStart(2, "0");
   const parteEntera = intToWordsEs(entero);
+  const prefix = tipo === "Recibo Devolución" ? "SE DEVUELVE LA CANTIDAD DE" : "RECIBIMOS LA CANTIDAD DE";
   return {
-    line1: toSentenceCase(`RECIBIMOS LA CANTIDAD DE ${parteEntera}`),
-    line2: toSentenceCase(`DÓLARES ESTADOUNIDENSES CON ${centStr}/100`) + "."
+    line1: toSentenceCase(`${prefix} ${parteEntera}`),
+    line2: `dólares estadounidenses con ${centStr}/100.`
   };
 }

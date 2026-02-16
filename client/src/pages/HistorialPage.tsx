@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
-import { deleteEmittedDocumentsAll, getClients, verifyPassword } from "../lib/api";
+import { addEmittedDocument, deleteEmittedDocumentsAll, getClients, verifyPassword } from "../lib/api";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadInvoices, loadInvoicesAsic, saveInvoices, saveInvoicesAsic } from "../lib/storage";
 import type { ComprobanteType, Invoice } from "../lib/types";
@@ -31,8 +31,10 @@ function findCol(headerRow: (string | number)[], ...names: string[]): number {
   return -1;
 }
 
-// Parsear Excel de facturas (mismo formato que exportExcel)
-async function parseExcelInvoices(file: File): Promise<Invoice[]> {
+type ParsedExcelRow = { invoice: Invoice; source: "hosting" | "asic" };
+
+// Parsear Excel de facturas (mismo formato que exportExcel); incluye columna Origen para repartir en Hosting/ASIC
+async function parseExcelInvoices(file: File): Promise<ParsedExcelRow[]> {
   const arrayBuffer = await file.arrayBuffer();
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(arrayBuffer);
@@ -45,6 +47,7 @@ async function parseExcelInvoices(file: File): Promise<Invoice[]> {
 
   const headerRow = rows[0];
   const idx = {
+    origen: findCol(headerRow, "origen", "origin", "source"),
     number: findCol(headerRow, "número", "numero", "number", "n°"),
     type: findCol(headerRow, "tipo", "type"),
     clientName: findCol(headerRow, "cliente", "clientname", "client"),
@@ -67,7 +70,7 @@ async function parseExcelInvoices(file: File): Promise<Invoice[]> {
     return isNaN(num) ? 0 : num;
   };
 
-  const result: Invoice[] = [];
+  const result: ParsedExcelRow[] = [];
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
     if (!row) continue;
@@ -85,6 +88,10 @@ async function parseExcelInvoices(file: File): Promise<Invoice[]> {
     const discounts = idx.discounts >= 0 ? getNum(row, idx.discounts) : getNum(row, 10);
     const total = idx.total >= 0 ? getNum(row, idx.total) : getNum(row, 11);
 
+    // Origen: si la columna existe y dice ASIC → asic, sino → hosting
+    const origenVal = idx.origen >= 0 ? get(row, idx.origen).toUpperCase() : "";
+    const source: "hosting" | "asic" = origenVal.includes("ASIC") ? "asic" : "hosting";
+
     // Validar tipo
     const validType = type === "Factura" || type === "Recibo" || type === "Nota de Crédito" ? type : "Factura";
     
@@ -94,7 +101,6 @@ async function parseExcelInvoices(file: File): Promise<Invoice[]> {
     // Parsear mes (si viene como YYYY-MM o necesita conversión)
     let monthFormatted = month;
     if (month && !month.match(/^\d{4}-\d{2}$/)) {
-      // Intentar convertir formato DD/MM/YYYY o MM/YYYY a YYYY-MM
       const parts = month.split("/");
       if (parts.length === 2) {
         monthFormatted = `${parts[1]}-${parts[0].padStart(2, "0")}`;
@@ -103,7 +109,7 @@ async function parseExcelInvoices(file: File): Promise<Invoice[]> {
       }
     }
 
-    result.push({
+    const invoice: Invoice = {
       id,
       number,
       type: validType as ComprobanteType,
@@ -116,8 +122,9 @@ async function parseExcelInvoices(file: File): Promise<Invoice[]> {
       subtotal: Math.abs(subtotal),
       discounts: Math.abs(discounts),
       total: Math.abs(total),
-      items: [] // Items vacíos por defecto, se pueden editar después
-    });
+      items: []
+    };
+    result.push({ invoice, source });
   }
   return result;
 }
@@ -446,31 +453,68 @@ export function HistorialPage() {
     setExcelLoading(true);
     e.target.value = "";
     try {
-      const invoices = await parseExcelInvoices(file);
-      if (invoices.length === 0) {
-        showToast("No se encontraron facturas en el Excel. La primera fila debe ser encabezados (Número, Tipo, Cliente, etc.).", "error");
-        setExcelLoading(false);
-        return;
-      }
-      // Combinar con facturas existentes en Hosting (evitar duplicados por número)
-      const existingNumbers = new Set(allHosting.map((inv) => `${inv.type}-${inv.number}`));
-      const newInvoices = invoices.filter((inv) => !existingNumbers.has(`${inv.type}-${inv.number}`));
-      const duplicates = invoices.length - newInvoices.length;
-      
-      if (newInvoices.length === 0) {
-        showToast(`Todas las facturas del Excel ya existen en el historial.`, "warning");
+      const parsed = await parseExcelInvoices(file);
+      if (parsed.length === 0) {
+        showToast("No se encontraron facturas en el Excel. La primera fila debe ser encabezados (Número, Tipo, Cliente, Origen, etc.).", "error");
         setExcelLoading(false);
         return;
       }
 
-      const updated = [...allHosting, ...newInvoices];
-      setAllHosting(updated);
-      saveInvoices(updated);
-      
+      const existingHosting = new Set(allHosting.map((inv) => `${inv.type}-${inv.number}`));
+      const existingAsic = new Set(allAsic.map((inv) => `${inv.type}-${inv.number}`));
+
+      const newHosting: Invoice[] = [];
+      const newAsic: Invoice[] = [];
+      let duplicates = 0;
+      for (const { invoice, source } of parsed) {
+        const key = `${invoice.type}-${invoice.number}`;
+        if (source === "asic") {
+          if (existingAsic.has(key)) {
+            duplicates++;
+          } else {
+            existingAsic.add(key);
+            newAsic.push(invoice);
+          }
+        } else {
+          if (existingHosting.has(key)) {
+            duplicates++;
+          } else {
+            existingHosting.add(key);
+            newHosting.push(invoice);
+          }
+        }
+      }
+
+      const totalNew = newHosting.length + newAsic.length;
+      if (totalNew === 0) {
+        showToast("Todas las facturas del Excel ya existen en el historial.", "warning");
+        setExcelLoading(false);
+        return;
+      }
+
+      if (newHosting.length > 0) {
+        const updatedHosting = [...allHosting, ...newHosting];
+        setAllHosting(updatedHosting);
+        saveInvoices(updatedHosting);
+      }
+      if (newAsic.length > 0) {
+        const updatedAsic = [...allAsic, ...newAsic];
+        setAllAsic(updatedAsic);
+        saveInvoicesAsic(updatedAsic);
+      }
+
+      const emittedAt = new Date().toISOString();
+      for (const inv of newHosting) {
+        addEmittedDocument("hosting", inv as Record<string, unknown>, emittedAt).catch(() => {});
+      }
+      for (const inv of newAsic) {
+        addEmittedDocument("asic", inv as Record<string, unknown>, emittedAt).catch(() => {});
+      }
+
       if (duplicates > 0) {
-        showToast(`Se importaron ${newInvoices.length} facturas. ${duplicates} ya existían y se omitieron.`, "success");
+        showToast(`Se importaron ${totalNew} documentos (${newHosting.length} Hosting, ${newAsic.length} ASIC). ${duplicates} ya existían y se omitieron.`, "success");
       } else {
-        showToast(`Se importaron ${newInvoices.length} facturas correctamente.`, "success");
+        showToast(`Se importaron ${totalNew} documentos correctamente (${newHosting.length} Hosting, ${newAsic.length} ASIC).`, "success");
       }
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Error al leer el archivo Excel.", "error");

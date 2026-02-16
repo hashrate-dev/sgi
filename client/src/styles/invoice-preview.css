@@ -90,6 +90,7 @@
   margin-bottom: 1.5mm;
   line-height: 1.2;
   padding: 0;
+  white-space: nowrap; /* RECIBO DEVOLUCIÓN - RDxxxx en una sola fila */
 }
 
 .invoice-preview-label {
@@ -360,6 +361,15 @@
 }
 .invoice-preview-recibimos-line1 {
   margin-bottom: 2mm;
+}
+.invoice-preview-recibimos-line2 {
+  margin-bottom: 2mm;
+}
+.invoice-preview-recibimos-texto-seguido {
+  font-size: 12pt;
+  font-weight: normal;
+  color: #000000;
+  line-height: 1.5;
 }
 
 /* Total al pie: contra abajo de la A4, mismo margen 18mm que los extremos de la hoja */

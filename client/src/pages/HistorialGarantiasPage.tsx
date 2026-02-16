@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import {
+  addGarantiaEmitted,
   deleteGarantiaEmittedOne,
   deleteGarantiasEmittedAll,
   getGarantiasEmitted,
@@ -13,6 +15,10 @@ import { PageHeader } from "../components/PageHeader";
 import { showToast } from "../components/ToastNotification";
 import { formatCurrency, formatCurrencyNumber } from "../lib/formatCurrency";
 import "../styles/facturacion.css";
+
+function genId() {
+  return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
 
 const MS_15_DAYS = 15 * 24 * 60 * 60 * 1000;
 const PAGE_SIZE = 25;
@@ -37,6 +43,7 @@ export function HistorialGarantiasPage() {
   const [clearPasswordError, setClearPasswordError] = useState("");
   const [clearing, setClearing] = useState(false);
   const [passwordAttempts, setPasswordAttempts] = useState(0);
+  const [excelLoading, setExcelLoading] = useState(false);
   const MAX_PASSWORD_ATTEMPTS = 3;
 
   useEffect(() => {
@@ -75,6 +82,143 @@ export function HistorialGarantiasPage() {
     const montoTotal = itemsInPeriod.reduce((s, item) => s + Math.abs(item.invoice.total || 0), 0);
     return { totalRecibos, montoTotal, registros: itemsInPeriod.length };
   }, [itemsInPeriod]);
+
+  function exportExcel() {
+    if (items.length === 0) {
+      showToast("No hay datos para exportar.", "warning");
+      return;
+    }
+    const fecha = new Date().toISOString().slice(0, 10).replace(/-/g, "-");
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Historial Garantías ANDE");
+    ws.columns = [
+      { header: "Número", key: "number", width: 14 },
+      { header: "Tipo", key: "type", width: 18 },
+      { header: "Cliente", key: "clientName", width: 32 },
+      { header: "Fecha Emisión", key: "date", width: 14 },
+      { header: "Hora Emisión", key: "emissionTime", width: 12 },
+      { header: "Total", key: "total", width: 14 },
+      { header: "Emitido (ISO)", key: "emittedAt", width: 24 },
+    ];
+    items.forEach((item) => {
+      ws.addRow({
+        number: item.invoice.number,
+        type: item.invoice.type ?? "Recibo",
+        clientName: item.invoice.clientName,
+        date: item.invoice.date,
+        emissionTime: formatTimeNoSeconds(item.invoice.emissionTime),
+        total: item.invoice.total ?? 0,
+        emittedAt: item.emittedAt,
+      });
+    });
+    ws.getRow(1).font = { bold: true };
+    wb.xlsx.writeBuffer().then((buf) => {
+      saveAs(new Blob([buf]), `Historial_Garantias_ANDE_${fecha}.xlsx`);
+      showToast("Excel exportado correctamente.", "success");
+    });
+  }
+
+  type GarantiasHistorialRow = { number: string; type: string; clientName: string; date: string; emissionTime: string; total: number; emittedAt?: string };
+
+  async function parseExcelGarantiasHistorial(file: File): Promise<GarantiasHistorialRow[]> {
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(arrayBuffer);
+    const sheet = workbook.worksheets[0];
+    if (!sheet) return [];
+    const rows: (string | number)[][] = [];
+    sheet.eachRow((row) => rows.push(row.values as (string | number)[]));
+    if (rows.length < 2) return [];
+    const headerRow = rows[0];
+    const findCol = (...names: string[]) => {
+      const h = headerRow.map((c) => String(c ?? "").toLowerCase());
+      for (const n of names) {
+        const i = h.findIndex((c) => c.includes(n.toLowerCase()) || n.toLowerCase().includes(c));
+        if (i >= 0) return i;
+      }
+      return -1;
+    };
+    const idx = {
+      number: findCol("número", "numero", "number"),
+      type: findCol("tipo", "type"),
+      clientName: findCol("cliente", "clientname"),
+      date: findCol("fecha emisión", "fecha emision", "date", "fecha"),
+      emissionTime: findCol("hora emisión", "hora emision", "emissiontime", "hora"),
+      total: findCol("total"),
+      emittedAt: findCol("emitido", "emittedat", "iso"),
+    };
+    const get = (row: (string | number)[], i: number): string =>
+      i >= 0 && row[i] !== undefined && row[i] !== null ? String(row[i]).trim() : "";
+    const getNum = (row: (string | number)[], i: number): number => {
+      const val = get(row, i);
+      if (!val) return 0;
+      const n = parseFloat(val.replace(/[^\d.-]/g, ""));
+      return Number.isFinite(n) ? n : 0;
+    };
+    const result: GarantiasHistorialRow[] = [];
+    for (let r = 1; r < rows.length; r++) {
+      const row = rows[r];
+      if (!row) continue;
+      const number = idx.number >= 0 ? get(row, idx.number) : get(row, 1);
+      if (!number) continue;
+      const type = idx.type >= 0 ? get(row, idx.type) : "Recibo";
+      const validType = type === "Recibo Devolución" ? "Recibo Devolución" : "Recibo";
+      result.push({
+        number,
+        type: validType,
+        clientName: idx.clientName >= 0 ? get(row, idx.clientName) : get(row, 3) || "Sin cliente",
+        date: idx.date >= 0 ? get(row, idx.date) : get(row, 4) || new Date().toLocaleDateString(),
+        emissionTime: idx.emissionTime >= 0 ? get(row, idx.emissionTime) : get(row, 5) || "",
+        total: idx.total >= 0 ? getNum(row, idx.total) : getNum(row, 6),
+        emittedAt: idx.emittedAt >= 0 ? get(row, idx.emittedAt) : undefined,
+      });
+    }
+    return result;
+  }
+
+  async function handleImportExcel(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.endsWith(".xlsx") && !file.name.endsWith(".xls")) {
+      showToast("Elegí un archivo Excel (.xlsx).", "error");
+      e.target.value = "";
+      return;
+    }
+    setExcelLoading(true);
+    e.target.value = "";
+    try {
+      const parsed = await parseExcelGarantiasHistorial(file);
+      if (parsed.length === 0) {
+        showToast("No se encontraron filas válidas. Use el formato exportado: Número, Tipo, Cliente, Fecha Emisión, Hora Emisión, Total.", "error");
+        setExcelLoading(false);
+        return;
+      }
+      for (const row of parsed) {
+        const emittedAt = row.emittedAt && row.emittedAt.length > 10 ? row.emittedAt : new Date().toISOString();
+        const inv: Record<string, unknown> = {
+          id: genId(),
+          number: row.number,
+          type: row.type,
+          clientName: row.clientName,
+          date: row.date,
+          emissionTime: row.emissionTime || undefined,
+          total: row.total,
+          subtotal: row.total,
+          discounts: 0,
+          month: "",
+          items: [],
+        };
+        await addGarantiaEmitted(inv, emittedAt);
+      }
+      const res = await getGarantiasEmitted();
+      setItems(res.items as { invoice: Invoice; emittedAt: string }[]);
+      showToast(`Se importaron ${parsed.length} documento(s) correctamente.`, "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Error al importar Excel.", "error");
+    } finally {
+      setExcelLoading(false);
+    }
+  }
 
   async function removeOne(item: { invoice: Invoice; emittedAt: string }) {
     try {
@@ -199,15 +343,6 @@ export function HistorialGarantiasPage() {
       <div className="container">
         <PageHeader title="Historial Garantías ANDE" />
 
-        <div className="d-flex align-items-center gap-2 mb-3">
-          <Link to="/equipos-asic" className="btn btn-outline-secondary btn-sm">
-            ← Equipos ASIC
-          </Link>
-          <Link to="/equipos-asic/garantia-ande" className="btn btn-outline-primary btn-sm">
-            Emitir documento Garantía
-          </Link>
-        </div>
-
         <div className="hrs-card hrs-card--rect p-4">
           <div className="historial-filtros-outer">
             <div className="historial-filtros-container">
@@ -229,6 +364,34 @@ export function HistorialGarantiasPage() {
                       onClick={() => setQClient("")}
                     >
                       Limpiar
+                    </button>
+                  </div>
+                  <div className="col-md-auto d-flex align-items-end gap-2 ms-auto">
+                    <label
+                      className="btn btn-outline-secondary btn-sm historial-import-excel-btn mb-0"
+                      style={{
+                        backgroundColor: "rgba(45, 93, 70, 0.35)",
+                        cursor: excelLoading ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      {excelLoading ? "⏳ Importando..." : "📥 Importar Excel"}
+                      <input
+                        type="file"
+                        accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        className="d-none"
+                        onChange={handleImportExcel}
+                        disabled={excelLoading}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="btn btn-outline-secondary btn-sm historial-export-excel-btn"
+                      style={{ backgroundColor: "rgba(13, 110, 253, 0.12)" }}
+                      onClick={exportExcel}
+                      disabled={items.length === 0}
+                      title="Exportar a Excel"
+                    >
+                      📊 Exportar Excel
                     </button>
                   </div>
                 </div>
@@ -274,14 +437,18 @@ export function HistorialGarantiasPage() {
                     paginated.map((item) => (
                       <tr key={item.invoice.id}>
                         <td className="fw-bold text-start historial-col-num">{item.invoice.number}</td>
-                        <td className="text-start historial-col-tipo">Recibo</td>
+                        <td className="text-start historial-col-tipo">{item.invoice.type ?? "Recibo"}</td>
                         <td className="text-start historial-col-cliente" title={item.invoice.clientName}>
                           <span className="historial-cliente-nombre">{item.invoice.clientName}</span>
                         </td>
                         <td className="text-start historial-col-fecha-emision">{item.invoice.date}</td>
                         <td className="text-start historial-col-hora">{formatTimeNoSeconds(item.invoice.emissionTime)}</td>
                         <td className="text-start fw-bold historial-col-total">
-                          {formatCurrencyNumber(Math.abs(item.invoice.total || 0))}<br />USD
+                          {formatCurrencyNumber(
+                            item.invoice.type === "Recibo Devolución"
+                              ? -Math.abs(item.invoice.total || 0)
+                              : Math.abs(item.invoice.total || 0)
+                          )}<br />USD
                         </td>
                         <td className="text-center historial-col-acciones">
                           <div className="d-flex gap-1 justify-content-center align-items-center flex-nowrap historial-acciones-btns">
@@ -387,11 +554,13 @@ export function HistorialGarantiasPage() {
                 <div className="modal-body">
                   {(() => {
                     const inv = detailItem.invoice;
+                    const isReciboDevolucion = inv.type === "Recibo Devolución";
+                    const signMul = isReciboDevolucion ? -1 : 1;
                     return (
                       <>
                         <div className="row g-2 small mb-3">
                           <div className="col-md-4"><strong>Número:</strong> {inv.number}</div>
-                          <div className="col-md-4"><strong>Tipo:</strong> Recibo (Garantía ANDE)</div>
+                          <div className="col-md-4"><strong>Tipo:</strong> {inv.type === "Recibo Devolución" ? "Recibo Devolución" : "Recibo (Garantía ANDE)"}</div>
                           <div className="col-md-4"><strong>Cliente:</strong> {inv.clientName}</div>
                           <div className="col-md-4"><strong>Fecha emisión:</strong> {inv.date}</div>
                           <div className="col-md-4"><strong>Hora emisión:</strong> {formatTimeNoSeconds(inv.emissionTime)}</div>
@@ -416,13 +585,16 @@ export function HistorialGarantiasPage() {
                                     ? [item.garantiaCodigo, "Garantías", item.garantiaMarca, item.garantiaModelo].filter(Boolean).join(" - ")
                                     : item.setupNombre || item.marcaEquipo ? `${item.marcaEquipo || ""} ${item.modeloEquipo || ""}`.trim() || "Ítem" : "Ítem";
                                   const lineTotal = (item.price || 0) * (item.quantity || 1) - (item.discount || 0) * (item.quantity || 1);
+                                  const priceDisplay = isReciboDevolucion ? Math.abs(item.price || 0) : (item.price || 0);
+                                  const qtyDisplay = isReciboDevolucion ? -Math.abs(item.quantity || 1) : (item.quantity || 1);
+                                  const lineTotalDisplay = signMul * Math.abs(lineTotal);
                                   return (
                                     <tr key={idx}>
                                       <td>{desc}</td>
-                                      <td className="text-end">{item.quantity}</td>
-                                      <td className="text-end">{formatCurrencyNumber(item.price || 0)} USD</td>
+                                      <td className="text-end">{qtyDisplay}</td>
+                                      <td className="text-end">{formatCurrencyNumber(priceDisplay)} USD</td>
                                       <td className="text-end">{formatCurrencyNumber(item.discount || 0)} USD</td>
-                                      <td className="text-end">{formatCurrencyNumber(lineTotal)} USD</td>
+                                      <td className="text-end">{formatCurrencyNumber(lineTotalDisplay)} USD</td>
                                     </tr>
                                   );
                                 })}

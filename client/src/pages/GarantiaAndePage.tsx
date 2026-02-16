@@ -39,28 +39,28 @@ function genId() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
-/** Prefijo por tipo: Recibo = RV, Recibo Devolución = RD. Numeración RV010000, RD010000, ... */
-const GARANTIA_TIPO_PREFIX: Record<string, string> = { Recibo: "RV", "Recibo Devolución": "RD" };
+/** Recibo: R + 4 dígitos desde R0100. Recibo Devolución: RD + 4 dígitos desde RD0200. */
+const GARANTIA_NUM_CONFIG: Record<string, { prefix: string; digits: number; startNum: number }> = {
+  Recibo: { prefix: "R", digits: 4, startNum: 100 },
+  "Recibo Devolución": { prefix: "RD", digits: 4, startNum: 200 }
+};
 
 function nextValeNumber(emitted: { invoice: Invoice }[], tipo: "Recibo" | "Recibo Devolución"): string {
-  const prefix = GARANTIA_TIPO_PREFIX[tipo] ?? "RV";
-  const filtered = emitted.filter((e) =>
-    e.invoice.number.startsWith(prefix) || e.invoice.number.startsWith(prefix + "-")
-  );
-  const startNum = 10000;
-  const regex = new RegExp(`^${prefix}-?`, "i");
+  const { prefix, digits, startNum } = GARANTIA_NUM_CONFIG[tipo] ?? { prefix: "R", digits: 4, startNum: 100 };
+  const formatRegex = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\d{1,${digits}})$`, "i");
+  const filtered = emitted.filter((e) => formatRegex.test(e.invoice.number));
   const next =
     filtered.length === 0
       ? startNum
       : Math.max(
           startNum - 1,
           ...filtered.map((e) => {
-            const numStr = e.invoice.number.replace(regex, "");
-            const n = Number(numStr);
+            const m = e.invoice.number.match(formatRegex);
+            const n = m ? Number(m[1]) : 0;
             return Number.isFinite(n) ? n : 0;
           })
         ) + 1;
-  return `${prefix}${String(next).padStart(6, "0")}`;
+  return `${prefix}${String(next).padStart(digits, "0")}`;
 }
 
 function calcTotals(items: LineItem[]) {
@@ -70,7 +70,7 @@ function calcTotals(items: LineItem[]) {
   return { subtotal, discounts, total };
 }
 
-const MS_15_DAYS = 15 * 24 * 60 * 60 * 1000;
+const MS_5_DAYS = 5 * 24 * 60 * 60 * 1000;
 
 export function GarantiaAndePage() {
   const { user } = useAuth();
@@ -85,10 +85,15 @@ export function GarantiaAndePage() {
   const [showConfirmPdf, setShowConfirmPdf] = useState(false);
   type GarantiaTipo = "Recibo" | "Recibo Devolución";
   const [tipoGarantia, setTipoGarantia] = useState<GarantiaTipo>("Recibo");
+  /** Recibo a cancelar con este Recibo Devolución (solo cuando tipoGarantia === "Recibo Devolución"). */
+  const [relatedReciboId, setRelatedReciboId] = useState<string>("");
+  const [itemsLocked, setItemsLocked] = useState(false);
+  /** Documento emitido a mostrar en la Vista previa (al hacer clic en el botón ojo). */
+  const [previewEmitted, setPreviewEmitted] = useState<{ invoice: Invoice; emittedAt: string } | null>(null);
 
-  const emittedInLast15Days = useMemo(() => {
+  const emittedInLast5Days = useMemo(() => {
     const now = Date.now();
-    return emittedVales.filter((item) => now - new Date(item.emittedAt).getTime() < MS_15_DAYS);
+    return emittedVales.filter((item) => now - new Date(item.emittedAt).getTime() < MS_5_DAYS);
   }, [emittedVales]);
 
   const number = useMemo(() => nextValeNumber(emittedVales, tipoGarantia), [emittedVales, tipoGarantia]);
@@ -104,6 +109,54 @@ export function GarantiaAndePage() {
       (c) => `${c.code} - ${c.name}`.toLowerCase().includes(q) || c.name.toLowerCase().includes(q)
     );
   }, [clients, clientQuery]);
+
+  /** Recibos del cliente que aún no tienen un Recibo Devolución que los cancele (solo para tipo "Recibo Devolución"). */
+  const recibosDisponiblesParaDevolucion = useMemo(() => {
+    if (!selectedClient || tipoGarantia !== "Recibo Devolución") return [];
+    const recibosDelCliente = emittedVales.filter(
+      (item) => item.invoice.type === "Recibo" && item.invoice.clientName === selectedClient.name
+    );
+    const numerosYaCancelados = new Set(
+      emittedVales
+        .filter((item) => item.invoice.type === "Recibo Devolución" && item.invoice.relatedInvoiceNumber)
+        .map((item) => item.invoice.relatedInvoiceNumber)
+    );
+    return recibosDelCliente.filter((item) => !numerosYaCancelados.has(item.invoice.number));
+  }, [emittedVales, selectedClient, tipoGarantia]);
+
+  /** Al cambiar tipo, limpiar recibo relacionado y (si se sale de Recibo Devolución) ítems. */
+  useEffect(() => {
+    if (tipoGarantia !== "Recibo Devolución") {
+      setRelatedReciboId("");
+      setItemsLocked(false);
+      setItems([]);
+    }
+  }, [tipoGarantia]);
+
+  useEffect(() => {
+    setRelatedReciboId("");
+    setItems([]);
+    setItemsLocked(false);
+  }, [selectedClientId]);
+
+  /** Cargar ítems del recibo seleccionado cuando se elige un Recibo a devolver. */
+  useEffect(() => {
+    if (tipoGarantia !== "Recibo Devolución" || !relatedReciboId || !selectedClient) {
+      return;
+    }
+    const item = emittedVales.find(
+      (e) => (e.invoice.id && e.invoice.id === relatedReciboId) || e.invoice.number === relatedReciboId
+    );
+    if (!item || !item.invoice.items || item.invoice.items.length === 0) return;
+    const loadedItems: LineItem[] = item.invoice.items.map((it) => ({
+      ...it,
+      quantity: it.quantity ?? 1,
+      price: it.price ?? 0,
+      discount: it.discount ?? 0
+    }));
+    setItems(loadedItems);
+    setItemsLocked(true);
+  }, [relatedReciboId, tipoGarantia, selectedClient, emittedVales]);
 
   useEffect(() => {
     setEquiposAsic(loadEquiposAsic());
@@ -129,6 +182,15 @@ export function GarantiaAndePage() {
       .then((r: ClientsResponse) => setClients((r.clients ?? []) as Client[]))
       .catch(() => setClients([]));
   }, []);
+
+  /** Limpiar vista previa de documento emitido cuando el usuario edita el formulario. */
+  useEffect(() => {
+    setPreviewEmitted(null);
+  }, [tipoGarantia, selectedClientId, items]);
+
+  function viewEmittedInPreview(item: { invoice: Invoice; emittedAt: string }) {
+    setPreviewEmitted(item);
+  }
 
   function addItem() {
     if (itemsGarantia.length > 0) {
@@ -165,6 +227,10 @@ export function GarantiaAndePage() {
   function generatePdfAndSave() {
     if (!selectedClient) {
       showToast("Debe seleccionar un cliente válido.", "error");
+      return;
+    }
+    if (tipoGarantia === "Recibo Devolución" && !relatedReciboId) {
+      showToast("Debe seleccionar un Recibo a devolver (cancelar) para el Recibo Devolución.", "error");
       return;
     }
     if (items.length === 0) {
@@ -233,6 +299,16 @@ export function GarantiaAndePage() {
     }
     showToast(savePdf ? `${tipoGarantia} generado y guardado correctamente.` : `${tipoGarantia} emitido correctamente.`, "success");
 
+    const relatedRecibo = relatedReciboId
+      ? emittedVales.find(
+          (e) => (e.invoice.id && e.invoice.id === relatedReciboId) || e.invoice.number === relatedReciboId
+        )?.invoice
+      : null;
+    const isReciboDevolucion = tipoGarantia === "Recibo Devolución";
+    const finalSubtotal = isReciboDevolucion ? -Math.abs(subtotal) : subtotal;
+    const finalDiscounts = isReciboDevolucion ? -Math.abs(discounts) : discounts;
+    const finalTotal = isReciboDevolucion ? -Math.abs(total) : total;
+
     const inv: Invoice = {
       id: genId(),
       number,
@@ -250,10 +326,14 @@ export function GarantiaAndePage() {
       date: dateStr,
       emissionTime,
       month,
-      subtotal,
-      discounts,
-      total,
-      items
+      subtotal: finalSubtotal,
+      discounts: finalDiscounts,
+      total: finalTotal,
+      items,
+      ...(relatedRecibo && {
+        relatedInvoiceId: relatedRecibo.id,
+        relatedInvoiceNumber: relatedRecibo.number
+      })
     };
     const emittedAt = new Date().toISOString();
     try {
@@ -261,6 +341,8 @@ export function GarantiaAndePage() {
       const res = await getGarantiasEmitted();
       setEmittedVales(res.items as { invoice: Invoice; emittedAt: string }[]);
       setItems([]);
+      setRelatedReciboId("");
+      setItemsLocked(false);
       setShowConfirmPdf(false);
       showToast(`${tipoGarantia} ${inv.number} guardado en el servidor.`, "success");
     } catch (e) {
@@ -425,6 +507,56 @@ export function GarantiaAndePage() {
                     <small className="text-muted d-block mt-1">Cargá clientes en la hoja Clientes.</small>
                   )}
                 </div>
+
+                {/* Recibo a devolver (cancelar) cuando el tipo es Recibo Devolución */}
+                {tipoGarantia === "Recibo Devolución" && (
+                  <div className="fact-field" style={{ borderTop: "2px solid #00a652", paddingTop: "1rem", marginTop: "1rem" }}>
+                    <label className="fact-label" style={{ fontWeight: "bold", color: "#00a652" }}>
+                      🧾 Recibo a devolver / cancelar (Requerido)
+                    </label>
+                    {!selectedClient ? (
+                      <div style={{ padding: "0.75rem", backgroundColor: "#fff3cd", border: "1px solid #ffc107", borderRadius: "4px" }}>
+                        <small className="text-warning">Primero debe seleccionar un cliente para ver los recibos disponibles.</small>
+                      </div>
+                    ) : (
+                      <>
+                        <select
+                          className="fact-select"
+                          value={relatedReciboId}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setRelatedReciboId(val);
+                            if (val) {
+                              const item = emittedVales.find(
+                                (x) => (x.invoice.id && x.invoice.id === val) || x.invoice.number === val
+                              );
+                              if (item) showToast(`Recibo ${item.invoice.number} cargado. Los detalles quedan bloqueados para este Recibo Devolución.`, "success");
+                            }
+                          }}
+                          style={{ border: relatedReciboId ? "2px solid #00a652" : "2px solid #dc3545" }}
+                        >
+                          <option value="">-- Seleccione recibo a cancelar --</option>
+                          {recibosDisponiblesParaDevolucion.map((item) => (
+                            <option key={item.invoice.id ?? item.invoice.number} value={item.invoice.id ?? item.invoice.number}>
+                              {item.invoice.number} - {item.invoice.date} - Total: {formatUSD(Math.abs(item.invoice.total))}
+                            </option>
+                          ))}
+                        </select>
+                        {recibosDisponiblesParaDevolucion.length === 0 && selectedClient && (
+                          <div style={{ padding: "0.75rem", backgroundColor: "#f8d7da", border: "1px solid #dc3545", borderRadius: "4px", marginTop: "0.5rem" }}>
+                            <small className="text-danger">Este cliente no tiene Recibos disponibles para devolución.</small>
+                          </div>
+                        )}
+                        {relatedReciboId && (
+                          <div style={{ padding: "0.75rem", backgroundColor: "#d1e7dd", border: "1px solid #00a652", borderRadius: "4px", marginTop: "0.5rem" }}>
+                            <small className="text-success" style={{ fontWeight: "bold" }}>✓ Recibo seleccionado. Contablemente se cancelará con este Recibo Devolución.</small>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+
                 <div className="mt-2">
                   <Link to="/equipos-asic" className="btn btn-sm btn-outline-secondary">← Volver a Equipos ASIC</Link>
                 </div>
@@ -444,8 +576,9 @@ export function GarantiaAndePage() {
                           <button
                             type="button"
                             className="fact-detail-servicios-btn-clear"
-                            onClick={() => setItems([])}
-                            title="Vaciar lista"
+                            onClick={() => !itemsLocked && setItems([])}
+                            disabled={itemsLocked}
+                            title={itemsLocked ? "Detalles bloqueados (Recibo Devolución vinculado a un Recibo)" : "Vaciar lista"}
                           >
                             🗑️ Borrar
                           </button>
@@ -453,12 +586,18 @@ export function GarantiaAndePage() {
                             type="button"
                             className="fact-detail-servicios-btn-add"
                             onClick={addItem}
-                            disabled={!canEdit}
+                            disabled={!canEdit || itemsLocked}
+                            title={itemsLocked ? "No se pueden agregar ítems; vienen del Recibo seleccionado" : undefined}
                           >
                             + Agregar ítem
                           </button>
                         </div>
                       </div>
+                      {tipoGarantia === "Recibo Devolución" && relatedReciboId && (
+                        <div style={{ padding: "0.75rem", backgroundColor: "rgba(255, 255, 255, 0.15)", border: "1px solid rgba(255, 255, 255, 0.4)", borderRadius: "10px", marginBottom: "1rem" }}>
+                          <small style={{ fontWeight: "bold", color: "#fff" }}>🔒 Recibo Devolución vinculado al recibo seleccionado. Los detalles están bloqueados.</small>
+                        </div>
+                      )}
                       <div className="fact-detail-servicios-table-wrap">
                         <table className="fact-detail-servicios-table">
                           <thead>
@@ -562,7 +701,7 @@ export function GarantiaAndePage() {
                                             });
                                           }
                                         }}
-                                        disabled={!canEdit}
+                                        disabled={!canEdit || itemsLocked}
                                       >
                                         <option value="">Seleccionar...</option>
                                         {itemsGarantia.length > 0 && (
@@ -584,12 +723,15 @@ export function GarantiaAndePage() {
                                           padding: "0.4rem 0.35rem",
                                           fontSize: "0.8125rem",
                                           width: "100%",
-                                          textAlign: "center"
+                                          textAlign: "center",
+                                          backgroundColor: itemsLocked ? "#f3f4f6" : undefined,
+                                          cursor: itemsLocked ? "not-allowed" : undefined
                                         }}
                                         min={1}
                                         value={it.quantity}
                                         onChange={(e) => updateItem(idx, { quantity: Math.max(1, Number(e.target.value || 1)) })}
-                                        disabled={!canEdit}
+                                        readOnly={itemsLocked}
+                                        disabled={!canEdit || itemsLocked}
                                       />
                                     </td>
                                     <td className="fact-cell-center">
@@ -599,10 +741,11 @@ export function GarantiaAndePage() {
                                           className="fact-input"
                                           value={it.price}
                                           onChange={(e) => updateItem(idx, { price: Math.max(0, Math.round(Number(e.target.value) || 0)) })}
-                                          style={{ flex: 1, minWidth: 0, padding: "0.4rem", textAlign: "center" }}
+                                          style={{ flex: 1, minWidth: 0, padding: "0.4rem", textAlign: "center", backgroundColor: itemsLocked ? "#f3f4f6" : undefined }}
                                           min={0}
                                           step={1}
-                                          disabled={!canEdit}
+                                          readOnly={itemsLocked}
+                                          disabled={!canEdit || itemsLocked}
                                         />
                                         <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#64748b" }}>USD</span>
                                       </div>
@@ -617,8 +760,9 @@ export function GarantiaAndePage() {
                                       <button
                                         type="button"
                                         className="fact-detail-servicios-btn-remove"
-                                        onClick={() => removeItem(idx)}
-                                        disabled={!canEdit}
+                                        onClick={() => !itemsLocked && removeItem(idx)}
+                                        disabled={!canEdit || itemsLocked}
+                                        title={itemsLocked ? "No se pueden quitar ítems del Recibo Devolución vinculado" : undefined}
                                       >
                                         ×
                                       </button>
@@ -663,10 +807,10 @@ export function GarantiaAndePage() {
                   </div>
                 </div>
 
-                {emittedInLast15Days.length > 0 && (
+                {emittedInLast5Days.length > 0 && (
                   <div className="fact-emitted-section">
                     <h3 className="fact-section-title" style={{ marginTop: "2rem", marginBottom: "1rem" }}>
-                      <span style={{ fontSize: "1.4em", lineHeight: 1 }}>📄</span> Recibos emitidos (últimos 15 días)
+                      <span style={{ fontSize: "1.4em", lineHeight: 1 }}>📄</span> Recibos emitidos (últimos 5 días)
                     </h3>
                     <div className="fact-table-wrap">
                       <table className="fact-table fact-emitted-table fact-emitted-table--7col" style={{ tableLayout: "fixed", width: "100%" }}>
@@ -682,7 +826,7 @@ export function GarantiaAndePage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {[...emittedInLast15Days].reverse().map((item) => (
+                          {[...emittedInLast5Days].reverse().map((item) => (
                             <tr key={item.invoice.id}>
                               <td>{item.invoice.type}</td>
                               <td className="fw-bold">{item.invoice.number}</td>
@@ -695,8 +839,8 @@ export function GarantiaAndePage() {
                                   <button
                                     type="button"
                                     className="btn btn-sm border"
-                                    onClick={() => viewEmittedPdf(item)}
-                                    title="Visualizar"
+                                    onClick={() => viewEmittedInPreview(item)}
+                                    title="Ver en vista previa"
                                     style={{ width: "1.3rem", height: "1.3rem", padding: 0 }}
                                   >
                                     👁️
@@ -719,11 +863,11 @@ export function GarantiaAndePage() {
                     </div>
                     <div className="fact-emitted-count">
                       <span className="fact-emitted-count-badge">
-                        <span className="fact-emitted-count-num">{emittedInLast15Days.length}</span>
+                        <span className="fact-emitted-count-num">{emittedInLast5Days.length}</span>
                         <span className="fact-emitted-count-label">
-                          {emittedInLast15Days.length === 1 ? "recibo emitido" : "recibos emitidos"}
+                          {emittedInLast5Days.length === 1 ? "recibo emitido" : "recibos emitidos"}
                         </span>
-                        <span className="fact-emitted-count-period"> en los últimos 15 días</span>
+                        <span className="fact-emitted-count-period"> en los últimos 5 días</span>
                       </span>
                     </div>
                   </div>
@@ -735,7 +879,31 @@ export function GarantiaAndePage() {
               <div className="fact-panel-vista-previa-header"><span style={{ fontSize: "1.25em", lineHeight: 1 }}>🔍</span> Vista previa</div>
               <div className="fact-panel-vista-previa-body">
                 <div className="fact-panel-vista-previa-inner">
-                  {selectedClient && items.length > 0 ? (
+                  {previewEmitted ? (
+                    <InvoicePreview
+                      type={previewEmitted.invoice.type as "Recibo" | "Recibo Devolución"}
+                      number={previewEmitted.invoice.number}
+                      client={{
+                        code: "",
+                        name: previewEmitted.invoice.clientName ?? "",
+                        name2: previewEmitted.invoice.clientName2,
+                        phone: previewEmitted.invoice.clientPhone,
+                        phone2: previewEmitted.invoice.clientPhone2,
+                        email: previewEmitted.invoice.clientEmail,
+                        email2: previewEmitted.invoice.clientEmail2,
+                        address: previewEmitted.invoice.clientAddress,
+                        address2: previewEmitted.invoice.clientAddress2,
+                        city: previewEmitted.invoice.clientCity,
+                        city2: previewEmitted.invoice.clientCity2
+                      }}
+                      date={new Date(previewEmitted.emittedAt)}
+                      items={previewEmitted.invoice.items ?? []}
+                      subtotal={Math.abs(previewEmitted.invoice.subtotal ?? 0)}
+                      discounts={Math.abs(previewEmitted.invoice.discounts ?? 0)}
+                      total={Math.abs(previewEmitted.invoice.total ?? 0)}
+                      dueDateDays={7}
+                    />
+                  ) : selectedClient && items.length > 0 ? (
                     <InvoicePreview
                       type={tipoGarantia}
                       number={number}

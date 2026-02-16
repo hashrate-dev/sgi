@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import type { ComprobanteType, LineItem } from "./types";
+import { formatUSD } from "./formatCurrency";
 import { recibimosMontoEnDosLineas } from "./numberToWords";
 
 /** Colores HRS (verde marca) */
@@ -29,14 +30,6 @@ function ymToMonthYear(ym: string): string {
   if (!/^\d{4}-\d{2}$/.test(ym)) return ym;
   const [y, m] = ym.split("-");
   return `${m}-${y}`;
-}
-
-function formatUSD(n: number): string {
-  return `${n.toFixed(2).replace(".", ",")} USD`;
-}
-
-function formatTotalUSD(n: number): string {
-  return `${n.toFixed(2).replace(".", ",")} USD`;
 }
 
 export type FacturaPdfData = {
@@ -452,7 +445,7 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   y += 6;
 
   // ---------- Fechas: mismo lenguaje visual que la tabla (solo 2 esquinas superiores redondeadas, mismo ancho y borde) ----------
-  const yFechas = PAGE_H / 2 + 12 + 50 + 30;
+  const yFechas = PAGE_H / 2 + 12 + 50 + 30 - 5; /* 0.5 cm más arriba */
   const datesBlockH = 14;
   const datesBlockTop = yFechas - datesBlockH / 2;
   const datesColW = TABLE_W / 2;
@@ -461,21 +454,29 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   const Rd = TABLE_RADIUS;
   const kd = 0.5522847498;
 
-  // ---------- Recibo / Recibo Devolución: texto RECIBIMOS LA CANTIDAD DE... en dos filas + contenedor con borde ----------
+  // ---------- Recibo / Recibo Devolución: texto dentro del contenedor con borde ----------
   if (data.type === "Recibo" || data.type === "Recibo Devolución") {
-    const { line1, line2 } = recibimosMontoEnDosLineas(data.total);
-    const yRecTop = y; /* justo debajo de la tabla (y ya tiene +6) para que quede en A4 */
-    const recBlockH = 22; /* altura del contenedor: 2 líneas + padding */
+    const { line1, line2 } = recibimosMontoEnDosLineas(data.total, data.type);
+    const notaGuarani = "El monto que se devuelve puede ser distinto al monto contable, debido a que se ajusta por el valor del Guaraní a la fecha.";
+    const yRecTop = y + 40;
     const recPaddingTop = 5;
+    const recPaddingBottom = 5;
     const recLineH = 6;
-    doc.setDrawColor(TABLE_BORDER.r, TABLE_BORDER.g, TABLE_BORDER.b);
-    doc.setLineWidth(0.5);
-    doc.rect(tableLeft, yRecTop, TABLE_W, recBlockH, "S"); /* contenedor con borde */
-    doc.setFontSize(12); /* texto un poco más grande */
+    doc.setFontSize(12);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(0, 0, 0);
-    doc.text(line1, tableLeft + 3, yRecTop + recPaddingTop + 4);
-    doc.text(line2, tableLeft + 3, yRecTop + recPaddingTop + 4 + recLineH);
+
+    const textoCompleto =
+      data.type === "Recibo Devolución"
+        ? `${line1} ${line2} ${notaGuarani}`
+        : `${line1} ${line2}`;
+    const lineas = doc.splitTextToSize(textoCompleto, TABLE_W - 6);
+    const recBlockH = recPaddingTop + lineas.length * recLineH + recPaddingBottom;
+
+    doc.setDrawColor(TABLE_BORDER.r, TABLE_BORDER.g, TABLE_BORDER.b);
+    doc.setLineWidth(0.5);
+    doc.rect(tableLeft, yRecTop, TABLE_W, recBlockH, "S");
+    doc.text(lineas, tableLeft + 3, yRecTop + recPaddingTop + 4);
     y = yRecTop + recBlockH;
   } else {
     // Factura / Nota de Crédito: tabla FECHA DE EMISIÓN y FECHA DE VENCIMIENTO
@@ -583,8 +584,14 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   doc.setTextColor(255, 255, 255);
   doc.text("TOTAL", totalLabelCenterX, totalBaselineY, { align: "center" });
 
+  const isNegativeType =
+    data.type === "Recibo" ||
+    data.type === "Recibo Devolución" ||
+    data.type === "Nota de Crédito";
+  const totalForDisplay = isNegativeType ? Math.abs(data.total) : data.total;
+
   doc.setTextColor(0, 0, 0);
-  doc.text(formatUSD(data.total), totalAmountRight, totalBaselineY, { align: "right" });
+  doc.text(formatUSD(totalForDisplay), totalAmountRight, totalBaselineY, { align: "right" });
 
   return doc;
 }
