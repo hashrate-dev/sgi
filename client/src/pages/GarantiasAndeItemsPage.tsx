@@ -21,6 +21,76 @@ function genId() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
+function findCol(headerRow: (string | number)[], ...names: string[]): number {
+  for (let i = 1; i < headerRow.length; i++) {
+    const h = String(headerRow[i] ?? "").trim().toLowerCase();
+    for (const n of names) {
+      const k = n.toLowerCase();
+      if (h === k || h.includes(k) || k.includes(h)) return i;
+    }
+  }
+  return -1;
+}
+
+/** Parsea Excel (mismo formato que export: Código, Marca, Modelo, Fecha ingreso, Observaciones) */
+async function parseExcelGarantiasItems(file: File): Promise<Omit<ItemGarantiaAnde, "id">[]> {
+  const arrayBuffer = await file.arrayBuffer();
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(arrayBuffer);
+  const sheet = workbook.worksheets[0];
+  if (!sheet) return [];
+
+  const rows: (string | number)[][] = [];
+  sheet.eachRow((row) => rows.push(row.values as (string | number)[]));
+  if (rows.length < 2) return [];
+
+  const headerRow = rows[0];
+  const idx = {
+    codigo: findCol(headerRow, "código", "codigo"),
+    marca: findCol(headerRow, "marca"),
+    modelo: findCol(headerRow, "modelo"),
+    fechaIngreso: findCol(headerRow, "fecha ingreso", "fechaIngreso", "fecha"),
+    observaciones: findCol(headerRow, "observaciones"),
+  };
+
+  const get = (row: (string | number)[], i: number): string =>
+    i >= 0 && row[i] !== undefined && row[i] !== null ? String(row[i]).trim() : "";
+
+  function toYyyyMmDd(s: string): string {
+    if (!s) return new Date().toISOString().slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const parts = s.split(/[/-]/).map((p) => p.trim());
+    if (parts.length === 3) {
+      const [a, b, c] = parts;
+      if (a.length === 4) return `${a}-${b.padStart(2, "0")}-${c.padStart(2, "0")}`;
+      return `${c}-${b.padStart(2, "0")}-${a.padStart(2, "0")}`;
+    }
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  const result: Omit<ItemGarantiaAnde, "id">[] = [];
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row) continue;
+    const marca = idx.marca >= 0 ? get(row, idx.marca) : get(row, 2);
+    const modelo = idx.modelo >= 0 ? get(row, idx.modelo) : get(row, 3);
+    if (!marca && !modelo) continue;
+
+    const codigo = idx.codigo >= 0 ? get(row, idx.codigo) : "";
+    const fechaIngreso = idx.fechaIngreso >= 0 ? toYyyyMmDd(get(row, idx.fechaIngreso)) : toYyyyMmDd(get(row, 4));
+    const observaciones = idx.observaciones >= 0 ? get(row, idx.observaciones) || undefined : undefined;
+
+    result.push({
+      codigo: codigo || "—",
+      marca: marca || "—",
+      modelo: modelo || "—",
+      fechaIngreso,
+      observaciones: observaciones || undefined,
+    });
+  }
+  return result;
+}
+
 export function GarantiasAndeItemsPage() {
   const { user } = useAuth();
   const canDelete = user ? canDeleteClientes(user.role) : false;
@@ -34,6 +104,7 @@ export function GarantiasAndeItemsPage() {
   const [deleting, setDeleting] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingItem, setEditingItem] = useState<ItemGarantiaAnde | null>(null);
+  const [excelLoading, setExcelLoading] = useState(false);
   const [formData, setFormData] = useState({
     codigo: "",
     marca: "",
@@ -194,6 +265,61 @@ export function GarantiasAndeItemsPage() {
     });
   }
 
+  async function handleImportExcel(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.endsWith(".xlsx") && !file.name.endsWith(".xls")) {
+      showToast("Elegí un archivo Excel (.xlsx).", "error", "Items Garantía ANDE");
+      e.target.value = "";
+      return;
+    }
+    if (!canEdit) {
+      showToast("No tiene permisos para importar.", "error", "Items Garantía ANDE");
+      e.target.value = "";
+      return;
+    }
+    setExcelLoading(true);
+    e.target.value = "";
+    try {
+      const parsed = await parseExcelGarantiasItems(file);
+      if (parsed.length === 0) {
+        showToast("No se encontraron filas válidas. Use encabezados: Código, Marca, Modelo, Fecha ingreso, Observaciones.", "error", "Items Garantía ANDE");
+        setExcelLoading(false);
+        return;
+      }
+      const usedCodigos = new Set(items.map((i) => i.codigo));
+      let nextG = 1;
+      while (usedCodigos.has(`G${String(nextG).padStart(3, "0")}`)) nextG++;
+
+      for (const row of parsed) {
+        let codigo: string;
+        if (row.codigo && row.codigo !== "—" && !usedCodigos.has(row.codigo)) {
+          codigo = row.codigo;
+        } else {
+          while (usedCodigos.has(`G${String(nextG).padStart(3, "0")}`)) nextG++;
+          codigo = `G${String(nextG).padStart(3, "0")}`;
+          nextG++;
+        }
+        usedCodigos.add(codigo);
+        await createGarantiaItem({
+          id: genId(),
+          codigo,
+          marca: row.marca,
+          modelo: row.modelo,
+          fechaIngreso: row.fechaIngreso,
+          observaciones: row.observaciones,
+        });
+      }
+      const res = await getGarantiasItems();
+      setItems(res.items);
+      showToast(`Se importaron ${parsed.length} ítem(s) correctamente.`, "success", "Items Garantía ANDE");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Error al importar Excel.", "error", "Items Garantía ANDE");
+    } finally {
+      setExcelLoading(false);
+    }
+  }
+
   const filteredItems = items.filter((i) => {
     const searchLower = searchTerm.toLowerCase();
     return (
@@ -335,6 +461,25 @@ export function GarantiasAndeItemsPage() {
                       >
                         📊 Exportar Excel
                       </button>
+                    )}
+                    {canEdit && (
+                      <>
+                        <input
+                          type="file"
+                          accept=".xlsx,.xls"
+                          className="d-none"
+                          id="garantias-items-import-excel"
+                          onChange={handleImportExcel}
+                          disabled={excelLoading}
+                        />
+                        <label
+                          htmlFor="garantias-items-import-excel"
+                          className="btn btn-outline-secondary btn-sm mb-0"
+                          style={{ backgroundColor: "rgba(25, 135, 84, 0.12)", cursor: excelLoading ? "not-allowed" : "pointer" }}
+                        >
+                          {excelLoading ? "⏳ Importando..." : "📥 Importar Excel"}
+                        </label>
+                      </>
                     )}
                     {canDelete && (
                       <button

@@ -1,4 +1,4 @@
-export type ComprobanteType = "Factura" | "Recibo" | "Nota de Crédito";
+export type ComprobanteType = "Factura" | "Recibo" | "Recibo Devolución" | "Nota de Crédito";
 
 export type Client = {
   id?: number | string;
@@ -67,15 +67,18 @@ export type Invoice = {
 
 export type EquipoASIC = {
   id: string;
+  numeroSerie?: string; // Número de serie único: M001, M002, ... (auto)
   fechaIngreso: string; // Fecha de ingreso
   marcaEquipo: string; // Marca del equipo
   modelo: string; // Modelo
   procesador: string; // Procesador
   precioUSD: number; // Precio en USD
+  observaciones?: string;
 };
 
 export type Setup = {
   id: string;
+  codigo?: string; // Número de ítem: S01, S02, ... (auto)
   nombre: string; // Nombre del Setup
   precioUSD: number; // Precio en USD (50 o 0)
 };

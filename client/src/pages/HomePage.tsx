@@ -8,7 +8,7 @@ import "../styles/hrshome.css";
 const menuItems: Array<{ to: string; icon: string; label: string; desc: string; roles?: string[] }> = [
   { to: "/hosting", icon: "bi-receipt", label: "Servicios de Hosting", desc: "Información de Facturación de Servicios de Hosting", roles: ["admin_a", "admin_b", "operador"] },
   { to: "/equipos-asic", icon: "bi-cpu", label: "Equipos ASIC", desc: "Información de Facturación de Equipos de Minería ASIC", roles: ["admin_a", "admin_b", "operador"] },
-  { to: "/historial-hosting", icon: "bi-clock-history", label: "Historial", desc: "Ver y gestionar comprobantes" },
+  { to: "/historial", icon: "bi-clock-history", label: "Historial", desc: "Ver y gestionar comprobantes" },
   { to: "/pendientes-hosting", icon: "bi-hourglass-split", label: "Pendientes", desc: "Facturas pendientes de cobro" },
   { to: "/clientes", icon: "bi-people", label: "Clientes", desc: "Administrar cartera de clientes" },
   { to: "/reportes", icon: "bi-graph-up", label: "Reportes", desc: "Estadísticas y análisis" }
@@ -106,12 +106,12 @@ export function HomePage() {
             </Link>
           ))}
           {(user?.role === "admin_a" || user?.role === "admin_b") && (
-            <Link to="/usuarios" className="hrs-home-card hrs-home-card-admin">
+            <Link to="/configuracion" className="hrs-home-card hrs-home-card-admin">
               <div className="hrs-home-card-icon">
-                <i className="bi bi-shield-lock" />
+                <i className="bi bi-gear-fill" aria-hidden />
               </div>
-              <h3 className="hrs-home-card-title">Usuarios y permisos</h3>
-              <p className="hrs-home-card-desc">Gestionar accesos y roles</p>
+              <h3 className="hrs-home-card-title">Configuración</h3>
+              <p className="hrs-home-card-desc">Usuarios, permisos y accesos</p>
             </Link>
           )}
         </main>

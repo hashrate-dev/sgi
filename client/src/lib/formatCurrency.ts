@@ -1,15 +1,16 @@
 /**
- * Formato de montos en todo el proyecto: separador de miles con . y decimales con , (ej. 1.234,56).
+ * Formato de montos: separador de miles "." y decimales "," con dos dígitos (ej. 1.234,56).
  */
 
 /** Solo la parte numérica (ej. "1.234,56" o "- 1.234,56" si es negativo) */
 export function formatAmount(n: number): string {
-  const abs = Math.abs(n);
+  const num = Number(n);
+  const abs = Math.abs(num);
   const fixed = abs.toFixed(2);
   const [intPart, decPart] = fixed.split(".");
   const withDots = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   const s = `${withDots},${decPart}`;
-  return n < 0 ? `- ${s}` : s;
+  return num < 0 ? `- ${s}` : s;
 }
 
 /** Monto con " USD" al final (ej. "1.234,56 USD") */
@@ -17,22 +18,24 @@ export function formatUSD(n: number): string {
   return `${formatAmount(n)} USD`;
 }
 
-/** Para tablas que muestran negativo sin espacio: "-1.234,56" (y " USD" en otra celda o debajo) */
+/** Para tablas: miles con "." y decimales con "," (ej. "1.234,56" o "-1.234,56") */
 export function formatCurrencyNumber(n: number): string {
-  const abs = Math.abs(n);
+  const num = Number(n);
+  const abs = Math.abs(num);
   const fixed = abs.toFixed(2);
   const [intPart, decPart] = fixed.split(".");
   const withDots = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   const s = `${withDots},${decPart}`;
-  return n < 0 ? `-${s}` : s;
+  return num < 0 ? `-${s}` : s;
 }
 
-/** formatCurrency para Historial/Pendientes/Reportes: incluye " USD", negativos como "-1.234,56 USD" */
+/** formatCurrency: incluye " USD", formato 1.234,56 USD */
 export function formatCurrency(n: number): string {
-  const abs = Math.abs(n);
+  const num = Number(n);
+  const abs = Math.abs(num);
   const fixed = abs.toFixed(2);
   const [intPart, decPart] = fixed.split(".");
   const withDots = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   const s = `${withDots},${decPart}`;
-  return n < 0 ? `-${s} USD` : `${s} USD`;
+  return num < 0 ? `-${s} USD` : `${s} USD`;
 }

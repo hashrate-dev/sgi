@@ -19,9 +19,9 @@ const InvoiceCreateSchema = z.object({
   clientName: z.string().min(1).max(200),
   date: z.string().min(1).max(50),
   month: z.string().regex(/^\d{4}-\d{2}$/),
-  subtotal: z.number().min(0),
-  discounts: z.number().min(0),
-  total: z.number().min(0),
+  subtotal: z.number(), /* permitir negativos para Recibos vinculados a factura */
+  discounts: z.number(),
+  total: z.number(),
   items: z.array(LineItemSchema).default([]),
   relatedInvoiceId: z.string().optional(),
   relatedInvoiceNumber: z.string().optional(),
@@ -31,26 +31,42 @@ const InvoiceCreateSchema = z.object({
 });
 
 const TYPE_PREFIX: Record<string, string> = {
-  "Factura": "FC",
+  "Factura": "F",
   "Recibo": "RC",
-  "Nota de Crédito": "NC"
+  "Nota de Crédito": "N"
 };
 
-/** GET /invoices/next-number?type=Factura|Recibo|Nota de Crédito — devuelve el siguiente número (ej. FC1001). */
+/** GET /invoices/next-number?type=Factura|Recibo|Nota de Crédito&peek=1 — devuelve el siguiente número (ej. F001162, RC001162, NC001162; 6 dígitos). Si peek=1 no incrementa la secuencia (solo para vista previa). */
 invoicesRouter.get("/invoices/next-number", requireRole("admin_a", "admin_b", "operador"), (req, res) => {
-  const q = z.object({ type: z.enum(["Factura", "Recibo", "Nota de Crédito"]) }).safeParse(req.query);
+  const q = z.object({
+    type: z.enum(["Factura", "Recibo", "Nota de Crédito"]),
+    peek: z.union([z.string(), z.undefined()]).optional()
+  }).safeParse(req.query);
   if (!q.success) {
     return res.status(400).json({ error: { message: "Query inválida: type debe ser Factura, Recibo o Nota de Crédito" } });
   }
   const type = q.data.type;
+  const peek = q.data.peek === "1" || q.data.peek === "true";
   const prefix = TYPE_PREFIX[type];
+
+  const padDigits = 6;
+  const formatNumber = (n: number) => `${prefix}${String(n).padStart(padDigits, "0")}`;
+
+  if (peek) {
+    const row = db.prepare("SELECT last_number FROM invoice_sequences WHERE type = ?").get(type) as { last_number: number } | undefined;
+    if (!row) {
+      return res.status(500).json({ error: { message: "Secuencia no configurada para este tipo" } });
+    }
+    const number = formatNumber(row.last_number + 1);
+    return res.json({ number });
+  }
 
   const getNext = db.transaction(() => {
     const row = db.prepare("SELECT last_number FROM invoice_sequences WHERE type = ?").get(type) as { last_number: number } | undefined;
     if (!row) return null;
     const nextNum = row.last_number + 1;
     db.prepare("UPDATE invoice_sequences SET last_number = ? WHERE type = ?").run(nextNum, type);
-    return `${prefix}${nextNum}`;
+    return formatNumber(nextNum);
   });
 
   const number = getNext();
@@ -110,6 +126,10 @@ invoicesRouter.post("/invoices", requireRole("admin_a", "admin_b", "operador"), 
   }
 
   const inv = parsed.data;
+  /** Contable: Recibo y Nota de Crédito se guardan con montos en negativo (anulan/cancelan factura). */
+  const subtotalDb = inv.type === "Recibo" || inv.type === "Nota de Crédito" ? -Math.abs(inv.subtotal) : inv.subtotal;
+  const discountsDb = inv.type === "Recibo" || inv.type === "Nota de Crédito" ? -Math.abs(inv.discounts) : inv.discounts;
+  const totalDb = inv.type === "Recibo" || inv.type === "Nota de Crédito" ? -Math.abs(inv.total) : inv.total;
   const insertInvoice = db.prepare(`
     INSERT INTO invoices (number, type, clientName, date, month, subtotal, discounts, total, 
                           related_invoice_id, related_invoice_number, payment_date, emission_time, due_date)
@@ -127,9 +147,9 @@ invoicesRouter.post("/invoices", requireRole("admin_a", "admin_b", "operador"), 
       inv.clientName,
       inv.date,
       inv.month,
-      inv.subtotal,
-      inv.discounts,
-      inv.total,
+      subtotalDb,
+      discountsDb,
+      totalDb,
       inv.relatedInvoiceId || null,
       inv.relatedInvoiceNumber || null,
       inv.paymentDate || null,

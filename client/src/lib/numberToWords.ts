@@ -59,3 +59,26 @@ export function amountToWordsReceipt(amount: number): string {
   const parteEntera = intToWordsEs(entero);
   return `${parteEntera} DÓLARES ESTADOUNIDENSES CON ${centStr}/100`;
 }
+
+/** Primera letra en mayúscula, resto en minúscula */
+function toSentenceCase(str: string): string {
+  if (!str) return str;
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+}
+
+/**
+ * Texto para recibo en dos líneas, minúsculas con primera letra mayúscula:
+ * Línea 1: "Recibimos la cantidad de [monto en letras]"
+ * Línea 2: "Dólares estadounidenses con XX/100"
+ */
+export function recibimosMontoEnDosLineas(amount: number): { line1: string; line2: string } {
+  const abs = Math.abs(amount);
+  const entero = Math.floor(abs);
+  const centavos = Math.round((abs - entero) * 100) % 100;
+  const centStr = String(centavos).padStart(2, "0");
+  const parteEntera = intToWordsEs(entero);
+  return {
+    line1: toSentenceCase(`RECIBIMOS LA CANTIDAD DE ${parteEntera}`),
+    line2: toSentenceCase(`DÓLARES ESTADOUNIDENSES CON ${centStr}/100`) + "."
+  };
+}

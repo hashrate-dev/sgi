@@ -4,6 +4,7 @@ import { getClients } from "../lib/api";
 import type { Client } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
 import { loadInvoices } from "../lib/storage";
+import { formatCurrency } from "../lib/formatCurrency";
 import "../styles/facturacion.css";
 
 type ReportesView = "menu" | "por-mes" | "ranking-clientes" | "por-hosting";
@@ -51,10 +52,6 @@ function useClientesConTotalFacturado(): { clients: Client[]; loading: boolean; 
   }, [clients]);
 
   return { clients, loading, error, rows };
-}
-
-function formatCurrency(value: number): string {
-  return `${value.toFixed(2)} USD`;
 }
 
 /** Meses con total neto (Facturas - NC y recibos relacionados). Ordenado por mes. */

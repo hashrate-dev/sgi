@@ -572,6 +572,7 @@
   padding: 1.25rem 1.5rem;
   position: relative;
   z-index: 1;
+  min-height: 280px;
 }
 
 /* Caja blanca para el documento: tipo “hoja” sobre el panel verde */
@@ -580,31 +581,37 @@
   border-radius: 12px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  overflow: hidden;
+  overflow: visible;
   max-width: 100%;
+  min-height: 260px;
 }
 
 /* Estado vacío: "No hay documento" cuando no hay datos para previsualizar */
 .fact-panel-vista-previa-empty {
-  min-height: 320px;
+  min-height: 260px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 0.75rem;
-  padding: 2rem;
-  color: #64748b;
+  padding: 2rem 1.5rem;
+  color: #334155;
+  text-align: center;
 }
 .fact-panel-vista-previa-empty-icon {
-  font-size: 4rem;
+  font-size: 3.5rem;
   line-height: 1;
-  opacity: 0.7;
+  opacity: 0.85;
 }
 .fact-panel-vista-previa-empty-text {
   margin: 0;
-  font-size: 1.125rem;
+  font-size: 1.0625rem;
   font-weight: 500;
-  color: #475569;
+  color: #334155;
+  max-width: 420px;
+}
+.fact-panel-vista-previa-empty-text strong {
+  color: #0f172a;
 }
 
 .fact-card {
@@ -913,11 +920,66 @@
 .fact-emitted-section .fact-section-title {
   color: #fff;
 }
+.fact-emitted-section .fact-table-wrap {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: #fff;
+  max-height: none;
+  overflow: hidden;
+  scrollbar-width: none;
+  border-radius: 12px;
+}
+.fact-emitted-section .fact-table-wrap::-webkit-scrollbar {
+  display: none;
+}
 .fact-card:has(.fact-detail-green) .fact-emitted-section,
 .fact-card:has(.fact-detail-servicios-outer) .fact-emitted-section {
   border-radius: 12px;
   padding: 1.25rem;
   margin-top: 1rem;
+}
+
+/* Contador de documentos emitidos: badge profesional debajo de la tabla */
+.fact-emitted-count {
+  margin-top: 0.875rem;
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+.fact-emitted-count-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.85rem;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+.fact-emitted-count-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6rem;
+  height: 1.6rem;
+  padding: 0 0.35rem;
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #fff;
+  line-height: 1;
+}
+.fact-emitted-count-label {
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+.fact-emitted-count-period {
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.8125rem;
 }
 
 .fact-detail-green {
@@ -1759,23 +1821,47 @@
   color: #0f172a;
 }
 
-/* Tabla Documentos emitidos: alineación, anchos y espacio para que no se corten Fecha/Hora/Total */
+/* Tabla Documentos emitidos: 8 columnas (Marcador, Tipo, Número, Cliente, Fecha, Hora, Total, Acciones) */
 .fact-emitted-table th:first-child,
-.fact-emitted-table td:first-child { width: 4.5rem; min-width: 0; text-align: left; padding: 0.5rem 0.6rem; }
+.fact-emitted-table td:first-child { width: 3rem; min-width: 3rem; text-align: center; padding: 0.5rem 0.35rem; }
 .fact-emitted-table th:nth-child(2),
-.fact-emitted-table td:nth-child(2) { width: 5rem; min-width: 0; text-align: left; padding: 0.5rem 0.6rem; }
+.fact-emitted-table td:nth-child(2) { width: 8.5rem; min-width: 8rem; text-align: left; padding: 0.5rem 0.6rem; white-space: nowrap; }
 .fact-emitted-table th:nth-child(3),
-.fact-emitted-table td:nth-child(3) { width: 38%; min-width: 0; text-align: left; padding: 0.5rem 0.6rem; }
+.fact-emitted-table td:nth-child(3) { width: 5rem; min-width: 4rem; text-align: left; padding: 0.5rem 0.6rem; }
 .fact-emitted-table th:nth-child(4),
-.fact-emitted-table td:nth-child(4) { width: 9rem; min-width: 9rem; text-align: left; padding: 0.5rem 0.75rem; }
+.fact-emitted-table td:nth-child(4) { width: auto; min-width: 8rem; text-align: left; padding: 0.5rem 0.75rem; }
 .fact-emitted-table th:nth-child(5),
-.fact-emitted-table td:nth-child(5) { width: 8rem; min-width: 8rem; text-align: left; padding: 0.5rem 0.75rem; }
+.fact-emitted-table td:nth-child(5) { width: 7rem; min-width: 6.5rem; text-align: left; padding: 0.5rem 0.5rem; }
 .fact-emitted-table th:nth-child(6),
-.fact-emitted-table td:nth-child(6) { width: 7rem; min-width: 7rem; text-align: left; padding: 0.5rem 0.75rem; }
+.fact-emitted-table td:nth-child(6) { width: 6rem; min-width: 5rem; text-align: left; padding: 0.5rem 0.5rem; }
 .fact-emitted-table th:nth-child(7),
-.fact-emitted-table td:nth-child(7) { width: 8rem; min-width: 0; text-align: center; padding: 0.5rem 0.6rem; }
+.fact-emitted-table td:nth-child(7) { width: 7rem; min-width: 6rem; text-align: left; padding: 0.5rem 0.6rem; }
+.fact-emitted-table th:nth-child(8),
+.fact-emitted-table td:nth-child(8) { width: 6rem; min-width: 5rem; text-align: left; padding: 0.5rem 0.35rem; }
 .fact-emitted-table th:nth-child(4),
 .fact-emitted-table th:nth-child(5) { white-space: nowrap; }
+
+/* Tabla Documentos emitidos 7 columnas (sin Marcador): Tipo, Número, Cliente, Fecha, Hora, Total, Acciones */
+.fact-emitted-table--7col th:nth-child(1),
+.fact-emitted-table--7col td:nth-child(1) { width: 9rem; min-width: 8.5rem; text-align: left; padding: 0.5rem 0.6rem; white-space: nowrap; }
+.fact-emitted-table--7col th:nth-child(2),
+.fact-emitted-table--7col td:nth-child(2) { width: 6rem; min-width: 5rem; text-align: left; padding: 0.5rem 0.6rem; }
+.fact-emitted-table--7col th:nth-child(3),
+.fact-emitted-table--7col td:nth-child(3) { width: auto; min-width: 10rem; text-align: left; padding: 0.5rem 0.75rem; }
+.fact-emitted-table--7col th:nth-child(4),
+.fact-emitted-table--7col td:nth-child(4) { width: 7rem; min-width: 6.5rem; text-align: left; padding: 0.5rem 0.5rem; }
+.fact-emitted-table--7col th:nth-child(5),
+.fact-emitted-table--7col td:nth-child(5) { width: 6rem; min-width: 5.5rem; text-align: left; padding: 0.5rem 0.5rem; }
+.fact-emitted-table--7col th:nth-child(6),
+.fact-emitted-table--7col td:nth-child(6) { width: 7rem; min-width: 6rem; text-align: left; padding: 0.5rem 0.6rem; }
+.fact-emitted-table--7col th:nth-child(7) { width: 6rem; min-width: 5rem; text-align: left; padding: 0.5rem 0.35rem 0.5rem 0.25rem; }
+.fact-emitted-table--7col td:nth-child(7) { width: 6rem; min-width: 5rem; text-align: center; padding: 0.5rem 0.5rem 0.5rem 0.25rem; }
+.fact-emitted-table--7col td:nth-child(7) > div { transform: translateX(-12px); }
+.fact-emitted-table--7col th:nth-child(4),
+.fact-emitted-table--7col th:nth-child(5) { white-space: nowrap; }
+.fact-emitted-table--7col thead th:nth-child(1) { text-align: left; }
+.fact-emitted-table--7col thead th:nth-child(6) { text-align: left; }
+.fact-emitted-table--7col thead th:nth-child(7) { text-align: left; padding-left: 0.25rem; }
 
 /* Encabezado tabla Documentos emitidos: mismo estilo que Detalle de servicios (verde #2D5D46) */
 .fact-emitted-table thead {
@@ -1793,8 +1879,55 @@
   background: #2D5D46;
   border-bottom: none;
 }
-.fact-emitted-table thead th:nth-child(6) { text-align: left; }
-.fact-emitted-table thead th:nth-child(7) { text-align: center; }
+.fact-emitted-table:not(.fact-emitted-table--7col) thead th:nth-child(1) { text-align: left; }
+.fact-emitted-table thead th:nth-child(2) { text-align: left; }
+.fact-emitted-table:not(.fact-emitted-table--7col) thead th:nth-child(6) { text-align: left; }
+.fact-emitted-table:not(.fact-emitted-table--7col) thead th:nth-child(7) { text-align: left; }
+.fact-emitted-table thead th:nth-child(8) { text-align: left; padding-left: 0.25rem; }
+.fact-emitted-table td:nth-child(8) { padding: 0.5rem 0.5rem 0.5rem 0.25rem; text-align: left; }
+.fact-emitted-table:not(.fact-emitted-table--7col) td:nth-child(8) > div { justify-content: flex-start; }
+
+.fact-emitted-table .fact-emitted-marker {
+  font-size: 1.1em;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+/* Impresión: encabezado tabla Documentos emitidos sin cortes raros y con color */
+@media print {
+  .fact-emitted-section .fact-section-title {
+    color: #1e3a2f;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .fact-emitted-table thead {
+    background: #2D5D46 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .fact-emitted-table thead th {
+    background: #2D5D46 !important;
+    color: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 0.5rem 0.4rem;
+    font-size: 0.65rem;
+  }
+  .fact-emitted-table thead th br {
+    display: none;
+  }
+  .fact-emitted-table thead th {
+    white-space: nowrap;
+  }
+  .fact-emitted-section .fact-table-wrap {
+    border: 1px solid #94a3b8;
+    box-shadow: none;
+  }
+  .fact-emitted-table tbody tr {
+    break-inside: avoid;
+  }
+}
 
 /* Tabla Hosting (Detalle de servicios): mismo encabezado verde que Equipos */
 .fact-table-hosting thead {
@@ -2797,6 +2930,21 @@
   line-height: 1.4;
   min-height: 4rem;
 }
+/* Columna Origen: solo "HOSTING" o "ASIC" */
+.historial-listado-wrap .historial-listado-table th.historial-col-origen,
+.historial-listado-wrap .historial-listado-table td.historial-col-origen {
+  min-width: 4.25rem;
+  white-space: nowrap;
+  padding-left: 0.5rem;
+  padding-right: 0.35rem;
+}
+
+/* Montos en una sola fila (ej. "20.000,00 USD") */
+.historial-listado-wrap .historial-listado-table td.historial-monto-cell {
+  white-space: nowrap;
+  line-height: 1.25;
+}
+
 .historial-listado-wrap .historial-listado-table thead.table-dark tr th:first-child {
   border-radius: 12px 0 0 0;
 }
@@ -2822,9 +2970,9 @@
 }
 .historial-listado-wrap .historial-listado-table th.historial-col-cliente,
 .historial-listado-wrap .historial-listado-table td.historial-col-cliente {
-  min-width: 5.5rem;
-  max-width: 9rem;
-  width: 7rem;
+  min-width: 6rem;
+  max-width: 12rem;
+  width: 8rem;
   white-space: normal;
   word-break: break-word;
   vertical-align: middle;
@@ -2898,10 +3046,10 @@
   white-space: normal;
   line-height: 1.25;
 }
-/* Columnas de montos: pegadas a la izquierda, mínimo espacio */
+/* Columnas de montos: una fila "X.XXX,XX USD", ancho suficiente */
 .historial-listado-wrap .historial-listado-table th.historial-col-total-sdesc,
 .historial-listado-wrap .historial-listado-table td.historial-col-total-sdesc {
-  min-width: 4rem;
+  min-width: 5.5rem;
   text-align: left;
   padding-left: 0.3rem;
   padding-right: 0.25rem;
@@ -2910,24 +3058,16 @@
   white-space: normal;
   line-height: 1.2;
 }
-.historial-listado-wrap .historial-listado-table td.historial-col-total-sdesc {
-  white-space: normal;
-  line-height: 1.25;
-}
 .historial-listado-wrap .historial-listado-table th.historial-col-desc,
 .historial-listado-wrap .historial-listado-table td.historial-col-desc {
-  min-width: 3.75rem;
+  min-width: 5rem;
   text-align: left;
   padding-left: 0.3rem;
   padding-right: 0.25rem;
 }
-.historial-listado-wrap .historial-listado-table td.historial-col-desc {
-  white-space: normal;
-  line-height: 1.25;
-}
 .historial-listado-wrap .historial-listado-table th.historial-col-total,
 .historial-listado-wrap .historial-listado-table td.historial-col-total {
-  min-width: 4rem;
+  min-width: 5.5rem;
   text-align: left;
   padding-left: 0.3rem;
   padding-right: 0.25rem;
@@ -2936,13 +3076,9 @@
   text-align: left !important;
   padding-left: calc(0.3rem - 0.1cm);
 }
-.historial-listado-wrap .historial-listado-table td.historial-col-total {
-  white-space: normal;
-  line-height: 1.25;
-}
 .historial-listado-wrap .historial-listado-table th.historial-col-total-stc,
 .historial-listado-wrap .historial-listado-table td.historial-col-total-stc {
-  min-width: 4rem;
+  min-width: 5.5rem;
   text-align: left;
   padding-left: calc(0.3rem - 0.1cm);
   padding-right: 0.25rem;
@@ -2951,21 +3087,13 @@
   white-space: normal;
   line-height: 1.2;
 }
-.historial-listado-wrap .historial-listado-table td.historial-col-total-stc {
-  white-space: normal;
-  line-height: 1.25;
-}
-/* TC: ancho suficiente para "X.XX" + "USD" en dos líneas */
+/* TC: ancho para "X.XXX,XX USD" en una fila */
 .historial-listado-wrap .historial-listado-table th.historial-col-cambio-header,
 .historial-listado-wrap .historial-listado-table td.historial-col-cambio {
-  min-width: 3.5rem;
+  min-width: 4.5rem;
   text-align: left;
   padding-left: 0.35rem;
   padding-right: 0.35rem;
-}
-.historial-listado-wrap .historial-listado-table td.historial-col-cambio {
-  white-space: normal;
-  line-height: 1.25;
 }
 .historial-listado-wrap .historial-listado-table thead.table-dark th.historial-col-cambio-header {
   padding-left: calc(0.35rem - 0.1cm);

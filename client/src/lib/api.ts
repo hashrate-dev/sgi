@@ -311,11 +311,76 @@ export function deleteAllClients(): Promise<void> {
   return api<void>("/api/clients-all", { method: "DELETE" });
 }
 
+/** Crear factura/recibo/NC en la base de datos (numeración única, no se repiten). */
+export type InvoiceCreateBody = {
+  number: string;
+  type: "Factura" | "Recibo" | "Nota de Crédito";
+  clientName: string;
+  date: string;
+  month: string;
+  subtotal: number;
+  discounts: number;
+  total: number;
+  items: Array<{ service: string; month: string; quantity: number; price: number; discount: number }>;
+  relatedInvoiceId?: string;
+  relatedInvoiceNumber?: string;
+  paymentDate?: string;
+  emissionTime?: string;
+  dueDate?: string;
+};
+export type InvoiceCreateResponse = { invoice: { id: number; number: string; type: string; clientName: string; date: string; month: string; subtotal: number; discounts: number; total: number } };
+
+export function createInvoice(body: InvoiceCreateBody): Promise<InvoiceCreateResponse> {
+  return api<InvoiceCreateResponse>("/api/invoices", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+/** Listar facturas/recibos/NC desde la base de datos (filtros opcionales). */
+export type InvoicesListResponse = { invoices: Array<{ id: number; number: string; type: string; clientName: string; date: string; month: string; subtotal: number; discounts: number; total: number; relatedInvoiceId?: number; relatedInvoiceNumber?: string; paymentDate?: string; emissionTime?: string; dueDate?: string }> };
+
+export function getInvoices(params?: { client?: string; type?: "Factura" | "Recibo" | "Nota de Crédito"; month?: string }): Promise<InvoicesListResponse> {
+  const sp = new URLSearchParams();
+  if (params?.client) sp.set("client", params.client);
+  if (params?.type) sp.set("type", params.type);
+  if (params?.month) sp.set("month", params.month);
+  const q = sp.toString();
+  return api<InvoicesListResponse>(`/api/invoices${q ? `?${q}` : ""}`);
+}
+
 /** Siguiente número para Factura / Recibo / Nota de Crédito (generado en el servidor). */
 export type NextInvoiceNumberResponse = { number: string };
 
-export function getNextInvoiceNumber(type: "Factura" | "Recibo" | "Nota de Crédito"): Promise<NextInvoiceNumberResponse> {
-  return api<NextInvoiceNumberResponse>(`/api/invoices/next-number?type=${encodeURIComponent(type)}`);
+export function getNextInvoiceNumber(
+  type: "Factura" | "Recibo" | "Nota de Crédito",
+  options?: { peek?: boolean }
+): Promise<NextInvoiceNumberResponse> {
+  const peek = options?.peek ? "&peek=1" : "";
+  return api<NextInvoiceNumberResponse>(`/api/invoices/next-number?type=${encodeURIComponent(type)}${peek}`);
+}
+
+/** Documentos emitidos (hosting o asic), últimos ~15 días desde el servidor */
+export type EmittedDocumentsResponse = { items: Array<{ invoice: Record<string, unknown>; emittedAt: string }> };
+
+export function getEmittedDocuments(source: "hosting" | "asic"): Promise<EmittedDocumentsResponse> {
+  return api<EmittedDocumentsResponse>(`/api/emitted?source=${encodeURIComponent(source)}`);
+}
+
+export function addEmittedDocument(
+  source: "hosting" | "asic",
+  invoice: Record<string, unknown>,
+  emittedAt: string
+): Promise<{ ok: boolean }> {
+  return api<{ ok: boolean }>("/api/emitted", {
+    method: "POST",
+    body: JSON.stringify({ source, invoice, emittedAt }),
+  });
+}
+
+/** Borrar todos los documentos emitidos de un origen (al eliminar todo el historial) */
+export function deleteEmittedDocumentsAll(source: "hosting" | "asic"): Promise<{ ok: boolean; deleted: number }> {
+  return api<{ ok: boolean; deleted: number }>(`/api/emitted?source=${encodeURIComponent(source)}`, { method: "DELETE" });
 }
 
 // ——— Garantías ANDE ———
@@ -369,4 +434,27 @@ export function deleteGarantiaItem(id: string): Promise<void> {
 
 export function deleteGarantiasItemsAll(): Promise<{ ok: boolean; deleted: number }> {
   return api<{ ok: boolean; deleted: number }>("/api/garantias/items", { method: "DELETE" });
+}
+
+// ——— Setups (backend) ———
+export type SetupsResponse = { items: import("./types.js").Setup[] };
+
+export function getSetups(): Promise<SetupsResponse> {
+  return api<SetupsResponse>("/api/setups");
+}
+
+export function createSetup(data: { nombre: string; precioUSD: number }): Promise<{ ok: boolean; id: string }> {
+  return api<{ ok: boolean; id: string }>("/api/setups", { method: "POST", body: JSON.stringify(data) });
+}
+
+export function updateSetup(id: string, data: { nombre: string; precioUSD: number }): Promise<{ ok: boolean }> {
+  return api<{ ok: boolean }>(`/api/setups/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(data) });
+}
+
+export function deleteSetup(id: string): Promise<void> {
+  return api<void>(`/api/setups/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export function deleteSetupsAll(): Promise<{ ok: boolean }> {
+  return api<{ ok: boolean }>("/api/setups", { method: "DELETE" });
 }

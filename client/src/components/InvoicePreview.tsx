@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import type { Client, ComprobanteType, LineItem } from "../lib/types";
+import { recibimosMontoEnDosLineas } from "../lib/numberToWords";
 import "../styles/invoice-preview.css";
 
 const EMISOR = {
@@ -80,6 +81,7 @@ export function InvoicePreview({
   const tipoLabel =
     type === "Factura" ? "FACTURA CREDITO" :
     type === "Recibo" ? "RECIBO" :
+    type === "Recibo Devolución" ? "RECIBO DEVOLUCIÓN" :
     "NOTA DE CRÉDITO";
 
   const vencimiento = new Date(date);
@@ -193,7 +195,7 @@ export function InvoicePreview({
               <tbody>
                 {items.map((item, idx) => {
                   const lineTotalServicio = item.price * item.quantity;
-                  // Determinar la descripción: priorizar Setup, luego equipos ASIC, luego servicios de Hosting
+                  // Determinar la descripción: Setup, equipos ASIC, Garantía ANDE, servicios de Hosting
                   let desc = "";
                   if (item.setupId && item.setupNombre) {
                     // Setup
@@ -202,6 +204,9 @@ export function InvoicePreview({
                     // Equipo ASIC
                     const equipoDesc = `${item.marcaEquipo} - ${item.modeloEquipo} - ${item.procesadorEquipo}`;
                     desc = item.month ? `${equipoDesc} - ${ymToMonthYear(item.month)}` : equipoDesc;
+                  } else if (item.garantiaCodigo || item.garantiaMarca || item.garantiaModelo) {
+                    // Ítem de Garantía ANDE (tabla Detalles -> Garantías): código - Garantías - marca - modelo
+                    desc = [item.garantiaCodigo, "Garantías", item.garantiaMarca, item.garantiaModelo].filter(Boolean).join(" - ") || "Garantía";
                   } else if (item.serviceName) {
                     // Servicio de Hosting (compatibilidad hacia atrás)
                     desc = item.month ? `${item.serviceName} - ${ymToMonthYear(item.month)}` : item.serviceName;
@@ -224,11 +229,13 @@ export function InvoicePreview({
                               ? `Descuento ${item.setupNombre}`
                               : item.marcaEquipo && item.modeloEquipo 
                                 ? `Descuento ${item.marcaEquipo} ${item.modeloEquipo}`
-                                : item.serviceKey === "A" 
-                                  ? "Descuento HASHRATE L7" 
-                                  : item.serviceKey === "B" 
-                                    ? "Descuento HASHRATE L9" 
-                                    : "Descuento HASHRATE S21"}
+                                : item.garantiaMarca && item.garantiaModelo
+                                  ? `Descuento ${item.garantiaMarca} ${item.garantiaModelo}`
+                                  : item.serviceKey === "A" 
+                                    ? "Descuento HASHRATE L7" 
+                                    : item.serviceKey === "B" 
+                                      ? "Descuento HASHRATE L9" 
+                                      : "Descuento HASHRATE S21"}
                           </td>
                           <td className="invoice-preview-td-precio">- {formatUSD(item.discount)}</td>
                           <td className="invoice-preview-td-cant">{item.quantity}</td>
@@ -243,8 +250,17 @@ export function InvoicePreview({
           </div>
         )}
 
-        {/* Bloque de fechas */}
-        {items.length > 0 && (
+        {/* Recibo / Recibo Devolución: texto RECIBIMOS LA CANTIDAD DE... Factura/NC: tabla FECHA DE EMISIÓN / VENCIMIENTO */}
+        {items.length > 0 && (type === "Recibo" || type === "Recibo Devolución") && (() => {
+          const { line1, line2 } = recibimosMontoEnDosLineas(total);
+          return (
+            <div className="invoice-preview-recibimos-block">
+              <div className="invoice-preview-recibimos-line1">{line1}</div>
+              <div className="invoice-preview-recibimos-line2">{line2}</div>
+            </div>
+          );
+        })()}
+        {items.length > 0 && type !== "Recibo" && type !== "Recibo Devolución" && (
           <div className="invoice-preview-dates">
             <div className="invoice-preview-dates-header">
               <div className="invoice-preview-dates-label">FECHA DE EMISIÓN:</div>

@@ -1,7 +1,7 @@
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { useEffect, useMemo, useState } from "react";
-import { getClients, getNextInvoiceNumber } from "../lib/api";
+import { addEmittedDocument, createInvoice, getClients, getEmittedDocuments, getNextInvoiceNumber } from "../lib/api";
 import { serviceCatalog } from "../lib/constants";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadInvoices, saveInvoices } from "../lib/storage";
@@ -9,9 +9,11 @@ import type { Client, ComprobanteType, Invoice, LineItem } from "../lib/types";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { InvoicePreview } from "../components/InvoicePreview";
+import { ConfirmModal } from "../components/ConfirmModal";
 import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import { canEditFacturacion } from "../lib/auth";
+import { formatCurrencyNumber, formatUSD } from "../lib/formatCurrency";
 import "../styles/facturacion.css";
 
 function todayLocale() {
@@ -32,10 +34,10 @@ function genId() {
 
 function nextNumber(type: ComprobanteType, invoices: Invoice[]) {
   const prefix = 
-    type === "Factura" ? "FC" : 
+    type === "Factura" ? "F" : 
     type === "Recibo" ? "RC" : 
-    "NC"; // Nota de Crédito
-  // Filtrar facturas que empiecen con el prefijo (con o sin guion para compatibilidad)
+    "N"; // Nota de Crédito
+  // Filtrar facturas que empiecen con el prefijo (F incluye FC por compatibilidad con datos antiguos)
   const filtered = invoices.filter((i) => 
     i.number.startsWith(prefix + "-") || i.number.startsWith(prefix)
   );
@@ -44,7 +46,7 @@ function nextNumber(type: ComprobanteType, invoices: Invoice[]) {
       ? 1001
       : Math.max(
           ...filtered.map((i) => {
-            // Extraer el número: puede ser "FC-1001" o "FC1001"
+            // Extraer el número: puede ser "F-1001" o "F1001", "FC1001" (legacy), etc.
             let numStr = i.number;
             if (numStr.includes("-")) {
               numStr = numStr.split("-")[1];
@@ -56,7 +58,7 @@ function nextNumber(type: ComprobanteType, invoices: Invoice[]) {
             return Number.isFinite(n) ? n : 0;
           })
         ) + 1;
-  return `${prefix}${next}`;
+  return `${prefix}${String(next).padStart(6, "0")}`;
 }
 
 function calcTotals(items: LineItem[]) {
@@ -110,17 +112,38 @@ export function FacturacionPage() {
   const [nextNumFromApi, setNextNumFromApi] = useState<string | null>(null);
   /** Documentos emitidos en esta sesión: se muestran solo 24 h, luego se quitan de la tabla (siguen en Historial/Pendientes) */
   const [emittedInSession, setEmittedInSession] = useState<{ invoice: Invoice; emittedAt: string }[]>([]);
+  /** Modal: ¿Descargar documento en PDF? Sí → registrar + descargar; No → solo registrar */
+  const [showEmitPdfConfirm, setShowEmitPdfConfirm] = useState(false);
+  /** Documento emitido a mostrar en la vista previa (al hacer clic en Visualizar) */
+  const [previewEmitted, setPreviewEmitted] = useState<{ invoice: Invoice; emittedAt: string } | null>(null);
+
+  /** Emoji naranja 🔖 solo las primeras 22 h; la tabla muestra documentos hasta 10 días 22 h */
+  const MS_22H = 22 * 60 * 60 * 1000;
+  const MS_TABLE_WINDOW = 10 * 24 * 60 * 60 * 1000 + MS_22H;
 
   const emittedInLast24h = useMemo(() => {
     const now = Date.now();
-    const ms24h = 24 * 60 * 60 * 1000;
-    return emittedInSession.filter((item) => now - new Date(item.emittedAt).getTime() < ms24h);
+    return emittedInSession.filter((item) => now - new Date(item.emittedAt).getTime() < MS_TABLE_WINDOW);
   }, [emittedInSession]);
 
   useEffect(() => {
-    const ms24h = 24 * 60 * 60 * 1000;
     const now = Date.now();
-    setEmittedInSession((prev) => prev.filter((item) => now - new Date(item.emittedAt).getTime() < ms24h));
+    const windowMs = 10 * 24 * 60 * 60 * 1000 + 22 * 60 * 60 * 1000;
+    setEmittedInSession((prev) => prev.filter((item) => now - new Date(item.emittedAt).getTime() < windowMs));
+  }, []);
+
+  /** Cargar documentos emitidos (hosting) desde el servidor para verlos tras recargar o en otra sesión */
+  useEffect(() => {
+    const windowMs = 10 * 24 * 60 * 60 * 1000 + 22 * 60 * 60 * 1000;
+    getEmittedDocuments("hosting")
+      .then((r) => {
+        const now = Date.now();
+        const list = (r.items ?? [])
+          .filter((item) => now - new Date(item.emittedAt).getTime() < windowMs)
+          .map((i) => ({ invoice: i.invoice as Invoice, emittedAt: i.emittedAt }));
+        setEmittedInSession(list);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -129,10 +152,10 @@ export function FacturacionPage() {
       .catch(() => setClients([]));
   }, []);
 
-  /** Pedir siguiente número al servidor al cambiar el tipo; si falla, se usa el cálculo local */
+  /** Vista previa: pedir siguiente número sin consumir (peek) para no gastar números al solo abrir la página */
   useEffect(() => {
     setNextNumFromApi(null);
-    getNextInvoiceNumber(type)
+    getNextInvoiceNumber(type, { peek: true })
       .then((r) => setNextNumFromApi(r.number))
       .catch(() => setNextNumFromApi(""));
   }, [type]);
@@ -339,6 +362,7 @@ export function FacturacionPage() {
   function exportExcel() {
     const hist = loadInvoices();
     if (hist.length === 0) return;
+    const fecha = new Date().toISOString().slice(0, 10).replace(/-/g, "-");
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("Historial");
     ws.columns = [
@@ -353,10 +377,10 @@ export function FacturacionPage() {
     ];
     hist.forEach((inv) => ws.addRow(inv));
     ws.getRow(1).font = { bold: true };
-    wb.xlsx.writeBuffer().then((buf) => saveAs(new Blob([buf]), "HRS_Historial.xlsx"));
+    wb.xlsx.writeBuffer().then((buf) => saveAs(new Blob([buf]), `HRS-Historial-Hosting-${fecha}.xlsx`));
   }
 
-  async function generatePdfAndSave() {
+  function handleClickEmitir() {
     if (!selectedClient) {
       showToast("Debe seleccionar un cliente válido.", "error");
       return;
@@ -365,7 +389,6 @@ export function FacturacionPage() {
       showToast("Debe seleccionar una factura a cancelar para la Nota de Crédito.", "error");
       return;
     }
-    // Validar que la factura seleccionada no tenga ya una Nota de Crédito relacionada
     if (type === "Nota de Crédito" && relatedInvoiceId) {
       const hasExistingNC = invoices.some(
         (inv) => inv.type === "Nota de Crédito" && inv.relatedInvoiceId === relatedInvoiceId
@@ -379,7 +402,6 @@ export function FacturacionPage() {
       showToast("Debe ingresar la fecha de pago para el recibo.", "error");
       return;
     }
-    // No permitir recibo si la factura relacionada fue cancelada con Nota de Crédito
     if (type === "Recibo" && relatedInvoiceId) {
       const facturaCanceladaPorNC = invoices.some(
         (inv) => inv.type === "Nota de Crédito" && inv.relatedInvoiceId === relatedInvoiceId
@@ -393,77 +415,124 @@ export function FacturacionPage() {
       showToast("La factura no tiene ítems cargados.", "error");
       return;
     }
+    if (totals.total === 0) {
+      showToast("Hay que llenar los campos para emitir el documento. El total no puede ser cero.", "error");
+      return;
+    }
     if (items.some((it) => !it.month)) {
       showToast("Por favor, indique el mes para todos los ítems.", "warning");
       return;
     }
+    setShowEmitPdfConfirm(true);
+  }
 
-    // Notificación de inicio de generación
-    showToast("Generando factura PDF...", "info");
+  async function performEmit(downloadPdf: boolean) {
+    setShowEmitPdfConfirm(false);
+    if (!selectedClient) return;
+
+    if (downloadPdf) showToast("Generando factura PDF...", "info");
+
+    let numberToUse = number;
+    try {
+      const res = await getNextInvoiceNumber(type);
+      numberToUse = res.number;
+    } catch {
+      //
+    }
 
     const { subtotal, discounts, total } = calcTotals(items);
     const dateNow = new Date();
     const dateStr = todayLocale();
     const emissionTime = getCurrentTime();
     const month = items[0]!.month;
-    
-    // Calcular fecha de vencimiento según días elegidos por el usuario (5, 6 o 7)
     const dueDate = new Date(dateNow);
     dueDate.setDate(dueDate.getDate() + dueDateDays);
     const dueDateStr = dueDate.toLocaleDateString();
 
-    let logoBase64: string | undefined;
-    try {
-      logoBase64 = await loadImageAsBase64("/images/LOGO-HASHRATE.png");
-    } catch {
-      //
+    if (downloadPdf) {
+      let logoBase64: string | undefined;
+      try {
+        logoBase64 = await loadImageAsBase64("/images/LOGO-HASHRATE.png");
+      } catch {
+        //
+      }
+      const doc = generateFacturaPdf(
+        {
+          number: numberToUse,
+          type,
+          clientName: selectedClient.name,
+          clientPhone: selectedClient.phone,
+          clientEmail: selectedClient.email,
+          clientAddress: selectedClient.address,
+          clientCity: selectedClient.city,
+          clientName2: selectedClient.name2,
+          clientPhone2: selectedClient.phone2,
+          clientEmail2: selectedClient.email2,
+          clientAddress2: selectedClient.address2,
+          clientCity2: selectedClient.city2,
+          date: dateNow,
+          items,
+          subtotal,
+          discounts,
+          total,
+          dueDateDays
+        },
+        { logoBase64 }
+      );
+      const safeName = selectedClient.name.replace(/[^\w\s-]/g, "").replace(/\s+/g, " ").trim() || "cliente";
+      doc.save(`${numberToUse}_${safeName}.pdf`);
+      const tipoMensaje = type === "Factura" ? "Factura" : type === "Recibo" ? "Recibo" : "Nota de Crédito";
+      showToast(`${tipoMensaje} generada y guardada correctamente.`, "success");
+    } else {
+      const tipoMensaje = type === "Factura" ? "Factura" : type === "Recibo" ? "Recibo" : "Nota de Crédito";
+      showToast(`${tipoMensaje} registrada correctamente.`, "success");
     }
 
-    const doc = generateFacturaPdf(
-      {
-        number,
-        type,
-        clientName: selectedClient.name,
-        clientPhone: selectedClient.phone,
-        clientEmail: selectedClient.email,
-        clientAddress: selectedClient.address,
-        clientCity: selectedClient.city,
-        clientName2: selectedClient.name2,
-        clientPhone2: selectedClient.phone2,
-        clientEmail2: selectedClient.email2,
-        clientAddress2: selectedClient.address2,
-        clientCity2: selectedClient.city2,
-        date: dateNow,
-        items,
-        subtotal,
-        discounts,
-        total,
-        dueDateDays
-      },
-      { logoBase64 }
-    );
-    const safeName = selectedClient.name.replace(/[^\w\s-]/g, "").replace(/\s+/g, " ").trim() || "cliente";
-    doc.save(`${number}_${safeName}.pdf`);
-    
-    // Notificación de éxito
-    const tipoMensaje = type === "Factura" ? "Factura" : type === "Recibo" ? "Recibo" : "Nota de Crédito";
-    showToast(`${tipoMensaje} generada y guardada correctamente.`, "success");
+    const relatedInvoice = relatedInvoiceId ? invoices.find((inv) => inv.id === relatedInvoiceId) : null;
+    /** Contable: Recibo y Nota de Crédito con montos en negativo (anulan factura). */
+    const isNegativeType = type === "Recibo" || type === "Nota de Crédito";
+    const finalSubtotal = isNegativeType ? -(Math.abs(subtotal)) : subtotal;
+    const finalDiscounts = isNegativeType ? -(Math.abs(discounts)) : discounts;
+    const finalTotal = isNegativeType ? -(Math.abs(total)) : total;
 
-    // Obtener información de la factura relacionada si es Nota de Crédito o Recibo
-    const relatedInvoice = relatedInvoiceId 
-      ? invoices.find((inv) => inv.id === relatedInvoiceId)
-      : null;
-
-    // Para recibos relacionados con facturas: guardar valores negativos en BD (contabilidad)
-    // pero el PDF ya se generó con valores positivos (correcto para visualización)
-    const isReceiptWithInvoice = type === "Recibo" && relatedInvoiceId;
-    const finalSubtotal = isReceiptWithInvoice ? -(Math.abs(subtotal)) : subtotal;
-    const finalDiscounts = isReceiptWithInvoice ? -(Math.abs(discounts)) : discounts;
-    const finalTotal = isReceiptWithInvoice ? -(Math.abs(total)) : total;
+    const apiBody = {
+      number: numberToUse,
+      type,
+      clientName: selectedClient.name,
+      date: dateStr,
+      month,
+      subtotal: finalSubtotal,
+      discounts: finalDiscounts,
+      total: finalTotal,
+      items: items.map((it) => ({
+        service: it.serviceName || "Servicio",
+        month: it.month,
+        quantity: it.quantity,
+        price: it.price,
+        discount: it.discount
+      })),
+      relatedInvoiceNumber: relatedInvoice?.number,
+      paymentDate: type === "Recibo" ? paymentDate : undefined,
+      emissionTime,
+      dueDate: dueDateStr
+    };
+    try {
+      await createInvoice(apiBody);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e ?? "");
+      if (msg.includes("already exists")) {
+        showToast("Este número de documento ya existe en la base de datos. No se guardó.", "error");
+      } else if (msg.includes("Invalid body") || msg.includes("Invalid")) {
+        showToast("Datos rechazados por el servidor. Revisá que todos los ítems tengan mes (YYYY-MM) y valores válidos.", "error");
+      } else {
+        showToast("No se pudo guardar en la base de datos. Revisá la conexión.", "error");
+      }
+      return;
+    }
 
     const inv: Invoice = {
       id: genId(),
-      number,
+      number: numberToUse,
       type,
       clientName: selectedClient.name,
       clientPhone: selectedClient.phone,
@@ -476,7 +545,7 @@ export function FacturacionPage() {
       clientAddress2: selectedClient.address2,
       clientCity2: selectedClient.city2,
       date: dateStr,
-      emissionTime: emissionTime,
+      emissionTime,
       dueDate: dueDateStr,
       paymentDate: type === "Recibo" ? paymentDate : undefined,
       month,
@@ -492,17 +561,19 @@ export function FacturacionPage() {
     saveInvoices(hist);
     setInvoices(loadInvoices());
     const now = Date.now();
-    const ms24h = 24 * 60 * 60 * 1000;
+    const MS_22H_EMIT = 22 * 60 * 60 * 1000;
+    const MS_TABLE_WINDOW_EMIT = 10 * 24 * 60 * 60 * 1000 + MS_22H_EMIT;
+    const emittedAt = new Date().toISOString();
     setEmittedInSession((prev) => [
-      ...prev.filter((item) => now - new Date(item.emittedAt).getTime() < ms24h),
-      { invoice: inv, emittedAt: new Date().toISOString() }
+      ...prev.filter((item) => now - new Date(item.emittedAt).getTime() < MS_TABLE_WINDOW_EMIT),
+      { invoice: inv, emittedAt }
     ]);
+    addEmittedDocument("hosting", inv as Record<string, unknown>, emittedAt).catch(() => {});
     setItems([]);
     setRelatedInvoiceId("");
     setPaymentDate("");
     setItemsLocked(false);
-    // Pedir al servidor el siguiente número para el mismo tipo (por si emite otro seguido)
-    getNextInvoiceNumber(type).then((r) => setNextNumFromApi(r.number)).catch(() => setNextNumFromApi(""));
+    getNextInvoiceNumber(type, { peek: true }).then((r) => setNextNumFromApi(r.number)).catch(() => setNextNumFromApi(""));
   }
 
   /** Parsea fecha de vencimiento guardada (dd/mm/yyyy o ISO) para el PDF */
@@ -560,48 +631,15 @@ export function FacturacionPage() {
     showToast(`PDF ${inv.number} descargado.`, "success");
   }
 
-  /** Visualizar PDF de un documento emitido en esta sesión (abre en nueva pestaña) */
-  async function viewEmittedPdf(item: { invoice: Invoice; emittedAt: string }) {
-    const inv = item.invoice;
-    const date = new Date(item.emittedAt);
-    const subtotal = Math.abs(inv.subtotal);
-    const discounts = Math.abs(inv.discounts);
-    const total = Math.abs(inv.total);
-    let logoBase64: string | undefined;
-    try {
-      logoBase64 = await loadImageAsBase64("/images/LOGO-HASHRATE.png");
-    } catch {
-      //
-    }
-    const doc = generateFacturaPdf(
-      {
-        number: inv.number,
-        type: inv.type,
-        clientName: inv.clientName,
-        clientPhone: inv.clientPhone,
-        clientEmail: inv.clientEmail,
-        clientAddress: inv.clientAddress,
-        clientCity: inv.clientCity,
-        clientName2: inv.clientName2,
-        clientPhone2: inv.clientPhone2,
-        clientEmail2: inv.clientEmail2,
-        clientAddress2: inv.clientAddress2,
-        clientCity2: inv.clientCity2,
-        date,
-        items: inv.items,
-        subtotal,
-        discounts,
-        total,
-        dueDate: parseDueDateStr(inv.dueDate ?? "")
-      },
-      { logoBase64 }
-    );
-    const blob = doc.output("blob");
-    const url = URL.createObjectURL(blob);
-    window.open(url, "_blank", "noopener,noreferrer");
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
-    showToast(`PDF ${inv.number} abierto en nueva pestaña.`, "info");
+  /** Mostrar documento emitido en la vista previa de abajo (sin abrir enlace) */
+  function viewEmittedInPreview(item: { invoice: Invoice; emittedAt: string }) {
+    setPreviewEmitted(item);
   }
+
+  /** Limpiar vista previa de documento emitido cuando el usuario edita el formulario */
+  useEffect(() => {
+    setPreviewEmitted(null);
+  }, [type, selectedClientId, items]);
 
   if (user && !canEditFacturacion(user.role)) {
     return (
@@ -730,7 +768,7 @@ export function FacturacionPage() {
                           <option value="">-- Seleccione factura --</option>
                           {invoicesWithoutCreditNote.map((inv) => (
                             <option key={inv.id} value={inv.id}>
-                              {inv.number} - {inv.date} - Total: {inv.total.toFixed(2)} USD
+                              {inv.number} - {inv.date} - Total: {formatUSD(Math.abs(inv.total))}
                             </option>
                           ))}
                         </select>
@@ -776,7 +814,7 @@ export function FacturacionPage() {
                           <option value="">-- Seleccione factura --</option>
                           {invoicesWithoutReceipt.map((inv) => (
                             <option key={inv.id} value={inv.id}>
-                              {inv.number} - {inv.date} - Total: {inv.total.toFixed(2)} USD
+                              {inv.number} - {inv.date} - Total: {formatUSD(Math.abs(inv.total))}
                             </option>
                           ))}
                         </select>
@@ -997,7 +1035,7 @@ export function FacturacionPage() {
                                     value={it.price}
                                     onChange={(e) => {
                                       if (itemsLocked || is4Pct) return;
-                                      updateItem(idx, { price: Math.max(0, Number(e.target.value) || 0) });
+                                      updateItem(idx, { price: Math.max(0, Math.round(Number(e.target.value) || 0)) });
                                     }}
                                     style={{
                                       flex: 1,
@@ -1011,7 +1049,7 @@ export function FacturacionPage() {
                                       opacity: itemsLocked ? 0.7 : 1
                                     }}
                                     min={0}
-                                    step="0.01"
+                                    step={1}
                                     readOnly={itemsLocked || is4Pct}
                                     disabled={itemsLocked || is4Pct}
                                     title={is4Pct ? "4% solo sobre el valor de la fila de arriba (alojamiento), no sobre el total" : undefined}
@@ -1047,7 +1085,7 @@ export function FacturacionPage() {
                               </td>
                               <td className="fact-cell-center fact-cell-total">
                                 <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", width: "100%" }}>
-                                  <input readOnly value={lineTotal.toFixed(2)} className="fact-detail-servicios-input-total" style={{ flex: 1, minWidth: 0 }} />
+                                  <input readOnly value={formatCurrencyNumber(lineTotal)} className="fact-detail-servicios-input-total" style={{ flex: 1, minWidth: 0 }} />
                                   <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#64748b", flexShrink: 0 }}>USD</span>
                                 </div>
                               </td>
@@ -1078,21 +1116,21 @@ export function FacturacionPage() {
                           <div className="fact-summary-cards">
                             <div className="fact-summary-card fact-summary-card--sub">
                               <span className="fact-summary-card-label">Subtotal</span>
-                              <span className="fact-summary-card-value">{totals.subtotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              <span className="fact-summary-card-value">{formatCurrencyNumber(totals.subtotal)}</span>
                               <span className="fact-summary-card-currency">USD</span>
                             </div>
                             <div className="fact-summary-card fact-summary-card--disc">
                               <span className="fact-summary-card-label">Descuentos</span>
-                              <span className="fact-summary-card-value">− {totals.discounts.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              <span className="fact-summary-card-value">− {formatCurrencyNumber(totals.discounts)}</span>
                               <span className="fact-summary-card-currency">USD</span>
                             </div>
                             <div className="fact-summary-card fact-summary-card--total">
                               <span className="fact-summary-card-label">Total</span>
-                              <span className="fact-summary-card-value">{totals.total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              <span className="fact-summary-card-value">{formatCurrencyNumber(totals.total)}</span>
                               <span className="fact-summary-card-currency">USD</span>
                             </div>
                           </div>
-                          <button type="button" className="fact-detail-servicios-btn-emitir" onClick={generatePdfAndSave}>
+                          <button type="button" className="fact-detail-servicios-btn-emitir" onClick={handleClickEmitir}>
                             📄 Emitir documento
                           </button>
                         </div>
@@ -1105,17 +1143,18 @@ export function FacturacionPage() {
                 {emittedInLast24h.length > 0 && (
                   <div className="fact-emitted-section">
                     <h3 className="fact-section-title" style={{ marginTop: "2rem", marginBottom: "1rem" }}>
-                      <span style={{ fontSize: "1.4em", lineHeight: 1 }}>📄</span> Documentos emitidos en esta sesión (últimas 24 h)
+                      📄 Documentos Emitidos
                     </h3>
                     <div className="fact-table-wrap">
-                      <table className="fact-table fact-emitted-table" style={{ tableLayout: "fixed", width: "100%" }}>
+                      <table className="fact-table fact-emitted-table" style={{ tableLayout: "fixed", width: "100%", minWidth: "640px" }}>
                         <thead>
                           <tr>
+                            <th aria-label="Marcador"></th>
                             <th>Tipo</th>
                             <th>Número</th>
                             <th>Cliente</th>
-                            <th>Fecha emisión</th>
-                            <th>Hora emisión</th>
+                            <th>Fecha<br />emisión</th>
+                            <th>Hora<br />emisión</th>
                             <th>Total</th>
                             <th>Acciones</th>
                           </tr>
@@ -1123,21 +1162,43 @@ export function FacturacionPage() {
                         <tbody>
                           {[...emittedInLast24h].reverse().map((item) => {
                             const inv = item.invoice;
-                            const totalDisplay = Math.abs(inv.total);
                             return (
                               <tr key={item.invoice.id}>
-                                <td>{inv.type}</td>
+                                <td className="fact-emitted-marker" title="Documento emitido">📄</td>
+                                <td>
+                                  {inv.type === "Nota de Crédito" ? "Nota C." : inv.type}
+                                  {inv.type === "Recibo" && " "}
+                                  {(inv.type === "Factura" || inv.type === "Recibo" || inv.type === "Nota de Crédito") && (Date.now() - new Date(item.emittedAt).getTime() < MS_22H) && (
+                                    <span
+                                      style={{
+                                        marginLeft: "0.35rem",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        width: "1.2rem",
+                                        height: "1.2rem",
+                                        borderRadius: "50%",
+                                        backgroundColor: "#ff9800",
+                                        fontSize: "0.7rem",
+                                        lineHeight: 1
+                                      }}
+                                      title={inv.type}
+                                    >
+                                      🔖
+                                    </span>
+                                  )}
+                                </td>
                                 <td className="fw-bold">{inv.number}</td>
                                 <td>{inv.clientName}</td>
                                 <td>{inv.date}</td>
                                 <td>{inv.emissionTime ?? "-"}</td>
-                                <td>{totalDisplay.toFixed(2)} USD</td>
+                                <td style={{ textAlign: "left" }}>{formatUSD(inv.total)}</td>
                                 <td className="text-center">
                                   <div className="d-flex gap-1 justify-content-center flex-wrap">
                                     <button
                                       type="button"
                                       className="btn btn-sm border"
-                                      onClick={() => viewEmittedPdf(item)}
+                                      onClick={() => viewEmittedInPreview(item)}
                                       title="Visualizar"
                                       style={{ width: "1.3rem", height: "1.3rem", padding: 0, fontSize: "1rem", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, backgroundColor: "#fff9c4", color: "#5d4037", borderColor: "#d4c44a" }}
                                     >
@@ -1160,17 +1221,50 @@ export function FacturacionPage() {
                         </tbody>
                       </table>
                     </div>
+                    <div className="fact-emitted-count">
+                      <span className="fact-emitted-count-badge">
+                        <span className="fact-emitted-count-num">{emittedInLast24h.length}</span>
+                        <span className="fact-emitted-count-label">
+                          {emittedInLast24h.length === 1 ? "Documento" : "Documentos"}
+                        </span>
+                        <span className="fact-emitted-count-period"> emitidos en los últimos 10 días</span>
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Vista previa: siempre visible; con documento o mensaje "No hay Documento" */}
+            {/* Vista previa: documento emitido (Visualizar) o comprobante en edición */}
             <div className="fact-panel-vista-previa">
               <div className="fact-panel-vista-previa-header"><span style={{ fontSize: "1.25em", lineHeight: 1 }}>🔍</span> Vista previa</div>
               <div className="fact-panel-vista-previa-body">
                 <div className="fact-panel-vista-previa-inner">
-                  {selectedClient && items.length > 0 ? (
+                  {previewEmitted ? (
+                    <InvoicePreview
+                      type={previewEmitted.invoice.type}
+                      number={previewEmitted.invoice.number}
+                      client={{
+                        code: "",
+                        name: previewEmitted.invoice.clientName,
+                        name2: previewEmitted.invoice.clientName2,
+                        phone: previewEmitted.invoice.clientPhone,
+                        phone2: previewEmitted.invoice.clientPhone2,
+                        email: previewEmitted.invoice.clientEmail,
+                        email2: previewEmitted.invoice.clientEmail2,
+                        address: previewEmitted.invoice.clientAddress,
+                        address2: previewEmitted.invoice.clientAddress2,
+                        city: previewEmitted.invoice.clientCity,
+                        city2: previewEmitted.invoice.clientCity2
+                      }}
+                      date={new Date(previewEmitted.emittedAt)}
+                      items={previewEmitted.invoice.items}
+                      subtotal={previewEmitted.invoice.subtotal}
+                      discounts={previewEmitted.invoice.discounts}
+                      total={previewEmitted.invoice.total}
+                      dueDateDays={dueDateDays}
+                    />
+                  ) : selectedClient && items.length > 0 ? (
                     <InvoicePreview
                       type={type}
                       number={number}
@@ -1182,10 +1276,26 @@ export function FacturacionPage() {
                       total={totals.total}
                       dueDateDays={dueDateDays}
                     />
+                  ) : selectedClient ? (
+                    <div className="fact-panel-vista-previa-empty">
+                      <p className="fact-panel-vista-previa-empty-text" style={{ marginBottom: "0.5rem" }}>
+                        <strong>{type}</strong> {number}
+                      </p>
+                      <p className="fact-panel-vista-previa-empty-text" style={{ marginBottom: "0.25rem" }}>
+                        Cliente: {selectedClient.name}
+                      </p>
+                      <p className="fact-panel-vista-previa-empty-text">
+                        Vencimiento: {dueDateDays} días
+                      </p>
+                      <p className="fact-panel-vista-previa-empty-text" style={{ marginTop: "0.75rem", fontSize: "0.9em", opacity: 0.85 }}>
+                        Agregá ítems en «Detalle de servicios» para ver la vista previa completa.
+                      </p>
+                    </div>
                   ) : (
                     <div className="fact-panel-vista-previa-empty">
                       <span className="fact-panel-vista-previa-empty-icon" aria-hidden>📄</span>
                       <p className="fact-panel-vista-previa-empty-text">No hay documento</p>
+                      <p className="fact-panel-vista-previa-empty-text" style={{ fontSize: "0.9em", marginTop: "0.5rem" }}>Seleccioná un cliente y agregá ítems.</p>
                     </div>
                   )}
                 </div>
@@ -1194,6 +1304,16 @@ export function FacturacionPage() {
           </main>
         </div>
       </div>
+      <ConfirmModal
+        open={showEmitPdfConfirm}
+        title="Emitir documento"
+        message="¿Desea descargar el documento en PDF?"
+        confirmLabel="Sí"
+        cancelLabel="No"
+        variant="info"
+        onConfirm={() => performEmit(true)}
+        onCancel={() => performEmit(false)}
+      />
     </div>
   );
 }

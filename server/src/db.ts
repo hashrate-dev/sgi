@@ -64,6 +64,41 @@ CREATE TABLE IF NOT EXISTS invoice_sequences (
   last_number INTEGER NOT NULL DEFAULT 1000
 );
 INSERT OR IGNORE INTO invoice_sequences (type, last_number) VALUES ('Factura', 1000), ('Recibo', 1000), ('Nota de Crédito', 1000);
+
+CREATE TABLE IF NOT EXISTS emitted_documents (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source TEXT NOT NULL CHECK (source IN ('hosting', 'asic')),
+  invoice_json TEXT NOT NULL,
+  emitted_at TEXT NOT NULL,
+  emitted_by INTEGER,
+  FOREIGN KEY (emitted_by) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_emitted_source_at ON emitted_documents(source, emitted_at);
+
+CREATE TABLE IF NOT EXISTS emitted_garantias (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  invoice_json TEXT NOT NULL,
+  emitted_at TEXT NOT NULL,
+  emitted_by INTEGER,
+  FOREIGN KEY (emitted_by) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_emitted_garantias_at ON emitted_garantias(emitted_at);
+
+CREATE TABLE IF NOT EXISTS items_garantia_ande (
+  id TEXT PRIMARY KEY,
+  codigo TEXT NOT NULL,
+  marca TEXT NOT NULL,
+  modelo TEXT NOT NULL,
+  fecha_ingreso TEXT NOT NULL,
+  observaciones TEXT
+);
+
+CREATE TABLE IF NOT EXISTS setups (
+  id TEXT PRIMARY KEY,
+  codigo TEXT NOT NULL UNIQUE,
+  nombre TEXT NOT NULL,
+  precio_usd INTEGER NOT NULL DEFAULT 0
+);
 `);
 
 // Migrar roles antiguos admin -> admin_a (jv@hashrate.space) / admin_b (resto)
@@ -145,6 +180,13 @@ try {
 
 try {
   db.exec("ALTER TABLE invoices ADD COLUMN due_date TEXT");
+} catch (e: unknown) {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (!msg.includes("duplicate column")) throw e;
+}
+
+try {
+  db.exec("ALTER TABLE setups ADD COLUMN codigo TEXT");
 } catch (e: unknown) {
   const msg = e instanceof Error ? e.message : String(e);
   if (!msg.includes("duplicate column")) throw e;

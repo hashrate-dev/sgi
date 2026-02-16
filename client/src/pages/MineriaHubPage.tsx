@@ -6,8 +6,8 @@ const asicMenuItems: Array<{ to: string; icon: string; label: string; desc: stri
   { to: "/facturacion-equipos", icon: "bi-receipt", label: "Emitir Facturas de Equipos ASIC", desc: "Emisión de Facturas, Notas de Crédito y Recibos" },
   { to: "/historial-equipos", icon: "bi-clock-history", label: "Historial Venta de ASIC", desc: "Ver y gestionar comprobantes por Ventas de Equipos ASIC" },
   { to: "/pendientes-equipos", icon: "bi-hourglass-split", label: "Pendientes de Cobro", desc: "Facturas pendientes de cobro por venta de Equipos ASIC" },
-  { to: "/equipos-asic/equipos", icon: "bi-gear", label: "Gestión de Equipos", desc: "Base de datos de equipos ASIC: agregar, editar y eliminar equipos" },
-  { to: "/equipos-asic/setup", icon: "bi-tools", label: "Gestión de Setup", desc: "Base de datos de Setup: agregar, editar y eliminar configuraciones (0 USD o 50 USD)" },
+  { to: "/equipos-asic/garantia-ande", icon: "bi-file-earmark-text", label: "Recibos Garantía ANDE", desc: "Emisión de recibos de garantía ANDE para equipos" },
+  { to: "/equipos-asic/garantias-historial", icon: "bi-clock-history", label: "Historial Garantías ANDE", desc: "Ver y gestionar recibos de garantía ANDE emitidos (últimos 15 días)" },
 ];
 
 export function MineriaHubPage() {

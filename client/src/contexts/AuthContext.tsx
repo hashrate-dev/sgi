@@ -23,13 +23,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
       return;
     }
+    const t = setTimeout(() => {
+      setLoading(false);
+      setUser(null);
+      clearStoredAuth();
+    }, 5000);
     getMe()
       .then(({ user: u }) => setUser(u))
       .catch(() => {
         clearStoredAuth();
         setUser(null);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        clearTimeout(t);
+        setLoading(false);
+      });
   }, []);
 
   useEffect(() => {

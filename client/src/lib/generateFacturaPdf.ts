@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import type { ComprobanteType, LineItem } from "./types";
+import { recibimosMontoEnDosLineas } from "./numberToWords";
 
 /** Colores HRS (verde marca) */
 const HRS_GREEN = { r: 0, g: 166, b: 82 };
@@ -34,7 +35,6 @@ function formatUSD(n: number): string {
   return `${n.toFixed(2).replace(".", ",")} USD`;
 }
 
-/** Número con USD al final (ej. "100,00 USD") para la línea TOTAL abajo */
 function formatTotalUSD(n: number): string {
   return `${n.toFixed(2).replace(".", ",")} USD`;
 }
@@ -147,17 +147,18 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   const tipoLabel = 
     data.type === "Factura" ? "FACTURA CREDITO" : 
     data.type === "Recibo" ? "RECIBO" : 
+    data.type === "Recibo Devolución" ? "RECIBO DEVOLUCIÓN" : 
     "NOTA DE CRÉDITO";
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
   doc.setTextColor(0, 0, 0);
+  doc.setFontSize(12); /* igual que vista previa: company-name 12pt */
   doc.text(EMISOR.nombre, COMPANY_INFO_X, y);
-  doc.setFontSize(9);
+  doc.setFontSize(11); /* igual que vista previa: type 11pt */
   doc.text(`${tipoLabel} - ${data.number}`, contentRight, y, { align: "right" });
   y += 5;
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
+  doc.setFontSize(9); /* igual que vista previa: company-detail 9pt */
   doc.text(EMISOR.direccion, COMPANY_INFO_X, y);
   doc.text("VIA CLIENTE", contentRight, y, { align: "right" });
   y += 5;
@@ -173,6 +174,7 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   doc.text(EMISOR.email, COMPANY_INFO_X, y);
   y += 5; // Línea en blanco antes de RUC EMISOR
 
+  doc.setFontSize(9); /* igual que vista previa: label/value/ruc 9pt */
   doc.text(EMISOR.ruc, contentRight, y, { align: "right" });
   y += 5;
   // bajar hasta debajo del encabezado (logo o texto, el que baje más) + margen
@@ -219,7 +221,7 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
     // Si tiene guion y es largo, dividir en dos líneas sin el guion
     if (hasText(block.name)) {
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
+      doc.setFontSize(11); /* igual que vista previa: client-name 11pt */
       const nameStr = String(block.name).trim();
       const hasHyphen = nameStr.includes(" - ");
       let nameLines: string[] = [];
@@ -252,7 +254,7 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
     }
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
+    doc.setFontSize(10); /* igual que vista previa: client-detail 10pt */
     const lineH = 5;
     const add = (v?: string, upper = false) => {
       if (!hasText(v)) return;
@@ -279,7 +281,7 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   const getClientNameHeight = (name: string | undefined): number => {
     if (!hasText(name)) return 0;
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
+    doc.setFontSize(11); /* igual que client-name */
     const nameStr = String(name).trim();
     const hasHyphen = nameStr.includes(" - ");
     let nameLines: string[] = [];
@@ -379,7 +381,7 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   doc.line(tableLeft, tableTop + HEADER_ROW_H, tableLeft + TABLE_W, tableTop + HEADER_ROW_H);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(10); /* tablas: +1pt (encabezado tabla ítems) */
+  doc.setFontSize(11); /* igual que vista previa: thead th 11pt */
   doc.setTextColor(255, 255, 255);
   doc.text("DESCRIPCION", tableLeft + 3, tableTop + 6.5);
   doc.text("PRECIO", centerPrecio, tableTop + 6.5, { align: "center" });
@@ -389,11 +391,11 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
 
   y = tableTop + HEADER_ROW_H;
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(10); /* tablas: +1pt (filas tabla ítems) */
+  doc.setFontSize(11); /* igual que vista previa: tbody td 11pt */
 
   for (const it of data.items) {
     const lineTotalServicio = it.price * it.quantity;
-    // Determinar la descripción: priorizar Setup, luego equipos ASIC, luego servicios de Hosting
+    // Determinar la descripción: Setup, equipos ASIC, Garantía ANDE, servicios de Hosting
     let desc = "";
     if (it.setupId && it.setupNombre) {
       // Setup
@@ -402,6 +404,9 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
       // Equipo ASIC
       const equipoDesc = `${it.marcaEquipo} - ${it.modeloEquipo} - ${it.procesadorEquipo}`;
       desc = it.month ? `${equipoDesc} - ${ymToMonthYear(it.month)}` : equipoDesc;
+    } else if (it.garantiaCodigo || it.garantiaMarca || it.garantiaModelo) {
+      // Ítem de Garantía ANDE (tabla Detalles -> Garantías): código - Garantías - marca - modelo
+      desc = [it.garantiaCodigo, "Garantías", it.garantiaMarca, it.garantiaModelo].filter(Boolean).join(" - ") || "Garantía";
     } else if (it.serviceName) {
       // Servicio de Hosting (compatibilidad hacia atrás)
       desc = it.month ? `${it.serviceName} - ${ymToMonthYear(it.month)}` : it.serviceName;
@@ -425,6 +430,8 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
         descDescuento = `Descuento ${it.setupNombre}`;
       } else if (it.marcaEquipo && it.modeloEquipo) {
         descDescuento = `Descuento ${it.marcaEquipo} ${it.modeloEquipo}`;
+      } else if (it.garantiaMarca && it.garantiaModelo) {
+        descDescuento = `Descuento ${it.garantiaMarca} ${it.garantiaModelo}`;
       } else if (it.serviceKey) {
         const serviceLabel = it.serviceKey === "A" ? "L7" : it.serviceKey === "B" ? "L9" : "S21";
         descDescuento = `Descuento HASHRATE ${serviceLabel}`;
@@ -454,57 +461,76 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   const Rd = TABLE_RADIUS;
   const kd = 0.5522847498;
 
-  const pathDatesHeaderGreen = [
-    { op: "m" as const, c: [tableLeft + Rd, datesBlockTop] },
-    { op: "l" as const, c: [tableLeft + TABLE_W - Rd, datesBlockTop] },
-    { op: "c" as const, c: [tableLeft + TABLE_W - Rd + Rd * kd, datesBlockTop, tableLeft + TABLE_W, datesBlockTop + Rd - Rd * kd, tableLeft + TABLE_W, datesBlockTop + Rd] },
-    { op: "l" as const, c: [tableLeft + TABLE_W, datesBlockTop + datesBlockH / 2] },
-    { op: "l" as const, c: [tableLeft, datesBlockTop + datesBlockH / 2] },
-    { op: "l" as const, c: [tableLeft, datesBlockTop + Rd] },
-    { op: "c" as const, c: [tableLeft, datesBlockTop + Rd - Rd * kd, tableLeft + Rd - Rd * kd, datesBlockTop, tableLeft + Rd, datesBlockTop] },
-    { op: "h" as const, c: [] },
-  ];
-  const pathDatesOutline = [
-    { op: "m" as const, c: [tableLeft + Rd, datesBlockTop] },
-    { op: "l" as const, c: [tableLeft + TABLE_W - Rd, datesBlockTop] },
-    { op: "c" as const, c: [tableLeft + TABLE_W - Rd + Rd * kd, datesBlockTop, tableLeft + TABLE_W, datesBlockTop + Rd - Rd * kd, tableLeft + TABLE_W, datesBlockTop + Rd] },
-    { op: "l" as const, c: [tableLeft + TABLE_W, datesBlockTop + datesBlockH] },
-    { op: "l" as const, c: [tableLeft, datesBlockTop + datesBlockH] },
-    { op: "l" as const, c: [tableLeft, datesBlockTop + Rd] },
-    { op: "c" as const, c: [tableLeft, datesBlockTop + Rd - Rd * kd, tableLeft + Rd - Rd * kd, datesBlockTop, tableLeft + Rd, datesBlockTop] },
-    { op: "h" as const, c: [] },
-  ];
+  // ---------- Recibo / Recibo Devolución: texto RECIBIMOS LA CANTIDAD DE... en dos filas + contenedor con borde ----------
+  if (data.type === "Recibo" || data.type === "Recibo Devolución") {
+    const { line1, line2 } = recibimosMontoEnDosLineas(data.total);
+    const yRecTop = y; /* justo debajo de la tabla (y ya tiene +6) para que quede en A4 */
+    const recBlockH = 22; /* altura del contenedor: 2 líneas + padding */
+    const recPaddingTop = 5;
+    const recLineH = 6;
+    doc.setDrawColor(TABLE_BORDER.r, TABLE_BORDER.g, TABLE_BORDER.b);
+    doc.setLineWidth(0.5);
+    doc.rect(tableLeft, yRecTop, TABLE_W, recBlockH, "S"); /* contenedor con borde */
+    doc.setFontSize(12); /* texto un poco más grande */
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(0, 0, 0);
+    doc.text(line1, tableLeft + 3, yRecTop + recPaddingTop + 4);
+    doc.text(line2, tableLeft + 3, yRecTop + recPaddingTop + 4 + recLineH);
+    y = yRecTop + recBlockH;
+  } else {
+    // Factura / Nota de Crédito: tabla FECHA DE EMISIÓN y FECHA DE VENCIMIENTO
+    const pathDatesHeaderGreen = [
+      { op: "m" as const, c: [tableLeft + Rd, datesBlockTop] },
+      { op: "l" as const, c: [tableLeft + TABLE_W - Rd, datesBlockTop] },
+      { op: "c" as const, c: [tableLeft + TABLE_W - Rd + Rd * kd, datesBlockTop, tableLeft + TABLE_W, datesBlockTop + Rd - Rd * kd, tableLeft + TABLE_W, datesBlockTop + Rd] },
+      { op: "l" as const, c: [tableLeft + TABLE_W, datesBlockTop + datesBlockH / 2] },
+      { op: "l" as const, c: [tableLeft, datesBlockTop + datesBlockH / 2] },
+      { op: "l" as const, c: [tableLeft, datesBlockTop + Rd] },
+      { op: "c" as const, c: [tableLeft, datesBlockTop + Rd - Rd * kd, tableLeft + Rd - Rd * kd, datesBlockTop, tableLeft + Rd, datesBlockTop] },
+      { op: "h" as const, c: [] },
+    ];
+    const pathDatesOutline = [
+      { op: "m" as const, c: [tableLeft + Rd, datesBlockTop] },
+      { op: "l" as const, c: [tableLeft + TABLE_W - Rd, datesBlockTop] },
+      { op: "c" as const, c: [tableLeft + TABLE_W - Rd + Rd * kd, datesBlockTop, tableLeft + TABLE_W, datesBlockTop + Rd - Rd * kd, tableLeft + TABLE_W, datesBlockTop + Rd] },
+      { op: "l" as const, c: [tableLeft + TABLE_W, datesBlockTop + datesBlockH] },
+      { op: "l" as const, c: [tableLeft, datesBlockTop + datesBlockH] },
+      { op: "l" as const, c: [tableLeft, datesBlockTop + Rd] },
+      { op: "c" as const, c: [tableLeft, datesBlockTop + Rd - Rd * kd, tableLeft + Rd - Rd * kd, datesBlockTop, tableLeft + Rd, datesBlockTop] },
+      { op: "h" as const, c: [] },
+    ];
 
-  doc.setFillColor(HRS_GREEN.r, HRS_GREEN.g, HRS_GREEN.b);
-  doc.path(pathDatesHeaderGreen);
-  doc.fill();
+    doc.setFillColor(HRS_GREEN.r, HRS_GREEN.g, HRS_GREEN.b);
+    doc.path(pathDatesHeaderGreen);
+    doc.fill();
 
-  doc.setDrawColor(TABLE_BORDER.r, TABLE_BORDER.g, TABLE_BORDER.b);
-  doc.path(pathDatesOutline);
-  doc.stroke();
+    doc.setDrawColor(TABLE_BORDER.r, TABLE_BORDER.g, TABLE_BORDER.b);
+    doc.path(pathDatesOutline);
+    doc.stroke();
 
-  doc.line(tableLeft, datesBlockTop + datesBlockH / 2, tableLeft + TABLE_W, datesBlockTop + datesBlockH / 2);
-  doc.line(tableLeft + datesColW, datesBlockTop, tableLeft + datesColW, datesBlockTop + datesBlockH);
+    doc.line(tableLeft, datesBlockTop + datesBlockH / 2, tableLeft + TABLE_W, datesBlockTop + datesBlockH / 2);
+    doc.line(tableLeft + datesColW, datesBlockTop, tableLeft + datesColW, datesBlockTop + datesBlockH);
 
-  doc.setFontSize(10); /* tablas fechas: +1pt (encabezados y datos) */
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(255, 255, 255);
-  doc.text("FECHA DE EMISIÓN:", leftCenterX, datesBlockTop + 5, { align: "center" });
-  doc.text("FECHA DE VENCIMIENTO:", rightCenterX, datesBlockTop + 5, { align: "center" });
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(0, 0, 0);
-  const datesDataRowTop = datesBlockTop + datesBlockH / 2;
-  const datesDataRowH = datesBlockH / 2;
-  const datesRowCenterY = datesDataRowTop + datesDataRowH / 2;
-  const fs = doc.getFontSize();
-  const baselineOffset = fs * 0.12;
-  const datesBaselineY = datesRowCenterY + baselineOffset;
-  const dateEmisionStr = formatDDMMYY(now);
-  const dateVencStr = formatDDMMYY(vencimiento);
-  const wEmision = doc.getTextWidth(dateEmisionStr);
-  const wVenc = doc.getTextWidth(dateVencStr);
-  doc.text(dateEmisionStr, leftCenterX - wEmision / 2, datesBaselineY);
-  doc.text(dateVencStr, rightCenterX - wVenc / 2, datesBaselineY);
+    doc.setFontSize(11); /* igual que vista previa: dates 11pt */
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(255, 255, 255);
+    doc.text("FECHA DE EMISIÓN:", leftCenterX, datesBlockTop + 5, { align: "center" });
+    doc.text("FECHA DE VENCIMIENTO:", rightCenterX, datesBlockTop + 5, { align: "center" });
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(0, 0, 0);
+    const datesDataRowTop = datesBlockTop + datesBlockH / 2;
+    const datesDataRowH = datesBlockH / 2;
+    const datesRowCenterY = datesDataRowTop + datesDataRowH / 2;
+    const fs = doc.getFontSize();
+    const baselineOffset = fs * 0.12;
+    const datesBaselineY = datesRowCenterY + baselineOffset;
+    const dateEmisionStr = formatDDMMYY(now);
+    const dateVencStr = formatDDMMYY(vencimiento);
+    const wEmision = doc.getTextWidth(dateEmisionStr);
+    const wVenc = doc.getTextWidth(dateVencStr);
+    doc.text(dateEmisionStr, leftCenterX - wEmision / 2, datesBaselineY);
+    doc.text(dateVencStr, rightCenterX - wVenc / 2, datesBaselineY);
+  }
 
   // ---------- TOTAL al pie: recuadro corto, borde derecho alineado con la tabla de arriba ----------
   const totalTableRight = tableLeft + TABLE_W;
@@ -553,12 +579,12 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   const totalBaselineY = totalCenterY + doc.getFontSize() * 0.12;
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(10); /* caja TOTAL: +1pt */
+  doc.setFontSize(11); /* igual que vista previa: total 11pt */
   doc.setTextColor(255, 255, 255);
   doc.text("TOTAL", totalLabelCenterX, totalBaselineY, { align: "center" });
 
   doc.setTextColor(0, 0, 0);
-  doc.text(formatTotalUSD(data.total), totalAmountRight, totalBaselineY, { align: "right" });
+  doc.text(formatUSD(data.total), totalAmountRight, totalBaselineY, { align: "right" });
 
   return doc;
 }

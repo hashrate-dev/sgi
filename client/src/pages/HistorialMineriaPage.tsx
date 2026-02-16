@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
-import { getClients, verifyPassword } from "../lib/api";
+import { deleteEmittedDocumentsAll, getClients, verifyPassword } from "../lib/api";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadInvoicesAsic, saveInvoicesAsic } from "../lib/storage";
 import type { ComprobanteType, Invoice } from "../lib/types";
@@ -9,15 +9,8 @@ import { PageHeader } from "../components/PageHeader";
 import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import { canDeleteHistorial, canExport } from "../lib/auth";
+import { formatCurrency, formatCurrencyNumber } from "../lib/formatCurrency";
 import "../styles/facturacion.css";
-
-// Función para formatear números: negativos con -, positivos sin cambios; todo en negro
-function formatCurrency(value: number): string {
-  if (value < 0) {
-    return `-${Math.abs(value).toFixed(2)} USD`;
-  }
-  return `${value.toFixed(2)} USD`;
-}
 
 // Función auxiliar para encontrar columna en Excel por nombres posibles
 function findCol(headerRow: (string | number)[], ...names: string[]): number {
@@ -370,6 +363,7 @@ export function HistorialMineriaPage() {
       setPasswordAttempts(0);
       setAll([]);
       saveInvoicesAsic([]);
+      await deleteEmittedDocumentsAll("asic").catch(() => {});
       showToast("Todo el historial ha sido eliminado.", "success", "Historial");
     } catch (err) {
       const newAttempts = passwordAttempts + 1;
@@ -652,7 +646,7 @@ export function HistorialMineriaPage() {
                 style={{ backgroundColor: "rgba(220, 53, 69, 0.4)" }}
                 onClick={handleClearClick}
               >
-                🗑️ Limpiar todo
+                🗑️ Borrar Todo
               </button>
             )}
             </div>
@@ -864,21 +858,21 @@ export function HistorialMineriaPage() {
             <div className="card stat-card p-3">
               <div className="stat-accent bg-dark" />
               <div className="stat-label">Facturación total</div>
-              <div className="stat-value text-dark">{stats.facturacionTotal.toFixed(2)} <span className="currency">USD</span></div>
+              <div className="stat-value text-dark">{formatCurrencyNumber(stats.facturacionTotal)} <span className="currency">USD</span></div>
             </div>
           </div>
           <div className="col-6 col-md-2">
             <div className="card stat-card p-3">
               <div className="stat-accent bg-danger" />
               <div className="stat-label">Cobros pendientes</div>
-              <div className="stat-value text-danger">{stats.cobrosPendientes.toFixed(2)} <span className="currency">USD</span></div>
+              <div className="stat-value text-danger">{formatCurrencyNumber(stats.cobrosPendientes)} <span className="currency">USD</span></div>
             </div>
           </div>
           <div className="col-6 col-md-2">
             <div className="card stat-card p-3">
               <div className="stat-accent bg-success" />
               <div className="stat-label">Cobros realizados</div>
-              <div className="stat-value text-success">{stats.cobrosRealizados.toFixed(2)} <span className="currency">USD</span></div>
+              <div className="stat-value text-success">{formatCurrencyNumber(stats.cobrosRealizados)} <span className="currency">USD</span></div>
             </div>
           </div>
         </div>
@@ -942,9 +936,9 @@ export function HistorialMineriaPage() {
                                     <td>{item.serviceName}</td>
                                     <td>{item.month || "-"}</td>
                                     <td className="text-end">{item.quantity}</td>
-                                    <td className="text-end">{item.price.toFixed(2)} USD</td>
-                                    <td className="text-end">{item.discount.toFixed(2)} USD</td>
-                                    <td className="text-end">{((item.quantity * item.price) - item.discount).toFixed(2)} USD</td>
+                                    <td className="text-end">{formatCurrencyNumber(item.price)} USD</td>
+                                    <td className="text-end">{formatCurrencyNumber(item.discount)} USD</td>
+                                    <td className="text-end">{formatCurrencyNumber((item.quantity * item.price) - item.discount)} USD</td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -1016,7 +1010,7 @@ export function HistorialMineriaPage() {
           </div>
         )}
 
-        {/* Modal Primera Confirmación - Limpiar Todo */}
+        {/* Modal Primera Confirmación - Borrar Todo */}
         {showClearConfirm && (
           <div className="modal show d-block historial-delete-modal-overlay" tabIndex={-1}>
             <div className="modal-dialog modal-dialog-centered">
@@ -1052,7 +1046,7 @@ export function HistorialMineriaPage() {
           </div>
         )}
 
-        {/* Modal Segunda Confirmación - Limpiar Todo */}
+        {/* Modal Segunda Confirmación - Borrar Todo */}
         {showClearConfirm2 && (
           <div className="modal show d-block historial-delete-modal-overlay" tabIndex={-1}>
             <div className="modal-dialog modal-dialog-centered">

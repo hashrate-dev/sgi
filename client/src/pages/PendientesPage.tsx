@@ -9,15 +9,8 @@ import { PageHeader } from "../components/PageHeader";
 import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import { canExport } from "../lib/auth";
+import { formatCurrency, formatCurrencyNumber } from "../lib/formatCurrency";
 import "../styles/facturacion.css";
-
-// Función para formatear números: negativos con -, positivos sin cambios; todo en negro
-function formatCurrency(value: number): string {
-  if (value < 0) {
-    return `-${Math.abs(value).toFixed(2)} USD`;
-  }
-  return `${value.toFixed(2)} USD`;
-}
 
 // Función para calcular fecha de vencimiento desde fecha de emisión
 function calculateDueDate(dateStr: string): string {
@@ -413,7 +406,7 @@ export function PendientesPage() {
               <div className="stat-accent bg-danger" />
               <div className="stat-label">Monto total pendiente</div>
               <div className="stat-value text-danger">
-                {stats.totalMontoPendiente.toFixed(2)} <span className="currency">USD</span>
+                {formatCurrencyNumber(stats.totalMontoPendiente)} <span className="currency">USD</span>
               </div>
             </div>
           </div>
@@ -464,9 +457,9 @@ export function PendientesPage() {
                                     <td>{item.serviceName}</td>
                                     <td>{item.month || "-"}</td>
                                     <td className="text-end">{item.quantity}</td>
-                                    <td className="text-end">{item.price.toFixed(2)} USD</td>
-                                    <td className="text-end">{item.discount.toFixed(2)} USD</td>
-                                    <td className="text-end">{((item.quantity * item.price) - item.discount).toFixed(2)} USD</td>
+                                    <td className="text-end">{formatCurrencyNumber(item.price)} USD</td>
+                                    <td className="text-end">{formatCurrencyNumber(item.discount)} USD</td>
+                                    <td className="text-end">{formatCurrencyNumber((item.quantity * item.price) - item.discount)} USD</td>
                                   </tr>
                                 ))}
                               </tbody>

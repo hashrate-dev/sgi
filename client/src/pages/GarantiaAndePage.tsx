@@ -5,13 +5,15 @@ import {
   getGarantiasEmitted,
   getGarantiasItems,
   getClients,
+  getSetups,
   type GarantiasEmittedResponse,
   type GarantiasItemsResponse,
   type ClientsResponse,
+  type SetupsResponse,
 } from "../lib/api";
 import { formatAmount, formatUSD } from "../lib/formatCurrency.js";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
-import { loadEquiposAsic, loadSetup } from "../lib/storage";
+import { loadEquiposAsic } from "../lib/storage";
 import type { Client, EquipoASIC, Invoice, ItemGarantiaAnde, LineItem, Setup } from "../lib/types";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { PageHeader } from "../components/PageHeader";
@@ -37,20 +39,23 @@ function genId() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
-/** Numeración RV: RV010000, RV010001, ... Sin repetir (mismo criterio que facturas en el proyecto). */
-function nextValeNumber(emitted: { invoice: Invoice }[]): string {
-  const prefix = "RV";
+/** Prefijo por tipo: Recibo = RV, Recibo Devolución = RD. Numeración RV010000, RD010000, ... */
+const GARANTIA_TIPO_PREFIX: Record<string, string> = { Recibo: "RV", "Recibo Devolución": "RD" };
+
+function nextValeNumber(emitted: { invoice: Invoice }[], tipo: "Recibo" | "Recibo Devolución"): string {
+  const prefix = GARANTIA_TIPO_PREFIX[tipo] ?? "RV";
   const filtered = emitted.filter((e) =>
     e.invoice.number.startsWith(prefix) || e.invoice.number.startsWith(prefix + "-")
   );
-  const startNum = 10000; // RV010000
+  const startNum = 10000;
+  const regex = new RegExp(`^${prefix}-?`, "i");
   const next =
     filtered.length === 0
       ? startNum
       : Math.max(
           startNum - 1,
           ...filtered.map((e) => {
-            const numStr = e.invoice.number.replace(/^RV-?/, "");
+            const numStr = e.invoice.number.replace(regex, "");
             const n = Number(numStr);
             return Number.isFinite(n) ? n : 0;
           })
@@ -78,13 +83,15 @@ export function GarantiaAndePage() {
   const [itemsGarantia, setItemsGarantia] = useState<ItemGarantiaAnde[]>([]);
   const [emittedVales, setEmittedVales] = useState<{ invoice: Invoice; emittedAt: string }[]>([]);
   const [showConfirmPdf, setShowConfirmPdf] = useState(false);
+  type GarantiaTipo = "Recibo" | "Recibo Devolución";
+  const [tipoGarantia, setTipoGarantia] = useState<GarantiaTipo>("Recibo");
 
   const emittedInLast15Days = useMemo(() => {
     const now = Date.now();
     return emittedVales.filter((item) => now - new Date(item.emittedAt).getTime() < MS_15_DAYS);
   }, [emittedVales]);
 
-  const number = useMemo(() => nextValeNumber(emittedVales), [emittedVales]);
+  const number = useMemo(() => nextValeNumber(emittedVales, tipoGarantia), [emittedVales, tipoGarantia]);
   const totals = useMemo(() => calcTotals(items), [items]);
   const selectedClient = useMemo(
     () => (selectedClientId === "" ? null : clients.find((c) => (c.id ?? c.code) === selectedClientId) ?? null),
@@ -100,7 +107,9 @@ export function GarantiaAndePage() {
 
   useEffect(() => {
     setEquiposAsic(loadEquiposAsic());
-    setSetups(loadSetup());
+    getSetups()
+      .then((r: SetupsResponse) => setSetups(r.items || []))
+      .catch(() => setSetups([]));
   }, []);
 
   useEffect(() => {
@@ -162,6 +171,10 @@ export function GarantiaAndePage() {
       showToast("El recibo no tiene ítems cargados.", "error");
       return;
     }
+    if (totals.total === 0) {
+      showToast("Hay que llenar los campos para emitir el documento. El total no puede ser cero.", "error");
+      return;
+    }
     if (items.some((it) => {
       const tieneEquipo = it.equipoId && it.marcaEquipo && it.modeloEquipo && it.procesadorEquipo;
       const tieneSetup = it.setupId && it.setupNombre;
@@ -194,7 +207,7 @@ export function GarantiaAndePage() {
     const doc = generateFacturaPdf(
       {
         number,
-        type: "Recibo",
+        type: tipoGarantia,
         clientName: selectedClient.name,
         clientPhone: selectedClient.phone,
         clientEmail: selectedClient.email,
@@ -218,12 +231,12 @@ export function GarantiaAndePage() {
     if (savePdf) {
       doc.save(`${number}_${safeName}.pdf`);
     }
-    showToast(savePdf ? "Recibo generado y guardado correctamente." : "Recibo emitido correctamente.", "success");
+    showToast(savePdf ? `${tipoGarantia} generado y guardado correctamente.` : `${tipoGarantia} emitido correctamente.`, "success");
 
     const inv: Invoice = {
       id: genId(),
       number,
-      type: "Recibo",
+      type: tipoGarantia,
       clientName: selectedClient.name,
       clientPhone: selectedClient.phone,
       clientEmail: selectedClient.email,
@@ -249,9 +262,9 @@ export function GarantiaAndePage() {
       setEmittedVales(res.items as { invoice: Invoice; emittedAt: string }[]);
       setItems([]);
       setShowConfirmPdf(false);
-      showToast(`Recibo ${inv.number} guardado en el servidor.`, "success");
+      showToast(`${tipoGarantia} ${inv.number} guardado en el servidor.`, "success");
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "Error al guardar el recibo.", "error");
+      showToast(e instanceof Error ? e.message : `Error al guardar el ${tipoGarantia.toLowerCase()}.`, "error");
     }
   }
 
@@ -367,9 +380,20 @@ export function GarantiaAndePage() {
           <aside className="fact-sidebar">
             <div className="fact-card fact-panel-nuevo-documento">
               <div className="fact-panel-nuevo-documento-header">
-                <span style={{ fontSize: "1.25em", lineHeight: 1 }}>🗂️</span> Nuevo Recibo
+                <span style={{ fontSize: "1.25em", lineHeight: 1 }}>🗂️</span> Nuevo documento
               </div>
               <div className="fact-card-body">
+                <div className="fact-field">
+                  <label className="fact-label"><span style={{ fontSize: "1.25em", lineHeight: 1 }}>📄</span> Tipo</label>
+                  <select
+                    className="fact-select"
+                    value={tipoGarantia}
+                    onChange={(e) => setTipoGarantia(e.target.value as GarantiaTipo)}
+                  >
+                    <option value="Recibo">Recibo</option>
+                    <option value="Recibo Devolución">Recibo Devolución</option>
+                  </select>
+                </div>
                 <div className="fact-field">
                   <label className="fact-label"><span style={{ fontSize: "1.25em", lineHeight: 1 }}>#️⃣</span> Número</label>
                   <input className="fact-input" readOnly value={number} />
@@ -574,10 +598,10 @@ export function GarantiaAndePage() {
                                           type="number"
                                           className="fact-input"
                                           value={it.price}
-                                          onChange={(e) => updateItem(idx, { price: Math.max(0, Number(e.target.value) || 0) })}
+                                          onChange={(e) => updateItem(idx, { price: Math.max(0, Math.round(Number(e.target.value) || 0)) })}
                                           style={{ flex: 1, minWidth: 0, padding: "0.4rem", textAlign: "center" }}
                                           min={0}
-                                          step="0.01"
+                                          step={1}
                                           disabled={!canEdit}
                                         />
                                         <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#64748b" }}>USD</span>
@@ -645,14 +669,14 @@ export function GarantiaAndePage() {
                       <span style={{ fontSize: "1.4em", lineHeight: 1 }}>📄</span> Recibos emitidos (últimos 15 días)
                     </h3>
                     <div className="fact-table-wrap">
-                      <table className="fact-table fact-emitted-table" style={{ tableLayout: "fixed", width: "100%" }}>
+                      <table className="fact-table fact-emitted-table fact-emitted-table--7col" style={{ tableLayout: "fixed", width: "100%" }}>
                         <thead>
                           <tr>
                             <th>Tipo</th>
                             <th>Número</th>
                             <th>Cliente</th>
-                            <th>Fecha emisión</th>
-                            <th>Hora emisión</th>
+                            <th>Fecha<br />emisión</th>
+                            <th>Hora<br />emisión</th>
                             <th className="text-start">Total</th>
                             <th>Acciones</th>
                           </tr>
@@ -660,7 +684,7 @@ export function GarantiaAndePage() {
                         <tbody>
                           {[...emittedInLast15Days].reverse().map((item) => (
                             <tr key={item.invoice.id}>
-                              <td>Recibo</td>
+                              <td>{item.invoice.type}</td>
                               <td className="fw-bold">{item.invoice.number}</td>
                               <td>{item.invoice.clientName}</td>
                               <td>{item.invoice.date}</td>
@@ -713,7 +737,7 @@ export function GarantiaAndePage() {
                 <div className="fact-panel-vista-previa-inner">
                   {selectedClient && items.length > 0 ? (
                     <InvoicePreview
-                      type="Recibo"
+                      type={tipoGarantia}
                       number={number}
                       client={selectedClient}
                       date={new Date()}

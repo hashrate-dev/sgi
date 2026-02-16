@@ -10,6 +10,9 @@ import { usersRouter } from "./routes/users.js";
 import { clientsRouter } from "./routes/clients.js";
 import { invoicesRouter } from "./routes/invoices.js";
 import { renderRouter } from "./routes/render.js";
+import { emittedRouter } from "./routes/emitted.js";
+import { garantiasRouter } from "./routes/garantias.js";
+import { setupsRouter } from "./routes/setups.js";
 import { requireAuth } from "./middleware/auth.js";
 import { notFound } from "./middleware/notFound.js";
 import { errorHandler } from "./middleware/errorHandler.js";
@@ -47,6 +50,9 @@ export function createApp() {
   app.use("/api", requireAuth, clientsRouter);
   app.use("/api", requireAuth, invoicesRouter);
   app.use("/api", requireAuth, renderRouter);
+  app.use("/api", emittedRouter);
+  app.use("/api", garantiasRouter);
+  app.use("/api", requireAuth, setupsRouter);
 
   app.use(notFound);
   app.use(errorHandler);

@@ -1,29 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
-import { getClients, verifyPassword } from "../lib/api";
+import { deleteEmittedDocumentsAll, getClients, verifyPassword } from "../lib/api";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
-import { loadInvoices, saveInvoices } from "../lib/storage";
+import { loadInvoices, loadInvoicesAsic, saveInvoices, saveInvoicesAsic } from "../lib/storage";
 import type { ComprobanteType, Invoice } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
 import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import { canDeleteHistorial, canExport } from "../lib/auth";
+import { formatCurrency, formatCurrencyNumber } from "../lib/formatCurrency";
 import "../styles/facturacion.css";
-
-// Función para formatear números: negativos con -, positivos sin cambios; todo en negro
-function formatCurrency(value: number): string {
-  if (value < 0) {
-    return `-${Math.abs(value).toFixed(2)} USD`;
-  }
-  return `${value.toFixed(2)} USD`;
-}
-
-/** Solo la parte numérica para mostrar en tabla con USD en línea de abajo */
-function formatCurrencyNumber(value: number): string {
-  if (value < 0) return `-${Math.abs(value).toFixed(2)}`;
-  return value.toFixed(2);
-}
 
 /** Hora sin segundos (HH:MM) para ahorrar espacio en la tabla */
 function formatTimeNoSeconds(t: string | undefined): string {
@@ -178,9 +165,16 @@ function calculateDueDate(dateStr: string): string {
   }
 }
 
+type InvoiceWithSource = Invoice & { _source: "hosting" | "asic" };
+
 export function HistorialPage() {
   const { user } = useAuth();
-  const [all, setAll] = useState<Invoice[]>(() => loadInvoices());
+  const [allHosting, setAllHosting] = useState<Invoice[]>(() => loadInvoices());
+  const [allAsic, setAllAsic] = useState<Invoice[]>(() => loadInvoicesAsic());
+  const all = useMemo<InvoiceWithSource[]>(() => [
+    ...allHosting.map((i) => ({ ...i, _source: "hosting" as const })),
+    ...allAsic.map((i) => ({ ...i, _source: "asic" as const }))
+  ], [allHosting, allAsic]);
   const [qClient, setQClient] = useState("");
   const [qType, setQType] = useState<"" | ComprobanteType>("");
   const [qMonth, setQMonth] = useState("");
@@ -204,7 +198,7 @@ export function HistorialPage() {
       const okMonth = !qMonth || inv.month.startsWith(qMonth);
       return okClient && okType && okMonth;
     });
-  }, [all, qClient, qType, qMonth]);
+  }, [all, qClient, qType, qMonth]) as InvoiceWithSource[];
 
   const PAGE_SIZE = 25;
   const [page, setPage] = useState(1);
@@ -218,21 +212,22 @@ export function HistorialPage() {
   }, [filtered.length]);
 
   const stats = useMemo(() => {
-    const facturas = all.filter((i) => i.type === "Factura").length;
-    const recibos = all.filter((i) => i.type === "Recibo").length;
-    const notasCredito = all.filter((i) => i.type === "Nota de Crédito").length;
-    // Facturación total: suma de todas las facturas, menos las notas de crédito (restan la factura correspondiente)
-    const sumaFacturas = all.filter((i) => i.type === "Factura").reduce((s, i) => s + (Number(i.total) || 0), 0);
-    const sumaNotasCredito = all.filter((i) => i.type === "Nota de Crédito").reduce((s, i) => s + (Math.abs(i.total) || 0), 0);
+    const allSrc = all as InvoiceWithSource[];
+    const facturas = allSrc.filter((i) => i.type === "Factura").length;
+    const recibos = allSrc.filter((i) => i.type === "Recibo").length;
+    const notasCredito = allSrc.filter((i) => i.type === "Nota de Crédito").length;
+    // Facturación total: suma de todas las facturas, menos las notas de crédito (ambas bases)
+    const sumaFacturas = allSrc.filter((i) => i.type === "Factura").reduce((s, i) => s + (Number(i.total) || 0), 0);
+    const sumaNotasCredito = allSrc.filter((i) => i.type === "Nota de Crédito").reduce((s, i) => s + (Math.abs(i.total) || 0), 0);
     const facturacionTotal = sumaFacturas - sumaNotasCredito;
-    // Cobros pendientes: facturas que figuran como pendiente de pago (sin recibo asociado en la BD)
-    const facturasPendientes = all.filter((i) => {
+    // Cobros pendientes: facturas sin recibo asociado dentro del mismo origen
+    const facturasPendientes = allSrc.filter((i) => {
       if (i.type !== "Factura") return false;
-      const tieneRecibo = all.some((r) => r.type === "Recibo" && r.relatedInvoiceId === i.id);
+      const sameSource = allSrc.filter((x) => x._source === i._source);
+      const tieneRecibo = sameSource.some((r) => r.type === "Recibo" && r.relatedInvoiceId === i.id);
       return !tieneRecibo;
     });
     const cobrosPendientes = facturasPendientes.reduce((s, i) => s + (Number(i.total) || 0), 0);
-    // Cobros realizados = Facturación total - Cobros pendientes
     const cobrosRealizados = facturacionTotal - cobrosPendientes;
     return { facturas, recibos, notasCredito, facturacionTotal, cobrosPendientes, cobrosRealizados, registros: all.length };
   }, [all]);
@@ -243,6 +238,7 @@ export function HistorialPage() {
     const ws = wb.addWorksheet("Historial");
 
     ws.columns = [
+      { header: "Origen", key: "origen", width: 20 },
       { header: "Número", key: "number", width: 14 },
       { header: "Tipo", key: "type", width: 10 },
       { header: "Cliente", key: "clientName", width: 30 },
@@ -259,7 +255,9 @@ export function HistorialPage() {
       { header: "Estado", key: "status", width: 10 }
     ];
 
-    all.forEach((inv) => {
+    const allWithSource = all as InvoiceWithSource[];
+    allWithSource.forEach((inv) => {
+      const sameSource = allWithSource.filter((x) => x._source === inv._source);
       // Calcular fecha de vencimiento si no existe
       const dueDate = inv.dueDate || calculateDueDate(inv.date);
       // Aplicar signo negativo a las Notas de Crédito y Recibos relacionados con facturas
@@ -279,21 +277,19 @@ export function HistorialPage() {
       const cambioExport = getCambio4Pct(inv) ?? 0;
       const totalSinCambioExport = total - Math.sign(total || 1) * cambioExport;
 
-      // Verificar si la operación está cerrada
+      // Verificar si la operación está cerrada (solo dentro del mismo origen)
       let isClosed = false;
       let isCancelledByNC = false;
       if (inv.type === "Factura") {
-        const hasReceipt = all.some((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id);
-        // Solo considerar válida si hay exactamente UNA Nota de Crédito relacionada
-        const creditNotes = all.filter((nc) => nc.type === "Nota de Crédito" && nc.relatedInvoiceId === inv.id);
+        const hasReceipt = sameSource.some((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id);
+        const creditNotes = sameSource.filter((nc) => nc.type === "Nota de Crédito" && nc.relatedInvoiceId === inv.id);
         const hasCreditNote = creditNotes.length === 1;
         isClosed = hasReceipt || hasCreditNote;
         isCancelledByNC = hasCreditNote;
       } else if (inv.type === "Recibo" && inv.relatedInvoiceId) {
         isClosed = true;
       } else if (inv.type === "Nota de Crédito" && inv.relatedInvoiceId) {
-        // Verificar que sea la única NC para esa factura
-        const otherNCs = all.filter((nc) => nc.type === "Nota de Crédito" && nc.relatedInvoiceId === inv.relatedInvoiceId && nc.id !== inv.id);
+        const otherNCs = sameSource.filter((nc) => nc.type === "Nota de Crédito" && nc.relatedInvoiceId === inv.relatedInvoiceId && nc.id !== inv.id);
         if (otherNCs.length === 0) {
           isClosed = true;
           isCancelledByNC = true;
@@ -313,9 +309,9 @@ export function HistorialPage() {
       } else if (inv.type === "Factura") {
         status = "⚠️ Pendiente";
       }
-      // Fecha de pago: misma lógica que la tabla (Factura pagada=fecha, cancelada por NC="Cancelada", sino "Pendiente"; NC=fecha emisión)
-      const relatedReciboPayment = inv.type === "Factura" ? all.find((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id) : null;
-      const relatedNCPayment = inv.type === "Factura" ? all.find((n) => n.type === "Nota de Crédito" && n.relatedInvoiceId === inv.id) : null;
+      // Fecha de pago: misma lógica que la tabla (solo mismo origen)
+      const relatedReciboPayment = inv.type === "Factura" ? sameSource.find((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id) : null;
+      const relatedNCPayment = inv.type === "Factura" ? sameSource.find((n) => n.type === "Nota de Crédito" && n.relatedInvoiceId === inv.id) : null;
       let paymentDateExportCell: string;
       if (inv.type === "Factura") {
         if (relatedReciboPayment?.paymentDate) paymentDateExportCell = new Date(relatedReciboPayment.paymentDate).toLocaleDateString();
@@ -328,6 +324,7 @@ export function HistorialPage() {
       }
       const cambioVal = getCambio4Pct(inv);
       ws.addRow({
+        origen: inv._source === "hosting" ? "HOSTING" : "ASIC",
         number: inv.number,
         type: inv.type,
         clientName: inv.clientName,
@@ -340,7 +337,7 @@ export function HistorialPage() {
         subtotal: subtotal,
         total: total,
         totalSinCambio: totalSinCambioExport,
-        cambio: cambioVal != null ? `${cambioVal.toFixed(2)} USD` : "-",
+        cambio: cambioVal != null ? formatCurrency(cambioVal) : "-",
         status: status
       });
     });
@@ -348,14 +345,22 @@ export function HistorialPage() {
 
     wb.xlsx.writeBuffer().then((buf) => {
       const fecha = new Date().toISOString().split("T")[0];
-      saveAs(new Blob([buf]), `Historial_Documentos_Hosting_${fecha}.xlsx`);
+      saveAs(new Blob([buf]), `Historial_Documentos_Completo_${fecha}.xlsx`);
     });
   }
 
   function removeOne(id: string) {
-    const next = all.filter((i) => i.id !== id);
-    setAll(next);
-    saveInvoices(next);
+    const found = all.find((i) => i.id === id) as InvoiceWithSource | undefined;
+    if (!found) return;
+    if (found._source === "hosting") {
+      const next = allHosting.filter((i) => i.id !== id);
+      setAllHosting(next);
+      saveInvoices(next);
+    } else {
+      const next = allAsic.filter((i) => i.id !== id);
+      setAllAsic(next);
+      saveInvoicesAsic(next);
+    }
   }
 
   function handleClearClick() {
@@ -393,8 +398,9 @@ export function HistorialPage() {
       setClearPassword("");
       setClearPasswordError("");
       setPasswordAttempts(0);
-      setAll([]);
+      setAllHosting([]);
       saveInvoices([]);
+      await deleteEmittedDocumentsAll("hosting").catch(() => {});
       showToast("Todo el historial ha sido eliminado.", "success", "Historial");
     } catch (err) {
       const newAttempts = passwordAttempts + 1;
@@ -446,8 +452,8 @@ export function HistorialPage() {
         setExcelLoading(false);
         return;
       }
-      // Combinar con facturas existentes (evitar duplicados por número si ya existen)
-      const existingNumbers = new Set(all.map((inv) => `${inv.type}-${inv.number}`));
+      // Combinar con facturas existentes en Hosting (evitar duplicados por número)
+      const existingNumbers = new Set(allHosting.map((inv) => `${inv.type}-${inv.number}`));
       const newInvoices = invoices.filter((inv) => !existingNumbers.has(`${inv.type}-${inv.number}`));
       const duplicates = invoices.length - newInvoices.length;
       
@@ -457,8 +463,8 @@ export function HistorialPage() {
         return;
       }
 
-      const updated = [...all, ...newInvoices];
-      setAll(updated);
+      const updated = [...allHosting, ...newInvoices];
+      setAllHosting(updated);
       saveInvoices(updated);
       
       if (duplicates > 0) {
@@ -586,7 +592,7 @@ export function HistorialPage() {
   return (
     <div className="fact-page">
       <div className="container">
-        <PageHeader title="Historial" />
+        <PageHeader title="Detalles de Documentos Emitidos" />
 
         <div className="hrs-card hrs-card--rect p-4">
           <div className="historial-filtros-outer">
@@ -679,7 +685,7 @@ export function HistorialPage() {
                 style={{ backgroundColor: "rgba(220, 53, 69, 0.4)" }}
                 onClick={handleClearClick}
               >
-                🗑️ Limpiar todo
+                🗑️ Borrar Todo
               </button>
             )}
             </div>
@@ -689,6 +695,7 @@ export function HistorialPage() {
             <table className="table table-sm align-middle historial-listado-table" style={{ fontSize: "0.85rem" }}>
               <thead className="table-dark">
                 <tr>
+                  <th className="text-start historial-col-origen">Origen</th>
                   <th className="text-start historial-col-num">N°</th>
                   <th className="text-start historial-col-tipo">Tipo</th>
                   <th className="text-start historial-col-cliente">Cliente</th>
@@ -698,8 +705,6 @@ export function HistorialPage() {
                   <th className="text-start historial-col-fecha-pago">Fecha<br />Pago</th>
                   <th className="text-start historial-col-mes">Mes</th>
                   <th className="text-start historial-col-total-sdesc">Total<br />(S/Desc)</th>
-                  <th className="text-start historial-col-desc">DESC.</th>
-                  <th className="text-start historial-col-total-stc">Total<br />(S/TC)</th>
                   <th className="text-start historial-col-cambio-header">TC</th>
                   <th className="text-start historial-col-total">Total</th>
                   <th className="text-center historial-col-estado">Estado</th>
@@ -709,12 +714,13 @@ export function HistorialPage() {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={15} className="text-center text-muted py-4">
+                    <td colSpan={14} className="text-center text-muted py-4">
                       <small>No hay facturas registradas</small>
                     </td>
                   </tr>
                 ) : (
                   paginated.map((inv) => {
+                    const sameSource = all.filter((x) => (x as InvoiceWithSource)._source === inv._source);
                     // Calcular fecha de vencimiento si no existe (para facturas antiguas)
                     const dueDate = inv.dueDate || calculateDueDate(inv.date);
                     // Aplicar signo negativo a las Notas de Crédito y Recibos relacionados con facturas
@@ -734,9 +740,9 @@ export function HistorialPage() {
                     const cambioVal = getCambio4Pct(inv) ?? 0;
                     const totalSinCambio = total - Math.sign(total || 1) * cambioVal;
 
-                    // Fecha de pago: Factura = fecha del Recibo si pagada, "Cancelada" si cancelada por NC, sino "Pendiente"; NC = fecha emisión
-                    const relatedReciboForPayment = inv.type === "Factura" ? all.find((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id) : null;
-                    const relatedNCForPayment = inv.type === "Factura" ? all.find((n) => n.type === "Nota de Crédito" && n.relatedInvoiceId === inv.id) : null;
+                    // Fecha de pago: Factura = fecha del Recibo si pagada (solo mismo origen), "Cancelada" si cancelada por NC, sino "Pendiente"; NC = fecha emisión
+                    const relatedReciboForPayment = inv.type === "Factura" ? sameSource.find((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id) : null;
+                    const relatedNCForPayment = inv.type === "Factura" ? sameSource.find((n) => n.type === "Nota de Crédito" && n.relatedInvoiceId === inv.id) : null;
                     const paymentDateDisplay = (inv.type === "Factura" && relatedReciboForPayment?.paymentDate) ? relatedReciboForPayment.paymentDate : inv.paymentDate;
                     let paymentDateCell: string;
                     if (inv.type === "Factura") {
@@ -748,31 +754,27 @@ export function HistorialPage() {
                     } else {
                       paymentDateCell = paymentDateDisplay ? new Date(paymentDateDisplay).toLocaleDateString() : "-";
                     }
-                    // Verificar si la operación está cerrada (factura con recibo relacionado, factura cancelada por NC, o recibo/NC con factura relacionada)
+                    // Verificar si la operación está cerrada (solo dentro del mismo origen)
                     let isClosed = false;
                     let isCancelledByNC = false;
                     if (inv.type === "Factura") {
-                      // Buscar si existe un recibo relacionado con esta factura
-                      const hasReceipt = all.some((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id);
-                      // Buscar si existe exactamente UNA Nota de Crédito relacionada con esta factura (no múltiples)
-                      const creditNotes = all.filter((nc) => nc.type === "Nota de Crédito" && nc.relatedInvoiceId === inv.id);
-                      const hasCreditNote = creditNotes.length === 1; // Solo una NC válida
+                      const hasReceipt = sameSource.some((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id);
+                      const creditNotes = sameSource.filter((nc) => nc.type === "Nota de Crédito" && nc.relatedInvoiceId === inv.id);
+                      const hasCreditNote = creditNotes.length === 1;
                       isClosed = hasReceipt || hasCreditNote;
                       isCancelledByNC = hasCreditNote;
                     } else if (inv.type === "Recibo" && inv.relatedInvoiceId) {
-                      // Si es un recibo con factura relacionada, está cerrado
                       isClosed = true;
                     } else if (inv.type === "Nota de Crédito" && inv.relatedInvoiceId) {
-                      // Verificar que sea la única NC para esa factura
-                      const otherNCs = all.filter((nc) => nc.type === "Nota de Crédito" && nc.relatedInvoiceId === inv.relatedInvoiceId && nc.id !== inv.id);
-                      // Solo mostrar check si es la única NC para esa factura
+                      const otherNCs = sameSource.filter((nc) => nc.type === "Nota de Crédito" && nc.relatedInvoiceId === inv.relatedInvoiceId && nc.id !== inv.id);
                       if (otherNCs.length === 0) {
                         isClosed = true;
                         isCancelledByNC = true;
                       }
                     }
                     return (
-                      <tr key={inv.id}>
+                      <tr key={`${inv._source}-${inv.id}`}>
+                        <td className="text-start small historial-col-origen">{inv._source === "hosting" ? "HOSTING" : "ASIC"}</td>
                         <td className="fw-bold text-start historial-col-num">{inv.number}</td>
                         <td className="text-start historial-col-tipo">{inv.type === "Nota de Crédito" ? "NC" : inv.type}</td>
                         <td className="text-start historial-col-cliente" title={inv.clientName}><span className="historial-cliente-nombre">{inv.clientName}</span></td>
@@ -786,15 +788,11 @@ export function HistorialPage() {
                             return parts.length >= 2 ? <>{parts[0]}<br />-{parts[1]}</> : inv.month;
                           })()}
                         </td>
-                        <td className="text-start historial-col-total-sdesc">{formatCurrencyNumber(subtotal)}<br />USD</td>
-                        <td className="text-start historial-col-desc">{formatCurrencyNumber(discounts)}<br />USD</td>
-                        <td className="text-start historial-col-total-stc" title="Total sin incluir ítem 4% Gastos Operativos Transferencia">
-                          {formatCurrencyNumber(totalSinCambio)}<br />USD
+                        <td className="text-start historial-col-total-sdesc historial-monto-cell">{formatCurrency(subtotal)}</td>
+                        <td className="text-start historial-col-cambio historial-monto-cell" title="4% Gastos Operativos Transferencia (si aplica)">
+                          {getCambio4Pct(inv) != null ? formatCurrency(getCambio4Pct(inv)!) : "-"}
                         </td>
-                        <td className="text-start historial-col-cambio" title="4% Gastos Operativos Transferencia (si aplica)">
-                          {getCambio4Pct(inv) != null ? <>{getCambio4Pct(inv)!.toFixed(2)}<br />USD</> : "-"}
-                        </td>
-                        <td className="text-start fw-bold historial-col-total">{formatCurrencyNumber(total)}<br />USD</td>
+                        <td className="text-start fw-bold historial-col-total historial-monto-cell">{formatCurrency(total)}</td>
                         <td className="text-center historial-col-estado">
                           {isClosed ? (
                             isCancelledByNC ? (
@@ -906,21 +904,21 @@ export function HistorialPage() {
             <div className="card stat-card p-3">
               <div className="stat-accent bg-dark" />
               <div className="stat-label">Facturación total</div>
-              <div className="stat-value text-dark">{stats.facturacionTotal.toFixed(2)} <span className="currency">USD</span></div>
+              <div className="stat-value text-dark">{formatCurrencyNumber(stats.facturacionTotal)} <span className="currency">USD</span></div>
             </div>
           </div>
           <div className="col-6 col-md-2">
             <div className="card stat-card p-3">
               <div className="stat-accent bg-danger" />
               <div className="stat-label">Cobros pendientes</div>
-              <div className="stat-value text-danger">{stats.cobrosPendientes.toFixed(2)} <span className="currency">USD</span></div>
+              <div className="stat-value text-danger">{formatCurrencyNumber(stats.cobrosPendientes)} <span className="currency">USD</span></div>
             </div>
           </div>
           <div className="col-6 col-md-2">
             <div className="card stat-card p-3">
               <div className="stat-accent bg-success" />
               <div className="stat-label">Cobros realizados</div>
-              <div className="stat-value text-success">{stats.cobrosRealizados.toFixed(2)} <span className="currency">USD</span></div>
+              <div className="stat-value text-success">{formatCurrencyNumber(stats.cobrosRealizados)} <span className="currency">USD</span></div>
             </div>
           </div>
         </div>
@@ -947,14 +945,16 @@ export function HistorialPage() {
                 </div>
                 <div className="modal-body">
                   {(() => {
-                    const inv = detailInvoice;
+                    const inv = detailInvoice as InvoiceWithSource;
+                    const sameSource = all.filter((x) => (x as InvoiceWithSource)._source === inv._source);
                     const dueDate = inv.dueDate || calculateDueDate(inv.date);
-                    const relatedRecibo = all.find((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id);
-                    const relatedNC = all.find((n) => n.type === "Nota de Crédito" && n.relatedInvoiceId === inv.id);
-                    const relatedFactura = inv.relatedInvoiceId ? all.find((f) => f.id === inv.relatedInvoiceId) : null;
+                    const relatedRecibo = sameSource.find((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id);
+                    const relatedNC = sameSource.find((n) => n.type === "Nota de Crédito" && n.relatedInvoiceId === inv.id);
+                    const relatedFactura = inv.relatedInvoiceId ? sameSource.find((f) => f.id === inv.relatedInvoiceId) : null;
                     return (
                       <>
                         <div className="row g-2 small mb-3">
+                          <div className="col-md-4"><strong>Origen:</strong> {inv._source === "hosting" ? "HOSTING" : "ASIC"}</div>
                           <div className="col-md-4"><strong>Número:</strong> {inv.number}</div>
                           <div className="col-md-4"><strong>Tipo:</strong> {inv.type}</div>
                           <div className="col-md-4"><strong>Cliente:</strong> {inv.clientName}</div>
@@ -984,9 +984,9 @@ export function HistorialPage() {
                                     <td>{item.serviceName}</td>
                                     <td>{item.month || "-"}</td>
                                     <td className="text-end">{item.quantity}</td>
-                                    <td className="text-end">{item.price.toFixed(2)} USD</td>
-                                    <td className="text-end">{item.discount.toFixed(2)} USD</td>
-                                    <td className="text-end">{((item.quantity * item.price) - item.discount).toFixed(2)} USD</td>
+                                    <td className="text-end">{formatCurrencyNumber(item.price)} USD</td>
+                                    <td className="text-end">{formatCurrencyNumber(item.discount)} USD</td>
+                                    <td className="text-end">{formatCurrencyNumber((item.quantity * item.price) - item.discount)} USD</td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -1058,7 +1058,7 @@ export function HistorialPage() {
           </div>
         )}
 
-        {/* Modal Primera Confirmación - Limpiar Todo */}
+        {/* Modal Primera Confirmación - Borrar Todo */}
         {showClearConfirm && (
           <div className="modal show d-block historial-delete-modal-overlay" tabIndex={-1}>
             <div className="modal-dialog modal-dialog-centered">
@@ -1094,7 +1094,7 @@ export function HistorialPage() {
           </div>
         )}
 
-        {/* Modal Segunda Confirmación - Limpiar Todo */}
+        {/* Modal Segunda Confirmación - Borrar Todo */}
         {showClearConfirm2 && (
           <div className="modal show d-block historial-delete-modal-overlay" tabIndex={-1}>
             <div className="modal-dialog modal-dialog-centered">
