@@ -253,7 +253,6 @@ export function HistorialPage() {
       { header: "Hora Emisión", key: "emissionTime", width: 12 },
       { header: "Fecha Venc.", key: "dueDate", width: 18 },
       { header: "Fecha Pago", key: "paymentDate", width: 18 },
-      { header: "Mes", key: "month", width: 10 },
       { header: "Total (S/Desc)", key: "subtotal", width: 16 },
       { header: "DESC.", key: "discounts", width: 12 },
       { header: "Total", key: "total", width: 12 },
@@ -339,7 +338,6 @@ export function HistorialPage() {
         emissionTime: formatTimeNoSeconds(inv.emissionTime),
         dueDate: dueDate,
         paymentDate: paymentDateExportCell,
-        month: inv.month,
         discounts: discounts,
         subtotal: subtotal,
         total: total,
@@ -747,7 +745,6 @@ export function HistorialPage() {
                   <th className="text-start historial-col-hora">Hora<br />Emisión</th>
                   <th className="text-start historial-col-fecha-venc">Fecha<br />Venc.</th>
                   <th className="text-start historial-col-fecha-pago">Fecha<br />Pago</th>
-                  <th className="text-start historial-col-mes">Mes</th>
                   <th className="text-start historial-col-total-sdesc">Total<br />(S/Desc)</th>
                   <th className="text-start historial-col-cambio-header">TC</th>
                   <th className="text-start historial-col-total">Total</th>
@@ -758,7 +755,7 @@ export function HistorialPage() {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={14} className="text-center text-muted py-4">
+                    <td colSpan={13} className="text-center text-muted py-4">
                       <small>No hay facturas registradas</small>
                     </td>
                   </tr>
@@ -826,12 +823,6 @@ export function HistorialPage() {
                         <td className="text-start historial-col-hora">{formatTimeNoSeconds(inv.emissionTime)}</td>
                         <td className="text-start historial-col-fecha-venc">{dueDate}</td>
                         <td className="text-start historial-col-fecha-pago">{paymentDateCell}</td>
-                        <td className="text-start historial-col-mes">
-                          {(() => {
-                            const parts = inv.month ? inv.month.split("-") : [];
-                            return parts.length >= 2 ? <>{parts[0]}<br />-{parts[1]}</> : inv.month;
-                          })()}
-                        </td>
                         <td className="text-start historial-col-total-sdesc historial-monto-cell">{formatCurrency(subtotal)}</td>
                         <td className="text-start historial-col-cambio historial-monto-cell" title="4% Gastos Operativos Transferencia (si aplica)">
                           {getCambio4Pct(inv) != null ? formatCurrency(getCambio4Pct(inv)!) : "-"}

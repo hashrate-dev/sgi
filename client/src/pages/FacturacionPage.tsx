@@ -6,7 +6,7 @@ import { serviceCatalog } from "../lib/constants";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadInvoices, saveInvoices } from "../lib/storage";
 import type { Client, ComprobanteType, Invoice, LineItem } from "../lib/types";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { InvoicePreview } from "../components/InvoicePreview";
 import { ConfirmModal } from "../components/ConfirmModal";
@@ -96,6 +96,7 @@ function currentMonthValue(): string {
 
 export function FacturacionPage() {
   const { user } = useAuth();
+  const location = useLocation();
   const [type, setType] = useState<ComprobanteType>("Factura");
   const [clientQuery, setClientQuery] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
@@ -132,8 +133,9 @@ export function FacturacionPage() {
     setEmittedInSession((prev) => prev.filter((item) => now - new Date(item.emittedAt).getTime() < windowMs));
   }, []);
 
-  /** Cargar documentos emitidos (hosting) desde el servidor para verlos tras recargar o en otra sesión */
+  /** Cargar documentos emitidos (hosting) desde el servidor; al borrar del historial se borran también de aquí. Refrescar cada vez que se entra a esta página para reflejar borrados en Historial. */
   useEffect(() => {
+    if (location.pathname !== "/facturacion-hosting") return;
     const windowMs = 10 * 24 * 60 * 60 * 1000 + 22 * 60 * 60 * 1000;
     getEmittedDocuments("hosting")
       .then((r) => {
@@ -144,7 +146,7 @@ export function FacturacionPage() {
         setEmittedInSession(list);
       })
       .catch(() => {});
-  }, []);
+  }, [location.pathname]);
 
   useEffect(() => {
     getClients()

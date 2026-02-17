@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   createUser,
   deleteUser,
@@ -47,6 +47,8 @@ export function UsuariosPage() {
   const [formPassword, setFormPassword] = useState("");
   const [formRole, setFormRole] = useState<UserRole>("operador");
   const [saving, setSaving] = useState(false);
+  const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
+  const roleDropdownRef = useRef<HTMLDivElement>(null);
 
   function loadActivity() {
     setActivityLoading(true);
@@ -78,6 +80,7 @@ export function UsuariosPage() {
     setFormEmail("");
     setFormPassword("");
     setFormRole("operador");
+    setRoleDropdownOpen(false);
   }
 
   function openEdit(u: UserListItem) {
@@ -85,7 +88,20 @@ export function UsuariosPage() {
     setFormEmail(u.email);
     setFormPassword("");
     setFormRole(u.role as UserRole);
+    setRoleDropdownOpen(false);
   }
+
+  /* Cerrar dropdown Rol al hacer clic fuera */
+  useEffect(() => {
+    if (!roleDropdownOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (roleDropdownRef.current && !roleDropdownRef.current.contains(e.target as Node)) {
+        setRoleDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [roleDropdownOpen]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -329,17 +345,18 @@ export function UsuariosPage() {
               <form onSubmit={handleSubmit}>
                 <div className="modal-body professional-modal-body">
                   <div className="mb-3">
-                    <label className="form-label professional-modal-body .form-label">Correo</label>
+                    <label className="form-label">Correo</label>
                     <input
                       type="email"
                       className="form-control"
                       value={formEmail}
                       onChange={(e) => setFormEmail(e.target.value)}
                       required
+                      placeholder="usuario@ejemplo.com"
                     />
                   </div>
                   <div className="mb-3">
-                    <label className="form-label professional-modal-body .form-label">{modal === "new" ? "Contraseña (mín. 6 caracteres)" : "Nueva contraseña (dejar en blanco para no cambiar)"}</label>
+                    <label className="form-label">{modal === "new" ? "Contraseña (mín. 6 caracteres)" : "Nueva contraseña (dejar en blanco para no cambiar)"}</label>
                     <input
                       type="password"
                       className="form-control"
@@ -347,21 +364,50 @@ export function UsuariosPage() {
                       onChange={(e) => setFormPassword(e.target.value)}
                       required={modal === "new"}
                       minLength={modal === "new" ? 6 : undefined}
+                      placeholder={modal === "new" ? "••••••••" : "•••••••• (opcional)"}
                     />
                   </div>
-                  <div className="mb-3">
-                    <label className="form-label professional-modal-body .form-label">Rol</label>
-                    <select className="form-select" value={formRole} onChange={(e) => setFormRole(e.target.value as UserRole)}>
-                      {modal !== "new" && (modal as UserListItem).role === "admin_a" && currentUser?.role === "admin_b" && (
-                        <option value="admin_a" disabled>Administrador</option>
+                  <div className="mb-3" ref={roleDropdownRef}>
+                    <label className="form-label">Rol</label>
+                    <div className="role-dropdown-wrap">
+                      <button
+                        type="button"
+                        className="role-dropdown-trigger"
+                        onClick={() => setRoleDropdownOpen((o) => !o)}
+                        aria-expanded={roleDropdownOpen}
+                        aria-haspopup="listbox"
+                        aria-label="Seleccionar rol"
+                      >
+                        <span>{getRoleDisplayLabel(formRole, currentUser?.role)}</span>
+                        <svg className="role-dropdown-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+                          <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                      {roleDropdownOpen && (
+                        <ul className="role-dropdown-list" role="listbox">
+                          {modal !== "new" && (modal as UserListItem).role === "admin_a" && currentUser?.role === "admin_b" && (
+                            <li className="role-dropdown-option role-dropdown-option--disabled" role="option" aria-disabled="true">
+                              Administrador
+                            </li>
+                          )}
+                          {ROLES.filter((r) => r.value !== "admin_a" || currentUser?.role === "admin_a").map((r) => (
+                            <li
+                              key={r.value}
+                              className={`role-dropdown-option ${formRole === r.value ? "role-dropdown-option--selected" : ""}`}
+                              role="option"
+                              aria-selected={formRole === r.value}
+                              onClick={() => {
+                                setFormRole(r.value);
+                                setRoleDropdownOpen(false);
+                              }}
+                            >
+                              {r.label}
+                            </li>
+                          ))}
+                        </ul>
                       )}
-                      {ROLES.filter((r) => r.value !== "admin_a" || currentUser?.role === "admin_a").map((r) => (
-                        <option key={r.value} value={r.value}>
-                          {r.label}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="modal-help mb-0 mt-2" style={{ fontSize: "0.85rem", color: "#6b7280", lineHeight: "1.5" }}>AdministradorA: todo (incl. eliminar otros admins); AdministradorB: todo salvo eso; Operador: facturación y clientes; Lector: solo consulta. Operador y Lector cambian su contraseña desde Inicio &gt; Cambiar contraseña. Cualquier Administrador (A o B) puede cambiar la contraseña de cualquier usuario aquí.</p>
+                    </div>
+                    <p className="modal-help mb-0">AdministradorA: todo (incl. eliminar otros admins); AdministradorB: todo salvo eso; Operador: facturación y clientes; Lector: solo consulta. Operador y Lector cambian su contraseña desde Inicio &gt; Cambiar contraseña. Cualquier Administrador (A o B) puede cambiar la contraseña de cualquier usuario aquí.</p>
                   </div>
                 </div>
                 <div className="modal-footer professional-modal-footer">

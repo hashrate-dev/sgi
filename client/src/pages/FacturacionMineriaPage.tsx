@@ -6,7 +6,7 @@ import { serviceCatalog } from "../lib/constants";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadEquiposAsic, loadInvoicesAsic, saveInvoicesAsic } from "../lib/storage";
 import type { Client, ComprobanteType, EquipoASIC, Invoice, LineItem, Setup } from "../lib/types";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { InvoicePreview } from "../components/InvoicePreview";
 import { ConfirmModal } from "../components/ConfirmModal";
@@ -70,6 +70,7 @@ function calcTotals(items: LineItem[]) {
 
 export function FacturacionMineriaPage() {
   const { user } = useAuth();
+  const location = useLocation();
   const [type, setType] = useState<ComprobanteType>("Factura");
   const [clientQuery, setClientQuery] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
@@ -116,8 +117,9 @@ export function FacturacionMineriaPage() {
     setEmittedInSession((prev) => prev.filter((item) => now - new Date(item.emittedAt).getTime() < windowMs));
   }, []);
 
-  /** Cargar documentos emitidos (asic) desde el servidor; al borrar del historial se borran también de aquí */
+  /** Cargar documentos emitidos (asic) desde el servidor; al borrar del historial se borran también de aquí. Refrescar cada vez que se entra a esta página para reflejar borrados en Historial. */
   useEffect(() => {
+    if (location.pathname !== "/facturacion-equipos") return;
     const windowMs = 10 * 24 * 60 * 60 * 1000 + 22 * 60 * 60 * 1000;
     getEmittedDocuments("asic")
       .then((r) => {
@@ -128,7 +130,7 @@ export function FacturacionMineriaPage() {
         setEmittedInSession(list);
       })
       .catch(() => {});
-  }, []);
+  }, [location.pathname]);
 
   useEffect(() => {
     getClients()

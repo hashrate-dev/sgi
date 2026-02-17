@@ -2737,8 +2737,8 @@
 }
 
 .historial-import-excel-btn:hover {
-  background: rgba(255, 255, 255, 0.35) !important;
-  border-color: rgba(255, 255, 255, 0.7);
+  background: #2D5D46 !important;
+  border-color: #234a38;
   color: #fff;
 }
 
@@ -3494,6 +3494,7 @@
   flex-wrap: wrap;
   gap: 1rem;
   position: relative;
+  border-radius: 16px 16px 0 0;
 }
 
 .usuarios-page-header::before {
@@ -3533,6 +3534,11 @@
   align-items: center;
   justify-content: center;
   font-size: 1.25rem;
+}
+
+.usuarios-page-title-icon .bi {
+  font-size: 1.125rem;
+  color: #fff;
 }
 
 .usuarios-page-header--activity .usuarios-page-title-icon--activity {
@@ -3588,6 +3594,391 @@
   background: rgba(220, 38, 38, 0.08);
   border: 1px solid rgba(220, 38, 38, 0.25);
   color: #b91c1c;
+}
+
+/* ========== Página Agregar nuevo cliente (mismo formato que Usuarios) ========== */
+
+.clientes-new-dos-formas {
+  font-size: 0.9375rem;
+  color: #475569;
+  line-height: 1.5;
+  margin: 0 0 1rem 0;
+  padding: 0.75rem 1rem;
+  background: #f8fafc;
+  border-radius: 10px;
+  border-left: 4px solid #2D5D46;
+}
+
+.clientes-new-dos-formas strong {
+  color: #1e293b;
+}
+
+.clientes-new-paso {
+  margin-bottom: 0;
+}
+
+.clientes-new-paso-title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 0.75rem 0;
+  padding: 0;
+}
+
+.clientes-new-paso-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #2D5D46;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.clientes-new-paso-manual .client-form-ordered {
+  margin-top: 0;
+}
+
+.clientes-new-paso-excel .clientes-new-excel-box {
+  margin-bottom: 0;
+}
+
+.clientes-new-paso-excel {
+  margin-top: 0.5rem;
+}
+
+.clientes-new-divider {
+  margin: 1.25rem 0 1rem;
+}
+
+.clientes-new-excel-box {
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(45, 93, 70, 0.08) 0%, rgba(45, 93, 70, 0.03) 100%);
+  border: 1px solid rgba(45, 93, 70, 0.2);
+  border-left: 4px solid #2D5D46;
+  margin-bottom: 1.5rem;
+  margin-right: 8cm;
+  max-width: calc(100% - 8cm);
+}
+
+.clientes-new-excel-title {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.clientes-new-excel-text {
+  font-size: 0.9375rem;
+  color: #475569;
+  margin: 0 0 0.75rem;
+  line-height: 1.5;
+}
+
+.clientes-new-excel-text strong {
+  color: #334155;
+}
+
+.clientes-new-excel-columns {
+  margin: 0.5rem 0 0 1.25rem;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9375rem;
+  color: #475569;
+}
+
+.clientes-new-excel-columns li {
+  margin-bottom: 0.35rem;
+  padding-left: 0.5rem;
+  position: relative;
+  line-height: 1.5;
+}
+
+.clientes-new-excel-columns li::before {
+  content: "";
+  position: absolute;
+  left: -0.75rem;
+  top: 0.5em;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #2D5D46;
+}
+
+.clientes-new-excel-columns strong {
+  color: #1e293b;
+}
+
+.clientes-new-excel-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.clientes-new-excel-loading {
+  font-size: 0.8125rem;
+  color: #64748b;
+}
+
+.clientes-new-divider {
+  margin: 1.5rem 0;
+  border: none;
+  border-top: 1px solid #e2e8f0;
+}
+
+.clientes-new-message {
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  grid-column: 1 / -1;
+  margin-top: 1rem;
+}
+
+.clientes-new-message--ok {
+  background: rgba(45, 93, 70, 0.1);
+  border: 1px solid rgba(45, 93, 70, 0.25);
+  color: #166534;
+}
+
+.clientes-new-message--err {
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  color: #b91c1c;
+}
+
+.clientes-new-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  grid-column: 1 / -1;
+  margin-top: 1.5rem;
+}
+
+.clientes-new-actions .fact-btn {
+  min-width: 120px;
+}
+
+/* Formulario cliente ordenado: Código arriba + dos contactos (cada uno con nombre, tel, email, dirección, ciudad) */
+.client-form-ordered {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.client-form-code-block {
+  padding: 1rem 1.25rem;
+  background: linear-gradient(135deg, rgba(45, 93, 70, 0.08) 0%, rgba(45, 93, 70, 0.03) 100%);
+  border: 1px solid rgba(45, 93, 70, 0.2);
+  border-radius: 12px;
+  border-left: 4px solid #2D5D46;
+}
+
+.client-form-code-block .fact-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.client-form-code-input {
+  max-width: 280px;
+  font-weight: 500;
+}
+
+.client-form-contacts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.client-form-contact-block {
+  padding: 1.25rem 1.5rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.client-form-contact-block:hover {
+  border-color: rgba(45, 93, 70, 0.25);
+  box-shadow: 0 4px 12px rgba(45, 93, 70, 0.08);
+}
+
+.client-form-contact-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 0.25rem 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e293b;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.client-form-contact-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #2D5D46;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.client-form-contact-block .fact-field {
+  margin-bottom: 0;
+}
+
+.client-form-contact-block .fact-field:last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .client-form-contacts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .client-form-code-input {
+    max-width: 100%;
+  }
+}
+
+/* Modal Agregar nuevo cliente: más ancho y más alto, que quepa en pantalla sin scroll de página */
+.clientes-new-modal-dialog {
+  max-width: 1400px;
+  width: 96%;
+  max-height: 94vh;
+  display: flex;
+  flex-direction: column;
+  margin: 1rem auto;
+}
+
+.professional-modal-form.clientes-new-modal-content {
+  max-width: 100%;
+  max-height: calc(94vh - 2rem);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Cuerpo del modal cliente: scroll interno y contenido compacto para que entre en la ventana */
+.clientes-new-modal-content .modal-body.professional-modal-body {
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  min-height: 0;
+  padding: 1rem 1.25rem;
+}
+
+.clientes-new-modal-content .professional-modal-footer {
+  flex-shrink: 0;
+  padding: 1rem 1.25rem;
+}
+
+/* Contenido más compacto dentro del modal para que entre todo en la ventana */
+.clientes-new-modal-content .clientes-new-dos-formas {
+  font-size: 0.9375rem;
+  margin: 0 0 0.75rem 0;
+  padding: 0.6rem 0.9rem;
+}
+
+.clientes-new-modal-content .clientes-new-excel-box {
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.clientes-new-modal-content .clientes-new-excel-title {
+  margin-bottom: 0.35rem;
+  font-size: 1rem;
+}
+
+.clientes-new-modal-content .clientes-new-excel-text {
+  margin: 0 0 0.5rem;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: #475569;
+}
+
+.clientes-new-modal-content .clientes-new-excel-columns {
+  margin: 0.35rem 0 0 1rem;
+}
+
+.clientes-new-modal-content .clientes-new-excel-columns li {
+  margin-bottom: 0.2rem;
+}
+
+.clientes-new-modal-content .clientes-new-divider {
+  margin: 0.75rem 0;
+}
+
+.clientes-new-modal-content .client-form-ordered {
+  gap: 1rem;
+}
+
+.clientes-new-modal-content .client-form-code-block {
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+}
+
+.clientes-new-modal-content .client-form-code-block .fact-label {
+  margin-bottom: 0.35rem;
+  font-size: 0.875rem;
+}
+
+.clientes-new-modal-content .client-form-contacts-grid {
+  gap: 1rem;
+}
+
+.clientes-new-modal-content .client-form-contact-block {
+  padding: 0.75rem 1rem;
+  gap: 0.6rem;
+  border-radius: 12px;
+}
+
+.clientes-new-modal-content .client-form-contact-title {
+  font-size: 0.9375rem;
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.15rem;
+}
+
+.clientes-new-modal-content .client-form-contact-num {
+  width: 24px;
+  height: 24px;
+  font-size: 0.8125rem;
+}
+
+.clientes-new-modal-content .client-form-contact-block .fact-label {
+  font-size: 0.8125rem;
+  margin-bottom: 0.25rem;
+}
+
+.clientes-new-modal-content .client-form-contact-block .fact-input,
+.clientes-new-modal-content .professional-modal-body .form-control {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9375rem;
 }
 
 /* Card solo mensaje (no admin) */
@@ -4266,9 +4657,27 @@
 
 /* Overlay base para todos los modales */
 .professional-modal-overlay {
-  background: rgba(0, 0, 0, 0.65) !important;
-  backdrop-filter: blur(4px);
+  background: transparent !important;
+  pointer-events: none; /* el overlay no captura clics; así el dropdown nativo del <select> recibe el clic al elegir opción */
   animation: fadeInOverlay 0.2s ease-out;
+}
+
+/* Fondo oscuro en pseudo-elemento: sí captura clics en la zona oscura, pero el dialog queda por encima */
+.professional-modal-overlay::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  pointer-events: auto;
+}
+
+/* Dialog por encima del backdrop para que clics en modal y en el dropdown del <select> no se pierdan */
+.professional-modal-overlay .modal-dialog {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
 }
 
 /* Contenedor base del modal */
@@ -4279,6 +4688,15 @@
   overflow: hidden;
   animation: slideInModal 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   max-width: 520px;
+}
+
+/* Modal de formulario: overflow visible para que el <select> nativo no se recorte (evita fondo negro y parpadeo del dropdown) */
+.professional-modal-form {
+  overflow: visible;
+}
+
+.professional-modal-form .professional-modal-body {
+  overflow: visible;
 }
 
 /* Header base con gradientes según tipo */
@@ -4494,54 +4912,271 @@
   box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
 }
 
-/* Modal de FORMULARIO (azul/gris neutro) */
+/* Modal de FORMULARIO — estilo proyecto (verde #2D5D46, mismo que topbar/paneles) */
+.professional-modal-form {
+  border: 1px solid rgba(45, 93, 70, 0.35);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(45, 93, 70, 0.08);
+  box-sizing: border-box;
+}
+
 .professional-modal-form .professional-modal-header {
-  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
-  border-bottom-color: #cbd5e1;
+  background: #2D5D46;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px 16px 0 0;
+}
+
+.professional-modal-form .professional-modal-header::before {
+  content: "";
+  position: absolute;
+  top: -40%;
+  right: -15%;
+  width: 200px;
+  height: 200px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 50%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.professional-modal-form .professional-modal-header::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
 }
 
 .professional-modal-form .professional-modal-icon-wrapper {
-  background: linear-gradient(135deg, #64748b 0%, #475569 100%);
-  box-shadow: 0 4px 12px rgba(100, 116, 139, 0.3);
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  position: relative;
+  z-index: 1;
+}
+
+.professional-modal-form .professional-modal-icon {
+  color: #fff;
 }
 
 .professional-modal-form .professional-modal-title {
-  color: #1e293b;
+  color: #fff;
+  position: relative;
+  z-index: 1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.professional-modal-form .professional-modal-close {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  position: relative;
+  z-index: 1;
+}
+
+.professional-modal-form .professional-modal-close:hover {
+  background: rgba(255, 255, 255, 0.35);
+  color: #fff;
+}
+
+.professional-modal-form .professional-modal-close svg {
+  stroke: currentColor;
+}
+
+.professional-modal-form .professional-modal-body {
+  background: linear-gradient(180deg, #fafdfb 0%, #ffffff 100%);
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.professional-modal-form .professional-modal-footer {
+  background: #f0fdf4;
+  border-top: 1px solid rgba(45, 93, 70, 0.12);
 }
 
 .professional-modal-form .professional-btn-primary {
-  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  background: #2D5D46;
   color: white;
-  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+  box-shadow: 0 4px 12px rgba(45, 93, 70, 0.35);
 }
 
 .professional-modal-form .professional-btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-  box-shadow: 0 6px 16px rgba(2, 132, 199, 0.4);
+  background: #244a39;
+  box-shadow: 0 6px 16px rgba(45, 93, 70, 0.45);
+  color: white;
 }
 
-/* Inputs profesionales en modales */
+.professional-modal-form .professional-btn-secondary {
+  border-color: rgba(45, 93, 70, 0.25);
+  color: #2D5D46;
+}
+
+.professional-modal-form .professional-btn-secondary:hover:not(:disabled) {
+  background: #f0fdf4;
+  border-color: #2D5D46;
+  color: #1e3d2e;
+}
+
+/* Inputs en modales de formulario — acento verde del proyecto */
 .professional-modal-body .form-control,
 .professional-modal-body .form-select {
-  border: 2px solid #e5e7eb;
+  border: 1px solid #e2e8f0;
   border-radius: 10px;
-  padding: 0.875rem 1.125rem;
+  padding: 0.75rem 1rem;
   font-size: 1rem;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background: #fff;
 }
 
 .professional-modal-body .form-control:focus,
 .professional-modal-body .form-select:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: #2D5D46;
+  box-shadow: 0 0 0 3px rgba(45, 93, 70, 0.15);
+}
+
+.professional-modal-form .professional-modal-body .form-control,
+.professional-modal-form .professional-modal-body .form-select {
+  border-radius: 10px;
+}
+
+/* Fondo explícito en select y opciones para evitar área negra/parpadeo del dropdown nativo */
+.professional-modal-form .professional-modal-body .form-select {
+  background-color: #fff;
+}
+
+.professional-modal-form .professional-modal-body .form-select option {
+  background: #fff;
+  color: #1e293b;
 }
 
 .professional-modal-body .form-label {
   font-weight: 600;
-  color: #374151;
+  color: #334155;
   margin-bottom: 0.5rem;
   font-size: 0.9rem;
+}
+
+.professional-modal-form .professional-modal-body .form-label {
+  color: #1e293b;
+}
+
+/* Texto de ayuda en modal formulario (roles, etc.) */
+.professional-modal-form .modal-help {
+  font-size: 0.8125rem !important;
+  color: #64748b !important;
+  line-height: 1.5 !important;
+  margin-top: 0.75rem !important;
+  padding: 0.75rem 1rem;
+  background: rgba(45, 93, 70, 0.06);
+  border-radius: 8px;
+  border-left: 3px solid rgba(45, 93, 70, 0.35);
+}
+
+/* ========== Dropdown custom Rol (evita select nativo y zona negra) ========== */
+.role-dropdown-wrap {
+  position: relative;
+}
+
+.role-dropdown-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  color: #1e293b;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  text-align: left;
+  font-family: inherit;
+}
+
+.role-dropdown-trigger:hover {
+  border-color: rgba(45, 93, 70, 0.4);
+}
+
+.role-dropdown-trigger:focus {
+  outline: none;
+  border-color: #2D5D46;
+  box-shadow: 0 0 0 3px rgba(45, 93, 70, 0.15);
+}
+
+.role-dropdown-trigger[aria-expanded="true"] {
+  border-color: #2D5D46;
+  box-shadow: 0 0 0 2px rgba(45, 93, 70, 0.2);
+}
+
+.role-dropdown-chevron {
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+  transition: transform 0.2s ease;
+  color: #64748b;
+}
+
+.role-dropdown-trigger[aria-expanded="true"] .role-dropdown-chevron {
+  transform: rotate(180deg);
+  color: #2D5D46;
+}
+
+.role-dropdown-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  z-index: 50;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.role-dropdown-option {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  color: #1e293b;
+  background: #ffffff;
+  transition: background 0.15s ease, color 0.15s ease;
+  font-size: 1rem;
+  border: none;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.role-dropdown-option:last-child {
+  border-bottom: none;
+  border-radius: 0 0 10px 10px;
+}
+
+.role-dropdown-option:first-child {
+  border-radius: 10px 10px 0 0;
+}
+
+.role-dropdown-list li:only-child {
+  border-radius: 10px;
+}
+
+.role-dropdown-option:hover:not(.role-dropdown-option--disabled) {
+  background: rgba(45, 93, 70, 0.08);
+  color: #1e293b;
+}
+
+.role-dropdown-option--selected {
+  background: rgba(45, 93, 70, 0.12);
+  font-weight: 600;
+  color: #2D5D46;
+}
+
+.role-dropdown-option--selected:hover {
+  background: rgba(45, 93, 70, 0.18);
+}
+
+.role-dropdown-option--disabled {
+  color: #94a3b8;
+  cursor: not-allowed;
+  background: #f8fafc;
 }
 
 /* Spinner para botones */

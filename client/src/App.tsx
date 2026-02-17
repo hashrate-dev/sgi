@@ -13,7 +13,6 @@ import { PendientesPage } from "./pages/PendientesPage";
 import { PendientesMineriaPage } from "./pages/PendientesMineriaPage";
 import { ClientesPage } from "./pages/ClientesPage";
 import { ClienteEditPage } from "./pages/ClienteEditPage";
-import { ClienteNewPage } from "./pages/ClienteNewPage";
 import { EquiposAsicPage } from "./pages/EquiposAsicPage";
 import { EquiposAsicNuevoPage } from "./pages/EquiposAsicNuevoPage";
 import { SetupPage } from "./pages/SetupPage";
@@ -58,7 +57,7 @@ function App() {
             <Route path="/historial-mineria" element={<Navigate to="/historial-equipos" replace />} />
             <Route path="/pendientes-mineria" element={<Navigate to="/pendientes-equipos" replace />} />
             <Route path="/clientes" element={<ClientesPage />} />
-            <Route path="/clientes/nuevo" element={<ClienteNewPage />} />
+            <Route path="/clientes/nuevo" element={<Navigate to="/clientes" replace />} />
             <Route path="/clientes/:id/edit" element={<ClienteEditPage />} />
             <Route path="/reportes" element={<ReportesPage />} />
             <Route path="/configuracion" element={<ConfiguracionPage />} />

@@ -225,7 +225,6 @@ export function HistorialMineriaPage() {
       { header: "Hora Emisión", key: "emissionTime", width: 12 },
       { header: "Fecha Vencimiento", key: "dueDate", width: 18 },
       { header: "Fecha Pago", key: "paymentDate", width: 18 },
-      { header: "Mes", key: "month", width: 10 },
       { header: "Total (S/Desc)", key: "subtotal", width: 16 },
       { header: "Descuento", key: "discounts", width: 12 },
       { header: "Total", key: "total", width: 12 },
@@ -305,7 +304,6 @@ export function HistorialMineriaPage() {
         emissionTime: inv.emissionTime || "-",
         dueDate: dueDate,
         paymentDate: paymentDateExportCell,
-        month: inv.month,
         discounts: discounts,
         subtotal: subtotal,
         total: total,
@@ -661,9 +659,8 @@ export function HistorialMineriaPage() {
                   <th className="text-start">Cliente</th>
                   <th className="text-start">Fecha Emisión</th>
                   <th className="text-start">Hora Emisión</th>
-                  <th className="text-start">Fecha Vencimiento</th>
+                  <th className="text-start">Fecha<br />Vencimiento</th>
                   <th className="text-start">Fecha Pago</th>
-                  <th className="text-start">Mes</th>
                   <th className="text-start">Total (S/Desc)</th>
                   <th className="text-start">Descuento</th>
                   <th className="text-start">Total</th>
@@ -674,7 +671,7 @@ export function HistorialMineriaPage() {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={13} className="text-center text-muted py-4">
+                    <td colSpan={12} className="text-center text-muted py-4">
                       <small>No hay facturas registradas</small>
                     </td>
                   </tr>
@@ -743,7 +740,6 @@ export function HistorialMineriaPage() {
                         <td className="text-start">{inv.emissionTime || "-"}</td>
                         <td className="text-start">{dueDate}</td>
                         <td className="text-start">{paymentDateCell}</td>
-                        <td className="text-start">{inv.month}</td>
                         <td className="text-start">{formatCurrency(subtotal)}</td>
                         <td className="text-start">{formatCurrency(discounts)}</td>
                         <td className="text-start fw-bold">{formatCurrency(total)}</td>

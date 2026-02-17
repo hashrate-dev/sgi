@@ -180,33 +180,56 @@ export function ClienteNewPage() {
   }
 
   return (
-    <div className="fact-page">
+    <div className="fact-page clientes-new-page">
       <div className="container">
-        <PageHeader title="Nuevo Cliente" />
+        <PageHeader title="Nuevo Cliente" showBackButton backTo="/clientes" backText="Volver a clientes" />
 
-        <div className="fact-layout" style={{ gridTemplateColumns: "1fr", maxWidth: "100%" }}>
-          <div className="fact-card">
-            <div className="fact-card-header">Agregar nuevo cliente</div>
-            <div className="fact-card-body">
-              {/* Opción de cargar desde Excel */}
-              <div className="mb-3 p-3 rounded" style={{ background: "#f0f9ff", border: "1px solid #bae6fd" }}>
-                <strong className="d-block mb-2">Cargar desde Excel</strong>
-                <p className="text-muted small mb-2">
-                  Subí un .xlsx con la primera fila igual que &quot;listado de clientes&quot;: <strong>Codigo</strong>, <strong>Nombre o Razon Social 1</strong>, 2, <strong>Teléfono 1</strong>, 2, <strong>Email1</strong>, Email2, <strong>Dirección 1</strong>, Direccion 2, <strong>Ciudad / Pais 1</strong>, 2.
-                </p>
-                <input
-                  type="file"
-                  accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                  className="d-block mb-2"
-                  onChange={handleExcelChange}
-                  disabled={excelLoading}
-                />
-                {excelLoading && <span className="text-muted small">Cargando y guardando clientes...</span>}
+        <div className="usuarios-page-card">
+          <div className="usuarios-page-header">
+            <div className="usuarios-page-header-inner">
+              <h2 className="usuarios-page-title">
+                <span className="usuarios-page-title-icon" aria-hidden><i className="bi bi-person-plus-fill" /></span>
+                Agregar nuevo cliente
+              </h2>
+              <p className="usuarios-page-subtitle">
+                Código, nombre, teléfonos, contacto y ubicación. Opcional: cargar desde Excel.
+              </p>
+            </div>
+          </div>
+          <div className="usuarios-page-body">
+            <div className="clientes-new-excel-box">
+              <strong className="clientes-new-excel-title">B. Automático: cargar desde Excel</strong>
+              <p className="clientes-new-excel-text">
+                Usá un archivo .xlsx. La <strong>primera fila</strong> = nombres de columnas, en este orden:
+              </p>
+              <ul className="clientes-new-excel-columns">
+                <li><strong>Código</strong></li>
+                <li><strong>Contacto Principal</strong> y <strong>Contacto alternativo</strong>: para cada uno, columnas — Nombre o Razón Social, Teléfono, Email, Dirección, Ciudad / País.</li>
+              </ul>
+              <div className="clientes-new-excel-actions">
+                <label
+                  className="btn btn-outline-secondary btn-sm historial-import-excel-btn mb-0"
+                  style={{
+                    backgroundColor: "rgba(45, 93, 70, 0.35)",
+                    cursor: excelLoading ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {excelLoading ? "⏳ Importando..." : "📥 Importar Excel"}
+                  <input
+                    type="file"
+                    accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    className="d-none"
+                    onChange={handleExcelChange}
+                    disabled={excelLoading}
+                  />
+                </label>
+                {excelLoading && <span className="clientes-new-excel-loading ms-2 align-middle">Cargando y guardando clientes...</span>}
               </div>
+            </div>
 
-              <hr style={{ margin: "1.5rem 0", border: "none", borderTop: "1px solid #e2e8f0" }} />
+            <hr className="clientes-new-divider" />
 
-              <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit}>
                 {/* Formulario en 4 columnas */}
                 <div className="client-form-grid-4">
                   {/* Columna 1: Información Básica */}
@@ -228,12 +251,12 @@ export function ClienteNewPage() {
                         className="fact-input"
                         value={form.name}
                         onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                        placeholder="Ej. PIROTTO, PABLO"
+                        placeholder="Nombre o razón social"
                       />
                     </div>
                     <div className="fact-field">
                       <label className="fact-label">Nombre o Razón Social 2</label>
-                      <input className="fact-input" value={form.name2} onChange={(e) => setForm((f) => ({ ...f, name2: e.target.value }))} placeholder="Nombre alternativo" />
+                      <input className="fact-input" value={form.name2} onChange={(e) => setForm((f) => ({ ...f, name2: e.target.value }))} placeholder="Nombre (opcional)" />
                     </div>
                   </div>
 
@@ -248,12 +271,12 @@ export function ClienteNewPage() {
                         type="tel"
                         value={form.phone}
                         onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                        placeholder="Ej. (+598) 99 123 456"
+                        placeholder="Teléfono"
                       />
                     </div>
                     <div className="fact-field">
                       <label className="fact-label">Teléfono 2</label>
-                      <input className="fact-input" type="tel" value={form.phone2} onChange={(e) => setForm((f) => ({ ...f, phone2: e.target.value }))} placeholder="Teléfono alternativo" />
+                      <input className="fact-input" type="tel" value={form.phone2} onChange={(e) => setForm((f) => ({ ...f, phone2: e.target.value }))} placeholder="Teléfono" />
                     </div>
                   </div>
 
@@ -268,7 +291,7 @@ export function ClienteNewPage() {
                         type="email"
                         value={form.email}
                         onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                        placeholder="cliente@email.com"
+                        placeholder="correo@ejemplo.com"
                       />
                     </div>
                     <div className="fact-field">
@@ -278,7 +301,7 @@ export function ClienteNewPage() {
                         type="email"
                         value={form.email2}
                         onChange={(e) => setForm((f) => ({ ...f, email2: e.target.value }))}
-                        placeholder="segundo@email.com"
+                        placeholder="correo@ejemplo.com"
                       />
                     </div>
                   </div>
@@ -293,12 +316,12 @@ export function ClienteNewPage() {
                         className="fact-input"
                         value={form.address}
                         onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                        placeholder="Calle, número, apto"
+                        placeholder="Dirección"
                       />
                     </div>
                     <div className="fact-field">
                       <label className="fact-label">Dirección 2</label>
-                      <input className="fact-input" value={form.address2} onChange={(e) => setForm((f) => ({ ...f, address2: e.target.value }))} placeholder="Dirección alternativa" />
+                      <input className="fact-input" value={form.address2} onChange={(e) => setForm((f) => ({ ...f, address2: e.target.value }))} placeholder="Dirección" />
                     </div>
                     <div className="fact-field">
                       <label className="fact-label">Ciudad / País 1</label>
@@ -306,42 +329,30 @@ export function ClienteNewPage() {
                         className="fact-input"
                         value={form.city}
                         onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
-                        placeholder="Ej. MONTEVIDEO, URUGUAY"
+                        placeholder="Ciudad, País"
                       />
                     </div>
                     <div className="fact-field">
                       <label className="fact-label">Ciudad / País 2</label>
-                      <input className="fact-input" value={form.city2} onChange={(e) => setForm((f) => ({ ...f, city2: e.target.value }))} placeholder="Ciudad/País alternativo" />
+                      <input className="fact-input" value={form.city2} onChange={(e) => setForm((f) => ({ ...f, city2: e.target.value }))} placeholder="Ciudad, País" />
                     </div>
                   </div>
                 </div>
 
                 {message && (
-                  <div
-                    className="fact-field"
-                    style={{
-                      padding: "0.5rem 0.75rem",
-                      borderRadius: 8,
-                      background: message.type === "ok" ? "#f0fdf4" : "#fef2f2",
-                      color: message.type === "ok" ? "#166534" : "#b91c1c",
-                      fontSize: "0.875rem",
-                      gridColumn: "1 / -1",
-                      marginTop: "1rem"
-                    }}
-                  >
-                    {message.text}
-                  </div>
-                )}
-                <div className="d-flex gap-2 mt-3 flex-wrap" style={{ gridColumn: "1 / -1", justifyContent: "flex-end", marginTop: "1.5rem" }}>
-                  <Link to="/clientes" className="fact-btn fact-btn-secondary">
-                    Cancelar
-                  </Link>
-                  <button type="submit" className="fact-btn fact-btn-primary">
-                    Agregar cliente
-                  </button>
+                <div className={`clientes-new-message clientes-new-message--${message.type}`}>
+                  {message.text}
                 </div>
-              </form>
-            </div>
+              )}
+              <div className="clientes-new-actions">
+                <Link to="/clientes" className="fact-btn fact-btn-secondary">
+                  Cancelar
+                </Link>
+                <button type="submit" className="fact-btn fact-btn-primary">
+                  Agregar cliente
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       </div>

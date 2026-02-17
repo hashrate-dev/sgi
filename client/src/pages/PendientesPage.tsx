@@ -107,7 +107,6 @@ export function PendientesPage() {
       { header: "Fecha Emisión", key: "date", width: 18 },
       { header: "Hora Emisión", key: "emissionTime", width: 12 },
       { header: "Fecha Vencimiento", key: "dueDate", width: 18 },
-      { header: "Mes", key: "month", width: 10 },
       { header: "Total (S/Desc)", key: "subtotal", width: 16 },
       { header: "Descuento", key: "discounts", width: 12 },
       { header: "Total", key: "total", width: 12 }
@@ -121,7 +120,6 @@ export function PendientesPage() {
         date: inv.date,
         emissionTime: inv.emissionTime || "-",
         dueDate: dueDate,
-        month: inv.month,
         subtotal: inv.subtotal.toFixed(2),
         discounts: inv.discounts.toFixed(2),
         total: inv.total.toFixed(2)
@@ -298,8 +296,7 @@ export function PendientesPage() {
                   <th className="text-start">Cliente</th>
                   <th className="text-start">Fecha Emisión</th>
                   <th className="text-start">Hora Emisión</th>
-                  <th className="text-start">Fecha Vencimiento</th>
-                  <th className="text-start">Mes</th>
+                  <th className="text-start">Fecha<br />Vencimiento</th>
                   <th className="text-start">Total (S/Desc)</th>
                   <th className="text-start">Descuento</th>
                   <th className="text-start">Total</th>
@@ -310,7 +307,7 @@ export function PendientesPage() {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="text-center text-muted py-4">
+                    <td colSpan={10} className="text-center text-muted py-4">
                       <small>{pendingInvoices.length === 0 ? "No hay facturas pendientes de cobro." : "No se encontraron facturas con los filtros aplicados."}</small>
                     </td>
                   </tr>
@@ -324,7 +321,6 @@ export function PendientesPage() {
                         <td className="text-start">{inv.date}</td>
                         <td className="text-start">{inv.emissionTime || "-"}</td>
                         <td className="text-start">{dueDate}</td>
-                        <td className="text-start">{inv.month}</td>
                         <td className="text-start">{formatCurrency(inv.subtotal)}</td>
                         <td className="text-start">{formatCurrency(inv.discounts)}</td>
                         <td className="text-start fw-bold">{formatCurrency(inv.total)}</td>

@@ -195,12 +195,12 @@ export function ClienteEditPage() {
                         className="fact-input"
                         value={form.name}
                         onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                        placeholder="Ej. PIROTTO, PABLO"
+                        placeholder="Nombre o razón social"
                       />
                     </div>
                     <div className="fact-field">
                       <label className="fact-label">Nombre o Razón Social 2</label>
-                      <input className="fact-input" value={form.name2} onChange={(e) => setForm((f) => ({ ...f, name2: e.target.value }))} placeholder="Nombre alternativo" />
+                      <input className="fact-input" value={form.name2} onChange={(e) => setForm((f) => ({ ...f, name2: e.target.value }))} placeholder="Nombre (opcional)" />
                     </div>
                   </div>
 
@@ -215,12 +215,12 @@ export function ClienteEditPage() {
                         type="tel"
                         value={form.phone}
                         onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                        placeholder="Ej. (+598) 99 123 456"
+                        placeholder="Teléfono"
                       />
                     </div>
                     <div className="fact-field">
                       <label className="fact-label">Teléfono 2</label>
-                      <input className="fact-input" type="tel" value={form.phone2} onChange={(e) => setForm((f) => ({ ...f, phone2: e.target.value }))} placeholder="Teléfono alternativo" />
+                      <input className="fact-input" type="tel" value={form.phone2} onChange={(e) => setForm((f) => ({ ...f, phone2: e.target.value }))} placeholder="Teléfono" />
                     </div>
                   </div>
 
@@ -235,7 +235,7 @@ export function ClienteEditPage() {
                         type="email"
                         value={form.email}
                         onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                        placeholder="cliente@email.com"
+                        placeholder="correo@ejemplo.com"
                       />
                     </div>
                     <div className="fact-field">
@@ -245,7 +245,7 @@ export function ClienteEditPage() {
                         type="email"
                         value={form.email2}
                         onChange={(e) => setForm((f) => ({ ...f, email2: e.target.value }))}
-                        placeholder="segundo@email.com"
+                        placeholder="correo@ejemplo.com"
                       />
                     </div>
                   </div>
@@ -260,12 +260,12 @@ export function ClienteEditPage() {
                         className="fact-input"
                         value={form.address}
                         onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                        placeholder="Calle, número, apto"
+                        placeholder="Dirección"
                       />
                     </div>
                     <div className="fact-field">
                       <label className="fact-label">Dirección 2</label>
-                      <input className="fact-input" value={form.address2} onChange={(e) => setForm((f) => ({ ...f, address2: e.target.value }))} placeholder="Dirección alternativa" />
+                      <input className="fact-input" value={form.address2} onChange={(e) => setForm((f) => ({ ...f, address2: e.target.value }))} placeholder="Dirección" />
                     </div>
                     <div className="fact-field">
                       <label className="fact-label">Ciudad / País 1</label>
@@ -273,12 +273,12 @@ export function ClienteEditPage() {
                         className="fact-input"
                         value={form.city}
                         onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
-                        placeholder="Ej. MONTEVIDEO, URUGUAY"
+                        placeholder="Ciudad, País"
                       />
                     </div>
                     <div className="fact-field">
                       <label className="fact-label">Ciudad / País 2</label>
-                      <input className="fact-input" value={form.city2} onChange={(e) => setForm((f) => ({ ...f, city2: e.target.value }))} placeholder="Ciudad/País alternativo" />
+                      <input className="fact-input" value={form.city2} onChange={(e) => setForm((f) => ({ ...f, city2: e.target.value }))} placeholder="Ciudad, País" />
                     </div>
                   </div>
                 </div>
