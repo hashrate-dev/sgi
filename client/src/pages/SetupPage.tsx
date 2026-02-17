@@ -349,7 +349,7 @@ export function SetupPage() {
             {loading ? (
               <div className="fact-empty">
                 <div className="fact-empty-icon">⏳</div>
-                <div className="fact-empty-text">Cargando Setup...</div>
+                <div className="fact-empty-text">₿</div>
               </div>
             ) : filtered.length === 0 ? (
               <div className="fact-empty">

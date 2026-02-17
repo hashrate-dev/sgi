@@ -170,7 +170,7 @@ export function ReportesPage() {
                 </div>
               )}
               {loading ? (
-                <p className="text-muted">Cargando clientes...</p>
+                <p className="text-muted">₿</p>
               ) : (
                 <div className="table-responsive">
                   <table className="table table-sm align-middle reportes-listado-table" style={{ fontSize: "0.85rem" }}>

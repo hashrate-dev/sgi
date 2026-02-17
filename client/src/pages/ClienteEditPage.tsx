@@ -134,7 +134,7 @@ export function ClienteEditPage() {
         <div className="container">
           <div className="fact-card">
             <div className="fact-card-body">
-              <p className="text-muted">Cargando cliente...</p>
+              <p className="text-muted">₿</p>
             </div>
           </div>
         </div>

@@ -278,7 +278,7 @@ export function ClientesPage() {
             )}
 
             {loading ? (
-              <p className="text-muted">Cargando clientes...</p>
+              <p className="text-muted">₿</p>
             ) : filteredClients.length === 0 ? (
               <div className="fact-empty">
                 <div className="fact-empty-icon">👥</div>

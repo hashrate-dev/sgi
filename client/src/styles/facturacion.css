@@ -944,7 +944,9 @@
   margin-bottom: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  width: 100%;
+  gap: 0.5rem;
 }
 .fact-emitted-count-badge {
   display: inline-flex;
@@ -980,6 +982,29 @@
   font-weight: 400;
   color: rgba(255, 255, 255, 0.82);
   font-size: 0.8125rem;
+}
+
+/* Botón Monitor Emails: mismo diseño pill que el badge (arriba), color verde */
+.fact-emitted-monitor-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #fff;
+  background: linear-gradient(135deg, #00a652 0%, #00cc6e 100%);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  text-decoration: none;
+  box-shadow: 0 2px 8px rgba(0, 166, 82, 0.3);
+  transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
+}
+.fact-emitted-monitor-btn:hover {
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(0, 166, 82, 0.4);
+  transform: translateY(-1px);
 }
 
 .fact-detail-green {
@@ -2597,6 +2622,19 @@
   height: 4px;
   width: 100%;
 }
+/* Barra de progreso: cobros realizados / facturación total (Flujo de Emails) */
+.historial-stats .stat-card .stat-progress-track {
+  height: 6px;
+  width: 100%;
+  background: #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.historial-stats .stat-card .stat-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
 .historial-stats .stat-card .stat-label {
   font-size: 0.7rem;
   font-weight: 600;
@@ -2753,6 +2791,13 @@
 }
 
 /* Separación entre Filtros y Listado en Pendientes: mismo ancho que Filtros y margen con color de fondo */
+/* Título de tabla (emoji + texto) mismo tamaño en Pendientes, Flujo de Emails, Historial, etc. */
+.pendientes-listado-wrap .listado-table-title,
+.historial-listado-wrap .listado-table-title {
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
 .pendientes-listado-wrap {
   margin-top: 1.5rem;
   margin-left: -1.5rem;
@@ -2812,12 +2857,49 @@
   background: #f8fafc;
 }
 
+/* Filas conectadas: factura + recibo/NC que la cancela (mismo color suave para remarcar relación) */
+.pendientes-listado-wrap .table tbody tr.facturas-mes-row-connected td {
+  background: #e8f5e9;
+}
+.pendientes-listado-wrap .table tbody tr.facturas-mes-row-connected:hover td {
+  background: #c8e6c9;
+}
+
+/* Select Enviado por Mail: cuando está en SI, botón en gris claro */
+.pendientes-listado-wrap .table select.facturas-mes-mail-si {
+  background-color: #d1d5db;
+  color: #374151;
+  border-color: #9ca3af;
+}
+.pendientes-listado-wrap .table select.facturas-mes-mail-si:hover,
+.pendientes-listado-wrap .table select.facturas-mes-mail-si:focus {
+  background-color: #9ca3af;
+  border-color: #6b7280;
+  color: #fff;
+}
+
+/* Columna Estado: ancho fijo para que no se corra la tabla al cambiar SI/NO (Pendiente... / Confirmado / doble check) */
+.pendientes-listado-wrap .table th.facturas-mes-col-estado,
+.pendientes-listado-wrap .table td.facturas-mes-col-estado {
+  width: 1%;
+  min-width: 11rem;
+  white-space: nowrap;
+}
+
 /* ========== Página Historial: mismo diseño que Pendientes (Filtros + Listado) ========== */
 .historial-filtros-outer {
   margin-left: -1.5rem;
   margin-right: -1.5rem;
   margin-top: -1.5rem;
   margin-bottom: 0;
+}
+/* Flujo de Emails: tabla al mismo ancho que el bloque de filtros */
+.flujo-emails-listado-outer {
+  margin-top: 1.5rem;
+}
+.flujo-emails-listado-outer .pendientes-listado-wrap {
+  margin-left: 0;
+  margin-right: 0;
 }
 
 .historial-filtros-container {

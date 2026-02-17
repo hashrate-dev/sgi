@@ -204,7 +204,7 @@ export function UsuariosPage() {
                 {loading ? (
                   <div className="usuarios-loading">
                     <div className="spinner-border" role="status" aria-label="Cargando" />
-                    <p className="mt-2 mb-0 small">Cargando usuarios...</p>
+                    <p className="mt-2 mb-0 small">₿</p>
                   </div>
                 ) : (
                   <div className="usuarios-listado-wrap">
@@ -272,7 +272,7 @@ export function UsuariosPage() {
                 {activityLoading ? (
                   <div className="activity-loading">
                     <div className="spinner-border" role="status" aria-label="Cargando" />
-                    <p className="mt-2 mb-0 small">Cargando actividad...</p>
+                    <p className="mt-2 mb-0 small">₿</p>
                   </div>
                 ) : activity.length === 0 ? (
                   <div className="empty-activity">

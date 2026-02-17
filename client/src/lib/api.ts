@@ -378,6 +378,14 @@ export function addEmittedDocument(
   });
 }
 
+/** Borrar un documento emitido por número (al eliminar ese documento del historial) */
+export function deleteEmittedDocumentOne(source: "hosting" | "asic", invoiceNumber: string): Promise<{ ok: boolean; deleted: number }> {
+  return api<{ ok: boolean; deleted: number }>(
+    `/api/emitted/${encodeURIComponent(source)}/${encodeURIComponent(invoiceNumber)}`,
+    { method: "DELETE" }
+  );
+}
+
 /** Borrar todos los documentos emitidos de un origen (al eliminar todo el historial) */
 export function deleteEmittedDocumentsAll(source: "hosting" | "asic"): Promise<{ ok: boolean; deleted: number }> {
   return api<{ ok: boolean; deleted: number }>(`/api/emitted?source=${encodeURIComponent(source)}`, { method: "DELETE" });

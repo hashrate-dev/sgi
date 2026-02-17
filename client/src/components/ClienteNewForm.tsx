@@ -267,7 +267,7 @@ export function ClienteNewForm({ onSuccess, onCancel, variant = "card" }: Props)
                 disabled={excelLoading}
               />
             </label>
-            {excelLoading && <span className="clientes-new-excel-loading ms-2 align-middle">Cargando y guardando clientes...</span>}
+            {excelLoading && <span className="clientes-new-excel-loading ms-2 align-middle">₿</span>}
           </div>
         </div>
         </section>

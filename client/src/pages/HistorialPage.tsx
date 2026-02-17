@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
-import { addEmittedDocument, deleteEmittedDocumentsAll, getClients, verifyPassword } from "../lib/api";
+import { addEmittedDocument, deleteEmittedDocumentOne, deleteEmittedDocumentsAll, getClients, verifyPassword } from "../lib/api";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadInvoices, loadInvoicesAsic, saveInvoices, saveInvoicesAsic } from "../lib/storage";
 import type { ComprobanteType, Invoice } from "../lib/types";
@@ -361,10 +361,12 @@ export function HistorialPage() {
       const next = allHosting.filter((i) => i.id !== id);
       setAllHosting(next);
       saveInvoices(next);
+      deleteEmittedDocumentOne("hosting", found.number).catch(() => {});
     } else {
       const next = allAsic.filter((i) => i.id !== id);
       setAllAsic(next);
       saveInvoicesAsic(next);
+      deleteEmittedDocumentOne("asic", found.number).catch(() => {});
     }
   }
 

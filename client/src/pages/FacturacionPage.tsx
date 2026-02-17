@@ -133,9 +133,8 @@ export function FacturacionPage() {
     setEmittedInSession((prev) => prev.filter((item) => now - new Date(item.emittedAt).getTime() < windowMs));
   }, []);
 
-  /** Cargar documentos emitidos (hosting) desde el servidor; al borrar del historial se borran también de aquí. Refrescar cada vez que se entra a esta página para reflejar borrados en Historial. */
-  useEffect(() => {
-    if (location.pathname !== "/facturacion-hosting") return;
+  /** Cargar documentos emitidos (hosting) desde el servidor; al borrar del historial se borran también de aquí. */
+  function fetchEmittedHosting() {
     const windowMs = 10 * 24 * 60 * 60 * 1000 + 22 * 60 * 60 * 1000;
     getEmittedDocuments("hosting")
       .then((r) => {
@@ -146,6 +145,19 @@ export function FacturacionPage() {
         setEmittedInSession(list);
       })
       .catch(() => {});
+  }
+
+  useEffect(() => {
+    if (location.pathname !== "/facturacion-hosting") return;
+    fetchEmittedHosting();
+  }, [location.pathname]);
+
+  /** Refrescar lista al volver a esta pestaña (p. ej. después de borrar en Historial) */
+  useEffect(() => {
+    if (location.pathname !== "/facturacion-hosting") return;
+    const onFocus = () => fetchEmittedHosting();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, [location.pathname]);
 
   useEffect(() => {
@@ -1243,7 +1255,7 @@ export function FacturacionPage() {
                         </tbody>
                       </table>
                     </div>
-                    <div className="fact-emitted-count">
+                    <div className="fact-emitted-count d-flex align-items-center gap-2 flex-wrap">
                       <span className="fact-emitted-count-badge">
                         <span className="fact-emitted-count-num">{emittedInLast24h.length}</span>
                         <span className="fact-emitted-count-label">
@@ -1251,6 +1263,12 @@ export function FacturacionPage() {
                         </span>
                         <span className="fact-emitted-count-period"> emitidos en los últimos 10 días</span>
                       </span>
+                      <Link
+                        to="/hosting/control-documentos-cobros"
+                        className="fact-emitted-monitor-btn"
+                      >
+                        ✉️ Monitor
+                      </Link>
                     </div>
                   </div>
                 )}

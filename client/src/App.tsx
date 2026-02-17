@@ -6,6 +6,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { FacturacionPage } from "./pages/FacturacionPage";
 import { FacturacionMineriaPage } from "./pages/FacturacionMineriaPage";
 import { HostingHubPage } from "./pages/HostingHubPage";
+import { FacturasMesHostingPage } from "./pages/FacturasMesHostingPage";
 import { MineriaHubPage } from "./pages/MineriaHubPage";
 import { HistorialPage } from "./pages/HistorialPage";
 import { HistorialMineriaPage } from "./pages/HistorialMineriaPage";
@@ -35,6 +36,7 @@ function App() {
           <Route element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
             <Route path="/" element={<HomePage />} />
             <Route path="/hosting" element={<HostingHubPage />} />
+            <Route path="/hosting/control-documentos-cobros" element={<FacturasMesHostingPage />} />
             <Route path="/facturacion-hosting" element={<FacturacionPage />} />
             <Route path="/historial" element={<HistorialPage />} />
             <Route path="/historial-hosting" element={<Navigate to="/historial" replace />} />
