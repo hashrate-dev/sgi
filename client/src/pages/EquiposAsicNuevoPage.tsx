@@ -29,7 +29,7 @@ export function EquiposAsicNuevoPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const canEdit = user ? canEditClientes(user.role) : false;
-  const [equipos, setEquipos] = useState<EquipoASIC[]>(() => loadEquiposAsic());
+  const [equipos, _setEquipos] = useState<EquipoASIC[]>(() => loadEquiposAsic());
   const nextNumeroSerie = getNextNumeroSerie(equipos);
 
   const [formData, setFormData] = useState({

@@ -1,7 +1,7 @@
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { useEffect, useMemo, useState } from "react";
-import { addEmittedDocument, createInvoice, getEmittedDocuments, getClients, getNextInvoiceNumber, getSetups, type SetupsResponse } from "../lib/api";
+import { addEmittedDocument, createInvoice, getEmittedDocuments, getClients, getNextInvoiceNumber, getSetups, type InvoiceCreateBody, type SetupsResponse } from "../lib/api";
 import { serviceCatalog } from "../lib/constants";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadEquiposAsic, loadInvoicesAsic, saveInvoicesAsic } from "../lib/storage";
@@ -141,7 +141,7 @@ export function FacturacionMineriaPage() {
   /** Vista previa: pedir siguiente número sin consumir (peek) */
   useEffect(() => {
     setNextNumFromApi(null);
-    getNextInvoiceNumber(type, { peek: true })
+    getNextInvoiceNumber((type === "Recibo Devolución" ? "Recibo" : type) as "Factura" | "Recibo" | "Nota de Crédito", { peek: true })
       .then((r) => setNextNumFromApi(r.number))
       .catch(() => setNextNumFromApi(""));
   }, [type]);
@@ -418,7 +418,7 @@ export function FacturacionMineriaPage() {
 
     let numberToUse = number;
     try {
-      const res = await getNextInvoiceNumber(type);
+      const res = await getNextInvoiceNumber((type === "Recibo Devolución" ? "Recibo" : type) as "Factura" | "Recibo" | "Nota de Crédito");
       numberToUse = res.number;
     } catch {
       //
@@ -482,7 +482,7 @@ export function FacturacionMineriaPage() {
 
     const apiBody = {
       number: numberToUse,
-      type,
+      type: type === "Recibo Devolución" ? "Recibo" : type,
       clientName: selectedClient.name,
       date: dateStr,
       month: monthForApi,
@@ -502,7 +502,7 @@ export function FacturacionMineriaPage() {
       dueDate: dueDateStr
     };
     try {
-      await createInvoice(apiBody);
+      await createInvoice(apiBody as InvoiceCreateBody);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e ?? "");
       if (msg.includes("already exists")) {
@@ -557,7 +557,7 @@ export function FacturacionMineriaPage() {
     setRelatedInvoiceId("");
     setPaymentDate("");
     setItemsLocked(false);
-    getNextInvoiceNumber(type, { peek: true }).then((r) => setNextNumFromApi(r.number)).catch(() => setNextNumFromApi(""));
+    getNextInvoiceNumber((type === "Recibo Devolución" ? "Recibo" : type) as "Factura" | "Recibo" | "Nota de Crédito", { peek: true }).then((r) => setNextNumFromApi(r.number)).catch(() => setNextNumFromApi(""));
   }
 
   /** Parsea fecha de vencimiento guardada (dd/mm/yyyy o ISO) para el PDF */

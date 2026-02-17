@@ -350,47 +350,6 @@ export function GarantiaAndePage() {
     }
   }
 
-  async function viewEmittedPdf(item: { invoice: Invoice; emittedAt: string }) {
-    const inv = item.invoice;
-    const date = new Date(item.emittedAt);
-    const subtotal = Math.abs(inv.subtotal);
-    const discounts = Math.abs(inv.discounts);
-    const total = Math.abs(inv.total);
-    let logoBase64: string | undefined;
-    try {
-      logoBase64 = await loadImageAsBase64("/images/LOGO-HASHRATE.png");
-    } catch {
-      //
-    }
-    const doc = generateFacturaPdf(
-      {
-        number: inv.number,
-        type: inv.type,
-        clientName: inv.clientName,
-        clientPhone: inv.clientPhone,
-        clientEmail: inv.clientEmail,
-        clientAddress: inv.clientAddress,
-        clientCity: inv.clientCity,
-        clientName2: inv.clientName2,
-        clientPhone2: inv.clientPhone2,
-        clientEmail2: inv.clientEmail2,
-        clientAddress2: inv.clientAddress2,
-        clientCity2: inv.clientCity2,
-        date,
-        items: inv.items,
-        subtotal,
-        discounts,
-        total
-      },
-      { logoBase64 }
-    );
-    const blob = doc.output("blob");
-    const url = URL.createObjectURL(blob);
-    window.open(url, "_blank", "noopener,noreferrer");
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
-    showToast(`PDF ${inv.number} abierto en nueva pestaña.`, "info");
-  }
-
   async function downloadEmittedPdf(item: { invoice: Invoice; emittedAt: string }) {
     const inv = item.invoice;
     const date = new Date(item.emittedAt);

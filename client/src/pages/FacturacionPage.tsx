@@ -1,7 +1,7 @@
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { useEffect, useMemo, useState } from "react";
-import { addEmittedDocument, createInvoice, getClients, getEmittedDocuments, getNextInvoiceNumber } from "../lib/api";
+import { addEmittedDocument, createInvoice, getClients, getEmittedDocuments, getNextInvoiceNumber, type InvoiceCreateBody } from "../lib/api";
 import { serviceCatalog } from "../lib/constants";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadInvoices, saveInvoices } from "../lib/storage";
@@ -169,7 +169,7 @@ export function FacturacionPage() {
   /** Vista previa: pedir siguiente número sin consumir (peek) para no gastar números al solo abrir la página */
   useEffect(() => {
     setNextNumFromApi(null);
-    getNextInvoiceNumber(type, { peek: true })
+    getNextInvoiceNumber((type === "Recibo Devolución" ? "Recibo" : type) as "Factura" | "Recibo" | "Nota de Crédito", { peek: true })
       .then((r) => setNextNumFromApi(r.number))
       .catch(() => setNextNumFromApi(""));
   }, [type]);
@@ -470,7 +470,7 @@ export function FacturacionPage() {
 
     let numberToUse = number;
     try {
-      const res = await getNextInvoiceNumber(type);
+      const res = await getNextInvoiceNumber((type === "Recibo Devolución" ? "Recibo" : type) as "Factura" | "Recibo" | "Nota de Crédito");
       numberToUse = res.number;
     } catch {
       //
@@ -533,7 +533,7 @@ export function FacturacionPage() {
 
     const apiBody = {
       number: numberToUse,
-      type,
+      type: type === "Recibo Devolución" ? "Recibo" : type,
       clientName: selectedClient.name,
       date: dateStr,
       month,
@@ -553,7 +553,7 @@ export function FacturacionPage() {
       dueDate: dueDateStr
     };
     try {
-      await createInvoice(apiBody);
+      await createInvoice(apiBody as InvoiceCreateBody);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e ?? "");
       if (msg.includes("already exists")) {
@@ -609,7 +609,7 @@ export function FacturacionPage() {
     setRelatedInvoiceId("");
     setPaymentDate("");
     setItemsLocked(false);
-    getNextInvoiceNumber(type, { peek: true }).then((r) => setNextNumFromApi(r.number)).catch(() => setNextNumFromApi(""));
+    getNextInvoiceNumber((type === "Recibo Devolución" ? "Recibo" : type) as "Factura" | "Recibo" | "Nota de Crédito", { peek: true }).then((r) => setNextNumFromApi(r.number)).catch(() => setNextNumFromApi(""));
   }
 
   /** Parsea fecha de vencimiento guardada (dd/mm/yyyy o ISO) para el PDF */

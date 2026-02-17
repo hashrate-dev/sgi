@@ -769,19 +769,7 @@ export function HistorialPage() {
                     // Aplicar signo negativo a las Notas de Crédito y Recibos relacionados con facturas
                     const isNegativeType = inv.type === "Nota de Crédito" || (inv.type === "Recibo" && inv.relatedInvoiceId);
                     const subtotal = isNegativeType ? -(Math.abs(inv.subtotal) || 0) : (inv.subtotal || 0);
-                    // Descuento: negativo para Facturas, positivo para Recibos, negativo para Notas de Crédito
-                    let discounts: number;
-                    if (inv.type === "Factura") {
-                      discounts = -(Math.abs(inv.discounts) || 0);
-                    } else if (inv.type === "Recibo") {
-                      discounts = Math.abs(inv.discounts) || 0;
-                    } else {
-                      // Nota de Crédito
-                      discounts = -(Math.abs(inv.discounts) || 0);
-                    }
                     const total = isNegativeType ? -(Math.abs(inv.total) || 0) : (inv.total || 0);
-                    const cambioVal = getCambio4Pct(inv) ?? 0;
-                    const totalSinCambio = total - Math.sign(total || 1) * cambioVal;
 
                     // Fecha de pago: Factura = fecha del Recibo si pagada (solo mismo origen), "Cancelada" si cancelada por NC, sino "Pendiente"; NC = fecha emisión
                     const relatedReciboForPayment = inv.type === "Factura" ? sameSource.find((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id) : null;
