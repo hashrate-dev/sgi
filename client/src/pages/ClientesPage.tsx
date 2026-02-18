@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
@@ -36,8 +36,7 @@ export function ClientesPage() {
   }
 
   useEffect(() => {
-    const t = setTimeout(loadClients, 0);
-    return () => clearTimeout(t);
+    loadClients();
   }, []);
 
   function handleEdit(c: Client) {
@@ -152,16 +151,18 @@ export function ClientesPage() {
     });
   }
 
-  const filteredClients = clients.filter((c) => {
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      c.code?.toLowerCase().includes(searchLower) ||
-      c.name?.toLowerCase().includes(searchLower) ||
-      c.name2?.toLowerCase().includes(searchLower) ||
-      c.phone?.toLowerCase().includes(searchLower) ||
-      c.email?.toLowerCase().includes(searchLower)
+  const filteredClients = useMemo(() => {
+    const searchLower = searchTerm.toLowerCase().trim();
+    if (!searchLower) return clients;
+    return clients.filter(
+      (c) =>
+        c.code?.toLowerCase().includes(searchLower) ||
+        c.name?.toLowerCase().includes(searchLower) ||
+        c.name2?.toLowerCase().includes(searchLower) ||
+        c.phone?.toLowerCase().includes(searchLower) ||
+        c.email?.toLowerCase().includes(searchLower)
     );
-  });
+  }, [clients, searchTerm]);
 
   return (
     <div className="fact-page clientes-page">
@@ -189,10 +190,10 @@ export function ClientesPage() {
                 </div>
                 <ClienteNewForm
                   variant="modal"
-                  onSuccess={() => {
+                  onSuccess={(message) => {
                     loadClients();
                     setShowNewForm(false);
-                    showToast("Cliente(s) agregado(s) correctamente.", "success", "Clientes");
+                    showToast(message ?? "Listo.", "success", "Clientes");
                   }}
                   onCancel={() => setShowNewForm(false)}
                 />
@@ -257,7 +258,7 @@ export function ClientesPage() {
           {/* Listado: mismo diseño que Historial (tabla con encabezado verde) */}
           <div className="clientes-listado-wrap">
             <div className="d-flex justify-content-between align-items-center mb-2">
-              <h6 className="fw-bold m-0">👥 Listado de clientes ({filteredClients.length}){!canEdit && <span className="text-muted small ms-2">(solo consulta)</span>}</h6>
+              <h6 className="fw-bold m-0">👥 Listado de clientes ({loading ? "…" : filteredClients.length}){!canEdit && <span className="text-muted small ms-2">(solo consulta)</span>}</h6>
               {canEdit && (
                 <button
                   type="button"
@@ -278,7 +279,30 @@ export function ClientesPage() {
             )}
 
             {loading ? (
-              <p className="text-muted">₿</p>
+              <div className="table-responsive" style={{ minHeight: 200 }}>
+                <table className="table table-sm align-middle clientes-listado-table" style={{ fontSize: "0.85rem" }}>
+                  <thead className="table-dark">
+                    <tr>
+                      <th className="text-start">Código</th>
+                      <th className="text-start">Nombre/Razón Social</th>
+                      <th className="text-start">Contacto</th>
+                      <th className="text-start">Ubicación</th>
+                      {canEdit && <th className="text-start" style={{ width: "100px" }}>Acciones</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <tr key={i}>
+                        <td><span className="clientes-skeleton" style={{ width: "4em" }} /></td>
+                        <td><span className="clientes-skeleton" style={{ width: "12em" }} /></td>
+                        <td><span className="clientes-skeleton" style={{ width: "10em" }} /></td>
+                        <td><span className="clientes-skeleton" style={{ width: "8em" }} /></td>
+                        {canEdit && <td><span className="clientes-skeleton" style={{ width: "5em" }} /></td>}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             ) : filteredClients.length === 0 ? (
               <div className="fact-empty">
                 <div className="fact-empty-icon">👥</div>

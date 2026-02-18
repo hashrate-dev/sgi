@@ -23,7 +23,7 @@ function normalizeHeader(h: string): string {
 }
 
 function findCol(headerRow: (string | number)[], ...names: string[]): number {
-  for (let i = 1; i < headerRow.length; i++) {
+  for (let i = 0; i < headerRow.length; i++) {
     const h = normalizeHeader(String(headerRow[i] ?? ""));
     for (const n of names) {
       const k = normalizeHeader(n);
@@ -33,7 +33,27 @@ function findCol(headerRow: (string | number)[], ...names: string[]): number {
   return -1;
 }
 
-export async function parseExcelFile(file: File): Promise<ClientRow[]> {
+/** Extrae el número más alto de una lista de códigos (ej: "1","C002","10" -> 10) */
+function getMaxNumericCode(codes: string[]): number {
+  let max = 0;
+  for (const c of codes) {
+    const n = parseInt(String(c).trim(), 10);
+    if (!isNaN(n)) {
+      max = Math.max(max, n);
+    } else {
+      const m = String(c).match(/(\d+)/);
+      if (m) max = Math.max(max, parseInt(m[1], 10));
+    }
+  }
+  return max;
+}
+
+export type ParseExcelOptions = {
+  /** Códigos existentes en la base: los duplicados se omitirán en el servidor; para filas sin código se asigna el siguiente al máximo */
+  existingCodes?: string[];
+};
+
+export async function parseExcelFile(file: File, options?: ParseExcelOptions): Promise<ClientRow[]> {
   const arrayBuffer = await file.arrayBuffer();
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(arrayBuffer);
@@ -61,15 +81,29 @@ export async function parseExcelFile(file: File): Promise<ClientRow[]> {
   const get = (row: (string | number)[], i: number): string =>
     i >= 0 && row[i] !== undefined && row[i] !== null ? String(row[i]).trim() : "";
 
+  const existingCodesSet = new Set((options?.existingCodes ?? []).map((c) => String(c).trim()).filter(Boolean));
+  const usedCodes = new Set<string>(existingCodesSet);
+  let nextCode = getMaxNumericCode([...existingCodesSet]) + 1;
+
   const result: ClientRow[] = [];
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
     if (!row) continue;
-    const code = idx.code >= 0 ? get(row, idx.code) : get(row, 1);
+    let code = idx.code >= 0 ? get(row, idx.code) : get(row, 1);
     const name = idx.name >= 0 ? get(row, idx.name) : get(row, 2);
     if (!code && !name) continue;
+    if (!code) {
+      while (usedCodes.has(String(nextCode))) nextCode++;
+      code = String(nextCode++);
+    } else {
+      if (existingCodesSet.has(code)) continue;
+      while (usedCodes.has(code)) {
+        code = `${code}-${r}`;
+      }
+    }
+    usedCodes.add(code);
     result.push({
-      code: code || `R${r}`,
+      code,
       name: name || "Sin nombre",
       name2: idx.name2 >= 0 ? get(row, idx.name2) || undefined : undefined,
       phone: idx.phone >= 0 ? get(row, idx.phone) || undefined : undefined,

@@ -294,6 +294,11 @@ export function createClient(body: Omit<ClientFields, "id">): Promise<ClientResp
   return api<ClientResponse>("/api/clients", { method: "POST", body: JSON.stringify(body) });
 }
 
+export type ClientsBulkResponse = { inserted: number; skipped: number; errors: number; insertedClients: Array<{ code: string; name: string }>; skippedCodes: string[]; errorMessages: string[] };
+export function createClientsBulk(clients: Array<Omit<ClientFields, "id">>): Promise<ClientsBulkResponse> {
+  return api<ClientsBulkResponse>("/api/clients/bulk", { method: "POST", body: JSON.stringify({ clients }) });
+}
+
 export function updateClient(id: number | string, body: Omit<Partial<ClientFields>, "id" | "code">): Promise<ClientResponse> {
   return api<ClientResponse>(`/api/clients/${id}`, { method: "PUT", body: JSON.stringify(body) });
 }
@@ -308,7 +313,7 @@ export function deleteAllClients(): Promise<void> {
 
 /** Crear factura/recibo/NC en la base de datos (numeración única, no se repiten). */
 export type InvoiceCreateBody = {
-  number: string;
+  number?: string; /* opcional: el servidor genera el número */
   type: "Factura" | "Recibo" | "Nota de Crédito";
   clientName: string;
   date: string;

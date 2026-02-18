@@ -174,14 +174,19 @@ function calculateDueDate(dateStr: string): string {
 
 type InvoiceWithSource = Invoice & { _source: "hosting" | "asic" };
 
-export function HistorialPage() {
+type HistorialPageProps = { sourceFilter?: "hosting" | "asic" };
+
+export function HistorialPage({ sourceFilter }: HistorialPageProps) {
   const { user } = useAuth();
   const [allHosting, setAllHosting] = useState<Invoice[]>(() => loadInvoices());
   const [allAsic, setAllAsic] = useState<Invoice[]>(() => loadInvoicesAsic());
-  const all = useMemo<InvoiceWithSource[]>(() => [
-    ...allHosting.map((i) => ({ ...i, _source: "hosting" as const })),
-    ...allAsic.map((i) => ({ ...i, _source: "asic" as const }))
-  ], [allHosting, allAsic]);
+  const all = useMemo<InvoiceWithSource[]>(() => {
+    const hosting = allHosting.map((i) => ({ ...i, _source: "hosting" as const }));
+    const asic = allAsic.map((i) => ({ ...i, _source: "asic" as const }));
+    if (sourceFilter === "hosting") return hosting;
+    if (sourceFilter === "asic") return asic;
+    return [...hosting, ...asic];
+  }, [allHosting, allAsic, sourceFilter]);
   const [qClient, setQClient] = useState("");
   const [qType, setQType] = useState<"" | ComprobanteType>("");
   const [qMonth, setQMonth] = useState("");
@@ -405,10 +410,27 @@ export function HistorialPage() {
       setClearPassword("");
       setClearPasswordError("");
       setPasswordAttempts(0);
-      setAllHosting([]);
-      saveInvoices([]);
-      await deleteEmittedDocumentsAll("hosting").catch(() => {});
-      showToast("Todo el historial ha sido eliminado.", "success", "Historial");
+      if (sourceFilter === "hosting") {
+        setAllHosting([]);
+        saveInvoices([]);
+        await deleteEmittedDocumentsAll("hosting").catch(() => {});
+        showToast("Historial de Hosting eliminado.", "success", "Historial");
+      } else if (sourceFilter === "asic") {
+        setAllAsic([]);
+        saveInvoicesAsic([]);
+        await deleteEmittedDocumentsAll("asic").catch(() => {});
+        showToast("Historial de ASIC eliminado.", "success", "Historial");
+      } else {
+        setAllHosting([]);
+        setAllAsic([]);
+        saveInvoices([]);
+        saveInvoicesAsic([]);
+        await Promise.all([
+          deleteEmittedDocumentsAll("hosting").catch(() => {}),
+          deleteEmittedDocumentsAll("asic").catch(() => {})
+        ]);
+        showToast("Todo el historial ha sido eliminado.", "success", "Historial");
+      }
     } catch (err) {
       const newAttempts = passwordAttempts + 1;
       setPasswordAttempts(newAttempts);
@@ -636,7 +658,7 @@ export function HistorialPage() {
   return (
     <div className="fact-page">
       <div className="container">
-        <PageHeader title="Detalles de Documentos Emitidos" />
+        <PageHeader title={sourceFilter === "hosting" ? "Historial Servicios de Hosting" : sourceFilter === "asic" ? "Historial Venta de ASIC" : "Detalles de Documentos Emitidos"} />
 
         <div className="hrs-card hrs-card--rect p-4">
           <div className="historial-filtros-outer">

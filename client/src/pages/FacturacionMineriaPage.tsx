@@ -1,5 +1,3 @@
-import ExcelJS from "exceljs";
-import { saveAs } from "file-saver";
 import { useEffect, useMemo, useState } from "react";
 import { addEmittedDocument, createInvoice, getEmittedDocuments, getClients, getNextInvoiceNumber, getSetups, type InvoiceCreateBody, type SetupsResponse } from "../lib/api";
 import { serviceCatalog } from "../lib/constants";
@@ -32,33 +30,37 @@ function genId() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
+const MAX_INVOICE_NUM = 999999;
+const MIN_INVOICE_NUM = 1001;
+
 function nextNumber(type: ComprobanteType, invoices: Invoice[]) {
   const prefix = 
     type === "Factura" ? "F" : 
     type === "Recibo" ? "RC" : 
     "N"; // Nota de Crédito
-  // Filtrar facturas que empiecen con el prefijo (F incluye FC por compatibilidad con datos antiguos)
   const filtered = invoices.filter((i) => 
     i.number.startsWith(prefix + "-") || i.number.startsWith(prefix)
   );
   const next =
     filtered.length === 0
-      ? 1001
-      : Math.max(
-          ...filtered.map((i) => {
-            // Extraer el número: puede ser "F-1001" o "F1001", "FC1001" (legacy), etc.
-            let numStr = i.number;
-            if (numStr.includes("-")) {
-              numStr = numStr.split("-")[1];
-            } else {
-              // Si no tiene guion, extraer los dígitos después del prefijo
-              numStr = numStr.replace(/^[A-Z]+/, "");
-            }
-            const n = Number(numStr);
-            return Number.isFinite(n) ? n : 0;
-          })
-        ) + 1;
-  return `${prefix}${String(next).padStart(6, "0")}`;
+      ? MIN_INVOICE_NUM
+      : Math.min(
+          MAX_INVOICE_NUM,
+          Math.max(
+            ...filtered.map((i) => {
+              let numStr = i.number;
+              if (numStr.includes("-")) {
+                numStr = numStr.split("-")[1];
+              } else {
+                numStr = numStr.replace(/^[A-Z]+/, "");
+              }
+              const n = Number(numStr);
+              if (!Number.isFinite(n) || n > MAX_INVOICE_NUM) return 0;
+              return n;
+            })
+          ) + 1
+        );
+  return `${prefix}${String(Math.max(MIN_INVOICE_NUM, next)).padStart(6, "0")}`;
 }
 
 function calcTotals(items: LineItem[]) {
@@ -74,7 +76,7 @@ export function FacturacionMineriaPage() {
   const [type, setType] = useState<ComprobanteType>("Factura");
   const [clientQuery, setClientQuery] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
-  const [selectedClientId, setSelectedClientId] = useState<number | "">("");
+  const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [items, setItems] = useState<LineItem[]>([]);
   const [relatedInvoiceId, setRelatedInvoiceId] = useState<string>("");
   const [paymentDate, setPaymentDate] = useState<string>("");
@@ -160,8 +162,17 @@ export function FacturacionMineriaPage() {
     );
   }, [clients, clientQuery]);
 
+  /** Lista de clientes para el select: incluye siempre el seleccionado aunque no coincida con el filtro */
+  const clientsForSelect = useMemo(() => {
+    if (!selectedClientId) return visibleClients;
+    const sel = clients.find((c) => String(c.id ?? "") === String(selectedClientId));
+    if (!sel) return visibleClients;
+    if (visibleClients.some((c) => String(c.id ?? "") === String(selectedClientId))) return visibleClients;
+    return [sel, ...visibleClients];
+  }, [clients, visibleClients, selectedClientId]);
+
   const selectedClient = useMemo(
-    () => (selectedClientId !== "" ? clients.find((c) => c.id === selectedClientId) ?? null : null),
+    () => (selectedClientId ? clients.find((c) => String(c.id ?? "") === String(selectedClientId)) ?? null : null),
     [clients, selectedClientId]
   );
 
@@ -339,27 +350,6 @@ export function FacturacionMineriaPage() {
     setItems((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  function exportExcel() {
-    const hist = loadInvoicesAsic();
-    if (hist.length === 0) return;
-    const fecha = new Date().toISOString().slice(0, 10).replace(/-/g, "-");
-    const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet("Historial");
-    ws.columns = [
-      { header: "Número", key: "number", width: 14 },
-      { header: "Tipo", key: "type", width: 10 },
-      { header: "Cliente", key: "clientName", width: 30 },
-      { header: "Fecha", key: "date", width: 14 },
-      { header: "Mes", key: "month", width: 10 },
-      { header: "Subtotal", key: "subtotal", width: 12 },
-      { header: "Descuentos", key: "discounts", width: 12 },
-      { header: "Total", key: "total", width: 12 }
-    ];
-    hist.forEach((inv) => ws.addRow(inv));
-    ws.getRow(1).font = { bold: true };
-    wb.xlsx.writeBuffer().then((buf) => saveAs(new Blob([buf]), `HRS-Historial-ASIC-${fecha}.xlsx`));
-  }
-
   function handleClickEmitir() {
     if (!selectedClient) {
       showToast("Debe seleccionar un cliente válido.", "error");
@@ -414,15 +404,7 @@ export function FacturacionMineriaPage() {
     setShowEmitPdfConfirm(false);
     if (!selectedClient) return;
 
-    if (downloadPdf) showToast("Generando factura PDF...", "info");
-
-    let numberToUse = number;
-    try {
-      const res = await getNextInvoiceNumber((type === "Recibo Devolución" ? "Recibo" : type) as "Factura" | "Recibo" | "Nota de Crédito");
-      numberToUse = res.number;
-    } catch {
-      //
-    }
+    if (downloadPdf) showToast("Guardando documento...", "info");
 
     const { subtotal, discounts, total } = calcTotals(items);
     const dateNow = new Date();
@@ -434,7 +416,50 @@ export function FacturacionMineriaPage() {
     dueDate.setDate(dueDate.getDate() + dueDateDays);
     const dueDateStr = dueDate.toLocaleDateString();
 
+    const relatedInvoice = relatedInvoiceId ? invoices.find((inv) => inv.id === relatedInvoiceId) : null;
+    const isNegativeType = type === "Recibo" || type === "Nota de Crédito";
+    const finalSubtotal = isNegativeType ? -(Math.abs(subtotal)) : subtotal;
+    const finalDiscounts = isNegativeType ? -(Math.abs(discounts)) : discounts;
+    const finalTotal = isNegativeType ? -(Math.abs(total)) : total;
+
+    const apiBody: InvoiceCreateBody = {
+      type: type === "Recibo Devolución" ? "Recibo" : type,
+      clientName: selectedClient.name,
+      date: dateStr,
+      month: monthForApi,
+      subtotal: finalSubtotal,
+      discounts: finalDiscounts,
+      total: finalTotal,
+      items: items.map((it) => ({
+        service: String(it.serviceName || it.setupNombre || "Equipo / Servicio").slice(0, 200),
+        month: /^\d{4}-\d{2}$/.test(it.month) ? it.month : monthForApi,
+        quantity: Math.max(1, Math.round(Number(it.quantity) || 1)),
+        price: Number(it.price) || 0,
+        discount: Number(it.discount) || 0
+      })),
+      relatedInvoiceNumber: relatedInvoice?.number,
+      paymentDate: type === "Recibo" ? paymentDate : undefined,
+      emissionTime,
+      dueDate: dueDateStr
+    };
+
+    let createdInvoice: { number: string };
+    try {
+      const res = await createInvoice(apiBody);
+      createdInvoice = res.invoice;
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e ?? "");
+      showToast(msg || "No se pudo guardar. Revisá la conexión con el servidor.", "error");
+      getNextInvoiceNumber((type === "Recibo Devolución" ? "Recibo" : type) as "Factura" | "Recibo" | "Nota de Crédito", { peek: true })
+        .then((r) => setNextNumFromApi(r.number))
+        .catch(() => setNextNumFromApi(""));
+      return;
+    }
+
+    const numberToUse = createdInvoice.number;
+
     if (downloadPdf) {
+      showToast("Generando factura PDF...", "info");
       let logoBase64: string | undefined;
       try {
         logoBase64 = await loadImageAsBase64("/images/LOGO-HASHRATE.png");
@@ -471,48 +496,6 @@ export function FacturacionMineriaPage() {
     } else {
       const tipoMensaje = type === "Factura" ? "Factura" : type === "Recibo" ? "Recibo" : "Nota de Crédito";
       showToast(`${tipoMensaje} registrada correctamente.`, "success");
-    }
-
-    const relatedInvoice = relatedInvoiceId ? invoices.find((inv) => inv.id === relatedInvoiceId) : null;
-    /** Contable: Recibo y Nota de Crédito con montos en negativo (anulan factura). */
-    const isNegativeType = type === "Recibo" || type === "Nota de Crédito";
-    const finalSubtotal = isNegativeType ? -(Math.abs(subtotal)) : subtotal;
-    const finalDiscounts = isNegativeType ? -(Math.abs(discounts)) : discounts;
-    const finalTotal = isNegativeType ? -(Math.abs(total)) : total;
-
-    const apiBody = {
-      number: numberToUse,
-      type: type === "Recibo Devolución" ? "Recibo" : type,
-      clientName: selectedClient.name,
-      date: dateStr,
-      month: monthForApi,
-      subtotal: finalSubtotal,
-      discounts: finalDiscounts,
-      total: finalTotal,
-      items: items.map((it) => ({
-        service: it.serviceName || "Equipo / Servicio",
-        month: /^\d{4}-\d{2}$/.test(it.month) ? it.month : monthForApi,
-        quantity: it.quantity,
-        price: it.price,
-        discount: it.discount
-      })),
-      relatedInvoiceNumber: relatedInvoice?.number,
-      paymentDate: type === "Recibo" ? paymentDate : undefined,
-      emissionTime,
-      dueDate: dueDateStr
-    };
-    try {
-      await createInvoice(apiBody as InvoiceCreateBody);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e ?? "");
-      if (msg.includes("already exists")) {
-        showToast("Este número de documento ya existe en la base de datos. No se guardó.", "error");
-      } else if (msg.includes("Invalid body") || msg.includes("Invalid")) {
-        showToast("Datos rechazados por el servidor. Revisá que todos los ítems tengan mes (YYYY-MM) y valores válidos.", "error");
-      } else {
-        showToast("No se pudo guardar en la base de datos. Revisá la conexión.", "error");
-      }
-      return;
     }
 
     const inv: Invoice = {
@@ -714,12 +697,12 @@ export function FacturacionMineriaPage() {
                     className="fact-select"
                     size={8}
                     value={selectedClientId}
-                    onChange={(e) => setSelectedClientId(e.target.value === "" ? "" : Number(e.target.value))}
+                    onChange={(e) => setSelectedClientId(e.target.value)}
                     style={{ marginTop: "0.5rem" }}
                   >
                     <option value="">Seleccione cliente</option>
-                    {visibleClients.map((c) => (
-                      <option key={c.id ?? c.code} value={c.id ?? ""}>
+                    {clientsForSelect.map((c) => (
+                      <option key={c.id ?? c.code} value={String(c.id ?? "")}>
                         {c.code} - {c.name}
                       </option>
                     ))}
@@ -856,25 +839,17 @@ export function FacturacionMineriaPage() {
                             type="button"
                             className="fact-detail-servicios-btn-clear"
                             onClick={() => !itemsLocked && setItems([])}
-                            disabled={itemsLocked || (type === "Nota de Crédito" && !relatedInvoiceId)}
-                            title={itemsLocked ? "Los detalles están bloqueados" : "Vaciar lista de ítems"}
+                            disabled={itemsLocked || (type === "Nota de Crédito" && !relatedInvoiceId) || !selectedClient || items.length === 0}
+                            title={itemsLocked ? "Los detalles están bloqueados" : !selectedClient ? "Primero debe seleccionar un cliente" : items.length === 0 ? "No hay ítems para borrar" : "Vaciar lista de ítems"}
                           >
                             🗑️ Borrar
                           </button>
                           <button
                             type="button"
                             className="fact-detail-servicios-btn-add"
-                            onClick={exportExcel}
-                            title="Exportar a Excel"
-                          >
-                            📊 Exportar Excel
-                          </button>
-                          <button
-                            type="button"
-                            className="fact-detail-servicios-btn-add"
                             onClick={addItem}
-                            disabled={itemsLocked || (type === "Nota de Crédito" && !relatedInvoiceId)}
-                            title={itemsLocked ? "Los detalles están bloqueados porque vienen de una factura relacionada" : type === "Nota de Crédito" && !relatedInvoiceId ? "Primero debe seleccionar una factura a cancelar" : (type === "Recibo" || type === "Nota de Crédito") && relatedInvoiceId ? "Los ítems se cargaron desde la factura relacionada" : ""}
+                            disabled={itemsLocked || (type === "Nota de Crédito" && !relatedInvoiceId) || !selectedClient}
+                            title={itemsLocked ? "Los detalles están bloqueados porque vienen de una factura relacionada" : !selectedClient ? "Primero debe seleccionar un cliente" : type === "Nota de Crédito" && !relatedInvoiceId ? "Primero debe seleccionar una factura a cancelar" : (type === "Recibo" || type === "Nota de Crédito") && relatedInvoiceId ? "Los ítems se cargaron desde la factura relacionada" : ""}
                           >
                             + Agregar ítem
                           </button>

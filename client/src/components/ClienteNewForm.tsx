@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { createClient } from "../lib/api";
-import { parseExcelFile, type ClientRow } from "../lib/parseClientExcel";
+import { createClient, createClientsBulk, getClients } from "../lib/api";
+import { parseExcelFile } from "../lib/parseClientExcel";
 import { showToast } from "./ToastNotification";
 import "../styles/facturacion.css";
 
@@ -21,7 +21,7 @@ const emptyForm = {
 };
 
 type Props = {
-  onSuccess: () => void;
+  onSuccess: (message?: string) => void;
   onCancel: () => void;
   /** "modal" = solo cuerpo + pie para usar dentro del modal; "card" = card completa con header */
   variant?: "card" | "modal";
@@ -53,9 +53,8 @@ export function ClienteNewForm({ onSuccess, onCancel, variant = "card" }: Props)
 
     createClient(payload)
       .then(() => {
-        showToast("Cliente agregado correctamente.", "success", TOAST_CONTEXT);
         setForm(emptyForm);
-        onSuccess();
+        onSuccess("Cliente agregado correctamente.");
       })
       .catch((err) => showToast(err instanceof Error ? err.message : "Error al crear", "error", TOAST_CONTEXT));
   }
@@ -74,20 +73,23 @@ export function ClienteNewForm({ onSuccess, onCancel, variant = "card" }: Props)
     setExcelLoading(true);
     e.target.value = "";
     try {
-      const rows = await parseExcelFile(file);
+      const existingCodes = await getClients().then((r) => (r.clients ?? []).map((c) => c.code).filter(Boolean) as string[]);
+      const rows = await parseExcelFile(file, { existingCodes });
       if (rows.length === 0) {
-        showToast("No se encontraron filas con datos. La primera fila debe ser encabezados (Código, Nombre, etc.).", "error", TOAST_CONTEXT);
+        onSuccess("Lista de Clientes Actualizada. No se agregaron clientes nuevos (todos ya existían).");
         setExcelLoading(false);
         return;
       }
-      const results = await Promise.allSettled(rows.map((payload: ClientRow) => createClient(payload)));
-      const ok = results.filter((r) => r.status === "fulfilled").length;
-      const err = results.filter((r) => r.status === "rejected").length;
-      if (err === 0) {
-        showToast(`Se agregaron ${ok} clientes desde el Excel.`, "success", TOAST_CONTEXT);
-        onSuccess();
+      const res = await createClientsBulk(rows);
+      const { inserted, skipped, errors } = res;
+      if (errors > 0) {
+        const errPreview = (res.errorMessages ?? []).slice(0, 3).join(" | ");
+        const msg = errPreview
+          ? `Se agregaron ${inserted}. ${skipped} omitidos. ${errors} con error: ${errPreview}`
+          : `Se agregaron ${inserted}. ${skipped} omitidos. ${errors} con error de validación. Revisá que Código y Nombre tengan datos.`;
+        showToast(msg, "error", TOAST_CONTEXT);
       } else {
-        showToast(`Se agregaron ${ok} clientes. ${err} no se pudieron agregar (código duplicado u otro error).`, "error", TOAST_CONTEXT);
+        onSuccess("Lista de Clientes Actualizada.");
       }
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Error al leer el archivo Excel.", "error", TOAST_CONTEXT);

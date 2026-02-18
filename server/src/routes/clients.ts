@@ -35,44 +35,118 @@ const ClientUpdateSchema = z.object({
 
 const selectFields = "id, code, name, name2, phone, phone2, email, email2, address, address2, city, city2";
 
+clientsRouter.post("/clients/bulk", requireRole("admin_a", "admin_b", "operador"), async (req, res) => {
+  const body = req.body as { clients?: unknown[] };
+  if (!Array.isArray(body?.clients) || body.clients.length === 0) {
+    return res.status(400).json({ error: { message: "Se requiere un array 'clients' con al menos un cliente" } });
+  }
+  const inserted: Array<{ code: string; name: string }> = [];
+  const skipped: string[] = [];
+  const errors: string[] = [];
+  const isPg = (db as { isPostgres?: boolean }).isPostgres === true;
+
+  for (const c of body.clients) {
+    const parsed = ClientCreateSchema.safeParse(c);
+    if (!parsed.success) {
+      const code = (c as { code?: string })?.code ?? "?";
+      const msg = parsed.error.errors.map((e) => e.message).join("; ");
+      errors.push(`${code}: ${msg}`);
+      continue;
+    }
+    const d = parsed.data;
+    try {
+      if (isPg) {
+        const existing = await db.prepare("SELECT id FROM clients WHERE code = ?").get(d.code);
+        if (existing) {
+          skipped.push(d.code);
+        } else {
+          await db.prepare(
+            "INSERT INTO clients (code, name, name2, phone, phone2, email, email2, address, address2, city, city2) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+          ).run(d.code, d.name, d.name2 ?? null, d.phone ?? null, d.phone2 ?? null, d.email ?? null, d.email2 ?? null, d.address ?? null, d.address2 ?? null, d.city ?? null, d.city2 ?? null);
+          inserted.push({ code: d.code, name: d.name });
+        }
+      } else {
+        try {
+          await db.prepare(
+            "INSERT INTO clients (code, name, name2, phone, phone2, email, email2, address, address2, city, city2) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+          ).run(d.code, d.name, d.name2 ?? null, d.phone ?? null, d.phone2 ?? null, d.email ?? null, d.email2 ?? null, d.address ?? null, d.address2 ?? null, d.city ?? null, d.city2 ?? null);
+          inserted.push({ code: d.code, name: d.name });
+        } catch (e: unknown) {
+          const err = e as { code?: string };
+          if (err?.code && String(err.code).includes("SQLITE_CONSTRAINT")) {
+            skipped.push(d.code);
+          } else {
+            throw e;
+          }
+        }
+      }
+    } catch (e: unknown) {
+      const err = e as { code?: string };
+      if (err?.code && (String(err.code).includes("SQLITE_CONSTRAINT") || err.code === "23505")) {
+        skipped.push(d.code);
+      } else {
+        errors.push(`${d.code}: ${(e as Error)?.message ?? String(e)}`);
+      }
+    }
+  }
+
+  res.status(200).json({
+    inserted: inserted.length,
+    skipped: skipped.length,
+    errors: errors.length,
+    insertedClients: inserted,
+    skippedCodes: skipped,
+    errorMessages: errors
+  });
+});
+
 clientsRouter.get("/clients", async (_req, res) => {
   const rows = await db.prepare(`SELECT ${selectFields} FROM clients ORDER BY code ASC`).all();
   res.json({ clients: rows });
 });
 
-clientsRouter.post("/clients", requireRole("admin_a", "admin_b", "operador"), async (req, res) => {
-  const parsed = ClientCreateSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res
-      .status(400)
-      .json({ error: { message: "Invalid body", details: parsed.error.flatten() } });
-  }
-  const d = parsed.data;
-  const stmt = db.prepare(
-    "INSERT INTO clients (code, name, name2, phone, phone2, email, email2, address, address2, city, city2) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-  );
+clientsRouter.post("/clients", requireRole("admin_a", "admin_b", "operador"), async (req, res, next) => {
   try {
-    const info = await stmt.run(
-      d.code,
-      d.name,
-      d.name2 ?? null,
-      d.phone ?? null,
-      d.phone2 ?? null,
-      d.email ?? null,
-      d.email2 ?? null,
-      d.address ?? null,
-      d.address2 ?? null,
-      d.city ?? null,
-      d.city2 ?? null
-    );
-    const client = await db.prepare(`SELECT ${selectFields} FROM clients WHERE id = ?`).get(info.lastInsertRowid as number);
-    res.status(201).json({ client });
-  } catch (e: unknown) {
-    const err = e as { code?: string };
-    if (err?.code && String(err.code).includes("SQLITE_CONSTRAINT")) {
-      return res.status(409).json({ error: { message: "Ya existe un cliente con ese código" } });
+    const parsed = ClientCreateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ error: { message: "Invalid body", details: parsed.error.flatten() } });
     }
-    throw e;
+    const d = parsed.data;
+    const stmt = db.prepare(
+      "INSERT INTO clients (code, name, name2, phone, phone2, email, email2, address, address2, city, city2) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    );
+    try {
+      const info = await stmt.run(
+        d.code,
+        d.name,
+        d.name2 ?? null,
+        d.phone ?? null,
+        d.phone2 ?? null,
+        d.email ?? null,
+        d.email2 ?? null,
+        d.address ?? null,
+        d.address2 ?? null,
+        d.city ?? null,
+        d.city2 ?? null
+      );
+      const id = info?.lastInsertRowid;
+      if (id == null || !Number.isFinite(Number(id))) {
+        return res.status(500).json({ error: { message: "Error al crear cliente. No se obtuvo el ID." } });
+      }
+      const client = await db.prepare(`SELECT ${selectFields} FROM clients WHERE id = ?`).get(Number(id));
+      return res.status(201).json({ client: client ?? { ...d, id } });
+    } catch (e: unknown) {
+      const err = e as { code?: string };
+      if (err?.code && (String(err.code).includes("SQLITE_CONSTRAINT") || err.code === "23505")) {
+        return res.status(409).json({ error: { message: "Ya existe un cliente con ese código" } });
+      }
+      console.error("POST /clients error:", e);
+      return res.status(500).json({ error: { message: "Error al crear cliente. Revisá la conexión a la base de datos." } });
+    }
+  } catch (e) {
+    next(e);
   }
 });
 

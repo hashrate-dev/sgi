@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import {
@@ -240,9 +240,11 @@ export function SetupPage() {
     }
   }
 
-  const filtered = setups.filter((s) =>
-    s.nombre.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filtered = useMemo(() => {
+    const t = searchTerm.toLowerCase().trim();
+    if (!t) return setups;
+    return setups.filter((s) => s.nombre.toLowerCase().includes(t));
+  }, [setups, searchTerm]);
 
   return (
     <div className="fact-page">
@@ -327,7 +329,7 @@ export function SetupPage() {
           <div className="clientes-listado-wrap">
             <div className="d-flex justify-content-between align-items-center mb-2">
               <h6 className="fw-bold m-0">
-                📋 Listado de Setup ({filtered.length})
+                📋 Listado de Setup ({loading ? "…" : filtered.length})
                 {!canEdit && <span className="text-muted small ms-2">(solo consulta)</span>}
               </h6>
               {canEdit && (
@@ -347,9 +349,27 @@ export function SetupPage() {
             </div>
 
             {loading ? (
-              <div className="fact-empty">
-                <div className="fact-empty-icon">⏳</div>
-                <div className="fact-empty-text">₿</div>
+              <div className="table-responsive" style={{ minHeight: 200 }}>
+                <table className="table table-sm align-middle clientes-listado-table" style={{ fontSize: "0.85rem" }}>
+                  <thead className="table-dark">
+                    <tr>
+                      <th className="text-start">Nº</th>
+                      <th className="text-start">Nombre</th>
+                      <th className="text-start">Precio USD</th>
+                      {canEdit && <th className="text-start" style={{ width: "120px" }}>Acciones</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <tr key={i}>
+                        <td><span className="clientes-skeleton" style={{ width: "2em" }} /></td>
+                        <td><span className="clientes-skeleton" style={{ width: "10em" }} /></td>
+                        <td><span className="clientes-skeleton" style={{ width: "4em" }} /></td>
+                        {canEdit && <td><span className="clientes-skeleton" style={{ width: "5em" }} /></td>}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             ) : filtered.length === 0 ? (
               <div className="fact-empty">

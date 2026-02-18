@@ -33,10 +33,8 @@ export function LoginPage() {
     }
   }, [location.search, location.pathname, location.hash]);
 
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? "/";
-
   if (user) {
-    return <Navigate to={from} replace />;
+    return <Navigate to="/" replace />;
   }
 
   async function handleSubmit(e: React.FormEvent) {

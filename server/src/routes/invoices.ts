@@ -17,7 +17,7 @@ const LineItemSchema = z.object({
 });
 
 const InvoiceCreateSchema = z.object({
-  number: z.string().min(1).max(50),
+  number: z.string().min(1).max(50).optional(), /* ignorado: el servidor genera el número */
   type: z.enum(["Factura", "Recibo", "Nota de Crédito"]),
   clientName: z.string().min(1).max(200),
   date: z.string().min(1).max(50),
@@ -39,7 +39,42 @@ const TYPE_PREFIX: Record<string, string> = {
   "Nota de Crédito": "N"
 };
 
-/** GET /invoices/next-number?type=Factura|Recibo|Nota de Crédito&peek=1 — devuelve el siguiente número (ej. F001162, RC001162, NC001162; 6 dígitos). Si peek=1 no incrementa la secuencia (solo para vista previa). */
+const padDigits = 6;
+const MAX_NUM = 999999;
+const MIN_NUM = 1001;
+
+function parseInvoiceNum(numStr: string, prefix: string): number | null {
+  if (!numStr || !numStr.startsWith(prefix)) return null;
+  const rest = numStr.slice(prefix.length).replace(/^0+/, "") || "0";
+  const n = parseInt(rest, 10);
+  return Number.isFinite(n) && n >= MIN_NUM && n <= MAX_NUM ? n : null;
+}
+
+/** Obtiene el siguiente número válido: max(secuencia, max_en_db) + 1. Nunca repite números existentes. */
+async function getNextNumber(tx: { prepare: (s: string) => { get: (...p: unknown[]) => Promise<unknown>; all: (...p: unknown[]) => Promise<unknown[]>; run: (...p: unknown[]) => Promise<{ changes: number; lastInsertRowid: number | null }> } }, type: string, consume: boolean): Promise<string> {
+  const prefix = TYPE_PREFIX[type] ?? "F";
+  const formatNumber = (n: number) => `${prefix}${String(Math.min(MAX_NUM, Math.max(MIN_NUM, n))).padStart(padDigits, "0")}`;
+  const sanitizeNext = (n: number) => (n > MAX_NUM ? MIN_NUM : n);
+
+  const seqRow = (await tx.prepare("SELECT last_number FROM invoice_sequences WHERE type = ?").get(type)) as { last_number: number } | undefined;
+  const seqVal = seqRow?.last_number ?? 1000;
+
+  const rows = (await tx.prepare("SELECT number FROM invoices WHERE type = ?").all(type)) as { number: string }[];
+  const nums = (Array.isArray(rows) ? rows : [])
+    .map((r) => parseInvoiceNum(String(r?.number ?? ""), prefix))
+    .filter((n): n is number => n != null);
+  const maxInDb = nums.length > 0 ? Math.max(...nums) : 0;
+
+  const base = Math.max(seqVal, maxInDb, MIN_NUM - 1);
+  const nextNum = sanitizeNext(base + 1);
+
+  if (consume) {
+    await tx.prepare("UPDATE invoice_sequences SET last_number = ? WHERE type = ?").run(nextNum, type);
+  }
+  return formatNumber(nextNum);
+}
+
+/** GET /invoices/next-number?type=Factura|Recibo|Nota de Crédito&peek=1 — devuelve el siguiente número. Si peek=1 no incrementa la secuencia. */
 invoicesRouter.get("/invoices/next-number", requireRole("admin_a", "admin_b", "operador"), async (req, res) => {
   const q = z.object({
     type: z.enum(["Factura", "Recibo", "Nota de Crédito"]),
@@ -50,32 +85,14 @@ invoicesRouter.get("/invoices/next-number", requireRole("admin_a", "admin_b", "o
   }
   const type = q.data.type;
   const peek = q.data.peek === "1" || q.data.peek === "true";
-  const prefix = TYPE_PREFIX[type];
 
-  const padDigits = 6;
-  const formatNumber = (n: number) => `${prefix}${String(n).padStart(padDigits, "0")}`;
-
-  if (peek) {
-    const row = (await db.prepare("SELECT last_number FROM invoice_sequences WHERE type = ?").get(type)) as { last_number: number } | undefined;
-    if (!row) {
-      return res.status(500).json({ error: { message: "Secuencia no configurada para este tipo" } });
-    }
-    const number = formatNumber(row.last_number + 1);
+  try {
+    const number = await getNextNumber(db as never, type, !peek);
     return res.json({ number });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e ?? "");
+    return res.status(500).json({ error: { message: msg || "Secuencia no configurada" } });
   }
-
-  const number = await db.transaction(async (tx) => {
-    const row = (await tx.prepare("SELECT last_number FROM invoice_sequences WHERE type = ?").get(type)) as { last_number: number } | undefined;
-    if (!row) return null;
-    const nextNum = row.last_number + 1;
-    await tx.prepare("UPDATE invoice_sequences SET last_number = ? WHERE type = ?").run(nextNum, type);
-    return formatNumber(nextNum);
-  });
-
-  if (number === null) {
-    return res.status(500).json({ error: { message: "Secuencia no configurada para este tipo" } });
-  }
-  res.json({ number });
 });
 
 invoicesRouter.get("/invoices", async (req, res) => {
@@ -122,9 +139,15 @@ invoicesRouter.get("/invoices", async (req, res) => {
 invoicesRouter.post("/invoices", requireRole("admin_a", "admin_b", "operador"), async (req, res) => {
   const parsed = InvoiceCreateSchema.safeParse(req.body);
   if (!parsed.success) {
+    const details = parsed.error.flatten();
+    const msg = details.fieldErrors && Object.keys(details.fieldErrors).length > 0
+      ? Object.entries(details.fieldErrors)
+          .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`)
+          .join("; ")
+      : "Invalid body";
     return res
       .status(400)
-      .json({ error: { message: "Invalid body", details: parsed.error.flatten() } });
+      .json({ error: { message: msg, details: parsed.error.flatten() } });
   }
 
   const inv = parsed.data;
@@ -134,12 +157,14 @@ invoicesRouter.post("/invoices", requireRole("admin_a", "admin_b", "operador"), 
 
   try {
     const created = await db.transaction(async (tx) => {
+      const numberToUse = await getNextNumber(tx as never, inv.type, true);
+
       const info = await tx.prepare(`
         INSERT INTO invoices (number, type, ${clientNameCol()}, date, month, subtotal, discounts, total,
                               related_invoice_id, related_invoice_number, payment_date, emission_time, due_date)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
-        inv.number,
+        numberToUse,
         inv.type,
         inv.clientName,
         inv.date,
@@ -161,21 +186,22 @@ invoicesRouter.post("/invoices", requireRole("admin_a", "admin_b", "operador"), 
       for (const item of inv.items) {
         await insertItem.run(invoiceId, item.service, item.month, item.quantity, item.price, item.discount);
       }
-      const row = await tx.prepare(
+      const createdRow = await tx.prepare(
         `SELECT id, number, type, ${clientNameCol()} as clientName, date, month, subtotal, discounts, total,
                 related_invoice_id as relatedInvoiceId, related_invoice_number as relatedInvoiceNumber,
                 payment_date as paymentDate, emission_time as emissionTime, due_date as dueDate
          FROM invoices WHERE id = ?`
       ).get(invoiceId);
-      return row;
+      return createdRow;
     });
     res.status(201).json({ invoice: created });
   } catch (e: unknown) {
-    const err = e as { code?: string };
+    const err = e as { code?: string; message?: string };
     if (err?.code?.includes("SQLITE_CONSTRAINT") || err?.code === "23505") {
       return res.status(409).json({ error: { message: "Invoice number already exists" } });
     }
-    throw e;
+    const msg = err?.message ?? (e instanceof Error ? e.message : String(e ?? "Error al guardar"));
+    return res.status(500).json({ error: { message: msg } });
   }
 });
 

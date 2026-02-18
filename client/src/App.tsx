@@ -39,7 +39,7 @@ function App() {
             <Route path="/hosting/control-documentos-cobros" element={<FacturasMesHostingPage />} />
             <Route path="/facturacion-hosting" element={<FacturacionPage />} />
             <Route path="/historial" element={<HistorialPage />} />
-            <Route path="/historial-hosting" element={<Navigate to="/historial" replace />} />
+            <Route path="/historial-hosting" element={<HistorialPage sourceFilter="hosting" />} />
             <Route path="/pendientes-hosting" element={<PendientesPage />} />
             <Route path="/facturacion" element={<Navigate to="/facturacion-hosting" replace />} />
             <Route path="/pendientes" element={<Navigate to="/pendientes-hosting" replace />} />

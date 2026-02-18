@@ -39,7 +39,8 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
       }
       req.user = { id: row.id, username: row.username, email: row.email ?? row.username, role: row.role as UserRole };
       next();
-    } catch {
+    } catch (e) {
+      if (res.headersSent) return;
       res.status(401).json({ error: { message: "Token inválido o expirado" } });
     }
   })();

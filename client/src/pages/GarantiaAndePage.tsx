@@ -76,7 +76,7 @@ export function GarantiaAndePage() {
   const { user } = useAuth();
   const [clientQuery, setClientQuery] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
-  const [selectedClientId, setSelectedClientId] = useState<number | "">("");
+  const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [items, setItems] = useState<LineItem[]>([]);
   const [equiposAsic, setEquiposAsic] = useState<EquipoASIC[]>([]);
   const [setups, setSetups] = useState<Setup[]>([]);
@@ -99,7 +99,7 @@ export function GarantiaAndePage() {
   const number = useMemo(() => nextValeNumber(emittedVales, tipoGarantia), [emittedVales, tipoGarantia]);
   const totals = useMemo(() => calcTotals(items), [items]);
   const selectedClient = useMemo(
-    () => (selectedClientId === "" ? null : clients.find((c) => (c.id ?? c.code) === selectedClientId) ?? null),
+    () => (selectedClientId ? clients.find((c) => String(c.id ?? "") === String(selectedClientId)) ?? null : null),
     [clients, selectedClientId]
   );
   const visibleClients = useMemo(() => {
@@ -109,6 +109,15 @@ export function GarantiaAndePage() {
       (c) => `${c.code} - ${c.name}`.toLowerCase().includes(q) || c.name.toLowerCase().includes(q)
     );
   }, [clients, clientQuery]);
+
+  /** Lista para el select: incluye siempre el cliente seleccionado aunque no coincida con el filtro */
+  const clientsForSelect = useMemo(() => {
+    if (!selectedClientId) return visibleClients;
+    const sel = clients.find((c) => String(c.id ?? "") === String(selectedClientId));
+    if (!sel) return visibleClients;
+    if (visibleClients.some((c) => String(c.id ?? "") === String(selectedClientId))) return visibleClients;
+    return [sel, ...visibleClients];
+  }, [clients, visibleClients, selectedClientId]);
 
   /** Recibos del cliente que aún no tienen un Recibo Devolución que los cancele (solo para tipo "Recibo Devolución"). */
   const recibosDisponiblesParaDevolucion = useMemo(() => {
@@ -452,12 +461,12 @@ export function GarantiaAndePage() {
                     className="fact-select"
                     size={8}
                     value={selectedClientId}
-                    onChange={(e) => setSelectedClientId(e.target.value === "" ? "" : Number(e.target.value))}
+                    onChange={(e) => setSelectedClientId(e.target.value)}
                     style={{ marginTop: "0.5rem" }}
                   >
                     <option value="">Seleccione cliente</option>
-                    {visibleClients.map((c) => (
-                      <option key={c.id ?? c.code} value={c.id ?? ""}>
+                    {clientsForSelect.map((c) => (
+                      <option key={c.id ?? c.code} value={String(c.id ?? "")}>
                         {c.code} - {c.name}
                       </option>
                     ))}
@@ -536,8 +545,8 @@ export function GarantiaAndePage() {
                             type="button"
                             className="fact-detail-servicios-btn-clear"
                             onClick={() => !itemsLocked && setItems([])}
-                            disabled={itemsLocked}
-                            title={itemsLocked ? "Detalles bloqueados (Recibo Devolución vinculado a un Recibo)" : "Vaciar lista"}
+                            disabled={itemsLocked || !selectedClient || items.length === 0}
+                            title={itemsLocked ? "Detalles bloqueados (Recibo Devolución vinculado a un Recibo)" : !selectedClient ? "Primero debe seleccionar un cliente" : items.length === 0 ? "No hay ítems para borrar" : "Vaciar lista"}
                           >
                             🗑️ Borrar
                           </button>
@@ -545,8 +554,8 @@ export function GarantiaAndePage() {
                             type="button"
                             className="fact-detail-servicios-btn-add"
                             onClick={addItem}
-                            disabled={!canEdit || itemsLocked}
-                            title={itemsLocked ? "No se pueden agregar ítems; vienen del Recibo seleccionado" : undefined}
+                            disabled={!canEdit || itemsLocked || !selectedClient}
+                            title={itemsLocked ? "No se pueden agregar ítems; vienen del Recibo seleccionado" : !selectedClient ? "Primero debe seleccionar un cliente" : undefined}
                           >
                             + Agregar ítem
                           </button>
