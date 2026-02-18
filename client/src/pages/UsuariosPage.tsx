@@ -39,6 +39,7 @@ export function UsuariosPage() {
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activityLoading, setActivityLoading] = useState(true);
+  const [activityError, setActivityError] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<"new" | UserListItem | null>(null);
   const [deleteConfirmUser, setDeleteConfirmUser] = useState<UserListItem | null>(null);
@@ -52,9 +53,16 @@ export function UsuariosPage() {
 
   function loadActivity() {
     setActivityLoading(true);
+    setActivityError(false);
     getUsersActivity(200)
-      .then((r) => setActivity(r.activity))
-      .catch(() => setActivity([]))
+      .then((r) => {
+        setActivity(Array.isArray(r?.activity) ? r.activity : []);
+        setActivityError(false);
+      })
+      .catch(() => {
+        setActivity([]);
+        setActivityError(true);
+      })
       .finally(() => setActivityLoading(false));
   }
 
@@ -124,6 +132,7 @@ export function UsuariosPage() {
           showToast("Usuario creado correctamente.", "success", toastContext);
           setModal(null);
           loadUsers();
+          loadActivity();
         })
         .catch((err) => showToast(`Error al crear usuario: ${err instanceof Error ? err.message : "Error desconocido"}`, "error", toastContext))
         .finally(() => setSaving(false));
@@ -272,12 +281,20 @@ export function UsuariosPage() {
                 {activityLoading ? (
                   <div className="activity-loading">
                     <div className="spinner-border" role="status" aria-label="Cargando" />
-                    <p className="mt-2 mb-0 small">₿</p>
+                    <p className="mt-2 mb-0 small text-muted">Cargando actividad...</p>
+                  </div>
+                ) : activityError ? (
+                  <div className="empty-activity">
+                    <i className="bi bi-exclamation-triangle text-warning" />
+                    <p className="mb-2">No se pudo cargar la actividad. Si estás en Vercel, verificá que la API esté desplegada (Root Directory en raíz del repo).</p>
+                    <button type="button" className="btn btn-sm btn-outline-secondary" onClick={loadActivity}>
+                      Reintentar
+                    </button>
                   </div>
                 ) : activity.length === 0 ? (
                   <div className="empty-activity">
                     <i className="bi bi-inbox" />
-                    Sin registros aún
+                    <p className="mb-0">Sin registros aún. La actividad se mostrará cuando los usuarios inicien o cierren sesión.</p>
                   </div>
                 ) : (
                   <div className="usuarios-activity-listado-wrap">

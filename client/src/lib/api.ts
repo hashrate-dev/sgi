@@ -105,6 +105,29 @@ function fetchWithTimeout(url: string, opts: RequestInit, timeoutMs: number): Pr
   return fetch(url, { ...opts, signal: ac.signal }).finally(() => clearTimeout(t));
 }
 
+/** Fetch sin reintentos ni timeouts largos. Para endpoints que no deben colgar la UI (ej. actividad). */
+async function apiNoRetry<T>(path: string, timeoutMs = 10000): Promise<T> {
+  const token = getStoredToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let base = getApiBase();
+  const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
+  if (h.endsWith(".vercel.app")) base = "";
+  const url = base && base.trim() !== "" ? `${base}${path}` : path;
+  const res = await fetchWithTimeout(url, { method: "GET", headers, credentials: "include" }, timeoutMs);
+  const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    if (token) {
+      clearStoredAuth();
+      const cb = typeof window !== "undefined" ? (window as unknown as { __on401?: () => void }).__on401 : undefined;
+      if (typeof cb === "function") cb();
+    }
+    throw new Error((data as { error?: { message?: string } })?.error?.message ?? "Sesión expirada.");
+  }
+  if (!res.ok) throw new Error((data as { error?: { message?: string } })?.error?.message ?? res.statusText);
+  return data as T;
+}
+
 export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const token = getStoredToken();
   const headers: Record<string, string> = { "Content-Type": "application/json", ...(options?.headers as Record<string, string>) };
@@ -275,7 +298,7 @@ export type UsersActivityResponse = { activity: ActivityItem[] };
 
 export function getUsersActivity(limit?: number): Promise<UsersActivityResponse> {
   const q = limit != null ? `?limit=${limit}` : "";
-  return api<UsersActivityResponse>(`/api/users/activity${q}`);
+  return apiNoRetry<UsersActivityResponse>(`/api/users/activity${q}`, 12000);
 }
 
 export function logoutApi(): Promise<void> {
