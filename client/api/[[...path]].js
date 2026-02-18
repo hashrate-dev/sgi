@@ -85,6 +85,19 @@ export default async function handler(req, res) {
     }
   }
 
+  // Fallback: DELETE/PUT /api/setups/:id si el handler dedicado no matchea
+  const setupsIdMatch = path.match(/^\/api\/setups\/(.+)$/);
+  if (setupsIdMatch && (req.method === "DELETE" || req.method === "PUT")) {
+    try {
+      const id = decodeURIComponent(setupsIdMatch[1]);
+      const { default: setupsIdHandler } = await import("./setups/[id].js");
+      const reqWithQuery = { ...req, query: { ...(req.query || {}), id } };
+      return setupsIdHandler(reqWithQuery, res);
+    } catch (e) {
+      /* seguir al app */
+    }
+  }
+
   const app = await getApp();
   // Normalizar req.url para Express (Vercel puede pasar URL completa)
   const pathname = path.startsWith("/") ? path : `/${path}`;
