@@ -17,17 +17,18 @@ async function getApp() {
 }
 
 export default async function handler(req, res) {
-  const path = req.url?.split("?")[0] ?? "";
+  const rawUrl = req.url ?? "";
+  const path = (rawUrl.startsWith("http") ? new URL(rawUrl).pathname : rawUrl).split("?")[0] ?? "";
   res.setHeader("Content-Type", "application/json");
 
   // /api/health responde de inmediato (sin esperar DB)
-  if (path === "/api/health" || path.endsWith("/health")) {
+  if (path === "/api/health" || path.endsWith("/health") || path === "/health") {
     res.status(200).end(JSON.stringify({ ok: true }));
     return;
   }
 
   // /api/test-db: diagnóstico de conexión a Supabase
-  if (path === "/api/test-db" || path.endsWith("/test-db")) {
+  if (path === "/api/test-db" || path.endsWith("/test-db") || path === "/test-db") {
     try {
       const { initDb, getDb } = await import("../server/dist/db.js");
       await initDb();
@@ -41,7 +42,7 @@ export default async function handler(req, res) {
   }
 
   // /api/login-debug: diagnóstico del login (ensureDefaultUser + listar usuarios)
-  if (path === "/api/login-debug" || path.endsWith("/login-debug")) {
+  if (path === "/api/login-debug" || path.endsWith("/login-debug") || path === "/login-debug" || path.includes("login-debug")) {
     try {
       const { initDb, getDb } = await import("../server/dist/db.js");
       const { ensureDefaultUser } = await import("../server/dist/routes/auth.js");
