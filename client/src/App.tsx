@@ -15,7 +15,6 @@ import { PendientesMineriaPage } from "./pages/PendientesMineriaPage";
 import { ClientesPage } from "./pages/ClientesPage";
 import { ClienteEditPage } from "./pages/ClienteEditPage";
 import { EquiposAsicPage } from "./pages/EquiposAsicPage";
-import { EquiposAsicNuevoPage } from "./pages/EquiposAsicNuevoPage";
 import { SetupPage } from "./pages/SetupPage";
 import { ReportesPage } from "./pages/ReportesPage";
 import { UsuariosPage } from "./pages/UsuariosPage";
@@ -45,7 +44,7 @@ function App() {
             <Route path="/pendientes" element={<Navigate to="/pendientes-hosting" replace />} />
             <Route path="/equipos-asic" element={<MineriaHubPage />} />
             <Route path="/equipos-asic/equipos" element={<EquiposAsicPage />} />
-            <Route path="/equipos-asic/equipos/nuevos" element={<EquiposAsicNuevoPage />} />
+            <Route path="/equipos-asic/equipos/nuevos" element={<Navigate to="/equipos-asic/equipos" replace />} />
             <Route path="/equipos-asic/setup" element={<SetupPage />} />
             <Route path="/equipos-asic/garantia-ande" element={<GarantiaAndePage />} />
             <Route path="/equipos-asic/items-garantia" element={<GarantiasAndeItemsPage />} />

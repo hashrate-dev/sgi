@@ -502,3 +502,66 @@ export function deleteSetup(id: string): Promise<void> {
 export function deleteSetupsAll(): Promise<{ ok: boolean }> {
   return api<{ ok: boolean }>("/api/setups", { method: "DELETE" });
 }
+
+// ——— Equipos ASIC (backend) ———
+export type EquiposResponse = { items: import("./types.js").EquipoASIC[] };
+
+export function getEquipos(): Promise<EquiposResponse> {
+  return api<EquiposResponse>("/api/equipos");
+}
+
+export function createEquipo(data: {
+  fechaIngreso: string;
+  marcaEquipo: string;
+  modelo: string;
+  procesador: string;
+  precioUSD?: number;
+  observaciones?: string;
+}): Promise<{ ok: boolean; id: string; numeroSerie: string }> {
+  return api<{ ok: boolean; id: string; numeroSerie: string }>("/api/equipos", {
+    method: "POST",
+    body: JSON.stringify({ ...data, precioUSD: data.precioUSD ?? 0 }),
+  });
+}
+
+export function updateEquipo(
+  id: string,
+  data: {
+    fechaIngreso: string;
+    marcaEquipo: string;
+    modelo: string;
+    procesador: string;
+    precioUSD?: number;
+    observaciones?: string;
+  }
+): Promise<{ ok: boolean }> {
+  return api<{ ok: boolean }>(`/api/equipos/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify({ ...data, precioUSD: data.precioUSD ?? 0 }),
+  });
+}
+
+export function deleteEquipo(id: string): Promise<void> {
+  return api<void>(`/api/equipos/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export function deleteEquiposAll(): Promise<{ ok: boolean }> {
+  return api<{ ok: boolean }>("/api/equipos", { method: "DELETE" });
+}
+
+export function createEquiposBulk(
+  items: Array<{
+    fechaIngreso: string;
+    marcaEquipo: string;
+    modelo: string;
+    procesador: string;
+    precioUSD?: number;
+    observaciones?: string;
+    numeroSerie?: string;
+  }>
+): Promise<{ ok: boolean; inserted: number }> {
+  return api<{ ok: boolean; inserted: number }>("/api/equipos/bulk", {
+    method: "POST",
+    body: JSON.stringify(items),
+  });
+}

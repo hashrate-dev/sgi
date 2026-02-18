@@ -1,18 +1,21 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
-import { loadEquiposAsic, saveEquiposAsic } from "../lib/storage";
+import {
+  getEquipos,
+  createEquipo,
+  updateEquipo,
+  deleteEquipo,
+  deleteEquiposAll,
+  createEquiposBulk,
+  wakeUpBackend,
+} from "../lib/api";
 import type { EquipoASIC } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
 import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import { canDeleteClientes, canEditClientes, canExport } from "../lib/auth";
 import "../styles/facturacion.css";
-
-function genId() {
-  return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
-}
 
 function findCol(headerRow: (string | number)[], ...names: string[]): number {
   for (let i = 1; i < headerRow.length; i++) {
@@ -102,7 +105,9 @@ export function EquiposAsicPage() {
   const canDelete = user ? canDeleteClientes(user.role) : false;
   const canEdit = user ? canEditClientes(user.role) : false;
   const canExportData = user ? canExport(user.role) : false;
-  const [equipos, setEquipos] = useState<EquipoASIC[]>(() => loadEquiposAsic());
+  const [equipos, setEquipos] = useState<EquipoASIC[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [showDeleteConfirm1, setShowDeleteConfirm1] = useState(false);
   const [showDeleteConfirm2, setShowDeleteConfirm2] = useState(false);
@@ -120,56 +125,89 @@ export function EquiposAsicPage() {
   });
 
   useEffect(() => {
-    let loaded = loadEquiposAsic();
-    const withoutSerie = loaded.filter((e) => !e.numeroSerie);
-    if (withoutSerie.length > 0) {
-      const used = new Set(loaded.filter((e) => e.numeroSerie).map((e) => e.numeroSerie!));
-      let n = 1;
-      while (used.has(`M${String(n).padStart(3, "0")}`)) n++;
-      loaded = loaded.map((e) => {
-        if (e.numeroSerie) return e;
-        const ns = `M${String(n).padStart(3, "0")}`;
-        n++;
-        used.add(ns);
-        return { ...e, numeroSerie: ns };
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
+    wakeUpBackend()
+      .then(() => getEquipos())
+      .then((res) => {
+        if (!cancelled) {
+          setEquipos(res.items ?? []);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setLoadError(err instanceof Error ? err.message : "Error al cargar equipos");
+          setEquipos([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
-      saveEquiposAsic(loaded);
-    }
-    setEquipos(loaded);
+    return () => { cancelled = true; };
   }, []);
 
-  function handleSave() {
+  async function handleSave() {
     if (!formData.marcaEquipo || !formData.modelo || !formData.procesador) {
       showToast("Debe completar Marca, Modelo y Procesador.", "error", "Equipos ASIC");
       return;
     }
 
-    const updated = [...equipos];
-    if (editingEquipo) {
-      const idx = updated.findIndex((e) => e.id === editingEquipo.id);
-      if (idx >= 0) {
-        updated[idx] = { ...editingEquipo, ...formData };
+    try {
+      if (editingEquipo) {
+        await updateEquipo(editingEquipo.id, {
+          fechaIngreso: formData.fechaIngreso,
+          marcaEquipo: formData.marcaEquipo,
+          modelo: formData.modelo,
+          procesador: formData.procesador,
+          precioUSD: formData.precioUSD,
+          observaciones: formData.observaciones || undefined,
+        });
+        setEquipos((prev) =>
+          prev.map((e) =>
+            e.id === editingEquipo.id
+              ? { ...e, ...formData }
+              : e
+          )
+        );
+        showToast("Equipo actualizado correctamente.", "success", "Equipos ASIC");
+      } else {
+        const res = await createEquipo({
+          fechaIngreso: formData.fechaIngreso,
+          marcaEquipo: formData.marcaEquipo,
+          modelo: formData.modelo,
+          procesador: formData.procesador,
+          precioUSD: formData.precioUSD,
+          observaciones: formData.observaciones || undefined,
+        });
+        setEquipos((prev) => [
+          ...prev,
+          {
+            id: res.id,
+            numeroSerie: res.numeroSerie,
+            fechaIngreso: formData.fechaIngreso,
+            marcaEquipo: formData.marcaEquipo,
+            modelo: formData.modelo,
+            procesador: formData.procesador,
+            precioUSD: formData.precioUSD,
+            observaciones: formData.observaciones || undefined,
+          },
+        ]);
+        showToast("Equipo agregado correctamente.", "success", "Equipos ASIC");
       }
-      showToast("Equipo actualizado correctamente.", "success", "Equipos ASIC");
-    } else {
-      updated.push({
-        id: genId(),
-        ...formData,
+      setShowAddModal(false);
+      setEditingEquipo(null);
+      setFormData({
+        fechaIngreso: new Date().toISOString().split("T")[0],
+        marcaEquipo: "",
+        modelo: "",
+        procesador: "",
+        precioUSD: 0,
+        observaciones: "",
       });
-      showToast("Equipo agregado correctamente.", "success", "Equipos ASIC");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Error al guardar", "error", "Equipos ASIC");
     }
-    saveEquiposAsic(updated);
-    setEquipos(updated);
-    setShowAddModal(false);
-    setEditingEquipo(null);
-    setFormData({
-      fechaIngreso: new Date().toISOString().split("T")[0],
-      marcaEquipo: "",
-      modelo: "",
-      procesador: "",
-      precioUSD: 0,
-      observaciones: "",
-    });
   }
 
   function handleEdit(e: EquipoASIC) {
@@ -185,11 +223,14 @@ export function EquiposAsicPage() {
     setShowAddModal(true);
   }
 
-  function handleDelete(e: EquipoASIC) {
-    const updated = equipos.filter((eq) => eq.id !== e.id);
-    saveEquiposAsic(updated);
-    setEquipos(updated);
-    showToast("Equipo eliminado correctamente.", "success", "Equipos ASIC");
+  async function handleDelete(e: EquipoASIC) {
+    try {
+      await deleteEquipo(e.id);
+      setEquipos((prev) => prev.filter((eq) => eq.id !== e.id));
+      showToast("Equipo eliminado correctamente.", "success", "Equipos ASIC");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Error al eliminar", "error", "Equipos ASIC");
+    }
   }
 
   function handleDeleteAllClick() {
@@ -201,13 +242,18 @@ export function EquiposAsicPage() {
     setShowDeleteConfirm2(true);
   }
 
-  function handleDeleteConfirm2() {
+  async function handleDeleteConfirm2() {
     setShowDeleteConfirm2(false);
     setDeleting(true);
-    saveEquiposAsic([]);
-    setEquipos([]);
-    showToast("Todos los equipos han sido eliminados.", "success", "Equipos ASIC");
-    setDeleting(false);
+    try {
+      await deleteEquiposAll();
+      setEquipos([]);
+      showToast("Todos los equipos han sido eliminados.", "success", "Equipos ASIC");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Error al eliminar", "error", "Equipos ASIC");
+    } finally {
+      setDeleting(false);
+    }
   }
 
   function handleDeleteCancel() {
@@ -235,28 +281,21 @@ export function EquiposAsicPage() {
         setExcelLoading(false);
         return;
       }
-      const used = new Set(equipos.filter((e) => e.numeroSerie).map((e) => e.numeroSerie!));
-      let nextNum = 1;
-      while (used.has(`M${String(nextNum).padStart(3, "0")}`)) nextNum++;
-
-      const newEquipos: EquipoASIC[] = parsed.map((row) => {
-        const fromFile = row.numeroSerie && row.numeroSerie.trim() && !used.has(row.numeroSerie.trim());
-        const numeroSerie = fromFile ? row.numeroSerie!.trim() : `M${String(nextNum).padStart(3, "0")}`;
-        if (!fromFile) nextNum++;
-        used.add(numeroSerie);
-        const { numeroSerie: _sr, ...rest } = row;
-        return {
-          id: genId(),
-          numeroSerie,
-          ...rest,
-        };
-      });
-      const updated = [...equipos, ...newEquipos];
-      saveEquiposAsic(updated);
-      setEquipos(updated);
-      showToast(`Se importaron ${newEquipos.length} equipo(s) correctamente.`, "success", "Equipos ASIC");
+      const items = parsed.map((row) => ({
+        fechaIngreso: row.fechaIngreso,
+        marcaEquipo: row.marcaEquipo,
+        modelo: row.modelo,
+        procesador: row.procesador,
+        precioUSD: row.precioUSD ?? 0,
+        observaciones: row.observaciones,
+        numeroSerie: row.numeroSerie,
+      }));
+      const res = await createEquiposBulk(items);
+      const { items: updated } = await getEquipos();
+      setEquipos(updated ?? []);
+      showToast(`Se importaron ${res.inserted} equipo(s) correctamente.`, "success", "Equipos ASIC");
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Error al leer el archivo Excel.", "error", "Equipos ASIC");
+      showToast(err instanceof Error ? err.message : "Error al importar Excel.", "error", "Equipos ASIC");
     } finally {
       setExcelLoading(false);
     }
@@ -334,7 +373,7 @@ export function EquiposAsicPage() {
   });
 
   return (
-    <div className="fact-page">
+    <div className="fact-page clientes-page">
       <div className="container">
         <PageHeader title="Equipos ASIC" />
 
@@ -412,17 +451,39 @@ export function EquiposAsicPage() {
             <div className="d-flex justify-content-between align-items-center mb-2">
               <h6 className="fw-bold m-0">⚙️ Listado de Equipos ASIC ({filteredEquipos.length}){!canEdit && <span className="text-muted small ms-2">(solo consulta)</span>}</h6>
               {canEdit && (
-                <Link
-                  to="/equipos-asic/equipos/nuevos"
+                <button
+                  type="button"
                   className="fact-btn fact-btn-primary btn-sm"
-                  style={{ fontSize: "0.8125rem", padding: "0.5rem 1rem", textDecoration: "none" }}
+                  style={{ fontSize: "0.8125rem", padding: "0.5rem 1rem", textDecoration: "none", display: "inline-block", color: "inherit" }}
+                  onClick={() => {
+                    setEditingEquipo(null);
+                    setFormData({
+                      fechaIngreso: new Date().toISOString().split("T")[0],
+                      marcaEquipo: "",
+                      modelo: "",
+                      procesador: "",
+                      precioUSD: 0,
+                      observaciones: "",
+                    });
+                    setShowAddModal(true);
+                  }}
                 >
                   ➕ Nuevo Equipo
-                </Link>
+                </button>
               )}
             </div>
 
-            {filteredEquipos.length === 0 ? (
+            {loading ? (
+              <div className="fact-empty">
+                <div className="fact-empty-icon">⏳</div>
+                <div className="fact-empty-text">Cargando equipos...</div>
+              </div>
+            ) : loadError ? (
+              <div className="fact-empty">
+                <div className="fact-empty-icon text-danger">⚠️</div>
+                <div className="fact-empty-text">{loadError}</div>
+              </div>
+            ) : filteredEquipos.length === 0 ? (
               <div className="fact-empty">
                 <div className="fact-empty-icon">⚙️</div>
                 <div className="fact-empty-text">
@@ -527,14 +588,25 @@ export function EquiposAsicPage() {
         )}
 
         {showAddModal && (
-          <div className="modal d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} tabIndex={-1}>
-            <div className="modal-dialog modal-dialog-centered modal-lg">
-              <div className="modal-content fact-card" style={{ border: "none", borderRadius: "8px", overflow: "hidden" }}>
-                <div className="fact-card-header d-flex align-items-center justify-content-between">
-                  <span>{editingEquipo ? "Editar Equipo ASIC" : "Nuevo Equipo ASIC"}</span>
-                  <button type="button" className="btn-close" onClick={() => { setShowAddModal(false); setEditingEquipo(null); }} aria-label="Cerrar" />
+          <div className="modal d-block professional-modal-overlay" tabIndex={-1}>
+            <div className="modal-dialog modal-dialog-centered modal-lg clientes-new-modal-dialog">
+              <div className="modal-content professional-modal professional-modal-form clientes-new-modal-content">
+                <div className="modal-header professional-modal-header">
+                  <div className="professional-modal-icon-wrapper">
+                    <svg className="professional-modal-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                  <h5 className="modal-title professional-modal-title">
+                    {editingEquipo ? "Editar Equipo ASIC" : "Agregar nuevo equipo"}
+                  </h5>
+                  <button type="button" className="professional-modal-close" onClick={() => { setShowAddModal(false); setEditingEquipo(null); }} aria-label="Cerrar">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M18 6L6 18M6 6L18 18" strokeLinecap="round"/>
+                    </svg>
+                  </button>
                 </div>
-                <div className="fact-card-body">
+                <div className="modal-body">
                   <div className="client-form-grid-4">
                     <div className="client-form-column">
                       <h3 className="client-form-section-title">Identificación</h3>
@@ -593,22 +665,6 @@ export function EquiposAsicPage() {
                           value={formData.procesador}
                           onChange={(e) => setFormData({ ...formData, procesador: e.target.value })}
                           placeholder="Ej: SHA-256"
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div className="client-form-column" style={{ gridColumn: "span 2" }}>
-                      <h3 className="client-form-section-title">Precio</h3>
-                      <div className="fact-field">
-                        <label className="fact-label">Precio USD *</label>
-                        <input
-                          type="number"
-                          className="fact-input"
-                          min={0}
-                          step={1}
-                          value={formData.precioUSD}
-                          onChange={(e) => setFormData({ ...formData, precioUSD: Math.max(0, Math.round(Number(e.target.value) || 0)) })}
-                          placeholder="0"
                           required
                         />
                       </div>

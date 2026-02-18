@@ -111,6 +111,17 @@ CREATE TABLE IF NOT EXISTS setups (
   precio_usd INTEGER NOT NULL DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS equipos_asic (
+  id TEXT PRIMARY KEY,
+  numero_serie TEXT,
+  fecha_ingreso TEXT NOT NULL,
+  marca_equipo TEXT NOT NULL,
+  modelo TEXT NOT NULL,
+  procesador TEXT NOT NULL,
+  precio_usd INTEGER NOT NULL DEFAULT 0,
+  observaciones TEXT
+);
+
 -- Columnas extra que el app puede agregar si no existen (opcional)
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS related_invoice_id INTEGER;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS related_invoice_number TEXT;

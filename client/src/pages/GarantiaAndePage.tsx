@@ -7,14 +7,14 @@ import {
   getNextGarantiaNumber,
   getClients,
   getSetups,
+  getEquipos,
+  wakeUpBackend,
   type GarantiasEmittedResponse,
   type GarantiasItemsResponse,
   type ClientsResponse,
-  type SetupsResponse,
 } from "../lib/api";
 import { formatAmount, formatUSD } from "../lib/formatCurrency.js";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
-import { loadEquiposAsic } from "../lib/storage";
 import type { Client, EquipoASIC, Invoice, ItemGarantiaAnde, LineItem, Setup } from "../lib/types";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { PageHeader } from "../components/PageHeader";
@@ -174,10 +174,16 @@ export function GarantiaAndePage() {
   }, [relatedReciboId, tipoGarantia, selectedClient, emittedVales]);
 
   useEffect(() => {
-    setEquiposAsic(loadEquiposAsic());
-    getSetups()
-      .then((r: SetupsResponse) => setSetups(r.items || []))
-      .catch(() => setSetups([]));
+    wakeUpBackend()
+      .then(() => Promise.all([getEquipos(), getSetups()]))
+      .then(([equiposRes, setupsRes]) => {
+        setEquiposAsic(equiposRes.items ?? []);
+        setSetups(setupsRes.items ?? []);
+      })
+      .catch(() => {
+        setEquiposAsic([]);
+        setSetups([]);
+      });
   }, []);
 
   useEffect(() => {

@@ -137,6 +137,17 @@ CREATE TABLE IF NOT EXISTS setups (
   nombre TEXT NOT NULL,
   precio_usd INTEGER NOT NULL DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS equipos_asic (
+  id TEXT PRIMARY KEY,
+  numero_serie TEXT,
+  fecha_ingreso TEXT NOT NULL,
+  marca_equipo TEXT NOT NULL,
+  modelo TEXT NOT NULL,
+  procesador TEXT NOT NULL,
+  precio_usd INTEGER NOT NULL DEFAULT 0,
+  observaciones TEXT
+);
 `);
 
   const hasLegacyAdmin = native.prepare("SELECT 1 FROM users WHERE role = 'admin' LIMIT 1").get();

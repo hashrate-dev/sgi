@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { addEmittedDocument, createInvoice, getEmittedDocuments, getClients, getNextInvoiceNumber, getSetups, type InvoiceCreateBody, type SetupsResponse } from "../lib/api";
+import { addEmittedDocument, createInvoice, getEmittedDocuments, getClients, getEquipos, getNextInvoiceNumber, getSetups, wakeUpBackend, type InvoiceCreateBody } from "../lib/api";
 import { serviceCatalog } from "../lib/constants";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
-import { loadEquiposAsic, loadInvoicesAsic, saveInvoicesAsic } from "../lib/storage";
+import { loadInvoicesAsic, saveInvoicesAsic } from "../lib/storage";
 import type { Client, ComprobanteType, EquipoASIC, Invoice, LineItem, Setup } from "../lib/types";
 import { Link, useLocation } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
@@ -98,10 +98,16 @@ export function FacturacionMineriaPage() {
   // Recargar desde localStorage/API al montar
   useEffect(() => {
     setInvoices(loadInvoicesAsic());
-    setEquiposAsic(loadEquiposAsic());
-    getSetups()
-      .then((r: SetupsResponse) => setSetups(r.items || []))
-      .catch(() => setSetups([]));
+    wakeUpBackend()
+      .then(() => Promise.all([getEquipos(), getSetups()]))
+      .then(([equiposRes, setupsRes]) => {
+        setEquiposAsic(equiposRes.items ?? []);
+        setSetups(setupsRes.items ?? []);
+      })
+      .catch(() => {
+        setEquiposAsic([]);
+        setSetups([]);
+      });
   }, []);
 
   /** Emoji naranja 🔖 solo las primeras 22 h; la tabla muestra documentos hasta 10 días 22 h */
