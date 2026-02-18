@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "npx tsc -b && npx vite build",
+    "build:vercel": "cd .. && npm run build",
     "lint": "eslint .",
     "preview": "vite preview",
     "make-logo-transparent": "node scripts/make-logo-transparent.mjs"
