@@ -208,7 +208,7 @@ export function HistorialGarantiasPage() {
           month: "",
           items: [],
         };
-        await addGarantiaEmitted(inv, emittedAt);
+        await addGarantiaEmitted(inv, emittedAt, { preserveNumber: true });
       }
       const res = await getGarantiasEmitted();
       setItems(res.items as { invoice: Invoice; emittedAt: string }[]);

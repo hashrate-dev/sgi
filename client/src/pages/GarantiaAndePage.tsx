@@ -4,6 +4,7 @@ import {
   addGarantiaEmitted,
   getGarantiasEmitted,
   getGarantiasItems,
+  getNextGarantiaNumber,
   getClients,
   getSetups,
   type GarantiasEmittedResponse,
@@ -90,13 +91,18 @@ export function GarantiaAndePage() {
   const [itemsLocked, setItemsLocked] = useState(false);
   /** Documento emitido a mostrar en la Vista previa (al hacer clic en el botón ojo). */
   const [previewEmitted, setPreviewEmitted] = useState<{ invoice: Invoice; emittedAt: string } | null>(null);
+  /** Número de vista previa desde el servidor (evita duplicados); fallback a nextValeNumber si falla la API */
+  const [nextNumFromApi, setNextNumFromApi] = useState<string | null>(null);
 
   const emittedInLast5Days = useMemo(() => {
     const now = Date.now();
     return emittedVales.filter((item) => now - new Date(item.emittedAt).getTime() < MS_5_DAYS);
   }, [emittedVales]);
 
-  const number = useMemo(() => nextValeNumber(emittedVales, tipoGarantia), [emittedVales, tipoGarantia]);
+  const number = useMemo(
+    () => (nextNumFromApi !== null && nextNumFromApi !== "" ? nextNumFromApi : nextValeNumber(emittedVales, tipoGarantia)),
+    [nextNumFromApi, emittedVales, tipoGarantia]
+  );
   const totals = useMemo(() => calcTotals(items), [items]);
   const selectedClient = useMemo(
     () => (selectedClientId ? clients.find((c) => String(c.id ?? "") === String(selectedClientId)) ?? null : null),
@@ -179,6 +185,13 @@ export function GarantiaAndePage() {
       .then((r: GarantiasEmittedResponse) => setEmittedVales(r.items as { invoice: Invoice; emittedAt: string }[]))
       .catch(() => setEmittedVales([]));
   }, []);
+
+  /** Vista previa: pedir siguiente número sin consumir (peek) */
+  useEffect(() => {
+    getNextGarantiaNumber(tipoGarantia, { peek: true })
+      .then((r) => setNextNumFromApi(r.number))
+      .catch(() => setNextNumFromApi(""));
+  }, [tipoGarantia]);
 
   useEffect(() => {
     getGarantiasItems()
@@ -346,14 +359,16 @@ export function GarantiaAndePage() {
     };
     const emittedAt = new Date().toISOString();
     try {
-      await addGarantiaEmitted(inv, emittedAt);
-      const res = await getGarantiasEmitted();
-      setEmittedVales(res.items as { invoice: Invoice; emittedAt: string }[]);
+      const res = await addGarantiaEmitted(inv, emittedAt);
+      const assignedNumber = res.number ?? inv.number;
+      const emittedRes = await getGarantiasEmitted();
+      setEmittedVales(emittedRes.items as { invoice: Invoice; emittedAt: string }[]);
       setItems([]);
       setRelatedReciboId("");
       setItemsLocked(false);
       setShowConfirmPdf(false);
-      showToast(`${tipoGarantia} ${inv.number} guardado en el servidor.`, "success");
+      getNextGarantiaNumber(tipoGarantia, { peek: true }).then((r) => setNextNumFromApi(r.number)).catch(() => {});
+      showToast(`${tipoGarantia} ${assignedNumber} guardado en el servidor.`, "success");
     } catch (e) {
       showToast(e instanceof Error ? e.message : `Error al guardar el ${tipoGarantia.toLowerCase()}.`, "error");
     }

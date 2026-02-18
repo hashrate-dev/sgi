@@ -1,5 +1,6 @@
 -- Ejecutar una vez en Supabase: SQL Editor → New query → pegar y Run
 -- Proyecto: https://supabase.com/dashboard/project/cvzkjjzwnzwbopvsnqwi
+-- Si ya tenés tablas: ejecutá solo el bloque garantia_sequences (líneas 82-87) para migrar.
 
 CREATE TABLE IF NOT EXISTS clients (
   id SERIAL PRIMARY KEY,
@@ -78,6 +79,13 @@ CREATE TABLE IF NOT EXISTS emitted_documents (
   emitted_by INTEGER REFERENCES users(id)
 );
 CREATE INDEX IF NOT EXISTS idx_emitted_source_at ON emitted_documents(source, emitted_at);
+
+CREATE TABLE IF NOT EXISTS garantia_sequences (
+  type TEXT PRIMARY KEY CHECK (type IN ('Recibo', 'Recibo Devolución')),
+  last_number INTEGER NOT NULL DEFAULT 100
+);
+INSERT INTO garantia_sequences (type, last_number) VALUES ('Recibo', 100), ('Recibo Devolución', 200)
+ON CONFLICT (type) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS emitted_garantias (
   id SERIAL PRIMARY KEY,

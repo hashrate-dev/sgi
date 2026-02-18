@@ -938,13 +938,14 @@
   margin-top: 1rem;
 }
 
-/* Contador de documentos emitidos: badge profesional debajo de la tabla */
+/* Contador de documentos emitidos: badge centrado (tamaño natural), botón Monitor a la derecha */
 .fact-emitted-count {
   margin-top: 0.875rem;
   margin-bottom: 0;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
+  position: relative;
   width: 100%;
   gap: 0.5rem;
 }
@@ -984,12 +985,13 @@
   font-size: 0.8125rem;
 }
 
-/* Botón Monitor Emails: mismo diseño pill que el badge (arriba), color verde */
+/* Botón Monitor Emails: mismo diseño pill que el badge (arriba), color verde, fijo a la derecha */
 .fact-emitted-monitor-btn {
+  position: absolute;
+  right: 0;
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  margin-left: auto;
   padding: 0.4rem 0.85rem;
   font-size: 0.875rem;
   font-weight: 500;
@@ -1874,11 +1876,11 @@
 .fact-emitted-table--7col th:nth-child(3),
 .fact-emitted-table--7col td:nth-child(3) { width: auto; min-width: 16rem; text-align: left; padding: 0.5rem 0.75rem; white-space: nowrap; }
 .fact-emitted-table--7col th:nth-child(4),
-.fact-emitted-table--7col td:nth-child(4) { width: 7rem; min-width: 6.5rem; text-align: left; padding: 0.5rem 0.5rem; }
+.fact-emitted-table--7col td:nth-child(4) { width: 7rem; min-width: 6.5rem; text-align: left; padding: 0.5rem 0.5rem; padding-left: 2rem; transform: translateX(0.7cm); }
 .fact-emitted-table--7col th:nth-child(5),
-.fact-emitted-table--7col td:nth-child(5) { width: 6rem; min-width: 5.5rem; text-align: left; padding: 0.5rem 0.5rem; transform: translateX(-0.3cm); }
+.fact-emitted-table--7col td:nth-child(5) { width: 6rem; min-width: 5.5rem; text-align: left; padding: 0.5rem 0.5rem; padding-left: 2rem; transform: translateX(0.7cm); }
 .fact-emitted-table--7col th:nth-child(6),
-.fact-emitted-table--7col td:nth-child(6) { width: 10rem; min-width: 9rem; text-align: left; padding: 0.5rem 0.6rem; transform: translateX(0.4cm); white-space: nowrap; }
+.fact-emitted-table--7col td:nth-child(6) { width: 10rem; min-width: 9rem; text-align: left; padding: 0.5rem 0.6rem; padding-left: 2rem; transform: translateX(0.9cm); white-space: nowrap; }
 .fact-emitted-table--7col th:nth-child(7) { width: 6rem; min-width: 5rem; text-align: left; padding: 0.5rem 0.35rem 0.5rem 0.25rem; transform: translateX(0.5cm); }
 .fact-emitted-table--7col td:nth-child(7) { width: 6rem; min-width: 5rem; text-align: center; padding: 0.5rem 0.5rem 0.5rem 0.25rem; transform: translateX(0.5cm); }
 .fact-emitted-table--7col td:nth-child(7) > div { transform: translateX(-12px); }

@@ -72,5 +72,11 @@ export default async function handler(req, res) {
   }
 
   const app = await getApp();
+  // Normalizar req.url para Express: Vercel puede pasar URL completa
+  const pathname = path.startsWith("/") ? path : `/${path}`;
+  const q = rawUrl.includes("?") ? "?" + rawUrl.split("?")[1] : "";
+  if (req.url && (req.url.startsWith("http") || !req.url.startsWith("/"))) {
+    req.url = pathname + q;
+  }
   return app(req, res);
 }

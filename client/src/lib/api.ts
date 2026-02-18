@@ -398,10 +398,23 @@ export function getGarantiasEmitted(): Promise<GarantiasEmittedResponse> {
   return api<GarantiasEmittedResponse>("/api/garantias/emitted");
 }
 
-export function addGarantiaEmitted(invoice: Record<string, unknown>, emittedAt: string): Promise<{ ok: boolean }> {
-  return api<{ ok: boolean }>("/api/garantias/emitted", {
+/** Siguiente número para Recibo / Recibo Devolución (generado en el servidor). peek=1 no consume. */
+export function getNextGarantiaNumber(
+  type: "Recibo" | "Recibo Devolución",
+  options?: { peek?: boolean }
+): Promise<{ number: string }> {
+  const peek = options?.peek ? "&peek=1" : "";
+  return api<{ number: string }>(`/api/garantias/next-number?type=${encodeURIComponent(type)}${peek}`);
+}
+
+export function addGarantiaEmitted(
+  invoice: Record<string, unknown>,
+  emittedAt: string,
+  options?: { preserveNumber?: boolean }
+): Promise<{ ok: boolean; number?: string }> {
+  return api<{ ok: boolean; number?: string }>("/api/garantias/emitted", {
     method: "POST",
-    body: JSON.stringify({ invoice, emittedAt }),
+    body: JSON.stringify({ invoice, emittedAt, preserveNumber: options?.preserveNumber ?? false }),
   });
 }
 

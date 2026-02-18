@@ -49,7 +49,7 @@ clientsRouter.post("/clients/bulk", requireRole("admin_a", "admin_b", "operador"
     const parsed = ClientCreateSchema.safeParse(c);
     if (!parsed.success) {
       const code = (c as { code?: string })?.code ?? "?";
-      const msg = parsed.error.errors.map((e) => e.message).join("; ");
+      const msg = parsed.error.issues.map((e: { message?: string }) => e.message ?? "").join("; ");
       errors.push(`${code}: ${msg}`);
       continue;
     }

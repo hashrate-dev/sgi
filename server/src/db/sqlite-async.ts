@@ -107,6 +107,12 @@ CREATE TABLE IF NOT EXISTS emitted_documents (
 );
 CREATE INDEX IF NOT EXISTS idx_emitted_source_at ON emitted_documents(source, emitted_at);
 
+CREATE TABLE IF NOT EXISTS garantia_sequences (
+  type TEXT PRIMARY KEY CHECK (type IN ('Recibo', 'Recibo Devolución')),
+  last_number INTEGER NOT NULL DEFAULT 100
+);
+INSERT OR IGNORE INTO garantia_sequences (type, last_number) VALUES ('Recibo', 100), ('Recibo Devolución', 200);
+
 CREATE TABLE IF NOT EXISTS emitted_garantias (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   invoice_json TEXT NOT NULL,
