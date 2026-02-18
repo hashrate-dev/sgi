@@ -44,6 +44,9 @@ export function LoginPage() {
     setError("");
     setSubmitting(true);
     try {
+      if (window.location.hostname.endsWith(".vercel.app")) {
+        await wakeUpBackend();
+      }
       await login(username.trim(), password);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al iniciar sesión");
