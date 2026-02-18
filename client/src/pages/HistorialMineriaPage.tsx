@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
-import { deleteEmittedDocumentsAll, getClients, verifyPassword } from "../lib/api";
+import { deleteEmittedDocumentOne, deleteEmittedDocumentsAll, getClients, verifyPassword } from "../lib/api";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadInvoicesAsic, saveInvoicesAsic } from "../lib/storage";
 import type { ComprobanteType, Invoice } from "../lib/types";
@@ -155,6 +155,7 @@ export function HistorialMineriaPage() {
   const [qType, setQType] = useState<"" | ComprobanteType>("");
   const [qMonth, setQMonth] = useState("");
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null);
+  const [deleteConfirmInv, setDeleteConfirmInv] = useState<Invoice | null>(null);
   const [excelLoading, setExcelLoading] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showClearConfirm2, setShowClearConfirm2] = useState(false);
@@ -332,9 +333,18 @@ export function HistorialMineriaPage() {
   }
 
   function removeOne(id: string) {
+    const found = all.find((i) => i.id === id);
+    if (!found) return;
     const next = all.filter((i) => i.id !== id);
     setAll(next);
     saveInvoicesAsic(next);
+    deleteEmittedDocumentOne("asic", found.number).catch(() => {});
+  }
+
+  function handleDeleteOneConfirm() {
+    if (!deleteConfirmInv) return;
+    removeOne(deleteConfirmInv.id);
+    setDeleteConfirmInv(null);
   }
 
   function handleClearClick() {
@@ -790,11 +800,11 @@ export function HistorialMineriaPage() {
                           </button>
                           {canDelete && (
                             <button 
-                              className="btn btn-danger btn-sm historial-accion-btn" 
-                              onClick={() => removeOne(inv.id)}
+                              className="btn btn-danger btn-sm historial-accion-btn historial-accion-btn-delete" 
+                              onClick={() => setDeleteConfirmInv(inv)}
                               title="Eliminar"
                             >
-                              <span className="historial-accion-trash">🗑️</span>
+                              <i className="bi bi-trash" />
                             </button>
                           )}
                         </div>
@@ -925,6 +935,39 @@ export function HistorialMineriaPage() {
         </div>
           </div>
         </div>
+
+        {/* Modal Confirmación eliminar una transacción */}
+        {deleteConfirmInv && (
+          <div className="modal show d-block historial-delete-modal-overlay" tabIndex={-1}>
+            <div className="modal-dialog modal-dialog-centered">
+              <div className="modal-content historial-delete-modal">
+                <div className="modal-header historial-delete-modal-header">
+                  <div className="historial-delete-icon-wrapper historial-delete-icon-danger">
+                    <i className="bi bi-trash historial-delete-icon" style={{ fontSize: "1.5rem" }} />
+                  </div>
+                  <h5 className="modal-title historial-delete-modal-title">Eliminar transacción</h5>
+                  <button type="button" className="btn-close" onClick={() => setDeleteConfirmInv(null)} aria-label="Cerrar" />
+                </div>
+                <div className="modal-body historial-delete-modal-body">
+                  <p className="historial-delete-question">
+                    ¿Está eliminando una transacción. ¿Está seguro que quiere hacer esto?
+                  </p>
+                  <p className="historial-delete-warning text-muted small mb-0">
+                    {deleteConfirmInv.type} {deleteConfirmInv.number} - {deleteConfirmInv.clientName}
+                  </p>
+                </div>
+                <div className="modal-footer historial-delete-modal-footer">
+                  <button type="button" className="btn historial-delete-btn-cancel" onClick={() => setDeleteConfirmInv(null)}>
+                    No
+                  </button>
+                  <button type="button" className="btn historial-delete-btn-confirm" onClick={handleDeleteOneConfirm}>
+                    Sí
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Modal Detalle del comprobante */}
         {detailInvoice && (

@@ -3565,6 +3565,19 @@
   line-height: 1;
   font-size: inherit;
 }
+.historial-acciones-btns .historial-accion-btn-delete {
+  background-color: #dc3545 !important;
+  border-color: #dc3545 !important;
+  color: #fff !important;
+}
+.historial-acciones-btns .historial-accion-btn-delete:hover {
+  background-color: #bb2d3b !important;
+  border-color: #b02a37 !important;
+  color: #fff !important;
+}
+.historial-acciones-btns .historial-accion-btn-delete .bi-trash {
+  font-size: 0.75rem;
+}
 .historial-acciones-btns .btn,
 .historial-acciones-btns .fact-btn {
   transition: transform 0.15s ease;
@@ -3660,20 +3673,19 @@
   padding: 0.625rem 1.25rem;
   font-size: 0.9375rem;
   font-weight: 600;
-  color: #2D5D46;
-  background: #fff;
-  border: none;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.4);
   border-radius: 10px;
   cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.2s;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.15s, background 0.2s, border-color 0.2s;
 }
 
 .usuarios-page-btn-new:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
-  color: #2D5D46;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+  color: #fff;
 }
 
 .usuarios-page-body {
