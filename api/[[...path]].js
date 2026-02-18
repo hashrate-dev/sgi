@@ -17,6 +17,13 @@ async function getApp() {
 }
 
 export default async function handler(req, res) {
+  // /api/health responde de inmediato (sin esperar DB) para cold start y monitoreo
+  const path = req.url?.split("?")[0] ?? "";
+  if (path === "/api/health" || path.endsWith("/health")) {
+    res.setHeader("Content-Type", "application/json");
+    res.status(200).end(JSON.stringify({ ok: true }));
+    return;
+  }
   const app = await getApp();
   return app(req, res);
 }
