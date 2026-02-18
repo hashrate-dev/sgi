@@ -4354,6 +4354,16 @@
   display: block;
 }
 
+.usuarios-page .usuarios-pagination {
+  padding: 0.5rem 0;
+  border-top: 1px solid #e2e8f0;
+}
+
+.usuarios-page .usuarios-pagination .form-select-sm,
+.usuarios-page .usuarios-pagination .form-control-sm {
+  font-size: 0.8125rem;
+}
+
 /* Modal usuarios */
 .usuarios-page .modal-content {
   border-radius: 16px;

@@ -181,16 +181,29 @@ export function HistorialMineriaPage() {
     });
   }, [all, qClient, qType, qMonth]);
 
-  const PAGE_SIZE = 25;
+  const PAGE_SIZE_OPTIONS = [20, 25, 30] as const;
+  const [pageSize, setPageSize] = useState(20);
   const [page, setPage] = useState(1);
+  const [goToPage, setGoToPage] = useState("");
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE;
-    return filtered.slice(start, start + PAGE_SIZE);
-  }, [filtered, page]);
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    const start = (page - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, page, pageSize]);
   useEffect(() => {
     setPage(1);
   }, [filtered.length]);
+  function handlePageSizeChange(v: number) {
+    setPageSize(v);
+    setPage(1);
+  }
+  function handleGoTo() {
+    const n = parseInt(goToPage, 10);
+    if (Number.isFinite(n) && n >= 1 && n <= totalPages) {
+      setPage(n);
+      setGoToPage("");
+    }
+  }
 
   const stats = useMemo(() => {
     const facturas = all.filter((i) => i.type === "Factura").length;
@@ -549,109 +562,105 @@ export function HistorialMineriaPage() {
   }
 
   return (
-    <div className="fact-page">
+    <div className="fact-page usuarios-page">
       <div className="container">
-        <PageHeader title="Historial ASIC" />
+        <PageHeader title="Historial Venta de ASIC" showBackButton backTo="/" backText="Volver al inicio" />
 
-        <div className="hrs-card hrs-card--rect p-4">
-          <div className="historial-filtros-outer">
-            <div className="historial-filtros-container">
-              <div className="card historial-filtros-card">
-                <h6 className="fw-bold border-bottom pb-2">🔍 Filtros</h6>
-                <div className="row g-2 align-items-end">
-                  <div className="col-md-3">
-                    <label className="form-label small fw-bold">Cliente</label>
+        <div className="usuarios-page-card">
+          <div className="usuarios-page-header">
+            <div className="usuarios-page-header-inner">
+              <h2 className="usuarios-page-title">
+                <span className="usuarios-page-title-icon" aria-hidden>📄</span>
+                Historial Venta de ASIC
+              </h2>
+              <p className="usuarios-page-subtitle">Documentos detalle por Ventas de Equipos ASIC. Filtros por cliente, tipo y mes.{user && !canExportData && !canDelete ? " (solo consulta)" : ""}</p>
+            </div>
+            <div className="d-flex gap-2 flex-wrap" style={{ position: "relative", zIndex: 1 }}>
+              {canExportData && (
+                <>
+                  <label
+                    className="usuarios-page-btn-new"
+                    style={{ cursor: excelLoading ? "not-allowed" : "pointer", opacity: excelLoading ? 0.7 : 1 }}
+                  >
+                    {excelLoading ? "⏳ Importando..." : "📥 Importar Excel"}
                     <input
-                      className="form-control form-control-sm"
-                      placeholder="Buscar cliente..."
-                      value={qClient}
-                      onChange={(e) => setQClient(e.target.value)}
+                      type="file"
+                      accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                      className="d-none"
+                      onChange={handleExcelImport}
+                      disabled={excelLoading}
                     />
-                  </div>
-                  <div className="col-md-2">
-                    <label className="form-label small fw-bold">Tipo</label>
-                    <select
-                      className="form-select form-select-sm"
-                      value={qType}
-                      onChange={(e) => setQType(e.target.value as "" | ComprobanteType)}
-                    >
-                      <option value="">Todos</option>
-                      <option value="Factura">Factura</option>
-                      <option value="Recibo">Recibo</option>
-                      <option value="Nota de Crédito">Nota de Crédito</option>
-                    </select>
-                  </div>
-                  <div className="col-md-2">
-                    <label className="form-label small fw-bold">Mes</label>
-                    <input
-                      type="month"
-                      className="form-control form-control-sm"
-                      value={qMonth}
-                      onChange={(e) => setQMonth(e.target.value)}
-                    />
-                  </div>
-                  <div className="col-md-2 d-flex align-items-end">
-                    <button
-                      className="btn btn-outline-secondary btn-sm w-100"
-                      onClick={() => {
-                        setQClient("");
-                        setQType("");
-                        setQMonth("");
-                      }}
-                    >
-                      Limpiar
-                    </button>
-                  </div>
-                  {canExportData && (
-                    <div className="col-md-auto d-flex align-items-end gap-2 ms-auto">
-                      <label
-                        className="btn btn-outline-secondary btn-sm historial-import-excel-btn mb-0"
-                        style={{
-                          backgroundColor: "rgba(45, 93, 70, 0.35)",
-                          cursor: excelLoading ? "not-allowed" : "pointer",
-                        }}
-                      >
-                        {excelLoading ? "⏳ Importando..." : "📥 Importar Excel"}
-                        <input
-                          type="file"
-                          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                          className="d-none"
-                          onChange={handleExcelImport}
-                          disabled={excelLoading}
-                        />
-                      </label>
-                      <button
-                        className="btn btn-outline-secondary btn-sm historial-export-excel-btn"
-                        style={{ backgroundColor: "rgba(13, 110, 253, 0.12)" }}
-                        onClick={exportExcel}
-                      >
-                        📊 Exportar Excel
-                      </button>
-                    </div>
-                  )}
+                  </label>
+                  <button type="button" className="usuarios-page-btn-new" onClick={exportExcel}>
+                    📊 Exportar Excel
+                  </button>
+                </>
+              )}
+              {canDelete && (
+                <button
+                  type="button"
+                  className="usuarios-page-btn-new"
+                  style={{ backgroundColor: "rgba(220, 53, 69, 0.9)", color: "#fff" }}
+                  onClick={handleClearClick}
+                >
+                  🗑️ Borrar Todo
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="usuarios-page-body">
+            <div className="historial-filtros-en-body mb-3 p-3 rounded" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+              <h6 className="fw-bold mb-2 small text-muted">🔍 Filtros</h6>
+              <div className="row g-2 align-items-end">
+                <div className="col-md-3">
+                  <label className="form-label small fw-bold">Cliente</label>
+                  <input
+                    className="form-control form-control-sm"
+                    placeholder="Buscar cliente..."
+                    value={qClient}
+                    onChange={(e) => setQClient(e.target.value)}
+                  />
+                </div>
+                <div className="col-md-2">
+                  <label className="form-label small fw-bold">Tipo</label>
+                  <select
+                    className="form-select form-select-sm"
+                    value={qType}
+                    onChange={(e) => setQType(e.target.value as "" | ComprobanteType)}
+                  >
+                    <option value="">Todos</option>
+                    <option value="Factura">Factura</option>
+                    <option value="Recibo">Recibo</option>
+                    <option value="Nota de Crédito">Nota de Crédito</option>
+                  </select>
+                </div>
+                <div className="col-md-2">
+                  <label className="form-label small fw-bold">Mes</label>
+                  <input
+                    type="month"
+                    className="form-control form-control-sm"
+                    value={qMonth}
+                    onChange={(e) => setQMonth(e.target.value)}
+                  />
+                </div>
+                <div className="col-md-2 d-flex align-items-end">
+                  <button
+                    className="btn btn-outline-secondary btn-sm w-100"
+                    onClick={() => {
+                      setQClient("");
+                      setQType("");
+                      setQMonth("");
+                    }}
+                  >
+                    Limpiar
+                  </button>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="historial-listado-wrap">
-            <div className="d-flex justify-content-between align-items-center mb-2">
-            <h6 className="fw-bold m-0">📄 Documentos ASIC{user && !canExportData && !canDelete ? " (solo consulta)" : ""}</h6>
-            <div className="d-flex gap-2">
-              {canDelete && (
-              <button
-                className="btn btn-outline-secondary btn-sm historial-limpiar-todo-btn"
-                style={{ backgroundColor: "rgba(220, 53, 69, 0.4)" }}
-                onClick={handleClearClick}
-              >
-                🗑️ Borrar Todo
-              </button>
-            )}
-            </div>
-          </div>
-
+            <div className="usuarios-listado-wrap">
           <div className="table-responsive">
-            <table className="table table-sm align-middle historial-listado-table" style={{ fontSize: "0.85rem" }}>
+            <table className="table table-sm align-middle usuarios-listado-table historial-listado-table" style={{ fontSize: "0.85rem" }}>
               <thead className="table-dark">
                 <tr>
                   <th className="text-start">N°</th>
@@ -797,38 +806,69 @@ export function HistorialMineriaPage() {
               </tbody>
             </table>
           </div>
-          {filtered.length > PAGE_SIZE && (
-            <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3 px-1 historial-pagination">
-              <span className="text-muted small">
-                Mostrando {((page - 1) * PAGE_SIZE) + 1}-{Math.min(page * PAGE_SIZE, filtered.length)} de {filtered.length} operaciones
-              </span>
-              <div className="d-flex align-items-center gap-1">
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-secondary"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+          {filtered.length > 0 && (
+            <div className="usuarios-pagination d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3 px-1">
+              <div className="d-flex align-items-center gap-2">
+                <label className="text-muted small mb-0">Mostrar</label>
+                <select
+                  className="form-select form-select-sm"
+                  style={{ width: "auto" }}
+                  value={pageSize}
+                  onChange={(e) => handlePageSizeChange(Number(e.target.value))}
                 >
+                  {PAGE_SIZE_OPTIONS.map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+                <span className="text-muted small">registros</span>
+              </div>
+              <div className="d-flex align-items-center gap-2">
+                <span className="text-muted small">
+                  Mostrando {((page - 1) * pageSize) + 1}-{Math.min(page * pageSize, filtered.length)} de {filtered.length}
+                </span>
+                <button type="button" className="btn btn-sm btn-outline-secondary" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
                   ‹ Anterior
                 </button>
-                <span className="px-2 small text-muted">
-                  Página {page} de {totalPages}
-                </span>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-secondary"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                >
+                <span className="px-2 small text-muted">Página {page} de {totalPages}</span>
+                <button type="button" className="btn btn-sm btn-outline-secondary" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
                   Siguiente ›
                 </button>
+                <div className="d-flex align-items-center gap-1">
+                  <span className="small text-muted">Ir a</span>
+                  <input
+                    type="number"
+                    className="form-control form-control-sm"
+                    style={{ width: "4rem" }}
+                    min={1}
+                    max={totalPages}
+                    value={goToPage}
+                    onChange={(e) => setGoToPage(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleGoTo())}
+                    placeholder={String(totalPages)}
+                  />
+                  <button type="button" className="btn btn-sm btn-outline-secondary" onClick={handleGoTo}>
+                    Ir
+                  </button>
+                </div>
               </div>
             </div>
           )}
+            </div>
           </div>
         </div>
 
-        <div className="row mt-4 g-3 historial-stats">
+        <div className="usuarios-page-card mt-4">
+          <div className="usuarios-page-header usuarios-page-header--activity">
+            <div className="usuarios-page-header-inner">
+              <h2 className="usuarios-page-title">
+                <span className="usuarios-page-title-icon usuarios-page-title-icon--activity" aria-hidden>📊</span>
+                Resumen
+              </h2>
+              <p className="usuarios-page-subtitle">Estadísticas de facturación y cobros.</p>
+            </div>
+          </div>
+          <div className="usuarios-page-body">
+        <div className="row g-3 historial-stats">
           <div className="col-6 col-md-2">
             <div className="card stat-card p-3">
               <div className="stat-accent bg-primary" />
@@ -881,6 +921,8 @@ export function HistorialMineriaPage() {
                 <span className="stat-value text-info mb-0">{stats.registros}</span>
               </div>
             </div>
+          </div>
+        </div>
           </div>
         </div>
 

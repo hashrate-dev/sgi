@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createUser,
   deleteUser,
@@ -13,6 +13,8 @@ import { PageHeader } from "../components/PageHeader";
 import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import "../styles/facturacion.css";
+
+const PAGE_SIZE_OPTIONS = [20, 25, 30] as const;
 
 const ROLES: { value: UserRole; label: string }[] = [
   { value: "admin_a", label: "AdministradorA" },
@@ -50,6 +52,12 @@ export function UsuariosPage() {
   const [saving, setSaving] = useState(false);
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
   const roleDropdownRef = useRef<HTMLDivElement>(null);
+  const [pageUsers, setPageUsers] = useState(1);
+  const [pageSizeUsers, setPageSizeUsers] = useState<number>(20);
+  const [pageActivity, setPageActivity] = useState(1);
+  const [pageSizeActivity, setPageSizeActivity] = useState<number>(20);
+  const [goToPageUsers, setGoToPageUsers] = useState("");
+  const [goToPageActivity, setGoToPageActivity] = useState("");
 
   function loadActivity() {
     setActivityLoading(true);
@@ -174,6 +182,41 @@ export function UsuariosPage() {
   const isAdmin = currentUser?.role === "admin_a" || currentUser?.role === "admin_b";
   const toastContext = "Gestión de usuarios";
 
+  const totalPagesUsers = Math.max(1, Math.ceil(users.length / pageSizeUsers));
+  const paginatedUsers = useMemo(() => {
+    const start = (pageUsers - 1) * pageSizeUsers;
+    return users.slice(start, start + pageSizeUsers);
+  }, [users, pageUsers, pageSizeUsers]);
+
+  const totalPagesActivity = Math.max(1, Math.ceil(activity.length / pageSizeActivity));
+  const paginatedActivity = useMemo(() => {
+    const start = (pageActivity - 1) * pageSizeActivity;
+    return activity.slice(start, start + pageSizeActivity);
+  }, [activity, pageActivity, pageSizeActivity]);
+
+  function handlePageSizeUsersChange(v: number) {
+    setPageSizeUsers(v);
+    setPageUsers(1);
+  }
+  function handlePageSizeActivityChange(v: number) {
+    setPageSizeActivity(v);
+    setPageActivity(1);
+  }
+  function handleGoToUsers() {
+    const n = parseInt(goToPageUsers, 10);
+    if (Number.isFinite(n) && n >= 1 && n <= totalPagesUsers) {
+      setPageUsers(n);
+      setGoToPageUsers("");
+    }
+  }
+  function handleGoToActivity() {
+    const n = parseInt(goToPageActivity, 10);
+    if (Number.isFinite(n) && n >= 1 && n <= totalPagesActivity) {
+      setPageActivity(n);
+      setGoToPageActivity("");
+    }
+  }
+
   return (
     <div className="fact-page usuarios-page">
       <div className="container">
@@ -234,7 +277,7 @@ export function UsuariosPage() {
                             </td>
                           </tr>
                         ) : (
-                          users.map((u) => (
+                          paginatedUsers.map((u) => (
                             <tr key={u.id}>
                               <td><span className="user-email">{u.email}</span></td>
                               <td>
@@ -262,6 +305,53 @@ export function UsuariosPage() {
                         )}
                       </tbody>
                     </table>
+                  </div>
+                )}
+                {!loading && users.length > 0 && (
+                  <div className="usuarios-pagination d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3 px-1">
+                    <div className="d-flex align-items-center gap-2">
+                      <label className="text-muted small mb-0">Mostrar</label>
+                      <select
+                        className="form-select form-select-sm"
+                        style={{ width: "auto" }}
+                        value={pageSizeUsers}
+                        onChange={(e) => handlePageSizeUsersChange(Number(e.target.value))}
+                      >
+                        {PAGE_SIZE_OPTIONS.map((n) => (
+                          <option key={n} value={n}>{n}</option>
+                        ))}
+                      </select>
+                      <span className="text-muted small">registros</span>
+                    </div>
+                    <div className="d-flex align-items-center gap-2">
+                      <span className="text-muted small">
+                        Mostrando {((pageUsers - 1) * pageSizeUsers) + 1}-{Math.min(pageUsers * pageSizeUsers, users.length)} de {users.length}
+                      </span>
+                      <button type="button" className="btn btn-sm btn-outline-secondary" disabled={pageUsers <= 1} onClick={() => setPageUsers((p) => Math.max(1, p - 1))}>
+                        ‹ Anterior
+                      </button>
+                      <span className="px-2 small text-muted">Página {pageUsers} de {totalPagesUsers}</span>
+                      <button type="button" className="btn btn-sm btn-outline-secondary" disabled={pageUsers >= totalPagesUsers} onClick={() => setPageUsers((p) => Math.min(totalPagesUsers, p + 1))}>
+                        Siguiente ›
+                      </button>
+                      <div className="d-flex align-items-center gap-1">
+                        <span className="small text-muted">Ir a</span>
+                        <input
+                          type="number"
+                          className="form-control form-control-sm"
+                          style={{ width: "4rem" }}
+                          min={1}
+                          max={totalPagesUsers}
+                          value={goToPageUsers}
+                          onChange={(e) => setGoToPageUsers(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleGoToUsers())}
+                          placeholder={String(totalPagesUsers)}
+                        />
+                        <button type="button" className="btn btn-sm btn-outline-secondary" onClick={handleGoToUsers}>
+                          Ir
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -309,7 +399,7 @@ export function UsuariosPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {activity.map((a) => (
+                        {paginatedActivity.map((a) => (
                           <tr key={a.id}>
                             <td><span className="user-email">{a.user_email}</span></td>
                             <td>
@@ -328,6 +418,53 @@ export function UsuariosPage() {
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                )}
+                {!activityLoading && !activityError && activity.length > 0 && (
+                  <div className="usuarios-pagination d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3 px-1">
+                    <div className="d-flex align-items-center gap-2">
+                      <label className="text-muted small mb-0">Mostrar</label>
+                      <select
+                        className="form-select form-select-sm"
+                        style={{ width: "auto" }}
+                        value={pageSizeActivity}
+                        onChange={(e) => handlePageSizeActivityChange(Number(e.target.value))}
+                      >
+                        {PAGE_SIZE_OPTIONS.map((n) => (
+                          <option key={n} value={n}>{n}</option>
+                        ))}
+                      </select>
+                      <span className="text-muted small">registros</span>
+                    </div>
+                    <div className="d-flex align-items-center gap-2">
+                      <span className="text-muted small">
+                        Mostrando {((pageActivity - 1) * pageSizeActivity) + 1}-{Math.min(pageActivity * pageSizeActivity, activity.length)} de {activity.length}
+                      </span>
+                      <button type="button" className="btn btn-sm btn-outline-secondary" disabled={pageActivity <= 1} onClick={() => setPageActivity((p) => Math.max(1, p - 1))}>
+                        ‹ Anterior
+                      </button>
+                      <span className="px-2 small text-muted">Página {pageActivity} de {totalPagesActivity}</span>
+                      <button type="button" className="btn btn-sm btn-outline-secondary" disabled={pageActivity >= totalPagesActivity} onClick={() => setPageActivity((p) => Math.min(totalPagesActivity, p + 1))}>
+                        Siguiente ›
+                      </button>
+                      <div className="d-flex align-items-center gap-1">
+                        <span className="small text-muted">Ir a</span>
+                        <input
+                          type="number"
+                          className="form-control form-control-sm"
+                          style={{ width: "4rem" }}
+                          min={1}
+                          max={totalPagesActivity}
+                          value={goToPageActivity}
+                          onChange={(e) => setGoToPageActivity(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleGoToActivity())}
+                          placeholder={String(totalPagesActivity)}
+                        />
+                        <button type="button" className="btn btn-sm btn-outline-secondary" onClick={handleGoToActivity}>
+                          Ir
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
