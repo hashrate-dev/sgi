@@ -51,3 +51,12 @@ Si la sección "Actividad de usuarios" muestra "No se pudo cargar la actividad":
 2. Si health responde OK pero login falla → revisá `SUPABASE_DATABASE_URL` y `JWT_SECRET`
 3. Si health da 404 → la API no se despliega; verificá Root Directory y el build
 4. **Actividad:** con sesión de admin, la pestaña Usuarios debe cargar la actividad. Si falla, probá `/api/users/activity` con un token Bearer en el header.
+
+## Items Garantía ANDE / Importar Excel no funciona
+
+Si la página **Items Garantía ANDE** muestra "No hay ítems" o el **Importar Excel** falla:
+
+1. **Tabla en Supabase:** La tabla `items_garantia_ande` debe existir. En Supabase → SQL Editor, ejecutá el bloque de `server/src/db/schema-supabase.sql` (líneas 98-106) o todo el schema.
+2. **Variables de entorno:** `SUPABASE_DATABASE_URL` y `JWT_SECRET` en Vercel.
+3. **Formato Excel:** El archivo debe tener encabezados: Código, Marca, Modelo, Fecha ingreso, Observaciones. Al menos Marca o Modelo deben tener valor en cada fila.
+4. Si ves "No se pudo cargar desde el servidor", usá el botón **Reintentar** o verificá los logs de Vercel.

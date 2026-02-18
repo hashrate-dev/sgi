@@ -75,6 +75,7 @@ export function SetupPage() {
   const [setups, setSetups] = useState<Setup[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [deleteConfirmSetup, setDeleteConfirmSetup] = useState<Setup | null>(null);
   const [showDeleteConfirm1, setShowDeleteConfirm1] = useState(false);
   const [showDeleteConfirm2, setShowDeleteConfirm2] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -148,6 +149,12 @@ export function SetupPage() {
       })
       .then((r: SetupsResponse) => setSetups(r.items || []))
       .catch((e) => showToast(e instanceof Error ? e.message : "Error al eliminar.", "error", "Setup"));
+  }
+
+  function handleDeleteOneConfirm() {
+    if (!deleteConfirmSetup) return;
+    handleDelete(deleteConfirmSetup);
+    setDeleteConfirmSetup(null);
   }
 
   function handleDeleteAllClick() {
@@ -336,7 +343,7 @@ export function SetupPage() {
                 <button
                   type="button"
                   className="fact-btn fact-btn-primary btn-sm"
-                  style={{ fontSize: "0.8125rem", padding: "0.5rem 1rem" }}
+                  style={{ fontSize: "0.8125rem", padding: "0.5rem 1rem", textDecoration: "none", display: "inline-block", color: "inherit" }}
                   onClick={() => {
                     setEditingSetup(null);
                     setFormData({ nombre: "", precioUSD: 0 });
@@ -420,9 +427,10 @@ export function SetupPage() {
                                   type="button"
                                   className="btn btn-danger btn-sm"
                                   style={{ padding: "0.35rem 0.75rem", fontSize: "0.8125rem" }}
-                                  onClick={() => handleDelete(s)}
+                                  onClick={() => setDeleteConfirmSetup(s)}
+                                  title="Eliminar"
                                 >
-                                  🗑️
+                                  <i className="bi bi-trash" />
                                 </button>
                               )}
                             </div>
@@ -512,6 +520,39 @@ export function SetupPage() {
                       {editingSetup ? "Actualizar" : "Guardar"}
                     </button>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Confirmación eliminar un ítem */}
+        {deleteConfirmSetup && (
+          <div className="modal show d-block historial-delete-modal-overlay" tabIndex={-1}>
+            <div className="modal-dialog modal-dialog-centered">
+              <div className="modal-content historial-delete-modal">
+                <div className="modal-header historial-delete-modal-header">
+                  <div className="historial-delete-icon-wrapper historial-delete-icon-danger">
+                    <i className="bi bi-trash historial-delete-icon" style={{ fontSize: "1.5rem" }} />
+                  </div>
+                  <h5 className="modal-title historial-delete-modal-title">Eliminar Setup</h5>
+                  <button type="button" className="btn-close" onClick={() => setDeleteConfirmSetup(null)} aria-label="Cerrar" />
+                </div>
+                <div className="modal-body historial-delete-modal-body">
+                  <p className="historial-delete-question">
+                    ¿Está eliminando un ítem. ¿Está seguro que quiere hacer esto?
+                  </p>
+                  <p className="historial-delete-warning text-muted small mb-0">
+                    {deleteConfirmSetup.codigo ?? "—"} - {deleteConfirmSetup.nombre} ({deleteConfirmSetup.precioUSD} USD)
+                  </p>
+                </div>
+                <div className="modal-footer historial-delete-modal-footer">
+                  <button type="button" className="btn historial-delete-btn-cancel" onClick={() => setDeleteConfirmSetup(null)}>
+                    No
+                  </button>
+                  <button type="button" className="btn historial-delete-btn-confirm" onClick={handleDeleteOneConfirm}>
+                    Sí
+                  </button>
                 </div>
               </div>
             </div>

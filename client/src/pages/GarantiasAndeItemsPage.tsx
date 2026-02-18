@@ -97,8 +97,10 @@ export function GarantiasAndeItemsPage() {
   const canEdit = user ? canEditClientes(user.role) : false;
   const canExportData = user ? canExport(user.role) : false;
   const [items, setItems] = useState<ItemGarantiaAnde[]>([]);
-  const [, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [deleteConfirmItem, setDeleteConfirmItem] = useState<ItemGarantiaAnde | null>(null);
   const [showDeleteConfirm1, setShowDeleteConfirm1] = useState(false);
   const [showDeleteConfirm2, setShowDeleteConfirm2] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -113,11 +115,24 @@ export function GarantiasAndeItemsPage() {
     observaciones: "",
   });
 
-  useEffect(() => {
+  function loadItems() {
+    setLoading(true);
+    setLoadError(false);
     getGarantiasItems()
-      .then((r: GarantiasItemsResponse) => setItems(r.items))
-      .catch(() => setItems([]))
+      .then((r: GarantiasItemsResponse) => {
+        setItems(r.items);
+        setLoadError(false);
+      })
+      .catch((e) => {
+        setItems([]);
+        setLoadError(true);
+        showToast(e instanceof Error ? e.message : "No se pudo cargar desde el servidor.", "error", "Items Garantía ANDE");
+      })
       .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    loadItems();
   }, []);
 
   async function handleSave() {
@@ -177,6 +192,12 @@ export function GarantiasAndeItemsPage() {
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Error al eliminar.", "error", "Items Garantía ANDE");
     }
+  }
+
+  function handleDeleteOneConfirm() {
+    if (!deleteConfirmItem) return;
+    handleDelete(deleteConfirmItem);
+    setDeleteConfirmItem(null);
   }
 
   function handleDeleteAllClick() {
@@ -291,6 +312,7 @@ export function GarantiasAndeItemsPage() {
       let nextG = 1;
       while (usedCodigos.has(`G${String(nextG).padStart(3, "0")}`)) nextG++;
 
+      let imported = 0;
       for (const row of parsed) {
         let codigo: string;
         if (row.codigo && row.codigo !== "—" && !usedCodigos.has(row.codigo)) {
@@ -301,20 +323,27 @@ export function GarantiasAndeItemsPage() {
           nextG++;
         }
         usedCodigos.add(codigo);
-        await createGarantiaItem({
-          id: genId(),
-          codigo,
-          marca: row.marca,
-          modelo: row.modelo,
-          fechaIngreso: row.fechaIngreso,
-          observaciones: row.observaciones,
-        });
+        try {
+          await createGarantiaItem({
+            id: genId(),
+            codigo,
+            marca: row.marca,
+            modelo: row.modelo,
+            fechaIngreso: row.fechaIngreso,
+            observaciones: row.observaciones,
+          });
+          imported++;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          throw new Error(`Fila ${imported + 1}: ${msg}`);
+        }
       }
       const res = await getGarantiasItems();
       setItems(res.items);
+      setLoadError(false);
       showToast(`Se importaron ${parsed.length} ítem(s) correctamente.`, "success", "Items Garantía ANDE");
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Error al importar Excel.", "error", "Items Garantía ANDE");
+      showToast(err instanceof Error ? err.message : "Error al importar Excel. Verificá que la tabla items_garantia_ande exista en Supabase (SQL Editor).", "error", "Items Garantía ANDE");
     } finally {
       setExcelLoading(false);
     }
@@ -514,13 +543,28 @@ export function GarantiasAndeItemsPage() {
               )}
             </div>
 
-            {filteredItems.length === 0 ? (
+            {loading ? (
+              <div className="fact-empty">
+                <div className="spinner-border text-success" role="status" aria-label="Cargando" />
+                <div className="fact-empty-text mt-2">Cargando desde el servidor...</div>
+              </div>
+            ) : loadError ? (
+              <div className="fact-empty">
+                <div className="fact-empty-icon text-warning">⚠️</div>
+                <div className="fact-empty-text">
+                  No se pudo cargar desde el servidor. Si estás en Vercel, verificá que la tabla <code>items_garantia_ande</code> exista en Supabase (SQL Editor → ejecutá el schema).
+                </div>
+                <button type="button" className="btn btn-outline-secondary btn-sm mt-3" onClick={loadItems}>
+                  Reintentar
+                </button>
+              </div>
+            ) : filteredItems.length === 0 ? (
               <div className="fact-empty">
                 <div className="fact-empty-icon">🛡️</div>
                 <div className="fact-empty-text">
                   {searchTerm
                     ? "No se encontraron ítems con ese criterio de búsqueda."
-                    : 'No hay ítems cargados. Agregá uno con el botón "Nuevo ítem".'}
+                    : 'No hay ítems cargados. Agregá uno con el botón "Nuevo ítem" o importá desde Excel.'}
                 </div>
               </div>
             ) : (
@@ -559,9 +603,10 @@ export function GarantiasAndeItemsPage() {
                                 type="button"
                                 className="btn btn-danger btn-sm"
                                 style={{ padding: "0.35rem 0.75rem", fontSize: "0.8125rem" }}
-                                onClick={() => handleDelete(i)}
+                                onClick={() => setDeleteConfirmItem(i)}
+                                title="Eliminar"
                               >
-                                🗑️
+                                <i className="bi bi-trash" />
                               </button>
                             </div>
                           </td>
@@ -574,6 +619,39 @@ export function GarantiasAndeItemsPage() {
             )}
           </div>
         </div>
+
+        {/* Modal Confirmación eliminar un ítem */}
+        {deleteConfirmItem && (
+          <div className="modal show d-block historial-delete-modal-overlay" tabIndex={-1}>
+            <div className="modal-dialog modal-dialog-centered">
+              <div className="modal-content historial-delete-modal">
+                <div className="modal-header historial-delete-modal-header">
+                  <div className="historial-delete-icon-wrapper historial-delete-icon-danger">
+                    <i className="bi bi-trash historial-delete-icon" style={{ fontSize: "1.5rem" }} />
+                  </div>
+                  <h5 className="modal-title historial-delete-modal-title">Eliminar ítem</h5>
+                  <button type="button" className="btn-close" onClick={() => setDeleteConfirmItem(null)} aria-label="Cerrar" />
+                </div>
+                <div className="modal-body historial-delete-modal-body">
+                  <p className="historial-delete-question">
+                    ¿Está eliminando un ítem. ¿Está seguro que quiere hacer esto?
+                  </p>
+                  <p className="historial-delete-warning text-muted small mb-0">
+                    {deleteConfirmItem.codigo} - {deleteConfirmItem.marca} {deleteConfirmItem.modelo}
+                  </p>
+                </div>
+                <div className="modal-footer historial-delete-modal-footer">
+                  <button type="button" className="btn historial-delete-btn-cancel" onClick={() => setDeleteConfirmItem(null)}>
+                    No
+                  </button>
+                  <button type="button" className="btn historial-delete-btn-confirm" onClick={handleDeleteOneConfirm}>
+                    Sí
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {showDeleteConfirm1 && (
           <div className="modal d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} tabIndex={-1}>
