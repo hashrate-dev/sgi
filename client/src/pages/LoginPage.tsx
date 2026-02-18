@@ -15,7 +15,7 @@ export function LoginPage() {
 
   // En Vercel: warmup (DB+app) antes de permitir login. En Render: health.
   useEffect(() => {
-    const t = setTimeout(() => setReady(true), 15000); // fallback: habilitar tras 15s
+    const t = setTimeout(() => setReady(true), 25000); // fallback: habilitar tras 25s
     wakeUpBackend().finally(() => {
       clearTimeout(t);
       setReady(true);

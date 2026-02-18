@@ -92,18 +92,8 @@ function get502Message(): string {
   return "No se pudo conectar con el servidor. Volvé a intentar en unos momentos.";
 }
 
-const RETRY_DELAYS_MS = [0, 4000, 10000];
-const FETCH_TIMEOUT_MS = 55000;
-
-let backendUrlFromServer: Promise<string> | null = null;
-
-function getBackendUrlFromVercel(): Promise<string> {
-  if (backendUrlFromServer) return backendUrlFromServer;
-  backendUrlFromServer = fetch("/api/backend-url", { method: "GET" })
-    .then((r) => r.json().then((d: { url?: string }) => (d?.url && typeof d.url === "string" ? d.url.trim().replace(/\/+$/, "") : "")))
-    .catch(() => "");
-  return backendUrlFromServer;
-}
+const RETRY_DELAYS_MS = [0, 6000, 15000, 25000];
+const FETCH_TIMEOUT_MS = 60000;
 
 function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -121,16 +111,9 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   if (token) headers.Authorization = `Bearer ${token}`;
   let base = getApiBase();
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  const useDirectRender = h === "sgi-hrs.vercel.app" || h === "sgi.hashrate.space";
-  if (typeof window !== "undefined" && !useDirectRender && (window.location?.hostname?.endsWith(".vercel.app") || window.location?.hostname?.endsWith(".hashrate.space"))) {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (!stored || stored.trim() === "") {
-      const fromServer = await getBackendUrlFromVercel();
-      if (fromServer && fromServer.trim() !== "") {
-        setApiBaseUrl(fromServer);
-        base = fromServer;
-      }
-    }
+  // *.vercel.app: siempre mismo origen (API serverless en Vercel). No usar Render.
+  if (h.endsWith(".vercel.app")) {
+    base = "";
   }
   // base vacío = mismo origen (ej. Vercel: front + API en mismo dominio)
   const url = base && base.trim() !== "" ? `${base}${path}` : path;
