@@ -17,13 +17,29 @@ async function getApp() {
 }
 
 export default async function handler(req, res) {
-  // /api/health responde de inmediato (sin esperar DB) para cold start y monitoreo
   const path = req.url?.split("?")[0] ?? "";
+  res.setHeader("Content-Type", "application/json");
+
+  // /api/health responde de inmediato (sin esperar DB)
   if (path === "/api/health" || path.endsWith("/health")) {
-    res.setHeader("Content-Type", "application/json");
     res.status(200).end(JSON.stringify({ ok: true }));
     return;
   }
+
+  // /api/test-db: diagnóstico de conexión a Supabase
+  if (path === "/api/test-db" || path.endsWith("/test-db")) {
+    try {
+      const { initDb, getDb } = await import("../server/dist/db.js");
+      await initDb();
+      const row = await getDb().prepare("SELECT 1 as ok").get();
+      res.status(200).end(JSON.stringify({ ok: true, db: "connected", row }));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      res.status(500).end(JSON.stringify({ ok: false, error: msg }));
+    }
+    return;
+  }
+
   const app = await getApp();
   return app(req, res);
 }
