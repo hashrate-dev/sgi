@@ -98,6 +98,19 @@ export default async function handler(req, res) {
     }
   }
 
+  // Fallback: DELETE/PUT /api/users/:id si el handler dedicado no matchea
+  const usersIdMatch = path.match(/^\/api\/users\/(.+)$/);
+  if (usersIdMatch && !path.includes("/activity") && (req.method === "DELETE" || req.method === "PUT")) {
+    try {
+      const id = decodeURIComponent(usersIdMatch[1]);
+      const { default: usersIdHandler } = await import("./users/[id].js");
+      const reqWithQuery = { ...req, query: { ...(req.query || {}), id } };
+      return usersIdHandler(reqWithQuery, res);
+    } catch (e) {
+      /* seguir al app */
+    }
+  }
+
   const app = await getApp();
   // Normalizar req.url para Express (Vercel puede pasar URL completa)
   const pathname = path.startsWith("/") ? path : `/${path}`;
