@@ -21,8 +21,8 @@ const UpdateUserSchema = z.object({
 const UpdateMyPasswordSchema = z.object({ password: z.string().min(6).max(100) });
 
 /** Listar usuarios (solo admin) - devuelve id, email, role, created_at (sin password) */
-usersRouter.get("/users", requireAuth, requireRole("admin_a", "admin_b"), (req, res) => {
-  const rows = db.prepare("SELECT id, username, email, role, created_at FROM users ORDER BY created_at DESC").all() as Array<{
+usersRouter.get("/users", requireAuth, requireRole("admin_a", "admin_b"), async (req, res) => {
+  const rows = (await db.prepare("SELECT id, username, email, role, created_at FROM users ORDER BY created_at DESC").all()) as Array<{
     id: number;
     username: string;
     email: string | null;
@@ -39,7 +39,7 @@ usersRouter.get("/users", requireAuth, requireRole("admin_a", "admin_b"), (req, 
 });
 
 /** Crear usuario (solo admin) */
-usersRouter.post("/users", requireAuth, requireRole("admin_a", "admin_b"), (req, res) => {
+usersRouter.post("/users", requireAuth, requireRole("admin_a", "admin_b"), async (req, res) => {
   const parsed = CreateUserSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
@@ -51,7 +51,7 @@ usersRouter.post("/users", requireAuth, requireRole("admin_a", "admin_b"), (req,
   const emailNorm = email.trim().toLowerCase();
   const hash = bcrypt.hashSync(password, 10);
   try {
-    db.prepare("INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)").run(emailNorm, emailNorm, hash, role);
+    await db.prepare("INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)").run(emailNorm, emailNorm, hash, role);
   } catch (e: unknown) {
     const err = e as { code?: string };
     if (err?.code && String(err.code).includes("SQLITE_CONSTRAINT")) {
@@ -59,24 +59,24 @@ usersRouter.post("/users", requireAuth, requireRole("admin_a", "admin_b"), (req,
     }
     throw e;
   }
-  const row = db.prepare("SELECT id, email, role, created_at FROM users WHERE email = ?").get(emailNorm) as { id: number; email: string; role: string; created_at: string };
+  const row = (await db.prepare("SELECT id, email, role, created_at FROM users WHERE email = ?").get(emailNorm)) as { id: number; email: string; role: string; created_at: string };
   res.status(201).json({ user: { id: row.id, email: row.email, role: row.role, created_at: row.created_at } });
 });
 
 /** Cambiar mi propia contraseña (Operador, Lector o cualquier admin). Cualquier usuario autenticado puede usar esta ruta. */
-usersRouter.put("/users/me", requireAuth, (req, res) => {
+usersRouter.put("/users/me", requireAuth, async (req, res) => {
   const parsed = UpdateMyPasswordSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: { message: "La contraseña debe tener entre 6 y 100 caracteres", details: parsed.error.flatten() } });
   }
   const hash = bcrypt.hashSync(parsed.data.password, 10);
-  db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(hash, req.user!.id);
-  const row = db.prepare("SELECT id, username, email, role, created_at FROM users WHERE id = ?").get(req.user!.id) as { id: number; username: string; email: string | null; role: string; created_at: string };
+  await db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(hash, req.user!.id);
+  const row = (await db.prepare("SELECT id, username, email, role, created_at FROM users WHERE id = ?").get(req.user!.id)) as { id: number; username: string; email: string | null; role: string; created_at: string };
   res.json({ user: { id: row.id, email: row.email ?? row.username, role: row.role, created_at: row.created_at } });
 });
 
 /** Actualizar usuario (solo admin). AdminA y AdminB pueden cambiar contraseña de cualquier usuario (Operador, Lector, o la propia). No puede quitarse su propio rol admin. */
-usersRouter.put("/users/:id", requireAuth, requireRole("admin_a", "admin_b"), (req, res) => {
+usersRouter.put("/users/:id", requireAuth, requireRole("admin_a", "admin_b"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) {
     return res.status(400).json({ error: { message: "ID inválido" } });
@@ -85,7 +85,7 @@ usersRouter.put("/users/:id", requireAuth, requireRole("admin_a", "admin_b"), (r
   if (!parsed.success) {
     return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
   }
-  const existing = db.prepare("SELECT id, email, role FROM users WHERE id = ?").get(id) as { id: number; email: string; role: string } | undefined;
+  const existing = (await db.prepare("SELECT id, email, role FROM users WHERE id = ?").get(id)) as { id: number; email: string; role: string } | undefined;
   if (!existing) {
     return res.status(404).json({ error: { message: "Usuario no encontrado" } });
   }
@@ -112,19 +112,19 @@ usersRouter.put("/users/:id", requireAuth, requireRole("admin_a", "admin_b"), (r
     values.push(parsed.data.role);
   }
   if (updates.length === 0) {
-    const row = db.prepare("SELECT id, username, email, role, created_at FROM users WHERE id = ?").get(id) as { id: number; username: string; email: string | null; role: string; created_at: string };
+    const row = (await db.prepare("SELECT id, username, email, role, created_at FROM users WHERE id = ?").get(id)) as { id: number; username: string; email: string | null; role: string; created_at: string };
     return res.json({ user: { id: row.id, email: row.email ?? row.username, role: row.role, created_at: row.created_at } });
   }
   values.push(id);
-  db.prepare(`UPDATE users SET ${updates.join(", ")} WHERE id = ?`).run(...values);
-  const row = db.prepare("SELECT id, username, email, role, created_at FROM users WHERE id = ?").get(id) as { id: number; username: string; email: string | null; role: string; created_at: string };
+  await db.prepare(`UPDATE users SET ${updates.join(", ")} WHERE id = ?`).run(...values);
+  const row = (await db.prepare("SELECT id, username, email, role, created_at FROM users WHERE id = ?").get(id)) as { id: number; username: string; email: string | null; role: string; created_at: string };
   res.json({ user: { id: row.id, email: row.email ?? row.username, role: row.role, created_at: row.created_at } });
 });
 
 /** Listar actividad de usuarios (solo admin): entradas/salidas, horarios, tiempo conectado, IP */
-usersRouter.get("/users/activity", requireAuth, requireRole("admin_a", "admin_b"), (req, res) => {
+usersRouter.get("/users/activity", requireAuth, requireRole("admin_a", "admin_b"), async (req, res) => {
   const limit = Math.min(Math.max(1, Number(req.query.limit) || 100), 500);
-  const rows = db
+  const rows = (await db
     .prepare(
       `SELECT a.id, a.user_id, a.event, a.created_at, a.ip_address, a.user_agent, a.duration_seconds,
               u.email, u.username
@@ -133,7 +133,7 @@ usersRouter.get("/users/activity", requireAuth, requireRole("admin_a", "admin_b"
        ORDER BY a.created_at DESC
        LIMIT ?`
     )
-    .all(limit) as Array<{
+    .all(limit)) as Array<{
     id: number;
     user_id: number;
     event: string;
@@ -158,7 +158,7 @@ usersRouter.get("/users/activity", requireAuth, requireRole("admin_a", "admin_b"
 });
 
 /** Eliminar usuario (solo admin). Solo AdministradorA puede eliminar cuentas con rol AdministradorA o AdministradorB. */
-usersRouter.delete("/users/:id", requireAuth, requireRole("admin_a", "admin_b"), (req, res) => {
+usersRouter.delete("/users/:id", requireAuth, requireRole("admin_a", "admin_b"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) {
     return res.status(400).json({ error: { message: "ID inválido" } });
@@ -166,13 +166,13 @@ usersRouter.delete("/users/:id", requireAuth, requireRole("admin_a", "admin_b"),
   if (req.user!.id === id) {
     return res.status(400).json({ error: { message: "No puede eliminarse a sí mismo" } });
   }
-  const target = db.prepare("SELECT id, role FROM users WHERE id = ?").get(id) as { id: number; role: string } | undefined;
+  const target = (await db.prepare("SELECT id, role FROM users WHERE id = ?").get(id)) as { id: number; role: string } | undefined;
   if (!target) {
     return res.status(404).json({ error: { message: "Usuario no encontrado" } });
   }
   if ((target.role === "admin_a" || target.role === "admin_b") && req.user!.role !== "admin_a") {
     return res.status(403).json({ error: { message: "Solo AdministradorA puede eliminar cuentas de administrador" } });
   }
-  db.prepare("DELETE FROM users WHERE id = ?").run(id);
+  await db.prepare("DELETE FROM users WHERE id = ?").run(id);
   res.status(204).send();
 });

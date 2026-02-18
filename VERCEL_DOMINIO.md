@@ -32,17 +32,14 @@ Guardá los cambios y esperá unos minutos (a veces hasta 48 h, pero en general 
 
 ## 4. Si el build en Vercel falla o la app no se ve
 
-- **Root Directory:** tiene que ser **`client`** (solo el frontend).
-- **Build Command:** `npm run build` (Vite por defecto).
-- **Output Directory:** `dist`.
-- **Install Command:** `npm install`.
+**Para Vercel + Supabase (front + API en mismo dominio):**
 
-Si en la raíz del repo tenés un `vercel.json` con `outputDirectory: "dist"`, al usar Root Directory = **client**, la salida del build de Vite ya es `client/dist`; en Vercel poné **Output Directory** = **`dist`** (relativo a `client`).
-
-Si preferís desplegar desde la **raíz** del repo:
-- **Build Command:** `npm run build:vercel`
+- **Root Directory:** **vacío** o **`.`** (raíz del repo, donde están `client`, `server`, `api`).
+- **Build Command:** `npm run build`
 - **Output Directory:** `dist`
-- Así se construye solo el client y se deja la salida en `dist` para Vercel.
+- **Install Command:** `npm install`
+
+Si Root Directory está en **`client`**, solo se despliega el frontend y la API no funciona (login falla).
 
 ## 5. Resumen
 

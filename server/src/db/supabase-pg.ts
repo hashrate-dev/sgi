@@ -6,10 +6,11 @@ import pg from "pg";
 import type { QueryResult } from "pg";
 import { env } from "../config/env.js";
 
-const pool = new pg.Pool({
+export const pool = new pg.Pool({
   connectionString: env.SUPABASE_DATABASE_URL ?? undefined,
   max: 10,
   idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
   // Supabase suele requerir SSL; allow fallback si no tenés certificados
   ssl: env.SUPABASE_DATABASE_URL?.includes("supabase.co")
     ? { rejectUnauthorized: false }
@@ -58,6 +59,7 @@ function createStatement(sql: string) {
 }
 
 export const db = {
+  isPostgres: true as const,
   prepare: (sql: string) => createStatement(sql),
   exec: (_sql: string) => Promise.resolve(), // no-op para migraciones que ya corrieron en Supabase
   transaction: async <T>(fn: (tx: { prepare: (s: string) => ReturnType<typeof createStatement> }) => Promise<T> | T): Promise<T> => {

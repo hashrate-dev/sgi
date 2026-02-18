@@ -27,20 +27,22 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     res.status(401).json({ error: { message: "Token requerido" } });
     return;
   }
-  try {
-    const payload = jwt.verify(token, env.JWT_SECRET) as { sub: string; userId: number };
-    const row = db.prepare("SELECT id, username, email, role FROM users WHERE id = ?").get(payload.userId) as
-      | { id: number; username: string; email: string | null; role: string }
-      | undefined;
-    if (!row) {
-      res.status(401).json({ error: { message: "Usuario no encontrado" } });
-      return;
+  (async () => {
+    try {
+      const payload = jwt.verify(token, env.JWT_SECRET) as { sub: string; userId: number };
+      const row = (await db.prepare("SELECT id, username, email, role FROM users WHERE id = ?").get(payload.userId)) as
+        | { id: number; username: string; email: string | null; role: string }
+        | undefined;
+      if (!row) {
+        res.status(401).json({ error: { message: "Usuario no encontrado" } });
+        return;
+      }
+      req.user = { id: row.id, username: row.username, email: row.email ?? row.username, role: row.role as UserRole };
+      next();
+    } catch {
+      res.status(401).json({ error: { message: "Token inválido o expirado" } });
     }
-    req.user = { id: row.id, username: row.username, email: row.email ?? row.username, role: row.role as UserRole };
-    next();
-  } catch {
-    res.status(401).json({ error: { message: "Token inválido o expirado" } });
-  }
+  })();
 }
 
 export function requireRole(...roles: UserRole[]) {

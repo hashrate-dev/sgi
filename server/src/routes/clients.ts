@@ -35,12 +35,12 @@ const ClientUpdateSchema = z.object({
 
 const selectFields = "id, code, name, name2, phone, phone2, email, email2, address, address2, city, city2";
 
-clientsRouter.get("/clients", (_req, res) => {
-  const rows = db.prepare(`SELECT ${selectFields} FROM clients ORDER BY code ASC`).all();
+clientsRouter.get("/clients", async (_req, res) => {
+  const rows = await db.prepare(`SELECT ${selectFields} FROM clients ORDER BY code ASC`).all();
   res.json({ clients: rows });
 });
 
-clientsRouter.post("/clients", requireRole("admin_a", "admin_b", "operador"), (req, res) => {
+clientsRouter.post("/clients", requireRole("admin_a", "admin_b", "operador"), async (req, res) => {
   const parsed = ClientCreateSchema.safeParse(req.body);
   if (!parsed.success) {
     return res
@@ -52,7 +52,7 @@ clientsRouter.post("/clients", requireRole("admin_a", "admin_b", "operador"), (r
     "INSERT INTO clients (code, name, name2, phone, phone2, email, email2, address, address2, city, city2) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
   );
   try {
-    const info = stmt.run(
+    const info = await stmt.run(
       d.code,
       d.name,
       d.name2 ?? null,
@@ -65,7 +65,7 @@ clientsRouter.post("/clients", requireRole("admin_a", "admin_b", "operador"), (r
       d.city ?? null,
       d.city2 ?? null
     );
-    const client = db.prepare(`SELECT ${selectFields} FROM clients WHERE id = ?`).get(info.lastInsertRowid as number);
+    const client = await db.prepare(`SELECT ${selectFields} FROM clients WHERE id = ?`).get(info.lastInsertRowid as number);
     res.status(201).json({ client });
   } catch (e: unknown) {
     const err = e as { code?: string };
@@ -76,7 +76,7 @@ clientsRouter.post("/clients", requireRole("admin_a", "admin_b", "operador"), (r
   }
 });
 
-clientsRouter.put("/clients/:id", requireRole("admin_a", "admin_b", "operador"), (req, res) => {
+clientsRouter.put("/clients/:id", requireRole("admin_a", "admin_b", "operador"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) {
     return res.status(400).json({ error: { message: "Invalid id" } });
@@ -87,7 +87,7 @@ clientsRouter.put("/clients/:id", requireRole("admin_a", "admin_b", "operador"),
       .status(400)
       .json({ error: { message: "Invalid body", details: parsed.error.flatten() } });
   }
-  const existing = db.prepare("SELECT id FROM clients WHERE id = ?").get(id);
+  const existing = await db.prepare("SELECT id FROM clients WHERE id = ?").get(id);
   if (!existing) {
     return res.status(404).json({ error: { message: "Cliente no encontrado" } });
   }
@@ -139,13 +139,13 @@ clientsRouter.put("/clients/:id", requireRole("admin_a", "admin_b", "operador"),
     values.push(d.city2);
   }
   if (updates.length === 0) {
-    const client = db.prepare(`SELECT ${selectFields} FROM clients WHERE id = ?`).get(id);
+    const client = await db.prepare(`SELECT ${selectFields} FROM clients WHERE id = ?`).get(id);
     return res.json({ client });
   }
   values.push(id);
   try {
-    db.prepare(`UPDATE clients SET ${updates.join(", ")} WHERE id = ?`).run(...values);
-    const client = db.prepare(`SELECT ${selectFields} FROM clients WHERE id = ?`).get(id);
+    await db.prepare(`UPDATE clients SET ${updates.join(", ")} WHERE id = ?`).run(...values);
+    const client = await db.prepare(`SELECT ${selectFields} FROM clients WHERE id = ?`).get(id);
     res.json({ client });
   } catch (e: unknown) {
     const err = e as { code?: string };
@@ -156,20 +156,20 @@ clientsRouter.put("/clients/:id", requireRole("admin_a", "admin_b", "operador"),
   }
 });
 
-clientsRouter.delete("/clients-all", requireRole("admin_a", "admin_b"), (req, res) => {
-  db.prepare("DELETE FROM clients").run();
+clientsRouter.delete("/clients-all", requireRole("admin_a", "admin_b"), async (_req, res) => {
+  await db.prepare("DELETE FROM clients").run();
   res.status(204).send();
 });
 
-clientsRouter.delete("/clients/:id", requireRole("admin_a", "admin_b"), (req, res) => {
+clientsRouter.delete("/clients/:id", requireRole("admin_a", "admin_b"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) {
     return res.status(400).json({ error: { message: "Invalid id" } });
   }
-  const existing = db.prepare("SELECT id FROM clients WHERE id = ?").get(id);
+  const existing = await db.prepare("SELECT id FROM clients WHERE id = ?").get(id);
   if (!existing) {
     return res.status(404).json({ error: { message: "Cliente no encontrado" } });
   }
-  db.prepare("DELETE FROM clients WHERE id = ?").run(id);
+  await db.prepare("DELETE FROM clients WHERE id = ?").run(id);
   res.status(204).send();
 });

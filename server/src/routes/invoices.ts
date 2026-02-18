@@ -1,7 +1,10 @@
 import { Router } from "express";
 import { z } from "zod";
-import { db } from "../db.js";
+import { db, getDb } from "../db.js";
 import { requireRole } from "../middleware/auth.js";
+
+const isPg = () => (getDb() as { isPostgres?: boolean }).isPostgres === true;
+const clientNameCol = () => (isPg() ? '"clientName"' : "clientName");
 
 export const invoicesRouter = Router();
 
@@ -37,7 +40,7 @@ const TYPE_PREFIX: Record<string, string> = {
 };
 
 /** GET /invoices/next-number?type=Factura|Recibo|Nota de Crédito&peek=1 — devuelve el siguiente número (ej. F001162, RC001162, NC001162; 6 dígitos). Si peek=1 no incrementa la secuencia (solo para vista previa). */
-invoicesRouter.get("/invoices/next-number", requireRole("admin_a", "admin_b", "operador"), (req, res) => {
+invoicesRouter.get("/invoices/next-number", requireRole("admin_a", "admin_b", "operador"), async (req, res) => {
   const q = z.object({
     type: z.enum(["Factura", "Recibo", "Nota de Crédito"]),
     peek: z.union([z.string(), z.undefined()]).optional()
@@ -53,7 +56,7 @@ invoicesRouter.get("/invoices/next-number", requireRole("admin_a", "admin_b", "o
   const formatNumber = (n: number) => `${prefix}${String(n).padStart(padDigits, "0")}`;
 
   if (peek) {
-    const row = db.prepare("SELECT last_number FROM invoice_sequences WHERE type = ?").get(type) as { last_number: number } | undefined;
+    const row = (await db.prepare("SELECT last_number FROM invoice_sequences WHERE type = ?").get(type)) as { last_number: number } | undefined;
     if (!row) {
       return res.status(500).json({ error: { message: "Secuencia no configurada para este tipo" } });
     }
@@ -61,22 +64,21 @@ invoicesRouter.get("/invoices/next-number", requireRole("admin_a", "admin_b", "o
     return res.json({ number });
   }
 
-  const getNext = db.transaction(() => {
-    const row = db.prepare("SELECT last_number FROM invoice_sequences WHERE type = ?").get(type) as { last_number: number } | undefined;
+  const number = await db.transaction(async (tx) => {
+    const row = (await tx.prepare("SELECT last_number FROM invoice_sequences WHERE type = ?").get(type)) as { last_number: number } | undefined;
     if (!row) return null;
     const nextNum = row.last_number + 1;
-    db.prepare("UPDATE invoice_sequences SET last_number = ? WHERE type = ?").run(nextNum, type);
+    await tx.prepare("UPDATE invoice_sequences SET last_number = ? WHERE type = ?").run(nextNum, type);
     return formatNumber(nextNum);
   });
 
-  const number = getNext();
   if (number === null) {
     return res.status(500).json({ error: { message: "Secuencia no configurada para este tipo" } });
   }
   res.json({ number });
 });
 
-invoicesRouter.get("/invoices", (req, res) => {
+invoicesRouter.get("/invoices", async (req, res) => {
   const q = z
     .object({
       client: z.string().optional(),
@@ -92,7 +94,7 @@ invoicesRouter.get("/invoices", (req, res) => {
   const clauses: string[] = [];
   const params: unknown[] = [];
   if (q.data.client) {
-    clauses.push("LOWER(clientName) LIKE ?");
+    clauses.push(`LOWER(${clientNameCol()}) LIKE ?`);
     params.push(`%${q.data.client.toLowerCase()}%`);
   }
   if (q.data.type) {
@@ -105,9 +107,9 @@ invoicesRouter.get("/invoices", (req, res) => {
   }
 
   const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
-  const invoices = db
+  const invoices = await db
     .prepare(
-      `SELECT id, number, type, clientName, date, month, subtotal, discounts, total,
+      `SELECT id, number, type, ${clientNameCol()} as clientName, date, month, subtotal, discounts, total,
               related_invoice_id as relatedInvoiceId, related_invoice_number as relatedInvoiceNumber,
               payment_date as paymentDate, emission_time as emissionTime, due_date as dueDate
        FROM invoices ${where} ORDER BY id DESC`
@@ -117,7 +119,7 @@ invoicesRouter.get("/invoices", (req, res) => {
   res.json({ invoices });
 });
 
-invoicesRouter.post("/invoices", requireRole("admin_a", "admin_b", "operador"), (req, res) => {
+invoicesRouter.post("/invoices", requireRole("admin_a", "admin_b", "operador"), async (req, res) => {
   const parsed = InvoiceCreateSchema.safeParse(req.body);
   if (!parsed.success) {
     return res
@@ -126,70 +128,63 @@ invoicesRouter.post("/invoices", requireRole("admin_a", "admin_b", "operador"), 
   }
 
   const inv = parsed.data;
-  /** Contable: Recibo y Nota de Crédito se guardan con montos en negativo (anulan/cancelan factura). */
   const subtotalDb = inv.type === "Recibo" || inv.type === "Nota de Crédito" ? -Math.abs(inv.subtotal) : inv.subtotal;
   const discountsDb = inv.type === "Recibo" || inv.type === "Nota de Crédito" ? -Math.abs(inv.discounts) : inv.discounts;
   const totalDb = inv.type === "Recibo" || inv.type === "Nota de Crédito" ? -Math.abs(inv.total) : inv.total;
-  const insertInvoice = db.prepare(`
-    INSERT INTO invoices (number, type, clientName, date, month, subtotal, discounts, total, 
-                          related_invoice_id, related_invoice_number, payment_date, emission_time, due_date)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  const insertItem = db.prepare(`
-    INSERT INTO invoice_items (invoice_id, service, month, quantity, price, discount)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `);
 
-  const tx = db.transaction(() => {
-    const info = insertInvoice.run(
-      inv.number,
-      inv.type,
-      inv.clientName,
-      inv.date,
-      inv.month,
-      subtotalDb,
-      discountsDb,
-      totalDb,
-      inv.relatedInvoiceId || null,
-      inv.relatedInvoiceNumber || null,
-      inv.paymentDate || null,
-      inv.emissionTime || null,
-      inv.dueDate || null
-    );
-    const invoiceId = info.lastInsertRowid as number;
-    for (const item of inv.items) {
-      insertItem.run(invoiceId, item.service, item.month, item.quantity, item.price, item.discount);
-    }
-    const created = db
-      .prepare(
-        `SELECT id, number, type, clientName, date, month, subtotal, discounts, total,
+  try {
+    const created = await db.transaction(async (tx) => {
+      const info = await tx.prepare(`
+        INSERT INTO invoices (number, type, ${clientNameCol()}, date, month, subtotal, discounts, total,
+                              related_invoice_id, related_invoice_number, payment_date, emission_time, due_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        inv.number,
+        inv.type,
+        inv.clientName,
+        inv.date,
+        inv.month,
+        subtotalDb,
+        discountsDb,
+        totalDb,
+        inv.relatedInvoiceId || null,
+        inv.relatedInvoiceNumber || null,
+        inv.paymentDate || null,
+        inv.emissionTime || null,
+        inv.dueDate || null
+      );
+      const invoiceId = info.lastInsertRowid as number;
+      const insertItem = tx.prepare(`
+        INSERT INTO invoice_items (invoice_id, service, month, quantity, price, discount)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+      for (const item of inv.items) {
+        await insertItem.run(invoiceId, item.service, item.month, item.quantity, item.price, item.discount);
+      }
+      const row = await tx.prepare(
+        `SELECT id, number, type, ${clientNameCol()} as clientName, date, month, subtotal, discounts, total,
                 related_invoice_id as relatedInvoiceId, related_invoice_number as relatedInvoiceNumber,
                 payment_date as paymentDate, emission_time as emissionTime, due_date as dueDate
          FROM invoices WHERE id = ?`
-      )
-      .get(invoiceId);
-    return created;
-  });
-
-  try {
-    const created = tx();
+      ).get(invoiceId);
+      return row;
+    });
     res.status(201).json({ invoice: created });
   } catch (e: unknown) {
     const err = e as { code?: string };
-    if (err?.code?.includes("SQLITE_CONSTRAINT")) {
+    if (err?.code?.includes("SQLITE_CONSTRAINT") || err?.code === "23505") {
       return res.status(409).json({ error: { message: "Invoice number already exists" } });
     }
     throw e;
   }
 });
 
-invoicesRouter.delete("/invoices/:id", requireRole("admin_a", "admin_b"), (req, res) => {
+invoicesRouter.delete("/invoices/:id", requireRole("admin_a", "admin_b"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) {
     return res.status(400).json({ error: { message: "Invalid id" } });
   }
-  const stmt = db.prepare("DELETE FROM invoices WHERE id = ?");
-  const info = stmt.run(id);
+  const info = await db.prepare("DELETE FROM invoices WHERE id = ?").run(id);
   if (info.changes === 0) {
     return res.status(404).json({ error: { message: "Invoice not found" } });
   }

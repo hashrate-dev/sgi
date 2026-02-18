@@ -1,49 +1,43 @@
-# Conectar Vercel con Supabase como backend (sin Render)
+# Vercel + Supabase (front y API en el mismo dominio)
 
-Para que **https://sgi-client.vercel.app** use **solo Supabase** (nada de Render), el backend tiene que correr en Vercel y conectarse a Supabase.
+El frontend y la API corren en Vercel. La API se conecta a **Supabase** (PostgreSQL). No se usa Render.
 
-## 1. Configuración del proyecto en Vercel
+## 1. Configuración en Vercel
 
 En [vercel.com](https://vercel.com) → tu proyecto → **Settings**:
 
 | Opción | Valor |
 |--------|--------|
-| **Root Directory** | Dejá en blanco o `./` (raíz del repo, donde están `client`, `server`, `api`) |
+| **Root Directory** | Raíz del repo (donde están `client`, `server`, `api`) |
 | **Build Command** | `npm run build` |
 | **Output Directory** | `dist` |
 | **Install Command** | `npm install` |
 
-Si Root Directory está en `client`, **cambialo a la raíz**. Si solo está el front, la API no se despliega y el login no puede usar Supabase.
+## 2. Variables de entorno
 
-## 2. Variables de entorno en Vercel
-
-En **Settings → Environment Variables** agregá (para Production y Preview si quieres):
+En **Settings → Environment Variables** agregá:
 
 | Nombre | Valor | Obligatorio |
 |--------|--------|-------------|
-| `SUPABASE_DATABASE_URL` | La connection string de Supabase (Postgres). En Supabase: Project Settings → Database → Connection string → URI. Reemplazá `[YOUR-PASSWORD]` por tu contraseña. Sin barra final. | Sí |
-| `JWT_SECRET` | Una frase o string largo de al menos 16 caracteres (para firmar el login). | Sí |
+| `SUPABASE_DATABASE_URL` | Connection string de Supabase. Ej: `postgresql://postgres:TU_PASSWORD@db.xxx.supabase.co:5432/postgres` | **Sí** |
+| `JWT_SECRET` | String largo (mín. 16 caracteres) para firmar el JWT del login | **Sí** |
 
-No hace falta `VITE_API_URL`: el front llama a `/api/*` en el mismo dominio.
+Obtener `SUPABASE_DATABASE_URL`: Supabase Dashboard → Project Settings → Database → Connection string → URI.
 
-## 3. Redeploy
+## 3. Schema en Supabase
 
-1. **Deployments** → menú (⋮) del último deploy → **Redeploy**.
-2. O hacé un **push a tu rama** (ej. `main`) si tenés deploy automático.
+Ejecutá una vez el schema en Supabase: **SQL Editor** → New query → pegar el contenido de `server/src/db/schema-supabase.sql` → Run.
 
-Esperá a que termine el build. El build debe ejecutar `npm run build` en la raíz (genera `dist` y `server/dist`). La carpeta `api/` hace que Vercel cree funciones serverless que usan `server/dist` y las variables de entorno.
+## 4. Deploy
 
-## 4. Probar el login
+- **Deployments** → Redeploy, o push a `main` si tenés deploy automático.
+- El build genera `dist` (front) y `server/dist` (API). La carpeta `api/` expone la API como función serverless.
 
-Abrí **https://sgi-client.vercel.app/login** (mejor en incógnito o borrando datos del sitio).
+## 5. Probar
 
-- Usuario: **jv@hashrate.space** — Contraseña: **admin123**
-- O: **fb@hashrate.space** — **123456**
+Abrí `https://tu-proyecto.vercel.app/login`:
 
-Si falla, revisá en **Deployments** los logs del último deploy: que el build termine bien y que no falte `server/dist`. Y en **Functions** (o logs de la función) que no haya error de conexión a Supabase (ej. `SUPABASE_DATABASE_URL` mal definida).
+- **jv@hashrate.space** / **admin123**
+- **fb@hashrate.space** / **123456**
 
-## Resumen
-
-- **Render:** no se usa. No hace falta tener nada en dashboard.render.com.
-- **Backend:** corre en Vercel (carpeta `api/`, Express en serverless) y se conecta a **Supabase** con `SUPABASE_DATABASE_URL`.
-- **Base de datos:** solo Supabase (misma que en local). Las tablas se crean ejecutando `server/supabase/schema.sql` en el SQL Editor de Supabase (una sola vez).
+Si falla: revisá los logs del deploy y que `SUPABASE_DATABASE_URL` y `JWT_SECRET` estén configuradas.
