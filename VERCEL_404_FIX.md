@@ -54,9 +54,10 @@ Si la sección "Actividad de usuarios" muestra "No se pudo cargar la actividad":
 
 ## Items Garantía ANDE / Importar Excel no funciona
 
-Si la página **Items Garantía ANDE** muestra "No hay ítems" o el **Importar Excel** falla:
+Si la página **Items Garantía ANDE** muestra "Cargando desde el servidor..." o "No se pudo cargar":
 
-1. **Tabla en Supabase:** La tabla `items_garantia_ande` debe existir. En Supabase → SQL Editor, ejecutá el bloque de `server/src/db/schema-supabase.sql` (líneas 98-106) o todo el schema.
-2. **Variables de entorno:** `SUPABASE_DATABASE_URL` y `JWT_SECRET` en Vercel.
-3. **Formato Excel:** El archivo debe tener encabezados: Código, Marca, Modelo, Fecha ingreso, Observaciones. Al menos Marca o Modelo deben tener valor en cada fila.
-4. Si ves "No se pudo cargar desde el servidor", usá el botón **Reintentar** o verificá los logs de Vercel.
+1. **Schema en el build:** El `schema-supabase.sql` ahora se copia a `server/dist/db/` durante el build. Al iniciar, la app ejecuta el schema y crea `items_garantia_ande` si no existe.
+2. **Si la tabla sigue sin existir:** Ejecutá manualmente en Supabase → SQL Editor el archivo `server/supabase/create-items-garantia-ande.sql`.
+3. **Handler dedicado:** `api/garantias/items.js` para GET /api/garantias/items (evita problemas de routing).
+4. **Variables de entorno:** `SUPABASE_DATABASE_URL` y `JWT_SECRET` en Vercel.
+5. **Formato Excel:** Código, Marca, Modelo, Fecha ingreso, Observaciones. Al menos Marca o Modelo por fila.
