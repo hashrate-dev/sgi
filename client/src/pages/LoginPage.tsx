@@ -11,10 +11,16 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [ready, setReady] = useState(false);
 
-  // Despertar el backend en Render al cargar la página (evita timeout en el primer login cuando el servicio estaba dormido).
+  // En Vercel: warmup (DB+app) antes de permitir login. En Render: health.
   useEffect(() => {
-    wakeUpBackend();
+    const t = setTimeout(() => setReady(true), 15000); // fallback: habilitar tras 15s
+    wakeUpBackend().finally(() => {
+      clearTimeout(t);
+      setReady(true);
+    });
+    return () => clearTimeout(t);
   }, []);
 
   // Plan B (oculto): /login?api=URL guarda la URL del backend en localStorage; el usuario no ve nada.
@@ -81,8 +87,8 @@ export function LoginPage() {
                   {error}
                 </div>
               )}
-              <button type="submit" className="btn btn-primary w-100" disabled={submitting}>
-                {submitting ? "Entrando..." : "Entrar"}
+              <button type="submit" className="btn btn-primary w-100" disabled={submitting || !ready}>
+                {!ready ? "Preparando..." : submitting ? "Entrando..." : "Entrar"}
               </button>
             </form>
           </div>

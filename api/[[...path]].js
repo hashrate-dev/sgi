@@ -27,6 +27,18 @@ export default async function handler(req, res) {
     return;
   }
 
+  // /api/warmup: inicializa DB + app para evitar cold start en el primer login
+  if (path === "/api/warmup" || path.endsWith("/warmup") || path === "/warmup") {
+    try {
+      await getApp();
+      res.status(200).end(JSON.stringify({ ok: true }));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      res.status(500).end(JSON.stringify({ ok: false, error: msg }));
+    }
+    return;
+  }
+
   // /api/test-db: diagnóstico de conexión a Supabase
   if (path === "/api/test-db" || path.endsWith("/test-db") || path === "/test-db") {
     try {
