@@ -36,8 +36,18 @@ En **Settings → Environment Variables** (Production):
 | `SUPABASE_DATABASE_URL` | Sí – Connection string de Supabase (pooler, puerto 6543) |
 | `JWT_SECRET` | Sí – String largo para firmar JWT |
 
+## Actividad de usuarios no carga
+
+Si la sección "Actividad de usuarios" muestra "No se pudo cargar la actividad":
+
+1. Se añadió un handler dedicado `api/users/activity.js` que responde a `GET /api/users/activity` sin pasar por el catch-all.
+2. El handler principal usa fallbacks para `req.url` (x-vercel-url, x-url, x-invoke-path) por si Vercel no pasa la URL correctamente.
+3. Verificá que `SUPABASE_DATABASE_URL` y `JWT_SECRET` estén configurados.
+4. La tabla `user_activity` debe existir en Supabase (ver `server/src/db/schema-supabase.sql`).
+
 ## Probar
 
 1. **https://sgi-two.vercel.app/api/health** → debe devolver `{"ok":true,"t":...}`
 2. Si health responde OK pero login falla → revisá `SUPABASE_DATABASE_URL` y `JWT_SECRET`
 3. Si health da 404 → la API no se despliega; verificá Root Directory y el build
+4. **Actividad:** con sesión de admin, la pestaña Usuarios debe cargar la actividad. Si falla, probá `/api/users/activity` con un token Bearer en el header.

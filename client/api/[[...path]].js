@@ -16,7 +16,16 @@ async function getApp() {
 }
 
 export default async function handler(req, res) {
-  const rawUrl = req.url ?? "";
+  // Vercel puede pasar req.url como undefined; usar fallbacks
+  const h = req.headers || {};
+  const hVal = (k) => (typeof h[k] === "string" ? h[k] : Array.isArray(h[k]) ? h[k][0] : null);
+  const rawUrl =
+    req.url ??
+    req.originalUrl ??
+    hVal("x-vercel-url") ??
+    hVal("x-url") ??
+    hVal("x-invoke-path") ??
+    "";
   const path = (rawUrl.startsWith("http") ? new URL(rawUrl).pathname : rawUrl).split("?")[0] ?? "";
   res.setHeader("Content-Type", "application/json");
 
