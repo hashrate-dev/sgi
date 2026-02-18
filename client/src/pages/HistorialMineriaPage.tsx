@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
-import { deleteEmittedDocumentOne, deleteEmittedDocumentsAll, getClients, verifyPassword } from "../lib/api";
+import { deleteAllInvoices, deleteEmittedDocumentOne, deleteEmittedDocumentsAll, deleteInvoice, getClients, getInvoices, verifyPassword, wakeUpBackend } from "../lib/api";
 import { dispatchEmittedChanged } from "../lib/emittedEvents";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadInvoicesAsic, saveInvoicesAsic } from "../lib/storage";
@@ -168,9 +168,41 @@ export function HistorialMineriaPage() {
   const canDelete = user ? canDeleteHistorial(user.role) : false;
   const canExportData = user ? canExport(user.role) : false;
 
-  // Recargar desde localStorage al montar (asegura ver datos de ASIC/mineria)
+  /** Cargar desde API cuando el backend está disponible (para Lector y todos: ver datos agregados por otros usuarios) */
   useEffect(() => {
-    setAll(loadInvoicesAsic());
+    let cancelled = false;
+    const doFetch = () => {
+      wakeUpBackend().then(() => {
+        if (cancelled) return;
+        getInvoices({ source: "asic" })
+          .then((r) => {
+            if (cancelled) return;
+            const list = (r.invoices ?? []).map((inv) => ({
+              id: String(inv.id),
+              number: inv.number,
+              type: inv.type as ComprobanteType,
+              clientName: inv.clientName,
+              date: inv.date,
+              month: inv.month,
+              subtotal: inv.subtotal,
+              discounts: inv.discounts,
+              total: inv.total,
+              relatedInvoiceId: inv.relatedInvoiceId != null ? String(inv.relatedInvoiceId) : undefined,
+              relatedInvoiceNumber: inv.relatedInvoiceNumber,
+              paymentDate: inv.paymentDate,
+              emissionTime: inv.emissionTime,
+              dueDate: inv.dueDate,
+              items: []
+            }));
+            setAll(list);
+          })
+          .catch(() => {});
+      });
+    };
+    doFetch();
+    const onVisible = () => { if (document.visibilityState === "visible") doFetch(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { cancelled = true; document.removeEventListener("visibilitychange", onVisible); };
   }, []);
 
   const filtered = useMemo(() => {
@@ -333,9 +365,18 @@ export function HistorialMineriaPage() {
     });
   }
 
-  function removeOne(id: string) {
+  async function removeOne(id: string) {
     const found = all.find((i) => i.id === id);
     if (!found) return;
+    const numericId = /^\d+$/.test(id) ? parseInt(id, 10) : null;
+    if (numericId != null) {
+      try {
+        await deleteInvoice(numericId);
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : "No se pudo eliminar en el servidor.", "error");
+        return;
+      }
+    }
     const next = all.filter((i) => i.id !== id);
     setAll(next);
     saveInvoicesAsic(next);
@@ -345,8 +386,7 @@ export function HistorialMineriaPage() {
 
   function handleDeleteOneConfirm() {
     if (!deleteConfirmInv) return;
-    removeOne(deleteConfirmInv.id);
-    setDeleteConfirmInv(null);
+    void removeOne(deleteConfirmInv.id).then(() => setDeleteConfirmInv(null));
   }
 
   function handleClearClick() {
@@ -380,15 +420,20 @@ export function HistorialMineriaPage() {
     setClearPasswordError("");
     try {
       await verifyPassword(clearPassword);
-      setShowClearConfirm2(false);
-      setClearPassword("");
-      setClearPasswordError("");
-      setPasswordAttempts(0);
-      setAll([]);
-      saveInvoicesAsic([]);
-      await deleteEmittedDocumentsAll("asic").catch(() => {});
-      dispatchEmittedChanged("asic");
-      showToast("Todo el historial ha sido eliminado.", "success", "Historial");
+      try {
+        await deleteAllInvoices("asic");
+        await deleteEmittedDocumentsAll("asic").catch(() => {});
+        setAll([]);
+        saveInvoicesAsic([]);
+        dispatchEmittedChanged("asic");
+        showToast("Todo el historial ha sido eliminado.", "success", "Historial");
+        setShowClearConfirm2(false);
+        setClearPassword("");
+        setClearPasswordError("");
+        setPasswordAttempts(0);
+      } catch (delErr) {
+        showToast(delErr instanceof Error ? delErr.message : "No se pudo eliminar en el servidor.", "error");
+      }
     } catch (err) {
       const newAttempts = passwordAttempts + 1;
       setPasswordAttempts(newAttempts);
@@ -574,106 +619,108 @@ export function HistorialMineriaPage() {
     }
   }
 
+  const pageSubtitle = "Documentos detalle por Ventas de Equipos ASIC. Filtros por cliente, tipo y mes.";
+
   return (
-    <div className="fact-page usuarios-page">
+    <div className="fact-page clientes-page">
       <div className="container">
         <PageHeader title="Historial Venta de ASIC" showBackButton backTo="/" backText="Volver al inicio" />
 
-        <div className="usuarios-page-card">
-          <div className="usuarios-page-header">
-            <div className="usuarios-page-header-inner">
-              <h2 className="usuarios-page-title">
-                <span className="usuarios-page-title-icon" aria-hidden>📄</span>
-                Historial Venta de ASIC
-              </h2>
-              <p className="usuarios-page-subtitle">Documentos detalle por Ventas de Equipos ASIC. Filtros por cliente, tipo y mes.{user && !canExportData && !canDelete ? " (solo consulta)" : ""}</p>
-            </div>
-            <div className="d-flex gap-2 flex-wrap" style={{ position: "relative", zIndex: 1 }}>
-              {canExportData && (
-                <>
-                  <label
-                    className="usuarios-page-btn-new"
-                    style={{ cursor: excelLoading ? "not-allowed" : "pointer", opacity: excelLoading ? 0.7 : 1 }}
-                  >
-                    {excelLoading ? "⏳ Importando..." : "📥 Importar Excel"}
+        <div className="hrs-card hrs-card--rect p-4">
+          <div className="historial-filtros-outer">
+            <div className="historial-filtros-container">
+              <div className="card historial-filtros-card">
+                <h6 className="fw-bold border-bottom pb-2">🔍 Filtros</h6>
+                <div className="row g-2 align-items-end">
+                  <div className="col-md-2">
+                    <label className="form-label small fw-bold">Cliente</label>
                     <input
-                      type="file"
-                      accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                      className="d-none"
-                      onChange={handleExcelImport}
-                      disabled={excelLoading}
+                      className="form-control form-control-sm"
+                      placeholder="Buscar cliente..."
+                      value={qClient}
+                      onChange={(e) => setQClient(e.target.value)}
                     />
-                  </label>
-                  <button type="button" className="usuarios-page-btn-new" onClick={exportExcel}>
-                    📊 Exportar Excel
-                  </button>
-                </>
-              )}
-              {canDelete && (
-                <button
-                  type="button"
-                  className="usuarios-page-btn-new"
-                  style={{ backgroundColor: "rgba(220, 53, 69, 0.9)", color: "#fff" }}
-                  onClick={handleClearClick}
-                >
-                  🗑️ Borrar Todo
-                </button>
-              )}
-            </div>
-          </div>
-          <div className="usuarios-page-body">
-            <div className="historial-filtros-en-body mb-3 p-3 rounded" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-              <h6 className="fw-bold mb-2 small text-muted">🔍 Filtros</h6>
-              <div className="row g-2 align-items-end">
-                <div className="col-md-3">
-                  <label className="form-label small fw-bold">Cliente</label>
-                  <input
-                    className="form-control form-control-sm"
-                    placeholder="Buscar cliente..."
-                    value={qClient}
-                    onChange={(e) => setQClient(e.target.value)}
-                  />
-                </div>
-                <div className="col-md-2">
-                  <label className="form-label small fw-bold">Tipo</label>
-                  <select
-                    className="form-select form-select-sm"
-                    value={qType}
-                    onChange={(e) => setQType(e.target.value as "" | ComprobanteType)}
-                  >
-                    <option value="">Todos</option>
-                    <option value="Factura">Factura</option>
-                    <option value="Recibo">Recibo</option>
-                    <option value="Nota de Crédito">Nota de Crédito</option>
-                  </select>
-                </div>
-                <div className="col-md-2">
-                  <label className="form-label small fw-bold">Mes</label>
-                  <input
-                    type="month"
-                    className="form-control form-control-sm"
-                    value={qMonth}
-                    onChange={(e) => setQMonth(e.target.value)}
-                  />
-                </div>
-                <div className="col-md-2 d-flex align-items-end">
-                  <button
-                    className="btn btn-outline-secondary btn-sm w-100"
-                    onClick={() => {
-                      setQClient("");
-                      setQType("");
-                      setQMonth("");
-                    }}
-                  >
-                    Limpiar
-                  </button>
+                  </div>
+                  <div className="col-md-1 col-lg-1">
+                    <label className="form-label small fw-bold">Tipo</label>
+                    <select
+                      className="form-select form-select-sm"
+                      value={qType}
+                      onChange={(e) => setQType(e.target.value as "" | ComprobanteType)}
+                      style={{ maxWidth: "8.5rem" }}
+                    >
+                      <option value="">Todos</option>
+                      <option value="Factura">Factura</option>
+                      <option value="Recibo">Recibo</option>
+                      <option value="Nota de Crédito">Nota de Crédito</option>
+                    </select>
+                  </div>
+                  <div className="col-md-1 col-lg-2">
+                    <label className="form-label small fw-bold">Mes</label>
+                    <input
+                      type="month"
+                      className="form-control form-control-sm"
+                      value={qMonth}
+                      onChange={(e) => setQMonth(e.target.value)}
+                      style={{ maxWidth: "9rem" }}
+                    />
+                  </div>
+                  <div className="col-md-1 d-flex align-items-end filtros-limpiar-col">
+                    <button
+                      className="btn btn-outline-secondary btn-sm filtros-limpiar-btn"
+                      onClick={() => {
+                        setQClient("");
+                        setQType("");
+                        setQMonth("");
+                      }}
+                    >
+                      Limpiar
+                    </button>
+                  </div>
+                  <div className="col-md-auto d-flex align-items-end gap-2 ms-auto">
+                    {canExportData && (
+                      <>
+                        <label
+                          className="btn btn-outline-secondary btn-sm historial-import-excel-btn mb-0"
+                          style={{ backgroundColor: "rgba(45, 93, 70, 0.35)", cursor: excelLoading ? "not-allowed" : "pointer" }}
+                        >
+                          {excelLoading ? "⏳ Importando..." : "📥 Importar Excel"}
+                          <input
+                            type="file"
+                            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                            className="d-none"
+                            onChange={handleExcelImport}
+                            disabled={excelLoading}
+                          />
+                        </label>
+                        <button type="button" className="btn btn-outline-secondary btn-sm clientes-export-excel-btn" style={{ backgroundColor: "rgba(13, 110, 253, 0.12)" }} onClick={exportExcel}>
+                          📊 Exportar Excel
+                        </button>
+                      </>
+                    )}
+                    {canDelete && (
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary btn-sm clientes-borrar-todo-btn"
+                        style={{ backgroundColor: "rgba(220, 53, 69, 0.4)" }}
+                        onClick={handleClearClick}
+                      >
+                        🗑️ Borrar Todo
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
+          </div>
 
-            <div className="usuarios-listado-wrap">
-          <div className="table-responsive">
-            <table className="table table-sm align-middle usuarios-listado-table historial-listado-table" style={{ fontSize: "0.85rem" }}>
+          <div className="historial-listado-wrap historial-listado-outer">
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <h6 className="fw-bold m-0">📄 Listado de documentos ({filtered.length}){user && !canExportData && !canDelete ? <span className="text-muted small ms-2">(solo consulta)</span> : ""}</h6>
+            </div>
+            <p className="text-muted small mb-3">{pageSubtitle}</p>
+            <div className="table-responsive">
+            <table className="table table-sm align-middle historial-listado-table" style={{ fontSize: "0.85rem" }}>
               <thead className="table-dark">
                 <tr>
                   <th className="text-start">N°</th>
@@ -866,7 +913,6 @@ export function HistorialMineriaPage() {
               </div>
             </div>
           )}
-            </div>
           </div>
         </div>
 

@@ -228,6 +228,12 @@ CREATE TABLE IF NOT EXISTS equipos_asic (
     if (!msg.includes("duplicate column")) throw e;
   }
   try {
+    native.exec("ALTER TABLE invoices ADD COLUMN source TEXT DEFAULT 'hosting'");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+  try {
     native.exec("ALTER TABLE setups ADD COLUMN codigo TEXT");
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);

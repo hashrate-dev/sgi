@@ -350,6 +350,7 @@ export type InvoiceCreateBody = {
   paymentDate?: string;
   emissionTime?: string;
   dueDate?: string;
+  source?: "hosting" | "asic";
 };
 export type InvoiceCreateResponse = { invoice: { id: number; number: string; type: string; clientName: string; date: string; month: string; subtotal: number; discounts: number; total: number } };
 
@@ -361,15 +362,27 @@ export function createInvoice(body: InvoiceCreateBody): Promise<InvoiceCreateRes
 }
 
 /** Listar facturas/recibos/NC desde la base de datos (filtros opcionales). */
-export type InvoicesListResponse = { invoices: Array<{ id: number; number: string; type: string; clientName: string; date: string; month: string; subtotal: number; discounts: number; total: number; relatedInvoiceId?: number; relatedInvoiceNumber?: string; paymentDate?: string; emissionTime?: string; dueDate?: string }> };
+export type InvoicesListResponse = { invoices: Array<{ id: number; number: string; type: string; clientName: string; date: string; month: string; subtotal: number; discounts: number; total: number; relatedInvoiceId?: number; relatedInvoiceNumber?: string; paymentDate?: string; emissionTime?: string; dueDate?: string; source?: string }> };
 
-export function getInvoices(params?: { client?: string; type?: "Factura" | "Recibo" | "Nota de Crédito"; month?: string }): Promise<InvoicesListResponse> {
+export function getInvoices(params?: { client?: string; type?: "Factura" | "Recibo" | "Nota de Crédito"; month?: string; source?: "hosting" | "asic" }): Promise<InvoicesListResponse> {
   const sp = new URLSearchParams();
   if (params?.client) sp.set("client", params.client);
   if (params?.type) sp.set("type", params.type);
   if (params?.month) sp.set("month", params.month);
+  if (params?.source) sp.set("source", params.source);
   const q = sp.toString();
   return api<InvoicesListResponse>(`/api/invoices${q ? `?${q}` : ""}`);
+}
+
+/** Eliminar una factura por id (solo admin_a, admin_b). */
+export function deleteInvoice(id: number): Promise<{ ok: boolean }> {
+  return api<{ ok: boolean }>(`/api/invoices/${id}`, { method: "DELETE" });
+}
+
+/** Eliminar todas las facturas (solo admin_a). source opcional: hosting|asic. */
+export function deleteAllInvoices(source?: "hosting" | "asic"): Promise<{ ok: boolean; deleted: number }> {
+  const q = source ? `?source=${encodeURIComponent(source)}` : "";
+  return api<{ ok: boolean; deleted: number }>(`/api/invoices/all${q}`, { method: "DELETE" });
 }
 
 /** Siguiente número para Factura / Recibo / Nota de Crédito (generado en el servidor). */

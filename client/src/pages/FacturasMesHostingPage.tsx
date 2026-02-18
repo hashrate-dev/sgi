@@ -41,13 +41,14 @@ function parseDateMonth(dateStr: string): { year: number; month: number } | null
   return null;
 }
 
-/** Formatea mes YYYY-MM a "Feb 2026" (mes del documento en emisión) */
+/** Formatea mes YYYY-MM a "feb-2026" (mes del documento en emisión) */
 function formatMonth(monthStr: string): string {
   if (!monthStr || monthStr.length < 7) return monthStr || "—";
   const [y, m] = monthStr.split("-").map(Number);
   if (!Number.isFinite(y) || !Number.isFinite(m)) return monthStr;
   const d = new Date(y, m - 1, 1);
-  return d.toLocaleDateString("es-AR", { month: "short", year: "numeric" });
+  const mes = d.toLocaleDateString("es-AR", { month: "short" });
+  return `${mes}-${y}`;
 }
 
 function currentMonthValue(): string {
@@ -101,7 +102,8 @@ export function FacturasMesHostingPage() {
       for (let m = mStart; m <= mEnd; m++) {
         const value = `${y}-${String(m + 1).padStart(2, "0")}`;
         const d = new Date(y, m, 1);
-        opciones.push({ value, label: d.toLocaleDateString("es-AR", { month: "long", year: "numeric" }) });
+        const mes = d.toLocaleDateString("es-AR", { month: "short" });
+        opciones.push({ value, label: `${mes}-${y}` });
       }
     }
     return opciones.reverse(); /* más recientes primero */
@@ -240,11 +242,11 @@ export function FacturasMesHostingPage() {
             <div className="historial-filtros-container">
               <div className="card historial-filtros-card">
                 <h6 className="fw-bold border-bottom pb-2">🔍 Filtros</h6>
-                <div className="row g-2 align-items-end">
-                  <div className="col-md-3">
-                    <label className="form-label small fw-bold">Mes</label>
+                <div className="row g-3 align-items-end facturas-mes-filtros-row">
+                  <div className="col-6 col-md-2">
+                    <label className="form-label small fw-bold mb-1">Mes</label>
                     <select
-                      className="form-select form-select-sm"
+                      className="form-select form-select-sm w-100"
                       value={selectedMonth}
                       onChange={(e) => setSelectedMonth(e.target.value)}
                     >
@@ -253,19 +255,19 @@ export function FacturasMesHostingPage() {
                       ))}
                     </select>
                   </div>
-                  <div className="col-md-3">
-                    <label className="form-label small fw-bold">Cliente</label>
+                  <div className="col-6 col-md-3">
+                    <label className="form-label small fw-bold mb-1">Cliente</label>
                     <input
-                      className="form-control form-control-sm"
+                      className="form-control form-control-sm w-100"
                       placeholder="Buscar cliente..."
                       value={qClient}
                       onChange={(e) => setQClient(e.target.value)}
                     />
                   </div>
-                  <div className="col-md-2">
-                    <label className="form-label small fw-bold">Tipo</label>
+                  <div className="col-6 col-md-2">
+                    <label className="form-label small fw-bold mb-1">Tipo</label>
                     <select
-                      className="form-select form-select-sm"
+                      className="form-select form-select-sm w-100"
                       value={qType}
                       onChange={(e) => setQType(e.target.value as "" | ComprobanteType)}
                     >
@@ -275,9 +277,10 @@ export function FacturasMesHostingPage() {
                       <option value="Nota de Crédito">Nota de Crédito</option>
                     </select>
                   </div>
-                  <div className="col-md-2 d-flex align-items-end">
+                  <div className="col-6 col-md-auto d-flex align-items-end filtros-limpiar-col">
                     <button
-                      className="btn btn-outline-secondary btn-sm w-100"
+                      type="button"
+                      className="btn btn-outline-secondary btn-sm filtros-limpiar-btn"
                       onClick={() => {
                         setQClient("");
                         setQType("");

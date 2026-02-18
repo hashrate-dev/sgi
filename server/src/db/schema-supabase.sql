@@ -58,7 +58,8 @@ CREATE TABLE IF NOT EXISTS invoices (
   related_invoice_number TEXT,
   payment_date TEXT,
   emission_time TEXT,
-  due_date TEXT
+  due_date TEXT,
+  source TEXT NOT NULL DEFAULT 'hosting' CHECK (source IN ('hosting', 'asic'))
 );
 
 CREATE TABLE IF NOT EXISTS invoice_items (
@@ -124,6 +125,7 @@ CREATE TABLE IF NOT EXISTS equipos_asic (
 
 -- Columnas extra que el app puede agregar si no existen (opcional)
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS related_invoice_id INTEGER;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'hosting';
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS related_invoice_number TEXT;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payment_date TEXT;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS emission_time TEXT;

@@ -2938,6 +2938,15 @@
   overflow: visible;
 }
 
+.historial-filtros-card .row.g-2 {
+  flex-wrap: nowrap;
+}
+@media (max-width: 991px) {
+  .historial-filtros-card .row.g-2 {
+    flex-wrap: wrap;
+  }
+}
+
 .historial-filtros-card h6 {
   color: #fff;
   border-bottom-color: rgba(255, 255, 255, 0.25) !important;
@@ -2983,6 +2992,38 @@
   background: rgba(255, 255, 255, 0.35);
   border-color: rgba(255, 255, 255, 0.7);
   color: #fff;
+}
+
+/* Botón Limpiar: mismo tamaño en todos los filtros del proyecto */
+.filtros-limpiar-btn {
+  min-width: 5.5rem;
+}
+
+/* Columna del botón Limpiar: pegada al campo anterior (sin gap) */
+.filtros-limpiar-col {
+  padding-left: 0;
+  padding-right: 0;
+  margin-left: -1rem; /* elimina gutter y pega al campo anterior */
+  flex-shrink: 0;
+}
+
+/* Control documentos: filtros alineados */
+.facturas-mes-filtros-row .form-label {
+  margin-bottom: 0.25rem;
+}
+.facturas-mes-filtros-row .form-control,
+.facturas-mes-filtros-row .form-select {
+  height: 2rem;
+  min-height: 2rem;
+}
+.facturas-mes-filtros-row .filtros-limpiar-col {
+  margin-left: 0.5rem;
+}
+.facturas-mes-filtros-row .filtros-limpiar-btn {
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .historial-listado-wrap {

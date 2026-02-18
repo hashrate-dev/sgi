@@ -358,9 +358,9 @@ export function HistorialGarantiasPage() {
                       onChange={(e) => setQClient(e.target.value)}
                     />
                   </div>
-                  <div className="col-md-2 d-flex align-items-end">
+                  <div className="col-md-2 d-flex align-items-end filtros-limpiar-col">
                     <button
-                      className="btn btn-outline-secondary btn-sm w-100"
+                      className="btn btn-outline-secondary btn-sm filtros-limpiar-btn"
                       onClick={() => setQClient("")}
                     >
                       Limpiar

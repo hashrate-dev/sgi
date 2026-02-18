@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
-import { addEmittedDocument, deleteEmittedDocumentOne, deleteEmittedDocumentsAll, getClients, verifyPassword } from "../lib/api";
+import { addEmittedDocument, deleteAllInvoices, deleteEmittedDocumentOne, deleteEmittedDocumentsAll, deleteInvoice, getClients, getInvoices, verifyPassword, wakeUpBackend } from "../lib/api";
 import { dispatchEmittedChanged } from "../lib/emittedEvents";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadInvoices, loadInvoicesAsic, saveInvoices, saveInvoicesAsic } from "../lib/storage";
@@ -177,10 +177,56 @@ type InvoiceWithSource = Invoice & { _source: "hosting" | "asic" };
 
 type HistorialPageProps = { sourceFilter?: "hosting" | "asic" };
 
+/** Convierte factura de la API al formato Invoice con _source */
 export function HistorialPage({ sourceFilter }: HistorialPageProps) {
   const { user } = useAuth();
   const [allHosting, setAllHosting] = useState<Invoice[]>(() => loadInvoices());
   const [allAsic, setAllAsic] = useState<Invoice[]>(() => loadInvoicesAsic());
+
+  /** Cargar desde API cuando el backend está disponible (para Lector y todos: ver datos agregados por otros usuarios) */
+  useEffect(() => {
+    let cancelled = false;
+    const toInvoice = (inv: { id: number; number: string; type: string; clientName: string; date: string; month: string; subtotal: number; discounts: number; total: number; relatedInvoiceId?: number; relatedInvoiceNumber?: string; paymentDate?: string; emissionTime?: string; dueDate?: string; source?: string }, src: "hosting" | "asic"): Invoice & { _source: "hosting" | "asic" } => ({
+      id: String(inv.id),
+      number: inv.number,
+      type: inv.type as ComprobanteType,
+      clientName: inv.clientName,
+      date: inv.date,
+      month: inv.month,
+      subtotal: inv.subtotal,
+      discounts: inv.discounts,
+      total: inv.total,
+      relatedInvoiceId: inv.relatedInvoiceId != null ? String(inv.relatedInvoiceId) : undefined,
+      relatedInvoiceNumber: inv.relatedInvoiceNumber,
+      paymentDate: inv.paymentDate,
+      emissionTime: inv.emissionTime,
+      dueDate: inv.dueDate,
+      items: [],
+      _source: src
+    });
+    const doFetch = () => {
+      wakeUpBackend().then(() => {
+        if (cancelled) return;
+        const fetchSource = (src: "hosting" | "asic") =>
+          getInvoices({ source: src })
+            .then((r) => {
+              if (cancelled) return;
+              const list = (r.invoices ?? []).map((inv) => toInvoice(inv, src));
+              if (src === "hosting") setAllHosting(list);
+              else setAllAsic(list);
+            })
+            .catch(() => {});
+        if (sourceFilter === "hosting") void fetchSource("hosting");
+        else if (sourceFilter === "asic") void fetchSource("asic");
+        else void Promise.all([fetchSource("hosting"), fetchSource("asic")]);
+      });
+    };
+    doFetch();
+    const onVisible = () => { if (document.visibilityState === "visible") doFetch(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { cancelled = true; document.removeEventListener("visibilitychange", onVisible); };
+  }, [sourceFilter]);
+
   const all = useMemo<InvoiceWithSource[]>(() => {
     const hosting = allHosting.map((i) => ({ ...i, _source: "hosting" as const }));
     const asic = allAsic.map((i) => ({ ...i, _source: "asic" as const }));
@@ -374,9 +420,18 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
     });
   }
 
-  function removeOne(id: string) {
+  async function removeOne(id: string) {
     const found = all.find((i) => i.id === id) as InvoiceWithSource | undefined;
     if (!found) return;
+    const numericId = /^\d+$/.test(id) ? parseInt(id, 10) : null;
+    if (numericId != null) {
+      try {
+        await deleteInvoice(numericId);
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : "No se pudo eliminar en el servidor.", "error");
+        return;
+      }
+    }
     if (found._source === "hosting") {
       const next = allHosting.filter((i) => i.id !== id);
       setAllHosting(next);
@@ -394,8 +449,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
 
   function handleDeleteOneConfirm() {
     if (!deleteConfirmInv) return;
-    removeOne(deleteConfirmInv.id);
-    setDeleteConfirmInv(null);
+    void removeOne(deleteConfirmInv.id).then(() => setDeleteConfirmInv(null));
   }
 
   function handleClearClick() {
@@ -429,34 +483,41 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
     setClearPasswordError("");
     try {
       await verifyPassword(clearPassword);
-      setShowClearConfirm2(false);
-      setClearPassword("");
-      setClearPasswordError("");
-      setPasswordAttempts(0);
-      if (sourceFilter === "hosting") {
-        setAllHosting([]);
-        saveInvoices([]);
-        await deleteEmittedDocumentsAll("hosting").catch(() => {});
-        dispatchEmittedChanged("hosting");
-        showToast("Historial de Hosting eliminado.", "success", "Historial");
-      } else if (sourceFilter === "asic") {
-        setAllAsic([]);
-        saveInvoicesAsic([]);
-        await deleteEmittedDocumentsAll("asic").catch(() => {});
-        dispatchEmittedChanged("asic");
-        showToast("Historial de ASIC eliminado.", "success", "Historial");
-      } else {
-        setAllHosting([]);
-        setAllAsic([]);
-        saveInvoices([]);
-        saveInvoicesAsic([]);
-        await Promise.all([
-          deleteEmittedDocumentsAll("hosting").catch(() => {}),
-          deleteEmittedDocumentsAll("asic").catch(() => {})
-        ]);
-        dispatchEmittedChanged("hosting");
-        dispatchEmittedChanged("asic");
-        showToast("Todo el historial ha sido eliminado.", "success", "Historial");
+      try {
+        if (sourceFilter === "hosting") {
+          await deleteAllInvoices("hosting");
+          await deleteEmittedDocumentsAll("hosting").catch(() => {});
+          setAllHosting([]);
+          saveInvoices([]);
+          dispatchEmittedChanged("hosting");
+          showToast("Historial de Hosting eliminado.", "success", "Historial");
+        } else if (sourceFilter === "asic") {
+          await deleteAllInvoices("asic");
+          await deleteEmittedDocumentsAll("asic").catch(() => {});
+          setAllAsic([]);
+          saveInvoicesAsic([]);
+          dispatchEmittedChanged("asic");
+          showToast("Historial de ASIC eliminado.", "success", "Historial");
+        } else {
+          await deleteAllInvoices();
+          await Promise.all([
+            deleteEmittedDocumentsAll("hosting").catch(() => {}),
+            deleteEmittedDocumentsAll("asic").catch(() => {})
+          ]);
+          setAllHosting([]);
+          setAllAsic([]);
+          saveInvoices([]);
+          saveInvoicesAsic([]);
+          dispatchEmittedChanged("hosting");
+          dispatchEmittedChanged("asic");
+          showToast("Todo el historial ha sido eliminado.", "success", "Historial");
+        }
+        setShowClearConfirm2(false);
+        setClearPassword("");
+        setClearPasswordError("");
+        setPasswordAttempts(0);
+      } catch (delErr) {
+        showToast(delErr instanceof Error ? delErr.message : "No se pudo eliminar en el servidor.", "error");
       }
     } catch (err) {
       const newAttempts = passwordAttempts + 1;
@@ -700,7 +761,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
               <div className="card historial-filtros-card">
                 <h6 className="fw-bold border-bottom pb-2">🔍 Filtros</h6>
                 <div className="row g-2 align-items-end">
-                  <div className="col-md-3">
+                  <div className="col-md-2">
                     <label className="form-label small fw-bold">Cliente</label>
                     <input
                       className="form-control form-control-sm"
@@ -709,12 +770,13 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
                       onChange={(e) => setQClient(e.target.value)}
                     />
                   </div>
-                  <div className="col-md-2">
+                  <div className="col-md-1 col-lg-1">
                     <label className="form-label small fw-bold">Tipo</label>
                     <select
                       className="form-select form-select-sm"
                       value={qType}
                       onChange={(e) => setQType(e.target.value as "" | ComprobanteType)}
+                      style={{ maxWidth: "8.5rem" }}
                     >
                       <option value="">Todos</option>
                       <option value="Factura">Factura</option>
@@ -722,18 +784,19 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
                       <option value="Nota de Crédito">Nota de Crédito</option>
                     </select>
                   </div>
-                  <div className="col-md-2">
+                  <div className="col-md-1 col-lg-2">
                     <label className="form-label small fw-bold">Mes</label>
                     <input
                       type="month"
                       className="form-control form-control-sm"
                       value={qMonth}
                       onChange={(e) => setQMonth(e.target.value)}
+                      style={{ maxWidth: "9rem" }}
                     />
                   </div>
-                  <div className="col-md-2 d-flex align-items-end">
+                  <div className="col-md-1 d-flex align-items-end filtros-limpiar-col">
                     <button
-                      className="btn btn-outline-secondary btn-sm w-100"
+                      className="btn btn-outline-secondary btn-sm filtros-limpiar-btn"
                       onClick={() => {
                         setQClient("");
                         setQType("");

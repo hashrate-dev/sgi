@@ -30,7 +30,8 @@ const InvoiceCreateSchema = z.object({
   relatedInvoiceNumber: z.string().optional(),
   paymentDate: z.string().optional(),
   emissionTime: z.string().optional(),
-  dueDate: z.string().optional()
+  dueDate: z.string().optional(),
+  source: z.enum(["hosting", "asic"]).optional()
 });
 
 const TYPE_PREFIX: Record<string, string> = {
@@ -95,12 +96,15 @@ invoicesRouter.get("/invoices/next-number", requireRole("admin_a", "admin_b", "o
   }
 });
 
+const sourceCol = () => (isPg() ? "COALESCE(source, 'hosting')" : "COALESCE(source, 'hosting')");
+
 invoicesRouter.get("/invoices", async (req, res) => {
   const q = z
     .object({
       client: z.string().optional(),
       type: z.enum(["Factura", "Recibo", "Nota de Crédito"]).optional(),
-      month: z.string().regex(/^\d{4}-\d{2}$/).optional()
+      month: z.string().regex(/^\d{4}-\d{2}$/).optional(),
+      source: z.enum(["hosting", "asic"]).optional()
     })
     .safeParse(req.query);
 
@@ -122,13 +126,18 @@ invoicesRouter.get("/invoices", async (req, res) => {
     clauses.push("month = ?");
     params.push(q.data.month);
   }
+  if (q.data.source) {
+    clauses.push(`(${sourceCol()} = ?)`);
+    params.push(q.data.source);
+  }
 
   const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
   const invoices = await db
     .prepare(
       `SELECT id, number, type, ${clientNameCol()} as clientName, date, month, subtotal, discounts, total,
               related_invoice_id as relatedInvoiceId, related_invoice_number as relatedInvoiceNumber,
-              payment_date as paymentDate, emission_time as emissionTime, due_date as dueDate
+              payment_date as paymentDate, emission_time as emissionTime, due_date as dueDate,
+              ${sourceCol()} as source
        FROM invoices ${where} ORDER BY id DESC`
     )
     .all(...params);
@@ -151,6 +160,7 @@ invoicesRouter.post("/invoices", requireRole("admin_a", "admin_b", "operador"), 
   }
 
   const inv = parsed.data;
+  const sourceVal = inv.source ?? "hosting";
   const subtotalDb = inv.type === "Recibo" || inv.type === "Nota de Crédito" ? -Math.abs(inv.subtotal) : inv.subtotal;
   const discountsDb = inv.type === "Recibo" || inv.type === "Nota de Crédito" ? -Math.abs(inv.discounts) : inv.discounts;
   const totalDb = inv.type === "Recibo" || inv.type === "Nota de Crédito" ? -Math.abs(inv.total) : inv.total;
@@ -161,8 +171,8 @@ invoicesRouter.post("/invoices", requireRole("admin_a", "admin_b", "operador"), 
 
       const info = await tx.prepare(`
         INSERT INTO invoices (number, type, ${clientNameCol()}, date, month, subtotal, discounts, total,
-                              related_invoice_id, related_invoice_number, payment_date, emission_time, due_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                              related_invoice_id, related_invoice_number, payment_date, emission_time, due_date, source)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         numberToUse,
         inv.type,
@@ -176,7 +186,8 @@ invoicesRouter.post("/invoices", requireRole("admin_a", "admin_b", "operador"), 
         inv.relatedInvoiceNumber || null,
         inv.paymentDate || null,
         inv.emissionTime || null,
-        inv.dueDate || null
+        inv.dueDate || null,
+        sourceVal
       );
       const invoiceId = info.lastInsertRowid as number;
       const insertItem = tx.prepare(`
@@ -203,6 +214,21 @@ invoicesRouter.post("/invoices", requireRole("admin_a", "admin_b", "operador"), 
     const msg = err?.message ?? (e instanceof Error ? e.message : String(e ?? "Error al guardar"));
     return res.status(500).json({ error: { message: msg } });
   }
+});
+
+/** DELETE /invoices/all?source=hosting|asic — borrar todas las facturas (solo admin_a, mismo permiso que "Borrar Todo" en Historial) */
+invoicesRouter.delete("/invoices/all", requireRole("admin_a"), async (req, res) => {
+  const q = z.object({ source: z.enum(["hosting", "asic"]).optional() }).safeParse(req.query);
+  if (!q.success) {
+    return res.status(400).json({ error: { message: "Query inválida: source opcional (hosting|asic)" } });
+  }
+  const source = q.data.source;
+  if (source) {
+    const info = await db.prepare(`DELETE FROM invoices WHERE ${sourceCol()} = ?`).run(source);
+    return res.json({ ok: true, deleted: info.changes ?? 0 });
+  }
+  const info = await db.prepare("DELETE FROM invoices").run();
+  return res.json({ ok: true, deleted: info.changes ?? 0 });
 });
 
 invoicesRouter.delete("/invoices/:id", requireRole("admin_a", "admin_b"), async (req, res) => {

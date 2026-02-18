@@ -451,6 +451,7 @@ export function FacturacionMineriaPage() {
 
     const apiBody: InvoiceCreateBody = {
       type: type === "Recibo Devolución" ? "Recibo" : type,
+      source: "asic",
       clientName: selectedClient.name,
       date: dateStr,
       month: monthForApi,

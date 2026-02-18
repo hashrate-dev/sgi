@@ -261,15 +261,15 @@ export function PendientesMineriaPage() {
                       onChange={(e) => setQMonth(e.target.value)}
                     />
                   </div>
-                  <div className="col-md-2 d-flex align-items-end">
+                  <div className="col-md-2 d-flex align-items-end filtros-limpiar-col">
                     <button
-                      className="btn btn-outline-secondary btn-sm w-100"
-                      onClick={() => {
-                        setQClient("");
-                        setQMonth("");
-                      }}
-                    >
-                      Limpiar
+                      className="btn btn-outline-secondary btn-sm filtros-limpiar-btn"
+                    onClick={() => {
+                      setQClient("");
+                      setQMonth("");
+                    }}
+                  >
+                    Limpiar
                     </button>
                   </div>
                   {canExportData && (
@@ -397,9 +397,9 @@ export function PendientesMineriaPage() {
         <div className="row mt-4 g-3 historial-stats">
           <div className="col-6 col-md-4">
             <div className="card stat-card p-3">
-              <div className="stat-accent bg-warning" />
+              <div className={`stat-accent ${user?.role === "lector" ? "bg-danger" : "bg-warning"}`} />
               <div className="stat-label">Total facturas pendientes</div>
-              <div className="stat-value text-warning">{stats.totalPendientes}</div>
+              <div className={`stat-value ${user?.role === "lector" ? "text-danger" : "text-warning"}`}>{stats.totalPendientes}</div>
             </div>
           </div>
           <div className="col-6 col-md-4">

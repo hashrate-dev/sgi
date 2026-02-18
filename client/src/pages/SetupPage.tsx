@@ -274,13 +274,13 @@ export function SetupPage() {
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
                   </div>
-                  <div className="col-md-2 d-flex align-items-end">
+                  <div className="col-md-2 d-flex align-items-end filtros-limpiar-col">
                     <button
                       type="button"
-                      className="btn btn-outline-secondary btn-sm w-100"
-                      onClick={() => setSearchTerm("")}
-                    >
-                      Limpiar
+                      className="btn btn-outline-secondary btn-sm filtros-limpiar-btn"
+                    onClick={() => setSearchTerm("")}
+                  >
+                    Limpiar
                     </button>
                   </div>
                   <div className="col-md-auto d-flex align-items-end gap-2 ms-auto">

@@ -485,6 +485,7 @@ export function FacturacionPage() {
 
     const apiBody: InvoiceCreateBody = {
       type: type === "Recibo Devolución" ? "Recibo" : type,
+      source: "hosting",
       clientName: selectedClient.name,
       date: dateStr,
       month,
