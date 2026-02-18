@@ -13,7 +13,9 @@ function toPoolerUrl(url: string): string {
   if (!refMatch || !passMatch) return url;
   const ref = refMatch[1];
   const pass = passMatch[1];
-  return `postgresql://postgres.${ref}:${pass}@aws-0-us-east-1.pooler.supabase.com:6543/postgres`;
+  const region = env.SUPABASE_POOLER_REGION ?? "us-east-1";
+  const host = `aws-0-${region}.pooler.supabase.com`;
+  return `postgresql://postgres.${ref}:${pass}@${host}:6543/postgres`;
 }
 
 function getConnectionString(): string | undefined {

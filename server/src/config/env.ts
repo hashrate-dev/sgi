@@ -13,7 +13,9 @@ const EnvSchema = z.object({
   /** API key de Render (https://dashboard.render.com → Account Settings → API Keys). Usado para listar servicios y disparar deploy desde la app. */
   RENDER_API_KEY: z.string().optional(),
   /** Supabase: conexión directa a Postgres. Si está definida, la app usa PostgreSQL (Supabase) en lugar de SQLite. */
-  SUPABASE_DATABASE_URL: z.string().min(10).optional()
+  SUPABASE_DATABASE_URL: z.string().min(10).optional(),
+  /** Región del pooler (ej. us-east-1, eu-west-1). Por defecto us-east-1. */
+  SUPABASE_POOLER_REGION: z.string().optional()
 });
 
 export type Env = z.infer<typeof EnvSchema>;
