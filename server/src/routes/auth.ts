@@ -34,9 +34,8 @@ async function ensureDefaultUser(): Promise<void> {
       } catch {
         await db.prepare("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)").run(email, hash, role);
       }
-    } else if (email === "jv@hashrate.space" || email === "fb@hashrate.space") {
-      await db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(hash, existing.id);
     }
+    /* No sobrescribir contraseña si el usuario ya existe: respeta "Cambiar contraseña" */
   }
   try {
     await db.prepare("UPDATE users SET email = username WHERE email IS NULL OR email = ''").run();

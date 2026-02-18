@@ -243,7 +243,8 @@ export function HistorialGarantiasPage() {
   }
 
   async function handleClearConfirm2() {
-    if (!clearPassword.trim()) {
+    const pwd = clearPassword.trim();
+    if (!pwd) {
       setClearPasswordError("Debes ingresar tu contraseña para confirmar");
       return;
     }
@@ -258,7 +259,7 @@ export function HistorialGarantiasPage() {
     setClearing(true);
     setClearPasswordError("");
     try {
-      await verifyPassword(clearPassword);
+      await verifyPassword(pwd);
       await deleteGarantiasEmittedAll();
       setShowClearConfirm2(false);
       setClearPassword("");
@@ -683,7 +684,7 @@ export function HistorialGarantiasPage() {
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && !clearing) handleClearConfirm2();
                       }}
-                      placeholder="Tu contraseña de acceso"
+                      placeholder="La misma con la que iniciaste sesión"
                       autoFocus
                       disabled={clearing}
                     />

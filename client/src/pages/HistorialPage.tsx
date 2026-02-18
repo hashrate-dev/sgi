@@ -465,7 +465,8 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
   }
 
   async function handleClearConfirm2() {
-    if (!clearPassword.trim()) {
+    const pwd = clearPassword.trim();
+    if (!pwd) {
       setClearPasswordError("Debes ingresar tu contraseña para confirmar");
       return;
     }
@@ -482,7 +483,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
     setClearing(true);
     setClearPasswordError("");
     try {
-      await verifyPassword(clearPassword);
+      await verifyPassword(pwd);
       try {
         if (sourceFilter === "hosting") {
           await deleteAllInvoices("hosting");
@@ -1317,7 +1318,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
                     Se eliminará <strong>todo</strong> el historial permanentemente.
                   </p>
                   <p className="historial-delete-password-label">
-                    Ingresa tu contraseña:
+                    Ingresa tu contraseña (la misma con la que iniciaste sesión):
                   </p>
                   {passwordAttempts > 0 && (
                     <div className="historial-delete-attempts-alert">
