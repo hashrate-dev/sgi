@@ -132,7 +132,7 @@ invoicesRouter.get("/invoices", async (req, res) => {
   }
 
   const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
-  const invoices = await db
+  const rows = await db
     .prepare(
       `SELECT id, number, type, ${clientNameCol()} as clientName, date, month, subtotal, discounts, total,
               related_invoice_id as relatedInvoiceId, related_invoice_number as relatedInvoiceNumber,
@@ -141,6 +141,25 @@ invoicesRouter.get("/invoices", async (req, res) => {
        FROM invoices ${where} ORDER BY id DESC`
     )
     .all(...params);
+
+  /* PostgreSQL devuelve alias en minúsculas; normalizar a camelCase para el cliente */
+  const invoices = (rows as Record<string, unknown>[]).map((r) => ({
+    id: r.id,
+    number: r.number,
+    type: r.type,
+    clientName: r.clientName ?? r.clientname,
+    date: r.date,
+    month: r.month,
+    subtotal: r.subtotal,
+    discounts: r.discounts,
+    total: r.total,
+    relatedInvoiceId: r.relatedInvoiceId ?? r.relatedinvoiceid,
+    relatedInvoiceNumber: r.relatedInvoiceNumber ?? r.relatedinvoicenumber,
+    paymentDate: r.paymentDate ?? r.paymentdate,
+    emissionTime: r.emissionTime ?? r.emissiontime ?? r.emission_time,
+    dueDate: r.dueDate ?? r.duedate,
+    source: r.source
+  }));
 
   res.json({ invoices });
 });
