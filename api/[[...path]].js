@@ -40,6 +40,24 @@ export default async function handler(req, res) {
     return;
   }
 
+  // /api/login-debug: diagnóstico del login (ensureDefaultUser + listar usuarios)
+  if (path === "/api/login-debug" || path.endsWith("/login-debug")) {
+    try {
+      const { initDb, getDb } = await import("../server/dist/db.js");
+      const { ensureDefaultUser } = await import("../server/dist/routes/auth.js");
+      await initDb();
+      await ensureDefaultUser();
+      const db = getDb();
+      const users = await db.prepare("SELECT id, username, email, role FROM users LIMIT 5").all();
+      const testUser = await db.prepare("SELECT id, username FROM users WHERE username = ? OR email = ?").get("jv@hashrate.space", "jv@hashrate.space");
+      res.status(200).end(JSON.stringify({ ok: true, usersCount: Array.isArray(users) ? users.length : 0, users: users ?? [], testUser }));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      res.status(500).end(JSON.stringify({ ok: false, error: msg }));
+    }
+    return;
+  }
+
   const app = await getApp();
   return app(req, res);
 }
