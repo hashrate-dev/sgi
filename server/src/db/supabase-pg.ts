@@ -10,8 +10,7 @@ export const pool = new pg.Pool({
   connectionString: env.SUPABASE_DATABASE_URL ?? undefined,
   max: 10,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
-  // Supabase suele requerir SSL; allow fallback si no tenés certificados
+  connectionTimeoutMillis: 10000,
   ssl: env.SUPABASE_DATABASE_URL?.includes("supabase.co")
     ? { rejectUnauthorized: false }
     : undefined,

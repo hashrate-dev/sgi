@@ -33,10 +33,15 @@ En **Settings** → **Environment Variables** (Production):
 
 | Variable | Requerido | Ejemplo |
 |---------|-----------|---------|
-| SUPABASE_DATABASE_URL | Sí | `postgresql://postgres.xxx:pass@aws-0-us-east-1.pooler.supabase.com:6543/postgres` |
+| SUPABASE_DATABASE_URL | Sí | Ver abajo |
 | JWT_SECRET | Sí | `hashrate-jwt-secreto-produccion-2024` |
 
-Usá la URL del **pooler** de Supabase (puerto 6543), no la conexión directa.
+**SUPABASE_DATABASE_URL:** Copiá la URL exacta desde Supabase:
+1. Supabase Dashboard → tu proyecto → **Settings** → **Database**
+2. **Connection string** → **URI**
+3. Elegí **Connection pooling** (Transaction, puerto 6543) o **Direct** (puerto 5432)
+4. Hacé clic en **Copy** – usá esa URL tal cual (la contraseña es la correcta)
+5. Si no recordás la contraseña: **Reset database password** y usá la nueva
 
 ## 5. Si nada funciona: usar Render para la API
 
