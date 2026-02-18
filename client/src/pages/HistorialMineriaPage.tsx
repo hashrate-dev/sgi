@@ -394,11 +394,36 @@ export function HistorialMineriaPage() {
   }
 
   function handleClearConfirm() {
+    if (user?.role === "admin_a") {
+      setShowClearConfirm(false);
+      void doDeleteAll();
+      return;
+    }
     setShowClearConfirm(false);
     setShowClearConfirm2(true);
     setClearPassword("");
     setClearPasswordError("");
     setPasswordAttempts(0);
+  }
+
+  async function doDeleteAll() {
+    setClearing(true);
+    try {
+      await deleteAllInvoices("asic");
+      await deleteEmittedDocumentsAll("asic").catch(() => {});
+      setAll([]);
+      saveInvoicesAsic([]);
+      dispatchEmittedChanged("asic");
+      setShowClearConfirm2(false);
+      setClearPassword("");
+      setClearPasswordError("");
+      setPasswordAttempts(0);
+      showToast("Todo el historial ha sido eliminado.", "success", "Historial");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "No se pudo eliminar en el servidor.", "error");
+    } finally {
+      setClearing(false);
+    }
   }
 
   async function handleClearConfirm2() {
@@ -421,20 +446,7 @@ export function HistorialMineriaPage() {
     setClearPasswordError("");
     try {
       await verifyPassword(pwd);
-      try {
-        await deleteAllInvoices("asic");
-        await deleteEmittedDocumentsAll("asic").catch(() => {});
-        setAll([]);
-        saveInvoicesAsic([]);
-        dispatchEmittedChanged("asic");
-        showToast("Todo el historial ha sido eliminado.", "success", "Historial");
-        setShowClearConfirm2(false);
-        setClearPassword("");
-        setClearPasswordError("");
-        setPasswordAttempts(0);
-      } catch (delErr) {
-        showToast(delErr instanceof Error ? delErr.message : "No se pudo eliminar en el servidor.", "error");
-      }
+      await doDeleteAll();
     } catch (err) {
       const newAttempts = passwordAttempts + 1;
       setPasswordAttempts(newAttempts);

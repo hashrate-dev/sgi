@@ -457,11 +457,58 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
   }
 
   function handleClearConfirm() {
+    if (user?.role === "admin_a") {
+      setShowClearConfirm(false);
+      void doDeleteAll();
+      return;
+    }
     setShowClearConfirm(false);
     setShowClearConfirm2(true);
     setClearPassword("");
     setClearPasswordError("");
     setPasswordAttempts(0);
+  }
+
+  async function doDeleteAll() {
+    setClearing(true);
+    try {
+      if (sourceFilter === "hosting") {
+        await deleteAllInvoices("hosting");
+        await deleteEmittedDocumentsAll("hosting").catch(() => {});
+        setAllHosting([]);
+        saveInvoices([]);
+        dispatchEmittedChanged("hosting");
+        showToast("Historial de Hosting eliminado.", "success", "Historial");
+      } else if (sourceFilter === "asic") {
+        await deleteAllInvoices("asic");
+        await deleteEmittedDocumentsAll("asic").catch(() => {});
+        setAllAsic([]);
+        saveInvoicesAsic([]);
+        dispatchEmittedChanged("asic");
+        showToast("Historial de ASIC eliminado.", "success", "Historial");
+      } else {
+        await deleteAllInvoices();
+        await Promise.all([
+          deleteEmittedDocumentsAll("hosting").catch(() => {}),
+          deleteEmittedDocumentsAll("asic").catch(() => {})
+        ]);
+        setAllHosting([]);
+        setAllAsic([]);
+        saveInvoices([]);
+        saveInvoicesAsic([]);
+        dispatchEmittedChanged("hosting");
+        dispatchEmittedChanged("asic");
+        showToast("Todo el historial ha sido eliminado.", "success", "Historial");
+      }
+      setShowClearConfirm2(false);
+      setClearPassword("");
+      setClearPasswordError("");
+      setPasswordAttempts(0);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "No se pudo eliminar en el servidor.", "error");
+    } finally {
+      setClearing(false);
+    }
   }
 
   async function handleClearConfirm2() {
@@ -484,42 +531,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
     setClearPasswordError("");
     try {
       await verifyPassword(pwd);
-      try {
-        if (sourceFilter === "hosting") {
-          await deleteAllInvoices("hosting");
-          await deleteEmittedDocumentsAll("hosting").catch(() => {});
-          setAllHosting([]);
-          saveInvoices([]);
-          dispatchEmittedChanged("hosting");
-          showToast("Historial de Hosting eliminado.", "success", "Historial");
-        } else if (sourceFilter === "asic") {
-          await deleteAllInvoices("asic");
-          await deleteEmittedDocumentsAll("asic").catch(() => {});
-          setAllAsic([]);
-          saveInvoicesAsic([]);
-          dispatchEmittedChanged("asic");
-          showToast("Historial de ASIC eliminado.", "success", "Historial");
-        } else {
-          await deleteAllInvoices();
-          await Promise.all([
-            deleteEmittedDocumentsAll("hosting").catch(() => {}),
-            deleteEmittedDocumentsAll("asic").catch(() => {})
-          ]);
-          setAllHosting([]);
-          setAllAsic([]);
-          saveInvoices([]);
-          saveInvoicesAsic([]);
-          dispatchEmittedChanged("hosting");
-          dispatchEmittedChanged("asic");
-          showToast("Todo el historial ha sido eliminado.", "success", "Historial");
-        }
-        setShowClearConfirm2(false);
-        setClearPassword("");
-        setClearPasswordError("");
-        setPasswordAttempts(0);
-      } catch (delErr) {
-        showToast(delErr instanceof Error ? delErr.message : "No se pudo eliminar en el servidor.", "error");
-      }
+      await doDeleteAll();
     } catch (err) {
       const newAttempts = passwordAttempts + 1;
       setPasswordAttempts(newAttempts);

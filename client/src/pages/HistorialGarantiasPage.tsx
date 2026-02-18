@@ -13,6 +13,7 @@ import {
 import type { Invoice } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
 import { showToast } from "../components/ToastNotification";
+import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency, formatCurrencyNumber } from "../lib/formatCurrency";
 import "../styles/facturacion.css";
 
@@ -32,6 +33,7 @@ function formatTimeNoSeconds(t: string | undefined): string {
 }
 
 export function HistorialGarantiasPage() {
+  const { user } = useAuth();
   const [items, setItems] = useState<{ invoice: Invoice; emittedAt: string }[]>([]);
   const [, setLoading] = useState(true);
   const [qClient, setQClient] = useState("");
@@ -235,11 +237,34 @@ export function HistorialGarantiasPage() {
   }
 
   function handleClearConfirm() {
+    if (user?.role === "admin_a") {
+      setShowClearConfirm(false);
+      void doDeleteAllGarantias();
+      return;
+    }
     setShowClearConfirm(false);
     setShowClearConfirm2(true);
     setClearPassword("");
     setClearPasswordError("");
     setPasswordAttempts(0);
+  }
+
+  async function doDeleteAllGarantias() {
+    setClearing(true);
+    try {
+      await deleteGarantiasEmittedAll();
+      setShowClearConfirm2(false);
+      setClearPassword("");
+      setClearPasswordError("");
+      setPasswordAttempts(0);
+      setItems([]);
+      setDetailItem(null);
+      showToast("Todo el historial de recibos de garantía ha sido eliminado.", "success");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "No se pudo eliminar en el servidor.", "error");
+    } finally {
+      setClearing(false);
+    }
   }
 
   async function handleClearConfirm2() {
@@ -260,14 +285,7 @@ export function HistorialGarantiasPage() {
     setClearPasswordError("");
     try {
       await verifyPassword(pwd);
-      await deleteGarantiasEmittedAll();
-      setShowClearConfirm2(false);
-      setClearPassword("");
-      setClearPasswordError("");
-      setPasswordAttempts(0);
-      setItems([]);
-      setDetailItem(null);
-      showToast("Todo el historial de recibos de garantía ha sido eliminado.", "success");
+      await doDeleteAllGarantias();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Contraseña incorrecta";
       const isConnectionError = errorMessage === "Failed to fetch" || errorMessage.includes("NetworkError") || errorMessage === "Load failed" || errorMessage.includes("conexión");
