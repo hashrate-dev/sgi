@@ -8,3 +8,4 @@ build/
 .idea/
 server/data.db
 server/src/data.db
+client/server/
