@@ -170,7 +170,7 @@ export function FacturasMesHostingPage() {
   }
   const fullySentConnectedIds = getFullySentConnectedIds();
 
-  /** Resumen de lo que muestra la tabla (filtered) */
+  /** Resumen de lo que muestra la tabla (filtered). registros = solo facturas cobradas (con recibo). */
   const stats = useMemo(() => {
     const facturas = filtered.filter((i) => i.type === "Factura").length;
     const recibos = filtered.filter((i) => i.type === "Recibo").length;
@@ -185,7 +185,11 @@ export function FacturasMesHostingPage() {
     });
     const cobrosPendientes = facturasPendientes.reduce((s, i) => s + (Number(i.total) || 0), 0);
     const cobrosRealizados = facturacionTotal - cobrosPendientes;
-    return { facturas, recibos, notasCredito, facturacionTotal, cobrosPendientes, cobrosRealizados, registros: filtered.length };
+    /** Registros = solo facturas que ya están cobradas (tienen recibo asociado) */
+    const registros = filtered.filter(
+      (i) => i.type === "Factura" && filtered.some((r) => r.type === "Recibo" && r.relatedInvoiceId === i.id)
+    ).length;
+    return { facturas, recibos, notasCredito, facturacionTotal, cobrosPendientes, cobrosRealizados, registros };
   }, [filtered]);
 
   /** Porcentaje cobros realizados / facturación total (0–100) para la barra de progreso */
@@ -405,12 +409,13 @@ export function FacturasMesHostingPage() {
             <div className="col-12">
               <div className="card stat-card p-3">
                 <div className="stat-progress-track">
-                  <div className="stat-progress-fill bg-info" style={{ width: `${progressPct}%` }} title={`Cobros realizados: ${progressPct}% de la facturación total`} />
+                  <div className="stat-progress-fill bg-success" style={{ width: `${progressPct}%` }} title={`Cobros realizados: ${progressPct}% de la facturación total`} />
                 </div>
                 <div className="d-flex align-items-center justify-content-center gap-2 flex-wrap mt-2">
-                  <span className="stat-label mb-0">Registros en historial</span>
-                  <span className="stat-value text-info mb-0">{stats.registros}</span>
-                  <span className="stat-label mb-0 text-muted small"> · Cobros realizados: {progressPct}%</span>
+                  <span className="stat-label mb-0">Facturas cobradas</span>
+                  <span className="stat-value text-success mb-0">{stats.registros}</span>
+                  <span className="stat-label mb-0 text-muted"> · Cobros realizados: </span>
+                  <span className="stat-value text-success mb-0">{progressPct}%</span>
                 </div>
               </div>
             </div>

@@ -162,6 +162,15 @@ export function FacturacionPage() {
     return () => window.removeEventListener("focus", onFocus);
   }, [location.pathname]);
 
+  /** Refrescar Documentos Emitidos cuando se elimina en Historial (hosting) */
+  useEffect(() => {
+    const handler = (e: CustomEvent<{ source: string }>) => {
+      if (e.detail?.source === "hosting") fetchEmittedHosting();
+    };
+    window.addEventListener("hrs-emitted-changed", handler as EventListener);
+    return () => window.removeEventListener("hrs-emitted-changed", handler as EventListener);
+  }, []);
+
   useEffect(() => {
     getClients()
       .then((r) => setClients((r.clients ?? []) as Client[]))

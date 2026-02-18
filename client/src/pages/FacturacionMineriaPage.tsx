@@ -125,9 +125,8 @@ export function FacturacionMineriaPage() {
     setEmittedInSession((prev) => prev.filter((item) => now - new Date(item.emittedAt).getTime() < windowMs));
   }, []);
 
-  /** Cargar documentos emitidos (asic) desde el servidor; al borrar del historial se borran también de aquí. Refrescar cada vez que se entra a esta página para reflejar borrados en Historial. */
-  useEffect(() => {
-    if (location.pathname !== "/facturacion-equipos") return;
+  /** Cargar documentos emitidos (asic) desde el servidor; al borrar del historial se borran también de aquí. */
+  function fetchEmittedAsic() {
     const windowMs = 10 * 24 * 60 * 60 * 1000 + 22 * 60 * 60 * 1000;
     getEmittedDocuments("asic")
       .then((r) => {
@@ -138,7 +137,29 @@ export function FacturacionMineriaPage() {
         setEmittedInSession(list);
       })
       .catch(() => {});
+  }
+
+  useEffect(() => {
+    if (location.pathname !== "/facturacion-equipos") return;
+    fetchEmittedAsic();
   }, [location.pathname]);
+
+  /** Refrescar lista al volver a esta pestaña (p. ej. después de borrar en Historial) */
+  useEffect(() => {
+    if (location.pathname !== "/facturacion-equipos") return;
+    const onFocus = () => fetchEmittedAsic();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [location.pathname]);
+
+  /** Refrescar Documentos Emitidos cuando se elimina en Historial (asic) */
+  useEffect(() => {
+    const handler = (e: CustomEvent<{ source: string }>) => {
+      if (e.detail?.source === "asic") fetchEmittedAsic();
+    };
+    window.addEventListener("hrs-emitted-changed", handler as EventListener);
+    return () => window.removeEventListener("hrs-emitted-changed", handler as EventListener);
+  }, []);
 
   useEffect(() => {
     getClients()

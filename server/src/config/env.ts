@@ -1,7 +1,13 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import dotenv from "dotenv";
 
+// Cargar .env: primero cwd, luego server/.env (prioridad para Supabase en local)
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config();
+const serverEnvPath = path.join(__dirname, "..", "..", ".env");
+dotenv.config({ path: serverEnvPath, override: true });
 
 const defaultSqlitePath = process.env.VERCEL ? "/tmp/data.db" : "data.db";
 const EnvSchema = z.object({

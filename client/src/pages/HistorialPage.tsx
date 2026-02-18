@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { addEmittedDocument, deleteEmittedDocumentOne, deleteEmittedDocumentsAll, getClients, verifyPassword } from "../lib/api";
+import { dispatchEmittedChanged } from "../lib/emittedEvents";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadInvoices, loadInvoicesAsic, saveInvoices, saveInvoicesAsic } from "../lib/storage";
 import type { ComprobanteType, Invoice } from "../lib/types";
@@ -381,11 +382,13 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
       setAllHosting(next);
       saveInvoices(next);
       deleteEmittedDocumentOne("hosting", found.number).catch(() => {});
+      dispatchEmittedChanged("hosting");
     } else {
       const next = allAsic.filter((i) => i.id !== id);
       setAllAsic(next);
       saveInvoicesAsic(next);
       deleteEmittedDocumentOne("asic", found.number).catch(() => {});
+      dispatchEmittedChanged("asic");
     }
   }
 
@@ -434,11 +437,13 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
         setAllHosting([]);
         saveInvoices([]);
         await deleteEmittedDocumentsAll("hosting").catch(() => {});
+        dispatchEmittedChanged("hosting");
         showToast("Historial de Hosting eliminado.", "success", "Historial");
       } else if (sourceFilter === "asic") {
         setAllAsic([]);
         saveInvoicesAsic([]);
         await deleteEmittedDocumentsAll("asic").catch(() => {});
+        dispatchEmittedChanged("asic");
         showToast("Historial de ASIC eliminado.", "success", "Historial");
       } else {
         setAllHosting([]);
@@ -449,6 +454,8 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
           deleteEmittedDocumentsAll("hosting").catch(() => {}),
           deleteEmittedDocumentsAll("asic").catch(() => {})
         ]);
+        dispatchEmittedChanged("hosting");
+        dispatchEmittedChanged("asic");
         showToast("Todo el historial ha sido eliminado.", "success", "Historial");
       }
     } catch (err) {

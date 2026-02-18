@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { deleteEmittedDocumentOne, deleteEmittedDocumentsAll, getClients, verifyPassword } from "../lib/api";
+import { dispatchEmittedChanged } from "../lib/emittedEvents";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadInvoicesAsic, saveInvoicesAsic } from "../lib/storage";
 import type { ComprobanteType, Invoice } from "../lib/types";
@@ -339,6 +340,7 @@ export function HistorialMineriaPage() {
     setAll(next);
     saveInvoicesAsic(next);
     deleteEmittedDocumentOne("asic", found.number).catch(() => {});
+    dispatchEmittedChanged("asic");
   }
 
   function handleDeleteOneConfirm() {
@@ -385,6 +387,7 @@ export function HistorialMineriaPage() {
       setAll([]);
       saveInvoicesAsic([]);
       await deleteEmittedDocumentsAll("asic").catch(() => {});
+      dispatchEmittedChanged("asic");
       showToast("Todo el historial ha sido eliminado.", "success", "Historial");
     } catch (err) {
       const newAttempts = passwordAttempts + 1;

@@ -19,18 +19,23 @@ async function loadDb() {
           await runSupabaseSchema(pool);
           await pool.query("SELECT 1");
         })(),
-        new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 8000))
+        new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 15000))
       ]);
+      // eslint-disable-next-line no-console
+      console.log("[DB] Conectado a Supabase (PostgreSQL)");
       return db;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (process.env.VERCEL) {
         throw new Error(`Supabase no disponible en Vercel: ${msg}. Verificá SUPABASE_DATABASE_URL en Environment Variables.`);
       }
-      console.warn("Supabase no disponible:", msg, "- usando SQLite local");
+      // eslint-disable-next-line no-console
+      console.warn("[DB] Supabase no disponible:", msg, "- usando SQLite local");
     }
   }
   const { createAsyncSqlite } = await import("./sqlite-async.js");
+  // eslint-disable-next-line no-console
+  console.log("[DB] Usando SQLite local (data.db)");
   return createAsyncSqlite();
 }
 
