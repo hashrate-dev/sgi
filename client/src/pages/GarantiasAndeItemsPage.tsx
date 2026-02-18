@@ -8,6 +8,7 @@ import {
   deleteGarantiasItemsAll,
   getGarantiasItems,
   updateGarantiaItem,
+  wakeUpBackend,
   type GarantiasItemsResponse,
 } from "../lib/api";
 import type { ItemGarantiaAnde } from "../lib/types";
@@ -118,7 +119,8 @@ export function GarantiasAndeItemsPage() {
   function loadItems() {
     setLoading(true);
     setLoadError(false);
-    getGarantiasItems()
+    wakeUpBackend()
+      .then(() => getGarantiasItems())
       .then((r: GarantiasItemsResponse) => {
         setItems(r.items);
         setLoadError(false);

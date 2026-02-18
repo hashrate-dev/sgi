@@ -75,6 +75,16 @@ export default async function handler(req, res) {
     return;
   }
 
+  // Fallback: GET /api/garantias/items si el handler dedicado no matchea
+  if ((path === "/api/garantias/items" || path.endsWith("/garantias/items")) && req.method === "GET") {
+    try {
+      const { default: itemsHandler } = await import("./garantias/items.js");
+      return itemsHandler(req, res);
+    } catch (e) {
+      /* seguir al app */
+    }
+  }
+
   const app = await getApp();
   // Normalizar req.url para Express (Vercel puede pasar URL completa)
   const pathname = path.startsWith("/") ? path : `/${path}`;
