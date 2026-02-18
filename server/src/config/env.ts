@@ -14,8 +14,8 @@ const EnvSchema = z.object({
   RENDER_API_KEY: z.string().optional(),
   /** Supabase: conexión directa a Postgres. Si está definida, la app usa PostgreSQL (Supabase) en lugar de SQLite. */
   SUPABASE_DATABASE_URL: z.string().min(10).optional(),
-  /** Región del pooler (ej. us-east-1, eu-west-1). Por defecto us-east-1. */
-  SUPABASE_POOLER_REGION: z.string().optional()
+  /** Host del pooler (ej. aws-1-us-east-1.pooler.supabase.com). Copiar desde Supabase Dashboard. */
+  SUPABASE_POOLER_HOST: z.string().optional()
 });
 
 export type Env = z.infer<typeof EnvSchema>;

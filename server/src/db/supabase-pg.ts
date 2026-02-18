@@ -6,15 +6,14 @@ import pg from "pg";
 import type { QueryResult } from "pg";
 import { env } from "../config/env.js";
 
-/** Convierte URL directa (db.xxx.supabase.co) a pooler para Vercel/serverless (evita ENOTFOUND). */
+/** Convierte URL directa (db.xxx.supabase.co) a pooler. Algunos proyectos usan aws-1, otros aws-0. */
 function toPoolerUrl(url: string): string {
   const refMatch = url.match(/db\.([a-z0-9]+)\.supabase\.co/);
   const passMatch = url.match(/:\/\/(?:[^:]*):([^@]*)@/);
   if (!refMatch || !passMatch) return url;
   const ref = refMatch[1];
   const pass = passMatch[1];
-  const region = env.SUPABASE_POOLER_REGION ?? "us-east-1";
-  const host = `aws-0-${region}.pooler.supabase.com`;
+  const host = env.SUPABASE_POOLER_HOST || `aws-1-us-east-1.pooler.supabase.com`;
   return `postgresql://postgres.${ref}:${pass}@${host}:6543/postgres`;
 }
 
