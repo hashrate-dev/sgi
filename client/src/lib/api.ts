@@ -134,8 +134,8 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
       const errMsg = e instanceof Error ? e.message : String(e);
       // Detectar errores de CORS (generalmente "Failed to fetch" o "NetworkError")
       if (errMsg === "Failed to fetch" || errMsg.includes("NetworkError") || errMsg === "Load failed") {
-        const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-        if (h === "sgi-hrs.vercel.app" || h === "sgi.hashrate.space") {
+        const hostErr = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
+        if (hostErr === "sgi-hrs.vercel.app" || hostErr === "sgi.hashrate.space") {
           lastError = new Error("No se pudo conectar con el backend en Render. Verificá que el servicio sistema-gestion-interna esté activo en dashboard.render.com (si está dormido, esperá 1 minuto y reintentá).");
         } else {
           lastError = new Error(`Error de conexión: ${errMsg}. Verificá CORS y que el backend esté activo.`);
@@ -170,7 +170,8 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   }
   const msg = lastError?.message || "";
   const isConnectionError = msg === "Failed to fetch" || msg === "Load failed" || msg.includes("NetworkError") || msg === "The operation was aborted." || msg === get502Message() || msg === getNoApiMessage();
-  if (isConnectionError && typeof window !== "undefined" && (window.location?.hostname?.endsWith(".vercel.app") || window.location?.hostname?.endsWith(".hashrate.space"))) {
+  const host = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
+  if (isConnectionError && host.endsWith(".hashrate.space") && !host.endsWith(".vercel.app")) {
     const currentBase = getApiBase();
     for (const fallback of FALLBACK_API_URLS) {
       if (fallback === currentBase) continue;
