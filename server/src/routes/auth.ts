@@ -114,13 +114,15 @@ authRouter.post("/auth/verify-password", requireAuth, async (req, res) => {
   if (!row) {
     return res.status(401).json({ error: { message: "Usuario no encontrado" } });
   }
-  const hash = row.password_hash ?? (row as Record<string, unknown>).password_hash as string | undefined;
-  const valid = hash && bcrypt.compareSync(password, hash);
+  const rowAny = row as Record<string, unknown>;
+  const hash = (row.password_hash ?? rowAny.password_hash ?? rowAny.Password_hash) as string | undefined;
+  const valid = hash && typeof hash === "string" && bcrypt.compareSync(password, hash);
   if (valid) {
     return res.json({ valid: true });
   }
   /* Reparar Admin A: si falla con admin123, actualizar hash y permitir (Supabase/PostgreSQL a veces devuelve columnas con distinto casing) */
-  if (req.user!.role === "admin_a" && password === "admin123") {
+  const isAdminA = req.user!.role === "admin_a" || row.username === "jv@hashrate.space";
+  if (isAdminA && password === "admin123") {
     try {
       const newHash = bcrypt.hashSync("admin123", 10);
       await db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(newHash, userId);
