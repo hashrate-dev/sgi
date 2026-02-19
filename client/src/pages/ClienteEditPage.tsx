@@ -34,6 +34,7 @@ export function ClienteEditPage() {
   const [form, setForm] = useState(emptyForm);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   if (user && !canEdit) return <Navigate to="/clientes" replace />;
 
@@ -78,9 +79,14 @@ export function ClienteEditPage() {
     e.preventDefault();
     if (!id) return;
     setMessage(null);
-    const payload = {
-      code: form.code.trim(),
-      name: form.name.trim(),
+    const nameTrim = form.name.trim();
+    if (!nameTrim) {
+      setMessage({ type: "err", text: "Nombre es obligatorio." });
+      return;
+    }
+    // Solo enviar los campos que queremos actualizar (no code). Campos opcionales vacíos se omiten para no borrar datos existentes.
+    const payload: Record<string, string | undefined> = {
+      name: nameTrim,
       name2: form.name2.trim() || undefined,
       phone: form.phone.trim() || undefined,
       phone2: form.phone2.trim() || undefined,
@@ -91,11 +97,9 @@ export function ClienteEditPage() {
       city: form.city.trim() || undefined,
       city2: form.city2.trim() || undefined
     };
-    if (!payload.code || !payload.name) {
-      setMessage({ type: "err", text: "Código y nombre son obligatorios." });
-      return;
-    }
+    if (!payload.name) return;
 
+    setSaving(true);
     updateClient(id, payload)
       .then(() => {
         setMessage({ type: "ok", text: "Cliente actualizado correctamente." });
@@ -103,7 +107,10 @@ export function ClienteEditPage() {
           navigate("/clientes");
         }, 1500);
       })
-      .catch((err) => setMessage({ type: "err", text: err instanceof Error ? err.message : "Error al actualizar" }));
+      .catch((err) => {
+        setMessage({ type: "err", text: err instanceof Error ? err.message : "Error al actualizar" });
+        setSaving(false);
+      });
   }
 
   function handleDeleteClick() {
@@ -313,8 +320,8 @@ export function ClienteEditPage() {
                       Eliminar cliente
                     </button>
                   )}
-                  <button type="submit" className="fact-btn fact-btn-primary">
-                    Guardar cambios
+                  <button type="submit" className="fact-btn fact-btn-primary" disabled={saving}>
+                    {saving ? "Guardando..." : "Guardar cambios"}
                   </button>
                 </div>
               </form>
