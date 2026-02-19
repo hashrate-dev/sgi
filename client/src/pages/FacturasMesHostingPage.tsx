@@ -489,6 +489,8 @@ export function FacturasMesHostingPage() {
                           <span title="Factura y recibo/NC enviados por mail"><span role="img" aria-hidden>✅✅</span> Confirmado</span>
                         ) : getMailSent(inv.id) === "SI" ? (
                           <span title="Enviado por mail"><span role="img" aria-hidden>✅</span> Confirmado</span>
+                        ) : getMailSent(inv.id) === "Cancelado" ? (
+                          <span title="Documento cancelado"><span role="img" aria-hidden>⛔</span> Cancelado</span>
                         ) : (
                           <span title="No enviado por mail"><span role="img" aria-hidden>🕐</span> Pendiente...</span>
                         )}
