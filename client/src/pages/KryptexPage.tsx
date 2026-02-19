@@ -58,7 +58,7 @@ export function KryptexPage() {
                 disabled={loading}
               >
                 <i className="bi bi-arrow-clockwise me-1" />
-                Actualizar
+                Volver a cargar
               </button>
               <a
                 href="https://pool.kryptex.com/"

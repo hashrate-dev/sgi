@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { getInvoices, wakeUpBackend } from "../lib/api";
 import { loadInvoices } from "../lib/storage";
 import type { ComprobanteType, Invoice } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
@@ -57,8 +58,41 @@ function currentMonthValue(): string {
 }
 
 export function FacturasMesHostingPage() {
-  const [all] = useState<Invoice[]>(() => loadInvoices());
+  const [all, setAll] = useState<Invoice[]>(() => loadInvoices());
   const [, forceUpdate] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  function fetchDocuments() {
+    setLoading(true);
+    wakeUpBackend()
+      .then(() => getInvoices({ source: "hosting" }))
+      .then((r) => {
+        const list = (r.invoices ?? []).map((inv) => ({
+          id: String(inv.id),
+          number: inv.number,
+          type: inv.type as ComprobanteType,
+          clientName: inv.clientName,
+          date: inv.date,
+          month: inv.month,
+          subtotal: inv.subtotal,
+          discounts: inv.discounts,
+          total: inv.total,
+          relatedInvoiceId: inv.relatedInvoiceId != null ? String(inv.relatedInvoiceId) : undefined,
+          relatedInvoiceNumber: inv.relatedInvoiceNumber,
+          paymentDate: inv.paymentDate,
+          emissionTime: inv.emissionTime,
+          dueDate: inv.dueDate,
+          items: [],
+        }));
+        setAll(list.length > 0 ? list : loadInvoices());
+      })
+      .catch(() => setAll(loadInvoices()))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    fetchDocuments();
+  }, []);
   const [qClient, setQClient] = useState("");
   const [qType, setQType] = useState<"" | ComprobanteType>("");
   /** Mes/año a mostrar (YYYY-MM); por defecto mes actual */
@@ -288,6 +322,15 @@ export function FacturasMesHostingPage() {
                     >
                       Limpiar
                     </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary btn-sm"
+                      onClick={() => fetchDocuments()}
+                      disabled={loading}
+                    >
+                      <i className="bi bi-arrow-clockwise me-1" />
+                      Volver a cargar
+                    </button>
                   </div>
                 </div>
               </div>
@@ -303,6 +346,9 @@ export function FacturasMesHostingPage() {
             Indicá si cada documento fue enviado por mail.
           </p>
 
+          {loading ? (
+            <p className="text-muted mb-0 py-4">Cargando documentos del historial...</p>
+          ) : (
           <div className="table-responsive">
             <table className="table table-sm align-middle" style={{ fontSize: "0.9rem" }}>
               <thead className="table-dark">
@@ -363,6 +409,7 @@ export function FacturasMesHostingPage() {
               </tbody>
             </table>
           </div>
+          )}
 
           <div className="row mt-4 g-3 historial-stats">
             <div className="col-6 col-md-2">

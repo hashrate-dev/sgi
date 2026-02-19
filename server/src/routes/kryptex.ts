@@ -103,12 +103,21 @@ function parseWorkerBlock(html: string, workerName: string): Omit<KryptexWorkerD
   const fragment = html.slice(workerIdx, workerIdx + 3500);
   const thAll = [...fragment.matchAll(/([\d.]+)\s*TH\/s/g)];
   const ghAll = [...fragment.matchAll(/([\d.]+)\s*GH\/s/g)];
-  // SHA256: TH/s (24h, 10m). Scrypt: GH/s (24h, 10m). Segundo match = 10m.
+  // Cuando apagado, Kryptex muestra 10m como "0.00 H/s" (no TH/s ni GH/s)
+  const hsMatch = fragment.match(/([\d.]+)\s+H\/s/);
   const useTh = thAll.length > 0;
   const hashrate24h = thAll[0] ? `${thAll[0][1]} TH/s` : ghAll[0] ? `${ghAll[0][1]} GH/s` : null;
-  const match10m = useTh ? thAll[1] : ghAll[1];
-  const hashrate10m = match10m ? (useTh ? `${match10m[1]} TH/s` : `${match10m[1]} GH/s`) : null;
-  const value10m = match10m ? parseFloat(match10m[1] ?? "0") : 0;
+  // 10m: segundo TH/s o GH/s si está prendido; si apagado = 0.00 H/s
+  let hashrate10m: string | null = null;
+  let value10m = 0;
+  const match10mThGh = useTh ? thAll[1] : ghAll[1];
+  if (match10mThGh) {
+    hashrate10m = useTh ? `${match10mThGh[1]} TH/s` : `${match10mThGh[1]} GH/s`;
+    value10m = parseFloat(match10mThGh[1] ?? "0");
+  } else if (hsMatch) {
+    hashrate10m = `${hsMatch[1]} H/s`;
+    value10m = parseFloat(hsMatch[1] ?? "0");
+  }
   const status: "activo" | "inactivo" | "desconocido" =
     hashrate10m === null ? "desconocido" : value10m > 0 ? "activo" : "inactivo";
   return { name: workerName, hashrate24h, hashrate10m, status };
