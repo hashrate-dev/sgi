@@ -402,14 +402,16 @@ export function FacturasMesHostingPage() {
                     >
                       Limpiar
                     </button>
+                  </div>
+                  <div className="col-6 col-md-auto d-flex align-items-end ms-md-auto">
                     <button
                       type="button"
-                      className="btn btn-outline-primary btn-sm"
+                      className="btn btn-outline-secondary btn-sm filtros-limpiar-btn"
                       onClick={() => fetchDocuments()}
                       disabled={loading}
                     >
                       <i className="bi bi-arrow-clockwise me-1" />
-                      Volver a cargar
+                      Actualizar
                     </button>
                   </div>
                 </div>
