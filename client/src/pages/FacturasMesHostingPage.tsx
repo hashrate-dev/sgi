@@ -157,6 +157,8 @@ export function FacturasMesHostingPage() {
   const [selectedMonth, setSelectedMonth] = useState<string>(() => currentMonthValue());
   /** Cuando el usuario intenta pasar de SI a NO, guardamos el documento para pedir confirmación */
   const [confirmNoMailSent, setConfirmNoMailSent] = useState<Invoice | null>(null);
+  /** Cuando el usuario elige Cancelado, pedimos confirmación antes de aplicar */
+  const [confirmCancelado, setConfirmCancelado] = useState<Invoice | null>(null);
 
   /** Opciones de mes desde el primer mes (inv.month) con datos en la base hasta el mes actual */
   const opcionesMesAnio = useMemo(() => {
@@ -320,9 +322,21 @@ export function FacturasMesHostingPage() {
       setConfirmNoMailSent(inv);
       return;
     }
+    if (value === "Cancelado") {
+      setConfirmCancelado(inv);
+      return;
+    }
     setMailSent(inv.id, value);
     forceUpdate((n) => n + 1);
-    showToast(value === "Cancelado" ? "Documento marcado como cancelado (no se mostrará en la lista)." : `Enviado por mail: ${value}`, "success");
+    showToast(`Enviado por mail: ${value}`, "success");
+  }
+
+  function confirmSetCancelado() {
+    if (!confirmCancelado) return;
+    setMailSent(confirmCancelado.id, "Cancelado");
+    setConfirmCancelado(null);
+    forceUpdate((n) => n + 1);
+    showToast("Documento cancelado. Se quitó de la lista.", "success");
   }
 
   function confirmSetNoMailSent() {
@@ -567,6 +581,27 @@ export function FacturasMesHostingPage() {
           cancelLabel="Cancelar (seguir en SI)"
           onConfirm={confirmSetNoMailSent}
           onCancel={() => setConfirmNoMailSent(null)}
+        />
+
+        <ConfirmModal
+          open={confirmCancelado !== null}
+          title="¿Cancelar documento?"
+          message={
+            confirmCancelado ? (
+              <>
+                ¿Está seguro que realmente deseas cancelar este documento?
+                <br />
+                <strong>{confirmCancelado.number}</strong> ({confirmCancelado.type}) — {confirmCancelado.clientName}.
+                <br />
+                <span className="text-muted">Se quitará de la lista de forma inmediata.</span>
+              </>
+            ) : null
+          }
+          variant="delete"
+          confirmLabel="Sí"
+          cancelLabel="No"
+          onConfirm={confirmSetCancelado}
+          onCancel={() => setConfirmCancelado(null)}
         />
       </div>
     </div>
