@@ -89,12 +89,14 @@ function parseWorkerBlock(html: string, workerName: string): Omit<KryptexWorkerD
     return { name: workerName, hashrate24h: null, hashrate10m: null, status: "desconocido" };
   }
   const fragment = html.slice(workerIdx, workerIdx + 3500);
-  const thMatch = fragment.match(/([\d.]+)\s*TH\/s/);
-  const ghMatch = fragment.match(/([\d.]+)\s*GH\/s/);
-  const hsMatch = fragment.match(/([\d.]+)\s*H\/s/);
-  const hashrate24h = thMatch ? `${thMatch[1]} TH/s` : ghMatch ? `${ghMatch[1]} GH/s` : null;
-  const hashrate10m = hsMatch ? `${hsMatch[1]} H/s` : null;
-  const value10m = hsMatch ? parseFloat(hsMatch[1] ?? "0") : 0;
+  const thAll = [...fragment.matchAll(/([\d.]+)\s*TH\/s/g)];
+  const ghAll = [...fragment.matchAll(/([\d.]+)\s*GH\/s/g)];
+  // SHA256: TH/s (24h, 10m). Scrypt: GH/s (24h, 10m). Segundo match = 10m.
+  const useTh = thAll.length > 0;
+  const hashrate24h = thAll[0] ? `${thAll[0][1]} TH/s` : ghAll[0] ? `${ghAll[0][1]} GH/s` : null;
+  const match10m = useTh ? thAll[1] : ghAll[1];
+  const hashrate10m = match10m ? (useTh ? `${match10m[1]} TH/s` : `${match10m[1]} GH/s`) : null;
+  const value10m = match10m ? parseFloat(match10m[1] ?? "0") : 0;
   const status: "activo" | "inactivo" | "desconocido" =
     hashrate10m === null ? "desconocido" : value10m > 0 ? "activo" : "inactivo";
   return { name: workerName, hashrate24h, hashrate10m, status };
