@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { getInvoices, wakeUpBackend } from "../lib/api";
-import { loadInvoices } from "../lib/storage";
 import type { ComprobanteType, Invoice } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
 import { ConfirmModal } from "../components/ConfirmModal";
@@ -26,6 +25,18 @@ function setMailSent(invoiceId: string, value: "SI" | "NO") {
   }
 }
 
+/** Normaliza mes a YYYY-MM (ej. "2026-2" -> "2026-02") */
+function normalizeMonth(mm: string | undefined): string {
+  if (!mm || typeof mm !== "string") return "";
+  const parts = mm.split("-").map((p) => parseInt(p.trim(), 10));
+  if (parts.length >= 2 && Number.isFinite(parts[0]) && Number.isFinite(parts[1])) {
+    const y = parts[0];
+    const m = Math.max(1, Math.min(12, parts[1]));
+    return `${y}-${String(m).padStart(2, "0")}`;
+  }
+  return mm;
+}
+
 /** Parsea fecha en formato DD/MM/YYYY o YYYY-MM-DD y devuelve { year, month } */
 function parseDateMonth(dateStr: string): { year: number; month: number } | null {
   if (!dateStr) return null;
@@ -40,6 +51,30 @@ function parseDateMonth(dateStr: string): { year: number; month: number } | null
   const d = new Date(dateStr);
   if (!isNaN(d.getTime())) return { year: d.getFullYear(), month: d.getMonth() };
   return null;
+}
+
+/** Parsea fecha a Date (para comparar con hoy) */
+function parseDate(dateStr: string): Date | null {
+  if (!dateStr) return null;
+  if (dateStr.includes("/")) {
+    const parts = dateStr.split("/");
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const year = parseInt(parts[2], 10);
+      if (Number.isFinite(year) && Number.isFinite(month) && Number.isFinite(day)) {
+        const d = new Date(year, month, day);
+        if (!isNaN(d.getTime())) return d;
+      }
+    }
+  }
+  const d = new Date(dateStr);
+  return !isNaN(d.getTime()) ? d : null;
+}
+
+/** Devuelve YYYY-MM del mes de una fecha parseada */
+function dateToMonthStr(parsed: { year: number; month: number }): string {
+  return `${parsed.year}-${String(parsed.month + 1).padStart(2, "0")}`;
 }
 
 /** Formatea mes YYYY-MM a "feb-2026" (mes del documento en emisión) */
@@ -58,12 +93,14 @@ function currentMonthValue(): string {
 }
 
 export function FacturasMesHostingPage() {
-  const [all, setAll] = useState<Invoice[]>(() => loadInvoices());
+  const [all, setAll] = useState<Invoice[]>([]);
   const [, forceUpdate] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   function fetchDocuments() {
     setLoading(true);
+    setFetchError(null);
     wakeUpBackend()
       .then(() => getInvoices({ source: "hosting" }))
       .then((r) => {
@@ -73,7 +110,7 @@ export function FacturasMesHostingPage() {
           type: inv.type as ComprobanteType,
           clientName: inv.clientName,
           date: inv.date,
-          month: inv.month,
+          month: inv.month ?? "",
           subtotal: inv.subtotal,
           discounts: inv.discounts,
           total: inv.total,
@@ -84,14 +121,33 @@ export function FacturasMesHostingPage() {
           dueDate: inv.dueDate,
           items: [],
         }));
-        setAll(list.length > 0 ? list : loadInvoices());
+        setAll(list);
       })
-      .catch(() => setAll(loadInvoices()))
+      .catch((err) => {
+        setFetchError(err instanceof Error ? err.message : "Error al cargar documentos");
+        setAll([]);
+      })
       .finally(() => setLoading(false));
   }
 
   useEffect(() => {
     fetchDocuments();
+  }, []);
+
+  useEffect(() => {
+    const onEmitted = (e: Event) => {
+      const d = (e as CustomEvent).detail as { source?: string };
+      if (d?.source === "hosting") fetchDocuments();
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchDocuments();
+    };
+    window.addEventListener("hrs-emitted-changed", onEmitted);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("hrs-emitted-changed", onEmitted);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, []);
   const [qClient, setQClient] = useState("");
   const [qType, setQType] = useState<"" | ComprobanteType>("");
@@ -150,11 +206,18 @@ export function FacturasMesHostingPage() {
     if (!exists) setSelectedMonth(opcionesMesAnio[0].value);
   }, [opcionesMesAnio, selectedMonth]);
 
-  /** Documentos del mes seleccionado: filtro por inv.month (mes del documento), no por fecha de emisión */
+  /** Documentos del mes seleccionado: inv.month o fecha de emisión. Acumulado a hoy = date <= hoy */
   const facturasEsteMes = useMemo(() => {
+    const hoy = new Date();
+    hoy.setHours(23, 59, 59, 999);
     return all.filter((inv) => {
-      const docMonth = inv.month && inv.month.length >= 7 ? inv.month : ""; // YYYY-MM
-      return docMonth === selectedMonth;
+      const docMonth = normalizeMonth(inv.month);
+      const monthMatch = docMonth === selectedMonth;
+      const parsed = parseDateMonth(inv.date);
+      const dateInMonth = parsed && dateToMonthStr(parsed) === selectedMonth;
+      const invDate = parseDate(inv.date);
+      const dateHoy = invDate ? invDate <= hoy : true;
+      return (monthMatch || dateInMonth) && dateHoy;
     }).sort((a, b) => {
       const pa = parseDateMonth(a.date);
       const pb = parseDateMonth(b.date);
@@ -346,6 +409,15 @@ export function FacturasMesHostingPage() {
             Indicá si cada documento fue enviado por mail.
           </p>
 
+          {fetchError ? (
+            <div className="alert alert-warning d-flex align-items-center gap-2">
+              <i className="bi bi-exclamation-triangle" />
+              <span>{fetchError}</span>
+              <button type="button" className="btn btn-sm btn-outline-warning ms-auto" onClick={() => fetchDocuments()}>
+                Reintentar
+              </button>
+            </div>
+          ) : null}
           {loading ? (
             <p className="text-muted mb-0 py-4">Cargando documentos del historial...</p>
           ) : (

@@ -9,6 +9,7 @@ import type { Pool } from "pg";
 import { env } from "../config/env.js";
 
 let _db: Awaited<ReturnType<typeof loadDb>>;
+export let dbType: "supabase" | "sqlite" = "sqlite";
 
 async function loadDb() {
   if (env.SUPABASE_DATABASE_URL) {
@@ -21,8 +22,9 @@ async function loadDb() {
         })(),
         new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 15000))
       ]);
+      dbType = "supabase";
       // eslint-disable-next-line no-console
-      console.log("[DB] Conectado a Supabase (PostgreSQL)");
+      console.log("[DB] Conectado a Supabase (PostgreSQL) - localhost usa la misma BD que Vercel");
       return db;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -33,9 +35,10 @@ async function loadDb() {
       console.warn("[DB] Supabase no disponible:", msg, "- usando SQLite local");
     }
   }
+  dbType = "sqlite";
   const { createAsyncSqlite } = await import("./sqlite-async.js");
   // eslint-disable-next-line no-console
-  console.log("[DB] Usando SQLite local (data.db)");
+  console.log("[DB] Usando SQLite local (data.db) - NO conectado a Supabase. Agregá SUPABASE_DATABASE_URL en server/.env");
   return createAsyncSqlite();
 }
 

@@ -13,7 +13,7 @@ export default defineConfig({
     chunkSizeWarningLimit: 2000, // evita el aviso de chunks > 500 KB (React, jspdf, etc.)
   },
   server: {
-    port: 3000,
+    port: 5173,
     proxy: {
       "/api": { target: "http://localhost:8080", changeOrigin: true }
     },

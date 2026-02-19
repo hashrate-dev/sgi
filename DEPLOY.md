@@ -1,47 +1,98 @@
-# GitHub + Vercel + Render: checklist
+# Despliegue: Localhost, GitHub, Vercel y Supabase
 
-## 1. GitHub
-- Repo: **hashrate_app** con el código en la rama `main`.
-- Cada **push a main** puede activar deploy automático en Vercel y Render (si están conectados).
+## 1. Localhost
 
-## 2. Vercel (frontend)
-- [ ] Proyecto conectado al repo **hashrate_app**.
-- [ ] **Root Directory:** `client`.
-- [ ] **Environment Variables:**  
-  `VITE_API_URL` = URL del backend en Render (ej. `https://hashrate-api.onrender.com`) **sin** barra final.
-- [ ] Después de agregar o cambiar `VITE_API_URL`, hacer **Redeploy**.
-- Anotar la URL del sitio: **https://sgi-hrs.vercel.app**
+```bash
+# Instalar dependencias (si no lo hiciste)
+npm install
 
-## 3. Render (backend)
-- [ ] **Web Service** conectado al repo **hashrate_app**.
-- [ ] Aplicar el **Blueprint** (`render.yaml`) o configurar a mano:
-  - **Root Directory:** `server`
-  - **Build Command:** `npm install && npm run build`
-  - **Start Command:** `npm start`
-  - **Disk:** el Blueprint incluye un disco persistente (`/data`, 1 GB) y `SQLITE_PATH=/data/data.db` para que **usuarios, clientes y toda la base de datos se conserven entre deploys**.
-- [ ] **Environment:**  
-  `CORS_ORIGIN` = **https://sgi-hrs.vercel.app** (sin barra final).  
-  Si no usás el Blueprint, agregar también `SQLITE_PATH=/data/data.db` y crear un **Disk** en Render (mount path `/data`) para no perder datos en cada deploy.
-- [ ] Anotar la URL del servicio (ej. `https://hashrate-api.onrender.com`).
+# Iniciar cliente (Vite) + servidor (Express)
+npm run dev
+```
 
-## 4. Comprobar
-- Abrir la URL de Vercel: la app carga.
-- Ir a Clientes y agregar uno: debe guardar sin error (llamada a la API de Render).
-- En Render, en **Logs**, no debe haber errores.
+- **Cliente:** http://localhost:5173  
+- **API:** http://localhost:8080  
 
-## Resumen de variables
-| Servicio | Variable        | Valor (ejemplo)                          |
-|----------|-----------------|------------------------------------------|
-| Vercel   | VITE_API_URL    | https://sistema-gestion-interna.onrender.com                 |
-| Render   | CORS_ORIGIN     | https://sgi-hrs.vercel.app               |
+En localhost el cliente usa automáticamente el backend local. Si no tenés `SUPABASE_DATABASE_URL` en `.env`, usará SQLite (`server/data.db`).
 
-Siempre **sin** barra final en las URLs.
+---
 
-## Persistencia de datos en Render (ya configurado en el Blueprint)
-El `render.yaml` incluye un **disco persistente** (`/data`) y `SQLITE_PATH=/data/data.db`. Así la base SQLite (usuarios, clientes, facturas del API, actividad) **no se borra en cada deploy**.  
-**Si el servicio ya existía sin disco:** en Render → tu servicio → **Disks** → **Add Disk** (name: `data`, mount path: `/data`, 1 GB). En **Environment** agregar `SQLITE_PATH` = `/data/data.db`. Luego **Redeploy**. A partir de ese deploy, los datos se mantienen.
+## 2. GitHub
 
-## Si no anda
-- **Front carga pero no guarda:** En Vercel tiene que existir `VITE_API_URL` y después hay que hacer **Redeploy** (el valor se usa en el build).
-- **Error de CORS en el navegador:** En Render, `CORS_ORIGIN` debe ser exactamente la URL del front (la que ves en la barra del navegador al usar la app en Vercel). Podés poner varias separadas por coma si tenés más de un dominio.
-- **Render:** En los logs del servicio deberías ver `API listening on :XXXX` y, si definiste `CORS_ORIGIN`, `CORS allowed origin: https://...`.
+```bash
+git add .
+git commit -m "Actualizaciones: Kryptex, control documentos, parser estado"
+git push origin main
+```
+
+Si el repo está conectado a Vercel, cada push a `main` dispara un deploy automático.
+
+---
+
+## 3. Vercel
+
+### Opción A: Conectado a GitHub
+Si el proyecto ya está en [vercel.com](https://vercel.com) vinculado al repo, cada `git push` despliega automáticamente.
+
+### Opción B: Deploy manual
+```bash
+npm i -g vercel
+vercel --prod
+```
+
+### Variables de entorno en Vercel
+En **Project Settings → Environment Variables** configurá:
+
+| Variable | Descripción |
+|----------|-------------|
+| `SUPABASE_DATABASE_URL` | Connection string de Supabase (URI). Obtener en: Supabase Dashboard → Project Settings → Database → Connection string (URI) |
+| `JWT_SECRET` | Secreto largo para JWT (ej. 32+ caracteres aleatorios) |
+| `CORS_ORIGIN` | `https://app.hashrate.space` o tu dominio |
+
+---
+
+## 4. Supabase
+
+### Crear proyecto
+1. Ir a [supabase.com](https://supabase.com) → New Project  
+2. Elegir región y contraseña de la base de datos  
+
+### Ejecutar schema
+1. En el proyecto: **SQL Editor** → **New query**  
+2. Copiar el contenido de `server/src/db/schema-supabase.sql`  
+3. Ejecutar (Run)  
+
+### Obtener connection string
+1. **Project Settings** → **Database**  
+2. En **Connection string** elegir **URI**  
+3. Copiar la URI y reemplazar `[YOUR-PASSWORD]` por la contraseña del proyecto  
+4. Pegar en `SUPABASE_DATABASE_URL` en Vercel  
+
+Formato típico:
+```
+postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres
+```
+
+### Usuario inicial
+Después de crear las tablas, insertar un usuario admin (en SQL Editor):
+
+```sql
+INSERT INTO users (username, email, password_hash, role)
+VALUES ('admin', 'admin@ejemplo.com', '$2a$10$...', 'admin_a');
+```
+
+El `password_hash` debe ser bcrypt. Podés generarlo con:
+```bash
+node -e "console.log(require('bcryptjs').hashSync('tu_password', 10))"
+```
+
+---
+
+## Resumen rápido
+
+| Paso | Comando / Acción |
+|------|------------------|
+| Localhost | `npm run dev` |
+| GitHub | `git add . && git commit -m "..." && git push` |
+| Vercel | Auto-deploy si está conectado, o `vercel --prod` |
+| Supabase | Ejecutar `schema-supabase.sql` + configurar `SUPABASE_DATABASE_URL` en Vercel |

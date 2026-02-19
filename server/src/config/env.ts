@@ -1,13 +1,22 @@
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import dotenv from "dotenv";
 
-// Cargar .env: primero cwd, luego server/.env (prioridad para Supabase en local)
+// Cargar .env desde múltiples ubicaciones (localhost puede ejecutarse desde raíz o server/)
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const serverDir = path.join(__dirname, "..", "..");
+const projectRoot = path.join(serverDir, "..");
+
+// 1) cwd (donde se ejecutó npm)
 dotenv.config();
-const serverEnvPath = path.join(__dirname, "..", "..", ".env");
-dotenv.config({ path: serverEnvPath, override: true });
+// 2) server/.env
+const serverEnv = path.join(serverDir, ".env");
+if (fs.existsSync(serverEnv)) dotenv.config({ path: serverEnv, override: true });
+// 3) raíz del proyecto .env (set-supabase-url.cjs escribe aquí)
+const rootEnv = path.join(projectRoot, ".env");
+if (fs.existsSync(rootEnv)) dotenv.config({ path: rootEnv, override: true });
 
 const defaultSqlitePath = process.env.VERCEL ? "/tmp/data.db" : "data.db";
 const EnvSchema = z.object({

@@ -21,20 +21,24 @@ Proyecto: **https://supabase.com/dashboard/project/cvzkjjzwnzwbopvsnqwi**
 
 ### 3. Poner la URL en el servidor
 
-- En el proyecto, abrí **`server/.env`**
-- Descomentá la línea de Supabase y pegá tu URI completa:
+**Opción A — Script (recomendado):**
+```bash
+npm run supabase:set -- "postgresql://postgres:TU_PASSWORD@db.cvzkjjzwnzwbopvsnqwi.supabase.co:5432/postgres"
+```
+(Reemplazá por tu URI real de Supabase.)
 
+**Opción B — Manual:** Abrí **`server/.env`** y agregá (o descomentá):
 ```env
 SUPABASE_DATABASE_URL=postgresql://postgres:TU_PASSWORD_REAL@db.cvzkjjzwnzwbopvsnqwi.supabase.co:5432/postgres
 ```
-
-(Usá la URI que te dio Supabase; el ejemplo es con conexión directa.)
 
 ### 4. Arrancar el servidor
 
 - En la raíz del proyecto: **`npm run dev`**
 - La primera vez que arranque con `SUPABASE_DATABASE_URL` definida, el backend creará las tablas en Supabase (ejecuta `server/src/db/schema-supabase.sql`).
-- Abrí **http://localhost:3000** (o el puerto que muestre Vite) y logueate con **jv@hashrate.space** / **admin123** (esos usuarios se crean en Supabase al hacer el primer login).
+- En la consola deberías ver: **`[DB] Conectado a Supabase (PostgreSQL)`**. Si ves "Usando SQLite local", no está conectado.
+- Verificá en **http://localhost:8080/api/db-info** — debe decir `"db": "supabase"`.
+- Abrí **http://localhost:5173** y logueate con **jv@hashrate.space** / **admin123** (esos usuarios se crean en Supabase al hacer el primer login).
 
 ### 5. Si algo falla
 
