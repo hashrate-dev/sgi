@@ -579,3 +579,30 @@ export function createEquiposBulk(
     body: JSON.stringify(items),
   });
 }
+
+export type KryptexWorkerStatus = "activo" | "inactivo" | "desconocido";
+
+export type KryptexWorkerData = {
+  name: string;
+  hashrate24h: string | null;
+  hashrate10m: string | null;
+  status: KryptexWorkerStatus;
+  poolUrl: string;
+  usuario: string;
+  modelo: string;
+};
+
+export function getKryptexWorkers(): Promise<{ workers: KryptexWorkerData[] }> {
+  return apiNoRetry<{ workers: KryptexWorkerData[] }>("/api/kryptex/workers");
+}
+
+export function getKryptexWorkerStatus(workerName: string): Promise<{
+  worker: string;
+  status: KryptexWorkerStatus;
+  hashrate24h?: string | null;
+  hashrate10m?: string | null;
+}> {
+  return apiNoRetry(
+    `/api/kryptex/worker/${encodeURIComponent(workerName)}`
+  );
+}

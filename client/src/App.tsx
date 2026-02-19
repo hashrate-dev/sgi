@@ -23,6 +23,7 @@ import { GarantiaAndePage } from "./pages/GarantiaAndePage";
 import { GarantiasAndeItemsPage } from "./pages/GarantiasAndeItemsPage";
 import { GarantiaAndeItemNewPage } from "./pages/GarantiaAndeItemNewPage";
 import { HistorialGarantiasPage } from "./pages/HistorialGarantiasPage";
+import { KryptexPage } from "./pages/KryptexPage";
 import { ToastContainer } from "./components/ToastNotification";
 
 function App() {
@@ -43,6 +44,7 @@ function App() {
             <Route path="/facturacion" element={<Navigate to="/facturacion-hosting" replace />} />
             <Route path="/pendientes" element={<Navigate to="/pendientes-hosting" replace />} />
             <Route path="/equipos-asic" element={<MineriaHubPage />} />
+            <Route path="/kryptex" element={<KryptexPage />} />
             <Route path="/equipos-asic/equipos" element={<EquiposAsicPage />} />
             <Route path="/equipos-asic/equipos/nuevos" element={<Navigate to="/equipos-asic/equipos" replace />} />
             <Route path="/equipos-asic/setup" element={<SetupPage />} />

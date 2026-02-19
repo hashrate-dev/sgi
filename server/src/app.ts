@@ -14,6 +14,7 @@ import { emittedRouter } from "./routes/emitted.js";
 import { garantiasRouter } from "./routes/garantias.js";
 import { setupsRouter } from "./routes/setups.js";
 import { equiposRouter } from "./routes/equipos.js";
+import { kryptexRouter } from "./routes/kryptex.js";
 import { requireAuth } from "./middleware/auth.js";
 import { notFound } from "./middleware/notFound.js";
 import { errorHandler } from "./middleware/errorHandler.js";
@@ -55,6 +56,7 @@ export function createApp() {
   app.use("/api", garantiasRouter);
   app.use("/api", requireAuth, setupsRouter);
   app.use("/api", requireAuth, equiposRouter);
+  app.use("/api", requireAuth, kryptexRouter);
 
   app.use(notFound);
   app.use(errorHandler);
