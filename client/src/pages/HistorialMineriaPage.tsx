@@ -243,19 +243,15 @@ export function HistorialMineriaPage() {
     const facturas = all.filter((i) => i.type === "Factura").length;
     const recibos = all.filter((i) => i.type === "Recibo").length;
     const notasCredito = all.filter((i) => i.type === "Nota de Crédito").length;
-    // Facturación total: suma de todas las facturas, menos las notas de crédito (restan la factura correspondiente)
+    // Facturación total: suma de facturas, menos notas de crédito
     const sumaFacturas = all.filter((i) => i.type === "Factura").reduce((s, i) => s + (Number(i.total) || 0), 0);
     const sumaNotasCredito = all.filter((i) => i.type === "Nota de Crédito").reduce((s, i) => s + (Math.abs(i.total) || 0), 0);
+    const sumaRecibos = all.filter((i) => i.type === "Recibo").reduce((s, i) => s + (Math.abs(i.total) || 0), 0);
     const facturacionTotal = sumaFacturas - sumaNotasCredito;
-    // Cobros pendientes: facturas que figuran como pendiente de pago (sin recibo asociado en la BD)
-    const facturasPendientes = all.filter((i) => {
-      if (i.type !== "Factura") return false;
-      const tieneRecibo = all.some((r) => r.type === "Recibo" && r.relatedInvoiceId === i.id);
-      return !tieneRecibo;
-    });
-    const cobrosPendientes = facturasPendientes.reduce((s, i) => s + (Number(i.total) || 0), 0);
-    // Cobros realizados = Facturación total - Cobros pendientes
-    const cobrosRealizados = facturacionTotal - cobrosPendientes;
+    // Cobros pendientes: total facturas - recibos - notas de crédito (lo que aún se debe cobrar)
+    const cobrosPendientes = sumaFacturas - sumaRecibos - sumaNotasCredito;
+    // Cobros realizados: suma de los recibos generados (lo que ya se cobró)
+    const cobrosRealizados = sumaRecibos;
     return { facturas, recibos, notasCredito, facturacionTotal, cobrosPendientes, cobrosRealizados, registros: all.length };
   }, [all]);
 

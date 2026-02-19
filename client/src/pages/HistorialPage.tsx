@@ -289,19 +289,15 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
     const facturas = allSrc.filter((i) => i.type === "Factura").length;
     const recibos = allSrc.filter((i) => i.type === "Recibo").length;
     const notasCredito = allSrc.filter((i) => i.type === "Nota de Crédito").length;
-    // Facturación total: suma de todas las facturas, menos las notas de crédito (ambas bases)
+    // Facturación total: suma de facturas, menos notas de crédito
     const sumaFacturas = allSrc.filter((i) => i.type === "Factura").reduce((s, i) => s + (Number(i.total) || 0), 0);
     const sumaNotasCredito = allSrc.filter((i) => i.type === "Nota de Crédito").reduce((s, i) => s + (Math.abs(i.total) || 0), 0);
+    const sumaRecibos = allSrc.filter((i) => i.type === "Recibo").reduce((s, i) => s + (Math.abs(i.total) || 0), 0);
     const facturacionTotal = sumaFacturas - sumaNotasCredito;
-    // Cobros pendientes: facturas sin recibo asociado dentro del mismo origen
-    const facturasPendientes = allSrc.filter((i) => {
-      if (i.type !== "Factura") return false;
-      const sameSource = allSrc.filter((x) => x._source === i._source);
-      const tieneRecibo = sameSource.some((r) => r.type === "Recibo" && r.relatedInvoiceId === i.id);
-      return !tieneRecibo;
-    });
-    const cobrosPendientes = facturasPendientes.reduce((s, i) => s + (Number(i.total) || 0), 0);
-    const cobrosRealizados = facturacionTotal - cobrosPendientes;
+    // Cobros pendientes: total facturas - recibos - notas de crédito (lo que aún se debe cobrar)
+    const cobrosPendientes = sumaFacturas - sumaRecibos - sumaNotasCredito;
+    // Cobros realizados: suma de los recibos generados (lo que ya se cobró)
+    const cobrosRealizados = sumaRecibos;
     return { facturas, recibos, notasCredito, facturacionTotal, cobrosPendientes, cobrosRealizados, registros: all.length };
   }, [all]);
 
