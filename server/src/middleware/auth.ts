@@ -52,7 +52,9 @@ export function requireRole(...roles: UserRole[]) {
       res.status(401).json({ error: { message: "No autenticado" } });
       return;
     }
-    if (roles.includes(req.user.role)) {
+    const userRole = (req.user.role ?? "").toLowerCase().trim();
+    const allowed = roles.some((r) => r.toLowerCase() === userRole);
+    if (allowed) {
       next();
       return;
     }

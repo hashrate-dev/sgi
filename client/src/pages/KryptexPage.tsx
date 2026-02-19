@@ -23,10 +23,6 @@ export function KryptexPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  if (user && user.role !== "admin_a" && user.role !== "admin_b") {
-    return <Navigate to="/" replace />;
-  }
-
   function loadWorkers() {
     setLoading(true);
     setError(null);
@@ -39,6 +35,12 @@ export function KryptexPage() {
   useEffect(() => {
     loadWorkers();
   }, []);
+
+  const roleNorm = (r: string | undefined) => (r ?? "").toLowerCase().trim();
+  const canAccess = roleNorm(user?.role) === "admin_a" || roleNorm(user?.role) === "admin_b";
+  if (user && !canAccess) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <div className="fact-page">

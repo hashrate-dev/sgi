@@ -75,6 +75,16 @@ export default async function handler(req, res) {
     return;
   }
 
+  // Fallback: GET /api/kryptex/workers si el handler dedicado no matchea
+  if ((path === "/api/kryptex/workers" || path.endsWith("/kryptex/workers")) && req.method === "GET") {
+    try {
+      const { default: kryptexHandler } = await import("./kryptex/workers.js");
+      return kryptexHandler(req, res);
+    } catch (e) {
+      /* seguir al app */
+    }
+  }
+
   // Fallback: GET /api/garantias/items si el handler dedicado no matchea
   if ((path === "/api/garantias/items" || path.endsWith("/garantias/items")) && req.method === "GET") {
     try {

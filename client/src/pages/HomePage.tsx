@@ -21,7 +21,10 @@ export function HomePage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [logoSrc, setLogoSrc] = useState("/images/HRSLOGO.png");
-  const visibleMenuItems = menuItems.filter((item) => !item.roles || (user && item.roles.includes(user.role)));
+  const roleNorm = (r: string | undefined) => (r ?? "").toLowerCase().trim();
+const visibleMenuItems = menuItems.filter(
+  (item) => !item.roles || (user && item.roles.some((r) => roleNorm(r) === roleNorm(user.role)))
+);
 
   useEffect(() => {
     // Verificar que la imagen existe
@@ -105,7 +108,7 @@ export function HomePage() {
               <p className="hrs-home-card-desc">{item.desc}</p>
             </Link>
           ))}
-          {(user?.role === "admin_a" || user?.role === "admin_b") && (
+          {(roleNorm(user?.role) === "admin_a" || roleNorm(user?.role) === "admin_b") && (
             <Link to="/configuracion" className="hrs-home-card hrs-home-card-admin">
               <div className="hrs-home-card-icon">
                 <i className="bi bi-gear-fill" aria-hidden />
