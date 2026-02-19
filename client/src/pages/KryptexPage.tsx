@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { Navigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { getKryptexWorkers, type KryptexWorkerData } from "../lib/api";
 import "../styles/facturacion.css";
@@ -16,9 +18,14 @@ function statusBadgeClass(status: KryptexWorkerData["status"]) {
 }
 
 export function KryptexPage() {
+  const { user } = useAuth();
   const [workers, setWorkers] = useState<KryptexWorkerData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  if (user && user.role !== "admin_a" && user.role !== "admin_b") {
+    return <Navigate to="/" replace />;
+  }
 
   function loadWorkers() {
     setLoading(true);
