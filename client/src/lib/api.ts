@@ -18,9 +18,10 @@ function getApiBase(): string {
   const h = window.location?.hostname ?? "";
   // En localhost siempre usar el backend local (no usar localStorage para no apuntar a Render por error).
   if (h === "localhost" || h === "127.0.0.1") return "http://localhost:8080";
-  // *.vercel.app: API en mismo origen (serverless en Vercel + Supabase). No usar Render.
+  // *.vercel.app y app.hashrate.space: API en mismo origen (Vercel serverless + Supabase). Sin CORS.
   if (h.endsWith(".vercel.app")) return "";
-  // sgi.hashrate.space: backend en Render (dominio custom)
+  if (h === "app.hashrate.space") return "";
+  // sgi.hashrate.space: backend en Render (dominio custom distinto)
   if (h === "sgi.hashrate.space") return SGI_RENDER_API;
   const stored = window.localStorage.getItem(STORAGE_KEY);
   const s = typeof stored === "string" ? stored.replace(/\/+$/, "").trim() : "";
@@ -43,11 +44,11 @@ export function getApiBaseUrlForDisplay(): string {
   return getApiBase() || "(mismo origen o no configurado)";
 }
 
-/** En Vercel: warmup (DB+app). En Render: health. Retorna Promise que resuelve cuando el backend está listo. */
+/** En Vercel / app.hashrate.space: warmup (DB+app). En Render: health. Retorna Promise que resuelve cuando el backend está listo. */
 export function wakeUpBackend(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
   const h = window.location?.hostname ?? "";
-  if (h.endsWith(".vercel.app")) {
+  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") {
     return fetch("/api/warmup", { method: "GET", keepalive: true })
       .then(() => {})
       .catch(() => {});
@@ -69,7 +70,7 @@ function getNoApiMessage(): string {
     return "No se pudo conectar con el servidor. ¿Tenés el backend levantado? Ejecutá en la raíz del proyecto: npm run dev";
   }
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  if (h.endsWith(".vercel.app")) {
+  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") {
     return "No se pudo conectar con la API. Esperá unos segundos (cold start) y volvé a intentar.";
   }
   if (h === "sgi.hashrate.space") {
@@ -83,7 +84,7 @@ function get502Message(): string {
     return "No se pudo conectar con el servidor. ¿Tenés el backend levantado? Ejecutá: npm run dev";
   }
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  if (h.endsWith(".vercel.app")) {
+  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") {
     return "La API está iniciando (cold start). Esperá 30-60 segundos y volvé a intentar.";
   }
   if (h === "sgi.hashrate.space") {
@@ -112,7 +113,7 @@ async function apiNoRetry<T>(path: string, timeoutMs = 10000): Promise<T> {
   if (token) headers.Authorization = `Bearer ${token}`;
   let base = getApiBase();
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  if (h.endsWith(".vercel.app")) base = "";
+  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") base = "";
   const url = base && base.trim() !== "" ? `${base}${path}` : path;
   const res = await fetchWithTimeout(url, { method: "GET", headers, credentials: "include" }, timeoutMs);
   const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
@@ -134,13 +135,13 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   if (token) headers.Authorization = `Bearer ${token}`;
   let base = getApiBase();
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  // *.vercel.app: siempre mismo origen (API serverless en Vercel). No usar Render.
-  if (h.endsWith(".vercel.app")) {
+  // *.vercel.app y app.hashrate.space: mismo origen (API serverless en Vercel). Sin CORS.
+  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") {
     base = "";
   }
   // base vacío = mismo origen (ej. Vercel: front + API en mismo dominio)
   const url = base && base.trim() !== "" ? `${base}${path}` : path;
-  if ((!base || base.trim() === "") && h !== "localhost" && h !== "127.0.0.1" && !h.endsWith(".vercel.app")) {
+  if ((!base || base.trim() === "") && h !== "localhost" && h !== "127.0.0.1" && !h.endsWith(".vercel.app") && h !== "app.hashrate.space") {
     throw new Error(getNoApiMessage());
   }
   // Debug: log la URL que estamos usando
