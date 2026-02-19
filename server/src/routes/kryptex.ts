@@ -133,6 +133,9 @@ kryptexRouter.get("/kryptex/worker/:name", async (req, res) => {
     return res.status(400).json({ error: "Nombre de worker inválido" });
   }
   const config = POOL_CONFIGS.find((c) => c.workers.includes(workerName)) ?? POOL_CONFIGS[0];
+  if (!config) {
+    return res.status(500).json({ error: "No hay configuración de pools" });
+  }
   try {
     const resp = await fetch(config.url, {
       headers: {
