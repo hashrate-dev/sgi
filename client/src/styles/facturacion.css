@@ -2880,6 +2880,13 @@
   color: #fff;
 }
 
+/* Select Cancelado: estilo gris/rojo suave */
+.pendientes-listado-wrap .table select.facturas-mes-mail-cancelado {
+  background-color: #fecaca;
+  color: #991b1b;
+  border-color: #f87171;
+}
+
 /* Columna Estado: ancho fijo para que no se corra la tabla al cambiar SI/NO (Pendiente... / Confirmado / doble check) */
 .pendientes-listado-wrap .table th.facturas-mes-col-estado,
 .pendientes-listado-wrap .table td.facturas-mes-col-estado {

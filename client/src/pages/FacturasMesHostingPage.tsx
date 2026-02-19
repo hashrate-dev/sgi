@@ -9,15 +9,17 @@ import "../styles/facturacion.css";
 
 const STORAGE_PREFIX = "hosting_mail_sent_";
 
-function getMailSent(invoiceId: string): "SI" | "NO" {
+export type MailSentStatus = "SI" | "NO" | "Cancelado";
+
+function getMailSent(invoiceId: string): MailSentStatus {
   try {
     const v = localStorage.getItem(STORAGE_PREFIX + invoiceId);
-    if (v === "SI" || v === "NO") return v;
+    if (v === "SI" || v === "NO" || v === "Cancelado") return v;
   } catch {}
   return "NO";
 }
 
-function setMailSent(invoiceId: string, value: "SI" | "NO") {
+function setMailSent(invoiceId: string, value: MailSentStatus) {
   try {
     localStorage.setItem(STORAGE_PREFIX + invoiceId, value);
   } catch (e) {
@@ -206,11 +208,12 @@ export function FacturasMesHostingPage() {
     if (!exists) setSelectedMonth(opcionesMesAnio[0].value);
   }, [opcionesMesAnio, selectedMonth]);
 
-  /** Documentos del mes seleccionado: inv.month o fecha de emisión. Acumulado a hoy = date <= hoy */
+  /** Documentos del mes seleccionado: inv.month o fecha de emisión. Acumulado a hoy = date <= hoy. Sin NC (no se muestran en esta página). */
   const facturasEsteMes = useMemo(() => {
     const hoy = new Date();
     hoy.setHours(23, 59, 59, 999);
     return all.filter((inv) => {
+      if (inv.type === "Nota de Crédito") return false;
       const docMonth = normalizeMonth(inv.month);
       const monthMatch = docMonth === selectedMonth;
       const parsed = parseDateMonth(inv.date);
@@ -231,6 +234,7 @@ export function FacturasMesHostingPage() {
   const filtered = useMemo(() => {
     const client = qClient.trim().toLowerCase();
     return facturasEsteMes.filter((inv) => {
+      if (getMailSent(inv.id) === "Cancelado") return false;
       const okClient = !client || inv.clientName.toLowerCase().includes(client);
       const okType = !qType || inv.type === qType;
       return okClient && okType;
@@ -311,14 +315,14 @@ export function FacturasMesHostingPage() {
     return "";
   }
 
-  function handleMailSentChange(inv: Invoice, value: "SI" | "NO") {
+  function handleMailSentChange(inv: Invoice, value: MailSentStatus) {
     if (value === "NO" && getMailSent(inv.id) === "SI") {
       setConfirmNoMailSent(inv);
       return;
     }
     setMailSent(inv.id, value);
     forceUpdate((n) => n + 1);
-    showToast(`Enviado por mail: ${value}`, "success");
+    showToast(value === "Cancelado" ? "Documento marcado como cancelado (no se mostrará en la lista)." : `Enviado por mail: ${value}`, "success");
   }
 
   function confirmSetNoMailSent() {
@@ -371,7 +375,6 @@ export function FacturasMesHostingPage() {
                       <option value="">Todos</option>
                       <option value="Factura">Factura</option>
                       <option value="Recibo">Recibo</option>
-                      <option value="Nota de Crédito">Nota de Crédito</option>
                     </select>
                   </div>
                   <div className="col-6 col-md-auto d-flex align-items-end filtros-limpiar-col">
@@ -457,13 +460,14 @@ export function FacturasMesHostingPage() {
                       <td className="text-start">{getObservaciones(inv)}</td>
                       <td className="text-start">
                         <select
-                          className={`form-select form-select-sm ${getMailSent(inv.id) === "SI" ? "facturas-mes-mail-si" : ""}`}
-                          style={{ width: "auto", minWidth: "5rem" }}
+                          className={`form-select form-select-sm ${getMailSent(inv.id) === "SI" ? "facturas-mes-mail-si" : getMailSent(inv.id) === "Cancelado" ? "facturas-mes-mail-cancelado" : ""}`}
+                          style={{ width: "auto", minWidth: "6.5rem" }}
                           value={getMailSent(inv.id)}
-                          onChange={(e) => handleMailSentChange(inv, e.target.value as "SI" | "NO")}
+                          onChange={(e) => handleMailSentChange(inv, e.target.value as MailSentStatus)}
                         >
                           <option value="NO">NO</option>
                           <option value="SI">SI</option>
+                          <option value="Cancelado">Cancelado</option>
                         </select>
                       </td>
                       <td className="text-center facturas-mes-col-estado">
