@@ -57,6 +57,12 @@ const POOL_CONFIGS: Array<{
     usuario: "Damasco",
     modelo: "L7",
   },
+  {
+    url: "https://pool.kryptex.com/quai-scrypt/miner/stats/0x005Eb53eD5242eCed3A10BD92D2B81CA1dE8F4D5",
+    workers: ["HashR2L10P3"],
+    usuario: "Bala",
+    modelo: "L7",
+  },
 ];
 
 export type KryptexWorkerData = {
