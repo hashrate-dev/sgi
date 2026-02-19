@@ -429,7 +429,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
         await deleteInvoice(numericId);
       } catch (e) {
         showToast(e instanceof Error ? e.message : "No se pudo eliminar en el servidor.", "error");
-        return;
+        throw e;
       }
     }
     if (found._source === "hosting") {
@@ -445,11 +445,12 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
       deleteEmittedDocumentOne("asic", found.number).catch(() => {});
       dispatchEmittedChanged("asic");
     }
+    showToast("Documento eliminado correctamente.", "success");
   }
 
   function handleDeleteOneConfirm() {
     if (!deleteConfirmInv) return;
-    void removeOne(deleteConfirmInv.id).then(() => setDeleteConfirmInv(null));
+    void removeOne(deleteConfirmInv.id).finally(() => setDeleteConfirmInv(null));
   }
 
   function handleClearClick() {
