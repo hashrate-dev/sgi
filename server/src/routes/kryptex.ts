@@ -1,5 +1,8 @@
 import { Router } from "express";
 
+const FETCH_TIMEOUT_MS = 8000;
+const CACHE_TTL_MS = 90000; // 90 segundos - Kryptex actualiza cada ~5 min
+
 const POOL_CONFIGS: Array<{
   url: string;
   workers: string[];
@@ -66,6 +69,20 @@ export type KryptexWorkerData = {
   modelo: string;
 };
 
+let cache: { workers: KryptexWorkerData[]; ts: number } | null = null;
+
+async function fetchWithTimeout(url: string, headers: Record<string, string>): Promise<string> {
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const resp = await fetch(url, { headers, signal: ac.signal });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return await resp.text();
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 function parseWorkerBlock(html: string, workerName: string): Omit<KryptexWorkerData, "poolUrl" | "usuario" | "modelo"> {
   const workerIdx = html.indexOf(workerName);
   if (workerIdx === -1) {
@@ -85,19 +102,29 @@ function parseWorkerBlock(html: string, workerName: string): Omit<KryptexWorkerD
 
 export const kryptexRouter = Router();
 
-kryptexRouter.get("/kryptex/workers", async (_req, res) => {
-  const allWorkers: KryptexWorkerData[] = [];
+kryptexRouter.get("/kryptex/workers", async (req, res) => {
+  const now = Date.now();
+  const forceRefresh = req.query?.refresh === "1" || req.query?.refresh === "true";
+  if (!forceRefresh && cache && now - cache.ts < CACHE_TTL_MS) {
+    return res.json({ workers: cache.workers });
+  }
+
   const headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     Accept: "text/html,application/xhtml+xml",
   };
 
   try {
-    for (const config of POOL_CONFIGS) {
-      const resp = await fetch(config.url, { headers });
-      if (!resp.ok) {
-        allWorkers.push(
-          ...config.workers.map((name) => ({
+    const results = await Promise.all(
+      POOL_CONFIGS.map(async (config) => {
+        try {
+          const html = await fetchWithTimeout(config.url, headers);
+          return config.workers.map((workerName) => {
+            const parsed = parseWorkerBlock(html, workerName);
+            return { ...parsed, poolUrl: config.url, usuario: config.usuario, modelo: config.modelo };
+          });
+        } catch {
+          return config.workers.map((name) => ({
             name,
             hashrate24h: null as string | null,
             hashrate10m: null as string | null,
@@ -105,21 +132,12 @@ kryptexRouter.get("/kryptex/workers", async (_req, res) => {
             poolUrl: config.url,
             usuario: config.usuario,
             modelo: config.modelo,
-          }))
-        );
-        continue;
-      }
-      const html = await resp.text();
-      for (const workerName of config.workers) {
-        const parsed = parseWorkerBlock(html, workerName);
-        allWorkers.push({
-          ...parsed,
-          poolUrl: config.url,
-          usuario: config.usuario,
-          modelo: config.modelo,
-        });
-      }
-    }
+          }));
+        }
+      })
+    );
+    const allWorkers = results.flat();
+    cache = { workers: allWorkers, ts: Date.now() };
     return res.json({ workers: allWorkers });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

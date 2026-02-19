@@ -592,8 +592,9 @@ export type KryptexWorkerData = {
   modelo: string;
 };
 
-export function getKryptexWorkers(): Promise<{ workers: KryptexWorkerData[] }> {
-  return apiNoRetry<{ workers: KryptexWorkerData[] }>("/api/kryptex/workers");
+export function getKryptexWorkers(forceRefresh = false): Promise<{ workers: KryptexWorkerData[] }> {
+  const path = forceRefresh ? "/api/kryptex/workers?refresh=1" : "/api/kryptex/workers";
+  return apiNoRetry<{ workers: KryptexWorkerData[] }>(path, 25000);
 }
 
 export function getKryptexWorkerStatus(workerName: string): Promise<{

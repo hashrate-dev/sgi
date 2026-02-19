@@ -23,10 +23,10 @@ export function KryptexPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  function loadWorkers() {
+  function loadWorkers(forceRefresh = false) {
     setLoading(true);
     setError(null);
-    getKryptexWorkers()
+    getKryptexWorkers(forceRefresh)
       .then((res) => setWorkers(res.workers))
       .catch((err) => setError(err instanceof Error ? err.message : "Error al consultar"))
       .finally(() => setLoading(false));
@@ -54,7 +54,7 @@ export function KryptexPage() {
               <button
                 type="button"
                 className="btn btn-sm btn-outline-secondary"
-                onClick={loadWorkers}
+                onClick={() => loadWorkers(true)}
                 disabled={loading}
               >
                 <i className="bi bi-arrow-clockwise me-1" />
