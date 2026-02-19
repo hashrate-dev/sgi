@@ -30,6 +30,19 @@ function genId() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
+/** Nombre de archivo PDF para Hosting: HRS_GROUP_F100143_PIROTTO_ANA_LUCIA_ENERO_2026.pdf */
+function buildHostingPdfFilename(number: string, clientName: string, monthStr: string): string {
+  const safeName = (clientName.replace(/[^\w\s-]/g, "").replace(/\s+/g, " ").trim() || "cliente").replace(/\s+/g, "_");
+  const meses: Record<string, string> = {
+    "01": "ENERO", "02": "FEBRERO", "03": "MARZO", "04": "ABRIL", "05": "MAYO", "06": "JUNIO",
+    "07": "JULIO", "08": "AGOSTO", "09": "SEPTIEMBRE", "10": "OCTUBRE", "11": "NOVIEMBRE", "12": "DICIEMBRE"
+  };
+  const [year, month] = monthStr.split("-");
+  const mesLabel = (month && meses[month]) || "SIN_MES";
+  const anio = year || new Date().getFullYear().toString();
+  return `HRS_GROUP_${number}_${safeName}_${mesLabel}_${anio}.pdf`;
+}
+
 const MAX_INVOICE_NUM = 999999;
 const MIN_INVOICE_NUM = 1001;
 
@@ -551,8 +564,8 @@ export function FacturacionPage() {
         },
         { logoBase64 }
       );
-      const safeName = selectedClient.name.replace(/[^\w\s-]/g, "").replace(/\s+/g, " ").trim() || "cliente";
-      doc.save(`${numberToUse}_${safeName}.pdf`);
+      const pdfFilename = buildHostingPdfFilename(numberToUse, selectedClient.name, month);
+      doc.save(pdfFilename);
       const tipoMensaje = type === "Factura" ? "Factura" : type === "Recibo" ? "Recibo" : "Nota de Crédito";
       showToast(`${tipoMensaje} generada y guardada correctamente.`, "success");
     } else {
@@ -656,8 +669,9 @@ export function FacturacionPage() {
       },
       { logoBase64 }
     );
-    const safeName = inv.clientName.replace(/[^\w\s-]/g, "").replace(/\s+/g, " ").trim() || "cliente";
-    doc.save(`${inv.number}_${safeName}.pdf`);
+    const monthStr = inv.month || (inv.items?.[0]?.month ?? "");
+    const pdfFilename = buildHostingPdfFilename(inv.number, inv.clientName, monthStr);
+    doc.save(pdfFilename);
     showToast(`PDF ${inv.number} descargado.`, "success");
   }
 
