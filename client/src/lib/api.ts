@@ -607,3 +607,18 @@ export function getKryptexWorkerStatus(workerName: string): Promise<{
     `/api/kryptex/worker/${encodeURIComponent(workerName)}`
   );
 }
+
+export type NiceHashRigStatus = "activo" | "inactivo" | "desconocido";
+
+export type NiceHashRigData = {
+  rigId: string;
+  name: string;
+  status: NiceHashRigStatus;
+  profitability: string | null;
+  profitabilityUsd: number | null;
+};
+
+export function getNiceHashRigs(forceRefresh = false): Promise<{ rigs: NiceHashRigData[]; message?: string }> {
+  const path = forceRefresh ? "/api/nicehash/rigs?refresh=1" : "/api/nicehash/rigs";
+  return apiNoRetry<{ rigs: NiceHashRigData[]; message?: string }>(path, 25000);
+}

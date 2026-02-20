@@ -30,7 +30,11 @@ const EnvSchema = z.object({
   /** Supabase: conexión directa a Postgres. Si está definida, la app usa PostgreSQL (Supabase) en lugar de SQLite. */
   SUPABASE_DATABASE_URL: z.string().min(10).optional(),
   /** Host del pooler (ej. aws-1-us-east-1.pooler.supabase.com). Copiar desde Supabase Dashboard. */
-  SUPABASE_POOLER_HOST: z.string().optional()
+  SUPABASE_POOLER_HOST: z.string().optional(),
+  /** NiceHash API (opcional). Ver https://www.nicehash.com/my/settings/keys */
+  NICEHASH_API_KEY: z.string().optional(),
+  NICEHASH_API_SECRET: z.string().optional(),
+  NICEHASH_ORG_ID: z.string().optional()
 });
 
 export type Env = z.infer<typeof EnvSchema>;
