@@ -1,1 +1,12 @@
-{"installCommand":"cd .. && npm install","buildCommand":"npm run build:vercel","outputDirectory":"dist","rewrites":[{"source":"/((?!api).*)","destination":"/index.html"}],"functions":{"api/[[...path]].js":{"maxDuration":60}}}
+{
+  "installCommand": "cd .. && npm install",
+  "buildCommand": "npm run build:vercel",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api/:path*" },
+    { "source": "/((?!api).*)", "destination": "/index.html" }
+  ],
+  "functions": {
+    "api/[[...path]].js": { "maxDuration": 60 }
+  }
+}
