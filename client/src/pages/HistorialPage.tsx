@@ -177,6 +177,13 @@ type InvoiceWithSource = Invoice & { _source: "hosting" | "asic" };
 
 type HistorialPageProps = { sourceFilter?: "hosting" | "asic" };
 
+/** Comprueba si un comprobante (Recibo/NC) está vinculado a una factura. Usa id y number por robustez. */
+function isLinkedToInvoice(comp: Invoice, factura: Invoice): boolean {
+  const matchId = comp.relatedInvoiceId != null && String(comp.relatedInvoiceId) === String(factura.id);
+  const matchNumber = comp.relatedInvoiceNumber != null && comp.relatedInvoiceNumber === factura.number;
+  return matchId || matchNumber;
+}
+
 /** Convierte factura de la API al formato Invoice con _source */
 export function HistorialPage({ sourceFilter }: HistorialPageProps) {
   const { user } = useAuth();
@@ -329,7 +336,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
       // Calcular fecha de vencimiento si no existe
       const dueDate = inv.dueDate || calculateDueDate(inv.date);
       // Aplicar signo negativo a las Notas de Crédito y Recibos relacionados con facturas
-      const isNegative = inv.type === "Nota de Crédito" || (inv.type === "Recibo" && inv.relatedInvoiceId);
+      const isNegative = inv.type === "Nota de Crédito" || (inv.type === "Recibo" && (inv.relatedInvoiceId || inv.relatedInvoiceNumber));
       const subtotal = isNegative ? -(Math.abs(inv.subtotal) || 0) : (inv.subtotal || 0);
       // Descuento: negativo para Facturas, positivo para Recibos, negativo para Notas de Crédito
       let discounts: number;
@@ -349,21 +356,22 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
       let isClosed = false;
       let isCancelledByNC = false;
       if (inv.type === "Factura") {
-        const hasReceipt = sameSource.some((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id);
-        const creditNotes = sameSource.filter((nc) => nc.type === "Nota de Crédito" && nc.relatedInvoiceId === inv.id);
-        const hasCreditNote = creditNotes.length === 1;
+        const hasReceipt = sameSource.some((r) => r.type === "Recibo" && isLinkedToInvoice(r, inv));
+        const creditNotes = sameSource.filter((nc) => nc.type === "Nota de Crédito" && isLinkedToInvoice(nc, inv));
+        const hasCreditNote = creditNotes.length >= 1;
         isClosed = hasReceipt || hasCreditNote;
         isCancelledByNC = hasCreditNote;
-      } else if (inv.type === "Recibo" && inv.relatedInvoiceId) {
+      } else if (inv.type === "Recibo" && (inv.relatedInvoiceId || inv.relatedInvoiceNumber)) {
         isClosed = true;
-      } else if (inv.type === "Nota de Crédito" && inv.relatedInvoiceId) {
-        const otherNCs = sameSource.filter((nc) => nc.type === "Nota de Crédito" && nc.relatedInvoiceId === inv.relatedInvoiceId && nc.id !== inv.id);
+      } else if (inv.type === "Nota de Crédito" && (inv.relatedInvoiceId || inv.relatedInvoiceNumber)) {
+        const relatedFactura = sameSource.find((f) => f.type === "Factura" && (String(f.id) === String(inv.relatedInvoiceId) || f.number === inv.relatedInvoiceNumber));
+        const otherNCs = relatedFactura ? sameSource.filter((nc) => nc.type === "Nota de Crédito" && nc.id !== inv.id && isLinkedToInvoice(nc, relatedFactura)) : [];
         if (otherNCs.length === 0) {
           isClosed = true;
           isCancelledByNC = true;
         }
       }
-      
+
       // Determinar el estado para Excel
       let status = "Pendiente";
       if (isClosed) {
@@ -378,8 +386,8 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
         status = "⚠️ Pendiente";
       }
       // Fecha de pago: misma lógica que la tabla (solo mismo origen)
-      const relatedReciboPayment = inv.type === "Factura" ? sameSource.find((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id) : null;
-      const relatedNCPayment = inv.type === "Factura" ? sameSource.find((n) => n.type === "Nota de Crédito" && n.relatedInvoiceId === inv.id) : null;
+      const relatedReciboPayment = inv.type === "Factura" ? sameSource.find((r) => r.type === "Recibo" && isLinkedToInvoice(r, inv)) : null;
+      const relatedNCPayment = inv.type === "Factura" ? sameSource.find((n) => n.type === "Nota de Crédito" && isLinkedToInvoice(n, inv)) : null;
       let paymentDateExportCell: string;
       if (inv.type === "Factura") {
         if (relatedReciboPayment?.paymentDate) paymentDateExportCell = new Date(relatedReciboPayment.paymentDate).toLocaleDateString();
@@ -890,13 +898,13 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
                     // Calcular fecha de vencimiento si no existe (para facturas antiguas)
                     const dueDate = inv.dueDate || calculateDueDate(inv.date);
                     // Aplicar signo negativo a las Notas de Crédito y Recibos relacionados con facturas
-                    const isNegativeType = inv.type === "Nota de Crédito" || (inv.type === "Recibo" && inv.relatedInvoiceId);
+                    const isNegativeType = inv.type === "Nota de Crédito" || (inv.type === "Recibo" && (inv.relatedInvoiceId || inv.relatedInvoiceNumber));
                     const subtotal = isNegativeType ? -(Math.abs(inv.subtotal) || 0) : (inv.subtotal || 0);
                     const total = isNegativeType ? -(Math.abs(inv.total) || 0) : (inv.total || 0);
 
                     // Fecha de pago: Factura = fecha del Recibo si pagada (solo mismo origen), "Cancelada" si cancelada por NC, sino "Pendiente"; NC = fecha emisión
-                    const relatedReciboForPayment = inv.type === "Factura" ? sameSource.find((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id) : null;
-                    const relatedNCForPayment = inv.type === "Factura" ? sameSource.find((n) => n.type === "Nota de Crédito" && n.relatedInvoiceId === inv.id) : null;
+                    const relatedReciboForPayment = inv.type === "Factura" ? sameSource.find((r) => r.type === "Recibo" && isLinkedToInvoice(r, inv)) : null;
+                    const relatedNCForPayment = inv.type === "Factura" ? sameSource.find((n) => n.type === "Nota de Crédito" && isLinkedToInvoice(n, inv)) : null;
                     const paymentDateDisplay = (inv.type === "Factura" && relatedReciboForPayment?.paymentDate) ? relatedReciboForPayment.paymentDate : inv.paymentDate;
                     let paymentDateCell: string;
                     if (inv.type === "Factura") {
@@ -912,15 +920,16 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
                     let isClosed = false;
                     let isCancelledByNC = false;
                     if (inv.type === "Factura") {
-                      const hasReceipt = sameSource.some((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id);
-                      const creditNotes = sameSource.filter((nc) => nc.type === "Nota de Crédito" && nc.relatedInvoiceId === inv.id);
-                      const hasCreditNote = creditNotes.length === 1;
+                      const hasReceipt = sameSource.some((r) => r.type === "Recibo" && isLinkedToInvoice(r, inv));
+                      const creditNotes = sameSource.filter((nc) => nc.type === "Nota de Crédito" && isLinkedToInvoice(nc, inv));
+                      const hasCreditNote = creditNotes.length >= 1;
                       isClosed = hasReceipt || hasCreditNote;
                       isCancelledByNC = hasCreditNote;
-                    } else if (inv.type === "Recibo" && inv.relatedInvoiceId) {
+                    } else if (inv.type === "Recibo" && (inv.relatedInvoiceId || inv.relatedInvoiceNumber)) {
                       isClosed = true;
-                    } else if (inv.type === "Nota de Crédito" && inv.relatedInvoiceId) {
-                      const otherNCs = sameSource.filter((nc) => nc.type === "Nota de Crédito" && nc.relatedInvoiceId === inv.relatedInvoiceId && nc.id !== inv.id);
+                    } else if (inv.type === "Nota de Crédito" && (inv.relatedInvoiceId || inv.relatedInvoiceNumber)) {
+                      const relatedFactura = sameSource.find((f) => f.type === "Factura" && (String(f.id) === String(inv.relatedInvoiceId) || f.number === inv.relatedInvoiceNumber));
+                      const otherNCs = relatedFactura ? sameSource.filter((nc) => nc.type === "Nota de Crédito" && nc.id !== inv.id && isLinkedToInvoice(nc, relatedFactura)) : [];
                       if (otherNCs.length === 0) {
                         isClosed = true;
                         isCancelledByNC = true;
@@ -1161,9 +1170,9 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
                     const inv = detailInvoice as InvoiceWithSource;
                     const sameSource = all.filter((x) => (x as InvoiceWithSource)._source === inv._source);
                     const dueDate = inv.dueDate || calculateDueDate(inv.date);
-                    const relatedRecibo = sameSource.find((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id);
-                    const relatedNC = sameSource.find((n) => n.type === "Nota de Crédito" && n.relatedInvoiceId === inv.id);
-                    const relatedFactura = inv.relatedInvoiceId ? sameSource.find((f) => f.id === inv.relatedInvoiceId) : null;
+                    const relatedRecibo = inv.type === "Factura" ? sameSource.find((r) => r.type === "Recibo" && isLinkedToInvoice(r, inv)) : null;
+                    const relatedNC = inv.type === "Factura" ? sameSource.find((n) => n.type === "Nota de Crédito" && isLinkedToInvoice(n, inv)) : null;
+                    const relatedFactura = (inv.relatedInvoiceId || inv.relatedInvoiceNumber) ? sameSource.find((f) => f.type === "Factura" && (String(f.id) === String(inv.relatedInvoiceId) || f.number === inv.relatedInvoiceNumber)) : null;
                     return (
                       <>
                         <div className="row g-2 small mb-3">
