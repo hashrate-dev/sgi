@@ -1,5 +1,6 @@
 /**
- * Vercel Serverless: rutas /api/*. Funciona con Root Directory = client.
+ * Vercel Serverless: maneja TODAS las rutas /api/*.
+ * Rewrite en vercel.json envía /api/:path* -> /api para que esta función reciba todo.
  * Requiere server/dist copiado a client/server/dist (build:vercel).
  */
 import { initDb } from "../server/dist/db.js";
@@ -15,18 +16,33 @@ async function getApp() {
   return appPromise;
 }
 
-export default async function handler(req, res) {
-  // Vercel puede pasar req.url como undefined; usar fallbacks
+function getPathFromRequest(req) {
   const h = req.headers || {};
   const hVal = (k) => (typeof h[k] === "string" ? h[k] : Array.isArray(h[k]) ? h[k][0] : null);
+  const q = req.query || {};
+  const pathParam = typeof q.path === "string" ? q.path : Array.isArray(q.path) ? q.path.join("/") : null;
+  if (pathParam) return `/api/${pathParam.replace(/^\/+/, "")}`;
   const rawUrl =
     req.url ??
     req.originalUrl ??
     hVal("x-vercel-url") ??
     hVal("x-url") ??
     hVal("x-invoke-path") ??
+    hVal("x-original-url") ??
     "";
   const path = (rawUrl.startsWith("http") ? new URL(rawUrl).pathname : rawUrl).split("?")[0] ?? "";
+  return path.startsWith("/") ? path : `/${path}`;
+}
+
+export default async function handler(req, res) {
+  const path = getPathFromRequest(req);
+  const rawUrl =
+    req.url ??
+    req.originalUrl ??
+    (req.headers && (req.headers["x-vercel-url"] || req.headers["x-url"] || req.headers["x-invoke-path"])) ??
+    "";
+  const q = rawUrl.includes("?") ? "?" + String(rawUrl).split("?")[1] : "";
+
   res.setHeader("Content-Type", "application/json");
 
   if (path === "/api/health" || path.endsWith("/health") || path === "/health") {
@@ -75,12 +91,8 @@ export default async function handler(req, res) {
     return;
   }
 
-  // Todo lo demás: delegar a Express (una sola función serverless para cumplir límite Vercel)
   const app = await getApp();
-  // Normalizar req.url para Express (Vercel puede pasar URL completa o undefined)
-  const pathname = path.startsWith("/") ? path : `/${path}`;
-  const q = rawUrl.includes("?") ? "?" + rawUrl.split("?")[1] : "";
-  req.url = pathname + q;
+  req.url = path + q;
   req.originalUrl = req.originalUrl ?? req.url;
   return app(req, res);
 }
