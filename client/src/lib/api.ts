@@ -184,8 +184,8 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
         continue;
       }
       if (res.status === 404) {
-        lastError = new Error(getNoApiMessage());
-        continue;
+        const msg = (data as { error?: { message?: string } })?.error?.message ?? "Recurso no encontrado";
+        throw new Error(msg);
       }
       const msg = (data as { error?: { message?: string } })?.error?.message ?? res.statusText;
       throw new Error(msg);
@@ -195,7 +195,8 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const msg = lastError?.message || "";
   const isConnectionError = msg === "Failed to fetch" || msg === "Load failed" || msg.includes("NetworkError") || msg === "The operation was aborted." || msg === get502Message() || msg === getNoApiMessage();
   const host = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  if (isConnectionError && host.endsWith(".hashrate.space") && !host.endsWith(".vercel.app")) {
+  // Solo intentar fallbacks en sgi.hashrate.space (Render). app.hashrate.space usa API en mismo origen, no hay fallback.
+  if (isConnectionError && host === "sgi.hashrate.space") {
     const currentBase = getApiBase();
     for (const fallback of FALLBACK_API_URLS) {
       if (fallback === currentBase) continue;
