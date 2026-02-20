@@ -16,7 +16,7 @@ const FALLBACK_API_URLS = [
 function getApiBase(): string {
   if (typeof window === "undefined") return "";
   const h = window.location?.hostname ?? "";
-  // En localhost siempre usar el backend local (no usar localStorage para no apuntar a Render por error).
+  // En localhost: backend directo en 8080. Proxy Vite puede fallar con headers; conexión directa más fiable.
   if (h === "localhost" || h === "127.0.0.1") return "http://localhost:8080";
   // *.vercel.app y app.hashrate.space: API en mismo origen (Vercel serverless + Supabase). Sin CORS.
   if (h.endsWith(".vercel.app")) return "";
@@ -606,19 +606,4 @@ export function getKryptexWorkerStatus(workerName: string): Promise<{
   return apiNoRetry(
     `/api/kryptex/worker/${encodeURIComponent(workerName)}`
   );
-}
-
-export type NiceHashRigStatus = "activo" | "inactivo" | "desconocido";
-
-export type NiceHashRigData = {
-  rigId: string;
-  name: string;
-  status: NiceHashRigStatus;
-  profitability: string | null;
-  profitabilityUsd: number | null;
-};
-
-export function getNiceHashRigs(forceRefresh = false): Promise<{ rigs: NiceHashRigData[]; message?: string }> {
-  const path = forceRefresh ? "/api/nicehash/rigs?refresh=1" : "/api/nicehash/rigs";
-  return apiNoRetry<{ rigs: NiceHashRigData[]; message?: string }>(path, 25000);
 }

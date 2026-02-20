@@ -33,6 +33,7 @@ function App() {
         <ToastContainer />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/kryptex" element={<KryptexPage />} />
           <Route element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
             <Route path="/" element={<HomePage />} />
             <Route path="/hosting" element={<HostingHubPage />} />
@@ -44,7 +45,6 @@ function App() {
             <Route path="/facturacion" element={<Navigate to="/facturacion-hosting" replace />} />
             <Route path="/pendientes" element={<Navigate to="/pendientes-hosting" replace />} />
             <Route path="/equipos-asic" element={<MineriaHubPage />} />
-            <Route path="/kryptex" element={<KryptexPage />} />
             <Route path="/equipos-asic/equipos" element={<EquiposAsicPage />} />
             <Route path="/equipos-asic/equipos/nuevos" element={<Navigate to="/equipos-asic/equipos" replace />} />
             <Route path="/equipos-asic/setup" element={<SetupPage />} />

@@ -15,7 +15,6 @@ import { garantiasRouter } from "./routes/garantias.js";
 import { setupsRouter } from "./routes/setups.js";
 import { equiposRouter } from "./routes/equipos.js";
 import { kryptexRouter } from "./routes/kryptex.js";
-import { nicehashRouter } from "./routes/nicehash.js";
 import { requireAuth, requireRole } from "./middleware/auth.js";
 import { notFound } from "./middleware/notFound.js";
 import { errorHandler } from "./middleware/errorHandler.js";
@@ -49,6 +48,8 @@ export function createApp() {
 
   app.use("/api", healthRouter);
   app.use("/api", authRouter);
+  // Kryptex: público (datos de pool, sin info sensible). Sin auth para que funcione en localhost sin login.
+  app.use("/api", kryptexRouter);
   app.use("/api", requireAuth, usersRouter);
   app.use("/api", requireAuth, clientsRouter);
   app.use("/api", requireAuth, invoicesRouter);
@@ -57,8 +58,6 @@ export function createApp() {
   app.use("/api", garantiasRouter);
   app.use("/api", requireAuth, setupsRouter);
   app.use("/api", requireAuth, equiposRouter);
-  app.use("/api", requireAuth, requireRole("admin_a", "admin_b"), kryptexRouter);
-  app.use("/api", requireAuth, requireRole("admin_a", "admin_b"), nicehashRouter);
 
   app.use(notFound);
   app.use(errorHandler);
