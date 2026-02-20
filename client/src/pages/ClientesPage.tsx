@@ -40,8 +40,8 @@ export function ClientesPage() {
   }, []);
 
   function handleEdit(c: Client) {
-    if (c.id == null) return;
-    navigate(`/clientes/${c.id}/edit`);
+    if (!c.code && c.id == null) return;
+    navigate(`/clientes/${encodeURIComponent(c.code || String(c.id))}/edit`);
   }
 
   function handleNewClient() {

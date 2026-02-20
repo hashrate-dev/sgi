@@ -49,7 +49,10 @@ export function ClienteEditPage() {
 
     getClients()
       .then((r) => {
-        const found = r.clients.find((c) => String(c.id) === id) as Client | undefined;
+        const idDecoded = decodeURIComponent(id);
+        const found = r.clients.find(
+          (c) => String(c.id) === idDecoded || (c.code && c.code === idDecoded)
+        ) as Client | undefined;
         if (!found) {
           setError("Cliente no encontrado");
           setLoading(false);
@@ -79,7 +82,7 @@ export function ClienteEditPage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!id) return;
+    if (!client) return;
     setMessage(null);
     const nameTrim = form.name.trim();
     if (!nameTrim) {
@@ -104,8 +107,9 @@ export function ClienteEditPage() {
     setSaving(true);
     // En Vercel+Supabase el cold start puede tardar 60-90s; precalentamos y damos tiempo suficiente
     const timeoutMs = 120000; // 2 min para cold start + Supabase
+    const clientId = String(client.id);
     const doSave = () =>
-      wakeUpBackend().then(() => updateClient(id, payload));
+      wakeUpBackend().then(() => updateClient(clientId, payload));
     const withTimeout = Promise.race([
       doSave(),
       new Promise<never>((_, reject) =>
@@ -128,11 +132,11 @@ export function ClienteEditPage() {
   }
 
   function handleDeleteConfirm() {
-    if (!id) return;
+    if (!client?.id) return;
     setShowDeleteConfirm(false);
     setDeleting(true);
     setMessage(null);
-    deleteClient(id)
+    deleteClient(client.id)
       .then(() => {
         setMessage({ type: "ok", text: "Cliente eliminado." });
         setTimeout(() => {
