@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
-import { getClients } from "../lib/api";
+import { getClients, getInvoices, wakeUpBackend } from "../lib/api";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
-import { loadInvoices } from "../lib/storage";
 import type { Invoice } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
 import { showToast } from "../components/ToastNotification";
@@ -42,26 +41,87 @@ function calculateDueDate(dateStr: string): string {
   }
 }
 
+/** Compara si un comprobante (Recibo/NC) está vinculado a una factura. Usa id y number por robustez. */
+function isLinkedToInvoice(comp: Invoice, factura: Invoice): boolean {
+  const matchId = comp.relatedInvoiceId != null && String(comp.relatedInvoiceId) === String(factura.id);
+  const matchNumber = comp.relatedInvoiceNumber != null && comp.relatedInvoiceNumber === factura.number;
+  return matchId || matchNumber;
+}
+
 export function PendientesPage() {
   const { user } = useAuth();
-  const [all] = useState<Invoice[]>(() => loadInvoices());
+  const [all, setAll] = useState<Invoice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [qClient, setQClient] = useState("");
   const [qMonth, setQMonth] = useState("");
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null);
   const canExportData = user ? canExport(user.role) : false;
+
+  function fetchDocuments() {
+    setLoading(true);
+    setFetchError(null);
+    wakeUpBackend()
+      .then(() => getInvoices({ source: "hosting" }))
+      .then((r) => {
+        const list = (r.invoices ?? []).map((inv) => ({
+          id: String(inv.id),
+          number: inv.number,
+          type: inv.type as Invoice["type"],
+          clientName: inv.clientName,
+          date: inv.date,
+          month: inv.month ?? "",
+          subtotal: inv.subtotal,
+          discounts: inv.discounts,
+          total: inv.total,
+          relatedInvoiceId: inv.relatedInvoiceId != null ? String(inv.relatedInvoiceId) : undefined,
+          relatedInvoiceNumber: inv.relatedInvoiceNumber,
+          paymentDate: inv.paymentDate,
+          emissionTime: inv.emissionTime,
+          dueDate: inv.dueDate,
+          items: [],
+        }));
+        setAll(list);
+      })
+      .catch((err) => {
+        setFetchError(err instanceof Error ? err.message : "Error al cargar facturas");
+        setAll([]);
+      })
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    fetchDocuments();
+  }, []);
+
+  useEffect(() => {
+    const onEmitted = (e: Event) => {
+      const d = (e as CustomEvent).detail as { source?: string };
+      if (d?.source === "hosting") fetchDocuments();
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchDocuments();
+    };
+    window.addEventListener("hrs-emitted-changed", onEmitted);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("hrs-emitted-changed", onEmitted);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
 
   // Filtrar solo facturas pendientes (sin recibo ni nota de crédito relacionada)
   const pendingInvoices = useMemo(() => {
     return all.filter((inv) => {
       // Solo facturas
       if (inv.type !== "Factura") return false;
-      
-      // Verificar si tiene recibo relacionado
-      const hasReceipt = all.some((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id);
-      
-      // Verificar si tiene nota de crédito relacionada
-      const hasCreditNote = all.some((nc) => nc.type === "Nota de Crédito" && nc.relatedInvoiceId === inv.id);
-      
+
+      // Verificar si tiene recibo relacionado (por id o por número)
+      const hasReceipt = all.some((r) => r.type === "Recibo" && isLinkedToInvoice(r, inv));
+
+      // Verificar si tiene nota de crédito relacionada (por id o por número)
+      const hasCreditNote = all.some((nc) => nc.type === "Nota de Crédito" && isLinkedToInvoice(nc, inv));
+
       // Es pendiente si no tiene recibo ni nota de crédito
       return !hasReceipt && !hasCreditNote;
     });
@@ -232,6 +292,12 @@ export function PendientesPage() {
       <div className="container">
         <PageHeader title="Facturas Pendientes" />
 
+        {fetchError && (
+          <div className="alert alert-warning mb-3">
+            {fetchError} — <button type="button" className="btn btn-sm btn-outline-secondary" onClick={fetchDocuments}>Reintentar</button>
+          </div>
+        )}
+
         <div className="hrs-card hrs-card--rect p-4">
           <div className="pendientes-filtros-outer">
             <div className="pendientes-filtros-container">
@@ -305,7 +371,13 @@ export function PendientesPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.length === 0 ? (
+                {loading ? (
+                  <tr>
+                    <td colSpan={10} className="text-center text-muted py-4">
+                      <small>Cargando facturas...</small>
+                    </td>
+                  </tr>
+                ) : filtered.length === 0 ? (
                   <tr>
                     <td colSpan={10} className="text-center text-muted py-4">
                       <small>{pendingInvoices.length === 0 ? "No hay facturas pendientes de cobro." : "No se encontraron facturas con los filtros aplicados."}</small>
