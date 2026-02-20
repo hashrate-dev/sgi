@@ -94,6 +94,13 @@ function currentMonthValue(): string {
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}`;
 }
 
+/** Comprueba si un comprobante (Recibo/NC) está vinculado a una factura. Usa id y number por robustez. */
+function isLinkedToInvoice(comp: Invoice, factura: Invoice): boolean {
+  const matchId = comp.relatedInvoiceId != null && String(comp.relatedInvoiceId) === String(factura.id);
+  const matchNumber = comp.relatedInvoiceNumber != null && comp.relatedInvoiceNumber === factura.number;
+  return matchId || matchNumber;
+}
+
 export function FacturasMesHostingPage() {
   const [all, setAll] = useState<Invoice[]>([]);
   const [, forceUpdate] = useState(0);
@@ -245,11 +252,11 @@ export function FacturasMesHostingPage() {
 
   /** IDs de facturas que están conectadas con un Recibo o NC en la lista (para pintar ambas filas) */
   const connectedFacturaIds = useMemo(() => {
-    const facturaIds = new Set(filtered.filter((i) => i.type === "Factura").map((i) => i.id));
     const connected = new Set<string>();
     for (const inv of filtered) {
-      if ((inv.type === "Recibo" || inv.type === "Nota de Crédito") && inv.relatedInvoiceId && facturaIds.has(inv.relatedInvoiceId)) {
-        connected.add(inv.relatedInvoiceId);
+      if (inv.type === "Recibo" || inv.type === "Nota de Crédito") {
+        const factura = filtered.find((f) => f.type === "Factura" && isLinkedToInvoice(inv, f));
+        if (factura) connected.add(factura.id);
       }
     }
     return connected;
@@ -257,7 +264,10 @@ export function FacturasMesHostingPage() {
 
   function isRowConnected(inv: Invoice): boolean {
     if (inv.type === "Factura") return connectedFacturaIds.has(inv.id);
-    if ((inv.type === "Recibo" || inv.type === "Nota de Crédito") && inv.relatedInvoiceId) return connectedFacturaIds.has(inv.relatedInvoiceId);
+    if (inv.type === "Recibo" || inv.type === "Nota de Crédito") {
+      const factura = filtered.find((f) => f.type === "Factura" && isLinkedToInvoice(inv, f));
+      return factura ? connectedFacturaIds.has(factura.id) : false;
+    }
     return false;
   }
 
@@ -267,7 +277,7 @@ export function FacturasMesHostingPage() {
     for (const facturaId of connectedFacturaIds) {
       const facturaRow = filtered.find((i) => i.type === "Factura" && i.id === facturaId);
       if (!facturaRow) continue;
-      const group = [facturaRow, ...filtered.filter((i) => i.relatedInvoiceId === facturaId)];
+      const group = [facturaRow, ...filtered.filter((i) => (i.type === "Recibo" || i.type === "Nota de Crédito") && isLinkedToInvoice(i, facturaRow))];
       const allSent = group.every((inv) => getMailSent(inv.id) === "SI");
       if (allSent) group.forEach((inv) => set.add(inv.id));
     }
@@ -275,7 +285,7 @@ export function FacturasMesHostingPage() {
   }
   const fullySentConnectedIds = getFullySentConnectedIds();
 
-  /** Resumen de lo que muestra la tabla (filtered). registros = solo facturas cobradas (con recibo). */
+  /** Resumen de lo que muestra la tabla (filtered). Cobros realizados = suma de recibos vinculados a facturas. */
   const stats = useMemo(() => {
     const facturas = filtered.filter((i) => i.type === "Factura").length;
     const recibos = filtered.filter((i) => i.type === "Recibo").length;
@@ -283,17 +293,16 @@ export function FacturasMesHostingPage() {
     const sumaFacturas = filtered.filter((i) => i.type === "Factura").reduce((s, i) => s + (Number(i.total) || 0), 0);
     const sumaNC = filtered.filter((i) => i.type === "Nota de Crédito").reduce((s, i) => s + (Math.abs(i.total) || 0), 0);
     const facturacionTotal = sumaFacturas - sumaNC;
-    const facturasPendientes = filtered.filter((i) => {
-      if (i.type !== "Factura") return false;
-      const tieneRecibo = filtered.some((r) => r.type === "Recibo" && r.relatedInvoiceId === i.id);
-      return !tieneRecibo;
-    });
+    const tieneRecibo = (factura: Invoice) =>
+      filtered.some((r) => r.type === "Recibo" && isLinkedToInvoice(r, factura));
+    const facturasPendientes = filtered.filter((i) => i.type === "Factura" && !tieneRecibo(i));
     const cobrosPendientes = facturasPendientes.reduce((s, i) => s + (Number(i.total) || 0), 0);
-    const cobrosRealizados = facturacionTotal - cobrosPendientes;
-    /** Registros = solo facturas que ya están cobradas (tienen recibo asociado) */
-    const registros = filtered.filter(
-      (i) => i.type === "Factura" && filtered.some((r) => r.type === "Recibo" && r.relatedInvoiceId === i.id)
-    ).length;
+    /** Cobros realizados = suma de los totales de los recibos vinculados a facturas del mes */
+    const cobrosRealizados = filtered
+      .filter((r) => r.type === "Recibo" && filtered.some((f) => f.type === "Factura" && isLinkedToInvoice(r, f)))
+      .reduce((s, r) => s + (Math.abs(r.total) || 0), 0);
+    /** Registros = facturas que ya están cobradas (tienen recibo asociado) */
+    const registros = filtered.filter((i) => i.type === "Factura" && tieneRecibo(i)).length;
     return { facturas, recibos, notasCredito, facturacionTotal, cobrosPendientes, cobrosRealizados, registros };
   }, [filtered]);
 
