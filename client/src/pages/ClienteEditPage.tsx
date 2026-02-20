@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
-import { deleteClient, getClients, updateClient } from "../lib/api";
+import { deleteClient, getClients, updateClient, wakeUpBackend } from "../lib/api";
 import type { Client } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
@@ -44,6 +44,8 @@ export function ClienteEditPage() {
       setLoading(false);
       return;
     }
+    // Precalentar backend (Vercel cold start) para que el guardado sea más rápido
+    wakeUpBackend();
 
     getClients()
       .then((r) => {
@@ -100,9 +102,12 @@ export function ClienteEditPage() {
     if (!payload.name) return;
 
     setSaving(true);
-    const timeoutMs = 45000;
+    // En Vercel+Supabase el cold start puede tardar 60-90s; precalentamos y damos tiempo suficiente
+    const timeoutMs = 120000; // 2 min para cold start + Supabase
+    const doSave = () =>
+      wakeUpBackend().then(() => updateClient(id, payload));
     const withTimeout = Promise.race([
-      updateClient(id, payload),
+      doSave(),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("La solicitud tardó demasiado. Probá de nuevo en unos segundos.")), timeoutMs)
       )
