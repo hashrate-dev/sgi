@@ -100,17 +100,22 @@ export function ClienteEditPage() {
     if (!payload.name) return;
 
     setSaving(true);
-    updateClient(id, payload)
+    const timeoutMs = 45000;
+    const withTimeout = Promise.race([
+      updateClient(id, payload),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("La solicitud tardó demasiado. Probá de nuevo en unos segundos.")), timeoutMs)
+      )
+    ]);
+    withTimeout
       .then(() => {
         setMessage({ type: "ok", text: "Cliente actualizado correctamente." });
-        setTimeout(() => {
-          navigate("/clientes");
-        }, 1500);
+        setTimeout(() => navigate("/clientes"), 1500);
       })
       .catch((err) => {
         setMessage({ type: "err", text: err instanceof Error ? err.message : "Error al actualizar" });
-        setSaving(false);
-      });
+      })
+      .finally(() => setSaving(false));
   }
 
   function handleDeleteClick() {
