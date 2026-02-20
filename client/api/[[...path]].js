@@ -75,65 +75,7 @@ export default async function handler(req, res) {
     return;
   }
 
-  // Fallback: GET /api/kryptex/workers si el handler dedicado no matchea
-  if ((path === "/api/kryptex/workers" || path.endsWith("/kryptex/workers")) && req.method === "GET") {
-    try {
-      const { default: kryptexHandler } = await import("./kryptex/workers.js");
-      return kryptexHandler(req, res);
-    } catch (e) {
-      /* seguir al app */
-    }
-  }
-
-  // Fallback: GET /api/garantias/items si el handler dedicado no matchea
-  if ((path === "/api/garantias/items" || path.endsWith("/garantias/items")) && req.method === "GET") {
-    try {
-      const { default: itemsHandler } = await import("./garantias/items.js");
-      return itemsHandler(req, res);
-    } catch (e) {
-      /* seguir al app */
-    }
-  }
-
-  // Fallback: DELETE/PUT /api/setups/:id si el handler dedicado no matchea
-  const setupsIdMatch = path.match(/^\/api\/setups\/(.+)$/);
-  if (setupsIdMatch && (req.method === "DELETE" || req.method === "PUT")) {
-    try {
-      const id = decodeURIComponent(setupsIdMatch[1]);
-      const { default: setupsIdHandler } = await import("./setups/[id].js");
-      const reqWithQuery = { ...req, query: { ...(req.query || {}), id } };
-      return setupsIdHandler(reqWithQuery, res);
-    } catch (e) {
-      /* seguir al app */
-    }
-  }
-
-  // Fallback: DELETE/PUT /api/users/:id si el handler dedicado no matchea
-  const usersIdMatch = path.match(/^\/api\/users\/(.+)$/);
-  if (usersIdMatch && !path.includes("/activity") && (req.method === "DELETE" || req.method === "PUT")) {
-    try {
-      const id = decodeURIComponent(usersIdMatch[1]);
-      const { default: usersIdHandler } = await import("./users/[id].js");
-      const reqWithQuery = { ...req, query: { ...(req.query || {}), id } };
-      return usersIdHandler(reqWithQuery, res);
-    } catch (e) {
-      /* seguir al app */
-    }
-  }
-
-  // Fallback: GET/PUT/DELETE /api/clients/:id (crítico: Vercel a veces no invoca el handler dedicado)
-  const clientsIdMatch = path.match(/^\/api\/clients\/(.+)$/);
-  if (clientsIdMatch && (req.method === "GET" || req.method === "PUT" || req.method === "DELETE")) {
-    try {
-      const id = decodeURIComponent(clientsIdMatch[1]);
-      const { default: clientsIdHandler } = await import("./clients/[id].js");
-      const reqWithQuery = { ...req, query: { ...(req.query || {}), id } };
-      return clientsIdHandler(reqWithQuery, res);
-    } catch (e) {
-      /* seguir al app */
-    }
-  }
-
+  // Todo lo demás: delegar a Express (una sola función serverless para cumplir límite Vercel)
   const app = await getApp();
   // Normalizar req.url para Express (Vercel puede pasar URL completa)
   const pathname = path.startsWith("/") ? path : `/${path}`;
