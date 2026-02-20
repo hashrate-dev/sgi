@@ -77,11 +77,10 @@ export default async function handler(req, res) {
 
   // Todo lo demás: delegar a Express (una sola función serverless para cumplir límite Vercel)
   const app = await getApp();
-  // Normalizar req.url para Express (Vercel puede pasar URL completa)
+  // Normalizar req.url para Express (Vercel puede pasar URL completa o undefined)
   const pathname = path.startsWith("/") ? path : `/${path}`;
   const q = rawUrl.includes("?") ? "?" + rawUrl.split("?")[1] : "";
-  if (req.url && (req.url.startsWith("http") || !req.url.startsWith("/"))) {
-    req.url = pathname + q;
-  }
+  req.url = pathname + q;
+  req.originalUrl = req.originalUrl ?? req.url;
   return app(req, res);
 }
