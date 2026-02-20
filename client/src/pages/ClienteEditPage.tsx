@@ -73,6 +73,10 @@ export function ClienteEditPage() {
           city2: found.city2 ?? ""
         });
         setLoading(false);
+        // Si la URL tiene id numérico (279), reemplazar por código (C17) para que la barra muestre el código
+        if (found.code && /^\d+$/.test(idDecoded)) {
+          navigate(`/clientes/${encodeURIComponent(found.code)}/edit`, { replace: true });
+        }
       })
       .catch((e) => {
         setError(e instanceof Error ? e.message : "Error al cargar cliente");
