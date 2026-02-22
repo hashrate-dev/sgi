@@ -497,17 +497,17 @@
   padding-left: calc(4px + 0.75rem) !important;
 }
 
-/* Tabla Equipos y Payouts: thead verde */
+/* Tabla Equipos y Payouts: thead con títulos en negro */
 .kryptex-detalle .table thead,
 .kryptex-detalle .table-hover thead {
-  background: #2D5D46 !important;
-  color: #fff !important;
+  background: #f8f9fa !important;
+  color: #000 !important;
 }
 
 .kryptex-detalle .table thead th,
 .kryptex-detalle .table-hover thead th {
-  color: #fff !important;
-  border-color: rgba(255, 255, 255, 0.2);
+  color: #000 !important;
+  border-color: rgba(0, 0, 0, 0.1);
 }
 
 .kryptex-chart-placeholder p {

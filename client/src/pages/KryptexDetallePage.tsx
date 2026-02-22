@@ -130,13 +130,13 @@ export function KryptexDetallePage() {
             </div>
           ) : data ? (
             <>
-              {/* Workers (24h), Unpaid, Paid, etc. */}
+              {/* Mineros, PAGOS PENDIENTES, PAGOS ACUMULADOS */}
               <div className="row g-3 mb-4">
                 {data.workers24h != null && (
                   <div className="col-6 col-md-3">
                     <div className="card border-0 shadow-sm h-100 kryptex-metric-card">
                       <div className="card-body">
-                        <div className="small text-muted text-uppercase fw-bold">Workers (24h)</div>
+                        <div className="small text-muted text-uppercase fw-bold">Mineros</div>
                         <div className="fs-4 fw-bold">{data.workers24h}</div>
                         <div className="small text-muted">conectados</div>
                       </div>
@@ -146,7 +146,7 @@ export function KryptexDetallePage() {
                 <div className="col-6 col-md-3">
                   <div className="card border-0 shadow-sm h-100 kryptex-metric-card">
                     <div className="card-body">
-                      <div className="small text-muted text-uppercase fw-bold">Unpaid</div>
+                      <div className="small text-muted fw-bold">Pagos Pendientes</div>
                       <div className="fs-4 fw-bold text-primary">{formatNum(data.unpaid)} QUAI</div>
                       {data.unpaidUsd != null && (
                         <div className="small text-muted">≈ {formatNum(data.unpaidUsd)} USD</div>
@@ -157,7 +157,7 @@ export function KryptexDetallePage() {
                 <div className="col-6 col-md-3">
                   <div className="card border-0 shadow-sm h-100 kryptex-metric-card">
                     <div className="card-body">
-                      <div className="small text-muted text-uppercase fw-bold">Paid</div>
+                      <div className="small text-muted fw-bold">Pagos Acumulados</div>
                       <div className="fs-4 fw-bold text-success">{formatNum(data.paid)} QUAI</div>
                       {data.paidUsd != null && (
                         <div className="small text-muted">≈ {formatNum(data.paidUsd)} USD</div>
@@ -180,7 +180,7 @@ export function KryptexDetallePage() {
                       <table className="table table-sm table-hover mb-0 align-middle">
                         <thead>
                           <tr>
-                            <th className="text-start">Name</th>
+                            <th className="text-start">Minero</th>
                             <th className="text-start">Hashrate (24h)</th>
                             <th className="text-start">Hashrate (10m)</th>
                             <th className="text-start">Estado</th>
