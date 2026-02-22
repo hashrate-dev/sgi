@@ -276,7 +276,6 @@ export function CuentaClienteDetallePage() {
                         <tbody>
                           {sortedInvoices.map((inv) => {
                             const dueDate = inv.dueDate || calculateDueDate(inv.date);
-                            const hasReceipt = invoices.some((r) => r.type === "Recibo" && isLinkedToInvoice(r, inv));
                             const hasNC = invoices.some((nc) => nc.type === "Nota de Crédito" && isLinkedToInvoice(nc, inv));
                             const relatedRecibo = invoices.find((r) => r.type === "Recibo" && isLinkedToInvoice(r, inv));
                             let paymentDateCell: string;
