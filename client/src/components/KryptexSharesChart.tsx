@@ -43,11 +43,6 @@ export function KryptexSharesChart({ history, currentTotal, title }: KryptexShar
     const ctx = canvasRef.current.getContext("2d");
     if (!ctx) return;
 
-    const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-    gradient.addColorStop(0, "rgba(99, 102, 241, 0.35)");
-    gradient.addColorStop(0.5, "rgba(99, 102, 241, 0.12)");
-    gradient.addColorStop(1, "rgba(99, 102, 241, 0.02)");
-
     const labels = history.map((p) => {
       const d = new Date(p.timestamp);
       return d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
@@ -56,24 +51,20 @@ export function KryptexSharesChart({ history, currentTotal, title }: KryptexShar
 
     if (chartRef.current) chartRef.current.destroy();
 
-    const config: ChartConfiguration<"line"> = {
-      type: "line",
+    const config: ChartConfiguration<"bar"> = {
+      type: "bar",
       data: {
         labels,
         datasets: [
           {
             label: "Shares (24h)",
             data,
-            fill: true,
-            backgroundColor: gradient,
-            borderColor: "#6366f1",
-            borderWidth: 2,
-            tension: 0.4,
-            pointRadius: 2,
-            pointHoverRadius: 6,
-            pointBackgroundColor: "#fff",
-            pointBorderColor: "#6366f1",
-            pointBorderWidth: 1,
+            backgroundColor: "rgba(34, 197, 94, 0.85)",
+            borderColor: "rgba(34, 197, 94, 1)",
+            borderWidth: 1,
+            borderRadius: 2,
+            barPercentage: 0.85,
+            categoryPercentage: 0.9,
           },
         ],
       },
@@ -145,7 +136,7 @@ export function KryptexSharesChart({ history, currentTotal, title }: KryptexShar
     <div className="kryptex-chart-wrap kryptex-chart-wrap--gh">
       <div className="kryptex-chart-header">
         <h6 className="kryptex-chart-title">
-          <i className="bi bi-pie-chart me-2" />
+          <i className="bi bi-bar-chart me-2" />
           {title}
         </h6>
         <div className="kryptex-chart-badges">
