@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import {
   KryptexHashrateChart,
@@ -20,6 +21,17 @@ import "../styles/hrshome.css";
 
 function workerUrl(poolUrl: string, name: string) {
   return `${poolUrl}/${name}/prop`;
+}
+
+function getWalletFromPoolUrl(poolUrl: string): { pool: string; wallet: string } | null {
+  const m = poolUrl.match(/pool\.kryptex\.com\/(quai-(?:sha256|scrypt))\/miner\/stats\/(0x[a-fA-F0-9]+)/);
+  return m ? { pool: m[1]!, wallet: m[2]! } : null;
+}
+
+function kryptexDetalleUrl(poolUrl: string): string {
+  const info = getWalletFromPoolUrl(poolUrl);
+  if (!info) return "/kryptex";
+  return `/kryptex/detalle?wallet=${encodeURIComponent(info.wallet)}&pool=${encodeURIComponent(info.pool)}`;
 }
 
 function statusLabel(status: KryptexWorkerData["status"]) {
@@ -49,22 +61,13 @@ function WorkerTable({
         <div className="d-flex gap-2 align-items-center">
           <button
             type="button"
-            className="btn btn-sm btn-outline-secondary"
+            className="fact-back kryptex-btn"
             onClick={() => loadWorkers(true)}
             disabled={refreshing}
           >
             <i className={`bi bi-arrow-clockwise me-1 ${refreshing ? "kryptex-spin" : ""}`} />
             Volver a cargar
           </button>
-          <a
-            href="https://pool.kryptex.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-1"
-          >
-            <i className="bi bi-box-arrow-up-right" />
-            Ver en Kryptex
-          </a>
         </div>
       </div>
       {error && (
@@ -91,7 +94,7 @@ function WorkerTable({
                 <th>Estado</th>
                 <th>Hashrate (24h)</th>
                 <th>Hashrate (10m)</th>
-                <th></th>
+                <th className="text-end">Acción</th>
               </tr>
             </thead>
             <tbody>
@@ -105,12 +108,18 @@ function WorkerTable({
                   </td>
                   <td>{w.hashrate24h ?? "—"}</td>
                   <td>{w.hashrate10m ?? "—"}</td>
-                  <td>
+                  <td className="text-end">
+                    <Link
+                      to={kryptexDetalleUrl(w.poolUrl)}
+                      className="fact-back kryptex-btn kryptex-btn-sm me-1"
+                    >
+                      Ver cuenta
+                    </Link>
                     <a
                       href={workerUrl(w.poolUrl, w.name)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="btn btn-sm btn-link py-0"
+                      className="fact-back kryptex-btn kryptex-btn-icon"
                     >
                       <i className="bi bi-box-arrow-up-right" />
                     </a>

@@ -1,25 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { getClients, wakeUpBackend } from "../lib/api";
 import type { Client } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
 import "../styles/facturacion.css";
 
 export function CuentaClientePage() {
-  const navigate = useNavigate();
   const [clients, setClients] = useState<Client[]>([]);
-  const [clientFilter, setClientFilter] = useState("");
   const [loadingClients, setLoadingClients] = useState(true);
   const [clientListSearch, setClientListSearch] = useState("");
-
-  const clientNames = useMemo(() => {
-    const names = new Set<string>();
-    clients.forEach((c) => {
-      if (c.name?.trim()) names.add(c.name.trim());
-      if (c.name2?.trim()) names.add(c.name2.trim());
-    });
-    return Array.from(names).sort((a, b) => a.localeCompare(b));
-  }, [clients]);
 
   const filteredAndSortedClients = useMemo(() => {
     const q = clientListSearch.toLowerCase().trim();
@@ -79,25 +68,8 @@ export function CuentaClientePage() {
           <div className="card historial-filtros-card">
             <h6 className="fw-bold border-bottom pb-2">🔍 Filtros</h6>
             <div className="row g-2 align-items-end">
-              <div className="col-md-3">
-                <label className="form-label small fw-bold">Cliente</label>
-                <input
-                  type="text"
-                  className="form-control form-control-sm"
-                  list="clientes-datalist"
-                  placeholder="Buscar cliente por nombre..."
-                  value={clientFilter}
-                  onChange={(e) => setClientFilter(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && clientFilter.trim() && navigate(detalleUrl(clientFilter.trim()))}
-                />
-                <datalist id="clientes-datalist">
-                  {clientNames.map((n) => (
-                    <option key={n} value={n} />
-                  ))}
-                </datalist>
-              </div>
-              <div className="col-md-3">
-                <label className="form-label small fw-bold">Filtrar directorio</label>
+              <div className="col-md-6">
+                <label className="form-label small fw-bold">Clientes</label>
                 <input
                   type="text"
                   className="form-control form-control-sm"
@@ -106,19 +78,14 @@ export function CuentaClientePage() {
                   onChange={(e) => setClientListSearch(e.target.value)}
                 />
               </div>
-              <div className="col-md-2 d-flex align-items-end">
-                {clientFilter.trim() ? (
-                  <Link
-                    to={detalleUrl(clientFilter.trim())}
-                    className="btn btn-outline-secondary btn-sm cuenta-cliente-btn-ver-detalle"
-                  >
-                    Ver detalle
-                  </Link>
-                ) : (
-                  <span className="btn btn-outline-secondary btn-sm cuenta-cliente-btn-ver-detalle disabled opacity-50">
-                    Ver detalle
-                  </span>
-                )}
+              <div className="col-md-2 d-flex align-items-end filtros-limpiar-col">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary btn-sm filtros-limpiar-btn"
+                  onClick={() => setClientListSearch("")}
+                >
+                  Limpiar
+                </button>
               </div>
               {loadingClients && (
                 <div className="col-12">
@@ -179,7 +146,7 @@ export function CuentaClientePage() {
                       <td className="cuenta-cliente-cell-action text-end">
                         <Link
                           to={detalleUrl(c.name ?? "")}
-                          className="cuenta-cliente-btn-ver"
+                          className="fact-back cuenta-cliente-btn-ver"
                         >
                           Ver cuenta
                         </Link>

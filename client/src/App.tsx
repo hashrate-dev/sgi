@@ -24,6 +24,7 @@ import { GarantiasAndeItemsPage } from "./pages/GarantiasAndeItemsPage";
 import { GarantiaAndeItemNewPage } from "./pages/GarantiaAndeItemNewPage";
 import { HistorialGarantiasPage } from "./pages/HistorialGarantiasPage";
 import { KryptexPage } from "./pages/KryptexPage";
+import { KryptexDetallePage } from "./pages/KryptexDetallePage";
 import { CuentaClientePage } from "./pages/CuentaClientePage";
 import { CuentaClienteDetallePage } from "./pages/CuentaClienteDetallePage";
 import { ToastContainer } from "./components/ToastNotification";
@@ -36,6 +37,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/kryptex" element={<KryptexPage />} />
+          <Route path="/kryptex/detalle" element={<KryptexDetallePage />} />
           <Route element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
             <Route path="/" element={<HomePage />} />
             <Route path="/hosting" element={<HostingHubPage />} />

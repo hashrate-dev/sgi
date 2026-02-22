@@ -231,6 +231,34 @@
   border-color: rgba(255, 255, 255, 0.5);
 }
 
+/* Botones Kryptex: mismo tamaño y estilo que Limpiar (pill, verde #2D5D46, compacto) */
+.kryptex-btn {
+  text-decoration: none !important;
+  border-radius: 9999px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  padding: 0.5rem 1rem;
+  min-width: 5.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+.kryptex-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+.kryptex-btn-sm {
+  padding: 0.25rem 0.55rem;
+  font-size: 0.75rem;
+  min-width: auto;
+}
+.kryptex-btn-icon {
+  padding: 0.2rem 0.35rem;
+  font-size: 0.8rem;
+  min-width: auto;
+}
+
 /* ========== Gráfico Hashrate Kryptex ========== */
 .kryptex-chart-card {
   margin-bottom: 1.5rem !important;
@@ -377,6 +405,50 @@
 .kryptex-chart-placeholder i {
   font-size: 2.5rem;
   opacity: 0.5;
+}
+
+.kryptex-detail-chart {
+  margin-bottom: 0;
+}
+
+/* ========== Kryptex Detalle: color verde Hashrate (#2D5D46) en contenedores y tablas ========== */
+.kryptex-detalle .card {
+  border: 1px solid rgba(45, 93, 70, 0.3) !important;
+  border-top: 3px solid #2D5D46 !important;
+}
+
+.kryptex-detalle .card-header {
+  background: #2D5D46 !important;
+  color: #fff !important;
+  border-color: rgba(45, 93, 70, 0.5);
+}
+
+.kryptex-detalle .card-header .text-muted,
+.kryptex-detalle .card-header h6,
+.kryptex-detalle .card-header .fw-bold {
+  color: #fff !important;
+}
+
+.kryptex-detalle .card-header i {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* Métricas (Workers, Unpaid, Paid, etc.): barra verde lateral */
+.kryptex-detalle .row .card .card-body {
+  border-left: 4px solid #2D5D46;
+}
+
+/* Tabla Equipos y Payouts: thead verde */
+.kryptex-detalle .table thead,
+.kryptex-detalle .table-hover thead {
+  background: #2D5D46 !important;
+  color: #fff !important;
+}
+
+.kryptex-detalle .table thead th,
+.kryptex-detalle .table-hover thead th {
+  color: #fff !important;
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .kryptex-chart-placeholder p {

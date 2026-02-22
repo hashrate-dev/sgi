@@ -188,6 +188,259 @@ kryptexRouter.get("/kryptex/workers", async (req, res) => {
   }
 });
 
+const payoutsCache = new Map<string, { data: KryptexPayoutsData; ts: number }>();
+const PAYOUTS_CACHE_TTL = 60000; // 1 min
+
+export type KryptexPayoutsData = {
+  unpaid: number;
+  paid: number;
+  unpaidUsd: number | null;
+  paidUsd: number | null;
+  reward7d: number;
+  reward30d: number;
+  reward7dUsd: number | null;
+  reward30dUsd: number | null;
+  workers24h: number | null;
+  workers: Array<{ name: string; status: "activo" | "inactivo"; hashrate24h: string | null; hashrate10m: string | null; valid: number }>;
+  payouts: Array<{ date: string; amount: number; txid: string; status: string }>;
+  payoutsUrl: string;
+  usuario: string | null;
+};
+
+type ApiPayoutItem = { date: string; amount: string; received: string; status: string; txid: string };
+type ApiResponse = { results?: ApiPayoutItem[]; next?: string | null };
+
+async function fetchPayoutsFromApi(pool: string, wallet: string): Promise<{ payouts: KryptexPayoutsData["payouts"]; totalPaid: number }> {
+  const headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    Accept: "application/json",
+  };
+  let url: string | null = `https://pool.kryptex.com/${pool}/api/v1/miner/payouts/${wallet}`;
+  const allPayouts: Array<{ date: string; amount: number; txid: string; status: string }> = [];
+  let totalPaid = 0;
+
+  while (url) {
+    const resp = await fetch(url, { headers });
+    if (!resp.ok) throw new Error(`API ${resp.status}`);
+    const json = (await resp.json()) as ApiResponse;
+    const results = json.results ?? [];
+    for (const r of results) {
+      const amount = parseFloat(r.received ?? r.amount ?? "0");
+      totalPaid += amount;
+      const d = new Date(parseInt(r.date, 10) * 1000);
+      allPayouts.push({
+        date: d.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+        amount,
+        txid: r.txid ?? "",
+        status: r.status ?? "FINISHED",
+      });
+    }
+    url = json.next ?? null;
+  }
+
+  return { payouts: allPayouts, totalPaid };
+}
+
+function parseStatsPageWorkers24h(html: string): number | null {
+  const workersSection = html.split(/Workers\s*\(\s*24\s*[hH]\s*\)/i)[1]?.split(/Current Hashrate|Average Hashrate|Unconfirmed/i)[0] ?? "";
+  const m = workersSection.match(/<span[^>]*class="[^"]*text-xl[^"]*"[^>]*>(\d+)<\/span>/i) ?? workersSection.match(/>(\d+)</);
+  if (m) {
+    const n = parseInt(m[1] ?? "0", 10);
+    return isNaN(n) ? null : n;
+  }
+  return null;
+}
+
+function parseStatsPageWorkersWithStatus(html: string): Array<{ name: string; status: "activo" | "inactivo"; hashrate24h: string | null; hashrate10m: string | null; valid: number }> {
+  const matches = [...html.matchAll(/miner\/stats\/[^/]+\/([A-Za-z0-9_-]+)\/prop/gi)];
+  const seen = new Set<string>();
+  const result: Array<{ name: string; status: "activo" | "inactivo"; hashrate24h: string | null; hashrate10m: string | null; valid: number }> = [];
+  for (const m of matches) {
+    const name = (m[1] ?? "").trim();
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    const workerIdx = html.indexOf(name, m.index ?? 0);
+    const fragment = workerIdx >= 0 ? html.slice(workerIdx, workerIdx + 2500) : "";
+    const validMatch = fragment.match(/Valid\s*:\s*(\d+)/i);
+    const valid = validMatch ? parseInt(validMatch[1] ?? "0", 10) : 0;
+    const thAll = [...fragment.matchAll(/([\d.]+)\s*TH\/s/gi)];
+    const ghAll = [...fragment.matchAll(/([\d.]+)\s*GH\/s/gi)];
+    const useTh = thAll.length > 0;
+    const hashrate24h = useTh && thAll[0] ? `${thAll[0][1]} TH/s` : ghAll[0] ? `${ghAll[0][1]} GH/s` : null;
+    const match10m = fragment.match(/Hashrate\s*\(\s*10\s*m\s*\)\s*:\s*([\d.]+)\s*(TH\/s|GH\/s|H\/s)/i);
+    let hashrate10m: string | null = null;
+    let value10m = 0;
+    if (match10m) {
+      const val = match10m[1] ?? "0";
+      const unit = match10m[2] ?? "H/s";
+      hashrate10m = `${val} ${unit}`;
+      value10m = parseFloat(val);
+      if (unit.toUpperCase().startsWith("H/") && value10m < 0.001) value10m = 0;
+    } else {
+      const m10 = useTh ? thAll[1] : ghAll[1];
+      if (m10) {
+        hashrate10m = useTh ? `${m10[1]} TH/s` : `${m10[1]} GH/s`;
+        value10m = parseFloat(m10[1] ?? "0");
+      }
+    }
+    const status: "activo" | "inactivo" = value10m > 0 ? "activo" : "inactivo";
+    result.push({ name, status, hashrate24h, hashrate10m, valid });
+  }
+  return result;
+}
+
+function parsePayoutsPage(html: string): { unpaid: number; paid: number; reward7d: number; reward30d: number; unpaidUsd: number | null; paidUsd: number | null } {
+  const num = (s: string) => parseFloat(String(s).replace(/[^\d.-]/g, "")) || 0;
+  let unpaid = 0, paid = 0, reward7d = 0, reward30d = 0;
+  let unpaidUsd: number | null = null;
+  let paidUsd: number | null = null;
+
+  const unpaidSection = html.split(/\bUnpaid\b/i)[1]?.split(/\bPaid\b/i)[0] ?? "";
+  const unpaidM = html.match(/Unpaid\s*[\s\S]*?([\d.]+)\s*(?:NaN|USD)/i);
+  if (unpaidM) unpaid = num(unpaidM[1] ?? "0");
+  if (unpaid === 0) {
+    const unpaidSpanPatterns = [
+      /<span[^>]*class="[^"]*text-xl[^"]*"[^>]*>([\d.]+)<\/span>/i,
+      /<span[^>]*>([\d.]+)<\/span>/,
+      /([\d.]+)\s*(?:NaN|USD)/,
+    ];
+    for (const re of unpaidSpanPatterns) {
+      const m = unpaidSection.match(re);
+      if (m) {
+        const v = num(m[1] ?? "0");
+        if (v >= 0) {
+          unpaid = v;
+          break;
+        }
+      }
+    }
+  }
+  const usdSpanPatterns = [
+    /<span[^>]*class="[^"]*mt-0[^"]*text-xs[^"]*font-medium[^"]*"[^>]*>([\d.]+)\s*USD\s*<\/span>/i,
+    /<span[^>]*class="[^"]*mt-0[^"]*"[^>]*>([\d.]+)\s*USD\s*<\/span>/i,
+    /<span[^>]*>([\d.]+)\s*USD\s*<\/span>/i,
+    />([\d.]+)\s*USD\s*</,
+  ];
+  for (const re of usdSpanPatterns) {
+    const m = unpaidSection.match(re);
+    if (m) {
+      const v = num(m[1] ?? "0");
+      if (v > 0) {
+        unpaidUsd = v;
+        break;
+      }
+    }
+  }
+  const paidM = html.match(/\bPaid\b\s*[\s\S]*?([\d.]+)\s+([\d.]+|NaN)\s*USD/i);
+  if (paidM) {
+    paid = num(paidM[1] ?? "0");
+    const usdStr = (paidM[2] ?? "").trim();
+    if (usdStr && usdStr.toLowerCase() !== "nan") {
+      const usdVal = num(usdStr);
+      if (!isNaN(usdVal)) paidUsd = usdVal;
+    }
+  }
+  const r7M = html.match(/Reward\s*\(\s*7\s*D\s*\)\s*[\s\S]*?([\d.]+)/i);
+  if (r7M) reward7d = num(r7M[1] ?? "0");
+  const r30M = html.match(/Reward\s*\(\s*30\s*D\s*\)\s*[\s\S]*?([\d.]+)/i);
+  if (r30M) reward30d = num(r30M[1] ?? "0");
+
+  if (paidUsd == null && paid > 0) {
+    const paidSection = html.split(/\bPaid\b/i)[1] ?? "";
+    for (const re of usdSpanPatterns) {
+      const m = paidSection.match(re);
+      if (m) {
+        const v = num(m[1] ?? "0");
+        if (v > 0) {
+          paidUsd = v;
+          break;
+        }
+      }
+    }
+  }
+
+  return { unpaid, paid, reward7d, reward30d, unpaidUsd, paidUsd };
+}
+
+async function fetchQuaiPriceUsd(): Promise<number | null> {
+  try {
+    const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=quai-network&vs_currencies=usd", {
+      headers: { Accept: "application/json" },
+    });
+    if (!r.ok) return null;
+    const j = (await r.json()) as { "quai-network"?: { usd?: number } };
+    const price = j["quai-network"]?.usd;
+    return typeof price === "number" && price > 0 ? price : null;
+  } catch {
+    return null;
+  }
+}
+
+kryptexRouter.get("/kryptex/payouts", async (req, res) => {
+  const wallet = req.query.wallet as string;
+  const pool = (req.query.pool as string) || "quai-scrypt";
+  if (!wallet || !/^0x[a-fA-F0-9]+$/.test(wallet)) {
+    return res.status(400).json({ error: "Wallet inválido" });
+  }
+  const cacheKey = `${pool}:${wallet}`;
+  const cached = payoutsCache.get(cacheKey);
+  if (cached && Date.now() - cached.ts < PAYOUTS_CACHE_TTL) {
+    return res.json(cached.data);
+  }
+  const payoutsUrl = `https://pool.kryptex.com/${pool}/miner/payouts/${wallet}`;
+  const statsUrl = `https://pool.kryptex.com/${pool}/miner/stats/${wallet}`;
+  const htmlHeaders = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+  };
+  try {
+    const [htmlResp, statsResp, apiData] = await Promise.all([
+      fetch(payoutsUrl, { headers: htmlHeaders }).then((r) => (r.ok ? r.text() : Promise.resolve(""))),
+      fetch(statsUrl, { headers: htmlHeaders }).then((r) => (r.ok ? r.text() : Promise.resolve(""))),
+      fetchPayoutsFromApi(pool, wallet).catch(() => ({ payouts: [] as KryptexPayoutsData["payouts"], totalPaid: 0 })),
+    ]);
+    const parsed = htmlResp ? parsePayoutsPage(htmlResp) : { unpaid: 0, paid: 0, reward7d: 0, reward30d: 0, unpaidUsd: null, paidUsd: null };
+    let paidUsd = parsed.paidUsd;
+    let unpaidUsd = parsed.unpaidUsd;
+    const quaPrice = await fetchQuaiPriceUsd();
+    if (paidUsd == null) {
+      const paidAmount = parsed.paid || apiData.totalPaid;
+      if (quaPrice != null && paidAmount > 0) paidUsd = Math.round(paidAmount * quaPrice * 100) / 100;
+    }
+    if (unpaidUsd == null && quaPrice != null && parsed.unpaid > 0) {
+      unpaidUsd = Math.round(parsed.unpaid * quaPrice * 100) / 100;
+    }
+    const workers24h = statsResp ? parseStatsPageWorkers24h(statsResp) : null;
+    const workers = statsResp ? parseStatsPageWorkersWithStatus(statsResp) : [];
+    const config = POOL_CONFIGS.find(
+      (c) => c.url.includes(wallet) && c.url.includes(`/${pool}/`)
+    );
+    const usuario = config?.usuario ?? null;
+    const data: KryptexPayoutsData = {
+      unpaid: parsed.unpaid,
+      paid: parsed.paid || apiData.totalPaid,
+      unpaidUsd,
+      paidUsd,
+      reward7d: parsed.reward7d,
+      reward30d: parsed.reward30d,
+      reward7dUsd: null,
+      reward30dUsd: null,
+      workers24h,
+      workers,
+      payouts: apiData.payouts,
+      payoutsUrl,
+      usuario,
+    };
+    payoutsCache.set(cacheKey, { data, ts: Date.now() });
+    res.setHeader("Cache-Control", "public, max-age=60");
+    return res.json(data);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return res.status(502).json({ error: `Error al consultar Kryptex: ${msg}` });
+  }
+});
+
 kryptexRouter.get("/kryptex/worker/:name", async (req, res) => {
   const workerName = req.params.name;
   if (!workerName || !/^[a-zA-Z0-9_-]+$/.test(workerName)) {

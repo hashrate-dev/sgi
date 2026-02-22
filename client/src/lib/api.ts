@@ -598,6 +598,26 @@ export function getKryptexWorkers(forceRefresh = false): Promise<{ workers: Kryp
   return apiNoRetry<{ workers: KryptexWorkerData[] }>(path, 25000);
 }
 
+export type KryptexPayoutsData = {
+  unpaid: number;
+  paid: number;
+  unpaidUsd: number | null;
+  paidUsd: number | null;
+  reward7d: number;
+  reward30d: number;
+  reward7dUsd: number | null;
+  reward30dUsd: number | null;
+  workers24h: number | null;
+  workers: Array<{ name: string; status: "activo" | "inactivo"; hashrate24h: string | null; hashrate10m: string | null; valid: number }>;
+  payouts: Array<{ date: string; amount: number; txid: string; status: string }>;
+  payoutsUrl: string;
+  usuario: string | null;
+};
+
+export function getKryptexPayouts(wallet: string, pool: string): Promise<KryptexPayoutsData> {
+  return apiNoRetry(`/api/kryptex/payouts?wallet=${encodeURIComponent(wallet)}&pool=${encodeURIComponent(pool)}`, 15000);
+}
+
 export function getKryptexWorkerStatus(workerName: string): Promise<{
   worker: string;
   status: KryptexWorkerStatus;
