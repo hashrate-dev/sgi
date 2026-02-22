@@ -417,6 +417,43 @@
   border-top: 3px solid #2D5D46 !important;
 }
 
+/* Gráfico Hashrate: esquinas superiores redondeadas y detalle verde integrado */
+.kryptex-detalle .kryptex-hashrate-card {
+  position: relative;
+  border-radius: 16px !important;
+  overflow: hidden !important;
+  border-top: none !important;
+  border: 1px solid rgba(45, 93, 70, 0.3) !important;
+}
+.kryptex-detalle .kryptex-hashrate-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #2D5D46;
+  border-radius: 16px 16px 0 0;
+  z-index: 1;
+}
+.kryptex-detalle .kryptex-hashrate-card .card-body {
+  background: linear-gradient(145deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+}
+
+/* Cards con header (Equipos, Payouts): esquinas superiores redondeadas y detalle verde */
+.kryptex-detalle .kryptex-card-rounded {
+  border-radius: 16px !important;
+  overflow: hidden !important;
+  border-top: none !important;
+}
+.kryptex-detalle .kryptex-card-rounded .card-header {
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
 .kryptex-detalle .card-header {
   background: #2D5D46 !important;
   color: #fff !important;

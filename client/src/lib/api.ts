@@ -612,6 +612,8 @@ export type KryptexPayoutsData = {
   payouts: Array<{ date: string; amount: number; txid: string; status: string }>;
   payoutsUrl: string;
   usuario: string | null;
+  /** Datos del gráfico Shares (24h) desde Kryptex (timestamp, value por bucket) */
+  sharesChart?: Array<{ timestamp: number; value: number }>;
 };
 
 export function getKryptexPayouts(wallet: string, pool: string): Promise<KryptexPayoutsData> {

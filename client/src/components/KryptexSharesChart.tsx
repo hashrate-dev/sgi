@@ -31,23 +31,30 @@ interface KryptexSharesChartProps {
   history: SharesPoint[];
   currentTotal: number;
   title: string;
+  statsUrl?: string;
+  /** Datos del gráfico desde Kryptex (prioridad sobre history) */
+  sharesChart?: Array<{ timestamp: number; value: number }>;
 }
 
-export function KryptexSharesChart({ history, currentTotal, title }: KryptexSharesChartProps) {
+export function KryptexSharesChart({ history, currentTotal, title, statsUrl, sharesChart }: KryptexSharesChartProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chartRef = useRef<Chart | null>(null);
 
+  const chartData = (sharesChart?.length ? sharesChart : history) as SharesPoint[];
+  const chartPoints = chartData.length >= 1 ? chartData : [];
+
   useEffect(() => {
-    if (!canvasRef.current || history.length < 2) return;
+    const points = (sharesChart?.length ? sharesChart : history) as SharesPoint[];
+    if (!canvasRef.current || points.length < 1) return;
 
     const ctx = canvasRef.current.getContext("2d");
     if (!ctx) return;
 
-    const labels = history.map((p) => {
+    const labels = points.map((p) => {
       const d = new Date(p.timestamp);
-      return d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+      return d.toLocaleString("es-AR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
     });
-    const data = history.map((p) => p.value);
+    const data = points.map((p) => p.value);
 
     if (chartRef.current) chartRef.current.destroy();
 
@@ -128,9 +135,9 @@ export function KryptexSharesChart({ history, currentTotal, title }: KryptexShar
       chartRef.current?.destroy();
       chartRef.current = null;
     };
-  }, [history]);
+  }, [history, sharesChart]);
 
-  const hasData = history.length >= 2;
+  const hasData = chartPoints.length >= 1;
 
   return (
     <div className="kryptex-chart-wrap kryptex-chart-wrap--gh">
@@ -139,11 +146,22 @@ export function KryptexSharesChart({ history, currentTotal, title }: KryptexShar
           <i className="bi bi-bar-chart me-2" />
           {title}
         </h6>
-        <div className="kryptex-chart-badges">
+        <div className="kryptex-chart-badges d-flex align-items-center gap-2">
           <div className="kryptex-chart-badge">
             <span className="kryptex-chart-badge-label">Total</span>
             <span className="kryptex-chart-value">{currentTotal > 0 ? currentTotal.toLocaleString("es-AR") : "—"}</span>
           </div>
+          {statsUrl && (
+            <a
+              href={statsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-sm btn-outline-light border-0 py-1 px-2"
+              title="Ver en Kryptex Pool"
+            >
+              <i className="bi bi-box-arrow-up-right small" />
+            </a>
+          )}
         </div>
       </div>
       {hasData ? (

@@ -11,11 +11,6 @@ import {
   saveHashrateHistory,
   type HashratePoint,
 } from "../components/KryptexHashrateChart";
-import {
-  KryptexSharesChart,
-  loadSharesHistory,
-  saveSharesHistory,
-} from "../components/KryptexSharesChart";
 import { getKryptexPayouts, type KryptexPayoutsData } from "../lib/api";
 import "../styles/facturacion.css";
 import "../styles/hrshome.css";
@@ -36,9 +31,7 @@ export function KryptexDetallePage() {
 
   const isTHs = pool.includes("sha256");
   const storageKey = `kryptex_detalle_${isTHs ? "th" : "gh"}_${wallet}`;
-  const sharesStorageKey = `kryptex_detalle_shares_${wallet}`;
   const [history, setHistory] = useState<HashratePoint[]>(() => loadHashrateHistory(storageKey));
-  const [sharesHistory, setSharesHistory] = useState(() => loadSharesHistory(sharesStorageKey));
 
   const loadData = useCallback(() => {
     if (!wallet) {
@@ -54,22 +47,16 @@ export function KryptexDetallePage() {
           const now = Date.now();
           const total24h = isTHs ? sumWorkersTHs(res.workers) : sumWorkersGHs(res.workers);
           const total10m = isTHs ? sumWorkers10mTHs(res.workers) : sumWorkers10mGHs(res.workers);
-          const totalShares = res.workers.reduce((acc, w) => acc + (w.valid ?? 0), 0);
           setHistory((prev) => {
             const next = [...prev, { timestamp: now, value24h: total24h, value10m: total10m }].slice(-MAX_HISTORY_POINTS);
             saveHashrateHistory(storageKey, next);
-            return next;
-          });
-          setSharesHistory((prev) => {
-            const next = [...prev, { timestamp: now, value: totalShares }].slice(-MAX_HISTORY_POINTS);
-            saveSharesHistory(sharesStorageKey, next);
             return next;
           });
         }
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Error al cargar"))
       .finally(() => setLoading(false));
-  }, [wallet, pool, isTHs, storageKey, sharesStorageKey]);
+  }, [wallet, pool, isTHs, storageKey]);
 
   useEffect(() => {
     loadData();
@@ -77,15 +64,13 @@ export function KryptexDetallePage() {
 
   useEffect(() => {
     setHistory(loadHashrateHistory(storageKey));
-    setSharesHistory(loadSharesHistory(sharesStorageKey));
-  }, [storageKey, sharesStorageKey]);
+  }, [storageKey]);
 
   const chartTotals = useMemo(() => {
-    if (!data?.workers.length) return { total24h: 0, total10m: 0, totalShares: 0 };
+    if (!data?.workers.length) return { total24h: 0, total10m: 0 };
     return {
       total24h: isTHs ? sumWorkersTHs(data.workers) : sumWorkersGHs(data.workers),
       total10m: isTHs ? sumWorkers10mTHs(data.workers) : sumWorkers10mGHs(data.workers),
-      totalShares: data.workers.reduce((acc, w) => acc + (w.valid ?? 0), 0),
     };
   }, [data?.workers, isTHs]);
 
@@ -205,7 +190,7 @@ export function KryptexDetallePage() {
               </div>
 
               {data.workers.length > 0 && (
-                <div className="card border-0 shadow-sm mb-4">
+                <div className="card border-0 shadow-sm mb-4 kryptex-card-rounded">
                   <div className="card-header bg-transparent border-bottom">
                     <h6 className="mb-0 fw-bold">
                       <i className="bi bi-cpu me-2" />
@@ -244,7 +229,7 @@ export function KryptexDetallePage() {
               )}
 
               {/* Hashrate (24h) */}
-              <div className="card border-0 shadow-sm mb-4">
+              <div className="card border-0 shadow-sm mb-4 kryptex-hashrate-card">
                 <div className="card-body p-0">
                   <KryptexHashrateChart
                     history={history}
@@ -256,19 +241,8 @@ export function KryptexDetallePage() {
                 </div>
               </div>
 
-              {/* Shares (24h) */}
-              <div className="card border-0 shadow-sm mb-4">
-                <div className="card-body p-0">
-                  <KryptexSharesChart
-                    history={sharesHistory}
-                    currentTotal={chartTotals.totalShares}
-                    title="Shares (24h)"
-                  />
-                </div>
-              </div>
-
               {/* Payouts: gráfico Unconfirmed Reward + tabla */}
-              <div className="card border-0 shadow-sm">
+              <div className="card border-0 shadow-sm kryptex-card-rounded">
                 <div className="card-header bg-transparent border-bottom">
                   <h6 className="mb-0 fw-bold">Payouts</h6>
                 </div>

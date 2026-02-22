@@ -205,6 +205,8 @@ export type KryptexPayoutsData = {
   payouts: Array<{ date: string; amount: number; txid: string; status: string }>;
   payoutsUrl: string;
   usuario: string | null;
+  /** Datos del gráfico Shares (24h) desde pool.kryptex.com (timestamp, value por bucket) */
+  sharesChart?: Array<{ timestamp: number; value: number }>;
 };
 
 type ApiPayoutItem = { date: string; amount: string; received: string; status: string; txid: string };
@@ -241,6 +243,94 @@ async function fetchPayoutsFromApi(pool: string, wallet: string): Promise<{ payo
   return { payouts: allPayouts, totalPaid };
 }
 
+/** Extrae datos del gráfico Shares (24h) desde el payload __NUXT__ de Kryptex */
+function parseSharesChartFromStats(html: string): Array<{ timestamp: number; value: number }> {
+  const chartMatch = html.match(/chart:\[(\{timestamp:\d+,valid:[^}]+\}(?:\,\{timestamp:\d+,valid:[^}]+\})*)\]/);
+  if (!chartMatch) return [];
+
+  const argsMatch = html.match(/\}\s*\)\s*\(([\s\S]+)\)\s*\)\s*;?\s*<\/script>/);
+  if (!argsMatch?.[1]) return [];
+
+  const paramStr = html.match(/__NUXT__\s*=\s*\(function\s*\(([^)]+)\)/)?.[1] ?? "";
+  const params = paramStr.split(",").map((p) => p.trim()).filter(Boolean);
+  const argsStr = argsMatch[1];
+  const args: (number | string | null | boolean)[] = [];
+  let pos = 0;
+  while (pos < argsStr.length) {
+    const tail = argsStr.slice(pos).replace(/^\s*,?\s*/, "");
+    pos = argsStr.length - tail.length;
+    if (tail.startsWith("null")) {
+      args.push(null);
+      pos += 4;
+      continue;
+    }
+    if (tail.startsWith("true")) {
+      args.push(true);
+      pos += 4;
+      continue;
+    }
+    if (tail.startsWith("false")) {
+      args.push(false);
+      pos += 5;
+      continue;
+    }
+    const q = tail[0];
+    if (q === '"' || q === "'") {
+      let end = 1;
+      while (end < tail.length) {
+        if (tail[end] === "\\") end += 2;
+        else if (tail[end] === q) {
+          end++;
+          break;
+        } else end++;
+      }
+      args.push(tail.slice(1, end - 1));
+      pos += end;
+      continue;
+    }
+    const numMatch = tail.match(/^([\d.]+)/);
+    if (numMatch?.[1]) {
+      const n = parseFloat(numMatch[1]);
+      args.push(n);
+      pos += numMatch[1].length;
+      continue;
+    }
+    break;
+  }
+
+  const paramIdx = new Map<string, number>();
+  params.forEach((p, idx) => paramIdx.set(p, idx));
+
+  const chartStr = chartMatch[1] ?? "";
+  const entries = chartStr.match(/\{timestamp:(\d+),valid:([^,}]+)/g) ?? [];
+  const result: Array<{ timestamp: number; value: number }> = [];
+
+  for (const entry of entries) {
+    const tsMatch = entry.match(/timestamp:(\d+)/);
+    const validMatch = entry.match(/valid:([^,}]+)/);
+    if (!tsMatch?.[1] || !validMatch?.[1]) continue;
+    const timestamp = parseInt(tsMatch[1], 10);
+    const validRef = validMatch[1].trim();
+    let value = 0;
+    if (/^\d+$/.test(validRef)) {
+      value = parseInt(validRef, 10);
+    } else {
+      const idx = paramIdx.get(validRef);
+      if (idx != null && typeof args[idx] === "number") value = args[idx] as number;
+    }
+    result.push({ timestamp, value });
+  }
+  if (result.length > 0) return result;
+  const fallback = chartStr.match(/\{timestamp:(\d+),valid:(\d+)/g);
+  if (fallback) {
+    return fallback.map((m) => {
+      const m2 = m.match(/timestamp:(\d+),valid:(\d+)/);
+      return { timestamp: parseInt(m2?.[1] ?? "0", 10), value: parseInt(m2?.[2] ?? "0", 10) };
+    });
+  }
+  return [];
+}
+
 function parseStatsPageWorkers24h(html: string): number | null {
   const workersSection = html.split(/Workers\s*\(\s*24\s*[hH]\s*\)/i)[1]?.split(/Current Hashrate|Average Hashrate|Unconfirmed/i)[0] ?? "";
   const m = workersSection.match(/<span[^>]*class="[^"]*text-xl[^"]*"[^>]*>(\d+)<\/span>/i) ?? workersSection.match(/>(\d+)</);
@@ -261,8 +351,14 @@ function parseStatsPageWorkersWithStatus(html: string): Array<{ name: string; st
     seen.add(name);
     const workerIdx = html.indexOf(name, m.index ?? 0);
     const fragment = workerIdx >= 0 ? html.slice(workerIdx, workerIdx + 2500) : "";
+    let valid = 0;
     const validMatch = fragment.match(/Valid\s*:\s*(\d+)/i);
-    const valid = validMatch ? parseInt(validMatch[1] ?? "0", 10) : 0;
+    if (validMatch) {
+      valid = parseInt(validMatch[1] ?? "0", 10);
+    } else {
+      const tdMatch = fragment.match(/<td[^>]*>\s*<span[^>]*>(\d+)<\/span>/);
+      if (tdMatch) valid = parseInt(tdMatch[1] ?? "0", 10);
+    }
     const thAll = [...fragment.matchAll(/([\d.]+)\s*TH\/s/gi)];
     const ghAll = [...fragment.matchAll(/([\d.]+)\s*GH\/s/gi)];
     const useTh = thAll.length > 0;
@@ -413,6 +509,7 @@ kryptexRouter.get("/kryptex/payouts", async (req, res) => {
     }
     const workers24h = statsResp ? parseStatsPageWorkers24h(statsResp) : null;
     const workers = statsResp ? parseStatsPageWorkersWithStatus(statsResp) : [];
+    const sharesChart = statsResp ? parseSharesChartFromStats(statsResp) : undefined;
     const config = POOL_CONFIGS.find(
       (c) => c.url.includes(wallet) && c.url.includes(`/${pool}/`)
     );
@@ -431,6 +528,7 @@ kryptexRouter.get("/kryptex/payouts", async (req, res) => {
       payouts: apiData.payouts,
       payoutsUrl,
       usuario,
+      sharesChart,
     };
     payoutsCache.set(cacheKey, { data, ts: Date.now() });
     res.setHeader("Cache-Control", "public, max-age=60");
