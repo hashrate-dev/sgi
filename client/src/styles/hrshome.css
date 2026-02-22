@@ -470,9 +470,31 @@
   color: rgba(255, 255, 255, 0.9) !important;
 }
 
-/* Métricas (Workers, Unpaid, Paid, etc.): barra verde lateral */
-.kryptex-detalle .row .card .card-body {
-  border-left: 4px solid #2D5D46;
+/* Métricas (Workers, Unpaid, Paid, Reward 7D, 30D): esquinas redondeadas + barra verde */
+.kryptex-detalle .kryptex-metric-card {
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  border-top: none !important;
+  border: 1px solid rgba(45, 93, 70, 0.3) !important;
+  box-shadow: inset 0 3px 0 0 #2D5D46, 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+  position: relative;
+}
+.kryptex-detalle .kryptex-metric-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: #2D5D46;
+  border-radius: 12px 0 0 12px;
+  z-index: 0;
+}
+.kryptex-detalle .kryptex-metric-card .card-body {
+  position: relative;
+  z-index: 1;
+  border-left: none !important;
+  padding-left: calc(4px + 0.75rem) !important;
 }
 
 /* Tabla Equipos y Payouts: thead verde */

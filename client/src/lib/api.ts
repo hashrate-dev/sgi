@@ -616,8 +616,10 @@ export type KryptexPayoutsData = {
   sharesChart?: Array<{ timestamp: number; value: number }>;
 };
 
-export function getKryptexPayouts(wallet: string, pool: string): Promise<KryptexPayoutsData> {
-  return apiNoRetry(`/api/kryptex/payouts?wallet=${encodeURIComponent(wallet)}&pool=${encodeURIComponent(pool)}`, 15000);
+export function getKryptexPayouts(wallet: string, pool: string, forceRefresh = false): Promise<KryptexPayoutsData> {
+  const qs = new URLSearchParams({ wallet, pool });
+  if (forceRefresh) qs.set("refresh", "1");
+  return apiNoRetry(`/api/kryptex/payouts?${qs}`, 15000);
 }
 
 export function getKryptexWorkerStatus(workerName: string): Promise<{

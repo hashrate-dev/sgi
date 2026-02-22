@@ -436,9 +436,12 @@ function parsePayoutsPage(html: string): { unpaid: number; paid: number; reward7
       if (!isNaN(usdVal)) paidUsd = usdVal;
     }
   }
-  const r7M = html.match(/Reward\s*\(\s*7\s*D\s*\)\s*[\s\S]*?([\d.]+)/i);
+  // Reward (7D) y (30D): extraer la sección específica para evitar capturar otros números (ej. Workers)
+  const reward7Section = html.split(/Reward\s*\(\s*7\s*D\s*\)/i)[1]?.split(/Reward\s*\(\s*30\s*D\s*\)|\bUnpaid\b/i)[0] ?? "";
+  const r7M = reward7Section.match(/([\d]+(?:\.[\d]+)?)\s*(?:NaN|USD)/);
   if (r7M) reward7d = num(r7M[1] ?? "0");
-  const r30M = html.match(/Reward\s*\(\s*30\s*D\s*\)\s*[\s\S]*?([\d.]+)/i);
+  const reward30Section = html.split(/Reward\s*\(\s*30\s*D\s*\)/i)[1]?.split(/\bUnpaid\b|\bPaid\b/i)[0] ?? "";
+  const r30M = reward30Section.match(/([\d]+(?:\.[\d]+)?)\s*(?:NaN|USD)/);
   if (r30M) reward30d = num(r30M[1] ?? "0");
 
   if (paidUsd == null && paid > 0) {
@@ -479,8 +482,9 @@ kryptexRouter.get("/kryptex/payouts", async (req, res) => {
     return res.status(400).json({ error: "Wallet inválido" });
   }
   const cacheKey = `${pool}:${wallet}`;
+  const forceRefresh = req.query?.refresh === "1" || req.query?.refresh === "true";
   const cached = payoutsCache.get(cacheKey);
-  if (cached && Date.now() - cached.ts < PAYOUTS_CACHE_TTL) {
+  if (!forceRefresh && cached && Date.now() - cached.ts < PAYOUTS_CACHE_TTL) {
     return res.json(cached.data);
   }
   const payoutsUrl = `https://pool.kryptex.com/${pool}/miner/payouts/${wallet}`;

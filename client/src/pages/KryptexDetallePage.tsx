@@ -33,14 +33,14 @@ export function KryptexDetallePage() {
   const storageKey = `kryptex_detalle_${isTHs ? "th" : "gh"}_${wallet}`;
   const [history, setHistory] = useState<HashratePoint[]>(() => loadHashrateHistory(storageKey));
 
-  const loadData = useCallback(() => {
+  const loadData = useCallback((forceRefresh = false) => {
     if (!wallet) {
       setLoading(false);
       return;
     }
     setLoading(true);
     setError(null);
-    getKryptexPayouts(wallet, pool)
+    getKryptexPayouts(wallet, pool, forceRefresh)
       .then((res) => {
         setData(res);
         if (res.workers.length > 0) {
@@ -101,7 +101,7 @@ export function KryptexDetallePage() {
           <div className="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-3">
             <span className="text-muted fw-medium">{data?.usuario ? `@${data.usuario}` : ""}</span>
             <div className="d-flex gap-2 align-items-center">
-              <button type="button" className="fact-back kryptex-btn" onClick={loadData} disabled={loading}>
+              <button type="button" className="fact-back kryptex-btn" onClick={() => loadData(true)} disabled={loading}>
                 <i className={`bi bi-arrow-clockwise me-1 ${loading ? "kryptex-spin" : ""}`} />
                 Actualizar
               </button>
@@ -134,7 +134,7 @@ export function KryptexDetallePage() {
               <div className="row g-3 mb-4">
                 {data.workers24h != null && (
                   <div className="col-6 col-md-3">
-                    <div className="card border-0 shadow-sm h-100">
+                    <div className="card border-0 shadow-sm h-100 kryptex-metric-card">
                       <div className="card-body">
                         <div className="small text-muted text-uppercase fw-bold">Workers (24h)</div>
                         <div className="fs-4 fw-bold">{data.workers24h}</div>
@@ -144,7 +144,7 @@ export function KryptexDetallePage() {
                   </div>
                 )}
                 <div className="col-6 col-md-3">
-                  <div className="card border-0 shadow-sm h-100">
+                  <div className="card border-0 shadow-sm h-100 kryptex-metric-card">
                     <div className="card-body">
                       <div className="small text-muted text-uppercase fw-bold">Unpaid</div>
                       <div className="fs-4 fw-bold text-primary">{formatNum(data.unpaid)} QUAI</div>
@@ -155,34 +155,12 @@ export function KryptexDetallePage() {
                   </div>
                 </div>
                 <div className="col-6 col-md-3">
-                  <div className="card border-0 shadow-sm h-100">
+                  <div className="card border-0 shadow-sm h-100 kryptex-metric-card">
                     <div className="card-body">
                       <div className="small text-muted text-uppercase fw-bold">Paid</div>
                       <div className="fs-4 fw-bold text-success">{formatNum(data.paid)} QUAI</div>
                       {data.paidUsd != null && (
                         <div className="small text-muted">≈ {formatNum(data.paidUsd)} USD</div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className="col-6 col-md-3">
-                  <div className="card border-0 shadow-sm h-100">
-                    <div className="card-body">
-                      <div className="small text-muted text-uppercase fw-bold">Reward (7D)</div>
-                      <div className="fs-4 fw-bold">{formatNum(data.reward7d)} QUAI</div>
-                      {data.reward7dUsd != null && (
-                        <div className="small text-muted">≈ {formatNum(data.reward7dUsd)} USD</div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className="col-6 col-md-3">
-                  <div className="card border-0 shadow-sm h-100">
-                    <div className="card-body">
-                      <div className="small text-muted text-uppercase fw-bold">Reward (30D)</div>
-                      <div className="fs-4 fw-bold">{formatNum(data.reward30d)} QUAI</div>
-                      {data.reward30dUsd != null && (
-                        <div className="small text-muted">≈ {formatNum(data.reward30dUsd)} USD</div>
                       )}
                     </div>
                   </div>
