@@ -9,6 +9,7 @@ const menuItems: Array<{ to: string; icon: string; label: string; desc: string; 
   { to: "/hosting", icon: "bi-receipt", label: "Servicios de Hosting", desc: "Información de Facturación de Servicios de Hosting", roles: ["admin_a", "admin_b", "operador"] },
   { to: "/equipos-asic", icon: "bi-cpu", label: "Equipos ASIC", desc: "Información de Facturación de Equipos de Minería ASIC", roles: ["admin_a", "admin_b", "operador"] },
   { to: "/kryptex", icon: "bi-currency-bitcoin", label: "Kryptex", desc: "Información de Kryptex", roles: ["admin_a", "admin_b"] },
+  { to: "/cuenta-cliente", icon: "bi-journal-text", label: "Cuenta por cliente", desc: "Detalle histórico de movimientos por cliente (Hosting + ASIC)" },
   { to: "/historial", icon: "bi-clock-history", label: "Historial", desc: "Ver y gestionar comprobantes" },
   { to: "/clientes", icon: "bi-people", label: "Clientes", desc: "Administrar cartera de clientes" },
   { to: "/reportes", icon: "bi-graph-up", label: "Reportes", desc: "Estadísticas y análisis" }

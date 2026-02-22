@@ -24,6 +24,8 @@ import { GarantiasAndeItemsPage } from "./pages/GarantiasAndeItemsPage";
 import { GarantiaAndeItemNewPage } from "./pages/GarantiaAndeItemNewPage";
 import { HistorialGarantiasPage } from "./pages/HistorialGarantiasPage";
 import { KryptexPage } from "./pages/KryptexPage";
+import { CuentaClientePage } from "./pages/CuentaClientePage";
+import { CuentaClienteDetallePage } from "./pages/CuentaClienteDetallePage";
 import { ToastContainer } from "./components/ToastNotification";
 
 function App() {
@@ -60,6 +62,8 @@ function App() {
             <Route path="/historial-mineria" element={<Navigate to="/historial-equipos" replace />} />
             <Route path="/pendientes-mineria" element={<Navigate to="/pendientes-equipos" replace />} />
             <Route path="/clientes" element={<ClientesPage />} />
+            <Route path="/cuenta-cliente" element={<CuentaClientePage />} />
+            <Route path="/cuenta-cliente/detalle" element={<CuentaClienteDetallePage />} />
             <Route path="/clientes/nuevo" element={<Navigate to="/clientes" replace />} />
             <Route path="/clientes/:id/edit" element={<ClienteEditPage />} />
             <Route path="/reportes" element={<ReportesPage />} />
