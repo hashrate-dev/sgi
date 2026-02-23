@@ -98,7 +98,7 @@ INSERT OR IGNORE INTO invoice_sequences (type, last_number) VALUES ('Factura', 1
     }
   }
 
-  ["phone", "email", "address", "city", "email2", "name2", "phone2", "address2", "city2"].forEach((col) => {
+  ["phone", "email", "address", "city", "email2", "name2", "phone2", "address2", "city2", "usuario"].forEach((col) => {
     try {
       db.exec(`ALTER TABLE clients ADD COLUMN ${col} TEXT`);
     } catch (e: unknown) {
@@ -109,6 +109,12 @@ INSERT OR IGNORE INTO invoice_sequences (type, last_number) VALUES ('Factura', 1
 
   try {
     db.exec("ALTER TABLE users ADD COLUMN email TEXT");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+  try {
+    db.exec("ALTER TABLE users ADD COLUMN usuario TEXT");
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     if (!msg.includes("duplicate column")) throw e;

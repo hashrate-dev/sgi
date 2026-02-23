@@ -10,6 +10,7 @@ export type AuthUser = {
   username: string;
   email: string;
   role: UserRole;
+  usuario?: string;
 };
 
 declare global {
@@ -30,14 +31,14 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   (async () => {
     try {
       const payload = jwt.verify(token, env.JWT_SECRET) as { sub: string; userId: number };
-      const row = (await db.prepare("SELECT id, username, email, role FROM users WHERE id = ?").get(payload.userId)) as
-        | { id: number; username: string; email: string | null; role: string }
+      const row = (await db.prepare("SELECT id, username, email, role, usuario FROM users WHERE id = ?").get(payload.userId)) as
+        | { id: number; username: string; email: string | null; role: string; usuario?: string | null }
         | undefined;
       if (!row) {
         res.status(401).json({ error: { message: "Usuario no encontrado" } });
         return;
       }
-      req.user = { id: row.id, username: row.username, email: row.email ?? row.username, role: row.role as UserRole };
+      req.user = { id: row.id, username: row.username, email: row.email ?? row.username, role: row.role as UserRole, usuario: row.usuario ?? undefined };
       next();
     } catch (e) {
       if (res.headersSent) return;

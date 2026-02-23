@@ -18,5 +18,11 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
+  // LECTOR solo puede ver Kryptex
+  const path = location.pathname;
+  const isKryptex = path === "/kryptex" || path.startsWith("/kryptex/");
+  if (user.role === "lector" && !isKryptex) {
+    return <Navigate to="/kryptex" replace />;
+  }
   return <>{children}</>;
 }

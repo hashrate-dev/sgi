@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
+import { useAuth } from "../contexts/AuthContext";
 import {
   KryptexHashrateChart,
   sumWorkersTHs,
@@ -15,7 +16,7 @@ import {
   STORAGE_KEY_GH,
   type HashratePoint,
 } from "../components/KryptexHashrateChart";
-import { getKryptexWorkers, type KryptexWorkerData } from "../lib/api";
+import { getKryptexWorkers, getKryptexLectorWallet, type KryptexWorkerData } from "../lib/api";
 import "../styles/facturacion.css";
 import "../styles/hrshome.css";
 
@@ -135,6 +136,9 @@ function WorkerTable({
 }
 
 export function KryptexPage() {
+  const { user, logout } = useAuth();
+  const [lectorRedirect, setLectorRedirect] = useState<{ wallet: string; pool: string } | null>(null);
+  const [lectorError, setLectorError] = useState<string | null>(null);
   const [workers, setWorkers] = useState<KryptexWorkerData[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -180,6 +184,38 @@ export function KryptexPage() {
 
   const isInitialLoad = loading && workers.length === 0;
 
+  // LECTOR: redirigir a su detalle (no ver dashboard completo)
+  useEffect(() => {
+    if (user?.role !== "lector") return;
+    getKryptexLectorWallet()
+      .then((r) => setLectorRedirect({ wallet: r.wallet, pool: r.pool }))
+      .catch((err) => setLectorError(err instanceof Error ? err.message : "Error al cargar cuenta"));
+  }, [user?.role]);
+
+  if (user?.role === "lector") {
+    if (lectorRedirect) {
+      return <Navigate to={`/kryptex/detalle?wallet=${encodeURIComponent(lectorRedirect.wallet)}&pool=${encodeURIComponent(lectorRedirect.pool)}`} replace />;
+    }
+    if (lectorError) {
+      return (
+        <div className="hrs-home">
+          <div className="hrs-home-container container" style={{ maxWidth: "600px" }}>
+            <PageHeader title="Kryptex" rightContent={<button type="button" className="fact-back" onClick={logout}><i className="bi bi-box-arrow-right me-1" />Cerrar sesión</button>} />
+            <div className="alert alert-danger">{lectorError}</div>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="hrs-home">
+        <div className="hrs-home-container container d-flex align-items-center justify-content-center min-vh-50">
+          <div className="spinner-border text-primary" role="status"><span className="visually-hidden">Cargando...</span></div>
+          <p className="ms-2 mb-0 text-muted">Cargando tu cuenta...</p>
+        </div>
+      </div>
+    );
+  }
+
   useEffect(() => {
     loadWorkers();
     const interval = setInterval(() => loadWorkers(true), 45000);
@@ -189,7 +225,18 @@ export function KryptexPage() {
   return (
     <div className="hrs-home">
       <div className="hrs-home-container container" style={{ maxWidth: "1200px" }}>
-        <PageHeader title="Kryptex" />
+        <PageHeader
+          title="Kryptex"
+          showBackButton={user?.role !== "lector"}
+          backTo="/"
+          backText="Volver al inicio"
+          rightContent={user?.role === "lector" ? (
+            <button type="button" className="fact-back" onClick={logout}>
+              <i className="bi bi-box-arrow-right me-1" />
+              Cerrar sesión
+            </button>
+          ) : undefined}
+        />
 
         {/* Sección TH/s (S21) */}
         <div className="hrs-card p-4 kryptex-section" style={{ background: "#fff", borderRadius: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>

@@ -17,7 +17,8 @@ const emptyForm = {
   address: "",
   address2: "",
   city: "",
-  city2: ""
+  city2: "",
+  usuario: ""
 };
 
 type Props = {
@@ -44,7 +45,8 @@ export function ClienteNewForm({ onSuccess, onCancel, variant = "card" }: Props)
       address: form.address.trim() || undefined,
       address2: form.address2.trim() || undefined,
       city: form.city.trim() || undefined,
-      city2: form.city2.trim() || undefined
+      city2: form.city2.trim() || undefined,
+      usuario: form.usuario.trim() || undefined
     };
     if (!payload.code || !payload.name) {
       showToast("Código y nombre son obligatorios.", "error", TOAST_CONTEXT);
@@ -113,6 +115,16 @@ export function ClienteNewForm({ onSuccess, onCancel, variant = "card" }: Props)
               value={form.code}
               onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
               placeholder="Ej. C01"
+            />
+          </div>
+
+          <div className="fact-field">
+            <label className="fact-label">Usuario</label>
+            <input
+              className="fact-input"
+              value={form.usuario}
+              onChange={(e) => setForm((f) => ({ ...f, usuario: e.target.value }))}
+              placeholder="Usuario"
             />
           </div>
 
@@ -249,7 +261,7 @@ export function ClienteNewForm({ onSuccess, onCancel, variant = "card" }: Props)
             Usá un archivo tipo Excel para cargar la Base de Clientes (.xlsx):
           </p>
           <ul className="clientes-new-excel-columns">
-            <li><strong>Código</strong></li>
+            <li><strong>Código</strong>, <strong>Usuario</strong></li>
             <li><strong>Contacto Principal</strong> y <strong>Contacto Alternativo</strong>: para cada uno, columnas — Nombre o Razón Social, Teléfono, Email, Dirección, Ciudad / País.</li>
           </ul>
           <div className="clientes-new-excel-actions">

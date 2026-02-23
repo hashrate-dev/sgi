@@ -5,6 +5,7 @@ export type AuthUser = {
   username: string;
   email: string;
   role: UserRole;
+  usuario?: string;
 };
 
 const TOKEN_KEY = "hrs_facturacion_token";

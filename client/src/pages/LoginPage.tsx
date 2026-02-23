@@ -34,7 +34,7 @@ export function LoginPage() {
   }, [location.search, location.pathname, location.hash]);
 
   if (user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={user.role === "lector" ? "/kryptex" : "/"} replace />;
   }
 
   async function handleSubmit(e: React.FormEvent) {

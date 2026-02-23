@@ -261,7 +261,7 @@ export async function verifyPassword(password: string): Promise<{ valid: boolean
   return data as { valid: boolean };
 }
 
-export type UserListItem = { id: number; email: string; role: string; created_at: string };
+export type UserListItem = { id: number; email: string; role: string; created_at: string; usuario?: string };
 export type UsersResponse = { users: UserListItem[] };
 export type UserResponse = { user: UserListItem };
 
@@ -269,11 +269,11 @@ export function getUsers(): Promise<UsersResponse> {
   return api<UsersResponse>("/api/users");
 }
 
-export function createUser(body: { email: string; password: string; role: "admin_a" | "admin_b" | "operador" | "lector" }): Promise<UserResponse> {
+export function createUser(body: { email: string; password: string; role: "admin_a" | "admin_b" | "operador" | "lector"; usuario?: string }): Promise<UserResponse> {
   return api<UserResponse>("/api/users", { method: "POST", body: JSON.stringify(body) });
 }
 
-export function updateUser(id: number, body: { email?: string; password?: string; role?: "admin_a" | "admin_b" | "operador" | "lector" }): Promise<UserResponse> {
+export function updateUser(id: number, body: { email?: string; password?: string; role?: "admin_a" | "admin_b" | "operador" | "lector"; usuario?: string }): Promise<UserResponse> {
   return api<UserResponse>(`/api/users/${id}`, { method: "PUT", body: JSON.stringify(body) });
 }
 
@@ -596,6 +596,11 @@ export type KryptexWorkerData = {
 export function getKryptexWorkers(forceRefresh = false): Promise<{ workers: KryptexWorkerData[] }> {
   const path = forceRefresh ? "/api/kryptex/workers?refresh=1" : "/api/kryptex/workers";
   return apiNoRetry<{ workers: KryptexWorkerData[] }>(path, 25000);
+}
+
+/** Wallet y pool asignados al usuario LECTOR (users.usuario → POOL_CONFIGS). Solo para rol lector. */
+export function getKryptexLectorWallet(): Promise<{ wallet: string; pool: string }> {
+  return api<{ wallet: string; pool: string }>("/api/kryptex/lector-wallet");
 }
 
 export type KryptexPayoutsData = {

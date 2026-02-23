@@ -62,12 +62,12 @@ authRouter.post("/auth/login", async (req, res) => {
   }
   const { username, password } = parsed.data;
   const loginName = username.trim();
-  let row: { id: number; username: string; email?: string | null; password_hash: string; role: string } | undefined;
+  let row: { id: number; username: string; email?: string | null; password_hash: string; role: string; usuario?: string | null } | undefined;
   try {
-    row = (await db.prepare("SELECT id, username, email, password_hash, role FROM users WHERE username = ? OR email = ?").get(loginName, loginName)) as typeof row;
+    row = (await db.prepare("SELECT id, username, email, password_hash, role, usuario FROM users WHERE username = ? OR email = ?").get(loginName, loginName)) as typeof row;
   } catch (e) {
     try {
-      row = (await db.prepare("SELECT id, username, password_hash, role FROM users WHERE username = ?").get(loginName)) as typeof row;
+      row = (await db.prepare("SELECT id, username, password_hash, role, usuario FROM users WHERE username = ?").get(loginName)) as typeof row;
     } catch (e2) {
       console.error("login db error:", e2);
       return res.status(500).json({ error: { message: "Error al consultar usuario. Revisá la base de datos." } });
@@ -77,7 +77,7 @@ authRouter.post("/auth/login", async (req, res) => {
     return res.status(401).json({ error: { message: "Usuario o contraseña incorrectos" } });
   }
   try {
-    const user: AuthUser = { id: row.id, username: row.username, email: row.email ?? row.username, role: row.role as AuthUser["role"] };
+    const user: AuthUser = { id: row.id, username: row.username, email: row.email ?? row.username, role: row.role as AuthUser["role"], usuario: row.usuario ?? undefined };
     const token = jwt.sign({ sub: row.username, userId: row.id }, JWT_SECRET, { expiresIn: "7d" });
     const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket?.remoteAddress || "";
     const userAgent = (req.headers["user-agent"] as string) || "";

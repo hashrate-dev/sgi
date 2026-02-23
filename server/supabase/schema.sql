@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS clients (
   address TEXT,
   address2 TEXT,
   city TEXT,
-  city2 TEXT
+  city2 TEXT,
+  usuario TEXT
 );
 
 -- Secuencias para facturas/recibos/notas de crédito
@@ -61,7 +62,8 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT UNIQUE,
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('admin_a', 'admin_b', 'operador', 'lector')),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  usuario TEXT
 );
 
 -- Actividad de login/logout

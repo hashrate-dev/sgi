@@ -9,31 +9,35 @@ export const usersRouter = Router();
 const CreateUserSchema = z.object({
   email: z.string().email().max(200),
   password: z.string().min(6).max(100),
-  role: z.enum(["admin_a", "admin_b", "operador", "lector"])
+  role: z.enum(["admin_a", "admin_b", "operador", "lector"]),
+  usuario: z.string().max(100).trim().optional()
 });
 
 const UpdateUserSchema = z.object({
   email: z.string().email().max(200).optional(),
   password: z.string().min(6).max(100).optional(),
-  role: z.enum(["admin_a", "admin_b", "operador", "lector"]).optional()
+  role: z.enum(["admin_a", "admin_b", "operador", "lector"]).optional(),
+  usuario: z.string().max(100).trim().optional()
 });
 
 const UpdateMyPasswordSchema = z.object({ password: z.string().min(6).max(100) });
 
-/** Listar usuarios (solo admin) - devuelve id, email, role, created_at (sin password) */
+/** Listar usuarios (solo admin) - devuelve id, email, role, created_at, usuario (sin password) */
 usersRouter.get("/users", requireAuth, requireRole("admin_a", "admin_b"), async (req, res) => {
-  const rows = (await db.prepare("SELECT id, username, email, role, created_at FROM users ORDER BY created_at DESC").all()) as Array<{
+  const rows = (await db.prepare("SELECT id, username, email, role, created_at, usuario FROM users ORDER BY created_at DESC").all()) as Array<{
     id: number;
     username: string;
     email: string | null;
     role: string;
     created_at: string;
+    usuario: string | null;
   }>;
   const users = rows.map((r) => ({
     id: r.id,
     email: r.email ?? r.username,
     role: r.role,
-    created_at: r.created_at
+    created_at: r.created_at,
+    usuario: r.usuario ?? undefined
   }));
   res.json({ users });
 });
@@ -44,14 +48,14 @@ usersRouter.post("/users", requireAuth, requireRole("admin_a", "admin_b"), async
   if (!parsed.success) {
     return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
   }
-  const { email, password, role } = parsed.data;
+  const { email, password, role, usuario } = parsed.data;
   if (role === "admin_a" && req.user!.role !== "admin_a") {
     return res.status(403).json({ error: { message: "Solo AdministradorA puede crear cuentas con rol AdministradorA" } });
   }
   const emailNorm = email.trim().toLowerCase();
   const hash = bcrypt.hashSync(password, 10);
   try {
-    await db.prepare("INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)").run(emailNorm, emailNorm, hash, role);
+    await db.prepare("INSERT INTO users (username, email, password_hash, role, usuario) VALUES (?, ?, ?, ?, ?)").run(emailNorm, emailNorm, hash, role, usuario?.trim() || null);
   } catch (e: unknown) {
     const err = e as { code?: string };
     if (err?.code && String(err.code).includes("SQLITE_CONSTRAINT")) {
@@ -59,8 +63,8 @@ usersRouter.post("/users", requireAuth, requireRole("admin_a", "admin_b"), async
     }
     throw e;
   }
-  const row = (await db.prepare("SELECT id, email, role, created_at FROM users WHERE email = ?").get(emailNorm)) as { id: number; email: string; role: string; created_at: string };
-  res.status(201).json({ user: { id: row.id, email: row.email, role: row.role, created_at: row.created_at } });
+  const row = (await db.prepare("SELECT id, email, role, created_at, usuario FROM users WHERE email = ?").get(emailNorm)) as { id: number; email: string; role: string; created_at: string; usuario: string | null };
+  res.status(201).json({ user: { id: row.id, email: row.email, role: row.role, created_at: row.created_at, usuario: row.usuario ?? undefined } });
 });
 
 /** Cambiar mi propia contraseña (Operador, Lector o cualquier admin). Cualquier usuario autenticado puede usar esta ruta. */
@@ -71,8 +75,8 @@ usersRouter.put("/users/me", requireAuth, async (req, res) => {
   }
   const hash = bcrypt.hashSync(parsed.data.password, 10);
   await db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(hash, req.user!.id);
-  const row = (await db.prepare("SELECT id, username, email, role, created_at FROM users WHERE id = ?").get(req.user!.id)) as { id: number; username: string; email: string | null; role: string; created_at: string };
-  res.json({ user: { id: row.id, email: row.email ?? row.username, role: row.role, created_at: row.created_at } });
+  const row = (await db.prepare("SELECT id, username, email, role, created_at, usuario FROM users WHERE id = ?").get(req.user!.id)) as { id: number; username: string; email: string | null; role: string; created_at: string; usuario: string | null };
+  res.json({ user: { id: row.id, email: row.email ?? row.username, role: row.role, created_at: row.created_at, usuario: row.usuario ?? undefined } });
 });
 
 /** Actualizar usuario (solo admin). AdminA y AdminB pueden cambiar contraseña de cualquier usuario (Operador, Lector, o la propia). No puede quitarse su propio rol admin. */
@@ -111,14 +115,18 @@ usersRouter.put("/users/:id", requireAuth, requireRole("admin_a", "admin_b"), as
     updates.push("role = ?");
     values.push(parsed.data.role);
   }
+  if (parsed.data.usuario !== undefined) {
+    updates.push("usuario = ?");
+    values.push(parsed.data.usuario.trim() || null);
+  }
   if (updates.length === 0) {
-    const row = (await db.prepare("SELECT id, username, email, role, created_at FROM users WHERE id = ?").get(id)) as { id: number; username: string; email: string | null; role: string; created_at: string };
-    return res.json({ user: { id: row.id, email: row.email ?? row.username, role: row.role, created_at: row.created_at } });
+    const row = (await db.prepare("SELECT id, username, email, role, created_at, usuario FROM users WHERE id = ?").get(id)) as { id: number; username: string; email: string | null; role: string; created_at: string; usuario: string | null };
+    return res.json({ user: { id: row.id, email: row.email ?? row.username, role: row.role, created_at: row.created_at, usuario: row.usuario ?? undefined } });
   }
   values.push(id);
   await db.prepare(`UPDATE users SET ${updates.join(", ")} WHERE id = ?`).run(...values);
-  const row = (await db.prepare("SELECT id, username, email, role, created_at FROM users WHERE id = ?").get(id)) as { id: number; username: string; email: string | null; role: string; created_at: string };
-  res.json({ user: { id: row.id, email: row.email ?? row.username, role: row.role, created_at: row.created_at } });
+  const row = (await db.prepare("SELECT id, username, email, role, created_at, usuario FROM users WHERE id = ?").get(id)) as { id: number; username: string; email: string | null; role: string; created_at: string; usuario: string | null };
+  res.json({ user: { id: row.id, email: row.email ?? row.username, role: row.role, created_at: row.created_at, usuario: row.usuario ?? undefined } });
 });
 
 /** Listar actividad de usuarios (solo admin): entradas/salidas, horarios, tiempo conectado, IP */

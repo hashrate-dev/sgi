@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS clients (
   phone2 TEXT,
   email2 TEXT,
   address2 TEXT,
-  city2 TEXT
+  city2 TEXT,
+  usuario TEXT
 );
 
 CREATE TABLE IF NOT EXISTS users (
@@ -23,7 +24,8 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT UNIQUE,
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('admin_a', 'admin_b', 'operador', 'lector')),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  usuario TEXT
 );
 
 CREATE TABLE IF NOT EXISTS user_activity (
@@ -124,6 +126,8 @@ CREATE TABLE IF NOT EXISTS equipos_asic (
 );
 
 -- Columnas extra que el app puede agregar si no existen (opcional)
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS usuario TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS usuario TEXT;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS related_invoice_id INTEGER;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'hosting';
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS related_invoice_number TEXT;

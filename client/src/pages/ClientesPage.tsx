@@ -89,6 +89,7 @@ export function ClientesPage() {
     // Configurar columnas
     ws.columns = [
       { header: "Código", key: "code", width: 15 },
+      { header: "Usuario", key: "usuario", width: 20 },
       { header: "Nombre o Razón Social 1", key: "name", width: 35 },
       { header: "Nombre o Razón Social 2", key: "name2", width: 35 },
       { header: "Teléfono 1", key: "phone", width: 20 },
@@ -105,6 +106,7 @@ export function ClientesPage() {
     clients.forEach((client) => {
       ws.addRow({
         code: client.code || "",
+        usuario: client.usuario || "",
         name: client.name || "",
         name2: client.name2 || "",
         phone: client.phone || "",
@@ -159,6 +161,7 @@ export function ClientesPage() {
         c.code?.toLowerCase().includes(searchLower) ||
         c.name?.toLowerCase().includes(searchLower) ||
         c.name2?.toLowerCase().includes(searchLower) ||
+        c.usuario?.toLowerCase().includes(searchLower) ||
         c.phone?.toLowerCase().includes(searchLower) ||
         c.email?.toLowerCase().includes(searchLower)
     );
@@ -284,6 +287,7 @@ export function ClientesPage() {
                   <thead className="table-dark">
                     <tr>
                       <th className="text-start">Código</th>
+                      <th className="text-start">Usuario</th>
                       <th className="text-start">Nombre/Razón Social</th>
                       <th className="text-start">Contacto</th>
                       <th className="text-start">Ubicación</th>
@@ -294,6 +298,7 @@ export function ClientesPage() {
                     {[1, 2, 3, 4, 5].map((i) => (
                       <tr key={i}>
                         <td><span className="clientes-skeleton" style={{ width: "4em" }} /></td>
+                        <td><span className="clientes-skeleton" style={{ width: "6em" }} /></td>
                         <td><span className="clientes-skeleton" style={{ width: "12em" }} /></td>
                         <td><span className="clientes-skeleton" style={{ width: "10em" }} /></td>
                         <td><span className="clientes-skeleton" style={{ width: "8em" }} /></td>
@@ -316,6 +321,7 @@ export function ClientesPage() {
                   <thead className="table-dark">
                     <tr>
                       <th className="text-start">Código</th>
+                      <th className="text-start">Usuario</th>
                       <th className="text-start">Nombre/Razón Social</th>
                       <th className="text-start">Contacto</th>
                       <th className="text-start">Ubicación</th>
@@ -326,6 +332,7 @@ export function ClientesPage() {
                     {filteredClients.map((c) => (
                       <tr key={c.id ?? c.code}>
                         <td className="text-start client-code">{c.code}</td>
+                        <td className="text-start client-usuario">{c.usuario ?? "—"}</td>
                         <td className="text-start client-name">
                           <div className="client-name-primary">{c.name}</div>
                           {c.name2 && (

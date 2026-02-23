@@ -13,6 +13,7 @@ export type Client = {
   address2?: string;
   city?: string;
   city2?: string;
+  usuario?: string;
 };
 
 export type LineItem = {

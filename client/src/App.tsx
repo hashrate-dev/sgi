@@ -36,10 +36,10 @@ function App() {
         <ToastContainer />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/kryptex" element={<KryptexPage />} />
-          <Route path="/kryptex/detalle" element={<KryptexDetallePage />} />
           <Route element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
             <Route path="/" element={<HomePage />} />
+            <Route path="/kryptex" element={<KryptexPage />} />
+            <Route path="/kryptex/detalle" element={<KryptexDetallePage />} />
             <Route path="/hosting" element={<HostingHubPage />} />
             <Route path="/hosting/control-documentos-cobros" element={<FacturasMesHostingPage />} />
             <Route path="/facturacion-hosting" element={<FacturacionPage />} />

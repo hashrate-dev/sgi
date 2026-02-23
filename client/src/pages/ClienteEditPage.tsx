@@ -18,7 +18,8 @@ const emptyForm = {
   address: "",
   address2: "",
   city: "",
-  city2: ""
+  city2: "",
+  usuario: ""
 };
 
 export function ClienteEditPage() {
@@ -70,7 +71,8 @@ export function ClienteEditPage() {
           address: found.address ?? "",
           address2: found.address2 ?? "",
           city: found.city ?? "",
-          city2: found.city2 ?? ""
+          city2: found.city2 ?? "",
+          usuario: found.usuario ?? ""
         });
         setLoading(false);
         // Si la URL tiene id numérico (279), reemplazar por código (C17) para que la barra muestre el código
@@ -104,7 +106,8 @@ export function ClienteEditPage() {
       address: form.address.trim() || undefined,
       address2: form.address2.trim() || undefined,
       city: form.city.trim() || undefined,
-      city2: form.city2.trim() || undefined
+      city2: form.city2.trim() || undefined,
+      usuario: form.usuario.trim() || undefined
     };
     if (!payload.name) return;
 
@@ -226,6 +229,15 @@ export function ClienteEditPage() {
                     <div className="fact-field">
                       <label className="fact-label">Nombre o Razón Social 2</label>
                       <input className="fact-input" value={form.name2} onChange={(e) => setForm((f) => ({ ...f, name2: e.target.value }))} placeholder="Nombre (opcional)" />
+                    </div>
+                    <div className="fact-field">
+                      <label className="fact-label">Usuario</label>
+                      <input
+                        className="fact-input"
+                        value={form.usuario}
+                        onChange={(e) => setForm((f) => ({ ...f, usuario: e.target.value }))}
+                        placeholder="Usuario"
+                      />
                     </div>
                   </div>
 

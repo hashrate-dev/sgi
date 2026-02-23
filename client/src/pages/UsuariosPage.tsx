@@ -49,6 +49,7 @@ export function UsuariosPage() {
   const [formEmail, setFormEmail] = useState("");
   const [formPassword, setFormPassword] = useState("");
   const [formRole, setFormRole] = useState<UserRole>("operador");
+  const [formUsuario, setFormUsuario] = useState("");
   const [saving, setSaving] = useState(false);
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
   const roleDropdownRef = useRef<HTMLDivElement>(null);
@@ -96,6 +97,7 @@ export function UsuariosPage() {
     setFormEmail("");
     setFormPassword("");
     setFormRole("operador");
+    setFormUsuario("");
     setRoleDropdownOpen(false);
   }
 
@@ -104,6 +106,7 @@ export function UsuariosPage() {
     setFormEmail(u.email);
     setFormPassword("");
     setFormRole(u.role as UserRole);
+    setFormUsuario(u.usuario ?? "");
     setRoleDropdownOpen(false);
   }
 
@@ -135,7 +138,7 @@ export function UsuariosPage() {
     }
     setSaving(true);
     if (modal === "new") {
-      createUser({ email: formEmail.trim(), password: formPassword, role: formRole })
+      createUser({ email: formEmail.trim(), password: formPassword, role: formRole, usuario: formUsuario.trim() || undefined })
         .then(() => {
           showToast("Usuario creado correctamente.", "success", toastContext);
           setModal(null);
@@ -145,7 +148,7 @@ export function UsuariosPage() {
         .catch((err) => showToast(`Error al crear usuario: ${err instanceof Error ? err.message : "Error desconocido"}`, "error", toastContext))
         .finally(() => setSaving(false));
     } else {
-      const body: { email?: string; password?: string; role?: UserRole } = { email: formEmail.trim(), role: formRole };
+      const body: { email?: string; password?: string; role?: UserRole; usuario?: string } = { email: formEmail.trim(), role: formRole, usuario: formUsuario.trim() || undefined };
       if (formPassword) body.password = formPassword;
       updateUser((modal as UserListItem).id, body)
         .then(() => {
@@ -264,6 +267,7 @@ export function UsuariosPage() {
                       <thead className="table-dark">
                         <tr>
                           <th className="text-start">Correo</th>
+                          <th className="text-start">Usuario</th>
                           <th className="text-start">Rol</th>
                           <th className="text-start">Fecha alta</th>
                           <th className="text-center">Acciones</th>
@@ -272,7 +276,7 @@ export function UsuariosPage() {
                       <tbody>
                         {users.length === 0 ? (
                           <tr>
-                            <td colSpan={4} className="text-center text-muted py-4">
+                            <td colSpan={5} className="text-center text-muted py-4">
                               <small>No hay usuarios registrados</small>
                             </td>
                           </tr>
@@ -280,6 +284,7 @@ export function UsuariosPage() {
                           paginatedUsers.map((u) => (
                             <tr key={u.id}>
                               <td><span className="user-email">{u.email}</span></td>
+                              <td><span className="user-usuario">{u.usuario ?? "—"}</span></td>
                               <td>
                                 <span className={getRoleBadgeClass(u.role, currentUser?.role)}>
                                   {getRoleDisplayLabel(u.role, currentUser?.role)}
@@ -498,6 +503,16 @@ export function UsuariosPage() {
               </div>
               <form onSubmit={handleSubmit}>
                 <div className="modal-body professional-modal-body">
+                  <div className="mb-3">
+                    <label className="form-label">Usuario</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={formUsuario}
+                      onChange={(e) => setFormUsuario(e.target.value)}
+                      placeholder="Nombre de usuario"
+                    />
+                  </div>
                   <div className="mb-3">
                     <label className="form-label">Correo</label>
                     <input

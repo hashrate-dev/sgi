@@ -4,6 +4,7 @@ export type ClientRow = {
   code: string;
   name: string;
   name2?: string;
+  usuario?: string;
   phone?: string;
   phone2?: string;
   email?: string;
@@ -69,6 +70,7 @@ export async function parseExcelFile(file: File, options?: ParseExcelOptions): P
     code: findCol(headerRow, "codigo", "código", "code"),
     name: findCol(headerRow, "nombre o razon social 1", "nombre o razón social 1", "nombre", "razon social", "name"),
     name2: findCol(headerRow, "nombre o razon social 2", "nombre o razón social 2", "nombre 2", "nombre2"),
+    usuario: findCol(headerRow, "usuario", "user"),
     phone: findCol(headerRow, "teléfono 1", "telefono 1", "teléfono", "telefono", "phone"),
     phone2: findCol(headerRow, "teléfono 2", "telefono 2", "phone2"),
     email: findCol(headerRow, "email1", "email 1", "email", "correo"),
@@ -106,6 +108,7 @@ export async function parseExcelFile(file: File, options?: ParseExcelOptions): P
       code,
       name: name || "Sin nombre",
       name2: idx.name2 >= 0 ? get(row, idx.name2) || undefined : undefined,
+      usuario: idx.usuario >= 0 ? get(row, idx.usuario) || undefined : undefined,
       phone: idx.phone >= 0 ? get(row, idx.phone) || undefined : undefined,
       phone2: idx.phone2 >= 0 ? get(row, idx.phone2) || undefined : undefined,
       email: idx.email >= 0 ? get(row, idx.email) || undefined : undefined,
