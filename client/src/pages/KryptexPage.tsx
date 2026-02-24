@@ -146,6 +146,8 @@ export function KryptexPage() {
   const [historyTH, setHistoryTH] = useState<HashratePoint[]>(() => loadHashrateHistory(STORAGE_KEY_TH));
   const [historyGH, setHistoryGH] = useState<HashratePoint[]>(() => loadHashrateHistory(STORAGE_KEY_GH));
 
+  const isLector = (user as unknown as { role?: string } | null)?.role === "lector";
+
   const workersTH = useMemo(() => workers.filter(isWorkerTHs), [workers]);
   const workersGH = useMemo(() => workers.filter(isWorkerGHs), [workers]);
 
@@ -186,13 +188,13 @@ export function KryptexPage() {
 
   // LECTOR: redirigir a su detalle (no ver dashboard completo)
   useEffect(() => {
-    if (user?.role !== "lector") return;
+    if (!isLector) return;
     getKryptexLectorWallet()
       .then((r) => setLectorRedirect({ wallet: r.wallet, pool: r.pool }))
       .catch((err) => setLectorError(err instanceof Error ? err.message : "Error al cargar cuenta"));
-  }, [user?.role]);
+  }, [isLector]);
 
-  if (user?.role === "lector") {
+  if (isLector) {
     if (lectorRedirect) {
       return <Navigate to={`/kryptex/detalle?wallet=${encodeURIComponent(lectorRedirect.wallet)}&pool=${encodeURIComponent(lectorRedirect.pool)}`} replace />;
     }
@@ -227,10 +229,10 @@ export function KryptexPage() {
       <div className="hrs-home-container container" style={{ maxWidth: "1200px" }}>
         <PageHeader
           title="Kryptex"
-          showBackButton={user?.role !== "lector"}
+          showBackButton={!isLector}
           backTo="/"
           backText="Volver al inicio"
-          rightContent={user?.role === "lector" ? (
+          rightContent={isLector ? (
             <button type="button" className="fact-back" onClick={logout}>
               <i className="bi bi-box-arrow-right me-1" />
               Cerrar sesión

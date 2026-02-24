@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Link, Navigate, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -12,7 +12,7 @@ import {
   saveHashrateHistory,
   type HashratePoint,
 } from "../components/KryptexHashrateChart";
-import { getKryptexPayouts, getKryptexLectorWallet, type KryptexPayoutsData } from "../lib/api";
+import { getKryptexPayouts, type KryptexPayoutsData } from "../lib/api";
 import "../styles/facturacion.css";
 import "../styles/hrshome.css";
 
@@ -30,9 +30,6 @@ export function KryptexDetallePage() {
   const [data, setData] = useState<KryptexPayoutsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [lectorRedirect, setLectorRedirect] = useState<{ wallet: string; pool: string } | null>(null);
-  const [lectorError, setLectorError] = useState<string | null>(null);
-
   const isTHs = pool.includes("sha256");
   const storageKey = `kryptex_detalle_${isTHs ? "th" : "gh"}_${wallet}`;
   const [history, setHistory] = useState<HashratePoint[]>(() => loadHashrateHistory(storageKey));
