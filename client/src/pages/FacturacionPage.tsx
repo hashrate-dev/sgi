@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { addEmittedDocument, createInvoice, getClients, getEmittedDocuments, getNextInvoiceNumber, type InvoiceCreateBody } from "../lib/api";
+import {
+  addEmittedDocument,
+  createInvoice,
+  getClients,
+  getEmittedDocuments,
+  getInvoices,
+  getNextInvoiceNumber,
+  wakeUpBackend,
+  type InvoiceCreateBody,
+} from "../lib/api";
 import { serviceCatalog } from "../lib/constants";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadInvoices, saveInvoices } from "../lib/storage";
@@ -124,6 +133,8 @@ export function FacturacionPage() {
   const [dueDateDays, setDueDateDays] = useState<5 | 6 | 7>(6);
 
   const [invoices, setInvoices] = useState<Invoice[]>(() => loadInvoices());
+  /** Facturas / recibos / NC leídos desde la base de datos (source=hosting) para habilitar recibos/NC sobre facturas de la base */
+  const [dbInvoices, setDbInvoices] = useState<Invoice[]>([]);
   /** Siguiente número desde el servidor; null = aún no pedido, "" = API falló (usar fallback local) */
   const [nextNumFromApi, setNextNumFromApi] = useState<string | null>(null);
   /** Documentos emitidos en esta sesión: se muestran solo 24 h, luego se quitan de la tabla (siguen en Historial/Pendientes) */
@@ -147,6 +158,59 @@ export function FacturacionPage() {
     const windowMs = 10 * 24 * 60 * 60 * 1000 + 22 * 60 * 60 * 1000;
     setEmittedInSession((prev) => prev.filter((item) => now - new Date(item.emittedAt).getTime() < windowMs));
   }, []);
+
+  /** Cargar documentos desde la base de datos (source=hosting) para usarlos en selects de Nota de Crédito / Recibo */
+  useEffect(() => {
+    let cancelled = false;
+    const fetchDbInvoices = async () => {
+      try {
+        await wakeUpBackend();
+        if (cancelled) return;
+        const r = await getInvoices({ source: "hosting" });
+        if (cancelled) return;
+        const list: Invoice[] = (r.invoices ?? []).map((inv) => ({
+          id: String(inv.id),
+          number: inv.number,
+          type: inv.type as ComprobanteType,
+          clientName: inv.clientName,
+          date: inv.date,
+          month: inv.month,
+          subtotal: inv.subtotal,
+          discounts: inv.discounts,
+          total: inv.total,
+          relatedInvoiceId: inv.relatedInvoiceId != null ? String(inv.relatedInvoiceId) : undefined,
+          relatedInvoiceNumber: inv.relatedInvoiceNumber,
+          paymentDate: inv.paymentDate,
+          emissionTime: inv.emissionTime,
+          dueDate: inv.dueDate,
+          items: [],
+        }));
+        setDbInvoices(list);
+      } catch {
+        setDbInvoices([]);
+      }
+    };
+    fetchDbInvoices();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /** Conjunto combinado de facturas/recibos/NC: locales (historial del navegador) + base de datos (hosting). Dedupe por tipo+número. */
+  const invoicesAll = useMemo<Invoice[]>(() => {
+    const map = new Map<string, Invoice>();
+    const addAll = (src: Invoice[]) => {
+      for (const inv of src) {
+        const key = `${inv.type}-${inv.number}`;
+        if (!map.has(key)) {
+          map.set(key, inv);
+        }
+      }
+    };
+    addAll(invoices);
+    addAll(dbInvoices);
+    return Array.from(map.values());
+  }, [invoices, dbInvoices]);
 
   /** Cargar documentos emitidos (hosting) desde el servidor; al borrar del historial se borran también de aquí. */
   function fetchEmittedHosting() {
@@ -264,18 +328,18 @@ export function FacturacionPage() {
   const invoicesWithoutCreditNote = useMemo(() => {
     if (!selectedClient || type !== "Nota de Crédito") return [];
     // Obtener todas las facturas del cliente
-    const facturas = invoices.filter(
+    const facturas = invoicesAll.filter(
       (inv) => inv.clientName === selectedClient.name && inv.type === "Factura"
     );
     // Obtener IDs de facturas que ya tienen Nota de Crédito conectada
     const facturasConNC = new Set(
-      invoices
+      invoicesAll
         .filter((inv) => inv.type === "Nota de Crédito" && inv.relatedInvoiceId)
         .map((inv) => inv.relatedInvoiceId)
     );
     // Obtener IDs de facturas que ya tienen Recibo (pagadas) — no se puede emitir NC sobre factura pagada
     const facturasConRecibo = new Set(
-      invoices
+      invoicesAll
         .filter((inv) => inv.type === "Recibo" && inv.relatedInvoiceId)
         .map((inv) => inv.relatedInvoiceId)
     );
@@ -283,24 +347,24 @@ export function FacturacionPage() {
     return facturas.filter(
       (inv) => !facturasConNC.has(inv.id) && !facturasConRecibo.has(inv.id)
     );
-  }, [invoices, selectedClient, type]);
+  }, [invoicesAll, selectedClient, type]);
 
   // Obtener facturas sin recibo conectado y que no estén canceladas por NC (para recibos)
   const invoicesWithoutReceipt = useMemo(() => {
     if (!selectedClient || type !== "Recibo") return [];
     // Obtener todas las facturas del cliente
-    const facturas = invoices.filter(
+    const facturas = invoicesAll.filter(
       (inv) => inv.clientName === selectedClient.name && inv.type === "Factura"
     );
     // Obtener IDs de facturas que ya tienen recibo conectado
     const facturasConRecibo = new Set(
-      invoices
+      invoicesAll
         .filter((inv) => inv.type === "Recibo" && inv.relatedInvoiceId)
         .map((inv) => inv.relatedInvoiceId)
     );
     // Obtener IDs de facturas canceladas por Nota de Crédito (no se puede hacer recibo)
     const facturasCanceladasPorNC = new Set(
-      invoices
+      invoicesAll
         .filter((inv) => inv.type === "Nota de Crédito" && inv.relatedInvoiceId)
         .map((inv) => inv.relatedInvoiceId)
     );
@@ -308,7 +372,7 @@ export function FacturacionPage() {
     return facturas.filter(
       (inv) => !facturasConRecibo.has(inv.id) && !facturasCanceladasPorNC.has(inv.id)
     );
-  }, [invoices, selectedClient, type]);
+  }, [invoicesAll, selectedClient, type]);
 
   // Limpiar factura relacionada cuando cambia el tipo o el cliente
   useEffect(() => {
@@ -348,7 +412,7 @@ export function FacturacionPage() {
   // Cargar ítems de la factura relacionada cuando se selecciona
   useEffect(() => {
     if ((type === "Nota de Crédito" || type === "Recibo") && relatedInvoiceId && selectedClient) {
-      const relatedInvoice = invoices.find((inv) => inv.id === relatedInvoiceId);
+      const relatedInvoice = invoicesAll.find((inv) => inv.id === relatedInvoiceId);
       if (relatedInvoice && relatedInvoice.items && relatedInvoice.items.length > 0) {
         // Cargar los ítems de la factura relacionada con todos los campos copiados correctamente
         const loadedItems: LineItem[] = relatedInvoice.items.map((item) => {
@@ -490,7 +554,7 @@ export function FacturacionPage() {
     dueDate.setDate(dueDate.getDate() + dueDateDays);
     const dueDateStr = dueDate.toLocaleDateString();
 
-    const relatedInvoice = relatedInvoiceId ? invoices.find((inv) => inv.id === relatedInvoiceId) : null;
+    const relatedInvoice = relatedInvoiceId ? invoicesAll.find((inv) => inv.id === relatedInvoiceId) : null;
     const isNegativeType = type === "Recibo" || type === "Nota de Crédito";
     const finalSubtotal = isNegativeType ? -(Math.abs(subtotal)) : subtotal;
     const finalDiscounts = isNegativeType ? -(Math.abs(discounts)) : discounts;
