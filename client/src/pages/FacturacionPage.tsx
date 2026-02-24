@@ -118,6 +118,29 @@ function currentMonthValue(): string {
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}`;
 }
 
+/** Normaliza nombre de cliente para comparar (quita tildes, dobles espacios, mayúsculas/minúsculas) */
+function normalizeClientName(name: string | undefined | null): string {
+  if (!name) return "";
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9\s]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isNumericId(id: string | undefined): boolean {
+  return typeof id === "string" && /^\d+$/.test(id);
+}
+
+/** Link robusto: usa relatedInvoiceId o relatedInvoiceNumber */
+function isLinkedToInvoice(comp: Invoice, factura: Invoice): boolean {
+  const matchId = comp.relatedInvoiceId != null && String(comp.relatedInvoiceId) === String(factura.id);
+  const matchNumber = comp.relatedInvoiceNumber != null && comp.relatedInvoiceNumber === factura.number;
+  return matchId || matchNumber;
+}
+
 export function FacturacionPage() {
   const { user } = useAuth();
   const location = useLocation();
@@ -202,9 +225,15 @@ export function FacturacionPage() {
     const addAll = (src: Invoice[]) => {
       for (const inv of src) {
         const key = `${inv.type}-${inv.number}`;
-        if (!map.has(key)) {
+        const prev = map.get(key);
+        if (!prev) {
           map.set(key, inv);
+          continue;
         }
+        // Preferir el registro "de base" (id numérico) por sobre el local (id tipo timestamp_uuid)
+        const prevIsDb = isNumericId(prev.id);
+        const invIsDb = isNumericId(inv.id);
+        if (!prevIsDb && invIsDb) map.set(key, inv);
       }
     };
     addAll(invoices);
@@ -327,51 +356,25 @@ export function FacturacionPage() {
   // Obtener facturas disponibles para Nota de Crédito: sin NC y sin Recibo (no pagadas)
   const invoicesWithoutCreditNote = useMemo(() => {
     if (!selectedClient || type !== "Nota de Crédito") return [];
-    // Obtener todas las facturas del cliente
-    const facturas = invoicesAll.filter(
-      (inv) => inv.clientName === selectedClient.name && inv.type === "Factura"
-    );
-    // Obtener IDs de facturas que ya tienen Nota de Crédito conectada
-    const facturasConNC = new Set(
-      invoicesAll
-        .filter((inv) => inv.type === "Nota de Crédito" && inv.relatedInvoiceId)
-        .map((inv) => inv.relatedInvoiceId)
-    );
-    // Obtener IDs de facturas que ya tienen Recibo (pagadas) — no se puede emitir NC sobre factura pagada
-    const facturasConRecibo = new Set(
-      invoicesAll
-        .filter((inv) => inv.type === "Recibo" && inv.relatedInvoiceId)
-        .map((inv) => inv.relatedInvoiceId)
-    );
-    // Filtrar: sin NC y sin Recibo (no pagadas)
-    return facturas.filter(
-      (inv) => !facturasConNC.has(inv.id) && !facturasConRecibo.has(inv.id)
-    );
+    const clientNorm = normalizeClientName(selectedClient.name);
+    // Obtener todas las facturas del cliente (comparando nombre normalizado)
+    const facturas = invoicesAll.filter((inv) => inv.type === "Factura" && normalizeClientName(inv.clientName) === clientNorm);
+    const recibos = invoicesAll.filter((inv) => inv.type === "Recibo");
+    const ncs = invoicesAll.filter((inv) => inv.type === "Nota de Crédito");
+    // Disponibles para NC: no tienen recibo ni NC vinculados
+    return facturas.filter((f) => !recibos.some((r) => isLinkedToInvoice(r, f)) && !ncs.some((nc) => isLinkedToInvoice(nc, f)));
   }, [invoicesAll, selectedClient, type]);
 
   // Obtener facturas sin recibo conectado y que no estén canceladas por NC (para recibos)
   const invoicesWithoutReceipt = useMemo(() => {
     if (!selectedClient || type !== "Recibo") return [];
-    // Obtener todas las facturas del cliente
-    const facturas = invoicesAll.filter(
-      (inv) => inv.clientName === selectedClient.name && inv.type === "Factura"
-    );
-    // Obtener IDs de facturas que ya tienen recibo conectado
-    const facturasConRecibo = new Set(
-      invoicesAll
-        .filter((inv) => inv.type === "Recibo" && inv.relatedInvoiceId)
-        .map((inv) => inv.relatedInvoiceId)
-    );
-    // Obtener IDs de facturas canceladas por Nota de Crédito (no se puede hacer recibo)
-    const facturasCanceladasPorNC = new Set(
-      invoicesAll
-        .filter((inv) => inv.type === "Nota de Crédito" && inv.relatedInvoiceId)
-        .map((inv) => inv.relatedInvoiceId)
-    );
-    // Filtrar: no tener recibo Y no estar cancelada por NC
-    return facturas.filter(
-      (inv) => !facturasConRecibo.has(inv.id) && !facturasCanceladasPorNC.has(inv.id)
-    );
+    const clientNorm = normalizeClientName(selectedClient.name);
+    // Obtener todas las facturas del cliente (comparando nombre normalizado)
+    const facturas = invoicesAll.filter((inv) => inv.type === "Factura" && normalizeClientName(inv.clientName) === clientNorm);
+    const recibos = invoicesAll.filter((inv) => inv.type === "Recibo");
+    const ncs = invoicesAll.filter((inv) => inv.type === "Nota de Crédito");
+    // Disponibles para Recibo: no tienen recibo ni NC vinculados
+    return facturas.filter((f) => !recibos.some((r) => isLinkedToInvoice(r, f)) && !ncs.some((nc) => isLinkedToInvoice(nc, f)));
   }, [invoicesAll, selectedClient, type]);
 
   // Limpiar factura relacionada cuando cambia el tipo o el cliente
@@ -455,7 +458,7 @@ export function FacturacionPage() {
     } else {
       setItemsLocked(false);
     }
-  }, [relatedInvoiceId, type, selectedClient, invoices]);
+  }, [relatedInvoiceId, type, selectedClient, invoicesAll]);
 
   function addItem() {
     const def = serviceCatalog.A;
@@ -503,9 +506,8 @@ export function FacturacionPage() {
       return;
     }
     if (type === "Nota de Crédito" && relatedInvoiceId) {
-      const hasExistingNC = invoices.some(
-        (inv) => inv.type === "Nota de Crédito" && inv.relatedInvoiceId === relatedInvoiceId
-      );
+      const factura = invoicesAll.find((i) => i.type === "Factura" && String(i.id) === String(relatedInvoiceId)) || null;
+      const hasExistingNC = !!factura && invoicesAll.some((inv) => inv.type === "Nota de Crédito" && isLinkedToInvoice(inv, factura));
       if (hasExistingNC) {
         showToast("Esta factura ya tiene una Nota de Crédito relacionada. No se puede crear otra.", "error");
         return;
@@ -516,9 +518,8 @@ export function FacturacionPage() {
       return;
     }
     if (type === "Recibo" && relatedInvoiceId) {
-      const facturaCanceladaPorNC = invoices.some(
-        (inv) => inv.type === "Nota de Crédito" && inv.relatedInvoiceId === relatedInvoiceId
-      );
+      const factura = invoicesAll.find((i) => i.type === "Factura" && String(i.id) === String(relatedInvoiceId)) || null;
+      const facturaCanceladaPorNC = !!factura && invoicesAll.some((inv) => inv.type === "Nota de Crédito" && isLinkedToInvoice(inv, factura));
       if (facturaCanceladaPorNC) {
         showToast("Esta factura fue cancelada con Nota de Crédito. No se puede crear un recibo para ella.", "error");
         return;
