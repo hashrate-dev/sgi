@@ -59,7 +59,7 @@ export function LoginPage() {
         <div className="col-lg-4 col-md-6">
           <div className="hrs-card p-4">
             <h2 className="hrs-title mb-4 text-center">Iniciar sesión</h2>
-            <p className="text-muted small text-center mb-4">Sistema de Facturación HRS</p>
+            <p className="text-muted small text-center mb-4">HRS Sistema de Gestión Interna</p>
             <form onSubmit={handleSubmit}>
               <div className="mb-3">
                 <label className="form-label">Usuario o correo</label>
