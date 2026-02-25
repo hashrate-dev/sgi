@@ -376,6 +376,32 @@ export function getInvoices(params?: { client?: string; type?: "Factura" | "Reci
   return api<InvoicesListResponse>(`/api/invoices${q ? `?${q}` : ""}`);
 }
 
+/** Obtener una factura por id con sus ítems (para recibo/NC). */
+export type InvoiceWithItemsResponse = {
+  invoice: {
+    id: number;
+    number: string;
+    type: string;
+    clientName: string;
+    date: string;
+    month: string;
+    subtotal: number;
+    discounts: number;
+    total: number;
+    relatedInvoiceId?: number;
+    relatedInvoiceNumber?: string;
+    paymentDate?: string;
+    emissionTime?: string;
+    dueDate?: string;
+    source?: string;
+    items: Array<{ service: string; month: string; quantity: number; price: number; discount: number }>;
+  };
+};
+
+export function getInvoiceById(id: number): Promise<InvoiceWithItemsResponse> {
+  return api<InvoiceWithItemsResponse>(`/api/invoices/${id}`);
+}
+
 /** Eliminar una factura por id (solo admin_a, admin_b). */
 export function deleteInvoice(id: number): Promise<{ ok: boolean }> {
   return api<{ ok: boolean }>(`/api/invoices/${id}`, { method: "DELETE" });
@@ -604,6 +630,10 @@ export function getKryptexLectorWallet(): Promise<{ wallet: string; pool: string
 }
 
 export type KryptexPayoutsData = {
+  /** Saldo sin confirmar (Unconfirmed Balance en Kryptex Stats) */
+  unconfirmed: number;
+  unconfirmedUsd: number | null;
+  /** Saldo pendiente de pago (Unpaid en Kryptex Payouts) */
   unpaid: number;
   paid: number;
   unpaidUsd: number | null;

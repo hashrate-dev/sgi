@@ -164,6 +164,53 @@ invoicesRouter.get("/invoices", async (req, res) => {
   res.json({ invoices });
 });
 
+/** GET /invoices/:id — devuelve una factura con sus ítems (para cargar detalle en recibo/NC). */
+invoicesRouter.get("/invoices/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) {
+    return res.status(400).json({ error: { message: "Invalid id" } });
+  }
+  const row = await db.prepare(
+    `SELECT id, number, type, ${clientNameCol()} as clientName, date, month, subtotal, discounts, total,
+            related_invoice_id as relatedInvoiceId, related_invoice_number as relatedInvoiceNumber,
+            payment_date as paymentDate, emission_time as emissionTime, due_date as dueDate,
+            ${sourceCol()} as source
+     FROM invoices WHERE id = ?`
+  ).get(id) as Record<string, unknown> | undefined;
+  if (!row) {
+    return res.status(404).json({ error: { message: "Invoice not found" } });
+  }
+  const itemRows = await db.prepare(
+    "SELECT service, month, quantity, price, discount FROM invoice_items WHERE invoice_id = ? ORDER BY id"
+  ).all(id) as Array<{ service: string; month: string; quantity: number; price: number; discount: number }>;
+  const items = (Array.isArray(itemRows) ? itemRows : []).map((r) => ({
+    service: r.service,
+    month: r.month,
+    quantity: r.quantity,
+    price: r.price,
+    discount: r.discount
+  }));
+  const invoice = {
+    id: row.id,
+    number: row.number,
+    type: row.type,
+    clientName: row.clientName ?? row.clientname,
+    date: row.date,
+    month: row.month,
+    subtotal: row.subtotal,
+    discounts: row.discounts,
+    total: row.total,
+    relatedInvoiceId: row.relatedInvoiceId ?? row.relatedinvoiceid,
+    relatedInvoiceNumber: row.relatedInvoiceNumber ?? row.relatedinvoicenumber,
+    paymentDate: row.paymentDate ?? row.paymentdate,
+    emissionTime: row.emissionTime ?? row.emissiontime ?? row.emission_time,
+    dueDate: row.dueDate ?? row.duedate,
+    source: row.source,
+    items
+  };
+  res.json({ invoice });
+});
+
 invoicesRouter.post("/invoices", requireRole("admin_a", "admin_b", "operador"), async (req, res) => {
   const parsed = InvoiceCreateSchema.safeParse(req.body);
   if (!parsed.success) {

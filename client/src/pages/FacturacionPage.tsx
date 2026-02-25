@@ -4,6 +4,7 @@ import {
   createInvoice,
   getClients,
   getEmittedDocuments,
+  getInvoiceById,
   getInvoices,
   getNextInvoiceNumber,
   wakeUpBackend,
@@ -452,8 +453,49 @@ export function FacturacionPage() {
           showToast(`Factura ${relatedInvoice.number} cargada. Puedes modificar los ítems si es necesario.`, "info");
         }
       } else if (relatedInvoice && (!relatedInvoice.items || relatedInvoice.items.length === 0)) {
-        showToast(`La factura ${relatedInvoice.number} no tiene ítems cargados.`, "warning");
-        setItemsLocked(false);
+        // Factura de la base sin ítems en memoria: traer ítems desde la API para que el recibo muestre las líneas reales
+        const invId = typeof relatedInvoice.id === "number" ? relatedInvoice.id : Number(relatedInvoice.id);
+        if (!Number.isFinite(invId)) {
+          const totalAbs = Math.abs(Number(relatedInvoice.total) || 0);
+          const month = (relatedInvoice.month && /^\d{4}-\d{2}$/.test(relatedInvoice.month)) ? relatedInvoice.month : currentMonthValue();
+          setItems([{ serviceKey: "A", serviceName: `Total factura ${relatedInvoice.number}`, month, quantity: 1, price: totalAbs, discount: 0 }]);
+          setItemsLocked(true);
+          return;
+        }
+        getInvoiceById(invId)
+          .then((res) => {
+            const apiItems = res.invoice?.items ?? [];
+            if (apiItems.length > 0) {
+              const loadedItems: LineItem[] = apiItems.map((item) => {
+                const serviceName = item.service || "";
+                const key = (["A", "B", "C", "D"] as const).find((k) => serviceCatalog[k].name === serviceName || serviceCatalog[k].price === item.price) ?? "A";
+                return {
+                  serviceKey: key,
+                  serviceName: serviceName || serviceCatalog[key].name,
+                  month: item.month || currentMonthValue(),
+                  quantity: item.quantity || 1,
+                  price: item.price || 0,
+                  discount: item.discount || 0
+                };
+              });
+              setItems(loadedItems);
+              setItemsLocked(true);
+              showToast(`Factura ${relatedInvoice.number} cargada con sus ítems. Podés emitir el ${type === "Recibo" ? "recibo" : "NC"}.`, "success");
+            } else {
+              const totalAbs = Math.abs(Number(relatedInvoice.total) || 0);
+              const month = (relatedInvoice.month && /^\d{4}-\d{2}$/.test(relatedInvoice.month)) ? relatedInvoice.month : currentMonthValue();
+              setItems([{ serviceKey: "A", serviceName: `Total factura ${relatedInvoice.number}`, month, quantity: 1, price: totalAbs, discount: 0 }]);
+              setItemsLocked(true);
+              showToast(`Factura ${relatedInvoice.number} sin ítems en la base; se usó el total. Podés emitir el ${type === "Recibo" ? "recibo" : "NC"}.`, "success");
+            }
+          })
+          .catch(() => {
+            const totalAbs = Math.abs(Number(relatedInvoice.total) || 0);
+            const month = (relatedInvoice.month && /^\d{4}-\d{2}$/.test(relatedInvoice.month)) ? relatedInvoice.month : currentMonthValue();
+            setItems([{ serviceKey: "A", serviceName: `Total factura ${relatedInvoice.number}`, month, quantity: 1, price: totalAbs, discount: 0 }]);
+            setItemsLocked(true);
+            showToast(`No se pudieron cargar los ítems de la factura; se usó el total. Podés emitir el ${type === "Recibo" ? "recibo" : "NC"}.`, "warning");
+          });
       }
     } else {
       setItemsLocked(false);

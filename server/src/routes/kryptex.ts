@@ -231,6 +231,10 @@ const payoutsCache = new Map<string, { data: KryptexPayoutsData; ts: number }>()
 const PAYOUTS_CACHE_TTL = 60000; // 1 min
 
 export type KryptexPayoutsData = {
+  /** Saldo sin confirmar (Unconfirmed Balance en Kryptex Stats) */
+  unconfirmed: number;
+  unconfirmedUsd: number | null;
+  /** Saldo pendiente de pago (Unpaid en Kryptex Payouts) */
   unpaid: number;
   paid: number;
   unpaidUsd: number | null;
@@ -500,6 +504,31 @@ function parsePayoutsPage(html: string): { unpaid: number; paid: number; reward7
   return { unpaid, paid, reward7d, reward30d, unpaidUsd, paidUsd };
 }
 
+/** Extrae Unconfirmed Balance (solo QUAI) desde la página de Stats de Kryptex.
+ *  Ejemplo de bloque:
+ *  Unconfirmed Balance
+ *  ...
+ *  3364.729836
+ *  ...
+ *  • NaN USD
+ */
+function parseUnconfirmedFromStatsPage(html: string): { unconfirmed: number; unconfirmedUsd: number | null } {
+  const section = html.split(/Unconfirmed Balance/i)[1] ?? "";
+  if (!section) return { unconfirmed: 0, unconfirmedUsd: null };
+  // Intentar capturar específicamente el valor dentro del span con clase text-sm
+  const spanMatch = section.match(/class="[^"]*text-sm[^"]*"[^>]*>\s*([\d.]+)\s*<\/span>/i);
+  if (spanMatch?.[1]) {
+    const v = parseFloat(spanMatch[1] ?? "0");
+    if (!isNaN(v) && v >= 0) {
+      return { unconfirmed: v, unconfirmedUsd: null };
+    }
+  }
+  // Fallback: tomar el primer número con decimales dentro del bloque
+  const anyMatch = section.match(/(\d+\.\d+)/);
+  const unconfirmed = anyMatch ? parseFloat(anyMatch[1] ?? "0") || 0 : 0;
+  return { unconfirmed, unconfirmedUsd: null };
+}
+
 async function fetchQuaiPriceUsd(): Promise<number | null> {
   try {
     const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=quai-network&vs_currencies=usd", {
@@ -553,11 +582,18 @@ kryptexRouter.get("/kryptex/payouts", async (req, res) => {
     const workers24h = statsResp ? parseStatsPageWorkers24h(statsResp) : null;
     const workers = statsResp ? parseStatsPageWorkersWithStatus(statsResp) : [];
     const sharesChart = statsResp ? parseSharesChartFromStats(statsResp) : undefined;
+    const { unconfirmed, unconfirmedUsd: unconfirmedUsdRaw } = statsResp ? parseUnconfirmedFromStatsPage(statsResp) : { unconfirmed: 0, unconfirmedUsd: null };
+    let unconfirmedUsd = unconfirmedUsdRaw;
+    if (unconfirmedUsd == null && quaPrice != null && unconfirmed > 0) {
+      unconfirmedUsd = Math.round(unconfirmed * quaPrice * 100) / 100;
+    }
     const config = POOL_CONFIGS.find(
       (c) => c.url.includes(wallet) && c.url.includes(`/${pool}/`)
     );
     const usuario = config?.usuario ?? null;
     const data: KryptexPayoutsData = {
+      unconfirmed,
+      unconfirmedUsd,
       unpaid: parsed.unpaid,
       paid: parsed.paid || apiData.totalPaid,
       unpaidUsd,

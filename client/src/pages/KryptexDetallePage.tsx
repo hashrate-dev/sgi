@@ -137,7 +137,7 @@ export function KryptexDetallePage() {
             </div>
           ) : data ? (
             <>
-              {/* Mineros, PAGOS PENDIENTES, PAGOS ACUMULADOS */}
+              {/* Mineros, PAGOS SIN CONFIRMAR, PAGOS PENDIENTES, PAGOS ACUMULADOS */}
               <div className="row g-3 mb-4">
                 {data.workers24h != null && (
                   <div className="col-6 col-md-3">
@@ -150,6 +150,17 @@ export function KryptexDetallePage() {
                     </div>
                   </div>
                 )}
+                <div className="col-6 col-md-3">
+                  <div className="card border-0 shadow-sm h-100 kryptex-metric-card">
+                    <div className="card-body">
+                      <div className="small text-muted fw-bold">Pagos sin confirmar</div>
+                      <div className="fs-5 fw-bold text-warning">{formatNum(data.unconfirmed)} QUAI</div>
+                      {data.unconfirmedUsd != null && (
+                        <div className="small text-muted">≈ {formatNum(data.unconfirmedUsd)} USD</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
                 <div className="col-6 col-md-3">
                   <div className="card border-0 shadow-sm h-100 kryptex-metric-card">
                     <div className="card-body">
