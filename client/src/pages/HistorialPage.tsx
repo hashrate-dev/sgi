@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
-import { addEmittedDocument, deleteAllInvoices, deleteEmittedDocumentOne, deleteEmittedDocumentsAll, deleteInvoice, getClients, getInvoices, verifyPassword, wakeUpBackend } from "../lib/api";
+import { addEmittedDocument, deleteAllInvoices, deleteEmittedDocumentOne, deleteEmittedDocumentsAll, deleteInvoice, getClients, getInvoiceById, getInvoices, verifyPassword, wakeUpBackend } from "../lib/api";
+import { serviceCatalog } from "../lib/constants";
 import { dispatchEmittedChanged } from "../lib/emittedEvents";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadInvoices, loadInvoicesAsic, saveInvoices, saveInvoicesAsic } from "../lib/storage";
@@ -653,19 +654,48 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
 
   async function generatePdfFromHistory(inv: Invoice) {
     try {
-      // Validar que el invoice tenga items
+      // Si el invoice no tiene ítems (vino del listado API que no los trae), cargar factura completa por id
+      let invoiceToUse = inv;
       if (!inv.items || inv.items.length === 0) {
-        showToast("Esta factura no tiene ítems cargados. No se puede generar el PDF.", "error");
-        return;
+        const invId = inv.id != null && inv.id !== "" ? Number(inv.id) : NaN;
+        if (!Number.isFinite(invId)) {
+          showToast("Esta factura no tiene ítems cargados. No se puede generar el PDF.", "error");
+          return;
+        }
+        try {
+          const res = await getInvoiceById(invId);
+          const apiInv = res.invoice;
+          const apiItems = apiInv?.items ?? [];
+          if (apiItems.length === 0) {
+            showToast("Esta factura no tiene ítems en la base de datos. No se puede generar el PDF.", "error");
+            return;
+          }
+          const loadedItems = apiItems.map((item) => {
+            const serviceName = item.service || "";
+            const key = (["A", "B", "C", "D"] as const).find((k) => serviceCatalog[k].name === serviceName || serviceCatalog[k].price === item.price) ?? "A";
+            return {
+              serviceKey: key,
+              serviceName: serviceName || serviceCatalog[key].name,
+              month: item.month || inv.month,
+              quantity: item.quantity || 1,
+              price: item.price || 0,
+              discount: item.discount || 0
+            };
+          });
+          invoiceToUse = { ...inv, items: loadedItems };
+        } catch {
+          showToast("No se pudo cargar el detalle de la factura. No se puede generar el PDF.", "error");
+          return;
+        }
       }
 
       // Buscar el cliente completo por nombre
       const clientsResponse = await getClients();
       const clients = clientsResponse.clients ?? [];
-      const client = clients.find((c) => c.name === inv.clientName);
+      const client = clients.find((c) => c.name === invoiceToUse.clientName);
       
       if (!client) {
-        showToast(`No se encontró el cliente "${inv.clientName}" en la base de datos.`, "error");
+        showToast(`No se encontró el cliente "${invoiceToUse.clientName}" en la base de datos.`, "error");
         return;
       }
 
@@ -681,19 +711,19 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
       // Convertir la fecha del string a Date
       // La fecha puede estar en formato localizado (ej: "11/2/2026") o ISO
       let invoiceDate: Date;
-      if (inv.date.includes("/")) {
+      if (invoiceToUse.date.includes("/")) {
         // Formato localizado: DD/MM/YYYY o M/D/YYYY
-        const parts = inv.date.split("/");
+        const parts = invoiceToUse.date.split("/");
         if (parts.length === 3) {
           const day = parseInt(parts[0], 10);
           const month = parseInt(parts[1], 10) - 1; // Los meses en Date son 0-indexed
           const year = parseInt(parts[2], 10);
           invoiceDate = new Date(year, month, day);
         } else {
-          invoiceDate = new Date(inv.date);
+          invoiceDate = new Date(invoiceToUse.date);
         }
       } else {
-        invoiceDate = new Date(inv.date);
+        invoiceDate = new Date(invoiceToUse.date);
       }
 
       // Validar que la fecha sea válida
@@ -703,7 +733,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
       }
 
       // Validar y asegurar que los items tengan la estructura correcta
-      const validItems = inv.items.map((item) => {
+      const validItems = invoiceToUse.items.map((item) => {
         // Asegurar que serviceKey existe, si no, intentar inferirlo desde serviceName
         let serviceKey: "A" | "B" | "C" | "D" = (item.serviceKey as "A" | "B" | "C" | "D") || "A";
         if (!item.serviceKey && item.serviceName) {
@@ -720,7 +750,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
         return {
           serviceKey,
           serviceName: item.serviceName || "Servicio",
-          month: item.month || inv.month,
+          month: item.month || invoiceToUse.month,
           quantity: item.quantity || 1,
           price: item.price || 0,
           discount: item.discount || 0
@@ -730,8 +760,8 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
       // Generar el PDF
       const doc = generateFacturaPdf(
         {
-          number: inv.number,
-          type: inv.type,
+          number: invoiceToUse.number,
+          type: invoiceToUse.type,
           clientName: client.name,
           clientPhone: client.phone,
           clientEmail: client.email,
@@ -744,16 +774,16 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
           clientCity2: client.city2,
           date: invoiceDate,
           items: validItems,
-          subtotal: inv.subtotal || 0,
-          discounts: inv.discounts || 0,
-          total: inv.total || 0
+          subtotal: invoiceToUse.subtotal || 0,
+          discounts: invoiceToUse.discounts || 0,
+          total: invoiceToUse.total || 0
         },
         { logoBase64 }
       );
 
       // Guardar el PDF
       const safeName = client.name.replace(/[^\w\s-]/g, "").replace(/\s+/g, " ").trim() || "cliente";
-      doc.save(`${inv.number}_${safeName}.pdf`);
+      doc.save(`${invoiceToUse.number}_${safeName}.pdf`);
       showToast("PDF generado correctamente.", "success");
     } catch (error) {
       console.error("Error al generar PDF:", error);
