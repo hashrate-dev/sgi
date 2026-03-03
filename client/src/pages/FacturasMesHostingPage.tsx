@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getInvoices, wakeUpBackend } from "../lib/api";
+import { deleteInvoice, getInvoices, wakeUpBackend } from "../lib/api";
 import type { ComprobanteType, Invoice } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
 import { ConfirmModal } from "../components/ConfirmModal";
@@ -77,6 +77,15 @@ function parseDate(dateStr: string): Date | null {
 /** Devuelve YYYY-MM del mes de una fecha parseada */
 function dateToMonthStr(parsed: { year: number; month: number }): string {
   return `${parsed.year}-${String(parsed.month + 1).padStart(2, "0")}`;
+}
+
+/** Dado un mes YYYY-MM (periodo de facturación), devuelve el MES de servicio: el mes anterior (ene si facturación feb). */
+function serviceMonthForBillingPeriod(billingMonthYYYYMM: string): string {
+  if (!billingMonthYYYYMM || billingMonthYYYYMM.length < 7) return "";
+  const [y, m] = billingMonthYYYYMM.split("-").map(Number);
+  if (!Number.isFinite(y) || !Number.isFinite(m)) return "";
+  if (m === 1) return `${y - 1}-12`;
+  return `${y}-${String(m - 1).padStart(2, "0")}`;
 }
 
 /** Formatea mes YYYY-MM a "feb-2026" (mes del documento en emisión) */
@@ -167,7 +176,7 @@ export function FacturasMesHostingPage() {
   /** Cuando el usuario elige Cancelado, pedimos confirmación antes de aplicar */
   const [confirmCancelado, setConfirmCancelado] = useState<Invoice | null>(null);
 
-  /** Opciones de mes desde el primer mes (inv.month) con datos en la base hasta el mes actual */
+  /** Opciones de mes = periodos de facturación (feb, mar, ...). Se arman desde los MES de servicio existentes: ene→feb, feb→mar. */
   const opcionesMesAnio = useMemo(() => {
     const hoy = new Date();
     const endYear = hoy.getFullYear();
@@ -183,13 +192,16 @@ export function FacturasMesHostingPage() {
       let minYear = endYear + 1;
       let minMonth = 12;
       for (const inv of all) {
-        const mm = inv.month && inv.month.length >= 7 ? inv.month : "";
-        if (!mm) continue;
+        const mm = normalizeMonth(inv.month);
+        if (!mm || mm.length < 7) continue;
         const [y, m] = mm.split("-").map(Number);
         const month0 = (m || 1) - 1;
-        if (y < minYear || (y === minYear && month0 < minMonth)) {
-          minYear = y;
-          minMonth = month0;
+        /* periodo de facturación = mes siguiente al MES de servicio */
+        const billingMonth = m === 12 ? 0 : month0 + 1;
+        const billingYear = m === 12 ? y + 1 : y;
+        if (billingYear < minYear || (billingYear === minYear && billingMonth < minMonth)) {
+          minYear = billingYear;
+          minMonth = billingMonth;
         }
       }
       startYear = minYear;
@@ -217,19 +229,18 @@ export function FacturasMesHostingPage() {
     if (!exists) setSelectedMonth(opcionesMesAnio[0].value);
   }, [opcionesMesAnio, selectedMonth]);
 
-  /** Documentos del mes seleccionado: inv.month o fecha de emisión. Acumulado a hoy = date <= hoy. Sin NC (no se muestran en esta página). */
+  /** Documentos del periodo de facturación seleccionado: selectedMonth = mes de facturación (ej. feb); se muestran los de MES = mes anterior (ene). Sin NC. */
   const facturasEsteMes = useMemo(() => {
     const hoy = new Date();
     hoy.setHours(23, 59, 59, 999);
+    const serviceMonth = serviceMonthForBillingPeriod(selectedMonth);
+    if (!serviceMonth) return [];
     return all.filter((inv) => {
       if (inv.type === "Nota de Crédito") return false;
-      const docMonth = normalizeMonth(inv.month);
-      const monthMatch = docMonth === selectedMonth;
-      const parsed = parseDateMonth(inv.date);
-      const dateInMonth = parsed && dateToMonthStr(parsed) === selectedMonth;
+      const docServiceMonth = normalizeMonth(inv.month);
       const invDate = parseDate(inv.date);
       const dateHoy = invDate ? invDate <= hoy : true;
-      return (monthMatch || dateInMonth) && dateHoy;
+      return docServiceMonth === serviceMonth && dateHoy;
     }).sort((a, b) => {
       const pa = parseDateMonth(a.date);
       const pb = parseDateMonth(b.date);
@@ -240,15 +251,18 @@ export function FacturasMesHostingPage() {
     });
   }, [all, selectedMonth]);
 
+  /** Lista para la tabla: filtro por cliente/tipo; se muestran también los cancelados. */
   const filtered = useMemo(() => {
     const client = qClient.trim().toLowerCase();
     return facturasEsteMes.filter((inv) => {
-      if (getMailSent(inv.id) === "Cancelado") return false;
       const okClient = !client || inv.clientName.toLowerCase().includes(client);
       const okType = !qType || inv.type === qType;
       return okClient && okType;
     });
   }, [facturasEsteMes, qClient, qType]);
+
+  /** Lista para totales y barra: excluye cancelados para que no se contabilicen. */
+  const filteredForStats = useMemo(() => filtered.filter((inv) => getMailSent(inv.id) !== "Cancelado"), [filtered]);
 
   /** IDs de facturas que están conectadas con un Recibo o NC en la lista (para pintar ambas filas) */
   const connectedFacturaIds = useMemo(() => {
@@ -271,13 +285,13 @@ export function FacturasMesHostingPage() {
     return false;
   }
 
-  /** IDs de documentos que forman un par factura+recibo/NC y ambos están marcados como enviados por mail */
+  /** IDs de documentos que forman un par factura+recibo/NC y ambos están marcados como enviados por mail (solo entre no cancelados) */
   function getFullySentConnectedIds(): Set<string> {
     const set = new Set<string>();
     for (const facturaId of connectedFacturaIds) {
-      const facturaRow = filtered.find((i) => i.type === "Factura" && i.id === facturaId);
+      const facturaRow = filteredForStats.find((i) => i.type === "Factura" && i.id === facturaId);
       if (!facturaRow) continue;
-      const group = [facturaRow, ...filtered.filter((i) => (i.type === "Recibo" || i.type === "Nota de Crédito") && isLinkedToInvoice(i, facturaRow))];
+      const group = [facturaRow, ...filteredForStats.filter((i) => (i.type === "Recibo" || i.type === "Nota de Crédito") && isLinkedToInvoice(i, facturaRow))];
       const allSent = group.every((inv) => getMailSent(inv.id) === "SI");
       if (allSent) group.forEach((inv) => set.add(inv.id));
     }
@@ -285,26 +299,25 @@ export function FacturasMesHostingPage() {
   }
   const fullySentConnectedIds = getFullySentConnectedIds();
 
-  /** Resumen de lo que muestra la tabla (filtered). Cobros realizados = suma de recibos vinculados a facturas. */
+  /** Resumen: solo documentos no cancelados (filteredForStats) para que los cancelados no se contabilicen. */
   const stats = useMemo(() => {
-    const facturas = filtered.filter((i) => i.type === "Factura").length;
-    const recibos = filtered.filter((i) => i.type === "Recibo").length;
-    const notasCredito = filtered.filter((i) => i.type === "Nota de Crédito").length;
-    const sumaFacturas = filtered.filter((i) => i.type === "Factura").reduce((s, i) => s + (Number(i.total) || 0), 0);
-    const sumaNC = filtered.filter((i) => i.type === "Nota de Crédito").reduce((s, i) => s + (Math.abs(i.total) || 0), 0);
+    const list = filteredForStats;
+    const facturas = list.filter((i) => i.type === "Factura").length;
+    const recibos = list.filter((i) => i.type === "Recibo").length;
+    const notasCredito = list.filter((i) => i.type === "Nota de Crédito").length;
+    const sumaFacturas = list.filter((i) => i.type === "Factura").reduce((s, i) => s + (Number(i.total) || 0), 0);
+    const sumaNC = list.filter((i) => i.type === "Nota de Crédito").reduce((s, i) => s + (Math.abs(i.total) || 0), 0);
     const facturacionTotal = sumaFacturas - sumaNC;
     const tieneRecibo = (factura: Invoice) =>
-      filtered.some((r) => r.type === "Recibo" && isLinkedToInvoice(r, factura));
-    const facturasPendientes = filtered.filter((i) => i.type === "Factura" && !tieneRecibo(i));
+      list.some((r) => r.type === "Recibo" && isLinkedToInvoice(r, factura));
+    const facturasPendientes = list.filter((i) => i.type === "Factura" && !tieneRecibo(i));
     const cobrosPendientes = facturasPendientes.reduce((s, i) => s + (Number(i.total) || 0), 0);
-    /** Cobros realizados = suma de los totales de los recibos vinculados a facturas del mes */
-    const cobrosRealizados = filtered
-      .filter((r) => r.type === "Recibo" && filtered.some((f) => f.type === "Factura" && isLinkedToInvoice(r, f)))
+    const cobrosRealizados = list
+      .filter((r) => r.type === "Recibo" && list.some((f) => f.type === "Factura" && isLinkedToInvoice(r, f)))
       .reduce((s, r) => s + (Math.abs(r.total) || 0), 0);
-    /** Registros = facturas que ya están cobradas (tienen recibo asociado) */
-    const registros = filtered.filter((i) => i.type === "Factura" && tieneRecibo(i)).length;
+    const registros = list.filter((i) => i.type === "Factura" && tieneRecibo(i)).length;
     return { facturas, recibos, notasCredito, facturacionTotal, cobrosPendientes, cobrosRealizados, registros };
-  }, [filtered]);
+  }, [filteredForStats]);
 
   /** Porcentaje cobros realizados / facturación total (0–100) para la barra de progreso */
   const progressPct = useMemo(() => {
@@ -340,12 +353,26 @@ export function FacturasMesHostingPage() {
     showToast(`Enviado por mail: ${value}`, "success");
   }
 
-  function confirmSetCancelado() {
+  async function confirmSetCancelado() {
     if (!confirmCancelado) return;
-    setMailSent(confirmCancelado.id, "Cancelado");
-    setConfirmCancelado(null);
-    forceUpdate((n) => n + 1);
-    showToast("Documento cancelado. Se quitó de la lista.", "success");
+    const id = Number(confirmCancelado.id);
+    if (!Number.isFinite(id)) {
+      setConfirmCancelado(null);
+      showToast("No se puede eliminar este documento.", "error");
+      return;
+    }
+    try {
+      await deleteInvoice(id);
+      try {
+        localStorage.removeItem(STORAGE_PREFIX + confirmCancelado.id);
+      } catch {}
+      setConfirmCancelado(null);
+      fetchDocuments();
+      showToast("Documento eliminado de la base de datos.", "success");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "No se pudo eliminar.";
+      showToast(msg, "error");
+    }
   }
 
   function confirmSetNoMailSent() {
@@ -598,20 +625,20 @@ export function FacturasMesHostingPage() {
 
         <ConfirmModal
           open={confirmCancelado !== null}
-          title="¿Cancelar documento?"
+          title="¿Eliminar de la base de datos?"
           message={
             confirmCancelado ? (
               <>
-                ¿Está seguro que realmente deseas cancelar este documento?
+                ¿Desea eliminar este documento de la base de datos?
                 <br />
                 <strong>{confirmCancelado.number}</strong> ({confirmCancelado.type}) — {confirmCancelado.clientName}.
                 <br />
-                <span className="text-muted">Se quitará de la lista de forma inmediata.</span>
+                <span className="text-muted">Esta acción no se puede deshacer.</span>
               </>
             ) : null
           }
           variant="delete"
-          confirmLabel="Sí"
+          confirmLabel="Sí, eliminar"
           cancelLabel="No"
           onConfirm={confirmSetCancelado}
           onCancel={() => setConfirmCancelado(null)}
