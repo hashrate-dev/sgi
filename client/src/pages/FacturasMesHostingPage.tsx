@@ -79,16 +79,7 @@ function dateToMonthStr(parsed: { year: number; month: number }): string {
   return `${parsed.year}-${String(parsed.month + 1).padStart(2, "0")}`;
 }
 
-/** Dado un mes YYYY-MM (periodo de facturación), devuelve el MES de servicio: el mes anterior (ene si facturación feb). */
-function serviceMonthForBillingPeriod(billingMonthYYYYMM: string): string {
-  if (!billingMonthYYYYMM || billingMonthYYYYMM.length < 7) return "";
-  const [y, m] = billingMonthYYYYMM.split("-").map(Number);
-  if (!Number.isFinite(y) || !Number.isFinite(m)) return "";
-  if (m === 1) return `${y - 1}-12`;
-  return `${y}-${String(m - 1).padStart(2, "0")}`;
-}
-
-/** Formatea mes YYYY-MM a "feb-2026" (mes del documento en emisión) */
+/** Formatea mes YYYY-MM a "feb-2026" (mes del documento, columna MES) */
 function formatMonth(monthStr: string): string {
   if (!monthStr || monthStr.length < 7) return monthStr || "—";
   const [y, m] = monthStr.split("-").map(Number);
@@ -176,50 +167,15 @@ export function FacturasMesHostingPage() {
   /** Cuando el usuario elige Cancelado, pedimos confirmación antes de aplicar */
   const [confirmCancelado, setConfirmCancelado] = useState<Invoice | null>(null);
 
-  /** Opciones de mes = periodos de facturación (feb, mar, ...). Se arman desde los MES de servicio existentes: ene→feb, feb→mar. */
+  /** Opciones de mes = valores distintos de la columna MES de la tabla (ene-2026, feb-2026, ...). */
   const opcionesMesAnio = useMemo(() => {
-    const hoy = new Date();
-    const endYear = hoy.getFullYear();
-    const endMonth = hoy.getMonth(); /* 0-indexed */
-
-    let startYear: number;
-    let startMonth: number;
-
-    if (all.length === 0) {
-      startYear = endYear;
-      startMonth = endMonth;
-    } else {
-      let minYear = endYear + 1;
-      let minMonth = 12;
-      for (const inv of all) {
-        const mm = normalizeMonth(inv.month);
-        if (!mm || mm.length < 7) continue;
-        const [y, m] = mm.split("-").map(Number);
-        const month0 = (m || 1) - 1;
-        /* periodo de facturación = mes siguiente al MES de servicio */
-        const billingMonth = m === 12 ? 0 : month0 + 1;
-        const billingYear = m === 12 ? y + 1 : y;
-        if (billingYear < minYear || (billingYear === minYear && billingMonth < minMonth)) {
-          minYear = billingYear;
-          minMonth = billingMonth;
-        }
-      }
-      startYear = minYear;
-      startMonth = minMonth;
+    const set = new Set<string>();
+    for (const inv of all) {
+      const mm = normalizeMonth(inv.month);
+      if (mm && mm.length >= 7) set.add(mm);
     }
-
-    const opciones: { value: string; label: string }[] = [];
-    for (let y = startYear; y <= endYear; y++) {
-      const mStart = y === startYear ? startMonth : 0;
-      const mEnd = y === endYear ? endMonth : 11;
-      for (let m = mStart; m <= mEnd; m++) {
-        const value = `${y}-${String(m + 1).padStart(2, "0")}`;
-        const d = new Date(y, m, 1);
-        const mes = d.toLocaleDateString("es-AR", { month: "short" });
-        opciones.push({ value, label: `${mes}-${y}` });
-      }
-    }
-    return opciones.reverse(); /* más recientes primero */
+    const sorted = Array.from(set).sort().reverse(); /* más reciente primero */
+    return sorted.map((value) => ({ value, label: formatMonth(value) }));
   }, [all]);
 
   /** Si el mes seleccionado no está en las opciones (p. ej. datos recién cargados), elegir el más reciente */
@@ -229,18 +185,18 @@ export function FacturasMesHostingPage() {
     if (!exists) setSelectedMonth(opcionesMesAnio[0].value);
   }, [opcionesMesAnio, selectedMonth]);
 
-  /** Documentos del periodo de facturación seleccionado: selectedMonth = mes de facturación (ej. feb); se muestran los de MES = mes anterior (ene). Sin NC. */
+  /** Documentos del mes seleccionado: filtro por columna MES (inv.month). Sin NC. */
   const facturasEsteMes = useMemo(() => {
     const hoy = new Date();
     hoy.setHours(23, 59, 59, 999);
-    const serviceMonth = serviceMonthForBillingPeriod(selectedMonth);
-    if (!serviceMonth) return [];
+    const mesFiltro = normalizeMonth(selectedMonth);
+    if (!mesFiltro) return [];
     return all.filter((inv) => {
       if (inv.type === "Nota de Crédito") return false;
-      const docServiceMonth = normalizeMonth(inv.month);
+      const docMes = normalizeMonth(inv.month);
       const invDate = parseDate(inv.date);
       const dateHoy = invDate ? invDate <= hoy : true;
-      return docServiceMonth === serviceMonth && dateHoy;
+      return docMes === mesFiltro && dateHoy;
     }).sort((a, b) => {
       const pa = parseDateMonth(a.date);
       const pb = parseDateMonth(b.date);
