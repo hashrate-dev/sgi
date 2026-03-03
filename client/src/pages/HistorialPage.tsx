@@ -338,17 +338,16 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
     const facturas = src.filter((i) => i.type === "Factura").length;
     const recibos = src.filter((i) => i.type === "Recibo").length;
     const notasCredito = src.filter((i) => i.type === "Nota de Crédito").length;
-    // Sumas en valor absoluto para ser consistentes (en BD Factura total > 0, Recibo/NC total < 0)
     const sumaFacturas = src.filter((i) => i.type === "Factura").reduce((s, i) => s + Math.abs(Number(i.total) || 0), 0);
     const sumaNotasCredito = src.filter((i) => i.type === "Nota de Crédito").reduce((s, i) => s + Math.abs(Number(i.total) || 0), 0);
     const sumaRecibos = src.filter((i) => i.type === "Recibo").reduce((s, i) => s + Math.abs(Number(i.total) || 0), 0);
-    // Facturación total = facturas emitidas menos notas de crédito
     const facturacionTotal = sumaFacturas - sumaNotasCredito;
-    // Cobros realizados = total cobrado (recibos)
     const cobrosRealizados = sumaRecibos;
-    // Cobros pendientes = lo que falta por cobrar (nunca negativo)
     const cobrosPendientes = Math.max(0, facturacionTotal - cobrosRealizados);
-    return { facturas, recibos, notasCredito, facturacionTotal, cobrosPendientes, cobrosRealizados, registros: filtered.length };
+    const tieneRecibo = (factura: Invoice) => src.some((r) => r.type === "Recibo" && isLinkedToInvoice(r, factura));
+    const facturasCobradas = src.filter((i) => i.type === "Factura" && tieneRecibo(i)).length;
+    const progressPct = facturacionTotal <= 0 ? 0 : Math.min(100, Math.round((cobrosRealizados / facturacionTotal) * 100));
+    return { facturas, recibos, notasCredito, facturacionTotal, cobrosPendientes, cobrosRealizados, facturasCobradas, progressPct, registros: filtered.length };
   }, [filtered]);
 
   function exportExcel() {
@@ -1183,6 +1182,21 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
               <div className="stat-accent bg-success" />
               <div className="stat-label">Cobros realizados</div>
               <div className="stat-value text-success">{formatCurrencyNumber(stats.cobrosRealizados)} <span className="currency">USD</span></div>
+            </div>
+          </div>
+        </div>
+        <div className="row mt-3 g-3 historial-stats">
+          <div className="col-12">
+            <div className="card stat-card p-3">
+              <div className="stat-progress-track">
+                <div className="stat-progress-fill bg-success" style={{ width: `${stats.progressPct}%` }} title={`Cobros realizados: ${stats.progressPct}% de la facturación total`} />
+              </div>
+              <div className="d-flex align-items-center justify-content-center gap-2 flex-wrap mt-2">
+                <span className="stat-label mb-0">Facturas cobradas</span>
+                <span className="stat-value text-success mb-0">{stats.facturasCobradas}</span>
+                <span className="stat-label mb-0 text-muted"> · Cobros realizados: </span>
+                <span className="stat-value text-success mb-0">{stats.progressPct}%</span>
+              </div>
             </div>
           </div>
         </div>

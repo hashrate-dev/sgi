@@ -2608,6 +2608,11 @@
 }
 
 /* Historial: indicadores modernos */
+/* Contenedores del resumen: ancho mínimo para que número + USD no se partan (row tiene historial-stats) */
+.historial-stats.row > [class*="col-"],
+.historial-stats > [class*="col-"] {
+  min-width: 12rem;
+}
 .historial-stats .stat-card {
   border: none;
   border-radius: 1rem;
@@ -2615,6 +2620,7 @@
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   overflow: hidden;
   background: #fff;
+  min-width: 0;
 }
 .historial-stats .stat-card:hover {
   transform: translateY(-2px);
@@ -2650,6 +2656,7 @@
   font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.2;
+  white-space: nowrap;
 }
 @media (min-width: 768px) {
   .historial-stats .stat-card .stat-value {
@@ -2660,6 +2667,7 @@
   font-size: 0.85em;
   font-weight: 500;
   opacity: 0.9;
+  margin-left: 0.15em;
 }
 
 /* ========== Página Pendientes: Filtros con estilo del header ========== */
