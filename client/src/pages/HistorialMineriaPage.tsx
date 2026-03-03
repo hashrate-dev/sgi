@@ -13,6 +13,35 @@ import { canDeleteHistorial, canExport } from "../lib/auth";
 import { formatCurrency, formatCurrencyNumber } from "../lib/formatCurrency";
 import "../styles/facturacion.css";
 
+/** Normaliza mes a YYYY-MM para filtrar por columna MES */
+function normalizeMonth(mm: string | undefined): string {
+  if (!mm || typeof mm !== "string") return "";
+  const parts = mm.split("-").map((p) => parseInt(String(p).trim(), 10));
+  if (parts.length >= 2 && Number.isFinite(parts[0]) && Number.isFinite(parts[1])) {
+    let y: number, m: number;
+    if (parts[1] > 12) {
+      y = parts[1];
+      m = parts[0];
+    } else {
+      y = parts[0];
+      m = parts[1];
+    }
+    m = Math.max(1, Math.min(12, m));
+    return `${y}-${String(m).padStart(2, "0")}`;
+  }
+  return mm;
+}
+
+/** Formatea YYYY-MM a "ene-2026" para el selector de mes */
+function formatMonthLabel(monthStr: string): string {
+  if (!monthStr || monthStr.length < 7) return monthStr || "—";
+  const [y, m] = monthStr.split("-").map(Number);
+  if (!Number.isFinite(y) || !Number.isFinite(m)) return monthStr;
+  const d = new Date(y, m - 1, 1);
+  const mes = d.toLocaleDateString("es-AR", { month: "short" });
+  return `${mes}-${y}`;
+}
+
 // Función auxiliar para encontrar columna en Excel por nombres posibles
 function findCol(headerRow: (string | number)[], ...names: string[]): number {
   for (let i = 1; i < headerRow.length; i++) {
@@ -205,12 +234,23 @@ export function HistorialMineriaPage() {
     return () => { cancelled = true; document.removeEventListener("visibilitychange", onVisible); };
   }, []);
 
+  /** Opciones de mes (MES) para el filtro: valores distintos de la columna month en los datos */
+  const opcionesMes = useMemo(() => {
+    const set = new Set<string>();
+    for (const inv of all) {
+      const mm = normalizeMonth(inv.month);
+      if (mm && mm.length >= 7) set.add(mm);
+    }
+    return Array.from(set).sort().reverse().map((value) => ({ value, label: formatMonthLabel(value) }));
+  }, [all]);
+
   const filtered = useMemo(() => {
     const client = qClient.trim().toLowerCase();
+    const mesFiltro = normalizeMonth(qMonth) || qMonth;
     return all.filter((inv) => {
       const okClient = !client || inv.clientName.toLowerCase().includes(client);
       const okType = !qType || inv.type === qType;
-      const okMonth = !qMonth || inv.month.startsWith(qMonth);
+      const okMonth = !mesFiltro || normalizeMonth(inv.month) === mesFiltro;
       return okClient && okType && okMonth;
     });
   }, [all, qClient, qType, qMonth]);
@@ -239,21 +279,20 @@ export function HistorialMineriaPage() {
     }
   }
 
+  /** Resumen: Facturas, NC y Recibos. Facturación total = facturas - NC. Cobros realizados = recibos. Pendientes = facturación - realizados (≥ 0). */
   const stats = useMemo(() => {
-    const facturas = all.filter((i) => i.type === "Factura").length;
-    const recibos = all.filter((i) => i.type === "Recibo").length;
-    const notasCredito = all.filter((i) => i.type === "Nota de Crédito").length;
-    // Facturación total: suma de facturas, menos notas de crédito
-    const sumaFacturas = all.filter((i) => i.type === "Factura").reduce((s, i) => s + (Number(i.total) || 0), 0);
-    const sumaNotasCredito = all.filter((i) => i.type === "Nota de Crédito").reduce((s, i) => s + (Math.abs(i.total) || 0), 0);
-    const sumaRecibos = all.filter((i) => i.type === "Recibo").reduce((s, i) => s + (Math.abs(i.total) || 0), 0);
+    const src = filtered;
+    const facturas = src.filter((i) => i.type === "Factura").length;
+    const recibos = src.filter((i) => i.type === "Recibo").length;
+    const notasCredito = src.filter((i) => i.type === "Nota de Crédito").length;
+    const sumaFacturas = src.filter((i) => i.type === "Factura").reduce((s, i) => s + Math.abs(Number(i.total) || 0), 0);
+    const sumaNotasCredito = src.filter((i) => i.type === "Nota de Crédito").reduce((s, i) => s + Math.abs(Number(i.total) || 0), 0);
+    const sumaRecibos = src.filter((i) => i.type === "Recibo").reduce((s, i) => s + Math.abs(Number(i.total) || 0), 0);
     const facturacionTotal = sumaFacturas - sumaNotasCredito;
-    // Cobros pendientes: total facturas - recibos - notas de crédito (lo que aún se debe cobrar)
-    const cobrosPendientes = sumaFacturas - sumaRecibos - sumaNotasCredito;
-    // Cobros realizados: suma de los recibos generados (lo que ya se cobró)
     const cobrosRealizados = sumaRecibos;
-    return { facturas, recibos, notasCredito, facturacionTotal, cobrosPendientes, cobrosRealizados, registros: all.length };
-  }, [all]);
+    const cobrosPendientes = Math.max(0, facturacionTotal - cobrosRealizados);
+    return { facturas, recibos, notasCredito, facturacionTotal, cobrosPendientes, cobrosRealizados, registros: filtered.length };
+  }, [filtered]);
 
   function exportExcel() {
     if (all.length === 0) return;
@@ -665,14 +704,19 @@ export function HistorialMineriaPage() {
                     </select>
                   </div>
                   <div className="col-md-1 col-lg-2">
-                    <label className="form-label small fw-bold">Mes</label>
-                    <input
-                      type="month"
-                      className="form-control form-control-sm"
+                    <label className="form-label small fw-bold">Mes (MES)</label>
+                    <select
+                      className="form-select form-select-sm"
                       value={qMonth}
                       onChange={(e) => setQMonth(e.target.value)}
-                      style={{ maxWidth: "9rem" }}
-                    />
+                      style={{ maxWidth: "10rem" }}
+                      title="Filtro por columna MES (periodo del documento)"
+                    >
+                      <option value="">Todos</option>
+                      {opcionesMes.map((op) => (
+                        <option key={op.value} value={op.value}>{op.label}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="col-md-1 d-flex align-items-end filtros-limpiar-col">
                     <button
