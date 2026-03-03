@@ -160,25 +160,31 @@ export function FacturasMesHostingPage() {
   }, []);
   const [qClient, setQClient] = useState("");
   const [qType, setQType] = useState<"" | ComprobanteType>("");
-  /** Mes/año a mostrar (YYYY-MM); por defecto mes actual */
-  const [selectedMonth, setSelectedMonth] = useState<string>(() => currentMonthValue());
+  /** Mes/año a mostrar (YYYY-MM); se ajusta en useEffect al primer MES con datos */
+  const [selectedMonth, setSelectedMonth] = useState<string>("");
   /** Cuando el usuario intenta pasar de SI a NO, guardamos el documento para pedir confirmación */
   const [confirmNoMailSent, setConfirmNoMailSent] = useState<Invoice | null>(null);
   /** Cuando el usuario elige Cancelado, pedimos confirmación antes de aplicar */
   const [confirmCancelado, setConfirmCancelado] = useState<Invoice | null>(null);
 
-  /** Opciones de mes = valores distintos de la columna MES de la tabla (ene-2026, feb-2026, ...). */
+  /** Opciones de mes = solo MES que tienen al menos un documento (excl. NC, date <= hoy). Así feb/mar no aparecen si no hay datos. */
   const opcionesMesAnio = useMemo(() => {
+    const hoy = new Date();
+    hoy.setHours(23, 59, 59, 999);
     const set = new Set<string>();
     for (const inv of all) {
+      if (inv.type === "Nota de Crédito") continue;
       const mm = normalizeMonth(inv.month);
-      if (mm && mm.length >= 7) set.add(mm);
+      if (!mm || mm.length < 7) continue;
+      const invDate = parseDate(inv.date);
+      if (invDate && invDate > hoy) continue;
+      set.add(mm);
     }
     const sorted = Array.from(set).sort().reverse(); /* más reciente primero */
     return sorted.map((value) => ({ value, label: formatMonth(value) }));
   }, [all]);
 
-  /** Si el mes seleccionado no está en las opciones (p. ej. datos recién cargados), elegir el más reciente */
+  /** Si el mes seleccionado no está en las opciones, elegir el primero disponible (evita mostrar mar/feb con datos de ene). */
   useEffect(() => {
     if (opcionesMesAnio.length === 0) return;
     const exists = opcionesMesAnio.some((o) => o.value === selectedMonth);
