@@ -74,11 +74,6 @@ function parseDate(dateStr: string): Date | null {
   return !isNaN(d.getTime()) ? d : null;
 }
 
-/** Devuelve YYYY-MM del mes de una fecha parseada */
-function dateToMonthStr(parsed: { year: number; month: number }): string {
-  return `${parsed.year}-${String(parsed.month + 1).padStart(2, "0")}`;
-}
-
 /** Formatea mes YYYY-MM a "feb-2026" (mes del documento, columna MES) */
 function formatMonth(monthStr: string): string {
   if (!monthStr || monthStr.length < 7) return monthStr || "—";
@@ -87,11 +82,6 @@ function formatMonth(monthStr: string): string {
   const d = new Date(y, m - 1, 1);
   const mes = d.toLocaleDateString("es-AR", { month: "short" });
   return `${mes}-${y}`;
-}
-
-function currentMonthValue(): string {
-  const n = new Date();
-  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}`;
 }
 
 /** Comprueba si un comprobante (Recibo/NC) está vinculado a una factura. Usa id y number por robustez. */
