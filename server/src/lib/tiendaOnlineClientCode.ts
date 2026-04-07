@@ -3,10 +3,13 @@
  * Secuencia monotónica en `tienda_online_client_seq`: no se reutiliza un número aunque se borre el usuario.
  */
 
+/** Resultado de `prepare(...).run(...)` en SQLite async / Supabase pooler. */
+export type TiendaSeqRunResult = { changes: number; lastInsertRowid: number | null };
+
 export type TiendaSeqTx = {
   prepare: (sql: string) => {
     get: (...params: unknown[]) => Promise<unknown>;
-    run: (...params: unknown[]) => Promise<unknown>;
+    run: (...params: unknown[]) => Promise<TiendaSeqRunResult>;
   };
 };
 
@@ -19,7 +22,7 @@ export function isTiendaOnlineClientCode(code: string): boolean {
 type DbPrepare = {
   prepare: (sql: string) => {
     get: (...params: unknown[]) => Promise<unknown>;
-    run: (...params: unknown[]) => Promise<unknown>;
+    run: (...params: unknown[]) => Promise<TiendaSeqRunResult>;
   };
 };
 
