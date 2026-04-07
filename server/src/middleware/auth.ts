@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
 import { db } from "../db.js";
 
-export type UserRole = "admin_a" | "admin_b" | "operador" | "lector";
+export type UserRole = "admin_a" | "admin_b" | "operador" | "lector" | "cliente";
 
 export type AuthUser = {
   id: number;

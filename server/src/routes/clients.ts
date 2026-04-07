@@ -17,7 +17,9 @@ const ClientCreateSchema = z.object({
   address2: z.string().max(300).trim().optional(),
   city: z.string().max(100).trim().optional(),
   city2: z.string().max(100).trim().optional(),
-  usuario: z.string().max(100).trim().optional()
+  usuario: z.string().max(100).trim().optional(),
+  documento_identidad: z.string().max(50).trim().optional(),
+  country: z.string().max(100).trim().optional()
 });
 
 const ClientUpdateSchema = z.object({
@@ -32,10 +34,13 @@ const ClientUpdateSchema = z.object({
   address2: z.string().max(300).trim().optional(),
   city: z.string().max(100).trim().optional(),
   city2: z.string().max(100).trim().optional(),
-  usuario: z.string().max(100).trim().optional()
+  usuario: z.string().max(100).trim().optional(),
+  documento_identidad: z.string().max(50).trim().optional(),
+  country: z.string().max(100).trim().optional()
 });
 
-const selectFields = "id, code, name, name2, phone, phone2, email, email2, address, address2, city, city2, usuario";
+const selectFields =
+  "id, code, name, name2, phone, phone2, email, email2, address, address2, city, city2, usuario, documento_identidad, country";
 
 clientsRouter.post("/clients/bulk", requireRole("admin_a", "admin_b", "operador"), async (req, res) => {
   const body = req.body as { clients?: unknown[] };
@@ -63,15 +68,45 @@ clientsRouter.post("/clients/bulk", requireRole("admin_a", "admin_b", "operador"
           skipped.push(d.code);
         } else {
           await db.prepare(
-            "INSERT INTO clients (code, name, name2, phone, phone2, email, email2, address, address2, city, city2, usuario) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-          ).run(d.code, d.name, d.name2 ?? null, d.phone ?? null, d.phone2 ?? null, d.email ?? null, d.email2 ?? null, d.address ?? null, d.address2 ?? null, d.city ?? null, d.city2 ?? null, d.usuario ?? null);
+            "INSERT INTO clients (code, name, name2, phone, phone2, email, email2, address, address2, city, city2, usuario, documento_identidad, country) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+          ).run(
+            d.code,
+            d.name,
+            d.name2 ?? null,
+            d.phone ?? null,
+            d.phone2 ?? null,
+            d.email ?? null,
+            d.email2 ?? null,
+            d.address ?? null,
+            d.address2 ?? null,
+            d.city ?? null,
+            d.city2 ?? null,
+            d.usuario ?? null,
+            d.documento_identidad ?? null,
+            d.country ?? null
+          );
           inserted.push({ code: d.code, name: d.name });
         }
       } else {
         try {
           await db.prepare(
-            "INSERT INTO clients (code, name, name2, phone, phone2, email, email2, address, address2, city, city2, usuario) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-          ).run(d.code, d.name, d.name2 ?? null, d.phone ?? null, d.phone2 ?? null, d.email ?? null, d.email2 ?? null, d.address ?? null, d.address2 ?? null, d.city ?? null, d.city2 ?? null, d.usuario ?? null);
+            "INSERT INTO clients (code, name, name2, phone, phone2, email, email2, address, address2, city, city2, usuario, documento_identidad, country) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+          ).run(
+            d.code,
+            d.name,
+            d.name2 ?? null,
+            d.phone ?? null,
+            d.phone2 ?? null,
+            d.email ?? null,
+            d.email2 ?? null,
+            d.address ?? null,
+            d.address2 ?? null,
+            d.city ?? null,
+            d.city2 ?? null,
+            d.usuario ?? null,
+            d.documento_identidad ?? null,
+            d.country ?? null
+          );
           inserted.push({ code: d.code, name: d.name });
         } catch (e: unknown) {
           const err = e as { code?: string };
@@ -117,7 +152,7 @@ clientsRouter.post("/clients", requireRole("admin_a", "admin_b", "operador"), as
     }
     const d = parsed.data;
     const stmt = db.prepare(
-      "INSERT INTO clients (code, name, name2, phone, phone2, email, email2, address, address2, city, city2, usuario) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO clients (code, name, name2, phone, phone2, email, email2, address, address2, city, city2, usuario, documento_identidad, country) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
     try {
       const info = await stmt.run(
@@ -132,7 +167,9 @@ clientsRouter.post("/clients", requireRole("admin_a", "admin_b", "operador"), as
         d.address2 ?? null,
         d.city ?? null,
         d.city2 ?? null,
-        d.usuario ?? null
+        d.usuario ?? null,
+        d.documento_identidad ?? null,
+        d.country ?? null
       );
       const id = info?.lastInsertRowid;
       if (id == null || !Number.isFinite(Number(id))) {
@@ -218,6 +255,14 @@ clientsRouter.put("/clients/:id", requireRole("admin_a", "admin_b", "operador"),
   if (d.usuario !== undefined) {
     updates.push("usuario = ?");
     values.push(d.usuario);
+  }
+  if (d.documento_identidad !== undefined) {
+    updates.push("documento_identidad = ?");
+    values.push(d.documento_identidad);
+  }
+  if (d.country !== undefined) {
+    updates.push("country = ?");
+    values.push(d.country);
   }
   if (updates.length === 0) {
     const client = await db.prepare(`SELECT ${selectFields} FROM clients WHERE id = ?`).get(id);

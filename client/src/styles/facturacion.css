@@ -184,6 +184,18 @@
   display: none !important;
 }
 
+a.fact-logo-container--link {
+  cursor: pointer;
+  text-decoration: none !important;
+  color: inherit;
+}
+
+a.fact-logo-container--link:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
 .fact-logo {
   height: 48px;
   width: auto;
@@ -2497,6 +2509,623 @@
   }
 }
 
+/* ——— Modal Equipo ASIC: todo el contenido ordenado y cabiendo en la misma ventana ——— */
+.hrs-equipo-asic-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+  width: 100%;
+}
+
+.hrs-equipo-asic-modal-form__main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
+  gap: 1.25rem 1.75rem;
+  align-items: stretch;
+}
+
+.hrs-equipo-asic-modal-form__left {
+  min-width: 0;
+}
+
+.hrs-equipo-asic-modal-form__equipo-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem 1rem;
+  margin-top: 0.35rem;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.hrs-equipo-asic-modal-form__equipo-switch-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.hrs-equipo-asic-modal-form__equipo-switch-caption {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #14532d;
+  white-space: nowrap;
+}
+
+/* Identificación en una sola fila (código + fecha) */
+.hrs-equipo-asic-modal-form__ident-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem 1.25rem;
+  margin-bottom: 0.15rem;
+}
+
+.hrs-equipo-asic-modal-form__ident-field {
+  flex: 1 1 200px;
+  min-width: 0;
+  margin-bottom: 0.65rem;
+}
+
+.hrs-equipo-asic-modal-form__product-code-input {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #166534 !important;
+  background: linear-gradient(180deg, #f0fdf4 0%, #ecfdf5 100%) !important;
+  border-color: #86efac !important;
+}
+
+/** Marca, modelo y procesador en una sola fila (tres columnas) */
+.hrs-equipo-asic-modal-form__equipo-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 1.15fr);
+  gap: 0.65rem 0.75rem;
+  width: 100%;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .hrs-equipo-asic-modal-form__equipo-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+.hrs-equipo-asic-modal-form__spec-input--locked {
+  background: #f3f4f6 !important;
+  color: #1f2937 !important;
+  border-color: #d1d5db !important;
+  cursor: not-allowed;
+}
+
+/* Switch ON = campo desbloqueado para editar */
+.hrs-equipo-asic-modal-form__spec-switch {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.hrs-equipo-asic-modal-form__spec-switch-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 2;
+  appearance: none;
+}
+
+.hrs-equipo-asic-modal-form__spec-switch-track {
+  position: relative;
+  z-index: 0;
+  display: block;
+  width: 2.75rem;
+  height: 1.55rem;
+  border-radius: 999px;
+  background: #d1d5db;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition:
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.hrs-equipo-asic-modal-form__spec-switch-track::after {
+  content: "";
+  position: absolute;
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 50%;
+  background: #fff;
+  top: 50%;
+  left: 0.2rem;
+  transform: translateY(-50%);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  transition:
+    transform 0.2s ease,
+    left 0.2s ease;
+}
+
+.hrs-equipo-asic-modal-form__spec-switch:has(.hrs-equipo-asic-modal-form__spec-switch-input:checked)
+  .hrs-equipo-asic-modal-form__spec-switch-track {
+  background: linear-gradient(180deg, #3d7a5c 0%, #2d5d46 100%);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.hrs-equipo-asic-modal-form__spec-switch:has(.hrs-equipo-asic-modal-form__spec-switch-input:checked)
+  .hrs-equipo-asic-modal-form__spec-switch-track::after {
+  left: calc(100% - 1.2rem - 0.2rem);
+}
+
+.hrs-equipo-asic-modal-form__spec-switch:has(.hrs-equipo-asic-modal-form__spec-switch-input:focus-visible)
+  .hrs-equipo-asic-modal-form__spec-switch-track {
+  outline: 2px solid #14532d;
+  outline-offset: 3px;
+}
+
+.hrs-equipo-asic-modal-form__spec-switch:hover .hrs-equipo-asic-modal-form__spec-switch-track {
+  background: #b8c0cc;
+}
+
+.hrs-equipo-asic-modal-form__spec-switch:hover:has(.hrs-equipo-asic-modal-form__spec-switch-input:checked)
+  .hrs-equipo-asic-modal-form__spec-switch-track {
+  background: linear-gradient(180deg, #458a68 0%, #356d52 100%);
+}
+
+/* Tarjeta de precio (destacada) */
+.hrs-equipo-asic-modal-form__price-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  padding: 1.35rem 1.25rem 1.15rem;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #ecfdf5 0%, #d1fae5 45%, #a7f3d0 100%);
+  border: 2px solid #2d5d46;
+  box-shadow:
+    0 4px 14px rgba(45, 93, 70, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+.hrs-equipo-asic-modal-form__price-eyebrow {
+  margin: 0 0 0.15rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #14532d;
+  opacity: 0.9;
+}
+
+.hrs-equipo-asic-modal-form__price-currency {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #166534;
+  line-height: 1.2;
+}
+
+.hrs-equipo-asic-modal-form__price-amount {
+  margin: 0.2rem 0 1rem;
+  font-size: clamp(1.85rem, 4vw, 2.35rem);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: #052e16;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.hrs-equipo-asic-modal-form__price-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.55rem 0.85rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(180deg, #2d5d46 0%, #1f4d38 100%);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(31, 77, 56, 0.35);
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease,
+    filter 0.12s ease;
+}
+
+.hrs-equipo-asic-modal-form__price-btn:hover:not(:disabled) {
+  filter: brightness(1.05);
+  box-shadow: 0 4px 12px rgba(31, 77, 56, 0.4);
+}
+
+.hrs-equipo-asic-modal-form__price-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.hrs-equipo-asic-modal-form__price-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.hrs-equipo-asic-modal-form__price-meta {
+  margin: 0.75rem 0 0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #14532d;
+  text-align: center;
+  line-height: 1.35;
+}
+
+.hrs-equipo-asic-modal-form__price-meta--dim {
+  opacity: 0.75;
+  font-weight: 400;
+}
+
+/* Enlace al histórico completo de precios (misma tarjeta que «Modificar precio») */
+.hrs-equipo-asic-price-history-link {
+  display: block;
+  width: 100%;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #14532d;
+  text-decoration: underline;
+  text-decoration-color: rgba(20, 83, 45, 0.45);
+  text-underline-offset: 3px;
+  cursor: pointer;
+  text-align: center;
+  line-height: 1.35;
+}
+
+.hrs-equipo-asic-price-history-link:hover {
+  color: #052e16;
+  text-decoration-color: rgba(5, 46, 22, 0.65);
+}
+
+.hrs-equipo-asic-price-history-link:focus-visible {
+  outline: 2px solid #2d5d46;
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Modal “Modificar precio” encima del modal del equipo */
+.hrs-equipo-precio-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1080;
+}
+
+.hrs-equipo-precio-modal-dialog {
+  width: min(620px, 94vw);
+  max-width: none;
+  margin: 1rem auto;
+}
+
+.hrs-equipo-precio-modal-content {
+  width: 100%;
+  max-width: none;
+  border: 1px solid rgba(45, 93, 70, 0.28);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.hrs-equipo-precio-modal-body {
+  padding: 1.2rem 1.35rem 1.1rem;
+  background: linear-gradient(180deg, #fafdfb 0%, #ffffff 60%, #f8fafc 100%);
+}
+
+.hrs-equipo-precio-modal-intro {
+  margin-bottom: 0.85rem !important;
+  line-height: 1.55;
+}
+
+.hrs-equipo-precio-modal-field {
+  margin-bottom: 0.35rem;
+}
+
+.hrs-equipo-precio-modal-input {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #0f172a;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.hrs-equipo-precio-modal-input:focus {
+  border-color: #2d5d46;
+  box-shadow: 0 0 0 3px rgba(45, 93, 70, 0.16);
+}
+
+.hrs-equipo-precio-modal-history-title {
+  margin: 0.95rem 0 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #14532d;
+}
+
+.hrs-equipo-precio-modal-history-wrap {
+  border: 1px solid #dbe4ee;
+  border-radius: 12px;
+  max-height: 265px;
+  overflow: auto;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.hrs-equipo-precio-modal-history-table {
+  margin: 0;
+}
+
+.hrs-equipo-precio-modal-history-table thead th {
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+  color: #334155;
+  font-size: 0.8rem;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid #cbd5e1;
+}
+
+.hrs-equipo-precio-modal-history-table tbody td {
+  font-size: 0.9rem;
+  vertical-align: middle;
+}
+
+.hrs-equipo-asic-modal-form__market {
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0.9rem 1.1rem 1.1rem;
+}
+
+.hrs-equipo-asic-modal-form__market .client-form-section-title {
+  margin: 0 0 0.4rem;
+  padding-bottom: 0.4rem;
+  border-bottom-color: #cbd5e1;
+}
+
+.hrs-equipo-asic-modal-form__market > .small {
+  margin-bottom: 0.5rem !important;
+  line-height: 1.45;
+}
+
+.hrs-equipo-asic-modal-form__market-hint {
+  margin-top: 0.35rem;
+  margin-bottom: 0.75rem !important;
+  line-height: 1.45;
+}
+
+/* Panel: las 4 barras de detalle vitrina (agrupadas) */
+.hrs-equipo-asic-modal-form__detail-rows-panel {
+  box-sizing: border-box;
+  padding: 0.95rem 1rem 1.05rem;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fdf9 45%, #f0fdf4 100%);
+  border: 1px solid #86efac;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.92) inset,
+    0 4px 16px rgba(45, 93, 70, 0.1);
+}
+
+.hrs-equipo-asic-modal-form__market-inner--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Bloque destacado: publicar en vitrina debajo de las filas de detalle */
+.hrs-equipo-asic-modal-form__vitrina-callout {
+  margin-top: 1rem;
+  padding: 1rem 1.15rem 1.1rem;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 40%, #bbf7d0 100%);
+  border: 2px solid #2d5d46;
+  box-shadow:
+    0 6px 22px rgba(45, 93, 70, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.hrs-equipo-asic-modal-form__vitrina-callout-inner {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.hrs-equipo-asic-modal-form__vitrina-checkbox {
+  flex-shrink: 0;
+  margin-top: 0.2rem;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 6px;
+  accent-color: #15803d;
+  cursor: pointer;
+}
+
+.hrs-equipo-asic-modal-form__vitrina-callout-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.hrs-equipo-asic-modal-form__vitrina-callout-title {
+  display: block;
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #052e16;
+  cursor: pointer;
+  line-height: 1.25;
+}
+
+.hrs-equipo-asic-modal-form__vitrina-callout-sub {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: #166534;
+  font-weight: 500;
+}
+
+.hrs-equipo-asic-modal-form__col-spec .hrs-equipo-asic-modal-form__vitrina-callout--under-detail-rows {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.hrs-equipo-asic-modal-form__market-inner {
+  display: grid;
+  /* Un poco más de ancho a imágenes: la columna de specs queda visualmente más angosta */
+  grid-template-columns: minmax(0, 0.88fr) minmax(0, 1.12fr);
+  gap: 1rem 1.15rem;
+  align-items: start;
+  margin-top: 0.65rem;
+}
+
+.hrs-equipo-asic-modal-form__col-spec,
+.hrs-equipo-asic-modal-form__col-media {
+  min-width: 0;
+}
+
+/* Panel anidado: agrupa tarjeta + galería y las separa del bloque marketplace */
+.hrs-equipo-asic-modal-form__media-panel {
+  box-sizing: border-box;
+  padding: 0.95rem 1rem 1.05rem;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fffb 55%, #f0fdf4 100%);
+  border: 1px solid #a7f3d0;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 4px 18px rgba(45, 93, 70, 0.08);
+}
+
+.hrs-equipo-asic-modal-form__media-panel-title {
+  margin: 0 0 0.65rem;
+  padding-bottom: 0.45rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #14532d;
+  border-bottom: 1px solid rgba(45, 93, 70, 0.18);
+}
+
+/* Filas de detalle vitrina: más angostas (~4 cm vs columna) */
+.hrs-equipo-asic-modal-form__col-spec .hrs-detail-rows__list {
+  max-width: calc(100% - 4cm);
+  box-sizing: border-box;
+}
+
+.hrs-equipo-asic-modal-form__col-media .hrs-upload-field {
+  margin-bottom: 0.35rem;
+}
+
+/* Imagen tarjeta + galería: encajar en la columna derecha (modal marketplace equipos) */
+.hrs-equipo-asic-modal-form__col-media .hrs-upload-dropzone {
+  padding: 0.65rem 0.75rem;
+}
+
+.hrs-equipo-asic-modal-form__col-media .hrs-upload-dropzone--has-preview {
+  padding: 0.55rem 0.65rem;
+}
+
+.hrs-equipo-asic-modal-form__col-media .hrs-upload-dropzone-inner {
+  max-width: 100%;
+}
+
+.hrs-equipo-asic-modal-form__col-media .hrs-upload-dropzone-title {
+  font-size: 0.8125rem;
+  line-height: 1.3;
+}
+
+.hrs-equipo-asic-modal-form__col-media .hrs-upload-dropzone-hint {
+  font-size: 0.6875rem;
+}
+
+.hrs-equipo-asic-modal-form__col-media .hrs-upload-gallery-drop {
+  min-height: 88px;
+}
+
+.hrs-equipo-asic-modal-form__col-media .hrs-upload-preview-row {
+  flex-wrap: wrap;
+  gap: 0.65rem 0.75rem;
+  align-items: flex-start;
+}
+
+.hrs-equipo-asic-modal-form__col-media .hrs-upload-preview-thumb-wrap {
+  width: 72px;
+  height: 72px;
+  border-radius: 8px;
+}
+
+.hrs-equipo-asic-modal-form__col-media .hrs-upload-preview-meta {
+  flex: 1 1 min(100%, 160px);
+  min-width: 0;
+}
+
+.hrs-equipo-asic-modal-form__col-media .hrs-upload-preview-caption {
+  font-size: 0.75rem;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.hrs-equipo-asic-modal-form__col-media .hrs-upload-btn {
+  font-size: 0.75rem;
+  padding: 0.32rem 0.65rem;
+}
+
+.hrs-equipo-asic-modal-form__col-media .hrs-upload-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+  gap: 0.45rem;
+  margin-bottom: 0.5rem;
+}
+
+.hrs-equipo-asic-modal-form__col-media .hrs-upload-gallery-item {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 8px;
+}
+
+.hrs-equipo-asic-modal-form__col-media .hrs-upload-gallery-remove {
+  width: 22px;
+  height: 22px;
+  top: 3px;
+  right: 3px;
+  font-size: 0.9rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form .fact-field {
+  margin-bottom: 0.38rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form .fact-field:last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 992px) {
+  .hrs-equipo-asic-modal-form__main,
+  .hrs-equipo-asic-modal-form__market-inner {
+    grid-template-columns: 1fr;
+  }
+
+  .hrs-equipo-asic-modal-form__price-card {
+    max-width: 420px;
+  }
+}
+
 /* Formulario de cliente en 4 columnas */
 .client-form-grid-4 {
   display: grid;
@@ -2556,6 +3185,12 @@
   .fact-card-body {
     padding: 1rem;
   }
+}
+
+/* Editar cliente · tienda online (A9… / WEB-…) */
+.cliente-edit-card--tienda {
+  border-top: 3px solid #059669;
+  box-shadow: 0 2px 12px rgba(5, 150, 105, 0.08);
 }
 
 /* Utilidades básicas */
@@ -4035,12 +4670,194 @@
 
 /* Modal Agregar nuevo cliente: más ancho y más alto, que quepa en pantalla sin scroll de página */
 .clientes-new-modal-dialog {
-  max-width: 1400px;
-  width: 96%;
+  max-width: 1520px;
+  width: 98%;
   max-height: 94vh;
   display: flex;
   flex-direction: column;
   margin: 1rem auto;
+}
+
+/* Modal Equipo ASIC: ocupa casi todo el viewport; sin scroll interno si el contenido compacto alcanza */
+.hrs-equipo-asic-modal-dialog.clientes-new-modal-dialog {
+  max-height: 100vh;
+  max-height: 100dvh;
+  margin-top: 0;
+  margin-bottom: 0;
+  padding: 0.35rem 0;
+}
+
+.professional-modal-form.clientes-new-modal-content.hrs-equipo-asic-modal-content {
+  max-height: 100vh;
+  max-height: 100dvh;
+}
+
+/* ——— Equipo ASIC: densidad + sin barra vertical en el cuerpo del modal ——— */
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .modal-body.professional-modal-body {
+  overflow-y: hidden;
+  overflow-x: hidden;
+  padding: 0.55rem 1rem 0.6rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .professional-modal-footer {
+  padding: 0.55rem 1rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content > .modal-header.professional-modal-header {
+  padding: 0.75rem 1rem 0.55rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .professional-modal-icon-wrapper {
+  width: 40px;
+  height: 40px;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .professional-modal-title {
+  font-size: 1.15rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form {
+  gap: 0.45rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__main {
+  gap: 0.5rem 0.95rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__ident-strip {
+  gap: 0.5rem 0.85rem;
+  margin-bottom: 0;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__ident-field {
+  margin-bottom: 0.3rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__equipo-heading {
+  margin-top: 0.1rem;
+  margin-bottom: 0.3rem;
+  padding-bottom: 0.22rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__equipo-fields {
+  gap: 0.45rem 0.55rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .professional-modal-body .form-control,
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .professional-modal-body .form-select {
+  padding: 0.42rem 0.6rem;
+  font-size: 0.9rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__price-card {
+  padding: 0.75rem 0.95rem 0.7rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__price-amount {
+  margin: 0.08rem 0 0.45rem;
+  font-size: clamp(1.45rem, 3.2vw, 1.95rem);
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__price-meta {
+  margin: 0.35rem 0 0;
+  font-size: 0.7rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__market {
+  padding: 0.45rem 0.65rem 0.5rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__market .client-form-section-title {
+  margin: 0 0 0.2rem;
+  padding-bottom: 0.22rem;
+  font-size: 0.875rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__market-inner {
+  margin-top: 0.35rem;
+  gap: 0.5rem 0.75rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__detail-rows-panel {
+  padding: 0.45rem 0.55rem 0.5rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__vitrina-callout {
+  margin-top: 0.5rem;
+  padding: 0.55rem 0.75rem 0.6rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__vitrina-callout-title {
+  font-size: 0.95rem;
+  margin: 0 0 0.22rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__vitrina-callout-sub {
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__media-panel {
+  padding: 0.5rem 0.65rem 0.55rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__media-panel-title {
+  margin: 0 0 0.38rem;
+  padding-bottom: 0.28rem;
+  font-size: 0.75rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__col-media .hrs-upload-field {
+  margin-bottom: 0.25rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__col-media .hrs-upload-dropzone {
+  padding: 0.42rem 0.5rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__col-media .hrs-upload-dropzone--has-preview {
+  padding: 0.38rem 0.45rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__col-media .hrs-upload-gallery-drop {
+  min-height: 56px;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__col-media .hrs-upload-preview-thumb-wrap {
+  width: 56px;
+  height: 56px;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__col-media .hrs-upload-gallery-grid {
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-detail-rows__list {
+  gap: 0.32rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-detail-rows__row {
+  padding: 0.32rem 0.45rem;
+  gap: 0.38rem 0.5rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-detail-rows__icon-display {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-detail-rows__icon-display .shelf-detail-strip__svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Pantallas muy bajas: permitir scroll para no cortar contenido */
+@media (max-height: 600px) {
+  .clientes-new-modal-content.hrs-equipo-asic-modal-content .modal-body.professional-modal-body {
+    overflow-y: auto;
+  }
 }
 
 .professional-modal-form.clientes-new-modal-content {
@@ -4049,6 +4866,10 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.clientes-new-modal-content > .modal-header.professional-modal-header {
+  flex-shrink: 0;
 }
 
 /* Cuerpo del modal cliente: scroll interno y contenido compacto para que entre en la ventana */
@@ -4264,6 +5085,13 @@
   background: #f1f5f9;
   color: #475569;
   border: 1px solid #e2e8f0;
+}
+
+/* Cliente tienda marketplace: pill como el resto, tono ámbar (distinto de admin verde / operador azul) */
+.usuarios-page .role-badge--cliente {
+  background: linear-gradient(135deg, #c2410c 0%, #ea580c 100%);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(234, 88, 12, 0.22);
 }
 
 .usuarios-page .role-badge--admin {
@@ -5708,4 +6536,319 @@
 .cuenta-cliente-btn-ver {
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
+}
+
+/* Marketplace (vista nativa en este proyecto) */
+.marketplace-native .marketplace-intro {
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #fff;
+}
+.marketplace-intro-icon {
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: #047857;
+}
+.marketplace-category-card {
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 16px;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.marketplace-category-card:hover {
+  box-shadow: 0 8px 24px rgba(7, 64, 37, 0.12) !important;
+  transform: translateY(-2px);
+}
+.marketplace-category-icon-wrap {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 12px;
+  background: #ecfdf5;
+  color: #0f766e;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+}
+
+/* Tienda: tarjetas de producto */
+.marketplace-toolbar {
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 16px;
+  background: #fff;
+}
+.marketplace-product-card {
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 16px;
+  overflow: hidden;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.marketplace-product-card:hover {
+  box-shadow: 0 10px 28px rgba(7, 64, 37, 0.12) !important;
+  transform: translateY(-3px);
+}
+.marketplace-product--inactive {
+  opacity: 0.72;
+}
+.marketplace-product-image-wrap {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  background: linear-gradient(145deg, #f1f5f9 0%, #e2e8f0 100%);
+  overflow: hidden;
+}
+.marketplace-product-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.marketplace-product-image-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.75rem;
+  color: #94a3b8;
+}
+.marketplace-product-badge {
+  position: absolute;
+  top: 0.65rem;
+  left: 0.65rem;
+  background: rgba(15, 118, 110, 0.92);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.25rem 0.5rem;
+  border-radius: 8px;
+}
+.marketplace-product-inactive-badge {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.65rem;
+  background: rgba(71, 85, 105, 0.9);
+  color: #fff;
+  font-size: 0.65rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 6px;
+}
+.marketplace-product-price {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: #074025;
+}
+
+/* ——— Gestión ASIC: grilla de tarjetas estilo marketplace (/marketplacedashboard) ——— */
+.hrs-asic-dash-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  align-items: stretch;
+}
+
+@media (min-width: 640px) {
+  .hrs-asic-dash-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1100px) {
+  .hrs-asic-dash-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.35rem 1.15rem;
+  }
+}
+
+@media (min-width: 1400px) {
+  .hrs-asic-dash-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.hrs-asic-dash-grid .shelf-product.hrs-asic-dash-card {
+  height: 100%;
+}
+
+.hrs-asic-dash-card__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.hrs-asic-dash-card__meta {
+  font-size: 0.72rem;
+  line-height: 1.35;
+  padding: 0.45rem 0.5rem;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.hrs-asic-dash-card__actions {
+  margin-top: auto;
+  padding-top: 0.25rem;
+}
+
+/* Grupo tienda (visibles en /marketplace): panel con fondo verde claro */
+.hrs-equipo-asic-listado-grupos--tienda {
+  background: linear-gradient(180deg, rgba(236, 253, 245, 0.97) 0%, rgba(209, 250, 229, 0.9) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  border-radius: 14px;
+  padding: 1.1rem 1.15rem 1.35rem;
+  margin-bottom: 1.25rem !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.65) inset;
+}
+
+.hrs-equipo-asic-listado-grupos--tienda > h6 {
+  border-bottom-color: rgba(5, 150, 105, 0.22) !important;
+}
+
+.hrs-equipo-asic-listado-grupos--tienda .hrs-asic-dash-card.shelf-product {
+  border-color: rgba(16, 185, 129, 0.22);
+  box-shadow: 0 2px 8px rgba(6, 78, 59, 0.06);
+}
+
+/* Grupo inventario: sin borde duro — sombra suave tipo “glass” */
+.hrs-equipo-asic-listado-grupos--inventory {
+  background: linear-gradient(165deg, rgba(255, 252, 248, 0.98) 0%, rgba(255, 241, 224, 0.94) 48%, rgba(255, 247, 237, 0.96) 100%);
+  border: none;
+  border-radius: 16px;
+  padding: 1rem 1.2rem 1.3rem;
+  margin-top: 0.45rem;
+  box-shadow:
+    0 1px 2px rgba(120, 53, 15, 0.04),
+    0 12px 40px rgba(234, 88, 12, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* Cabecera clicable: línea divisoria tenue (no border Bootstrap gris) */
+.hrs-equipo-asic-inventory-toggle {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  padding: 0.45rem 0.55rem 0.8rem;
+  margin: 0 -0.15rem 0.35rem;
+  box-shadow: 0 1px 0 rgba(251, 146, 60, 0.2);
+  transition: background-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.hrs-equipo-asic-inventory-toggle:hover {
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 1px 0 rgba(251, 146, 60, 0.28);
+}
+
+.hrs-equipo-asic-inventory-toggle:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.95),
+    0 0 0 4px rgba(251, 146, 60, 0.45),
+    0 1px 0 rgba(251, 146, 60, 0.2);
+}
+
+/* Grupo inventario: tarjetas ligeramente contrastadas sobre el panel */
+.hrs-equipo-asic-listado-grupos--inventory .hrs-asic-dash-card.shelf-product {
+  border-color: rgba(251, 146, 60, 0.2);
+  box-shadow: 0 2px 8px rgba(154, 52, 18, 0.06);
+}
+
+.hrs-equipo-asic-listado-grupos--inventory .hrs-asic-dash-card .shelf-product__media {
+  filter: saturate(0.92);
+}
+
+/* Login SGI (/login): contraseña con mostrar/ocultar (mismas clases que MarketplacePasswordField) */
+.market-password-field {
+  position: relative;
+  display: block;
+}
+
+.market-password-field .form-control {
+  padding-right: 2.85rem;
+}
+
+.market-password-field__toggle {
+  position: absolute;
+  right: 0.4rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.market-password-field__toggle:hover {
+  color: #0d6efd;
+  background: #f3f4f6;
+}
+
+.market-password-field__toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.35);
+}
+
+.market-password-field__toggle .bi {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+/* Registro tienda: correo ya existente (misma línea que alertas del login SGI) */
+.hrs-reg-email-in-use {
+  border: 1px solid rgba(217, 119, 6, 0.45);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%);
+  color: #78350f;
+  box-shadow: 0 1px 3px rgba(180, 83, 9, 0.08);
+}
+
+.hrs-reg-email-in-use .text-body,
+.hrs-reg-email-in-use strong {
+  color: #78350f !important;
+}
+
+.hrs-reg-email-in-use__hint {
+  border-color: rgba(180, 83, 9, 0.2) !important;
+}
+
+/* Registro tienda: celular — el número usa todo el ancho restante sin recortarse */
+.hrs-reg-phone-input-group {
+  max-width: 100%;
+}
+
+.hrs-reg-phone-input-group .form-control {
+  min-width: 0;
+}
+
+@media (max-width: 400px) {
+  .hrs-reg-phone-input-group .hrs-reg-phone-dial {
+    width: 9.25rem !important;
+    min-width: 8.5rem !important;
+    max-width: 9.25rem !important;
+    font-size: 0.875rem;
+    padding-left: 0.5rem;
+    padding-right: 1.75rem;
+  }
 }

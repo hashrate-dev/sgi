@@ -13,9 +13,12 @@ export default defineConfig({
     chunkSizeWarningLimit: 2000, // evita el aviso de chunks > 500 KB (React, jspdf, etc.)
   },
   server: {
+    // Evita fallos en Windows con `localhost` (IPv6 vs 127.0.0.1) y deja la URL estable
+    host: "127.0.0.1",
     port: 5173,
+    strictPort: false,
     proxy: {
-      "/api": { target: "http://localhost:8080", changeOrigin: true }
+      "/api": { target: "http://127.0.0.1:8080", changeOrigin: true }
     },
     headers: {
       "Cache-Control": "no-store, no-cache, must-revalidate"

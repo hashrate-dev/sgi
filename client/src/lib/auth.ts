@@ -1,4 +1,4 @@
-export type UserRole = "admin_a" | "admin_b" | "operador" | "lector";
+export type UserRole = "admin_a" | "admin_b" | "operador" | "lector" | "cliente";
 
 export type AuthUser = {
   id: number;
@@ -58,6 +58,23 @@ export function canDeleteClientes(role: UserRole): boolean {
 
 export function canManageUsers(role: UserRole): boolean {
   return role === "admin_a" || role === "admin_b";
+}
+
+/** Precio USD, publicación en tienda online e imágenes de vitrina: solo AdministradorA / AdministradorB. */
+export function canEditEquipoMarketplacePrecioYTienda(role: UserRole): boolean {
+  return role === "admin_a" || role === "admin_b";
+}
+
+/** Monitoreo de cotizaciones / tickets del marketplace (carrito cliente). */
+export function canViewMarketplaceQuoteTickets(role: UserRole): boolean {
+  return role === "admin_a" || role === "admin_b";
+}
+
+/** Carrito de cotización en /marketplace: cuenta cliente o administradores A/B. */
+export function canUseMarketplaceQuoteCart(role: UserRole | string | undefined): boolean {
+  if (!role) return false;
+  const r = String(role).toLowerCase().trim();
+  return r === "cliente" || r === "admin_a" || r === "admin_b";
 }
 
 /** Solo AdministradorA puede eliminar cuentas con rol AdministradorA o AdministradorB. */

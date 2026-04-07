@@ -2,16 +2,29 @@ import { useState, useEffect } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { updateMyPassword } from "../lib/api";
+import { canViewMarketplaceQuoteTickets } from "../lib/auth.js";
 import { showToast } from "../components/ToastNotification";
 import "../styles/hrshome.css";
 
-const menuItems: Array<{ to: string; icon: string; label: string; desc: string; roles?: string[] }> = [
+const menuItems: Array<{ to: string; icon: string; label: string; desc: string; roles?: string[]; cardClass?: string }> = [
+  {
+    to: "/marketplace",
+    icon: "bi-bag-heart",
+    label: "Tienda online",
+    desc: "Catálogo público de equipos ASIC — vista cliente (sin administración)",
+    cardClass: "hrs-home-card--tienda-cliente",
+  },
   { to: "/hosting", icon: "bi-receipt", label: "Servicios de Hosting", desc: "Información de Facturación de Servicios de Hosting", roles: ["admin_a", "admin_b", "operador"] },
   { to: "/equipos-asic", icon: "bi-cpu", label: "Equipos ASIC", desc: "Información de Facturación de Equipos de Minería ASIC", roles: ["admin_a", "admin_b", "operador"] },
   { to: "/kryptex", icon: "bi-currency-bitcoin", label: "Kryptex", desc: "Información de Kryptex", roles: ["admin_a", "admin_b", "lector"] },
   { to: "/cuenta-cliente", icon: "bi-journal-text", label: "Cuenta por cliente", desc: "Detalle histórico de movimientos por cliente (Hosting + ASIC)" },
   { to: "/historial", icon: "bi-clock-history", label: "Historial", desc: "Ver y gestionar comprobantes" },
-  { to: "/clientes", icon: "bi-people", label: "Clientes", desc: "Administrar cartera de clientes" },
+  {
+    to: "/clientes-hub",
+    icon: "bi-people",
+    label: "Clientes",
+    desc: "Administración de Bases de Clientes de Tienda Online & Clientes de Hosting",
+  },
   { to: "/reportes", icon: "bi-graph-up", label: "Reportes", desc: "Estadísticas y análisis" }
 ];
 
@@ -66,6 +79,9 @@ const visibleMenuItems = menuItems.filter(
   if (user?.role === "lector") {
     return <Navigate to="/kryptex" replace />;
   }
+  if (user?.role === "cliente") {
+    return <Navigate to="/marketplace" replace />;
+  }
 
   return (
     <div className="hrs-home">
@@ -106,7 +122,7 @@ const visibleMenuItems = menuItems.filter(
 
         <main className="hrs-home-grid">
           {visibleMenuItems.map((item) => (
-            <Link key={item.to} to={item.to} className="hrs-home-card">
+            <Link key={item.to + (item.label || "")} to={item.to} className={`hrs-home-card${item.cardClass ? ` ${item.cardClass}` : ""}`}>
               <div className="hrs-home-card-icon">
                 <i className={`bi ${item.icon}`} />
               </div>
@@ -114,15 +130,27 @@ const visibleMenuItems = menuItems.filter(
               <p className="hrs-home-card-desc">{item.desc}</p>
             </Link>
           ))}
-          {(roleNorm(user?.role) === "admin_a" || roleNorm(user?.role) === "admin_b") && (
+          {user && canViewMarketplaceQuoteTickets(user.role) ? (
+            <Link to="/cotizaciones-marketplace" className="hrs-home-card hrs-home-card--marketplace-tickets">
+              <div className="hrs-home-card-icon">
+                <i className="bi bi-ticket-perforated" aria-hidden />
+              </div>
+              <h3 className="hrs-home-card-title">Ordenes Marketplace</h3>
+              <p className="hrs-home-card-desc">Tickets y órdenes del carrito (monitoreo en vivo)</p>
+            </Link>
+          ) : null}
+          {user ? (
             <Link to="/configuracion" className="hrs-home-card hrs-home-card-admin">
               <div className="hrs-home-card-icon">
                 <i className="bi bi-gear-fill" aria-hidden />
               </div>
               <h3 className="hrs-home-card-title">Configuración</h3>
-              <p className="hrs-home-card-desc">Usuarios, permisos y accesos</p>
+              <p className="hrs-home-card-desc">
+                Tienda Online, equipos ASIC, Setup y Garantías
+                {(roleNorm(user?.role) === "admin_a" || roleNorm(user?.role) === "admin_b") ? "; Usuarios" : ""}
+              </p>
             </Link>
-          )}
+          ) : null}
         </main>
       </div>
 

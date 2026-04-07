@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { deleteAllClients, getClients } from "../lib/api";
@@ -9,6 +9,7 @@ import { PageHeader } from "../components/PageHeader";
 import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import { canDeleteClientes, canEditClientes, canExport } from "../lib/auth";
+import { isClienteTiendaOnline } from "../lib/clientTienda";
 import "../styles/facturacion.css";
 
 export function ClientesPage() {
@@ -78,8 +79,8 @@ export function ClientesPage() {
   }
 
   function exportExcel() {
-    if (clients.length === 0) {
-      showToast("No hay clientes para exportar.", "warning");
+    if (filteredClients.length === 0) {
+      showToast("No hay clientes de hosting para exportar.", "warning");
       return;
     }
 
@@ -99,11 +100,13 @@ export function ClientesPage() {
       { header: "Dirección 1", key: "address", width: 40 },
       { header: "Dirección 2", key: "address2", width: 40 },
       { header: "Ciudad / País 1", key: "city", width: 30 },
-      { header: "Ciudad / País 2", key: "city2", width: 30 }
+      { header: "Ciudad / País 2", key: "city2", width: 30 },
+      { header: "País (tienda)", key: "country", width: 22 },
+      { header: "Documento identidad", key: "documento_identidad", width: 22 }
     ];
 
-    // Agregar datos
-    clients.forEach((client) => {
+    // Mismo criterio que el listado: solo clientes Hosting (sin tienda online A9… / WEB-)
+    filteredClients.forEach((client) => {
       ws.addRow({
         code: client.code || "",
         usuario: client.usuario || "",
@@ -116,7 +119,9 @@ export function ClientesPage() {
         address: client.address || "",
         address2: client.address2 || "",
         city: client.city || "",
-        city2: client.city2 || ""
+        city2: client.city2 || "",
+        country: client.country || "",
+        documento_identidad: client.documento_identidad || ""
       });
     });
 
@@ -153,24 +158,30 @@ export function ClientesPage() {
     });
   }
 
+  /** Solo cartera Hosting / SGI; excluye tienda online (A90001…, WEB-…). Ver Clientes · Tienda online. */
+  const hostingClients = useMemo(() => clients.filter((c) => !isClienteTiendaOnline(c)), [clients]);
+
   const filteredClients = useMemo(() => {
     const searchLower = searchTerm.toLowerCase().trim();
-    if (!searchLower) return clients;
-    return clients.filter(
+    if (!searchLower) return hostingClients;
+    return hostingClients.filter(
       (c) =>
         c.code?.toLowerCase().includes(searchLower) ||
         c.name?.toLowerCase().includes(searchLower) ||
         c.name2?.toLowerCase().includes(searchLower) ||
         c.usuario?.toLowerCase().includes(searchLower) ||
         c.phone?.toLowerCase().includes(searchLower) ||
-        c.email?.toLowerCase().includes(searchLower)
+        c.email?.toLowerCase().includes(searchLower) ||
+        c.city?.toLowerCase().includes(searchLower) ||
+        c.country?.toLowerCase().includes(searchLower) ||
+        c.documento_identidad?.toLowerCase().includes(searchLower)
     );
-  }, [clients, searchTerm]);
+  }, [hostingClients, searchTerm]);
 
   return (
     <div className="fact-page clientes-page">
       <div className="container">
-        <PageHeader title="Clientes" />
+        <PageHeader title="Clientes · Hosting" />
 
         {canEdit && showNewForm && (
           <div className="modal d-block professional-modal-overlay" tabIndex={-1}>
@@ -237,7 +248,7 @@ export function ClientesPage() {
                         className="btn btn-outline-secondary btn-sm clientes-export-excel-btn"
                         style={{ backgroundColor: "rgba(13, 110, 253, 0.12)" }}
                         onClick={exportExcel}
-                        disabled={clients.length === 0}
+                        disabled={filteredClients.length === 0}
                       >
                         📊 Exportar Excel
                       </button>
@@ -261,7 +272,10 @@ export function ClientesPage() {
           {/* Listado: mismo diseño que Historial (tabla con encabezado verde) */}
           <div className="clientes-listado-wrap">
             <div className="d-flex justify-content-between align-items-center mb-2">
-              <h6 className="fw-bold m-0">👥 Listado de clientes ({loading ? "…" : filteredClients.length}){!canEdit && <span className="text-muted small ms-2">(solo consulta)</span>}</h6>
+              <h6 className="fw-bold m-0">
+                👥 Listado de clientes · Hosting ({loading ? "…" : filteredClients.length})
+                {!canEdit && <span className="text-muted small ms-2">(solo consulta)</span>}
+              </h6>
               {canEdit && (
                 <button
                   type="button"
@@ -312,7 +326,17 @@ export function ClientesPage() {
               <div className="fact-empty">
                 <div className="fact-empty-icon">👥</div>
                 <div className="fact-empty-text">
-                  {searchTerm ? "No se encontraron clientes con ese criterio de búsqueda." : "No hay clientes cargados. Agregá uno con el formulario."}
+                  {searchTerm ? (
+                    "No se encontraron clientes de hosting con ese criterio."
+                  ) : hostingClients.length === 0 && clients.length > 0 ? (
+                    <>
+                      No hay clientes de hosting en la base: los registros actuales son de{" "}
+                      <strong>tienda online</strong> (<code>A9…</code>, <code>WEB-…</code>). Gestionalos en{" "}
+                      <Link to="/clientes-tienda-online">Clientes · Tienda online</Link>.
+                    </>
+                  ) : (
+                    "No hay clientes de hosting cargados. Agregá uno con «Nuevo Cliente»."
+                  )}
                 </div>
               </div>
             ) : (
@@ -348,8 +372,12 @@ export function ClientesPage() {
                           {c.email2 && <div className="text-muted small">✉️ {c.email2}</div>}
                         </td>
                         <td className="text-start client-location">
+                          {c.country && <div className="small fw-semibold text-body-secondary">{c.country}</div>}
                           {c.address && <div>{c.address}</div>}
                           {c.city && <div className="text-muted small">{c.city}</div>}
+                          {c.documento_identidad && (
+                            <div className="text-muted small">Doc. {c.documento_identidad}</div>
+                          )}
                         </td>
                         {canEdit && (
                           <td className="text-start">

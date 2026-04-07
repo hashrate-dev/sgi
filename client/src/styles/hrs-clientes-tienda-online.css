@@ -1,0 +1,565 @@
+/* Clientes tienda online — misma línea que fact-topbar / hosting (#2D5D46) */
+
+.cti-page {
+  --cti-host: #2d5d46;
+  --cti-host-light: #3d7a5c;
+  --cti-host-deep: #1e4034;
+  --cti-accent: #2d5d46;
+  --cti-accent-soft: #ecf5f1;
+  --cti-accent-mid: #d4e8df;
+  --cti-avatar: #9ca3af;
+  --cti-avatar-bg: #e5e7eb;
+}
+
+/* Menú superior: mismo verde sólido y acabado que el panel “Cuentas cliente…” */
+.cti-page .fact-topbar {
+  background: var(--cti-host) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  margin-bottom: 1.25rem;
+}
+
+.cti-page .fact-topbar::before,
+.cti-page .fact-topbar::after {
+  opacity: 0.85;
+}
+
+.cti-page .fact-topbar .fact-back {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.45);
+  color: #fff;
+  box-shadow: none;
+}
+
+.cti-page .fact-topbar .fact-back:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.55);
+  color: #fff;
+}
+
+.cti-back-link {
+  color: var(--cti-host);
+  text-decoration: none;
+}
+
+.cti-back-link:hover {
+  color: var(--cti-host-light);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Panel único: texto + filtro (mismo criterio que Clientes · Hosting, sin título «Filtros») */
+.cti-unified-panel {
+  position: relative;
+  overflow: hidden;
+  background: var(--cti-host);
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 1.35rem 1.5rem 1.45rem;
+  margin-bottom: 1.5rem;
+  margin-top: 0.15rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.cti-unified-panel::before {
+  content: "";
+  position: absolute;
+  top: -22%;
+  right: -18%;
+  width: 420px;
+  height: 420px;
+  background: rgba(255, 255, 255, 0.035);
+  border-radius: 50%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.cti-unified-panel__intro,
+.cti-unified-panel__divider,
+.cti-unified-panel__toolbar {
+  position: relative;
+  z-index: 1;
+}
+
+.cti-unified-panel__intro h1 {
+  font-size: clamp(1.25rem, 2.5vw, 1.55rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin: 0 0 0.45rem;
+  color: #fff;
+}
+
+.cti-unified-panel__intro > p:first-of-type {
+  margin: 0;
+  opacity: 0.92;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  max-width: 46rem;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.cti-unified-panel__intro a {
+  color: #fff;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.cti-unified-panel__intro a:hover {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.cti-unified-code {
+  display: inline;
+  padding: 0.12rem 0.35rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 0.85em;
+  font-family: ui-monospace, monospace;
+}
+
+.cti-unified-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.85rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.cti-unified-meta .bi {
+  font-size: 1.05rem;
+  opacity: 0.9;
+}
+
+.cti-unified-panel__divider {
+  margin: 1.15rem 0 1.2rem;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.cti-unified-panel__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem 1.25rem;
+}
+
+.cti-filter-search-block {
+  flex: 1 1 240px;
+  min-width: min(100%, 200px);
+  max-width: 520px;
+}
+
+.cti-filter-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.95);
+  letter-spacing: 0.02em;
+}
+
+.cti-input-group-joined {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  max-width: 480px;
+}
+
+.cti-search-field {
+  flex: 1 1 auto;
+  min-width: 0;
+  box-sizing: border-box;
+  min-height: 2.375rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-right: none;
+  border-radius: 10px 0 0 10px;
+  font-size: 0.9rem;
+  color: #1e293b;
+  background: #fff;
+}
+
+.cti-search-field::placeholder {
+  color: #94a3b8;
+}
+
+.cti-search-field:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.22);
+  z-index: 1;
+}
+
+.cti-btn-limpiar {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  min-width: 5.5rem;
+  min-height: 2.375rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.9rem;
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: #fff;
+  cursor: pointer;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-left: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 0 10px 10px 0;
+  /* Mismo verde que el panel (no gris semitransparente) */
+  background: var(--cti-host-deep);
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.cti-btn-limpiar:hover {
+  background: #163529;
+  border-color: rgba(255, 255, 255, 0.75);
+}
+
+.cti-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.cti-btn-excel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  background: var(--cti-host-deep);
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.cti-btn-excel:hover:not(:disabled) {
+  background: #163529;
+  border-color: rgba(255, 255, 255, 0.8);
+}
+
+.cti-btn-excel:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cti-btn-excel-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* Misma familia verde que el resto del menú/panel (acción deshabilitada) */
+.cti-btn-borrar-todo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  border: 2px dashed rgba(255, 255, 255, 0.38);
+  background: rgba(30, 64, 52, 0.55);
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: not-allowed;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.cti-btn-borrar-todo:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.cti-btn-borrar-todo:disabled {
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .cti-unified-panel__toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cti-filter-actions {
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+
+  .cti-input-group-joined {
+    max-width: none;
+  }
+
+  .cti-filter-search-block {
+    max-width: none;
+  }
+}
+
+.cti-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 1.25rem;
+}
+
+/* Tarjetas: mismo verde sólido que el filtro / menú (#2D5D46) + texto claro */
+.cti-card {
+  position: relative;
+  overflow: hidden;
+  background: var(--cti-host);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  padding: 1.15rem 1.2rem 1rem;
+  padding-left: calc(1.2rem + 5px);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
+  transition:
+    box-shadow 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.cti-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.08) 100%);
+  border-radius: 16px 0 0 16px;
+  pointer-events: none;
+}
+
+.cti-card:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+  transform: translateY(-2px);
+}
+
+.cti-card-head {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+  margin-bottom: 0.85rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.12) 0%, transparent 100%);
+  margin-left: calc(-1.2rem - 5px);
+  margin-right: -1.2rem;
+  margin-top: -1.15rem;
+  padding: 1.15rem 1.2rem 0.85rem calc(1.2rem + 5px);
+  border-radius: 16px 16px 0 0;
+}
+
+.cti-avatar {
+  flex-shrink: 0;
+  width: 3.75rem;
+  height: 3.75rem;
+  border-radius: 50%;
+  background: linear-gradient(145deg, var(--cti-host-light) 0%, var(--cti-host) 48%, var(--cti-host-deep) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f9fafb;
+  font-size: 1.85rem;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 2px 8px rgba(30, 64, 52, 0.25);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+}
+
+.cti-card-titles {
+  min-width: 0;
+  flex: 1;
+}
+
+/* Nombre legible sobre fondo verde (Bootstrap u otros suelen pintar h2 en gris/negro) */
+.cti-card .cti-card-name,
+.cti-card h2.cti-card-name {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #fff !important;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  margin: 0 0 0.25rem;
+  word-break: break-word;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.cti-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.22rem 0.55rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff !important;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.cti-code {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.78) !important;
+  font-family: ui-monospace, monospace;
+  margin-top: 0.35rem;
+}
+
+.cti-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  flex: 1;
+}
+
+.cti-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.cti-row-icon {
+  flex-shrink: 0;
+  width: 1.5rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.82);
+  opacity: 1;
+  margin-top: 0.05rem;
+}
+
+.cti-row-body {
+  min-width: 0;
+}
+
+.cti-row-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.62);
+  margin-bottom: 0.1rem;
+}
+
+.cti-row-value {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #fff;
+  word-break: break-word;
+}
+
+.cti-row-value--muted {
+  color: rgba(255, 255, 255, 0.48);
+  font-style: italic;
+}
+
+.cti-card-footer {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed rgba(255, 255, 255, 0.22);
+}
+
+.cti-btn-edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.55rem 0.85rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  border-radius: 10px;
+  text-decoration: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.cti-btn-edit:hover {
+  background: #fff;
+  color: var(--cti-host);
+  border-color: #fff;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.cti-empty {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  background: linear-gradient(180deg, rgba(45, 93, 70, 0.04) 0%, #f9fafb 100%);
+  border: 2px dashed rgba(45, 93, 70, 0.22);
+  border-radius: 16px;
+  color: #6b7280;
+}
+
+.cti-empty-icon {
+  font-size: 2.5rem;
+  opacity: 0.45;
+  margin-bottom: 0.75rem;
+  color: var(--cti-host);
+}
+
+.cti-skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 1.15rem;
+}
+
+.cti-skeleton-card {
+  height: 280px;
+  border-radius: 16px;
+  border: 1px solid rgba(45, 93, 70, 0.15);
+  box-shadow: 0 4px 14px rgba(45, 93, 70, 0.06);
+  background: linear-gradient(90deg, #ecf5f1 20%, #f3f4f6 50%, #ecf5f1 80%);
+  background-size: 200% 100%;
+  animation: cti-shine 1.2s ease-in-out infinite;
+}
+
+@keyframes cti-shine {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (max-width: 576px) {
+  .cti-unified-panel {
+    padding: 1.1rem 1rem 1.2rem;
+  }
+}

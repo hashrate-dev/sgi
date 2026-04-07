@@ -1,0 +1,164 @@
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { canUseMarketplaceQuoteCart } from "../../lib/auth.js";
+import { useAuth } from "../../contexts/AuthContext";
+import { useOptionalMarketplaceQuoteCart } from "../../contexts/MarketplaceQuoteCartContext.js";
+import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
+import type { MarketplaceLang } from "../../lib/i18n.js";
+
+const HS = "https://hashrate.space";
+
+export function MarketplaceSiteHeader() {
+  const [navOpen, setNavOpen] = useState(false);
+  const { user, logout } = useAuth();
+  const { lang, setLang, t, tf } = useMarketplaceLang();
+  const showLoggedAccount = Boolean(user && canUseMarketplaceQuoteCart(user.role));
+  const quoteCart = useOptionalMarketplaceQuoteCart();
+
+  const cartAria =
+    quoteCart?.totalUnits === 0
+      ? t("header.cart_empty")
+      : quoteCart && quoteCart.totalUnits > 99
+        ? t("header.cart_units_many")
+        : quoteCart
+          ? tf("header.cart_units", { n: String(quoteCart.totalUnits) })
+          : t("header.cart_empty");
+
+  return (
+    <header className="site-header site-header--marketplace">
+      <div className="container site-header__inner">
+        <a
+          className="logo-link logo-link--main"
+          href={HS}
+          aria-label={t("header.logo_aria")}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <img
+            className="site-logo-img"
+            src="https://hashrate.space/wp-content/uploads/hashrate-LOGO.png"
+            alt="Hashrate Space"
+            width={220}
+            height={52}
+            loading="eager"
+            decoding="async"
+          />
+        </a>
+        <div className="site-header__trailing">
+          <div
+            className="market-lang-switch"
+            role="group"
+            aria-label={t("header.lang_hint")}
+          >
+            {(["es", "en"] as const).map((code) => (
+              <button
+                key={code}
+                type="button"
+                className={`market-lang-switch__btn${lang === code ? " active" : ""}`}
+                onClick={() => setLang(code as MarketplaceLang)}
+                aria-pressed={lang === code}
+              >
+                {code === "es" ? t("header.lang_es") : t("header.lang_en")}
+              </button>
+            ))}
+          </div>
+          {quoteCart ? (
+            <button
+              type="button"
+              className="market-quote-cart-trigger"
+              onClick={quoteCart.toggleDrawer}
+              aria-expanded={quoteCart.drawerOpen}
+              aria-controls="market-quote-drawer-panel"
+              title={t("header.cart_open")}
+              aria-label={cartAria}
+            >
+              <span className="market-quote-cart-trigger__icon-wrap" aria-hidden>
+                <svg className="market-quote-cart-trigger__svg" viewBox="0 0 24 24" width="26" height="26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M6 6h15l-1.5 9h-12z"
+                    stroke="currentColor"
+                    strokeWidth="1.65"
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                  />
+                  <path d="M6 6 5 3H2" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx="9" cy="20" r="1.1" fill="currentColor" stroke="none" />
+                  <circle cx="18" cy="20" r="1.1" fill="currentColor" stroke="none" />
+                </svg>
+                {quoteCart.totalUnits > 0 ? (
+                  <span
+                    className={
+                      "market-quote-cart-trigger__badge" +
+                      (quoteCart.totalUnits > 9 ? " market-quote-cart-trigger__badge--wide" : "")
+                    }
+                  >
+                    {quoteCart.totalUnits > 99 ? "99+" : quoteCart.totalUnits}
+                  </span>
+                ) : null}
+              </span>
+              <span className="market-quote-cart-trigger__label">{t("header.cart")}</span>
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="nav-toggle"
+            aria-expanded={navOpen}
+            aria-controls="primary-nav"
+            onClick={() => setNavOpen((o) => !o)}
+          >
+            {t("header.menu")}
+          </button>
+        </div>
+        <nav id="primary-nav" className={"nav-main" + (navOpen ? " is-open" : "")} aria-label="Principal">
+          <ul>
+            <li>
+              <a href={`${HS}/`}>{t("nav.home")}</a>
+            </li>
+            <li>
+              <a href={`${HS}/servicios/`}>{t("nav.services")}</a>
+            </li>
+            <li>
+              <Link to="/marketplace" className="is-current" aria-current="page">
+                {t("nav.equipment")}
+              </Link>
+            </li>
+            <li>
+              <a href={`${HS}/faq/`}>{t("nav.faq")}</a>
+            </li>
+            <li>
+              <a href={`${HS}/empresa/`}>{t("nav.company")}</a>
+            </li>
+            <li>
+              <a href={`${HS}/contacto/`}>{t("nav.contact")}</a>
+            </li>
+            <li className={"site-header__account" + (!showLoggedAccount ? " site-header__account--guest" : "")}>
+              {showLoggedAccount ? (
+                <>
+                  <span className="site-header__account-email" title={user?.email ?? user?.username}>
+                    {user?.email ?? user?.username}
+                  </span>
+                  <button
+                    type="button"
+                    className="site-header__account-logout"
+                    onClick={() => {
+                      logout();
+                      window.location.href = "/marketplace";
+                    }}
+                  >
+                    {t("header.logout")}
+                  </button>
+                </>
+              ) : (
+                <div className="site-header__auth-actions">
+                  <Link to="/marketplace/registro" className="site-header__auth-link site-header__auth-link--primary">
+                    {t("header.register")}
+                  </Link>
+                </div>
+              )}
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+  );
+}

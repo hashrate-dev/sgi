@@ -1,0 +1,562 @@
+/* Cotizaciones marketplace — misma línea visual que Facturación Hosting (fact-panel #2D5D46) */
+
+:root {
+  --hrs-mqt-host: #2d5d46;
+  --hrs-mqt-primary: #00a652;
+  --hrs-mqt-primary-bright: #00cc6e;
+  /* Filtros activos: verde esmeralda vivo (referencia adjunto 2) */
+  --hrs-mqt-chip-active: #00d16e;
+  --hrs-mqt-chip-active-mid: #00c45c;
+}
+
+.hrs-mqt-page .container {
+  max-width: 1040px;
+}
+
+/* Topbar: botones ghost como en hosting */
+.hrs-mqt-page .fact-topbar .fact-back {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.45);
+  box-shadow: none;
+}
+
+.hrs-mqt-page .fact-topbar .fact-back:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.55);
+  transform: translateY(-1px);
+}
+
+/* Panel principal: mismo bloque verde que “Nuevo documento” / Detalle de servicios */
+.hrs-mqt-panel {
+  position: relative;
+  overflow: hidden;
+  background: var(--hrs-mqt-host);
+  border-radius: 16px;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 1.35rem 1.5rem 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.hrs-mqt-panel::before {
+  content: "";
+  position: absolute;
+  bottom: -35%;
+  left: -20%;
+  width: 320px;
+  height: 320px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 50%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.hrs-mqt-panel::after {
+  content: "";
+  position: absolute;
+  top: -25%;
+  right: -15%;
+  width: 260px;
+  height: 260px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 50%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.hrs-mqt-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Texto introductorio sobre verde */
+.hrs-mqt-panel .text-muted {
+  color: rgba(255, 255, 255, 0.78) !important;
+}
+
+.hrs-mqt-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1.25rem;
+}
+
+/* Tarjetas métricas: hojas blancas sobre el panel (como tablas en hosting) */
+.hrs-mqt-stat {
+  padding: 0.9rem 1rem;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.hrs-mqt-stat--accent {
+  border-color: rgba(0, 166, 82, 0.45);
+  background: linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.08),
+    inset 0 0 0 1px rgba(0, 166, 82, 0.12);
+}
+
+.hrs-mqt-stat__val {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--hrs-mqt-host);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.hrs-mqt-stat--accent .hrs-mqt-stat__val {
+  color: #047857;
+}
+
+.hrs-mqt-stat__lbl {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  margin-top: 0.35rem;
+}
+
+.hrs-mqt-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  margin-top: 0.25rem;
+  padding-top: 1rem;
+  padding-bottom: 1.4rem;
+  margin-bottom: 2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.22);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.hrs-mqt-search {
+  flex: 1;
+  min-width: 200px;
+  max-width: 320px;
+}
+
+/* Buscador: píldora blanca (adjunto 2) */
+.hrs-mqt-search input {
+  width: 100%;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  font-size: 0.875rem;
+  color: #1e293b;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.hrs-mqt-search input:focus {
+  outline: none;
+  border-color: var(--hrs-mqt-chip-active);
+  box-shadow: 0 0 0 3px rgba(0, 209, 110, 0.22);
+}
+
+.hrs-mqt-search input::placeholder {
+  color: #94a3b8;
+}
+
+.hrs-mqt-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+/*
+ * Chips filtro (adjunto 2): inactivos = fondo transparente + borde blanco fino + texto blanco MAYÚSCULAS;
+ * activo = verde esmeralda sólido + texto blanco.
+ */
+.hrs-mqt-chip {
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  background: transparent;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.45rem 0.85rem;
+  min-height: 2rem;
+  box-sizing: border-box;
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.12s ease;
+}
+
+.hrs-mqt-chip:hover {
+  border-color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.hrs-mqt-chip:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--hrs-mqt-host), 0 0 0 4px rgba(255, 255, 255, 0.65);
+}
+
+.hrs-mqt-chip--active {
+  background: linear-gradient(180deg, var(--hrs-mqt-chip-active) 0%, var(--hrs-mqt-chip-active-mid) 100%);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: #fff;
+  box-shadow: 0 2px 12px rgba(0, 209, 110, 0.45);
+}
+
+.hrs-mqt-chip--active:hover {
+  background: linear-gradient(180deg, #00e078 0%, var(--hrs-mqt-chip-active) 100%);
+  border-color: rgba(0, 0, 0, 0.06);
+  color: #fff;
+}
+
+/* Área de tarjetas de órdenes (separada del toolbar por borde + margen del .hrs-mqt-toolbar) */
+.hrs-mqt-orders-region {
+  position: relative;
+  z-index: 1;
+}
+
+.hrs-mqt-orders-region .hrs-mqt-msg {
+  padding-top: 0.5rem;
+  padding-bottom: 2rem;
+}
+
+.hrs-mqt-msg {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.9rem;
+}
+
+.hrs-mqt-err {
+  background: #fff5f5;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.hrs-mqt-ticket-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+  padding: 1.1rem;
+  margin: 0 -0.15rem;
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Tarjetas ticket: hoja blanca sobre panel verde */
+button.hrs-mqt-ticket-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  text-align: left;
+  padding: 1.25rem;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  width: 100%;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+button.hrs-mqt-ticket-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+  border-color: rgba(45, 93, 70, 0.35);
+}
+
+.hrs-mqt-ticket-card__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.hrs-mqt-ticket-card__ord {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.hrs-mqt-ticket-card__tkt {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+}
+
+.hrs-mqt-badge {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.3rem 0.5rem;
+  border-radius: 8px;
+}
+
+.hrs-mqt-badge--borrador {
+  background: #f1f5f9;
+  color: #475569;
+}
+.hrs-mqt-badge--enviado_consulta {
+  background: #fef3c7;
+  color: #b45309;
+}
+.hrs-mqt-badge--en_gestion {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+.hrs-mqt-badge--respondido {
+  background: #d1fae5;
+  color: #047857;
+}
+.hrs-mqt-badge--cerrado,
+.hrs-mqt-badge--descartado {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.hrs-mqt-ticket-card__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.hrs-mqt-ticket-card__total {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--hrs-mqt-host);
+  font-variant-numeric: tabular-nums;
+}
+
+.hrs-mqt-ticket-card__meta {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+/* Panel detalle (overlay) */
+.hrs-mqt-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 3000;
+  display: flex;
+  justify-content: flex-end;
+  align-items: stretch;
+}
+
+.hrs-mqt-drawer {
+  width: min(520px, 100vw);
+  max-height: 100%;
+  overflow-y: auto;
+  background: #f8fafc;
+  box-shadow: -12px 0 40px rgba(0, 0, 0, 0.12);
+}
+
+.hrs-mqt-drawer__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.25rem 1.35rem;
+  background: #2d5d46;
+  color: #fff;
+}
+
+.hrs-mqt-drawer__head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.hrs-mqt-drawer__sub {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.85);
+  margin-top: 0.35rem;
+}
+
+.hrs-mqt-drawer__close {
+  border: none;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 1.25rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.hrs-mqt-drawer__close:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.hrs-mqt-drawer__body {
+  padding: 1.25rem 1.35rem 2rem;
+}
+
+.hrs-mqt-timeline {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.35rem 1rem;
+  margin-bottom: 1.25rem;
+  padding: 1rem;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  font-size: 0.78rem;
+}
+
+.hrs-mqt-timeline dt {
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.62rem;
+}
+.hrs-mqt-timeline dd {
+  margin: 0;
+  color: #0f172a;
+}
+
+.hrs-mqt-items {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 1.25rem;
+}
+
+.hrs-mqt-items th,
+.hrs-mqt-items td {
+  padding: 0.5rem 0.65rem;
+  text-align: left;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+/* Cabecera tabla drawer: mismo verde que tablas hosting */
+.hrs-mqt-items th {
+  background: #2d5d46;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  font-size: 0.62rem;
+  letter-spacing: 0.05em;
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+
+.hrs-mqt-items tr:last-child td {
+  border-bottom: none;
+}
+
+.hrs-mqt-total-line {
+  font-size: 0.95rem;
+  font-weight: 800;
+  margin-bottom: 1rem;
+  color: #2d5d46;
+}
+
+.hrs-mqt-admin-form label {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  margin-bottom: 0.35rem;
+}
+
+.hrs-mqt-admin-form select,
+.hrs-mqt-admin-form textarea {
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  font-size: 0.85rem;
+  margin-bottom: 0.85rem;
+  font-family: inherit;
+}
+
+.hrs-mqt-admin-form textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+/* Botón guardar: mismo primary que .fact-btn-primary */
+.hrs-mqt-btn-save {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--hrs-mqt-primary) 0%, var(--hrs-mqt-primary-bright) 100%);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.875rem;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 166, 82, 0.3);
+  transition: transform 0.15s, box-shadow 0.2s;
+}
+
+.hrs-mqt-btn-save:hover:not(:disabled) {
+  box-shadow: 0 4px 14px rgba(0, 166, 82, 0.4);
+  transform: translateY(-1px);
+}
+
+.hrs-mqt-btn-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.hrs-mqt-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.hrs-mqt-header-actions .btn {
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+@media (max-width: 576px) {
+  .hrs-mqt-ticket-grid {
+    grid-template-columns: 1fr;
+    margin: 0;
+    padding: 0.85rem;
+  }
+
+  .hrs-mqt-toolbar {
+    margin-bottom: 1.5rem;
+  }
+}

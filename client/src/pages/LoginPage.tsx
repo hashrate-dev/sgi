@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Navigate, useLocation } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
+import { MarketplacePasswordField } from "../components/marketplace/MarketplacePasswordField";
 import { useAuth } from "../contexts/AuthContext";
 import { setApiBaseUrl, wakeUpBackend } from "../lib/api";
 import "../styles/facturacion.css";
@@ -34,7 +35,8 @@ export function LoginPage() {
   }, [location.search, location.pathname, location.hash]);
 
   if (user) {
-    return <Navigate to={user.role === "lector" ? "/kryptex" : "/"} replace />;
+    const to = user.role === "lector" ? "/kryptex" : user.role === "cliente" ? "/marketplace" : "/";
+    return <Navigate to={to} replace />;
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -72,17 +74,13 @@ export function LoginPage() {
                   required
                 />
               </div>
-              <div className="mb-3">
-                <label className="form-label">Contraseña</label>
-                <input
-                  type="password"
-                  className="form-control"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="current-password"
-                  required
-                />
-              </div>
+              <MarketplacePasswordField
+                label="Contraseña"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                required
+              />
               {error && (
                 <div className="alert alert-danger py-2 small" role="alert">
                   {error}
@@ -92,6 +90,12 @@ export function LoginPage() {
                 {!ready ? "Preparando..." : submitting ? "Entrando..." : "Entrar"}
               </button>
             </form>
+            <p className="text-center small text-muted mt-3 mb-0">
+              <Link to="/marketplace" className="text-decoration-none">
+                <i className="bi bi-bag-heart me-1" aria-hidden />
+                Tienda online
+              </Link>
+            </p>
           </div>
         </div>
       </div>

@@ -1,0 +1,195 @@
+/* Editor de filas de detalle (marketplace ASIC) */
+
+.hrs-detail-rows__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.hrs-detail-rows__row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.55rem 0.65rem;
+  align-items: center;
+  padding: 0.55rem 0.65rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.hrs-detail-rows__icon-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.hrs-detail-rows__icon-display {
+  box-sizing: border-box;
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  border: 2px solid #2d5d46;
+  border-radius: 10px;
+  background: #ecfdf5;
+  color: #1f4d38;
+  cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease,
+    color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.hrs-detail-rows__icon-display .shelf-detail-strip__svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+.hrs-detail-rows__icon-display:hover:not(:disabled) {
+  border-color: #1f4d38;
+  background: #d1fae5;
+  box-shadow: 0 0 0 2px rgba(45, 93, 70, 0.2);
+}
+
+.hrs-detail-rows__icon-display:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.hrs-detail-rows__icon-display--static {
+  cursor: default;
+  pointer-events: none;
+}
+
+.hrs-detail-rows__row--coins-fixed,
+.hrs-detail-rows__row--power-fixed,
+.hrs-detail-rows__row--cooling-fixed,
+.hrs-detail-rows__row--mining-fixed {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  /* Sin columna lateral «Fijo»: solo icono + control */
+  grid-template-columns: auto 1fr;
+}
+
+.hrs-detail-rows__coins-select {
+  width: 100%;
+  min-width: 0;
+}
+
+.hrs-detail-rows__icon-flyout {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  max-width: min(280px, calc(100vw - 2rem));
+  padding: 0.45rem;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.hrs-detail-rows__icon-flyout-btn {
+  box-sizing: border-box;
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #4b5563;
+  cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.hrs-detail-rows__icon-flyout-btn .shelf-detail-strip__svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.hrs-detail-rows__icon-flyout-btn:hover {
+  border-color: #2d5d46;
+  color: #2d5d46;
+  background: #f8fffb;
+}
+
+.hrs-detail-rows__icon-flyout-btn--active {
+  border-color: #2d5d46;
+  background: #ecfdf5;
+  color: #1f4d38;
+}
+
+.hrs-detail-rows__icon-flyout-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Fila energía: número con flechas nativas + W fija */
+.hrs-detail-rows__watts-wrap {
+  display: flex;
+  align-items: stretch;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.hrs-detail-rows__watts-wrap--fixed {
+  flex: 1;
+  min-width: 0;
+}
+
+.hrs-detail-rows__watts-number {
+  flex: 1;
+  min-width: 0;
+}
+
+.hrs-detail-rows__watts-number::-webkit-outer-spin-button,
+.hrs-detail-rows__watts-number::-webkit-inner-spin-button {
+  opacity: 1;
+  height: auto;
+}
+
+.hrs-detail-rows__watts-unit {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #374151;
+  flex-shrink: 0;
+  user-select: none;
+  padding-right: 0.1rem;
+}
+
+@media (max-width: 640px) {
+  .hrs-detail-rows__row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .hrs-detail-rows__row-remove {
+    align-self: flex-end;
+  }
+}
+
+.hrs-detail-rows__row-remove {
+  padding: 0.35rem 0.55rem;
+  font-size: 0.8rem;
+  align-self: center;
+}
+

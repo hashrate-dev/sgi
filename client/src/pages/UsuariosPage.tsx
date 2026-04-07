@@ -10,6 +10,7 @@ import {
 } from "../lib/api";
 import { canDeleteAdminUser, type UserRole } from "../lib/auth";
 import { PageHeader } from "../components/PageHeader";
+import { TiendaOnlineAuditSection } from "../components/TiendaOnlineAuditSection";
 import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import "../styles/facturacion.css";
@@ -20,7 +21,8 @@ const ROLES: { value: UserRole; label: string }[] = [
   { value: "admin_a", label: "AdministradorA" },
   { value: "admin_b", label: "AdministradorB" },
   { value: "operador", label: "Operador" },
-  { value: "lector", label: "Lector" }
+  { value: "lector", label: "Lector" },
+  { value: "cliente", label: "Cliente (tienda)" }
 ];
 
 /** AdministradorB ve "Administrador" en lugar de "AdministradorA" para usuarios de grado superior. */
@@ -42,6 +44,7 @@ export function UsuariosPage() {
   const [loading, setLoading] = useState(true);
   const [activityLoading, setActivityLoading] = useState(true);
   const [activityError, setActivityError] = useState(false);
+  const [auditRefreshKey, setAuditRefreshKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<"new" | UserListItem | null>(null);
   const [deleteConfirmUser, setDeleteConfirmUser] = useState<UserListItem | null>(null);
@@ -89,7 +92,9 @@ export function UsuariosPage() {
   }, []);
 
   useEffect(() => {
-    if (currentUser?.role === "admin_a" || currentUser?.role === "admin_b") loadActivity();
+    if (currentUser?.role === "admin_a" || currentUser?.role === "admin_b") {
+      loadActivity();
+    }
   }, [currentUser?.role]);
 
   function openNew() {
@@ -144,6 +149,7 @@ export function UsuariosPage() {
           setModal(null);
           loadUsers();
           loadActivity();
+          setAuditRefreshKey((k) => k + 1);
         })
         .catch((err) => showToast(`Error al crear usuario: ${err instanceof Error ? err.message : "Error desconocido"}`, "error", toastContext))
         .finally(() => setSaving(false));
@@ -219,7 +225,6 @@ export function UsuariosPage() {
       setGoToPageActivity("");
     }
   }
-
   return (
     <div className="fact-page usuarios-page">
       <div className="container">
@@ -474,6 +479,8 @@ export function UsuariosPage() {
                 )}
               </div>
             </div>
+
+            <TiendaOnlineAuditSection refreshKey={auditRefreshKey} />
           </>
         )}
       </div>

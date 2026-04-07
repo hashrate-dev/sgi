@@ -4,6 +4,12 @@ import { PageHeader } from "../components/PageHeader";
 import "../styles/facturacion.css";
 
 const configMenuItems: Array<{ to: string; icon: string; label: string; desc: string }> = [
+  {
+    to: "/marketplacedashboard",
+    icon: "bi-shop-window",
+    label: "Tienda Online Configuración",
+    desc: "Configuración de precios y productos publicados en la tienda ASIC",
+  },
   { to: "/equipos-asic/equipos", icon: "bi-gear", label: "Gestión de Equipos ASIC", desc: "Configuración de Equipos ASIC por marca y modelo" },
   { to: "/equipos-asic/setup", icon: "bi-tools", label: "Gestión de Setup", desc: "Configuración de tipos de Setup" },
   { to: "/equipos-asic/items-garantia", icon: "bi-list-ul", label: "Gestión de Garantías ANDE", desc: "Configuración de Garantías ANDE por tipo de equipo" },

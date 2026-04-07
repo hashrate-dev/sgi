@@ -1,0 +1,68 @@
+/* Mis órdenes marketplace — misma línea visual que Clientes tienda online (cti-*) */
+
+.moo-cti-wrap.cti-page {
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Tarjeta orden: clic / teclado (article con role=button) */
+.moo-cti-order-card.cti-card {
+  cursor: pointer;
+}
+
+.moo-cti-order-card.cti-card:focus {
+  outline: none;
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.45),
+    0 12px 32px rgba(0, 0, 0, 0.22);
+}
+
+.moo-cti-order-card.cti-card:focus:not(:focus-visible) {
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
+}
+
+.moo-cti-order-card .cti-btn-edit {
+  pointer-events: none;
+}
+
+/* Drawer alineado al verde SGI / cti */
+.market-mis-ord__drawer--cti {
+  border: 1px solid rgba(45, 93, 70, 0.25);
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2);
+}
+
+.market-mis-ord__drawer--cti .market-mis-ord__drawer-head {
+  background: linear-gradient(135deg, #2d5d46 0%, #1e4034 100%);
+  color: #fff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.market-mis-ord__drawer--cti .market-mis-ord__drawer-head h2 {
+  color: #fff !important;
+}
+
+.market-mis-ord__drawer--cti .market-mis-ord__drawer-sub {
+  color: rgba(255, 255, 255, 0.88) !important;
+}
+
+.market-mis-ord__drawer--cti .market-mis-ord__drawer-close {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.market-mis-ord__drawer--cti .market-mis-ord__drawer-close:hover {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+.market-mis-ord__drawer--cti .market-mis-ord__badge {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff !important;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.market-mis-ord__drawer--cti .market-mis-ord__drawer-body {
+  background: #f8faf9;
+}

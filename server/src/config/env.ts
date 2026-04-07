@@ -23,6 +23,7 @@ const EnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(8080),
   SQLITE_PATH: z.string().default(defaultSqlitePath),
+  /** Orígenes permitidos separados por coma (ej. https://app.tudominio.com,http://localhost:5174). Si no se define, CORS refleja el Origin del cliente (modo actual). */
   CORS_ORIGIN: z.string().optional(),
   JWT_SECRET: z.string().min(16).default("cambiar-en-produccion-secreto-jwt-muy-largo"),
   /** API key de Render (https://dashboard.render.com → Account Settings → API Keys). Usado para listar servicios y disparar deploy desde la app. */
@@ -35,4 +36,35 @@ const EnvSchema = z.object({
 
 export type Env = z.infer<typeof EnvSchema>;
 export const env: Env = EnvSchema.parse(process.env);
+
+(() => {
+  const tok = process.env.WHATSAPP_ACCESS_TOKEN?.trim();
+  const pid = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim();
+  const to = process.env.WHATSAPP_NOTIFY_TO?.trim();
+  if (tok && pid && to) {
+    // eslint-disable-next-line no-console
+    console.log(
+      "[whatsapp] Avisos de órdenes (marketplace): activos (plantilla requiere aprobación en Meta; revisá logs al generar orden)."
+    );
+  } else {
+    // eslint-disable-next-line no-console
+    console.log(
+      "[whatsapp] Avisos de órdenes (marketplace): no configurados. Definí en .env: WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_NOTIFY_TO (y plantilla en Meta; ver server/docs/WHATSAPP_MARKETPLACE.md)."
+    );
+  }
+})();
+
+if (env.NODE_ENV === "production") {
+  if (env.JWT_SECRET.length < 32) {
+    console.warn("[seguridad] JWT_SECRET debería tener al menos 32 caracteres en producción.");
+  }
+  if (env.JWT_SECRET.includes("cambiar-en-produccion") || env.JWT_SECRET === "cambiar-en-produccion-secreto-jwt-muy-largo") {
+    console.warn("[seguridad] Cambiá JWT_SECRET: detectado valor por defecto de desarrollo.");
+  }
+  if (!env.CORS_ORIGIN?.trim()) {
+    console.warn(
+      "[seguridad] Definí CORS_ORIGIN en producción (URLs del front separadas por coma) para acotar orígenes permitidos."
+    );
+  }
+}
 

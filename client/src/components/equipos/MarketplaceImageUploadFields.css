@@ -1,0 +1,227 @@
+/* Subida de imágenes marketplace (Equipos ASIC) — patrón tipo CMS moderno */
+
+.hrs-upload-field {
+  margin-bottom: 0;
+}
+
+.hrs-upload-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.4rem;
+}
+
+.hrs-upload-dropzone {
+  position: relative;
+  border: 2px dashed #c5cdd6;
+  border-radius: 10px;
+  background: #f9fafb;
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+  text-align: center;
+}
+
+.hrs-upload-dropzone:hover:not(.hrs-upload-dropzone--disabled):not(.hrs-upload-dropzone--has-preview) {
+  border-color: #2d5d46;
+  background: #f3faf6;
+}
+
+.hrs-upload-dropzone--active {
+  border-color: #2d5d46;
+  background: #e8f5ee;
+  border-style: solid;
+}
+
+.hrs-upload-dropzone--disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.hrs-upload-dropzone--has-preview {
+  cursor: default;
+  min-height: auto;
+  padding: 0.75rem 1rem;
+  border-style: solid;
+  border-color: #e5e7eb;
+  background: #fff;
+}
+
+.hrs-upload-dropzone-inner {
+  pointer-events: none;
+  max-width: 280px;
+}
+
+.hrs-upload-dropzone-icon {
+  font-size: 1.75rem;
+  line-height: 1;
+  margin-bottom: 0.35rem;
+  opacity: 0.85;
+}
+
+.hrs-upload-dropzone-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 0.25rem;
+}
+
+.hrs-upload-dropzone-hint {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.hrs-upload-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  pointer-events: auto;
+}
+
+.hrs-upload-preview-thumb-wrap {
+  position: relative;
+  flex-shrink: 0;
+  width: 96px;
+  height: 96px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  background: #f3f4f6;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.hrs-upload-preview-thumb-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.hrs-upload-preview-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.hrs-upload-preview-caption {
+  font-size: 0.8rem;
+  color: #4b5563;
+  margin: 0;
+  word-break: break-all;
+}
+
+.hrs-upload-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.hrs-upload-btn {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 0.4rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #1f2937;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.hrs-upload-btn:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #2d5d46;
+  color: #2d5d46;
+}
+
+.hrs-upload-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.hrs-upload-btn--danger {
+  border-color: #fecaca;
+  background: #fff;
+  color: #b91c1c;
+}
+
+.hrs-upload-btn--danger:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #f87171;
+}
+
+/* Galería: grid de miniaturas + zona drop */
+.hrs-upload-gallery-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 0.65rem;
+}
+
+.hrs-upload-gallery-item {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  flex-shrink: 0;
+}
+
+.hrs-upload-gallery-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.hrs-upload-gallery-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(185, 28, 28, 0.92);
+  color: #fff;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.hrs-upload-gallery-remove:hover {
+  background: #991b1b;
+}
+
+.hrs-upload-gallery-drop {
+  min-height: 100px;
+}
+
+.hrs-upload-gallery-empty {
+  font-size: 0.8rem;
+  color: #9ca3af;
+  margin: 0.25rem 0 0.5rem;
+}

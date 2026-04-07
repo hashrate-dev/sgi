@@ -1,0 +1,501 @@
+import { useEffect, useRef, useState } from "react";
+import type { AsicDetailIcon } from "../../lib/marketplaceAsicCatalog";
+import { AsicDetailSvg } from "../marketplace/AsicDetailIcon";
+import "./MarketplaceDetailRowsEditor.css";
+
+export const DETAIL_ROW_ICON_OPTIONS: { value: AsicDetailIcon; label: string }[] = [
+  { value: "bolt", label: "Energía (rayo)" },
+  { value: "chip", label: "Chip / monedas" },
+  { value: "sun", label: "Refrigeración / aire" },
+  { value: "btc", label: "Bitcoin" },
+  { value: "dual", label: "Minería dual" },
+];
+
+function isDetailIcon(x: string): x is AsicDetailIcon {
+  return x === "bolt" || x === "chip" || x === "sun" || x === "fan" || x === "droplet" || x === "btc" || x === "dual";
+}
+
+/** Presets de la fila fija «chip / monedas» (modal vitrina). */
+export type CoinPreset = "sha256" | "scrypt";
+
+export const COIN_ROW_TEXT: Record<CoinPreset, string> = {
+  sha256: "BTC / BCH / BSV · SHA-256",
+  scrypt: "DOGE + LTC · Scrypt",
+};
+
+/** Refrigeración fija (icono sol en vitrina). */
+export type CoolingPreset = "air" | "hydro";
+
+export const COOLING_ROW_TEXT: Record<CoolingPreset, string> = {
+  air: "Minero de Aire",
+  hydro: "Minero Hydro",
+};
+
+/** Tipo de minería (icono ₿ o dual en vitrina). */
+export type MiningPreset = "bitcoin" | "dual";
+
+export const MINING_ROW_BY_PRESET: Record<MiningPreset, { icon: AsicDetailIcon; text: string }> = {
+  bitcoin: { icon: "btc", text: "Minería Bitcoin" },
+  dual: { icon: "dual", text: "Minería Dual" },
+};
+
+function isMiningCatalogRow(row: { icon: AsicDetailIcon; text: string }): boolean {
+  return row.icon === "btc" || row.icon === "dual";
+}
+
+function miningPresetFromRow(row: { icon: AsicDetailIcon; text: string }): MiningPreset {
+  if (row.icon === "dual") return "dual";
+  const t = row.text.trim().toUpperCase();
+  if (t.includes("DUAL")) return "dual";
+  return "bitcoin";
+}
+
+/** Fila de refrigeración (fan = aire; droplet/sol legacy = hydro). */
+function isCoolingSunRow(row: { icon: AsicDetailIcon; text: string }): boolean {
+  if (row.icon !== "sun" && row.icon !== "fan" && row.icon !== "droplet") return false;
+  const t = row.text.trim().toUpperCase();
+  if (!t) return true;
+  if (t.includes("HYDR")) return true;
+  if (t.includes("AIRE") || t.includes("AIR")) return true;
+  return false;
+}
+
+function coolingPresetFromText(text: string): CoolingPreset {
+  const t = text.trim().toUpperCase();
+  if (t.includes("HYDR")) return "hydro";
+  return "air";
+}
+
+/** Icono contextual vitrina: ventilador (aire) o gota (hydro). */
+function coolingTypeIconForPreset(coolingPreset: CoolingPreset): AsicDetailIcon {
+  return coolingPreset === "air" ? "fan" : "droplet";
+}
+
+function isCoinChipRow(row: { icon: AsicDetailIcon; text: string }): boolean {
+  if (row.icon !== "chip") return false;
+  const t = row.text.trim().toUpperCase();
+  const hasBtcFamily =
+    (t.includes("BTC") || t.includes("BCH") || t.includes("BSV")) && (t.includes("SHA") || t.includes("BTC"));
+  const hasScryptFamily =
+    (t.includes("DOGE") && (t.includes("LTC") || t.includes("LITECOIN"))) ||
+    (t.includes("LTC") && t.includes("DOGE")) ||
+    (t.includes("SCRYPT") && !t.includes("SHA-256"));
+  return hasBtcFamily || hasScryptFamily;
+}
+
+function coinPresetFromText(text: string): CoinPreset {
+  const t = text.trim().toUpperCase();
+  if (
+    (t.includes("DOGE") && (t.includes("LTC") || t.includes("LITECOIN"))) ||
+    (t.includes("LTC") && t.includes("DOGE")) ||
+    (t.includes("SCRYPT") && !t.includes("SHA-256"))
+  ) {
+    return "scrypt";
+  }
+  return "sha256";
+}
+
+/**
+ * Separa JSON guardado en: preset de monedas, fila energía (siempre la primera del tipo rayo),
+ * e ítems extra editables (sin quitar energía ni monedas del listado).
+ * Orden persistido: [bolt, chip monedas, sun refrigeración, fila minería, ...extras] (como catálogo).
+ */
+export function extractDetailRowsForEditor(parsed: Array<{ icon: AsicDetailIcon; text: string }>): {
+  preset: CoinPreset;
+  powerRow: { icon: "bolt"; text: string };
+  coolingPreset: CoolingPreset;
+  miningPreset: MiningPreset;
+  extraRows: Array<{ icon: AsicDetailIcon; text: string }>;
+} {
+  let preset: CoinPreset = "sha256";
+  const rows = [...parsed];
+  const coinIdx = rows.findIndex((r) => isCoinChipRow(r));
+  if (coinIdx >= 0) {
+    preset = coinPresetFromText(rows[coinIdx]!.text);
+    rows.splice(coinIdx, 1);
+  }
+  const boltIdx = rows.findIndex((r) => r.icon === "bolt");
+  let powerRow: { icon: "bolt"; text: string };
+  if (boltIdx >= 0) {
+    powerRow = { icon: "bolt", text: rows[boltIdx]!.text };
+    rows.splice(boltIdx, 1);
+  } else {
+    powerRow = { icon: "bolt", text: "" };
+  }
+  let coolingPreset: CoolingPreset = "air";
+  const coolIdx = rows.findIndex((r) => isCoolingSunRow(r));
+  if (coolIdx >= 0) {
+    coolingPreset = coolingPresetFromText(rows[coolIdx]!.text);
+    rows.splice(coolIdx, 1);
+  }
+  let miningPreset: MiningPreset = preset === "scrypt" ? "dual" : "bitcoin";
+  const miningIdx = rows.findIndex((r) => isMiningCatalogRow(r));
+  if (miningIdx >= 0) {
+    miningPreset = miningPresetFromRow(rows[miningIdx]!);
+    rows.splice(miningIdx, 1);
+  }
+  return { preset, powerRow, coolingPreset, miningPreset, extraRows: rows };
+}
+
+export function buildDetailRowsFromEditor(
+  preset: CoinPreset,
+  powerRow: { icon: "bolt"; text: string },
+  coolingPreset: CoolingPreset,
+  miningPreset: MiningPreset,
+  extraRows: Array<{ icon: AsicDetailIcon; text: string }>
+): Array<{ icon: AsicDetailIcon; text: string }> {
+  const coin = { icon: "chip" as const, text: COIN_ROW_TEXT[preset] };
+  const coolIcon: AsicDetailIcon = coolingTypeIconForPreset(coolingPreset);
+  const cooling = { icon: coolIcon, text: COOLING_ROW_TEXT[coolingPreset] };
+  const mining = MINING_ROW_BY_PRESET[miningPreset];
+  return [{ icon: "bolt", text: powerRow.text }, coin, cooling, { icon: mining.icon, text: mining.text }, ...extraRows];
+}
+
+/** Parsea vatios de textos tipo "3950 W", "3.950 W" (miles con punto). */
+function parseBoltRowWatts(text: string): number | null {
+  const t = text.trim();
+  if (!t) return null;
+  const m = t.match(/^(\d+(?:[.,]\d+)*)\s*W\b/i);
+  if (!m?.[1]) return null;
+  let raw = m[1];
+  if (raw.includes(".") && !raw.includes(",")) {
+    const segs = raw.split(".");
+    if (segs.length === 2 && segs[1]!.length === 3) {
+      const a = parseInt(segs[0]!, 10);
+      const b = parseInt(segs[1]!, 10);
+      if (!Number.isNaN(a) && !Number.isNaN(b)) return a * 1000 + b;
+    }
+  }
+  raw = raw.replace(/\./g, "").replace(",", ".");
+  const n = parseFloat(raw);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.round(n);
+}
+
+function wattsTextFromNumber(watts: number): string {
+  const w = Math.max(0, Math.round(watts));
+  return `${w} W`;
+}
+
+export function parseDetailRowsJson(json: string): Array<{ icon: AsicDetailIcon; text: string }> {
+  const t = json.trim();
+  if (!t) return [];
+  try {
+    const raw = JSON.parse(t) as unknown;
+    if (!Array.isArray(raw)) return [];
+    const out: Array<{ icon: AsicDetailIcon; text: string }> = [];
+    for (const item of raw) {
+      if (!item || typeof item !== "object") continue;
+      const icon = (item as { icon?: string }).icon;
+      const text = (item as { text?: string }).text;
+      const ic = typeof icon === "string" && isDetailIcon(icon) ? icon : "bolt";
+      out.push({ icon: ic, text: typeof text === "string" ? text : "" });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+/** JSON normalizado para API: solo filas con texto; iconos válidos. */
+export function sanitizeDetailRowsForApi(json: string): string | null {
+  const t = json.trim();
+  if (!t) return null;
+  try {
+    const raw = JSON.parse(t) as unknown;
+    if (!Array.isArray(raw)) return t;
+    const out: Array<{ icon: AsicDetailIcon; text: string }> = [];
+    for (const item of raw) {
+      if (!item || typeof item !== "object") continue;
+      const icon = (item as { icon?: string }).icon;
+      const text = String((item as { text?: unknown }).text ?? "").trim();
+      if (!text) continue;
+      const ic = typeof icon === "string" && isDetailIcon(icon) ? icon : "bolt";
+      out.push({ icon: ic, text });
+    }
+    return out.length > 0 ? JSON.stringify(out) : null;
+  } catch {
+    return t;
+  }
+}
+
+function commitFullRows(
+  preset: CoinPreset,
+  powerRow: { icon: "bolt"; text: string },
+  coolingPreset: CoolingPreset,
+  miningPreset: MiningPreset,
+  extraRows: Array<{ icon: AsicDetailIcon; text: string }>,
+  onChange: (json: string) => void
+) {
+  const full = buildDetailRowsFromEditor(preset, powerRow, coolingPreset, miningPreset, extraRows);
+  onChange(JSON.stringify(full.map((r) => ({ icon: r.icon, text: r.text }))));
+}
+
+/** Formulario por filas: icono + texto; sincroniza con `mp_detail_rows_json`. */
+export function MarketplaceDetailRowsEditor({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  onChange: (json: string) => void;
+  disabled?: boolean;
+}) {
+  const parsed = parseDetailRowsJson(value);
+  const { preset, powerRow, coolingPreset, miningPreset, extraRows } = extractDetailRowsForEditor(
+    parsed.length > 0 ? parsed : []
+  );
+  const [iconMenuRow, setIconMenuRow] = useState<number | null>(null);
+  const iconMenuWrapRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (disabled) setIconMenuRow(null);
+  }, [disabled]);
+
+  useEffect(() => {
+    if (iconMenuRow === null) {
+      iconMenuWrapRef.current = null;
+      return;
+    }
+    const onDocDown = (e: MouseEvent) => {
+      const el = iconMenuWrapRef.current;
+      if (el && !el.contains(e.target as Node)) setIconMenuRow(null);
+    };
+    document.addEventListener("mousedown", onDocDown, true);
+    return () => document.removeEventListener("mousedown", onDocDown, true);
+  }, [iconMenuRow]);
+
+  function updatePowerRow(patch: Partial<{ text: string }>) {
+    commitFullRows(preset, { ...powerRow, ...patch }, coolingPreset, miningPreset, extraRows, onChange);
+  }
+
+  function updateExtraRow(i: number, patch: Partial<{ icon: AsicDetailIcon; text: string }>) {
+    const next = extraRows.map((r, j) => (j === i ? { ...r, ...patch } : r));
+    commitFullRows(preset, powerRow, coolingPreset, miningPreset, next, onChange);
+  }
+
+  function setCoinPreset(nextPreset: CoinPreset) {
+    commitFullRows(nextPreset, powerRow, coolingPreset, miningPreset, extraRows, onChange);
+  }
+
+  function setCoolingPreset(next: CoolingPreset) {
+    commitFullRows(preset, powerRow, next, miningPreset, extraRows, onChange);
+  }
+
+  function setMiningPreset(next: MiningPreset) {
+    commitFullRows(preset, powerRow, coolingPreset, next, extraRows, onChange);
+  }
+
+  function removeRow(i: number) {
+    if (iconMenuRow === i) setIconMenuRow(null);
+    const next = extraRows.filter((_, j) => j !== i);
+    commitFullRows(preset, powerRow, coolingPreset, miningPreset, next, onChange);
+  }
+
+  return (
+    <div className="fact-field">
+      <div className="hrs-detail-rows__list">
+        <div className="hrs-detail-rows__row hrs-detail-rows__row--power-fixed">
+          <div className="hrs-detail-rows__icon-wrap">
+            <div
+              className="hrs-detail-rows__icon-display hrs-detail-rows__icon-display--static"
+              title="Consumo eléctrico (fijo)"
+              aria-hidden
+            >
+              <AsicDetailSvg kind="bolt" />
+            </div>
+          </div>
+          <div className="hrs-detail-rows__watts-wrap hrs-detail-rows__watts-wrap--fixed">
+            <input
+              type="number"
+              className="fact-input hrs-detail-rows__watts-number"
+              min={0}
+              step={50}
+              inputMode="numeric"
+              value={parseBoltRowWatts(powerRow.text) ?? ""}
+              disabled={disabled}
+              placeholder="3950"
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "") {
+                  updatePowerRow({ text: "" });
+                  return;
+                }
+                const n = Number(v);
+                if (!Number.isFinite(n) || n < 0) return;
+                updatePowerRow({ text: wattsTextFromNumber(n) });
+              }}
+              aria-label="Consumo en vatios"
+            />
+            <span className="hrs-detail-rows__watts-unit" aria-hidden>
+              W
+            </span>
+          </div>
+        </div>
+        <div className="hrs-detail-rows__row hrs-detail-rows__row--coins-fixed">
+          <div className="hrs-detail-rows__icon-wrap">
+            <div
+              className="hrs-detail-rows__icon-display hrs-detail-rows__icon-display--static"
+              title="Monedas / algoritmo (fijo)"
+              aria-hidden
+            >
+              <AsicDetailSvg kind="chip" />
+            </div>
+          </div>
+          <select
+            className="fact-input hrs-detail-rows__coins-select"
+            value={preset}
+            disabled={disabled}
+            onChange={(e) => setCoinPreset(e.target.value as CoinPreset)}
+            aria-label="Monedas y algoritmo"
+          >
+            <option value="sha256">{COIN_ROW_TEXT.sha256}</option>
+            <option value="scrypt">{COIN_ROW_TEXT.scrypt}</option>
+          </select>
+        </div>
+        <div className="hrs-detail-rows__row hrs-detail-rows__row--cooling-fixed">
+          <div className="hrs-detail-rows__icon-wrap">
+            <div
+              className="hrs-detail-rows__icon-display hrs-detail-rows__icon-display--static"
+              title={coolingPreset === "air" ? "Ventilación / cooler" : "Refrigeración por agua"}
+              aria-hidden
+            >
+              <AsicDetailSvg kind={coolingTypeIconForPreset(coolingPreset)} />
+            </div>
+          </div>
+          <select
+            className="fact-input hrs-detail-rows__coins-select"
+            value={coolingPreset}
+            disabled={disabled}
+            onChange={(e) => setCoolingPreset(e.target.value as CoolingPreset)}
+            aria-label="Tipo de refrigeración"
+          >
+            <option value="air">{COOLING_ROW_TEXT.air}</option>
+            <option value="hydro">{COOLING_ROW_TEXT.hydro}</option>
+          </select>
+        </div>
+        <div className="hrs-detail-rows__row hrs-detail-rows__row--mining-fixed">
+          <div className="hrs-detail-rows__icon-wrap">
+            <div
+              className="hrs-detail-rows__icon-display hrs-detail-rows__icon-display--static"
+              title="Tipo de minería (fijo)"
+              aria-hidden
+            >
+              <AsicDetailSvg kind={MINING_ROW_BY_PRESET[miningPreset].icon} />
+            </div>
+          </div>
+          <select
+            className="fact-input hrs-detail-rows__coins-select"
+            value={miningPreset}
+            disabled={disabled}
+            onChange={(e) => setMiningPreset(e.target.value as MiningPreset)}
+            aria-label="Tipo de minería"
+          >
+            <option value="bitcoin">{MINING_ROW_BY_PRESET.bitcoin.text}</option>
+            <option value="dual">{MINING_ROW_BY_PRESET.dual.text}</option>
+          </select>
+        </div>
+        {extraRows.map((row, i) => (
+          <div key={i} className="hrs-detail-rows__row">
+            <div
+              className="hrs-detail-rows__icon-wrap"
+              ref={(el) => {
+                if (i === iconMenuRow) iconMenuWrapRef.current = el;
+              }}
+            >
+              <button
+                type="button"
+                className="hrs-detail-rows__icon-display"
+                title="Cambiar icono"
+                disabled={disabled}
+                aria-label={`Icono: ${DETAIL_ROW_ICON_OPTIONS.find((o) => o.value === row.icon)?.label ?? row.icon}. Clic para cambiar.`}
+                aria-expanded={iconMenuRow === i}
+                onClick={() => setIconMenuRow(iconMenuRow === i ? null : i)}
+              >
+                <AsicDetailSvg kind={row.icon} />
+              </button>
+              {iconMenuRow === i && !disabled && (
+                <div className="hrs-detail-rows__icon-flyout" role="listbox" aria-label="Elegir icono">
+                  {DETAIL_ROW_ICON_OPTIONS.filter(
+                    (o) =>
+                      o.value !== "bolt" &&
+                      o.value !== "sun" &&
+                      o.value !== "fan" &&
+                      o.value !== "droplet"
+                  ).map((o) => (
+                    <button
+                      key={o.value}
+                      type="button"
+                      role="option"
+                      aria-selected={row.icon === o.value}
+                      disabled={disabled}
+                      className={
+                        "hrs-detail-rows__icon-flyout-btn" +
+                        (row.icon === o.value ? " hrs-detail-rows__icon-flyout-btn--active" : "")
+                      }
+                      title={o.label}
+                      onClick={() => {
+                        updateExtraRow(i, { icon: o.value });
+                        setIconMenuRow(null);
+                      }}
+                    >
+                      <AsicDetailSvg kind={o.value} />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {row.icon === "bolt" ? (
+              <div className="hrs-detail-rows__watts-wrap">
+                <input
+                  type="number"
+                  className="fact-input hrs-detail-rows__watts-number"
+                  min={0}
+                  step={50}
+                  inputMode="numeric"
+                  value={parseBoltRowWatts(row.text) ?? ""}
+                  disabled={disabled}
+                  placeholder="3950"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "") {
+                      updateExtraRow(i, { text: "" });
+                      return;
+                    }
+                    const n = Number(v);
+                    if (!Number.isFinite(n) || n < 0) return;
+                    updateExtraRow(i, { text: wattsTextFromNumber(n) });
+                  }}
+                  aria-label={`Vatios fila extra ${i + 1}`}
+                />
+                <span className="hrs-detail-rows__watts-unit" aria-hidden>
+                  W
+                </span>
+              </div>
+            ) : (
+              <input
+                type="text"
+                className="fact-input"
+                value={row.text}
+                disabled={disabled}
+                onChange={(e) => updateExtraRow(i, { text: e.target.value })}
+                placeholder="Texto del ítem"
+                spellCheck={false}
+                aria-label={`Texto fila ${i + 1}`}
+              />
+            )}
+            <button
+              type="button"
+              className="btn btn-outline-danger btn-sm hrs-detail-rows__row-remove"
+              disabled={disabled}
+              onClick={() => removeRow(i)}
+              title="Quitar fila"
+            >
+              Quitar
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

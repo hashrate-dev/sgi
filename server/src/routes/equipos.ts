@@ -1,22 +1,138 @@
-import type { Response } from "express";
+import type { Request, Response } from "express";
 import { Router } from "express";
 import { z } from "zod";
 import { db, getDb } from "../db.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
+import { uploadMarketplaceImageMw } from "../middleware/marketplaceImageUpload.js";
+import {
+  estimateYieldWhatToMineForEquipo,
+  explainInferAlgoFailure,
+  resolveMarketplaceAlgoForPersist,
+} from "../lib/whattomineYield.js";
+import {
+  appendPrecioHistorial,
+  initialPrecioHistorialJson,
+  parsePrecioHistorialJson,
+  syntheticFirstEntryFromFechaIngreso,
+} from "../lib/precioHistorialAsic.js";
+import { codigoProductoVitrina } from "../lib/marketplaceProductCode.js";
+import { isAdminABRole, logEquipoAsicAudit } from "../lib/equipoAsicAudit.js";
 
 export const equiposRouter = Router();
 
 const requireCanEdit = requireRole("admin_a", "admin_b", "operador");
+const requireAdminsEquipo = requireRole("admin_a", "admin_b");
 
-const EquipoBodySchema = z.object({
-  fechaIngreso: z.string().min(1, "Fecha ingreso requerida"),
-  marcaEquipo: z.string().min(1, "Marca requerida"),
-  modelo: z.string().min(1, "Modelo requerido"),
-  procesador: z.string().min(1, "Procesador requerido"),
-  precioUSD: z.number().int().min(0).max(999999).default(0),
-  observaciones: z.string().optional(),
-  numeroSerie: z.string().optional(),
-});
+const EquipoBodySchema = z
+  .object({
+    /** En POST se ignora (se asigna en servidor). En PUT se ignora (no se puede cambiar). */
+    fechaIngreso: z.string().optional().default(""),
+    marcaEquipo: z.string().min(1, "Marca requerida"),
+    modelo: z.string().min(1, "Modelo requerido"),
+    procesador: z.string().min(1, "Procesador requerido"),
+    precioUSD: z.number().int().min(0).max(999999).default(0),
+    observaciones: z.string().optional(),
+    numeroSerie: z.string().optional(),
+    marketplaceVisible: z.boolean().optional().default(false),
+    marketplaceAlgo: z.enum(["sha256", "scrypt"]).optional().nullable(),
+    marketplaceHashrateDisplay: z.string().max(200).optional().nullable(),
+    marketplaceImageSrc: z.string().max(500).optional().nullable(),
+    marketplaceGalleryJson: z.string().max(32000).optional().nullable(),
+    marketplaceDetailRowsJson: z.string().max(32000).optional().nullable(),
+    marketplaceYieldJson: z.string().max(8000).optional().nullable(),
+    marketplaceSortOrder: z.number().int().min(0).max(999999).optional().default(0),
+    /** ISO o datetime enviado por el cliente al registrar cambio de precio (opcional → ahora). */
+    precioActualizadoEn: z.string().max(50).optional().nullable(),
+    /** Historial completo al crear (p. ej. varios precios antes del primer guardado). */
+    precioHistorialJson: z.string().max(32000).optional().nullable(),
+  });
+
+type EquipoRow = {
+  id: string;
+  numero_serie: string | null;
+  fecha_ingreso: string;
+  marca_equipo: string;
+  modelo: string;
+  procesador: string;
+  precio_usd: number;
+  observaciones: string | null;
+  mp_visible?: number | boolean | null;
+  mp_algo?: string | null;
+  mp_hashrate_display?: string | null;
+  mp_image_src?: string | null;
+  mp_gallery_json?: string | null;
+  mp_detail_rows_json?: string | null;
+  mp_yield_json?: string | null;
+  mp_sort_order?: number | null;
+  precio_historial_json?: string | null;
+};
+
+function mpVisibleToInt(visible: boolean): number {
+  return visible ? 1 : 0;
+}
+
+function rowMpVisible(r: EquipoRow): boolean {
+  const v = r.mp_visible;
+  if (typeof v === "boolean") return v;
+  return Number(v) === 1;
+}
+
+function rowToItem(r: EquipoRow) {
+  return {
+    id: r.id,
+    numeroSerie: r.numero_serie ?? undefined,
+    fechaIngreso: r.fecha_ingreso,
+    marcaEquipo: r.marca_equipo,
+    modelo: r.modelo,
+    procesador: r.procesador,
+    precioUSD: Number(r.precio_usd) || 0,
+    observaciones: r.observaciones ?? undefined,
+    marketplaceVisible: rowMpVisible(r),
+    marketplaceAlgo: (r.mp_algo ?? null) as "sha256" | "scrypt" | null,
+    marketplaceHashrateDisplay: r.mp_hashrate_display ?? null,
+    marketplaceImageSrc: r.mp_image_src ?? null,
+    marketplaceGalleryJson: r.mp_gallery_json ?? null,
+    marketplaceDetailRowsJson: r.mp_detail_rows_json ?? null,
+    marketplaceYieldJson: r.mp_yield_json ?? null,
+    marketplaceSortOrder: Number(r.mp_sort_order) || 0,
+    precioHistorial: parsePrecioHistorialJson(r.precio_historial_json ?? null),
+  };
+}
+
+function isoParaRegistroPrecio(input: string | null | undefined): string {
+  if (!input?.trim()) return new Date().toISOString();
+  const d = new Date(input.trim());
+  return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+}
+
+function mpPayloadFromBody(d: z.infer<typeof EquipoBodySchema>) {
+  const vis = d.marketplaceVisible === true;
+  const sort = Math.max(0, Math.min(999999, Number(d.marketplaceSortOrder) || 0));
+  return {
+    mp_visible: mpVisibleToInt(vis),
+    mp_algo: vis ? resolveMarketplaceAlgoForPersist(d) : null,
+    mp_hashrate_display: null,
+    mp_image_src: vis ? (d.marketplaceImageSrc?.trim() || null) : null,
+    mp_gallery_json: vis ? (d.marketplaceGalleryJson?.trim() || null) : null,
+    mp_detail_rows_json: vis ? (d.marketplaceDetailRowsJson?.trim() || null) : null,
+    mp_yield_json: null,
+    mp_sort_order: vis ? sort : 0,
+  };
+}
+
+/** Mantiene columnas de tienda sin cambios (Operador al editar equipo). */
+function mpPayloadFromExistingRow(r: EquipoRow) {
+  return {
+    mp_visible: mpVisibleToInt(rowMpVisible(r)),
+    mp_algo: (r.mp_algo ?? null) as "sha256" | "scrypt" | null,
+    mp_hashrate_display: r.mp_hashrate_display ?? null,
+    mp_image_src: r.mp_image_src ?? null,
+    mp_gallery_json: r.mp_gallery_json ?? null,
+    mp_detail_rows_json: r.mp_detail_rows_json ?? null,
+    mp_yield_json: r.mp_yield_json ?? null,
+    mp_sort_order: Number(r.mp_sort_order) || 0,
+  };
+}
 
 /** Siguiente número de serie M001, M002, ... sin repetir */
 async function nextNumeroSerie(): Promise<string> {
@@ -28,25 +144,46 @@ async function nextNumeroSerie(): Promise<string> {
   return `M${String(next).padStart(3, "0")}`;
 }
 
+const EQUIPOS_SELECT = `SELECT id, numero_serie, fecha_ingreso, marca_equipo, modelo, procesador, precio_usd, observaciones,
+  mp_visible, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_sort_order,
+  precio_historial_json
+  FROM equipos_asic`;
+
 /** GET /equipos — listar todos */
 equiposRouter.get("/equipos", requireAuth, async (_req, res: Response) => {
   try {
-    const rows = (await db
-      .prepare(
-        `SELECT id, numero_serie, fecha_ingreso, marca_equipo, modelo, procesador, precio_usd, observaciones FROM equipos_asic ORDER BY numero_serie ASC, marca_equipo ASC`
-      )
-      .all()) as { id: string; numero_serie: string | null; fecha_ingreso: string; marca_equipo: string; modelo: string; procesador: string; precio_usd: number; observaciones: string | null }[];
-    const items = rows.map((r) => ({
-      id: r.id,
-      numeroSerie: r.numero_serie ?? undefined,
-      fechaIngreso: r.fecha_ingreso,
-      marcaEquipo: r.marca_equipo,
-      modelo: r.modelo,
-      procesador: r.procesador,
-      precioUSD: r.precio_usd,
-      observaciones: r.observaciones ?? undefined,
-    }));
-    res.json({ items });
+    const rows = (await db.prepare(`${EQUIPOS_SELECT} ORDER BY marca_equipo ASC, modelo ASC, numero_serie ASC`).all()) as EquipoRow[];
+    res.json({ items: rows.map(rowToItem) });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: { message: msg } });
+  }
+});
+
+/**
+ * GET /equipos/:id/whattomine-yield — rendimiento estimado (WhatToMine, electricidad 0,078 USD/kWh).
+ */
+equiposRouter.get("/equipos/:id/whattomine-yield", requireAuth, async (req, res: Response) => {
+  const id = (typeof req.params.id === "string" ? req.params.id : req.params.id?.[0] ?? "").trim();
+  if (!id) return res.status(400).json({ error: { message: "ID requerido" } });
+  try {
+    const row = (await db.prepare(`${EQUIPOS_SELECT} WHERE id = ?`).get(id)) as EquipoRow | undefined;
+    if (!row) return res.status(404).json({ error: { message: "Equipo no encontrado" } });
+    const payload = {
+      mp_algo: row.mp_algo ?? null,
+      procesador: row.procesador ?? "",
+      mp_detail_rows_json: row.mp_detail_rows_json ?? null,
+    };
+    const hintFail = explainInferAlgoFailure(payload);
+    const y = await estimateYieldWhatToMineForEquipo(payload);
+    if (!y) {
+      return res.json({
+        ok: true,
+        yield: null,
+        hint: hintFail || "No se pudo obtener datos de WhatToMine. Probá de nuevo en unos segundos.",
+      });
+    }
+    res.json({ ok: true, yield: y });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     res.status(500).json({ error: { message: msg } });
@@ -59,22 +196,112 @@ equiposRouter.post("/equipos", requireAuth, requireCanEdit, async (req, res: Res
   if (!parsed.success) {
     return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
   }
-  const { fechaIngreso, marcaEquipo, modelo, procesador, precioUSD, observaciones } = parsed.data;
+  const admin = isAdminABRole(req.user!.role);
+  if (!admin && (parsed.data.precioUSD > 0 || parsed.data.marketplaceVisible)) {
+    return res.status(403).json({
+      error: {
+        message:
+          "Solo AdministradorA o AdministradorB pueden crear equipos con precio en USD o publicados en la tienda online.",
+      },
+    });
+  }
+  const { marcaEquipo, modelo, procesador, precioUSD, observaciones } = parsed.data;
+  const fechaIngresoServidor = new Date().toISOString();
+  const mp = mpPayloadFromBody(parsed.data);
+  const precioWhen = isoParaRegistroPrecio(parsed.data.precioActualizadoEn);
   const id = `equipo_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-  const numeroSerie = await nextNumeroSerie();
+  let numeroSerie = await nextNumeroSerie();
+  const codeVitrina = codigoProductoVitrina(modelo.trim(), procesador.trim(), mp.mp_visible === 1);
+  if (codeVitrina) numeroSerie = codeVitrina;
   try {
+    const rawHist = parsed.data.precioHistorialJson?.trim();
+    let historialInicial: string;
+    if (rawHist) {
+      const entries = parsePrecioHistorialJson(rawHist);
+      historialInicial = entries.length > 0 ? JSON.stringify(entries) : initialPrecioHistorialJson(precioUSD, precioWhen);
+    } else {
+      historialInicial = initialPrecioHistorialJson(precioUSD, precioWhen);
+    }
     await db
       .prepare(
-        `INSERT INTO equipos_asic (id, numero_serie, fecha_ingreso, marca_equipo, modelo, procesador, precio_usd, observaciones)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO equipos_asic (id, numero_serie, fecha_ingreso, marca_equipo, modelo, procesador, precio_usd, observaciones,
+          mp_visible, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_sort_order,
+          precio_historial_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .run(id, numeroSerie, fechaIngreso, marcaEquipo.trim(), modelo.trim(), procesador.trim(), precioUSD, observaciones ?? null);
-    res.status(201).json({ ok: true, id, numeroSerie });
+      .run(
+        id,
+        numeroSerie,
+        fechaIngresoServidor,
+        marcaEquipo.trim(),
+        modelo.trim(),
+        procesador.trim(),
+        precioUSD,
+        observaciones ?? null,
+        mp.mp_visible,
+        mp.mp_algo,
+        mp.mp_hashrate_display,
+        mp.mp_image_src,
+        mp.mp_gallery_json,
+        mp.mp_detail_rows_json,
+        mp.mp_yield_json,
+        mp.mp_sort_order,
+        historialInicial
+      );
+    await logEquipoAsicAudit({
+      user: req.user!,
+      equipoId: id,
+      codigoProducto: numeroSerie,
+      action: "create",
+      summary: `Alta: ${marcaEquipo.trim()} ${modelo.trim()} · código ${numeroSerie} · USD ${precioUSD}${parsed.data.marketplaceVisible ? " · tienda online" : ""}`,
+      details: {
+        precioUSD,
+        marketplaceVisible: parsed.data.marketplaceVisible,
+        marcaEquipo: marcaEquipo.trim(),
+        modelo: modelo.trim(),
+      },
+    });
+    res.status(201).json({ ok: true, id, numeroSerie, fechaIngreso: fechaIngresoServidor });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     res.status(500).json({ error: { message: msg } });
   }
 });
+
+/**
+ * POST /equipos/marketplace-image — subir imagen para vitrina (multipart field "file").
+ * Guarda en client/public/images/marketplace-uploads y devuelve ruta usable en el front: /images/marketplace-uploads/...
+ */
+equiposRouter.post(
+  "/equipos/marketplace-image",
+  requireAuth,
+  requireAdminsEquipo,
+  (req: Request, res: Response, next) => {
+    uploadMarketplaceImageMw(req, res, (err: unknown) => {
+      if (err) {
+        const msg = err instanceof Error ? err.message : "Error al subir la imagen";
+        return res.status(400).json({ error: { message: msg } });
+      }
+      next();
+    });
+  },
+  (req: Request, res: Response) => {
+    const file = req.file;
+    if (!file?.filename) {
+      return res.status(400).json({ error: { message: "Archivo requerido (campo file)" } });
+    }
+    const url = `/images/marketplace-uploads/${file.filename}`;
+    void logEquipoAsicAudit({
+      user: req.user!,
+      equipoId: null,
+      codigoProducto: null,
+      action: "marketplace_image",
+      summary: `Imagen cargada para tienda online: ${file.filename}`,
+      details: { url },
+    });
+    res.status(201).json({ url });
+  }
+);
 
 /** PUT /equipos/:id — actualizar */
 equiposRouter.put("/equipos/:id", requireAuth, requireCanEdit, async (req, res: Response) => {
@@ -84,14 +311,112 @@ equiposRouter.put("/equipos/:id", requireAuth, requireCanEdit, async (req, res: 
   if (!parsed.success) {
     return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
   }
-  const { fechaIngreso, marcaEquipo, modelo, procesador, precioUSD, observaciones } = parsed.data;
+  const { marcaEquipo, modelo, procesador, precioUSD, observaciones } = parsed.data;
+  const admin = isAdminABRole(req.user!.role);
   try {
+    const existing = (await db.prepare(`${EQUIPOS_SELECT} WHERE id = ?`).get(id)) as EquipoRow | undefined;
+    if (!existing) return res.status(404).json({ error: { message: "Equipo no encontrado" } });
+    if (!admin && rowMpVisible(existing)) {
+      if (
+        marcaEquipo.trim() !== String(existing.marca_equipo ?? "").trim() ||
+        modelo.trim() !== String(existing.modelo ?? "").trim() ||
+        procesador.trim() !== String(existing.procesador ?? "").trim()
+      ) {
+        return res.status(403).json({
+          error: {
+            message:
+              "Solo AdministradorA o AdministradorB pueden modificar la ficha técnica de un equipo publicado en la tienda.",
+          },
+        });
+      }
+    }
+    let mp = mpPayloadFromBody(parsed.data);
+    if (!admin) {
+      if (Math.round(Number(existing.precio_usd) || 0) !== precioUSD) {
+        return res.status(403).json({
+          error: { message: "Solo AdministradorA o AdministradorB pueden modificar el precio del equipo." },
+        });
+      }
+      mp = mpPayloadFromExistingRow(existing) as typeof mp;
+    }
+    const fechaIngresoInmutable = existing.fecha_ingreso;
+
+    const oldPrecio = Math.round(Number(existing.precio_usd) || 0);
+    let historialJson = existing.precio_historial_json ?? null;
+    if (oldPrecio !== precioUSD) {
+      const precioWhen = isoParaRegistroPrecio(parsed.data.precioActualizadoEn);
+      let entries = parsePrecioHistorialJson(historialJson);
+      if (entries.length === 0) {
+        entries = [syntheticFirstEntryFromFechaIngreso(fechaIngresoInmutable, oldPrecio)];
+      }
+      entries = appendPrecioHistorial(entries, precioUSD, precioWhen);
+      historialJson = JSON.stringify(entries);
+    }
+
+    let numeroSerie: string | null = existing.numero_serie;
+    const codeVitrina = codigoProductoVitrina(modelo.trim(), procesador.trim(), mp.mp_visible === 1);
+    if (codeVitrina) numeroSerie = codeVitrina;
+
     const result = await db
       .prepare(
-        `UPDATE equipos_asic SET fecha_ingreso = ?, marca_equipo = ?, modelo = ?, procesador = ?, precio_usd = ?, observaciones = ? WHERE id = ?`
+        `UPDATE equipos_asic SET fecha_ingreso = ?, marca_equipo = ?, modelo = ?, procesador = ?, precio_usd = ?, observaciones = ?,
+          numero_serie = ?, mp_visible = ?, mp_algo = ?, mp_hashrate_display = ?, mp_image_src = ?, mp_gallery_json = ?, mp_detail_rows_json = ?, mp_yield_json = ?, mp_sort_order = ?,
+          precio_historial_json = ?
+          WHERE id = ?`
       )
-      .run(fechaIngreso, marcaEquipo.trim(), modelo.trim(), procesador.trim(), precioUSD, observaciones ?? null, id);
+      .run(
+        fechaIngresoInmutable,
+        marcaEquipo.trim(),
+        modelo.trim(),
+        procesador.trim(),
+        precioUSD,
+        observaciones ?? null,
+        numeroSerie,
+        mp.mp_visible,
+        mp.mp_algo,
+        mp.mp_hashrate_display,
+        mp.mp_image_src,
+        mp.mp_gallery_json,
+        mp.mp_detail_rows_json,
+        mp.mp_yield_json,
+        mp.mp_sort_order,
+        historialJson,
+        id
+      );
     if (result.changes === 0) return res.status(404).json({ error: { message: "Equipo no encontrado" } });
+
+    const changes: Record<string, unknown> = {};
+    if (existing.marca_equipo !== marcaEquipo.trim()) changes.marca = { antes: existing.marca_equipo, despues: marcaEquipo.trim() };
+    if (existing.modelo !== modelo.trim()) changes.modelo = { antes: existing.modelo, despues: modelo.trim() };
+    if (existing.procesador !== procesador.trim()) changes.procesador = { antes: existing.procesador, despues: procesador.trim() };
+    if (oldPrecio !== precioUSD) changes.precioUSD = { antes: oldPrecio, despues: precioUSD };
+    if (mpVisibleToInt(rowMpVisible(existing)) !== mp.mp_visible) changes.tiendaVisible = { antes: rowMpVisible(existing), despues: mp.mp_visible === 1 };
+    if (String(existing.observaciones ?? "") !== String(observaciones ?? "")) changes.observaciones = true;
+    const snap = (r: EquipoRow) => ({
+      mp_algo: r.mp_algo ?? null,
+      mp_image: r.mp_image_src ?? null,
+      mp_gallery_len: (r.mp_gallery_json ?? "").length,
+      mp_detail_len: (r.mp_detail_rows_json ?? "").length,
+      mp_sort: Number(r.mp_sort_order) || 0,
+    });
+    const bef = snap(existing);
+    const aft = {
+      mp_algo: mp.mp_algo ?? null,
+      mp_image: mp.mp_image_src ?? null,
+      mp_gallery_len: (mp.mp_gallery_json ?? "").length,
+      mp_detail_len: (mp.mp_detail_rows_json ?? "").length,
+      mp_sort: mp.mp_sort_order,
+    };
+    if (JSON.stringify(bef) !== JSON.stringify(aft)) changes.marketplace = { antes: bef, despues: aft };
+
+    await logEquipoAsicAudit({
+      user: req.user!,
+      equipoId: id,
+      codigoProducto: numeroSerie,
+      action: "update",
+      summary: `Modificación: ${marcaEquipo.trim()} ${modelo.trim()} · ${numeroSerie ?? id}${oldPrecio !== precioUSD ? ` · precio ${oldPrecio}→${precioUSD} USD` : ""}`,
+      details: Object.keys(changes).length ? changes : { sinCambiosRelevantes: true },
+    });
     res.json({ ok: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -104,8 +429,18 @@ equiposRouter.delete("/equipos/:id", requireAuth, requireCanEdit, async (req, re
   const id = (typeof req.params.id === "string" ? req.params.id : req.params.id?.[0] ?? "").trim();
   if (!id) return res.status(400).json({ error: { message: "ID requerido" } });
   try {
+    const prev = (await db.prepare(`${EQUIPOS_SELECT} WHERE id = ?`).get(id)) as EquipoRow | undefined;
     const result = await db.prepare("DELETE FROM equipos_asic WHERE id = ?").run(id);
     if (result.changes === 0) return res.status(404).json({ error: { message: "Equipo no encontrado" } });
+    if (prev) {
+      await logEquipoAsicAudit({
+        user: req.user!,
+        equipoId: id,
+        codigoProducto: prev.numero_serie ?? null,
+        action: "delete",
+        summary: `Baja: ${prev.marca_equipo} ${prev.modelo} · ${prev.numero_serie ?? id} · USD ${Number(prev.precio_usd) || 0}`,
+      });
+    }
     res.json({ ok: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -113,17 +448,25 @@ equiposRouter.delete("/equipos/:id", requireAuth, requireCanEdit, async (req, re
   }
 });
 
+const BulkRowSchema = z.object({
+  fechaIngreso: z.string().min(1, "Fecha ingreso requerida"),
+  marcaEquipo: z.string().min(1, "Marca requerida"),
+  modelo: z.string().min(1, "Modelo requerido"),
+  procesador: z.string().min(1, "Procesador requerido"),
+  precioUSD: z.number().int().min(0).max(999999).default(0),
+  observaciones: z.string().optional(),
+  numeroSerie: z.string().optional(),
+});
+
 /** POST /equipos/bulk — importar varios equipos */
-equiposRouter.post("/equipos/bulk", requireAuth, requireCanEdit, async (req, res: Response) => {
-  const parsed = z.array(EquipoBodySchema).safeParse(req.body);
+equiposRouter.post("/equipos/bulk", requireAuth, requireAdminsEquipo, async (req, res: Response) => {
+  const parsed = z.array(BulkRowSchema).safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
   }
   const rows = parsed.data;
   const used = new Set(
-    ((await db.prepare("SELECT numero_serie FROM equipos_asic WHERE numero_serie IS NOT NULL").all()) as { numero_serie: string }[]).map(
-      (r) => r.numero_serie
-    )
+    ((await db.prepare("SELECT numero_serie FROM equipos_asic WHERE numero_serie IS NOT NULL").all()) as { numero_serie: string }[]).map((r) => r.numero_serie)
   );
   let nextNum = 1;
   for (const row of rows) {
@@ -139,20 +482,38 @@ equiposRouter.post("/equipos/bulk", requireAuth, requireCanEdit, async (req, res
       nextNum++;
       used.add(ns);
     }
+    const historialInicial = initialPrecioHistorialJson(precioUSD);
     await db
       .prepare(
-        `INSERT INTO equipos_asic (id, numero_serie, fecha_ingreso, marca_equipo, modelo, procesador, precio_usd, observaciones)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO equipos_asic (id, numero_serie, fecha_ingreso, marca_equipo, modelo, procesador, precio_usd, observaciones,
+          mp_visible, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_sort_order,
+          precio_historial_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, NULL, NULL, NULL, NULL, NULL, 0, ?)`
       )
-      .run(id, ns, fechaIngreso, marcaEquipo.trim(), modelo.trim(), procesador.trim(), precioUSD, observaciones ?? null);
+      .run(id, ns, fechaIngreso, marcaEquipo.trim(), modelo.trim(), procesador.trim(), precioUSD, observaciones ?? null, historialInicial);
   }
+  await logEquipoAsicAudit({
+    user: req.user!,
+    equipoId: null,
+    codigoProducto: null,
+    action: "bulk_import",
+    summary: `Importación masiva (Excel): ${rows.length} fila(s)`,
+    details: { filas: rows.length },
+  });
   res.status(201).json({ ok: true, inserted: rows.length });
 });
 
 /** DELETE /equipos — eliminar todos */
-equiposRouter.delete("/equipos", requireAuth, requireRole("admin_a", "admin_b"), async (_req, res: Response) => {
+equiposRouter.delete("/equipos", requireAuth, requireRole("admin_a", "admin_b"), async (req, res: Response) => {
   try {
     await db.prepare("DELETE FROM equipos_asic").run();
+    await logEquipoAsicAudit({
+      user: req.user!,
+      equipoId: null,
+      codigoProducto: null,
+      action: "delete_all",
+      summary: "Eliminación de todos los equipos ASIC (inventario completo)",
+    });
     res.json({ ok: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

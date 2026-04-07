@@ -98,7 +98,7 @@ INSERT OR IGNORE INTO invoice_sequences (type, last_number) VALUES ('Factura', 1
     }
   }
 
-  ["phone", "email", "address", "city", "email2", "name2", "phone2", "address2", "city2", "usuario"].forEach((col) => {
+  ["phone", "email", "address", "city", "email2", "name2", "phone2", "address2", "city2", "usuario", "documento_identidad", "country"].forEach((col) => {
     try {
       db.exec(`ALTER TABLE clients ADD COLUMN ${col} TEXT`);
     } catch (e: unknown) {
@@ -184,6 +184,18 @@ CREATE TABLE IF NOT EXISTS items_garantia_ande (
   observaciones TEXT
 );
 `);
+
+  db.exec(`CREATE TABLE IF NOT EXISTS tienda_online_client_seq (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    next_code_num INTEGER NOT NULL
+  )`);
+  db.prepare("INSERT OR IGNORE INTO tienda_online_client_seq (id, next_code_num) VALUES (1, 90001)").run();
+  try {
+    db.exec("ALTER TABLE clients ADD COLUMN user_id INTEGER");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
 
   return db;
 }

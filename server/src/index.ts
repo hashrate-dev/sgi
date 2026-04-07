@@ -1,10 +1,12 @@
 import { createApp } from "./app.js";
 import { env } from "./config/env.js";
 import { initDb } from "./db.js";
+import { runSeedVitrinaEquipos } from "./db/seedVitrinaEquipos.js";
 
 async function main() {
   try {
     await initDb();
+    await runSeedVitrinaEquipos();
     const app = createApp();
     const host = "0.0.0.0";
     app.listen(env.PORT, host, () => {

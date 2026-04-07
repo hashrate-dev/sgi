@@ -16,8 +16,13 @@ const FALLBACK_API_URLS = [
 function getApiBase(): string {
   if (typeof window === "undefined") return "";
   const h = window.location?.hostname ?? "";
-  // En localhost: backend directo en 8080. Proxy Vite puede fallar con headers; conexión directa más fiable.
-  if (h === "localhost" || h === "127.0.0.1") return "http://localhost:8080";
+  // En localhost: por defecto mismo origen (`/api/...`) → proxy Vite → 8080. Evita CORS si CORS_ORIGIN no incluye tu puerto (ej. 5174) y funciona aunque el front no sea 5173.
+  // Para forzar API directa: `VITE_API_URL=http://127.0.0.1:8080` en client/.env
+  if (h === "localhost" || h === "127.0.0.1") {
+    const build = typeof RAW === "string" ? RAW.replace(/\/+$/, "").trim() : "";
+    if (build) return build;
+    return "";
+  }
   // *.vercel.app y app.hashrate.space: API en mismo origen (Vercel serverless + Supabase). Sin CORS.
   if (h.endsWith(".vercel.app")) return "";
   if (h === "app.hashrate.space") return "";
@@ -106,6 +111,28 @@ function fetchWithTimeout(url: string, opts: RequestInit, timeoutMs: number): Pr
   return fetch(url, { ...opts, signal: ac.signal }).finally(() => clearTimeout(t));
 }
 
+/** Error HTTP de la API (status y code opcional del JSON) para manejo en UI (ej. registro duplicado). */
+export type ApiHttpError = Error & { status?: number; code?: string };
+
+export const API_ERROR_EMAIL_ALREADY_REGISTERED = "EMAIL_ALREADY_REGISTERED";
+
+function makeApiError(message: string, status: number, code?: string): ApiHttpError {
+  const e = new Error(message) as ApiHttpError;
+  e.status = status;
+  if (code) e.code = code;
+  return e;
+}
+
+/**
+ * Conflicto al registrar cliente: correo ya en `users` (misma BD que el SGI).
+ * Acepta 409 sin `code` por compatibilidad con despliegues anteriores.
+ */
+export function isEmailAlreadyRegisteredError(err: unknown): boolean {
+  const e = err as ApiHttpError;
+  if (e?.status !== 409) return false;
+  return !e.code || e.code === API_ERROR_EMAIL_ALREADY_REGISTERED;
+}
+
 /** Fetch sin reintentos ni timeouts largos. Para endpoints que no deben colgar la UI (ej. actividad). */
 async function apiNoRetry<T>(path: string, timeoutMs = 10000): Promise<T> {
   const token = getStoredToken();
@@ -184,11 +211,13 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
         continue;
       }
       if (res.status === 404) {
-        const msg = (data as { error?: { message?: string } })?.error?.message ?? "Recurso no encontrado";
-        throw new Error(msg);
+        const payload = data as { error?: { message?: string; code?: string } };
+        const msg = payload?.error?.message ?? "Recurso no encontrado";
+        throw makeApiError(msg, 404, payload?.error?.code);
       }
-      const msg = (data as { error?: { message?: string } })?.error?.message ?? res.statusText;
-      throw new Error(msg);
+      const payload = data as { error?: { message?: string; code?: string } };
+      const msg = payload?.error?.message ?? res.statusText;
+      throw makeApiError(msg, res.status, payload?.error?.code);
     }
     return data as T;
   }
@@ -213,8 +242,9 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
           throw new Error((data as { error?: { message?: string } })?.error?.message ?? "Sesión expirada. Volvé a iniciar sesión.");
         }
         if (!res.ok) {
-          const errMsg = (data as { error?: { message?: string } })?.error?.message ?? res.statusText;
-          throw new Error(errMsg);
+          const payload = data as { error?: { message?: string; code?: string } };
+          const errMsg = payload?.error?.message ?? res.statusText;
+          throw makeApiError(errMsg, res.status, payload?.error?.code);
         }
         return data as T;
       } catch (e) {
@@ -231,6 +261,25 @@ export type MeResponse = { user: AuthUser };
 
 export function login(username: string, password: string): Promise<LoginResponse> {
   return api<LoginResponse>("/api/auth/login", { method: "POST", body: JSON.stringify({ username, password }) });
+}
+
+/** Registro tienda: crea usuario rol `cliente` + registro en tabla `clients`. */
+export function registerMarketplaceCliente(body: {
+  email: string;
+  password: string;
+  nombre: string;
+  apellidos: string;
+  documentoIdentidad: string;
+  country: string;
+  city: string;
+  direccion: string;
+  celular: string;
+  telefono?: string;
+}): Promise<LoginResponse> {
+  return api<LoginResponse>("/api/auth/register-cliente", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 }
 
 export function getMe(): Promise<MeResponse> {
@@ -269,11 +318,29 @@ export function getUsers(): Promise<UsersResponse> {
   return api<UsersResponse>("/api/users");
 }
 
-export function createUser(body: { email: string; password: string; role: "admin_a" | "admin_b" | "operador" | "lector"; usuario?: string }): Promise<UserResponse> {
+/** Crea/actualiza filas `clients` (A9…) para todos los usuarios con rol cliente (repara desalineaciones). */
+export function syncTiendaOnlineClientsFromUsers(): Promise<{ ok: boolean; synced: number }> {
+  return api<{ ok: boolean; synced: number }>("/api/users/sync-tienda-online-clients", { method: "POST" });
+}
+
+export function createUser(body: {
+  email: string;
+  password: string;
+  role: "admin_a" | "admin_b" | "operador" | "lector" | "cliente";
+  usuario?: string;
+}): Promise<UserResponse> {
   return api<UserResponse>("/api/users", { method: "POST", body: JSON.stringify(body) });
 }
 
-export function updateUser(id: number, body: { email?: string; password?: string; role?: "admin_a" | "admin_b" | "operador" | "lector"; usuario?: string }): Promise<UserResponse> {
+export function updateUser(
+  id: number,
+  body: {
+    email?: string;
+    password?: string;
+    role?: "admin_a" | "admin_b" | "operador" | "lector" | "cliente";
+    usuario?: string;
+  }
+): Promise<UserResponse> {
   return api<UserResponse>(`/api/users/${id}`, { method: "PUT", body: JSON.stringify(body) });
 }
 
@@ -303,11 +370,75 @@ export function getUsersActivity(limit?: number): Promise<UsersActivityResponse>
   return apiNoRetry<UsersActivityResponse>(`/api/users/activity${q}`, 12000);
 }
 
+export type EquipoAsicAuditDelta = { label: string; before: string; after: string };
+export type EquipoAsicAuditEntry = {
+  id: number;
+  created_at: string;
+  user_id: number;
+  user_email: string;
+  user_usuario?: string;
+  equipo_id?: string;
+  codigo_producto?: string;
+  action: string;
+  summary: string;
+  details_json?: string;
+  deltas?: EquipoAsicAuditDelta[];
+  flags?: string[];
+};
+export type EquiposAsicAuditStats = {
+  grandTotal: number;
+  last24h: number;
+  last7d: number;
+  byAction: Record<string, number>;
+};
+export type EquiposAsicAuditResponse = {
+  entries: EquipoAsicAuditEntry[];
+  total: number;
+  limit: number;
+  offset: number;
+  stats: EquiposAsicAuditStats;
+};
+
+export function getEquiposAsicAudit(params?: {
+  limit?: number;
+  offset?: number;
+  q?: string;
+  action?: string;
+  from?: string;
+  to?: string;
+}): Promise<EquiposAsicAuditResponse> {
+  const qs = new URLSearchParams();
+  if (params?.limit != null) qs.set("limit", String(params.limit));
+  if (params?.offset != null) qs.set("offset", String(params.offset));
+  if (params?.q?.trim()) qs.set("q", params.q.trim());
+  if (params?.action?.trim()) qs.set("action", params.action.trim());
+  if (params?.from?.trim()) qs.set("from", params.from.trim());
+  if (params?.to?.trim()) qs.set("to", params.to.trim());
+  const q = qs.toString();
+  return apiNoRetry<EquiposAsicAuditResponse>(`/api/users/equipos-asic-audit${q ? `?${q}` : ""}`, 20000);
+}
+
 export function logoutApi(): Promise<void> {
   return api<void>("/api/auth/logout", { method: "POST" });
 }
 
-type ClientFields = { id?: number | string; code: string; name: string; name2?: string; phone?: string; phone2?: string; email?: string; email2?: string; address?: string; address2?: string; city?: string; city2?: string };
+type ClientFields = {
+  id?: number | string;
+  code: string;
+  name: string;
+  name2?: string;
+  phone?: string;
+  phone2?: string;
+  email?: string;
+  email2?: string;
+  address?: string;
+  address2?: string;
+  city?: string;
+  city2?: string;
+  usuario?: string;
+  documento_identidad?: string;
+  country?: string;
+};
 export type ClientsResponse = { clients: Array<ClientFields> };
 export type ClientResponse = { client: ClientFields };
 
@@ -525,7 +656,7 @@ export function deleteGarantiasItemsAll(): Promise<{ ok: boolean; deleted: numbe
 export type SetupsResponse = { items: import("./types.js").Setup[] };
 
 export function getSetups(): Promise<SetupsResponse> {
-  return api<SetupsResponse>("/api/setups");
+  return api<SetupsResponse>("/api/setups", { cache: "no-store" });
 }
 
 export function createSetup(data: { nombre: string; precioUSD: number }): Promise<{ ok: boolean; id: string }> {
@@ -540,8 +671,8 @@ export function deleteSetup(id: string): Promise<void> {
   return api<void>(`/api/setups/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
-export function deleteSetupsAll(): Promise<{ ok: boolean }> {
-  return api<{ ok: boolean }>("/api/setups", { method: "DELETE" });
+export function deleteSetupsAll(): Promise<{ ok: boolean; deletedCount?: number }> {
+  return api<{ ok: boolean; deletedCount?: number }>("/api/setups", { method: "DELETE" });
 }
 
 // ——— Equipos ASIC (backend) ———
@@ -551,15 +682,106 @@ export function getEquipos(): Promise<EquiposResponse> {
   return api<EquiposResponse>("/api/equipos");
 }
 
-export function createEquipo(data: {
-  fechaIngreso: string;
-  marcaEquipo: string;
-  modelo: string;
-  procesador: string;
-  precioUSD?: number;
-  observaciones?: string;
-}): Promise<{ ok: boolean; id: string; numeroSerie: string }> {
-  return api<{ ok: boolean; id: string; numeroSerie: string }>("/api/equipos", {
+/**
+ * Sube una imagen para la vitrina ASIC. Devuelve una ruta bajo /images/marketplace-uploads/...
+ * (en local el backend escribe en client/public; el front en :5173 la sirve Vite).
+ */
+export async function uploadMarketplaceAsicImage(file: File): Promise<{ url: string }> {
+  const token = getStoredToken();
+  const formData = new FormData();
+  formData.append("file", file);
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  let base = getApiBase();
+  const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
+  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") base = "";
+  const pathUrl = "/api/equipos/marketplace-image";
+  const url = base && base.trim() !== "" ? `${base}${pathUrl}` : pathUrl;
+
+  const res = await fetchWithTimeout(url, { method: "POST", body: formData, headers }, FETCH_TIMEOUT_MS);
+  const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    if (token) {
+      clearStoredAuth();
+      const cb = typeof window !== "undefined" ? (window as unknown as { __on401?: () => void }).__on401 : undefined;
+      if (typeof cb === "function") cb();
+    }
+    throw new Error((data as { error?: { message?: string } })?.error?.message ?? "Sesión expirada.");
+  }
+  if (!res.ok) {
+    const msg = (data as { error?: { message?: string } })?.error?.message ?? res.statusText;
+    throw new Error(msg);
+  }
+  return data as { url: string };
+}
+
+/** Catálogo ASIC para /marketplace (público, sin auth). */
+export function getMarketplaceAsicVitrina(): Promise<{ products: import("./marketplaceAsicCatalog.js").AsicProduct[] }> {
+  return api<{ products: import("./marketplaceAsicCatalog.js").AsicProduct[] }>("/api/marketplace/asic-vitrina");
+}
+
+/**
+ * Precios setup cotización: S02 (equipo completo) + S03 (fracción hashrate).
+ * Público — mismo origen que la vitrina.
+ */
+export function getMarketplaceSetupQuotePrices(): Promise<{
+  setupEquipoCompletoUsd: number;
+  setupCompraHashrateUsd: number;
+}> {
+  return api<{ setupEquipoCompletoUsd: number; setupCompraHashrateUsd: number }>(
+    "/api/marketplace/setup-quote-prices"
+  );
+}
+
+/**
+ * Solo S03 (compatibilidad). Preferir getMarketplaceSetupQuotePrices.
+ */
+export function getMarketplaceSetupCompraHashrateUsd(): Promise<{ precioUSD: number }> {
+  return api<{ precioUSD: number }>("/api/marketplace/setup-compra-hashrate-usd");
+}
+
+export type MarketplaceAsicLiveYield = { id: string; line1: string; line2: string; note: string };
+
+/** Rendimiento estimado en vivo (red + CoinGecko, tipo WhatToMine). Público, sin auth. */
+export function postMarketplaceAsicYields(
+  items: Array<{
+    id: string;
+    algo: "sha256" | "scrypt";
+    hashrate: string;
+    detailRows?: Array<{ icon: string; text: string }>;
+  }>
+): Promise<{ ok: boolean; yields: MarketplaceAsicLiveYield[]; networkOk: boolean }> {
+  return api<{ ok: boolean; yields: MarketplaceAsicLiveYield[]; networkOk: boolean }>("/api/marketplace/asic-yields", {
+    method: "POST",
+    body: JSON.stringify({ items }),
+  });
+}
+
+export type EquipoMarketplacePayload = {
+  marketplaceVisible?: boolean;
+  marketplaceAlgo?: "sha256" | "scrypt" | null;
+  marketplaceHashrateDisplay?: string | null;
+  marketplaceImageSrc?: string | null;
+  marketplaceGalleryJson?: string | null;
+  marketplaceDetailRowsJson?: string | null;
+  marketplaceYieldJson?: string | null;
+  marketplaceSortOrder?: number;
+};
+
+export function createEquipo(
+  data: {
+    fechaIngreso?: string;
+    marcaEquipo: string;
+    modelo: string;
+    procesador: string;
+    precioUSD?: number;
+    observaciones?: string;
+    precioActualizadoEn?: string | null;
+    precioHistorialJson?: string | null;
+  } & EquipoMarketplacePayload
+): Promise<{ ok: boolean; id: string; numeroSerie: string; fechaIngreso: string }> {
+  return api<{ ok: boolean; id: string; numeroSerie: string; fechaIngreso: string }>("/api/equipos", {
     method: "POST",
     body: JSON.stringify({ ...data, precioUSD: data.precioUSD ?? 0 }),
   });
@@ -574,7 +796,8 @@ export function updateEquipo(
     procesador: string;
     precioUSD?: number;
     observaciones?: string;
-  }
+    precioActualizadoEn?: string | null;
+  } & EquipoMarketplacePayload
 ): Promise<{ ok: boolean }> {
   return api<{ ok: boolean }>(`/api/equipos/${encodeURIComponent(id)}`, {
     method: "PUT",
@@ -584,6 +807,23 @@ export function updateEquipo(
 
 export function deleteEquipo(id: string): Promise<void> {
   return api<void>(`/api/equipos/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export type EquipoWhatToMineYield = {
+  line1: string;
+  line2: string;
+  source: string;
+  electricityUsdPerKwh: number;
+  note: string;
+};
+
+/** Estimación WhatToMine (0,078 USD/kWh) para detalle de equipo. Requiere sesión. */
+export function getEquipoWhatToMineYield(id: string): Promise<{
+  ok: boolean;
+  yield: EquipoWhatToMineYield | null;
+  hint?: string;
+}> {
+  return apiNoRetry(`/api/equipos/${encodeURIComponent(id)}/whattomine-yield`, 30000);
 }
 
 export function deleteEquiposAll(): Promise<{ ok: boolean }> {
@@ -666,4 +906,178 @@ export function getKryptexWorkerStatus(workerName: string): Promise<{
   return apiNoRetry(
     `/api/kryptex/worker/${encodeURIComponent(workerName)}`
   );
+}
+
+/* --- Marketplace (tienda interna) --- */
+
+export type MarketplaceProduct = {
+  id: number;
+  name: string;
+  description: string | null;
+  category: string | null;
+  priceUsd: number;
+  imageUrl: string | null;
+  stock: number;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+};
+
+export function getMarketplaceProducts(opts?: { all?: boolean; category?: string; q?: string }): Promise<{ products: MarketplaceProduct[] }> {
+  const qs = new URLSearchParams();
+  if (opts?.all) qs.set("all", "1");
+  if (opts?.category) qs.set("category", opts.category);
+  if (opts?.q) qs.set("q", opts.q);
+  const suf = qs.toString();
+  return api<{ products: MarketplaceProduct[] }>(`/api/marketplace/products${suf ? `?${suf}` : ""}`);
+}
+
+export function createMarketplaceProduct(body: {
+  name: string;
+  description?: string | null;
+  category?: string | null;
+  priceUsd: number;
+  imageUrl?: string | null;
+  stock: number;
+  isActive?: boolean;
+  sortOrder?: number;
+}): Promise<{ ok: boolean; id: number | null }> {
+  return api<{ ok: boolean; id: number | null }>("/api/marketplace/products", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateMarketplaceProduct(
+  id: number,
+  body: Partial<{
+    name: string;
+    description: string | null;
+    category: string | null;
+    priceUsd: number;
+    imageUrl: string | null;
+    stock: number;
+    isActive: boolean;
+    sortOrder: number;
+  }>
+): Promise<{ ok: boolean }> {
+  return api<{ ok: boolean }>(`/api/marketplace/products/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+export function deleteMarketplaceProduct(id: number): Promise<void> {
+  return api<void>(`/api/marketplace/products/${id}`, { method: "DELETE" });
+}
+
+export type QuoteSyncLinePayload = {
+  productId: string;
+  qty: number;
+  brand: string;
+  model: string;
+  hashrate: string;
+  priceUsd: number;
+  priceLabel: string;
+  hashrateSharePct?: 25 | 50 | 75;
+  includeSetup?: boolean;
+  includeWarranty?: boolean;
+};
+
+/** Requiere JWT y rol `cliente` o administrador A/B. */
+export function syncMarketplaceQuoteTicket(payload: {
+  lines: QuoteSyncLinePayload[];
+  event?: "sync" | "contact_email" | "contact_whatsapp" | "submit_ticket";
+}): Promise<{
+  ok: boolean;
+  cleared?: boolean;
+  id?: number;
+  orderNumber?: string;
+  ticketCode?: string;
+  status?: string;
+}> {
+  return api("/api/marketplace/quote-sync", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export type MarketplaceQuoteTicketItem = {
+  productId?: string;
+  qty?: number;
+  brand?: string;
+  model?: string;
+  hashrate?: string;
+  priceUsd?: number;
+  priceLabel?: string;
+  hashrateSharePct?: number;
+  includeSetup?: boolean;
+  includeWarranty?: boolean;
+};
+
+export type MarketplaceQuoteTicket = {
+  id: number;
+  sessionId: string;
+  orderNumber: string | null;
+  ticketCode: string;
+  status: string;
+  subtotalUsd: number;
+  lineCount: number;
+  unitCount: number;
+  createdAt: string;
+  updatedAt: string;
+  lastContactChannel: string | null;
+  contactedAt: string | null;
+  notesAdmin: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  userId: number | null;
+  contactEmail: string | null;
+  items: MarketplaceQuoteTicketItem[];
+};
+
+/** Tickets enviados del usuario actual (marketplace). */
+export function getMyMarketplaceQuoteTickets(): Promise<{ tickets: MarketplaceQuoteTicket[] }> {
+  return api("/api/marketplace/my-quote-tickets");
+}
+
+export function getMyMarketplaceQuoteTicket(id: number): Promise<{ ticket: MarketplaceQuoteTicket }> {
+  return api(`/api/marketplace/my-quote-tickets/${id}`);
+}
+
+export function getMarketplaceQuoteTicketsStats(): Promise<{
+  byStatus: Record<string, number>;
+  total: number;
+  todayCount: number;
+}> {
+  return api("/api/marketplace/quote-tickets-stats");
+}
+
+export function getMarketplaceQuoteTickets(params?: {
+  status?: string;
+  q?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ tickets: MarketplaceQuoteTicket[]; total: number; limit: number; offset: number }> {
+  const qs = new URLSearchParams();
+  if (params?.status) qs.set("status", params.status);
+  if (params?.q) qs.set("q", params.q);
+  if (params?.limit != null) qs.set("limit", String(params.limit));
+  if (params?.offset != null) qs.set("offset", String(params.offset));
+  const suf = qs.toString();
+  return api(`/api/marketplace/quote-tickets${suf ? `?${suf}` : ""}`);
+}
+
+export function getMarketplaceQuoteTicket(id: number): Promise<{ ticket: MarketplaceQuoteTicket }> {
+  return api(`/api/marketplace/quote-tickets/${id}`);
+}
+
+export function patchMarketplaceQuoteTicket(
+  id: number,
+  body: { status?: string; notesAdmin?: string | null }
+): Promise<{ ticket: MarketplaceQuoteTicket }> {
+  return api(`/api/marketplace/quote-tickets/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
 }

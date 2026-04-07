@@ -64,6 +64,24 @@
   gap: 1rem;
 }
 
+/* Logo como enlace al inicio SGI (ej. cotizaciones marketplace) */
+a.hrs-home-logo-link {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  text-decoration: none;
+  border-radius: 12px;
+  outline-offset: 4px;
+}
+
+a.hrs-home-logo-link:hover .hrs-home-logo {
+  opacity: 0.9;
+}
+
+a.hrs-home-logo-link:focus-visible {
+  outline: 2px solid #059669;
+}
+
 .hrs-home-logo {
   height: 80px; /* Aumentado a 80px */
   width: auto;
@@ -205,6 +223,62 @@
 
 .hrs-home-card-admin:hover .hrs-home-card-icon {
   background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  color: #fff;
+}
+
+/* Primera tarjeta: acceso tienda pública (vista cliente) */
+.hrs-home-card--tienda-cliente {
+  border: 2px solid rgba(5, 150, 105, 0.45);
+  background: linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%);
+}
+
+.hrs-home-card--tienda-cliente .hrs-home-card-icon {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  color: #b45309;
+}
+
+.hrs-home-card--tienda-cliente:hover .hrs-home-card-icon {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #fff;
+}
+
+/* Cotizaciones marketplace (admin A/B): acceso desde inicio, misma línea visual menta que el marketplace */
+.hrs-home-card--marketplace-tickets {
+  border: 1px solid rgba(5, 150, 105, 0.22);
+  background: linear-gradient(180deg, #ffffff 0%, #f0fdf4 55%);
+}
+
+.hrs-home-card--marketplace-tickets .hrs-home-card-icon {
+  background: linear-gradient(135deg, #e6fcf5 0%, #d1fae5 100%);
+  color: #047857;
+}
+
+.hrs-home-card--marketplace-tickets:hover {
+  border-color: rgba(5, 150, 105, 0.4);
+}
+
+.hrs-home-card--marketplace-tickets:hover .hrs-home-card-icon {
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  color: #fff;
+}
+
+/* Clientes registrados vía tienda online (dashboard WEB-*) */
+.hrs-home-card--tienda-online-clientes {
+  border: 1px solid rgba(5, 150, 105, 0.22);
+  background: linear-gradient(180deg, #ffffff 0%, #f0fdf4 55%);
+}
+
+.hrs-home-card--tienda-online-clientes .hrs-home-card-icon {
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  color: #065f46;
+}
+
+.hrs-home-card--tienda-online-clientes:hover {
+  border-color: rgba(5, 150, 105, 0.4);
+}
+
+.hrs-home-card--tienda-online-clientes:hover .hrs-home-card-icon {
+  background: linear-gradient(135deg, #047857 0%, #059669 100%);
   color: #fff;
 }
 

@@ -14,6 +14,7 @@ import { PageHeader } from "../components/PageHeader";
 import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import { canDeleteClientes, canEditClientes, canExport } from "../lib/auth";
+import { isSetupCompraHashrateProtected } from "../lib/setupCompraHashrateProtected";
 import "../styles/facturacion.css";
 
 function findCol(headerRow: (string | number)[], ...names: string[]): number {
@@ -61,7 +62,7 @@ async function parseExcelSetups(file: File): Promise<{ nombre: string; precioUSD
     const nombre = idx.nombre >= 0 ? get(row, idx.nombre) : get(row, 1);
     if (!nombre) continue;
     let precioUSD = idx.precioUSD >= 0 ? getNum(row, idx.precioUSD) : getNum(row, 2);
-    if (precioUSD !== 0 && precioUSD !== 50) precioUSD = 0;
+    if (![0, 40, 50].includes(precioUSD)) precioUSD = 0;
     result.push({ nombre, precioUSD });
   }
   return result;
@@ -97,20 +98,28 @@ export function SetupPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  /** Precios permitidos en el formulario: 0, 40 o 50 USD. */
+  function normalizeSetupPrecioUsd(v: unknown): 0 | 40 | 50 {
+    const n = Number(v);
+    if (n === 50) return 50;
+    if (n === 40) return 40;
+    return 0;
+  }
+
   function handleSave() {
     if (!formData.nombre.trim()) {
       showToast("Debe completar el nombre del Setup.", "error", "Setup");
       return;
     }
-    if (formData.precioUSD !== 0 && formData.precioUSD !== 50) {
-      showToast("El precio debe ser 0 USD o 50 USD.", "error", "Setup");
-      return;
-    }
+    const precioUSD = normalizeSetupPrecioUsd(formData.precioUSD);
+    const nombre = formData.nombre.trim();
 
     if (editingSetup) {
-      updateSetup(editingSetup.id, { nombre: formData.nombre.trim(), precioUSD: formData.precioUSD })
+      const id = editingSetup.id;
+      updateSetup(id, { nombre, precioUSD })
         .then(() => {
           showToast("Setup actualizado correctamente.", "success", "Setup");
+          setSetups((prev) => prev.map((x) => (x.id === id ? { ...x, nombre, precioUSD } : x)));
           return getSetups();
         })
         .then((r: SetupsResponse) => setSetups(r.items || []))
@@ -121,7 +130,7 @@ export function SetupPage() {
           setFormData({ nombre: "", precioUSD: 0 });
         });
     } else {
-      createSetup({ nombre: formData.nombre.trim(), precioUSD: formData.precioUSD })
+      createSetup({ nombre, precioUSD })
         .then(() => {
           showToast("Setup agregado correctamente.", "success", "Setup");
           return getSetups();
@@ -137,11 +146,19 @@ export function SetupPage() {
 
   function handleEdit(s: Setup) {
     setEditingSetup(s);
-    setFormData({ nombre: s.nombre, precioUSD: s.precioUSD });
+    setFormData({ nombre: s.nombre, precioUSD: normalizeSetupPrecioUsd(s.precioUSD) });
     setShowAddModal(true);
   }
 
   function handleDelete(s: Setup) {
+    if (isSetupCompraHashrateProtected(s.codigo, s.nombre)) {
+      showToast(
+        "No se puede eliminar «Setup Compra Hashrate» (S03): lo usa la tienda para cotizaciones con fracción de hashrate.",
+        "error",
+        "Setup"
+      );
+      return;
+    }
     deleteSetup(s.id)
       .then(() => {
         showToast("Setup eliminado correctamente.", "success", "Setup");
@@ -170,9 +187,19 @@ export function SetupPage() {
     setShowDeleteConfirm2(false);
     setDeleting(true);
     deleteSetupsAll()
-      .then(() => {
-        setSetups([]);
-        showToast("Todos los Setup han sido eliminados.", "success", "Setup");
+      .then(async (meta) => {
+        const r = await getSetups();
+        setSetups(r.items || []);
+        const n = meta.deletedCount ?? 0;
+        if (n === 0) {
+          showToast("No había otros Setup por eliminar. S03 (Setup Compra Hashrate) permanece.", "info", "Setup");
+        } else {
+          showToast(
+            `Se eliminaron ${n} Setup. «Setup Compra Hashrate» (S03) se conserva para la tienda online.`,
+            "success",
+            "Setup"
+          );
+        }
       })
       .catch((e) => showToast(e instanceof Error ? e.message : "Error al eliminar.", "error", "Setup"))
       .finally(() => setDeleting(false));
@@ -317,7 +344,9 @@ export function SetupPage() {
                         </label>
                       </>
                     )}
-                    {canDelete && setups.length > 0 && (
+                    {canDelete &&
+                      setups.length > 0 &&
+                      setups.some((s) => !isSetupCompraHashrateProtected(s.codigo, s.nombre)) && (
                       <button
                         type="button"
                         className="btn btn-outline-secondary btn-sm clientes-borrar-todo-btn"
@@ -410,7 +439,9 @@ export function SetupPage() {
                       <tr key={s.id}>
                         <td className="text-start fw-bold">{s.codigo ?? "—"}</td>
                         <td className="text-start fw-bold">{s.nombre}</td>
-                        <td className="text-start">{s.precioUSD} USD</td>
+                        <td className="text-start">
+                          {Number.isFinite(Number(s.precioUSD)) ? Number(s.precioUSD) : 0} USD
+                        </td>
                         {canEdit && (
                           <td className="text-start">
                             <div className="d-flex gap-1">
@@ -422,17 +453,25 @@ export function SetupPage() {
                               >
                                 Editar
                               </button>
-                              {canDelete && (
-                                <button
-                                  type="button"
-                                  className="btn btn-danger btn-sm"
-                                  style={{ padding: "0.35rem 0.75rem", fontSize: "0.8125rem" }}
-                                  onClick={() => setDeleteConfirmSetup(s)}
-                                  title="Eliminar"
-                                >
-                                  <i className="bi bi-trash" />
-                                </button>
-                              )}
+                              {canDelete &&
+                                (isSetupCompraHashrateProtected(s.codigo, s.nombre) ? (
+                                  <span
+                                    className="text-muted small align-self-center px-1"
+                                    title="No se puede eliminar: ítem reservado para cotizaciones con fracción de hashrate en la tienda (S03)."
+                                  >
+                                    <i className="bi bi-lock-fill" aria-hidden />
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="btn btn-danger btn-sm"
+                                    style={{ padding: "0.35rem 0.75rem", fontSize: "0.8125rem" }}
+                                    onClick={() => setDeleteConfirmSetup(s)}
+                                    title="Eliminar"
+                                  >
+                                    <i className="bi bi-trash" />
+                                  </button>
+                                ))}
                             </div>
                           </td>
                         )}
@@ -489,16 +528,24 @@ export function SetupPage() {
                     />
                   </div>
                   <div className="fact-field">
-                    <label className="fact-label">Precio USD *</label>
+                    <label className="fact-label" htmlFor="setup-modal-precio-usd">
+                      Precio USD *
+                    </label>
                     <select
+                      id="setup-modal-precio-usd"
                       className="fact-select"
-                      value={formData.precioUSD}
-                      onChange={(e) =>
-                        setFormData({ ...formData, precioUSD: Number(e.target.value) })
+                      value={
+                        formData.precioUSD === 50 ? "50" : formData.precioUSD === 40 ? "40" : "0"
                       }
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const v = raw === "50" ? 50 : raw === "40" ? 40 : 0;
+                        setFormData({ ...formData, precioUSD: v });
+                      }}
                     >
-                      <option value={0}>0 USD</option>
-                      <option value={50}>50 USD</option>
+                      <option value="0">0 USD</option>
+                      <option value="40">40 USD</option>
+                      <option value="50">50 USD</option>
                     </select>
                   </div>
                   <div
@@ -568,7 +615,12 @@ export function SetupPage() {
                   <button type="button" className="btn-close" onClick={handleDeleteCancel} />
                 </div>
                 <div className="modal-body">
-                  <p>¿Estás seguro de que querés eliminar <strong>todos</strong> los Setup?</p>
+                  <p>
+                    ¿Estás seguro de que querés eliminar <strong>todos</strong> los Setup?
+                  </p>
+                  <p className="text-muted small mb-0">
+                    Se conservará <strong>Setup Compra Hashrate (S03)</strong>, necesario para la tienda online.
+                  </p>
                 </div>
                 <div className="modal-footer">
                   <button type="button" className="btn btn-secondary" onClick={handleDeleteCancel}>
@@ -593,8 +645,9 @@ export function SetupPage() {
                 </div>
                 <div className="modal-body">
                   <p className="text-danger">
-                    <strong>¡ADVERTENCIA!</strong> Esta acción eliminará permanentemente todos los
-                    Setup. No se puede deshacer.
+                    <strong>¡ADVERTENCIA!</strong> Esta acción eliminará permanentemente los Setup
+                    seleccionables. <strong>No se elimina S03 (Setup Compra Hashrate).</strong> No se puede deshacer el
+                    resto.
                   </p>
                   <p>¿Estás completamente seguro?</p>
                 </div>

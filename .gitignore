@@ -9,3 +9,7 @@ build/
 server/data.db
 server/src/data.db
 client/server/
+
+# Fotos subidas desde el panel (no versionar binarios); mantener la carpeta con .gitkeep
+client/public/images/marketplace-uploads/*
+!client/public/images/marketplace-uploads/.gitkeep

@@ -4,12 +4,26 @@ import jwt from "jsonwebtoken";
 import { z } from "zod";
 import { db } from "../db.js";
 import { env } from "../config/env.js";
+import { allocateNextTiendaOnlineClientCode, type TiendaSeqTx } from "../lib/tiendaOnlineClientCode.js";
 import { requireAuth } from "../middleware/auth.js";
+import { loginRateLimit, registerClienteRateLimit } from "../middleware/authRateLimit.js";
 import type { AuthUser } from "../middleware/auth.js";
 
 const authRouter = Router();
 const JWT_SECRET = env.JWT_SECRET;
 const LoginSchema = z.object({ username: z.string().min(1).max(200), password: z.string().min(1) });
+const RegisterClienteSchema = z.object({
+  email: z.string().email().max(200),
+  password: z.string().min(6).max(100),
+  nombre: z.string().min(1).max(120).trim(),
+  apellidos: z.string().min(1).max(120).trim(),
+  documentoIdentidad: z.string().min(3).max(120).trim(),
+  country: z.string().min(2).max(100).trim(),
+  city: z.string().min(1).max(100).trim(),
+  direccion: z.string().min(3).max(300).trim(),
+  celular: z.string().min(6).max(40).trim(),
+  telefono: z.string().max(40).trim().optional(),
+});
 
 const DEFAULT_USERS: Array<{ email: string; password: string; role: "admin_a" | "admin_b" | "operador" | "lector" }> = [
   { email: "jv@hashrate.space", password: "admin123", role: "admin_a" },
@@ -44,9 +58,113 @@ async function ensureDefaultUser(): Promise<void> {
   }
 }
 
-authRouter.post("/auth/login", async (req, res) => {
+/** Registro público: cuenta `users` rol cliente + fila en `clients` (tienda online). */
+authRouter.post("/auth/register-cliente", registerClienteRateLimit, async (req, res) => {
+  const parsed = RegisterClienteSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: {
+        message:
+          "Completá todos los datos: correo, contraseña (mín. 6), nombre, apellidos, documento, país, ciudad, dirección, celular y teléfono opcional.",
+      },
+    });
+  }
+  const body = parsed.data;
+  const emailNorm = body.email.trim().toLowerCase();
+  const password = body.password;
+  const hash = bcrypt.hashSync(password, 10);
+  const telefonoFijo = body.telefono?.trim() ? body.telefono.trim() : null;
+
   try {
-    await ensureDefaultUser();
+    let dup: { id: number } | undefined;
+    try {
+      dup = (await db.prepare("SELECT id FROM users WHERE username = ? OR email = ?").get(emailNorm, emailNorm)) as { id: number } | undefined;
+    } catch {
+      dup = (await db.prepare("SELECT id FROM users WHERE username = ?").get(emailNorm)) as { id: number } | undefined;
+    }
+    if (dup) {
+      return res.status(409).json({
+        error: {
+          code: "EMAIL_ALREADY_REGISTERED",
+          message:
+            "Este correo electrónico ya está asociado a una cuenta en el sistema. No podés crear una cuenta nueva con el mismo correo. Si ya tenés usuario, iniciá sesión con tu contraseña.",
+        },
+      });
+    }
+
+    await db.transaction(async (tx) => {
+      const insUser = await tx
+        .prepare("INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, 'cliente')")
+        .run(emailNorm, emailNorm, hash);
+      let uid = insUser.lastInsertRowid;
+      if (uid == null || !Number.isFinite(Number(uid))) {
+        const row = (await tx.prepare("SELECT id FROM users WHERE username = ?").get(emailNorm)) as { id: number } | undefined;
+        uid = row?.id ?? null;
+      }
+      if (uid == null || !Number.isFinite(Number(uid))) {
+        throw new Error("No se obtuvo el id de usuario tras el registro.");
+      }
+      const code = await allocateNextTiendaOnlineClientCode(tx as TiendaSeqTx);
+      await tx
+        .prepare(
+          `INSERT INTO clients (code, name, name2, phone, phone2, email, email2, address, address2, city, city2, usuario, documento_identidad, country, user_id)
+           VALUES (?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, NULL, ?, ?, ?, ?)`
+        )
+        .run(
+          code,
+          body.nombre.trim(),
+          body.apellidos.trim(),
+          body.celular.trim(),
+          telefonoFijo,
+          emailNorm,
+          body.direccion.trim(),
+          body.city.trim(),
+          emailNorm,
+          body.documentoIdentidad.trim(),
+          body.country.trim(),
+          uid
+        );
+    });
+  } catch (e: unknown) {
+    const err = e as { code?: string; message?: string };
+    if (String(err?.code ?? "").includes("23505") || String(err?.message ?? "").toLowerCase().includes("unique")) {
+      return res.status(409).json({
+        error: {
+          code: "EMAIL_ALREADY_REGISTERED",
+          message:
+            "Este correo electrónico ya está asociado a una cuenta en el sistema. No podés crear una cuenta nueva con el mismo correo. Si ya tenés usuario, iniciá sesión con tu contraseña.",
+        },
+      });
+    }
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("register-cliente:", e);
+    return res.status(500).json({ error: { message: env.NODE_ENV === "development" ? msg : "No se pudo crear la cuenta." } });
+  }
+  let row: { id: number; username: string; email?: string | null; password_hash: string; role: string; usuario?: string | null } | undefined;
+  try {
+    row = (await db.prepare("SELECT id, username, email, password_hash, role, usuario FROM users WHERE username = ?").get(emailNorm)) as typeof row;
+  } catch {
+    row = (await db.prepare("SELECT id, username, password_hash, role FROM users WHERE username = ?").get(emailNorm)) as typeof row;
+  }
+  if (!row) {
+    return res.status(500).json({ error: { message: "Cuenta creada pero no se pudo iniciar sesión." } });
+  }
+  const user: AuthUser = {
+    id: row.id,
+    username: row.username,
+    email: row.email ?? row.username,
+    role: row.role as AuthUser["role"],
+    usuario: row.usuario ?? undefined,
+  };
+  const token = jwt.sign({ sub: row.username, userId: row.id }, JWT_SECRET, { expiresIn: "7d" });
+  return res.status(201).json({ token, user });
+});
+
+authRouter.post("/auth/login", loginRateLimit, async (req, res) => {
+  try {
+    if (env.NODE_ENV !== "production") {
+      await ensureDefaultUser();
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("ensureDefaultUser:", e);
@@ -120,9 +238,9 @@ authRouter.post("/auth/verify-password", requireAuth, async (req, res) => {
   if (valid) {
     return res.json({ valid: true });
   }
-  /* Reparar Admin A: si falla con admin123, actualizar hash y permitir (Supabase/PostgreSQL a veces devuelve columnas con distinto casing) */
+  /* Solo desarrollo: bypass conocido para columnas raras en SQLite/Postgres (no usar en producción). */
   const isAdminA = req.user!.role === "admin_a" || row.username === "jv@hashrate.space";
-  if (isAdminA && password === "admin123") {
+  if (env.NODE_ENV !== "production" && isAdminA && password === "admin123") {
     try {
       const newHash = bcrypt.hashSync("admin123", 10);
       await db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(newHash, userId);

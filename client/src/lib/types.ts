@@ -14,6 +14,9 @@ export type Client = {
   city?: string;
   city2?: string;
   usuario?: string;
+  /** Registro tienda / documento */
+  documento_identidad?: string;
+  country?: string;
 };
 
 export type LineItem = {
@@ -68,20 +71,31 @@ export type Invoice = {
 
 export type EquipoASIC = {
   id: string;
-  numeroSerie?: string; // Número de serie único: M001, M002, ... (auto)
+  numeroSerie?: string; // Código de producto / serie (ej. M001 auto o VIT-L9-17G)
   fechaIngreso: string; // Fecha de ingreso
   marcaEquipo: string; // Marca del equipo
   modelo: string; // Modelo
   procesador: string; // Procesador
   precioUSD: number; // Precio en USD
+  /** Historial de cambios de precio (más reciente al final), desde API */
+  precioHistorial?: Array<{ precioUsd: number; actualizadoEn: string }>;
   observaciones?: string;
+  /** Publicado en /marketplace (catálogo vitrina) */
+  marketplaceVisible?: boolean;
+  marketplaceAlgo?: "sha256" | "scrypt" | null;
+  marketplaceHashrateDisplay?: string | null;
+  marketplaceImageSrc?: string | null;
+  marketplaceGalleryJson?: string | null;
+  marketplaceDetailRowsJson?: string | null;
+  marketplaceYieldJson?: string | null;
+  marketplaceSortOrder?: number;
 };
 
 export type Setup = {
   id: string;
   codigo?: string; // Número de ítem: S01, S02, ... (auto)
   nombre: string; // Nombre del Setup
-  precioUSD: number; // Precio en USD (50 o 0)
+  precioUSD: number; // Precio en USD (p. ej. 0, 40 o 50 según gestión)
 };
 
 export type ItemGarantiaAnde = {

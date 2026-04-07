@@ -13,6 +13,9 @@ interface PageHeaderProps {
   rightContent?: React.ReactNode;
   /** Logo custom (ej. Facturación usa HASHRATELOGO2.png) */
   logoSrc?: string;
+  /** Si se define, el logo enlaza (ej. "/" inicio SGI) */
+  logoHref?: string;
+  logoLinkAriaLabel?: string;
 }
 
 export function PageHeader({ 
@@ -21,7 +24,9 @@ export function PageHeader({
   backTo = "/",
   backText = "Volver al inicio",
   rightContent,
-  logoSrc: logoSrcProp 
+  logoSrc: logoSrcProp,
+  logoHref,
+  logoLinkAriaLabel = "Ir al inicio del Sistema de Gestión Interna",
 }: PageHeaderProps) {
   const [logoSrc, setLogoSrc] = useState(logoSrcProp ?? LOGO_PRINCIPAL);
   useEffect(() => {
@@ -32,17 +37,36 @@ export function PageHeader({
   return (
     <header className="fact-topbar">
       <div className="fact-topbar-left">
-        <div className="fact-logo-container">
-          <img 
-            src={logoSrc}
-            alt="Hashrate" 
-            className={`fact-logo ${useFallback ? "" : "fact-logo--white"}`}
-            width={180}
-            height={48}
-            loading="eager"
-            onError={() => setLogoSrc(LOGO_FALLBACK)}
-          />
-        </div>
+        {logoHref ? (
+          <Link
+            to={logoHref}
+            className="fact-logo-container fact-logo-container--link"
+            aria-label={logoLinkAriaLabel}
+            title="Ir al inicio SGI"
+          >
+            <img 
+              src={logoSrc}
+              alt="" 
+              className={`fact-logo ${useFallback ? "" : "fact-logo--white"}`}
+              width={180}
+              height={48}
+              loading="eager"
+              onError={() => setLogoSrc(LOGO_FALLBACK)}
+            />
+          </Link>
+        ) : (
+          <div className="fact-logo-container">
+            <img 
+              src={logoSrc}
+              alt="Hashrate" 
+              className={`fact-logo ${useFallback ? "" : "fact-logo--white"}`}
+              width={180}
+              height={48}
+              loading="eager"
+              onError={() => setLogoSrc(LOGO_FALLBACK)}
+            />
+          </div>
+        )}
         <h1>{title}</h1>
       </div>
       <div className="fact-topbar-right">

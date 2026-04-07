@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS users (
   username TEXT NOT NULL UNIQUE,
   email TEXT UNIQUE,
   password_hash TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('admin_a', 'admin_b', 'operador', 'lector')),
+  role TEXT NOT NULL CHECK (role IN ('admin_a', 'admin_b', 'operador', 'lector', 'cliente')),
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -96,6 +96,12 @@ CREATE TABLE IF NOT EXISTS invoice_sequences (
   last_number INTEGER NOT NULL DEFAULT 1000
 );
 INSERT OR IGNORE INTO invoice_sequences (type, last_number) VALUES ('Factura', 1000), ('Recibo', 1000), ('Nota de Crédito', 1000);
+
+CREATE TABLE IF NOT EXISTS tienda_online_client_seq (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  next_code_num INTEGER NOT NULL
+);
+INSERT OR IGNORE INTO tienda_online_client_seq (id, next_code_num) VALUES (1, 90001);
 
 CREATE TABLE IF NOT EXISTS emitted_documents (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -146,9 +152,90 @@ CREATE TABLE IF NOT EXISTS equipos_asic (
   modelo TEXT NOT NULL,
   procesador TEXT NOT NULL,
   precio_usd INTEGER NOT NULL DEFAULT 0,
-  observaciones TEXT
+  observaciones TEXT,
+  mp_visible INTEGER NOT NULL DEFAULT 0,
+  mp_algo TEXT,
+  mp_hashrate_display TEXT,
+  mp_image_src TEXT,
+  mp_gallery_json TEXT,
+  mp_detail_rows_json TEXT,
+  mp_yield_json TEXT,
+  mp_sort_order INTEGER NOT NULL DEFAULT 0,
+  precio_historial_json TEXT
 );
+
+CREATE TABLE IF NOT EXISTS marketplace_products (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  description TEXT,
+  category TEXT,
+  price_usd REAL NOT NULL DEFAULT 0,
+  image_url TEXT,
+  stock INTEGER NOT NULL DEFAULT 0,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS marketplace_quote_tickets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id TEXT NOT NULL UNIQUE,
+  order_number TEXT UNIQUE,
+  ticket_code TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL DEFAULT 'borrador' CHECK (status IN ('borrador', 'enviado_consulta', 'en_gestion', 'respondido', 'cerrado', 'descartado')),
+  items_json TEXT NOT NULL,
+  subtotal_usd REAL NOT NULL DEFAULT 0,
+  line_count INTEGER NOT NULL DEFAULT 0,
+  unit_count INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  last_contact_channel TEXT,
+  contacted_at TEXT,
+  notes_admin TEXT,
+  ip_address TEXT,
+  user_agent TEXT,
+  user_id INTEGER,
+  contact_email TEXT,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_mq_quote_status_updated ON marketplace_quote_tickets(status, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_mq_quote_created ON marketplace_quote_tickets(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS equipos_asic_audit (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  user_id INTEGER NOT NULL,
+  user_email TEXT NOT NULL,
+  user_usuario TEXT,
+  equipo_id TEXT,
+  codigo_producto TEXT,
+  action TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  details_json TEXT,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_equipos_asic_audit_created ON equipos_asic_audit(created_at DESC);
 `);
+
+  const mpc = native.prepare("SELECT COUNT(*) as c FROM marketplace_products").get() as { c: number } | undefined;
+  if (mpc && Number(mpc.c) === 0) {
+    const ins = native.prepare(
+      "INSERT INTO marketplace_products (name, description, category, price_usd, image_url, stock, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    );
+    const seeds: Array<[string, string, string, number, string | null, number, number]> = [
+      ["Rack 19\" 1U", "Chasis estándar para montaje en datacenter.", "Infraestructura", 95, null, 12, 1],
+      ["PDU 8 salidas", "Unidad de distribución de energía para rack.", "Infraestructura", 120, null, 8, 2],
+      ["Cable patch CAT6 2 m", "Cable de red categoría 6.", "Cabling", 8.5, null, 100, 3],
+      ["Ventilador rack 120 mm", "Refrigeración auxiliar para gabinete.", "Cooling", 35, null, 20, 4],
+      ["Bandeja fija 1U", "Bandeja para equipos ligeros en rack.", "Infraestructura", 45, null, 15, 5],
+      ["Filtro de aire rack", "Repuesto de filtro para entrada de aire.", "Cooling", 22, null, 40, 6],
+      ["Licencia gestión remota (1 año)", "Acceso remoto seguro a equipos.", "Software", 299, null, 50, 7],
+      ["Kit mantenimiento preventivo", "Inspección y limpieza programada (referencia).", "Servicios", 150, null, 999, 8],
+    ];
+    for (const row of seeds) {
+      ins.run(row[0], row[1], row[2], row[3], row[4], row[5], row[6]);
+    }
+  }
 
   const hasLegacyAdmin = native.prepare("SELECT 1 FROM users WHERE role = 'admin' LIMIT 1").get();
   if (hasLegacyAdmin) {
@@ -161,7 +248,7 @@ CREATE TABLE IF NOT EXISTS equipos_asic (
         username TEXT NOT NULL UNIQUE,
         email TEXT UNIQUE,
         password_hash TEXT NOT NULL,
-        role TEXT NOT NULL CHECK (role IN ('admin_a', 'admin_b', 'operador', 'lector')),
+        role TEXT NOT NULL CHECK (role IN ('admin_a', 'admin_b', 'operador', 'lector', 'cliente')),
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
       INSERT INTO users_new (id, username, email, password_hash, role, created_at)
@@ -181,7 +268,7 @@ CREATE TABLE IF NOT EXISTS equipos_asic (
     }
   }
 
-  ["phone", "email", "address", "city", "email2", "name2", "phone2", "address2", "city2", "usuario"].forEach((col) => {
+  ["phone", "email", "address", "city", "email2", "name2", "phone2", "address2", "city2", "usuario", "documento_identidad", "country"].forEach((col) => {
     try {
       native.exec(`ALTER TABLE clients ADD COLUMN ${col} TEXT`);
     } catch (e: unknown) {
@@ -244,6 +331,80 @@ CREATE TABLE IF NOT EXISTS equipos_asic (
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     if (!msg.includes("duplicate column")) throw e;
+  }
+
+  const equiposMpCols = [
+    "mp_visible INTEGER NOT NULL DEFAULT 0",
+    "mp_algo TEXT",
+    "mp_hashrate_display TEXT",
+    "mp_image_src TEXT",
+    "mp_gallery_json TEXT",
+    "mp_detail_rows_json TEXT",
+    "mp_yield_json TEXT",
+    "mp_sort_order INTEGER NOT NULL DEFAULT 0",
+    "precio_historial_json TEXT",
+  ];
+  for (const colDef of equiposMpCols) {
+    try {
+      native.exec(`ALTER TABLE equipos_asic ADD COLUMN ${colDef}`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!msg.includes("duplicate column")) throw e;
+    }
+  }
+
+  for (const colDef of ["user_id INTEGER", "contact_email TEXT"]) {
+    try {
+      native.exec(`ALTER TABLE marketplace_quote_tickets ADD COLUMN ${colDef}`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!msg.includes("duplicate column")) throw e;
+    }
+  }
+
+  native.exec(`CREATE TABLE IF NOT EXISTS tienda_online_client_seq (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    next_code_num INTEGER NOT NULL
+  )`);
+  native.prepare("INSERT OR IGNORE INTO tienda_online_client_seq (id, next_code_num) VALUES (1, 90001)").run();
+  try {
+    native.exec("ALTER TABLE clients ADD COLUMN user_id INTEGER");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+
+  const usersSqlRow = native.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get() as { sql: string } | undefined;
+  if (usersSqlRow?.sql && !usersSqlRow.sql.includes("'cliente'")) {
+    native.exec("PRAGMA foreign_keys=OFF");
+    native.exec("BEGIN");
+    try {
+      native.exec(`CREATE TABLE users__role_cliente (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL UNIQUE,
+        email TEXT UNIQUE,
+        password_hash TEXT NOT NULL,
+        role TEXT NOT NULL CHECK (role IN ('admin_a', 'admin_b', 'operador', 'lector', 'cliente')),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        usuario TEXT
+      )`);
+      native.exec(
+        `INSERT INTO users__role_cliente (id, username, email, password_hash, role, created_at, usuario)
+         SELECT id, username, email, password_hash, role, created_at, usuario FROM users`
+      );
+      native.exec("DROP TABLE users");
+      native.exec("ALTER TABLE users__role_cliente RENAME TO users");
+      native.exec("COMMIT");
+    } catch (e) {
+      try {
+        native.exec("ROLLBACK");
+      } catch {
+        /* ignore */
+      }
+      throw e;
+    } finally {
+      native.exec("PRAGMA foreign_keys=ON");
+    }
   }
 
   const txWrap = {

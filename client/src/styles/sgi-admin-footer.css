@@ -1,0 +1,90 @@
+/* Footer fijo Hashrate Space — solo usuarios Administrador A/B (SGI interno) */
+
+.sgi-protected-root--admin-footer {
+  min-height: 100vh;
+  box-sizing: border-box;
+  /* Altura aprox. del footer (1 fila); en móvil puede ser 2 filas */
+  padding-bottom: 52px;
+}
+
+@media (max-width: 768px) {
+  .sgi-protected-root--admin-footer {
+    padding-bottom: 78px;
+  }
+}
+
+.sgi-admin-fixed-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1020;
+  padding: 0.65rem max(1.25rem, env(safe-area-inset-right, 0px)) calc(0.65rem + env(safe-area-inset-bottom, 0px))
+    max(1.25rem, env(safe-area-inset-left, 0px));
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
+  box-sizing: border-box;
+}
+
+.sgi-admin-fixed-footer__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  max-width: 100%;
+  column-gap: clamp(1rem, 4vw, 2.5rem);
+}
+
+.sgi-admin-fixed-footer__copy {
+  grid-column: 2;
+  margin: 0;
+  font-size: 0.8rem;
+  color: #6b7280;
+  text-align: center;
+}
+
+.sgi-admin-fixed-footer__copy a {
+  color: #059669;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.sgi-admin-fixed-footer__copy a:hover {
+  text-decoration: underline;
+}
+
+.sgi-admin-fixed-footer__sgi {
+  grid-column: 3;
+  justify-self: end;
+  font-size: 0.8rem;
+  color: #047857;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.sgi-admin-fixed-footer__sgi:hover {
+  text-decoration: underline;
+  color: #059669;
+}
+
+@media (max-width: 768px) {
+  .sgi-admin-fixed-footer__row {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    justify-items: center;
+    row-gap: 0.35rem;
+  }
+
+  .sgi-admin-fixed-footer__copy {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .sgi-admin-fixed-footer__sgi {
+    grid-column: 1;
+    grid-row: 2;
+    justify-self: center;
+    white-space: normal;
+    text-align: center;
+  }
+}

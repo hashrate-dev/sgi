@@ -1,0 +1,235 @@
+/* Vitrina Marketplace (estantería) */
+.market-hrs-back {
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.95);
+  border-bottom: 1px solid #e2e8f0;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.market-hrs-back a {
+  color: #074025;
+  font-weight: 600;
+  text-decoration: none;
+}
+.market-hrs-back a:hover {
+  text-decoration: underline;
+}
+
+.page-main--market {
+  min-height: 100vh;
+  background: linear-gradient(160deg, #f0fdf4 0%, #ecfdf5 35%, #ffffff 100%);
+}
+
+.section--market-shelf {
+  padding-bottom: 3rem;
+}
+
+.market-intro-wrap {
+  padding: 2rem 0 1.5rem;
+}
+
+.market-intro__kicker {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #0f766e;
+  margin-bottom: 0.5rem;
+}
+
+.market-intro__title {
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 0.75rem;
+}
+
+.market-intro__desc {
+  color: #64748b;
+  max-width: 40rem;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.market-shelf-wrap {
+  padding: 1rem 0 2rem;
+}
+
+.shelf-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.shelf-toolbar__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.shelf-filter {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #334155;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.shelf-filter:hover {
+  border-color: #0f766e;
+  color: #0f766e;
+}
+
+.shelf-filter.is-active {
+  background: linear-gradient(135deg, #074025 0%, #0d9488 100%);
+  border-color: transparent;
+  color: #fff;
+}
+
+.shelf-catalog-link {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #0f766e;
+  text-decoration: none;
+}
+.shelf-catalog-link:hover {
+  text-decoration: underline;
+}
+
+.shelf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1.25rem;
+}
+
+.shelf-card {
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+  display: flex;
+  flex-direction: column;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.shelf-card:hover {
+  box-shadow: 0 12px 28px rgba(7, 64, 37, 0.12);
+  transform: translateY(-2px);
+}
+
+.shelf-card--filtered-out {
+  visibility: hidden;
+  height: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: none;
+  pointer-events: none;
+}
+
+.shelf-card__media {
+  aspect-ratio: 16 / 10;
+  background: linear-gradient(145deg, #f1f5f9, #e2e8f0);
+  position: relative;
+}
+
+.shelf-card__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.shelf-card__img-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  color: #94a3b8;
+}
+
+.shelf-card__body {
+  padding: 1rem 1.1rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 0.5rem;
+}
+
+.shelf-card__tag {
+  align-self: flex-start;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #ecfdf5;
+  color: #047857;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+}
+
+.shelf-card__title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.shelf-card__desc {
+  font-size: 0.8125rem;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.45;
+  flex: 1;
+}
+
+.shelf-card__price {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #074025;
+  margin: 0;
+}
+
+.marketplace-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.marketplace-modal {
+  background: #fff;
+  border-radius: 16px;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+}
+
+.marketplace-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.marketplace-modal__body {
+  padding: 1.25rem;
+}

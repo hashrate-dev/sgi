@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { ProtectedAppLayout } from "./components/ProtectedAppLayout";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
 import { FacturacionPage } from "./pages/FacturacionPage";
@@ -19,15 +20,32 @@ import { SetupPage } from "./pages/SetupPage";
 import { ReportesPage } from "./pages/ReportesPage";
 import { UsuariosPage } from "./pages/UsuariosPage";
 import { ConfiguracionPage } from "./pages/ConfiguracionPage";
+import { ClientesTiendaOnlinePage } from "./pages/ClientesTiendaOnlinePage";
+import { ClientesHubPage } from "./pages/ClientesHubPage";
+import { CotizacionesMarketplacePage } from "./pages/CotizacionesMarketplacePage";
 import { GarantiaAndePage } from "./pages/GarantiaAndePage";
 import { GarantiasAndeItemsPage } from "./pages/GarantiasAndeItemsPage";
 import { GarantiaAndeItemNewPage } from "./pages/GarantiaAndeItemNewPage";
 import { HistorialGarantiasPage } from "./pages/HistorialGarantiasPage";
 import { KryptexPage } from "./pages/KryptexPage";
 import { KryptexDetallePage } from "./pages/KryptexDetallePage";
+import { MarketplacePage } from "./pages/MarketplacePage";
+import { MarketplaceClienteLoginPage } from "./pages/MarketplaceClienteLoginPage";
+import { MarketplaceClienteRegistroPage } from "./pages/MarketplaceClienteRegistroPage";
+import { MarketplaceMisOrdenesPage } from "./pages/MarketplaceMisOrdenesPage";
 import { CuentaClientePage } from "./pages/CuentaClientePage";
 import { CuentaClienteDetallePage } from "./pages/CuentaClienteDetallePage";
 import { ToastContainer } from "./components/ToastNotification";
+import { MarketplaceLanguageProvider } from "./contexts/MarketplaceLanguageContext";
+
+/** Outlet para anidar /marketplace, /marketplace/login, /marketplace/registro (matching estable en RR7). */
+function MarketplaceLayout() {
+  return (
+    <MarketplaceLanguageProvider>
+      <Outlet />
+    </MarketplaceLanguageProvider>
+  );
+}
 
 function App() {
   return (
@@ -35,11 +53,21 @@ function App() {
       <AuthProvider>
         <ToastContainer />
         <Routes>
+          {/* Tienda primero: catálogo público + login/registro cliente (anidado para matching estable en RR7) */}
+          <Route path="/marketplace" element={<MarketplaceLayout />}>
+            <Route index element={<MarketplacePage />} />
+            <Route path="login" element={<MarketplaceClienteLoginPage />} />
+            <Route path="registro" element={<MarketplaceClienteRegistroPage />} />
+            <Route path="mis-ordenes" element={<MarketplaceMisOrdenesPage />} />
+          </Route>
+          <Route path="/marketplace/" element={<Navigate to="/marketplace" replace />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
-            <Route path="/" element={<HomePage />} />
+          <Route element={<ProtectedRoute><ProtectedAppLayout /></ProtectedRoute>}>
+            {/* `index`: en layout sin path, `path="/"` como hijo puede no matchear `/` y el * devuelve bucle infinito */}
+            <Route index element={<HomePage />} />
             <Route path="/kryptex" element={<KryptexPage />} />
             <Route path="/kryptex/detalle" element={<KryptexDetallePage />} />
+            <Route path="/marketplacedashboard" element={<EquiposAsicPage />} />
             <Route path="/hosting" element={<HostingHubPage />} />
             <Route path="/hosting/control-documentos-cobros" element={<FacturasMesHostingPage />} />
             <Route path="/facturacion-hosting" element={<FacturacionPage />} />
@@ -63,6 +91,7 @@ function App() {
             <Route path="/facturacion-mineria" element={<Navigate to="/facturacion-equipos" replace />} />
             <Route path="/historial-mineria" element={<Navigate to="/historial-equipos" replace />} />
             <Route path="/pendientes-mineria" element={<Navigate to="/pendientes-equipos" replace />} />
+            <Route path="/clientes-hub" element={<ClientesHubPage />} />
             <Route path="/clientes" element={<ClientesPage />} />
             <Route path="/cuenta-cliente" element={<CuentaClientePage />} />
             <Route path="/cuenta-cliente/detalle" element={<CuentaClienteDetallePage />} />
@@ -70,6 +99,8 @@ function App() {
             <Route path="/clientes/:id/edit" element={<ClienteEditPage />} />
             <Route path="/reportes" element={<ReportesPage />} />
             <Route path="/configuracion" element={<ConfiguracionPage />} />
+            <Route path="/clientes-tienda-online" element={<ClientesTiendaOnlinePage />} />
+            <Route path="/cotizaciones-marketplace" element={<CotizacionesMarketplacePage />} />
             <Route path="/usuarios" element={<UsuariosPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

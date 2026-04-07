@@ -22,6 +22,7 @@ import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import { canEditFacturacion } from "../lib/auth";
 import { formatCurrencyNumber, formatUSD } from "../lib/formatCurrency";
+import { isClienteTiendaOnline } from "../lib/clientTienda";
 import "../styles/facturacion.css";
 
 function todayLocale() {
@@ -280,7 +281,11 @@ export function FacturacionPage() {
 
   useEffect(() => {
     getClients()
-      .then((r) => setClients((r.clients ?? []) as Client[]))
+      .then((r) => {
+        const all = (r.clients ?? []) as Client[];
+        /* Solo clientes Hosting (C01…); excluye tienda online A9… / WEB- */
+        setClients(all.filter((c) => !isClienteTiendaOnline(c)));
+      })
       .catch(() => setClients([]));
   }, []);
 
@@ -536,7 +541,7 @@ export function FacturacionPage() {
 
   function handleClickEmitir() {
     if (clients.length === 0) {
-      showToast("No hay clientes cargados. Agregá clientes en la hoja Clientes primero.", "error");
+      showToast("No hay clientes Hosting cargados. Agregalos en Clientes → Clientes Hosting.", "error");
       return;
     }
     if (!selectedClient) {
@@ -890,9 +895,6 @@ export function FacturacionPage() {
                       </option>
                     ))}
                   </select>
-                  {clients.length === 0 && (
-                    <small className="text-muted d-block mt-1">Cargá clientes en la hoja Clientes.</small>
-                  )}
                 </div>
 
                 {/* Selector de factura relacionada para Nota de Crédito */}
