@@ -4040,6 +4040,59 @@ a.fact-logo-container--link:focus-visible {
   color: #fff;
 }
 
+/* Búsqueda + Limpiar unidos (referencia panel Clientes / adjunto 2) */
+.clientes-filtros-card .filtros-buscar-input-group .form-control {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: 0;
+}
+.clientes-filtros-card .filtros-buscar-input-group .btn.filtros-limpiar-btn {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  margin-left: 0 !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+  border: 2px solid rgba(255, 255, 255, 0.5) !important;
+  border-left-width: 1px;
+  color: #fff !important;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.clientes-filtros-card .filtros-buscar-input-group .btn.filtros-limpiar-btn:hover {
+  background: rgba(255, 255, 255, 0.25) !important;
+  color: #fff !important;
+}
+
+/* Excel / Importar: contorno claro sobre verde (adjunto 2) */
+.clientes-filtros-card .filtros-btn-excel-outline,
+.clientes-filtros-card .filtros-btn-import-outline {
+  background: transparent !important;
+  border: 2px solid rgba(255, 255, 255, 0.55) !important;
+  color: #fff !important;
+  font-weight: 600;
+}
+.clientes-filtros-card .filtros-btn-excel-outline:hover:not(:disabled),
+.clientes-filtros-card .filtros-btn-import-outline:hover:not(.disabled) {
+  background: rgba(255, 255, 255, 0.18) !important;
+  border-color: rgba(255, 255, 255, 0.75) !important;
+  color: #fff !important;
+}
+.clientes-filtros-card .filtros-btn-excel-outline:disabled {
+  opacity: 0.45;
+}
+
+/* Borrar todo: sólido terracota (adjunto 2) */
+.clientes-filtros-card .garantia-borrar-todo-filled {
+  background: #8b4545 !important;
+  border: 2px solid rgba(255, 255, 255, 0.35) !important;
+  color: #fff !important;
+  font-weight: 600;
+}
+.clientes-filtros-card .garantia-borrar-todo-filled:hover {
+  background: #9e5050 !important;
+  border-color: rgba(255, 255, 255, 0.5) !important;
+  color: #fff !important;
+}
+
 .clientes-listado-wrap {
   margin-top: 1.5rem;
   margin-left: -1.5rem;
@@ -5665,6 +5718,11 @@ a.fact-logo-container--link:focus-visible {
   background: transparent !important;
   pointer-events: none; /* el overlay no captura clics; así el dropdown nativo del <select> recibe el clic al elegir opción */
   animation: fadeInOverlay 0.2s ease-out;
+}
+
+/* Por encima de drawers marketplace / modales con z-index ~10040–10050 */
+.professional-modal-overlay.professional-modal-overlay--elevated {
+  z-index: 11050 !important;
 }
 
 /* Fondo oscuro en pseudo-elemento: sí captura clics en la zona oscura, pero el dialog queda por encima */

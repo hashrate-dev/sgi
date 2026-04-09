@@ -31,7 +31,7 @@ export const COOLING_ROW_TEXT: Record<CoolingPreset, string> = {
   hydro: "Minero Hydro",
 };
 
-/** Tipo de minería (icono ₿ o dual en vitrina). */
+/** Tipo de minería (Bitcoin o dual en vitrina). */
 export type MiningPreset = "bitcoin" | "dual";
 
 export const MINING_ROW_BY_PRESET: Record<MiningPreset, { icon: AsicDetailIcon; text: string }> = {

@@ -263,8 +263,7 @@ export function UsuariosPage() {
                 )}
                 {loading ? (
                   <div className="usuarios-loading">
-                    <div className="spinner-border" role="status" aria-label="Cargando" />
-                    <p className="mt-2 mb-0 small">₿</p>
+                    <div className="spinner-border" role="status" aria-label="Espere un momento" />
                   </div>
                 ) : (
                   <div className="usuarios-listado-wrap">
@@ -380,8 +379,7 @@ export function UsuariosPage() {
               <div className="usuarios-page-body">
                 {activityLoading ? (
                   <div className="activity-loading">
-                    <div className="spinner-border" role="status" aria-label="Cargando" />
-                    <p className="mt-2 mb-0 small text-muted">Cargando actividad...</p>
+                    <div className="spinner-border" role="status" aria-label="Espere un momento" />
                   </div>
                 ) : activityError ? (
                   <div className="empty-activity">

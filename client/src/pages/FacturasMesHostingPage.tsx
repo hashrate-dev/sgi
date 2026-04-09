@@ -426,7 +426,9 @@ export function FacturasMesHostingPage() {
             </div>
           ) : null}
           {loading ? (
-            <p className="text-muted mb-0 py-4">Cargando documentos del historial...</p>
+            <div className="d-flex justify-content-center py-5">
+              <div className="spinner-border text-secondary" role="status" aria-label="Espere un momento" />
+            </div>
           ) : (
           <div className="table-responsive">
             <table className="table table-sm align-middle" style={{ fontSize: "0.9rem" }}>

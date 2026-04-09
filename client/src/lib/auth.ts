@@ -6,6 +6,10 @@ export type AuthUser = {
   email: string;
   role: UserRole;
   usuario?: string;
+  /** Celular indicado al registrar la cuenta tienda. */
+  celular?: string;
+  /** Teléfono fijo opcional del registro. */
+  telefono?: string;
 };
 
 const TOKEN_KEY = "hrs_facturacion_token";
@@ -75,6 +79,21 @@ export function canUseMarketplaceQuoteCart(role: UserRole | string | undefined):
   if (!role) return false;
   const r = String(role).toLowerCase().trim();
   return r === "cliente" || r === "admin_a" || r === "admin_b";
+}
+
+/**
+ * Una sola orden marketplace en curso (misma que se actualiza al agregar ítems): cliente tienda y admin A/B.
+ * Alineado con `canUseMarketplaceQuoteCart` — mismas cuentas con carrito en /marketplace.
+ */
+export function enforceSingleMarketplaceOrderForRole(role: UserRole | string | undefined): boolean {
+  return canUseMarketplaceQuoteCart(role);
+}
+
+/** En «Mis órdenes»: exportar Excel y borrar todas — solo staff (no cuenta cliente tienda). */
+export function canBulkManageMarketplaceMyOrders(role: UserRole | string | undefined): boolean {
+  if (!role) return false;
+  const r = String(role).toLowerCase().trim();
+  return r === "admin_a" || r === "admin_b";
 }
 
 /** Solo AdministradorA puede eliminar cuentas con rol AdministradorA o AdministradorB. */

@@ -373,8 +373,8 @@ export function PendientesPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={10} className="text-center text-muted py-4">
-                      <small>Cargando facturas...</small>
+                    <td colSpan={10} className="text-center py-5">
+                      <div className="spinner-border text-secondary" role="status" aria-label="Espere un momento" />
                     </td>
                   </tr>
                 ) : filtered.length === 0 ? (

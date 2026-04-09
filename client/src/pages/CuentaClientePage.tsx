@@ -87,11 +87,6 @@ export function CuentaClientePage() {
                   Limpiar
                 </button>
               </div>
-              {loadingClients && (
-                <div className="col-12">
-                  <small className="text-white-50">Cargando lista de clientes...</small>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -107,9 +102,8 @@ export function CuentaClientePage() {
       <div className="container">
         <div className="cuenta-cliente-directorio-wrapper">
         {loadingClients ? (
-          <div className="cuenta-cliente-directorio-loading">
-            <div className="spinner-border spinner-border-sm text-secondary me-2" />
-            <span>Cargando directorio...</span>
+          <div className="cuenta-cliente-directorio-loading justify-content-center">
+            <div className="spinner-border spinner-border-sm text-secondary" role="status" aria-label="Espere un momento" />
           </div>
         ) : filteredAndSortedClients.length === 0 ? (
           <div className="cuenta-cliente-directorio-empty">

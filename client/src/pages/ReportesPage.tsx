@@ -170,7 +170,9 @@ export function ReportesPage() {
                 </div>
               )}
               {loading ? (
-                <p className="text-muted">₿</p>
+                <div className="d-flex justify-content-center py-4">
+                  <div className="spinner-border" role="status" aria-label="Espere un momento" />
+                </div>
               ) : (
                 <div className="table-responsive">
                   <table className="table table-sm align-middle reportes-listado-table" style={{ fontSize: "0.85rem" }}>

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMarketplaceQuoteCart } from "../../contexts/MarketplaceQuoteCartContext.js";
+import { MarketplaceCartOrdersPanel } from "./MarketplaceCartOrdersPanel.js";
+import { isOneActiveOrderError } from "../../lib/api.js";
 import type { SubmittedConsultationSummary } from "../../contexts/MarketplaceQuoteCartContext.js";
 import { MarketplaceTicketSummaryModal } from "./MarketplaceTicketSummaryModal.js";
 import {
@@ -10,10 +12,13 @@ import {
   lineHashrateSharePct,
   quoteCartSetupUnitUsd,
   QUOTE_ADDON_WARRANTY_USD,
+  marketplaceQuoteTicketLineDisplayName,
 } from "../../lib/marketplaceQuoteCart.js";
 import { MailCtaIcon, WhatsAppCtaIcon } from "./MarketplaceCtaIcons.js";
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
 import { marketplaceLocale } from "../../lib/i18n.js";
+import { useAuth } from "../../contexts/AuthContext.js";
+import { enforceSingleMarketplaceOrderForRole } from "../../lib/auth.js";
 
 function EmptyCartIllustration() {
   return (
@@ -45,9 +50,15 @@ export function MarketplaceQuoteCartDrawer() {
     canUseQuoteCart,
     setupEquipoCompletoUsd,
     setupCompraHashrateUsd,
+    blockingPipelineOrder,
+    refreshActiveOrderGate,
+    drawerSubView,
+    switchDrawerToOrders,
+    switchDrawerToCart,
   } = useMarketplaceQuoteCart();
   const { lang, t, tf } = useMarketplaceLang();
   const loc = marketplaceLocale(lang);
+  const { user } = useAuth();
   const panelRef = useRef<HTMLDivElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
   const [contactBusy, setContactBusy] = useState<null | "email" | "wa">(null);
@@ -75,6 +86,10 @@ export function MarketplaceQuoteCartDrawer() {
     }
   }, [drawerOpen]);
 
+  useEffect(() => {
+    if (drawerOpen && canUseQuoteCart) void refreshActiveOrderGate();
+  }, [drawerOpen, canUseQuoteCart, refreshActiveOrderGate]);
+
   if (!drawerOpen) return null;
 
   const pricing = { setupEquipoCompletoUsd, setupCompraHashrateUsd };
@@ -82,6 +97,17 @@ export function MarketplaceQuoteCartDrawer() {
   const n = lines.length;
   const subtitle =
     n === 0 ? null : n === 1 ? t("drawer.sub_one") : tf("drawer.sub_many", { n: String(n) });
+  /** Orden en pipeline: cliente y admin A/B ven el aviso y el carrito se fusiona con esa orden. */
+  const showPipelineOrderHint = Boolean(canUseQuoteCart && blockingPipelineOrder && n > 0);
+  const showTicketRef = Boolean(ticketRef);
+  /** Caja «Orden en curso» / política una orden: con ítems en carrito (cuentas con carrito marketplace). */
+  const showCartPolicyFooter =
+    drawerSubView === "cart" &&
+    n > 0 &&
+    Boolean(user && canUseQuoteCart && enforceSingleMarketplaceOrderForRole(user.role));
+
+  /** Priorizar altura útil de la lista: encabezado/pie más bajos cuando ya hay equipos */
+  const compactCartChrome = drawerSubView === "cart" && n > 0;
 
   return (
     <>
@@ -92,57 +118,144 @@ export function MarketplaceQuoteCartDrawer() {
         aria-label={t("drawer.close_aria")}
         onClick={closeDrawer}
       />
-      <div ref={panelRef} id="market-quote-drawer-panel" className="market-quote-drawer__panel">
-        <div className="market-quote-drawer__top">
-          <div className="market-quote-drawer__head">
-            <div className="market-quote-drawer__head-text">
-              <h2 id="market-quote-drawer-title" className="market-quote-drawer__title">
-                {t("drawer.title")}
-              </h2>
-              {subtitle ? <p className="market-quote-drawer__subtitle">{subtitle}</p> : null}
+      <div
+        ref={panelRef}
+        id="market-quote-drawer-panel"
+        className={`market-quote-drawer__panel${compactCartChrome ? " market-quote-drawer__panel--has-lines" : ""}`}
+      >
+        {drawerSubView === "orders" ? (
+          <div className="market-quote-drawer__top">
+            <div className="market-quote-drawer__head market-quote-drawer__head--orders-nav">
+              <button
+                type="button"
+                className="market-quote-drawer__back-to-cart"
+                onClick={switchDrawerToCart}
+              >
+                <i className="bi bi-arrow-left" aria-hidden />
+                <span>{t("drawer.back_to_cart")}</span>
+              </button>
+              <button ref={closeBtnRef} type="button" className="market-quote-drawer__close" onClick={closeDrawer} aria-label={t("drawer.close")}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-            <button ref={closeBtnRef} type="button" className="market-quote-drawer__close" onClick={closeDrawer} aria-label={t("drawer.close")}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-                <path d="M18 6L6 18M6 6l12 12" />
-              </svg>
-            </button>
+            <h2 id="market-quote-drawer-title" className="visually-hidden">
+              {t("orders.title")}
+            </h2>
           </div>
-          <div className="market-quote-drawer__lede-wrap">
-            <p className="market-quote-drawer__lede">
-              Llená tu carrito con los equipos que quieras:
-            </p>
+        ) : (
+          <div className={`market-quote-drawer__top${compactCartChrome ? " market-quote-drawer__top--compact" : ""}`}>
+            <div className="market-quote-drawer__head">
+              <div className="market-quote-drawer__head-text">
+                <h2 id="market-quote-drawer-title" className="market-quote-drawer__title">
+                  {t("drawer.title")}
+                </h2>
+                {subtitle ? <p className="market-quote-drawer__subtitle">{subtitle}</p> : null}
+              </div>
+              <button ref={closeBtnRef} type="button" className="market-quote-drawer__close" onClick={closeDrawer} aria-label={t("drawer.close")}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
             {!canUseQuoteCart ? (
-              <p className="market-quote-drawer__login-hint" role="note">
-                Para agregar equipos y guardar tu pedido en el sistema,{" "}
-                <Link to="/marketplace/login">iniciá sesión</Link> con tu cuenta , o si no tenés cuenta,{" "}
-                <Link to="/marketplace/registro">creá una cuenta nueva</Link>.
-              </p>
+              <div className="market-quote-drawer__lede-wrap">
+                <p className="market-quote-drawer__lede">{t("drawer.lede")}</p>
+                <p className="market-quote-drawer__login-hint" role="note">
+                  {lang === "en" ? (
+                    <>
+                      To add equipment and save your order in the system,{" "}
+                      <Link to="/marketplace/login">log in</Link> with your account, or if you don&apos;t have one,{" "}
+                      <Link to="/marketplace/registro">create a new account</Link>.
+                    </>
+                  ) : (
+                    <>
+                      Para agregar equipos y guardar tu pedido en el sistema,{" "}
+                      <Link to="/marketplace/login">iniciá sesión</Link> con tu cuenta, o si no tenés cuenta,{" "}
+                      <Link to="/marketplace/registro">creá una cuenta nueva</Link>.
+                    </>
+                  )}
+                </p>
+              </div>
+            ) : showPipelineOrderHint ? null : n === 0 ? (
+              <div className="market-quote-drawer__lede-wrap">
+                <p className="market-quote-drawer__lede">{t("drawer.lede")}</p>
+              </div>
             ) : null}
           </div>
-        </div>
+        )}
 
-        <div className="market-quote-drawer__body">
+        <div
+          className={`market-quote-drawer__body${drawerSubView === "cart" ? " market-quote-drawer__body--cart-layout" : ""}`}
+        >
+          {drawerSubView === "orders" ? (
+            <MarketplaceCartOrdersPanel onBackToCart={switchDrawerToCart} />
+          ) : (
+            <>
+          <div
+            className={`market-quote-drawer__body-scroll${compactCartChrome ? " market-quote-drawer__body-scroll--has-lines" : ""}`}
+          >
+          {showPipelineOrderHint ? (
+            <div className="market-quote-drawer__one-active-order" role="status">
+              <p className="market-quote-drawer__one-active-order-title">{t("drawer.one_active_title")}</p>
+              <p className="market-quote-drawer__one-active-order-body">{t("drawer.one_active_body")}</p>
+              {blockingPipelineOrder?.orderNumber ? (
+                <p className="market-quote-drawer__one-active-order-ref small text-muted mb-2">
+                  <strong>{blockingPipelineOrder.orderNumber}</strong>
+                  {blockingPipelineOrder.ticketCode ? (
+                    <>
+                      {" "}
+                      · {blockingPipelineOrder.ticketCode}
+                    </>
+                  ) : null}
+                </p>
+              ) : null}
+              <button
+                type="button"
+                className="market-quote-drawer__btn market-quote-drawer__btn--solid market-quote-drawer__one-active-order-link"
+                onClick={switchDrawerToOrders}
+              >
+                {t("drawer.one_active_link")}
+              </button>
+            </div>
+          ) : null}
           {n === 0 ? (
             <div className="market-quote-drawer__empty">
               <EmptyCartIllustration />
               <p className="market-quote-drawer__empty-title">{t("drawer.empty_title")}</p>
               <p className="market-quote-drawer__hint">{t("drawer.empty_hint")}</p>
+              {canUseQuoteCart && blockingPipelineOrder ? (
+                <p className="market-quote-drawer__empty-pending-note">
+                  <button
+                    type="button"
+                    className="market-quote-drawer__empty-pending-link"
+                    onClick={switchDrawerToOrders}
+                  >
+                    {t("drawer.empty_pending_order_link")}
+                  </button>
+                </p>
+              ) : null}
             </div>
           ) : (
             <>
-              <p className="market-quote-drawer__section-label">{t("drawer.selected")}</p>
-              <ul className="market-quote-drawer__list">
-                {lines.map((l) => {
+              <p id="market-quote-drawer-selected-heading" className="market-quote-drawer__section-label">
+                {t("drawer.selected")}
+              </p>
+              <ul className="market-quote-drawer__list" aria-labelledby="market-quote-drawer-selected-heading">
+                {lines.map((l, lineIdx) => {
                   const lk = quoteCartLineKey(l);
                   const sharePct = lineHashrateSharePct(l);
                   const addonMult = sharePct / 100;
                   const setupUnit = quoteCartSetupUnitUsd(l, pricing);
                   const warrantyUnit = Math.round(QUOTE_ADDON_WARRANTY_USD * addonMult);
                   return (
-                  <li key={lk} className="market-quote-drawer__line">
+                  <li key={`${lk}#${lineIdx}`} className="market-quote-drawer__line">
                     <div className="market-quote-drawer__line-top">
                       <h3 className="market-quote-drawer__line-name">
-                        {l.brand} {l.model}
+                        {marketplaceQuoteTicketLineDisplayName(l as unknown as Record<string, unknown>, {
+                          includeShareSuffix: false,
+                        })}
                       </h3>
                       <button
                         type="button"
@@ -159,7 +272,6 @@ export function MarketplaceQuoteCartDrawer() {
                         <span className="market-quote-drawer__remove-txt">{t("drawer.remove")}</span>
                       </button>
                     </div>
-                    <p className="market-quote-drawer__line-meta">{l.hashrate}</p>
                     {sharePct < 100 ? (
                       <p className="market-quote-drawer__line-share small text-muted mb-1">
                         {tf("drawer.line_hashrate_share", { pct: String(sharePct) })}
@@ -235,14 +347,12 @@ export function MarketplaceQuoteCartDrawer() {
                   );
                 })}
               </ul>
-              <div className="market-quote-drawer__total">
-                <div className="market-quote-drawer__total-copy">
-                  <span className="market-quote-drawer__total-label">{t("drawer.total")}</span>
-                  <span className="market-quote-drawer__total-note">{t("drawer.total_note")}</span>
-                </div>
-                <strong className="market-quote-drawer__total-amt">{totalRef.toLocaleString(loc)} USD</strong>
-              </div>
-              {ticketRef ? (
+            </>
+          )}
+          </div>
+          {n > 0 ? (
+            <div className="market-quote-drawer__cart-sticky-summary" role="region" aria-labelledby="market-quote-drawer-total-heading">
+              {showTicketRef && ticketRef ? (
                 <p className="market-quote-drawer__ticket-ref" aria-live="polite">
                   <span className="market-quote-drawer__ticket-ref-label">{t("drawer.ref_label")}</span>
                   <span className="market-quote-drawer__ticket-ref-codes">
@@ -252,15 +362,29 @@ export function MarketplaceQuoteCartDrawer() {
                   </span>
                 </p>
               ) : null}
+              <div className="market-quote-drawer__total">
+                <div className="market-quote-drawer__total-copy">
+                  <span id="market-quote-drawer-total-heading" className="market-quote-drawer__total-label">
+                    {t("drawer.total")}
+                  </span>
+                  <span className="market-quote-drawer__total-note">{t("drawer.total_note")}</span>
+                </div>
+                <strong className="market-quote-drawer__total-amt">{totalRef.toLocaleString(loc)} USD</strong>
+              </div>
+            </div>
+          ) : null}
             </>
           )}
         </div>
 
-        <footer className="market-quote-drawer__foot">
-          <p className="market-quote-drawer__foot-kicker">{t("drawer.next")}</p>
-          <p className="market-quote-drawer__foot-lede">
-            {canUseQuoteCart ? t("drawer.next_logged") : t("drawer.next_guest")}
-          </p>
+        {drawerSubView === "cart" ? (
+        <footer className={`market-quote-drawer__foot${compactCartChrome ? " market-quote-drawer__foot--compact" : ""}`}>
+          {!compactCartChrome ? <p className="market-quote-drawer__foot-kicker">{t("drawer.next")}</p> : null}
+          {!(canUseQuoteCart && compactCartChrome) ? (
+            <p className="market-quote-drawer__foot-lede">
+              {canUseQuoteCart ? t("drawer.next_logged") : t("drawer.next_guest")}
+            </p>
+          ) : null}
           <div className="market-quote-drawer__cta">
             {canUseQuoteCart && n > 0 ? (
               <div className="market-quote-drawer__cta-submit-wrap">
@@ -276,12 +400,21 @@ export function MarketplaceQuoteCartDrawer() {
                         setTicketSummary(s);
                       })
                       .catch((e) => {
-                        setSubmitErr(e instanceof Error ? e.message : t("drawer.err_ticket"));
+                        if (isOneActiveOrderError(e)) void refreshActiveOrderGate();
+                        setSubmitErr(
+                          isOneActiveOrderError(e) ? t("drawer.one_active_err") : e instanceof Error ? e.message : t("drawer.err_ticket")
+                        );
                       })
                       .finally(() => setSubmitBusy(false));
                   }}
                 >
-                  {submitBusy ? t("drawer.gen_busy") : t("drawer.gen_ticket")}
+                  {submitBusy
+                    ? showPipelineOrderHint
+                      ? t("drawer.gen_busy_update")
+                      : t("drawer.gen_busy")
+                    : showPipelineOrderHint
+                      ? t("drawer.gen_ticket_update")
+                      : t("drawer.gen_ticket")}
                 </button>
               </div>
             ) : null}
@@ -298,8 +431,14 @@ export function MarketplaceQuoteCartDrawer() {
                   disabled={contactBusy !== null || submitBusy || n === 0}
                   aria-label={contactBusy === "email" ? t("drawer.email_opening") : t("drawer.email_aria")}
                   onClick={() => {
+                    setSubmitErr("");
                     setContactBusy("email");
-                    void openQuoteEmail().finally(() => setContactBusy(null));
+                    void openQuoteEmail()
+                      .catch((e) => {
+                        if (isOneActiveOrderError(e)) void refreshActiveOrderGate();
+                        setSubmitErr(isOneActiveOrderError(e) ? t("drawer.one_active_err") : t("drawer.err_ticket"));
+                      })
+                      .finally(() => setContactBusy(null));
                   }}
                 >
                   <span className="market-quote-drawer__btn-icon" aria-hidden>
@@ -309,12 +448,18 @@ export function MarketplaceQuoteCartDrawer() {
                 </button>
                 <button
                   type="button"
-                  className="market-quote-drawer__btn market-quote-drawer__btn--solid"
+                  className="market-quote-drawer__btn market-quote-drawer__btn--contact-wa"
                   disabled={contactBusy !== null || submitBusy || n === 0}
                   aria-label={contactBusy === "wa" ? t("drawer.wa_opening") : t("drawer.wa_aria")}
                   onClick={() => {
+                    setSubmitErr("");
                     setContactBusy("wa");
-                    void openQuoteWhatsApp().finally(() => setContactBusy(null));
+                    void openQuoteWhatsApp()
+                      .catch((e) => {
+                        if (isOneActiveOrderError(e)) void refreshActiveOrderGate();
+                        setSubmitErr(isOneActiveOrderError(e) ? t("drawer.one_active_err") : t("drawer.err_ticket"));
+                      })
+                      .finally(() => setContactBusy(null));
                   }}
                 >
                   <span className="market-quote-drawer__btn-icon" aria-hidden>
@@ -334,7 +479,19 @@ export function MarketplaceQuoteCartDrawer() {
               </button>
             ) : null}
           </div>
+          {showCartPolicyFooter ? (
+            <div className="market-quote-drawer__cart-policy" role="note">
+              <span className="market-quote-drawer__cart-policy-icon" aria-hidden>
+                <i className="bi bi-shield-check" />
+              </span>
+              <div className="market-quote-drawer__cart-policy-body">
+                <span className="market-quote-drawer__cart-policy-title">{t("drawer.cart_policy_title")}</span>
+                <span className="market-quote-drawer__cart-policy-text">{t("drawer.cart_policy_text")}</span>
+              </div>
+            </div>
+          ) : null}
         </footer>
+        ) : null}
       </div>
     </div>
     {ticketSummary ? (

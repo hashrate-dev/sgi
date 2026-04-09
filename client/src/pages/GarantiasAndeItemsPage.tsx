@@ -17,6 +17,8 @@ import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import { canDeleteClientes, canEditClientes, canExport } from "../lib/auth";
 import "../styles/facturacion.css";
+import "../styles/marketplace-hashrate.css";
+import "../styles/cliente-tienda-edit.css";
 
 function genId() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -33,7 +35,14 @@ function findCol(headerRow: (string | number)[], ...names: string[]): number {
   return -1;
 }
 
-/** Parsea Excel (mismo formato que export: Código, Marca, Modelo, Fecha ingreso, Observaciones) */
+function precioFromFormField(raw: string): number | null {
+  const t = raw.trim();
+  if (!t) return null;
+  const n = parseFloat(t.replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Parsea Excel (mismo formato que export: Código, Marca, Modelo, Fecha ingreso, Precio garantía, Observaciones) */
 async function parseExcelGarantiasItems(file: File): Promise<Omit<ItemGarantiaAnde, "id">[]> {
   const arrayBuffer = await file.arrayBuffer();
   const workbook = new ExcelJS.Workbook();
@@ -51,6 +60,7 @@ async function parseExcelGarantiasItems(file: File): Promise<Omit<ItemGarantiaAn
     marca: findCol(headerRow, "marca"),
     modelo: findCol(headerRow, "modelo"),
     fechaIngreso: findCol(headerRow, "fecha ingreso", "fechaIngreso", "fecha"),
+    precioGarantia: findCol(headerRow, "precio garantía", "precio garantia", "precioGarantia", "precio"),
     observaciones: findCol(headerRow, "observaciones"),
   };
 
@@ -79,6 +89,8 @@ async function parseExcelGarantiasItems(file: File): Promise<Omit<ItemGarantiaAn
 
     const codigo = idx.codigo >= 0 ? get(row, idx.codigo) : "";
     const fechaIngreso = idx.fechaIngreso >= 0 ? toYyyyMmDd(get(row, idx.fechaIngreso)) : toYyyyMmDd(get(row, 4));
+    const precioRaw = idx.precioGarantia >= 0 ? get(row, idx.precioGarantia) : "";
+    const precioGarantia = precioRaw ? precioFromFormField(precioRaw) : null;
     const observaciones = idx.observaciones >= 0 ? get(row, idx.observaciones) || undefined : undefined;
 
     result.push({
@@ -86,6 +98,7 @@ async function parseExcelGarantiasItems(file: File): Promise<Omit<ItemGarantiaAn
       marca: marca || "—",
       modelo: modelo || "—",
       fechaIngreso,
+      precioGarantia: precioGarantia ?? undefined,
       observaciones: observaciones || undefined,
     });
   }
@@ -113,6 +126,7 @@ export function GarantiasAndeItemsPage() {
     marca: "",
     modelo: "",
     fechaIngreso: "",
+    precioGarantia: "",
     observaciones: "",
   });
 
@@ -143,6 +157,8 @@ export function GarantiasAndeItemsPage() {
       return;
     }
 
+    const precioVal = precioFromFormField(formData.precioGarantia);
+
     try {
       if (editingItem) {
         await updateGarantiaItem(editingItem.id, {
@@ -150,6 +166,7 @@ export function GarantiasAndeItemsPage() {
           marca: formData.marca.trim(),
           modelo: formData.modelo.trim(),
           fechaIngreso: formData.fechaIngreso.trim(),
+          precioGarantia: precioVal,
           observaciones: formData.observaciones.trim() || undefined,
         });
         showToast("Ítem actualizado correctamente.", "success", "Items Garantía ANDE");
@@ -160,6 +177,7 @@ export function GarantiasAndeItemsPage() {
           marca: formData.marca.trim(),
           modelo: formData.modelo.trim(),
           fechaIngreso: formData.fechaIngreso.trim(),
+          precioGarantia: precioVal ?? undefined,
           observaciones: formData.observaciones.trim() || undefined,
         });
         showToast("Ítem agregado correctamente.", "success", "Items Garantía ANDE");
@@ -168,7 +186,7 @@ export function GarantiasAndeItemsPage() {
       setItems(res.items);
       setShowAddModal(false);
       setEditingItem(null);
-      setFormData({ codigo: "", marca: "", modelo: "", fechaIngreso: "", observaciones: "" });
+      setFormData({ codigo: "", marca: "", modelo: "", fechaIngreso: "", precioGarantia: "", observaciones: "" });
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Error al guardar.", "error", "Items Garantía ANDE");
     }
@@ -181,6 +199,7 @@ export function GarantiasAndeItemsPage() {
       marca: item.marca ?? "",
       modelo: item.modelo ?? "",
       fechaIngreso: item.fechaIngreso ?? "",
+      precioGarantia: item.precioGarantia != null && Number.isFinite(Number(item.precioGarantia)) ? String(item.precioGarantia) : "",
       observaciones: item.observaciones ?? "",
     });
     setShowAddModal(true);
@@ -244,6 +263,7 @@ export function GarantiasAndeItemsPage() {
       { header: "Marca", key: "marca", width: 22 },
       { header: "Modelo", key: "modelo", width: 22 },
       { header: "Fecha ingreso", key: "fechaIngreso", width: 16 },
+      { header: "Precio garantía", key: "precioGarantia", width: 14 },
       { header: "Observaciones", key: "observaciones", width: 30 },
     ];
 
@@ -253,6 +273,7 @@ export function GarantiasAndeItemsPage() {
         marca: i.marca ?? "",
         modelo: i.modelo ?? "",
         fechaIngreso: i.fechaIngreso ?? "",
+        precioGarantia: i.precioGarantia != null && Number.isFinite(Number(i.precioGarantia)) ? Number(i.precioGarantia) : "",
         observaciones: i.observaciones ?? "",
       });
     });
@@ -306,7 +327,11 @@ export function GarantiasAndeItemsPage() {
     try {
       const parsed = await parseExcelGarantiasItems(file);
       if (parsed.length === 0) {
-        showToast("No se encontraron filas válidas. Use encabezados: Código, Marca, Modelo, Fecha ingreso, Observaciones.", "error", "Items Garantía ANDE");
+        showToast(
+          "No se encontraron filas válidas. Use encabezados: Código, Marca, Modelo, Fecha ingreso, Precio garantía (opc.), Observaciones.",
+          "error",
+          "Items Garantía ANDE"
+        );
         setExcelLoading(false);
         return;
       }
@@ -332,6 +357,7 @@ export function GarantiasAndeItemsPage() {
             marca: row.marca,
             modelo: row.modelo,
             fechaIngreso: row.fechaIngreso,
+            precioGarantia: row.precioGarantia ?? undefined,
             observaciones: row.observaciones,
           });
           imported++;
@@ -358,269 +384,409 @@ export function GarantiasAndeItemsPage() {
       (i.marca ?? "").toLowerCase().includes(searchLower) ||
       (i.modelo ?? "").toLowerCase().includes(searchLower) ||
       (i.fechaIngreso ?? "").toLowerCase().includes(searchLower) ||
+      String(i.precioGarantia ?? "").toLowerCase().includes(searchLower) ||
       (i.observaciones ?? "").toLowerCase().includes(searchLower)
     );
   });
 
   return (
-    <div className="fact-page">
-      <div className="container">
-        <PageHeader title="Items Garantía ANDE" />
+    <div className="fact-page fact-page--cte-tienda-edit">
+      <div className="container cte-edit-tienda-page-inner">
+        <PageHeader title="Items Garantía ANDE" logoHref="/" />
 
-        {showAddModal && editingItem && (
-          <div className="fact-layout mb-4" style={{ gridTemplateColumns: "1fr", maxWidth: "100%" }}>
-            <div className="fact-card">
-              <div className="fact-card-header">
-                Editar ítem Garantía ANDE
-              </div>
-              <div className="fact-card-body">
-                <div className="client-form-grid-4">
-                  <div className="client-form-column">
-                    <h3 className="client-form-section-title">Identificación</h3>
-                    <div className="fact-field">
-                      <label className="fact-label">Código *</label>
-                      <input
-                        type="text"
-                        className="fact-input"
-                        value={formData.codigo}
-                        readOnly
-                        title={editingItem ? "El código no se puede modificar" : "Se asigna automáticamente (G001, G002, ...)"}
-                      />
-                      {!editingItem && (
-                        <small className="text-muted d-block mt-1">Se asigna automáticamente. Siguiente: {formData.codigo}</small>
-                      )}
-                    </div>
-                    <div className="fact-field">
-                      <label className="fact-label">Marca *</label>
-                      <input
-                        type="text"
-                        className="fact-input"
-                        value={formData.marca}
-                        onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
-                        placeholder="Ej: Antminer"
-                      />
-                    </div>
-                  </div>
-                  <div className="client-form-column">
-                    <h3 className="client-form-section-title">Equipo y fecha</h3>
-                    <div className="fact-field">
-                      <label className="fact-label">Modelo *</label>
-                      <input
-                        type="text"
-                        className="fact-input"
-                        value={formData.modelo}
-                        onChange={(e) => setFormData({ ...formData, modelo: e.target.value })}
-                        placeholder="Ej: S19 Pro"
-                      />
-                    </div>
-                    <div className="fact-field">
-                      <label className="fact-label">Fecha ingreso *</label>
-                      <input
-                        type="date"
-                        className="fact-input"
-                        value={formData.fechaIngreso}
-                        onChange={(e) => setFormData({ ...formData, fechaIngreso: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <div className="client-form-column" style={{ gridColumn: "span 2" }}>
-                    <h3 className="client-form-section-title">Observaciones</h3>
-                    <div className="fact-field">
-                      <label className="fact-label">Observaciones</label>
-                      <input
-                        type="text"
-                        className="fact-input"
-                        value={formData.observaciones}
-                        onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
-                        placeholder="Opcional"
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="d-flex gap-2 mt-3 flex-wrap" style={{ justifyContent: "flex-end", marginTop: "1.5rem" }}>
-                  <button
-                    type="button"
-                    className="fact-btn fact-btn-secondary"
-                    onClick={() => {
-                      setShowAddModal(false);
-                      setEditingItem(null);
-                    }}
-                  >
-                    Cancelar
-                  </button>
-                  <button type="button" className="fact-btn fact-btn-primary" onClick={handleSave}>
-                    {editingItem ? "Actualizar" : "Guardar"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <main className="cte-edit-market-main page-main page-main--market page-main--market--asic cliente-tienda-edit--admin">
+          <section className="market-registro-section pt-0">
 
-        <div className="hrs-card hrs-card--rect p-4">
-          <div className="clientes-filtros-outer">
-            <div className="clientes-filtros-container">
-              <div className="card clientes-filtros-card">
-                <h6 className="fw-bold border-bottom pb-2">🔍 Filtros</h6>
-                <div className="row g-2 align-items-end">
-                  <div className="col-md-4">
-                    <label className="form-label small fw-bold">Buscar</label>
-                    <input
-                      type="text"
-                      className="form-control form-control-sm"
-                      placeholder="Buscar por código, marca, modelo, fecha u observaciones..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                  </div>
-                  <div className="col-md-2 d-flex align-items-end filtros-limpiar-col">
-                    <button
-                      className="btn btn-outline-secondary btn-sm filtros-limpiar-btn"
-                    onClick={() => setSearchTerm("")}
-                  >
-                    Limpiar
-                    </button>
-                  </div>
-                  <div className="col-md-auto d-flex align-items-end gap-2 ms-auto">
-                    {canExportData && (
-                      <button
-                        type="button"
-                        className="btn btn-outline-secondary btn-sm clientes-export-excel-btn"
-                        style={{ backgroundColor: "rgba(13, 110, 253, 0.12)" }}
-                        onClick={exportExcel}
-                        disabled={items.length === 0}
-                      >
-                        📊 Exportar Excel
-                      </button>
-                    )}
-                    {canEdit && (
-                      <>
-                        <input
-                          type="file"
-                          accept=".xlsx,.xls"
-                          className="d-none"
-                          id="garantias-items-import-excel"
-                          onChange={handleImportExcel}
-                          disabled={excelLoading}
-                        />
-                        <label
-                          htmlFor="garantias-items-import-excel"
-                          className="btn btn-outline-secondary btn-sm mb-0"
-                          style={{ backgroundColor: "rgba(25, 135, 84, 0.12)", cursor: excelLoading ? "not-allowed" : "pointer" }}
+            <div className="py-2 py-lg-2 cte-edit-tienda-container">
+              {showAddModal && editingItem ? (
+                <div className="market-registro-card cte-edit-market__card cte-edit-market__card--full mb-3">
+                  <header className="market-registro-card__head cte-edit-tienda-card-head">
+                    <p className="market-registro-card__kicker">Garantía ANDE · Ítems</p>
+                    <h2 className="market-registro-card__title cte-edit-market__title-row">
+                      <span>Editar ítem</span>
+                      <span className="badge bg-success rounded-pill cte-edit-market__code-badge">{editingItem.codigo}</span>
+                    </h2>
+                  </header>
+                  <div className="cte-edit-market-form--admin px-1">
+                    <div className="row g-3 align-items-stretch cte-edit-tienda-main-grid">
+                      <div className="col-12 col-lg-4 d-flex">
+                        <div
+                          className="market-registro-fieldset market-registro-fieldset--panel market-registro-fieldset--panel--wide mb-0 flex-grow-1 w-100"
+                          role="group"
+                          aria-labelledby="gar-edit-legend-id"
                         >
-                          {excelLoading ? "⏳ Importando..." : "📥 Importar Excel"}
-                        </label>
-                      </>
-                    )}
-                    {canDelete && (
+                          <div id="gar-edit-legend-id" className="market-registro-fieldset__legend">
+                            <i className="bi bi-tag" aria-hidden />
+                            Identificación
+                          </div>
+                          <div className="mb-2">
+                            <label className="form-label market-registro-label" htmlFor="gar-edit-codigo">
+                              Código <span className="text-danger">*</span>
+                            </label>
+                            <input
+                              id="gar-edit-codigo"
+                              type="text"
+                              className="form-control cte-edit-market__input--locked"
+                              value={formData.codigo}
+                              readOnly
+                              aria-readonly="true"
+                              title="El código no se puede modificar"
+                            />
+                          </div>
+                          <div className="mb-0">
+                            <label className="form-label market-registro-label" htmlFor="gar-edit-marca">
+                              Marca <span className="text-danger">*</span>
+                            </label>
+                            <input
+                              id="gar-edit-marca"
+                              type="text"
+                              className="form-control"
+                              value={formData.marca}
+                              onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
+                              placeholder="Ej: Bitmain"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="col-12 col-lg-4 d-flex">
+                        <div
+                          className="market-registro-fieldset market-registro-fieldset--panel market-registro-fieldset--panel--wide mb-0 flex-grow-1 w-100"
+                          role="group"
+                          aria-labelledby="gar-edit-legend-eq"
+                        >
+                          <div id="gar-edit-legend-eq" className="market-registro-fieldset__legend">
+                            <i className="bi bi-cpu" aria-hidden />
+                            Equipo y fecha
+                          </div>
+                          <div className="mb-2">
+                            <label className="form-label market-registro-label" htmlFor="gar-edit-modelo">
+                              Modelo <span className="text-danger">*</span>
+                            </label>
+                            <input
+                              id="gar-edit-modelo"
+                              type="text"
+                              className="form-control"
+                              value={formData.modelo}
+                              onChange={(e) => setFormData({ ...formData, modelo: e.target.value })}
+                              placeholder="Ej: S19 Pro"
+                            />
+                          </div>
+                          <div className="mb-2">
+                            <label className="form-label market-registro-label" htmlFor="gar-edit-fecha">
+                              Fecha ingreso <span className="text-danger">*</span>
+                            </label>
+                            <input
+                              id="gar-edit-fecha"
+                              type="date"
+                              className="form-control"
+                              value={formData.fechaIngreso}
+                              onChange={(e) => setFormData({ ...formData, fechaIngreso: e.target.value })}
+                            />
+                          </div>
+                          <div className="mb-0">
+                            <label className="form-label market-registro-label" htmlFor="gar-edit-precio">
+                              Precio garantía
+                            </label>
+                            <input
+                              id="gar-edit-precio"
+                              type="text"
+                              inputMode="decimal"
+                              className="form-control"
+                              value={formData.precioGarantia}
+                              onChange={(e) => setFormData({ ...formData, precioGarantia: e.target.value })}
+                              placeholder="Opcional · ej. 150 o 150.50"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="col-12 col-lg-4 d-flex">
+                        <div
+                          className="market-registro-fieldset market-registro-fieldset--panel market-registro-fieldset--panel--wide mb-0 flex-grow-1 w-100"
+                          role="group"
+                          aria-labelledby="gar-edit-legend-obs"
+                        >
+                          <div id="gar-edit-legend-obs" className="market-registro-fieldset__legend">
+                            <i className="bi bi-chat-left-text" aria-hidden />
+                            Observaciones
+                          </div>
+                          <label className="form-label market-registro-label" htmlFor="gar-edit-obs">
+                            Observaciones
+                          </label>
+                          <textarea
+                            id="gar-edit-obs"
+                            className="form-control"
+                            rows={5}
+                            value={formData.observaciones}
+                            onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
+                            placeholder="Opcional"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="market-registro-submit-row d-flex flex-wrap gap-2 justify-content-end align-items-center cte-edit-tienda-actions">
                       <button
                         type="button"
-                        className="btn btn-outline-secondary btn-sm clientes-borrar-todo-btn"
-                        style={{ backgroundColor: "rgba(220, 53, 69, 0.4)" }}
-                        onClick={handleDeleteAllClick}
+                        className="btn btn-outline-secondary order-2 order-md-1"
+                        onClick={() => {
+                          setShowAddModal(false);
+                          setEditingItem(null);
+                        }}
                       >
-                        🗑️ Borrar todo
+                        Cancelar
                       </button>
-                    )}
+                      <button type="button" className="btn btn-success market-registro-submit order-1 order-md-3" onClick={handleSave}>
+                        Actualizar
+                      </button>
+                    </div>
                   </div>
                 </div>
+              ) : null}
+
+              {/* Mismo contenedor / filtros / tabla / botones que SetupPage */}
+              <div className="hrs-card hrs-card--rect p-4">
+                <div className="clientes-filtros-outer">
+                  <div className="clientes-filtros-container">
+                    <div className="card clientes-filtros-card">
+                      <h6 className="fw-bold border-bottom pb-2">🔍 Filtros</h6>
+                      <div className="row g-2 align-items-end">
+                        <div className="col-md-4">
+                          <label className="form-label small fw-bold" htmlFor="garantias-items-search">
+                            Buscar
+                          </label>
+                          <input
+                            id="garantias-items-search"
+                            type="text"
+                            className="form-control form-control-sm"
+                            placeholder="Buscar por código, marca, modelo, fecha o observaciones…"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            autoComplete="off"
+                          />
+                        </div>
+                        <div className="col-md-2 d-flex align-items-end filtros-limpiar-col">
+                          <button
+                            type="button"
+                            className="btn btn-outline-secondary btn-sm filtros-limpiar-btn"
+                            onClick={() => setSearchTerm("")}
+                          >
+                            Limpiar
+                          </button>
+                        </div>
+                        <div className="col-md-auto d-flex align-items-end gap-2 ms-auto">
+                          {canExportData && (
+                            <button
+                              type="button"
+                              className="btn btn-outline-secondary btn-sm clientes-export-excel-btn"
+                              style={{ backgroundColor: "rgba(13, 110, 253, 0.12)" }}
+                              onClick={exportExcel}
+                              disabled={items.length === 0}
+                            >
+                              📊 Exportar Excel
+                            </button>
+                          )}
+                          {canEdit && (
+                            <>
+                              <input
+                                type="file"
+                                accept=".xlsx,.xls"
+                                className="d-none"
+                                id="garantias-items-import-excel"
+                                onChange={handleImportExcel}
+                                disabled={excelLoading}
+                              />
+                              <label
+                                htmlFor="garantias-items-import-excel"
+                                className="btn btn-outline-secondary btn-sm mb-0"
+                                style={{
+                                  backgroundColor: "rgba(25, 135, 84, 0.12)",
+                                  cursor: excelLoading ? "not-allowed" : "pointer",
+                                }}
+                              >
+                                {excelLoading ? "⏳ Importando..." : "📥 Importar Excel"}
+                              </label>
+                            </>
+                          )}
+                          {canDelete && (
+                            <button
+                              type="button"
+                              className="btn btn-outline-secondary btn-sm clientes-borrar-todo-btn"
+                              style={{ backgroundColor: "rgba(220, 53, 69, 0.4)" }}
+                              onClick={handleDeleteAllClick}
+                            >
+                              🗑️ Borrar todo
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="clientes-listado-wrap">
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <h6 className="fw-bold m-0">
+                      📋 Listado de ítems ({loading ? "…" : filteredItems.length})
+                      {!canEdit && <span className="text-muted small ms-2">(solo consulta)</span>}
+                    </h6>
+                    {canEdit && (
+                      <Link
+                        to="/equipos-asic/items-garantia/nuevo"
+                        className="fact-btn fact-btn-primary btn-sm"
+                        style={{
+                          fontSize: "0.8125rem",
+                          padding: "0.5rem 1rem",
+                          textDecoration: "none",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.35rem",
+                          color: "inherit",
+                        }}
+                      >
+                        ➕ Nuevo ítem
+                      </Link>
+                    )}
+                  </div>
+
+                  {loading ? (
+                    <div className="table-responsive" style={{ minHeight: 200 }}>
+                      <table className="table table-sm align-middle clientes-listado-table" style={{ fontSize: "0.85rem" }}>
+                        <thead className="table-dark">
+                          <tr>
+                            <th className="text-start">Código</th>
+                            <th className="text-start">Marca</th>
+                            <th className="text-start">Modelo</th>
+                            <th className="text-start">Fecha ingreso</th>
+                            <th className="text-end">Precio garantía</th>
+                            <th className="text-start">Observaciones</th>
+                            {canEdit && (
+                              <th className="text-start" style={{ width: "120px" }}>
+                                Acciones
+                              </th>
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[1, 2, 3, 4, 5].map((row) => (
+                            <tr key={row}>
+                              <td>
+                                <span className="clientes-skeleton" style={{ width: "3em" }} />
+                              </td>
+                              <td>
+                                <span className="clientes-skeleton" style={{ width: "6em" }} />
+                              </td>
+                              <td>
+                                <span className="clientes-skeleton" style={{ width: "8em" }} />
+                              </td>
+                              <td>
+                                <span className="clientes-skeleton" style={{ width: "5em" }} />
+                              </td>
+                              <td>
+                                <span className="clientes-skeleton" style={{ width: "4em" }} />
+                              </td>
+                              <td>
+                                <span className="clientes-skeleton" style={{ width: "10em" }} />
+                              </td>
+                              {canEdit && (
+                                <td>
+                                  <span className="clientes-skeleton" style={{ width: "5em" }} />
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : loadError ? (
+                    <div className="fact-empty">
+                      <div className="fact-empty-icon text-warning">⚠️</div>
+                      <div className="fact-empty-text">
+                        No se pudo cargar desde el servidor. Si estás en Vercel, verificá que la tabla <code>items_garantia_ande</code> exista en Supabase (SQL Editor → ejecutá el schema).
+                      </div>
+                      <button type="button" className="btn btn-outline-secondary btn-sm mt-3" onClick={loadItems}>
+                        Reintentar
+                      </button>
+                    </div>
+                  ) : filteredItems.length === 0 ? (
+                    <div className="fact-empty">
+                      <div className="fact-empty-icon">📋</div>
+                      <div className="fact-empty-text">
+                        {searchTerm
+                          ? "No se encontraron ítems con ese criterio de búsqueda."
+                          : 'No hay ítems cargados. Agregá uno con el botón "Nuevo ítem" o importá desde Excel.'}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="table-responsive">
+                      <table
+                        className="table table-sm align-middle clientes-listado-table"
+                        style={{ fontSize: "0.85rem" }}
+                      >
+                        <thead className="table-dark">
+                          <tr>
+                            <th className="text-start">Código</th>
+                            <th className="text-start">Marca</th>
+                            <th className="text-start">Modelo</th>
+                            <th className="text-start">Fecha ingreso</th>
+                            <th className="text-end">Precio garantía</th>
+                            <th className="text-start">Observaciones</th>
+                            {canEdit && (
+                              <th className="text-start" style={{ width: "120px" }}>
+                                Acciones
+                              </th>
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredItems.map((i) => (
+                            <tr key={i.id}>
+                              <td className="text-start fw-bold">{i.codigo}</td>
+                              <td className="text-start">{i.marca ?? "—"}</td>
+                              <td className="text-start">{i.modelo ?? "—"}</td>
+                              <td className="text-start">
+                                {i.fechaIngreso
+                                  ? new Date(i.fechaIngreso + "T12:00:00").toLocaleDateString("es-AR")
+                                  : "—"}
+                              </td>
+                              <td className="text-end text-muted small">
+                                {i.precioGarantia != null && Number.isFinite(Number(i.precioGarantia))
+                                  ? Number(i.precioGarantia).toLocaleString("es-AR", { maximumFractionDigits: 2 })
+                                  : "—"}
+                              </td>
+                              <td className="text-start text-muted small">{i.observaciones ?? "—"}</td>
+                              {canEdit && (
+                                <td className="text-start">
+                                  <div className="d-flex gap-1">
+                                    <button
+                                      type="button"
+                                      className="fact-btn fact-btn-secondary btn-sm"
+                                      style={{ padding: "0.35rem 0.75rem", fontSize: "0.8125rem" }}
+                                      onClick={() => handleEdit(i)}
+                                    >
+                                      Editar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn btn-danger btn-sm"
+                                      style={{ padding: "0.35rem 0.75rem", fontSize: "0.8125rem" }}
+                                      onClick={() => setDeleteConfirmItem(i)}
+                                      title="Eliminar"
+                                    >
+                                      <i className="bi bi-trash" />
+                                    </button>
+                                  </div>
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-
-          <div className="clientes-listado-wrap">
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <h6 className="fw-bold m-0">
-                🛡️ Listado de ítems Garantía ANDE ({filteredItems.length})
-                {!canEdit && <span className="text-muted small ms-2">(solo consulta)</span>}
-              </h6>
-              {canEdit && (
-                <Link
-                  to="/equipos-asic/items-garantia/nuevo"
-                  className="fact-btn fact-btn-primary btn-sm"
-                  style={{ fontSize: "0.8125rem", padding: "0.5rem 1rem", textDecoration: "none", display: "inline-block", color: "inherit" }}
-                >
-                  ➕ Nuevo ítem
-                </Link>
-              )}
-            </div>
-
-            {loading ? (
-              <div className="fact-empty">
-                <div className="spinner-border text-success" role="status" aria-label="Cargando" />
-                <div className="fact-empty-text mt-2">Cargando desde el servidor...</div>
-              </div>
-            ) : loadError ? (
-              <div className="fact-empty">
-                <div className="fact-empty-icon text-warning">⚠️</div>
-                <div className="fact-empty-text">
-                  No se pudo cargar desde el servidor. Si estás en Vercel, verificá que la tabla <code>items_garantia_ande</code> exista en Supabase (SQL Editor → ejecutá el schema).
-                </div>
-                <button type="button" className="btn btn-outline-secondary btn-sm mt-3" onClick={loadItems}>
-                  Reintentar
-                </button>
-              </div>
-            ) : filteredItems.length === 0 ? (
-              <div className="fact-empty">
-                <div className="fact-empty-icon">🛡️</div>
-                <div className="fact-empty-text">
-                  {searchTerm
-                    ? "No se encontraron ítems con ese criterio de búsqueda."
-                    : 'No hay ítems cargados. Agregá uno con el botón "Nuevo ítem" o importá desde Excel.'}
-                </div>
-              </div>
-            ) : (
-              <div className="table-responsive">
-                <table className="table table-sm align-middle clientes-listado-table" style={{ fontSize: "0.85rem" }}>
-                  <thead className="table-dark">
-                    <tr>
-                      <th className="text-start">Código</th>
-                      <th className="text-start">Marca</th>
-                      <th className="text-start">Modelo</th>
-                      <th className="text-start">Fecha ingreso</th>
-                      <th className="text-start">Observaciones</th>
-                      {canEdit && <th className="text-start" style={{ width: "120px" }}>Acciones</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredItems.map((i) => (
-                      <tr key={i.id}>
-                        <td className="text-start fw-bold">{i.codigo}</td>
-                        <td className="text-start">{i.marca ?? "—"}</td>
-                        <td className="text-start">{i.modelo ?? "—"}</td>
-                        <td className="text-start">{i.fechaIngreso ? new Date(i.fechaIngreso + "T12:00:00").toLocaleDateString("es-AR") : "—"}</td>
-                        <td className="text-start text-muted small">{i.observaciones ?? "—"}</td>
-                        {canEdit && (
-                          <td className="text-start">
-                            <div className="d-flex gap-1">
-                              <button
-                                type="button"
-                                className="fact-btn fact-btn-secondary btn-sm"
-                                style={{ padding: "0.35rem 0.75rem", fontSize: "0.8125rem" }}
-                                onClick={() => handleEdit(i)}
-                              >
-                                Editar
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-danger btn-sm"
-                                style={{ padding: "0.35rem 0.75rem", fontSize: "0.8125rem" }}
-                                onClick={() => setDeleteConfirmItem(i)}
-                                title="Eliminar"
-                              >
-                                <i className="bi bi-trash" />
-                              </button>
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
+          </section>
+        </main>
 
         {/* Modal Confirmación eliminar un ítem */}
         {deleteConfirmItem && (

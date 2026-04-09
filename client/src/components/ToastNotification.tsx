@@ -24,9 +24,10 @@ export function showToast(message: string, type: ToastType = "info", context?: s
   toasts.push(newToast);
   notifyListeners();
 
+  const durationMs = type === "error" ? 5500 : type === "success" ? 5000 : 4000;
   setTimeout(() => {
     removeToast(id);
-  }, type === "error" ? 5000 : 4000);
+  }, durationMs);
 }
 
 function removeToast(id: string) {
@@ -90,7 +91,7 @@ export function ToastContainer() {
   return createPortal(
     <div
       className="hrs-toast-container position-fixed top-0 end-0 p-3"
-      style={{ zIndex: 9999 }}
+      style={{ zIndex: 20000 }}
     >
       {currentToasts.map((toast) => {
         const style = TOAST_STYLE[toast.type];

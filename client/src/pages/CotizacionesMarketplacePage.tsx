@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import {
+  deleteMarketplaceQuoteTicketAdmin,
   getMarketplaceQuoteTickets,
   getMarketplaceQuoteTicketsStats,
   getMarketplaceSetupQuotePrices,
@@ -13,9 +14,12 @@ import {
   ticketRowSharePct,
   QUOTE_ADDON_WARRANTY_USD,
   QUOTE_ADDON_SETUP_USD_FALLBACK,
+  marketplaceQuoteTicketLineDisplayName,
 } from "../lib/marketplaceQuoteCart.js";
 import { useAuth } from "../contexts/AuthContext.js";
 import { PageHeader } from "../components/PageHeader";
+import { ConfirmModal } from "../components/ConfirmModal.js";
+import { showToast } from "../components/ToastNotification.js";
 import "../styles/facturacion.css";
 import "../styles/hrs-cotizaciones-marketplace.css";
 
@@ -70,6 +74,8 @@ export function CotizacionesMarketplacePage() {
   const [editNotes, setEditNotes] = useState("");
   const [setupEquipoCompletoUsd, setSetupEquipoCompletoUsd] = useState(QUOTE_ADDON_SETUP_USD_FALLBACK);
   const [setupCompraHashrateUsd, setSetupCompraHashrateUsd] = useState(QUOTE_ADDON_SETUP_USD_FALLBACK);
+  const [deleteModalTicket, setDeleteModalTicket] = useState<MarketplaceQuoteTicket | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -152,6 +158,26 @@ export function CotizacionesMarketplacePage() {
     }
   };
 
+  const orderLabel = (t: MarketplaceQuoteTicket) => t.orderNumber ?? `Ticket #${t.id}`;
+
+  const executeDeleteFromSystem = async () => {
+    if (!deleteModalTicket) return;
+    const id = deleteModalTicket.id;
+    const label = orderLabel(deleteModalTicket);
+    setDeleteBusy(true);
+    try {
+      await deleteMarketplaceQuoteTicketAdmin(id);
+      setDeleteModalTicket(null);
+      if (selected?.id === id) setSelected(null);
+      showToast(`Orden ${label} eliminada del sistema.`, "success", "Cotizaciones tienda");
+      void load();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "No se pudo eliminar.", "error", "Cotizaciones tienda");
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
   return (
     <div className="fact-page hrs-mqt-page">
       <div className="container">
@@ -219,7 +245,11 @@ export function CotizacionesMarketplacePage() {
           </div>
 
           <div className="hrs-mqt-orders-region" aria-label="Listado de órdenes">
-            {loading ? <p className="hrs-mqt-msg">Cargando tickets…</p> : null}
+            {loading ? (
+              <div className="d-flex justify-content-center py-5">
+                <div className="spinner-border text-secondary" role="status" aria-label="Espere un momento" />
+              </div>
+            ) : null}
 
             {!loading && tickets.length === 0 ? (
               <p className="hrs-mqt-msg">
@@ -321,12 +351,11 @@ export function CotizacionesMarketplacePage() {
                       setupEquipoCompletoUsd,
                       setupCompraHashrateUsd,
                     });
-                    const name = `${String(row.brand ?? "")} ${String(row.model ?? "")}`.trim() || String(row.productId ?? "—");
+                    const name = marketplaceQuoteTicketLineDisplayName(row);
                     return (
                       <tr key={i}>
                         <td>
                           <div style={{ fontWeight: 700, color: "#0f172a" }}>{name}</div>
-                          <div style={{ fontSize: "0.7rem", color: "#64748b" }}>{String(row.hashrate ?? "")}</div>
                           {inclSetup || inclGar ? (
                             <div style={{ fontSize: "0.68rem", color: "#0d6efd", marginTop: "0.35rem" }}>
                               {inclSetup ? `+ Setup ${setupLbl} USD/u` : null}
@@ -344,7 +373,7 @@ export function CotizacionesMarketplacePage() {
                 </tbody>
               </table>
 
-              <div className="hrs-mqt-total-line">Total referencial: {selected.subtotalUsd.toLocaleString("es-PY")} USD</div>
+              <div className="hrs-mqt-total-line">Precio Total: {selected.subtotalUsd.toLocaleString("es-PY")} USD</div>
 
               <div className="hrs-mqt-admin-form">
                 <label htmlFor="hrs-mqt-status">Estado del ticket</label>
@@ -367,6 +396,22 @@ export function CotizacionesMarketplacePage() {
                 </button>
               </div>
 
+              <div className="hrs-mqt-drawer__danger-zone">
+                <p className="hrs-mqt-drawer__danger-label">Zona de administración</p>
+                <button
+                  type="button"
+                  className="hrs-mqt-btn-delete-order"
+                  disabled={deleteBusy}
+                  onClick={() => setDeleteModalTicket(selected)}
+                >
+                  <i className="bi bi-trash3 me-2" aria-hidden />
+                  Eliminar orden del sistema
+                </button>
+                <p className="hrs-mqt-drawer__danger-hint">
+                  Borra el registro por completo. El cliente ya no lo verá en «Mis órdenes». No se puede deshacer.
+                </p>
+              </div>
+
               {selected.userAgent ? (
                 <p style={{ fontSize: "0.68rem", color: "#94a3b8", marginTop: "1rem", wordBreak: "break-word" }}>
                   UA: {selected.userAgent}
@@ -376,6 +421,30 @@ export function CotizacionesMarketplacePage() {
           </aside>
         </div>
       ) : null}
+
+      <ConfirmModal
+        open={deleteModalTicket !== null}
+        elevated
+        variant="delete"
+        title="Eliminar orden del sistema"
+        message={
+          deleteModalTicket ? (
+            <p style={{ fontSize: "1rem", color: "#374151", margin: 0 }}>
+              ¿Eliminar definitivamente la orden{" "}
+              <strong>{orderLabel(deleteModalTicket)}</strong> ({deleteModalTicket.ticketCode})? Esta acción no se puede deshacer.
+            </p>
+          ) : null
+        }
+        warningText="Se borrará el ticket de la base de datos, incluido el historial visible para el cliente."
+        cancelLabel="Cancelar"
+        confirmLabel="Eliminar"
+        confirmPending={deleteBusy}
+        confirmPendingLabel="Eliminando…"
+        onCancel={() => {
+          if (!deleteBusy) setDeleteModalTicket(null);
+        }}
+        onConfirm={() => void executeDeleteFromSystem()}
+      />
     </div>
   );
 }

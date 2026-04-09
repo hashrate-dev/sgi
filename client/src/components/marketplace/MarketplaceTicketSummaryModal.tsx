@@ -1,5 +1,5 @@
-import { Link } from "react-router-dom";
 import type { SubmittedConsultationSummary } from "../../contexts/MarketplaceQuoteCartContext.js";
+import { useMarketplaceQuoteCart } from "../../contexts/MarketplaceQuoteCartContext.js";
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
 import { marketplaceLocale } from "../../lib/i18n.js";
 
@@ -9,6 +9,7 @@ type Props = {
 };
 
 export function MarketplaceTicketSummaryModal({ summary, onClose }: Props) {
+  const { openDrawerOrders } = useMarketplaceQuoteCart();
   const { lang, t } = useMarketplaceLang();
   const loc = marketplaceLocale(lang);
   const stKey = `orders.status.${summary.status}`;
@@ -66,9 +67,16 @@ export function MarketplaceTicketSummaryModal({ summary, onClose }: Props) {
         <p className="market-ticket-summary__fine-print">{t("ticket.invoice_fine")}</p>
 
         <div className="market-ticket-summary__actions">
-          <Link to="/marketplace/mis-ordenes" className="market-ticket-summary__btn market-ticket-summary__btn--primary" onClick={onClose}>
+          <button
+            type="button"
+            className="market-ticket-summary__btn market-ticket-summary__btn--primary"
+            onClick={() => {
+              onClose();
+              openDrawerOrders();
+            }}
+          >
             {t("ticket.btn_orders")}
-          </Link>
+          </button>
           <button type="button" className="market-ticket-summary__btn market-ticket-summary__btn--ghost" onClick={onClose}>
             {t("ticket.close")}
           </button>

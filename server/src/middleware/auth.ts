@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
 import { db } from "../db.js";
+import { getTiendaPhonesForUserId } from "../lib/tiendaClientContact.js";
 
 export type UserRole = "admin_a" | "admin_b" | "operador" | "lector" | "cliente";
 
@@ -11,6 +12,10 @@ export type AuthUser = {
   email: string;
   role: UserRole;
   usuario?: string;
+  /** Celular del registro tienda (`clients.phone`). */
+  celular?: string;
+  /** Teléfono fijo opcional del registro (`clients.phone2`). */
+  telefono?: string;
 };
 
 declare global {
@@ -38,7 +43,16 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
         res.status(401).json({ error: { message: "Usuario no encontrado" } });
         return;
       }
-      req.user = { id: row.id, username: row.username, email: row.email ?? row.username, role: row.role as UserRole, usuario: row.usuario ?? undefined };
+      const { celular, telefono } = await getTiendaPhonesForUserId(row.id);
+      req.user = {
+        id: row.id,
+        username: row.username,
+        email: row.email ?? row.username,
+        role: row.role as UserRole,
+        usuario: row.usuario ?? undefined,
+        celular,
+        telefono,
+      };
       next();
     } catch (e) {
       if (res.headersSent) return;

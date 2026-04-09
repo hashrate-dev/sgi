@@ -8,10 +8,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (loading) {
     return (
       <div className="d-flex flex-column align-items-center justify-content-center min-vh-100" style={{ background: "linear-gradient(135deg, #074025 0%, #49f227 100%)" }}>
-        <div className="spinner-border text-light mb-3" role="status" style={{ width: "3rem", height: "3rem" }}>
-          <span className="visually-hidden">Cargando...</span>
-        </div>
-        <p className="text-white mb-0">Cargando...</p>
+        <div className="spinner-border text-light" role="status" aria-label="Espere un momento" style={{ width: "3rem", height: "3rem" }} />
       </div>
     );
   }

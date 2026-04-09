@@ -153,7 +153,6 @@ export function ClienteNewPage() {
                     disabled={excelLoading}
                   />
                 </label>
-                {excelLoading && <span className="clientes-new-excel-loading ms-2 align-middle">₿</span>}
               </div>
             </div>
 

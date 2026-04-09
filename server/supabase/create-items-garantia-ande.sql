@@ -7,5 +7,8 @@ CREATE TABLE IF NOT EXISTS items_garantia_ande (
   marca TEXT NOT NULL,
   modelo TEXT NOT NULL,
   fecha_ingreso TEXT NOT NULL,
-  observaciones TEXT
+  observaciones TEXT,
+  precio_garantia DOUBLE PRECISION
 );
+
+ALTER TABLE items_garantia_ande ADD COLUMN IF NOT EXISTS precio_garantia DOUBLE PRECISION;

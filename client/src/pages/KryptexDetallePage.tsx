@@ -131,9 +131,8 @@ export function KryptexDetallePage() {
           )}
 
           {loading && !data ? (
-            <div className="text-center py-5 text-muted">
-              <div className="spinner-border mb-2" />
-              <p className="mb-0">Cargando datos de payouts...</p>
+            <div className="text-center py-5">
+              <div className="spinner-border text-secondary" role="status" aria-label="Espere un momento" />
             </div>
           ) : data ? (
             <>

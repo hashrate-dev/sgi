@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db } from "../db.js";
 import { env } from "../config/env.js";
 import { allocateNextTiendaOnlineClientCode, type TiendaSeqTx } from "../lib/tiendaOnlineClientCode.js";
+import { getTiendaPhonesForUserId } from "../lib/tiendaClientContact.js";
 import { requireAuth } from "../middleware/auth.js";
 import { loginRateLimit, registerClienteRateLimit } from "../middleware/authRateLimit.js";
 import type { AuthUser } from "../middleware/auth.js";
@@ -155,6 +156,8 @@ authRouter.post("/auth/register-cliente", registerClienteRateLimit, async (req, 
     email: row.email ?? row.username,
     role: row.role as AuthUser["role"],
     usuario: row.usuario ?? undefined,
+    celular: body.celular.trim(),
+    telefono: telefonoFijo ?? undefined,
   };
   const token = jwt.sign({ sub: row.username, userId: row.id }, JWT_SECRET, { expiresIn: "7d" });
   return res.status(201).json({ token, user });
@@ -195,7 +198,16 @@ authRouter.post("/auth/login", loginRateLimit, async (req, res) => {
     return res.status(401).json({ error: { message: "Usuario o contraseña incorrectos" } });
   }
   try {
-    const user: AuthUser = { id: row.id, username: row.username, email: row.email ?? row.username, role: row.role as AuthUser["role"], usuario: row.usuario ?? undefined };
+    const { celular, telefono } = await getTiendaPhonesForUserId(row.id);
+    const user: AuthUser = {
+      id: row.id,
+      username: row.username,
+      email: row.email ?? row.username,
+      role: row.role as AuthUser["role"],
+      usuario: row.usuario ?? undefined,
+      celular,
+      telefono,
+    };
     const token = jwt.sign({ sub: row.username, userId: row.id }, JWT_SECRET, { expiresIn: "7d" });
     const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket?.remoteAddress || "";
     const userAgent = (req.headers["user-agent"] as string) || "";

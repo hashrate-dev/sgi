@@ -77,8 +77,8 @@ function WorkerTable({
         </div>
       )}
       {isInitialLoad ? (
-        <div className="kryptex-table-placeholder">
-          <p className="text-muted mb-0">Cargando...</p>
+        <div className="kryptex-table-placeholder d-flex justify-content-center py-4">
+          <div className="spinner-border spinner-border-sm text-secondary" role="status" aria-label="Espere un momento" />
         </div>
       ) : workers.length === 0 ? (
         <div className="kryptex-table-placeholder">
@@ -211,8 +211,7 @@ export function KryptexPage() {
     return (
       <div className="hrs-home">
         <div className="hrs-home-container container d-flex align-items-center justify-content-center min-vh-50">
-          <div className="spinner-border text-primary" role="status"><span className="visually-hidden">Cargando...</span></div>
-          <p className="ms-2 mb-0 text-muted">Cargando tu cuenta...</p>
+          <div className="spinner-border text-primary" role="status" aria-label="Espere un momento" />
         </div>
       </div>
     );

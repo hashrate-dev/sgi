@@ -12,6 +12,20 @@ export const QUOTE_CART_GUEST_KEY = `${QUOTE_CART_STORAGE_KEY}_guest`;
 export function quoteCartStorageKeyForUser(userId: number): string {
   return `${QUOTE_CART_STORAGE_KEY}_u${userId}`;
 }
+
+/** Estado en BD (lowercase). */
+export function normalizeMarketplaceQuoteTicketStatus(s: string): string {
+  return String(s ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+/** Consulta “en curso” que bloquea una segunda orden para el mismo cliente. */
+export function isMarketplacePipelineTicketStatus(s: string): boolean {
+  const x = normalizeMarketplaceQuoteTicketStatus(s);
+  return x === "enviado_consulta" || x === "en_gestion" || x === "respondido";
+}
 export const QUOTE_EMAIL = "dl@hashrate.space";
 export const QUOTE_WA_PHONE = "595994392728";
 
@@ -77,7 +91,9 @@ function isRecord(x: unknown): x is Record<string, unknown> {
 
 function parseLine(x: unknown): QuoteCartLine | null {
   if (!isRecord(x)) return null;
-  const productId = typeof x.productId === "string" ? x.productId.trim() : "";
+  const rawId = x.productId;
+  const productId =
+    typeof rawId === "string" ? rawId.trim() : String(rawId ?? "").trim();
   const qty = Math.min(MAX_QTY, Math.max(1, Math.round(Number(x.qty) || 0)));
   const brand = typeof x.brand === "string" ? x.brand : "";
   const model = typeof x.model === "string" ? x.model : "";
@@ -90,7 +106,7 @@ function parseLine(x: unknown): QuoteCartLine | null {
   const rawShare = Number(x.hashrateSharePct);
   const hashrateSharePct =
     rawShare === 25 || rawShare === 50 || rawShare === 75 ? rawShare : undefined;
-  if (!productId || !model) return null;
+  if (!productId) return null;
   return {
     productId,
     qty,
@@ -103,6 +119,52 @@ function parseLine(x: unknown): QuoteCartLine | null {
     includeSetup,
     includeWarranty,
   };
+}
+
+export type MarketplaceQuoteLineDisplayOpts = {
+  /** Si es false, no agrega "(25% hashrate)" (p. ej. el carrito ya muestra esa línea aparte). Default true. */
+  includeShareSuffix?: boolean;
+};
+
+/**
+ * Nombre para listados de ticket (drawer pedido, cotizaciones): marca + modelo + hashrate
+ * para distinguir variantes (ej. varios Antminer L9 por MH/s) y, si aplica, fracción de hashrate.
+ */
+export function marketplaceQuoteTicketLineDisplayName(
+  row: Record<string, unknown>,
+  opts?: MarketplaceQuoteLineDisplayOpts
+): string {
+  const includeShare = opts?.includeShareSuffix !== false;
+  const brand = String(row.brand ?? "").trim();
+  const model = String(row.model ?? "").trim();
+  const productId = String(row.productId ?? "").trim();
+  const base = [brand, model].filter(Boolean).join(" ").trim() || productId || "—";
+  const hr = String(row.hashrate ?? "").trim();
+  const rawShare = Number(row.hashrateSharePct);
+  const sharePct = rawShare === 25 || rawShare === 50 || rawShare === 75 ? rawShare : null;
+  let out = base;
+  if (hr) out = `${out} · ${hr}`;
+  if (includeShare && sharePct != null) out = `${out} (${sharePct}% hashrate)`;
+  return out;
+}
+
+/** Líneas devueltas por POST /quote-sync (fusión con orden en curso) u items del ticket. */
+export function quoteCartLinesFromApiPayload(rows: unknown): QuoteCartLine[] {
+  if (!Array.isArray(rows)) return [];
+  return rows.map(parseLine).filter((l): l is QuoteCartLine => l != null);
+}
+
+/**
+ * Alineado con el servidor al hidratar con orden en pipeline: el carrito local es el snapshot si ya tiene líneas;
+ * si está vacío (primer paint), se muestran las del ticket.
+ * Evita que líneas quitadas en el carrito “vuelvan” al unir con el servidor.
+ */
+export function mergeCartLinesForPipelineOrder(baseFromServer: QuoteCartLine[], incomingLocal: QuoteCartLine[]): QuoteCartLine[] {
+  const sortFn = (a: QuoteCartLine, b: QuoteCartLine) => quoteCartLineKey(a).localeCompare(quoteCartLineKey(b));
+  if (incomingLocal.length > 0) {
+    return [...incomingLocal].sort(sortFn);
+  }
+  return [...baseFromServer].sort(sortFn);
 }
 
 export function readQuoteCartFromStorageKey(storageKey: string): QuoteCartLine[] {
@@ -309,13 +371,13 @@ export function buildQuoteMessage(
         `${i + 1}) ${l.brand} ${l.model} — ${l.hashrate}${shareNote}\n` +
         `   Cantidad: ${l.qty} — Precio ref. unit.: ${l.priceLabel} — Equipo: ${eq.toLocaleString("es-PY")} USD` +
         addonBlock +
-        `\n   Subtotal ref. línea: ${sub.toLocaleString("es-PY")} USD`
+        `\n   Subtotal línea: ${sub.toLocaleString("es-PY")} USD`
       );
     })
     .join("\n\n");
   const total = quoteCartSubtotalUsd(lines, pricing);
   const footer =
-    `\n\n—\nTotal referencial (USD): ${total.toLocaleString("es-PY")} — sujeto a confirmación, impuestos y disponibilidad.\n\nGracias.`;
+    `\n\n—\nTotal precio (USD): ${total.toLocaleString("es-PY")} — sujeto a confirmación, impuestos y disponibilidad.\n\nGracias.`;
   let out = header + body + footer;
   if (ref) out += ticketRefFooter(ref.orderNumber, ref.ticketCode);
   return out;

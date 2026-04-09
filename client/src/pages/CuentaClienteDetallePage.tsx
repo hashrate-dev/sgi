@@ -217,8 +217,7 @@ export function CuentaClienteDetallePage() {
 
                 {loading ? (
                   <div className="text-center py-5">
-                    <div className="spinner-border text-secondary" />
-                    <p className="mt-2 text-muted">Cargando movimientos...</p>
+                    <div className="spinner-border text-secondary" role="status" aria-label="Espere un momento" />
                   </div>
                 ) : invoices.length > 0 ? (
                   <>

@@ -105,5 +105,7 @@ export type ItemGarantiaAnde = {
   modelo: string;
   fechaIngreso: string;
   observaciones?: string;
+  /** Precio del ítem de garantía (ej. USD). */
+  precioGarantia?: number | null;
 };
 

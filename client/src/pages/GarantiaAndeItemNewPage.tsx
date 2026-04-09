@@ -7,6 +7,8 @@ import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import { canEditClientes } from "../lib/auth";
 import "../styles/facturacion.css";
+import "../styles/marketplace-hashrate.css";
+import "../styles/cliente-tienda-edit.css";
 
 function genId() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -34,10 +36,10 @@ export function GarantiaAndeItemNewPage() {
   const nextCodigo = getNextCodigoGarantia(items);
 
   const [formData, setFormData] = useState({
-    codigo: "G001",
     marca: "",
     modelo: "",
     fechaIngreso: new Date().toISOString().slice(0, 10),
+    precioGarantia: "",
     observaciones: "",
   });
 
@@ -56,12 +58,16 @@ export function GarantiaAndeItemNewPage() {
     }
 
     const codigo = getNextCodigoGarantia(items);
+    const precioRaw = formData.precioGarantia.trim();
+    const precioNum = precioRaw ? parseFloat(precioRaw.replace(",", ".")) : NaN;
+    const precioGarantia = Number.isFinite(precioNum) ? precioNum : undefined;
     const newItem: ItemGarantiaAnde = {
       id: genId(),
       codigo,
       marca: formData.marca.trim(),
       modelo: formData.modelo.trim(),
       fechaIngreso: formData.fechaIngreso.trim(),
+      precioGarantia,
       observaciones: formData.observaciones.trim() || undefined,
     };
     try {
@@ -75,112 +81,184 @@ export function GarantiaAndeItemNewPage() {
 
   if (!canEdit) {
     return (
-      <div className="fact-page">
-        <div className="container">
-          <PageHeader title="Items Garantía ANDE" />
-          <p className="text-muted">No tenés permisos para crear ítems.</p>
-          <Link to="/equipos-asic/items-garantia" className="fact-btn fact-btn-secondary">
-            Volver al listado
-          </Link>
+      <div className="fact-page fact-page--cte-tienda-edit">
+        <div className="container cte-edit-tienda-page-inner">
+          <PageHeader title="Items Garantía ANDE" logoHref="/" />
+          <main className="cte-edit-market-main page-main page-main--market page-main--market--asic cliente-tienda-edit--admin">
+            <section className="market-registro-section pt-0">
+              <div className="py-2 cte-edit-tienda-container">
+                <div className="market-registro-card cte-edit-market__card cte-edit-market__card--full">
+                  <div className="p-3 text-muted">No tenés permisos para crear ítems.</div>
+                  <div className="px-3 pb-3">
+                    <Link to="/equipos-asic/items-garantia" className="btn btn-outline-secondary">
+                      Volver al listado
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </main>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="fact-page">
-      <div className="container">
-        <PageHeader title="Nuevo ítem Garantía ANDE" />
-        <p className="text-muted small mb-3">
-          <Link to="/equipos-asic/items-garantia" style={{ textDecoration: "none" }}>← Volver al listado</Link>
-          {" · "}
-          Completá el formulario para dar de alta un ítem en la base de datos de garantía.
-        </p>
+    <div className="fact-page fact-page--cte-tienda-edit">
+      <div className="container cte-edit-tienda-page-inner">
+        <PageHeader title="Nuevo ítem Garantía ANDE" logoHref="/" />
+        <main className="cte-edit-market-main page-main page-main--market page-main--market--asic cliente-tienda-edit--admin">
+          <section className="market-registro-section pt-0">
+            <div className="py-2 py-lg-2 cte-edit-tienda-container">
+              <div className="market-registro-card cte-edit-market__card cte-edit-market__card--full">
+                <header className="market-registro-card__head cte-edit-tienda-card-head">
+                  <p className="market-registro-card__kicker">Garantía ANDE · Ítems</p>
+                  <h2 className="market-registro-card__title cte-edit-market__title-row">
+                    <span>Nuevo ítem</span>
+                    <span className="badge bg-success rounded-pill cte-edit-market__code-badge">{nextCodigo}</span>
+                  </h2>
+                </header>
 
-        <div className="fact-layout mb-4" style={{ gridTemplateColumns: "1fr", maxWidth: "100%" }}>
-          <div className="fact-card">
-            <div className="fact-card-header">Nuevo ítem Garantía ANDE</div>
-            <div className="fact-card-body">
-              <form onSubmit={handleSubmit}>
-                <div className="client-form-grid-4">
-                  <div className="client-form-column">
-                    <h3 className="client-form-section-title">Identificación</h3>
-                    <div className="fact-field">
-                      <label className="fact-label">Fecha ingreso *</label>
-                      <input
-                        type="date"
-                        className="fact-input"
-                        value={formData.fechaIngreso}
-                        readOnly
-                        title="Se asigna automáticamente con la fecha actual"
-                        style={{ backgroundColor: "#f0f0f0", cursor: "not-allowed" }}
-                        required
-                      />
+                <form onSubmit={handleSubmit} noValidate className="cte-edit-market-form--admin">
+                  <div className="row g-3 align-items-stretch cte-edit-tienda-main-grid">
+                    <div className="col-12 col-lg-4 d-flex">
+                      <div
+                        className="market-registro-fieldset market-registro-fieldset--panel market-registro-fieldset--panel--wide mb-0 flex-grow-1 w-100"
+                        role="group"
+                        aria-labelledby="gar-new-legend-id"
+                      >
+                        <div id="gar-new-legend-id" className="market-registro-fieldset__legend">
+                          <i className="bi bi-tag" aria-hidden />
+                          Identificación
+                        </div>
+                        <div className="mb-2">
+                          <label className="form-label market-registro-label" htmlFor="gar-new-fecha">
+                            Fecha ingreso <span className="text-danger">*</span>
+                          </label>
+                          <input
+                            id="gar-new-fecha"
+                            type="date"
+                            className="form-control cte-edit-market__input--locked"
+                            value={formData.fechaIngreso}
+                            readOnly
+                            required
+                            title="Se asigna automáticamente con la fecha actual"
+                          />
+                        </div>
+                        <div className="mb-0">
+                          <label className="form-label market-registro-label" htmlFor="gar-new-codigo">
+                            Código <span className="text-danger">*</span>
+                          </label>
+                          <input
+                            id="gar-new-codigo"
+                            type="text"
+                            className="form-control cte-edit-market__input--locked"
+                            value={nextCodigo}
+                            readOnly
+                            aria-readonly="true"
+                            title="Se asigna automáticamente (G001, G002, …)"
+                          />
+                          <div className="market-registro-hint text-muted">Se asigna automáticamente. Siguiente: {nextCodigo}</div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="fact-field">
-                      <label className="fact-label">Código *</label>
-                      <input
-                        type="text"
-                        className="fact-input"
-                        value={nextCodigo}
-                        readOnly
-                        title="Se asigna automáticamente (G001, G002, ...)"
-                        style={{ backgroundColor: "#f0f0f0", cursor: "not-allowed" }}
-                      />
-                      <small className="text-muted d-block mt-1">Se asigna automáticamente. Siguiente: {nextCodigo}</small>
+
+                    <div className="col-12 col-lg-4 d-flex">
+                      <div
+                        className="market-registro-fieldset market-registro-fieldset--panel market-registro-fieldset--panel--wide mb-0 flex-grow-1 w-100"
+                        role="group"
+                        aria-labelledby="gar-new-legend-eq"
+                      >
+                        <div id="gar-new-legend-eq" className="market-registro-fieldset__legend">
+                          <i className="bi bi-cpu" aria-hidden />
+                          Equipo
+                        </div>
+                        <div className="mb-2">
+                          <label className="form-label market-registro-label" htmlFor="gar-new-marca">
+                            Marca <span className="text-danger">*</span>
+                          </label>
+                          <input
+                            id="gar-new-marca"
+                            type="text"
+                            className="form-control"
+                            value={formData.marca}
+                            onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
+                            placeholder="Ej: Bitmain"
+                            required
+                            autoComplete="off"
+                          />
+                        </div>
+                        <div className="mb-2">
+                          <label className="form-label market-registro-label" htmlFor="gar-new-modelo">
+                            Modelo <span className="text-danger">*</span>
+                          </label>
+                          <input
+                            id="gar-new-modelo"
+                            type="text"
+                            className="form-control"
+                            value={formData.modelo}
+                            onChange={(e) => setFormData({ ...formData, modelo: e.target.value })}
+                            placeholder="Ej: Antminer"
+                            required
+                            autoComplete="off"
+                          />
+                        </div>
+                        <div className="mb-0">
+                          <label className="form-label market-registro-label" htmlFor="gar-new-precio">
+                            Precio garantía
+                          </label>
+                          <input
+                            id="gar-new-precio"
+                            type="text"
+                            inputMode="decimal"
+                            className="form-control"
+                            value={formData.precioGarantia}
+                            onChange={(e) => setFormData({ ...formData, precioGarantia: e.target.value })}
+                            placeholder="Opcional · ej. 150 o 150.50"
+                            autoComplete="off"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="col-12 col-lg-4 d-flex">
+                      <div
+                        className="market-registro-fieldset market-registro-fieldset--panel market-registro-fieldset--panel--wide mb-0 flex-grow-1 w-100"
+                        role="group"
+                        aria-labelledby="gar-new-legend-obs"
+                      >
+                        <div id="gar-new-legend-obs" className="market-registro-fieldset__legend">
+                          <i className="bi bi-chat-left-text" aria-hidden />
+                          Observaciones
+                        </div>
+                        <label className="form-label market-registro-label" htmlFor="gar-new-obs">
+                          Observaciones
+                        </label>
+                        <textarea
+                          id="gar-new-obs"
+                          className="form-control"
+                          rows={5}
+                          value={formData.observaciones}
+                          onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
+                          placeholder="Opcional"
+                        />
+                      </div>
                     </div>
                   </div>
-                  <div className="client-form-column">
-                    <h3 className="client-form-section-title">Equipo</h3>
-                    <div className="fact-field">
-                      <label className="fact-label">Marca *</label>
-                      <input
-                        type="text"
-                        className="fact-input"
-                        value={formData.marca}
-                        onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
-                        placeholder="Ej: Bitmain"
-                        required
-                      />
-                    </div>
-                    <div className="fact-field">
-                      <label className="fact-label">Modelo *</label>
-                      <input
-                        type="text"
-                        className="fact-input"
-                        value={formData.modelo}
-                        onChange={(e) => setFormData({ ...formData, modelo: e.target.value })}
-                        placeholder="Ej: Antminer"
-                        required
-                      />
-                    </div>
+
+                  <div className="market-registro-submit-row d-flex flex-wrap gap-2 justify-content-end align-items-center cte-edit-tienda-actions">
+                    <Link to="/equipos-asic/items-garantia" className="btn btn-outline-secondary order-2 order-md-1">
+                      Cancelar
+                    </Link>
+                    <button type="submit" className="btn btn-success market-registro-submit order-1 order-md-3">
+                      Guardar
+                    </button>
                   </div>
-                  <div className="client-form-column" style={{ gridColumn: "span 2" }}>
-                    <h3 className="client-form-section-title">Observaciones</h3>
-                    <div className="fact-field">
-                      <label className="fact-label">Observaciones</label>
-                      <input
-                        type="text"
-                        className="fact-input"
-                        value={formData.observaciones}
-                        onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
-                        placeholder="Opcional"
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="d-flex gap-2 mt-3 flex-wrap" style={{ justifyContent: "flex-end", marginTop: "1.5rem" }}>
-                  <Link to="/equipos-asic/items-garantia" className="fact-btn fact-btn-secondary">
-                    Cancelar
-                  </Link>
-                  <button type="submit" className="fact-btn fact-btn-primary">
-                    Guardar
-                  </button>
-                </div>
-              </form>
+                </form>
+              </div>
             </div>
-          </div>
-        </div>
+          </section>
+        </main>
       </div>
     </div>
   );

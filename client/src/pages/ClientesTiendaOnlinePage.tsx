@@ -182,8 +182,8 @@ export function ClientesTiendaOnlinePage() {
   if (authLoading) {
     return (
       <div className="fact-page cti-page">
-        <div className="container py-4">
-          <p className="text-muted">Cargando…</p>
+        <div className="container py-5 d-flex justify-content-center">
+          <div className="spinner-border text-secondary" role="status" aria-label="Espere un momento" />
         </div>
       </div>
     );

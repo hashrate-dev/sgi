@@ -134,7 +134,8 @@ CREATE TABLE IF NOT EXISTS items_garantia_ande (
   marca TEXT NOT NULL,
   modelo TEXT NOT NULL,
   fecha_ingreso TEXT NOT NULL,
-  observaciones TEXT
+  observaciones TEXT,
+  precio_garantia REAL
 );
 
 CREATE TABLE IF NOT EXISTS setups (
@@ -369,6 +370,13 @@ CREATE INDEX IF NOT EXISTS idx_equipos_asic_audit_created ON equipos_asic_audit(
   native.prepare("INSERT OR IGNORE INTO tienda_online_client_seq (id, next_code_num) VALUES (1, 90001)").run();
   try {
     native.exec("ALTER TABLE clients ADD COLUMN user_id INTEGER");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+
+  try {
+    native.exec("ALTER TABLE items_garantia_ande ADD COLUMN precio_garantia REAL");
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     if (!msg.includes("duplicate column")) throw e;

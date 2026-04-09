@@ -292,8 +292,7 @@ export function TiendaOnlineAuditSection({ refreshKey = 0 }: Props) {
       <div className="tienda-audit__body">
         {loading ? (
           <div className="tienda-audit__loading">
-            <div className="spinner-border spinner-border-sm" role="status" aria-label="Cargando" />
-            <p className="mt-2 mb-0 small">Cargando movimientos…</p>
+            <div className="spinner-border spinner-border-sm" role="status" aria-label="Espere un momento" />
           </div>
         ) : error ? (
           <div className="tienda-audit__empty">

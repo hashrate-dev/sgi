@@ -38,6 +38,11 @@ const LineSchema = z.object({
 const SyncSchema = z.object({
   lines: z.array(LineSchema).max(50),
   event: z.enum(["sync", "contact_email", "contact_whatsapp", "submit_ticket"]).optional(),
+  /**
+   * Si true y lines está vacío: vaciar ítems de la orden en pipeline del usuario.
+   * Sin esto, un POST vacío tras “generar consulta” borraba el ticket recién creado.
+   */
+  clearPipelineCart: z.boolean().optional(),
 });
 
 const TICKET_SELECT =
@@ -84,9 +89,108 @@ function computeTotals(lines: z.infer<typeof LineSchema>[], setupEquipoCompletoU
   return { subtotal, lineCount: lines.length, unitCount };
 }
 
+function quoteLineMergeKey(l: { productId: string; hashrateSharePct?: 25 | 50 | 75 }): string {
+  const p = l.hashrateSharePct;
+  const share = p === 25 || p === 50 || p === 75 ? p : 100;
+  return `${l.productId}:${share}`;
+}
+
+/**
+ * Snapshot del carrito del cliente sobre el ticket en pipeline: reemplaza por completo `items_json`.
+ * Las líneas que el usuario quitó en el carrito no deben quedar en la orden (antes se hacía unión y “volvían”).
+ */
+function mergePipelineCartLines(
+  _existingJson: string,
+  incoming: z.infer<typeof LineSchema>[]
+): z.infer<typeof LineSchema>[] {
+  const map = new Map<string, z.infer<typeof LineSchema>>();
+  for (const l of incoming) {
+    map.set(quoteLineMergeKey(l), l);
+  }
+  return Array.from(map.values()).sort((a, b) => quoteLineMergeKey(a).localeCompare(quoteLineMergeKey(b)));
+}
+
 /** Libera session_id `u:{userId}` para el próximo borrador (ticket ya enviado al dashboard). */
 function submittedSessionId(userId: number, ticketId: number): string {
   return `u:${userId}:submitted:${ticketId}`;
+}
+
+/** Una sola consulta “en curso” por cuenta (cliente tienda + admin A/B con carrito): bloquea otro envío hasta cancelar o cierre. */
+
+function normalizeTicketStatusDb(s: string): string {
+  return String(s ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+function normalizeEmailAddr(email: string | null | undefined): string {
+  return String(email ?? "")
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * El ticket pertenece a la sesión si coincide `user_id` (p. ej. SQLite puede devolver string)
+ * o, solo como respaldo legacy, si `user_id` es NULL y el email del ticket coincide con el de la cuenta.
+ */
+function ticketOwnedBySessionUser(
+  row: { user_id: unknown; contact_email?: unknown; user_join_email?: unknown },
+  sessionUser: { id: number; email: string }
+): boolean {
+  const sid = Number(sessionUser.id);
+  const rawUid = row.user_id;
+  const ticketUid =
+    rawUid == null || rawUid === "" ? null : Number(rawUid as number | string);
+  if (ticketUid != null && Number.isFinite(ticketUid) && ticketUid === sid) {
+    return true;
+  }
+  const ce = row.contact_email != null && String(row.contact_email).trim() !== "" ? String(row.contact_email) : "";
+  const uje =
+    row.user_join_email != null && String(row.user_join_email).trim() !== "" ? String(row.user_join_email) : "";
+  const rowEmail = normalizeEmailAddr(ce || uje);
+  const sessionEmail = normalizeEmailAddr(sessionUser.email);
+  if (!rowEmail || !sessionEmail || rowEmail !== sessionEmail) {
+    return false;
+  }
+  return ticketUid == null || !Number.isFinite(ticketUid);
+}
+
+function isPipelineStatus(s: string): boolean {
+  const t = normalizeTicketStatusDb(s);
+  return t === "enviado_consulta" || t === "en_gestion" || t === "respondido";
+}
+
+/** Cuántas órdenes en pipeline tiene el usuario (opcional: excluir un id, p. ej. el borrador que se está enviando). */
+async function countPipelineTicketsForUser(userId: number, excludeId: number | null): Promise<number> {
+  if (excludeId != null && Number.isFinite(excludeId)) {
+    const row = (await db
+      .prepare(
+        `SELECT COUNT(*) as c FROM marketplace_quote_tickets
+         WHERE user_id = ? AND status IN ('enviado_consulta','en_gestion','respondido') AND id != ?`
+      )
+      .get(userId, excludeId)) as { c: number } | undefined;
+    return Number(row?.c) || 0;
+  }
+  const row = (await db
+    .prepare(
+      `SELECT COUNT(*) as c FROM marketplace_quote_tickets
+       WHERE user_id = ? AND status IN ('enviado_consulta','en_gestion','respondido')`
+    )
+    .get(userId)) as { c: number } | undefined;
+  return Number(row?.c) || 0;
+}
+
+function oneActiveOrder409Payload(blocking: { order_number: string | null; ticket_code: string }) {
+  return {
+    error: {
+      code: "ONE_ACTIVE_ORDER",
+      message:
+        "Ya tenés una consulta en curso. Cancelala en «Mis órdenes» para armar un carrito nuevo y generar otra orden.",
+      orderNumber: blocking.order_number ?? undefined,
+      ticketCode: blocking.ticket_code,
+    },
+  };
 }
 
 /** POST autenticado (cliente o admin A/B): guardar carrito / marcar consulta por mail o WhatsApp */
@@ -97,8 +201,12 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
     if (!parsed.success) {
       return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
     }
-    const { lines, event } = parsed.data;
+    const { lines, event, clearPipelineCart } = parsed.data;
     const userId = req.user!.id;
+    const userRole = String(req.user!.role ?? "").toLowerCase().trim();
+    /** Cliente y admin A/B: una consulta activa; se fusionan cambios del carrito en ese ticket (quote-sync). */
+    const singleMarketplaceOrderPolicy =
+      userRole === "cliente" || userRole === "admin_a" || userRole === "admin_b";
     const contactEmail = req.user!.email;
     const sessionId = `u:${userId}`;
     const ip = clientIp(req);
@@ -112,6 +220,51 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
       if (ex && ex.status === "borrador") {
         await db.prepare("DELETE FROM marketplace_quote_tickets WHERE id = ?").run(ex.id);
       }
+      /** Solo con intención explícita (vaciar carrito con orden en curso). Nunca con el POST vacío post-submit. */
+      if (singleMarketplaceOrderPolicy && clearPipelineCart === true) {
+        const blocking = (await db
+          .prepare(
+            `SELECT id, order_number, ticket_code, status FROM marketplace_quote_tickets
+             WHERE user_id = ? AND status IN ('enviado_consulta','en_gestion','respondido')
+             ORDER BY updated_at DESC LIMIT 1`
+          )
+          .get(userId)) as
+          | { id: number; order_number: string | null; ticket_code: string; status: string }
+          | undefined;
+        if (blocking) {
+          const [setupEquipoCompletoUsd, setupCompraHashrateUsd] = await Promise.all([
+            resolveSetupEquipoCompletoUsd(),
+            resolveSetupCompraHashrateUsd(),
+          ]);
+          const { subtotal: mergedSub, lineCount: mergedLc, unitCount: mergedUc } = computeTotals(
+            [],
+            setupEquipoCompletoUsd,
+            setupCompraHashrateUsd
+          );
+          await db
+            .prepare(
+              `UPDATE marketplace_quote_tickets SET
+                items_json = ?, subtotal_usd = ?, line_count = ?, unit_count = ?, updated_at = ?,
+                ip_address = ?, user_agent = ?,
+                user_id = ?, contact_email = ?
+              WHERE id = ?`
+            )
+            .run("[]", mergedSub, mergedLc, mergedUc, nowIso, ip, ua, userId, contactEmail, blocking.id);
+          const orderNumber = blocking.order_number ?? `ORD-${String(blocking.id).padStart(7, "0")}`;
+          return res.json({
+            ok: true,
+            id: blocking.id,
+            orderNumber,
+            ticketCode: blocking.ticket_code,
+            status: blocking.status,
+            merged: true,
+            lines: [],
+            subtotalUsd: mergedSub,
+            lineCount: mergedLc,
+            unitCount: mergedUc,
+          });
+        }
+      }
       return res.json({ ok: true, cleared: true });
     }
 
@@ -119,6 +272,99 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
       resolveSetupEquipoCompletoUsd(),
       resolveSetupCompraHashrateUsd(),
     ]);
+
+    /** Orden en pipeline → fusionar el carrito en ese ticket (mismas refs y estado). */
+    if (singleMarketplaceOrderPolicy && lines.length > 0) {
+      const blocking = (await db
+        .prepare(
+          `SELECT id, order_number, ticket_code, status, items_json FROM marketplace_quote_tickets
+           WHERE user_id = ? AND status IN ('enviado_consulta','en_gestion','respondido')
+           ORDER BY updated_at DESC LIMIT 1`
+        )
+        .get(userId)) as
+        | { id: number; order_number: string | null; ticket_code: string; status: string; items_json: string | null }
+        | undefined;
+      if (blocking) {
+        const orphanDraft = (await db
+          .prepare("SELECT id FROM marketplace_quote_tickets WHERE session_id = ? AND status = 'borrador'")
+          .get(sessionId)) as { id: number } | undefined;
+        if (orphanDraft) {
+          await db.prepare("DELETE FROM marketplace_quote_tickets WHERE id = ?").run(orphanDraft.id);
+        }
+
+        const mergedLines = mergePipelineCartLines(String(blocking.items_json ?? "[]"), lines);
+        const { subtotal: mergedSub, lineCount: mergedLc, unitCount: mergedUc } = computeTotals(
+          mergedLines,
+          setupEquipoCompletoUsd,
+          setupCompraHashrateUsd
+        );
+        const itemsJsonMerged = JSON.stringify(mergedLines);
+        const isSubmitTicketMerge = event === "submit_ticket";
+        const contactChannelMerge =
+          isSubmitTicketMerge ? "portal" : event === "contact_email" ? "email" : event === "contact_whatsapp" ? "whatsapp" : undefined;
+        const keepStatus = String(blocking.status ?? "").trim();
+        const stNorm = normalizeTicketStatusDb(keepStatus);
+        const terminalMerge = stNorm === "cerrado" || stNorm === "descartado";
+
+        if (contactChannelMerge) {
+          await db
+            .prepare(
+              `UPDATE marketplace_quote_tickets SET
+                items_json = ?, subtotal_usd = ?, line_count = ?, unit_count = ?, updated_at = ?,
+                status = ?, ip_address = ?, user_agent = ?,
+                user_id = ?, contact_email = ?,
+                last_contact_channel = ?,
+                contacted_at = CASE WHEN ? = 0 THEN contacted_at ELSE COALESCE(contacted_at, ?) END
+              WHERE id = ?`
+            )
+            .run(
+              itemsJsonMerged,
+              mergedSub,
+              mergedLc,
+              mergedUc,
+              nowIso,
+              keepStatus,
+              ip,
+              ua,
+              userId,
+              contactEmail,
+              contactChannelMerge,
+              terminalMerge ? 0 : 1,
+              nowIso,
+              blocking.id
+            );
+        } else {
+          await db
+            .prepare(
+              `UPDATE marketplace_quote_tickets SET
+                items_json = ?, subtotal_usd = ?, line_count = ?, unit_count = ?, updated_at = ?,
+                ip_address = ?, user_agent = ?,
+                user_id = ?, contact_email = ?
+              WHERE id = ?`
+            )
+            .run(itemsJsonMerged, mergedSub, mergedLc, mergedUc, nowIso, ip, ua, userId, contactEmail, blocking.id);
+        }
+
+        let orderNumber = blocking.order_number ?? `ORD-${String(blocking.id).padStart(7, "0")}`;
+        if (!blocking.order_number) {
+          await db.prepare("UPDATE marketplace_quote_tickets SET order_number = ? WHERE id = ?").run(orderNumber, blocking.id);
+        }
+
+        return res.json({
+          ok: true,
+          id: blocking.id,
+          orderNumber,
+          ticketCode: blocking.ticket_code,
+          status: keepStatus,
+          merged: true,
+          lines: mergedLines,
+          subtotalUsd: mergedSub,
+          lineCount: mergedLc,
+          unitCount: mergedUc,
+        });
+      }
+    }
+
     const { subtotal, lineCount, unitCount } = computeTotals(lines, setupEquipoCompletoUsd, setupCompraHashrateUsd);
     const itemsJson = JSON.stringify(lines);
     const isSubmitTicket = event === "submit_ticket";
@@ -132,8 +378,27 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
       | undefined;
 
     if (existing) {
-      const terminal = existing.status === "cerrado" || existing.status === "descartado";
+      const exSt = normalizeTicketStatusDb(existing.status);
+      const terminal = exSt === "cerrado" || exSt === "descartado";
       const nextStatus = contactChannel ? (terminal ? existing.status : "enviado_consulta") : existing.status;
+      if (
+        singleMarketplaceOrderPolicy &&
+        contactChannel &&
+        !terminal &&
+        nextStatus === "enviado_consulta" &&
+        (await countPipelineTicketsForUser(userId, existing.id)) > 0
+      ) {
+        const blocking = (await db
+          .prepare(
+            `SELECT order_number, ticket_code FROM marketplace_quote_tickets
+             WHERE user_id = ? AND status IN ('enviado_consulta','en_gestion','respondido') AND id != ?
+             ORDER BY updated_at DESC LIMIT 1`
+          )
+          .get(userId, existing.id)) as { order_number: string | null; ticket_code: string } | undefined;
+        if (blocking) {
+          return res.status(409).json(oneActiveOrder409Payload(blocking));
+        }
+      }
       if (contactChannel) {
         await db
           .prepare(
@@ -206,6 +471,23 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
 
     const ticketCode = genTicketCode();
     const initialStatus = contactChannel ? "enviado_consulta" : "borrador";
+    if (
+      singleMarketplaceOrderPolicy &&
+      contactChannel &&
+      initialStatus === "enviado_consulta" &&
+      (await countPipelineTicketsForUser(userId, null)) > 0
+    ) {
+      const blocking = (await db
+        .prepare(
+          `SELECT order_number, ticket_code FROM marketplace_quote_tickets
+           WHERE user_id = ? AND status IN ('enviado_consulta','en_gestion','respondido')
+           ORDER BY updated_at DESC LIMIT 1`
+        )
+        .get(userId)) as { order_number: string | null; ticket_code: string } | undefined;
+      if (blocking) {
+        return res.status(409).json(oneActiveOrder409Payload(blocking));
+      }
+    }
     let insertOk = false;
     let lastErr: unknown;
     for (let attempt = 0; attempt < 5 && !insertOk; attempt++) {
@@ -321,8 +603,14 @@ const quoteOwnerAuth = requireRole("cliente", "admin_a", "admin_b");
 marketplaceQuoteTicketsRouter.get("/marketplace/my-quote-tickets", requireAuth, quoteOwnerAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
-    const sql = `SELECT ${TICKET_SELECT} FROM ${TICKET_FROM} WHERE t.user_id = ? AND t.status != 'borrador' ORDER BY t.updated_at DESC LIMIT 100`;
-    const rows = (await db.prepare(sql).all(userId)) as Record<string, unknown>[];
+    const emailNorm = normalizeEmailAddr(req.user!.email);
+    const sql = `SELECT ${TICKET_SELECT} FROM ${TICKET_FROM} WHERE (
+        t.user_id = ? OR (
+          t.user_id IS NULL
+          AND LOWER(TRIM(COALESCE(t.contact_email, ''))) = ?
+        )
+      ) AND t.status != 'borrador' ORDER BY t.updated_at DESC LIMIT 100`;
+    const rows = (await db.prepare(sql).all(userId, emailNorm)) as Record<string, unknown>[];
     res.json({ tickets: rows.map(rowToTicketList) });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -330,16 +618,123 @@ marketplaceQuoteTicketsRouter.get("/marketplace/my-quote-tickets", requireAuth, 
   }
 });
 
+/** Cliente/admin A/B: cancela una orden en curso (marca descartado) para poder generar una nueva desde el carrito. */
+marketplaceQuoteTicketsRouter.post(
+  "/marketplace/my-quote-tickets/:id/cancel",
+  requireAuth,
+  quoteOwnerAuth,
+  async (req: Request, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const id = Number(req.params.id);
+      if (!Number.isFinite(id)) return res.status(400).json({ error: { message: "ID inválido" } });
+      const row = (await db
+        .prepare(
+          `SELECT t.id, t.user_id, t.status, t.contact_email, u.email AS user_join_email
+           FROM marketplace_quote_tickets t LEFT JOIN users u ON u.id = t.user_id WHERE t.id = ?`
+        )
+        .get(id)) as
+        | {
+            id: number;
+            user_id: unknown;
+            status: string;
+            contact_email: string | null;
+            user_join_email: string | null;
+          }
+        | undefined;
+      if (!row) return res.status(404).json({ error: { message: "Ticket no encontrado" } });
+      if (!ticketOwnedBySessionUser(row, req.user!)) {
+        return res.status(403).json({ error: { message: "No autorizado: solo podés cancelar tu propia orden." } });
+      }
+      if (!isPipelineStatus(row.status)) {
+        return res.status(400).json({
+          error: { message: "Solo podés cancelar consultas en curso (enviada, en gestión o respondida)." },
+        });
+      }
+      const nowIso = new Date().toISOString();
+      await db
+        .prepare(
+          "UPDATE marketplace_quote_tickets SET status = 'descartado', updated_at = ?, user_id = COALESCE(user_id, ?) WHERE id = ?"
+        )
+        .run(nowIso, userId, id);
+      res.json({ ok: true });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      res.status(500).json({ error: { message: msg } });
+    }
+  }
+);
+
 marketplaceQuoteTicketsRouter.get("/marketplace/my-quote-tickets/:id", requireAuth, quoteOwnerAuth, async (req: Request, res: Response) => {
   try {
-    const userId = req.user!.id;
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ error: { message: "ID inválido" } });
-    const row = (await db
-      .prepare(`SELECT ${TICKET_SELECT} FROM ${TICKET_FROM} WHERE t.id = ? AND t.user_id = ?`)
-      .get(id, userId)) as Record<string, unknown> | undefined;
+    const row = (await db.prepare(`SELECT ${TICKET_SELECT} FROM ${TICKET_FROM} WHERE t.id = ?`).get(id)) as
+      | Record<string, unknown>
+      | undefined;
     if (!row) return res.status(404).json({ error: { message: "Ticket no encontrado" } });
+    if (
+      !ticketOwnedBySessionUser(
+        {
+          user_id: row.user_id,
+          contact_email: row.contact_email,
+          user_join_email: row.user_join_email,
+        },
+        req.user!
+      )
+    ) {
+      return res.status(403).json({ error: { message: "No autorizado" } });
+    }
     res.json({ ticket: rowToTicketList(row) });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: { message: msg } });
+  }
+});
+
+/** Eliminar todas las órdenes/consultas del usuario (no borradores). Solo AdministradorA/B — los clientes tienda no pueden borrado masivo. */
+marketplaceQuoteTicketsRouter.delete("/marketplace/my-quote-tickets", requireAuth, adminAB, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const r = await db
+      .prepare("DELETE FROM marketplace_quote_tickets WHERE user_id = ? AND status != 'borrador'")
+      .run(userId);
+    const deleted = Number(r.changes) || 0;
+    res.json({ ok: true, deleted });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: { message: msg } });
+  }
+});
+
+/** Eliminar una orden/consulta del usuario (no borrador). */
+marketplaceQuoteTicketsRouter.delete("/marketplace/my-quote-tickets/:id", requireAuth, quoteOwnerAuth, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: { message: "ID inválido" } });
+    const ex = (await db
+      .prepare(
+        `SELECT t.id, t.user_id, t.status, t.contact_email, u.email AS user_join_email
+         FROM marketplace_quote_tickets t LEFT JOIN users u ON u.id = t.user_id WHERE t.id = ?`
+      )
+      .get(id)) as
+      | {
+          id: number;
+          user_id: unknown;
+          status: string;
+          contact_email: string | null;
+          user_join_email: string | null;
+        }
+      | undefined;
+    if (!ex) return res.status(404).json({ error: { message: "Ticket no encontrado" } });
+    if (!ticketOwnedBySessionUser(ex, req.user!)) {
+      return res.status(403).json({ error: { message: "No autorizado: solo podés eliminar tu propia orden." } });
+    }
+    if (ex.status === "borrador") {
+      return res.status(400).json({ error: { message: "Los borradores se gestionan desde el carrito." } });
+    }
+    await db.prepare("DELETE FROM marketplace_quote_tickets WHERE id = ?").run(id);
+    res.json({ ok: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     res.status(500).json({ error: { message: msg } });
@@ -405,6 +800,22 @@ marketplaceQuoteTicketsRouter.get("/marketplace/quote-tickets/:id", requireAuth,
     const row = (await db.prepare(`SELECT ${TICKET_SELECT} FROM ${TICKET_FROM} WHERE t.id = ?`).get(id)) as Record<string, unknown> | undefined;
     if (!row) return res.status(404).json({ error: { message: "Ticket no encontrado" } });
     res.json({ ticket: rowToTicketList(row) });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: { message: msg } });
+  }
+});
+
+/** Eliminar ticket / orden del marketplace (solo AdministradorA/B). */
+marketplaceQuoteTicketsRouter.delete("/marketplace/quote-tickets/:id", requireAuth, adminAB, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: { message: "ID inválido" } });
+    const r = await db.prepare("DELETE FROM marketplace_quote_tickets WHERE id = ?").run(id);
+    if (!Number(r.changes)) {
+      return res.status(404).json({ error: { message: "Ticket no encontrado" } });
+    }
+    res.json({ ok: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     res.status(500).json({ error: { message: msg } });

@@ -115,6 +115,8 @@ function fetchWithTimeout(url: string, opts: RequestInit, timeoutMs: number): Pr
 export type ApiHttpError = Error & { status?: number; code?: string };
 
 export const API_ERROR_EMAIL_ALREADY_REGISTERED = "EMAIL_ALREADY_REGISTERED";
+/** Marketplace: ya hay una consulta en curso para esta cuenta (una orden activa). */
+export const API_ERROR_ONE_ACTIVE_ORDER = "ONE_ACTIVE_ORDER";
 
 function makeApiError(message: string, status: number, code?: string): ApiHttpError {
   const e = new Error(message) as ApiHttpError;
@@ -131,6 +133,20 @@ export function isEmailAlreadyRegisteredError(err: unknown): boolean {
   const e = err as ApiHttpError;
   if (e?.status !== 409) return false;
   return !e.code || e.code === API_ERROR_EMAIL_ALREADY_REGISTERED;
+}
+
+export function isOneActiveOrderError(err: unknown): boolean {
+  const e = err as ApiHttpError;
+  return e?.status === 409 && e?.code === API_ERROR_ONE_ACTIVE_ORDER;
+}
+
+/** Error local (misma semántica que 409 ONE_ACTIVE_ORDER del servidor). */
+export function oneActiveOrderClientError(message?: string): ApiHttpError {
+  return makeApiError(
+    message ?? "Ya tenés una consulta en curso. Cancelala en «Mis órdenes» para armar un carrito nuevo.",
+    409,
+    API_ERROR_ONE_ACTIVE_ORDER
+  );
 }
 
 /** Fetch sin reintentos ni timeouts largos. Para endpoints que no deben colgar la UI (ej. actividad). */
@@ -988,6 +1004,8 @@ export type QuoteSyncLinePayload = {
 export function syncMarketplaceQuoteTicket(payload: {
   lines: QuoteSyncLinePayload[];
   event?: "sync" | "contact_email" | "contact_whatsapp" | "submit_ticket";
+  /** Si true con lines vacío: vaciar ítems en la orden marketplace en curso (no usar tras generar consulta). */
+  clearPipelineCart?: boolean;
 }): Promise<{
   ok: boolean;
   cleared?: boolean;
@@ -995,6 +1013,12 @@ export function syncMarketplaceQuoteTicket(payload: {
   orderNumber?: string;
   ticketCode?: string;
   status?: string;
+  /** true cuando se actualizó la orden ya en pipeline (no se creó ticket nuevo). */
+  merged?: boolean;
+  lines?: QuoteSyncLinePayload[];
+  subtotalUsd?: number;
+  lineCount?: number;
+  unitCount?: number;
 }> {
   return api("/api/marketplace/quote-sync", {
     method: "POST",
@@ -1045,6 +1069,21 @@ export function getMyMarketplaceQuoteTicket(id: number): Promise<{ ticket: Marke
   return api(`/api/marketplace/my-quote-tickets/${id}`);
 }
 
+/** Eliminar una consulta/orden propia (no borrador). */
+export function deleteMyMarketplaceQuoteTicket(id: number): Promise<{ ok: boolean }> {
+  return api(`/api/marketplace/my-quote-tickets/${id}`, { method: "DELETE" });
+}
+
+/** Cancelar orden en curso (descartado) para poder generar otra desde el carrito. */
+export function cancelMyMarketplaceQuoteTicket(id: number): Promise<{ ok: boolean }> {
+  return api(`/api/marketplace/my-quote-tickets/${id}/cancel`, { method: "POST" });
+}
+
+/** Eliminar todas las consultas/órdenes propias visibles en "mis órdenes" (no borradores). */
+export function deleteAllMyMarketplaceQuoteTickets(): Promise<{ ok: boolean; deleted: number }> {
+  return api("/api/marketplace/my-quote-tickets", { method: "DELETE" });
+}
+
 export function getMarketplaceQuoteTicketsStats(): Promise<{
   byStatus: Record<string, number>;
   total: number;
@@ -1080,4 +1119,9 @@ export function patchMarketplaceQuoteTicket(
     method: "PATCH",
     body: JSON.stringify(body),
   });
+}
+
+/** Panel staff: elimina el ticket de la base (solo admin A/B). */
+export function deleteMarketplaceQuoteTicketAdmin(id: number): Promise<{ ok: boolean }> {
+  return api(`/api/marketplace/quote-tickets/${id}`, { method: "DELETE" });
 }

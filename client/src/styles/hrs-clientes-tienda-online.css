@@ -268,7 +268,7 @@
   line-height: 1;
 }
 
-/* Misma familia verde que el resto del menú/panel (acción deshabilitada) */
+/* Misma familia que «Exportar Excel»: sólido cuando hay órdenes; dashed solo deshabilitado */
 .cti-btn-borrar-todo {
   display: inline-flex;
   align-items: center;
@@ -276,25 +276,30 @@
   gap: 0.4rem;
   padding: 0.45rem 1rem;
   border-radius: 999px;
-  border: 2px dashed rgba(255, 255, 255, 0.38);
-  background: rgba(30, 64, 52, 0.55);
-  color: rgba(255, 255, 255, 0.88);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  background: var(--cti-host-deep);
+  color: #fff;
   font-size: 0.8125rem;
   font-weight: 600;
   font-family: inherit;
-  cursor: not-allowed;
+  cursor: pointer;
   transition:
     background 0.15s ease,
-    border-color 0.15s ease;
+    border-color 0.15s ease,
+    opacity 0.15s ease;
 }
 
 .cti-btn-borrar-todo:hover:not(:disabled) {
-  filter: brightness(1.05);
+  background: #163529;
+  border-color: rgba(255, 255, 255, 0.8);
 }
 
 .cti-btn-borrar-todo:disabled {
-  opacity: 1;
+  opacity: 0.45;
   cursor: not-allowed;
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(30, 64, 52, 0.45);
 }
 
 @media (max-width: 768px) {

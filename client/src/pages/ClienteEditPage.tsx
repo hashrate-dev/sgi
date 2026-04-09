@@ -298,7 +298,9 @@ export function ClienteEditPage() {
         <div className="container">
           <div className="fact-card">
             <div className="fact-card-body">
-              <p className="text-muted">₿</p>
+              <div className="text-center py-4">
+                <div className="spinner-border" role="status" aria-label="Espere un momento" />
+              </div>
             </div>
           </div>
         </div>

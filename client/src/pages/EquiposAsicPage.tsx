@@ -943,9 +943,8 @@ export function EquiposAsicPage() {
             </div>
 
             {loading ? (
-              <div className="fact-empty">
-                <div className="fact-empty-icon">⏳</div>
-                <div className="fact-empty-text">Cargando equipos...</div>
+              <div className="fact-empty d-flex flex-column align-items-center justify-content-center py-5">
+                <div className="spinner-border text-secondary" role="status" aria-label="Espere un momento" style={{ width: "2.5rem", height: "2.5rem" }} />
               </div>
             ) : loadError ? (
               <div className="fact-empty">

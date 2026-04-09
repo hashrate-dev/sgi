@@ -32,7 +32,6 @@ import { KryptexDetallePage } from "./pages/KryptexDetallePage";
 import { MarketplacePage } from "./pages/MarketplacePage";
 import { MarketplaceClienteLoginPage } from "./pages/MarketplaceClienteLoginPage";
 import { MarketplaceClienteRegistroPage } from "./pages/MarketplaceClienteRegistroPage";
-import { MarketplaceMisOrdenesPage } from "./pages/MarketplaceMisOrdenesPage";
 import { CuentaClientePage } from "./pages/CuentaClientePage";
 import { CuentaClienteDetallePage } from "./pages/CuentaClienteDetallePage";
 import { ToastContainer } from "./components/ToastNotification";
@@ -58,7 +57,7 @@ function App() {
             <Route index element={<MarketplacePage />} />
             <Route path="login" element={<MarketplaceClienteLoginPage />} />
             <Route path="registro" element={<MarketplaceClienteRegistroPage />} />
-            <Route path="mis-ordenes" element={<MarketplaceMisOrdenesPage />} />
+            <Route path="mis-ordenes" element={<Navigate to="/marketplace" replace />} />
           </Route>
           <Route path="/marketplace/" element={<Navigate to="/marketplace" replace />} />
           <Route path="/login" element={<LoginPage />} />

@@ -181,9 +181,17 @@ CREATE TABLE IF NOT EXISTS items_garantia_ande (
   marca TEXT NOT NULL,
   modelo TEXT NOT NULL,
   fecha_ingreso TEXT NOT NULL,
-  observaciones TEXT
+  observaciones TEXT,
+  precio_garantia REAL
 );
 `);
+
+  try {
+    db.exec("ALTER TABLE items_garantia_ande ADD COLUMN precio_garantia REAL");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
 
   db.exec(`CREATE TABLE IF NOT EXISTS tienda_online_client_seq (
     id INTEGER PRIMARY KEY CHECK (id = 1),

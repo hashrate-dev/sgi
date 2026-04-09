@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "../db.js";
 import { env } from "../config/env.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
+import { ensureItemsGarantiaAndePrecioColumn } from "../lib/ensureItemsGarantiaAndePrecio.js";
 
 export const garantiasRouter = Router();
 
@@ -72,6 +73,8 @@ const ItemGarantiaSchema = z.object({
   modelo: z.string(),
   fechaIngreso: z.string(),
   observaciones: z.string().optional(),
+  /** Precio de la garantía (USD u otra moneda de referencia del negocio). */
+  precioGarantia: z.number().finite().optional().nullable(),
 });
 
 function paramStr(p: unknown): string {
@@ -198,11 +201,45 @@ garantiasRouter.delete("/garantias/emitted", requireAuth, requireRole("admin_a")
 
 /** GET /garantias/items — listar ítems de garantía ANDE */
 garantiasRouter.get("/garantias/items", authGarantias, async (_req, res) => {
-  const rows = (await db
-    .prepare(
-      `SELECT id, codigo, marca, modelo, fecha_ingreso, observaciones FROM items_garantia_ande ORDER BY codigo`
-    )
-    .all()) as { id: string; codigo: string; marca: string; modelo: string; fecha_ingreso: string; observaciones: string | null }[];
+  await ensureItemsGarantiaAndePrecioColumn();
+
+  type Row = {
+    id: string;
+    codigo: string;
+    marca: string;
+    modelo: string;
+    fecha_ingreso: string;
+    observaciones: string | null;
+    precio_garantia?: number | null;
+  };
+
+  let rows: Row[];
+  try {
+    rows = (await db
+      .prepare(
+        `SELECT id, codigo, marca, modelo, fecha_ingreso, observaciones, precio_garantia FROM items_garantia_ande ORDER BY codigo`
+      )
+      .all()) as Row[];
+  } catch (e) {
+    const m = e instanceof Error ? e.message : String(e);
+    if (
+      m.toLowerCase().includes("precio_garantia") ||
+      m.includes("no such column") ||
+      m.includes("42703") /* PostgreSQL undefined_column */
+    ) {
+      rows = (await db
+        .prepare(
+          `SELECT id, codigo, marca, modelo, fecha_ingreso, observaciones FROM items_garantia_ande ORDER BY codigo`
+        )
+        .all()) as Row[];
+    } else {
+      // eslint-disable-next-line no-console
+      console.error("[GET /garantias/items]", e);
+      return res.status(500).json({
+        error: { message: env.NODE_ENV === "development" ? m : "Error al listar ítems de garantía" },
+      });
+    }
+  }
 
   const items = rows.map((r) => ({
     id: r.id,
@@ -211,6 +248,8 @@ garantiasRouter.get("/garantias/items", authGarantias, async (_req, res) => {
     modelo: r.modelo,
     fechaIngreso: r.fecha_ingreso,
     observaciones: r.observaciones ?? undefined,
+    precioGarantia:
+      r.precio_garantia != null && Number.isFinite(Number(r.precio_garantia)) ? Number(r.precio_garantia) : undefined,
   }));
 
   res.json({ items });
@@ -218,19 +257,22 @@ garantiasRouter.get("/garantias/items", authGarantias, async (_req, res) => {
 
 /** POST /garantias/items — crear ítem */
 garantiasRouter.post("/garantias/items", authGarantias, requireCanPostGarantias, async (req, res) => {
+  await ensureItemsGarantiaAndePrecioColumn();
   const parsed = ItemGarantiaSchema.safeParse(req.body);
   if (!parsed.success) {
     return res
       .status(400)
       .json({ error: { message: "Body inválido", details: parsed.error.flatten() } });
   }
-  const { id, codigo, marca, modelo, fechaIngreso, observaciones } = parsed.data;
+  const { id, codigo, marca, modelo, fechaIngreso, observaciones, precioGarantia } = parsed.data;
+  const precioSql =
+    precioGarantia != null && Number.isFinite(Number(precioGarantia)) ? Number(precioGarantia) : null;
 
   try {
     await db.prepare(
-      `INSERT INTO items_garantia_ande (id, codigo, marca, modelo, fecha_ingreso, observaciones)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    ).run(id, codigo, marca, modelo, fechaIngreso, observaciones ?? null);
+      `INSERT INTO items_garantia_ande (id, codigo, marca, modelo, fecha_ingreso, observaciones, precio_garantia)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(id, codigo, marca, modelo, fechaIngreso, observaciones ?? null, precioSql);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes("UNIQUE constraint") || msg.includes("23505")) {
@@ -248,6 +290,7 @@ garantiasRouter.put(
   authGarantias,
   requireCanPostGarantias,
   async (req, res) => {
+    await ensureItemsGarantiaAndePrecioColumn();
     const id = paramStr(req.params.id);
     if (!id) return res.status(400).json({ error: { message: "id requerido" } });
     const parsed = ItemGarantiaSchema.partial().omit({ id: true }).safeParse(req.body);
@@ -256,30 +299,35 @@ garantiasRouter.put(
         .status(400)
         .json({ error: { message: "Body inválido", details: parsed.error.flatten() } });
     }
-    const body = parsed.data as Record<string, string | undefined>;
-    const codigo = body.codigo;
-    const marca = body.marca;
-    const modelo = body.modelo;
-    const fechaIngreso = body.fechaIngreso;
-    const observaciones = body.observaciones;
+    const patch = parsed.data;
+    const codigo = patch.codigo;
+    const marca = patch.marca;
+    const modelo = patch.modelo;
+    const fechaIngreso = patch.fechaIngreso;
+    const observaciones = patch.observaciones;
+    const precioProvided = Object.prototype.hasOwnProperty.call(patch, "precioGarantia");
+    const precioPatch = patch.precioGarantia;
+    const precioSql =
+      precioPatch != null && Number.isFinite(Number(precioPatch)) ? Number(precioPatch) : null;
+
+    const setClauses = [
+      "codigo = COALESCE(?, codigo)",
+      "marca = COALESCE(?, marca)",
+      "modelo = COALESCE(?, modelo)",
+      "fecha_ingreso = COALESCE(?, fecha_ingreso)",
+      "observaciones = ?",
+    ];
+    const runParams: unknown[] = [codigo ?? null, marca ?? null, modelo ?? null, fechaIngreso ?? null, observaciones ?? null];
+    if (precioProvided) {
+      setClauses.push("precio_garantia = ?");
+      runParams.push(precioSql);
+    }
+    runParams.push(id);
 
     try {
-      const result = await db.prepare(`
-        UPDATE items_garantia_ande
-        SET codigo = COALESCE(?, codigo),
-            marca = COALESCE(?, marca),
-            modelo = COALESCE(?, modelo),
-            fecha_ingreso = COALESCE(?, fecha_ingreso),
-            observaciones = ?
-        WHERE id = ?
-      `).run(
-        codigo ?? null,
-        marca ?? null,
-        modelo ?? null,
-        fechaIngreso ?? null,
-        observaciones ?? null,
-        id
-      );
+      const result = await db
+        .prepare(`UPDATE items_garantia_ande SET ${setClauses.join(", ")} WHERE id = ?`)
+        .run(...runParams);
       if (result.changes === 0) {
         return res.status(404).json({ error: { message: "Ítem no encontrado" } });
       }
