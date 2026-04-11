@@ -201,6 +201,14 @@ usersRouter.put("/users/:id", requireAuth, requireRole("admin_a", "admin_b"), as
   if (parsed.data.role === "admin_a" && req.user!.role !== "admin_a") {
     return res.status(403).json({ error: { message: "Solo AdministradorA puede asignar el rol AdministradorA" } });
   }
+  /** Cuentas tienda online: el rol Cliente no se puede cambiar por API. */
+  if (existing.role === "cliente") {
+    if (parsed.data.role !== undefined && parsed.data.role !== "cliente") {
+      return res.status(403).json({
+        error: { message: "No se puede cambiar el rol de cuentas de la tienda online (siempre Cliente)." },
+      });
+    }
+  }
   const updates: string[] = [];
   const values: unknown[] = [];
   if (parsed.data.email !== undefined) {
@@ -212,7 +220,7 @@ usersRouter.put("/users/:id", requireAuth, requireRole("admin_a", "admin_b"), as
     updates.push("password_hash = ?");
     values.push(bcrypt.hashSync(parsed.data.password, 10));
   }
-  if (parsed.data.role !== undefined) {
+  if (parsed.data.role !== undefined && existing.role !== "cliente") {
     const isAdminRole = (r: string) => r === "admin_a" || r === "admin_b";
     if (req.user!.id === id && isAdminRole(existing.role) && !isAdminRole(parsed.data.role)) {
       return res.status(400).json({ error: { message: "No puede quitarse su propio rol de administrador" } });

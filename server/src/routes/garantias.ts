@@ -5,6 +5,10 @@ import { db } from "../db.js";
 import { env } from "../config/env.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { ensureItemsGarantiaAndePrecioColumn } from "../lib/ensureItemsGarantiaAndePrecio.js";
+import {
+  ensureItemsGarantiaAndePrecioHistorial,
+  pricesDiffer,
+} from "../lib/ensureItemsGarantiaAndePrecioHistorial.js";
 
 export const garantiasRouter = Router();
 
@@ -202,6 +206,7 @@ garantiasRouter.delete("/garantias/emitted", requireAuth, requireRole("admin_a")
 /** GET /garantias/items — listar ítems de garantía ANDE */
 garantiasRouter.get("/garantias/items", authGarantias, async (_req, res) => {
   await ensureItemsGarantiaAndePrecioColumn();
+  await ensureItemsGarantiaAndePrecioHistorial();
 
   type Row = {
     id: string;
@@ -255,9 +260,57 @@ garantiasRouter.get("/garantias/items", authGarantias, async (_req, res) => {
   res.json({ items });
 });
 
+/** GET /garantias/items/:id/precio-historial — historial de cambios de precio (USD) */
+garantiasRouter.get("/garantias/items/:id/precio-historial", authGarantias, async (req, res) => {
+  await ensureItemsGarantiaAndePrecioColumn();
+  await ensureItemsGarantiaAndePrecioHistorial();
+  const id = paramStr(req.params.id);
+  if (!id) return res.status(400).json({ error: { message: "id requerido" } });
+
+  const exists = (await db.prepare("SELECT 1 AS ok FROM items_garantia_ande WHERE id = ?").get(id)) as { ok: number } | undefined;
+  if (!exists) {
+    return res.status(404).json({ error: { message: "Ítem no encontrado" } });
+  }
+
+  type HRow = { precio_usd: number; recorded_at: string };
+  let rows: HRow[];
+  try {
+    rows = (await db
+      .prepare(
+        `SELECT precio_usd, recorded_at FROM items_garantia_ande_precio_historial
+         WHERE item_id = ? ORDER BY recorded_at ASC`
+      )
+      .all(id)) as HRow[];
+  } catch (e) {
+    const m = e instanceof Error ? e.message : String(e);
+    if (m.includes("no such table") || m.includes("42P01")) {
+      rows = [];
+    } else {
+      // eslint-disable-next-line no-console
+      console.error("[GET /garantias/items/:id/precio-historial]", e);
+      return res.status(500).json({
+        error: { message: env.NODE_ENV === "development" ? m : "Error al leer historial" },
+      });
+    }
+  }
+
+  const entries = rows.map((r) => ({
+    precioUsd: Number(r.precio_usd),
+    actualizadoEn:
+      typeof r.recorded_at === "string"
+        ? r.recorded_at
+        : r.recorded_at != null
+          ? String(r.recorded_at)
+          : new Date().toISOString(),
+  }));
+
+  res.json({ entries });
+});
+
 /** POST /garantias/items — crear ítem */
 garantiasRouter.post("/garantias/items", authGarantias, requireCanPostGarantias, async (req, res) => {
   await ensureItemsGarantiaAndePrecioColumn();
+  await ensureItemsGarantiaAndePrecioHistorial();
   const parsed = ItemGarantiaSchema.safeParse(req.body);
   if (!parsed.success) {
     return res
@@ -273,6 +326,20 @@ garantiasRouter.post("/garantias/items", authGarantias, requireCanPostGarantias,
       `INSERT INTO items_garantia_ande (id, codigo, marca, modelo, fecha_ingreso, observaciones, precio_garantia)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).run(id, codigo, marca, modelo, fechaIngreso, observaciones ?? null, precioSql);
+    if (precioSql != null) {
+      const ts = new Date().toISOString();
+      try {
+        await db
+          .prepare(
+            `INSERT INTO items_garantia_ande_precio_historial (item_id, precio_usd, recorded_at) VALUES (?, ?, ?)`
+          )
+          .run(id, precioSql, ts);
+      } catch (he) {
+        const hm = he instanceof Error ? he.message : String(he);
+        // eslint-disable-next-line no-console
+        console.warn("[POST /garantias/items] historial precio:", hm);
+      }
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes("UNIQUE constraint") || msg.includes("23505")) {
@@ -291,6 +358,7 @@ garantiasRouter.put(
   requireCanPostGarantias,
   async (req, res) => {
     await ensureItemsGarantiaAndePrecioColumn();
+    await ensureItemsGarantiaAndePrecioHistorial();
     const id = paramStr(req.params.id);
     if (!id) return res.status(400).json({ error: { message: "id requerido" } });
     const parsed = ItemGarantiaSchema.partial().omit({ id: true }).safeParse(req.body);
@@ -324,7 +392,13 @@ garantiasRouter.put(
     }
     runParams.push(id);
 
+    type PrevRow = { precio_garantia: number | null };
+    let prev: PrevRow | undefined;
     try {
+      prev = (await db.prepare("SELECT precio_garantia FROM items_garantia_ande WHERE id = ?").get(id)) as PrevRow | undefined;
+      if (!prev) {
+        return res.status(404).json({ error: { message: "Ítem no encontrado" } });
+      }
       const result = await db
         .prepare(`UPDATE items_garantia_ande SET ${setClauses.join(", ")} WHERE id = ?`)
         .run(...runParams);
@@ -336,12 +410,39 @@ garantiasRouter.put(
       return res.status(500).json({ error: { message: `Error al actualizar: ${msg}` } });
     }
 
+    if (precioProvided && precioSql != null) {
+      const oldP =
+        prev?.precio_garantia != null && Number.isFinite(Number(prev.precio_garantia))
+          ? Number(prev.precio_garantia)
+          : null;
+      if (pricesDiffer(oldP, precioSql)) {
+        const ts = new Date().toISOString();
+        try {
+          await db
+            .prepare(
+              `INSERT INTO items_garantia_ande_precio_historial (item_id, precio_usd, recorded_at) VALUES (?, ?, ?)`
+            )
+            .run(id, precioSql, ts);
+        } catch (he) {
+          const hm = he instanceof Error ? he.message : String(he);
+          // eslint-disable-next-line no-console
+          console.warn("[PUT /garantias/items] historial precio:", hm);
+        }
+      }
+    }
+
     res.json({ ok: true });
   }
 );
 
 /** DELETE /garantias/items — borrar todos los ítems (solo admin_a) */
 garantiasRouter.delete("/garantias/items", authGarantias, requireAuth, requireRole("admin_a"), async (_req, res) => {
+  await ensureItemsGarantiaAndePrecioHistorial();
+  try {
+    await db.prepare("DELETE FROM items_garantia_ande_precio_historial").run();
+  } catch {
+    /* tabla puede no existir en BD muy vieja */
+  }
   const result = await db.prepare("DELETE FROM items_garantia_ande").run();
   res.json({ ok: true, deleted: result.changes });
 });
@@ -352,8 +453,14 @@ garantiasRouter.delete(
   authGarantias,
   requireCanPostGarantias,
   async (req, res) => {
+    await ensureItemsGarantiaAndePrecioHistorial();
     const id = paramStr(req.params.id);
     if (!id) return res.status(400).json({ error: { message: "id requerido" } });
+    try {
+      await db.prepare("DELETE FROM items_garantia_ande_precio_historial WHERE item_id = ?").run(id);
+    } catch {
+      /* sin tabla */
+    }
     const result = await db.prepare("DELETE FROM items_garantia_ande WHERE id = ?").run(id);
     if (result.changes === 0) {
       return res.status(404).json({ error: { message: "Ítem no encontrado" } });

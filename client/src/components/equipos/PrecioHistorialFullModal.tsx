@@ -54,8 +54,16 @@ function formatFechaHora(iso: string): string {
   });
 }
 
+function segmentProducto(s: string | undefined): string | null {
+  const t = (s ?? "").trim();
+  if (!t || t === "—" || t === "–" || t === "-") return null;
+  return t;
+}
+
 function productLabel(marca: string, modelo: string, procesador: string): string {
-  const parts = [marca?.trim(), modelo?.trim(), procesador?.trim()].filter(Boolean);
+  const parts = [segmentProducto(marca), segmentProducto(modelo), segmentProducto(procesador)].filter(
+    (x): x is string => Boolean(x)
+  );
   return parts.length ? parts.join(" · ") : "—";
 }
 
@@ -300,18 +308,10 @@ export function PrecioHistorialFullModal({
             <div className="hrs-precio-historial-product-card">
               <p className="hrs-precio-historial-product-label">Producto</p>
               <p className="hrs-precio-historial-product-main">{productoTexto}</p>
-              <dl className="hrs-precio-historial-product-dl">
+              <dl className="hrs-precio-historial-product-dl hrs-precio-historial-product-dl--compact">
                 <div>
                   <dt>Marca</dt>
                   <dd>{marca?.trim() || "—"}</dd>
-                </div>
-                <div>
-                  <dt>Modelo</dt>
-                  <dd>{modelo?.trim() || "—"}</dd>
-                </div>
-                <div>
-                  <dt>Procesador</dt>
-                  <dd>{procesador?.trim() || "—"}</dd>
                 </div>
                 <div>
                   <dt>Código de producto</dt>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { ASIC_MARKETPLACE_PRODUCTS } from "../lib/marketplaceAsicCatalog.js";
 import type { AsicAlgo, AsicProduct } from "../lib/marketplaceAsicCatalog.js";
 import type { AddQuoteLineOptions } from "../lib/marketplaceQuoteCart.js";
@@ -34,6 +34,7 @@ function MarketplacePageBody() {
   const { lang, t } = useMarketplaceLang();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { addProduct, openDrawer } = useMarketplaceQuoteCart();
   const [filterAlgo, setFilterAlgo] = useState<AsicAlgo | null>(null);
   const [modalIndex, setModalIndex] = useState<number | null>(null);
@@ -94,7 +95,7 @@ function MarketplacePageBody() {
       linkGoogle.setAttribute("rel", "stylesheet");
       linkGoogle.setAttribute(
         "href",
-        "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400..700;1,14..32,400..700&display=swap"
+        "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&display=swap"
       );
       document.head.appendChild(linkGoogle);
     }
@@ -188,6 +189,21 @@ function MarketplacePageBody() {
     });
     return list;
   }, [products, filterAlgo, sortLoc]);
+
+  /** Deep link desde home corporativa: `/marketplace?asic=<id>` abre el modal de esa ficha. */
+  useEffect(() => {
+    const id = searchParams.get("asic")?.trim();
+    if (!id) return;
+    const idx = shelfProducts.findIndex((p) => p.id === id);
+    const next = new URLSearchParams(searchParams);
+    next.delete("asic");
+    if (idx < 0) {
+      setSearchParams(next, { replace: true });
+      return;
+    }
+    setModalIndex(idx);
+    setSearchParams(next, { replace: true });
+  }, [searchParams, shelfProducts, setSearchParams]);
 
   const modalProduct = modalIndex != null ? shelfProducts[modalIndex] ?? null : null;
   const modalLiveYield = modalProduct ? liveYieldsById[modalProduct.id] : undefined;

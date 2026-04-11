@@ -193,6 +193,17 @@ CREATE TABLE IF NOT EXISTS items_garantia_ande (
     if (!msg.includes("duplicate column")) throw e;
   }
 
+  db.exec(`
+CREATE TABLE IF NOT EXISTS items_garantia_ande_precio_historial (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id TEXT NOT NULL,
+  precio_usd REAL NOT NULL,
+  recorded_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (item_id) REFERENCES items_garantia_ande(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_gar_ande_precio_hist_item ON items_garantia_ande_precio_historial(item_id, recorded_at);
+`);
+
   db.exec(`CREATE TABLE IF NOT EXISTS tienda_online_client_seq (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     next_code_num INTEGER NOT NULL

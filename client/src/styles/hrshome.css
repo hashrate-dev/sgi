@@ -5,7 +5,8 @@
   padding: 2rem 1rem 3rem;
   /* Mismo fondo que Login (hrs.css) */
   background: linear-gradient(135deg, #074025 0%, #49f227 100%);
-  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-family: "Space Grotesk", system-ui, -apple-system, sans-serif;
+  font-optical-sizing: auto;
   position: relative;
   overflow: hidden;
 }

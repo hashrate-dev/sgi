@@ -6,6 +6,7 @@ import {
   createGarantiaItem,
   deleteGarantiaItem,
   deleteGarantiasItemsAll,
+  getGarantiaItemPrecioHistorial,
   getGarantiasItems,
   updateGarantiaItem,
   wakeUpBackend,
@@ -13,6 +14,8 @@ import {
 } from "../lib/api";
 import type { ItemGarantiaAnde } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
+import { PrecioHistorialFullModal } from "../components/equipos/PrecioHistorialFullModal";
+import type { PrecioHistorialModalEntry } from "../components/equipos/PrecioHistorialFullModal";
 import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import { canDeleteClientes, canEditClientes, canExport } from "../lib/auth";
@@ -129,6 +132,9 @@ export function GarantiasAndeItemsPage() {
     precioGarantia: "",
     observaciones: "",
   });
+  const [precioHistorialOpen, setPrecioHistorialOpen] = useState(false);
+  const [precioHistorialEntries, setPrecioHistorialEntries] = useState<PrecioHistorialModalEntry[]>([]);
+  const [precioHistorialLoading, setPrecioHistorialLoading] = useState(false);
 
   function loadItems() {
     setLoading(true);
@@ -150,6 +156,70 @@ export function GarantiasAndeItemsPage() {
   useEffect(() => {
     loadItems();
   }, []);
+
+  useEffect(() => {
+    if (!showAddModal || !editingItem) return;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (precioHistorialOpen) {
+          setPrecioHistorialOpen(false);
+          e.preventDefault();
+          return;
+        }
+        setShowAddModal(false);
+        setEditingItem(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [showAddModal, editingItem, precioHistorialOpen]);
+
+  function closeEditModal() {
+    setPrecioHistorialOpen(false);
+    setPrecioHistorialEntries([]);
+    setShowAddModal(false);
+    setEditingItem(null);
+  }
+
+  async function openPrecioHistorialModal() {
+    if (!editingItem) return;
+    setPrecioHistorialLoading(true);
+    try {
+      const r = await getGarantiaItemPrecioHistorial(editingItem.id);
+      let entries: PrecioHistorialModalEntry[] = r.entries.map((x) => ({
+        precioUsd: x.precioUsd,
+        actualizadoEn: x.actualizadoEn,
+      }));
+      if (
+        entries.length === 0 &&
+        editingItem.precioGarantia != null &&
+        Number.isFinite(Number(editingItem.precioGarantia))
+      ) {
+        const fi = editingItem.fechaIngreso?.trim() || new Date().toISOString().slice(0, 10);
+        entries = [
+          {
+            precioUsd: Number(editingItem.precioGarantia),
+            actualizadoEn: /^\d{4}-\d{2}-\d{2}$/.test(fi) ? `${fi}T12:00:00.000Z` : new Date().toISOString(),
+          },
+        ];
+      }
+      setPrecioHistorialEntries(entries);
+      setPrecioHistorialOpen(true);
+    } catch (e) {
+      showToast(
+        e instanceof Error ? e.message : "No se pudo cargar el historial de precios.",
+        "error",
+        "Items Garantía ANDE"
+      );
+    } finally {
+      setPrecioHistorialLoading(false);
+    }
+  }
 
   async function handleSave() {
     if (!formData.codigo.trim() || !formData.marca.trim() || !formData.modelo.trim() || !formData.fechaIngreso.trim()) {
@@ -398,150 +468,6 @@ export function GarantiasAndeItemsPage() {
           <section className="market-registro-section pt-0">
 
             <div className="py-2 py-lg-2 cte-edit-tienda-container">
-              {showAddModal && editingItem ? (
-                <div className="market-registro-card cte-edit-market__card cte-edit-market__card--full mb-3">
-                  <header className="market-registro-card__head cte-edit-tienda-card-head">
-                    <p className="market-registro-card__kicker">Garantía ANDE · Ítems</p>
-                    <h2 className="market-registro-card__title cte-edit-market__title-row">
-                      <span>Editar ítem</span>
-                      <span className="badge bg-success rounded-pill cte-edit-market__code-badge">{editingItem.codigo}</span>
-                    </h2>
-                  </header>
-                  <div className="cte-edit-market-form--admin px-1">
-                    <div className="row g-3 align-items-stretch cte-edit-tienda-main-grid">
-                      <div className="col-12 col-lg-4 d-flex">
-                        <div
-                          className="market-registro-fieldset market-registro-fieldset--panel market-registro-fieldset--panel--wide mb-0 flex-grow-1 w-100"
-                          role="group"
-                          aria-labelledby="gar-edit-legend-id"
-                        >
-                          <div id="gar-edit-legend-id" className="market-registro-fieldset__legend">
-                            <i className="bi bi-tag" aria-hidden />
-                            Identificación
-                          </div>
-                          <div className="mb-2">
-                            <label className="form-label market-registro-label" htmlFor="gar-edit-codigo">
-                              Código <span className="text-danger">*</span>
-                            </label>
-                            <input
-                              id="gar-edit-codigo"
-                              type="text"
-                              className="form-control cte-edit-market__input--locked"
-                              value={formData.codigo}
-                              readOnly
-                              aria-readonly="true"
-                              title="El código no se puede modificar"
-                            />
-                          </div>
-                          <div className="mb-0">
-                            <label className="form-label market-registro-label" htmlFor="gar-edit-marca">
-                              Marca <span className="text-danger">*</span>
-                            </label>
-                            <input
-                              id="gar-edit-marca"
-                              type="text"
-                              className="form-control"
-                              value={formData.marca}
-                              onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
-                              placeholder="Ej: Bitmain"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                      <div className="col-12 col-lg-4 d-flex">
-                        <div
-                          className="market-registro-fieldset market-registro-fieldset--panel market-registro-fieldset--panel--wide mb-0 flex-grow-1 w-100"
-                          role="group"
-                          aria-labelledby="gar-edit-legend-eq"
-                        >
-                          <div id="gar-edit-legend-eq" className="market-registro-fieldset__legend">
-                            <i className="bi bi-cpu" aria-hidden />
-                            Equipo y fecha
-                          </div>
-                          <div className="mb-2">
-                            <label className="form-label market-registro-label" htmlFor="gar-edit-modelo">
-                              Modelo <span className="text-danger">*</span>
-                            </label>
-                            <input
-                              id="gar-edit-modelo"
-                              type="text"
-                              className="form-control"
-                              value={formData.modelo}
-                              onChange={(e) => setFormData({ ...formData, modelo: e.target.value })}
-                              placeholder="Ej: S19 Pro"
-                            />
-                          </div>
-                          <div className="mb-2">
-                            <label className="form-label market-registro-label" htmlFor="gar-edit-fecha">
-                              Fecha ingreso <span className="text-danger">*</span>
-                            </label>
-                            <input
-                              id="gar-edit-fecha"
-                              type="date"
-                              className="form-control"
-                              value={formData.fechaIngreso}
-                              onChange={(e) => setFormData({ ...formData, fechaIngreso: e.target.value })}
-                            />
-                          </div>
-                          <div className="mb-0">
-                            <label className="form-label market-registro-label" htmlFor="gar-edit-precio">
-                              Precio garantía
-                            </label>
-                            <input
-                              id="gar-edit-precio"
-                              type="text"
-                              inputMode="decimal"
-                              className="form-control"
-                              value={formData.precioGarantia}
-                              onChange={(e) => setFormData({ ...formData, precioGarantia: e.target.value })}
-                              placeholder="Opcional · ej. 150 o 150.50"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                      <div className="col-12 col-lg-4 d-flex">
-                        <div
-                          className="market-registro-fieldset market-registro-fieldset--panel market-registro-fieldset--panel--wide mb-0 flex-grow-1 w-100"
-                          role="group"
-                          aria-labelledby="gar-edit-legend-obs"
-                        >
-                          <div id="gar-edit-legend-obs" className="market-registro-fieldset__legend">
-                            <i className="bi bi-chat-left-text" aria-hidden />
-                            Observaciones
-                          </div>
-                          <label className="form-label market-registro-label" htmlFor="gar-edit-obs">
-                            Observaciones
-                          </label>
-                          <textarea
-                            id="gar-edit-obs"
-                            className="form-control"
-                            rows={5}
-                            value={formData.observaciones}
-                            onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
-                            placeholder="Opcional"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="market-registro-submit-row d-flex flex-wrap gap-2 justify-content-end align-items-center cte-edit-tienda-actions">
-                      <button
-                        type="button"
-                        className="btn btn-outline-secondary order-2 order-md-1"
-                        onClick={() => {
-                          setShowAddModal(false);
-                          setEditingItem(null);
-                        }}
-                      >
-                        Cancelar
-                      </button>
-                      <button type="button" className="btn btn-success market-registro-submit order-1 order-md-3" onClick={handleSave}>
-                        Actualizar
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-
               {/* Mismo contenedor / filtros / tabla / botones que SetupPage */}
               <div className="hrs-card hrs-card--rect p-4">
                 <div className="clientes-filtros-outer">
@@ -787,6 +713,194 @@ export function GarantiasAndeItemsPage() {
             </div>
           </section>
         </main>
+
+        {/* Editar ítem: modal superpuesto al listado (no empuja filtros/tabla hacia abajo) */}
+        {showAddModal && editingItem ? (
+          <div
+            className="gar-ande-edit-modal-root modal show d-block"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="gar-edit-modal-title"
+            style={{ backgroundColor: "rgba(15, 23, 42, 0.55)", zIndex: 1060 }}
+            onClick={closeEditModal}
+          >
+            <div
+              className="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable gar-ande-edit-modal-dialog"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="modal-content market-registro-card cte-edit-market__card cte-edit-market__card--full border-0 shadow-lg">
+                <div className="modal-header border-0 pb-0 align-items-start">
+                  <header className="market-registro-card__head cte-edit-tienda-card-head flex-grow-1 mb-0 border-0 p-0">
+                    <p className="market-registro-card__kicker mb-1">Garantía ANDE · Ítems</p>
+                    <h2 id="gar-edit-modal-title" className="market-registro-card__title cte-edit-market__title-row h4 mb-0">
+                      <span>Editar ítem</span>
+                      <span className="badge bg-success rounded-pill cte-edit-market__code-badge">{editingItem.codigo}</span>
+                    </h2>
+                  </header>
+                  <button type="button" className="btn-close ms-2" aria-label="Cerrar" onClick={closeEditModal} />
+                </div>
+                <div className="modal-body pt-2">
+                  <div className="cte-edit-market-form--admin px-1">
+                    <div className="row g-3 align-items-stretch cte-edit-tienda-main-grid">
+                      <div className="col-12 col-lg-4 d-flex">
+                        <div
+                          className="market-registro-fieldset market-registro-fieldset--panel market-registro-fieldset--panel--wide mb-0 flex-grow-1 w-100"
+                          role="group"
+                          aria-labelledby="gar-edit-legend-id"
+                        >
+                          <div id="gar-edit-legend-id" className="market-registro-fieldset__legend">
+                            <i className="bi bi-tag" aria-hidden />
+                            Identificación
+                          </div>
+                          <div className="mb-2">
+                            <label className="form-label market-registro-label" htmlFor="gar-edit-codigo">
+                              Código <span className="text-danger">*</span>
+                            </label>
+                            <input
+                              id="gar-edit-codigo"
+                              type="text"
+                              className="form-control cte-edit-market__input--locked"
+                              value={formData.codigo}
+                              readOnly
+                              aria-readonly="true"
+                              title="El código no se puede modificar"
+                            />
+                          </div>
+                          <div className="mb-0">
+                            <label className="form-label market-registro-label" htmlFor="gar-edit-marca">
+                              Marca <span className="text-danger">*</span>
+                            </label>
+                            <input
+                              id="gar-edit-marca"
+                              type="text"
+                              className="form-control"
+                              value={formData.marca}
+                              onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
+                              placeholder="Ej: Bitmain"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="col-12 col-lg-4 d-flex">
+                        <div
+                          className="market-registro-fieldset market-registro-fieldset--panel market-registro-fieldset--panel--wide mb-0 flex-grow-1 w-100"
+                          role="group"
+                          aria-labelledby="gar-edit-legend-eq"
+                        >
+                          <div id="gar-edit-legend-eq" className="market-registro-fieldset__legend">
+                            <i className="bi bi-cpu" aria-hidden />
+                            Equipo y fecha
+                          </div>
+                          <div className="mb-2">
+                            <label className="form-label market-registro-label" htmlFor="gar-edit-modelo">
+                              Modelo <span className="text-danger">*</span>
+                            </label>
+                            <input
+                              id="gar-edit-modelo"
+                              type="text"
+                              className="form-control"
+                              value={formData.modelo}
+                              onChange={(e) => setFormData({ ...formData, modelo: e.target.value })}
+                              placeholder="Ej: S19 Pro"
+                            />
+                          </div>
+                          <div className="mb-2">
+                            <label className="form-label market-registro-label" htmlFor="gar-edit-fecha">
+                              Fecha ingreso <span className="text-danger">*</span>
+                            </label>
+                            <input
+                              id="gar-edit-fecha"
+                              type="date"
+                              className="form-control"
+                              value={formData.fechaIngreso}
+                              onChange={(e) => setFormData({ ...formData, fechaIngreso: e.target.value })}
+                            />
+                          </div>
+                          <div className="mb-0">
+                            <label className="form-label market-registro-label" htmlFor="gar-edit-precio">
+                              Precio garantía
+                            </label>
+                            <input
+                              id="gar-edit-precio"
+                              type="text"
+                              inputMode="decimal"
+                              className="form-control"
+                              value={formData.precioGarantia}
+                              onChange={(e) => setFormData({ ...formData, precioGarantia: e.target.value })}
+                              placeholder="Opcional · ej. 150 o 150.50"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="col-12 col-lg-4 d-flex">
+                        <div
+                          className="market-registro-fieldset market-registro-fieldset--panel market-registro-fieldset--panel--wide mb-0 flex-grow-1 w-100"
+                          role="group"
+                          aria-labelledby="gar-edit-legend-obs"
+                        >
+                          <div id="gar-edit-legend-obs" className="market-registro-fieldset__legend">
+                            <i className="bi bi-chat-left-text" aria-hidden />
+                            Observaciones
+                          </div>
+                          <label className="form-label market-registro-label" htmlFor="gar-edit-obs">
+                            Observaciones
+                          </label>
+                          <textarea
+                            id="gar-edit-obs"
+                            className="form-control"
+                            rows={5}
+                            value={formData.observaciones}
+                            onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
+                            placeholder="Opcional"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="modal-footer border-0 pt-0 market-registro-submit-row d-flex flex-wrap gap-2 justify-content-end align-items-center cte-edit-tienda-actions">
+                  <button type="button" className="btn btn-outline-secondary order-2 order-md-1" onClick={closeEditModal}>
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline-success order-2"
+                    onClick={() => void openPrecioHistorialModal()}
+                    disabled={precioHistorialLoading}
+                    title="Ver evolución y registros de precio"
+                  >
+                    {precioHistorialLoading ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden />
+                        Cargando…
+                      </>
+                    ) : (
+                      <>
+                        <i className="bi bi-graph-up-arrow me-1" aria-hidden />
+                        Historial de precios
+                      </>
+                    )}
+                  </button>
+                  <button type="button" className="btn btn-success market-registro-submit order-1 order-md-3" onClick={handleSave}>
+                    Actualizar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {precioHistorialOpen && editingItem ? (
+          <PrecioHistorialFullModal
+            open={precioHistorialOpen}
+            onClose={() => setPrecioHistorialOpen(false)}
+            historial={precioHistorialEntries}
+            marca={editingItem.marca ?? ""}
+            modelo={editingItem.modelo ?? ""}
+            procesador="—"
+            codigoProducto={editingItem.codigo}
+          />
+        ) : null}
 
         {/* Modal Confirmación eliminar un ítem */}
         {deleteConfirmItem && (

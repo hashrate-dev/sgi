@@ -668,6 +668,16 @@ export function deleteGarantiasItemsAll(): Promise<{ ok: boolean; deleted: numbe
   return api<{ ok: boolean; deleted: number }>("/api/garantias/items", { method: "DELETE" });
 }
 
+export type GarantiaPrecioHistorialEntry = { precioUsd: number; actualizadoEn: string };
+export type GarantiaPrecioHistorialResponse = { entries: GarantiaPrecioHistorialEntry[] };
+
+export function getGarantiaItemPrecioHistorial(id: string): Promise<GarantiaPrecioHistorialResponse> {
+  return api<GarantiaPrecioHistorialResponse>(
+    `/api/garantias/items/${encodeURIComponent(id)}/precio-historial`,
+    { cache: "no-store" }
+  );
+}
+
 // ——— Setups (backend) ———
 export type SetupsResponse = { items: import("./types.js").Setup[] };
 

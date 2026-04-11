@@ -4333,6 +4333,14 @@ a.fact-logo-container--link:focus-visible {
 
 /* ========== Página Usuarios y permisos (mismo diseño que Historial/Clientes) ========== */
 
+.usuarios-section {
+  scroll-margin-top: 1rem;
+}
+
+.usuarios-section--auditoria .tienda-audit {
+  margin-top: 0;
+}
+
 .usuarios-page-card {
   background: #fff;
   border-radius: 16px;

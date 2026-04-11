@@ -1,15 +1,18 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { canUseMarketplaceQuoteCart } from "../../lib/auth.js";
 import { useAuth } from "../../contexts/AuthContext";
 import { useOptionalMarketplaceQuoteCart } from "../../contexts/MarketplaceQuoteCartContext.js";
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
 import type { MarketplaceLang } from "../../lib/i18n.js";
 
-const HS = "https://hashrate.space";
-
 export function MarketplaceSiteHeader() {
   const [navOpen, setNavOpen] = useState(false);
+  const { pathname, hash } = useLocation();
+  const onCatalog = pathname === "/marketplace" || pathname === "/marketplace/";
+  const onCorporateHome = pathname === "/marketplace/home" || pathname === "/marketplace/home/";
+  const corpHashCurrent = (id: string) =>
+    onCorporateHome && hash === `#${id}` ? ("is-current" as const) : undefined;
   const { user, logout } = useAuth();
   const { lang, setLang, t, tf } = useMarketplaceLang();
   const showLoggedAccount = Boolean(user && canUseMarketplaceQuoteCart(user.role));
@@ -27,23 +30,17 @@ export function MarketplaceSiteHeader() {
   return (
     <header className="site-header site-header--marketplace">
       <div className="container site-header__inner">
-        <a
-          className="logo-link logo-link--main"
-          href={HS}
-          aria-label={t("header.logo_aria")}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
+        <Link className="logo-link logo-link--main" to="/marketplace/home" aria-label={t("header.logo_aria")}>
           <img
             className="site-logo-img"
             src="https://hashrate.space/wp-content/uploads/hashrate-LOGO.png"
             alt="Hashrate Space"
-            width={220}
-            height={52}
+            width={248}
+            height={60}
             loading="eager"
             decoding="async"
           />
-        </a>
+        </Link>
         <div className="site-header__trailing">
           <div
             className="market-lang-switch"
@@ -112,24 +109,42 @@ export function MarketplaceSiteHeader() {
         <nav id="primary-nav" className={"nav-main" + (navOpen ? " is-open" : "")} aria-label="Principal">
           <ul>
             <li>
-              <a href={`${HS}/`}>{t("nav.home")}</a>
+              <Link
+                to="/marketplace/home"
+                className={onCorporateHome ? "is-current" : undefined}
+                {...(onCorporateHome ? { "aria-current": "page" as const } : {})}
+              >
+                {t("nav.home")}
+              </Link>
             </li>
             <li>
-              <a href={`${HS}/servicios/`}>{t("nav.services")}</a>
+              <Link to="/marketplace/home#servicios" className={corpHashCurrent("servicios")}>
+                {t("nav.services")}
+              </Link>
             </li>
             <li>
-              <Link to="/marketplace" className="is-current" aria-current="page">
+              <Link
+                to="/marketplace"
+                className={onCatalog ? "is-current" : undefined}
+                {...(onCatalog ? { "aria-current": "page" as const } : {})}
+              >
                 {t("nav.equipment")}
               </Link>
             </li>
             <li>
-              <a href={`${HS}/faq/`}>{t("nav.faq")}</a>
+              <Link to="/marketplace/home#faq" className={corpHashCurrent("faq")}>
+                {t("nav.faq")}
+              </Link>
             </li>
             <li>
-              <a href={`${HS}/empresa/`}>{t("nav.company")}</a>
+              <Link to="/marketplace/home#empresa" className={corpHashCurrent("empresa")}>
+                {t("nav.company")}
+              </Link>
             </li>
             <li>
-              <a href={`${HS}/contacto/`}>{t("nav.contact")}</a>
+              <Link to="/marketplace/home#contacto" className={corpHashCurrent("contacto")}>
+                {t("nav.contact")}
+              </Link>
             </li>
             <li className={"site-header__account" + (!showLoggedAccount ? " site-header__account--guest" : "")}>
               {showLoggedAccount ? (

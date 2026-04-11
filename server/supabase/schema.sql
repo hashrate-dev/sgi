@@ -110,5 +110,13 @@ CREATE TABLE IF NOT EXISTS items_garantia_ande (
 
 ALTER TABLE items_garantia_ande ADD COLUMN IF NOT EXISTS precio_garantia DOUBLE PRECISION;
 
+CREATE TABLE IF NOT EXISTS items_garantia_ande_precio_historial (
+  id BIGSERIAL PRIMARY KEY,
+  item_id TEXT NOT NULL REFERENCES items_garantia_ande(id) ON DELETE CASCADE,
+  precio_usd DOUBLE PRECISION NOT NULL,
+  recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_gar_ande_precio_hist_item ON items_garantia_ande_precio_historial(item_id, recorded_at);
+
 -- Habilitar RLS (opcional): si querés que solo el backend acceda, usá la service_role key y no definas políticas.
 -- Por defecto con service_role el backend bypassa RLS.

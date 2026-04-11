@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import {
   createUser,
   deleteUser,
@@ -16,6 +17,38 @@ import { useAuth } from "../contexts/AuthContext";
 import "../styles/facturacion.css";
 
 const PAGE_SIZE_OPTIONS = [20, 25, 30] as const;
+
+/** Hub igual que /hosting: solo tarjetas; cada ruta muestra su tabla. */
+const USUARIOS_HUB_ITEMS: Array<{ to: string; icon: string; label: string; desc: string }> = [
+  {
+    to: "/usuarios/cuentas",
+    icon: "bi-people",
+    label: "Cuentas de usuario",
+    desc: "Alta, edición, roles y permisos. Identificados por correo.",
+  },
+  {
+    to: "/usuarios/actividad",
+    icon: "bi-clock-history",
+    label: "Actividad de sesiones",
+    desc: "Entradas y salidas al sistema, horarios, tiempo conectado e IP.",
+  },
+  {
+    to: "/usuarios/auditoria",
+    icon: "bi-journal-text",
+    label: "Auditoría tienda e inventario",
+    desc: "Libro de movimientos: quién cambió qué en equipos ASIC y tienda online.",
+  },
+];
+
+function usuariosRouteMode(pathname: string): "hub" | "cuentas" | "actividad" | "auditoria" | "unknown" {
+  const p = (pathname || "/").replace(/\/+$/, "") || "/";
+  if (p === "/usuarios") return "hub";
+  if (p === "/usuarios/cuentas") return "cuentas";
+  if (p === "/usuarios/actividad") return "actividad";
+  if (p === "/usuarios/auditoria") return "auditoria";
+  if (p.startsWith("/usuarios/")) return "unknown";
+  return "unknown";
+}
 
 const ROLES: { value: UserRole; label: string }[] = [
   { value: "admin_a", label: "AdministradorA" },
@@ -38,6 +71,8 @@ function getRoleBadgeClass(role: string, viewerRole: UserRole | undefined): stri
 }
 
 export function UsuariosPage() {
+  const { pathname } = useLocation();
+  const routeMode = usuariosRouteMode(pathname);
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
@@ -154,7 +189,12 @@ export function UsuariosPage() {
         .catch((err) => showToast(`Error al crear usuario: ${err instanceof Error ? err.message : "Error desconocido"}`, "error", toastContext))
         .finally(() => setSaving(false));
     } else {
-      const body: { email?: string; password?: string; role?: UserRole; usuario?: string } = { email: formEmail.trim(), role: formRole, usuario: formUsuario.trim() || undefined };
+      const editingTiendaCliente = (modal as UserListItem).role === "cliente";
+      const body: { email?: string; password?: string; role?: UserRole; usuario?: string } = {
+        email: formEmail.trim(),
+        usuario: formUsuario.trim() || undefined,
+      };
+      if (!editingTiendaCliente) body.role = formRole;
       if (formPassword) body.password = formPassword;
       updateUser((modal as UserListItem).id, body)
         .then(() => {
@@ -225,27 +265,68 @@ export function UsuariosPage() {
       setGoToPageActivity("");
     }
   }
+  const hubPageTitle = "Gestión de usuarios y permisos";
+  const subPageHeader =
+    routeMode === "cuentas"
+      ? { title: "Cuentas de usuario", backText: "Volver a usuarios" }
+      : routeMode === "actividad"
+        ? { title: "Actividad de sesiones", backText: "Volver a usuarios" }
+        : { title: "Auditoría tienda e inventario", backText: "Volver a usuarios" };
+
   return (
     <div className="fact-page usuarios-page">
       <div className="container">
-        <PageHeader title="Gestión de usuarios y permisos" showBackButton backTo="/" backText="Volver al inicio" />
-
         {!isAdmin ? (
-          <div className="usuarios-page-card usuarios-page-card--single">
-            <div className="usuarios-page-card-inner">
-              <div className="usuarios-page-no-access">
-                <span className="usuarios-page-no-access-icon" aria-hidden>👤</span>
-                <p className="usuarios-page-no-access-text">Solo los administradores pueden gestionar usuarios.</p>
+          <>
+            <PageHeader title={hubPageTitle} showBackButton backTo="/" backText="Volver al inicio" />
+            <div className="usuarios-page-card usuarios-page-card--single">
+              <div className="usuarios-page-card-inner">
+                <div className="usuarios-page-no-access">
+                  <span className="usuarios-page-no-access-icon" aria-hidden>👤</span>
+                  <p className="usuarios-page-no-access-text">Solo los administradores pueden gestionar usuarios.</p>
+                </div>
               </div>
             </div>
-          </div>
+          </>
+        ) : routeMode === "unknown" ? (
+          <Navigate to="/usuarios" replace />
         ) : (
           <>
-            <div className="usuarios-page-card">
+            <PageHeader
+              title={routeMode === "hub" ? hubPageTitle : subPageHeader.title}
+              showBackButton
+              backTo={routeMode === "hub" ? "/" : "/usuarios"}
+              backText={routeMode === "hub" ? "Volver al inicio" : subPageHeader.backText}
+            />
+
+            {routeMode === "hub" ? (
+              <div className="hrs-card p-4">
+                <p className="text-muted small mb-3">
+                  Espacio para administrar cuentas del sistema, sesiones y trazabilidad de la tienda online (mismo
+                  estilo de accesos que <strong>Servicios de Hosting</strong>).
+                </p>
+                <div className="reportes-grid">
+                  {USUARIOS_HUB_ITEMS.map((item) => (
+                    <Link key={item.to} to={item.to} className="reportes-card mineria-hub-card">
+                      <div className="reportes-card-icon">
+                        <i className={`bi ${item.icon}`} />
+                      </div>
+                      <h3 className="reportes-card-title">{item.label}</h3>
+                      <p className="reportes-card-desc">{item.desc}</p>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {routeMode === "cuentas" ? (
+              <div className="usuarios-page-card">
               <div className="usuarios-page-header">
                 <div className="usuarios-page-header-inner">
-                  <h2 className="usuarios-page-title">
-                    <span className="usuarios-page-title-icon" aria-hidden>👥</span>
+                  <h2 className="usuarios-page-title" id="usuarios-heading-cuentas">
+                    <span className="usuarios-page-title-icon" aria-hidden>
+                      <i className="bi bi-people" />
+                    </span>
                     Usuarios
                   </h2>
                   <p className="usuarios-page-subtitle">Identificados por correo. Roles: AdministradorA, AdministradorB, Operador o Lector.</p>
@@ -365,12 +446,16 @@ export function UsuariosPage() {
                 )}
               </div>
             </div>
+            ) : null}
 
-            <div className="usuarios-page-card usuarios-page-activity-card mt-4">
+            {routeMode === "actividad" ? (
+            <div className="usuarios-page-card usuarios-page-activity-card">
               <div className="usuarios-page-header usuarios-page-header--activity">
                 <div className="usuarios-page-header-inner">
-                  <h2 className="usuarios-page-title">
-                    <span className="usuarios-page-title-icon usuarios-page-title-icon--activity" aria-hidden>📊</span>
+                  <h2 className="usuarios-page-title" id="usuarios-heading-actividad">
+                    <span className="usuarios-page-title-icon usuarios-page-title-icon--activity" aria-hidden>
+                      <i className="bi bi-clock-history" />
+                    </span>
                     Actividad de usuarios
                   </h2>
                   <p className="usuarios-page-subtitle">Entradas y salidas al sistema, horarios y tiempo conectado.</p>
@@ -477,13 +562,18 @@ export function UsuariosPage() {
                 )}
               </div>
             </div>
+            ) : null}
 
-            <TiendaOnlineAuditSection refreshKey={auditRefreshKey} />
+            {routeMode === "auditoria" ? (
+            <div className="usuarios-section usuarios-section--auditoria">
+              <TiendaOnlineAuditSection refreshKey={auditRefreshKey} />
+            </div>
+            ) : null}
           </>
         )}
       </div>
 
-      {modal && (
+      {isAdmin && modal && (
         <div className="modal d-block professional-modal-overlay" tabIndex={-1}>
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content professional-modal professional-modal-form">
@@ -543,45 +633,61 @@ export function UsuariosPage() {
                   </div>
                   <div className="mb-3" ref={roleDropdownRef}>
                     <label className="form-label">Rol</label>
-                    <div className="role-dropdown-wrap">
-                      <button
-                        type="button"
-                        className="role-dropdown-trigger"
-                        onClick={() => setRoleDropdownOpen((o) => !o)}
-                        aria-expanded={roleDropdownOpen}
-                        aria-haspopup="listbox"
-                        aria-label="Seleccionar rol"
-                      >
-                        <span>{getRoleDisplayLabel(formRole, currentUser?.role)}</span>
-                        <svg className="role-dropdown-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
-                          <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                      {roleDropdownOpen && (
-                        <ul className="role-dropdown-list" role="listbox">
-                          {modal !== "new" && (modal as UserListItem).role === "admin_a" && currentUser?.role === "admin_b" && (
-                            <li className="role-dropdown-option role-dropdown-option--disabled" role="option" aria-disabled="true">
-                              Administrador
-                            </li>
+                    {modal !== "new" && (modal as UserListItem).role === "cliente" ? (
+                      <>
+                        <div className="usuarios-rol-locked d-flex align-items-center gap-2 flex-wrap p-2 rounded border bg-light">
+                          <span className="role-badge role-badge--cliente">Cliente (tienda)</span>
+                          <span className="text-muted small mb-0">
+                            Cuenta de la tienda online — el rol no se puede cambiar desde aquí.
+                          </span>
+                        </div>
+                        <p className="modal-help mb-0 mt-2">
+                          Podés editar correo, usuario referido y contraseña. El vínculo con la ficha de cliente en tienda se mantiene.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="role-dropdown-wrap">
+                          <button
+                            type="button"
+                            className="role-dropdown-trigger"
+                            onClick={() => setRoleDropdownOpen((o) => !o)}
+                            aria-expanded={roleDropdownOpen}
+                            aria-haspopup="listbox"
+                            aria-label="Seleccionar rol"
+                          >
+                            <span>{getRoleDisplayLabel(formRole, currentUser?.role)}</span>
+                            <svg className="role-dropdown-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+                              <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </button>
+                          {roleDropdownOpen && (
+                            <ul className="role-dropdown-list" role="listbox">
+                              {modal !== "new" && (modal as UserListItem).role === "admin_a" && currentUser?.role === "admin_b" && (
+                                <li className="role-dropdown-option role-dropdown-option--disabled" role="option" aria-disabled="true">
+                                  Administrador
+                                </li>
+                              )}
+                              {ROLES.filter((r) => r.value !== "admin_a" || currentUser?.role === "admin_a").map((r) => (
+                                <li
+                                  key={r.value}
+                                  className={`role-dropdown-option ${formRole === r.value ? "role-dropdown-option--selected" : ""}`}
+                                  role="option"
+                                  aria-selected={formRole === r.value}
+                                  onClick={() => {
+                                    setFormRole(r.value);
+                                    setRoleDropdownOpen(false);
+                                  }}
+                                >
+                                  {r.label}
+                                </li>
+                              ))}
+                            </ul>
                           )}
-                          {ROLES.filter((r) => r.value !== "admin_a" || currentUser?.role === "admin_a").map((r) => (
-                            <li
-                              key={r.value}
-                              className={`role-dropdown-option ${formRole === r.value ? "role-dropdown-option--selected" : ""}`}
-                              role="option"
-                              aria-selected={formRole === r.value}
-                              onClick={() => {
-                                setFormRole(r.value);
-                                setRoleDropdownOpen(false);
-                              }}
-                            >
-                              {r.label}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                    <p className="modal-help mb-0">AdministradorA: todo (incl. eliminar otros admins); AdministradorB: todo salvo eso; Operador: facturación y clientes; Lector: solo consulta. Operador y Lector cambian su contraseña desde Inicio &gt; Cambiar contraseña. Cualquier Administrador (A o B) puede cambiar la contraseña de cualquier usuario aquí.</p>
+                        </div>
+                        <p className="modal-help mb-0">AdministradorA: todo (incl. eliminar otros admins); AdministradorB: todo salvo eso; Operador: facturación y clientes; Lector: solo consulta. Operador y Lector cambian su contraseña desde Inicio &gt; Cambiar contraseña. Cualquier Administrador (A o B) puede cambiar la contraseña de cualquier usuario aquí.</p>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="modal-footer professional-modal-footer">
@@ -605,7 +711,7 @@ export function UsuariosPage() {
         </div>
       )}
 
-      {deleteConfirmUser && (
+      {isAdmin && deleteConfirmUser && (
         <div className="modal d-block professional-modal-overlay" tabIndex={-1} role="dialog" aria-labelledby="deleteModalTitle" aria-modal="true">
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content professional-modal professional-modal-delete">

@@ -116,6 +116,11 @@
   padding: 0;
 }
 
+/* Solo Marca + Código (sin Modelo / Procesador duplicados en la tarjeta) */
+.hrs-precio-historial-product-dl--compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .hrs-precio-historial-product-dl dt {
   margin: 0;
   font-size: 0.7rem;

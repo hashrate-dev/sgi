@@ -241,3 +241,9 @@
 
 /* Grilla 2×2 en .cte-edit-tienda-main-grid: columnas `d-flex` + paneles `flex-grow-1` (ClienteEditPage) */
 
+/* Modal «Editar ítem» Garantía ANDE: encima del listado, sin empujar filtros */
+.gar-ande-edit-modal-root .gar-ande-edit-modal-dialog {
+  max-width: min(1140px, calc(100vw - 1.25rem));
+  margin: 0.75rem auto;
+}
+

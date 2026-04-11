@@ -17,10 +17,7 @@ export function MarketplaceSiteFooter() {
         className={`site-footer--marketplace__row${showSgiLink ? " site-footer--marketplace__row--with-sgi" : ""}`}
       >
         <p className="site-footer--marketplace__copy mb-0">
-          © <span id="footer-year">{year}</span> Hashrate Space ·{" "}
-          <a href="https://hashrate.space" target="_blank" rel="noopener noreferrer">
-            hashrate.space
-          </a>
+          © <span id="footer-year">{year}</span> Hashrate Space
         </p>
         {showSgiLink ? (
           <Link to="/" className="site-footer--marketplace__sgi-link">

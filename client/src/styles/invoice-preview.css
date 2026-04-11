@@ -13,7 +13,7 @@
   margin: 0 auto;
   background: #ffffff;
   padding: 18mm 20mm 18mm 16mm; /* 0.2cm a la izquierda: left 16mm, right 20mm */
-  font-family: 'Helvetica', 'Arial', sans-serif;
+  font-family: "Space Grotesk", "Helvetica Neue", Helvetica, Arial, sans-serif;
   color: #000000; /* RGB(0,0,0) */
   position: relative;
   box-sizing: border-box;

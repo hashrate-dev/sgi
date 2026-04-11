@@ -7,7 +7,7 @@
   flex-direction: column;
   background: #f3f4f6;
   color: #1f2937;
-  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 .marketplace-asic-page .bg-mesh,
@@ -55,9 +55,9 @@
 
 .site-logo-img {
   height: auto;
-  max-height: 40px;
+  max-height: 60px;
   width: auto;
-  max-width: 180px;
+  max-width: 248px;
   display: block;
 }
 
@@ -448,6 +448,15 @@
   color: #047857;
 }
 
+button.market-link-hrs {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  text-align: inherit;
+}
+
 .market-intro__desc--note {
   font-size: 0.85rem;
   color: #6b7280;
@@ -793,6 +802,8 @@
   cursor: pointer;
   line-height: 0;
   overflow: hidden;
+  text-decoration: none;
+  color: inherit;
 }
 
 .shelf-product__photo {
@@ -902,6 +913,7 @@
 }
 
 .shelf-product__cta {
+  display: block;
   width: 100%;
   padding: 0.7rem 1rem;
   font-size: 0.88rem;
@@ -913,6 +925,9 @@
   color: #fff;
   background: linear-gradient(180deg, #10b981 0%, #059669 100%);
   box-shadow: 0 2px 0 #047857;
+  text-align: center;
+  box-sizing: border-box;
+  line-height: 1.25;
 }
 
 .shelf-product__cta:hover {
@@ -925,6 +940,7 @@
 }
 
 .shelf-product__quote-btn {
+  display: block;
   width: 100%;
   padding: 0.55rem 0.75rem;
   font-size: 0.78rem;
@@ -936,6 +952,9 @@
   background: #fff;
   border: 2px solid #a7f3d0;
   transition: background 0.15s, border-color 0.15s;
+  text-align: center;
+  box-sizing: border-box;
+  line-height: 1.25;
 }
 
 .shelf-product__quote-btn:hover {
@@ -4379,4 +4398,2132 @@ button.product-modal__btn--quote-cart:hover {
   .market-registro-foot--beside-submit {
     margin-bottom: 0.25rem;
   }
+}
+
+/* ——— /marketplace/home — inicio corporativo (100 % React) ——— */
+.page-main--market--corp {
+  padding-bottom: 0;
+}
+
+/* Sin franja gris (#f3f4f6) entre la franja oscura y el footer */
+.page-main--market--corp .market-corp-inner {
+  padding-bottom: 0;
+}
+
+.page-main--market--corp .market-corp-strip {
+  margin-bottom: 0;
+}
+
+/* Bloque final: mismo degradado que Contacto (.market-corp-contact-wp__gradient) — franja + pie, sin costura */
+.market-corp-end-band {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+}
+
+.market-corp-end-band__gradient {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(135deg, #015b93 0%, #5cc866 100%);
+  opacity: 0.88;
+  pointer-events: none;
+}
+
+.market-corp-end-band .market-corp-strip {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  width: 100%;
+  max-width: none;
+  background: transparent;
+}
+
+@media (min-width: 768px) {
+  .market-corp-end-band .market-corp-strip {
+    margin-left: 0;
+    margin-right: 0;
+    width: 100%;
+  }
+}
+
+.market-corp-end-band .site-footer.site-footer--marketplace:not(.site-footer--marketplace--fixed) {
+  position: relative;
+  z-index: 1;
+  margin-top: 0;
+  border-top: none !important;
+  background: transparent !important;
+  box-shadow: none;
+  padding: 0.85rem 0 1.25rem;
+}
+
+.market-corp-end-band .site-footer.site-footer--marketplace:not(.site-footer--marketplace--fixed) .site-footer--marketplace__copy {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.market-corp-end-band .site-footer.site-footer--marketplace:not(.site-footer--marketplace--fixed) .site-footer--marketplace__copy a {
+  color: inherit;
+  font-weight: inherit;
+  text-decoration: none;
+}
+
+.market-corp-page .market-intro__desc--lede {
+  font-size: 0.95rem;
+  max-width: 44rem;
+}
+
+.market-corp-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.market-corp-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem 3rem;
+}
+
+.market-corp-anchor {
+  scroll-margin-top: 5.25rem;
+}
+
+.market-corp-stats {
+  list-style: none;
+  margin: 0 0 2rem;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .market-corp-stats {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+  }
+}
+
+.market-corp-stats__item {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  padding: 1rem 0.85rem;
+  text-align: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.market-corp-stats__value {
+  display: block;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #2d5d46;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.market-corp-stats__label {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+}
+
+.market-corp-section {
+  margin-bottom: 1.5rem;
+}
+
+.market-corp-section__title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #111827;
+  margin: 0 0 0.65rem;
+  line-height: 1.25;
+}
+
+.market-corp-section__title--center {
+  text-align: center;
+}
+
+.market-corp-section__kicker {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #059669;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.market-corp-section__body {
+  margin: 0;
+  color: #4b5563;
+  line-height: 1.6;
+  font-size: 0.9rem;
+}
+
+.market-corp-section__body--center {
+  text-align: center;
+  max-width: 36rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.market-corp-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.85rem;
+  padding: 1.35rem 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.market-corp-card--accent {
+  border-color: #d1fae5;
+  background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%);
+}
+
+.market-corp-card--green {
+  border-color: #bbf7d0;
+  background: linear-gradient(160deg, #ecfdf5 0%, #ffffff 55%);
+}
+
+.market-corp-card--contact {
+  border-color: #d1d5db;
+}
+
+.market-corp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.35rem;
+  padding: 0.5rem 1.25rem;
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.market-corp-btn--primary {
+  background: #2d5d46;
+  color: #fff;
+  border-color: #2d5d46;
+}
+
+.market-corp-btn--primary:hover {
+  background: #24503c;
+  border-color: #24503c;
+  color: #fff;
+}
+
+.market-corp-btn--outline {
+  background: #fff;
+  color: #2d5d46;
+  border-color: #2d5d46;
+}
+
+.market-corp-btn--outline:hover {
+  background: #f0fdf4;
+  color: #1f2937;
+}
+
+.market-corp-btn--light {
+  background: #fff;
+  color: #166534;
+  border-color: #86efac;
+  margin-top: 0.75rem;
+}
+
+.market-corp-btn--light:hover {
+  background: #f0fdf4;
+}
+
+.market-corp-btn--inline {
+  margin-top: 1rem;
+}
+
+.market-corp-metrics {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.65rem;
+}
+
+.market-corp-metrics__item {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.65rem;
+  padding: 0.85rem 0.5rem;
+  text-align: center;
+}
+
+.market-corp-metrics__value {
+  display: block;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+.market-corp-metrics__label {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #6b7280;
+  line-height: 1.3;
+}
+
+.market-corp-brands {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.market-corp-brands__chip {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #374151;
+}
+
+.market-corp-contact__list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+}
+
+.market-corp-contact__list li {
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  color: #4b5563;
+  line-height: 1.5;
+}
+
+.market-corp-contact__list li:last-child {
+  margin-bottom: 0;
+}
+
+.market-corp-contact__addr,
+.market-corp-contact__phones {
+  font-weight: 500;
+  color: #374151;
+}
+
+.market-corp-page .text-muted {
+  color: #6b7280 !important;
+}
+
+/* ——— Home corporativo: clon visual (hero WP + rejillas + contacto) ——— */
+.market-corp-page .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.market-corp-section__body--spaced {
+  margin-top: 0.75rem;
+}
+
+.market-corp-hero-full {
+  position: relative;
+  color: #fff;
+  overflow: visible;
+  padding-bottom: clamp(1.25rem, 3vw, 2rem);
+}
+
+/* Banner: padding inferior alarga imagen + overlay (~5 cm) para que las stats queden dentro del área del hero */
+.market-corp-hero-full__banner {
+  position: relative;
+  overflow: visible;
+  padding-bottom: calc(5cm + clamp(1.25rem, 4vw, 2.5rem));
+}
+
+.market-corp-hero-full__bg {
+  position: absolute;
+  inset: 0;
+  background-image: url("https://hashrate.space/wp-content/uploads/HRS-ASICS-HOT.png");
+  background-size: cover;
+  background-position: center center;
+  background-color: #fff;
+}
+
+.market-corp-hero-full__overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #015b93 0%, #5cc866 100%);
+  opacity: 0.82;
+}
+
+.market-corp-hero-full__inner {
+  position: relative;
+  z-index: 1;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: clamp(2rem, 5vw, 4rem) 1rem clamp(1.5rem, 3vw, 2.5rem);
+}
+
+/* Fila de stats: dentro del banner extendido (sobre imagen + degradé), sin mitad en el blanco */
+.market-corp-hero-full__stats-bridge {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(0.75rem, 2vw, 1.25rem);
+  width: calc(100% - 2rem);
+  max-width: 1200px;
+  z-index: 4;
+  display: flex;
+  justify-content: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.market-corp-hero-full__stats-bridge .market-corp-stats--wp {
+  pointer-events: auto;
+  width: 100%;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+/* Stats del hero: degradado verde/azul (como overlay) + texto e iconos blancos */
+.market-corp-hero-full__stats-bridge .market-corp-stats__item.market-corp-stats__item--wp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 1rem 0.65rem 1.15rem;
+  text-align: center;
+  background: linear-gradient(135deg, #015b93 0%, #5cc866 100%);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 1.25rem;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.18);
+  transition: none;
+}
+
+.market-corp-hero-full__stats-bridge .market-corp-stats__item.market-corp-stats__item--wp:hover,
+.market-corp-hero-full__stats-bridge .market-corp-stats__item.market-corp-stats__item--wp:focus-visible {
+  background: linear-gradient(135deg, #015b93 0%, #5cc866 100%);
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.18);
+  transform: none;
+}
+
+.market-corp-hero-full__stats-bridge .market-corp-stats__label--top {
+  order: 0;
+  margin-top: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.market-corp-hero-full__stats-bridge .market-corp-stats__icon {
+  order: 1;
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+.market-corp-hero-full__stats-bridge .market-corp-stats__item--wp .market-corp-stats__value {
+  order: 2;
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.market-corp-hero-full__grid {
+  display: grid;
+  gap: 2rem;
+  align-items: center;
+}
+
+@media (min-width: 900px) {
+  .market-corp-hero-full__grid {
+    grid-template-columns: 1fr minmax(200px, 28%);
+  }
+}
+
+.market-corp-hero-full__kicker {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  opacity: 0.95;
+  margin: 0 0 0.5rem;
+}
+
+.market-corp-hero-full__title {
+  font-size: clamp(1.5rem, 3.2vw, 2.35rem);
+  font-weight: 800;
+  line-height: 1.15;
+  margin: 0 0 1rem;
+  max-width: 20ch;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.market-corp-hero-full .market-corp-hero__actions {
+  margin-top: 0.5rem;
+}
+
+.market-corp-btn--ghost {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.55);
+}
+
+.market-corp-btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+.market-corp-btn--see-through {
+  background: transparent;
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 -2px rgba(0, 0, 0, 0.08) inset;
+}
+
+.market-corp-btn--see-through:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.market-corp-btn--jumbo {
+  margin-top: 1.25rem;
+  padding: 0.65rem 1.75rem;
+  font-size: 0.9rem;
+  background: transparent;
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+}
+
+.market-corp-btn--jumbo:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.market-corp-btn--strip {
+  margin-top: 0.5rem;
+}
+
+.market-corp-hero-full__video {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.market-corp-play {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: #fff;
+  font-family: inherit;
+  padding: 0.35rem;
+  line-height: 0;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.market-corp-play:hover,
+.market-corp-play:focus-visible {
+  transform: scale(1.06);
+  opacity: 0.95;
+}
+
+.market-corp-play:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.market-corp-play__svg {
+  display: block;
+  margin-left: 6px;
+}
+
+.market-corp-stats--wp {
+  margin-top: 2rem;
+  margin-bottom: 0;
+}
+
+/* Stats WP del hero: degradado + blanco — solo bajo .market-corp-hero-full__stats-bridge arriba */
+
+.market-corp-inner--flush-top {
+  padding-top: clamp(1.75rem, 4vw, 2.75rem);
+}
+
+/* Destacado producto (ej. Z15 PRO): tarjeta blanca + columna visual degradado + glass */
+.market-corp-spotlight {
+  margin: 0 0 2rem;
+}
+
+.market-corp-spotlight__card {
+  display: grid;
+  gap: clamp(1.5rem, 3vw, 2.25rem);
+  align-items: stretch;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: clamp(1.35rem, 3vw, 2rem);
+  background: #fff;
+  border: 1px solid #e8ecf0;
+  border-radius: clamp(18px, 2.5vw, 28px);
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08), 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+@media (min-width: 900px) {
+  .market-corp-spotlight__card {
+    grid-template-columns: minmax(0, 1.05fr) minmax(260px, 0.95fr);
+    padding: clamp(1.75rem, 3vw, 2.35rem) clamp(1.75rem, 3vw, 2.5rem);
+  }
+}
+
+.market-corp-spotlight__text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.market-corp-spotlight__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 0.15rem;
+}
+
+.market-corp-spotlight__tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.65rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #0f4c3a;
+  background: linear-gradient(180deg, #e0f7f1 0%, #d1fae5 100%);
+  border: 1px solid #a7f3d0;
+  border-radius: 999px;
+}
+
+.market-corp-spotlight__h2 {
+  margin: 0;
+  font-size: clamp(1.45rem, 3.2vw, 2.15rem);
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  color: #0f172a;
+}
+
+.market-corp-spotlight__specs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 26rem;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 520px) {
+  .market-corp-spotlight__specs {
+    grid-template-columns: 1fr;
+    max-width: 100%;
+  }
+}
+
+.market-corp-spotlight__spec {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 12px;
+  background: linear-gradient(165deg, #f0fdfa 0%, #ecfeff 45%, #f8fafc 100%);
+  border: 1px solid rgba(13, 148, 136, 0.22);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.market-corp-spotlight__spec-value {
+  font-size: clamp(0.95rem, 2.2vw, 1.05rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #0f766e;
+  line-height: 1.15;
+}
+
+.market-corp-spotlight__spec-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+  line-height: 1.25;
+}
+
+.market-corp-spotlight__body {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: #475569;
+  max-width: 38rem;
+}
+
+.market-corp-spotlight__cta {
+  margin-top: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0.5rem 1.35rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  color: #fff;
+  background: linear-gradient(135deg, #015b93 0%, #2d5d46 55%, #5cc866 100%);
+  border-radius: 999px;
+  border: none;
+  box-shadow: 0 4px 14px rgba(1, 91, 147, 0.25);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.market-corp-spotlight__cta:hover {
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(1, 91, 147, 0.3);
+}
+
+.market-corp-spotlight__visual {
+  position: relative;
+  /* Caja verde más compacta; el minero se escala dentro (ver __img) */
+  min-height: clamp(190px, 40vw, 260px);
+  border-radius: clamp(14px, 2vw, 20px);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.market-corp-spotlight__visual-grad {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(165deg, #064e3b 0%, #0d9488 38%, #5cc866 88%);
+  z-index: 0;
+}
+
+.market-corp-spotlight__visual-noise {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  opacity: 0.14;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+}
+
+.market-corp-spotlight__img {
+  position: relative;
+  z-index: 2;
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: min(292px, 58vw);
+  margin: 0 auto;
+  object-fit: contain;
+  object-position: 58% bottom;
+  transform: translateX(4%) scale(1.09);
+  transform-origin: bottom center;
+  filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.35));
+}
+
+@media (min-width: 900px) {
+  .market-corp-spotlight__visual {
+    min-height: clamp(210px, 22vw, 300px);
+  }
+
+  .market-corp-spotlight__img {
+    position: absolute;
+    right: -4%;
+    bottom: 0;
+    width: auto;
+    max-width: 115%;
+    max-height: 128%;
+    margin: 0;
+    transform: translateX(3%) scale(1.1);
+    transform-origin: bottom center;
+  }
+}
+
+.market-corp-spotlight__glass {
+  position: absolute;
+  z-index: 3;
+  right: clamp(0.65rem, 2vw, 1rem);
+  bottom: clamp(0.65rem, 2vw, 1rem);
+  left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  max-width: min(120px, 28vw);
+  padding: 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: linear-gradient(115deg, rgba(248, 250, 252, 0.75) 0%, rgba(236, 253, 245, 0.55) 55%, rgba(255, 255, 255, 0.5) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.market-corp-spotlight__glass-logo {
+  display: block;
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  border-radius: 50%;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.15);
+}
+
+.market-corp-products-title {
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #189296;
+  margin: 0 0 1.25rem;
+}
+
+/* Accesos directos al marketplace (misma data que catálogo ASIC) */
+.market-corp-mp-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 2rem;
+}
+
+@media (min-width: 768px) {
+  .market-corp-mp-shortcuts {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+  }
+}
+
+.market-corp-product-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+}
+
+@media (min-width: 768px) {
+  .market-corp-product-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+  }
+}
+
+.market-corp-product-grid--tight {
+  margin-bottom: 2.5rem;
+}
+
+.market-corp-product-card {
+  display: block;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.market-corp-product-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.market-corp-product-card img {
+  width: 100%;
+  height: auto;
+  display: block;
+  vertical-align: middle;
+}
+
+.market-corp-hosting-split {
+  display: grid;
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
+  align-items: stretch;
+}
+
+@media (min-width: 900px) {
+  .market-corp-hosting-split {
+    grid-template-columns: 1fr minmax(220px, 38%);
+    gap: 2rem;
+  }
+}
+
+.market-corp-hosting-split__text {
+  padding: 0.25rem 0 1rem;
+}
+
+.market-corp-gradient-title {
+  margin: 0 0 1rem;
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
+  font-weight: 800;
+  line-height: 1.1;
+  background: linear-gradient(to bottom right, #5087e5, #5cc866);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.market-corp-hosting-split__body {
+  margin: 0 0 1.5rem;
+  font-size: clamp(0.9rem, 1.1vw, 1.05rem);
+  line-height: 1.65;
+  color: #374151;
+  max-width: 40rem;
+}
+
+.market-corp-metrics--wp {
+  max-width: 36rem;
+}
+
+.market-corp-metrics__item--wp {
+  background: #fafafa;
+}
+
+.market-corp-metrics__value--grad {
+  background: linear-gradient(to bottom right, #5087e5, #5cc866);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-size: 1.5rem;
+}
+
+.market-corp-hosting-split__visual {
+  min-height: 220px;
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+@media (min-width: 900px) {
+  .market-corp-hosting-split__visual {
+    min-height: 360px;
+  }
+}
+
+.market-corp-hosting-split__visual-bg {
+  position: absolute;
+  inset: 0;
+  background-image: url("https://hashrate.space/wp-content/uploads/HRS-ASICS-HOT.png");
+  background-size: cover;
+  background-position: center;
+}
+
+.market-corp-hosting-split__visual-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #015b93 0%, #5cc866 100%);
+  opacity: 0.45;
+}
+
+.market-corp-itaipu {
+  position: relative;
+  /* Edge-to-edge como hero de referencia (ancho viewport) */
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  margin-bottom: 2.5rem;
+  width: 100vw;
+  max-width: 100vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(2.75rem, 6vw, 5rem) clamp(1rem, 4vw, 2rem);
+  min-height: clamp(20rem, 42vw, 38rem);
+  text-align: center;
+  color: #fff;
+  overflow: hidden;
+}
+
+/* Misma lógica que WP row-bg: itaipu-py.webp + #454156 + cover; -3cm en Y = menos cielo */
+.market-corp-itaipu__bg {
+  position: absolute;
+  inset: 0;
+  background-color: #454156;
+  background-image: url("https://hashrate.space/wp-content/uploads/itaipu-py.webp");
+  background-position: center -3cm;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+/* Como row-bg-overlay: degradé + opacidad 0.8 */
+.market-corp-itaipu__overlay {
+  position: absolute;
+  inset: 0;
+  background: #015b93;
+  background: linear-gradient(90deg, #015b93 0%, #5cc866 100%);
+  opacity: 0.8;
+}
+
+.market-corp-itaipu__content {
+  position: relative;
+  z-index: 1;
+  max-width: 44rem;
+  margin: 0 auto;
+}
+
+.market-corp-itaipu__title {
+  font-size: clamp(1.35rem, 3vw, 2rem);
+  font-weight: 800;
+  line-height: 1.2;
+  margin: 0 0 0.75rem;
+}
+
+.market-corp-itaipu__accent {
+  color: #bbf7d0;
+}
+
+.market-corp-itaipu__sub {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0;
+  opacity: 0.95;
+}
+
+.market-corp-brands-block {
+  margin-bottom: 2.5rem;
+}
+
+.market-corp-brands-block__title {
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  font-weight: 800;
+  margin: 0 0 1.25rem;
+  background: linear-gradient(to bottom right, #5087e5, #5cc866);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  max-width: 36rem;
+}
+
+/* Fabricantes: solo grid sobre el fondo de la página (sin caja contenedora) */
+.market-corp-clients {
+  --corp-clients-logo-opacity: 0.56;
+  display: grid;
+  gap: 1rem 0.75rem;
+  align-items: center;
+  justify-items: center;
+  padding: 0.35rem 0;
+  margin: 0;
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.market-corp-clients--six-cols {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 640px) {
+  .market-corp-clients--six-cols {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.1rem 1rem;
+  }
+}
+
+@media (min-width: 900px) {
+  .market-corp-clients--six-cols {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.5rem 1rem;
+  }
+}
+
+.market-corp-clients__item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 11rem;
+  min-height: 3.25rem;
+  padding: 0.4rem 0.35rem;
+  margin: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  cursor: default;
+  user-select: none;
+}
+
+.market-corp-clients__item img {
+  display: block;
+  max-width: 100%;
+  width: auto;
+  height: auto;
+  max-height: 44px;
+  object-fit: contain;
+  object-position: center;
+  filter: grayscale(1) brightness(1.02);
+  opacity: var(--corp-clients-logo-opacity);
+}
+
+/* Bitmain / Elphapex: PNG con gris de “mate” — subir luminancia para igualar logos con transparencia (Canaan, MicroBT) */
+.market-corp-clients__item--bitmain img,
+.market-corp-clients__item--elphapex img {
+  filter: grayscale(1) brightness(1.22) contrast(1.2);
+}
+
+@media (min-width: 900px) {
+  .market-corp-clients__item img {
+    max-height: 40px;
+  }
+}
+
+.market-corp-clients.fade-in-animation {
+  animation: market-corp-clients-fade-in 0.45s ease forwards;
+}
+
+@keyframes market-corp-clients-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* FAQ home corporativa: banner oscuro tipo showcase + imagen S21 local + acordeón (estilo marketplace) */
+.market-corp-faq-spotlight {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  /* Base un poco más clara que el negro‑verde profundo */
+  background: #0f1c18;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.2);
+}
+
+.market-corp-faq-spotlight__gradient {
+  position: absolute;
+  inset: 0;
+  /* Degradado verde/azul algo más luminoso + más presencia */
+  background: linear-gradient(135deg, #0f6ba3 0%, #2a6b52 42%, #6fd98a 100%);
+  opacity: 0.36;
+  pointer-events: none;
+}
+
+.market-corp-faq-spotlight__shine {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 90% 55% at 20% 0%, rgba(255, 255, 255, 0.14), transparent 58%);
+  pointer-events: none;
+}
+
+.market-corp-faq-spotlight__inner {
+  position: relative;
+  z-index: 1;
+  padding: clamp(1.25rem, 3vw, 1.75rem);
+}
+
+.market-corp-faq-spotlight__grid {
+  display: grid;
+  gap: 1.25rem 1.5rem;
+  align-items: stretch;
+}
+
+@media (min-width: 960px) {
+  .market-corp-faq-spotlight__grid {
+    grid-template-columns: minmax(0, 0.95fr) minmax(340px, 2fr) minmax(0, 0.95fr);
+    gap: 1.5rem 1.75rem;
+  }
+}
+
+@media (min-width: 1200px) {
+  .market-corp-faq-spotlight__grid {
+    grid-template-columns: minmax(0, 0.9fr) minmax(380px, 2.15fr) minmax(0, 0.9fr);
+  }
+}
+
+.market-corp-faq-spotlight__kicker {
+  margin: 0 0 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(226, 232, 240, 0.72);
+}
+
+.market-corp-faq-spotlight__h2 {
+  margin: 0 0 0.65rem;
+  font-size: clamp(1.35rem, 2.6vw, 1.85rem);
+  font-weight: 800;
+  line-height: 1.15;
+  color: #fff;
+  letter-spacing: -0.02em;
+}
+
+.market-corp-faq-spotlight__lede {
+  margin: 0 0 1.1rem;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: rgba(226, 232, 240, 0.88);
+  max-width: 28rem;
+}
+
+.market-corp-faq-spotlight__lead-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.market-corp-faq-spotlight__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.35rem;
+  padding: 0.45rem 1.15rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border-radius: 999px;
+  text-decoration: none;
+  border: 2px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.market-corp-faq-spotlight__btn--primary {
+  background: #fff;
+  color: #0f172a;
+  border-color: #fff;
+}
+
+.market-corp-faq-spotlight__btn--primary:hover {
+  background: #f1f5f9;
+  border-color: #f1f5f9;
+  color: #0f172a;
+}
+
+.market-corp-faq-spotlight__btn--ghost {
+  background: transparent;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.55);
+}
+
+.market-corp-faq-spotlight__btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.75);
+  color: #fff;
+}
+
+.market-corp-faq-spotlight__visual {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 0;
+}
+
+.market-corp-faq-spotlight__img {
+  display: block;
+  width: auto;
+  max-width: min(760px, 100%);
+  height: auto;
+  max-height: calc(min(700px, 84vh) + 2cm);
+  object-fit: contain;
+  object-position: bottom center;
+  filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.45));
+}
+
+@media (min-width: 960px) {
+  /* Base del ASIC al borde inferior del panel (anula padding de __inner) */
+  .market-corp-faq-spotlight__visual {
+    margin-bottom: calc(-1 * clamp(1.25rem, 3vw, 1.75rem));
+  }
+
+  .market-corp-faq-spotlight__img {
+    max-width: 100%;
+    max-height: calc(min(880px, 90vh) + 2cm);
+  }
+}
+
+@media (min-width: 1200px) {
+  .market-corp-faq-spotlight__img {
+    max-height: calc(min(960px, 92vh) + 2cm);
+  }
+}
+
+.market-corp-faq-spotlight__faqs-kicker {
+  margin: 0 0 0.65rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(226, 232, 240, 0.65);
+}
+
+.market-corp-faq-spotlight__accordion {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.market-corp-faq-spotlight__acc-item {
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.45);
+  overflow: hidden;
+}
+
+.market-corp-faq-spotlight__acc-trigger {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  margin: 0;
+  border: none;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.market-corp-faq-spotlight__acc-trigger:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.market-corp-faq-spotlight__acc-trigger:focus-visible {
+  outline: 2px solid #5cc866;
+  outline-offset: 2px;
+}
+
+.market-corp-faq-spotlight__acc-q {
+  flex: 1;
+  line-height: 1.35;
+}
+
+.market-corp-faq-spotlight__acc-icon {
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.market-corp-faq-spotlight__acc-panel {
+  padding: 0 0.85rem 0.75rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.market-corp-faq-spotlight__acc-panel[hidden] {
+  display: none;
+}
+
+.market-corp-faq-spotlight__acc-a {
+  margin: 0.55rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: rgba(226, 232, 240, 0.88);
+}
+
+.market-corp-faq-spotlight__footnote {
+  margin: 1rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: rgba(148, 163, 184, 0.95);
+}
+
+/* CTA / “Cómo funciona”: mismo tratamiento que overlay Itaipú (azul → verde, 0.8) */
+.market-corp-sales-cta {
+  width: 100vw;
+  max-width: none;
+  margin-top: 1.5rem;
+  margin-bottom: 2.25rem;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  position: relative;
+  overflow: hidden;
+}
+
+.market-corp-sales-cta__wrap {
+  position: relative;
+  padding: clamp(1.75rem, 4vw, 2.75rem) clamp(1rem, 3vw, 2rem);
+  background-color: #015b93;
+  overflow: hidden;
+}
+
+/* Capa tipo row-bg-overlay: degradé horizontal + opacidad sin afectar texto/tarjetas */
+.market-corp-sales-cta__wrap::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: #015b93;
+  background: linear-gradient(90deg, #015b93 0%, #5cc866 100%);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.market-corp-sales-cta__shine {
+  pointer-events: none;
+  position: absolute;
+  inset: -20% -10% auto;
+  z-index: 1;
+  height: 70%;
+  background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255, 255, 255, 0.18), transparent 65%);
+  opacity: 0.4;
+}
+
+.market-corp-sales-cta__wrap-inner {
+  position: relative;
+  z-index: 2;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.market-corp-sales-cta__wrap-inner--on-green {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1.35rem, 3vw, 1.85rem);
+  padding: clamp(1.25rem, 3vw, 1.75rem) clamp(1rem, 2.5vw, 1.5rem) clamp(1.35rem, 3vw, 1.85rem);
+}
+
+/* — “Cómo funciona?” directo sobre el verde (sin panel blanco ni tarjeta azul) — */
+.market-corp-how-on-green {
+  text-align: center;
+}
+
+.market-corp-how-on-green__head {
+  margin: 0 auto clamp(1.35rem, 3.5vw, 2rem);
+  max-width: 40rem;
+}
+
+.market-corp-how-on-green__title {
+  margin: 0;
+  font-size: clamp(1.75rem, 3.8vw, 2.45rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #fff;
+  line-height: 1.12;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.15);
+}
+
+.market-corp-how-on-green__lede {
+  margin: 0.6rem 0 0;
+  font-size: clamp(0.9rem, 1.45vw, 1.05rem);
+  font-weight: 400;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.market-corp-how-on-green__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.15rem;
+  text-align: left;
+}
+
+@media (min-width: 768px) {
+  .market-corp-how-on-green__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.15rem 1.1rem;
+  }
+}
+
+.market-corp-how-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Variante Compass: fondo blanco (resto de la app), texto oscuro */
+.market-corp-how-card--compass {
+  border-radius: clamp(18px, 2.2vw, 24px);
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.market-corp-how-card--compass:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+}
+
+/* Zona imagen ~ mitad superior de la tarjeta (sin overlay degradé; corte limpio al bloque de texto) */
+.market-corp-how-card__viz {
+  position: relative;
+  overflow: hidden;
+  background: #000;
+}
+
+.market-corp-how-card__viz--compass {
+  aspect-ratio: 4 / 3;
+}
+
+.market-corp-how-card__photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+  transform: scale(1.03);
+  transition: transform 0.45s ease;
+}
+
+.market-corp-how-card--compass:hover .market-corp-how-card__photo {
+  transform: scale(1.06);
+}
+
+/* Tarjeta 1: imagen a medida del recuadro 4:3 (misma lógica que las otras tarjetas) */
+.market-corp-how-card--product-miner .market-corp-how-card__viz--compass {
+  display: block;
+  padding: 0;
+  background: #042218;
+}
+
+.market-corp-how-card--product-miner .market-corp-how-card__photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 46%;
+  transform: scale(1.06);
+  transform-origin: center center;
+  filter: none;
+}
+
+.market-corp-how-card--product-miner.market-corp-how-card--compass:hover .market-corp-how-card__photo {
+  transform: scale(1.1);
+}
+
+/* Tarjeta 2: mano + celular (foto horizontal) — encuadre en 4:3, foco en el teléfono */
+.market-corp-how-card--mobile-hand .market-corp-how-card__viz--compass {
+  display: block;
+  padding: 0;
+  background: #12161a;
+}
+
+.market-corp-how-card--mobile-hand .market-corp-how-card__photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 30% 48%;
+  transform: scale(1.04);
+  transform-origin: 30% 48%;
+  filter: saturate(1.02) contrast(1.03);
+}
+
+.market-corp-how-card--mobile-hand.market-corp-how-card--compass:hover .market-corp-how-card__photo {
+  transform: scale(1.08);
+}
+
+/* Tarjeta gráfico: recorte superior para no mostrar el título del asset (ej. “MÉTRICAS DE REDES”) */
+.market-corp-how-card--chart-crop .market-corp-how-card__photo {
+  object-fit: cover;
+  object-position: center 22%;
+  transform: scale(1.06);
+  transform-origin: center top;
+  clip-path: inset(11% 0 0 0);
+}
+
+.market-corp-how-card--chart-crop.market-corp-how-card--compass:hover .market-corp-how-card__photo {
+  transform: scale(1.09);
+}
+
+.market-corp-how-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.market-corp-how-card__body--compass {
+  /* Evita línea de 1px entre la zona imagen y el texto (subpíxeles) */
+  margin-top: -1px;
+  padding: clamp(1.15rem, 2.5vw, 1.45rem) clamp(1.15rem, 2.8vw, 1.6rem) clamp(1.35rem, 3vw, 1.65rem);
+  padding-top: calc(clamp(1.15rem, 2.5vw, 1.45rem) + 1px);
+  background: #ffffff;
+  position: relative;
+  z-index: 1;
+}
+
+.market-corp-how-card__h3 {
+  margin: 0;
+  font-size: clamp(1rem, 1.35vw, 1.08rem);
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+  line-height: 1.28;
+}
+
+.market-corp-how-card__p {
+  margin: 0;
+  font-size: clamp(0.8rem, 1.1vw, 0.875rem);
+  line-height: 1.55;
+  color: #b4b4b8;
+}
+
+.market-corp-how-card--compass .market-corp-how-card__h3 {
+  color: #0f172a;
+}
+
+.market-corp-how-card--compass .market-corp-how-card__p {
+  color: #475569;
+}
+
+.market-corp-sales-cta__foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding-top: 0.35rem;
+  text-align: center;
+}
+
+.market-corp-sales-cta__foot-copy {
+  margin: 0;
+  max-width: 32rem;
+  font-size: clamp(0.86rem, 1.25vw, 0.95rem);
+  line-height: 1.55;
+  color: rgba(203, 213, 225, 0.88);
+}
+
+.market-corp-sales-cta__foot--on-green .market-corp-sales-cta__foot-copy {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.market-corp-sales-cta__btn {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 700;
+  padding: 0.72rem 1.35rem;
+  border-radius: 999px;
+  color: #0f172a;
+  background: #fff;
+  box-shadow: 0 2px 0 rgba(15, 23, 42, 0.12);
+  transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
+}
+
+.market-corp-sales-cta__btn:hover {
+  filter: brightness(1.02);
+}
+
+.market-corp-sales-cta__btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.1);
+}
+
+.market-corp-sales-cta__btn:focus-visible {
+  outline: 2px solid #5eead4;
+  outline-offset: 3px;
+}
+
+.market-corp-contact-wp {
+  margin-bottom: 2.5rem;
+}
+
+/* Mismo contorno que .market-corp-faq-spotlight (“Preguntas frecuentes”) */
+.market-corp-contact-wp__panel {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  margin: 0 -0.25rem;
+  isolation: isolate;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #0f1c18;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.2);
+}
+
+/* Fondo 100% vectorial (sin JPEG): degradados suaves + film grain SVG muy leve — sin pixelado al escalar */
+.market-corp-contact-wp__gradient {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-color: #052f38;
+  background-image:
+    radial-gradient(ellipse 115% 95% at 12% 96%, rgba(190, 230, 160, 0.28) 0%, transparent 48%),
+    radial-gradient(ellipse 85% 75% at 88% 8%, rgba(56, 189, 248, 0.22) 0%, transparent 46%),
+    radial-gradient(ellipse 70% 55% at 50% 40%, rgba(20, 184, 166, 0.35) 0%, transparent 62%),
+    linear-gradient(158deg, #032a35 0%, #064e3b 28%, #0f766e 52%, #0d5c4a 78%, #052e2a 100%);
+  background-repeat: no-repeat;
+}
+
+/*
+ * Capa tipo Webflow `.noise-overlay`: rock + soft-light + radial + textura (~690px).
+ * PNG externo reemplazado por SVG fractalNoise (misma idea, sin CDN / sin pixelado al escalar).
+ */
+.market-corp-contact-wp__panel .noise-overlay,
+.market-corp-contact-wp__noise {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  /* ~ rock-500 (slate) */
+  background-color: #475569;
+  mix-blend-mode: soft-light;
+  background-image:
+    radial-gradient(circle at 50% 45%, rgba(57, 87, 126, 0.57), rgba(77, 110, 153, 0.4)),
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-position: 0 0, 0 0;
+  background-size: auto, 690px 690px;
+  background-repeat: no-repeat, repeat;
+  opacity: 0.82;
+}
+
+.market-corp-contact-wp__inner {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  gap: 2rem;
+  padding: clamp(1.65rem, 4.2vw, 2.65rem);
+  color: #fff;
+}
+
+@media (min-width: 900px) {
+  .market-corp-contact-wp__inner {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
+/* Mismo borde / radio / sombra que .market-corp-spotlight__card (tarjeta de arriba) */
+.market-corp-contact-wp__col:last-child {
+  padding: clamp(1.1rem, 3vw, 1.35rem);
+  border-radius: clamp(18px, 2.5vw, 28px);
+  border: 1px solid #e8ecf0;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08), 0 2px 8px rgba(15, 23, 42, 0.04);
+  background: linear-gradient(160deg, rgba(0, 0, 0, 0.22) 0%, rgba(0, 30, 28, 0.18) 100%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+@media (min-width: 900px) {
+  .market-corp-contact-wp__col:last-child {
+    padding: 1.2rem 1.35rem 1.35rem;
+  }
+}
+
+.market-corp-contact-wp__h2,
+.market-corp-contact-wp__h3 {
+  margin: 0 0 0.75rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.02em;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+}
+
+.market-corp-contact-wp__h2 {
+  font-size: clamp(1.65rem, 4vw, 2.1rem);
+}
+
+.market-corp-contact-wp__h3 {
+  margin-top: 1.25rem;
+  font-size: 1rem;
+}
+
+.market-corp-contact-wp__blocks p {
+  margin: 0 0 0.85rem;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.3);
+}
+
+.market-corp-contact-wp__link {
+  color: #ecfdf5;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+}
+
+.market-corp-contact-wp__link:hover {
+  color: #fff;
+}
+
+.market-corp-contact-wp__muted {
+  opacity: 0.9;
+}
+
+.market-corp-social {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.market-corp-social__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.market-corp-social__btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.45);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .market-corp-social__btn:hover {
+    transform: none;
+  }
+}
+
+.market-corp-form-wp {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.market-corp-form-wp__field--full {
+  grid-column: 1 / -1;
+}
+
+.market-corp-form-wp input,
+.market-corp-form-wp textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12) inset;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.market-corp-form-wp input::placeholder,
+.market-corp-form-wp textarea::placeholder {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+/* Evita recuadros claros del autocompletado del navegador (se veían “pixelados” / fuera de estilo) */
+.market-corp-form-wp input:-webkit-autofill,
+.market-corp-form-wp input:-webkit-autofill:hover,
+.market-corp-form-wp input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #fff;
+  caret-color: #fff;
+  box-shadow: 0 0 0 1000px rgba(6, 40, 44, 0.92) inset;
+  -webkit-box-shadow: 0 0 0 1000px rgba(6, 40, 44, 0.92) inset;
+  transition: background-color 99999s ease-out;
+}
+
+.market-corp-form-wp input:focus,
+.market-corp-form-wp textarea:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.35);
+  border-bottom-color: rgba(167, 243, 208, 0.95);
+  background: rgba(0, 0, 0, 0.38);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 2px 14px rgba(0, 0, 0, 0.15) inset;
+}
+
+.market-corp-form-wp textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.market-corp-form-wp__hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.72rem;
+  opacity: 0.92;
+  line-height: 1.45;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+}
+
+.market-corp-btn--submit {
+  grid-column: 1 / -1;
+  justify-self: start;
+  margin-top: 0.25rem;
+  background: rgba(255, 255, 255, 0.95);
+  color: #015b93;
+  border-color: transparent;
+  font-weight: 800;
+}
+
+.market-corp-btn--submit:hover {
+  background: #fff;
+  color: #013d62;
+}
+
+/* Partner Luxor: mismo lenguaje visual que la fila de fabricantes (gris + un solo logo, sin caja blanca) */
+.market-corp-luxor {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.market-corp-luxor__heading {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.market-corp-luxor__row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 0 0.15rem;
+}
+
+.market-corp-luxor__link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  text-decoration: none;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.market-corp-luxor__link:hover .market-corp-luxor__img,
+.market-corp-luxor__link:focus-visible .market-corp-luxor__img {
+  opacity: 0.68;
+}
+
+.market-corp-luxor__link:focus-visible {
+  outline: 2px solid #5cc866;
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.market-corp-luxor__img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: min(200px, 55vw);
+  max-height: 44px;
+  object-fit: contain;
+  object-position: center;
+  filter: grayscale(1) brightness(1.02);
+  opacity: var(--corp-clients-logo-opacity, 0.56);
+  transition: opacity 0.2s ease;
+}
+
+@media (min-width: 900px) {
+  .market-corp-luxor__img {
+    max-height: 40px;
+    max-width: min(180px, 22vw);
+  }
+}
+
+.market-corp-strip {
+  position: relative;
+  margin: 0 -1rem 2rem;
+  padding: clamp(2rem, 6vw, 4rem) 1.25rem;
+  color: #fff;
+  overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  .market-corp-strip {
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    width: 100vw;
+  }
+}
+
+.market-corp-strip__bg {
+  position: absolute;
+  inset: 0;
+  background-image: url("https://hashrate.space/wp-content/uploads/background.png");
+  background-size: cover;
+  background-position: left top;
+}
+
+.market-corp-strip__inner {
+  position: relative;
+  z-index: 1;
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  gap: 2rem;
+}
+
+@media (min-width: 768px) {
+  .market-corp-strip__inner {
+    grid-template-columns: 1fr 1fr;
+    align-items: end;
+  }
+}
+
+.market-corp-strip__tagline {
+  margin: 0.75rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  opacity: 0.92;
+  max-width: 22rem;
+}
+
+.market-corp-strip__cols {
+  display: grid;
+  gap: 1.5rem;
+}
+
+@media (min-width: 480px) {
+  .market-corp-strip__cols {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.market-corp-strip__h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.market-corp-strip__links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.market-corp-strip__links a,
+.market-corp-strip__links button {
+  color: #d1fae5;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.market-corp-strip__links a:hover,
+.market-corp-strip__links button:hover {
+  color: #fff;
+}
+
+.market-corp-video-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(15, 23, 42, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.market-corp-video-modal__dialog {
+  position: relative;
+  width: min(960px, 100%);
+  background: #0f172a;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.35);
+}
+
+.market-corp-video-modal__close {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.65rem;
+  z-index: 2;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  padding: 0.4rem 0.85rem;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.market-corp-video-modal__close:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.market-corp-video-modal__video {
+  display: block;
+  width: 100%;
+  max-height: min(70vh, 540px);
+  background: #000;
 }
