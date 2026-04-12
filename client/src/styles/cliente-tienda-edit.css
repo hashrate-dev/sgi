@@ -10,37 +10,30 @@
 
 /* Mismo ancho que /clientes: solo `.container` Bootstrap (sin capa intermedia max-width). */
 
-/* Barra verde: más alta y legible (no usar el compacto del formulario acá) */
-.fact-page--cte-tienda-edit .cte-edit-tienda-page-inner .fact-topbar {
+/* Barra superior PageHeader (.sgi-unified-header): más aire en esta pantalla */
+.fact-page--cte-tienda-edit .cte-edit-tienda-page-inner .sgi-unified-header {
   margin-bottom: 1.35rem !important;
-  padding: 1.35rem 1.85rem !important;
-  min-height: 4.75rem;
-  align-items: center;
 }
 
-.fact-page--cte-tienda-edit .cte-edit-tienda-page-inner .fact-topbar h1 {
+.fact-page--cte-tienda-edit .cte-edit-tienda-page-inner .sgi-unified-header__inner {
+  padding-top: 1rem !important;
+  padding-bottom: 1rem !important;
+  min-height: 4.75rem;
+}
+
+.fact-page--cte-tienda-edit .cte-edit-tienda-page-inner .sgi-unified-header__title {
   font-size: clamp(1.45rem, 2.8vw, 2rem) !important;
   font-weight: 800 !important;
   line-height: 1.18 !important;
 }
 
-.fact-page--cte-tienda-edit .cte-edit-tienda-page-inner .fact-topbar-left {
-  gap: 1.15rem !important;
-  align-items: center !important;
-}
-
-.fact-page--cte-tienda-edit .cte-edit-tienda-page-inner .fact-logo-container {
-  height: 52px !important;
-  min-height: 48px !important;
-}
-
-.fact-page--cte-tienda-edit .cte-edit-tienda-page-inner .fact-logo {
+.fact-page--cte-tienda-edit .cte-edit-tienda-page-inner .sgi-unified-header__logo-img {
   max-height: 52px !important;
   width: auto !important;
   max-width: 220px !important;
 }
 
-.fact-page--cte-tienda-edit .cte-edit-tienda-page-inner .fact-back {
+.fact-page--cte-tienda-edit .cte-edit-tienda-page-inner .sgi-unified-header .fact-back {
   padding: 0.55rem 1.25rem !important;
   font-size: 1.05rem !important;
   font-weight: 700 !important;

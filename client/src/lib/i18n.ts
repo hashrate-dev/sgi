@@ -52,6 +52,17 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "header.lang_hint": "Idioma",
 
     // Footer
+    "footer.strip_region": "Pie de página del sitio",
+    "footer.brand_slogan":
+      "Plataforma de infraestructura de alto rendimiento para la minería de Bitcoin.",
+    "footer.col_company": "Empresa",
+    "footer.col_media": "Media",
+    "footer.col_social": "Social",
+    "footer.media.site": "Hashrate.space",
+    "footer.media.video": "Video corporativo",
+    "footer.social.instagram": "Instagram — Hashrate Space",
+    "footer.social.linkedin": "LinkedIn — Hashrate Space",
+    "footer.social.x": "X (Twitter) — Hashrate Space",
     "footer.sgi": "Sistema de Gestión Interna (SGI)",
     "footer.copyright": "© {{year}} Hashrate Space. Todos los derechos reservados.",
 
@@ -180,6 +191,73 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "corp.company.title": "Empresa",
     "corp.company.body":
       "Hashrate Space desarrolla y opera infraestructura para minería de Bitcoin en la región, con foco en energía, confiabilidad y soporte cercano.",
+
+    // Página Empresa (React — /marketplace/company), contenido alineado a hashrate.space/company
+    "company.doc_title": "Empresa – Hashrate Space",
+    "company.meta_desc":
+      "HRS GROUP S.A.: infraestructura y HPC en Paraguay. Equipo directivo de Hashrate Space — minería Bitcoin y datacenters.",
+    "company.intro.h3": "¿Por qué somos diferentes?",
+    "company.intro.p1":
+      "HRS GROUP S.A. es una empresa especializada en infraestructura y computación de alto rendimiento con sede en Paraguay. Brindamos acceso a energía a bajo costo y contamos con más de 11 años de experiencia en infraestructura tecnológica. Nuestro foco es brindar a nuestros clientes soluciones completas y personalizadas que cubran todas las necesidades relacionadas con infraestructura y centros de datos de alta disponibilidad para minería de criptomonedas.",
+    "company.intro.p2":
+      "Nuestra oferta se enfoca en crear un ecosistema de última generación donde los equipos de cómputo operan de manera automática y eficiente, generando ganancias pasivas que se depositan directamente en tu billetera digital.",
+    "company.intro.p3":
+      "Con nuestra tecnología avanzada y enfoque innovador, te garantizamos una experiencia excepcional y maximizada en términos de rentabilidad. Nos encargamos de todo para que vos solo tengas que disfrutar de los beneficios.",
+    "company.intro.img_alt": "Infraestructura y equipos ASIC en operación",
+    "company.values.h3": "Nuestro valor principal",
+    "company.values.p1":
+      "Somos una empresa innovadora orientada a dar soluciones y dedicada a brindar acceso a tecnologías blockchain e inteligencia artificial mediante el uso de energía renovable y a costos accesibles.",
+    "company.values.p2":
+      "Nuestra visión es transformar el sector tecnológico eliminando barreras a través de una infraestructura tecnológica y energética global que sea eficiente y accesible. Todo esto, mientras impulsamos un futuro más verde y rentable para el ecosistema.",
+    "company.lead.h2": "Conocé al equipo de liderazgo",
+    "company.lead.p":
+      "Somos un equipo multidisciplinario galardonado con sede en Paraguay y raíces en Uruguay, con pasión por crear infraestructura innovadora y descentralizada. Trabajamos con empresas e individuos para crear una empresa sólida en la que confíen nuestros inversores y clientes.",
+    "company.team.dlg_close": "Cerrar",
+    "company.team.linkedin_aria": "Perfil de LinkedIn (se abre en una pestaña nueva)",
+    "company.team.linkedin_label": "LinkedIn",
+    "company.team.read_bio": "Ver biografía",
+    "company.m.fab.role": "Co-Fundador",
+    "company.m.fab.name": "Fabrizio Bianchi",
+    "company.m.fab.b1":
+      "Apasionado por la tecnología y la innovación, Fabrizio es un líder especializado en infraestructura de gran escala y centros de datos de alto rendimiento. Con más de 20 años de experiencia en el sector, ha sido pionero en la minería industrial de Bitcoin y criptomonedas en Uruguay, consolidándose como un referente en la región y proyectando su visión hacia el ámbito global.",
+    "company.m.fab.b2":
+      "Su interés por el emprendimiento y su profundo conocimiento en hardware y software lo han llevado a explorar e implementar soluciones innovadoras en el campo de las tecnologías emergentes. Comprometido con la vanguardia, se dedica a estudiar y adoptar nuevas tendencias, siempre con el objetivo de optimizar procesos y generar impacto positivo.",
+    "company.m.jv.role": "Co-Fundador",
+    "company.m.jv.name": "Jose Luis Vila Soler",
+    "company.m.jv.b1":
+      "Licenciado en Administración de Empresas con más de 15 años de experiencia en gestión de negocios, se especializa en finanzas, marketing, fidelización de clientes y business intelligence. Su enfoque se centra en el análisis estratégico de datos, optimizando procesos y generando valor en cada proyecto que lidera.",
+    "company.m.jv.b2":
+      "Impulsado por una fuerte pasión por el emprendimiento, ha diversificado su trayectoria invirtiendo activamente en el sector agropecuario, donde continúa desarrollando proyectos en ganadería y agricultura.",
+    "company.m.jv.b3a":
+      "Durante una temporada en Estados Unidos, exploró el trading de acciones y criptomonedas, lo que despertó su interés por la tecnología. Esto lo llevó a adentrarse en la programación y a investigar el minado de criptomonedas, culminando en la creación de su proyecto más reciente: ",
+    "company.m.jv.brand": "Hashrate Space",
+    "company.m.jv.b3b": ".",
+    "company.m.jv.b4":
+      "Este proyecto destaca su dedicación a explorar nuevas oportunidades, fusionando datos, tecnología y estrategia para construir soluciones prácticas y novedosas. Con un enfoque dinámico, sigue liderando iniciativas que abren camino a nuevas posibilidades en los negocios y la tecnología.",
+    "company.m.af.role": "Co-Fundador",
+    "company.m.af.name": "Anthony Figueroa",
+    "company.m.af.b1":
+      "Ingeniero de Sistemas y Director de Tecnología (CTO), impulsado por tecnologías transformadoras e innovación de alto impacto. Apasionado por construir relaciones estratégicas, resolver desafíos complejos y conectar la visión de negocio con la ejecución técnica para ofrecer soluciones escalables y preparadas para el futuro.",
+    "company.m.af.b2":
+      "Especializado en: Blockchain, Inteligencia Artificial y Aprendizaje Automático, Ciencia de Datos, Plataformas de e-learning, Infraestructura IoT y Tecnologías de la Salud.",
+    "company.m.dg.role": "Ejecutivo de Ventas",
+    "company.m.dg.name": "Damian Gómez",
+    "company.m.dg.b1":
+      "Lidera el área de Alianzas Estratégicas de Negocio en Hashrate, donde es responsable de identificar, estructurar y consolidar alianzas estratégicas que impulsan el crecimiento sostenible de la compañía. Con una sólida visión de negocio y mentalidad orientada a resultados, conecta oportunidades en energía, tecnología y finanzas para apoyar la expansión de la infraestructura y operaciones de minería de alto rendimiento.",
+    "company.m.dg.b2":
+      "Su capacidad para generar relaciones de largo plazo con inversores, proveedores y socios estratégicos ha sido clave en el posicionamiento de Hashrate como un actor relevante en el ecosistema de minería de Bitcoin en la región. Damián combina pensamiento estratégico, ejecución disciplinada y una fuerte orientación a la creación de valor para stakeholders.",
+    "company.m.rg.role": "Desarrollo de Negocios - LATAM",
+    "company.m.rg.name": "Romina Garbino",
+    "company.m.rg.b1":
+      "Profesional enfocada en la identificación de oportunidades comerciales y en el fortalecimiento de la presencia y las alianzas de Hashrate en Argentina y la región. Con una sólida comprensión del mercado local y una visión centrada en la innovación tecnológica, impulsa conexiones clave entre empresas, inversores y oportunidades dentro del ecosistema de infraestructura digital y activos tecnológicos.",
+    "company.m.rg.b2":
+      "A lo largo de su trayectoria, ha desarrollado vínculos con comunidades, startups, partners y actores relevantes, actuando como puente entre necesidades de negocio y soluciones concretas.",
+    "company.m.ab.role": "Desarrollo de Negocios",
+    "company.m.ab.name": "Augusto Biselli",
+    "company.m.ab.b1":
+      "Profesional orientado al desarrollo estratégico de negocios, con experiencia en la identificación de oportunidades comerciales, generación de alianzas estratégicas y expansión de mercados. Se destaca por su visión analítica, capacidad de negociación y enfoque en resultados medibles.",
+    "company.m.ab.b2":
+      "A lo largo de su trayectoria, ha participado activamente en la estructuración y ejecución de estrategias de crecimiento, gestionando relaciones con socios clave, inversores y clientes corporativos. Su perfil combina pensamiento estratégico con ejecución práctica, permitiéndole transformar oportunidades en proyectos concretos y rentables.",
 
     // Filtros
     "filter.label": "Filtrar",
@@ -588,6 +666,16 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "header.lang_en": "EN",
     "header.lang_hint": "Language",
 
+    "footer.strip_region": "Site footer",
+    "footer.brand_slogan": "High-performance infrastructure platform for Bitcoin mining",
+    "footer.col_company": "Company",
+    "footer.col_media": "Media",
+    "footer.col_social": "Social",
+    "footer.media.site": "Hashrate.space",
+    "footer.media.video": "Corporate video",
+    "footer.social.instagram": "Instagram — Hashrate Space",
+    "footer.social.linkedin": "LinkedIn — Hashrate Space",
+    "footer.social.x": "X (Twitter) — Hashrate Space",
     "footer.sgi": "Internal Management System (SGI)",
     "footer.copyright": "© {{year}} Hashrate Space. All rights reserved.",
 
@@ -715,6 +803,72 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "corp.company.title": "Company",
     "corp.company.body":
       "Hashrate Space develops and operates Bitcoin mining infrastructure in the region, with a focus on energy, reliability and close support.",
+
+    "company.doc_title": "Company – Hashrate Space",
+    "company.meta_desc":
+      "HRS GROUP S.A.: infrastructure and HPC in Paraguay. Hashrate Space leadership team — Bitcoin mining and datacenters.",
+    "company.intro.h3": "Why we're different",
+    "company.intro.p1":
+      "HRS GROUP S.A. is a company specialized in infrastructure and High Performance Computing based in Paraguay. We provide access to energy at low costs and more than 11 years of know-how in technological infrastructure. Our focus is to provide our clients with complete and customized solutions that cover all the needs related to infrastructure and high availability data centers for cryptocurrency mining.",
+    "company.intro.p2":
+      "Our offer focuses on creating a state-of-the-art ecosystem where computing equipment operates automatically and efficiently, generating passive profits that are deposited directly into your digital wallet.",
+    "company.intro.p3":
+      "With our advanced technology and innovative approach, we guarantee you an exceptional and maximized experience in terms of profitability. We take care of everything so that you only have to worry about enjoying the benefits.",
+    "company.intro.img_alt": "ASIC infrastructure in operation",
+    "company.values.h3": "Our core value",
+    "company.values.p1":
+      "We are an innovative solutions-oriented company dedicated to providing access to blockchain and artificial intelligence technologies through the use of renewable energy and at affordable costs.",
+    "company.values.p2":
+      "Our vision is to transform the technology sector by removing barriers through a global technological and energy infrastructure that is efficient and accessible. All this, while driving a greener and more profitable future for the ecosystem.",
+    "company.lead.h2": "Meet the leadership team",
+    "company.lead.p":
+      "We are an award-winning multidisciplinary team based in Paraguay with roots in Uruguay, with a passion for creating innovative and decentralized infrastructure. We work with companies and individuals to create a robust enterprise that is trusted by our investors and clients.",
+    "company.team.dlg_close": "Close",
+    "company.team.linkedin_aria": "LinkedIn profile (opens in a new tab)",
+    "company.team.linkedin_label": "LinkedIn",
+    "company.team.read_bio": "View biography",
+    "company.m.fab.role": "Co-Founder",
+    "company.m.fab.name": "Fabrizio Bianchi",
+    "company.m.fab.b1":
+      "Passionate about technology and innovation, Fabrizio is a leader specialized in large-scale infrastructure and high-performance data centers. With over 20 years of experience in the sector, he has been a pioneer in industrial Bitcoin and cryptocurrency mining in Uruguay, establishing himself as a regional benchmark and projecting his vision globally.",
+    "company.m.fab.b2":
+      "His entrepreneurial drive and deep expertise in hardware and software have led him to explore and implement innovative solutions in emerging technologies. Committed to staying at the forefront, he dedicates himself to studying and adopting new trends, always aiming to optimize processes and create a positive impact.",
+    "company.m.jv.role": "Co-Founder",
+    "company.m.jv.name": "Jose Luis Vila Soler",
+    "company.m.jv.b1":
+      "With a degree in Business Administration and over 15 years of experience in business management, he specializes in finance, marketing, customer loyalty, and business intelligence. His approach focuses on strategic data analysis, optimizing processes, and generating value in every project he leads.",
+    "company.m.jv.b2":
+      "Driven by a strong passion for entrepreneurship, he has diversified his career by actively investing in the agricultural sector, where he continues to develop livestock and farming projects.",
+    "company.m.jv.b3a":
+      "During a period in the United States, he explored stock and cryptocurrency trading, sparking his interest in technology. This led him to delve into programming and investigate cryptocurrency mining, culminating in the creation of his latest venture: ",
+    "company.m.jv.brand": "Hashrate Space",
+    "company.m.jv.b3b": ".",
+    "company.m.jv.b4":
+      "This project reflects his dedication to exploring new opportunities, blending data, technology, and strategy to build practical and innovative solutions. With a dynamic approach, he continues to lead initiatives that pave the way for new possibilities in business and technology.",
+    "company.m.af.role": "Co-Founder",
+    "company.m.af.name": "Anthony Figueroa",
+    "company.m.af.b1":
+      "Systems Engineer and CTO driven by transformative technologies and high-impact innovation. Passionate about building strategic relationships, solving complex challenges, and bridging the gap between business vision and technical execution to deliver scalable, future-ready solutions.",
+    "company.m.af.b2":
+      "Specialized in: Blockchain, Artificial Intelligence & Machine Learning, Data Science, E-learning Platforms, IoT Infrastructure, and Healthcare Technologies.",
+    "company.m.dg.role": "Sales Executive",
+    "company.m.dg.name": "Damian Gómez",
+    "company.m.dg.b1":
+      "He leads the Strategic Business Partnerships area at Hashrate, where he is responsible for identifying, structuring, and consolidating strategic alliances that drive the company’s sustainable growth. With a strong business vision and a results-oriented mindset, he connects opportunities across the energy, technology, and financial sectors to support the expansion of high-performance mining infrastructure and operations.",
+    "company.m.dg.b2":
+      "His ability to build long-term relationships with investors, suppliers, and strategic partners has been instrumental in positioning Hashrate as a key player in the Bitcoin mining ecosystem in the region. Damián combines strategic thinking, disciplined execution, and a strong focus on delivering value to stakeholders.",
+    "company.m.rg.role": "Business Developer LATAM",
+    "company.m.rg.name": "Romina Garbino",
+    "company.m.rg.b1":
+      "A professional focused on identifying commercial opportunities and strengthening Hashrate’s presence and strategic partnerships in Argentina and the region. With a strong understanding of the local market and a vision centered on technological innovation, she drives key connections between companies, investors, and opportunities within the digital infrastructure and technology assets ecosystem.",
+    "company.m.rg.b2":
+      "Throughout her career, she has developed relationships with communities, startups, partners, and key industry stakeholders, acting as a bridge between business needs and concrete solutions.",
+    "company.m.ab.role": "Business Developer",
+    "company.m.ab.name": "Augusto Biselli",
+    "company.m.ab.b1":
+      "Professional focused on strategic business development, with experience in identifying commercial opportunities, building strategic partnerships, and expanding markets. He stands out for his analytical vision, negotiation skills, and strong results-oriented approach.",
+    "company.m.ab.b2":
+      "Throughout his career, he has actively participated in structuring and executing growth strategies, managing relationships with key partners, investors, and corporate clients. His profile combines strategic thinking with practical execution, enabling him to transform opportunities into concrete and profitable projects.",
 
     "filter.label": "Filter",
     "filter.all": "All",

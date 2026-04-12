@@ -22,7 +22,7 @@ const CORP_FAQ_ROWS = [
   { q: "corp.faq.q4" as const, a: "corp.faq.a4" as const },
 ];
 
-const CORP_ANCHOR_IDS = ["servicios", "faq", "empresa", "contacto"] as const;
+const CORP_ANCHOR_IDS = ["servicios", "faq", "contacto"] as const;
 
 const STAT_ICONS = {
   security: `${UP}/Security-150x150.png`,

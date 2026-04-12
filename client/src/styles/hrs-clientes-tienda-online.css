@@ -1,4 +1,4 @@
-/* Clientes tienda online — misma línea que fact-topbar / hosting (#2D5D46) */
+/* Clientes tienda online — paleta host (#2D5D46); barra superior = PageHeader (.sgi-unified-header) */
 
 .cti-page {
   --cti-host: #2d5d46;
@@ -9,32 +9,6 @@
   --cti-accent-mid: #d4e8df;
   --cti-avatar: #9ca3af;
   --cti-avatar-bg: #e5e7eb;
-}
-
-/* Menú superior: mismo verde sólido y acabado que el panel “Cuentas cliente…” */
-.cti-page .fact-topbar {
-  background: var(--cti-host) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  margin-bottom: 1.25rem;
-}
-
-.cti-page .fact-topbar::before,
-.cti-page .fact-topbar::after {
-  opacity: 0.85;
-}
-
-.cti-page .fact-topbar .fact-back {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.45);
-  color: #fff;
-  box-shadow: none;
-}
-
-.cti-page .fact-topbar .fact-back:hover {
-  background: rgba(255, 255, 255, 0.22);
-  border-color: rgba(255, 255, 255, 0.55);
-  color: #fff;
 }
 
 .cti-back-link {

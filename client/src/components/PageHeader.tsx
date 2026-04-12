@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import "../styles/facturacion.css";
+import "../styles/marketplace-hashrate.css";
 
 const LOGO_PRINCIPAL = "/images/HASHRATELOGO2.png";
 const LOGO_FALLBACK = "/images/LOGO-HASHRATE.png";
@@ -18,9 +19,12 @@ interface PageHeaderProps {
   logoLinkAriaLabel?: string;
 }
 
-export function PageHeader({ 
-  title, 
-  showBackButton = true, 
+/**
+ * Barra superior SGI — misma línea visual que el header del marketplace (blanco, sticky, grid estable).
+ */
+export function PageHeader({
+  title,
+  showBackButton = true,
   backTo = "/",
   backText = "Volver al inicio",
   rightContent,
@@ -32,50 +36,41 @@ export function PageHeader({
   useEffect(() => {
     setLogoSrc(logoSrcProp ?? LOGO_PRINCIPAL);
   }, [logoSrcProp]);
-  const useFallback = logoSrc === LOGO_FALLBACK;
+
+  const logoImg = (
+    <img
+      src={logoSrc}
+      alt=""
+      className="sgi-unified-header__logo-img"
+      width={200}
+      height={52}
+      loading="eager"
+      decoding="async"
+      onError={() => setLogoSrc(LOGO_FALLBACK)}
+    />
+  );
 
   return (
-    <header className="fact-topbar">
-      <div className="fact-topbar-left">
-        {logoHref ? (
-          <Link
-            to={logoHref}
-            className="fact-logo-container fact-logo-container--link"
-            aria-label={logoLinkAriaLabel}
-            title="Ir al inicio SGI"
-          >
-            <img 
-              src={logoSrc}
-              alt="" 
-              className={`fact-logo ${useFallback ? "" : "fact-logo--white"}`}
-              width={180}
-              height={48}
-              loading="eager"
-              onError={() => setLogoSrc(LOGO_FALLBACK)}
-            />
-          </Link>
-        ) : (
-          <div className="fact-logo-container">
-            <img 
-              src={logoSrc}
-              alt="Hashrate" 
-              className={`fact-logo ${useFallback ? "" : "fact-logo--white"}`}
-              width={180}
-              height={48}
-              loading="eager"
-              onError={() => setLogoSrc(LOGO_FALLBACK)}
-            />
-          </div>
-        )}
-        <h1>{title}</h1>
-      </div>
-      <div className="fact-topbar-right">
-        {rightContent}
-        {showBackButton && (
-          <Link to={backTo} className="fact-back">
-            {backText}
-          </Link>
-        )}
+    <header className="sgi-unified-header">
+      <div className="container sgi-unified-header__inner">
+        <div className="sgi-unified-header__logo">
+          {logoHref ? (
+            <Link to={logoHref} className="sgi-unified-header__logo-link" aria-label={logoLinkAriaLabel} title="Ir al inicio SGI">
+              {logoImg}
+            </Link>
+          ) : (
+            <span className="sgi-unified-header__logo-wrap">{logoImg}</span>
+          )}
+        </div>
+        <h1 className="sgi-unified-header__title">{title}</h1>
+        <div className="sgi-unified-header__actions">
+          {rightContent}
+          {showBackButton ? (
+            <Link to={backTo} className="fact-back sgi-unified-header__back">
+              {backText}
+            </Link>
+          ) : null}
+        </div>
       </div>
     </header>
   );

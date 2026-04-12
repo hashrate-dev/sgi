@@ -11,6 +11,7 @@ export function MarketplaceSiteHeader() {
   const { pathname, hash } = useLocation();
   const onCatalog = pathname === "/marketplace" || pathname === "/marketplace/";
   const onCorporateHome = pathname === "/marketplace/home" || pathname === "/marketplace/home/";
+  const onCompanyPage = pathname === "/marketplace/company" || pathname === "/marketplace/company/";
   const corpHashCurrent = (id: string) =>
     onCorporateHome && hash === `#${id}` ? ("is-current" as const) : undefined;
   const { user, logout } = useAuth();
@@ -137,7 +138,11 @@ export function MarketplaceSiteHeader() {
               </Link>
             </li>
             <li>
-              <Link to="/marketplace/home#empresa" className={corpHashCurrent("empresa")}>
+              <Link
+                to="/marketplace/company"
+                className={onCompanyPage ? "is-current" : undefined}
+                {...(onCompanyPage ? { "aria-current": "page" as const } : {})}
+              >
                 {t("nav.company")}
               </Link>
             </li>

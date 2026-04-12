@@ -13,19 +13,6 @@
   max-width: 1040px;
 }
 
-/* Topbar: botones ghost como en hosting */
-.hrs-mqt-page .fact-topbar .fact-back {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.45);
-  box-shadow: none;
-}
-
-.hrs-mqt-page .fact-topbar .fact-back:hover {
-  background: rgba(255, 255, 255, 0.22);
-  border-color: rgba(255, 255, 255, 0.55);
-  transform: translateY(-1px);
-}
-
 /* Panel principal: mismo bloque verde que “Nuevo documento” / Detalle de servicios */
 .hrs-mqt-panel {
   position: relative;

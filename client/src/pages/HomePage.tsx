@@ -5,6 +5,7 @@ import { updateMyPassword } from "../lib/api";
 import { canViewMarketplaceQuoteTickets } from "../lib/auth.js";
 import { showToast } from "../components/ToastNotification";
 import "../styles/hrshome.css";
+import "../styles/marketplace-hashrate.css";
 
 const menuItems: Array<{ to: string; icon: string; label: string; desc: string; roles?: string[]; cardClass?: string }> = [
   {
@@ -86,38 +87,40 @@ const visibleMenuItems = menuItems.filter(
   return (
     <div className="hrs-home">
       <div className="hrs-home-container">
-        <header className="hrs-home-header">
-          <div className="hrs-home-brand">
-            <img 
-              src={logoSrc} 
-              alt="HRS Logo" 
-              className="hrs-home-logo"
-              onError={() => {
-                console.error("Error loading HRSLOGO.png, trying fallback");
-                setLogoSrc("/images/HASHRATELOGO2.png");
-              }}
-            />
-            <div>
-              <h1 className="hrs-home-title">HRS GROUP S.A</h1>
-              <p className="hrs-home-subtitle">Sistema de Gestión Interna</p>
+        <header className="sgi-unified-header sgi-unified-header--home">
+          <div className="container sgi-unified-header__inner">
+            <div className="sgi-unified-header__brand">
+              <img
+                src={logoSrc}
+                alt="HRS Logo"
+                className="sgi-unified-header__home-logo"
+                onError={() => {
+                  console.error("Error loading HRSLOGO.png, trying fallback");
+                  setLogoSrc("/images/HASHRATELOGO2.png");
+                }}
+              />
+              <div>
+                <h1 className="sgi-unified-header__home-title">HRS GROUP S.A</h1>
+                <p className="sgi-unified-header__home-sub">Sistema de Gestión Interna</p>
+              </div>
             </div>
+            {user ? (
+              <div className="sgi-unified-header__actions sgi-unified-header__actions--home hrs-home-user">
+                <span className="hrs-home-user-badge">
+                  <i className="bi bi-person-circle me-2" />
+                  <span className="hrs-home-user-email">{user.email || user.username}</span>
+                  <span className="hrs-home-user-role">{user.role}</span>
+                </span>
+                <button type="button" className="btn btn-link py-0 px-2" onClick={() => setShowPasswordModal(true)} title="Cambiar mi contraseña">
+                  <i className="bi bi-key" /> Cambiar contraseña
+                </button>
+                <button type="button" className="hrs-home-logout btn btn-link" onClick={logout}>
+                  <i className="bi bi-box-arrow-right me-1" />
+                  Cerrar sesión
+                </button>
+              </div>
+            ) : null}
           </div>
-          {user && (
-            <div className="hrs-home-user">
-              <span className="hrs-home-user-badge">
-                <i className="bi bi-person-circle me-2" />
-                <span className="hrs-home-user-email">{user.email || user.username}</span>
-                <span className="hrs-home-user-role">{user.role}</span>
-              </span>
-              <button type="button" className="btn btn-link py-0 px-2" onClick={() => setShowPasswordModal(true)} title="Cambiar mi contraseña">
-                <i className="bi bi-key" /> Cambiar contraseña
-              </button>
-              <button type="button" className="hrs-home-logout btn btn-link" onClick={logout}>
-                <i className="bi bi-box-arrow-right me-1" />
-                Cerrar sesión
-              </button>
-            </div>
-          )}
         </header>
 
         <main className="hrs-home-grid">
