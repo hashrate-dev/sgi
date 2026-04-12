@@ -345,7 +345,7 @@ function createReportesAreaChart(
           pointBackgroundColor: "#ffffff",
           pointBorderColor: "#2563eb",
           pointBorderWidth: 2,
-          backgroundColor: (context) => {
+          backgroundColor: (context: { chart: ChartInstance; datasetIndex: number }) => {
             const chart = context.chart;
             const { ctx, chartArea } = chart;
             if (!chartArea) return "rgba(37, 99, 235, 0.08)";
@@ -461,7 +461,7 @@ function createReportesRankingCumulativeChart(
     type: "line",
     data: {
       labels,
-      datasets: ordered.map((s, datasetIndex) => ({
+      datasets: ordered.map((s) => ({
         label: s.label,
         data: s.data,
         borderColor: s.borderColor,
@@ -473,7 +473,7 @@ function createReportesRankingCumulativeChart(
         pointBackgroundColor: "#ffffff",
         pointBorderColor: s.borderColor,
         pointBorderWidth: 2,
-        backgroundColor: (context) => {
+        backgroundColor: (context: { chart: ChartInstance; datasetIndex: number }) => {
           const chart = context.chart;
           const { ctx, chartArea } = chart;
           if (!chartArea) return "transparent";
@@ -505,16 +505,16 @@ function createReportesRankingCumulativeChart(
             padding: ordered.length > 20 ? 6 : 10,
             boxWidth: 8,
             boxHeight: 8,
-            font: { size: ordered.length > 24 ? 9 : 10, weight: "600" },
+            font: { size: ordered.length > 24 ? 9 : 10, weight: 600 },
             color: "#64748b",
           },
         },
         tooltip: {
           backgroundColor: "rgba(255, 255, 255, 0.98)",
           titleColor: "#0f172a",
-          titleFont: { size: 13, weight: "700" },
+          titleFont: { size: 13, weight: 700 },
           bodyColor: "#334155",
-          bodyFont: { size: 12, weight: "500" },
+          bodyFont: { size: 12, weight: 500 },
           borderColor: "#e2e8f0",
           borderWidth: 1,
           padding: 14,
