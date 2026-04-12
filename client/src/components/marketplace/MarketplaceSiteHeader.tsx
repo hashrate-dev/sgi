@@ -47,15 +47,15 @@ export function MarketplaceSiteHeader() {
             role="group"
             aria-label={t("header.lang_hint")}
           >
-            {(["es", "en"] as const).map((code) => (
+            {(["es", "en", "pt"] as const satisfies readonly MarketplaceLang[]).map((code) => (
               <button
                 key={code}
                 type="button"
                 className={`market-lang-switch__btn${lang === code ? " active" : ""}`}
-                onClick={() => setLang(code as MarketplaceLang)}
+                onClick={() => setLang(code)}
                 aria-pressed={lang === code}
               >
-                {code === "es" ? t("header.lang_es") : t("header.lang_en")}
+                {code === "es" ? t("header.lang_es") : code === "en" ? t("header.lang_en") : t("header.lang_pt")}
               </button>
             ))}
           </div>

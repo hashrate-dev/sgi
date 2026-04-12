@@ -233,8 +233,13 @@ export function MarketplaceCorporateHomePage() {
                       aria-controls={videoTitleId}
                       aria-label={t("corp.play_video")}
                     >
-                      <svg className="market-corp-play__svg" viewBox="0 0 600 800" width="72" height="96" aria-hidden>
-                        <path fill="currentColor" d="M0-1.79v800L600,395L0-1.79z" />
+                      <svg className="market-corp-play__svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden>
+                        <path
+                          fill="currentColor"
+                          fillRule="evenodd"
+                          d="M4.5 5.653c0-1.427 1.529-2.33 2.779-1.643l11.54 6.347c1.295.712 1.295 2.573 0 3.286L7.28 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z"
+                          clipRule="evenodd"
+                        />
                       </svg>
                     </button>
                   </div>
@@ -738,48 +743,7 @@ export function MarketplaceCorporateHomePage() {
           {/* Un solo degradado (como bloque Contacto) para franja empresa + pie — sin línea entre ambos */}
           <div className="market-corp-end-band">
             <div className="market-corp-end-band__gradient" aria-hidden />
-            <section id="empresa" className="market-corp-strip market-corp-anchor" aria-label={t("corp.company.title")}>
-              <div className="market-corp-strip__inner">
-                <div className="market-corp-strip__brand">
-                  <img
-                    src={`${UP}/hashrate-white-300x46.png`}
-                    alt="Hashrate Space"
-                    width={300}
-                    height={46}
-                    loading="lazy"
-                  />
-                  <p className="market-corp-strip__tagline">{t("corp.strip.tagline")}</p>
-                </div>
-                <div className="market-corp-strip__cols">
-                  <div>
-                    <h3 className="market-corp-strip__h3">{t("corp.company.title")}</h3>
-                    <ul className="market-corp-strip__links">
-                      <li>
-                        <button type="button" onClick={() => goCorpHash("servicios")}>
-                          {t("corp.strip.services")}
-                        </button>
-                      </li>
-                      <li>
-                        <Link to="/marketplace">{t("corp.strip.equipment")}</Link>
-                      </li>
-                    </ul>
-                  </div>
-                  <div>
-                    <h3 className="market-corp-strip__h3">{t("corp.strip.investors")}</h3>
-                    <button
-                      type="button"
-                      className="market-corp-btn market-corp-btn--see-through market-corp-btn--strip"
-                      onClick={() => {
-                        window.location.href = "mailto:build@hashrate.space";
-                      }}
-                    >
-                      {t("corp.strip.write_us")}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </section>
-            <MarketplaceSiteFooter />
+            <MarketplaceSiteFooter variant="corp-end-band" />
           </div>
         </main>
       </div>

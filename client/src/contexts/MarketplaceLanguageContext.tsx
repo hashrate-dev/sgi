@@ -14,7 +14,7 @@ const STORAGE_KEY = "marketplace-lang";
 function readStoredLang(): MarketplaceLang {
   try {
     const v = localStorage.getItem(STORAGE_KEY);
-    if (v === "en" || v === "es") return v;
+    if (v === "en" || v === "es" || v === "pt") return v;
   } catch {
     /* ignore */
   }
@@ -43,7 +43,7 @@ export function MarketplaceLanguageProvider({ children }: { children: ReactNode 
   }, []);
 
   useEffect(() => {
-    document.documentElement.lang = lang === "en" ? "en" : "es";
+    document.documentElement.lang = lang === "en" ? "en" : lang === "pt" ? "pt" : "es";
   }, [lang]);
 
   const value = useMemo<Ctx>(

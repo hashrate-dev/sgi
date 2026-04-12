@@ -1,9 +1,11 @@
 /**
- * Cadenas Marketplace (/marketplace) — ES + EN.
+ * Cadenas Marketplace (/marketplace) — ES + EN + PT-BR.
  * Catálogo de productos (nombres, specs en BD) permanece en el idioma de origen.
  */
 
-export type MarketplaceLang = "es" | "en";
+import { MARKETPLACE_STRINGS_PT } from "./marketplace-strings-pt.js";
+
+export type MarketplaceLang = "es" | "en" | "pt";
 
 const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
   es: {
@@ -46,10 +48,12 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "header.logout": "Salir",
     "header.lang_es": "ES",
     "header.lang_en": "EN",
+    "header.lang_pt": "PT",
     "header.lang_hint": "Idioma",
 
     // Footer
     "footer.sgi": "Sistema de Gestión Interna (SGI)",
+    "footer.copyright": "© {{year}} Hashrate Space. Todos los derechos reservados.",
 
     // Catálogo principal
     "catalog.kicker": "Tienda online",
@@ -585,6 +589,7 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "header.lang_hint": "Language",
 
     "footer.sgi": "Internal Management System (SGI)",
+    "footer.copyright": "© {{year}} Hashrate Space. All rights reserved.",
 
     "catalog.kicker": "Online store",
     "catalog.intro": "Choose your equipment, fill the cart, and place your order.",
@@ -1072,6 +1077,7 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "reg.login_link": "Sign in",
     "reg.back_shop": "← Back to store",
   },
+  pt: MARKETPLACE_STRINGS_PT,
 };
 
 export function t(lang: string, key: string): string {
@@ -1094,5 +1100,7 @@ export function mailtoHref(lang: string, email: string, subjectKey: string): str
 
 /** Locale para números / fechas en marketplace */
 export function marketplaceLocale(lang: string): string {
-  return lang === "en" ? "en-US" : "es-PY";
+  if (lang === "en") return "en-US";
+  if (lang === "pt") return "pt-BR";
+  return "es-PY";
 }

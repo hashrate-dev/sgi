@@ -7,7 +7,7 @@ export function SgiAdminFixedFooter() {
     <footer className="sgi-admin-fixed-footer" role="contentinfo" aria-label="Hashrate Space">
       <div className="sgi-admin-fixed-footer__row">
         <p className="sgi-admin-fixed-footer__copy mb-0">
-          © {year} Hashrate Space ·{" "}
+          © {year} Hashrate Space. Todos los derechos reservados. ·{" "}
           <a href="https://hashrate.space" target="_blank" rel="noopener noreferrer">
             hashrate.space
           </a>

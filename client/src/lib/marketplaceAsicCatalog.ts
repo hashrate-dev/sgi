@@ -3,6 +3,8 @@
  * Fotos en `client/public/images/` — nombres con espacio tal cual en disco (Vite las sirve en `/images/...`).
  */
 
+import { marketplaceLocale } from "./i18n.js";
+
 export type AsicAlgo = "sha256" | "scrypt";
 
 export type AsicDetailIcon = "bolt" | "chip" | "sun" | "fan" | "droplet" | "btc" | "dual";
@@ -24,12 +26,10 @@ export function parseLocaleNumberForDisplay(numStr: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-const enLang = (lang?: string) => lang === "en" || lang === "en-US";
-
 /** Hashrate visible (TH/s o MH/s) prorrateado por fracción del mismo equipo. */
 export function scaleHashrateDisplay(hashrate: string, factor: number, lang?: string): string {
   if (factor >= 0.999) return hashrate;
-  const loc = enLang(lang) ? "en-US" : "es-PY";
+  const loc = marketplaceLocale(lang ?? "es");
   const trimmed = hashrate.trim();
   const th = /([\d.,]+)\s*TH\/s/i.exec(trimmed);
   if (th) {
@@ -56,7 +56,7 @@ export function scaleHashrateDisplay(hashrate: string, factor: number, lang?: st
 /** Texto de fila de potencia "3.800 W" (y similares) prorrateado. */
 export function scaleWattDetailText(text: string, factor: number, lang?: string): string {
   if (factor >= 0.999) return text;
-  const loc = enLang(lang) ? "en-US" : "es-PY";
+  const loc = marketplaceLocale(lang ?? "es");
   return text.replace(/(\d{1,3}(?:\.\d{3})+|\d+(?:,\d+)?)\s*W\b/gi, (full, wattStr: string) => {
     const v = parseLocaleNumberForDisplay(wattStr);
     if (v == null) return full;
@@ -79,7 +79,7 @@ export function scaleDetailRowTextForShare(
 /** Escala cantidades en líneas de rendimiento (~BTC, USDT, LTC, DOGE). */
 export function scaleYieldDisplayLine(line: string, factor: number, lang?: string): string {
   if (factor >= 0.999) return line;
-  const loc = enLang(lang) ? "en-US" : "es-PY";
+  const loc = marketplaceLocale(lang ?? "es");
   const fmtBtc = (n: number) =>
     n.toLocaleString(loc, { minimumFractionDigits: 6, maximumFractionDigits: 10 });
   const fmtDec = (n: number, maxFrac: number) =>

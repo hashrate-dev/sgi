@@ -246,17 +246,39 @@ export function MarketplaceCartOrdersPanel({ onBackToCart }: Props) {
       showToast(t("orders.excel_empty"), "warning", t("orders.title"));
       return;
     }
-    const en = lang === "en";
-    const h = {
-      order: en ? "Order" : "Orden",
-      ticket: en ? "Ticket" : "Ticket",
-      status: en ? "Status" : "Estado",
-      lines: en ? "Lines" : "Líneas",
-      units: en ? "Units" : "Unidades",
-      total: en ? "Total USD" : "Total USD",
-      created: en ? "Created" : "Creado",
-      updated: en ? "Updated" : "Actualizado",
-    };
+    const h =
+      lang === "en"
+        ? {
+            order: "Order",
+            ticket: "Ticket",
+            status: "Status",
+            lines: "Lines",
+            units: "Units",
+            total: "Total USD",
+            created: "Created",
+            updated: "Updated",
+          }
+        : lang === "pt"
+          ? {
+              order: "Pedido",
+              ticket: "Ticket",
+              status: "Status",
+              lines: "Linhas",
+              units: "Unidades",
+              total: "Total USD",
+              created: "Criado",
+              updated: "Atualizado",
+            }
+          : {
+              order: "Orden",
+              ticket: "Ticket",
+              status: "Estado",
+              lines: "Líneas",
+              units: "Unidades",
+              total: "Total USD",
+              created: "Creado",
+              updated: "Actualizado",
+            };
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet(t("orders.excel_sheet").slice(0, 31));
     ws.columns = [
@@ -333,7 +355,7 @@ export function MarketplaceCartOrdersPanel({ onBackToCart }: Props) {
                   autoComplete="off"
                 />
                 <button type="button" className="cti-btn-limpiar" onClick={() => setSearch("")}>
-                  {lang === "en" ? "Clear" : "Limpiar"}
+                  {t("orders.clear_search")}
                 </button>
               </div>
             </div>

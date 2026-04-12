@@ -1,11 +1,12 @@
 /* Marketplace ASIC — estilo claro (mockup: fondo gris, tarjetas blancas, precio rojo, verde acción) */
 
 .marketplace-asic-page {
+  --marketplace-page-bg: #f3f4f6;
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  background: #f3f4f6;
+  background: var(--marketplace-page-bg);
   color: #1f2937;
   font-family: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
@@ -68,7 +69,7 @@
   margin-left: auto;
 }
 
-/* Conmutador ES/EN — header claro: texto y bordes oscuros (antes era blanco sobre blanco = invisible) */
+/* Conmutador ES/EN/PT — header claro: texto y bordes oscuros (antes era blanco sobre blanco = invisible) */
 .market-lang-switch {
   flex-shrink: 0;
   display: inline-flex;
@@ -80,8 +81,8 @@
 }
 
 .market-lang-switch .market-lang-switch__btn {
-  padding: 0.35rem 0.7rem;
-  font-size: 0.75rem;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.7rem;
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: 0.02em;
@@ -510,21 +511,24 @@ button.market-link-hrs {
   filter: none;
 }
 
+/* Centrado en el viewport: al hacer scroll del catálogo de fondo, el formulario sigue en el centro */
 .market-login-page__card-float {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
+  position: fixed;
+  inset: 0;
   display: flex;
+  align-items: center;
   justify-content: center;
-  z-index: 4;
+  z-index: 120;
   pointer-events: none;
-  padding: 0 1rem;
+  padding: max(0.75rem, env(safe-area-inset-top, 0px)) 1rem max(0.75rem, env(safe-area-inset-bottom, 0px));
 }
 
 .market-login-page__form-card {
   width: 100%;
   max-width: 420px;
+  max-height: min(90dvh, 640px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   pointer-events: auto;
   box-shadow:
     0 22px 48px rgba(15, 23, 42, 0.16),
@@ -966,127 +970,76 @@ button.market-link-hrs {
   transform: translateY(1px);
 }
 
-/* ——— Footer ——— */
+/* ——— Footer marketplace: misma franja que home corporativa (gradiente + Empresa / Inversores + ©) ——— */
 .site-footer--marketplace {
   margin-top: auto;
-  padding: 1.25rem 0;
-  border-top: 1px solid #e5e7eb;
-  background: #fff;
+  padding: 0;
+  border-top: none;
+  background: transparent;
 }
 
-/* Admin A/B: pie siempre visible (antes quedaba al final del catálogo y había que scrollear mucho) */
-.marketplace-asic-page:has(.site-footer--marketplace--fixed) {
-  padding-bottom: 52px;
-  box-sizing: border-box;
-}
-
-@media (max-width: 768px) {
-  .marketplace-asic-page:has(.site-footer--marketplace--fixed) {
-    padding-bottom: 78px;
-  }
-}
-
-.site-footer--marketplace.site-footer--marketplace--fixed {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 1010;
-  margin-top: 0;
-  padding: 0.65rem 0;
-  padding-bottom: calc(0.65rem + env(safe-area-inset-bottom, 0px));
-  box-shadow: 0 -2px 10px rgba(15, 23, 42, 0.06);
-}
-
-.site-footer--marketplace--fixed .site-footer--marketplace__row {
-  padding-left: max(1.25rem, env(safe-area-inset-left, 0px));
-  padding-right: max(1.25rem, env(safe-area-inset-right, 0px));
-}
-
-/* Ancho completo del viewport (sin .container) para que SGI quede contra el borde derecho */
-.site-footer--marketplace__row {
+/* Catálogo / login / registro: banda propia con degradado (mismo tono que .market-corp-end-band) */
+.site-footer--marketplace--standalone .site-footer--marketplace__band {
+  position: relative;
+  overflow: hidden;
   width: 100%;
-  max-width: 100%;
-  margin: 0;
-  padding: 0 max(1.25rem, env(safe-area-inset-right, 0px)) 0 max(1.25rem, env(safe-area-inset-left, 0px));
-  box-sizing: border-box;
+}
+
+.site-footer--marketplace__band-grad {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(135deg, #015b93 0%, #5cc866 100%);
+  opacity: 0.88;
+  pointer-events: none;
+}
+
+.site-footer--marketplace .site-footer--marketplace__strip,
+.site-footer--marketplace--corp-end .site-footer--marketplace__strip {
+  position: relative;
+  z-index: 1;
+  margin: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+  background: transparent;
+  color: #fff;
+  overflow: hidden;
+}
+
+.site-footer--marketplace--standalone .site-footer--marketplace__strip {
+  margin-left: 0;
+  margin-right: 0;
+  padding: clamp(1.75rem, 5vw, 3rem) 1.25rem 1.15rem;
+}
+
+.site-footer--marketplace--corp-end .site-footer--marketplace__strip {
+  padding: clamp(1.75rem, 5vw, 3rem) 1.25rem 0.85rem;
+  margin-bottom: 0;
+}
+
+
+.site-footer--marketplace__legal {
+  position: relative;
+  z-index: 1;
+  padding: 0.45rem 1rem 1.1rem;
   text-align: center;
 }
 
-/* Sin SGI: copyright centrado, mismo ancho visual que el resto del sitio */
-.site-footer--marketplace__row:not(.site-footer--marketplace__row--with-sgi) {
-  display: block;
-  max-width: 1200px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-/* Con SGI: copyright centrado en pantalla; SGI al borde derecho (no compite con el bloque central) */
-.site-footer--marketplace__row--with-sgi {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center;
-  column-gap: clamp(1rem, 4vw, 2.5rem);
-  row-gap: 0.5rem;
-  text-align: initial;
-  max-width: none;
-  margin-left: 0;
-  margin-right: 0;
+.site-footer--marketplace--standalone .site-footer--marketplace__legal {
+  padding-bottom: calc(1.1rem + env(safe-area-inset-bottom, 0px));
 }
 
 .site-footer--marketplace__copy {
   margin: 0;
-  font-size: 0.8rem;
-  color: #6b7280;
-  text-align: center;
-}
-
-.site-footer--marketplace__row--with-sgi .site-footer--marketplace__copy {
-  grid-column: 2;
-  justify-self: center;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
   text-align: center;
 }
 
 .site-footer--marketplace a[href^="http"] {
-  color: #059669;
-  font-weight: 500;
-}
-
-.site-footer--marketplace__sgi-link {
-  grid-column: 3;
-  justify-self: end;
-  font-size: 0.8rem;
-  color: #047857;
-  font-weight: 600;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.site-footer--marketplace__sgi-link:hover {
-  text-decoration: underline;
-  color: #059669;
-}
-
-@media (max-width: 768px) {
-  .site-footer--marketplace__row--with-sgi {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto;
-    justify-items: center;
-    text-align: center;
-  }
-
-  .site-footer--marketplace__row--with-sgi .site-footer--marketplace__copy {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .site-footer--marketplace__row--with-sgi .site-footer--marketplace__sgi-link {
-    grid-column: 1;
-    grid-row: 2;
-    justify-self: center;
-    white-space: normal;
-    text-align: center;
-  }
+  color: inherit;
+  font-weight: inherit;
 }
 
 /* ——— Modal (detalle estilo vitrina 3 columnas) ——— */
@@ -4447,24 +4400,18 @@ button.product-modal__btn--quote-cart:hover {
   }
 }
 
-.market-corp-end-band .site-footer.site-footer--marketplace:not(.site-footer--marketplace--fixed) {
+.market-corp-end-band .site-footer.site-footer--marketplace--corp-end {
   position: relative;
   z-index: 1;
   margin-top: 0;
   border-top: none !important;
   background: transparent !important;
   box-shadow: none;
-  padding: 0.85rem 0 1.25rem;
+  padding: 0;
 }
 
-.market-corp-end-band .site-footer.site-footer--marketplace:not(.site-footer--marketplace--fixed) .site-footer--marketplace__copy {
+.market-corp-end-band .site-footer--marketplace--corp-end .site-footer--marketplace__copy {
   color: rgba(255, 255, 255, 0.92);
-}
-
-.market-corp-end-band .site-footer.site-footer--marketplace:not(.site-footer--marketplace--fixed) .site-footer--marketplace__copy a {
-  color: inherit;
-  font-weight: inherit;
-  text-decoration: none;
 }
 
 .market-corp-page .market-intro__desc--lede {
@@ -4944,34 +4891,62 @@ button.product-modal__btn--quote-cart:hover {
 }
 
 .market-corp-play {
+  --corp-play-size: clamp(4.25rem, 11vw, 5.75rem);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: none;
-  background: none;
+  width: var(--corp-play-size);
+  height: var(--corp-play-size);
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 50%;
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0.06) 48%, rgba(255, 255, 255, 0.1) 100%);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.06) inset,
+    0 1px 0 rgba(255, 255, 255, 0.35) inset,
+    0 10px 36px rgba(0, 0, 0, 0.22),
+    0 2px 10px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   cursor: pointer;
   color: #fff;
   font-family: inherit;
-  padding: 0.35rem;
+  font-size: clamp(1.65rem, 4.2vw, 2.15rem);
+  padding: 0;
   line-height: 0;
-  transition: transform 0.2s ease, opacity 0.2s ease;
+  transition:
+    transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.25s ease,
+    border-color 0.2s ease,
+    background 0.25s ease;
 }
 
 .market-corp-play:hover,
 .market-corp-play:focus-visible {
-  transform: scale(1.06);
-  opacity: 0.95;
+  transform: scale(1.07);
+  border-color: rgba(255, 255, 255, 0.58);
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.14) 100%);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.05) inset,
+    0 1px 0 rgba(255, 255, 255, 0.45) inset,
+    0 14px 44px rgba(0, 0, 0, 0.28),
+    0 4px 14px rgba(0, 0, 0, 0.14);
 }
 
 .market-corp-play:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 4px;
-  border-radius: 4px;
+  outline: 2px solid rgba(255, 255, 255, 0.95);
+  outline-offset: 5px;
+}
+
+.market-corp-play:active {
+  transform: scale(1.02);
 }
 
 .market-corp-play__svg {
   display: block;
-  margin-left: 6px;
+  width: 1em;
+  height: 1em;
+  margin-left: 0.12em;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.18));
 }
 
 .market-corp-stats--wp {
@@ -5504,9 +5479,23 @@ button.product-modal__btn--quote-cart:hover {
   opacity: var(--corp-clients-logo-opacity);
 }
 
-/* Bitmain / Elphapex: PNG con gris de “mate” — subir luminancia para igualar logos con transparencia (Canaan, MicroBT) */
+/*
+ * Bitmain / Innosilicon / Elphapex: PNG con caja blanca (mismo truco que Luxor).
+ * Opacidad en el ítem; multiply en la img para fundir blanco con --marketplace-page-bg.
+ */
+.market-corp-clients__item--bitmain,
+.market-corp-clients__item--innosilicon,
+.market-corp-clients__item--elphapex {
+  background-color: var(--marketplace-page-bg, #f3f4f6);
+  opacity: var(--corp-clients-logo-opacity, 0.56);
+}
+
 .market-corp-clients__item--bitmain img,
+.market-corp-clients__item--innosilicon img,
 .market-corp-clients__item--elphapex img {
+  mix-blend-mode: multiply;
+  opacity: 1;
+  /* Un poco más de brillo/contraste para acercarlos a logos con alpha (Canaan, MicroBT, IceRiver) */
   filter: grayscale(1) brightness(1.22) contrast(1.2);
 }
 
@@ -5529,31 +5518,47 @@ button.product-modal__btn--quote-cart:hover {
   }
 }
 
-/* FAQ home corporativa: banner oscuro tipo showcase + imagen S21 local + acordeón (estilo marketplace) */
+/* FAQ home corporativa: fondo aurora (foto) + velo oscuro + imagen S21 + acordeón */
 .market-corp-faq-spotlight {
   position: relative;
   border-radius: 14px;
   overflow: hidden;
-  /* Base un poco más clara que el negro‑verde profundo */
-  background: #0f1c18;
+  background-color: #030d14;
+  background-image: url("/images/market-corp-faq-aurora-bg.png");
+  background-size: cover;
+  background-position: center 26%;
+  background-repeat: no-repeat;
   border: 1px solid rgba(148, 163, 184, 0.28);
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.2);
+}
+
+@media (max-width: 959.98px) {
+  .market-corp-faq-spotlight {
+    /* En columna única priorizamos cielo / aurora */
+    background-position: center 18%;
+  }
 }
 
 .market-corp-faq-spotlight__gradient {
   position: absolute;
   inset: 0;
-  /* Degradado verde/azul algo más luminoso + más presencia */
-  background: linear-gradient(135deg, #0f6ba3 0%, #2a6b52 42%, #6fd98a 100%);
-  opacity: 0.36;
+  /* Velo sobre la foto: contraste para texto blanco y acordeón, sin tapar del todo el verde */
+  background: linear-gradient(
+    125deg,
+    rgba(2, 12, 22, 0.82) 0%,
+    rgba(4, 26, 22, 0.5) 45%,
+    rgba(2, 14, 26, 0.88) 100%
+  );
+  opacity: 1;
   pointer-events: none;
 }
 
 .market-corp-faq-spotlight__shine {
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse 90% 55% at 20% 0%, rgba(255, 255, 255, 0.14), transparent 58%);
+  background: radial-gradient(ellipse 95% 60% at 18% 8%, rgba(255, 255, 255, 0.1), transparent 55%);
   pointer-events: none;
+  opacity: 0.85;
 }
 
 .market-corp-faq-spotlight__inner {
@@ -6347,6 +6352,7 @@ button.product-modal__btn--quote-cart:hover {
   padding: 0.5rem 0 0.15rem;
 }
 
+/* Fondo del PNG (blanco) → mismo gris que la página (#f3f4f6): multiply + base explícita */
 .market-corp-luxor__link {
   display: inline-flex;
   align-items: center;
@@ -6354,13 +6360,15 @@ button.product-modal__btn--quote-cart:hover {
   line-height: 0;
   text-decoration: none;
   border: none;
-  background: transparent;
+  background-color: var(--marketplace-page-bg, #f3f4f6);
   box-shadow: none;
   cursor: pointer;
+  opacity: var(--corp-clients-logo-opacity, 0.56);
+  transition: opacity 0.2s ease;
 }
 
-.market-corp-luxor__link:hover .market-corp-luxor__img,
-.market-corp-luxor__link:focus-visible .market-corp-luxor__img {
+.market-corp-luxor__link:hover,
+.market-corp-luxor__link:focus-visible {
   opacity: 0.68;
 }
 
@@ -6379,8 +6387,8 @@ button.product-modal__btn--quote-cart:hover {
   object-fit: contain;
   object-position: center;
   filter: grayscale(1) brightness(1.02);
-  opacity: var(--corp-clients-logo-opacity, 0.56);
-  transition: opacity 0.2s ease;
+  mix-blend-mode: multiply;
+  opacity: 1;
 }
 
 @media (min-width: 900px) {
@@ -6428,6 +6436,47 @@ button.product-modal__btn--quote-cart:hover {
     grid-template-columns: 1fr 1fr;
     align-items: end;
   }
+}
+
+/*
+ * Footer marketplace: columna Empresa a la derecha (tras reglas genéricas del strip).
+ * Una sola columna de enlaces (sin Inversores).
+ */
+.site-footer--marketplace__strip .market-corp-strip__cols {
+  grid-template-columns: 1fr;
+  width: fit-content;
+  max-width: min(26rem, 100%);
+  margin-left: auto;
+  text-align: right;
+}
+
+/* Logo + tagline desplazado ~2 cm a la izquierda respecto al contenedor */
+.site-footer--marketplace__strip .market-corp-strip__brand {
+  margin-left: -2cm;
+}
+
+@media (min-width: 768px) {
+  .site-footer--marketplace__strip .market-corp-strip__inner {
+    grid-template-columns: 1fr auto;
+    align-items: end;
+  }
+
+  .site-footer--marketplace__strip .market-corp-strip__brand {
+    justify-self: start;
+  }
+
+  .site-footer--marketplace__strip .market-corp-strip__cols {
+    justify-self: end;
+    margin-left: 0;
+  }
+}
+
+.site-footer--marketplace__strip .market-corp-strip__h3 {
+  text-align: right;
+}
+
+.site-footer--marketplace__strip .market-corp-strip__links {
+  text-align: right;
 }
 
 .market-corp-strip__tagline {
@@ -6479,6 +6528,17 @@ button.product-modal__btn--quote-cart:hover {
 .market-corp-strip__links a:hover,
 .market-corp-strip__links button:hover {
   color: #fff;
+}
+
+@media (min-width: 480px) {
+  .site-footer--marketplace__strip .market-corp-strip__cols {
+    grid-template-columns: 1fr;
+  }
+}
+
+.site-footer--marketplace__strip .market-corp-strip__links a,
+.site-footer--marketplace__strip .market-corp-strip__links button {
+  text-align: right;
 }
 
 .market-corp-video-modal {

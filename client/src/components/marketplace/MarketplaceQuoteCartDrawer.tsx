@@ -163,19 +163,12 @@ export function MarketplaceQuoteCartDrawer() {
               <div className="market-quote-drawer__lede-wrap">
                 <p className="market-quote-drawer__lede">{t("drawer.lede")}</p>
                 <p className="market-quote-drawer__login-hint" role="note">
-                  {lang === "en" ? (
-                    <>
-                      To add equipment and save your order in the system,{" "}
-                      <Link to="/marketplace/login">log in</Link> with your account, or if you don&apos;t have one,{" "}
-                      <Link to="/marketplace/registro">create a new account</Link>.
-                    </>
-                  ) : (
-                    <>
-                      Para agregar equipos y guardar tu pedido en el sistema,{" "}
-                      <Link to="/marketplace/login">iniciá sesión</Link> con tu cuenta, o si no tenés cuenta,{" "}
-                      <Link to="/marketplace/registro">creá una cuenta nueva</Link>.
-                    </>
-                  )}
+                  {t("drawer.hint.p1")}{" "}
+                  <Link to="/marketplace/login">{t("drawer.login_link")}</Link> {t("drawer.hint.p2")}{" "}
+                  {t("drawer.client")} {t("drawer.hint.p3")} {t("drawer.admin")}
+                  {t("drawer.hint.p4")}{" "}
+                  <Link to="/marketplace/registro">{t("drawer.register_link")}</Link>
+                  {t("drawer.hint.p5")}
                 </p>
               </div>
             ) : showPipelineOrderHint ? null : n === 0 ? (
