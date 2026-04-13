@@ -3107,11 +3107,54 @@ button.product-modal__btn--quote-cart:hover {
   font-variant-numeric: tabular-nums;
 }
 
+.market-quote-drawer__line-unit--pending {
+  color: #b91c1c;
+}
+
 .market-quote-drawer__line-unit-suffix {
   font-weight: 600;
   font-size: 0.72rem;
   color: #64748b;
   margin-left: 0.15rem;
+}
+
+.market-quote-drawer__line-pending-hint {
+  margin: 0 0 0.45rem;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: #7f1d1d;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+}
+
+.market-quote-drawer__pending-total-banner {
+  margin: 0 0 0.65rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  border: 1px solid #fdba74;
+  background: linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.market-quote-drawer__pending-total-banner-title {
+  display: block;
+  margin: 0 0 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #c2410c;
+}
+
+.market-quote-drawer__pending-total-banner-body {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.45;
+  color: #9a3412;
 }
 
 .market-quote-drawer__stepper {
@@ -3204,6 +3247,11 @@ button.product-modal__btn--quote-cart:hover {
   font-variant-numeric: tabular-nums;
 }
 
+.market-quote-drawer__addon-price--pending {
+  color: #b91c1c;
+  font-variant-numeric: normal;
+}
+
 .market-quote-drawer__line-sub {
   display: flex;
   align-items: center;
@@ -3225,6 +3273,14 @@ button.product-modal__btn--quote-cart:hover {
   color: #0f172a;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
+  text-transform: none;
+}
+
+.market-quote-drawer__line-sub-amt--pending {
+  color: #b91c1c;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0;
   text-transform: none;
 }
 
@@ -3304,6 +3360,12 @@ button.product-modal__btn--quote-cart:hover {
   font-variant-numeric: tabular-nums;
   color: #fff;
   white-space: nowrap;
+}
+
+.market-quote-drawer__total-amt--pending {
+  color: #fecaca;
+  font-size: 1.45rem;
+  letter-spacing: 0.06em;
 }
 
 .market-quote-drawer__foot {

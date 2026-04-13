@@ -11,6 +11,7 @@ import {
 import { canViewMarketplaceQuoteTickets } from "../lib/auth.js";
 import {
   ticketRowLineSubtotalUsd,
+  ticketRowIsEquipmentPricePending,
   ticketRowSharePct,
   QUOTE_ADDON_WARRANTY_USD,
   QUOTE_ADDON_SETUP_USD_FALLBACK,
@@ -347,6 +348,7 @@ export function CotizacionesMarketplacePage() {
                     const shareMult = sharePct / 100;
                     const warrantyUnit = Math.round(QUOTE_ADDON_WARRANTY_USD * shareMult);
                     const setupLbl = sharePct < 100 ? setupCompraHashrateUsd : setupEquipoCompletoUsd;
+                    const linePending = ticketRowIsEquipmentPricePending(row);
                     const sub = ticketRowLineSubtotalUsd(row, {
                       setupEquipoCompletoUsd,
                       setupCompraHashrateUsd,
@@ -357,16 +359,32 @@ export function CotizacionesMarketplacePage() {
                         <td>
                           <div style={{ fontWeight: 700, color: "#0f172a" }}>{name}</div>
                           {inclSetup || inclGar ? (
-                            <div style={{ fontSize: "0.68rem", color: "#0d6efd", marginTop: "0.35rem" }}>
-                              {inclSetup ? `+ Setup ${setupLbl} USD/u` : null}
+                            <div
+                              style={{
+                                fontSize: "0.68rem",
+                                color: linePending ? "#b91c1c" : "#0d6efd",
+                                marginTop: "0.35rem",
+                              }}
+                            >
+                              {inclSetup
+                                ? linePending
+                                  ? "+ Setup: solicitar valor / u."
+                                  : `+ Setup ${setupLbl} USD/u`
+                                : null}
                               {inclSetup && inclGar ? " · " : null}
-                              {inclGar ? `Garantía ${warrantyUnit} USD/u` : null}
+                              {inclGar
+                                ? linePending
+                                  ? "Garantía: solicitar valor / u."
+                                  : `Garantía ${warrantyUnit} USD/u`
+                                : null}
                             </div>
                           ) : null}
                         </td>
                         <td>{qty}</td>
                         <td>{String(row.priceLabel ?? pu)}</td>
-                        <td style={{ fontWeight: 700 }}>{sub.toLocaleString("es-PY")} USD</td>
+                        <td style={{ fontWeight: 700 }}>
+                          {linePending ? "Cotización pendiente" : `${sub.toLocaleString("es-PY")} USD`}
+                        </td>
                       </tr>
                     );
                   })}

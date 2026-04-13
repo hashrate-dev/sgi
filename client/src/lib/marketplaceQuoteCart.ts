@@ -76,6 +76,34 @@ export type QuoteCartLine = {
   includeWarranty: boolean;
 };
 
+/** Misma regla que la vitrina «SOLICITA PRECIO»: sin USD numérico en etiqueta → precio a cotizar. */
+export function quoteLineEquipmentPricePendingFromFields(priceUsd: number, priceLabel: string): boolean {
+  if (priceUsd > 0) return false;
+  const base = priceLabel.replace(/\s*\([^)]*\)\s*$/, "").trim();
+  if (/^[\d.,\s]+\s*USD$/i.test(base)) return false;
+  return true;
+}
+
+/**
+ * Línea agregada sin precio USD de equipo (p. ej. vitrina «SOLICITA PRECIO»).
+ * Setup y garantía tampoco se tratan como importe fijo: los cotiza el equipo comercial.
+ */
+export function quoteCartLineIsEquipmentPricePending(l: QuoteCartLine): boolean {
+  return quoteLineEquipmentPricePendingFromFields(l.priceUsd, l.priceLabel);
+}
+
+/** Ítem persistido en ticket (JSON) — misma lógica que `quoteCartLineIsEquipmentPricePending`. */
+export function ticketRowIsEquipmentPricePending(row: Record<string, unknown>): boolean {
+  const priceUsd = Math.max(0, Math.round(Number(row.priceUsd) || 0));
+  const pl = row.priceLabel;
+  const priceLabel = typeof pl === "string" ? pl : formatAsicPriceUsd(priceUsd);
+  return quoteLineEquipmentPricePendingFromFields(priceUsd, priceLabel);
+}
+
+export function quoteCartHasEquipmentPricePending(lines: QuoteCartLine[]): boolean {
+  return lines.some(quoteCartLineIsEquipmentPricePending);
+}
+
 const MAX_QTY = 99;
 
 /** Clave única por producto + fracción de hashrate (misma máquina 100% y 25% = dos líneas). */
@@ -296,6 +324,7 @@ function shareAddonMult(l: QuoteCartLine): number {
  * La garantía sigue prorrateada al % cuando la línea es porción (25/50/75).
  */
 export function quoteCartLineAddonsUsd(l: QuoteCartLine, pricing?: QuoteCartPricing): number {
+  if (quoteCartLineIsEquipmentPricePending(l)) return 0;
   const setupUnit = quoteCartSetupUnitUsd(l, pricing);
   const m = shareAddonMult(l);
   let a = 0;
@@ -323,6 +352,7 @@ export function ticketRowSharePct(row: Record<string, unknown>): number {
 export function ticketRowLineSubtotalUsd(row: Record<string, unknown>, pricing?: QuoteCartPricing): number {
   const qty = Number(row.qty) || 0;
   const pu = Number(row.priceUsd) || 0;
+  if (ticketRowIsEquipmentPricePending(row)) return qty * pu;
   const pct = ticketRowSharePct(row);
   const setupUnit =
     pct < 100
@@ -358,34 +388,51 @@ export function buildQuoteMessage(
       const pct = lineHashrateSharePct(l);
       const shareNote =
         pct < 100 ? ` — Fracción hashrate: ${pct}% de 1 equipo (misma máquina)` : "";
+      const pending = quoteCartLineIsEquipmentPricePending(l);
       const eq = quoteCartLineEquipmentSubtotalUsd(l);
       const m = shareAddonMult(l);
       const addons: string[] = [];
       if (l.includeSetup) {
-        const unit = quoteCartSetupUnitUsd(l, pricing);
-        addons.push(
-          `Setup en granja: ${unit.toLocaleString("es-PY")} USD × ${l.qty} u. = ${(l.qty * unit).toLocaleString("es-PY")} USD`
-        );
+        if (pending) {
+          addons.push(`Setup en granja: importe a cotizar con el equipo comercial de Hashrate (×${l.qty} u.)`);
+        } else {
+          const unit = quoteCartSetupUnitUsd(l, pricing);
+          addons.push(
+            `Setup en granja: ${unit.toLocaleString("es-PY")} USD × ${l.qty} u. = ${(l.qty * unit).toLocaleString("es-PY")} USD`
+          );
+        }
       }
       if (l.includeWarranty) {
-        const unit = Math.round(QUOTE_ADDON_WARRANTY_USD * m);
-        addons.push(
-          `Garantía: ${unit.toLocaleString("es-PY")} USD × ${l.qty} u. = ${(l.qty * unit).toLocaleString("es-PY")} USD`
-        );
+        if (pending) {
+          addons.push(`Garantía: importe a cotizar con el equipo comercial de Hashrate (×${l.qty} u.)`);
+        } else {
+          const unit = Math.round(QUOTE_ADDON_WARRANTY_USD * m);
+          addons.push(
+            `Garantía: ${unit.toLocaleString("es-PY")} USD × ${l.qty} u. = ${(l.qty * unit).toLocaleString("es-PY")} USD`
+          );
+        }
       }
       const addonBlock = addons.length ? `\n   ${addons.join("\n   ")}` : "";
       const sub = quoteCartLineSubtotalUsd(l, pricing);
+      const subLine = pending
+        ? "Subtotal línea: pendiente de cotización (equipo / setup / garantía)"
+        : `Subtotal línea: ${sub.toLocaleString("es-PY")} USD`;
       return (
         `${i + 1}) ${l.brand} ${l.model} — ${l.hashrate}${shareNote}\n` +
         `   Cantidad: ${l.qty} — Precio ref. unit.: ${l.priceLabel} — Equipo: ${eq.toLocaleString("es-PY")} USD` +
         addonBlock +
-        `\n   Subtotal línea: ${sub.toLocaleString("es-PY")} USD`
+        `\n   ${subLine}`
       );
     })
     .join("\n\n");
   const total = quoteCartSubtotalUsd(lines, pricing);
+  const anyPending = quoteCartHasEquipmentPricePending(lines);
   const footer =
-    `\n\n—\nTotal precio (USD): ${total.toLocaleString("es-PY")} — sujeto a confirmación, impuestos y disponibilidad.\n\nGracias.`;
+    `\n\n—\n` +
+    (anyPending
+      ? "Líneas en consulta: precios de minero, setup y garantía serán confirmados por el equipo comercial de Hashrate al contactarte.\n"
+      : "") +
+    `Total referencial (USD): ${total.toLocaleString("es-PY")} — sujeto a confirmación, impuestos y disponibilidad.\n\nGracias.`;
   let out = header + body + footer;
   if (ref) out += ticketRefFooter(ref.orderNumber, ref.ticketCode);
   return out;
@@ -396,10 +443,16 @@ export function buildQuoteMailto(
   ref?: { orderNumber: string; ticketCode: string },
   pricing: QuoteCartPricing = {}
 ): string {
-  const subject = encodeURIComponent(
+  const sub = quoteCartSubtotalUsd(lines, pricing);
+  const anyPending = quoteCartHasEquipmentPricePending(lines);
+  const subjTail =
     lines.length === 0
-      ? "Cotización marketplace ASIC"
-      : `Cotización marketplace — ${lines.length} ítem(s) — ref. ${quoteCartSubtotalUsd(lines, pricing).toLocaleString("es-PY")} USD`
+      ? ""
+      : anyPending && sub === 0
+        ? `${lines.length} ítem(s) — precios a cotizar`
+        : `${lines.length} ítem(s) — ref. ${sub.toLocaleString("es-PY")} USD`;
+  const subject = encodeURIComponent(
+    lines.length === 0 ? "Cotización marketplace ASIC" : `Cotización marketplace — ${subjTail}`
   );
   const body = encodeURIComponent(buildQuoteMessage(lines, ref, pricing));
   return `mailto:${QUOTE_EMAIL}?subject=${subject}&body=${body}`;

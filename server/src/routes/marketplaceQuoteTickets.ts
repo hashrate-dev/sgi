@@ -78,9 +78,18 @@ function setupUsdForLine(
   return Math.max(0, Math.round(setupEquipoCompletoUsd)) || 50;
 }
 
+/** Alineado con cliente `quoteCartLineIsEquipmentPricePending`: sin USD en etiqueta → no sumar setup/garantía. */
+function lineEquipmentPricePending(l: { priceUsd: number; priceLabel: string }): boolean {
+  if (l.priceUsd > 0) return false;
+  const base = l.priceLabel.replace(/\s*\([^)]*\)\s*$/, "").trim();
+  if (/^[\d.,\s]+\s*USD$/i.test(base)) return false;
+  return true;
+}
+
 function computeTotals(lines: z.infer<typeof LineSchema>[], setupEquipoCompletoUsd: number, setupCompraHashrateUsd: number) {
   const subtotal = lines.reduce((a, l) => {
     let row = l.qty * l.priceUsd;
+    if (lineEquipmentPricePending(l)) return a + row;
     if (l.includeSetup) row += l.qty * setupUsdForLine(l, setupEquipoCompletoUsd, setupCompraHashrateUsd);
     if (l.includeWarranty) row += Math.round(l.qty * QUOTE_ADDON_WARRANTY_USD * lineShareMult(l));
     return a + row;

@@ -46,8 +46,9 @@ export function createApp() {
   };
   app.use(cors(corsOptions));
 
-  app.use(express.json({ limit: "1mb" }));
-  app.use(express.urlencoded({ extended: true }));
+  // Equipos ASIC pueden enviar mp_image_src como data URL (Vercel / modo memoria); 1mb cortaba el guardado.
+  app.use(express.json({ limit: "15mb" }));
+  app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 
   app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
 

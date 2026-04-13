@@ -26,6 +26,14 @@ export const equiposRouter = Router();
 const requireCanEdit = requireRole("admin_a", "admin_b", "operador");
 const requireAdminsEquipo = requireRole("admin_a", "admin_b");
 
+/**
+ * Imagen vitrina: ruta corta (`/images/marketplace-uploads/...`) o data URL en serverless
+ * (ver `marketplaceImageUpload.ts`, hasta ~2 MB binario → base64 ~2.8 M chars).
+ */
+const MARKETPLACE_IMAGE_SRC_MAX_LEN = 6_000_000;
+/** Galería JSON puede incluir varias URLs / data URLs. */
+const MARKETPLACE_GALLERY_JSON_MAX_LEN = 12_000_000;
+
 const EquipoBodySchema = z
   .object({
     /** En POST se ignora (se asigna en servidor). En PUT se ignora (no se puede cambiar). */
@@ -39,8 +47,8 @@ const EquipoBodySchema = z
     marketplaceVisible: z.boolean().optional().default(false),
     marketplaceAlgo: z.enum(["sha256", "scrypt"]).optional().nullable(),
     marketplaceHashrateDisplay: z.string().max(200).optional().nullable(),
-    marketplaceImageSrc: z.string().max(500).optional().nullable(),
-    marketplaceGalleryJson: z.string().max(32000).optional().nullable(),
+    marketplaceImageSrc: z.string().max(MARKETPLACE_IMAGE_SRC_MAX_LEN).optional().nullable(),
+    marketplaceGalleryJson: z.string().max(MARKETPLACE_GALLERY_JSON_MAX_LEN).optional().nullable(),
     marketplaceDetailRowsJson: z.string().max(32000).optional().nullable(),
     marketplaceYieldJson: z.string().max(8000).optional().nullable(),
     marketplaceSortOrder: z.number().int().min(0).max(999999).optional().default(0),

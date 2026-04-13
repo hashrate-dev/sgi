@@ -13,6 +13,8 @@ import {
   quoteCartSetupUnitUsd,
   QUOTE_ADDON_WARRANTY_USD,
   marketplaceQuoteTicketLineDisplayName,
+  quoteCartLineIsEquipmentPricePending,
+  quoteCartHasEquipmentPricePending,
 } from "../../lib/marketplaceQuoteCart.js";
 import { MailCtaIcon, WhatsAppCtaIcon } from "./MarketplaceCtaIcons.js";
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
@@ -94,6 +96,7 @@ export function MarketplaceQuoteCartDrawer() {
 
   const pricing = { setupEquipoCompletoUsd, setupCompraHashrateUsd };
   const totalRef = quoteCartSubtotalUsd(lines, pricing);
+  const hasPendingEquipmentPrice = quoteCartHasEquipmentPricePending(lines);
   const n = lines.length;
   const subtitle =
     n === 0 ? null : n === 1 ? t("drawer.sub_one") : tf("drawer.sub_many", { n: String(n) });
@@ -241,6 +244,7 @@ export function MarketplaceQuoteCartDrawer() {
                   const addonMult = sharePct / 100;
                   const setupUnit = quoteCartSetupUnitUsd(l, pricing);
                   const warrantyUnit = Math.round(QUOTE_ADDON_WARRANTY_USD * addonMult);
+                  const equipmentPricePending = quoteCartLineIsEquipmentPricePending(l);
                   return (
                   <li key={`${lk}#${lineIdx}`} className="market-quote-drawer__line">
                     <div className="market-quote-drawer__line-top">
@@ -270,7 +274,12 @@ export function MarketplaceQuoteCartDrawer() {
                       </p>
                     ) : null}
                     <div className="market-quote-drawer__line-mid">
-                      <span className="market-quote-drawer__line-unit">
+                      <span
+                        className={
+                          "market-quote-drawer__line-unit" +
+                          (equipmentPricePending ? " market-quote-drawer__line-unit--pending" : "")
+                        }
+                      >
                         {l.priceLabel}
                         <span className="market-quote-drawer__line-unit-suffix">{t("drawer.per_unit")}</span>
                       </span>
@@ -298,6 +307,11 @@ export function MarketplaceQuoteCartDrawer() {
                         </button>
                       </div>
                     </div>
+                    {equipmentPricePending ? (
+                      <p className="market-quote-drawer__line-pending-hint" role="note">
+                        {t("drawer.line_price_pending_hint")}
+                      </p>
+                    ) : null}
                     <div className="market-quote-drawer__addons" role="group" aria-label={tf("drawer.addons_aria", { model: l.model })}>
                       <p className="market-quote-drawer__addons-hint">{t("drawer.addons_hint")}</p>
                       <label className="market-quote-drawer__addon">
@@ -308,8 +322,15 @@ export function MarketplaceQuoteCartDrawer() {
                         />
                         <span>
                           {t("drawer.setup")}{" "}
-                          <span className="market-quote-drawer__addon-price">
-                            {setupUnit.toLocaleString(loc)} USD
+                          <span
+                            className={
+                              "market-quote-drawer__addon-price" +
+                              (equipmentPricePending ? " market-quote-drawer__addon-price--pending" : "")
+                            }
+                          >
+                            {equipmentPricePending
+                              ? t("drawer.addon_value_on_request")
+                              : `${setupUnit.toLocaleString(loc)} USD`}
                           </span>{" "}
                           {t("drawer.per_u")}
                         </span>
@@ -322,8 +343,15 @@ export function MarketplaceQuoteCartDrawer() {
                         />
                         <span>
                           {t("drawer.warranty")}{" "}
-                          <span className="market-quote-drawer__addon-price">
-                            {warrantyUnit.toLocaleString(loc)} USD
+                          <span
+                            className={
+                              "market-quote-drawer__addon-price" +
+                              (equipmentPricePending ? " market-quote-drawer__addon-price--pending" : "")
+                            }
+                          >
+                            {equipmentPricePending
+                              ? t("drawer.addon_value_on_request")
+                              : `${warrantyUnit.toLocaleString(loc)} USD`}
                           </span>{" "}
                           {t("drawer.per_u")}
                         </span>
@@ -331,8 +359,15 @@ export function MarketplaceQuoteCartDrawer() {
                     </div>
                     <div className="market-quote-drawer__line-sub">
                       <span>{t("drawer.subtotal")}</span>
-                      <strong className="market-quote-drawer__line-sub-amt">
-                        {quoteCartLineSubtotalUsd(l, pricing).toLocaleString(loc)} USD
+                      <strong
+                        className={
+                          "market-quote-drawer__line-sub-amt" +
+                          (equipmentPricePending ? " market-quote-drawer__line-sub-amt--pending" : "")
+                        }
+                      >
+                        {equipmentPricePending
+                          ? t("drawer.line_subtotal_pending")
+                          : `${quoteCartLineSubtotalUsd(l, pricing).toLocaleString(loc)} USD`}
                       </strong>
                     </div>
                   </li>
@@ -354,14 +389,35 @@ export function MarketplaceQuoteCartDrawer() {
                   </span>
                 </p>
               ) : null}
+              {hasPendingEquipmentPrice ? (
+                <div className="market-quote-drawer__pending-total-banner" role="status">
+                  <strong className="market-quote-drawer__pending-total-banner-title">
+                    {t("drawer.pending_equipment_total_title")}
+                  </strong>
+                  <p className="market-quote-drawer__pending-total-banner-body">
+                    {t("drawer.pending_equipment_total_body")}
+                  </p>
+                </div>
+              ) : null}
               <div className="market-quote-drawer__total">
                 <div className="market-quote-drawer__total-copy">
                   <span id="market-quote-drawer-total-heading" className="market-quote-drawer__total-label">
                     {t("drawer.total")}
                   </span>
-                  <span className="market-quote-drawer__total-note">{t("drawer.total_note")}</span>
+                  <span className="market-quote-drawer__total-note">
+                    {hasPendingEquipmentPrice ? t("drawer.total_note_pending_quote") : t("drawer.total_note")}
+                  </span>
                 </div>
-                <strong className="market-quote-drawer__total-amt">{totalRef.toLocaleString(loc)} USD</strong>
+                <strong
+                  className={
+                    "market-quote-drawer__total-amt" +
+                    (hasPendingEquipmentPrice && totalRef === 0 ? " market-quote-drawer__total-amt--pending" : "")
+                  }
+                >
+                  {hasPendingEquipmentPrice && totalRef === 0
+                    ? t("drawer.total_pending_placeholder")
+                    : `${totalRef.toLocaleString(loc)} USD`}
+                </strong>
               </div>
             </div>
           ) : null}

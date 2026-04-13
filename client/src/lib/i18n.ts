@@ -392,10 +392,21 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "drawer.addons_hint": "Opcional (× u.): desmarcá si no aplica instalación en granja o garantía.",
     "drawer.setup": "Setup",
     "drawer.warranty": "Garantía",
+    "drawer.addon_value_on_request": "solicitar valor",
     "drawer.per_u": "/ u.",
     "drawer.subtotal": "Subtotal",
+    "drawer.line_subtotal_pending": "Cotización pendiente",
     "drawer.total": "Total precio",
     "drawer.total_note": "Suma de la lista · USD",
+    "drawer.total_note_addons_only": "Suma visible: solo opcionales (setup / garantía) · USD",
+    "drawer.total_note_pending_quote":
+      "Solo suma equipos con precio en lista; en consulta no incluye minero ni setup ni garantía.",
+    "drawer.total_pending_placeholder": "—",
+    "drawer.line_price_pending_hint":
+      "Precio del equipo no incluido en esta lista. El equipo comercial de Hashrate se pondrá en contacto para cotizar minero, setup y garantía (si los marcaste).",
+    "drawer.pending_equipment_total_title": "Importante — sin total fijo",
+    "drawer.pending_equipment_total_body":
+      "Los importes de minero, instalación (setup) y garantía en consulta no se muestran aquí: el equipo comercial de Hashrate los confirmará al contactarte.",
     "drawer.ref_label": "Tu referencia",
     "drawer.next": "Siguiente paso",
     "drawer.next_logged":
@@ -495,6 +506,7 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "orders.search_label": "Buscar",
     "orders.search_placeholder": "Orden, ticket o estado…",
     "orders.detail_lines_loading": "Cargando equipos de la orden…",
+    "orders.detail_line_subtotal_pending": "Cotización pendiente",
     "orders.detail_lines_summary":
       "Resumen: {{lines}} tipo(s) de equipo · {{units}} u. · total {{total}} USD (no se listaron líneas en el servidor).",
     "orders.meta_records_one": "{{n}} registro",
@@ -1024,10 +1036,21 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "drawer.addons_hint": "Optional (per unit): uncheck if farm setup or warranty does not apply.",
     "drawer.setup": "Setup",
     "drawer.warranty": "Warranty",
+    "drawer.addon_value_on_request": "request pricing",
     "drawer.per_u": "/ unit",
     "drawer.subtotal": "Subtotal",
+    "drawer.line_subtotal_pending": "Quote pending",
     "drawer.total": "Total price",
     "drawer.total_note": "List sum · USD",
+    "drawer.total_note_addons_only": "Visible sum: add-ons only (setup / warranty) · USD",
+    "drawer.total_note_pending_quote":
+      "Only sums items with a list price; on-request lines exclude miner, setup, and warranty amounts.",
+    "drawer.total_pending_placeholder": "—",
+    "drawer.line_price_pending_hint":
+      "Miner price is not included here. Our Hashrate sales team will contact you to quote the miner, setup, and warranty (if selected).",
+    "drawer.pending_equipment_total_title": "Important — no fixed total",
+    "drawer.pending_equipment_total_body":
+      "Miner, farm setup, and warranty amounts on request are not shown here; Hashrate sales will confirm them when they reach out.",
     "drawer.ref_label": "Your reference",
     "drawer.next": "Next step",
     "drawer.next_logged":
@@ -1125,6 +1148,7 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "orders.search_label": "Search",
     "orders.search_placeholder": "Order, ticket, or status…",
     "orders.detail_lines_loading": "Loading order line items…",
+    "orders.detail_line_subtotal_pending": "Quote pending",
     "orders.detail_lines_summary":
       "Summary: {{lines}} equipment type(s) · {{units}} units · total {{total}} USD (no line detail from server).",
     "orders.meta_records_one": "{{n}} record",

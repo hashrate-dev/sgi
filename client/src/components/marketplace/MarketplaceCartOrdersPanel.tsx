@@ -13,6 +13,7 @@ import {
 import { MARKETPLACE_ACTIVE_ORDER_CHANGED_EVENT, useMarketplaceQuoteCart } from "../../contexts/MarketplaceQuoteCartContext.js";
 import {
   ticketRowLineSubtotalUsd,
+  ticketRowIsEquipmentPricePending,
   QUOTE_ADDON_SETUP_USD_FALLBACK,
   isMarketplacePipelineTicketStatus,
   marketplaceQuoteTicketLineDisplayName,
@@ -639,6 +640,7 @@ export function MarketplaceCartOrdersPanel({ onBackToCart }: Props) {
                       {lineItems.map((row, i) => {
                         const qty = Number(row.qty) || 0;
                         const name = marketplaceQuoteTicketLineDisplayName(row);
+                        const linePending = ticketRowIsEquipmentPricePending(row);
                         const sub = ticketRowLineSubtotalUsd(row, {
                           setupEquipoCompletoUsd,
                           setupCompraHashrateUsd,
@@ -648,7 +650,7 @@ export function MarketplaceCartOrdersPanel({ onBackToCart }: Props) {
                             <span className="market-mis-ord__item-name moo-order-detail-pro__item-name">{name}</span>
                             <span className="market-mis-ord__item-qty moo-order-detail-pro__item-qty">×{qty}</span>
                             <span className="market-mis-ord__item-sub moo-order-detail-pro__item-sub">
-                              {sub.toLocaleString(loc)} USD
+                              {linePending ? t("orders.detail_line_subtotal_pending") : `${sub.toLocaleString(loc)} USD`}
                             </span>
                           </li>
                         );
