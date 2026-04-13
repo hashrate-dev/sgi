@@ -794,6 +794,8 @@ export type EquipoMarketplacePayload = {
   marketplaceYieldJson?: string | null;
   marketplaceSortOrder?: number;
   marketplacePriceLabel?: string | null;
+  /** null = automático (heurística); solo aplica con tienda visible. */
+  marketplaceListingKind?: "miner" | "infrastructure" | null;
 };
 
 export function createEquipo(

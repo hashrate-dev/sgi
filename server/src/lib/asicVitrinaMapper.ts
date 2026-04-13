@@ -19,6 +19,27 @@ function normalizeConsultPriceLabelForDisplay(label: string): string {
   return s;
 }
 
+export type VitrinaListingKind = "miner" | "infrastructure";
+
+function inferMinerListingFromTitles(brand: string, model: string): boolean {
+  const s = `${brand} ${model}`.toLowerCase();
+  if (/\bantrack\b/.test(s)) return false;
+  if (/\bpdu\b|patch panel\b|bandeja rack|shelf rack|contenedor\b/i.test(s)) return false;
+  if (/\brack\b/.test(s) && !/\bantminer\b/i.test(s)) return false;
+  return true;
+}
+
+export function resolveVitrinaListingKind(row: {
+  mp_listing_kind?: string | null;
+  marca_equipo: string;
+  modelo: string;
+}): VitrinaListingKind {
+  const raw = (row.mp_listing_kind ?? "").trim().toLowerCase();
+  if (raw === "infrastructure") return "infrastructure";
+  if (raw === "miner") return "miner";
+  return inferMinerListingFromTitles(row.marca_equipo ?? "", row.modelo ?? "") ? "miner" : "infrastructure";
+}
+
 export type VitrinaAsicProduct = {
   id: string;
   algo: AsicAlgo;
@@ -33,6 +54,8 @@ export type VitrinaAsicProduct = {
   gallerySrcs?: string[];
   detailRows: Array<{ icon: AsicDetailIcon; text: string }>;
   estimatedYield: { line1: string; line2: string };
+  /** Minero vs rack/PDU: la tienda oculta rendimiento estimado y tarifa hosting si no es minero. */
+  listingKind: VitrinaListingKind;
 };
 
 function defaultDetailRows(algo: AsicAlgo): VitrinaAsicProduct["detailRows"] {
@@ -84,6 +107,7 @@ export type EquipoAsicVitrinaRow = {
   mp_detail_rows_json: string | null;
   mp_yield_json: string | null;
   mp_price_label?: string | null;
+  mp_listing_kind?: string | null;
 };
 
 export function mapEquipoRowToVitrina(row: EquipoAsicVitrinaRow): VitrinaAsicProduct | null {
@@ -141,6 +165,8 @@ export function mapEquipoRowToVitrina(row: EquipoAsicVitrinaRow): VitrinaAsicPro
   const labelNorm = labelRaw ? normalizeConsultPriceLabelForDisplay(labelRaw) : "";
   const priceDisplayLabel = priceUsd <= 0 && labelNorm ? labelNorm : undefined;
 
+  const listingKind = resolveVitrinaListingKind(row);
+
   return {
     id: row.id,
     algo,
@@ -153,5 +179,6 @@ export function mapEquipoRowToVitrina(row: EquipoAsicVitrinaRow): VitrinaAsicPro
     gallerySrcs: gallerySrcs?.length ? gallerySrcs : undefined,
     detailRows,
     estimatedYield,
+    listingKind,
   };
 }

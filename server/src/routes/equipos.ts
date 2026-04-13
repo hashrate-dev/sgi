@@ -22,6 +22,7 @@ import {
 import { codigoProductoVitrina } from "../lib/marketplaceProductCode.js";
 import { isAdminABRole, logEquipoAsicAudit } from "../lib/equipoAsicAudit.js";
 import { mimeForSniffedFormat, sniffImageFormat } from "../lib/marketplaceImageSniff.js";
+import { resolveVitrinaListingKind } from "../lib/asicVitrinaMapper.js";
 
 export const equiposRouter = Router();
 
@@ -63,6 +64,11 @@ const EquipoBodySchema = z
     precioActualizadoEn: z.string().max(50).optional().nullable(),
     /** Historial completo al crear (p. ej. varios precios antes del primer guardado). */
     precioHistorialJson: z.string().max(32000).optional().nullable(),
+    /**
+     * NULL/omitido = automático (heurística por marca/modelo en vitrina).
+     * Forzar minero o infraestructura (modal sin rendimiento/hosting para infra).
+     */
+    marketplaceListingKind: z.union([z.literal("miner"), z.literal("infrastructure")]).nullable().optional(),
   })
   .superRefine((d, ctx) => {
     if (!d.marketplaceVisible) return;
@@ -96,8 +102,15 @@ type EquipoRow = {
   mp_yield_json?: string | null;
   mp_sort_order?: number | null;
   mp_price_label?: string | null;
+  mp_listing_kind?: string | null;
   precio_historial_json?: string | null;
 };
+
+function mpListingKindPersistValue(raw: string | null | undefined): "miner" | "infrastructure" | null {
+  const s = (raw ?? "").trim().toLowerCase();
+  if (s === "miner" || s === "infrastructure") return s;
+  return null;
+}
 
 function mpVisibleToInt(visible: boolean): number {
   return visible ? 1 : 0;
@@ -128,6 +141,7 @@ function rowToItem(r: EquipoRow) {
     marketplaceYieldJson: r.mp_yield_json ?? null,
     marketplaceSortOrder: Number(r.mp_sort_order) || 0,
     marketplacePriceLabel: r.mp_price_label?.trim() ? r.mp_price_label.trim() : null,
+    marketplaceListingKind: mpListingKindPersistValue(r.mp_listing_kind),
     precioHistorial: parsePrecioHistorialJson(r.precio_historial_json ?? null),
   };
 }
@@ -145,6 +159,9 @@ function mpPayloadFromBody(d: z.infer<typeof EquipoBodySchema>) {
   const labelTrim = (d.marketplacePriceLabel ?? "").trim().slice(0, 120);
   /** Con precio > 0 la vitrina muestra USD; el label solo aplica si precio es 0. */
   const mp_price_label = vis && precio <= 0 ? (labelTrim || null) : null;
+  const lk = d.marketplaceListingKind;
+  const mp_listing_kind =
+    vis && (lk === "miner" || lk === "infrastructure") ? lk : null;
   return {
     mp_visible: mpVisibleToInt(vis),
     mp_algo: vis ? resolveMarketplaceAlgoForPersist(d) : null,
@@ -155,6 +172,7 @@ function mpPayloadFromBody(d: z.infer<typeof EquipoBodySchema>) {
     mp_yield_json: null,
     mp_sort_order: vis ? sort : 0,
     mp_price_label,
+    mp_listing_kind,
   };
 }
 
@@ -170,6 +188,7 @@ function mpPayloadFromExistingRow(r: EquipoRow) {
     mp_yield_json: r.mp_yield_json ?? null,
     mp_sort_order: Number(r.mp_sort_order) || 0,
     mp_price_label: r.mp_price_label?.trim() ? r.mp_price_label.trim() : null,
+    mp_listing_kind: mpListingKindPersistValue(r.mp_listing_kind),
   };
 }
 
@@ -185,7 +204,7 @@ async function nextNumeroSerie(): Promise<string> {
 
 const EQUIPOS_SELECT = `SELECT id, numero_serie, fecha_ingreso, marca_equipo, modelo, procesador, precio_usd, observaciones,
   mp_visible, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_sort_order,
-  mp_price_label, precio_historial_json
+  mp_price_label, mp_listing_kind, precio_historial_json
   FROM equipos_asic`;
 
 /** GET /equipos — listar todos */
@@ -208,6 +227,19 @@ equiposRouter.get("/equipos/:id/whattomine-yield", requireAuth, async (req, res:
   try {
     const row = (await db.prepare(`${EQUIPOS_SELECT} WHERE id = ?`).get(id)) as EquipoRow | undefined;
     if (!row) return res.status(404).json({ error: { message: "Equipo no encontrado" } });
+    if (
+      resolveVitrinaListingKind({
+        mp_listing_kind: row.mp_listing_kind ?? null,
+        marca_equipo: row.marca_equipo,
+        modelo: row.modelo,
+      }) !== "miner"
+    ) {
+      return res.json({
+        ok: true,
+        yield: null,
+        hint: "Este listado no es un minero ASIC; no aplica rendimiento estimado.",
+      });
+    }
     const payload = {
       mp_algo: row.mp_algo ?? null,
       procesador: row.procesador ?? "",
@@ -265,8 +297,8 @@ equiposRouter.post("/equipos", requireAuth, requireCanEdit, async (req, res: Res
       .prepare(
         `INSERT INTO equipos_asic (id, numero_serie, fecha_ingreso, marca_equipo, modelo, procesador, precio_usd, observaciones,
           mp_visible, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_sort_order,
-          mp_price_label, precio_historial_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          mp_price_label, mp_listing_kind, precio_historial_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         id,
@@ -286,6 +318,7 @@ equiposRouter.post("/equipos", requireAuth, requireCanEdit, async (req, res: Res
         mp.mp_yield_json,
         mp.mp_sort_order,
         mp.mp_price_label ?? null,
+        mp.mp_listing_kind ?? null,
         historialInicial
       );
     await logEquipoAsicAudit({
@@ -450,7 +483,7 @@ equiposRouter.put("/equipos/:id", requireAuth, requireCanEdit, async (req, res: 
       .prepare(
         `UPDATE equipos_asic SET fecha_ingreso = ?, marca_equipo = ?, modelo = ?, procesador = ?, precio_usd = ?, observaciones = ?,
           numero_serie = ?, mp_visible = ?, mp_algo = ?, mp_hashrate_display = ?, mp_image_src = ?, mp_gallery_json = ?, mp_detail_rows_json = ?, mp_yield_json = ?, mp_sort_order = ?,
-          mp_price_label = ?, precio_historial_json = ?
+          mp_price_label = ?, mp_listing_kind = ?, precio_historial_json = ?
           WHERE id = ?`
       )
       .run(
@@ -470,6 +503,7 @@ equiposRouter.put("/equipos/:id", requireAuth, requireCanEdit, async (req, res: 
         mp.mp_yield_json,
         mp.mp_sort_order,
         mp.mp_price_label ?? null,
+        mp.mp_listing_kind ?? null,
         historialJson,
         id
       );
@@ -489,6 +523,7 @@ equiposRouter.put("/equipos/:id", requireAuth, requireCanEdit, async (req, res: 
       mp_detail_len: (r.mp_detail_rows_json ?? "").length,
       mp_sort: Number(r.mp_sort_order) || 0,
       mp_price_label: (r.mp_price_label ?? "").trim() || null,
+      mp_listing_kind: mpListingKindPersistValue(r.mp_listing_kind),
     });
     const bef = snap(existing);
     const aft = {
@@ -498,6 +533,7 @@ equiposRouter.put("/equipos/:id", requireAuth, requireCanEdit, async (req, res: 
       mp_detail_len: (mp.mp_detail_rows_json ?? "").length,
       mp_sort: mp.mp_sort_order,
       mp_price_label: (mp.mp_price_label ?? "").trim() || null,
+      mp_listing_kind: mpListingKindPersistValue(mp.mp_listing_kind),
     };
     if (JSON.stringify(bef) !== JSON.stringify(aft)) changes.marketplace = { antes: bef, despues: aft };
 
@@ -579,8 +615,8 @@ equiposRouter.post("/equipos/bulk", requireAuth, requireAdminsEquipo, async (req
       .prepare(
         `INSERT INTO equipos_asic (id, numero_serie, fecha_ingreso, marca_equipo, modelo, procesador, precio_usd, observaciones,
           mp_visible, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_sort_order,
-          mp_price_label, precio_historial_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, ?)`
+          mp_price_label, mp_listing_kind, precio_historial_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, ?)`
       )
       .run(id, ns, fechaIngreso, marcaEquipo.trim(), modelo.trim(), procesador.trim(), precioUSD, observaciones ?? null, historialInicial);
   }

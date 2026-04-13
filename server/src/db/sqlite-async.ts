@@ -355,6 +355,7 @@ CREATE INDEX IF NOT EXISTS idx_equipos_asic_audit_created ON equipos_asic_audit(
     "mp_sort_order INTEGER NOT NULL DEFAULT 0",
     "precio_historial_json TEXT",
     "mp_price_label TEXT",
+    "mp_listing_kind TEXT",
   ];
   for (const colDef of equiposMpCols) {
     try {

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AsicProduct } from "../../lib/marketplaceAsicCatalog.js";
 import {
+  asicProductShowsMinerEconomyContent,
   formatAsicPriceUsd,
   normalizeConsultPriceLabelForDisplay,
   proratedEquipmentPriceUsd,
@@ -48,6 +49,7 @@ export function AsicProductModal({
   addToQuoteLabel?: string;
 }) {
   const { lang, t, tf } = useMarketplaceLang();
+  const showMinerEconomy = asicProductShowsMinerEconomyContent(product);
   const quoteLabel = addToQuoteLabel ?? t("catalog.add_short");
   const [hashrateShareView, setHashrateShareView] = useState(false);
   const [shareViewPct, setShareViewPct] = useState<25 | 50 | 75>(75);
@@ -326,23 +328,25 @@ export function AsicProductModal({
               </ul>
             </div>
 
-            <div className="product-modal__yield-card">
-              <h3 className="product-modal__yield-title">{t("modal.yield_title")}</h3>
-              {liveYieldLoading && !hasLive ? (
-                <p className="product-modal__yield-loading">{t("modal.yield_loading")}</p>
-              ) : null}
-              <div className="product-modal__yield-grid">
-                <div className="product-modal__yield-cell">
-                  <span className="product-modal__yield-lbl">{t("modal.yield_daily")}</span>
-                  <div className="product-modal__yield-box product-modal__yield-box--primary">{y1}</div>
+            {showMinerEconomy ? (
+              <div className="product-modal__yield-card">
+                <h3 className="product-modal__yield-title">{t("modal.yield_title")}</h3>
+                {liveYieldLoading && !hasLive ? (
+                  <p className="product-modal__yield-loading">{t("modal.yield_loading")}</p>
+                ) : null}
+                <div className="product-modal__yield-grid">
+                  <div className="product-modal__yield-cell">
+                    <span className="product-modal__yield-lbl">{t("modal.yield_daily")}</span>
+                    <div className="product-modal__yield-box product-modal__yield-box--primary">{y1}</div>
+                  </div>
+                  <div className="product-modal__yield-cell">
+                    <span className="product-modal__yield-lbl">{t("modal.yield_usdt")}</span>
+                    <div className="product-modal__yield-box product-modal__yield-box--secondary">{y2}</div>
+                  </div>
                 </div>
-                <div className="product-modal__yield-cell">
-                  <span className="product-modal__yield-lbl">{t("modal.yield_usdt")}</span>
-                  <div className="product-modal__yield-box product-modal__yield-box--secondary">{y2}</div>
-                </div>
+                {yieldFootShort ? <p className="product-modal__yield-foot">{yieldFootShort}</p> : null}
               </div>
-              {yieldFootShort ? <p className="product-modal__yield-foot">{yieldFootShort}</p> : null}
-            </div>
+            ) : null}
           </div>
 
           <div className="product-modal__aside">
@@ -427,45 +431,47 @@ export function AsicProductModal({
                   ) : null}
                 </div>
 
-                <div className="product-modal__host-card">
-                  <h3 className="product-modal__host-title">{t("modal.host_title")}</h3>
-                  <p className="product-modal__host-loc">
-                    <svg className="product-modal__host-pin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <path
-                        d="M12 11.25a2.25 2.25 0 100-4.5 2.25 2.25 0 000 4.5z"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                      />
-                      <path
-                        d="M12 21s7-4.35 7-10a7 7 0 10-14 0c0 5.65 7 10 7 10z"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                    <span className="product-modal__host-loc-txt">{t("modal.host_loc")}</span>
-                    <span className="product-modal__host-flag" role="img" aria-label={t("modal.host_flag_aria")}>
-                      <svg className="product-modal__host-flag-svg" viewBox="0 0 30 18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                        <rect width="30" height="6" y="0" fill="#D52B1E" />
-                        <rect width="30" height="6" y="6" fill="#FFFFFF" />
-                        <rect width="30" height="6" y="12" fill="#0038A8" />
+                {showMinerEconomy ? (
+                  <div className="product-modal__host-card">
+                    <h3 className="product-modal__host-title">{t("modal.host_title")}</h3>
+                    <p className="product-modal__host-loc">
+                      <svg className="product-modal__host-pin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path
+                          d="M12 11.25a2.25 2.25 0 100-4.5 2.25 2.25 0 000 4.5z"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                        />
+                        <path
+                          d="M12 21s7-4.35 7-10a7 7 0 10-14 0c0 5.65 7 10 7 10z"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinejoin="round"
+                        />
                       </svg>
-                    </span>
-                  </p>
-                  <div className="product-modal__host-divider" aria-hidden="true" />
-                  <table className="product-modal__host-table">
-                    <tbody>
-                      <tr>
-                        <td className="product-modal__host-label">{t("modal.host_tier1")}</td>
-                        <td className="product-modal__host-value">{t("modal.host_kwh1")}</td>
-                      </tr>
-                      <tr>
-                        <td className="product-modal__host-label">{t("modal.host_tier2")}</td>
-                        <td className="product-modal__host-value">{t("modal.host_kwh2")}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+                      <span className="product-modal__host-loc-txt">{t("modal.host_loc")}</span>
+                      <span className="product-modal__host-flag" role="img" aria-label={t("modal.host_flag_aria")}>
+                        <svg className="product-modal__host-flag-svg" viewBox="0 0 30 18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                          <rect width="30" height="6" y="0" fill="#D52B1E" />
+                          <rect width="30" height="6" y="6" fill="#FFFFFF" />
+                          <rect width="30" height="6" y="12" fill="#0038A8" />
+                        </svg>
+                      </span>
+                    </p>
+                    <div className="product-modal__host-divider" aria-hidden="true" />
+                    <table className="product-modal__host-table">
+                      <tbody>
+                        <tr>
+                          <td className="product-modal__host-label">{t("modal.host_tier1")}</td>
+                          <td className="product-modal__host-value">{t("modal.host_kwh1")}</td>
+                        </tr>
+                        <tr>
+                          <td className="product-modal__host-label">{t("modal.host_tier2")}</td>
+                          <td className="product-modal__host-value">{t("modal.host_kwh2")}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
                 {hashrateShareView && onAddToQuote && productSupportsHashrateShare(product) ? (
                   <button
                     type="button"

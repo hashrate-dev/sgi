@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { ASIC_MARKETPLACE_PRODUCTS } from "../lib/marketplaceAsicCatalog.js";
+import {
+  ASIC_MARKETPLACE_PRODUCTS,
+  asicProductShowsMinerEconomyContent,
+} from "../lib/marketplaceAsicCatalog.js";
 import type { AsicAlgo, AsicProduct } from "../lib/marketplaceAsicCatalog.js";
 import type { AddQuoteLineOptions } from "../lib/marketplaceQuoteCart.js";
 import { getMarketplaceAsicVitrina, postMarketplaceAsicYields, wakeUpBackend, type MarketplaceAsicLiveYield } from "../lib/api.js";
@@ -139,9 +142,15 @@ function MarketplacePageBody() {
     /** Defer: deja pintar la grilla antes del POST (red + CoinGecko puede tardar). */
     const tid = window.setTimeout(() => {
       if (cancelled) return;
+      const minerProducts = products.filter(asicProductShowsMinerEconomyContent);
+      if (minerProducts.length === 0) {
+        setLiveYieldsById({});
+        setYieldsLoading(false);
+        return;
+      }
       setYieldsLoading(true);
       postMarketplaceAsicYields(
-        products.map((p) => ({
+        minerProducts.map((p) => ({
           id: p.id,
           algo: p.algo,
           hashrate: p.hashrate,

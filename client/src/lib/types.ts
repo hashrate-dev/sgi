@@ -91,6 +91,11 @@ export type EquipoASIC = {
   marketplaceSortOrder?: number;
   /** Texto comercial en vitrina si no hay precio USD (ej. cotización bajo consulta). */
   marketplacePriceLabel?: string | null;
+  /**
+   * Tipo de ficha en tienda: null = automático (heurística por marca/modelo).
+   * `infrastructure` oculta rendimiento estimado y tarifa hosting en el modal público.
+   */
+  marketplaceListingKind?: "miner" | "infrastructure" | null;
 };
 
 export type Setup = {

@@ -23,6 +23,7 @@ import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import { canDeleteClientes, canEditClientes, canEditEquipoMarketplacePrecioYTienda, canExport } from "../lib/auth";
 import { codigoProductoVitrina as vitrinaCodigoFromSpecs } from "../lib/marketplaceProductCode";
+import { resolveMarketplaceListingKind } from "../lib/marketplaceAsicCatalog";
 import "../styles/facturacion.css";
 import "../styles/marketplace-hashrate.css";
 
@@ -257,6 +258,14 @@ function appendPrecioHistorialClient(prev: PrecioHistEntry[], precioUsd: number,
   return [...prev, { precioUsd: n, actualizadoEn }];
 }
 
+type MarketplaceListingTiendaForm = "auto" | "miner" | "infrastructure";
+
+function marketplaceListingTiendaFromEquipo(e: EquipoASIC): MarketplaceListingTiendaForm {
+  if (e.marketplaceListingKind === "miner") return "miner";
+  if (e.marketplaceListingKind === "infrastructure") return "infrastructure";
+  return "auto";
+}
+
 type EquipoFormState = {
   fechaIngreso: string;
   marcaEquipo: string;
@@ -273,6 +282,11 @@ type EquipoFormState = {
   marketplaceImageSrc: string;
   marketplaceGalleryLines: string;
   marketplaceDetailRowsJson: string;
+  /**
+   * Solo con tienda visible: automático (heurística) o forzar minero / infraestructura
+   * (modal público sin bloque rendimiento ni tarifa hosting para infra).
+   */
+  marketplaceListingTienda: MarketplaceListingTiendaForm;
 };
 
 function buildMarketplacePayload(form: EquipoFormState): {
@@ -285,6 +299,7 @@ function buildMarketplacePayload(form: EquipoFormState): {
   marketplaceYieldJson: string | null;
   marketplaceSortOrder: number;
   marketplacePriceLabel: string | null;
+  marketplaceListingKind: "miner" | "infrastructure" | null;
 } {
   const vis = form.marketplaceVisible === true;
   const lines = form.marketplaceGalleryLines.split("\n").map((s) => s.trim()).filter(Boolean);
@@ -295,6 +310,10 @@ function buildMarketplacePayload(form: EquipoFormState): {
   const labelTrim = form.marketplacePriceLabel.trim();
   const marketplacePriceLabel =
     consult ? (labelTrim || DEFAULT_MARKETPLACE_PRICE_LABEL).slice(0, 120) : null;
+  const marketplaceListingKind =
+    vis && (form.marketplaceListingTienda === "miner" || form.marketplaceListingTienda === "infrastructure")
+      ? form.marketplaceListingTienda
+      : null;
   return {
     marketplaceVisible: vis,
     marketplaceAlgo: null,
@@ -305,6 +324,7 @@ function buildMarketplacePayload(form: EquipoFormState): {
     marketplaceYieldJson: null,
     marketplaceSortOrder: 0,
     marketplacePriceLabel,
+    marketplaceListingKind,
   };
 }
 
@@ -345,6 +365,7 @@ function emptyEquipoForm(): EquipoFormState {
     marketplaceImageSrc: "",
     marketplaceGalleryLines: "",
     marketplaceDetailRowsJson: "",
+    marketplaceListingTienda: "auto",
   };
 }
 
@@ -511,6 +532,7 @@ export function EquiposAsicPage() {
                   marketplaceYieldJson: mp.marketplaceYieldJson,
                   marketplaceSortOrder: mp.marketplaceSortOrder,
                   marketplacePriceLabel: mp.marketplacePriceLabel ?? null,
+                  marketplaceListingKind: mp.marketplaceListingKind ?? null,
                 }
               : e
           )
@@ -544,6 +566,7 @@ export function EquiposAsicPage() {
             marketplaceYieldJson: mp.marketplaceYieldJson,
             marketplaceSortOrder: mp.marketplaceSortOrder,
             marketplacePriceLabel: mp.marketplacePriceLabel ?? null,
+            marketplaceListingKind: mp.marketplaceListingKind ?? null,
           },
         ]);
         showToast("Equipo agregado correctamente.", "success", "Equipos ASIC");
@@ -583,6 +606,7 @@ export function EquiposAsicPage() {
       marketplaceImageSrc: e.marketplaceImageSrc ?? "",
       marketplaceGalleryLines: galleryLinesFromJson(e.marketplaceGalleryJson),
       marketplaceDetailRowsJson: e.marketplaceDetailRowsJson ?? "",
+      marketplaceListingTienda: marketplaceListingTiendaFromEquipo(e),
     });
     setShowAddModal(true);
   }
@@ -660,6 +684,16 @@ export function EquiposAsicPage() {
     setDetailYieldLines(null);
     setDetailYieldNote(null);
     setDetailYieldHint(null);
+    const lk =
+      e.marketplaceListingKind === "miner" || e.marketplaceListingKind === "infrastructure"
+        ? e.marketplaceListingKind
+        : undefined;
+    const isMinerListing =
+      resolveMarketplaceListingKind({ brand: e.marcaEquipo, model: e.modelo, listingKind: lk }) === "miner";
+    if (!isMinerListing) {
+      setDetailYieldLoading(false);
+      return;
+    }
     setDetailYieldLoading(true);
     getEquipoWhatToMineYield(e.id)
       .then((res) => {
@@ -1570,6 +1604,35 @@ export function EquiposAsicPage() {
                                 </p>
                               </div>
                             </div>
+                            {formData.marketplaceVisible ? (
+                              <div className="hrs-equipo-asic-modal-form__listing-kind mt-2">
+                                <label className="form-label small mb-1" htmlFor="mp-listing-kind">
+                                  Tipo de anuncio (tienda)
+                                </label>
+                                <select
+                                  id="mp-listing-kind"
+                                  className="form-select form-select-sm"
+                                  disabled={!canEditTienda}
+                                  value={formData.marketplaceListingTienda}
+                                  onChange={(ev) =>
+                                    setFormData({
+                                      ...formData,
+                                      marketplaceListingTienda: ev.target.value as MarketplaceListingTiendaForm,
+                                    })
+                                  }
+                                >
+                                  <option value="auto">Automático (según nombre del equipo)</option>
+                                  <option value="miner">Minero — mostrar rendimiento estimado y hosting</option>
+                                  <option value="infrastructure">
+                                    Infraestructura / rack — sin rendimiento ni tarifa hosting en el modal
+                                  </option>
+                                </select>
+                                <p className="small text-muted mt-1 mb-0">
+                                  Racks tipo Antrack, PDU, etc.: usá «Infraestructura» o dejá «Automático» (se detecta
+                                  Antrack/rack).
+                                </p>
+                              </div>
+                            ) : null}
                           </div>
                         </div>
                         {canEditTienda ? (

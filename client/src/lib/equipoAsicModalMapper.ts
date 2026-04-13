@@ -2,7 +2,12 @@
  * Arma un `AsicProduct` para reutilizar el modal de vitrina (VER MÁS) en la gestión de equipos.
  */
 
-import { type AsicAlgo, type AsicProduct, normalizeConsultPriceLabelForDisplay } from "./marketplaceAsicCatalog.js";
+import {
+  type AsicAlgo,
+  type AsicProduct,
+  normalizeConsultPriceLabelForDisplay,
+  resolveMarketplaceListingKind,
+} from "./marketplaceAsicCatalog.js";
 import type { EquipoASIC } from "./types.js";
 import { parseDetailRowsJson } from "../components/equipos/MarketplaceDetailRowsEditor";
 
@@ -41,6 +46,15 @@ export function equipoASICToModalProduct(e: EquipoASIC): AsicProduct {
   }
   const priceLabel = e.marketplacePriceLabel?.trim();
   const priceDisplayLabelNorm = priceLabel ? normalizeConsultPriceLabelForDisplay(priceLabel) : "";
+  const listingKindRaw =
+    e.marketplaceListingKind === "miner" || e.marketplaceListingKind === "infrastructure"
+      ? e.marketplaceListingKind
+      : undefined;
+  const listingKind = resolveMarketplaceListingKind({
+    brand: e.marcaEquipo,
+    model: e.modelo,
+    listingKind: listingKindRaw,
+  });
   return {
     id: e.id,
     algo,
@@ -56,5 +70,6 @@ export function equipoASICToModalProduct(e: EquipoASIC): AsicProduct {
       line1: "Consultar rendimiento",
       line2: "—",
     },
+    listingKind,
   };
 }

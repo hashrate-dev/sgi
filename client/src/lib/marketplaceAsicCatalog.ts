@@ -117,6 +117,36 @@ export type AsicEstimatedYield = {
   line2: string;
 };
 
+/** Catálogo: minero ASIC vs rack/PDU/infra (modal sin rendimiento ni tarifa hosting). */
+export type MarketplaceListingKind = "miner" | "infrastructure";
+
+export type AsicListingTitleFields = {
+  brand: string;
+  model: string;
+  listingKind?: MarketplaceListingKind;
+};
+
+/** Heurística por nombre cuando en BD está en «automático» (NULL). */
+export function inferMinerListingFromTitles(brand: string, model: string): boolean {
+  const s = `${brand} ${model}`.toLowerCase();
+  if (/\bantrack\b/.test(s)) return false;
+  if (/\bpdu\b|patch panel\b|bandeja rack|shelf rack|contenedor\b/i.test(s)) return false;
+  if (/\brack\b/.test(s) && !/\bantminer\b/i.test(s)) return false;
+  return true;
+}
+
+/** Resuelve tipo de ficha para UI (modal tienda): honor explícito en `listingKind` o inferencia por título. */
+export function resolveMarketplaceListingKind(p: AsicListingTitleFields): MarketplaceListingKind {
+  if (p.listingKind === "infrastructure") return "infrastructure";
+  if (p.listingKind === "miner") return "miner";
+  return inferMinerListingFromTitles(p.brand, p.model) ? "miner" : "infrastructure";
+}
+
+/** Rendimiento estimado + bloque hosting del modal solo para fichas tipo minero. */
+export function asicProductShowsMinerEconomyContent(p: AsicListingTitleFields): boolean {
+  return resolveMarketplaceListingKind(p) === "miner";
+}
+
 export type AsicProduct = {
   /** ID en BD (`equipos_asic`) o fallback estático */
   id: string;
@@ -134,6 +164,11 @@ export type AsicProduct = {
   gallerySrcs?: string[];
   detailRows: Array<{ icon: AsicDetailIcon; text: string }>;
   estimatedYield: AsicEstimatedYield;
+  /**
+   * Opcional: forzar minero vs infra. Si falta, se infiere por marca/modelo (ej. Antrack → infra).
+   * En API vitrina suele venir resuelto desde `mp_listing_kind` + inferencia.
+   */
+  listingKind?: MarketplaceListingKind;
 };
 
 /** Ruta pública bajo `client/public/images/` (codifica espacios en nombres de archivo). */
@@ -310,6 +345,7 @@ export type HashrateSharePct = (typeof HASHRATE_SHARE_OPTIONS)[number];
 
 /** Solo Antminer S21 XP a 270 TH/s (catálogo estático o misma ficha desde API). */
 export function productSupportsHashrateShare(product: AsicProduct): boolean {
+  if (!asicProductShowsMinerEconomyContent(product)) return false;
   const raw = product.priceDisplayLabel?.trim();
   if (raw && normalizeConsultPriceLabelForDisplay(raw)) return false;
   if (product.id === "fallback-s21-xp-270") return true;
