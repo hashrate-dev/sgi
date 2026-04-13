@@ -183,9 +183,35 @@ function parseBoltRowWatts(text: string): number | null {
   return Math.round(n);
 }
 
-function wattsTextFromNumber(watts: number): string {
+/** Miles con punto (es-AR), p. ej. 24.000 — coherente con `parseBoltRowWatts`. */
+function formatWattsGrouped(watts: number): string {
   const w = Math.max(0, Math.round(watts));
-  return `${w} W`;
+  return w.toLocaleString("es-AR", { maximumFractionDigits: 0, useGrouping: true });
+}
+
+function wattsTextFromNumber(watts: number): string {
+  return `${formatWattsGrouped(watts)} W`;
+}
+
+/** Valor solo dígitos para el input (sin sufijo W). */
+function wattsInputDisplayFromBoltText(text: string): string {
+  const n = parseBoltRowWatts(text);
+  if (n === null) return "";
+  return formatWattsGrouped(n);
+}
+
+/** Interpreta lo que escribe el usuario: ignora puntos/comas de miles y letras (incl. W). */
+function parseDigitsFromWattsInput(raw: string): number | null {
+  const cleaned = raw
+    .trim()
+    .replace(/\s/g, "")
+    .replace(/w/gi, "")
+    .replace(/\./g, "")
+    .replace(/,/g, "");
+  if (cleaned === "") return null;
+  const n = parseInt(cleaned, 10);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.min(n, 9_999_999);
 }
 
 export function parseDetailRowsJson(json: string): Array<{ icon: AsicDetailIcon; text: string }> {
@@ -318,22 +344,22 @@ export function MarketplaceDetailRowsEditor({
           </div>
           <div className="hrs-detail-rows__watts-wrap hrs-detail-rows__watts-wrap--fixed">
             <input
-              type="number"
+              type="text"
               className="fact-input hrs-detail-rows__watts-number"
-              min={0}
-              step={50}
               inputMode="numeric"
-              value={parseBoltRowWatts(powerRow.text) ?? ""}
+              autoComplete="off"
+              spellCheck={false}
+              value={wattsInputDisplayFromBoltText(powerRow.text)}
               disabled={disabled}
-              placeholder="3950"
+              placeholder="3.950"
               onChange={(e) => {
                 const v = e.target.value;
-                if (v === "") {
+                if (v.trim() === "") {
                   updatePowerRow({ text: "" });
                   return;
                 }
-                const n = Number(v);
-                if (!Number.isFinite(n) || n < 0) return;
+                const n = parseDigitsFromWattsInput(v);
+                if (n === null) return;
                 updatePowerRow({ text: wattsTextFromNumber(n) });
               }}
               aria-label="Consumo en vatios"
@@ -460,22 +486,22 @@ export function MarketplaceDetailRowsEditor({
             {row.icon === "bolt" ? (
               <div className="hrs-detail-rows__watts-wrap">
                 <input
-                  type="number"
+                  type="text"
                   className="fact-input hrs-detail-rows__watts-number"
-                  min={0}
-                  step={50}
                   inputMode="numeric"
-                  value={parseBoltRowWatts(row.text) ?? ""}
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={wattsInputDisplayFromBoltText(row.text)}
                   disabled={disabled}
-                  placeholder="3950"
+                  placeholder="3.950"
                   onChange={(e) => {
                     const v = e.target.value;
-                    if (v === "") {
+                    if (v.trim() === "") {
                       updateExtraRow(i, { text: "" });
                       return;
                     }
-                    const n = Number(v);
-                    if (!Number.isFinite(n) || n < 0) return;
+                    const n = parseDigitsFromWattsInput(v);
+                    if (n === null) return;
                     updateExtraRow(i, { text: wattsTextFromNumber(n) });
                   }}
                   aria-label={`Vatios fila extra ${i + 1}`}

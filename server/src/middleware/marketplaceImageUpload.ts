@@ -55,10 +55,14 @@ function safeExt(original: string): string {
 }
 
 const fileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
+  const mt = (file.mimetype || "").toLowerCase().trim();
   const ok =
-    /^image\/(jpeg|png|gif|webp)$/i.test(file.mimetype) ||
-    file.mimetype === "image/jpg" ||
-    file.mimetype === "image/pjpeg";
+    /^image\/(jpeg|png|gif|webp)$/i.test(mt) ||
+    mt === "image/jpg" ||
+    mt === "image/pjpeg" ||
+    /** Windows / archivos sin extensión suelen subir como octet-stream; validamos firma en la ruta. */
+    mt === "application/octet-stream" ||
+    mt === "";
   if (!ok) {
     cb(new Error("Solo imágenes (JPEG, PNG, WebP, GIF)."));
     return;

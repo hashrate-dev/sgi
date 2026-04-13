@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import fs from "node:fs";
 import { Router } from "express";
 import { z } from "zod";
 import { db, getDb } from "../db.js";
@@ -20,6 +21,7 @@ import {
 } from "../lib/precioHistorialAsic.js";
 import { codigoProductoVitrina } from "../lib/marketplaceProductCode.js";
 import { isAdminABRole, logEquipoAsicAudit } from "../lib/equipoAsicAudit.js";
+import { mimeForSniffedFormat, sniffImageFormat } from "../lib/marketplaceImageSniff.js";
 
 export const equiposRouter = Router();
 
@@ -329,13 +331,41 @@ equiposRouter.post(
     if (!file) {
       return res.status(400).json({ error: { message: "Archivo requerido (campo file)" } });
     }
+    let buf: Buffer;
     if (marketplaceImageUploadUsesMemory()) {
-      const buf = file.buffer;
-      if (!buf?.length) {
+      const b = file.buffer;
+      if (!b?.length) {
         return res.status(400).json({ error: { message: "Archivo vacío" } });
       }
-      const mime = file.mimetype || "image/jpeg";
-      const url = `data:${mime};base64,${buf.toString("base64")}`;
+      buf = b;
+    } else {
+      const p = (file as Express.Multer.File & { path?: string }).path;
+      if (!p) {
+        return res.status(400).json({ error: { message: "Archivo no guardado" } });
+      }
+      try {
+        buf = fs.readFileSync(p);
+      } catch {
+        return res.status(400).json({ error: { message: "No se pudo leer el archivo" } });
+      }
+    }
+    const fmt = sniffImageFormat(buf);
+    if (!fmt) {
+      if (!marketplaceImageUploadUsesMemory()) {
+        const p = (file as Express.Multer.File & { path?: string }).path;
+        if (p) {
+          try {
+            fs.unlinkSync(p);
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+      return res.status(400).json({ error: { message: "Solo imágenes (JPEG, PNG, WebP, GIF)." } });
+    }
+    const verifiedMime = mimeForSniffedFormat(fmt);
+    if (marketplaceImageUploadUsesMemory()) {
+      const url = `data:${verifiedMime};base64,${buf.toString("base64")}`;
       void logEquipoAsicAudit({
         user: req.user!,
         equipoId: null,

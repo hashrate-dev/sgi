@@ -22,6 +22,34 @@ function fileLabelFromPath(path: string): string {
   }
 }
 
+const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp)$/i;
+
+/** PNG/JPEG/GIF/WebP por firma (archivos sin extensión suelen venir con `type` vacío al elegir desde carpeta). */
+async function sniffImageMagic(file: File): Promise<boolean> {
+  if (file.size < 12) return false;
+  try {
+    const buf = await file.slice(0, 16).arrayBuffer();
+    const u = new Uint8Array(buf);
+    if (u.length >= 3 && u[0] === 0xff && u[1] === 0xd8 && u[2] === 0xff) return true;
+    if (u.length >= 8 && u[0] === 0x89 && u[1] === 0x50 && u[2] === 0x4e && u[3] === 0x47) return true;
+    if (u.length >= 6 && u[0] === 0x47 && u[1] === 0x49 && u[2] === 0x46 && u[3] === 0x38) return true;
+    if (u.length >= 12 && u[0] === 0x52 && u[1] === 0x49 && u[2] === 0x46 && u[3] === 0x46) {
+      const tag = String.fromCharCode(u[8]!, u[9]!, u[10]!, u[11]!);
+      return tag === "WEBP";
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+async function isAcceptableMarketplaceImageFile(file: File): Promise<boolean> {
+  if (file.type.startsWith("image/")) return true;
+  if (IMAGE_EXT_RE.test(file.name)) return true;
+  if (!file.type || file.type === "application/octet-stream") return sniffImageMagic(file);
+  return false;
+}
+
 /** Imagen tarjeta: dropzone + vista previa (solo subida de archivo). */
 export function CardImageUploadField({
   value,
@@ -38,7 +66,7 @@ export function CardImageUploadField({
   const preview = imgSrcForPreview(value);
 
   async function processFile(file: File) {
-    if (!file.type.startsWith("image/")) {
+    if (!(await isAcceptableMarketplaceImageFile(file))) {
       showToast("Elegí un archivo de imagen (JPG, PNG, WebP o GIF).", "error", "Equipos ASIC");
       return;
     }
@@ -55,8 +83,10 @@ export function CardImageUploadField({
   }
 
   function onFile(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
+    const input = e.target;
+    const picked = input.files?.length ? Array.from(input.files) : [];
+    input.value = "";
+    const file = picked[0];
     if (!file || disabled) return;
     void processFile(file);
   }
@@ -200,7 +230,11 @@ export function GalleryImagesUploadField({
   }
 
   async function processFiles(files: FileList | File[]) {
-    const list = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    const raw = Array.from(files);
+    const list: File[] = [];
+    for (const f of raw) {
+      if (await isAcceptableMarketplaceImageFile(f)) list.push(f);
+    }
     if (!list.length) {
       showToast("No hay imágenes válidas.", "error", "Equipos ASIC");
       return;
@@ -222,10 +256,11 @@ export function GalleryImagesUploadField({
   }
 
   function onFiles(e: ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
-    e.target.value = "";
-    if (!files?.length || disabled) return;
-    void processFiles(files);
+    const input = e.target;
+    const picked = input.files?.length ? Array.from(input.files) : [];
+    input.value = "";
+    if (!picked.length || disabled) return;
+    void processFiles(picked);
   }
 
   function onDragOver(e: DragEvent) {

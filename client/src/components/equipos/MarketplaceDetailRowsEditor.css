@@ -141,7 +141,7 @@
   cursor: not-allowed;
 }
 
-/* Fila energía: número con flechas nativas + W fija */
+/* Fila energía: texto numérico con miles (.) + W fija */
 .hrs-detail-rows__watts-wrap {
   display: flex;
   align-items: stretch;
@@ -157,12 +157,8 @@
 .hrs-detail-rows__watts-number {
   flex: 1;
   min-width: 0;
-}
-
-.hrs-detail-rows__watts-number::-webkit-outer-spin-button,
-.hrs-detail-rows__watts-number::-webkit-inner-spin-button {
-  opacity: 1;
-  height: auto;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
 }
 
 .hrs-detail-rows__watts-unit {
