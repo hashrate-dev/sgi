@@ -307,13 +307,10 @@ export function MarketplaceQuoteCartDrawer() {
                         </button>
                       </div>
                     </div>
-                    {equipmentPricePending ? (
-                      <p className="market-quote-drawer__line-pending-hint" role="note">
-                        {t("drawer.line_price_pending_hint")}
-                      </p>
-                    ) : null}
                     <div className="market-quote-drawer__addons" role="group" aria-label={tf("drawer.addons_aria", { model: l.model })}>
-                      <p className="market-quote-drawer__addons-hint">{t("drawer.addons_hint")}</p>
+                      <p className="market-quote-drawer__addons-hint">
+                        {equipmentPricePending ? t("drawer.addons_hint_pending_line") : t("drawer.addons_hint")}
+                      </p>
                       <label className="market-quote-drawer__addon">
                         <input
                           type="checkbox"
@@ -321,18 +318,18 @@ export function MarketplaceQuoteCartDrawer() {
                           onChange={(e) => setLineAddons(lk, { includeSetup: e.target.checked })}
                         />
                         <span>
-                          {t("drawer.setup")}{" "}
-                          <span
-                            className={
-                              "market-quote-drawer__addon-price" +
-                              (equipmentPricePending ? " market-quote-drawer__addon-price--pending" : "")
-                            }
-                          >
-                            {equipmentPricePending
-                              ? t("drawer.addon_value_on_request")
-                              : `${setupUnit.toLocaleString(loc)} USD`}
-                          </span>{" "}
-                          {t("drawer.per_u")}
+                          {t("drawer.setup")}
+                          {equipmentPricePending ? (
+                            <span className="market-quote-drawer__addon-muted"> {t("drawer.per_u")}</span>
+                          ) : (
+                            <>
+                              {" "}
+                              <span className="market-quote-drawer__addon-price">
+                                {setupUnit.toLocaleString(loc)} USD
+                              </span>{" "}
+                              {t("drawer.per_u")}
+                            </>
+                          )}
                         </span>
                       </label>
                       <label className="market-quote-drawer__addon">
@@ -342,18 +339,18 @@ export function MarketplaceQuoteCartDrawer() {
                           onChange={(e) => setLineAddons(lk, { includeWarranty: e.target.checked })}
                         />
                         <span>
-                          {t("drawer.warranty")}{" "}
-                          <span
-                            className={
-                              "market-quote-drawer__addon-price" +
-                              (equipmentPricePending ? " market-quote-drawer__addon-price--pending" : "")
-                            }
-                          >
-                            {equipmentPricePending
-                              ? t("drawer.addon_value_on_request")
-                              : `${warrantyUnit.toLocaleString(loc)} USD`}
-                          </span>{" "}
-                          {t("drawer.per_u")}
+                          {t("drawer.warranty")}
+                          {equipmentPricePending ? (
+                            <span className="market-quote-drawer__addon-muted"> {t("drawer.per_u")}</span>
+                          ) : (
+                            <>
+                              {" "}
+                              <span className="market-quote-drawer__addon-price">
+                                {warrantyUnit.toLocaleString(loc)} USD
+                              </span>{" "}
+                              {t("drawer.per_u")}
+                            </>
+                          )}
                         </span>
                       </label>
                     </div>
@@ -366,7 +363,7 @@ export function MarketplaceQuoteCartDrawer() {
                         }
                       >
                         {equipmentPricePending
-                          ? t("drawer.line_subtotal_pending")
+                          ? t("drawer.total_pending_placeholder")
                           : `${quoteCartLineSubtotalUsd(l, pricing).toLocaleString(loc)} USD`}
                       </strong>
                     </div>
@@ -388,16 +385,6 @@ export function MarketplaceQuoteCartDrawer() {
                     <span>{ticketRef.ticketCode}</span>
                   </span>
                 </p>
-              ) : null}
-              {hasPendingEquipmentPrice ? (
-                <div className="market-quote-drawer__pending-total-banner" role="status">
-                  <strong className="market-quote-drawer__pending-total-banner-title">
-                    {t("drawer.pending_equipment_total_title")}
-                  </strong>
-                  <p className="market-quote-drawer__pending-total-banner-body">
-                    {t("drawer.pending_equipment_total_body")}
-                  </p>
-                </div>
               ) : null}
               <div className="market-quote-drawer__total">
                 <div className="market-quote-drawer__total-copy">

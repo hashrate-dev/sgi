@@ -3252,6 +3252,12 @@ button.product-modal__btn--quote-cart:hover {
   font-variant-numeric: normal;
 }
 
+.market-quote-drawer__addon-muted {
+  color: #64748b;
+  font-weight: 600;
+  font-size: 0.72rem;
+}
+
 .market-quote-drawer__line-sub {
   display: flex;
   align-items: center;

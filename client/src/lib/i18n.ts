@@ -390,6 +390,8 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "drawer.qty_plus": "Aumentar cantidad",
     "drawer.addons_aria": "Opciones para {{model}}",
     "drawer.addons_hint": "Opcional (× u.): desmarcá si no aplica instalación en granja o garantía.",
+    "drawer.addons_hint_pending_line":
+      "Opcional (× u.). Con precio a consulta, setup y garantía van en la misma cotización.",
     "drawer.setup": "Setup",
     "drawer.warranty": "Garantía",
     "drawer.addon_value_on_request": "solicitar valor",
@@ -399,14 +401,13 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "drawer.total": "Total precio",
     "drawer.total_note": "Suma de la lista · USD",
     "drawer.total_note_addons_only": "Suma visible: solo opcionales (setup / garantía) · USD",
-    "drawer.total_note_pending_quote":
-      "Solo suma equipos con precio en lista; en consulta no incluye minero ni setup ni garantía.",
+    "drawer.total_note_pending_quote": "Sin total en lista: Hashrate cotiza minero, setup y garantía.",
     "drawer.total_pending_placeholder": "—",
     "drawer.line_price_pending_hint":
-      "Precio del equipo no incluido en esta lista. El equipo comercial de Hashrate se pondrá en contacto para cotizar minero, setup y garantía (si los marcaste).",
-    "drawer.pending_equipment_total_title": "Importante — sin total fijo",
+      "Precio a consulta: Hashrate cotizará minero, setup y garantía al contactarte.",
+    "drawer.pending_equipment_total_title": "Sin total fijo",
     "drawer.pending_equipment_total_body":
-      "Los importes de minero, instalación (setup) y garantía en consulta no se muestran aquí: el equipo comercial de Hashrate los confirmará al contactarte.",
+      "Hashrate cotizará minero, setup y garantía en los ítems marcados como consulta.",
     "drawer.ref_label": "Tu referencia",
     "drawer.next": "Siguiente paso",
     "drawer.next_logged":
@@ -1034,6 +1035,8 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "drawer.qty_plus": "Increase quantity",
     "drawer.addons_aria": "Options for {{model}}",
     "drawer.addons_hint": "Optional (per unit): uncheck if farm setup or warranty does not apply.",
+    "drawer.addons_hint_pending_line":
+      "Optional (per unit). With price on request, setup and warranty are quoted together.",
     "drawer.setup": "Setup",
     "drawer.warranty": "Warranty",
     "drawer.addon_value_on_request": "request pricing",
@@ -1043,14 +1046,13 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "drawer.total": "Total price",
     "drawer.total_note": "List sum · USD",
     "drawer.total_note_addons_only": "Visible sum: add-ons only (setup / warranty) · USD",
-    "drawer.total_note_pending_quote":
-      "Only sums items with a list price; on-request lines exclude miner, setup, and warranty amounts.",
+    "drawer.total_note_pending_quote": "No list total — Hashrate quotes miner, setup & warranty.",
     "drawer.total_pending_placeholder": "—",
     "drawer.line_price_pending_hint":
-      "Miner price is not included here. Our Hashrate sales team will contact you to quote the miner, setup, and warranty (if selected).",
-    "drawer.pending_equipment_total_title": "Important — no fixed total",
+      "Price on request: Hashrate will quote miner, setup, and warranty when they contact you.",
+    "drawer.pending_equipment_total_title": "No fixed total",
     "drawer.pending_equipment_total_body":
-      "Miner, farm setup, and warranty amounts on request are not shown here; Hashrate sales will confirm them when they reach out.",
+      "Hashrate will quote miner, setup, and warranty for items marked on request.",
     "drawer.ref_label": "Your reference",
     "drawer.next": "Next step",
     "drawer.next_logged":

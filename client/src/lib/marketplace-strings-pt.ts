@@ -371,6 +371,8 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
   "drawer.qty_plus": "Aumentar quantidade",
   "drawer.addons_aria": "Opções para {{model}}",
   "drawer.addons_hint": "Opcional (por u.): desmarque se não se aplicar instalação na fazenda ou garantia.",
+  "drawer.addons_hint_pending_line":
+    "Opcional (por u.). Com preço sob consulta, setup e garantia entram na mesma cotação.",
   "drawer.setup": "Setup",
   "drawer.warranty": "Garantia",
   "drawer.addon_value_on_request": "solicitar valor",
@@ -384,10 +386,10 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
     "Soma apenas equipamentos com preço na lista; em consulta não inclui minerador, setup nem garantia.",
   "drawer.total_pending_placeholder": "—",
   "drawer.line_price_pending_hint":
-    "Preço do equipamento não incluído aqui. A equipe comercial da Hashrate entrará em contato para cotar minerador, setup e garantia (se selecionados).",
-  "drawer.pending_equipment_total_title": "Importante — sem total fixo",
+    "Preço sob consulta: a Hashrate cotará minerador, setup e garantia ao entrar em contato.",
+  "drawer.pending_equipment_total_title": "Sem total fixo",
   "drawer.pending_equipment_total_body":
-    "Valores de minerador, instalação (setup) e garantia em consulta não aparecem aqui; a equipe comercial da Hashrate confirmará ao entrar em contato.",
+    "A Hashrate cotará minerador, setup e garantia nos itens marcados como consulta.",
   "drawer.ref_label": "Sua referência",
   "drawer.next": "Próximo passo",
   "drawer.next_logged":
