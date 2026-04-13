@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { MarketplaceSiteHeader } from "../components/marketplace/MarketplaceSiteHeader";
 import { MarketplaceSiteFooter } from "../components/marketplace/MarketplaceSiteFooter";
+import { MarketplaceCorpFaqSpotlight } from "../components/marketplace/MarketplaceCorpFaqSpotlight";
+import { MarketplaceCorpContactCard } from "../components/marketplace/MarketplaceCorpContactCard";
 import { AsicDetailSvg } from "../components/marketplace/AsicDetailIcon.js";
 import { ASIC_MARKETPLACE_PRODUCTS, formatAsicPriceUsd } from "../lib/marketplaceAsicCatalog.js";
 import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
@@ -10,7 +12,6 @@ import "../styles/marketplace-hashrate.css";
 const DOC_TITLE = "Hashrate – Space";
 const UP = "https://hashrate.space/wp-content/uploads";
 const VIDEO_URL = "https://hashrate.space/video/Hashrate-Farm-Py.mp4";
-const FAQ_SPOTLIGHT_IMG = `${import.meta.env.BASE_URL}images/Antminer_S21_Range.png`;
 /** Promo Z15 — reemplazá `public/images/bitmain-z15-pro.png` por el render oficial si querés otro asset */
 const CORP_Z15_PROMO_IMG = `${import.meta.env.BASE_URL}images/bitmain-z15-pro.png`;
 const CORP_ZCASH_LOGO_IMG = `${import.meta.env.BASE_URL}images/zcash-logo.png`;
@@ -92,18 +93,7 @@ export function MarketplaceCorporateHomePage() {
     }, 80);
   }, [navigate, pathname]);
   const videoTitleId = useId();
-  const faqAccordionId = useId();
   const [videoOpen, setVideoOpen] = useState(false);
-  const [openFaqIdx, setOpenFaqIdx] = useState<number | null>(0);
-  const [form, setForm] = useState({
-    name: "",
-    last: "",
-    email: "",
-    subject: "",
-    phone: "",
-    message: "",
-  });
-
   useEffect(() => {
     const prevTitle = document.title;
     document.title = DOC_TITLE;
@@ -175,27 +165,6 @@ export function MarketplaceCorporateHomePage() {
     { label: t("corp.metrics.tech"), value: t("corp.metrics.tech_val") },
   ] as const;
 
-  const submitForm = useCallback(
-    (e: FormEvent) => {
-      e.preventDefault();
-      const body = [
-        `${t("corp.form.name")}: ${form.name}`,
-        `${t("corp.form.last_name")}: ${form.last}`,
-        `${t("corp.form.email")}: ${form.email}`,
-        `${t("corp.form.phone")}: ${form.phone}`,
-        "",
-        form.message,
-      ].join("\n");
-      const sales = "sales@hashrate.space";
-      const q = new URLSearchParams({
-        subject: form.subject || "Marketplace contact",
-        body,
-      });
-      window.location.href = `mailto:${sales}?${q.toString()}`;
-    },
-    [form, t]
-  );
-
   return (
     <div className="marketplace-asic-page market-corp-page">
       <div className="bg-mesh" aria-hidden />
@@ -218,9 +187,9 @@ export function MarketplaceCorporateHomePage() {
                       <Link to="/marketplace" className="market-corp-btn market-corp-btn--ghost">
                         {t("corp.hero.cta_shop")}
                       </Link>
-                      <a href="#contacto" className="market-corp-btn market-corp-btn--see-through">
+                      <Link to="/marketplace/contact" className="market-corp-btn market-corp-btn--see-through">
                         {t("corp.hero.cta_contact")}
-                      </a>
+                      </Link>
                     </div>
                   </div>
                   <div className="market-corp-hero-full__video">
@@ -442,79 +411,17 @@ export function MarketplaceCorporateHomePage() {
             </section>
 
             <section id="faq" className="market-corp-section market-corp-anchor" aria-labelledby="corp-faq-title">
-              <div className="market-corp-faq-spotlight">
-                <div className="market-corp-faq-spotlight__gradient" aria-hidden />
-                <div className="market-corp-faq-spotlight__shine" aria-hidden />
-                <div className="market-corp-faq-spotlight__inner">
-                  <div className="market-corp-faq-spotlight__grid">
-                    <div className="market-corp-faq-spotlight__lead">
-                      <p className="market-corp-faq-spotlight__kicker">{t("corp.faq.spot.kicker")}</p>
-                      <h2 id="corp-faq-title" className="market-corp-faq-spotlight__h2">
-                        {t("corp.faq.title")}
-                      </h2>
-                      <p className="market-corp-faq-spotlight__lede">{t("corp.faq.spot.specs")}</p>
-                      <div className="market-corp-faq-spotlight__lead-actions">
-                        <Link to="/marketplace" className="market-corp-faq-spotlight__btn market-corp-faq-spotlight__btn--primary">
-                          {t("corp.faq.shop_cta")}
-                        </Link>
-                        <button
-                          type="button"
-                          className="market-corp-faq-spotlight__btn market-corp-faq-spotlight__btn--ghost"
-                          onClick={() => goCorpHash("contacto")}
-                        >
-                          {t("corp.faq.contact_cta")}
-                        </button>
-                      </div>
-                    </div>
-                    <div className="market-corp-faq-spotlight__visual">
-                      <img
-                        src={FAQ_SPOTLIGHT_IMG}
-                        alt={t("corp.faq.spot.img_alt")}
-                        width={960}
-                        height={640}
-                        loading="lazy"
-                        decoding="async"
-                        className="market-corp-faq-spotlight__img"
-                      />
-                    </div>
-                    <div className="market-corp-faq-spotlight__faqs">
-                      <p className="market-corp-faq-spotlight__faqs-kicker">{t("corp.faq.spot.acc_heading")}</p>
-                      <div className="market-corp-faq-spotlight__accordion" role="region" aria-label={t("corp.faq.title")}>
-                        {CORP_FAQ_ROWS.map((row, i) => {
-                          const panelId = `${faqAccordionId}-panel-${i}`;
-                          const tabId = `${faqAccordionId}-tab-${i}`;
-                          const isOpen = openFaqIdx === i;
-                          return (
-                            <div key={row.q} className="market-corp-faq-spotlight__acc-item">
-                              <button
-                                type="button"
-                                id={tabId}
-                                className="market-corp-faq-spotlight__acc-trigger"
-                                aria-expanded={isOpen}
-                                aria-controls={panelId}
-                                onClick={() => setOpenFaqIdx((cur) => (cur === i ? null : i))}
-                              >
-                                <span className="market-corp-faq-spotlight__acc-q">{t(row.q)}</span>
-                                <span className="market-corp-faq-spotlight__acc-icon" aria-hidden>
-                                  {isOpen ? "−" : "+"}
-                                </span>
-                              </button>
-                              <div
-                                id={panelId}
-                                aria-labelledby={tabId}
-                                className="market-corp-faq-spotlight__acc-panel"
-                                hidden={!isOpen}
-                              >
-                                <p className="market-corp-faq-spotlight__acc-a">{t(row.a)}</p>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <p className="market-corp-faq-spotlight__footnote">{t("corp.faq.lede")}</p>
-                    </div>
-                  </div>
-                </div>
+              <MarketplaceCorpFaqSpotlight
+                headingId="corp-faq-title"
+                rows={CORP_FAQ_ROWS}
+                defaultOpenIndex={0}
+                variant="aurora"
+                onContactClick={() => goCorpHash("contacto")}
+              />
+              <div className="market-corp-faq-home-more">
+                <Link to="/marketplace/faq" className="market-corp-faq-home-more__link">
+                  {t("corp.faq.view_all")}
+                </Link>
               </div>
             </section>
 
@@ -563,155 +470,7 @@ export function MarketplaceCorporateHomePage() {
               </div>
             </section>
 
-            <section id="contacto" className="market-corp-contact-wp market-corp-anchor" aria-labelledby="corp-contact-title">
-              <div className="market-corp-contact-wp__panel">
-                <div className="market-corp-contact-wp__gradient" aria-hidden />
-                <div className="market-corp-contact-wp__noise noise-overlay" aria-hidden />
-                <div className="market-corp-contact-wp__inner">
-                  <div className="market-corp-contact-wp__col">
-                    <h2 id="corp-contact-title" className="market-corp-contact-wp__h2">
-                      {t("corp.contact.title")}
-                    </h2>
-                    <div className="market-corp-contact-wp__blocks">
-                      <p>
-                        <strong>{t("corp.contact.support")}</strong>
-                        <br />
-                        <a className="market-corp-contact-wp__link" href={`mailto:${t("corp.contact.support_email")}`}>
-                          {t("corp.contact.support_email")}
-                        </a>
-                      </p>
-                      <p>
-                        <strong>{t("corp.contact.investors")}</strong>
-                        <br />
-                        <a className="market-corp-contact-wp__link" href={`mailto:${t("corp.contact.investors_email")}`}>
-                          {t("corp.contact.investors_email")}
-                        </a>
-                      </p>
-                      <p>
-                        <strong>{t("corp.contact.sales")}</strong>
-                        <br />
-                        <a className="market-corp-contact-wp__link" href={`mailto:${t("corp.contact.sales_email")}`}>
-                          {t("corp.contact.sales_email")}
-                        </a>
-                      </p>
-                      <p>
-                        <strong>{t("corp.contact.headquarter")}</strong>
-                        <br />
-                        {t("corp.contact.addr1")}
-                        <br />
-                        <span className="market-corp-contact-wp__muted">{t("corp.contact.phones")}</span>
-                        <br />
-                        {t("corp.contact.addr2")}
-                      </p>
-                    </div>
-                    <h3 className="market-corp-contact-wp__h3">{t("corp.contact.social")}</h3>
-                    <div className="market-corp-social">
-                      <a
-                        className="market-corp-social__btn"
-                        href="https://www.instagram.com/hashrate.space/"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label="Instagram"
-                      >
-                        <SocialInstagram />
-                      </a>
-                      <a
-                        className="market-corp-social__btn"
-                        href="https://www.linkedin.com/company/hashrate-space"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label="LinkedIn"
-                      >
-                        <SocialLinkedIn />
-                      </a>
-                      <a
-                        className="market-corp-social__btn"
-                        href="https://x.com/Hashrate_Space"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label="X"
-                      >
-                        <SocialX />
-                      </a>
-                    </div>
-                  </div>
-                  <div className="market-corp-contact-wp__col">
-                    <form className="market-corp-form-wp" onSubmit={submitForm}>
-                      <label className="market-corp-form-wp__field">
-                        <span className="sr-only">{t("corp.form.name")}</span>
-                        <input
-                          name="name"
-                          required
-                          autoComplete="given-name"
-                          placeholder={t("corp.form.name")}
-                          value={form.name}
-                          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                        />
-                      </label>
-                      <label className="market-corp-form-wp__field">
-                        <span className="sr-only">{t("corp.form.last_name")}</span>
-                        <input
-                          name="last"
-                          required
-                          autoComplete="family-name"
-                          placeholder={t("corp.form.last_name")}
-                          value={form.last}
-                          onChange={(e) => setForm((f) => ({ ...f, last: e.target.value }))}
-                        />
-                      </label>
-                      <label className="market-corp-form-wp__field">
-                        <span className="sr-only">{t("corp.form.email")}</span>
-                        <input
-                          name="email"
-                          type="email"
-                          required
-                          autoComplete="email"
-                          placeholder={t("corp.form.email")}
-                          value={form.email}
-                          onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                        />
-                      </label>
-                      <label className="market-corp-form-wp__field">
-                        <span className="sr-only">{t("corp.form.subject")}</span>
-                        <input
-                          name="subject"
-                          required
-                          placeholder={t("corp.form.subject")}
-                          value={form.subject}
-                          onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))}
-                        />
-                      </label>
-                      <label className="market-corp-form-wp__field">
-                        <span className="sr-only">{t("corp.form.phone")}</span>
-                        <input
-                          name="phone"
-                          required
-                          autoComplete="tel"
-                          placeholder={t("corp.form.phone")}
-                          value={form.phone}
-                          onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                        />
-                      </label>
-                      <label className="market-corp-form-wp__field market-corp-form-wp__field--full">
-                        <span className="sr-only">{t("corp.form.message")}</span>
-                        <textarea
-                          name="message"
-                          rows={5}
-                          maxLength={2000}
-                          placeholder={t("corp.form.message")}
-                          value={form.message}
-                          onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
-                        />
-                      </label>
-                      <p className="market-corp-form-wp__hint">{t("corp.form.hint")}</p>
-                      <button type="submit" className="market-corp-btn market-corp-btn--submit">
-                        {t("corp.form.submit")}
-                      </button>
-                    </form>
-                  </div>
-                </div>
-              </div>
-            </section>
+            <MarketplaceCorpContactCard titleId="corp-contact-title" anchorId="contacto" />
 
             <section className="market-corp-luxor" aria-labelledby="corp-luxor-title">
               <h2 id="corp-luxor-title" className="market-corp-brands-block__title market-corp-luxor__heading">
@@ -771,38 +530,5 @@ export function MarketplaceCorporateHomePage() {
         </div>
       ) : null}
     </div>
-  );
-}
-
-function SocialInstagram() {
-  return (
-    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden>
-      <path
-        fill="currentColor"
-        d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5zm0 2a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3H7zm5 3.5A3.5 3.5 0 1 1 8.5 11 3.5 3.5 0 0 1 12 7.5zm0 2A1.5 1.5 0 1 0 13.5 11 1.5 1.5 0 0 0 12 9.5zm5.25-3.75a1 1 0 1 1-1 1 1 1 0 0 1 1-1z"
-      />
-    </svg>
-  );
-}
-
-function SocialLinkedIn() {
-  return (
-    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden>
-      <path
-        fill="currentColor"
-        d="M4.98 3.5C4.98 4.88 3.86 6 2.5 6S0 4.88 0 3.5 1.12 1 2.5 1s2.48 1.12 2.48 2.5zM.5 8h4V23h-4V8zm7.5 0h3.8v2h.05c.53-1 1.84-2.31 3.8-2.31 4.06 0 4.8 2.67 4.8 6.14V23h-4v-7.7c0-1.84-.03-4.2-2.56-4.2-2.56 0-2.95 2-2.95 4.1V23h-4V8z"
-      />
-    </svg>
-  );
-}
-
-function SocialX() {
-  return (
-    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
-      <path
-        fill="currentColor"
-        d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"
-      />
-    </svg>
   );
 }

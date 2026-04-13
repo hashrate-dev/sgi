@@ -12,6 +12,8 @@ export function MarketplaceSiteHeader() {
   const onCatalog = pathname === "/marketplace" || pathname === "/marketplace/";
   const onCorporateHome = pathname === "/marketplace/home" || pathname === "/marketplace/home/";
   const onCompanyPage = pathname === "/marketplace/company" || pathname === "/marketplace/company/";
+  const onFaqPage = pathname === "/marketplace/faq" || pathname === "/marketplace/faq/";
+  const onContactPage = pathname === "/marketplace/contact" || pathname === "/marketplace/contact/";
   const corpHashCurrent = (id: string) =>
     onCorporateHome && hash === `#${id}` ? ("is-current" as const) : undefined;
   const { user, logout } = useAuth();
@@ -28,6 +30,41 @@ export function MarketplaceSiteHeader() {
           ? tf("header.cart_units", { n: String(quoteCart.totalUnits) })
           : t("header.cart_empty");
 
+  function renderAccountBlock() {
+    return (
+      <div
+        className={
+          "site-header__account" +
+          (!showLoggedAccount ? " site-header__account--guest" : "")
+        }
+      >
+        {showLoggedAccount ? (
+          <>
+            <span className="site-header__account-email" title={user?.email ?? user?.username}>
+              {user?.email ?? user?.username}
+            </span>
+            <button
+              type="button"
+              className="site-header__account-logout"
+              onClick={() => {
+                logout();
+                window.location.href = "/marketplace";
+              }}
+            >
+              {t("header.logout")}
+            </button>
+          </>
+        ) : (
+          <div className="site-header__auth-actions">
+            <Link to="/marketplace/registro" className="site-header__auth-link site-header__auth-link--primary">
+              {t("header.register")}
+            </Link>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <header className="site-header site-header--marketplace">
       <div className="container site-header__inner">
@@ -43,23 +80,7 @@ export function MarketplaceSiteHeader() {
           />
         </Link>
         <div className="site-header__trailing">
-          <div
-            className="market-lang-switch"
-            role="group"
-            aria-label={t("header.lang_hint")}
-          >
-            {(["es", "en", "pt"] as const satisfies readonly MarketplaceLang[]).map((code) => (
-              <button
-                key={code}
-                type="button"
-                className={`market-lang-switch__btn${lang === code ? " active" : ""}`}
-                onClick={() => setLang(code)}
-                aria-pressed={lang === code}
-              >
-                {code === "es" ? t("header.lang_es") : code === "en" ? t("header.lang_en") : t("header.lang_pt")}
-              </button>
-            ))}
-          </div>
+          <div className="site-header__account-wrap site-header__account-wrap--desktop">{renderAccountBlock()}</div>
           {quoteCart ? (
             <button
               type="button"
@@ -96,7 +117,26 @@ export function MarketplaceSiteHeader() {
               </span>
               <span className="market-quote-cart-trigger__label">{t("header.cart")}</span>
             </button>
-          ) : null}
+          ) : (
+            <span className="site-header__cart-slot" aria-hidden />
+          )}
+          <div
+            className="market-lang-switch site-header__lang-switch"
+            role="group"
+            aria-label={t("header.lang_hint")}
+          >
+            {(["es", "en", "pt"] as const satisfies readonly MarketplaceLang[]).map((code) => (
+              <button
+                key={code}
+                type="button"
+                className={`market-lang-switch__btn${lang === code ? " active" : ""}`}
+                onClick={() => setLang(code)}
+                aria-pressed={lang === code}
+              >
+                {code === "es" ? t("header.lang_es") : code === "en" ? t("header.lang_en") : t("header.lang_pt")}
+              </button>
+            ))}
+          </div>
           <button
             type="button"
             className="nav-toggle"
@@ -133,7 +173,11 @@ export function MarketplaceSiteHeader() {
               </Link>
             </li>
             <li>
-              <Link to="/marketplace/home#faq" className={corpHashCurrent("faq")}>
+              <Link
+                to="/marketplace/faq"
+                className={onFaqPage ? "is-current" : undefined}
+                {...(onFaqPage ? { "aria-current": "page" as const } : {})}
+              >
                 {t("nav.faq")}
               </Link>
             </li>
@@ -147,34 +191,16 @@ export function MarketplaceSiteHeader() {
               </Link>
             </li>
             <li>
-              <Link to="/marketplace/home#contacto" className={corpHashCurrent("contacto")}>
+              <Link
+                to="/marketplace/contact"
+                className={onContactPage ? "is-current" : undefined}
+                {...(onContactPage ? { "aria-current": "page" as const } : {})}
+              >
                 {t("nav.contact")}
               </Link>
             </li>
-            <li className={"site-header__account" + (!showLoggedAccount ? " site-header__account--guest" : "")}>
-              {showLoggedAccount ? (
-                <>
-                  <span className="site-header__account-email" title={user?.email ?? user?.username}>
-                    {user?.email ?? user?.username}
-                  </span>
-                  <button
-                    type="button"
-                    className="site-header__account-logout"
-                    onClick={() => {
-                      logout();
-                      window.location.href = "/marketplace";
-                    }}
-                  >
-                    {t("header.logout")}
-                  </button>
-                </>
-              ) : (
-                <div className="site-header__auth-actions">
-                  <Link to="/marketplace/registro" className="site-header__auth-link site-header__auth-link--primary">
-                    {t("header.register")}
-                  </Link>
-                </div>
-              )}
+            <li className="site-header__account-wrap site-header__account-wrap--mobile">
+              {renderAccountBlock()}
             </li>
           </ul>
         </nav>

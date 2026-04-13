@@ -32,11 +32,14 @@ import { KryptexDetallePage } from "./pages/KryptexDetallePage";
 import { MarketplacePage } from "./pages/MarketplacePage";
 import { MarketplaceCorporateHomePage } from "./pages/MarketplaceCorporateHomePage";
 import { MarketplaceCompanyPage } from "./pages/MarketplaceCompanyPage";
+import { MarketplaceFaqPage } from "./pages/MarketplaceFaqPage";
+import { MarketplaceContactPage } from "./pages/MarketplaceContactPage";
 import { MarketplaceClienteLoginPage } from "./pages/MarketplaceClienteLoginPage";
 import { MarketplaceClienteRegistroPage } from "./pages/MarketplaceClienteRegistroPage";
 import { CuentaClientePage } from "./pages/CuentaClientePage";
 import { CuentaClienteDetallePage } from "./pages/CuentaClienteDetallePage";
 import { ToastContainer } from "./components/ToastNotification";
+import { ScrollToTop } from "./components/ScrollToTop";
 import { MarketplaceLanguageProvider } from "./contexts/MarketplaceLanguageContext";
 
 /** Outlet para anidar /marketplace, /marketplace/login, /marketplace/registro (matching estable en RR7). */
@@ -52,6 +55,7 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <ScrollToTop />
         <ToastContainer />
         <Routes>
           {/* Tienda primero: catálogo público + login/registro cliente (anidado para matching estable en RR7) */}
@@ -59,6 +63,8 @@ function App() {
             <Route index element={<MarketplacePage />} />
             <Route path="home" element={<MarketplaceCorporateHomePage />} />
             <Route path="company" element={<MarketplaceCompanyPage />} />
+            <Route path="faq" element={<MarketplaceFaqPage />} />
+            <Route path="contact" element={<MarketplaceContactPage />} />
             <Route path="login" element={<MarketplaceClienteLoginPage />} />
             <Route path="registro" element={<MarketplaceClienteRegistroPage />} />
             <Route path="mis-ordenes" element={<Navigate to="/marketplace" replace />} />

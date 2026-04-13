@@ -164,9 +164,8 @@ export function MarketplaceQuoteCartDrawer() {
                 <p className="market-quote-drawer__lede">{t("drawer.lede")}</p>
                 <p className="market-quote-drawer__login-hint" role="note">
                   {t("drawer.hint.p1")}{" "}
-                  <Link to="/marketplace/login">{t("drawer.login_link")}</Link> {t("drawer.hint.p2")}{" "}
-                  {t("drawer.client")} {t("drawer.hint.p3")} {t("drawer.admin")}
-                  {t("drawer.hint.p4")}{" "}
+                  <Link to="/marketplace/login">{t("drawer.login_link")}</Link>
+                  {t("drawer.hint.p2")}
                   <Link to="/marketplace/registro">{t("drawer.register_link")}</Link>
                   {t("drawer.hint.p5")}
                 </p>

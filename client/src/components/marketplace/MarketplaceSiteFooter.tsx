@@ -51,13 +51,13 @@ export function MarketplaceSiteFooter({ variant = "default" }: Props) {
               <Link to="/marketplace">{t("nav.equipment")}</Link>
             </li>
             <li>
-              <Link to="/marketplace/home#faq">{t("nav.faq")}</Link>
+              <Link to="/marketplace/faq">{t("nav.faq")}</Link>
             </li>
             <li>
               <Link to="/marketplace/company">{t("nav.company")}</Link>
             </li>
             <li>
-              <Link to="/marketplace/home#contacto">{t("nav.contact")}</Link>
+              <Link to="/marketplace/contact">{t("nav.contact")}</Link>
             </li>
             {showSgiLink ? (
               <li>

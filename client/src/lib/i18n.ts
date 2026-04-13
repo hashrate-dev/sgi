@@ -4,6 +4,11 @@
  */
 
 import { MARKETPLACE_STRINGS_PT } from "./marketplace-strings-pt.js";
+import {
+  MARKETPLACE_FAQ_WP_EN,
+  MARKETPLACE_FAQ_WP_ES,
+  MARKETPLACE_FAQ_WP_PT,
+} from "./marketplace-faq-wp-strings.js";
 
 export type MarketplaceLang = "es" | "en" | "pt";
 
@@ -70,7 +75,7 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "catalog.kicker": "Tienda online",
     "catalog.intro": "Elegí tu equipo, llená el carrito y hacé tu pedido.",
     "catalog.fallback_note":
-      "Si no encontrás el modelo que buscás, escribinos: actualizamos el catálogo con frecuencia.",
+      "Si no encontrás el modelo que buscás, escribinos.",
     "catalog.syncing": "Sincronizando catálogo con el servidor…",
     "catalog.add_short": "+ Agregar Equipo",
 
@@ -150,13 +155,16 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "corp.contact.addr1": "Juan de Salazar 1857",
     "corp.contact.addr2": "Asunción – Paraguay · CP 001527",
     "corp.contact.phones": "(+595) 991 907 308 · (+595) 993 358 387",
+    "corp.contact.doc_title": "Contacto — Hashrate Space",
+    "corp.contact.meta_desc":
+      "Datos de contacto, correos y formulario para soporte, ventas e inversores — Hashrate Space.",
     "corp.partners.title": "Partners oficiales",
     "corp.partners.lede": "Alianzas con fabricantes y proveedores del ecosistema de minería.",
     "corp.partners.luxor_aria": "Luxor — sitio externo (se abre en nueva pestaña)",
     "corp.faq.title": "Preguntas frecuentes",
     "corp.faq.lede": "Políticas, envíos y operación: el equipo responde por los canales de contacto.",
-    "corp.faq.spot.kicker": "ASICs · Hosting · Paraguay",
-    "corp.faq.spot.specs": "Cotizaciones, stock y logística según acuerdo. Respuestas por canales oficiales.",
+    "corp.faq.spot.kicker": "MINERIA · ASICs · Hosting",
+    "corp.faq.spot.specs": "Toda la información clave sobre nuestro servicio de minería: precios, disponibilidad, logística y atención oficial, para que inviertas con claridad, confianza y respaldo profesional.",
     "corp.faq.spot.acc_heading": "Respuestas rápidas",
     "corp.faq.spot.img_alt": "Gama Antminer S21 — render de producto",
     "corp.faq.shop_cta": "Ver equipos",
@@ -269,7 +277,7 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "shelf.seemore": "Ver más",
     "shelf.seemore_aria": "Ver más — {{model}} — {{hash}}",
     "shelf.techspecs": "Datos técnicos del modelo",
-    "shelf.add_title": "Agregar a la lista para cotización (cuenta cliente o administrador A/B)",
+    "shelf.add_title": "Agregar a la lista para cotización (con tu cuenta)",
 
     // Modal producto
     "modal.close_win": "Cerrar ventana",
@@ -335,10 +343,10 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "drawer.lede": "Llená tu carrito con los equipos que quieras:",
     "drawer.hint.p1": "Para agregar equipos y guardar tu cotización en el sistema,",
     "drawer.login_link": "iniciá sesión",
-    "drawer.hint.p2": "con cuenta",
+    "drawer.hint.p2": " con tu cuenta, sino tienes una cuenta, ",
     "drawer.hint.p3": "o",
     "drawer.hint.p4": ", o",
-    "drawer.register_link": "creá una cuenta cliente",
+    "drawer.register_link": "creá una nueva",
     "drawer.hint.p5": ".",
     "drawer.pending_orders": "Órdenes pendientes",
     "drawer.view_my_orders_kicker": "Seguimiento de consulta",
@@ -372,7 +380,7 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "drawer.next_logged":
       "Generá el ticket para registrar la consulta en el sistema. También podés escribirnos por correo o WhatsApp.",
     "drawer.next_guest":
-      "Iniciá sesión (cliente o administrador A/B) para generar el ticket y ver el estado en «Órdenes pendientes».",
+      "Iniciá sesión para generar el ticket y ver el estado en «Órdenes pendientes».",
     "drawer.gen_ticket": "Generar Orden de Compra",
     "drawer.gen_ticket_update": "Actualizar pedido",
     "drawer.gen_busy": "Generando ticket…",
@@ -626,6 +634,7 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "reg.have_account": "¿Ya tenés cuenta?",
     "reg.login_link": "Iniciar sesión",
     "reg.back_shop": "← Volver a la tienda",
+    ...MARKETPLACE_FAQ_WP_ES,
   },
   en: {
     "sec.market.kicker": "HRS / Hashrate Space marketplace",
@@ -762,6 +771,9 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "corp.contact.addr1": "Juan de Salazar 1857",
     "corp.contact.addr2": "Asunción – Paraguay · ZIP 001527",
     "corp.contact.phones": "(+595) 991 907 308 · (+595) 993 358 387",
+    "corp.contact.doc_title": "Contact — Hashrate Space",
+    "corp.contact.meta_desc":
+      "Contact details, emails and form for support, sales and investors — Hashrate Space.",
     "corp.partners.title": "Official partners",
     "corp.partners.lede": "Partnerships with manufacturers and suppliers in the mining ecosystem.",
     "corp.partners.luxor_aria": "Luxor — external site (opens in new tab)",
@@ -942,10 +954,10 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "drawer.lede": "Fill your cart with the equipment you want:",
     "drawer.hint.p1": "To add miners and save your quote in the system,",
     "drawer.login_link": "log in",
-    "drawer.hint.p2": "with a",
+    "drawer.hint.p2": " with your account; if you don’t have an account, ",
     "drawer.hint.p3": "or",
     "drawer.hint.p4": " account, or",
-    "drawer.register_link": "create a client account",
+    "drawer.register_link": "create a new one",
     "drawer.hint.p5": ".",
     "drawer.pending_orders": "Pending orders",
     "drawer.view_my_orders_kicker": "Order tracking",
@@ -1230,8 +1242,9 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "reg.have_account": "Already have an account?",
     "reg.login_link": "Sign in",
     "reg.back_shop": "← Back to store",
+    ...MARKETPLACE_FAQ_WP_EN,
   },
-  pt: MARKETPLACE_STRINGS_PT,
+  pt: { ...MARKETPLACE_STRINGS_PT, ...MARKETPLACE_FAQ_WP_PT },
 };
 
 export function t(lang: string, key: string): string {
