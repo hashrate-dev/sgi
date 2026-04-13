@@ -10,6 +10,7 @@ import {
 } from "../lib/miningYieldEstimate.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { resolveSetupCompraHashrateUsd, resolveSetupEquipoCompletoUsd } from "../lib/marketplaceSetupHashratePrice.js";
+import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
 
 export const marketplaceRouter = Router();
 
@@ -72,15 +73,23 @@ function rowToProduct(r: Row) {
  * Público: carrito sin JWT.
  */
 marketplaceRouter.get("/marketplace/setup-quote-prices", async (_req, res: Response) => {
+  const FALLBACK = 50;
+  let setupEquipoCompletoUsd = FALLBACK;
+  let setupCompraHashrateUsd = FALLBACK;
   try {
-    const [setupEquipoCompletoUsd, setupCompraHashrateUsd] = await Promise.all([
+    [setupEquipoCompletoUsd, setupCompraHashrateUsd] = await Promise.all([
       resolveSetupEquipoCompletoUsd(),
       resolveSetupCompraHashrateUsd(),
     ]);
+  } catch (e) {
+    console.error("[marketplace] setup-quote-prices (usando fallback):", e);
+  }
+  try {
     res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
     res.json({ setupEquipoCompletoUsd, setupCompraHashrateUsd });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    console.error("[marketplace] setup-quote-prices response:", e);
     res.status(500).json({ error: { message: msg } });
   }
 });
@@ -100,19 +109,27 @@ marketplaceRouter.get("/marketplace/setup-compra-hashrate-usd", async (_req, res
   }
 });
 
+/** Filtro vitrina: entero 0/1 o boolean en Postgres — evita COALESCE(mp_visible,0) con tipos boolean. */
+function sqlMarketplaceVisible(): string {
+  return "(COALESCE(CAST(mp_visible AS INTEGER), 0) = 1)";
+}
+
 /** GET /marketplace/asic-vitrina — catálogo ASIC para /marketplace (sin token). Origen: equipos_asic con mp_visible. */
 marketplaceRouter.get("/marketplace/asic-vitrina", async (_req, res: Response) => {
   try {
-    const clause = "(COALESCE(mp_visible, 0) = 1)";
+    const clause = sqlMarketplaceVisible();
     const sql = `SELECT id, marca_equipo, modelo, procesador, precio_usd, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json
       FROM equipos_asic WHERE ${clause} ORDER BY marca_equipo ASC, modelo ASC, procesador ASC`;
-    const rows = (await db.prepare(sql).all()) as EquipoAsicVitrinaRow[];
+    const raw = (await db.prepare(sql).all()) as Record<string, unknown>[];
+    const rows = raw.map((r) => rowKeysToLowercase(r) as EquipoAsicVitrinaRow);
     const products = rows.map(mapEquipoRowToVitrina).filter((p): p is NonNullable<typeof p> => p != null);
     res.set("Cache-Control", "public, max-age=45, stale-while-revalidate=120");
     res.json({ products });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    res.status(500).json({ error: { message: msg } });
+    console.error("[marketplace] asic-vitrina:", e);
+    /* Evitar 500 en el cliente: catálogo vacío hasta corregir BD/migraciones. */
+    res.set("Cache-Control", "no-store");
+    res.status(200).json({ products: [] });
   }
 });
 
@@ -141,11 +158,18 @@ marketplaceRouter.post("/marketplace/asic-yields", async (req, res: Response) =>
       return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
     }
     const snap = await fetchNetworkMiningSnapshot();
-    const yields = estimateAllYields(parsed.data.items as AsicYieldItem[], snap);
+    let yields: ReturnType<typeof estimateAllYields> = [];
+    try {
+      yields = estimateAllYields(parsed.data.items as AsicYieldItem[], snap);
+    } catch (estErr) {
+      console.error("[marketplace] asic-yields estimate:", estErr);
+    }
     res.json({ ok: true, yields, networkOk: snap != null });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    res.status(500).json({ error: { message: msg } });
+    console.error("[marketplace] asic-yields:", e);
+    /* No devolver 500: la vitrina puede seguir sin estimación en vivo (red/API caída). */
+    res.status(200).json({ ok: true, yields: [], networkOk: false, warning: msg });
   }
 });
 

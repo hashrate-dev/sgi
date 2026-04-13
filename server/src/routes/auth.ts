@@ -9,6 +9,7 @@ import { getTiendaPhonesForUserId } from "../lib/tiendaClientContact.js";
 import { requireAuth } from "../middleware/auth.js";
 import { loginRateLimit, registerClienteRateLimit } from "../middleware/authRateLimit.js";
 import type { AuthUser } from "../middleware/auth.js";
+import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
 
 const authRouter = Router();
 const JWT_SECRET = env.JWT_SECRET;
@@ -164,18 +165,12 @@ authRouter.post("/auth/register-cliente", registerClienteRateLimit, async (req, 
 });
 
 authRouter.post("/auth/login", loginRateLimit, async (req, res) => {
-  try {
-    if (env.NODE_ENV !== "production") {
+  if (env.NODE_ENV !== "production") {
+    try {
       await ensureDefaultUser();
+    } catch (e) {
+      console.warn("ensureDefaultUser (no bloquea login):", e);
     }
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("ensureDefaultUser:", e);
-    return res.status(500).json({
-      error: {
-        message: env.NODE_ENV === "development" ? `Error al inicializar sesión: ${msg}` : "Error al inicializar sesión. Revisá que la base de datos esté accesible."
-      }
-    });
   }
   const parsed = LoginSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -185,22 +180,44 @@ authRouter.post("/auth/login", loginRateLimit, async (req, res) => {
   const loginName = username.trim();
   let row: { id: number; username: string; email?: string | null; password_hash: string; role: string; usuario?: string | null } | undefined;
   try {
-    row = (await db.prepare("SELECT id, username, email, password_hash, role, usuario FROM users WHERE username = ? OR email = ?").get(loginName, loginName)) as typeof row;
+    const raw = (await db.prepare("SELECT id, username, email, password_hash, role, usuario FROM users WHERE username = ? OR email = ?").get(loginName, loginName)) as Record<string, unknown> | undefined;
+    row = raw ? (rowKeysToLowercase(raw) as typeof row) : undefined;
   } catch (e) {
     try {
-      row = (await db.prepare("SELECT id, username, password_hash, role, usuario FROM users WHERE username = ?").get(loginName)) as typeof row;
+      const raw = (await db.prepare("SELECT id, username, password_hash, role, usuario FROM users WHERE username = ?").get(loginName)) as Record<string, unknown> | undefined;
+      row = raw ? (rowKeysToLowercase(raw) as typeof row) : undefined;
     } catch (e2) {
       console.error("login db error:", e2);
       return res.status(500).json({ error: { message: "Error al consultar usuario. Revisá la base de datos." } });
     }
   }
-  if (!row || !bcrypt.compareSync(password, row.password_hash)) {
+  if (!row) {
+    return res.status(401).json({ error: { message: "Usuario o contraseña incorrectos" } });
+  }
+  const hashRaw = row.password_hash;
+  const hash = typeof hashRaw === "string" ? hashRaw.trim() : "";
+  if (!hash || !/^\$2[aby]\$\d{2}\$/.test(hash)) {
+    console.warn("login: usuario sin password_hash bcrypt válido (id=%s)", row.id);
+    return res.status(401).json({ error: { message: "Usuario o contraseña incorrectos" } });
+  }
+  let passwordOk = false;
+  try {
+    passwordOk = bcrypt.compareSync(password, hash);
+  } catch (e) {
+    console.error("login bcrypt compare:", e);
+    return res.status(401).json({ error: { message: "Usuario o contraseña incorrectos" } });
+  }
+  if (!passwordOk) {
     return res.status(401).json({ error: { message: "Usuario o contraseña incorrectos" } });
   }
   try {
-    const { celular, telefono } = await getTiendaPhonesForUserId(row.id);
+    const userId = Number(row.id);
+    if (!Number.isFinite(userId)) {
+      return res.status(500).json({ error: { message: "Id de usuario inválido en la base de datos." } });
+    }
+    const { celular, telefono } = await getTiendaPhonesForUserId(userId);
     const user: AuthUser = {
-      id: row.id,
+      id: userId,
       username: row.username,
       email: row.email ?? row.username,
       role: row.role as AuthUser["role"],
@@ -208,11 +225,11 @@ authRouter.post("/auth/login", loginRateLimit, async (req, res) => {
       celular,
       telefono,
     };
-    const token = jwt.sign({ sub: row.username, userId: row.id }, JWT_SECRET, { expiresIn: "7d" });
+    const token = jwt.sign({ sub: row.username, userId }, JWT_SECRET, { expiresIn: "7d" });
     const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket?.remoteAddress || "";
     const userAgent = (req.headers["user-agent"] as string) || "";
     try {
-      await db.prepare("INSERT INTO user_activity (user_id, event, ip_address, user_agent) VALUES (?, 'login', ?, ?)").run(row.id, ip, userAgent);
+      await db.prepare("INSERT INTO user_activity (user_id, event, ip_address, user_agent) VALUES (?, 'login', ?, ?)").run(userId, ip, userAgent);
     } catch (e) {
       console.error("user_activity login insert:", e);
     }
