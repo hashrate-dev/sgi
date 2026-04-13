@@ -11,6 +11,7 @@ export function MarketplaceSiteHeader() {
   const { pathname, hash } = useLocation();
   const onCatalog = pathname === "/marketplace" || pathname === "/marketplace/";
   const onCorporateHome = pathname === "/marketplace/home" || pathname === "/marketplace/home/";
+  const onServicesPage = pathname === "/marketplace/services" || pathname === "/marketplace/services/";
   const onCompanyPage = pathname === "/marketplace/company" || pathname === "/marketplace/company/";
   const onFaqPage = pathname === "/marketplace/faq" || pathname === "/marketplace/faq/";
   const onContactPage = pathname === "/marketplace/contact" || pathname === "/marketplace/contact/";
@@ -159,7 +160,11 @@ export function MarketplaceSiteHeader() {
               </Link>
             </li>
             <li>
-              <Link to="/marketplace/home#servicios" className={corpHashCurrent("servicios")}>
+              <Link
+                to="/marketplace/services"
+                className={onServicesPage || corpHashCurrent("servicios") ? "is-current" : undefined}
+                {...(onServicesPage ? { "aria-current": "page" as const } : {})}
+              >
                 {t("nav.services")}
               </Link>
             </li>

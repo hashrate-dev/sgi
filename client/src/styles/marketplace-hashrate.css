@@ -7457,3 +7457,316 @@ button.product-modal__btn--quote-cart:hover {
   display: inline-block;
   vertical-align: bottom;
 }
+
+/* Marketplace Services page (ported from old WordPress layout) */
+.page-main--market--services {
+  background: #fff;
+}
+
+.market-services-band {
+  position: relative;
+  overflow: hidden;
+  min-height: clamp(280px, 34vw, 360px);
+  display: grid;
+  place-items: center;
+}
+
+.market-services-band__bg,
+.market-services-band__overlay {
+  position: absolute;
+  inset: 0;
+}
+
+.market-services-band__bg {
+  background: url("/images/services-asic-band.png") center center / cover no-repeat;
+}
+
+.market-services-band__overlay {
+  background:
+    linear-gradient(90deg, rgba(7, 87, 142, 0.66) 0%, rgba(11, 163, 122, 0.6) 55%, rgba(87, 198, 90, 0.52) 100%),
+    linear-gradient(180deg, rgba(6, 31, 66, 0.25) 0%, rgba(6, 31, 66, 0.34) 100%);
+}
+
+.market-services-band__inner {
+  position: relative;
+  z-index: 1;
+  width: min(900px, calc(100% - 2rem));
+  text-align: center;
+  color: #fff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.34);
+}
+
+.market-services-band__inner h2 {
+  margin: 0;
+  font-size: clamp(1.75rem, 4vw, 2.9rem);
+  line-height: 1.08;
+}
+
+.market-services-band__sub {
+  margin: 0.25rem 0 0;
+  font-size: clamp(1.05rem, 2.2vw, 1.6rem);
+  font-weight: 800;
+}
+
+.market-services-band__body {
+  margin: 0.65rem 0 0;
+  font-size: clamp(0.92rem, 1.4vw, 1.12rem);
+  font-weight: 600;
+  opacity: 0.98;
+}
+
+.market-services-band__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1rem;
+  padding: 0.48rem 1.3rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  color: #fff;
+  text-decoration: none;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.market-services-band__cta:hover {
+  background: #fff;
+  color: #0f766e;
+  transform: translateY(-1px);
+}
+
+.market-services-hero {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(2.5rem, 6vw, 5.5rem) 1.25rem clamp(2.2rem, 6vw, 4rem);
+}
+
+.market-services-hero__bg {
+  position: absolute;
+  inset: 0;
+  background: url("https://hashrate.space/wp-content/uploads/Fabrizio-Hash.png") left top / contain no-repeat;
+  opacity: 0.18;
+  pointer-events: none;
+}
+
+.market-services-hero__inner {
+  position: relative;
+  z-index: 1;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.market-services-hero h1 {
+  margin: 0 0 0.95rem;
+  max-width: 850px;
+  font-size: clamp(1.7rem, 4vw, 3.25rem);
+  line-height: 1.1;
+}
+
+.market-services-hero p {
+  margin: 0;
+  max-width: 760px;
+  font-size: clamp(1rem, 1.5vw, 1.25rem);
+  line-height: 1.55;
+  color: #334155;
+}
+
+.market-services-grid {
+  padding: clamp(2.4rem, 7vw, 5.25rem) clamp(1.25rem, 5vw, 3rem) clamp(3.2rem, 9vw, 6rem);
+}
+
+.market-services-grid__inner {
+  max-width: min(980px, 92vw);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(0.75rem, 1.6vw, 1.1rem);
+}
+
+.market-services-card {
+  position: relative;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  aspect-ratio: 1.45 / 1;
+  min-height: 170px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  padding: clamp(1rem, 2.4vw, 1.35rem) clamp(0.75rem, 2vw, 1rem);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.85) inset,
+    0 8px 22px rgba(15, 118, 110, 0.07);
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.92) 0%, rgba(236, 253, 245, 0.88) 48%, rgba(224, 250, 240, 0.82) 100%);
+  transition:
+    background 0.22s ease,
+    border-color 0.22s ease,
+    box-shadow 0.22s ease;
+}
+
+.market-services-card:hover {
+  border-color: #d1d5db;
+  background: linear-gradient(165deg, #fafafa 0%, #f3f4f6 45%, #e8eaee 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 10px 26px rgba(15, 23, 42, 0.08);
+}
+
+.market-services-card:hover .market-services-card__bg {
+  opacity: 0.06;
+}
+
+.market-services-card__bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.1;
+  transition: opacity 0.22s ease;
+  pointer-events: none;
+}
+
+.market-services-card h3 {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  width: 100%;
+  max-width: min(24ch, 94%);
+  font-size: clamp(0.86rem, 1.15vw, 0.98rem);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.32;
+  color: #0f172a;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.market-services-card__icon {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.05rem;
+  height: 3.05rem;
+  border-radius: 999px;
+  color: #0f766e;
+  background: linear-gradient(180deg, #ffffff 0%, rgba(255, 255, 255, 0.94) 100%);
+  border: 1px solid rgba(15, 118, 110, 0.14);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 1) inset,
+    0 4px 14px rgba(15, 118, 110, 0.12),
+    0 2px 4px rgba(15, 23, 42, 0.04);
+}
+
+.market-services-flow {
+  position: relative;
+  background:
+    linear-gradient(45deg, rgba(0, 105, 255, 0.86) 0%, rgba(92, 200, 102, 0.86) 100%),
+    url("https://hashrate.space/wp-content/uploads/Equipos-Hashrate.png") center / cover no-repeat;
+  padding: clamp(2.5rem, 7vw, 5rem) 1.25rem;
+}
+
+.market-services-flow__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.22);
+  pointer-events: none;
+}
+
+.market-services-flow__inner {
+  position: relative;
+  z-index: 1;
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(1.25rem, 3vw, 2.5rem);
+  align-items: center;
+  color: #fff;
+}
+
+.market-services-flow__copy h2 {
+  margin: 0 0 0.9rem;
+  font-size: clamp(1.6rem, 3.4vw, 3rem);
+  line-height: 1.08;
+}
+
+.market-services-flow__copy p {
+  margin: 0;
+  font-size: clamp(1rem, 1.8vw, 1.4rem);
+  line-height: 1.45;
+}
+
+.market-services-flow__steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(0.85rem, 2vw, 1.15rem);
+}
+
+.market-services-flow__step {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 1rem;
+  min-height: 108px;
+  padding: 1rem 1.15rem;
+  border-radius: 8px;
+  /* Más transparente: se ve mejor la imagen de la faja detrás */
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.12) 0%,
+    rgba(255, 255, 255, 0.05) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.2) inset,
+    0 8px 24px rgba(2, 6, 23, 0.12);
+  backdrop-filter: blur(8px) saturate(1.1);
+  -webkit-backdrop-filter: blur(8px) saturate(1.1);
+}
+
+.market-services-flow__icon-wrap {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 6px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 2px 10px rgba(2, 6, 23, 0.08);
+}
+
+.market-services-flow__label {
+  font-size: clamp(0.95rem, 1.5vw, 1.05rem);
+  font-weight: 700;
+  line-height: 1.28;
+  letter-spacing: 0.01em;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(2, 6, 23, 0.25);
+}
+
+@media (max-width: 999px) {
+  .market-services-grid__inner {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .market-services-flow__inner {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .market-services-grid__inner,
+  .market-services-flow__steps {
+    grid-template-columns: 1fr;
+  }
+}

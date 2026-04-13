@@ -185,6 +185,27 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
   "corp.company.title": "Empresa",
   "corp.company.body":
     "A Hashrate Space desenvolve e opera infraestrutura para mineração de Bitcoin na região, com foco em energia, confiabilidade e suporte próximo.",
+  "services.doc_title": "Serviços de mineração e hospedagem — Hashrate Space",
+  "services.meta_desc":
+    "Serviços profissionais de mineração Bitcoin: infraestrutura, hospedagem gerenciada, logística internacional e manutenção técnica com suporte especializado.",
+  "services.hero.title": "Plataforma de infraestrutura de alto desempenho e totalmente gerenciada",
+  "services.hero.body":
+    "A Hashrate Space é uma distribuidora líder de equipamentos de mineração cripto na América do Sul e oferece soluções de mineração para operações de qualquer escala.",
+  "services.section.title": "Serviços",
+  "services.card.asic": "Equipamentos de mineração ASIC",
+  "services.card.network": "Conectividade de rede",
+  "services.card.installation": "Instalação",
+  "services.card.security": "Segurança física",
+  "services.card.maintenance": "Manutenção e reparos",
+  "services.card.insurance": "Seguro de equipamentos",
+  "services.flow.title": "Como funciona?",
+  "services.flow.body":
+    "Se você procura a melhor hospedagem profissional para seus equipamentos de mineração, podemos ajudar.",
+  "services.flow.aria": "Fluxo do serviço",
+  "services.flow.purchase": "Compra",
+  "services.flow.shipping": "Envio",
+  "services.flow.customs": "Desembaraço aduaneiro",
+  "services.flow.setup": "Setup e mineração",
 
   "company.doc_title": "Empresa – Hashrate Space",
   "company.meta_desc":

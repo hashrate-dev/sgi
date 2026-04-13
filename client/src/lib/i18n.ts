@@ -199,6 +199,27 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "corp.company.title": "Empresa",
     "corp.company.body":
       "Hashrate Space desarrolla y opera infraestructura para minería de Bitcoin en la región, con foco en energía, confiabilidad y soporte cercano.",
+    "services.doc_title": "Servicios de minería y hosting — Hashrate Space",
+    "services.meta_desc":
+      "Servicios profesionales de minería Bitcoin: infraestructura, hosting administrado, logística internacional y mantenimiento técnico con soporte especializado.",
+    "services.hero.title": "Plataforma de infraestructura de alto rendimiento y totalmente administrada",
+    "services.hero.body":
+      "Hashrate Space es un distribuidor líder de equipos de minería cripto en Sudamérica y ofrece soluciones de minería para operaciones de cualquier escala.",
+    "services.section.title": "Servicios",
+    "services.card.asic": "Equipos de minería ASIC",
+    "services.card.network": "Conectividad de red",
+    "services.card.installation": "Instalación",
+    "services.card.security": "Seguridad física",
+    "services.card.maintenance": "Mantenimiento y reparaciones",
+    "services.card.insurance": "Seguro de equipos",
+    "services.flow.title": "¿Cómo funciona?",
+    "services.flow.body":
+      "Si estás buscando el mejor hosting profesional para tus equipos de minería, podemos ayudarte.",
+    "services.flow.aria": "Flujo del servicio",
+    "services.flow.purchase": "Compra",
+    "services.flow.shipping": "Envío",
+    "services.flow.customs": "Despacho aduanero",
+    "services.flow.setup": "Setup y minería",
 
     // Página Empresa (React — /marketplace/company), contenido alineado a hashrate.space/company
     "company.doc_title": "Empresa – Hashrate Space",
@@ -815,6 +836,27 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "corp.company.title": "Company",
     "corp.company.body":
       "Hashrate Space develops and operates Bitcoin mining infrastructure in the region, with a focus on energy, reliability and close support.",
+    "services.doc_title": "Mining & hosting services — Hashrate Space",
+    "services.meta_desc":
+      "Professional Bitcoin mining services: infrastructure, managed hosting, international logistics and technical maintenance with specialized support.",
+    "services.hero.title": "High-performance and fully managed infrastructure platform",
+    "services.hero.body":
+      "Hashrate Space is a leading distributor of crypto mining equipment in South America and offers mining solutions for operations of any scale.",
+    "services.section.title": "Services",
+    "services.card.asic": "ASIC mining equipment",
+    "services.card.network": "Network connectivity",
+    "services.card.installation": "Installation",
+    "services.card.security": "Physical security",
+    "services.card.maintenance": "Maintenance and repairs",
+    "services.card.insurance": "Equipment insurance",
+    "services.flow.title": "How it works?",
+    "services.flow.body":
+      "If you are looking for the best professional hosting for your mining equipment, we can help you.",
+    "services.flow.aria": "Service flow",
+    "services.flow.purchase": "Purchase",
+    "services.flow.shipping": "Shipping",
+    "services.flow.customs": "Customs clearance",
+    "services.flow.setup": "Setup & Mine",
 
     "company.doc_title": "Company – Hashrate Space",
     "company.meta_desc":

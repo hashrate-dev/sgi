@@ -45,7 +45,7 @@ export function MarketplaceSiteFooter({ variant = "default" }: Props) {
               <Link to="/marketplace/home">{t("nav.home")}</Link>
             </li>
             <li>
-              <Link to="/marketplace/home#servicios">{t("nav.services")}</Link>
+              <Link to="/marketplace/services">{t("nav.services")}</Link>
             </li>
             <li>
               <Link to="/marketplace">{t("nav.equipment")}</Link>

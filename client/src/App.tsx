@@ -31,6 +31,7 @@ import { KryptexPage } from "./pages/KryptexPage";
 import { KryptexDetallePage } from "./pages/KryptexDetallePage";
 import { MarketplacePage } from "./pages/MarketplacePage";
 import { MarketplaceCorporateHomePage } from "./pages/MarketplaceCorporateHomePage";
+import { MarketplaceServicesPage } from "./pages/MarketplaceServicesPage";
 import { MarketplaceCompanyPage } from "./pages/MarketplaceCompanyPage";
 import { MarketplaceFaqPage } from "./pages/MarketplaceFaqPage";
 import { MarketplaceContactPage } from "./pages/MarketplaceContactPage";
@@ -62,6 +63,7 @@ function App() {
           <Route path="/marketplace" element={<MarketplaceLayout />}>
             <Route index element={<MarketplacePage />} />
             <Route path="home" element={<MarketplaceCorporateHomePage />} />
+            <Route path="services" element={<MarketplaceServicesPage />} />
             <Route path="company" element={<MarketplaceCompanyPage />} />
             <Route path="faq" element={<MarketplaceFaqPage />} />
             <Route path="contact" element={<MarketplaceContactPage />} />
