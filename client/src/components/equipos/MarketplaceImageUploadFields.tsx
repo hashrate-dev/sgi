@@ -98,14 +98,6 @@ export function CardImageUploadField({
   return (
     <div className="fact-field hrs-upload-field">
       <span className="hrs-upload-label">Imagen tarjeta</span>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif"
-        className="d-none"
-        onChange={onFile}
-        disabled={disabled || uploading}
-      />
 
       <div
         className={zoneClass}
@@ -125,6 +117,16 @@ export function CardImageUploadField({
         onDragLeave={onDragLeave}
         onDrop={onDrop}
       >
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          className="hrs-upload-file-input"
+          aria-hidden
+          tabIndex={-1}
+          onChange={onFile}
+          disabled={disabled || uploading}
+        />
         {!preview ? (
           <div className="hrs-upload-dropzone-inner">
             <div className="hrs-upload-dropzone-icon" aria-hidden>
@@ -286,16 +288,6 @@ export function GalleryImagesUploadField({
         <p className="hrs-upload-gallery-empty">Todavía no hay fotos en la galería.</p>
       )}
 
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif"
-        multiple
-        className="d-none"
-        onChange={onFiles}
-        disabled={disabled || uploading}
-      />
-
       <div
         className={zoneClass}
         role="button"
@@ -312,6 +304,17 @@ export function GalleryImagesUploadField({
         onDragLeave={onDragLeave}
         onDrop={onDrop}
       >
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          multiple
+          className="hrs-upload-file-input"
+          aria-hidden
+          tabIndex={-1}
+          onChange={onFiles}
+          disabled={disabled || uploading}
+        />
         <div className="hrs-upload-dropzone-inner">
           <div className="hrs-upload-dropzone-icon" aria-hidden>
             ➕

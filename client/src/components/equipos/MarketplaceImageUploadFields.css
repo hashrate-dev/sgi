@@ -1,5 +1,22 @@
 /* Subida de imágenes marketplace (Equipos ASIC) — patrón tipo CMS moderno */
 
+/**
+ * NO usar `display: none` en el input file: Chrome/Safari/Edge suelen ignorar
+ * `inputRef.current.click()` por política de “user activation” cuando el control no está renderizado.
+ */
+.hrs-upload-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  opacity: 0;
+}
+
 .hrs-upload-field {
   margin-bottom: 0;
 }
