@@ -171,7 +171,8 @@ CREATE TABLE IF NOT EXISTS equipos_asic (
   mp_detail_rows_json TEXT,
   mp_yield_json TEXT,
   mp_sort_order INTEGER NOT NULL DEFAULT 0,
-  precio_historial_json TEXT
+  precio_historial_json TEXT,
+  mp_price_label TEXT
 );
 
 CREATE TABLE IF NOT EXISTS marketplace_products (
@@ -353,6 +354,7 @@ CREATE INDEX IF NOT EXISTS idx_equipos_asic_audit_created ON equipos_asic_audit(
     "mp_yield_json TEXT",
     "mp_sort_order INTEGER NOT NULL DEFAULT 0",
     "precio_historial_json TEXT",
+    "mp_price_label TEXT",
   ];
   for (const colDef of equiposMpCols) {
     try {

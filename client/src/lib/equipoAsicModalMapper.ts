@@ -2,7 +2,7 @@
  * Arma un `AsicProduct` para reutilizar el modal de vitrina (VER MÁS) en la gestión de equipos.
  */
 
-import type { AsicAlgo, AsicProduct } from "./marketplaceAsicCatalog.js";
+import { type AsicAlgo, type AsicProduct, normalizeConsultPriceLabelForDisplay } from "./marketplaceAsicCatalog.js";
 import type { EquipoASIC } from "./types.js";
 import { parseDetailRowsJson } from "../components/equipos/MarketplaceDetailRowsEditor";
 
@@ -39,6 +39,8 @@ export function equipoASICToModalProduct(e: EquipoASIC): AsicProduct {
       /* ignore */
     }
   }
+  const priceLabel = e.marketplacePriceLabel?.trim();
+  const priceDisplayLabelNorm = priceLabel ? normalizeConsultPriceLabelForDisplay(priceLabel) : "";
   return {
     id: e.id,
     algo,
@@ -46,6 +48,7 @@ export function equipoASICToModalProduct(e: EquipoASIC): AsicProduct {
     model: e.modelo,
     hashrate: e.procesador,
     priceUsd: e.precioUSD ?? 0,
+    ...(priceDisplayLabelNorm ? { priceDisplayLabel: priceDisplayLabelNorm } : {}),
     imageSrc,
     gallerySrcs: gallerySrcs?.length ? gallerySrcs : undefined,
     detailRows,

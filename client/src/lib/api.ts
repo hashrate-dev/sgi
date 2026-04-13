@@ -793,6 +793,7 @@ export type EquipoMarketplacePayload = {
   marketplaceDetailRowsJson?: string | null;
   marketplaceYieldJson?: string | null;
   marketplaceSortOrder?: number;
+  marketplacePriceLabel?: string | null;
 };
 
 export function createEquipo(

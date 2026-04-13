@@ -40,7 +40,15 @@ function findCol(headerRow: (string | number)[], ...names: string[]): number {
 /** Opciones del formulario; si un equipo ya guardado tiene otro texto, se muestra como opción extra al editar. */
 const MARCAS_EQUIPO_OPCIONES = ["Bitmain"] as const;
 /** Modelos del desplegable; en edición, si en BD hay otro texto se ofrece como opción extra. */
-const MODELOS_EQUIPO_OPCIONES = ["Antminer S21", "Antminer L7", "Antminer L9"] as const;
+const MODELOS_EQUIPO_OPCIONES = [
+  "Antminer S21",
+  "Antminer L7",
+  "Antminer L9",
+  "Antrack Rack Hydro",
+] as const;
+
+/** Texto por defecto en vitrina cuando el producto no tiene precio fijo (editable). */
+const DEFAULT_MARKETPLACE_PRICE_LABEL = "SOLICITA PRECIO";
 
 function opcionesModeloConActual(actual: string): string[] {
   const base = [...MODELOS_EQUIPO_OPCIONES];
@@ -54,7 +62,14 @@ type FamiliaProcesadorPreset = "l9" | "l7" | "s21";
 /** Presets de hashrate según modelo (texto guardado en BD = valor del `option`). L9/L7 en MH/s, S21 en TH/s. */
 const PROCESADOR_PRESETS_L9 = ["15.000 MH/s", "16.000 MH/s", "16.500 MH/s", "17.000 MH/s"] as const;
 const PROCESADOR_PRESETS_L7 = ["8.800 MH/s", "9.050 MH/s", "9.500 MH/s"] as const;
-const PROCESADOR_PRESETS_S21 = ["200 TH/s", "234 TH/s", "235 TH/s", "245 TH/s", "270 TH/s"] as const;
+const PROCESADOR_PRESETS_S21 = [
+  "200 TH/s",
+  "234 TH/s",
+  "235 TH/s",
+  "245 TH/s",
+  "270 TH/s",
+  "473 TH/s Hydro",
+] as const;
 
 /** S21 → TH/s; L7 / L9 (y variantes en texto libre) → MH/s — solo para modelo sin preset de lista. */
 function unidadProcesadorDesdeModelo(modelo: string): "th" | "mh" | null {
@@ -252,6 +267,9 @@ type EquipoFormState = {
   precioHistorialLocal: PrecioHistEntry[];
   observaciones: string;
   marketplaceVisible: boolean;
+  /** Publicar en tienda sin importe USD: se muestra `marketplacePriceLabel` en la vitrina. */
+  marketplacePriceConsultMode: boolean;
+  marketplacePriceLabel: string;
   marketplaceImageSrc: string;
   marketplaceGalleryLines: string;
   marketplaceDetailRowsJson: string;
@@ -266,12 +284,17 @@ function buildMarketplacePayload(form: EquipoFormState): {
   marketplaceDetailRowsJson: string | null;
   marketplaceYieldJson: string | null;
   marketplaceSortOrder: number;
+  marketplacePriceLabel: string | null;
 } {
   const vis = form.marketplaceVisible === true;
   const lines = form.marketplaceGalleryLines.split("\n").map((s) => s.trim()).filter(Boolean);
   const galleryJson = vis && lines.length > 0 ? JSON.stringify(lines) : null;
   const detailTrim = form.marketplaceDetailRowsJson.trim();
   const detailJson = vis && detailTrim ? sanitizeDetailRowsForApi(form.marketplaceDetailRowsJson) : null;
+  const consult = vis && form.marketplacePriceConsultMode === true;
+  const labelTrim = form.marketplacePriceLabel.trim();
+  const marketplacePriceLabel =
+    consult ? (labelTrim || DEFAULT_MARKETPLACE_PRICE_LABEL).slice(0, 120) : null;
   return {
     marketplaceVisible: vis,
     marketplaceAlgo: null,
@@ -281,6 +304,7 @@ function buildMarketplacePayload(form: EquipoFormState): {
     marketplaceDetailRowsJson: detailJson,
     marketplaceYieldJson: null,
     marketplaceSortOrder: 0,
+    marketplacePriceLabel,
   };
 }
 
@@ -316,6 +340,8 @@ function emptyEquipoForm(): EquipoFormState {
     precioHistorialLocal: [],
     observaciones: "",
     marketplaceVisible: false,
+    marketplacePriceConsultMode: false,
+    marketplacePriceLabel: "",
     marketplaceImageSrc: "",
     marketplaceGalleryLines: "",
     marketplaceDetailRowsJson: "",
@@ -443,9 +469,21 @@ export function EquiposAsicPage() {
       showToast("Debe completar Marca, Modelo y Procesador.", "error", "Equipos ASIC");
       return;
     }
-    if (formData.marketplaceVisible && formData.precioUSD <= 0) {
-      showToast("Para publicar en la tienda indicá un precio USD mayor a 0.", "error", "Equipos ASIC");
-      return;
+    if (formData.marketplaceVisible) {
+      if (formData.marketplacePriceConsultMode) {
+        const lbl = (formData.marketplacePriceLabel.trim() || DEFAULT_MARKETPLACE_PRICE_LABEL).slice(0, 120);
+        if (lbl.length < 8) {
+          showToast("Completá un texto comercial claro para el precio bajo consulta (mín. 8 caracteres).", "error", "Equipos ASIC");
+          return;
+        }
+      } else if (formData.precioUSD <= 0) {
+        showToast(
+          "Para publicar con precio de lista indicá un importe USD mayor a 0, o activá «Precio bajo consulta».",
+          "error",
+          "Equipos ASIC"
+        );
+        return;
+      }
     }
     const mp = buildMarketplacePayload(formData);
     const basePayload = buildEquipoSavePayload(formData);
@@ -472,6 +510,7 @@ export function EquiposAsicPage() {
                   marketplaceDetailRowsJson: mp.marketplaceDetailRowsJson,
                   marketplaceYieldJson: mp.marketplaceYieldJson,
                   marketplaceSortOrder: mp.marketplaceSortOrder,
+                  marketplacePriceLabel: mp.marketplacePriceLabel ?? null,
                 }
               : e
           )
@@ -504,6 +543,7 @@ export function EquiposAsicPage() {
             marketplaceDetailRowsJson: mp.marketplaceDetailRowsJson,
             marketplaceYieldJson: mp.marketplaceYieldJson,
             marketplaceSortOrder: mp.marketplaceSortOrder,
+            marketplacePriceLabel: mp.marketplacePriceLabel ?? null,
           },
         ]);
         showToast("Equipo agregado correctamente.", "success", "Equipos ASIC");
@@ -538,6 +578,8 @@ export function EquiposAsicPage() {
       precioHistorialLocal: sortPrecioHistorialAsc(e.precioHistorial ?? []),
       observaciones: e.observaciones ?? "",
       marketplaceVisible: e.marketplaceVisible ?? false,
+      marketplacePriceConsultMode: Boolean(e.marketplacePriceLabel?.trim()) && (e.precioUSD ?? 0) <= 0,
+      marketplacePriceLabel: e.marketplacePriceLabel?.trim() ?? "",
       marketplaceImageSrc: e.marketplaceImageSrc ?? "",
       marketplaceGalleryLines: galleryLinesFromJson(e.marketplaceGalleryJson),
       marketplaceDetailRowsJson: e.marketplaceDetailRowsJson ?? "",
@@ -547,6 +589,10 @@ export function EquiposAsicPage() {
 
   function openPrecioModal() {
     if (!canEditTienda) return;
+    if (formData.marketplacePriceConsultMode) {
+      showToast("Desactivá «Precio bajo consulta» para cargar un importe fijo en USD.", "warning", "Equipos ASIC");
+      return;
+    }
     setPrecioModalInput(formData.precioUSD > 0 ? String(formData.precioUSD) : "");
     setShowPrecioModal(true);
   }
@@ -558,6 +604,10 @@ export function EquiposAsicPage() {
 
   async function handleConfirmPrecioModal() {
     if (!canEditTienda) return;
+    if (formData.marketplacePriceConsultMode) {
+      showToast("Desactivá «Precio bajo consulta» antes de guardar un precio en USD.", "warning", "Equipos ASIC");
+      return;
+    }
     const newP = Math.max(0, parseInt(precioModalInput, 10) || 0);
     if (newP <= 0) {
       showToast("Ingresá un precio mayor a 0.", "error", "Equipos ASIC");
@@ -582,6 +632,8 @@ export function EquiposAsicPage() {
         setFormData((prev) => ({
           ...prev,
           precioUSD: newP,
+          marketplacePriceConsultMode: false,
+          marketplacePriceLabel: "",
           precioHistorialLocal: sortPrecioHistorialAsc(row?.precioHistorial ?? []),
         }));
         showToast("Precio actualizado.", "success", "Equipos ASIC");
@@ -589,6 +641,8 @@ export function EquiposAsicPage() {
         setFormData((prev) => ({
           ...prev,
           precioUSD: newP,
+          marketplacePriceConsultMode: false,
+          marketplacePriceLabel: "",
           precioHistorialLocal: appendPrecioHistorialClient(prev.precioHistorialLocal, newP, isoAlGuardar),
         }));
         showToast("Precio registrado. Confirmá con «Guardar» para crear el equipo.", "success", "Equipos ASIC");
@@ -1405,21 +1459,56 @@ export function EquiposAsicPage() {
                         </div>
                       </div>
 
-                      <aside className="hrs-equipo-asic-modal-form__price-card" aria-label="Precio en dólares">
+                      <aside className="hrs-equipo-asic-modal-form__price-card" aria-label="Precio y cotización">
                         <p className="hrs-equipo-asic-modal-form__price-eyebrow">Precio de lista</p>
                         <p className="hrs-equipo-asic-modal-form__price-currency">USD</p>
                         <p className="hrs-equipo-asic-modal-form__price-amount">
-                          {formData.precioUSD > 0 ? formData.precioUSD.toLocaleString("es-PY") : "—"}
+                          {formData.marketplacePriceConsultMode
+                            ? "—"
+                            : formData.precioUSD > 0
+                              ? formData.precioUSD.toLocaleString("es-PY")
+                              : "—"}
                         </p>
                         <button
                           type="button"
                           className="hrs-equipo-asic-modal-form__price-btn"
                           onClick={openPrecioModal}
-                          disabled={!canEditTienda}
-                          title={!canEditTienda ? "Solo AdministradorA o AdministradorB pueden cambiar el precio." : undefined}
+                          disabled={!canEditTienda || formData.marketplacePriceConsultMode}
+                          title={
+                            formData.marketplacePriceConsultMode
+                              ? "Desactivá «Precio bajo consulta» para cargar un importe fijo en USD."
+                              : !canEditTienda
+                                ? "Solo AdministradorA o AdministradorB pueden cambiar el precio."
+                                : undefined
+                          }
                         >
                           Modificar precio
                         </button>
+                        {canEditTienda ? (
+                          <label className="hrs-equipo-asic-modal-form__price-consult-toggle hrs-equipo-asic-modal-form__price-consult-toggle--after-list-price">
+                            <input
+                              type="checkbox"
+                              className="hrs-equipo-asic-modal-form__price-consult-checkbox"
+                              checked={formData.marketplacePriceConsultMode}
+                              onChange={(e) => {
+                                const on = e.target.checked;
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  marketplacePriceConsultMode: on,
+                                  marketplacePriceLabel:
+                                    on && !prev.marketplacePriceLabel.trim()
+                                      ? DEFAULT_MARKETPLACE_PRICE_LABEL
+                                      : prev.marketplacePriceLabel,
+                                  precioUSD: on ? 0 : prev.precioUSD,
+                                  ...(on ? { precioHistorialLocal: [] } : {}),
+                                }));
+                              }}
+                            />
+                            <span className="hrs-equipo-asic-modal-form__price-consult-toggle-text">
+                              <strong>Precio bajo consulta en tienda</strong>
+                            </span>
+                          </label>
+                        ) : null}
                         {formData.precioHistorialLocal.length > 0 ? (
                           <button
                             type="button"
@@ -1453,12 +1542,6 @@ export function EquiposAsicPage() {
                       ) : null}
                       <div className="hrs-equipo-asic-modal-form__market-inner">
                         <div className="client-form-column hrs-equipo-asic-modal-form__col-spec">
-                          {!formData.marketplaceVisible && canEditTienda ? (
-                            <p className="hrs-equipo-asic-modal-form__market-hint small text-muted mb-2">
-                              <strong>Sin «Publicar en tienda»</strong>, la ficha técnica y las fotos del anuncio{" "}
-                              <strong>no se guardan</strong> al pulsar Guardar / Actualizar (solo inventario interno).
-                            </p>
-                          ) : null}
                           {canEditTienda ? (
                             <div className="hrs-equipo-asic-modal-form__detail-rows-panel">
                               <MarketplaceDetailRowsEditor

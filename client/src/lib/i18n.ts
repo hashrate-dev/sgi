@@ -319,7 +319,7 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "modal.yield_usdt": "Bruto USDT",
     "modal.yield_foot_loading": "…",
     "modal.yield_foot_ref": "Valores referenciales (catálogo).",
-    "modal.cta_title": "Solicitá cotización",
+    "modal.cta_title": "SOLICITA PRECIO",
     "modal.email_btn": "Consultar por Correo",
     "modal.wa_btn": "Consultar por Whatsapp",
     "modal.add_quote_aria": "Agregar al carrito",

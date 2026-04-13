@@ -2768,6 +2768,50 @@ a.fact-logo-container--link:focus-visible {
   font-weight: 400;
 }
 
+.hrs-equipo-asic-modal-form__price-card--consult {
+  background: linear-gradient(145deg, #f0fdf4 0%, #dcfce7 50%, #bbf7d0 100%);
+  border-color: #15803d;
+}
+
+.hrs-equipo-asic-modal-form__price-consult-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(21, 128, 61, 0.25);
+  cursor: pointer;
+  text-align: left;
+}
+
+.hrs-equipo-asic-modal-form__price-consult-toggle--footer {
+  margin: 0.85rem 0 0;
+}
+
+/* Checkbox «bajo consulta» debajo del bloque USD + botón modificar */
+.hrs-equipo-asic-modal-form__price-consult-toggle--after-list-price {
+  margin: 0.85rem 0 0;
+}
+
+.hrs-equipo-asic-modal-form__price-consult-checkbox {
+  margin-top: 0.2rem;
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: #2d5d46;
+  flex-shrink: 0;
+}
+
+.hrs-equipo-asic-modal-form__price-consult-toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.8125rem;
+  color: #14532d;
+  line-height: 1.35;
+}
+
 /* Enlace al histórico completo de precios (misma tarjeta que «Modificar precio») */
 .hrs-equipo-asic-price-history-link {
   display: block;
@@ -2899,12 +2943,6 @@ a.fact-logo-container--link:focus-visible {
 
 .hrs-equipo-asic-modal-form__market > .small {
   margin-bottom: 0.5rem !important;
-  line-height: 1.45;
-}
-
-.hrs-equipo-asic-modal-form__market-hint {
-  margin-top: 0.35rem;
-  margin-bottom: 0.75rem !important;
   line-height: 1.45;
 }
 

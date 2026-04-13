@@ -142,7 +142,8 @@ CREATE TABLE IF NOT EXISTS equipos_asic (
   mp_detail_rows_json TEXT,
   mp_yield_json TEXT,
   mp_sort_order INTEGER NOT NULL DEFAULT 0,
-  precio_historial_json TEXT
+  precio_historial_json TEXT,
+  mp_price_label TEXT
 );
 
 ALTER TABLE equipos_asic ADD COLUMN IF NOT EXISTS precio_historial_json TEXT;
@@ -155,6 +156,7 @@ ALTER TABLE equipos_asic ADD COLUMN IF NOT EXISTS mp_gallery_json TEXT;
 ALTER TABLE equipos_asic ADD COLUMN IF NOT EXISTS mp_detail_rows_json TEXT;
 ALTER TABLE equipos_asic ADD COLUMN IF NOT EXISTS mp_yield_json TEXT;
 ALTER TABLE equipos_asic ADD COLUMN IF NOT EXISTS mp_sort_order INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE equipos_asic ADD COLUMN IF NOT EXISTS mp_price_label TEXT;
 
 -- Auditoría: quién modificó equipos / precios / tienda (visible en Gestión de usuarios)
 CREATE TABLE IF NOT EXISTS equipos_asic_audit (

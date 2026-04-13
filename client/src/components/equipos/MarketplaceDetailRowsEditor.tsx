@@ -16,11 +16,12 @@ function isDetailIcon(x: string): x is AsicDetailIcon {
 }
 
 /** Presets de la fila fija «chip / monedas» (modal vitrina). */
-export type CoinPreset = "sha256" | "scrypt";
+export type CoinPreset = "sha256" | "scrypt" | "ethernet100";
 
 export const COIN_ROW_TEXT: Record<CoinPreset, string> = {
   sha256: "BTC / BCH / BSV · SHA-256",
   scrypt: "DOGE + LTC · Scrypt",
+  ethernet100: "Ethernet RJ45 10/100M",
 };
 
 /** Refrigeración fija (icono sol en vitrina). */
@@ -71,6 +72,15 @@ function coolingTypeIconForPreset(coolingPreset: CoolingPreset): AsicDetailIcon 
   return coolingPreset === "air" ? "fan" : "droplet";
 }
 
+function isEthernetChipText(text: string): boolean {
+  const t = text.trim().toUpperCase();
+  return (
+    t.includes("RJ45") ||
+    (t.includes("ETHERNET") && (t.includes("10/100") || t.includes("100M"))) ||
+    (t.includes("10/100") && t.includes("M"))
+  );
+}
+
 function isCoinChipRow(row: { icon: AsicDetailIcon; text: string }): boolean {
   if (row.icon !== "chip") return false;
   const t = row.text.trim().toUpperCase();
@@ -80,11 +90,12 @@ function isCoinChipRow(row: { icon: AsicDetailIcon; text: string }): boolean {
     (t.includes("DOGE") && (t.includes("LTC") || t.includes("LITECOIN"))) ||
     (t.includes("LTC") && t.includes("DOGE")) ||
     (t.includes("SCRYPT") && !t.includes("SHA-256"));
-  return hasBtcFamily || hasScryptFamily;
+  return hasBtcFamily || hasScryptFamily || isEthernetChipText(row.text);
 }
 
 function coinPresetFromText(text: string): CoinPreset {
   const t = text.trim().toUpperCase();
+  if (isEthernetChipText(text)) return "ethernet100";
   if (
     (t.includes("DOGE") && (t.includes("LTC") || t.includes("LITECOIN"))) ||
     (t.includes("LTC") && t.includes("DOGE")) ||
@@ -351,6 +362,7 @@ export function MarketplaceDetailRowsEditor({
           >
             <option value="sha256">{COIN_ROW_TEXT.sha256}</option>
             <option value="scrypt">{COIN_ROW_TEXT.scrypt}</option>
+            <option value="ethernet100">{COIN_ROW_TEXT.ethernet100}</option>
           </select>
         </div>
         <div className="hrs-detail-rows__row hrs-detail-rows__row--cooling-fixed">

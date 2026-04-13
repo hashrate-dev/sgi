@@ -15,6 +15,8 @@ const VIDEO_URL = "https://hashrate.space/video/Hashrate-Farm-Py.mp4";
 /** Promo Z15 — reemplazá `public/images/bitmain-z15-pro.png` por el render oficial si querés otro asset */
 const CORP_Z15_PROMO_IMG = `${import.meta.env.BASE_URL}images/bitmain-z15-pro.png`;
 const CORP_ZCASH_LOGO_IMG = `${import.meta.env.BASE_URL}images/zcash-logo.png`;
+/** Fondo faja “Servicio todo incluido” (mineros / hosting) */
+const CORP_HOSTING_BAND_IMG = `${import.meta.env.BASE_URL}images/hosting-mining-farm-04.png`;
 
 const CORP_FAQ_ROWS = [
   { q: "corp.faq.q1" as const, a: "corp.faq.a1" as const },
@@ -349,25 +351,32 @@ export function MarketplaceCorporateHomePage() {
               })}
             </div>
 
-            <section id="servicios" className="market-corp-hosting-split market-corp-anchor" aria-labelledby="corp-hosting-h1">
-              <div className="market-corp-hosting-split__text">
-                <h2 id="corp-hosting-h1" className="market-corp-gradient-title">
-                  {t("corp.hosting.title")}
-                </h2>
-                <p className="market-corp-hosting-split__body">{t("corp.hosting.body")}</p>
-                <ul className="market-corp-metrics market-corp-metrics--wp">
-                  {metricItems.map((m) => (
-                    <li key={m.label} className="market-corp-metrics__item market-corp-metrics__item--wp">
-                      <span className="market-corp-metrics__value market-corp-metrics__value--grad">{m.value}</span>
-                      <span className="market-corp-metrics__label">{m.label}</span>
-                    </li>
-                  ))}
-                </ul>
+            <div className="market-corp-hosting-split-band">
+              <div
+                className="market-corp-hosting-split-band__bg"
+                style={{ backgroundImage: `url(${CORP_HOSTING_BAND_IMG})` }}
+                aria-hidden
+              />
+              <div className="market-corp-hosting-split-band__overlay" aria-hidden />
+              <div className="market-corp-hosting-split-band__inner">
+                <section id="servicios" className="market-corp-hosting-split market-corp-anchor" aria-labelledby="corp-hosting-h1">
+                  <div className="market-corp-hosting-split__text">
+                    <h2 id="corp-hosting-h1" className="market-corp-gradient-title">
+                      {t("corp.hosting.title")}
+                    </h2>
+                    <p className="market-corp-hosting-split__body">{t("corp.hosting.body")}</p>
+                    <ul className="market-corp-metrics market-corp-metrics--wp">
+                      {metricItems.map((m) => (
+                        <li key={m.label} className="market-corp-metrics__item market-corp-metrics__item--wp">
+                          <span className="market-corp-metrics__value market-corp-metrics__value--grad">{m.value}</span>
+                          <span className="market-corp-metrics__label">{m.label}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </section>
               </div>
-              <div className="market-corp-hosting-split__visual" aria-hidden>
-                <div className="market-corp-hosting-split__visual-bg" />
-              </div>
-            </section>
+            </div>
 
             <div className="market-corp-product-grid market-corp-product-grid--tight">
               {ROW2.map((p) => (

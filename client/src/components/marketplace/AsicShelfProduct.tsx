@@ -1,6 +1,9 @@
 import { useState } from "react";
 import type { AsicProduct } from "../../lib/marketplaceAsicCatalog.js";
-import { formatAsicPriceUsd } from "../../lib/marketplaceAsicCatalog.js";
+import {
+  formatAsicProductPriceDisplay,
+  normalizeConsultPriceLabelForDisplay,
+} from "../../lib/marketplaceAsicCatalog.js";
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
 import { AsicDetailSvg } from "./AsicDetailIcon.js";
 
@@ -26,6 +29,9 @@ export function AsicShelfProduct({
   const [imgBroken, setImgBroken] = useState(false);
   const hasPhoto = Boolean(product.imageSrc?.trim());
   const ariaLabel = tf("shelf.seemore_aria", { model: product.model, hash: product.hashrate });
+  const consultLabel = product.priceDisplayLabel?.trim()
+    ? normalizeConsultPriceLabelForDisplay(product.priceDisplayLabel.trim())
+    : "";
 
   if (filteredHidden) {
     return <article className="shelf-product shelf-product--filtered-out" aria-hidden />;
@@ -60,7 +66,13 @@ export function AsicShelfProduct({
           <p className="shelf-product__hashrate">{product.hashrate}</p>
         </div>
         <div className="shelf-product__price-box">
-          <span className="shelf-product__price-value">{formatAsicPriceUsd(product.priceUsd, lang)}</span>
+          <span
+            className={
+              "shelf-product__price-value" + (consultLabel ? " shelf-product__price-value--consult" : "")
+            }
+          >
+            {formatAsicProductPriceDisplay(product, lang)}
+          </span>
         </div>
         <div className="shelf-product__specs-box" role="group" aria-label={t("shelf.techspecs")}>
           <ul className="shelf-detail-strip">

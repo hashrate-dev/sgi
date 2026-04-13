@@ -118,7 +118,7 @@ function sqlMarketplaceVisible(): string {
 marketplaceRouter.get("/marketplace/asic-vitrina", async (_req, res: Response) => {
   try {
     const clause = sqlMarketplaceVisible();
-    const sql = `SELECT id, marca_equipo, modelo, procesador, precio_usd, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json
+    const sql = `SELECT id, marca_equipo, modelo, procesador, precio_usd, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_price_label
       FROM equipos_asic WHERE ${clause} ORDER BY marca_equipo ASC, modelo ASC, procesador ASC`;
     const raw = (await db.prepare(sql).all()) as Record<string, unknown>[];
     const rows = raw.map((r) => rowKeysToLowercase(r) as EquipoAsicVitrinaRow);

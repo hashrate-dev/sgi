@@ -3,7 +3,10 @@ import { Router } from "express";
 import { z } from "zod";
 import { db, getDb } from "../db.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
-import { uploadMarketplaceImageMw } from "../middleware/marketplaceImageUpload.js";
+import {
+  marketplaceImageUploadUsesMemory,
+  uploadMarketplaceImageMw,
+} from "../middleware/marketplaceImageUpload.js";
 import {
   estimateYieldWhatToMineForEquipo,
   explainInferAlgoFailure,
@@ -41,10 +44,28 @@ const EquipoBodySchema = z
     marketplaceDetailRowsJson: z.string().max(32000).optional().nullable(),
     marketplaceYieldJson: z.string().max(8000).optional().nullable(),
     marketplaceSortOrder: z.number().int().min(0).max(999999).optional().default(0),
+    /**
+     * Texto comercial en vitrina cuando no hay precio USD (ej. «SOLICITA PRECIO»).
+     * Si `precioUSD` > 0, se ignora y no se persiste.
+     */
+    marketplacePriceLabel: z.string().max(120).optional().nullable(),
     /** ISO o datetime enviado por el cliente al registrar cambio de precio (opcional → ahora). */
     precioActualizadoEn: z.string().max(50).optional().nullable(),
     /** Historial completo al crear (p. ej. varios precios antes del primer guardado). */
     precioHistorialJson: z.string().max(32000).optional().nullable(),
+  })
+  .superRefine((d, ctx) => {
+    if (!d.marketplaceVisible) return;
+    const precio = Math.round(Number(d.precioUSD) || 0);
+    const label = (d.marketplacePriceLabel ?? "").trim();
+    if (precio > 0) return;
+    if (label.length > 0) return;
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message:
+        "Para publicar sin precio fijo: completá un texto comercial (ej. «SOLICITA PRECIO») o indicá precio USD mayor a 0.",
+      path: ["marketplacePriceLabel"],
+    });
   });
 
 type EquipoRow = {
@@ -64,6 +85,7 @@ type EquipoRow = {
   mp_detail_rows_json?: string | null;
   mp_yield_json?: string | null;
   mp_sort_order?: number | null;
+  mp_price_label?: string | null;
   precio_historial_json?: string | null;
 };
 
@@ -95,6 +117,7 @@ function rowToItem(r: EquipoRow) {
     marketplaceDetailRowsJson: r.mp_detail_rows_json ?? null,
     marketplaceYieldJson: r.mp_yield_json ?? null,
     marketplaceSortOrder: Number(r.mp_sort_order) || 0,
+    marketplacePriceLabel: r.mp_price_label?.trim() ? r.mp_price_label.trim() : null,
     precioHistorial: parsePrecioHistorialJson(r.precio_historial_json ?? null),
   };
 }
@@ -108,6 +131,10 @@ function isoParaRegistroPrecio(input: string | null | undefined): string {
 function mpPayloadFromBody(d: z.infer<typeof EquipoBodySchema>) {
   const vis = d.marketplaceVisible === true;
   const sort = Math.max(0, Math.min(999999, Number(d.marketplaceSortOrder) || 0));
+  const precio = Math.round(Number(d.precioUSD) || 0);
+  const labelTrim = (d.marketplacePriceLabel ?? "").trim().slice(0, 120);
+  /** Con precio > 0 la vitrina muestra USD; el label solo aplica si precio es 0. */
+  const mp_price_label = vis && precio <= 0 ? (labelTrim || null) : null;
   return {
     mp_visible: mpVisibleToInt(vis),
     mp_algo: vis ? resolveMarketplaceAlgoForPersist(d) : null,
@@ -117,6 +144,7 @@ function mpPayloadFromBody(d: z.infer<typeof EquipoBodySchema>) {
     mp_detail_rows_json: vis ? (d.marketplaceDetailRowsJson?.trim() || null) : null,
     mp_yield_json: null,
     mp_sort_order: vis ? sort : 0,
+    mp_price_label,
   };
 }
 
@@ -131,6 +159,7 @@ function mpPayloadFromExistingRow(r: EquipoRow) {
     mp_detail_rows_json: r.mp_detail_rows_json ?? null,
     mp_yield_json: r.mp_yield_json ?? null,
     mp_sort_order: Number(r.mp_sort_order) || 0,
+    mp_price_label: r.mp_price_label?.trim() ? r.mp_price_label.trim() : null,
   };
 }
 
@@ -146,7 +175,7 @@ async function nextNumeroSerie(): Promise<string> {
 
 const EQUIPOS_SELECT = `SELECT id, numero_serie, fecha_ingreso, marca_equipo, modelo, procesador, precio_usd, observaciones,
   mp_visible, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_sort_order,
-  precio_historial_json
+  mp_price_label, precio_historial_json
   FROM equipos_asic`;
 
 /** GET /equipos — listar todos */
@@ -226,8 +255,8 @@ equiposRouter.post("/equipos", requireAuth, requireCanEdit, async (req, res: Res
       .prepare(
         `INSERT INTO equipos_asic (id, numero_serie, fecha_ingreso, marca_equipo, modelo, procesador, precio_usd, observaciones,
           mp_visible, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_sort_order,
-          precio_historial_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          mp_price_label, precio_historial_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         id,
@@ -246,6 +275,7 @@ equiposRouter.post("/equipos", requireAuth, requireCanEdit, async (req, res: Res
         mp.mp_detail_rows_json,
         mp.mp_yield_json,
         mp.mp_sort_order,
+        mp.mp_price_label ?? null,
         historialInicial
       );
     await logEquipoAsicAudit({
@@ -270,7 +300,8 @@ equiposRouter.post("/equipos", requireAuth, requireCanEdit, async (req, res: Res
 
 /**
  * POST /equipos/marketplace-image — subir imagen para vitrina (multipart field "file").
- * Guarda en client/public/images/marketplace-uploads y devuelve ruta usable en el front: /images/marketplace-uploads/...
+ * En dev/monorepo: guarda en public/images/marketplace-uploads y devuelve `/images/marketplace-uploads/...`.
+ * En Vercel (FS de solo lectura): devuelve `data:image/...;base64,...` para persistir en mp_image_src / galería.
  */
 equiposRouter.post(
   "/equipos/marketplace-image",
@@ -287,7 +318,27 @@ equiposRouter.post(
   },
   (req: Request, res: Response) => {
     const file = req.file;
-    if (!file?.filename) {
+    if (!file) {
+      return res.status(400).json({ error: { message: "Archivo requerido (campo file)" } });
+    }
+    if (marketplaceImageUploadUsesMemory()) {
+      const buf = file.buffer;
+      if (!buf?.length) {
+        return res.status(400).json({ error: { message: "Archivo vacío" } });
+      }
+      const mime = file.mimetype || "image/jpeg";
+      const url = `data:${mime};base64,${buf.toString("base64")}`;
+      void logEquipoAsicAudit({
+        user: req.user!,
+        equipoId: null,
+        codigoProducto: null,
+        action: "marketplace_image",
+        summary: "Imagen cargada para tienda online (inline, serverless)",
+        details: { urlPrefix: url.slice(0, 48), bytes: buf.length },
+      });
+      return res.status(201).json({ url });
+    }
+    if (!file.filename) {
       return res.status(400).json({ error: { message: "Archivo requerido (campo file)" } });
     }
     const url = `/images/marketplace-uploads/${file.filename}`;
@@ -361,7 +412,7 @@ equiposRouter.put("/equipos/:id", requireAuth, requireCanEdit, async (req, res: 
       .prepare(
         `UPDATE equipos_asic SET fecha_ingreso = ?, marca_equipo = ?, modelo = ?, procesador = ?, precio_usd = ?, observaciones = ?,
           numero_serie = ?, mp_visible = ?, mp_algo = ?, mp_hashrate_display = ?, mp_image_src = ?, mp_gallery_json = ?, mp_detail_rows_json = ?, mp_yield_json = ?, mp_sort_order = ?,
-          precio_historial_json = ?
+          mp_price_label = ?, precio_historial_json = ?
           WHERE id = ?`
       )
       .run(
@@ -380,6 +431,7 @@ equiposRouter.put("/equipos/:id", requireAuth, requireCanEdit, async (req, res: 
         mp.mp_detail_rows_json,
         mp.mp_yield_json,
         mp.mp_sort_order,
+        mp.mp_price_label ?? null,
         historialJson,
         id
       );
@@ -398,6 +450,7 @@ equiposRouter.put("/equipos/:id", requireAuth, requireCanEdit, async (req, res: 
       mp_gallery_len: (r.mp_gallery_json ?? "").length,
       mp_detail_len: (r.mp_detail_rows_json ?? "").length,
       mp_sort: Number(r.mp_sort_order) || 0,
+      mp_price_label: (r.mp_price_label ?? "").trim() || null,
     });
     const bef = snap(existing);
     const aft = {
@@ -406,6 +459,7 @@ equiposRouter.put("/equipos/:id", requireAuth, requireCanEdit, async (req, res: 
       mp_gallery_len: (mp.mp_gallery_json ?? "").length,
       mp_detail_len: (mp.mp_detail_rows_json ?? "").length,
       mp_sort: mp.mp_sort_order,
+      mp_price_label: (mp.mp_price_label ?? "").trim() || null,
     };
     if (JSON.stringify(bef) !== JSON.stringify(aft)) changes.marketplace = { antes: bef, despues: aft };
 
@@ -487,8 +541,8 @@ equiposRouter.post("/equipos/bulk", requireAuth, requireAdminsEquipo, async (req
       .prepare(
         `INSERT INTO equipos_asic (id, numero_serie, fecha_ingreso, marca_equipo, modelo, procesador, precio_usd, observaciones,
           mp_visible, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_sort_order,
-          precio_historial_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, NULL, NULL, NULL, NULL, NULL, 0, ?)`
+          mp_price_label, precio_historial_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, ?)`
       )
       .run(id, ns, fechaIngreso, marcaEquipo.trim(), modelo.trim(), procesador.trim(), precioUSD, observaciones ?? null, historialInicial);
   }

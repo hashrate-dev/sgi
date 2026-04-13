@@ -3,7 +3,11 @@
  */
 
 import type { AsicProduct } from "./marketplaceAsicCatalog.js";
-import { formatAsicPriceUsd, proratedEquipmentPriceUsd } from "./marketplaceAsicCatalog.js";
+import {
+  formatAsicPriceUsd,
+  normalizeConsultPriceLabelForDisplay,
+  proratedEquipmentPriceUsd,
+} from "./marketplaceAsicCatalog.js";
 
 export const QUOTE_CART_STORAGE_KEY = "hrs_marketplace_quote_cart_v1";
 /** Carrito cuando aún no hay sesión cliente (no se sincroniza con el servidor). */
@@ -208,6 +212,10 @@ export type AddQuoteLineOptions = {
 };
 
 function equipmentPriceLabelForLine(product: AsicProduct, sharePct: number): string {
+  if (product.priceDisplayLabel?.trim()) {
+    const base = normalizeConsultPriceLabelForDisplay(product.priceDisplayLabel.trim());
+    if (base) return sharePct < 100 ? `${base} (${sharePct}%)` : base;
+  }
   const usd = proratedEquipmentPriceUsd(product, sharePct);
   const base = formatAsicPriceUsd(usd);
   return sharePct < 100 ? `${base} (${sharePct}%)` : base;

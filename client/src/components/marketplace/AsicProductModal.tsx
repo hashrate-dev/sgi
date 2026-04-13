@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AsicProduct } from "../../lib/marketplaceAsicCatalog.js";
 import {
   formatAsicPriceUsd,
+  normalizeConsultPriceLabelForDisplay,
   proratedEquipmentPriceUsd,
   productSupportsHashrateShare,
   scaleDetailRowTextForShare,
@@ -56,7 +57,14 @@ export function AsicProductModal({
     [product.hashrate, shareFactor, lang]
   );
   const displayPriceUsd = hashrateShareView ? proratedEquipmentPriceUsd(product, shareViewPct) : product.priceUsd;
-  const displayPriceStr = formatAsicPriceUsd(displayPriceUsd, lang);
+  const priceLabelNorm = product.priceDisplayLabel?.trim()
+    ? normalizeConsultPriceLabelForDisplay(product.priceDisplayLabel.trim())
+    : "";
+  const displayPriceStr = priceLabelNorm
+    ? hashrateShareView && productSupportsHashrateShare(product)
+      ? `${priceLabelNorm} (${shareViewPct}%)`
+      : priceLabelNorm
+    : formatAsicPriceUsd(displayPriceUsd, lang);
   const { mailto, waUrl } = useMemo(() => {
     const subject = encodeURIComponent(
       tf("modal.mail.subject", {
@@ -289,7 +297,14 @@ export function AsicProductModal({
               aria-label={t("modal.price_box_label")}
             >
               <span className="product-modal__price-box-label">{t("modal.price_box_label")}</span>
-              <p className="product-modal__price product-modal__price--xl product-modal__price--in-box">{displayPriceStr}</p>
+              <p
+                className={
+                  "product-modal__price product-modal__price--xl product-modal__price--in-box" +
+                  (priceLabelNorm ? " product-modal__price--consult" : "")
+                }
+              >
+                {displayPriceStr}
+              </p>
               <p className="product-modal__price-note product-modal__price-note--in-box">{t("modal.price_note")}</p>
             </div>
 

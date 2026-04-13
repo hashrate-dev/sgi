@@ -126,6 +126,8 @@ export type AsicProduct = {
   hashrate: string;
   /** precio entero USD (para mailto / modal) */
   priceUsd: number;
+  /** Si existe, se muestra en vitrina/modal en lugar de «X USD» (precio bajo consulta). */
+  priceDisplayLabel?: string;
   /** Ruta pública de la foto principal; vacío = listado sin imagen (sin placeholder de catálogo). */
   imageSrc: string;
   /** Miniaturas galería modal; si falta y hay `imageSrc`, el modal usa solo la principal. */
@@ -308,12 +310,16 @@ export type HashrateSharePct = (typeof HASHRATE_SHARE_OPTIONS)[number];
 
 /** Solo Antminer S21 XP a 270 TH/s (catálogo estático o misma ficha desde API). */
 export function productSupportsHashrateShare(product: AsicProduct): boolean {
+  const raw = product.priceDisplayLabel?.trim();
+  if (raw && normalizeConsultPriceLabelForDisplay(raw)) return false;
   if (product.id === "fallback-s21-xp-270") return true;
   return /\bS21\s+XP\b/i.test(product.model.trim()) && /270/i.test(product.hashrate) && /TH\//i.test(product.hashrate);
 }
 
 /** Precio referencial USD del equipo según % de hashrate (redondeado). */
 export function proratedEquipmentPriceUsd(product: AsicProduct, sharePct: number): number {
+  const raw = product.priceDisplayLabel?.trim();
+  if (raw && normalizeConsultPriceLabelForDisplay(raw)) return 0;
   const pct = Math.min(100, Math.max(1, Math.round(sharePct)));
   return Math.max(0, Math.round((product.priceUsd * pct) / 100));
 }
@@ -326,4 +332,31 @@ export function formatAsicPriceUsd(n: number, langOrLocale?: string): string {
         ? "es-PY"
         : langOrLocale;
   return `${n.toLocaleString(loc)} USD`;
+}
+
+/**
+ * Quita el sufijo antiguo del texto comercial (p. ej. «— te asesoramos sin compromiso»),
+ * y unifica textos legacy al mensaje actual de vitrina.
+ */
+export function normalizeConsultPriceLabelForDisplay(label: string): string {
+  let s = label
+    .replace(/\s*[—–-]\s*te asesoramos sin compromiso\.?\s*$/i, "")
+    .trim();
+  if (/^solicit[áa]\s+tu\s+cotizaci[oó]n\.?$/iu.test(s)) {
+    return "SOLICITA PRECIO";
+  }
+  if (/^solicit[áa]\s+precio\.?$/iu.test(s)) {
+    return "SOLICITA PRECIO";
+  }
+  return s;
+}
+
+/** Precio en tarjeta/modal: texto comercial o USD formateado. */
+export function formatAsicProductPriceDisplay(product: AsicProduct, langOrLocale?: string): string {
+  const lb = product.priceDisplayLabel?.trim();
+  if (lb) {
+    const n = normalizeConsultPriceLabelForDisplay(lb);
+    if (n) return n;
+  }
+  return formatAsicPriceUsd(product.priceUsd, langOrLocale);
 }

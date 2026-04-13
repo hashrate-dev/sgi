@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { EquipoASIC } from "../../lib/types";
-import { formatAsicPriceUsd } from "../../lib/marketplaceAsicCatalog";
+import { formatAsicPriceUsd, normalizeConsultPriceLabelForDisplay } from "../../lib/marketplaceAsicCatalog";
 import { AsicDetailSvg } from "../marketplace/AsicDetailIcon";
 import { parseDetailRowsJson } from "./MarketplaceDetailRowsEditor";
 
@@ -22,6 +22,8 @@ export function EquipoAsicDashboardCard({ equipo: e, canEdit, onDetail, onEdit, 
   const detailRows = parseDetailRowsJson(e.marketplaceDetailRowsJson ?? "")
     .filter((r) => r.text.trim())
     .slice(0, 4);
+  const mpLabelRaw = e.marketplacePriceLabel?.trim() ?? "";
+  const mpLabelDisplay = mpLabelRaw ? normalizeConsultPriceLabelForDisplay(mpLabelRaw) : "";
 
   return (
     <article className="shelf-product hrs-asic-dash-card" data-equipo-id={e.id}>
@@ -57,7 +59,13 @@ export function EquipoAsicDashboardCard({ equipo: e, canEdit, onDetail, onEdit, 
           <p className="shelf-product__hashrate">{e.procesador}</p>
         </div>
         <div className="shelf-product__price-box">
-          <span className="shelf-product__price-value">{formatAsicPriceUsd(e.precioUSD ?? 0)}</span>
+          <span
+            className={
+              "shelf-product__price-value" + (mpLabelDisplay ? " shelf-product__price-value--consult" : "")
+            }
+          >
+            {mpLabelDisplay || formatAsicPriceUsd(e.precioUSD ?? 0)}
+          </span>
         </div>
 
         {detailRows.length > 0 ? (

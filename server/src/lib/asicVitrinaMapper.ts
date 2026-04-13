@@ -5,6 +5,20 @@
 export type AsicAlgo = "sha256" | "scrypt";
 export type AsicDetailIcon = "bolt" | "chip" | "sun" | "fan" | "droplet" | "btc" | "dual";
 
+/** Alineado con client/src/lib/marketplaceAsicCatalog (sufijos / textos legacy en mp_price_label). */
+function normalizeConsultPriceLabelForDisplay(label: string): string {
+  let s = label
+    .replace(/\s*[—–-]\s*te asesoramos sin compromiso\.?\s*$/i, "")
+    .trim();
+  if (/^solicit[áa]\s+tu\s+cotizaci[oó]n\.?$/iu.test(s)) {
+    return "SOLICITA PRECIO";
+  }
+  if (/^solicit[áa]\s+precio\.?$/iu.test(s)) {
+    return "SOLICITA PRECIO";
+  }
+  return s;
+}
+
 export type VitrinaAsicProduct = {
   id: string;
   algo: AsicAlgo;
@@ -12,6 +26,8 @@ export type VitrinaAsicProduct = {
   model: string;
   hashrate: string;
   priceUsd: number;
+  /** Si viene de `mp_price_label`, la vitrina muestra este texto en lugar de «X USD». */
+  priceDisplayLabel?: string;
   /** Vacío si no hay `mp_image_src`; la tienda no usa imagen de relleno. */
   imageSrc: string;
   gallerySrcs?: string[];
@@ -67,6 +83,7 @@ export type EquipoAsicVitrinaRow = {
   mp_gallery_json: string | null;
   mp_detail_rows_json: string | null;
   mp_yield_json: string | null;
+  mp_price_label?: string | null;
 };
 
 export function mapEquipoRowToVitrina(row: EquipoAsicVitrinaRow): VitrinaAsicProduct | null {
@@ -119,6 +136,10 @@ export function mapEquipoRowToVitrina(row: EquipoAsicVitrinaRow): VitrinaAsicPro
 
   /** Sin imagen principal en BD → cadena vacía (la tienda no muestra foto genérica). */
   const imageSrc = (row.mp_image_src ?? "").trim();
+  const priceUsd = Math.max(0, Math.round(Number(row.precio_usd) || 0));
+  const labelRaw = (row.mp_price_label ?? "").trim();
+  const labelNorm = labelRaw ? normalizeConsultPriceLabelForDisplay(labelRaw) : "";
+  const priceDisplayLabel = priceUsd <= 0 && labelNorm ? labelNorm : undefined;
 
   return {
     id: row.id,
@@ -126,7 +147,8 @@ export function mapEquipoRowToVitrina(row: EquipoAsicVitrinaRow): VitrinaAsicPro
     brand: (row.marca_equipo ?? "").trim(),
     model: (row.modelo ?? "").trim(),
     hashrate,
-    priceUsd: Math.max(0, Math.round(Number(row.precio_usd) || 0)),
+    priceUsd,
+    ...(priceDisplayLabel ? { priceDisplayLabel } : {}),
     imageSrc,
     gallerySrcs: gallerySrcs?.length ? gallerySrcs : undefined,
     detailRows,

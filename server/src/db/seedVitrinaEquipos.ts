@@ -187,8 +187,8 @@ export async function runSeedVitrinaEquipos(): Promise<void> {
         `INSERT INTO equipos_asic (
           id, numero_serie, fecha_ingreso, marca_equipo, modelo, procesador, precio_usd, observaciones,
           mp_visible, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_sort_order,
-          precio_historial_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          mp_price_label, precio_historial_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         s.id,
@@ -207,6 +207,7 @@ export async function runSeedVitrinaEquipos(): Promise<void> {
         JSON.stringify(s.detailRows),
         JSON.stringify(s.yield),
         s.sort,
+        null,
         precioHist
       );
   }

@@ -89,6 +89,8 @@ export type EquipoASIC = {
   marketplaceDetailRowsJson?: string | null;
   marketplaceYieldJson?: string | null;
   marketplaceSortOrder?: number;
+  /** Texto comercial en vitrina si no hay precio USD (ej. cotización bajo consulta). */
+  marketplacePriceLabel?: string | null;
 };
 
 export type Setup = {
