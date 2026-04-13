@@ -72,9 +72,12 @@
   justify-content: flex-end;
 }
 
-.site-header--marketplace .site-header__trailing {
-  flex: 1 1 auto;
-  min-width: 0;
+/* Móvil: el bloque derecho puede crecer para empujar el menú; en desktop lo define la grilla */
+@media (max-width: 899px) {
+  .site-header--marketplace .site-header__trailing {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
 }
 
 /* Cuenta: desktop a la derecha con idioma+carrito; móvil solo dentro del menú desplegable */
@@ -171,12 +174,17 @@
     display: none !important;
   }
 
-  /* Una fila: logo | nav | columna derecha (crece: empuja idiomas al borde con margin-left:auto) */
+  /*
+   * Logo | nav (1fr = todo el espacio libre) | trailing (solo el ancho real).
+   * Antes: minmax(max-content, 1fr) en la 3ª columna competía en fr con el menú y lo achicaba
+   * (en PT: EQUIPAMENTOS + CONTATO + CADASTRO se solapaban / cortaban).
+   */
   .site-header--marketplace .site-header__inner {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) minmax(max-content, 1fr);
+    grid-template-columns: auto minmax(0, 1fr) max-content;
     align-items: center;
-    column-gap: clamp(0.65rem, 2vw, 1.15rem);
+    /* Más aire entre menú y bloque derecho (todos los idiomas / textos largos) */
+    column-gap: clamp(0.85rem, 2.5vw, 1.5rem);
     row-gap: 0.5rem;
   }
 
@@ -193,7 +201,8 @@
     min-width: 0;
     max-width: 100%;
     justify-self: stretch;
-    justify-content: center;
+    /* flex-start: el bloque del menú arranca a la izquierda de la columna; si hace falta scroll, no “recorta” por el centro */
+    justify-content: flex-start;
   }
 
   .site-header--marketplace .site-header__trailing {
@@ -201,8 +210,10 @@
     grid-row: 1;
     margin-left: 0;
     flex-shrink: 0;
-    width: 100%;
+    width: max-content;
+    max-width: 100%;
     min-width: 0;
+    justify-self: end;
   }
 }
 
@@ -440,29 +451,33 @@
     align-items: center;
   }
 
-  /* Marketplace: enlaces centrados en la columna central (no amontonados contra la derecha) */
+  /*
+   * Menú marketplace: wrap + alineación al inicio evita solapamiento con registro/idiomas
+   * en ES/EN/PT cuando el ancho útil es justo (antes: nowrap + centrado recortaba por ambos lados).
+   */
   .site-header--marketplace .nav-main {
-    justify-content: center;
+    justify-content: flex-start;
     overflow-x: auto;
     overflow-y: visible;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-
-  .site-header--marketplace .nav-main::-webkit-scrollbar {
-    display: none;
+    scrollbar-width: thin;
+    padding-inline-end: 0.5rem;
   }
 
   .site-header--marketplace .nav-main ul {
-    flex-wrap: nowrap;
-    justify-content: center;
-    gap: 0.15rem 0.28rem;
-    margin-inline: auto;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    align-content: flex-start;
+    row-gap: 0.4rem;
+    column-gap: 0.18rem;
+    margin-inline: 0;
+    max-width: 100%;
   }
 
   .site-header--marketplace .nav-main a {
     white-space: nowrap;
-    padding: 0.4rem 0.62rem;
+    padding: 0.36rem 0.48rem;
+    letter-spacing: 0.04em;
+    font-size: 0.68rem;
   }
 }
 
