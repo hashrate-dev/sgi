@@ -16,12 +16,14 @@ function isDetailIcon(x: string): x is AsicDetailIcon {
 }
 
 /** Presets de la fila fija «chip / monedas» (modal vitrina). */
-export type CoinPreset = "sha256" | "scrypt" | "ethernet100";
+export type CoinPreset = "sha256" | "scrypt" | "ethernet100" | "capacityMax210" | "capacityMax308";
 
 export const COIN_ROW_TEXT: Record<CoinPreset, string> = {
   sha256: "BTC / BCH / BSV · SHA-256",
   scrypt: "DOGE + LTC · Scrypt",
   ethernet100: "Ethernet RJ45 10/100M",
+  capacityMax210: "Capacidad max. 210 unidades",
+  capacityMax308: "Capacidad max. 308 unidades",
 };
 
 /** Refrigeración fija (icono sol en vitrina). */
@@ -81,6 +83,15 @@ function isEthernetChipText(text: string): boolean {
   );
 }
 
+/** Fila chip tipo rack/contenedor (capacidad en unidades). */
+function capacityPresetFromChipText(text: string): "capacityMax210" | "capacityMax308" | null {
+  const t = text.trim().toUpperCase();
+  if (!t.includes("CAPACIDAD") || !(t.includes("UNIDAD") || t.includes("MAX"))) return null;
+  if (t.includes("308")) return "capacityMax308";
+  if (t.includes("210")) return "capacityMax210";
+  return null;
+}
+
 function isCoinChipRow(row: { icon: AsicDetailIcon; text: string }): boolean {
   if (row.icon !== "chip") return false;
   const t = row.text.trim().toUpperCase();
@@ -90,12 +101,14 @@ function isCoinChipRow(row: { icon: AsicDetailIcon; text: string }): boolean {
     (t.includes("DOGE") && (t.includes("LTC") || t.includes("LITECOIN"))) ||
     (t.includes("LTC") && t.includes("DOGE")) ||
     (t.includes("SCRYPT") && !t.includes("SHA-256"));
-  return hasBtcFamily || hasScryptFamily || isEthernetChipText(row.text);
+  return hasBtcFamily || hasScryptFamily || isEthernetChipText(row.text) || capacityPresetFromChipText(row.text) != null;
 }
 
 function coinPresetFromText(text: string): CoinPreset {
   const t = text.trim().toUpperCase();
   if (isEthernetChipText(text)) return "ethernet100";
+  const cap = capacityPresetFromChipText(text);
+  if (cap) return cap;
   if (
     (t.includes("DOGE") && (t.includes("LTC") || t.includes("LITECOIN"))) ||
     (t.includes("LTC") && t.includes("DOGE")) ||
@@ -389,6 +402,8 @@ export function MarketplaceDetailRowsEditor({
             <option value="sha256">{COIN_ROW_TEXT.sha256}</option>
             <option value="scrypt">{COIN_ROW_TEXT.scrypt}</option>
             <option value="ethernet100">{COIN_ROW_TEXT.ethernet100}</option>
+            <option value="capacityMax210">{COIN_ROW_TEXT.capacityMax210}</option>
+            <option value="capacityMax308">{COIN_ROW_TEXT.capacityMax308}</option>
           </select>
         </div>
         <div className="hrs-detail-rows__row hrs-detail-rows__row--cooling-fixed">

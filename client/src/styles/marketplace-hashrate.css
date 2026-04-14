@@ -5445,6 +5445,15 @@ button.product-modal__btn--quote-cart:hover {
   margin: 0 0 1.25rem;
 }
 
+/* Segunda grilla marketplace debajo de “Servicio todo incluido” */
+.market-corp-home-row2 {
+  margin-bottom: 0.5rem;
+}
+
+.market-corp-products-title--row2 {
+  margin-top: 0.15rem;
+}
+
 /* Accesos directos al marketplace (misma data que catálogo ASIC) */
 .market-corp-mp-shortcuts {
   display: grid;
@@ -5498,6 +5507,11 @@ button.product-modal__btn--quote-cart:hover {
   height: auto;
   display: block;
   vertical-align: middle;
+}
+
+.market-corp-product-card__img-fallback {
+  min-height: 200px;
+  background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 50%, #cffafe 100%);
 }
 
 /* Faja ancho completo: “Servicio todo incluido” — foto de fondo + degradé Hashrate (estilo bloque Itaipu) */

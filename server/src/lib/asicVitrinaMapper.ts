@@ -24,7 +24,8 @@ export type VitrinaListingKind = "miner" | "infrastructure";
 function inferMinerListingFromTitles(brand: string, model: string): boolean {
   const s = `${brand} ${model}`.toLowerCase();
   if (/\bantrack\b/.test(s)) return false;
-  if (/\bpdu\b|patch panel\b|bandeja rack|shelf rack|contenedor\b/i.test(s)) return false;
+  if (/\bpdu\b|patch panel\b|bandeja rack|shelf rack|contenedor\b|\bcontainer\b|\bantspace\b/i.test(s))
+    return false;
   if (/\brack\b/.test(s) && !/\bantminer\b/i.test(s)) return false;
   return true;
 }

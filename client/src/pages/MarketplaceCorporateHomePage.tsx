@@ -1,11 +1,17 @@
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { MarketplaceSiteHeader } from "../components/marketplace/MarketplaceSiteHeader";
 import { MarketplaceSiteFooter } from "../components/marketplace/MarketplaceSiteFooter";
 import { MarketplaceCorpFaqSpotlight } from "../components/marketplace/MarketplaceCorpFaqSpotlight";
 import { MarketplaceCorpContactCard } from "../components/marketplace/MarketplaceCorpContactCard";
 import { AsicDetailSvg } from "../components/marketplace/AsicDetailIcon.js";
-import { ASIC_MARKETPLACE_PRODUCTS, formatAsicPriceUsd } from "../lib/marketplaceAsicCatalog.js";
+import {
+  ASIC_MARKETPLACE_PRODUCTS,
+  CORP_HOME_BEST_SELLING_PRODUCT_IDS,
+  CORP_HOME_GRID_PRODUCT_IDS,
+  formatAsicProductPriceDisplay,
+} from "../lib/marketplaceAsicCatalog.js";
+import type { AsicProduct } from "../lib/marketplaceAsicCatalog.js";
 import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
 import "../styles/marketplace-hashrate.css";
 
@@ -55,21 +61,6 @@ const CORP_HOW_STEPS = [
   { titleKey: "corp.how.step2_title" as const, bodyKey: "corp.how.step2_body" as const, imgAltKey: "corp.how.step2_img_alt" as const },
 ] as const;
 
-/** Accesos directos al catálogo `/marketplace?asic=<id>` (mismas fichas que el marketplace). */
-const CORP_MARKETPLACE_SHORTCUT_IDS = [
-  "fallback-s21-pro-235",
-  "fallback-s21-xp-270",
-  "fallback-l9-16g",
-  "fallback-l9-17g",
-] as const;
-
-const ROW2 = [
-  { src: `${UP}/S21-335.png`, alt: "Antminer S21 Hydro" },
-  { src: `${UP}/S21-473.png`, alt: "Antminer S21 XP Hydro" },
-  { src: `${UP}/ANTRACK.png`, alt: "Antrack" },
-  { src: `${UP}/ANTSPACE-HK3.png`, alt: "Antspace HK3" },
-] as const;
-
 const BRAND_LOGOS = [
   { src: `${UP}/bitmain.png`, alt: "Bitmain", w: 512, h: 180, slug: "bitmain" as const },
   { src: `${UP}/canaan-logo.png`, alt: "Canaan", w: 616, h: 188, slug: "canaan" as const },
@@ -87,6 +78,24 @@ export function MarketplaceCorporateHomePage() {
   const { t, lang } = useMarketplaceLang();
   const { pathname, hash } = useLocation();
   const navigate = useNavigate();
+
+  /** “Equipos más vendidos”: mineros S21 / L9 del catálogo — mismos enlaces que `/marketplace?asic=`. */
+  const corpMarketplaceFeaturedProducts = useMemo(
+    () =>
+      CORP_HOME_BEST_SELLING_PRODUCT_IDS.map((id) => ASIC_MARKETPLACE_PRODUCTS.find((p) => p.id === id)).filter(
+        (p): p is AsicProduct => Boolean(p)
+      ),
+    []
+  );
+
+  /** Segunda fila (debajo de “Servicio todo incluido”): extras de catálogo + `/marketplace?asic=`. */
+  const corpMarketplaceAfterHostingProducts = useMemo(
+    () =>
+      CORP_HOME_GRID_PRODUCT_IDS.map((id) => ASIC_MARKETPLACE_PRODUCTS.find((p) => p.id === id)).filter(
+        (p): p is AsicProduct => Boolean(p)
+      ),
+    []
+  );
 
   const goCorpHash = useCallback((id: (typeof CORP_ANCHOR_IDS)[number]) => {
     navigate({ pathname, hash: `#${id}` });
@@ -289,16 +298,14 @@ export function MarketplaceCorporateHomePage() {
 
             <h2 className="market-corp-products-title">{t("corp.best_selling.title")}</h2>
             <div className="market-corp-mp-shortcuts" aria-label={t("corp.market_shortcuts_aria")}>
-              {CORP_MARKETPLACE_SHORTCUT_IDS.map((id) => {
-                const p = ASIC_MARKETPLACE_PRODUCTS.find((x) => x.id === id);
-                if (!p) return null;
-                const to = `/marketplace?asic=${encodeURIComponent(id)}`;
+              {corpMarketplaceFeaturedProducts.map((p) => {
+                const to = `/marketplace?asic=${encodeURIComponent(p.id)}`;
                 const aria = `${p.brand} ${p.model} ${p.hashrate} — ${t("corp.mp_card_link_aria")}`;
                 const goAsic = () => {
                   void navigate(to);
                 };
                 return (
-                  <article key={id} className="shelf-product">
+                  <article key={p.id} className="shelf-product">
                     <div className="shelf-product__media">
                       <div className="shelf-product__media-gradient">
                         <Link to={to} className="shelf-product__imglink" aria-label={aria}>
@@ -325,7 +332,7 @@ export function MarketplaceCorporateHomePage() {
                         <p className="shelf-product__hashrate">{p.hashrate}</p>
                       </div>
                       <div className="shelf-product__price-box">
-                        <span className="shelf-product__price-value">{formatAsicPriceUsd(p.priceUsd, lang)}</span>
+                        <span className="shelf-product__price-value">{formatAsicProductPriceDisplay(p, lang)}</span>
                       </div>
                       <div className="shelf-product__specs-box" role="group" aria-label={t("shelf.techspecs")}>
                         <ul className="shelf-detail-strip">
@@ -378,13 +385,73 @@ export function MarketplaceCorporateHomePage() {
               </div>
             </div>
 
-            <div className="market-corp-product-grid market-corp-product-grid--tight">
-              {ROW2.map((p) => (
-                <Link key={p.src} to="/marketplace" className="market-corp-product-card">
-                  <img src={p.src} alt={p.alt} width={400} height={400} loading="lazy" decoding="async" />
-                </Link>
-              ))}
-            </div>
+            {corpMarketplaceAfterHostingProducts.length > 0 ? (
+              <section className="market-corp-home-row2" aria-labelledby="corp-home-row2-title">
+                <h2 id="corp-home-row2-title" className="market-corp-products-title market-corp-products-title--row2">
+                  {t("corp.home_row2.title")}
+                </h2>
+                <div className="market-corp-mp-shortcuts" aria-label={t("corp.home_row2.grid_aria")}>
+                  {corpMarketplaceAfterHostingProducts.map((p) => {
+                    const to = `/marketplace?asic=${encodeURIComponent(p.id)}`;
+                    const aria = `${p.brand} ${p.model} ${p.hashrate} — ${t("corp.mp_card_link_aria")}`;
+                    const goAsic = () => {
+                      void navigate(to);
+                    };
+                    return (
+                      <article key={p.id} className="shelf-product">
+                        <div className="shelf-product__media">
+                          <div className="shelf-product__media-gradient">
+                            <Link to={to} className="shelf-product__imglink" aria-label={aria}>
+                              {p.imageSrc ? (
+                                <img
+                                  src={p.imageSrc}
+                                  alt=""
+                                  width={400}
+                                  height={400}
+                                  loading="lazy"
+                                  decoding="async"
+                                  className="shelf-product__photo"
+                                />
+                              ) : (
+                                <div className="shelf-product__photo shelf-product__photo--fallback" aria-hidden />
+                              )}
+                            </Link>
+                          </div>
+                        </div>
+                        <div className="shelf-product__body">
+                          <div className="shelf-product__identity">
+                            <p className="shelf-product__brand">{p.brand}</p>
+                            <h3 className="shelf-product__title">{p.model}</h3>
+                            <p className="shelf-product__hashrate">{p.hashrate}</p>
+                          </div>
+                          <div className="shelf-product__price-box">
+                            <span className="shelf-product__price-value">{formatAsicProductPriceDisplay(p, lang)}</span>
+                          </div>
+                          <div className="shelf-product__specs-box" role="group" aria-label={t("shelf.techspecs")}>
+                            <ul className="shelf-detail-strip">
+                              {p.detailRows.map((row, i) => (
+                                <li key={i} className="shelf-detail-strip__row">
+                                  <AsicDetailSvg kind={row.icon} />
+                                  <span className="shelf-detail-strip__txt">{row.text}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                          <div className="shelf-product__cta-row">
+                            <button type="button" className="shelf-product__cta" onClick={goAsic}>
+                              {t("shelf.seemore")}
+                            </button>
+                            <button type="button" className="shelf-product__quote-btn" onClick={goAsic} title={t("shelf.add_title")}>
+                              {t("catalog.add_short")}
+                            </button>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            ) : null}
 
             <section className="market-corp-itaipu" aria-labelledby="corp-itaipu-title">
               <div className="market-corp-itaipu__bg" aria-hidden />

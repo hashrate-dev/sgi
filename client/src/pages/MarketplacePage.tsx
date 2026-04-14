@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ASIC_MARKETPLACE_PRODUCTS,
   asicProductShowsMinerEconomyContent,
+  mergeAsicCatalogWithCorpGridExtras,
 } from "../lib/marketplaceAsicCatalog.js";
 import type { AsicAlgo, AsicProduct } from "../lib/marketplaceAsicCatalog.js";
 import type { AddQuoteLineOptions } from "../lib/marketplaceQuoteCart.js";
@@ -118,16 +119,16 @@ function MarketplacePageBody() {
         if (cancelled) return;
         const list = res.products ?? [];
         if (list.length > 0) {
-          setProducts(list);
+          setProducts(mergeAsicCatalogWithCorpGridExtras(list));
           setCatalogFromApi(true);
         } else {
-          setProducts(ASIC_MARKETPLACE_PRODUCTS);
+          setProducts(mergeAsicCatalogWithCorpGridExtras(ASIC_MARKETPLACE_PRODUCTS));
           setCatalogFromApi(false);
         }
       })
       .catch(() => {
         if (cancelled) return;
-        setProducts(ASIC_MARKETPLACE_PRODUCTS);
+        setProducts(mergeAsicCatalogWithCorpGridExtras(ASIC_MARKETPLACE_PRODUCTS));
         setCatalogFromApi(false);
       });
     return () => {

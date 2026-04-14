@@ -45,7 +45,8 @@ const MODELOS_EQUIPO_OPCIONES = [
   "Antminer S21",
   "Antminer L7",
   "Antminer L9",
-  "Antrack Rack Hydro",
+  "AntSpace Hydro HW5",
+  "AntSpace Hydro MD5",
 ] as const;
 
 /** Texto por defecto en vitrina cuando el producto no tiene precio fijo (editable). */
@@ -258,14 +259,6 @@ function appendPrecioHistorialClient(prev: PrecioHistEntry[], precioUsd: number,
   return [...prev, { precioUsd: n, actualizadoEn }];
 }
 
-type MarketplaceListingTiendaForm = "auto" | "miner" | "infrastructure";
-
-function marketplaceListingTiendaFromEquipo(e: EquipoASIC): MarketplaceListingTiendaForm {
-  if (e.marketplaceListingKind === "miner") return "miner";
-  if (e.marketplaceListingKind === "infrastructure") return "infrastructure";
-  return "auto";
-}
-
 type EquipoFormState = {
   fechaIngreso: string;
   marcaEquipo: string;
@@ -282,11 +275,6 @@ type EquipoFormState = {
   marketplaceImageSrc: string;
   marketplaceGalleryLines: string;
   marketplaceDetailRowsJson: string;
-  /**
-   * Solo con tienda visible: automático (heurística) o forzar minero / infraestructura
-   * (modal público sin bloque rendimiento ni tarifa hosting para infra).
-   */
-  marketplaceListingTienda: MarketplaceListingTiendaForm;
 };
 
 function buildMarketplacePayload(form: EquipoFormState): {
@@ -310,10 +298,8 @@ function buildMarketplacePayload(form: EquipoFormState): {
   const labelTrim = form.marketplacePriceLabel.trim();
   const marketplacePriceLabel =
     consult ? (labelTrim || DEFAULT_MARKETPLACE_PRICE_LABEL).slice(0, 120) : null;
-  const marketplaceListingKind =
-    vis && (form.marketplaceListingTienda === "miner" || form.marketplaceListingTienda === "infrastructure")
-      ? form.marketplaceListingTienda
-      : null;
+  /** Siempre automático (heurística marca/modelo en vitrina); sin override manual en formulario. */
+  const marketplaceListingKind = null;
   return {
     marketplaceVisible: vis,
     marketplaceAlgo: null,
@@ -365,7 +351,6 @@ function emptyEquipoForm(): EquipoFormState {
     marketplaceImageSrc: "",
     marketplaceGalleryLines: "",
     marketplaceDetailRowsJson: "",
-    marketplaceListingTienda: "auto",
   };
 }
 
@@ -606,7 +591,6 @@ export function EquiposAsicPage() {
       marketplaceImageSrc: e.marketplaceImageSrc ?? "",
       marketplaceGalleryLines: galleryLinesFromJson(e.marketplaceGalleryJson),
       marketplaceDetailRowsJson: e.marketplaceDetailRowsJson ?? "",
-      marketplaceListingTienda: marketplaceListingTiendaFromEquipo(e),
     });
     setShowAddModal(true);
   }
@@ -1604,35 +1588,6 @@ export function EquiposAsicPage() {
                                 </p>
                               </div>
                             </div>
-                            {formData.marketplaceVisible ? (
-                              <div className="hrs-equipo-asic-modal-form__listing-kind mt-2">
-                                <label className="form-label small mb-1" htmlFor="mp-listing-kind">
-                                  Tipo de anuncio (tienda)
-                                </label>
-                                <select
-                                  id="mp-listing-kind"
-                                  className="form-select form-select-sm"
-                                  disabled={!canEditTienda}
-                                  value={formData.marketplaceListingTienda}
-                                  onChange={(ev) =>
-                                    setFormData({
-                                      ...formData,
-                                      marketplaceListingTienda: ev.target.value as MarketplaceListingTiendaForm,
-                                    })
-                                  }
-                                >
-                                  <option value="auto">Automático (según nombre del equipo)</option>
-                                  <option value="miner">Minero — mostrar rendimiento estimado y hosting</option>
-                                  <option value="infrastructure">
-                                    Infraestructura / rack — sin rendimiento ni tarifa hosting en el modal
-                                  </option>
-                                </select>
-                                <p className="small text-muted mt-1 mb-0">
-                                  Racks tipo Antrack, PDU, etc.: usá «Infraestructura» o dejá «Automático» (se detecta
-                                  Antrack/rack).
-                                </p>
-                              </div>
-                            ) : null}
                           </div>
                         </div>
                         {canEditTienda ? (

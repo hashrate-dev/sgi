@@ -130,7 +130,8 @@ export type AsicListingTitleFields = {
 export function inferMinerListingFromTitles(brand: string, model: string): boolean {
   const s = `${brand} ${model}`.toLowerCase();
   if (/\bantrack\b/.test(s)) return false;
-  if (/\bpdu\b|patch panel\b|bandeja rack|shelf rack|contenedor\b/i.test(s)) return false;
+  if (/\bpdu\b|patch panel\b|bandeja rack|shelf rack|contenedor\b|\bcontainer\b|\bantspace\b/i.test(s))
+    return false;
   if (/\brack\b/.test(s) && !/\bantminer\b/i.test(s)) return false;
   return true;
 }
@@ -333,6 +334,29 @@ export const ASIC_MARKETPLACE_PRODUCTS: AsicProduct[] = [
     },
   },
 ];
+
+/** Extras de vitrina bajo “Servicio todo incluido” en `/marketplace/home` (vacío = sin fichas estáticas mergeadas). */
+export const CORP_HOME_GRID_PRODUCT_IDS = [] as const;
+
+/**
+ * Sección “Equipos más vendidos” en `/marketplace/home`: mineros de catálogo (no infra Hydro/Antrack).
+ * Orden: S21 XP → S21 Pro (2 hashrates) → L9 representativo.
+ */
+export const CORP_HOME_BEST_SELLING_PRODUCT_IDS = [
+  "fallback-s21-xp-270",
+  "fallback-s21-pro-245",
+  "fallback-s21-pro-235",
+  "fallback-l9-16g",
+] as const;
+
+/** Añade fichas promo corporativas si la API no las trae (mismos ids que catálogo estático). */
+export function mergeAsicCatalogWithCorpGridExtras(apiProducts: AsicProduct[]): AsicProduct[] {
+  const apiIds = new Set(apiProducts.map((p) => p.id));
+  const extras = CORP_HOME_GRID_PRODUCT_IDS.map((id) => ASIC_MARKETPLACE_PRODUCTS.find((p) => p.id === id)).filter(
+    (p): p is AsicProduct => Boolean(p && !apiIds.has(p.id))
+  );
+  return [...apiProducts, ...extras];
+}
 
 export const ASIC_FILTER_GROUPS = [
   { id: "sha256" as const, label: "Bitcoin" },
