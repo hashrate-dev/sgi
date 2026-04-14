@@ -186,6 +186,64 @@
   color: #047857;
 }
 
+.hrs-home-card-icon--marketplace {
+  position: relative;
+}
+
+.hrs-home-marketplace-badge {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  border: 2px solid #fff;
+  box-shadow: 0 4px 10px rgba(220, 38, 38, 0.35);
+  animation: hrs-home-marketplace-badge-float 1.7s ease-in-out infinite;
+}
+
+.hrs-home-marketplace-badge--pulse {
+  animation:
+    hrs-home-marketplace-badge-pulse 1.2s ease-out,
+    hrs-home-marketplace-badge-float 1.7s ease-in-out infinite;
+}
+
+@keyframes hrs-home-marketplace-badge-float {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-1.5px) scale(1.03);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes hrs-home-marketplace-badge-pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.45);
+  }
+  55% {
+    transform: scale(1.12);
+    box-shadow: 0 0 0 8px rgba(220, 38, 38, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+  }
+}
+
 .hrs-home-card--marketplace-tickets:hover {
   border-color: rgba(5, 150, 105, 0.4);
 }
@@ -193,6 +251,51 @@
 .hrs-home-card--marketplace-tickets:hover .hrs-home-card-icon {
   background: linear-gradient(135deg, #059669 0%, #10b981 100%);
   color: #fff;
+}
+
+.hrs-home-card--marketplace-presence {
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  background: linear-gradient(180deg, #ffffff 0%, #ecfdf5 55%);
+  cursor: default;
+}
+
+.hrs-home-card-icon--marketplace-presence {
+  position: relative;
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  color: #047857;
+}
+
+.hrs-home-marketplace-presence-dot {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: #22c55e;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+  animation: hrs-home-marketplace-presence-ping 1.5s ease-out infinite;
+}
+
+.hrs-home-marketplace-presence-count {
+  margin: 0 0 0.25rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #065f46;
+  line-height: 1.1;
+}
+
+@keyframes hrs-home-marketplace-presence-ping {
+  0% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.42);
+  }
+  70% {
+    box-shadow: 0 0 0 9px rgba(34, 197, 94, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+  }
 }
 
 /* Clientes registrados vía tienda online (dashboard WEB-*) */

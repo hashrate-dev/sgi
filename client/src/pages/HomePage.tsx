@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { updateMyPassword } from "../lib/api";
+import { getMarketplacePresenceStats, getMarketplaceQuoteTicketsStats, updateMyPassword } from "../lib/api";
 import { canViewMarketplaceQuoteTickets } from "../lib/auth.js";
+import { playMarketplaceOrderNotificationSound } from "../lib/marketplaceCartSound";
 import { showToast } from "../components/ToastNotification";
 import "../styles/hrshome.css";
 import "../styles/marketplace-hashrate.css";
@@ -36,10 +37,17 @@ export function HomePage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [logoSrc, setLogoSrc] = useState("/images/HRSLOGO.png");
+  const [marketplaceOpenCount, setMarketplaceOpenCount] = useState(0);
+  const [marketplaceBadgePulse, setMarketplaceBadgePulse] = useState(false);
+  const [marketplaceOnlineTotal, setMarketplaceOnlineTotal] = useState(0);
+  const [marketplaceOnlineClientes, setMarketplaceOnlineClientes] = useState(0);
+  const [marketplaceOnlineAnon, setMarketplaceOnlineAnon] = useState(0);
+  const prevOpenCountRef = useRef(0);
   const roleNorm = (r: string | undefined) => (r ?? "").toLowerCase().trim();
 const visibleMenuItems = menuItems.filter(
   (item) => !item.roles || (user && item.roles.some((r) => roleNorm(r) === roleNorm(user.role)))
 );
+  const canSeeMarketplaceOrdersCard = Boolean(user && canViewMarketplaceQuoteTickets(user.role));
 
   useEffect(() => {
     // Verificar que la imagen existe
@@ -53,6 +61,83 @@ const visibleMenuItems = menuItems.filter(
     };
     img.src = "/images/HRSLOGO.png";
   }, []);
+
+  useEffect(() => {
+    if (!canSeeMarketplaceOrdersCard) return;
+    let cancelled = false;
+    let pulseTimeout: number | null = null;
+    const computeOpenCount = (byStatus: Record<string, number> | undefined): number => {
+      if (!byStatus) return 0;
+      const cerrado = Number(byStatus.cerrado ?? 0) || 0;
+      const descartado = Number(byStatus.descartado ?? 0) || 0;
+      const total = Object.values(byStatus).reduce((s, n) => s + (Number(n) || 0), 0);
+      return Math.max(0, total - cerrado - descartado);
+    };
+    const refresh = async () => {
+      try {
+        const stats = await getMarketplaceQuoteTicketsStats();
+        if (cancelled) return;
+        const nextOpen = computeOpenCount(stats.byStatus);
+        setMarketplaceOpenCount(nextOpen);
+        if (nextOpen > prevOpenCountRef.current) {
+          playMarketplaceOrderNotificationSound();
+          setMarketplaceBadgePulse(true);
+          if (pulseTimeout) window.clearTimeout(pulseTimeout);
+          pulseTimeout = window.setTimeout(() => setMarketplaceBadgePulse(false), 1600);
+        }
+        prevOpenCountRef.current = nextOpen;
+      } catch {
+        if (!cancelled) {
+          setMarketplaceOpenCount(0);
+        }
+      }
+    };
+    void refresh();
+    const int = window.setInterval(() => {
+      void refresh();
+    }, 30000);
+    const onFocus = () => void refresh();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      cancelled = true;
+      window.clearInterval(int);
+      window.removeEventListener("focus", onFocus);
+      if (pulseTimeout) window.clearTimeout(pulseTimeout);
+    };
+  }, [canSeeMarketplaceOrdersCard]);
+
+  useEffect(() => {
+    if (!canSeeMarketplaceOrdersCard) return;
+    let cancelled = false;
+    const refreshPresence = async () => {
+      try {
+        const presence = await getMarketplacePresenceStats();
+        if (cancelled) return;
+        const total = Number(presence.onlineTotal) || 0;
+        const by = presence.byViewerType ?? {};
+        setMarketplaceOnlineTotal(total);
+        setMarketplaceOnlineClientes(Number(by.cliente ?? 0) || 0);
+        setMarketplaceOnlineAnon(Number(by.anon ?? 0) || 0);
+      } catch {
+        if (!cancelled) {
+          setMarketplaceOnlineTotal(0);
+          setMarketplaceOnlineClientes(0);
+          setMarketplaceOnlineAnon(0);
+        }
+      }
+    };
+    void refreshPresence();
+    const int = window.setInterval(() => {
+      void refreshPresence();
+    }, 8000);
+    const onFocus = () => void refreshPresence();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      cancelled = true;
+      window.clearInterval(int);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [canSeeMarketplaceOrdersCard]);
 
   function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
@@ -133,14 +218,41 @@ const visibleMenuItems = menuItems.filter(
               <p className="hrs-home-card-desc">{item.desc}</p>
             </Link>
           ))}
-          {user && canViewMarketplaceQuoteTickets(user.role) ? (
+          {canSeeMarketplaceOrdersCard ? (
             <Link to="/cotizaciones-marketplace" className="hrs-home-card hrs-home-card--marketplace-tickets">
-              <div className="hrs-home-card-icon">
+              <div className="hrs-home-card-icon hrs-home-card-icon--marketplace">
                 <i className="bi bi-ticket-perforated" aria-hidden />
+                {marketplaceOpenCount > 0 ? (
+                  <span
+                    className={
+                      "hrs-home-marketplace-badge" +
+                      (marketplaceBadgePulse ? " hrs-home-marketplace-badge--pulse" : "")
+                    }
+                    aria-label={`${marketplaceOpenCount} órdenes abiertas`}
+                    title={`${marketplaceOpenCount} órdenes abiertas`}
+                  >
+                    {marketplaceOpenCount > 99 ? "99+" : marketplaceOpenCount}
+                  </span>
+                ) : null}
               </div>
               <h3 className="hrs-home-card-title">Ordenes Marketplace</h3>
               <p className="hrs-home-card-desc">Tickets y órdenes del carrito (monitoreo en vivo)</p>
             </Link>
+          ) : null}
+          {canSeeMarketplaceOrdersCard ? (
+            <div className="hrs-home-card hrs-home-card--marketplace-presence" role="status" aria-live="polite">
+              <div className="hrs-home-card-icon hrs-home-card-icon--marketplace-presence">
+                <i className="bi bi-broadcast-pin" aria-hidden />
+                <span className="hrs-home-marketplace-presence-dot" aria-hidden />
+              </div>
+              <h3 className="hrs-home-card-title">Marketplace en vivo</h3>
+              <p className="hrs-home-marketplace-presence-count">
+                {marketplaceOnlineTotal} online ahora
+              </p>
+              <p className="hrs-home-card-desc">
+                logueados: {marketplaceOnlineClientes} · sin cuenta: {marketplaceOnlineAnon}
+              </p>
+            </div>
           ) : null}
           {user ? (
             <Link to="/configuracion" className="hrs-home-card hrs-home-card-admin">

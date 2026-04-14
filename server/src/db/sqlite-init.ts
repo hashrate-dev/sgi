@@ -204,6 +204,16 @@ CREATE TABLE IF NOT EXISTS items_garantia_ande_precio_historial (
 CREATE INDEX IF NOT EXISTS idx_gar_ande_precio_hist_item ON items_garantia_ande_precio_historial(item_id, recorded_at);
 `);
 
+  db.exec(`
+CREATE TABLE IF NOT EXISTS marketplace_presence (
+  visitor_id TEXT PRIMARY KEY,
+  viewer_type TEXT NOT NULL DEFAULT 'anon' CHECK (viewer_type IN ('anon', 'cliente', 'staff')),
+  current_path TEXT,
+  last_seen_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_marketplace_presence_seen ON marketplace_presence(last_seen_at DESC);
+`);
+
   db.exec(`CREATE TABLE IF NOT EXISTS tienda_online_client_seq (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     next_code_num INTEGER NOT NULL

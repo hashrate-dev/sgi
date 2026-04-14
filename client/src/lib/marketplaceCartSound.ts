@@ -104,3 +104,22 @@ export function playMarketplaceCartItemRemovedSound(): void {
     /* ignore */
   }
 }
+
+/** Sonido corto para notificación de nueva orden en panel staff. */
+export function playMarketplaceOrderNotificationSound(): void {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  const t0 = ctx.currentTime;
+  const out = ctx.createGain();
+  out.gain.value = 0.3;
+  out.connect(ctx.destination);
+
+  try {
+    blip(ctx, out, t0, 1046, 0.065, 0.2); /* C6 */
+    blip(ctx, out, t0 + 0.055, 1396, 0.08, 0.22); /* F6 */
+    blip(ctx, out, t0 + 0.12, 1568, 0.09, 0.18); /* G6 */
+  } catch {
+    /* ignore */
+  }
+}

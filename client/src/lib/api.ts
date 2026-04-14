@@ -1145,6 +1145,28 @@ export function getMarketplaceQuoteTicketsStats(): Promise<{
   return api("/api/marketplace/quote-tickets-stats");
 }
 
+export type MarketplacePresenceViewerType = "anon" | "cliente" | "staff";
+
+export function postMarketplacePresenceHeartbeat(payload: {
+  visitorId: string;
+  viewerType?: MarketplacePresenceViewerType;
+  currentPath?: string;
+}): Promise<{ ok?: boolean }> {
+  return api("/api/marketplace/presence/heartbeat", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getMarketplacePresenceStats(): Promise<{
+  onlineTotal: number;
+  byViewerType: Record<string, number>;
+  windowSeconds: number;
+  asOf: string;
+}> {
+  return api("/api/marketplace/presence-stats");
+}
+
 export function getMarketplaceQuoteTickets(params?: {
   status?: string;
   q?: string;

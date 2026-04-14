@@ -1,4 +1,5 @@
-import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
+import { useEffect } from "react";
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ProtectedAppLayout } from "./components/ProtectedAppLayout";
@@ -42,11 +43,64 @@ import { CuentaClienteDetallePage } from "./pages/CuentaClienteDetallePage";
 import { ToastContainer } from "./components/ToastNotification";
 import { ScrollToTop } from "./components/ScrollToTop";
 import { MarketplaceLanguageProvider } from "./contexts/MarketplaceLanguageContext";
+import { getStoredUser } from "./lib/auth";
+import { postMarketplacePresenceHeartbeat, type MarketplacePresenceViewerType } from "./lib/api";
+
+const MARKETPLACE_PRESENCE_VISITOR_KEY = "hrs_marketplace_presence_visitor_id";
+
+function getMarketplacePresenceVisitorId(): string {
+  const fallback = `mp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  try {
+    const found = localStorage.getItem(MARKETPLACE_PRESENCE_VISITOR_KEY)?.trim();
+    if (found && found.length >= 8) return found;
+    localStorage.setItem(MARKETPLACE_PRESENCE_VISITOR_KEY, fallback);
+    return fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function resolveMarketplaceViewerType(): MarketplacePresenceViewerType {
+  const role = String(getStoredUser()?.role ?? "").toLowerCase().trim();
+  if (role === "cliente") return "cliente";
+  if (role === "admin_a" || role === "admin_b" || role === "operador" || role === "lector") return "staff";
+  return "anon";
+}
+
+function MarketplacePresenceBeacon() {
+  const location = useLocation();
+  useEffect(() => {
+    if (!location.pathname.startsWith("/marketplace")) return;
+    const visitorId = getMarketplacePresenceVisitorId();
+    const currentPath = `${location.pathname}${location.search ?? ""}`.slice(0, 200);
+    const viewerType = resolveMarketplaceViewerType();
+    let cancelled = false;
+    const sendBeat = () => {
+      if (cancelled) return;
+      void postMarketplacePresenceHeartbeat({ visitorId, viewerType, currentPath }).catch(() => {});
+    };
+    sendBeat();
+    const intervalId = window.setInterval(sendBeat, 30_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") sendBeat();
+    };
+    window.addEventListener("focus", sendBeat);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", sendBeat);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [location.pathname, location.search]);
+  return null;
+}
 
 /** Outlet para anidar /marketplace, /marketplace/login, /marketplace/registro (matching estable en RR7). */
 function MarketplaceLayout() {
   return (
     <MarketplaceLanguageProvider>
+      <MarketplacePresenceBeacon />
       <Outlet />
     </MarketplaceLanguageProvider>
   );

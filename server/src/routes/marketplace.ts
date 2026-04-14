@@ -1,4 +1,4 @@
-import type { Response } from "express";
+import type { Request, Response } from "express";
 import { Router } from "express";
 import { z } from "zod";
 import { db, getDb } from "../db.js";
@@ -16,6 +16,14 @@ import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
 export const marketplaceRouter = Router();
 
 const canManage = requireRole("admin_a", "admin_b", "operador");
+const adminAB = requireRole("admin_a", "admin_b");
+const MARKETPLACE_PRESENCE_ONLINE_WINDOW_MS = 90_000;
+
+const MarketplacePresenceHeartbeatSchema = z.object({
+  visitorId: z.string().min(8).max(120).trim(),
+  viewerType: z.enum(["anon", "cliente", "staff"]).optional(),
+  currentPath: z.string().max(200).trim().optional(),
+});
 
 const ProductCreateSchema = z.object({
   name: z.string().min(1).max(200).trim(),
@@ -68,6 +76,60 @@ function rowToProduct(r: Row) {
     createdAt: r.created_at,
   };
 }
+
+/** Conteo de navegantes activos del marketplace (cliente/invitado/staff). */
+marketplaceRouter.post("/marketplace/presence/heartbeat", async (req: Request, res: Response) => {
+  const parsed = MarketplacePresenceHeartbeatSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
+  }
+  try {
+    const nowIso = new Date().toISOString();
+    const cutoffIso = new Date(Date.now() - MARKETPLACE_PRESENCE_ONLINE_WINDOW_MS * 4).toISOString();
+    const currentPath = (parsed.data.currentPath || "/marketplace").slice(0, 200);
+    const viewerType = parsed.data.viewerType ?? "anon";
+    await db
+      .prepare(
+        `INSERT INTO marketplace_presence (visitor_id, viewer_type, current_path, last_seen_at)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(visitor_id)
+         DO UPDATE SET viewer_type = excluded.viewer_type, current_path = excluded.current_path, last_seen_at = excluded.last_seen_at`
+      )
+      .run(parsed.data.visitorId, viewerType, currentPath, nowIso);
+    await db.prepare("DELETE FROM marketplace_presence WHERE last_seen_at < ?").run(cutoffIso);
+    res.status(204).send();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: { message: msg } });
+  }
+});
+
+/** Vista interna: cuántas personas están navegando el marketplace ahora mismo. */
+marketplaceRouter.get("/marketplace/presence-stats", requireAuth, adminAB, async (_req: Request, res: Response) => {
+  try {
+    const cutoffIso = new Date(Date.now() - MARKETPLACE_PRESENCE_ONLINE_WINDOW_MS).toISOString();
+    const rows = (await db
+      .prepare("SELECT viewer_type, COUNT(*) as c FROM marketplace_presence WHERE last_seen_at >= ? GROUP BY viewer_type")
+      .all(cutoffIso)) as Array<{ viewer_type: string; c: number }>;
+    const byViewerType: Record<string, number> = {};
+    let onlineTotal = 0;
+    for (const r of rows) {
+      const key = String(r.viewer_type || "anon");
+      const n = Number(r.c) || 0;
+      byViewerType[key] = n;
+      onlineTotal += n;
+    }
+    res.json({
+      onlineTotal,
+      byViewerType,
+      windowSeconds: Math.floor(MARKETPLACE_PRESENCE_ONLINE_WINDOW_MS / 1000),
+      asOf: new Date().toISOString(),
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: { message: msg } });
+  }
+});
 
 /**
  * GET /marketplace/setup-quote-prices — S02 (equipo completo) + S03 (fracción hashrate).
