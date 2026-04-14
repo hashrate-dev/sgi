@@ -3408,6 +3408,16 @@ button.product-modal__btn--quote-cart:hover {
   color: rgba(226, 232, 240, 0.65);
 }
 
+.market-quote-drawer__total--mixed {
+  border-color: rgba(251, 191, 36, 0.22);
+}
+
+.market-quote-drawer__total-note--mixed {
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: rgba(254, 243, 199, 0.9);
+}
+
 .market-quote-drawer__total-amt {
   font-size: 1.35rem;
   font-weight: 800;
@@ -3415,6 +3425,11 @@ button.product-modal__btn--quote-cart:hover {
   font-variant-numeric: tabular-nums;
   color: #fff;
   white-space: nowrap;
+}
+
+.market-quote-drawer__total-amt--partial {
+  font-size: 1.2rem;
+  color: #fef9c3;
 }
 
 .market-quote-drawer__total-amt--pending {

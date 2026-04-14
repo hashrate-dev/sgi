@@ -121,6 +121,18 @@ export function quoteCartHasEquipmentPricePending(lines: QuoteCartLine[]): boole
   return lines.some(quoteCartLineIsEquipmentPricePending);
 }
 
+/** Hay al menos un ítem con precio publicado y otro «Solicita precio» (cotización pendiente). */
+export function quoteCartHasMixedPricedAndConsultLines(lines: QuoteCartLine[]): boolean {
+  if (lines.length < 2) return false;
+  let hasPending = false;
+  let hasPriced = false;
+  for (const l of lines) {
+    if (quoteCartLineIsEquipmentPricePending(l)) hasPending = true;
+    else hasPriced = true;
+  }
+  return hasPending && hasPriced;
+}
+
 const MAX_QTY = 99;
 
 /** Clave única por producto + fracción de hashrate (misma máquina 100% y 25% = dos líneas). */

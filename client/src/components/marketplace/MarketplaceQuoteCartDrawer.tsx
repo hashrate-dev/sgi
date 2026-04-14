@@ -15,6 +15,7 @@ import {
   marketplaceQuoteTicketLineDisplayName,
   quoteCartLineIsEquipmentPricePending,
   quoteCartHasEquipmentPricePending,
+  quoteCartHasMixedPricedAndConsultLines,
 } from "../../lib/marketplaceQuoteCart.js";
 import { MailCtaIcon, WhatsAppCtaIcon } from "./MarketplaceCtaIcons.js";
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
@@ -98,6 +99,7 @@ export function MarketplaceQuoteCartDrawer() {
   const pricing = { setupEquipoCompletoUsd, setupCompraHashrateUsd, garantiaItems: garantiaQuoteItems };
   const totalRef = quoteCartSubtotalUsd(lines, pricing);
   const hasPendingEquipmentPrice = quoteCartHasEquipmentPricePending(lines);
+  const mixedPricedAndConsult = quoteCartHasMixedPricedAndConsultLines(lines);
   const n = lines.length;
   const subtitle =
     n === 0 ? null : n === 1 ? t("drawer.sub_one") : tf("drawer.sub_many", { n: String(n) });
@@ -387,19 +389,34 @@ export function MarketplaceQuoteCartDrawer() {
                   </span>
                 </p>
               ) : null}
-              <div className="market-quote-drawer__total">
+              <div
+                className={
+                  "market-quote-drawer__total" +
+                  (mixedPricedAndConsult ? " market-quote-drawer__total--mixed" : "")
+                }
+              >
                 <div className="market-quote-drawer__total-copy">
                   <span id="market-quote-drawer-total-heading" className="market-quote-drawer__total-label">
-                    {t("drawer.total")}
+                    {mixedPricedAndConsult ? t("drawer.total_mixed_label") : t("drawer.total")}
                   </span>
-                  <span className="market-quote-drawer__total-note">
-                    {hasPendingEquipmentPrice ? t("drawer.total_note_pending_quote") : t("drawer.total_note")}
+                  <span
+                    className={
+                      "market-quote-drawer__total-note" +
+                      (mixedPricedAndConsult ? " market-quote-drawer__total-note--mixed" : "")
+                    }
+                  >
+                    {mixedPricedAndConsult
+                      ? t("drawer.total_note_mixed")
+                      : hasPendingEquipmentPrice
+                        ? t("drawer.total_note_pending_quote")
+                        : t("drawer.total_note")}
                   </span>
                 </div>
                 <strong
                   className={
                     "market-quote-drawer__total-amt" +
-                    (hasPendingEquipmentPrice && totalRef === 0 ? " market-quote-drawer__total-amt--pending" : "")
+                    (hasPendingEquipmentPrice && totalRef === 0 ? " market-quote-drawer__total-amt--pending" : "") +
+                    (mixedPricedAndConsult ? " market-quote-drawer__total-amt--partial" : "")
                   }
                 >
                   {hasPendingEquipmentPrice && totalRef === 0

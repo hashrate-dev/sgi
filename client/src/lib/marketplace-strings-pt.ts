@@ -384,6 +384,9 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
   "drawer.subtotal": "Subtotal",
   "drawer.line_subtotal_pending": "Cotação pendente",
   "drawer.total": "Total preço",
+  "drawer.total_mixed_label": "Soma referencial",
+  "drawer.total_note_mixed":
+    "Soma apenas equipamentos com preço publicado. A lista também tem itens «Solicita preço»: não é o total final. A Hashrate entrará em contato com a cotação completa.",
   "drawer.total_note": "Soma da lista · USD",
   "drawer.total_note_addons_only": "Soma visível: só opcionais (setup / garantia) · USD",
   "drawer.total_note_pending_quote":

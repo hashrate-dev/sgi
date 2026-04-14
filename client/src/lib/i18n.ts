@@ -403,6 +403,9 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "drawer.subtotal": "Subtotal",
     "drawer.line_subtotal_pending": "Cotización pendiente",
     "drawer.total": "Total precio",
+    "drawer.total_mixed_label": "Suma referencial",
+    "drawer.total_note_mixed":
+      "Suma solo equipos con precio publicado. En la lista también hay ítems «Solicita precio»: no es el total final. Hashrate te contactará con la cotización completa.",
     "drawer.total_note": "Suma de la lista · USD",
     "drawer.total_note_addons_only": "Suma visible: solo opcionales (setup / garantía) · USD",
     "drawer.total_note_pending_quote": "Sin total en lista: Hashrate cotiza minero, setup y garantía.",
@@ -1052,6 +1055,9 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "drawer.subtotal": "Subtotal",
     "drawer.line_subtotal_pending": "Quote pending",
     "drawer.total": "Total price",
+    "drawer.total_mixed_label": "Reference subtotal",
+    "drawer.total_note_mixed":
+      "This figure only includes miners with a published price. Your list also has “request price” items, so it is not the final total. The Hashrate team will contact you with a complete quote.",
     "drawer.total_note": "List sum · USD",
     "drawer.total_note_addons_only": "Visible sum: add-ons only (setup / warranty) · USD",
     "drawer.total_note_pending_quote": "No list total — Hashrate quotes miner, setup & warranty.",
