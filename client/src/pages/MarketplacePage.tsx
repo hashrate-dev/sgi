@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, memo } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ASIC_MARKETPLACE_PRODUCTS,
@@ -25,6 +25,57 @@ const DOC_TITLE = "Hashrate Space - Marketplace";
 const DOC_DESC =
   "Equipos ASIC para minería de Bitcoin y Scrypt. Hashrate Space — Paraguay y Uruguay: infraestructura, energía y soporte.";
 
+const SKELETON_GRID_COUNT = 8;
+
+function scheduleIdle(cb: () => void, timeoutMs: number): number {
+  const w = window as Window & { requestIdleCallback?: (fn: () => void, opts?: { timeout: number }) => number };
+  if (typeof w.requestIdleCallback === "function") {
+    return w.requestIdleCallback(cb, { timeout: timeoutMs });
+  }
+  return window.setTimeout(cb, 120);
+}
+
+function cancelIdle(id: number): void {
+  const w = window as Window & { cancelIdleCallback?: (n: number) => void };
+  if (typeof w.cancelIdleCallback === "function") w.cancelIdleCallback(id);
+  else window.clearTimeout(id);
+}
+
+function ShelfSkeletonGrid({ count = SKELETON_GRID_COUNT }: { count?: number }) {
+  return (
+    <>
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className="shelf-product shelf-product--skeleton" aria-hidden>
+          <div className="shelf-product__media">
+            <div className="shelf-product__media-gradient">
+              <div className="shelf-product__skeleton-photo" />
+            </div>
+          </div>
+          <div className="shelf-product__body">
+            <div className="shelf-product__skeleton-line shelf-product__skeleton-line--lg" />
+            <div className="shelf-product__skeleton-line shelf-product__skeleton-line--md" />
+            <div className="shelf-product__skeleton-line shelf-product__skeleton-line--sm" />
+            <div className="shelf-product__skeleton-line shelf-product__skeleton-line--full" />
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+/** Evita re-render de toda la grilla cuando solo llegan yields en vivo (el modal los consume). */
+const MemoAsicShelfProduct = memo(AsicShelfProduct, (prev, next) => {
+  return (
+    prev.product === next.product &&
+    prev.productIndex === next.productIndex &&
+    prev.filteredHidden === next.filteredHidden &&
+    prev.addToQuoteLabel === next.addToQuoteLabel &&
+    prev.onAddToQuote === next.onAddToQuote &&
+    prev.onOpenModal === next.onOpenModal
+  );
+});
+MemoAsicShelfProduct.displayName = "AsicShelfProduct";
+
 export function MarketplacePage() {
   return (
     <MarketplaceQuoteCartProvider>
@@ -42,8 +93,8 @@ function MarketplacePageBody() {
   const { addProduct, openDrawer } = useMarketplaceQuoteCart();
   const [filterAlgo, setFilterAlgo] = useState<AsicAlgo | null>(null);
   const [modalIndex, setModalIndex] = useState<number | null>(null);
-  /** Catálogo estático en el primer frame; la API lo reemplaza cuando responde (percepción de carga más rápida). */
-  const [products, setProducts] = useState<AsicProduct[]>(() => ASIC_MARKETPLACE_PRODUCTS);
+  /** Vacío hasta la vitrina: evita pintar catálogo placeholder y reemplazarlo por el de la API (doble trabajo y “ola” visual). */
+  const [products, setProducts] = useState<AsicProduct[]>(() => []);
   /** null = primer fetch en curso; true = vitrina API; false = fallback local tras vacío o error */
   const [catalogFromApi, setCatalogFromApi] = useState<boolean | null>(null);
   const [liveYieldsById, setLiveYieldsById] = useState<Record<string, MarketplaceAsicLiveYield>>({});
@@ -137,11 +188,10 @@ function MarketplacePageBody() {
   }, []);
 
   useEffect(() => {
-    /** Evita POST de yields contra el catálogo placeholder mientras llega la API. */
+    /** Evita POST de yields hasta tener catálogo definitivo y dar tiempo al primer paint de la grilla. */
     if (catalogFromApi === null || products.length === 0) return;
     let cancelled = false;
-    /** Defer: deja pintar la grilla antes del POST (red + CoinGecko puede tardar). */
-    const tid = window.setTimeout(() => {
+    const idleId = scheduleIdle(() => {
       if (cancelled) return;
       const minerProducts = products.filter(asicProductShowsMinerEconomyContent);
       if (minerProducts.length === 0) {
@@ -170,10 +220,10 @@ function MarketplacePageBody() {
         .finally(() => {
           if (!cancelled) setYieldsLoading(false);
         });
-    }, 0);
+    }, 1800);
     return () => {
       cancelled = true;
-      window.clearTimeout(tid);
+      cancelIdle(idleId);
     };
   }, [products, catalogFromApi]);
 
@@ -202,6 +252,7 @@ function MarketplacePageBody() {
 
   /** Deep link desde home corporativa: `/marketplace?asic=<id>` abre el modal de esa ficha. */
   useEffect(() => {
+    if (catalogFromApi === null) return;
     const id = searchParams.get("asic")?.trim();
     if (!id) return;
     const idx = shelfProducts.findIndex((p) => p.id === id);
@@ -213,7 +264,7 @@ function MarketplacePageBody() {
     }
     setModalIndex(idx);
     setSearchParams(next, { replace: true });
-  }, [searchParams, shelfProducts, setSearchParams]);
+  }, [searchParams, shelfProducts, setSearchParams, catalogFromApi]);
 
   const modalProduct = modalIndex != null ? shelfProducts[modalIndex] ?? null : null;
   const modalLiveYield = modalProduct ? liveYieldsById[modalProduct.id] : undefined;
@@ -243,17 +294,21 @@ function MarketplacePageBody() {
                 </p>
               ) : null}
               <div className="shelf-grid">
-                {shelfProducts.map((p, i) => (
-                  <AsicShelfProduct
-                    key={p.id}
-                    product={p}
-                    productIndex={i}
-                    filteredHidden={filterAlgo != null && p.algo !== filterAlgo}
-                    onOpenModal={setModalIndex}
-                    onAddToQuote={handleAddToQuote}
-                    addToQuoteLabel={addToQuoteLabel}
-                  />
-                ))}
+                {catalogFromApi === null ? (
+                  <ShelfSkeletonGrid />
+                ) : (
+                  shelfProducts.map((p, i) => (
+                    <MemoAsicShelfProduct
+                      key={p.id}
+                      product={p}
+                      productIndex={i}
+                      filteredHidden={filterAlgo != null && p.algo !== filterAlgo}
+                      onOpenModal={setModalIndex}
+                      onAddToQuote={handleAddToQuote}
+                      addToQuoteLabel={addToQuoteLabel}
+                    />
+                  ))
+                )}
               </div>
             </div>
           </section>

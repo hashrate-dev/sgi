@@ -7,6 +7,8 @@ import {
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
 import { AsicDetailSvg } from "./AsicDetailIcon.js";
 
+const EAGER_IMAGE_ABOVE_INDEX = 10;
+
 export function AsicShelfProduct({
   product,
   productIndex,
@@ -32,6 +34,7 @@ export function AsicShelfProduct({
   const consultLabel = product.priceDisplayLabel?.trim()
     ? normalizeConsultPriceLabelForDisplay(product.priceDisplayLabel.trim())
     : "";
+  const eagerImg = productIndex < EAGER_IMAGE_ABOVE_INDEX;
 
   if (filteredHidden) {
     return <article className="shelf-product shelf-product--filtered-out" aria-hidden />;
@@ -50,8 +53,9 @@ export function AsicShelfProduct({
                 alt=""
                 width={400}
                 height={400}
-                loading="lazy"
+                loading={eagerImg ? "eager" : "lazy"}
                 decoding="async"
+                {...(eagerImg ? { fetchPriority: productIndex === 0 ? ("high" as const) : ("auto" as const) } : {})}
                 className="shelf-product__photo"
                 onError={() => setImgBroken(true)}
               />

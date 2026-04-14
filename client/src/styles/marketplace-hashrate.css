@@ -908,6 +908,55 @@ button.market-link-hrs {
   flex-direction: column;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
   transition: box-shadow 0.25s, transform 0.2s;
+  /* Acelera scroll/pintura con muchas fichas (Chrome/Edge/Firefox recientes). */
+  content-visibility: auto;
+  contain-intrinsic-size: 440px;
+}
+
+.shelf-product--skeleton {
+  pointer-events: none;
+  content-visibility: visible;
+}
+
+.shelf-product__skeleton-photo {
+  width: 100%;
+  aspect-ratio: 1;
+  background: linear-gradient(110deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.22) 40%, rgba(255, 255, 255, 0.08) 80%);
+  background-size: 200% 100%;
+  animation: shelf-skeleton-shimmer 1.1s ease-in-out infinite;
+}
+
+.shelf-product__skeleton-line {
+  height: 0.65rem;
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(90deg, #e5e7eb 0%, #f3f4f6 50%, #e5e7eb 100%);
+  background-size: 200% 100%;
+  animation: shelf-skeleton-shimmer 1.1s ease-in-out infinite;
+}
+
+.shelf-product__skeleton-line--lg {
+  width: 42%;
+}
+.shelf-product__skeleton-line--md {
+  width: 72%;
+}
+.shelf-product__skeleton-line--sm {
+  width: 55%;
+}
+.shelf-product__skeleton-line--full {
+  width: 100%;
+  margin-top: 0.75rem;
+  height: 2.25rem;
+}
+
+@keyframes shelf-skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 .shelf-product:hover {

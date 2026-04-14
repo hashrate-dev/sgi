@@ -54,7 +54,7 @@ export function MarketplaceFaqPage() {
               <MarketplaceCorpFaqSpotlight
                 headingId={headingId}
                 rows={MARKETPLACE_WP_FAQ_ROWS}
-                defaultOpenIndex={0}
+                defaultOpenIndex={null}
                 variant="aurora"
               />
             </section>
