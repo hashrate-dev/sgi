@@ -30,7 +30,8 @@ export const pool = new pg.Pool({
   connectionString: getConnectionString(),
   max: 10,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
+  /* Cold start / pooler Supabase: 10s a veces corta en serverless. */
+  connectionTimeoutMillis: process.env.VERCEL ? 25_000 : 10_000,
   ssl: env.SUPABASE_DATABASE_URL?.includes("supabase.co")
     ? { rejectUnauthorized: false }
     : undefined,

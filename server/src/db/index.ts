@@ -11,16 +11,29 @@ import { env } from "../config/env.js";
 let _db: Awaited<ReturnType<typeof loadDb>>;
 export let dbType: "supabase" | "sqlite" = "sqlite";
 
+/** En Vercel el pool + DDL del esquema pueden tardar más que en local; 15s provocaba timeout falso. */
+const SUPABASE_INIT_TIMEOUT_MS = process.env.VERCEL ? 60_000 : 20_000;
+
 async function loadDb() {
   if (env.SUPABASE_DATABASE_URL) {
     try {
       const { db, pool } = await import("./supabase-pg.js");
       await Promise.race([
         (async () => {
-          await runSupabaseSchema(pool);
+          /* Primero comprobar conexión (credenciales / pooler); luego DDL idempotente. */
+          await pool.query("SELECT 1");
+          try {
+            await runSupabaseSchema(pool);
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            // eslint-disable-next-line no-console
+            console.warn("[DB] runSupabaseSchema con advertencias (se sigue si la BD ya existe):", msg);
+          }
           await pool.query("SELECT 1");
         })(),
-        new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 15000))
+        new Promise((_, rej) =>
+          setTimeout(() => rej(new Error(`timeout ${SUPABASE_INIT_TIMEOUT_MS}ms conectando a Supabase`)), SUPABASE_INIT_TIMEOUT_MS)
+        ),
       ]);
       dbType = "supabase";
       // eslint-disable-next-line no-console

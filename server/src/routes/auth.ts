@@ -165,12 +165,11 @@ authRouter.post("/auth/register-cliente", registerClienteRateLimit, async (req, 
 });
 
 authRouter.post("/auth/login", loginRateLimit, async (req, res) => {
-  if (env.NODE_ENV !== "production") {
-    try {
-      await ensureDefaultUser();
-    } catch (e) {
-      console.warn("ensureDefaultUser (no bloquea login):", e);
-    }
+  /* También en Vercel: si la tabla users está vacía (Supabase nuevo), crea defaults; si ya hay filas, no hace nada. */
+  try {
+    await ensureDefaultUser();
+  } catch (e) {
+    console.warn("ensureDefaultUser (no bloquea login):", e);
   }
   const parsed = LoginSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -211,8 +210,8 @@ authRouter.post("/auth/login", loginRateLimit, async (req, res) => {
     return res.status(401).json({ error: { message: "Usuario o contraseña incorrectos" } });
   }
   try {
-    const userId = Number(row.id);
-    if (!Number.isFinite(userId)) {
+    const userId = typeof row.id === "number" ? row.id : Number(String(row.id).trim());
+    if (!Number.isFinite(userId) || userId < 1) {
       return res.status(500).json({ error: { message: "Id de usuario inválido en la base de datos." } });
     }
     const { celular, telefono } = await getTiendaPhonesForUserId(userId);
