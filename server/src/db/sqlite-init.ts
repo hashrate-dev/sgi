@@ -211,6 +211,7 @@ CREATE TABLE IF NOT EXISTS marketplace_presence (
   country_code TEXT,
   country_name TEXT,
   client_ip TEXT,
+  user_email TEXT,
   current_path TEXT,
   last_seen_at TEXT NOT NULL
 );

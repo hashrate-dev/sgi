@@ -218,6 +218,7 @@ CREATE TABLE IF NOT EXISTS marketplace_presence (
   country_code TEXT,
   country_name TEXT,
   client_ip TEXT,
+  user_email TEXT,
   current_path TEXT,
   last_seen_at TEXT NOT NULL
 );
@@ -386,7 +387,7 @@ CREATE INDEX IF NOT EXISTS idx_equipos_asic_audit_created ON equipos_asic_audit(
     }
   }
 
-  for (const colDef of ["country_code TEXT", "country_name TEXT", "client_ip TEXT"]) {
+  for (const colDef of ["country_code TEXT", "country_name TEXT", "client_ip TEXT", "user_email TEXT"]) {
     try {
       native.exec(`ALTER TABLE marketplace_presence ADD COLUMN ${colDef}`);
     } catch (e: unknown) {

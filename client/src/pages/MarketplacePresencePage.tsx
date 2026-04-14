@@ -14,6 +14,8 @@ type PresenceRow = {
   viewerType: string;
   countryCode: string;
   countryName: string;
+  clientIp: string;
+  userEmail: string;
   currentPath: string;
   lastSeenAt: string;
 };
@@ -155,8 +157,24 @@ export function MarketplacePresencePage() {
                 <h3>Mapa mundial de accesos</h3>
                 <span>Marcadores por país de origen</span>
               </div>
-              <MapContainer center={[12, 0]} zoom={1.4} minZoom={1} scrollWheelZoom={false} className="hrs-mplive-map">
-                <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              <MapContainer
+                center={[12, 0]}
+                zoom={1.4}
+                minZoom={1}
+                maxZoom={6}
+                maxBounds={[
+                  [-85, -180],
+                  [85, 180],
+                ]}
+                maxBoundsViscosity={1.0}
+                scrollWheelZoom={false}
+                className="hrs-mplive-map"
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  noWrap
+                />
                 {mapCountries.map((c) => (
                   <CircleMarker
                     key={`${c.countryCode}-${c.countryName}`}
@@ -181,7 +199,10 @@ export function MarketplacePresencePage() {
                 ) : (
                   countries.slice(0, 10).map((c) => (
                     <span key={`${c.countryCode}-${c.countryName}`} className="hrs-mplive-country-chip">
-                      {c.countryName} ({c.count}) L:{c.loggedCount} I:{c.anonCount}
+                      <span className="hrs-mplive-country-chip__name">{c.countryName}</span>
+                      <span className="hrs-mplive-country-chip__total">{c.count}</span>
+                      <span className="hrs-mplive-country-chip__meta">L:{c.loggedCount}</span>
+                      <span className="hrs-mplive-country-chip__meta hrs-mplive-country-chip__meta--anon">I:{c.anonCount}</span>
                     </span>
                   ))
                 )}
@@ -199,7 +220,7 @@ export function MarketplacePresencePage() {
                     <th style={{ minWidth: 140 }}>Tipo</th>
                     <th>Ruta</th>
                     <th style={{ minWidth: 180 }}>Última actividad</th>
-                    <th style={{ minWidth: 160 }}>ID sesión</th>
+                    <th style={{ minWidth: 220 }}>Email</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -219,7 +240,7 @@ export function MarketplacePresencePage() {
                         </td>
                         <td>{new Date(r.lastSeenAt).toLocaleString("es-AR")}</td>
                         <td>
-                          <code>{r.visitorId}</code>
+                          <code>{r.userEmail || "—"}</code>
                         </td>
                       </tr>
                     ))

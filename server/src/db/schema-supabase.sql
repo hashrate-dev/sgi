@@ -230,6 +230,7 @@ CREATE TABLE IF NOT EXISTS marketplace_presence (
   country_code TEXT,
   country_name TEXT,
   client_ip TEXT,
+  user_email TEXT,
   current_path TEXT,
   last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -237,6 +238,7 @@ CREATE INDEX IF NOT EXISTS idx_marketplace_presence_seen ON marketplace_presence
 ALTER TABLE marketplace_presence ADD COLUMN IF NOT EXISTS country_code TEXT;
 ALTER TABLE marketplace_presence ADD COLUMN IF NOT EXISTS country_name TEXT;
 ALTER TABLE marketplace_presence ADD COLUMN IF NOT EXISTS client_ip TEXT;
+ALTER TABLE marketplace_presence ADD COLUMN IF NOT EXISTS user_email TEXT;
 
 INSERT INTO marketplace_products (name, description, category, price_usd, image_url, stock, sort_order)
 SELECT * FROM (

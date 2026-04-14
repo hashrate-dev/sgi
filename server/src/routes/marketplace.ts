@@ -1,7 +1,9 @@
 import type { Request, Response } from "express";
 import { Router } from "express";
 import { z } from "zod";
+import jwt from "jsonwebtoken";
 import { db, getDb } from "../db.js";
+import { env } from "../config/env.js";
 import { mapEquipoRowToVitrina, type EquipoAsicVitrinaRow } from "../lib/asicVitrinaMapper.js";
 import {
   estimateAllYields,
@@ -24,6 +26,7 @@ const ipCountryCache = new Map<string, { countryCode: string; countryName: strin
 const MarketplacePresenceHeartbeatSchema = z.object({
   visitorId: z.string().min(8).max(120).trim(),
   viewerType: z.enum(["anon", "cliente", "staff"]).optional(),
+  userEmail: z.string().trim().max(200).optional(),
   countryCode: z.string().trim().min(2).max(2).optional(),
   countryName: z.string().trim().max(80).optional(),
   clientIp: z.string().trim().max(80).optional(),
@@ -127,6 +130,27 @@ function selectBestPresenceIp(req: Request, clientIpRaw?: string): string {
   return "";
 }
 
+async function resolveAuthSnapshot(req: Request): Promise<{ viewerType: "anon" | "cliente" | "staff"; email: string }> {
+  const authHeader = String(req.headers.authorization || "");
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+  if (!token) return { viewerType: "anon", email: "" };
+  try {
+    const payload = jwt.verify(token, env.JWT_SECRET) as { userId?: number; sub?: string };
+    const userId = Number(payload?.userId);
+    if (!Number.isFinite(userId) || userId <= 0) return { viewerType: "anon", email: "" };
+    const row = (await db.prepare("SELECT email, username, role FROM users WHERE id = ?").get(userId)) as
+      | { email?: string | null; username?: string | null; role?: string | null }
+      | undefined;
+    if (!row) return { viewerType: "anon", email: "" };
+    const role = String(row.role || "").toLowerCase().trim();
+    const viewerType = role === "cliente" ? "cliente" : "staff";
+    const email = String(row.email || row.username || "").trim().toLowerCase().slice(0, 200);
+    return { viewerType, email };
+  } catch {
+    return { viewerType: "anon", email: "" };
+  }
+}
+
 function normalizeCountryCode(raw: unknown): string {
   const cc = String(raw ?? "").trim().toUpperCase();
   if (!/^[A-Z]{2}$/.test(cc)) return "";
@@ -167,6 +191,10 @@ function countryCodeFromLocale(localeRaw: string): string {
 
 function countryCodeFromTimezone(tzRaw: string): string {
   const tz = String(tzRaw || "").trim();
+  const tzNorm = tz.toLowerCase();
+  // Regla explícita solicitada por negocio:
+  // timezone America/Montevideo => Uruguay (UY)
+  if (tzNorm === "america/montevideo") return "UY";
   const map: Record<string, string> = {
     "America/Asuncion": "PY",
     "America/Montevideo": "UY",
@@ -181,7 +209,10 @@ function countryCodeFromTimezone(tzRaw: string): string {
     "Europe/Madrid": "ES",
     "Europe/Lisbon": "PT",
   };
-  return normalizeCountryCode(map[tz] || "");
+  const direct = map[tz];
+  if (direct) return normalizeCountryCode(direct);
+  const byNorm = Object.entries(map).find(([k]) => k.toLowerCase() === tzNorm)?.[1] ?? "";
+  return normalizeCountryCode(byNorm);
 }
 
 function detectCountryFromHeaders(req: Request): { countryCode: string; countryName: string } {
@@ -265,29 +296,28 @@ async function touchMarketplacePresence(req: Request, fallbackPath: string): Pro
   const nowIso = new Date().toISOString();
   const cutoffIso = new Date(Date.now() - MARKETPLACE_PRESENCE_ONLINE_WINDOW_MS * 4).toISOString();
   const currentPath = String(req.originalUrl || fallbackPath).slice(0, 200);
-  const hasAuth = typeof req.headers.authorization === "string" && req.headers.authorization.trim().length > 0;
-  const viewerType = hasAuth ? "staff" : "anon";
+  const auth = await resolveAuthSnapshot(req);
+  const viewerType = auth.viewerType;
   const visitorId = visitorFingerprintFromRequest(req);
   const clientIp = selectBestPresenceIp(req);
+  const userEmail = auth.email;
   const ipCountry = await resolveCountryFromIp(req);
-  const langHeader = String(req.headers["accept-language"] ?? "");
-  const ccFromLang = countryCodeFromLocale(langHeader.split(",")[0] ?? "");
-  const fallbackCode = ccFromLang || "PY";
+  const fallbackCode = "UN";
   const countryCode = shouldUseClientCountryFallback(ipCountry.countryCode) ? fallbackCode : ipCountry.countryCode;
   const countryName = shouldUseClientCountryFallback(ipCountry.countryCode)
-    ? countryNameFromCode(fallbackCode)
+    ? "Desconocido"
     : ipCountry.countryName;
   const upsertSql =
-    `INSERT INTO marketplace_presence (visitor_id, viewer_type, country_code, country_name, client_ip, current_path, last_seen_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO marketplace_presence (visitor_id, viewer_type, country_code, country_name, client_ip, user_email, current_path, last_seen_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(visitor_id)
-     DO UPDATE SET viewer_type = excluded.viewer_type, country_code = excluded.country_code, country_name = excluded.country_name, client_ip = excluded.client_ip, current_path = excluded.current_path, last_seen_at = excluded.last_seen_at`;
+     DO UPDATE SET viewer_type = excluded.viewer_type, country_code = excluded.country_code, country_name = excluded.country_name, client_ip = excluded.client_ip, user_email = excluded.user_email, current_path = excluded.current_path, last_seen_at = excluded.last_seen_at`;
   if (isPg()) {
     await db
       .prepare(`${upsertSql} RETURNING visitor_id as id`)
-      .get(visitorId, viewerType, countryCode, countryName, clientIp, currentPath, nowIso);
+      .get(visitorId, viewerType, countryCode, countryName, clientIp, userEmail, currentPath, nowIso);
   } else {
-    await db.prepare(upsertSql).run(visitorId, viewerType, countryCode, countryName, clientIp, currentPath, nowIso);
+    await db.prepare(upsertSql).run(visitorId, viewerType, countryCode, countryName, clientIp, userEmail, currentPath, nowIso);
   }
   await db.prepare("DELETE FROM marketplace_presence WHERE last_seen_at < ?").run(cutoffIso);
 }
@@ -322,8 +352,10 @@ marketplaceRouter.post("/marketplace/presence/heartbeat", async (req: Request, r
     const nowIso = new Date().toISOString();
     const cutoffIso = new Date(Date.now() - MARKETPLACE_PRESENCE_ONLINE_WINDOW_MS * 4).toISOString();
     const currentPath = (parsed.data.currentPath || "/marketplace").slice(0, 200);
-    const viewerType = parsed.data.viewerType ?? "anon";
+    const auth = await resolveAuthSnapshot(req);
+    const viewerType = auth.viewerType !== "anon" ? auth.viewerType : parsed.data.viewerType ?? "anon";
     const clientIp = selectBestPresenceIp(req, parsed.data.clientIp);
+    const userEmail = (auth.email || String(parsed.data.userEmail || "").trim().toLowerCase()).slice(0, 200);
     const ipCountry = await resolveCountryFromIp(req);
     const clientIpCountry =
       shouldUseClientCountryFallback(ipCountry.countryCode) && clientIp
@@ -334,10 +366,10 @@ marketplaceRouter.post("/marketplace/presence/heartbeat", async (req: Request, r
     const localeCode = countryCodeFromLocale(parsed.data.locale || "");
     const timezoneCode = countryCodeFromTimezone(parsed.data.timezone || "");
     const hintCode =
+      (isUsableCountryCode(timezoneCode) ? timezoneCode : "") ||
       (isUsableCountryCode(clientIpCountry.countryCode) ? normalizeCountryCode(clientIpCountry.countryCode) : "") ||
       (isUsableCountryCode(clientCountryCode) ? clientCountryCode : "") ||
       (isUsableCountryCode(localeCode) ? localeCode : "") ||
-      (isUsableCountryCode(timezoneCode) ? timezoneCode : "") ||
       "PY";
     const countryCode = shouldUseClientCountryFallback(ipCountry.countryCode) ? hintCode : ipCountry.countryCode;
     const countryName =
@@ -348,16 +380,16 @@ marketplaceRouter.post("/marketplace/presence/heartbeat", async (req: Request, r
           hintCode
         : ipCountry.countryName.slice(0, 80);
     const upsertSql =
-      `INSERT INTO marketplace_presence (visitor_id, viewer_type, country_code, country_name, client_ip, current_path, last_seen_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO marketplace_presence (visitor_id, viewer_type, country_code, country_name, client_ip, user_email, current_path, last_seen_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(visitor_id)
-       DO UPDATE SET viewer_type = excluded.viewer_type, country_code = excluded.country_code, country_name = excluded.country_name, client_ip = excluded.client_ip, current_path = excluded.current_path, last_seen_at = excluded.last_seen_at`;
+       DO UPDATE SET viewer_type = excluded.viewer_type, country_code = excluded.country_code, country_name = excluded.country_name, client_ip = excluded.client_ip, user_email = excluded.user_email, current_path = excluded.current_path, last_seen_at = excluded.last_seen_at`;
     if (isPg()) {
       await db
         .prepare(`${upsertSql} RETURNING visitor_id as id`)
-        .get(parsed.data.visitorId, viewerType, countryCode, countryName, clientIp, currentPath, nowIso);
+        .get(parsed.data.visitorId, viewerType, countryCode, countryName, clientIp, userEmail, currentPath, nowIso);
     } else {
-      await db.prepare(upsertSql).run(parsed.data.visitorId, viewerType, countryCode, countryName, clientIp, currentPath, nowIso);
+      await db.prepare(upsertSql).run(parsed.data.visitorId, viewerType, countryCode, countryName, clientIp, userEmail, currentPath, nowIso);
     }
     await db.prepare("DELETE FROM marketplace_presence WHERE last_seen_at < ?").run(cutoffIso);
     res.status(204).send();
@@ -400,7 +432,7 @@ marketplaceRouter.get("/marketplace/presence-live", requireAuth, adminAB, async 
     const cutoffIso = new Date(Date.now() - MARKETPLACE_PRESENCE_ONLINE_WINDOW_MS).toISOString();
     const rows = (await db
       .prepare(
-        "SELECT visitor_id, viewer_type, country_code, country_name, client_ip, current_path, last_seen_at FROM marketplace_presence WHERE last_seen_at >= ? ORDER BY last_seen_at DESC LIMIT 120"
+        "SELECT visitor_id, viewer_type, country_code, country_name, client_ip, user_email, current_path, last_seen_at FROM marketplace_presence WHERE last_seen_at >= ? ORDER BY last_seen_at DESC LIMIT 120"
       )
       .all(cutoffIso)) as Array<{
       visitor_id: string;
@@ -408,11 +440,11 @@ marketplaceRouter.get("/marketplace/presence-live", requireAuth, adminAB, async 
       country_code: string | null;
       country_name: string | null;
       client_ip: string | null;
+      user_email: string | null;
       current_path: string | null;
       last_seen_at: string;
     }>;
-    const reqLocaleCode = countryCodeFromLocale(String(req.headers["accept-language"] || "").split(",")[0] || "");
-    const liveFallbackCode = reqLocaleCode || "PY";
+    const liveFallbackCode = "UN";
     const hydratedRows = await Promise.all(
       rows.map(async (r) => {
         const cc = normalizeCountryCode(r.country_code);
@@ -429,7 +461,7 @@ marketplaceRouter.get("/marketplace/presence-live", requireAuth, adminAB, async 
         return {
           ...r,
           country_code: liveFallbackCode,
-          country_name: countryNameFromCode(liveFallbackCode) || liveFallbackCode,
+          country_name: "Desconocido",
         };
       })
     );
@@ -463,6 +495,8 @@ marketplaceRouter.get("/marketplace/presence-live", requireAuth, adminAB, async 
         viewerType: r.viewer_type,
         countryCode: normalizeCountryCode(r.country_code) || "UN",
         countryName: String(r.country_name || normalizeCountryCode(r.country_code) || "Desconocido"),
+        clientIp: String(r.client_ip || "").trim(),
+        userEmail: String(r.user_email || "").trim(),
         currentPath: r.current_path ?? "/marketplace",
         lastSeenAt: r.last_seen_at,
       })),

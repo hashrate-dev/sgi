@@ -1175,6 +1175,8 @@ export function getMarketplacePresenceLive(): Promise<{
     viewerType: string;
     countryCode: string;
     countryName: string;
+    clientIp: string;
+    userEmail: string;
     currentPath: string;
     lastSeenAt: string;
   }>;

@@ -83,7 +83,6 @@ async function sendMarketplacePresenceHeartbeat(payload: {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
-    keepalive: true,
     credentials: "include",
   });
 }
@@ -125,9 +124,6 @@ function sanitizeCountryCodeForPayload(cc: string): string | undefined {
 }
 
 function countryFromLocaleOrTimezone(): { countryCode: string; countryName: string } {
-  const byLocale = getBrowserCountryInfo();
-  if (isValidCountryCode(byLocale.countryCode)) return byLocale;
-
   const tz = String(Intl.DateTimeFormat().resolvedOptions().timeZone || "");
   const tzToCountry: Record<string, string> = {
     "America/Asuncion": "PY",
@@ -144,15 +140,21 @@ function countryFromLocaleOrTimezone(): { countryCode: string; countryName: stri
     "Europe/Lisbon": "PT",
   };
   const cc = tzToCountry[tz] || "";
-  if (!isValidCountryCode(cc)) return { countryCode: "", countryName: "" };
-  let name = cc;
-  try {
-    const dn = new Intl.DisplayNames(["es"], { type: "region" });
-    name = dn.of(cc) || cc;
-  } catch {
-    name = cc;
+  if (isValidCountryCode(cc)) {
+    let name = cc;
+    try {
+      const dn = new Intl.DisplayNames(["es"], { type: "region" });
+      name = dn.of(cc) || cc;
+    } catch {
+      name = cc;
+    }
+    return { countryCode: cc, countryName: name };
   }
-  return { countryCode: cc, countryName: name };
+
+  // Fallback secundario: locale del navegador (menos confiable que timezone)
+  const byLocale = getBrowserCountryInfo();
+  if (isValidCountryCode(byLocale.countryCode)) return byLocale;
+  return { countryCode: "", countryName: "" };
 }
 
 async function getCountryByPublicIp(): Promise<{ countryCode: string; countryName: string }> {
@@ -252,21 +254,42 @@ function MarketplacePresenceBeacon() {
     const visitorId = getMarketplacePresenceVisitorId();
     const currentPath = `${location.pathname}${location.search ?? ""}`.slice(0, 200);
     const viewerType = resolveMarketplaceViewerType();
+    const authUser = getStoredUser();
+    const userEmail =
+      viewerType === "anon" ? "" : String(authUser?.email || authUser?.username || "").trim().toLowerCase();
     const browserCountry = countryFromLocaleOrTimezone();
+    const locale = navigator.language || "";
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
     let cancelled = false;
     const sendBeat = async () => {
       if (cancelled) return;
-      const ipCountry = await getCountryByPublicIp().catch(() => browserCountry);
-      const clientIp = await getPublicIpAddress().catch(() => "");
+      // 1) Enviar de inmediato con timezone/locale para no depender de APIs externas.
+      await sendMarketplacePresenceHeartbeat({
+        visitorId,
+        viewerType,
+        userEmail: userEmail || undefined,
+        countryCode: sanitizeCountryCodeForPayload(browserCountry.countryCode),
+        countryName: (browserCountry.countryName || "").trim() || undefined,
+        locale,
+        timezone,
+        currentPath,
+      }).catch(() => {});
+
+      // 2) Enriquecer con IP pública/geo cuando esté disponible.
+      const [ipCountry, clientIp] = await Promise.all([
+        getCountryByPublicIp().catch(() => browserCountry),
+        getPublicIpAddress().catch(() => ""),
+      ]);
       if (cancelled) return;
       await sendMarketplacePresenceHeartbeat({
         visitorId,
         viewerType,
+        userEmail: userEmail || undefined,
         countryCode: sanitizeCountryCodeForPayload(ipCountry.countryCode || browserCountry.countryCode),
         countryName: (ipCountry.countryName || browserCountry.countryName || "").trim() || undefined,
         clientIp: clientIp.trim() || undefined,
-        locale: navigator.language || "",
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
+        locale,
+        timezone,
         currentPath,
       }).catch(() => {});
     };
