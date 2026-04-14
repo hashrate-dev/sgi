@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ASIC_MARKETPLACE_PRODUCTS,
   asicProductShowsMinerEconomyContent,
+  compareMarketplaceShelfProducts,
   mergeAsicCatalogWithCorpGridExtras,
 } from "../lib/marketplaceAsicCatalog.js";
 import type { AsicAlgo, AsicProduct } from "../lib/marketplaceAsicCatalog.js";
@@ -227,25 +228,21 @@ function MarketplacePageBody() {
     };
   }, [products, catalogFromApi]);
 
-  /** Sin filtro: alfabético. Con filtro: primero el algoritmo activo, luego el resto (oculto en grilla). */
+  /**
+   * Sin filtro: mineros de aire (Bitcoin → Zcash → L9 → otro scrypt), luego hydro/líquido, al final infra.
+   * Con filtro: primero el algoritmo activo; dentro de cada bloque, el mismo orden por familia.
+   */
   const shelfProducts = useMemo(() => {
     const list = [...products];
-    const label = (p: AsicProduct) => `${p.brand} ${p.model}`.toLowerCase();
     if (filterAlgo == null) {
-      // Siempre mostrar Bitcoin (SHA-256) arriba en el catálogo.
-      list.sort((a, b) => {
-        const ma = a.algo === "sha256" ? 0 : 1;
-        const mb = b.algo === "sha256" ? 0 : 1;
-        if (ma !== mb) return ma - mb;
-        return label(a).localeCompare(label(b), sortLoc);
-      });
+      list.sort((a, b) => compareMarketplaceShelfProducts(a, b, sortLoc));
       return list;
     }
     list.sort((a, b) => {
       const ma = a.algo === filterAlgo ? 0 : 1;
       const mb = b.algo === filterAlgo ? 0 : 1;
       if (ma !== mb) return ma - mb;
-      return label(a).localeCompare(label(b), sortLoc);
+      return compareMarketplaceShelfProducts(a, b, sortLoc);
     });
     return list;
   }, [products, filterAlgo, sortLoc]);

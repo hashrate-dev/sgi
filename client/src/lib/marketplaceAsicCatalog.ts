@@ -148,6 +148,70 @@ export function asicProductShowsMinerEconomyContent(p: AsicListingTitleFields): 
   return resolveMarketplaceListingKind(p) === "miner";
 }
 
+function textBlobForShelfSort(p: AsicProduct): string {
+  return `${p.brand} ${p.model} ${p.hashrate} ${p.detailRows.map((r) => r.text).join(" ")}`.toLowerCase();
+}
+
+/**
+ * Minero refrigeración líquida / Hydro / inmersión (no “de aire”): va después de mineros de aire.
+ */
+export function isHydroOrLiquidCooledMiner(p: AsicProduct): boolean {
+  if (!asicProductShowsMinerEconomyContent(p)) return false;
+  const t = textBlobForShelfSort(p);
+  if (/\bhydro\b/.test(t)) return true;
+  if (/inmersi[oó]n|immersion/.test(t)) return true;
+  if (/refrigeraci[oó]n\s+por\s+agua|liquid\s+cooling|enfriamiento\s+l[ií]quido/.test(t)) return true;
+  if (
+    p.detailRows.some(
+      (r) =>
+        r.icon === "droplet" &&
+        /(agua|l[ií]quid|hydro|inmers|immersion|rack\s+cooling)/i.test(r.text)
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function isZcashAirFamily(p: AsicProduct): boolean {
+  const t = textBlobForShelfSort(p);
+  if (/\bz15\b/.test(t)) return true;
+  if (/\bzcash\b/.test(t) || /\bzec\b/.test(t) || /equihash/.test(t)) return true;
+  if (/k\s*sol\/s/i.test(p.hashrate) || /\bksol\b/i.test(t)) return true;
+  return false;
+}
+
+function isAntminerL9(p: AsicProduct): boolean {
+  return /\bl9\b/i.test(`${p.brand} ${p.model}`);
+}
+
+/**
+ * Grupo para ordenar la grilla `/marketplace` (app.hashrate.space):
+ * 0 = minero de aire Bitcoin (SHA-256, sin Z15/Zcash),
+ * 1 = Zcash / Z15 / Equihash,
+ * 2 = Antminer L9,
+ * 3 = otro minero de aire,
+ * 4 = Hydro / líquido,
+ * 5 = infra (contenedores, racks, PDU…).
+ */
+export function marketplaceShelfPrimaryGroup(p: AsicProduct): number {
+  if (resolveMarketplaceListingKind(p) === "infrastructure") return 5;
+  if (!asicProductShowsMinerEconomyContent(p)) return 5;
+  if (isHydroOrLiquidCooledMiner(p)) return 4;
+  if (isZcashAirFamily(p)) return 1;
+  if (isAntminerL9(p)) return 2;
+  if (p.algo === "sha256") return 0;
+  return 3;
+}
+
+export function compareMarketplaceShelfProducts(a: AsicProduct, b: AsicProduct, sortLocale: string): number {
+  const ga = marketplaceShelfPrimaryGroup(a);
+  const gb = marketplaceShelfPrimaryGroup(b);
+  if (ga !== gb) return ga - gb;
+  const label = (p: AsicProduct) => `${p.brand} ${p.model}`.toLowerCase();
+  return label(a).localeCompare(label(b), sortLocale);
+}
+
 export type AsicProduct = {
   /** ID en BD (`equipos_asic`) o fallback estático */
   id: string;
