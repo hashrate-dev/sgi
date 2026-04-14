@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   addEmittedDocument,
   createInvoice,
@@ -146,6 +146,7 @@ function isLinkedToInvoice(comp: Invoice, factura: Invoice): boolean {
 export function FacturacionPage() {
   const { user } = useAuth();
   const location = useLocation();
+  const isHostingPath = location.pathname === "/facturacion-hosting" || location.pathname === "/facturacion-hosting/";
   const [type, setType] = useState<ComprobanteType>("Factura");
   const [clientQuery, setClientQuery] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
@@ -184,44 +185,48 @@ export function FacturacionPage() {
     setEmittedInSession((prev) => prev.filter((item) => now - new Date(item.emittedAt).getTime() < windowMs));
   }, []);
 
-  /** Cargar documentos desde la base de datos (source=hosting) para usarlos en selects de Nota de Crédito / Recibo */
+  /** Cargar facturas desde base (source=hosting) para selects de NC/Recibo en Hosting. */
+  const fetchDbInvoices = useCallback(async () => {
+    try {
+      await wakeUpBackend();
+      const r = await getInvoices({ source: "hosting" });
+      const list: Invoice[] = (r.invoices ?? []).map((inv) => ({
+        id: String(inv.id),
+        number: inv.number,
+        type: inv.type as ComprobanteType,
+        clientName: inv.clientName,
+        date: inv.date,
+        month: inv.month,
+        subtotal: inv.subtotal,
+        discounts: inv.discounts,
+        total: inv.total,
+        relatedInvoiceId: inv.relatedInvoiceId != null ? String(inv.relatedInvoiceId) : undefined,
+        relatedInvoiceNumber: inv.relatedInvoiceNumber,
+        paymentDate: inv.paymentDate,
+        emissionTime: inv.emissionTime,
+        dueDate: inv.dueDate,
+        items: [],
+      }));
+      setDbInvoices(list);
+    } catch {
+      setDbInvoices([]);
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
-    const fetchDbInvoices = async () => {
-      try {
-        await wakeUpBackend();
-        if (cancelled) return;
-        const r = await getInvoices({ source: "hosting" });
-        if (cancelled) return;
-        const list: Invoice[] = (r.invoices ?? []).map((inv) => ({
-          id: String(inv.id),
-          number: inv.number,
-          type: inv.type as ComprobanteType,
-          clientName: inv.clientName,
-          date: inv.date,
-          month: inv.month,
-          subtotal: inv.subtotal,
-          discounts: inv.discounts,
-          total: inv.total,
-          relatedInvoiceId: inv.relatedInvoiceId != null ? String(inv.relatedInvoiceId) : undefined,
-          relatedInvoiceNumber: inv.relatedInvoiceNumber,
-          paymentDate: inv.paymentDate,
-          emissionTime: inv.emissionTime,
-          dueDate: inv.dueDate,
-          items: [],
-        }));
-        setDbInvoices(list);
-      } catch {
-        setDbInvoices([]);
-      }
-    };
-    fetchDbInvoices();
+    void (async () => {
+      await fetchDbInvoices();
+      if (cancelled) return;
+    })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [fetchDbInvoices]);
 
-  /** Conjunto combinado de facturas/recibos/NC: locales (historial del navegador) + base de datos (hosting). Dedupe por tipo+número. */
+  /** Conjunto combinado de facturas/recibos/NC.
+   * En Hosting priorizamos solo BD para evitar "fantasmas" borrados manualmente en DB.
+   */
   const invoicesAll = useMemo<Invoice[]>(() => {
     const map = new Map<string, Invoice>();
     const addAll = (src: Invoice[]) => {
@@ -238,10 +243,10 @@ export function FacturacionPage() {
         if (!prevIsDb && invIsDb) map.set(key, inv);
       }
     };
-    addAll(invoices);
+    if (!isHostingPath) addAll(invoices);
     addAll(dbInvoices);
     return Array.from(map.values());
-  }, [invoices, dbInvoices]);
+  }, [invoices, dbInvoices, isHostingPath]);
 
   /** Cargar documentos emitidos (hosting) desde el servidor; al borrar del historial se borran también de aquí. */
   function fetchEmittedHosting() {
@@ -258,17 +263,20 @@ export function FacturacionPage() {
   }
 
   useEffect(() => {
-    if (location.pathname !== "/facturacion-hosting") return;
+    if (!isHostingPath) return;
     fetchEmittedHosting();
-  }, [location.pathname]);
+  }, [location.pathname, isHostingPath]);
 
   /** Refrescar lista al volver a esta pestaña (p. ej. después de borrar en Historial) */
   useEffect(() => {
-    if (location.pathname !== "/facturacion-hosting") return;
-    const onFocus = () => fetchEmittedHosting();
+    if (!isHostingPath) return;
+    const onFocus = () => {
+      fetchEmittedHosting();
+      void fetchDbInvoices();
+    };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [location.pathname]);
+  }, [location.pathname, isHostingPath, fetchDbInvoices]);
 
   /** Refrescar Documentos Emitidos cuando se elimina en Historial (hosting) */
   useEffect(() => {
@@ -298,8 +306,8 @@ export function FacturacionPage() {
   }, [type]);
 
   const number = useMemo(
-    () => (nextNumFromApi !== null && nextNumFromApi !== "" ? nextNumFromApi : nextNumber(type, invoices)),
-    [type, invoices, nextNumFromApi]
+    () => (nextNumFromApi !== null && nextNumFromApi !== "" ? nextNumFromApi : nextNumber(type, isHostingPath ? dbInvoices : invoices)),
+    [type, invoices, dbInvoices, isHostingPath, nextNumFromApi]
   );
   const totals = useMemo(() => calcTotals(items), [items]);
 
@@ -711,10 +719,15 @@ export function FacturacionPage() {
       relatedInvoiceId: relatedInvoice?.id,
       relatedInvoiceNumber: relatedInvoice?.number
     };
-    const hist = loadInvoices();
-    hist.push(inv);
-    saveInvoices(hist);
-    setInvoices(loadInvoices());
+    if (!isHostingPath) {
+      const hist = loadInvoices();
+      hist.push(inv);
+      saveInvoices(hist);
+      setInvoices(loadInvoices());
+    } else {
+      // Hosting: fuente única en BD. Evita que aparezcan facturas borradas manualmente por cache local.
+      void fetchDbInvoices();
+    }
     const now = Date.now();
     const MS_22H_EMIT = 22 * 60 * 60 * 1000;
     const MS_TABLE_WINDOW_EMIT = 10 * 24 * 60 * 60 * 1000 + MS_22H_EMIT;
