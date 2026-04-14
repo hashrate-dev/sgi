@@ -215,6 +215,9 @@ CREATE INDEX IF NOT EXISTS idx_mq_quote_created ON marketplace_quote_tickets(cre
 CREATE TABLE IF NOT EXISTS marketplace_presence (
   visitor_id TEXT PRIMARY KEY,
   viewer_type TEXT NOT NULL DEFAULT 'anon' CHECK (viewer_type IN ('anon', 'cliente', 'staff')),
+  country_code TEXT,
+  country_name TEXT,
+  client_ip TEXT,
   current_path TEXT,
   last_seen_at TEXT NOT NULL
 );
@@ -377,6 +380,15 @@ CREATE INDEX IF NOT EXISTS idx_equipos_asic_audit_created ON equipos_asic_audit(
   for (const colDef of ["user_id INTEGER", "contact_email TEXT"]) {
     try {
       native.exec(`ALTER TABLE marketplace_quote_tickets ADD COLUMN ${colDef}`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!msg.includes("duplicate column")) throw e;
+    }
+  }
+
+  for (const colDef of ["country_code TEXT", "country_name TEXT", "client_ip TEXT"]) {
+    try {
+      native.exec(`ALTER TABLE marketplace_presence ADD COLUMN ${colDef}`);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       if (!msg.includes("duplicate column")) throw e;

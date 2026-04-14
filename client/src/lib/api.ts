@@ -1150,6 +1150,8 @@ export type MarketplacePresenceViewerType = "anon" | "cliente" | "staff";
 export function postMarketplacePresenceHeartbeat(payload: {
   visitorId: string;
   viewerType?: MarketplacePresenceViewerType;
+  countryCode?: string;
+  countryName?: string;
   currentPath?: string;
 }): Promise<{ ok?: boolean }> {
   return api("/api/marketplace/presence/heartbeat", {
@@ -1165,6 +1167,28 @@ export function getMarketplacePresenceStats(): Promise<{
   asOf: string;
 }> {
   return api("/api/marketplace/presence-stats");
+}
+
+export function getMarketplacePresenceLive(): Promise<{
+  rows: Array<{
+    visitorId: string;
+    viewerType: string;
+    countryCode: string;
+    countryName: string;
+    currentPath: string;
+    lastSeenAt: string;
+  }>;
+  countries: Array<{
+    countryCode: string;
+    countryName: string;
+    count: number;
+    loggedCount: number;
+    anonCount: number;
+  }>;
+  windowSeconds: number;
+  asOf: string;
+}> {
+  return api("/api/marketplace/presence-live");
 }
 
 export function getMarketplaceQuoteTickets(params?: {

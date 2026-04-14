@@ -42,7 +42,6 @@ export function HomePage() {
   const [marketplaceOnlineTotal, setMarketplaceOnlineTotal] = useState(0);
   const [marketplaceOnlineLogged, setMarketplaceOnlineLogged] = useState(0);
   const [marketplaceOnlineAnon, setMarketplaceOnlineAnon] = useState(0);
-  const [marketplacePresenceUpdatedAt, setMarketplacePresenceUpdatedAt] = useState("");
   const prevOpenCountRef = useRef(0);
   const roleNorm = (r: string | undefined) => (r ?? "").toLowerCase().trim();
 const visibleMenuItems = menuItems.filter(
@@ -120,19 +119,11 @@ const visibleMenuItems = menuItems.filter(
         setMarketplaceOnlineTotal(total);
         setMarketplaceOnlineLogged(logged);
         setMarketplaceOnlineAnon(Number(by.anon ?? 0) || 0);
-        setMarketplacePresenceUpdatedAt(
-          new Date(presence.asOf || Date.now()).toLocaleTimeString("es-AR", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          })
-        );
       } catch {
         if (!cancelled) {
           setMarketplaceOnlineTotal(0);
           setMarketplaceOnlineLogged(0);
           setMarketplaceOnlineAnon(0);
-          setMarketplacePresenceUpdatedAt("");
         }
       }
     };
@@ -250,7 +241,7 @@ const visibleMenuItems = menuItems.filter(
             </Link>
           ) : null}
           {canSeeMarketplaceOrdersCard ? (
-            <div className="hrs-home-card hrs-home-card--marketplace-presence" role="status" aria-live="polite">
+            <Link to="/marketplace-presencia" className="hrs-home-card hrs-home-card--marketplace-presence" role="status" aria-live="polite">
               <div className="hrs-home-card-icon hrs-home-card-icon--marketplace-presence">
                 <i className="bi bi-broadcast-pin" aria-hidden />
                 <span className="hrs-home-marketplace-presence-dot" aria-hidden />
@@ -262,10 +253,7 @@ const visibleMenuItems = menuItems.filter(
               <p className="hrs-home-card-desc">
                 logueados: {marketplaceOnlineLogged} · sin cuenta: {marketplaceOnlineAnon}
               </p>
-              <p className="hrs-home-marketplace-presence-updated">
-                {marketplacePresenceUpdatedAt ? `actualizado: ${marketplacePresenceUpdatedAt}` : "actualizando..."}
-              </p>
-            </div>
+            </Link>
           ) : null}
           {user ? (
             <Link to="/configuracion" className="hrs-home-card hrs-home-card-admin">

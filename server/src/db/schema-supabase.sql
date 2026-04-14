@@ -227,10 +227,16 @@ CREATE INDEX IF NOT EXISTS idx_mq_quote_created ON marketplace_quote_tickets(cre
 CREATE TABLE IF NOT EXISTS marketplace_presence (
   visitor_id TEXT PRIMARY KEY,
   viewer_type TEXT NOT NULL DEFAULT 'anon' CHECK (viewer_type IN ('anon', 'cliente', 'staff')),
+  country_code TEXT,
+  country_name TEXT,
+  client_ip TEXT,
   current_path TEXT,
   last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_marketplace_presence_seen ON marketplace_presence(last_seen_at DESC);
+ALTER TABLE marketplace_presence ADD COLUMN IF NOT EXISTS country_code TEXT;
+ALTER TABLE marketplace_presence ADD COLUMN IF NOT EXISTS country_name TEXT;
+ALTER TABLE marketplace_presence ADD COLUMN IF NOT EXISTS client_ip TEXT;
 
 INSERT INTO marketplace_products (name, description, category, price_usd, image_url, stock, sort_order)
 SELECT * FROM (

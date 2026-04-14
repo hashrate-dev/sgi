@@ -208,6 +208,9 @@ CREATE INDEX IF NOT EXISTS idx_gar_ande_precio_hist_item ON items_garantia_ande_
 CREATE TABLE IF NOT EXISTS marketplace_presence (
   visitor_id TEXT PRIMARY KEY,
   viewer_type TEXT NOT NULL DEFAULT 'anon' CHECK (viewer_type IN ('anon', 'cliente', 'staff')),
+  country_code TEXT,
+  country_name TEXT,
+  client_ip TEXT,
   current_path TEXT,
   last_seen_at TEXT NOT NULL
 );

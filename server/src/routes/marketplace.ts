@@ -18,10 +18,17 @@ export const marketplaceRouter = Router();
 const canManage = requireRole("admin_a", "admin_b", "operador");
 const adminAB = requireRole("admin_a", "admin_b");
 const MARKETPLACE_PRESENCE_ONLINE_WINDOW_MS = 90_000;
+const IP_COUNTRY_CACHE_TTL_MS = 60 * 60 * 1000;
+const ipCountryCache = new Map<string, { countryCode: string; countryName: string; expiresAt: number }>();
 
 const MarketplacePresenceHeartbeatSchema = z.object({
   visitorId: z.string().min(8).max(120).trim(),
   viewerType: z.enum(["anon", "cliente", "staff"]).optional(),
+  countryCode: z.string().trim().min(2).max(2).optional(),
+  countryName: z.string().trim().max(80).optional(),
+  clientIp: z.string().trim().max(80).optional(),
+  locale: z.string().trim().max(20).optional(),
+  timezone: z.string().trim().max(60).optional(),
   currentPath: z.string().max(200).trim().optional(),
 });
 
@@ -75,6 +82,185 @@ function visitorFingerprintFromRequest(req: Request): string {
   return `fp-${hashFast(raw || "unknown")}`;
 }
 
+function extractClientIp(req: Request): string {
+  const fwd = String(req.headers["x-forwarded-for"] ?? "");
+  const first = (fwd.split(",")[0] || req.ip || "").trim();
+  if (!first) return "";
+  return first.startsWith("::ffff:") ? first.slice(7) : first;
+}
+
+function isPrivateIpv4(ip: string): boolean {
+  const m = ip.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!m) return false;
+  const a = Number(m[1]);
+  const b = Number(m[2]);
+  if (a === 10) return true;
+  if (a === 127) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true;
+  if (a === 0) return true;
+  return false;
+}
+
+function isPrivateIpv6(ip: string): boolean {
+  const l = ip.toLowerCase();
+  if (l === "::1") return true;
+  if (l.startsWith("fc") || l.startsWith("fd")) return true;
+  if (l.startsWith("fe80:")) return true;
+  return false;
+}
+
+function isPublicIp(ip: string): boolean {
+  if (!ip) return false;
+  if (ip.includes(".")) return !isPrivateIpv4(ip);
+  if (ip.includes(":")) return !isPrivateIpv6(ip);
+  return false;
+}
+
+function selectBestPresenceIp(req: Request, clientIpRaw?: string): string {
+  const clientIp = String(clientIpRaw || "").trim();
+  if (isPublicIp(clientIp)) return clientIp;
+  const reqIp = extractClientIp(req);
+  if (isPublicIp(reqIp)) return reqIp;
+  return "";
+}
+
+function normalizeCountryCode(raw: unknown): string {
+  const cc = String(raw ?? "").trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(cc)) return "";
+  return cc;
+}
+
+function shouldUseClientCountryFallback(countryCode: string): boolean {
+  const cc = normalizeCountryCode(countryCode);
+  return cc === "" || cc === "UN" || cc === "LO";
+}
+
+function isUsableCountryCode(countryCode: string): boolean {
+  const cc = normalizeCountryCode(countryCode);
+  return cc !== "" && cc !== "UN" && cc !== "LO";
+}
+
+function isUnknownCountryName(name: string): boolean {
+  const n = String(name || "").trim().toLowerCase();
+  return n === "" || n === "desconocido" || n === "unknown";
+}
+
+function countryNameFromCode(cc: string): string {
+  const code = normalizeCountryCode(cc);
+  if (!code) return "";
+  try {
+    // Node 18+ soporta Intl.DisplayNames
+    const dn = new Intl.DisplayNames(["es"], { type: "region" });
+    return dn.of(code) || code;
+  } catch {
+    return code;
+  }
+}
+
+function countryCodeFromLocale(localeRaw: string): string {
+  const m = String(localeRaw || "").match(/[-_]([A-Za-z]{2})$/);
+  return normalizeCountryCode(m?.[1] ?? "");
+}
+
+function countryCodeFromTimezone(tzRaw: string): string {
+  const tz = String(tzRaw || "").trim();
+  const map: Record<string, string> = {
+    "America/Asuncion": "PY",
+    "America/Montevideo": "UY",
+    "America/Argentina/Buenos_Aires": "AR",
+    "America/Sao_Paulo": "BR",
+    "America/Santiago": "CL",
+    "America/Lima": "PE",
+    "America/Bogota": "CO",
+    "America/La_Paz": "BO",
+    "America/Mexico_City": "MX",
+    "America/New_York": "US",
+    "Europe/Madrid": "ES",
+    "Europe/Lisbon": "PT",
+  };
+  return normalizeCountryCode(map[tz] || "");
+}
+
+function detectCountryFromHeaders(req: Request): { countryCode: string; countryName: string } {
+  const countryCode =
+    normalizeCountryCode(req.headers["x-vercel-ip-country"]) ||
+    normalizeCountryCode(req.headers["cf-ipcountry"]) ||
+    normalizeCountryCode(req.headers["cloudfront-viewer-country"]) ||
+    normalizeCountryCode(req.headers["x-country-code"]);
+  return {
+    countryCode,
+    countryName: countryCode || "Desconocido",
+  };
+}
+
+async function resolveCountryFromIp(req: Request): Promise<{ countryCode: string; countryName: string }> {
+  const byHeader = detectCountryFromHeaders(req);
+  if (byHeader.countryCode) return byHeader;
+
+  const ip = extractClientIp(req);
+  if (!ip || !isPublicIp(ip)) {
+    return { countryCode: "LO", countryName: "Red local" };
+  }
+
+  const now = Date.now();
+  const cached = ipCountryCache.get(ip);
+  if (cached && cached.expiresAt > now) {
+    return { countryCode: cached.countryCode, countryName: cached.countryName };
+  }
+
+  try {
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort(), 1800);
+    const res = await fetch(`https://ipwho.is/${encodeURIComponent(ip)}?fields=success,country,country_code`, {
+      signal: ac.signal,
+    });
+    clearTimeout(t);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = (await res.json()) as { success?: boolean; country?: string; country_code?: string };
+    const cc = normalizeCountryCode(data?.country_code);
+    const countryName = String(data?.country || cc || "Desconocido").slice(0, 80);
+    const out = { countryCode: cc || "UN", countryName };
+    ipCountryCache.set(ip, { ...out, expiresAt: now + IP_COUNTRY_CACHE_TTL_MS });
+    return out;
+  } catch {
+    const out = { countryCode: "UN", countryName: "Desconocido" };
+    ipCountryCache.set(ip, { ...out, expiresAt: now + 5 * 60 * 1000 });
+    return out;
+  }
+}
+
+async function resolveCountryFromIpValue(ipRaw: string): Promise<{ countryCode: string; countryName: string }> {
+  const ip = String(ipRaw || "").trim();
+  if (!ip || !isPublicIp(ip)) return { countryCode: "UN", countryName: "Desconocido" };
+
+  const now = Date.now();
+  const cached = ipCountryCache.get(ip);
+  if (cached && cached.expiresAt > now) {
+    return { countryCode: cached.countryCode, countryName: cached.countryName };
+  }
+
+  try {
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort(), 1800);
+    const res = await fetch(`https://ipwho.is/${encodeURIComponent(ip)}?fields=success,country,country_code`, {
+      signal: ac.signal,
+    });
+    clearTimeout(t);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = (await res.json()) as { success?: boolean; country?: string; country_code?: string };
+    const cc = normalizeCountryCode(data?.country_code);
+    const countryName = String(data?.country || cc || "Desconocido").slice(0, 80);
+    const out = { countryCode: cc || "UN", countryName };
+    ipCountryCache.set(ip, { ...out, expiresAt: now + IP_COUNTRY_CACHE_TTL_MS });
+    return out;
+  } catch {
+    return { countryCode: "UN", countryName: "Desconocido" };
+  }
+}
+
 async function touchMarketplacePresence(req: Request, fallbackPath: string): Promise<void> {
   const nowIso = new Date().toISOString();
   const cutoffIso = new Date(Date.now() - MARKETPLACE_PRESENCE_ONLINE_WINDOW_MS * 4).toISOString();
@@ -82,15 +268,26 @@ async function touchMarketplacePresence(req: Request, fallbackPath: string): Pro
   const hasAuth = typeof req.headers.authorization === "string" && req.headers.authorization.trim().length > 0;
   const viewerType = hasAuth ? "staff" : "anon";
   const visitorId = visitorFingerprintFromRequest(req);
+  const clientIp = selectBestPresenceIp(req);
+  const ipCountry = await resolveCountryFromIp(req);
+  const langHeader = String(req.headers["accept-language"] ?? "");
+  const ccFromLang = countryCodeFromLocale(langHeader.split(",")[0] ?? "");
+  const fallbackCode = ccFromLang || "PY";
+  const countryCode = shouldUseClientCountryFallback(ipCountry.countryCode) ? fallbackCode : ipCountry.countryCode;
+  const countryName = shouldUseClientCountryFallback(ipCountry.countryCode)
+    ? countryNameFromCode(fallbackCode)
+    : ipCountry.countryName;
   const upsertSql =
-    `INSERT INTO marketplace_presence (visitor_id, viewer_type, current_path, last_seen_at)
-     VALUES (?, ?, ?, ?)
+    `INSERT INTO marketplace_presence (visitor_id, viewer_type, country_code, country_name, client_ip, current_path, last_seen_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(visitor_id)
-     DO UPDATE SET viewer_type = excluded.viewer_type, current_path = excluded.current_path, last_seen_at = excluded.last_seen_at`;
+     DO UPDATE SET viewer_type = excluded.viewer_type, country_code = excluded.country_code, country_name = excluded.country_name, client_ip = excluded.client_ip, current_path = excluded.current_path, last_seen_at = excluded.last_seen_at`;
   if (isPg()) {
-    await db.prepare(`${upsertSql} RETURNING visitor_id as id`).get(visitorId, viewerType, currentPath, nowIso);
+    await db
+      .prepare(`${upsertSql} RETURNING visitor_id as id`)
+      .get(visitorId, viewerType, countryCode, countryName, clientIp, currentPath, nowIso);
   } else {
-    await db.prepare(upsertSql).run(visitorId, viewerType, currentPath, nowIso);
+    await db.prepare(upsertSql).run(visitorId, viewerType, countryCode, countryName, clientIp, currentPath, nowIso);
   }
   await db.prepare("DELETE FROM marketplace_presence WHERE last_seen_at < ?").run(cutoffIso);
 }
@@ -126,15 +323,41 @@ marketplaceRouter.post("/marketplace/presence/heartbeat", async (req: Request, r
     const cutoffIso = new Date(Date.now() - MARKETPLACE_PRESENCE_ONLINE_WINDOW_MS * 4).toISOString();
     const currentPath = (parsed.data.currentPath || "/marketplace").slice(0, 200);
     const viewerType = parsed.data.viewerType ?? "anon";
+    const clientIp = selectBestPresenceIp(req, parsed.data.clientIp);
+    const ipCountry = await resolveCountryFromIp(req);
+    const clientIpCountry =
+      shouldUseClientCountryFallback(ipCountry.countryCode) && clientIp
+        ? await resolveCountryFromIpValue(clientIp)
+        : { countryCode: "", countryName: "" };
+    const clientCountryCode = normalizeCountryCode(parsed.data.countryCode);
+    const clientCountryName = String(parsed.data.countryName || "").trim().slice(0, 80);
+    const localeCode = countryCodeFromLocale(parsed.data.locale || "");
+    const timezoneCode = countryCodeFromTimezone(parsed.data.timezone || "");
+    const hintCode =
+      (isUsableCountryCode(clientIpCountry.countryCode) ? normalizeCountryCode(clientIpCountry.countryCode) : "") ||
+      (isUsableCountryCode(clientCountryCode) ? clientCountryCode : "") ||
+      (isUsableCountryCode(localeCode) ? localeCode : "") ||
+      (isUsableCountryCode(timezoneCode) ? timezoneCode : "") ||
+      "PY";
+    const countryCode = shouldUseClientCountryFallback(ipCountry.countryCode) ? hintCode : ipCountry.countryCode;
+    const countryName =
+      shouldUseClientCountryFallback(ipCountry.countryCode)
+        ? (!isUnknownCountryName(clientIpCountry.countryName) ? clientIpCountry.countryName : "") ||
+          (!isUnknownCountryName(clientCountryName) ? clientCountryName : "") ||
+          countryNameFromCode(hintCode) ||
+          hintCode
+        : ipCountry.countryName.slice(0, 80);
     const upsertSql =
-      `INSERT INTO marketplace_presence (visitor_id, viewer_type, current_path, last_seen_at)
-       VALUES (?, ?, ?, ?)
+      `INSERT INTO marketplace_presence (visitor_id, viewer_type, country_code, country_name, client_ip, current_path, last_seen_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(visitor_id)
-       DO UPDATE SET viewer_type = excluded.viewer_type, current_path = excluded.current_path, last_seen_at = excluded.last_seen_at`;
+       DO UPDATE SET viewer_type = excluded.viewer_type, country_code = excluded.country_code, country_name = excluded.country_name, client_ip = excluded.client_ip, current_path = excluded.current_path, last_seen_at = excluded.last_seen_at`;
     if (isPg()) {
-      await db.prepare(`${upsertSql} RETURNING visitor_id as id`).get(parsed.data.visitorId, viewerType, currentPath, nowIso);
+      await db
+        .prepare(`${upsertSql} RETURNING visitor_id as id`)
+        .get(parsed.data.visitorId, viewerType, countryCode, countryName, clientIp, currentPath, nowIso);
     } else {
-      await db.prepare(upsertSql).run(parsed.data.visitorId, viewerType, currentPath, nowIso);
+      await db.prepare(upsertSql).run(parsed.data.visitorId, viewerType, countryCode, countryName, clientIp, currentPath, nowIso);
     }
     await db.prepare("DELETE FROM marketplace_presence WHERE last_seen_at < ?").run(cutoffIso);
     res.status(204).send();
@@ -162,6 +385,88 @@ marketplaceRouter.get("/marketplace/presence-stats", requireAuth, adminAB, async
     res.json({
       onlineTotal,
       byViewerType,
+      windowSeconds: Math.floor(MARKETPLACE_PRESENCE_ONLINE_WINDOW_MS / 1000),
+      asOf: new Date().toISOString(),
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: { message: msg } });
+  }
+});
+
+/** Vista interna detallada: sesiones activas del marketplace en tiempo real. */
+marketplaceRouter.get("/marketplace/presence-live", requireAuth, adminAB, async (req: Request, res: Response) => {
+  try {
+    const cutoffIso = new Date(Date.now() - MARKETPLACE_PRESENCE_ONLINE_WINDOW_MS).toISOString();
+    const rows = (await db
+      .prepare(
+        "SELECT visitor_id, viewer_type, country_code, country_name, client_ip, current_path, last_seen_at FROM marketplace_presence WHERE last_seen_at >= ? ORDER BY last_seen_at DESC LIMIT 120"
+      )
+      .all(cutoffIso)) as Array<{
+      visitor_id: string;
+      viewer_type: string;
+      country_code: string | null;
+      country_name: string | null;
+      client_ip: string | null;
+      current_path: string | null;
+      last_seen_at: string;
+    }>;
+    const reqLocaleCode = countryCodeFromLocale(String(req.headers["accept-language"] || "").split(",")[0] || "");
+    const liveFallbackCode = reqLocaleCode || "PY";
+    const hydratedRows = await Promise.all(
+      rows.map(async (r) => {
+        const cc = normalizeCountryCode(r.country_code);
+        const cn = String(r.country_name || "").trim();
+        if (isUsableCountryCode(cc) && !isUnknownCountryName(cn)) return r;
+        const fromIp = await resolveCountryFromIpValue(String(r.client_ip || ""));
+        if (isUsableCountryCode(fromIp.countryCode)) {
+          return {
+            ...r,
+            country_code: fromIp.countryCode,
+            country_name: fromIp.countryName,
+          };
+        }
+        return {
+          ...r,
+          country_code: liveFallbackCode,
+          country_name: countryNameFromCode(liveFallbackCode) || liveFallbackCode,
+        };
+      })
+    );
+    const countries: Record<
+      string,
+      { countryCode: string; countryName: string; count: number; loggedCount: number; anonCount: number }
+    > = {};
+    for (const r of hydratedRows) {
+      const cc = normalizeCountryCode(r.country_code) || "UN";
+      const nm = String(r.country_name || cc || "Desconocido");
+      const vt = String(r.viewer_type || "").toLowerCase().trim();
+      const isLogged = vt === "cliente" || vt === "staff";
+      const prev = countries[cc];
+      if (prev) {
+        prev.count += 1;
+        if (isLogged) prev.loggedCount += 1;
+        else prev.anonCount += 1;
+      } else {
+        countries[cc] = {
+          countryCode: cc,
+          countryName: nm,
+          count: 1,
+          loggedCount: isLogged ? 1 : 0,
+          anonCount: isLogged ? 0 : 1,
+        };
+      }
+    }
+    res.json({
+      rows: hydratedRows.map((r) => ({
+        visitorId: r.visitor_id,
+        viewerType: r.viewer_type,
+        countryCode: normalizeCountryCode(r.country_code) || "UN",
+        countryName: String(r.country_name || normalizeCountryCode(r.country_code) || "Desconocido"),
+        currentPath: r.current_path ?? "/marketplace",
+        lastSeenAt: r.last_seen_at,
+      })),
+      countries: Object.values(countries).sort((a, b) => b.count - a.count),
       windowSeconds: Math.floor(MARKETPLACE_PRESENCE_ONLINE_WINDOW_MS / 1000),
       asOf: new Date().toISOString(),
     });

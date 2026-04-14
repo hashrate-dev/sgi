@@ -256,7 +256,6 @@
 .hrs-home-card--marketplace-presence {
   border: 1px solid rgba(16, 185, 129, 0.28);
   background: linear-gradient(180deg, #ffffff 0%, #ecfdf5 55%);
-  cursor: default;
 }
 
 .hrs-home-card-icon--marketplace-presence {

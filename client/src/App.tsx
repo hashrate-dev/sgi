@@ -38,6 +38,7 @@ import { MarketplaceFaqPage } from "./pages/MarketplaceFaqPage";
 import { MarketplaceContactPage } from "./pages/MarketplaceContactPage";
 import { MarketplaceClienteLoginPage } from "./pages/MarketplaceClienteLoginPage";
 import { MarketplaceClienteRegistroPage } from "./pages/MarketplaceClienteRegistroPage";
+import { MarketplacePresencePage } from "./pages/MarketplacePresencePage";
 import { CuentaClientePage } from "./pages/CuentaClientePage";
 import { CuentaClienteDetallePage } from "./pages/CuentaClienteDetallePage";
 import { ToastContainer } from "./components/ToastNotification";
@@ -47,6 +48,7 @@ import { getStoredUser } from "./lib/auth";
 import type { MarketplacePresenceViewerType } from "./lib/api";
 
 const MARKETPLACE_PRESENCE_VISITOR_KEY = "hrs_marketplace_presence_visitor_id";
+const MARKETPLACE_PRESENCE_COUNTRY_CACHE_KEY = "hrs_marketplace_presence_country_v1";
 
 function getMarketplacePresenceVisitorId(): string {
   const fallback = `mp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -70,6 +72,11 @@ function resolveMarketplaceViewerType(): MarketplacePresenceViewerType {
 async function sendMarketplacePresenceHeartbeat(payload: {
   visitorId: string;
   viewerType: MarketplacePresenceViewerType;
+  countryCode?: string;
+  countryName?: string;
+  clientIp?: string;
+  locale?: string;
+  timezone?: string;
   currentPath: string;
 }): Promise<void> {
   await fetch("/api/marketplace/presence/heartbeat", {
@@ -81,6 +88,163 @@ async function sendMarketplacePresenceHeartbeat(payload: {
   });
 }
 
+function getBrowserCountryInfo(): { countryCode: string; countryName: string } {
+  try {
+    const locale =
+      (navigator.languages && navigator.languages[0]) ||
+      navigator.language ||
+      "";
+    const m = locale.match(/[-_]([A-Za-z]{2})$/);
+    const cc = (m?.[1] || "").toUpperCase();
+    if (!/^[A-Z]{2}$/.test(cc)) return { countryCode: "", countryName: "" };
+    let countryName = cc;
+    try {
+      const dn = new Intl.DisplayNames(["es"], { type: "region" });
+      countryName = dn.of(cc) || cc;
+    } catch {
+      countryName = cc;
+    }
+    return { countryCode: cc, countryName };
+  } catch {
+    return { countryCode: "", countryName: "" };
+  }
+}
+
+let countryByIpPromise: Promise<{ countryCode: string; countryName: string }> | null = null;
+let publicIpPromise: Promise<string> | null = null;
+
+function isValidCountryCode(cc: string): boolean {
+  return /^[A-Z]{2}$/.test(String(cc || "").trim().toUpperCase());
+}
+
+function sanitizeCountryCodeForPayload(cc: string): string | undefined {
+  const code = String(cc || "").trim().toUpperCase();
+  if (!isValidCountryCode(code)) return undefined;
+  if (code === "UN" || code === "LO") return undefined;
+  return code;
+}
+
+function countryFromLocaleOrTimezone(): { countryCode: string; countryName: string } {
+  const byLocale = getBrowserCountryInfo();
+  if (isValidCountryCode(byLocale.countryCode)) return byLocale;
+
+  const tz = String(Intl.DateTimeFormat().resolvedOptions().timeZone || "");
+  const tzToCountry: Record<string, string> = {
+    "America/Asuncion": "PY",
+    "America/Montevideo": "UY",
+    "America/Argentina/Buenos_Aires": "AR",
+    "America/Sao_Paulo": "BR",
+    "America/Santiago": "CL",
+    "America/Lima": "PE",
+    "America/Bogota": "CO",
+    "America/La_Paz": "BO",
+    "America/Mexico_City": "MX",
+    "America/New_York": "US",
+    "Europe/Madrid": "ES",
+    "Europe/Lisbon": "PT",
+  };
+  const cc = tzToCountry[tz] || "";
+  if (!isValidCountryCode(cc)) return { countryCode: "", countryName: "" };
+  let name = cc;
+  try {
+    const dn = new Intl.DisplayNames(["es"], { type: "region" });
+    name = dn.of(cc) || cc;
+  } catch {
+    name = cc;
+  }
+  return { countryCode: cc, countryName: name };
+}
+
+async function getCountryByPublicIp(): Promise<{ countryCode: string; countryName: string }> {
+  if (countryByIpPromise) return countryByIpPromise;
+  countryByIpPromise = (async () => {
+    try {
+      const cachedRaw = localStorage.getItem(MARKETPLACE_PRESENCE_COUNTRY_CACHE_KEY);
+      if (cachedRaw) {
+        const cached = JSON.parse(cachedRaw) as { countryCode?: string; countryName?: string; exp?: number };
+        if (
+          typeof cached.exp === "number" &&
+          cached.exp > Date.now() &&
+          isValidCountryCode(String(cached.countryCode || "")) &&
+          String(cached.countryName || "").trim()
+        ) {
+          return {
+            countryCode: String(cached.countryCode).toUpperCase(),
+            countryName: String(cached.countryName).trim(),
+          };
+        }
+      }
+    } catch {
+      /* ignore cache read */
+    }
+
+    const fallback = countryFromLocaleOrTimezone();
+    const controller = new AbortController();
+    const t = window.setTimeout(() => controller.abort(), 5000);
+    try {
+      const r = await fetch("https://ipwho.is/?fields=success,country,country_code", { signal: controller.signal });
+      const data = (await r.json()) as { success?: boolean; country?: string; country_code?: string };
+      const cc = String(data?.country_code ?? "").trim().toUpperCase();
+      const countryCode = isValidCountryCode(cc) ? cc : fallback.countryCode;
+      const countryName = String(data?.country ?? "").trim() || fallback.countryName || countryCode || "";
+      const out = { countryCode, countryName };
+      if (isValidCountryCode(countryCode) && countryName.trim()) {
+        try {
+          localStorage.setItem(
+            MARKETPLACE_PRESENCE_COUNTRY_CACHE_KEY,
+            JSON.stringify({ countryCode, countryName, exp: Date.now() + 24 * 60 * 60 * 1000 })
+          );
+        } catch {
+          /* ignore cache write */
+        }
+      }
+      return out;
+    } catch {
+      try {
+        const r2 = await fetch("https://ipapi.co/json/", { signal: controller.signal });
+        const d2 = (await r2.json()) as { country_code?: string; country_name?: string };
+        const cc2 = String(d2?.country_code ?? "").trim().toUpperCase();
+        const countryCode = isValidCountryCode(cc2) ? cc2 : fallback.countryCode;
+        const countryName = String(d2?.country_name ?? "").trim() || fallback.countryName || countryCode || "";
+        const out = { countryCode, countryName };
+        if (isValidCountryCode(countryCode) && countryName.trim()) {
+          try {
+            localStorage.setItem(
+              MARKETPLACE_PRESENCE_COUNTRY_CACHE_KEY,
+              JSON.stringify({ countryCode, countryName, exp: Date.now() + 24 * 60 * 60 * 1000 })
+            );
+          } catch {
+            /* ignore cache write */
+          }
+        }
+        return out;
+      } catch {
+        return fallback;
+      }
+    } finally {
+      window.clearTimeout(t);
+    }
+  })();
+  return countryByIpPromise;
+}
+
+async function getPublicIpAddress(): Promise<string> {
+  if (publicIpPromise) return publicIpPromise;
+  publicIpPromise = (async () => {
+    try {
+      const ac = new AbortController();
+      const t = window.setTimeout(() => ac.abort(), 3000);
+      const r = await fetch("https://api.ipify.org?format=json", { signal: ac.signal });
+      window.clearTimeout(t);
+      const d = (await r.json()) as { ip?: string };
+      return String(d?.ip || "").trim();
+    } catch {
+      return "";
+    }
+  })();
+  return publicIpPromise;
+}
+
 function MarketplacePresenceBeacon() {
   const location = useLocation();
   useEffect(() => {
@@ -88,22 +252,38 @@ function MarketplacePresenceBeacon() {
     const visitorId = getMarketplacePresenceVisitorId();
     const currentPath = `${location.pathname}${location.search ?? ""}`.slice(0, 200);
     const viewerType = resolveMarketplaceViewerType();
+    const browserCountry = countryFromLocaleOrTimezone();
     let cancelled = false;
-    const sendBeat = () => {
+    const sendBeat = async () => {
       if (cancelled) return;
-      void sendMarketplacePresenceHeartbeat({ visitorId, viewerType, currentPath }).catch(() => {});
+      const ipCountry = await getCountryByPublicIp().catch(() => browserCountry);
+      const clientIp = await getPublicIpAddress().catch(() => "");
+      if (cancelled) return;
+      await sendMarketplacePresenceHeartbeat({
+        visitorId,
+        viewerType,
+        countryCode: sanitizeCountryCodeForPayload(ipCountry.countryCode || browserCountry.countryCode),
+        countryName: (ipCountry.countryName || browserCountry.countryName || "").trim() || undefined,
+        clientIp: clientIp.trim() || undefined,
+        locale: navigator.language || "",
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
+        currentPath,
+      }).catch(() => {});
     };
-    sendBeat();
-    const intervalId = window.setInterval(sendBeat, 30_000);
+    void sendBeat();
+    const intervalId = window.setInterval(() => {
+      void sendBeat();
+    }, 30_000);
     const onVisible = () => {
-      if (document.visibilityState === "visible") sendBeat();
+      if (document.visibilityState === "visible") void sendBeat();
     };
-    window.addEventListener("focus", sendBeat);
+    const onFocus = () => void sendBeat();
+    window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
-      window.removeEventListener("focus", sendBeat);
+      window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [location.pathname, location.search]);
@@ -180,6 +360,7 @@ function App() {
             <Route path="/configuracion" element={<ConfiguracionPage />} />
             <Route path="/clientes-tienda-online" element={<ClientesTiendaOnlinePage />} />
             <Route path="/cotizaciones-marketplace" element={<CotizacionesMarketplacePage />} />
+            <Route path="/marketplace-presencia" element={<MarketplacePresencePage />} />
             <Route path="/usuarios/*" element={<UsuariosPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
