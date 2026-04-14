@@ -297,6 +297,8 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "filter.all": "Todos",
     "filter.bitcoin": "Bitcoin",
     "filter.doge_ltc": "DOGE + LTC",
+    "filter.zcash": "Zcash",
+    "filter.others": "Otros",
 
     // Tarjeta ASIC
     "shelf.seemore": "Ver más",
@@ -952,6 +954,8 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "filter.all": "All",
     "filter.bitcoin": "Bitcoin",
     "filter.doge_ltc": "DOGE + LTC",
+    "filter.zcash": "Zcash",
+    "filter.others": "Others",
 
     "shelf.seemore": "See more",
     "shelf.seemore_aria": "See more — {{model}} — {{hash}}",

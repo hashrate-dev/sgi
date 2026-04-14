@@ -1,18 +1,20 @@
 import { ASIC_FILTER_GROUPS } from "../../lib/marketplaceAsicCatalog.js";
-import type { AsicAlgo } from "../../lib/marketplaceAsicCatalog.js";
+import type { MarketplaceCatalogFilter } from "../../lib/marketplaceAsicCatalog.js";
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
 
-const FILTER_LABEL_KEY: Record<AsicAlgo, string> = {
+const FILTER_LABEL_KEY: Record<MarketplaceCatalogFilter, string> = {
   sha256: "filter.bitcoin",
   scrypt: "filter.doge_ltc",
+  zcash: "filter.zcash",
+  other: "filter.others",
 };
 
 export function MarketplaceCatalogFilters({
   value,
   onChange,
 }: {
-  value: AsicAlgo | null;
-  onChange: (next: AsicAlgo | null) => void;
+  value: MarketplaceCatalogFilter | null;
+  onChange: (next: MarketplaceCatalogFilter | null) => void;
 }) {
   const { t } = useMarketplaceLang();
   return (

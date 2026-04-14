@@ -281,6 +281,8 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
   "filter.all": "Todos",
   "filter.bitcoin": "Bitcoin",
   "filter.doge_ltc": "DOGE + LTC",
+  "filter.zcash": "Zcash",
+  "filter.others": "Outros",
 
   "shelf.seemore": "Ver mais",
   "shelf.seemore_aria": "Ver mais — {{model}} — {{hash}}",

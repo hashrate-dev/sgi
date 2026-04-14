@@ -442,9 +442,13 @@ export function mergeAsicCatalogWithCorpGridExtras(apiProducts: AsicProduct[]): 
   return [...apiProducts, ...extras];
 }
 
-export const ASIC_FILTER_GROUPS = [
-  { id: "sha256" as const, label: "Bitcoin" },
-  { id: "scrypt" as const, label: "DOGE + LTC" },
+export type MarketplaceCatalogFilter = "sha256" | "scrypt" | "zcash" | "other";
+
+export const ASIC_FILTER_GROUPS: ReadonlyArray<{ id: MarketplaceCatalogFilter; label: string }> = [
+  { id: "sha256", label: "Bitcoin" },
+  { id: "scrypt", label: "DOGE + LTC" },
+  { id: "zcash", label: "Zcash" },
+  { id: "other", label: "Otros" },
 ];
 
 /** Compra por fracción de hashrate de **un** equipo (cotización). Incluye equipo completo. */

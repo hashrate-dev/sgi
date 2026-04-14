@@ -4,9 +4,10 @@ import {
   ASIC_MARKETPLACE_PRODUCTS,
   asicProductShowsMinerEconomyContent,
   compareMarketplaceShelfProducts,
+  marketplaceShelfPrimaryGroup,
   mergeAsicCatalogWithCorpGridExtras,
 } from "../lib/marketplaceAsicCatalog.js";
-import type { AsicAlgo, AsicProduct } from "../lib/marketplaceAsicCatalog.js";
+import type { AsicProduct, MarketplaceCatalogFilter } from "../lib/marketplaceAsicCatalog.js";
 import type { AddQuoteLineOptions } from "../lib/marketplaceQuoteCart.js";
 import { getMarketplaceAsicVitrina, postMarketplaceAsicYields, wakeUpBackend, type MarketplaceAsicLiveYield } from "../lib/api.js";
 import { canUseMarketplaceQuoteCart } from "../lib/auth.js";
@@ -77,6 +78,15 @@ const MemoAsicShelfProduct = memo(AsicShelfProduct, (prev, next) => {
 });
 MemoAsicShelfProduct.displayName = "AsicShelfProduct";
 
+function matchesCatalogFilter(p: AsicProduct, f: MarketplaceCatalogFilter): boolean {
+  const g = marketplaceShelfPrimaryGroup(p);
+  if (f === "sha256") return g === 0;
+  if (f === "scrypt") return g === 2;
+  if (f === "zcash") return g === 1;
+  // Otros = infraestructura (contenedores/racks/PDU).
+  return g === 5;
+}
+
 export function MarketplacePage() {
   return (
     <MarketplaceQuoteCartProvider>
@@ -92,7 +102,7 @@ function MarketplacePageBody() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { addProduct, openDrawer } = useMarketplaceQuoteCart();
-  const [filterAlgo, setFilterAlgo] = useState<AsicAlgo | null>(null);
+  const [filterAlgo, setFilterAlgo] = useState<MarketplaceCatalogFilter | null>(null);
   const [modalIndex, setModalIndex] = useState<number | null>(null);
   /** Vacío hasta la vitrina: evita pintar catálogo placeholder y reemplazarlo por el de la API (doble trabajo y “ola” visual). */
   const [products, setProducts] = useState<AsicProduct[]>(() => []);
@@ -239,8 +249,8 @@ function MarketplacePageBody() {
       return list;
     }
     list.sort((a, b) => {
-      const ma = a.algo === filterAlgo ? 0 : 1;
-      const mb = b.algo === filterAlgo ? 0 : 1;
+      const ma = matchesCatalogFilter(a, filterAlgo) ? 0 : 1;
+      const mb = matchesCatalogFilter(b, filterAlgo) ? 0 : 1;
       if (ma !== mb) return ma - mb;
       return compareMarketplaceShelfProducts(a, b, sortLoc);
     });
@@ -299,7 +309,7 @@ function MarketplacePageBody() {
                       key={p.id}
                       product={p}
                       productIndex={i}
-                      filteredHidden={filterAlgo != null && p.algo !== filterAlgo}
+                      filteredHidden={filterAlgo != null && !matchesCatalogFilter(p, filterAlgo)}
                       onOpenModal={setModalIndex}
                       onAddToQuote={handleAddToQuote}
                       addToQuoteLabel={addToQuoteLabel}
