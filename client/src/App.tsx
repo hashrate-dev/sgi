@@ -72,6 +72,7 @@ function resolveMarketplaceViewerType(): MarketplacePresenceViewerType {
 async function sendMarketplacePresenceHeartbeat(payload: {
   visitorId: string;
   viewerType: MarketplacePresenceViewerType;
+  userEmail?: string;
   countryCode?: string;
   countryName?: string;
   clientIp?: string;

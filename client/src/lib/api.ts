@@ -1150,8 +1150,12 @@ export type MarketplacePresenceViewerType = "anon" | "cliente" | "staff";
 export function postMarketplacePresenceHeartbeat(payload: {
   visitorId: string;
   viewerType?: MarketplacePresenceViewerType;
+  userEmail?: string;
   countryCode?: string;
   countryName?: string;
+  clientIp?: string;
+  locale?: string;
+  timezone?: string;
   currentPath?: string;
 }): Promise<{ ok?: boolean }> {
   return api("/api/marketplace/presence/heartbeat", {
