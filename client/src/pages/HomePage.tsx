@@ -42,6 +42,7 @@ export function HomePage() {
   const [marketplaceOnlineTotal, setMarketplaceOnlineTotal] = useState(0);
   const [marketplaceOnlineLogged, setMarketplaceOnlineLogged] = useState(0);
   const [marketplaceOnlineAnon, setMarketplaceOnlineAnon] = useState(0);
+  const [marketplacePresenceUpdatedAt, setMarketplacePresenceUpdatedAt] = useState("");
   const prevOpenCountRef = useRef(0);
   const roleNorm = (r: string | undefined) => (r ?? "").toLowerCase().trim();
 const visibleMenuItems = menuItems.filter(
@@ -119,11 +120,19 @@ const visibleMenuItems = menuItems.filter(
         setMarketplaceOnlineTotal(total);
         setMarketplaceOnlineLogged(logged);
         setMarketplaceOnlineAnon(Number(by.anon ?? 0) || 0);
+        setMarketplacePresenceUpdatedAt(
+          new Date(presence.asOf || Date.now()).toLocaleTimeString("es-AR", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          })
+        );
       } catch {
         if (!cancelled) {
           setMarketplaceOnlineTotal(0);
           setMarketplaceOnlineLogged(0);
           setMarketplaceOnlineAnon(0);
+          setMarketplacePresenceUpdatedAt("");
         }
       }
     };
@@ -252,6 +261,9 @@ const visibleMenuItems = menuItems.filter(
               </p>
               <p className="hrs-home-card-desc">
                 logueados: {marketplaceOnlineLogged} · sin cuenta: {marketplaceOnlineAnon}
+              </p>
+              <p className="hrs-home-marketplace-presence-updated">
+                {marketplacePresenceUpdatedAt ? `actualizado: ${marketplacePresenceUpdatedAt}` : "actualizando..."}
               </p>
             </div>
           ) : null}
