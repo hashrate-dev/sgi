@@ -349,6 +349,26 @@ export const CORP_HOME_BEST_SELLING_PRODUCT_IDS = [
   "fallback-l9-16g",
 ] as const;
 
+/**
+ * Home “Otros Productos Interesantes”: elige hasta 5 equipos **solo** entre los que devuelve la vitrina (BD).
+ * Orden: contenedor HW5 → MD5 → HD5 → rack Antrack → minero S21 Hydro.
+ */
+export function pickCorpHomeInterestingFromVitrina(products: AsicProduct[]): AsicProduct[] {
+  const line = (p: AsicProduct) => `${p.brand} ${p.model} ${p.hashrate}`.toLowerCase().replace(/\s+/g, " ");
+  const used = new Set<string>();
+  const pick = (test: (s: string) => boolean): AsicProduct | undefined => {
+    const hit = products.find((p) => !used.has(p.id) && test(line(p)));
+    if (hit) used.add(hit.id);
+    return hit;
+  };
+  const hw5 = pick((s) => /\bhw5\b/.test(s) && (/\bantspace\b/.test(s) || /\bcontainer\b/.test(s)));
+  const md5 = pick((s) => /\bmd5\b/.test(s) && (/\bantspace\b/.test(s) || /\bcontainer\b/.test(s)));
+  const hd5 = pick((s) => /\bhd5\b/.test(s) && (/\bantspace\b/.test(s) || /\bcontainer\b/.test(s)));
+  const antrack = pick((s) => /\bantrack\b/.test(s));
+  const s21hydro = pick((s) => /\bs21\b/.test(s) && /\bhydro\b/.test(s));
+  return [hw5, md5, hd5, antrack, s21hydro].filter((x): x is AsicProduct => Boolean(x));
+}
+
 /** Añade fichas promo corporativas si la API no las trae (mismos ids que catálogo estático). */
 export function mergeAsicCatalogWithCorpGridExtras(apiProducts: AsicProduct[]): AsicProduct[] {
   const apiIds = new Set(apiProducts.map((p) => p.id));

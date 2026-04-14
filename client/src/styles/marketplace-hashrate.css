@@ -5204,9 +5204,33 @@ button.product-modal__btn--quote-cart:hover {
   padding-top: clamp(1.75rem, 4vw, 2.75rem);
 }
 
-/* Destacado producto (ej. Z15 PRO): tarjeta blanca + columna visual degradado + glass */
+/* Sin franja gris entre hero (stats verdes) y faja blanca del Z15 */
+.market-corp-inner.market-corp-inner--flush-top:has(> .market-corp-spotlight:first-child) {
+  padding-top: 0;
+}
+
+.page-main--market--corp > .market-corp-hero-full:has(+ .market-corp-inner > .market-corp-spotlight:first-child) {
+  padding-bottom: 0;
+}
+
+/* Destacado producto (ej. Z15 PRO): faja blanca ancho viewport + tarjeta + columna visual */
 .market-corp-spotlight {
-  margin: 0 0 2rem;
+  position: relative;
+  width: 100vw;
+  max-width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  box-sizing: border-box;
+  margin-top: 0;
+  margin-bottom: 0;
+  padding: clamp(1.5rem, 4vw, 2.5rem) clamp(1rem, 3vw, 1.25rem);
+  background: #fff;
+  border-top: none;
+  border-bottom: 1px solid #eef2f6;
+}
+
+.market-corp-spotlight + .market-corp-products-title {
+  margin-top: clamp(1.5rem, 4vw, 2.25rem);
 }
 
 .market-corp-spotlight__card {
@@ -5527,7 +5551,7 @@ button.product-modal__btn--quote-cart:hover {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   padding: clamp(2.5rem, 6vw, 4.25rem) 0;
-  margin-bottom: 2.5rem;
+  margin-bottom: 0;
 }
 
 .market-corp-hosting-split-band__bg {
@@ -5597,6 +5621,40 @@ button.product-modal__btn--quote-cart:hover {
 
 .market-corp-hosting-split-band .market-corp-metrics__label {
   color: rgba(255, 255, 255, 0.82);
+}
+
+/* Franja clara entre “Servicio todo incluido” y el bloque Itaipú / datacenters */
+.market-corp-interesting-slot {
+  position: relative;
+  width: 100vw;
+  max-width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  box-sizing: border-box;
+  background: #f1f5f9;
+  border-top: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  padding: clamp(1.75rem, 4vw, 2.5rem) clamp(1rem, 3vw, 1.25rem) clamp(2rem, 4.5vw, 2.75rem);
+  margin-bottom: 0;
+}
+
+.market-corp-interesting-slot__inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.market-corp-interesting-slot__title {
+  text-align: center;
+  font-size: clamp(1.05rem, 2.2vw, 1.2rem);
+  font-weight: 800;
+  color: #0f766e;
+  margin: 0 0 1.25rem;
+  letter-spacing: 0.02em;
+}
+
+/* Misma grilla que “Equipos más vendidos” (.market-corp-mp-shortcuts): 2 col móvil, 4 col ≥768px */
+.market-corp-interesting-slot .market-corp-interesting-slot__shortcuts {
+  margin-bottom: 0;
 }
 
 .market-corp-hosting-split {

@@ -16,11 +16,12 @@ function isDetailIcon(x: string): x is AsicDetailIcon {
 }
 
 /** Presets de la fila fija «chip / monedas» (modal vitrina). */
-export type CoinPreset = "sha256" | "scrypt" | "ethernet100" | "capacityMax210" | "capacityMax308";
+export type CoinPreset = "sha256" | "scrypt" | "zcash" | "ethernet100" | "capacityMax210" | "capacityMax308";
 
 export const COIN_ROW_TEXT: Record<CoinPreset, string> = {
   sha256: "BTC / BCH / BSV · SHA-256",
   scrypt: "DOGE + LTC · Scrypt",
+  zcash: "Zcash · Equihash",
   ethernet100: "Ethernet RJ45 10/100M",
   capacityMax210: "Capacidad max. 210 unidades",
   capacityMax308: "Capacidad max. 308 unidades",
@@ -34,12 +35,13 @@ export const COOLING_ROW_TEXT: Record<CoolingPreset, string> = {
   hydro: "Minero Hydro",
 };
 
-/** Tipo de minería (Bitcoin o dual en vitrina). */
-export type MiningPreset = "bitcoin" | "dual";
+/** Tipo de minería (Bitcoin, dual o Zcash en vitrina). */
+export type MiningPreset = "bitcoin" | "dual" | "zcash";
 
 export const MINING_ROW_BY_PRESET: Record<MiningPreset, { icon: AsicDetailIcon; text: string }> = {
   bitcoin: { icon: "btc", text: "Minería Bitcoin" },
   dual: { icon: "dual", text: "Minería Dual" },
+  zcash: { icon: "dual", text: "Minería Zcash" },
 };
 
 function isMiningCatalogRow(row: { icon: AsicDetailIcon; text: string }): boolean {
@@ -47,8 +49,9 @@ function isMiningCatalogRow(row: { icon: AsicDetailIcon; text: string }): boolea
 }
 
 function miningPresetFromRow(row: { icon: AsicDetailIcon; text: string }): MiningPreset {
-  if (row.icon === "dual") return "dual";
   const t = row.text.trim().toUpperCase();
+  if (t.includes("ZCASH") || t.includes("ZEC")) return "zcash";
+  if (row.icon === "dual") return "dual";
   if (t.includes("DUAL")) return "dual";
   return "bitcoin";
 }
@@ -101,7 +104,14 @@ function isCoinChipRow(row: { icon: AsicDetailIcon; text: string }): boolean {
     (t.includes("DOGE") && (t.includes("LTC") || t.includes("LITECOIN"))) ||
     (t.includes("LTC") && t.includes("DOGE")) ||
     (t.includes("SCRYPT") && !t.includes("SHA-256"));
-  return hasBtcFamily || hasScryptFamily || isEthernetChipText(row.text) || capacityPresetFromChipText(row.text) != null;
+  const hasZcashFamily = t.includes("ZCASH") || t.includes("ZEC");
+  return (
+    hasBtcFamily ||
+    hasScryptFamily ||
+    hasZcashFamily ||
+    isEthernetChipText(row.text) ||
+    capacityPresetFromChipText(row.text) != null
+  );
 }
 
 function coinPresetFromText(text: string): CoinPreset {
@@ -115,6 +125,9 @@ function coinPresetFromText(text: string): CoinPreset {
     (t.includes("SCRYPT") && !t.includes("SHA-256"))
   ) {
     return "scrypt";
+  }
+  if (t.includes("ZCASH") || t.includes("ZEC")) {
+    return "zcash";
   }
   return "sha256";
 }
@@ -152,7 +165,8 @@ export function extractDetailRowsForEditor(parsed: Array<{ icon: AsicDetailIcon;
     coolingPreset = coolingPresetFromText(rows[coolIdx]!.text);
     rows.splice(coolIdx, 1);
   }
-  let miningPreset: MiningPreset = preset === "scrypt" ? "dual" : "bitcoin";
+  let miningPreset: MiningPreset =
+    preset === "scrypt" ? "dual" : preset === "zcash" ? "zcash" : "bitcoin";
   const miningIdx = rows.findIndex((r) => isMiningCatalogRow(r));
   if (miningIdx >= 0) {
     miningPreset = miningPresetFromRow(rows[miningIdx]!);
@@ -325,7 +339,17 @@ export function MarketplaceDetailRowsEditor({
   }
 
   function setCoinPreset(nextPreset: CoinPreset) {
-    commitFullRows(nextPreset, powerRow, coolingPreset, miningPreset, extraRows, onChange);
+    let nextMining = miningPreset;
+    if (nextPreset === "zcash") {
+      nextMining = "zcash";
+    } else if (nextPreset === "scrypt") {
+      if (nextMining === "bitcoin" || nextMining === "zcash") nextMining = "dual";
+    } else if (nextPreset === "sha256") {
+      if (nextMining === "dual" || nextMining === "zcash") nextMining = "bitcoin";
+    } else {
+      if (nextMining === "zcash") nextMining = "bitcoin";
+    }
+    commitFullRows(nextPreset, powerRow, coolingPreset, nextMining, extraRows, onChange);
   }
 
   function setCoolingPreset(next: CoolingPreset) {
@@ -401,6 +425,7 @@ export function MarketplaceDetailRowsEditor({
           >
             <option value="sha256">{COIN_ROW_TEXT.sha256}</option>
             <option value="scrypt">{COIN_ROW_TEXT.scrypt}</option>
+            <option value="zcash">{COIN_ROW_TEXT.zcash}</option>
             <option value="ethernet100">{COIN_ROW_TEXT.ethernet100}</option>
             <option value="capacityMax210">{COIN_ROW_TEXT.capacityMax210}</option>
             <option value="capacityMax308">{COIN_ROW_TEXT.capacityMax308}</option>
@@ -446,6 +471,7 @@ export function MarketplaceDetailRowsEditor({
           >
             <option value="bitcoin">{MINING_ROW_BY_PRESET.bitcoin.text}</option>
             <option value="dual">{MINING_ROW_BY_PRESET.dual.text}</option>
+            <option value="zcash">{MINING_ROW_BY_PRESET.zcash.text}</option>
           </select>
         </div>
         {extraRows.map((row, i) => (

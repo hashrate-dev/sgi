@@ -45,6 +45,7 @@ const MODELOS_EQUIPO_OPCIONES = [
   "Antminer S21",
   "Antminer L7",
   "Antminer L9",
+  "Antminer Z15",
   "AntSpace Hydro HW5",
   "AntSpace Hydro MD5",
 ] as const;
@@ -59,11 +60,12 @@ function opcionesModeloConActual(actual: string): string[] {
   return base;
 }
 
-type FamiliaProcesadorPreset = "l9" | "l7" | "s21";
+type FamiliaProcesadorPreset = "l9" | "l7" | "s21" | "z15";
 
 /** Presets de hashrate según modelo (texto guardado en BD = valor del `option`). L9/L7 en MH/s, S21 en TH/s. */
 const PROCESADOR_PRESETS_L9 = ["15.000 MH/s", "16.000 MH/s", "16.500 MH/s", "17.000 MH/s"] as const;
 const PROCESADOR_PRESETS_L7 = ["8.800 MH/s", "9.050 MH/s", "9.500 MH/s"] as const;
+const PROCESADOR_PRESETS_Z15 = ["420 kSol/s", "840 kSol/s"] as const;
 const PROCESADOR_PRESETS_S21 = [
   "200 TH/s",
   "234 TH/s",
@@ -87,6 +89,7 @@ function familiaProcesadorPreset(modelo: string): FamiliaProcesadorPreset | null
   if (!m) return null;
   if (/\bl9\b/.test(m)) return "l9";
   if (/\bl7\b/.test(m)) return "l7";
+  if (/\bz15\b/.test(m)) return "z15";
   if (/\bs21\b/.test(m)) return "s21";
   return null;
 }
@@ -97,6 +100,8 @@ function presetsProcesadorFamilia(f: FamiliaProcesadorPreset): readonly string[]
       return PROCESADOR_PRESETS_L9;
     case "l7":
       return PROCESADOR_PRESETS_L7;
+    case "z15":
+      return PROCESADOR_PRESETS_Z15;
     case "s21":
       return PROCESADOR_PRESETS_S21;
   }
@@ -1464,6 +1469,8 @@ export function EquiposAsicPage() {
                                   onChange={(e) => setFormData({ ...formData, procesador: e.target.value })}
                                   readOnly={specsFieldsLocked}
                                   placeholder={(() => {
+                                    const mod = (formData.modelo ?? "").trim().toLowerCase();
+                                    if (/\bz15\b/.test(mod)) return "Ej: 840 kSol/s";
                                     const u = unidadProcesadorDesdeModelo(formData.modelo);
                                     if (u === "th") return "Ej: 245 TH/s";
                                     if (u === "mh") return "Ej: 17.000 MH/s";

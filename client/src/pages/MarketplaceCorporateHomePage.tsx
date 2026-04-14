@@ -10,8 +10,10 @@ import {
   CORP_HOME_BEST_SELLING_PRODUCT_IDS,
   CORP_HOME_GRID_PRODUCT_IDS,
   formatAsicProductPriceDisplay,
+  pickCorpHomeInterestingFromVitrina,
 } from "../lib/marketplaceAsicCatalog.js";
 import type { AsicProduct } from "../lib/marketplaceAsicCatalog.js";
+import { getMarketplaceAsicVitrina, wakeUpBackend } from "../lib/api.js";
 import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
 import "../styles/marketplace-hashrate.css";
 
@@ -97,6 +99,9 @@ export function MarketplaceCorporateHomePage() {
     []
   );
 
+  /** Vitrina real (BD): hasta 5 (HW5, MD5, HD5, Antrack, S21 Hydro); vacío si la API no trae coincidencias. */
+  const [interestingVitrina, setInterestingVitrina] = useState<AsicProduct[]>([]);
+
   const goCorpHash = useCallback((id: (typeof CORP_ANCHOR_IDS)[number]) => {
     navigate({ pathname, hash: `#${id}` });
     window.setTimeout(() => {
@@ -105,6 +110,24 @@ export function MarketplaceCorporateHomePage() {
   }, [navigate, pathname]);
   const videoTitleId = useId();
   const [videoOpen, setVideoOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void wakeUpBackend();
+    void getMarketplaceAsicVitrina()
+      .then((res) => {
+        if (cancelled) return;
+        const list = res.products ?? [];
+        setInterestingVitrina(pickCorpHomeInterestingFromVitrina(list));
+      })
+      .catch(() => {
+        if (!cancelled) setInterestingVitrina([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     const prevTitle = document.title;
     document.title = DOC_TITLE;
@@ -384,6 +407,82 @@ export function MarketplaceCorporateHomePage() {
                 </section>
               </div>
             </div>
+
+            {interestingVitrina.length > 0 ? (
+            <section
+              className="market-corp-interesting-slot"
+              aria-labelledby="corp-interesting-products-title"
+            >
+              <div className="market-corp-interesting-slot__inner">
+                <h2 id="corp-interesting-products-title" className="market-corp-interesting-slot__title">
+                  {t("corp.interesting_products.title")}
+                </h2>
+                <div
+                  className="market-corp-mp-shortcuts market-corp-interesting-slot__shortcuts"
+                  aria-label={t("corp.interesting_products.grid_aria")}
+                >
+                  {interestingVitrina.map((p) => {
+                    const to = `/marketplace?asic=${encodeURIComponent(p.id)}`;
+                    const aria = `${p.brand} ${p.model} ${p.hashrate} — ${t("corp.mp_card_link_aria")}`;
+                    const goAsic = () => {
+                      void navigate(to);
+                    };
+                    return (
+                      <article key={p.id} className="shelf-product">
+                        <div className="shelf-product__media">
+                          <div className="shelf-product__media-gradient">
+                            <Link to={to} className="shelf-product__imglink" aria-label={aria}>
+                              {p.imageSrc ? (
+                                <img
+                                  src={p.imageSrc}
+                                  alt=""
+                                  width={400}
+                                  height={400}
+                                  loading="lazy"
+                                  decoding="async"
+                                  className="shelf-product__photo"
+                                />
+                              ) : (
+                                <div className="shelf-product__photo shelf-product__photo--fallback" aria-hidden />
+                              )}
+                            </Link>
+                          </div>
+                        </div>
+                        <div className="shelf-product__body">
+                          <div className="shelf-product__identity">
+                            <p className="shelf-product__brand">{p.brand}</p>
+                            <h3 className="shelf-product__title">{p.model}</h3>
+                            <p className="shelf-product__hashrate">{p.hashrate}</p>
+                          </div>
+                          <div className="shelf-product__price-box">
+                            <span className="shelf-product__price-value">{formatAsicProductPriceDisplay(p, lang)}</span>
+                          </div>
+                          <div className="shelf-product__specs-box" role="group" aria-label={t("shelf.techspecs")}>
+                            <ul className="shelf-detail-strip">
+                              {p.detailRows.map((row, i) => (
+                                <li key={i} className="shelf-detail-strip__row">
+                                  <AsicDetailSvg kind={row.icon} />
+                                  <span className="shelf-detail-strip__txt">{row.text}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                          <div className="shelf-product__cta-row">
+                            <button type="button" className="shelf-product__cta" onClick={goAsic}>
+                              {t("shelf.seemore")}
+                            </button>
+                            <button type="button" className="shelf-product__quote-btn" onClick={goAsic} title={t("shelf.add_title")}>
+                              {t("catalog.add_short")}
+                            </button>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </div>
+            </section>
+            ) : null}
 
             {corpMarketplaceAfterHostingProducts.length > 0 ? (
               <section className="market-corp-home-row2" aria-labelledby="corp-home-row2-title">
