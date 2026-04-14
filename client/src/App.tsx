@@ -44,7 +44,7 @@ import { ToastContainer } from "./components/ToastNotification";
 import { ScrollToTop } from "./components/ScrollToTop";
 import { MarketplaceLanguageProvider } from "./contexts/MarketplaceLanguageContext";
 import { getStoredUser } from "./lib/auth";
-import { postMarketplacePresenceHeartbeat, type MarketplacePresenceViewerType } from "./lib/api";
+import type { MarketplacePresenceViewerType } from "./lib/api";
 
 const MARKETPLACE_PRESENCE_VISITOR_KEY = "hrs_marketplace_presence_visitor_id";
 
@@ -67,6 +67,20 @@ function resolveMarketplaceViewerType(): MarketplacePresenceViewerType {
   return "anon";
 }
 
+async function sendMarketplacePresenceHeartbeat(payload: {
+  visitorId: string;
+  viewerType: MarketplacePresenceViewerType;
+  currentPath: string;
+}): Promise<void> {
+  await fetch("/api/marketplace/presence/heartbeat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    keepalive: true,
+    credentials: "include",
+  });
+}
+
 function MarketplacePresenceBeacon() {
   const location = useLocation();
   useEffect(() => {
@@ -77,7 +91,7 @@ function MarketplacePresenceBeacon() {
     let cancelled = false;
     const sendBeat = () => {
       if (cancelled) return;
-      void postMarketplacePresenceHeartbeat({ visitorId, viewerType, currentPath }).catch(() => {});
+      void sendMarketplacePresenceHeartbeat({ visitorId, viewerType, currentPath }).catch(() => {});
     };
     sendBeat();
     const intervalId = window.setInterval(sendBeat, 30_000);

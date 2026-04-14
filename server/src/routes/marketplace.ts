@@ -57,6 +57,42 @@ type Row = {
   created_at: string;
 };
 
+function hashFast(input: string): string {
+  let h = 2166136261;
+  for (let i = 0; i < input.length; i += 1) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(36);
+}
+
+function visitorFingerprintFromRequest(req: Request): string {
+  const fwd = String(req.headers["x-forwarded-for"] ?? "");
+  const ip = (fwd.split(",")[0] || req.ip || "").trim();
+  const ua = String(req.headers["user-agent"] ?? "").trim().slice(0, 220);
+  const lang = String(req.headers["accept-language"] ?? "").trim().slice(0, 80);
+  const raw = `${ip}|${ua}|${lang}`;
+  return `fp-${hashFast(raw || "unknown")}`;
+}
+
+async function touchMarketplacePresence(req: Request, fallbackPath: string): Promise<void> {
+  const nowIso = new Date().toISOString();
+  const cutoffIso = new Date(Date.now() - MARKETPLACE_PRESENCE_ONLINE_WINDOW_MS * 4).toISOString();
+  const currentPath = String(req.originalUrl || fallbackPath).slice(0, 200);
+  const hasAuth = typeof req.headers.authorization === "string" && req.headers.authorization.trim().length > 0;
+  const viewerType = hasAuth ? "staff" : "anon";
+  const visitorId = visitorFingerprintFromRequest(req);
+  await db
+    .prepare(
+      `INSERT INTO marketplace_presence (visitor_id, viewer_type, current_path, last_seen_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(visitor_id)
+       DO UPDATE SET viewer_type = excluded.viewer_type, current_path = excluded.current_path, last_seen_at = excluded.last_seen_at`
+    )
+    .run(visitorId, viewerType, currentPath, nowIso);
+  await db.prepare("DELETE FROM marketplace_presence WHERE last_seen_at < ?").run(cutoffIso);
+}
+
 function isPg(): boolean {
   return (getDb() as { isPostgres?: boolean }).isPostgres === true;
 }
@@ -135,11 +171,12 @@ marketplaceRouter.get("/marketplace/presence-stats", requireAuth, adminAB, async
  * GET /marketplace/setup-quote-prices — S02 (equipo completo) + S03 (fracción hashrate).
  * Público: carrito sin JWT.
  */
-marketplaceRouter.get("/marketplace/setup-quote-prices", async (_req, res: Response) => {
+marketplaceRouter.get("/marketplace/setup-quote-prices", async (req: Request, res: Response) => {
   const FALLBACK = 50;
   let setupEquipoCompletoUsd = FALLBACK;
   let setupCompraHashrateUsd = FALLBACK;
   try {
+    await touchMarketplacePresence(req, "/marketplace/setup-quote-prices");
     [setupEquipoCompletoUsd, setupCompraHashrateUsd] = await Promise.all([
       resolveSetupEquipoCompletoUsd(),
       resolveSetupCompraHashrateUsd(),
@@ -161,8 +198,9 @@ marketplaceRouter.get("/marketplace/setup-quote-prices", async (_req, res: Respo
  * GET /marketplace/setup-compra-hashrate-usd — solo S03 (compatibilidad).
  * Público: carrito invitado y vitrina sin JWT.
  */
-marketplaceRouter.get("/marketplace/setup-compra-hashrate-usd", async (_req, res: Response) => {
+marketplaceRouter.get("/marketplace/setup-compra-hashrate-usd", async (req: Request, res: Response) => {
   try {
+    await touchMarketplacePresence(req, "/marketplace/setup-compra-hashrate-usd");
     const precioUSD = await resolveSetupCompraHashrateUsd();
     res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
     res.json({ precioUSD });
@@ -176,8 +214,9 @@ marketplaceRouter.get("/marketplace/setup-compra-hashrate-usd", async (_req, res
  * GET /marketplace/garantia-quote-prices — ítems con precio desde `items_garantia_ande` (misma fuente que /equipos-asic/items-garantia).
  * Público: el carrito de cotización empareja por código o marca+modelo (ej. Antminer Z15).
  */
-marketplaceRouter.get("/marketplace/garantia-quote-prices", async (_req, res: Response) => {
+marketplaceRouter.get("/marketplace/garantia-quote-prices", async (req: Request, res: Response) => {
   try {
+    await touchMarketplacePresence(req, "/marketplace/garantia-quote-prices");
     const raw = await loadGarantiaQuoteRows();
     const items = raw
       .filter((x) => Number.isFinite(x.precioGarantia) && x.precioGarantia >= 0)
@@ -202,8 +241,9 @@ function sqlMarketplaceVisible(): string {
 }
 
 /** GET /marketplace/asic-vitrina — catálogo ASIC para /marketplace (sin token). Origen: equipos_asic con mp_visible. */
-marketplaceRouter.get("/marketplace/asic-vitrina", async (_req, res: Response) => {
+marketplaceRouter.get("/marketplace/asic-vitrina", async (req: Request, res: Response) => {
   try {
+    await touchMarketplacePresence(req, "/marketplace/asic-vitrina");
     const clause = sqlMarketplaceVisible();
     const sql = `SELECT id, marca_equipo, modelo, procesador, precio_usd, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_price_label, mp_listing_kind
       FROM equipos_asic WHERE ${clause} ORDER BY marca_equipo ASC, modelo ASC, procesador ASC`;
@@ -238,8 +278,9 @@ const AsicYieldRequestSchema = z.object({
  * POST /marketplace/asic-yields — estimación de rendimiento en vivo (sin token).
  * Usa difficulty/emisiones de red públicas + CoinGecko; merge LTC+DOGE calibrado vs WhatToMine.
  */
-marketplaceRouter.post("/marketplace/asic-yields", async (req, res: Response) => {
+marketplaceRouter.post("/marketplace/asic-yields", async (req: Request, res: Response) => {
   try {
+    await touchMarketplacePresence(req, "/marketplace/asic-yields");
     const parsed = AsicYieldRequestSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
@@ -261,8 +302,9 @@ marketplaceRouter.post("/marketplace/asic-yields", async (req, res: Response) =>
 });
 
 /** GET /catalog — vitrina pública para la página Marketplace (array JSON, sin token). */
-marketplaceRouter.get("/catalog", async (req, res: Response) => {
+marketplaceRouter.get("/catalog", async (req: Request, res: Response) => {
   try {
+    await touchMarketplacePresence(req, "/catalog");
     const activeClause = isPg() ? "is_active = true" : "is_active = 1";
     const sql = `SELECT name, description, category, price_usd, image_url FROM marketplace_products WHERE ${activeClause} ORDER BY sort_order ASC, name ASC`;
     const rows = (await db.prepare(sql).all()) as Array<{
