@@ -14,6 +14,7 @@
 /* Barra de desplazamiento siempre visible: evita que el contenido se corra al cambiar de vista (ej. Facturación Factura/NC/Recibo) */
 html {
   overflow-y: scroll;
+  overflow-x: hidden;
   font-family: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-optical-sizing: auto;
 }
@@ -21,6 +22,8 @@ html {
 body {
   background: linear-gradient(135deg, #074025 0%, #49f227 100%);
   min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
   font-family: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-optical-sizing: auto;
   scrollbar-gutter: stable;
@@ -28,6 +31,23 @@ body {
 
 #root {
   min-height: 100vh;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Base responsive global: evita desbordes y hace medios fluidos en todas las vistas. */
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+}
+
+input,
+select,
+textarea,
+button {
+  max-width: 100%;
 }
 
 body::before {
@@ -35,8 +55,8 @@ body::before {
   position: fixed;
   top: -50%;
   right: -10%;
-  width: 500px;
-  height: 500px;
+  width: clamp(280px, 42vw, 500px);
+  height: clamp(280px, 42vw, 500px);
   background: rgba(255, 255, 255, 0.1);
   border-radius: 50%;
   z-index: -1;
@@ -47,8 +67,8 @@ body::after {
   position: fixed;
   bottom: -20%;
   left: -5%;
-  width: 400px;
-  height: 400px;
+  width: clamp(240px, 34vw, 400px);
+  height: clamp(240px, 34vw, 400px);
   background: rgba(255, 255, 255, 0.08);
   border-radius: 50%;
   z-index: -1;
