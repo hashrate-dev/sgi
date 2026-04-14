@@ -40,7 +40,7 @@ export function HomePage() {
   const [marketplaceOpenCount, setMarketplaceOpenCount] = useState(0);
   const [marketplaceBadgePulse, setMarketplaceBadgePulse] = useState(false);
   const [marketplaceOnlineTotal, setMarketplaceOnlineTotal] = useState(0);
-  const [marketplaceOnlineClientes, setMarketplaceOnlineClientes] = useState(0);
+  const [marketplaceOnlineLogged, setMarketplaceOnlineLogged] = useState(0);
   const [marketplaceOnlineAnon, setMarketplaceOnlineAnon] = useState(0);
   const prevOpenCountRef = useRef(0);
   const roleNorm = (r: string | undefined) => (r ?? "").toLowerCase().trim();
@@ -115,13 +115,14 @@ const visibleMenuItems = menuItems.filter(
         if (cancelled) return;
         const total = Number(presence.onlineTotal) || 0;
         const by = presence.byViewerType ?? {};
+        const logged = (Number(by.cliente ?? 0) || 0) + (Number(by.staff ?? 0) || 0);
         setMarketplaceOnlineTotal(total);
-        setMarketplaceOnlineClientes(Number(by.cliente ?? 0) || 0);
+        setMarketplaceOnlineLogged(logged);
         setMarketplaceOnlineAnon(Number(by.anon ?? 0) || 0);
       } catch {
         if (!cancelled) {
           setMarketplaceOnlineTotal(0);
-          setMarketplaceOnlineClientes(0);
+          setMarketplaceOnlineLogged(0);
           setMarketplaceOnlineAnon(0);
         }
       }
@@ -250,7 +251,7 @@ const visibleMenuItems = menuItems.filter(
                 {marketplaceOnlineTotal} online ahora
               </p>
               <p className="hrs-home-card-desc">
-                logueados: {marketplaceOnlineClientes} · sin cuenta: {marketplaceOnlineAnon}
+                logueados: {marketplaceOnlineLogged} · sin cuenta: {marketplaceOnlineAnon}
               </p>
             </div>
           ) : null}
