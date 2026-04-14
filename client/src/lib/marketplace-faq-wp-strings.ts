@@ -19,10 +19,10 @@ export const MARKETPLACE_FAQ_WP_ES: Record<string, string> = {
     "Para comenzar en nuestras granjas, los costos iniciales incluyen el valor del equipo y un depósito en garantía equivalente a dos meses de energía. Ese depósito se abona al proveedor de energía y se reembolsa al finalizar el contrato. Además, corresponde una tarifa mensual de hosting que cubre el mantenimiento y la operación de tu equipo en nuestras instalaciones.",
   "corp.faq.wp.4.q": "¿Cómo se paga el equipo ASIC?",
   "corp.faq.wp.4.a":
-    "El costo del equipo puede abonarse con Bitcoin (BTC), Ethereum (ETH), dólares digitales (USDT / USDC) o mediante transferencia bancaria en dólares estadounidenses.",
+    "El costo del equipo puede abonarse mediante transferencia bancaria en dólares estadounidenses, dólares digitales (USDT / USDC) o con criptomonedas como Bitcoin (BTC) y Ethereum (ETH).",
   "corp.faq.wp.5.q": "¿Cómo se paga el servicio de hosting?",
   "corp.faq.wp.5.a":
-    "El hosting puede pagarse en dólares digitales (USDT / USDC) o mediante transferencia bancaria en dólares estadounidenses.",
+    "El hosting puede pagarse mediante transferencia bancaria en dólares estadounidenses, dólares digitales (USDT / USDC) o con criptomonedas como Bitcoin (BTC) y Ethereum (ETH).",
   "corp.faq.wp.6.q": "¿Cuál es el costo energético asociado?",
   "corp.faq.wp.6.a":
     "Cobramos desde aprox. USD 0,07–0,078 / kWh todo incluido.\n\nPor ejemplo, un S21 Pro 234 puede costar alrededor de USD 200 por mes en energía.",
@@ -62,10 +62,10 @@ export const MARKETPLACE_FAQ_WP_EN: Record<string, string> = {
     "To start mining at our farms, the initial costs include the value of the equipment and a security deposit equivalent to two months of energy costs. This deposit is paid to the energy provider and is refunded to you at the end of the contract. Additionally, you will need to pay a monthly hosting fee, which covers the maintenance and operation of your equipment at our facilities.",
   "corp.faq.wp.4.q": "How is the ASIC equipment paid for?",
   "corp.faq.wp.4.a":
-    "The equipment can be paid with Bitcoin (BTC), Ethereum (ETH), digital dollars (USDT / USDC), or via bank transfer in U.S. dollars.",
+    "The equipment can be paid via bank transfer in U.S. dollars, with digital dollars (USDT / USDC), or with cryptocurrencies such as Bitcoin (BTC) and Ethereum (ETH).",
   "corp.faq.wp.5.q": "How is the hosting service paid for?",
   "corp.faq.wp.5.a":
-    "The hosting service can be paid using digital dollars (USDT / USDC) or through a bank transfer in U.S. dollars.",
+    "The hosting service can be paid via bank transfer in U.S. dollars, with digital dollars (USDT / USDC), or with cryptocurrencies such as Bitcoin (BTC) and Ethereum (ETH).",
   "corp.faq.wp.6.q": "What is the associated energy cost?",
   "corp.faq.wp.6.a":
     "We charge as low as USD 0.07–0.078/kWh all in.\n\nFor example, an S21 Pro 234 costs about USD 200 per month.",
@@ -105,10 +105,10 @@ export const MARKETPLACE_FAQ_WP_PT: Record<string, string> = {
     "Para começar em nossas fazendas, os custos iniciais incluem o valor do equipamento e um depósito de segurança equivalente a dois meses de energia. O depósito é pago ao fornecedor de energia e é reembolsado ao final do contrato. Além disso, há uma taxa mensal de hospedagem que cobre manutenção e operação do seu equipamento em nossas instalações.",
   "corp.faq.wp.4.q": "Como o equipamento ASIC é pago?",
   "corp.faq.wp.4.a":
-    "O equipamento pode ser pago com Bitcoin (BTC), Ethereum (ETH), dólares digitais (USDT / USDC) ou por transferência bancária em dólares americanos.",
+    "O equipamento pode ser pago por transferência bancária em dólares americanos, com dólares digitais (USDT / USDC) ou com criptomoedas como Bitcoin (BTC) e Ethereum (ETH).",
   "corp.faq.wp.5.q": "Como o serviço de hospedagem é pago?",
   "corp.faq.wp.5.a":
-    "A hospedagem pode ser paga em dólares digitais (USDT / USDC) ou por transferência bancária em dólares americanos.",
+    "A hospedagem pode ser paga por transferência bancária em dólares americanos, com dólares digitais (USDT / USDC) ou com criptomoedas como Bitcoin (BTC) e Ethereum (ETH).",
   "corp.faq.wp.6.q": "Qual é o custo de energia associado?",
   "corp.faq.wp.6.a":
     "Cobramos a partir de aprox. USD 0,07–0,078/kWh tudo incluído.\n\nPor exemplo, um S21 Pro 234 pode custar cerca de USD 200 por mês em energia.",

@@ -590,7 +590,7 @@ export function MarketplaceCorporateHomePage() {
               <MarketplaceCorpFaqSpotlight
                 headingId="corp-faq-title"
                 rows={CORP_FAQ_ROWS}
-                defaultOpenIndex={0}
+                defaultOpenIndex={null}
                 variant="aurora"
                 onContactClick={() => goCorpHash("contacto")}
               />
