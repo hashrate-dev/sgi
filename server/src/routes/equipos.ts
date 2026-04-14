@@ -31,7 +31,7 @@ const requireAdminsEquipo = requireRole("admin_a", "admin_b");
 
 /**
  * Imagen vitrina: ruta corta (`/images/marketplace-uploads/...`) o data URL en serverless
- * (ver `marketplaceImageUpload.ts`, hasta ~2 MB binario → base64 ~2.8 M chars).
+ * (ver `marketplaceImageUpload.ts`, hasta ~4 MB binario en memoria → base64 acotado al máx. del campo).
  */
 const MARKETPLACE_IMAGE_SRC_MAX_LEN = 6_000_000;
 /** Galería JSON puede incluir varias URLs / data URLs. */
@@ -353,7 +353,13 @@ equiposRouter.post(
   (req: Request, res: Response, next) => {
     uploadMarketplaceImageMw(req, res, (err: unknown) => {
       if (err) {
-        const msg = err instanceof Error ? err.message : "Error al subir la imagen";
+        const code = err && typeof err === "object" && "code" in err ? String((err as { code?: string }).code) : "";
+        let msg = err instanceof Error ? err.message : "Error al subir la imagen";
+        if (code === "LIMIT_FILE_SIZE") {
+          msg = marketplaceImageUploadUsesMemory()
+            ? "La imagen es demasiado grande para el modo alojado (máx. ~4 MB). Redimensioná o comprimí el archivo."
+            : "La imagen supera el tamaño máximo permitido (8 MB).";
+        }
         return res.status(400).json({ error: { message: msg } });
       }
       next();

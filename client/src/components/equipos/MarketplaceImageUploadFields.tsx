@@ -13,6 +13,7 @@ function imgSrcForPreview(path: string): string {
 function fileLabelFromPath(path: string): string {
   const t = path.trim();
   if (!t) return "";
+  if (/^data:image\//i.test(t)) return "Imagen (inline)";
   try {
     const noQuery = t.split("?")[0] ?? t;
     const seg = noQuery.split("/").filter(Boolean).pop();
@@ -165,7 +166,7 @@ export function CardImageUploadField({
             <p className="hrs-upload-dropzone-title">
               {uploading ? "Subiendo…" : "Arrastrá una imagen aquí o hacé clic para elegir"}
             </p>
-            <p className="hrs-upload-dropzone-hint">JPG, PNG, WebP o GIF · hasta 8 MB</p>
+            <p className="hrs-upload-dropzone-hint">JPG, PNG, WebP o GIF · hasta 8 MB en local · hasta ~4 MB en app alojada</p>
           </div>
         ) : (
           <div className="hrs-upload-preview-row">

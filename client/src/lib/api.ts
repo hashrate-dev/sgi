@@ -125,6 +125,25 @@ function makeApiError(message: string, status: number, code?: string): ApiHttpEr
   return e;
 }
 
+/** Mensaje desde JSON de error heterogéneo; evita toasts vacíos cuando `statusText` viene vacío (p. ej. HTTP/2). */
+function extractJsonErrorMessage(data: unknown, res: Response, fallback: string): string {
+  if (data && typeof data === "object") {
+    const o = data as Record<string, unknown>;
+    const nested = o.error;
+    if (typeof nested === "string" && nested.trim()) return nested.trim();
+    if (nested && typeof nested === "object") {
+      const m = (nested as { message?: unknown }).message;
+      if (typeof m === "string" && m.trim()) return m.trim();
+    }
+    const top = o.message;
+    if (typeof top === "string" && top.trim()) return top.trim();
+  }
+  const st = (res.statusText ?? "").trim();
+  if (st) return st;
+  if (res.status) return `${fallback} (HTTP ${res.status}).`;
+  return fallback;
+}
+
 /**
  * Conflicto al registrar cliente: correo ya en `users` (misma BD que el SGI).
  * Acepta 409 sin `code` por compatibilidad con despliegues anteriores.
@@ -725,7 +744,20 @@ export async function uploadMarketplaceAsicImage(file: File): Promise<{ url: str
   const pathUrl = "/api/equipos/marketplace-image";
   const url = base && base.trim() !== "" ? `${base}${pathUrl}` : pathUrl;
 
-  const res = await fetchWithTimeout(url, { method: "POST", body: formData, headers }, FETCH_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetchWithTimeout(url, { method: "POST", body: formData, headers }, FETCH_TIMEOUT_MS);
+  } catch (e) {
+    const isAbort =
+      (e instanceof Error && e.name === "AbortError") ||
+      (typeof DOMException !== "undefined" && e instanceof DOMException && e.name === "AbortError");
+    if (isAbort) {
+      throw new Error(
+        "Tiempo de espera agotado al subir la imagen. Probá con un archivo más chico o revisá la conexión."
+      );
+    }
+    throw e instanceof Error ? e : new Error(String(e));
+  }
   const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
   if (res.status === 401) {
     if (token) {
@@ -733,11 +765,10 @@ export async function uploadMarketplaceAsicImage(file: File): Promise<{ url: str
       const cb = typeof window !== "undefined" ? (window as unknown as { __on401?: () => void }).__on401 : undefined;
       if (typeof cb === "function") cb();
     }
-    throw new Error((data as { error?: { message?: string } })?.error?.message ?? "Sesión expirada.");
+    throw new Error(extractJsonErrorMessage(data, res, "Sesión expirada."));
   }
   if (!res.ok) {
-    const msg = (data as { error?: { message?: string } })?.error?.message ?? res.statusText;
-    throw new Error(msg);
+    throw new Error(extractJsonErrorMessage(data, res, "No se pudo subir la imagen"));
   }
   return data as { url: string };
 }

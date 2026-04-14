@@ -88,9 +88,9 @@ const diskStorage = multer.diskStorage({
 
 const memoryStorage = multer.memoryStorage();
 
-/** Límite menor en memoria para no inflar respuestas JSON / filas en BD con data URLs. */
+/** Límite menor en memoria: data URL debe caber en `MARKETPLACE_IMAGE_SRC_MAX_LEN` (~6M chars → ~4 MiB binario en base64). */
 const LIMIT_DISK = 8 * 1024 * 1024;
-const LIMIT_MEMORY = 2 * 1024 * 1024;
+const LIMIT_MEMORY = 4 * 1024 * 1024;
 
 function buildUploadMw() {
   const useMem = marketplaceImageUploadUsesMemory();
