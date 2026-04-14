@@ -11,7 +11,7 @@ import {
   quoteCartLineKey,
   lineHashrateSharePct,
   quoteCartSetupUnitUsd,
-  QUOTE_ADDON_WARRANTY_USD,
+  quoteCartWarrantyUnitUsd,
   marketplaceQuoteTicketLineDisplayName,
   quoteCartLineIsEquipmentPricePending,
   quoteCartHasEquipmentPricePending,
@@ -52,6 +52,7 @@ export function MarketplaceQuoteCartDrawer() {
     canUseQuoteCart,
     setupEquipoCompletoUsd,
     setupCompraHashrateUsd,
+    garantiaQuoteItems,
     blockingPipelineOrder,
     refreshActiveOrderGate,
     drawerSubView,
@@ -94,7 +95,7 @@ export function MarketplaceQuoteCartDrawer() {
 
   if (!drawerOpen) return null;
 
-  const pricing = { setupEquipoCompletoUsd, setupCompraHashrateUsd };
+  const pricing = { setupEquipoCompletoUsd, setupCompraHashrateUsd, garantiaItems: garantiaQuoteItems };
   const totalRef = quoteCartSubtotalUsd(lines, pricing);
   const hasPendingEquipmentPrice = quoteCartHasEquipmentPricePending(lines);
   const n = lines.length;
@@ -243,7 +244,7 @@ export function MarketplaceQuoteCartDrawer() {
                   const sharePct = lineHashrateSharePct(l);
                   const addonMult = sharePct / 100;
                   const setupUnit = quoteCartSetupUnitUsd(l, pricing);
-                  const warrantyUnit = Math.round(QUOTE_ADDON_WARRANTY_USD * addonMult);
+                  const warrantyUnit = Math.round(quoteCartWarrantyUnitUsd(l, pricing) * addonMult);
                   const equipmentPricePending = quoteCartLineIsEquipmentPricePending(l);
                   return (
                   <li key={`${lk}#${lineIdx}`} className="market-quote-drawer__line">

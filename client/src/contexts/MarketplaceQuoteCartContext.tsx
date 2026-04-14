@@ -10,6 +10,7 @@ import {
 } from "react";
 import type { AsicProduct } from "../lib/marketplaceAsicCatalog.js";
 import {
+  getMarketplaceGarantiaQuotePrices,
   getMarketplaceSetupQuotePrices,
   getMyMarketplaceQuoteTickets,
   getMyMarketplaceQuoteTicket,
@@ -34,6 +35,7 @@ import {
   QUOTE_ADDON_SETUP_USD_FALLBACK,
   type QuoteCartLine,
   type AddQuoteLineOptions,
+  type GarantiaQuotePriceItem,
 } from "../lib/marketplaceQuoteCart.js";
 import { canUseMarketplaceQuoteCart, enforceSingleMarketplaceOrderForRole } from "../lib/auth.js";
 import { playMarketplaceCartItemAddedSound, playMarketplaceCartItemRemovedSound } from "../lib/marketplaceCartSound.js";
@@ -66,6 +68,8 @@ type Ctx = {
   /** Setup equipo completo (S02) y fracción hashrate (S03); fallback 50 hasta cargar. */
   setupEquipoCompletoUsd: number;
   setupCompraHashrateUsd: number;
+  /** Precios garantía ANDE (items-garantia); vacío hasta cargar la API pública. */
+  garantiaQuoteItems: GarantiaQuotePriceItem[];
   drawerOpen: boolean;
   /** Vista dentro del panel: carrito o seguimiento de órdenes (sin ruta aparte). */
   drawerSubView: MarketplaceCartDrawerSubView;
@@ -148,6 +152,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
   } | null>(null);
   const [setupEquipoCompletoUsd, setSetupEquipoCompletoUsd] = useState(QUOTE_ADDON_SETUP_USD_FALLBACK);
   const [setupCompraHashrateUsd, setSetupCompraHashrateUsd] = useState(QUOTE_ADDON_SETUP_USD_FALLBACK);
+  const [garantiaQuoteItems, setGarantiaQuoteItems] = useState<GarantiaQuotePriceItem[]>([]);
 
   /** Quién tenía carrito “de cuenta” en el render anterior (cliente / admin con carrito marketplace). */
   const prevMarketplaceCartUserIdRef = useRef<number | null>(null);
@@ -205,6 +210,32 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
       })
       .catch(() => {
         /* mantener fallback */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getMarketplaceGarantiaQuotePrices()
+      .then((r) => {
+        if (cancelled) return;
+        const items = Array.isArray(r.items) ? r.items : [];
+        setGarantiaQuoteItems(
+          items.filter(
+            (x) =>
+              x &&
+              typeof x.codigo === "string" &&
+              typeof x.marca === "string" &&
+              typeof x.modelo === "string" &&
+              Number.isFinite(Number(x.precioGarantia)) &&
+              Number(x.precioGarantia) >= 0
+          ) as GarantiaQuotePriceItem[]
+        );
+      })
+      .catch(() => {
+        /* fallback 200 USD en lógica de carrito */
       });
     return () => {
       cancelled = true;
@@ -412,6 +443,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
     const subtotalUsd = quoteCartSubtotalUsd(lines, {
       setupEquipoCompletoUsd,
       setupCompraHashrateUsd,
+      garantiaItems: garantiaQuoteItems,
     });
     const unitCount = quoteCartTotalUnits(lines);
     const lineCount = lines.length;
@@ -439,7 +471,11 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
         status: r.status ?? "enviado_consulta",
         subtotalUsd:
           r.subtotalUsd ??
-          quoteCartSubtotalUsd(next, { setupEquipoCompletoUsd, setupCompraHashrateUsd }),
+          quoteCartSubtotalUsd(next, {
+            setupEquipoCompletoUsd,
+            setupCompraHashrateUsd,
+            garantiaItems: garantiaQuoteItems,
+          }),
         unitCount: r.unitCount ?? quoteCartTotalUnits(next),
         lineCount: r.lineCount ?? next.length,
       };
@@ -458,7 +494,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
       unitCount,
       lineCount,
     };
-  }, [canUseQuoteCart, lines, setupEquipoCompletoUsd, setupCompraHashrateUsd, refreshActiveOrderGate]);
+  }, [canUseQuoteCart, lines, setupEquipoCompletoUsd, setupCompraHashrateUsd, garantiaQuoteItems, refreshActiveOrderGate]);
 
   const openQuoteEmail = useCallback(async () => {
     let ref: QuoteTicketRef | undefined;
@@ -490,8 +526,9 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
     window.location.href = buildQuoteMailto(mailLines, ref, {
       setupEquipoCompletoUsd,
       setupCompraHashrateUsd,
+      garantiaItems: garantiaQuoteItems,
     });
-  }, [lines, canUseQuoteCart, setupEquipoCompletoUsd, setupCompraHashrateUsd, refreshActiveOrderGate]);
+  }, [lines, canUseQuoteCart, setupEquipoCompletoUsd, setupCompraHashrateUsd, garantiaQuoteItems, refreshActiveOrderGate]);
 
   const openQuoteWhatsApp = useCallback(async () => {
     let ref: QuoteTicketRef | undefined;
@@ -521,11 +558,15 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
       /* seguimos */
     }
     window.open(
-      buildQuoteWhatsAppUrl(waLines, ref, { setupEquipoCompletoUsd, setupCompraHashrateUsd }),
+      buildQuoteWhatsAppUrl(waLines, ref, {
+        setupEquipoCompletoUsd,
+        setupCompraHashrateUsd,
+        garantiaItems: garantiaQuoteItems,
+      }),
       "_blank",
       "noopener,noreferrer"
     );
-  }, [lines, canUseQuoteCart, setupEquipoCompletoUsd, setupCompraHashrateUsd, refreshActiveOrderGate]);
+  }, [lines, canUseQuoteCart, setupEquipoCompletoUsd, setupCompraHashrateUsd, garantiaQuoteItems, refreshActiveOrderGate]);
 
   const value = useMemo<Ctx>(
     () => ({
@@ -533,6 +574,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
       totalUnits,
       setupEquipoCompletoUsd,
       setupCompraHashrateUsd,
+      garantiaQuoteItems,
       drawerOpen,
       drawerSubView,
       canUseQuoteCart,
@@ -559,6 +601,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
       totalUnits,
       setupEquipoCompletoUsd,
       setupCompraHashrateUsd,
+      garantiaQuoteItems,
       drawerOpen,
       drawerSubView,
       canUseQuoteCart,

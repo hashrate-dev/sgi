@@ -791,6 +791,15 @@ export function getMarketplaceSetupQuotePrices(): Promise<{
   );
 }
 
+/** Ítems con precio garantía ANDE (misma BD que /equipos-asic/items-garantia). Público. */
+export function getMarketplaceGarantiaQuotePrices(): Promise<{
+  items: Array<{ codigo: string; marca: string; modelo: string; precioGarantia: number }>;
+}> {
+  return api<{ items: Array<{ codigo: string; marca: string; modelo: string; precioGarantia: number }> }>(
+    "/api/marketplace/garantia-quote-prices"
+  );
+}
+
 /**
  * Solo S03 (compatibilidad). Preferir getMarketplaceSetupQuotePrices.
  */

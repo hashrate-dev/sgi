@@ -5,6 +5,7 @@ import {
   cancelMyMarketplaceQuoteTicket,
   deleteAllMyMarketplaceQuoteTickets,
   deleteMyMarketplaceQuoteTicket,
+  getMarketplaceGarantiaQuotePrices,
   getMarketplaceSetupQuotePrices,
   getMyMarketplaceQuoteTicket,
   getMyMarketplaceQuoteTickets,
@@ -18,6 +19,7 @@ import {
   isMarketplacePipelineTicketStatus,
   marketplaceQuoteTicketLineDisplayName,
 } from "../../lib/marketplaceQuoteCart.js";
+import type { GarantiaQuotePriceItem } from "../../lib/marketplaceGarantiaQuote.js";
 import { canBulkManageMarketplaceMyOrders, enforceSingleMarketplaceOrderForRole } from "../../lib/auth.js";
 import { useAuth } from "../../contexts/AuthContext.js";
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
@@ -72,6 +74,7 @@ export function MarketplaceCartOrdersPanel({ onBackToCart }: Props) {
   const [search, setSearch] = useState("");
   const [setupEquipoCompletoUsd, setSetupEquipoCompletoUsd] = useState(QUOTE_ADDON_SETUP_USD_FALLBACK);
   const [setupCompraHashrateUsd, setSetupCompraHashrateUsd] = useState(QUOTE_ADDON_SETUP_USD_FALLBACK);
+  const [garantiaQuoteItems, setGarantiaQuoteItems] = useState<GarantiaQuotePriceItem[]>([]);
   const [deleteBusyId, setDeleteBusyId] = useState<number | null>(null);
   const [deleteAllBusy, setDeleteAllBusy] = useState(false);
   const [deleteUi, setDeleteUi] = useState<
@@ -107,6 +110,30 @@ export function MarketplaceCartOrdersPanel({ onBackToCart }: Props) {
         const b = Number(r.setupCompraHashrateUsd);
         if (Number.isFinite(a) && a >= 0) setSetupEquipoCompletoUsd(Math.round(a));
         if (Number.isFinite(b) && b >= 0) setSetupCompraHashrateUsd(Math.round(b));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getMarketplaceGarantiaQuotePrices()
+      .then((r) => {
+        if (cancelled) return;
+        const items = Array.isArray(r.items) ? r.items : [];
+        setGarantiaQuoteItems(
+          items.filter(
+            (x) =>
+              x &&
+              typeof x.codigo === "string" &&
+              typeof x.marca === "string" &&
+              typeof x.modelo === "string" &&
+              Number.isFinite(Number(x.precioGarantia)) &&
+              Number(x.precioGarantia) >= 0
+          ) as GarantiaQuotePriceItem[]
+        );
       })
       .catch(() => {});
     return () => {
@@ -644,6 +671,7 @@ export function MarketplaceCartOrdersPanel({ onBackToCart }: Props) {
                         const sub = ticketRowLineSubtotalUsd(row, {
                           setupEquipoCompletoUsd,
                           setupCompraHashrateUsd,
+                          garantiaItems: garantiaQuoteItems,
                         });
                         return (
                           <li key={i}>

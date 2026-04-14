@@ -10,6 +10,7 @@ import {
 } from "../lib/miningYieldEstimate.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { resolveSetupCompraHashrateUsd, resolveSetupEquipoCompletoUsd } from "../lib/marketplaceSetupHashratePrice.js";
+import { loadGarantiaQuoteRows } from "../lib/marketplaceGarantiaQuote.js";
 import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
 
 export const marketplaceRouter = Router();
@@ -105,6 +106,30 @@ marketplaceRouter.get("/marketplace/setup-compra-hashrate-usd", async (_req, res
     res.json({ precioUSD });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: { message: msg } });
+  }
+});
+
+/**
+ * GET /marketplace/garantia-quote-prices — ítems con precio desde `items_garantia_ande` (misma fuente que /equipos-asic/items-garantia).
+ * Público: el carrito de cotización empareja por código o marca+modelo (ej. Antminer Z15).
+ */
+marketplaceRouter.get("/marketplace/garantia-quote-prices", async (_req, res: Response) => {
+  try {
+    const raw = await loadGarantiaQuoteRows();
+    const items = raw
+      .filter((x) => Number.isFinite(x.precioGarantia) && x.precioGarantia >= 0)
+      .map((x) => ({
+        codigo: x.codigo,
+        marca: x.marca,
+        modelo: x.modelo,
+        precioGarantia: Math.round(x.precioGarantia),
+      }));
+    res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
+    res.json({ items });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[marketplace] garantia-quote-prices:", e);
     res.status(500).json({ error: { message: msg } });
   }
 });

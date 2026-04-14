@@ -8,6 +8,13 @@ import {
   normalizeConsultPriceLabelForDisplay,
   proratedEquipmentPriceUsd,
 } from "./marketplaceAsicCatalog.js";
+import {
+  DEFAULT_QUOTE_WARRANTY_USD,
+  resolveWarrantyUsdForQuoteLine,
+  type GarantiaQuotePriceItem,
+} from "./marketplaceGarantiaQuote.js";
+
+export type { GarantiaQuotePriceItem };
 
 export const QUOTE_CART_STORAGE_KEY = "hrs_marketplace_quote_cart_v1";
 /** Carrito cuando aún no hay sesión cliente (no se sincroniza con el servidor). */
@@ -38,12 +45,15 @@ export const QUOTE_WA_PHONE = "595994392728";
 export const QUOTE_ADDON_SETUP_USD_FALLBACK = 50;
 /** @deprecated Usar precios desde GET /api/marketplace/setup-quote-prices (S02 + S03). */
 export const QUOTE_ADDON_SETUP_USD = QUOTE_ADDON_SETUP_USD_FALLBACK;
-export const QUOTE_ADDON_WARRANTY_USD = 200;
+/** Fallback si no hay match en `items_garantia_ande` (GET /api/marketplace/garantia-quote-prices). */
+export const QUOTE_ADDON_WARRANTY_USD = DEFAULT_QUOTE_WARRANTY_USD;
 
 /** Precios setup desde gestión Setup: S02 = equipo completo, S03 = fracción hashrate. */
 export type QuoteCartPricing = {
   setupEquipoCompletoUsd?: number;
   setupCompraHashrateUsd?: number;
+  /** Precios garantía ANDE (`/equipos-asic/items-garantia`); match por código o marca+modelo. */
+  garantiaItems?: GarantiaQuotePriceItem[];
 };
 
 function roundSetupUsd(n: unknown, fallback: number): number {
@@ -72,9 +82,16 @@ export type QuoteCartLine = {
   hashrateSharePct?: 25 | 50 | 75;
   /** Setup / instalación en granja (S02 equipo completo, S03 fracción hashrate). */
   includeSetup: boolean;
-  /** Garantía (200 USD por unidad). */
+  /** Garantía ANDE (precio por ítem en gestión o fallback). */
   includeWarranty: boolean;
 };
+
+export function quoteCartWarrantyUnitUsd(l: QuoteCartLine, pricing?: QuoteCartPricing): number {
+  return resolveWarrantyUsdForQuoteLine(
+    { productId: l.productId, brand: l.brand, model: l.model },
+    pricing?.garantiaItems
+  );
+}
 
 /** Misma regla que la vitrina «SOLICITA PRECIO»: sin USD numérico en etiqueta → precio a cotizar. */
 export function quoteLineEquipmentPricePendingFromFields(priceUsd: number, priceLabel: string): boolean {
@@ -329,7 +346,7 @@ export function quoteCartLineAddonsUsd(l: QuoteCartLine, pricing?: QuoteCartPric
   const m = shareAddonMult(l);
   let a = 0;
   if (l.includeSetup) a += l.qty * setupUnit;
-  if (l.includeWarranty) a += Math.round(l.qty * QUOTE_ADDON_WARRANTY_USD * m);
+  if (l.includeWarranty) a += Math.round(l.qty * quoteCartWarrantyUnitUsd(l, pricing) * m);
   return a;
 }
 
@@ -361,7 +378,17 @@ export function ticketRowLineSubtotalUsd(row: Record<string, unknown>, pricing?:
   const m = pct / 100;
   let sub = qty * pu;
   if (row.includeSetup === true) sub += qty * setupUnit;
-  if (row.includeWarranty === true) sub += Math.round(qty * QUOTE_ADDON_WARRANTY_USD * m);
+  if (row.includeWarranty === true) {
+    const wu = resolveWarrantyUsdForQuoteLine(
+      {
+        productId: String(row.productId ?? ""),
+        brand: String(row.brand ?? ""),
+        model: String(row.model ?? ""),
+      },
+      pricing?.garantiaItems
+    );
+    sub += Math.round(qty * wu * m);
+  }
   return sub;
 }
 
@@ -406,7 +433,7 @@ export function buildQuoteMessage(
         if (pending) {
           addons.push(`Garantía: importe a cotizar con el equipo comercial de Hashrate (×${l.qty} u.)`);
         } else {
-          const unit = Math.round(QUOTE_ADDON_WARRANTY_USD * m);
+          const unit = Math.round(quoteCartWarrantyUnitUsd(l, pricing) * m);
           addons.push(
             `Garantía: ${unit.toLocaleString("es-PY")} USD × ${l.qty} u. = ${(l.qty * unit).toLocaleString("es-PY")} USD`
           );

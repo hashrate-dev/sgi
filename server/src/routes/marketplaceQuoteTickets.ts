@@ -8,6 +8,11 @@ import { z } from "zod";
 import { db, getDb } from "../db.js";
 import { notifyMarketplaceOrderWhatsApp } from "../lib/whatsappCloud.js";
 import { resolveSetupCompraHashrateUsd, resolveSetupEquipoCompletoUsd } from "../lib/marketplaceSetupHashratePrice.js";
+import {
+  loadGarantiaQuoteRows,
+  resolveWarrantyUsdForQuoteLine,
+  type GarantiaQuoteRow,
+} from "../lib/marketplaceGarantiaQuote.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 
 export const marketplaceQuoteTicketsRouter = Router();
@@ -17,9 +22,6 @@ const adminAB = requireRole("admin_a", "admin_b");
 function isPg(): boolean {
   return (getDb() as { isPostgres?: boolean }).isPostgres === true;
 }
-
-/** Garantía referencial (cliente prorratea por % hashrate en líneas 25/50/75). */
-const QUOTE_ADDON_WARRANTY_USD = 200;
 
 const LineSchema = z.object({
   productId: z.string().min(1).max(200),
@@ -86,12 +88,23 @@ function lineEquipmentPricePending(l: { priceUsd: number; priceLabel: string }):
   return true;
 }
 
-function computeTotals(lines: z.infer<typeof LineSchema>[], setupEquipoCompletoUsd: number, setupCompraHashrateUsd: number) {
+function computeTotals(
+  lines: z.infer<typeof LineSchema>[],
+  setupEquipoCompletoUsd: number,
+  setupCompraHashrateUsd: number,
+  garantiaItems: GarantiaQuoteRow[]
+) {
   const subtotal = lines.reduce((a, l) => {
     let row = l.qty * l.priceUsd;
     if (lineEquipmentPricePending(l)) return a + row;
     if (l.includeSetup) row += l.qty * setupUsdForLine(l, setupEquipoCompletoUsd, setupCompraHashrateUsd);
-    if (l.includeWarranty) row += Math.round(l.qty * QUOTE_ADDON_WARRANTY_USD * lineShareMult(l));
+    if (l.includeWarranty) {
+      const wu = resolveWarrantyUsdForQuoteLine(
+        { productId: l.productId, brand: l.brand, model: l.model },
+        garantiaItems
+      );
+      row += Math.round(l.qty * wu * lineShareMult(l));
+    }
     return a + row;
   }, 0);
   const unitCount = lines.reduce((a, l) => a + l.qty, 0);
@@ -211,6 +224,7 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
       return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
     }
     const { lines, event, clearPipelineCart } = parsed.data;
+    const garantiaItems = await loadGarantiaQuoteRows();
     const userId = req.user!.id;
     const userRole = String(req.user!.role ?? "").toLowerCase().trim();
     /** Cliente y admin A/B: una consulta activa; se fusionan cambios del carrito en ese ticket (quote-sync). */
@@ -248,7 +262,8 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
           const { subtotal: mergedSub, lineCount: mergedLc, unitCount: mergedUc } = computeTotals(
             [],
             setupEquipoCompletoUsd,
-            setupCompraHashrateUsd
+            setupCompraHashrateUsd,
+            garantiaItems
           );
           await db
             .prepare(
@@ -305,7 +320,8 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
         const { subtotal: mergedSub, lineCount: mergedLc, unitCount: mergedUc } = computeTotals(
           mergedLines,
           setupEquipoCompletoUsd,
-          setupCompraHashrateUsd
+          setupCompraHashrateUsd,
+          garantiaItems
         );
         const itemsJsonMerged = JSON.stringify(mergedLines);
         const isSubmitTicketMerge = event === "submit_ticket";
@@ -374,7 +390,12 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
       }
     }
 
-    const { subtotal, lineCount, unitCount } = computeTotals(lines, setupEquipoCompletoUsd, setupCompraHashrateUsd);
+    const { subtotal, lineCount, unitCount } = computeTotals(
+      lines,
+      setupEquipoCompletoUsd,
+      setupCompraHashrateUsd,
+      garantiaItems
+    );
     const itemsJson = JSON.stringify(lines);
     const isSubmitTicket = event === "submit_ticket";
     const contactChannel =

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import {
   deleteMarketplaceQuoteTicketAdmin,
+  getMarketplaceGarantiaQuotePrices,
   getMarketplaceQuoteTickets,
   getMarketplaceQuoteTicketsStats,
   getMarketplaceSetupQuotePrices,
@@ -13,10 +14,10 @@ import {
   ticketRowLineSubtotalUsd,
   ticketRowIsEquipmentPricePending,
   ticketRowSharePct,
-  QUOTE_ADDON_WARRANTY_USD,
   QUOTE_ADDON_SETUP_USD_FALLBACK,
   marketplaceQuoteTicketLineDisplayName,
 } from "../lib/marketplaceQuoteCart.js";
+import { resolveWarrantyUsdForQuoteLine, type GarantiaQuotePriceItem } from "../lib/marketplaceGarantiaQuote.js";
 import { useAuth } from "../contexts/AuthContext.js";
 import { PageHeader } from "../components/PageHeader";
 import { ConfirmModal } from "../components/ConfirmModal.js";
@@ -75,6 +76,7 @@ export function CotizacionesMarketplacePage() {
   const [editNotes, setEditNotes] = useState("");
   const [setupEquipoCompletoUsd, setSetupEquipoCompletoUsd] = useState(QUOTE_ADDON_SETUP_USD_FALLBACK);
   const [setupCompraHashrateUsd, setSetupCompraHashrateUsd] = useState(QUOTE_ADDON_SETUP_USD_FALLBACK);
+  const [garantiaQuoteItems, setGarantiaQuoteItems] = useState<GarantiaQuotePriceItem[]>([]);
   const [deleteModalTicket, setDeleteModalTicket] = useState<MarketplaceQuoteTicket | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
 
@@ -87,6 +89,30 @@ export function CotizacionesMarketplacePage() {
         const b = Number(r.setupCompraHashrateUsd);
         if (Number.isFinite(a) && a >= 0) setSetupEquipoCompletoUsd(Math.round(a));
         if (Number.isFinite(b) && b >= 0) setSetupCompraHashrateUsd(Math.round(b));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getMarketplaceGarantiaQuotePrices()
+      .then((r) => {
+        if (cancelled) return;
+        const items = Array.isArray(r.items) ? r.items : [];
+        setGarantiaQuoteItems(
+          items.filter(
+            (x) =>
+              x &&
+              typeof x.codigo === "string" &&
+              typeof x.marca === "string" &&
+              typeof x.modelo === "string" &&
+              Number.isFinite(Number(x.precioGarantia)) &&
+              Number(x.precioGarantia) >= 0
+          ) as GarantiaQuotePriceItem[]
+        );
       })
       .catch(() => {});
     return () => {
@@ -346,12 +372,22 @@ export function CotizacionesMarketplacePage() {
                     const inclGar = row.includeWarranty === true;
                     const sharePct = ticketRowSharePct(row);
                     const shareMult = sharePct / 100;
-                    const warrantyUnit = Math.round(QUOTE_ADDON_WARRANTY_USD * shareMult);
+                    const warrantyUnit = Math.round(
+                      resolveWarrantyUsdForQuoteLine(
+                        {
+                          productId: String(row.productId ?? ""),
+                          brand: String(row.brand ?? ""),
+                          model: String(row.model ?? ""),
+                        },
+                        garantiaQuoteItems
+                      ) * shareMult
+                    );
                     const setupLbl = sharePct < 100 ? setupCompraHashrateUsd : setupEquipoCompletoUsd;
                     const linePending = ticketRowIsEquipmentPricePending(row);
                     const sub = ticketRowLineSubtotalUsd(row, {
                       setupEquipoCompletoUsd,
                       setupCompraHashrateUsd,
+                      garantiaItems: garantiaQuoteItems,
                     });
                     const name = marketplaceQuoteTicketLineDisplayName(row);
                     return (
