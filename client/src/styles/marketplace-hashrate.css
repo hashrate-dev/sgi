@@ -901,7 +901,7 @@ button.market-link-hrs {
 /* ——— Tarjeta producto ——— */
 .shelf-product {
   background: #fff;
-  border-radius: 16px;
+  border-radius: 12px;
   border: 1px solid #e5e7eb;
   overflow: hidden;
   display: flex;
@@ -973,13 +973,13 @@ button.market-link-hrs {
   position: relative;
   padding: 7px;
   background: #0f3d28;
-  border-radius: 16px 16px 0 0;
+  border-radius: 12px 12px 0 0;
   box-sizing: border-box;
 }
 
 .shelf-product__media-gradient {
   position: relative;
-  border-radius: 12px 12px 0 0;
+  border-radius: 8px 8px 0 0;
   border: 1px solid rgba(0, 25, 18, 0.65);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
   background: linear-gradient(180deg, #004e75 0%, #0d6b58 45%, #42cc66 100%);
@@ -1060,7 +1060,7 @@ button.market-link-hrs {
   width: 100%;
   padding: 0.65rem 0.85rem;
   background: #f3f4f6;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid #e5e7eb;
 }
 
@@ -1084,7 +1084,7 @@ button.market-link-hrs {
 .shelf-product__specs-box {
   padding: 0.65rem 0.75rem;
   background: #e0f2fe;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid #bae6fd;
 }
 
@@ -1128,7 +1128,7 @@ button.market-link-hrs {
   font-weight: 700;
   font-family: inherit;
   border: none;
-  border-radius: 12px;
+  border-radius: 8px;
   cursor: pointer;
   color: #fff;
   background: linear-gradient(180deg, #10b981 0%, #059669 100%);
@@ -1154,7 +1154,7 @@ button.market-link-hrs {
   font-size: 0.78rem;
   font-weight: 700;
   font-family: inherit;
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
   color: #047857;
   background: #fff;

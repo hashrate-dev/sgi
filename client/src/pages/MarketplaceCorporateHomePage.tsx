@@ -27,10 +27,11 @@ const CORP_ZCASH_LOGO_IMG = `${import.meta.env.BASE_URL}images/zcash-logo.png`;
 const CORP_HOSTING_BAND_IMG = `${import.meta.env.BASE_URL}images/hosting-mining-farm-04.png`;
 
 const CORP_FAQ_ROWS = [
-  { q: "corp.faq.q1" as const, a: "corp.faq.a1" as const },
-  { q: "corp.faq.q2" as const, a: "corp.faq.a2" as const },
-  { q: "corp.faq.q3" as const, a: "corp.faq.a3" as const },
-  { q: "corp.faq.q4" as const, a: "corp.faq.a4" as const },
+  /** Intro comercial (tomadas del FAQ completo /marketplace/faq) */
+  { q: "corp.faq.wp.3.q" as const, a: "corp.faq.wp.3.a" as const },
+  { q: "corp.faq.wp.6.q" as const, a: "corp.faq.wp.6.a" as const },
+  { q: "corp.faq.wp.4.q" as const, a: "corp.faq.wp.4.a" as const },
+  { q: "corp.faq.wp.8.q" as const, a: "corp.faq.wp.8.a" as const },
 ];
 
 const CORP_ANCHOR_IDS = ["servicios", "faq", "contacto"] as const;
