@@ -82,14 +82,16 @@ async function touchMarketplacePresence(req: Request, fallbackPath: string): Pro
   const hasAuth = typeof req.headers.authorization === "string" && req.headers.authorization.trim().length > 0;
   const viewerType = hasAuth ? "staff" : "anon";
   const visitorId = visitorFingerprintFromRequest(req);
-  await db
-    .prepare(
-      `INSERT INTO marketplace_presence (visitor_id, viewer_type, current_path, last_seen_at)
-       VALUES (?, ?, ?, ?)
-       ON CONFLICT(visitor_id)
-       DO UPDATE SET viewer_type = excluded.viewer_type, current_path = excluded.current_path, last_seen_at = excluded.last_seen_at`
-    )
-    .run(visitorId, viewerType, currentPath, nowIso);
+  const upsertSql =
+    `INSERT INTO marketplace_presence (visitor_id, viewer_type, current_path, last_seen_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(visitor_id)
+     DO UPDATE SET viewer_type = excluded.viewer_type, current_path = excluded.current_path, last_seen_at = excluded.last_seen_at`;
+  if (isPg()) {
+    await db.prepare(`${upsertSql} RETURNING visitor_id as id`).get(visitorId, viewerType, currentPath, nowIso);
+  } else {
+    await db.prepare(upsertSql).run(visitorId, viewerType, currentPath, nowIso);
+  }
   await db.prepare("DELETE FROM marketplace_presence WHERE last_seen_at < ?").run(cutoffIso);
 }
 
@@ -124,14 +126,16 @@ marketplaceRouter.post("/marketplace/presence/heartbeat", async (req: Request, r
     const cutoffIso = new Date(Date.now() - MARKETPLACE_PRESENCE_ONLINE_WINDOW_MS * 4).toISOString();
     const currentPath = (parsed.data.currentPath || "/marketplace").slice(0, 200);
     const viewerType = parsed.data.viewerType ?? "anon";
-    await db
-      .prepare(
-        `INSERT INTO marketplace_presence (visitor_id, viewer_type, current_path, last_seen_at)
-         VALUES (?, ?, ?, ?)
-         ON CONFLICT(visitor_id)
-         DO UPDATE SET viewer_type = excluded.viewer_type, current_path = excluded.current_path, last_seen_at = excluded.last_seen_at`
-      )
-      .run(parsed.data.visitorId, viewerType, currentPath, nowIso);
+    const upsertSql =
+      `INSERT INTO marketplace_presence (visitor_id, viewer_type, current_path, last_seen_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(visitor_id)
+       DO UPDATE SET viewer_type = excluded.viewer_type, current_path = excluded.current_path, last_seen_at = excluded.last_seen_at`;
+    if (isPg()) {
+      await db.prepare(`${upsertSql} RETURNING visitor_id as id`).get(parsed.data.visitorId, viewerType, currentPath, nowIso);
+    } else {
+      await db.prepare(upsertSql).run(parsed.data.visitorId, viewerType, currentPath, nowIso);
+    }
     await db.prepare("DELETE FROM marketplace_presence WHERE last_seen_at < ?").run(cutoffIso);
     res.status(204).send();
   } catch (e) {
