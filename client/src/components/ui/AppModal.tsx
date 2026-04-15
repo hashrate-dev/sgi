@@ -40,6 +40,8 @@ export function AppModal({
             borderColor="gray.200"
             maxW="min(100%, 440px)"
             bg="white"
+            display="flex"
+            flexDirection="column"
           >
             <Dialog.Header
               px={6}
@@ -79,8 +81,11 @@ export function AppModal({
                 bg="gray.50"
                 display="flex"
                 justifyContent="flex-end"
+                alignItems="center"
                 gap={3}
                 flexWrap="wrap"
+                flexShrink={0}
+                rowGap={3}
               >
                 {footer}
               </Dialog.Footer>

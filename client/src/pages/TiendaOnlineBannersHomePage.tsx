@@ -198,19 +198,19 @@ export function TiendaOnlineBannersHomePage() {
   }
 
   return (
-    <Box minH="100vh" px={{ base: 4, md: 6 }} py={{ base: 5, md: 8 }} bgGradient="linear(135deg, #074025 0%, #49f227 100%)">
-      <Box maxW="1200px" mx="auto">
+    <Box minH="100vh" px={{ base: 4, md: 6 }} pt={{ base: 2, md: 2 }} pb={{ base: 3, md: 4 }} bgGradient="linear(135deg, #074025 0%, #49f227 100%)">
+      <Box maxW="1320px" mx="auto">
         <PageHeader title="Tienda Online Banners Home" showBackButton backTo="/" backText="Volver al inicio" />
 
         {loadError ? (
-          <AppCard mt={4} borderColor="red.300" bg="red.50">
+          <AppCard mt={3} borderColor="red.300" bg="red.50">
             <Text color="red.700" fontWeight="medium">{loadError}</Text>
           </AppCard>
         ) : null}
 
         <AppCard
-          mt={4}
-          p={{ base: 4, md: 6 }}
+          mt={3}
+          p={{ base: 3, md: 4 }}
           borderColor="#2D5D46"
           borderWidth="1px"
           boxShadow="md"

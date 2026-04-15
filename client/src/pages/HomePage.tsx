@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import type { CSSProperties } from "react";
 import { Navigate, Link as RouterLink } from "react-router-dom";
 import { Badge, Box, Flex, Grid, Heading, Image as ChakraImage, Stack, Text } from "@chakra-ui/react";
 import { useAuth } from "../contexts/AuthContext";
@@ -15,14 +16,20 @@ type MenuItem = {
   label: string;
   desc: string;
   roles?: string[];
+  iconBg?: string;
+  iconColor?: string;
+  iconBorderColor?: string;
+  iconHoverBg?: string;
+  iconHoverColor?: string;
+  iconHoverBorderColor?: string;
   /** Logo en la tarjeta (ej. Hosting = marca HASHRATE) en lugar del icono Bootstrap */
   cardLogoSrc?: string;
   cardLogoAlt?: string;
 };
 
 const ICON_SLOT_PROPS = {
-  w: "72px",
-  h: "72px",
+  w: "74px",
+  h: "74px",
   align: "center" as const,
   justify: "center" as const,
   borderRadius: "xl",
@@ -35,22 +42,37 @@ const ICON_SLOT_PROPS = {
 
 /** Tamaño uniforme de iconos Bootstrap en tarjetas del home (rellena más el recuadre) */
 const DASHBOARD_BI_ICON_SIZE = "2.125rem";
-const DASHBOARD_BI_ICON_SIZE_LG = "2.35rem";
+const DASHBOARD_BI_ICON_SIZE_LG = "2.55rem";
+
+/** Enlace que ocupa toda la celda del grid para igualar alturas entre tarjetas (misma fila = misma altura) */
+const DASHBOARD_CARD_LINK_STYLE: CSSProperties = {
+  textDecoration: "none",
+  color: "inherit",
+  display: "flex",
+  minHeight: 0,
+  height: "100%",
+  alignSelf: "stretch",
+};
 
 const menuItems: MenuItem[] = [
   {
     to: "/marketplace",
-    icon: "bi-bag-heart",
+    icon: "bi-bag",
     label: "Tienda online",
     desc: "Catálogo público de equipos ASIC — vista cliente (sin administración)",
+    iconBg: "#fff7d1",
+    iconColor: "#d97706",
+    iconBorderColor: "#fcd34d",
+    iconHoverBg: "#fde68a",
+    iconHoverColor: "#b45309",
+    iconHoverBorderColor: "#f59e0b",
   },
   {
     to: "/hosting",
+    icon: "bi-hdd-network",
     label: "Servicios de Hosting",
     desc: "Información de facturación de servicios de hosting",
     roles: ["admin_a", "admin_b", "operador"],
-    cardLogoSrc: "/images/LOGO-HASHRATE.png",
-    cardLogoAlt: "Hashrate",
   },
   {
     to: "/equipos-asic",
@@ -83,20 +105,59 @@ const menuItems: MenuItem[] = [
 ];
 
 function DashboardCardIconSlot({ item }: { item: MenuItem }) {
+  if (item.to === "/marketplace") {
+    return (
+      <Flex
+        {...ICON_SLOT_PROPS}
+        className="dashboard-card-icon-slot dashboard-card-icon-slot--marketplace"
+        bg="#fff7d1"
+        color="#1f2937"
+        borderColor="#fcd34d"
+        transition="background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease"
+        position="relative"
+        mb={3}
+      >
+        <Box as="i" className="bi bi-bag" fontSize={DASHBOARD_BI_ICON_SIZE_LG} lineHeight={1} aria-hidden />
+        <Flex
+          className="dashboard-card-icon-slot__marketplace-play"
+          position="absolute"
+          bottom="9px"
+          left="50%"
+          transform="translateX(-50%)"
+          w="14px"
+          h="14px"
+          borderRadius="4px"
+          bg="#f59e0b"
+          align="center"
+          justify="center"
+        >
+          <Box as="i" className="bi bi-play-fill" color="white" fontSize="0.5rem" lineHeight={1} aria-hidden />
+        </Flex>
+      </Flex>
+    );
+  }
   if (item.cardLogoSrc) {
     return (
       <Flex {...ICON_SLOT_PROPS} mb={3}>
         <img
           src={item.cardLogoSrc}
           alt={item.cardLogoAlt ?? "Hashrate"}
-          style={{ maxHeight: 50, width: "auto", maxWidth: 64, objectFit: "contain", display: "block" }}
+          style={{ maxHeight: 70, width: "auto", maxWidth: 82, objectFit: "contain", display: "block" }}
         />
       </Flex>
     );
   }
   if (item.icon) {
     return (
-      <Flex {...ICON_SLOT_PROPS} mb={3}>
+      <Flex
+        {...ICON_SLOT_PROPS}
+        className="dashboard-card-icon-slot"
+        bg={item.iconBg ?? ICON_SLOT_PROPS.bg}
+        color={item.iconColor ?? ICON_SLOT_PROPS.color}
+        borderColor={item.iconBorderColor ?? ICON_SLOT_PROPS.borderColor}
+        transition="background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease"
+        mb={3}
+      >
         <Box as="i" className={`bi ${item.icon}`} fontSize={DASHBOARD_BI_ICON_SIZE_LG} lineHeight={1} aria-hidden />
       </Flex>
     );
@@ -236,18 +297,30 @@ export function HomePage() {
 
   const cardTitleProps = {
     as: "h2" as const,
-    fontSize: { base: "lg", md: "xl" },
-    fontWeight: "semibold",
+    fontSize: { base: "1.55rem", md: "1.65rem" },
+    fontWeight: "700",
     color: "gray.800",
-    lineHeight: "snug",
-    mb: 2,
+    lineHeight: "1.12",
+    mb: 1.5,
     letterSpacing: "-0.01em",
   };
 
   const cardDescProps = {
-    fontSize: "sm",
+    fontSize: { base: "0.88rem", md: "0.9rem" },
     color: "gray.600",
-    lineHeight: "tall",
+    lineHeight: "1.28",
+  };
+
+  const dashboardCardProps = {
+    flex: 1,
+    w: "100%",
+    minH: "208px",
+    h: "100%",
+    p: 4,
+    display: "flex",
+    flexDirection: "column" as const,
+    transition: "box-shadow 0.2s ease, transform 0.2s ease",
+    _hover: { transform: "translateY(-2px)", boxShadow: "md", borderColor: "green.200" },
   };
 
   if (user?.role === "lector") {
@@ -258,9 +331,15 @@ export function HomePage() {
   }
 
   return (
-    <Box minH="100vh" px={{ base: 4, md: 6 }} py={{ base: 5, md: 8 }} bgGradient="linear(135deg, #074025 0%, #2d8f3a 55%, #49f227 100%)">
-      <Box maxW="1150px" mx="auto">
-        <AppCard mb={5} p={{ base: 4, md: 5 }} boxShadow="md">
+    <Box
+      minH="100vh"
+      px={{ base: 4, md: 6 }}
+      pt={{ base: 2, md: 2 }}
+      pb={{ base: 3, md: 4 }}
+      bgGradient="linear(135deg, #074025 0%, #2d8f3a 55%, #49f227 100%)"
+    >
+      <Box maxW="1320px" mx="auto">
+        <AppCard mb={3} p={{ base: 3, md: 4 }} boxShadow="md">
           <Flex
             align="center"
             justify="space-between"
@@ -272,9 +351,9 @@ export function HomePage() {
               <ChakraImage
                 src={logoSrc}
                 alt="HRS Logo"
-                h={{ base: "40px", md: "48px" }}
+                h={{ base: "56px", md: "72px" }}
                 w="auto"
-                maxW={{ base: "120px", md: "160px" }}
+                maxW={{ base: "200px", md: "260px" }}
                 objectFit="contain"
                 flexShrink={0}
                 onError={() => {
@@ -347,18 +426,33 @@ export function HomePage() {
 
         <Grid
           templateColumns={{ base: "1fr", md: "repeat(2, minmax(0, 1fr))", xl: "repeat(3, minmax(0, 1fr))" }}
-          gap={4}
+          gap={3}
           alignItems="stretch"
         >
           {visibleMenuItems.map((item) => (
-            <RouterLink key={item.to + item.label} to={item.to} style={{ textDecoration: "none", color: "inherit", display: "block", minHeight: 0 }}>
+            <RouterLink key={item.to + item.label} to={item.to} style={DASHBOARD_CARD_LINK_STYLE}>
               <AppCard
-                h="100%"
-                minH="148px"
-                display="flex"
-                flexDirection="column"
-                transition="box-shadow 0.2s ease, transform 0.2s ease"
-                _hover={{ transform: "translateY(-2px)", boxShadow: "md", borderColor: "green.200" }}
+                {...dashboardCardProps}
+                _hover={{
+                  ...dashboardCardProps._hover,
+                  "& .dashboard-card-icon-slot": {
+                    bg: item.iconHoverBg ?? "green.200",
+                    color: item.iconHoverColor ?? "green.800",
+                    borderColor: item.iconHoverBorderColor ?? "green.300",
+                  },
+                  ...(item.to === "/marketplace"
+                    ? {
+                        "& .dashboard-card-icon-slot--marketplace": {
+                          bg: "#d97706",
+                          color: "white",
+                          borderColor: "#d97706",
+                        },
+                        "& .dashboard-card-icon-slot__marketplace-play": {
+                          bg: "#b45309",
+                        },
+                      }
+                    : {}),
+                }}
               >
                 <DashboardCardIconSlot item={item} />
                 <Heading {...cardTitleProps}>{item.label}</Heading>
@@ -368,18 +462,23 @@ export function HomePage() {
           ))}
 
           {canSeeMarketplaceOrdersCard ? (
-            <RouterLink to="/cotizaciones-marketplace" style={{ textDecoration: "none", color: "inherit", display: "block", minHeight: 0 }}>
+            <RouterLink to="/cotizaciones-marketplace" style={DASHBOARD_CARD_LINK_STYLE}>
               <AppCard
-                h="100%"
-                minH="148px"
-                display="flex"
-                flexDirection="column"
+                {...dashboardCardProps}
                 borderLeftWidth="4px"
                 borderLeftColor="green.500"
-                transition="box-shadow 0.2s ease, transform 0.2s ease"
-                _hover={{ transform: "translateY(-2px)", boxShadow: "md", borderColor: "gray.200" }}
+                _hover={{
+                  transform: "translateY(-2px)",
+                  boxShadow: "md",
+                  borderColor: "gray.200",
+                  "& .dashboard-card-icon-slot": {
+                    bg: "green.200",
+                    color: "green.800",
+                    borderColor: "green.300",
+                  },
+                }}
               >
-                <Flex {...ICON_SLOT_PROPS} mb={3} position="relative">
+                <Flex {...ICON_SLOT_PROPS} className="dashboard-card-icon-slot" mb={3} position="relative">
                   <Box as="i" className="bi bi-ticket-perforated" fontSize={DASHBOARD_BI_ICON_SIZE_LG} lineHeight={1} aria-hidden />
                   {marketplaceOpenCount > 0 ? (
                     <Box
@@ -412,21 +511,19 @@ export function HomePage() {
           ) : null}
 
           {canSeeMarketplaceOrdersCard ? (
-            <RouterLink
-              to="/marketplace-presencia"
-              role="status"
-              aria-live="polite"
-              style={{ textDecoration: "none", color: "inherit", display: "block", minHeight: 0 }}
-            >
+            <RouterLink to="/marketplace-presencia" role="status" aria-live="polite" style={DASHBOARD_CARD_LINK_STYLE}>
               <AppCard
-                h="100%"
-                minH="148px"
-                display="flex"
-                flexDirection="column"
-                transition="box-shadow 0.2s ease, transform 0.2s ease"
-                _hover={{ transform: "translateY(-2px)", boxShadow: "md", borderColor: "green.200" }}
+                {...dashboardCardProps}
+                _hover={{
+                  ...dashboardCardProps._hover,
+                  "& .dashboard-card-icon-slot": {
+                    bg: "green.200",
+                    color: "green.800",
+                    borderColor: "green.300",
+                  },
+                }}
               >
-                <Flex {...ICON_SLOT_PROPS} mb={3}>
+                <Flex {...ICON_SLOT_PROPS} className="dashboard-card-icon-slot" mb={3}>
                   <Box as="i" className="bi bi-broadcast-pin" fontSize={DASHBOARD_BI_ICON_SIZE_LG} lineHeight={1} aria-hidden />
                 </Flex>
                 <Heading {...cardTitleProps}>Marketplace en vivo</Heading>
@@ -441,16 +538,19 @@ export function HomePage() {
           ) : null}
 
           {user && (roleNorm(user.role) === "admin_a" || roleNorm(user.role) === "admin_b") ? (
-            <RouterLink to="/tienda-online-banners-home" style={{ textDecoration: "none", color: "inherit", display: "block", minHeight: 0 }}>
+            <RouterLink to="/tienda-online-banners-home" style={DASHBOARD_CARD_LINK_STYLE}>
               <AppCard
-                h="100%"
-                minH="148px"
-                display="flex"
-                flexDirection="column"
-                transition="box-shadow 0.2s ease, transform 0.2s ease"
-                _hover={{ transform: "translateY(-2px)", boxShadow: "md", borderColor: "green.200" }}
+                {...dashboardCardProps}
+                _hover={{
+                  ...dashboardCardProps._hover,
+                  "& .dashboard-card-icon-slot": {
+                    bg: "green.200",
+                    color: "green.800",
+                    borderColor: "green.300",
+                  },
+                }}
               >
-                <Flex {...ICON_SLOT_PROPS} mb={3}>
+                <Flex {...ICON_SLOT_PROPS} className="dashboard-card-icon-slot" mb={3}>
                   <Box as="i" className="bi bi-images" fontSize={DASHBOARD_BI_ICON_SIZE_LG} lineHeight={1} aria-hidden />
                 </Flex>
                 <Heading {...cardTitleProps}>Tienda online — banners home</Heading>
@@ -460,16 +560,19 @@ export function HomePage() {
           ) : null}
 
           {user ? (
-            <RouterLink to="/configuracion" style={{ textDecoration: "none", color: "inherit", display: "block", minHeight: 0 }}>
+            <RouterLink to="/configuracion" style={DASHBOARD_CARD_LINK_STYLE}>
               <AppCard
-                h="100%"
-                minH="148px"
-                display="flex"
-                flexDirection="column"
-                transition="box-shadow 0.2s ease, transform 0.2s ease"
-                _hover={{ transform: "translateY(-2px)", boxShadow: "md", borderColor: "green.200" }}
+                {...dashboardCardProps}
+                _hover={{
+                  ...dashboardCardProps._hover,
+                  "& .dashboard-card-icon-slot": {
+                    bg: "green.200",
+                    color: "green.800",
+                    borderColor: "green.300",
+                  },
+                }}
               >
-                <Flex {...ICON_SLOT_PROPS} mb={3}>
+                <Flex {...ICON_SLOT_PROPS} className="dashboard-card-icon-slot" mb={3}>
                   <Box as="i" className="bi bi-gear-fill" fontSize={DASHBOARD_BI_ICON_SIZE_LG} lineHeight={1} aria-hidden />
                 </Flex>
                 <Heading {...cardTitleProps}>Configuración</Heading>
@@ -483,19 +586,20 @@ export function HomePage() {
         </Grid>
       </Box>
 
-      {showPasswordModal && user ? (
+      {/* Siempre montado con user: evita desmontar el Dialog al cerrar (dejaba backdrop/bloqueo de puntero) */}
+      {user ? (
         <AppModal
           open={showPasswordModal}
           onOpenChange={setShowPasswordModal}
           title="Cambiar mi contraseña"
           description="Elegí una contraseña segura. Mínimo 6 caracteres; podés combinar letras y números."
-          size="sm"
+          size="md"
           footer={
             <>
-              <AppButton variant="outline" size="sm" onClick={() => setShowPasswordModal(false)}>
+              <AppButton variant="outline" size="md" minH="42px" px={5} onClick={() => setShowPasswordModal(false)}>
                 Cancelar
               </AppButton>
-              <AppButton size="sm" onClick={handleChangePassword} loading={saving}>
+              <AppButton size="md" minH="42px" px={5} onClick={handleChangePassword} loading={saving}>
                 Guardar contraseña
               </AppButton>
             </>

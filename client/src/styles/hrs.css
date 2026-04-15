@@ -73,6 +73,11 @@ body.hrs-protected-green-bg {
   min-height: 100vh;
 }
 
+/* Unificar ancho de contenido SGI al mismo estándar visual */
+.sgi-protected-root .container {
+  max-width: 1320px;
+}
+
 @media (max-width: 768px) {
   .sgi-protected-root.sgi-protected-root--admin-footer .fact-page {
     min-height: calc(100vh - 78px);

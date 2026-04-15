@@ -942,11 +942,11 @@ export function EquiposAsicPage() {
   );
 
   return (
-    <Box minH="100vh" px={{ base: 4, md: 6 }} py={{ base: 5, md: 8 }} bgGradient="linear(180deg, #1f4f3d 0%, #0b0f12 100%)">
-      <Box maxW="1300px" mx="auto">
+    <Box minH="100vh" px={{ base: 4, md: 6 }} pt={{ base: 1, md: 1 }} pb={{ base: 3, md: 4 }} bgGradient="linear(180deg, #1f4f3d 0%, #0b0f12 100%)">
+      <Box maxW="1320px" mx="auto">
         <PageHeader title="Equipos ASIC" />
 
-        <Box mt={4} p={{ base: 4, md: 5 }}>
+        <Box mt={3} p={{ base: 3, md: 4 }}>
           <div className="clientes-filtros-outer">
             <div className="clientes-filtros-container">
               <AppCard className="clientes-filtros-card" bg="transparent" borderWidth="0" boxShadow="none" p={0}>

@@ -186,11 +186,9 @@ async function apiNoRetry<T>(path: string, timeoutMs = 10000): Promise<T> {
   const res = await fetchWithTimeout(url, { method: "GET", headers, credentials: "include" }, timeoutMs);
   const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
   if (res.status === 401) {
-    if (token) {
-      clearStoredAuth();
-      const cb = typeof window !== "undefined" ? (window as unknown as { __on401?: () => void }).__on401 : undefined;
-      if (typeof cb === "function") cb();
-    }
+    clearStoredAuth();
+    const cb = typeof window !== "undefined" ? (window as unknown as { __on401?: () => void }).__on401 : undefined;
+    if (typeof cb === "function") cb();
     throw new Error((data as { error?: { message?: string } })?.error?.message ?? "Sesión expirada.");
   }
   if (!res.ok) throw new Error((data as { error?: { message?: string } })?.error?.message ?? res.statusText);
@@ -239,11 +237,9 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
     }
     const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
     if (res.status === 401) {
-      if (token) {
-        clearStoredAuth();
-        const cb = typeof window !== "undefined" ? (window as unknown as { __on401?: () => void }).__on401 : undefined;
-        if (typeof cb === "function") cb();
-      }
+      clearStoredAuth();
+      const cb = typeof window !== "undefined" ? (window as unknown as { __on401?: () => void }).__on401 : undefined;
+      if (typeof cb === "function") cb();
       throw new Error((data as { error?: { message?: string } })?.error?.message ?? "Sesión expirada. Volvé a iniciar sesión.");
     }
     if (!res.ok) {
@@ -275,11 +271,9 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
         const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
         setApiBaseUrl(fallback);
         if (res.status === 401) {
-          if (token) {
-            clearStoredAuth();
-            const cb = (window as unknown as { __on401?: () => void }).__on401;
-            if (typeof cb === "function") cb();
-          }
+          clearStoredAuth();
+          const cb = (window as unknown as { __on401?: () => void }).__on401;
+          if (typeof cb === "function") cb();
           throw new Error((data as { error?: { message?: string } })?.error?.message ?? "Sesión expirada. Volvé a iniciar sesión.");
         }
         if (!res.ok) {
