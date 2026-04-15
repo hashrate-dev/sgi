@@ -1,3 +1,20 @@
+/* Reportes: fondo uniforme y altura estable (sin franjas por mezcla de capas) */
+.reportes-page.fact-page {
+  min-height: calc(100vh - 52px);
+  background: #f1f5f9;
+}
+
+.reportes-page.fact-page::before,
+.reportes-page.fact-page::after {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .reportes-page.fact-page {
+    min-height: calc(100vh - 78px);
+  }
+}
+
 /* Dashboard estilo “fintech”: KPIs + gráfico de área (Reportes) */
 .reportes-dash {
   display: grid;

@@ -1649,7 +1649,7 @@ export function ReportesPage() {
   }, [view, rankingLoading, rankingCumulativeChartModel]);
 
   return (
-    <div className="fact-page">
+    <div className="fact-page reportes-page">
       <div className="container">
         <PageHeader title="Reportes" />
 

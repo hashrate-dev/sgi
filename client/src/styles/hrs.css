@@ -3,6 +3,7 @@
 /* Alinear Bootstrap con la fuente global (carga después de bootstrap en main.tsx) */
 :root {
   --bs-body-font-family: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --hrs-app-bg-soft: #f1f5f9;
 }
 
 * {
@@ -17,11 +18,20 @@ html {
   overflow-x: hidden;
   font-family: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-optical-sizing: auto;
+  background: var(--hrs-app-bg-soft);
+}
+
+html.hrs-home-bg {
+  background: linear-gradient(135deg, #074025 0%, #2d8f3a 55%, #49f227 100%);
+}
+
+html.hrs-protected-green-bg {
+  background: var(--hrs-app-bg-soft);
 }
 
 body {
-  /* Neutro global: evita franja verde (scrollbar / 100vw) en SGI. El verde de login va en .hrs-login-page */
-  background: #f1f5f9;
+  /* Base interna SGI: verde claro suave para evitar fajas grises junto al scroll */
+  background: var(--hrs-app-bg-soft);
   min-height: 100vh;
   width: 100%;
   overflow-x: hidden;
@@ -30,14 +40,43 @@ body {
   scrollbar-gutter: stable;
 }
 
+body.hrs-home-bg {
+  background: linear-gradient(135deg, #074025 0%, #2d8f3a 55%, #49f227 100%);
+}
+
+body.hrs-protected-green-bg {
+  background: var(--hrs-app-bg-soft);
+}
+
 #root {
   position: relative;
   z-index: 1;
   min-height: 100vh;
   width: 100%;
   max-width: 100%;
-  background-color: #f1f5f9;
+  background-color: var(--hrs-app-bg-soft);
   overflow-x: hidden;
+}
+
+/* Todas las vistas SGI con .fact-page: fondo uniforme y altura estable (sin franjas) */
+.sgi-protected-root .fact-page {
+  min-height: calc(100vh - 52px);
+  background: #f1f5f9;
+}
+
+.sgi-protected-root .fact-page::before,
+.sgi-protected-root .fact-page::after {
+  display: none;
+}
+
+.sgi-protected-root:not(.sgi-protected-root--admin-footer) .fact-page {
+  min-height: 100vh;
+}
+
+@media (max-width: 768px) {
+  .sgi-protected-root.sgi-protected-root--admin-footer .fact-page {
+    min-height: calc(100vh - 78px);
+  }
 }
 
 /** Pantalla /login: recupera el fondo verde marca (body ya no lo lleva) */

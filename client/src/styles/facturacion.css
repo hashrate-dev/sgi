@@ -8,6 +8,23 @@
   overflow-x: hidden;
 }
 
+/* Equipos ASIC hub: fondo uniforme y altura estable para evitar franjas de tono */
+.mineria-page.fact-page {
+  min-height: calc(100vh - 52px);
+  background: #f1f5f9;
+}
+
+.mineria-page.fact-page::before,
+.mineria-page.fact-page::after {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mineria-page.fact-page {
+    min-height: calc(100vh - 78px);
+  }
+}
+
 /* absolute (no fixed): así overflow-x del .fact-page recorta y no asoma franja verde del body */
 .fact-page::before {
   content: "";

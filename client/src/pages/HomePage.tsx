@@ -306,15 +306,36 @@ export function HomePage() {
                     </Text>
                   </Flex>
                 </Badge>
-                <AppButton variant="ghost" size="sm" onClick={() => setShowPasswordModal(true)}>
+                <AppButton
+                  variant="plain"
+                  size="xs"
+                  h="auto"
+                  minW="auto"
+                  px={1}
+                  py={0.5}
+                  color="gray.600"
+                  fontWeight="medium"
+                  borderRadius="sm"
+                  _hover={{ bg: "transparent", color: "green.700", textDecoration: "underline" }}
+                  _active={{ bg: "transparent" }}
+                  onClick={() => setShowPasswordModal(true)}
+                >
                   <Flex align="center" gap={2}>
-                    <Box as="i" className="bi bi-key" aria-hidden />
+                    <Box as="i" className="bi bi-key" fontSize="12px" aria-hidden />
                     Cambiar contraseña
                   </Flex>
                 </AppButton>
-                <AppButton variant="solid" size="sm" onClick={logout}>
+                <AppButton
+                  variant="solid"
+                  size="xs"
+                  h="28px"
+                  px={3}
+                  borderRadius="full"
+                  fontWeight="semibold"
+                  onClick={logout}
+                >
                   <Flex align="center" gap={2}>
-                    <Box as="i" className="bi bi-box-arrow-right" aria-hidden />
+                    <Box as="i" className="bi bi-box-arrow-right" fontSize="12px" aria-hidden />
                     Cerrar sesión
                   </Flex>
                 </AppButton>

@@ -12,7 +12,7 @@ const asicMenuItems: Array<{ to: string; icon: string; label: string; desc: stri
 
 export function MineriaHubPage() {
   return (
-    <div className="fact-page">
+    <div className="fact-page mineria-page">
       <div className="container">
         <PageHeader title="Equipos ASIC" />
 
