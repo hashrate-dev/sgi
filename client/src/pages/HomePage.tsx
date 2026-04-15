@@ -21,8 +21,8 @@ type MenuItem = {
 };
 
 const ICON_SLOT_PROPS = {
-  w: "64px",
-  h: "64px",
+  w: "72px",
+  h: "72px",
   align: "center" as const,
   justify: "center" as const,
   borderRadius: "xl",
@@ -35,6 +35,7 @@ const ICON_SLOT_PROPS = {
 
 /** Tamaño uniforme de iconos Bootstrap en tarjetas del home (rellena más el recuadre) */
 const DASHBOARD_BI_ICON_SIZE = "2.125rem";
+const DASHBOARD_BI_ICON_SIZE_LG = "2.35rem";
 
 const menuItems: MenuItem[] = [
   {
@@ -88,7 +89,7 @@ function DashboardCardIconSlot({ item }: { item: MenuItem }) {
         <img
           src={item.cardLogoSrc}
           alt={item.cardLogoAlt ?? "Hashrate"}
-          style={{ maxHeight: 44, width: "auto", maxWidth: 58, objectFit: "contain", display: "block" }}
+          style={{ maxHeight: 50, width: "auto", maxWidth: 64, objectFit: "contain", display: "block" }}
         />
       </Flex>
     );
@@ -96,7 +97,7 @@ function DashboardCardIconSlot({ item }: { item: MenuItem }) {
   if (item.icon) {
     return (
       <Flex {...ICON_SLOT_PROPS} mb={3}>
-        <Box as="i" className={`bi ${item.icon}`} fontSize={DASHBOARD_BI_ICON_SIZE} lineHeight={1} aria-hidden />
+        <Box as="i" className={`bi ${item.icon}`} fontSize={DASHBOARD_BI_ICON_SIZE_LG} lineHeight={1} aria-hidden />
       </Flex>
     );
   }
@@ -235,7 +236,7 @@ export function HomePage() {
 
   const cardTitleProps = {
     as: "h2" as const,
-    fontSize: "md",
+    fontSize: { base: "lg", md: "xl" },
     fontWeight: "semibold",
     color: "gray.800",
     lineHeight: "snug",
@@ -379,7 +380,7 @@ export function HomePage() {
                 _hover={{ transform: "translateY(-2px)", boxShadow: "md", borderColor: "gray.200" }}
               >
                 <Flex {...ICON_SLOT_PROPS} mb={3} position="relative">
-                  <Box as="i" className="bi bi-ticket-perforated" fontSize={DASHBOARD_BI_ICON_SIZE} lineHeight={1} aria-hidden />
+                  <Box as="i" className="bi bi-ticket-perforated" fontSize={DASHBOARD_BI_ICON_SIZE_LG} lineHeight={1} aria-hidden />
                   {marketplaceOpenCount > 0 ? (
                     <Box
                       position="absolute"
@@ -426,7 +427,7 @@ export function HomePage() {
                 _hover={{ transform: "translateY(-2px)", boxShadow: "md", borderColor: "green.200" }}
               >
                 <Flex {...ICON_SLOT_PROPS} mb={3}>
-                  <Box as="i" className="bi bi-broadcast-pin" fontSize={DASHBOARD_BI_ICON_SIZE} lineHeight={1} aria-hidden />
+                  <Box as="i" className="bi bi-broadcast-pin" fontSize={DASHBOARD_BI_ICON_SIZE_LG} lineHeight={1} aria-hidden />
                 </Flex>
                 <Heading {...cardTitleProps}>Marketplace en vivo</Heading>
                 <Text fontSize="sm" fontWeight="semibold" color="gray.700" mb={1.5} lineHeight="short">
@@ -450,7 +451,7 @@ export function HomePage() {
                 _hover={{ transform: "translateY(-2px)", boxShadow: "md", borderColor: "green.200" }}
               >
                 <Flex {...ICON_SLOT_PROPS} mb={3}>
-                  <Box as="i" className="bi bi-images" fontSize={DASHBOARD_BI_ICON_SIZE} lineHeight={1} aria-hidden />
+                  <Box as="i" className="bi bi-images" fontSize={DASHBOARD_BI_ICON_SIZE_LG} lineHeight={1} aria-hidden />
                 </Flex>
                 <Heading {...cardTitleProps}>Tienda online — banners home</Heading>
                 <Text {...cardDescProps}>Destacados de la home pública: más vendidos y otros productos</Text>
@@ -469,7 +470,7 @@ export function HomePage() {
                 _hover={{ transform: "translateY(-2px)", boxShadow: "md", borderColor: "green.200" }}
               >
                 <Flex {...ICON_SLOT_PROPS} mb={3}>
-                  <Box as="i" className="bi bi-gear-fill" fontSize={DASHBOARD_BI_ICON_SIZE} lineHeight={1} aria-hidden />
+                  <Box as="i" className="bi bi-gear-fill" fontSize={DASHBOARD_BI_ICON_SIZE_LG} lineHeight={1} aria-hidden />
                 </Flex>
                 <Heading {...cardTitleProps}>Configuración</Heading>
                 <Text {...cardDescProps}>

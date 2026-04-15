@@ -665,7 +665,10 @@ marketplaceRouter.get("/marketplace/corp-interesting", async (req: Request, res:
 /** GET /marketplace/asic-vitrina — catálogo ASIC para /marketplace (sin token). Origen: equipos_asic con mp_visible. */
 marketplaceRouter.get("/marketplace/asic-vitrina", async (req: Request, res: Response) => {
   try {
-    await touchMarketplacePresence(req, "/marketplace/asic-vitrina");
+    // No bloquear la respuesta del catálogo por telemetría/presencia.
+    void touchMarketplacePresence(req, "/marketplace/asic-vitrina").catch((err) => {
+      console.warn("[marketplace] asic-vitrina presence:", err);
+    });
     const clause = sqlMarketplaceVisible();
     const sql = `SELECT id, marca_equipo, modelo, procesador, precio_usd, mp_visible, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_price_label, mp_listing_kind
       FROM equipos_asic WHERE ${clause} ORDER BY marca_equipo ASC, modelo ASC, procesador ASC`;
@@ -708,7 +711,10 @@ const AsicYieldRequestSchema = z.object({
  */
 marketplaceRouter.post("/marketplace/asic-yields", async (req: Request, res: Response) => {
   try {
-    await touchMarketplacePresence(req, "/marketplace/asic-yields");
+    // El cálculo de yields en vivo no debe esperar telemetría.
+    void touchMarketplacePresence(req, "/marketplace/asic-yields").catch((err) => {
+      console.warn("[marketplace] asic-yields presence:", err);
+    });
     const parsed = AsicYieldRequestSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });

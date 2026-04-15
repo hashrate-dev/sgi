@@ -39,7 +39,7 @@ import { codigoProductoVitrina as vitrinaCodigoFromSpecs } from "../lib/marketpl
 import { resolveMarketplaceListingKind } from "../lib/marketplaceAsicCatalog";
 import "../styles/facturacion.css";
 import "../styles/marketplace-hashrate.css";
-import { AppButton, AppCard, AppInput, AppModal } from "../components/ui";
+import { AppButton, AppCard, AppModal } from "../components/ui";
 
 function findCol(headerRow: (string | number)[], ...names: string[]): number {
   for (let i = 1; i < headerRow.length; i++) {
@@ -942,64 +942,83 @@ export function EquiposAsicPage() {
   );
 
   return (
-    <Box minH="100vh" px={{ base: 4, md: 6 }} py={{ base: 5, md: 8 }} bgGradient="linear(135deg, #f0fdf4 0%, #ffffff 30%, #f0f9f4 100%)">
+    <Box minH="100vh" px={{ base: 4, md: 6 }} py={{ base: 5, md: 8 }} bgGradient="linear(180deg, #1f4f3d 0%, #0b0f12 100%)">
       <Box maxW="1300px" mx="auto">
         <PageHeader title="Equipos ASIC" />
 
-        <AppCard mt={4} p={{ base: 4, md: 5 }}>
+        <Box mt={4} p={{ base: 4, md: 5 }}>
           <div className="clientes-filtros-outer">
             <div className="clientes-filtros-container">
-              <AppCard className="clientes-filtros-card">
-                <Heading size="sm" borderBottomWidth="1px" borderColor="gray.200" pb={2} mb={2}>🔍 Filtros</Heading>
+              <AppCard className="clientes-filtros-card" bg="transparent" borderWidth="0" boxShadow="none" p={0}>
+                <Heading
+                  as="h6"
+                  size="sm"
+                  color="white"
+                  borderBottomWidth="1px"
+                  borderColor="whiteAlpha.300"
+                  pb={2}
+                  mb={2}
+                >
+                  🔍 Filtros
+                </Heading>
                 <div className="row g-2 align-items-end">
                   <div className="col-md-4">
-                    <AppInput
-                      label="Buscar"
+                    <label className="form-label small fw-bold">Buscar</label>
+                    <input
+                      type="text"
+                      className="form-control form-control-sm"
                       placeholder="Marca, modelo, código de producto o procesador..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      size="sm"
-                      rootProps={{ mb: 0 }}
                     />
                   </div>
                   <div className="col-md-2 d-flex align-items-end filtros-limpiar-col">
-                    <AppButton variant="outline" className="filtros-limpiar-btn" onClick={() => setSearchTerm("")}>
+                    <button className="btn btn-outline-secondary btn-sm filtros-limpiar-btn" onClick={() => setSearchTerm("")}>
                       Limpiar
-                    </AppButton>
+                    </button>
                   </div>
                   <div className="col-md-auto d-flex align-items-end gap-2 ms-auto">
                     {canEditTienda ? (
                       <>
-                        <Input
+                        <input
                           ref={excelFileInputRef}
                           type="file"
                           accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                          display="none"
+                          className="d-none"
                           onChange={handleExcelImport}
                           disabled={excelLoading}
                         />
-                        <AppButton
+                        <button
                           type="button"
-                          variant="outline"
-                          className="historial-import-excel-btn mb-0"
-                          bg="rgba(45, 93, 70, 0.35)"
-                          cursor={excelLoading ? "not-allowed" : "pointer"}
+                          className="btn btn-outline-secondary btn-sm historial-import-excel-btn mb-0"
+                          style={{ backgroundColor: "rgba(45, 93, 70, 0.35)", cursor: excelLoading ? "not-allowed" : "pointer" }}
                           disabled={excelLoading}
                           onClick={() => excelFileInputRef.current?.click()}
                         >
                           {excelLoading ? "⏳ Importando..." : "📥 Importar Excel"}
-                        </AppButton>
+                        </button>
                       </>
                     ) : null}
                     {canExportData && (
-                      <AppButton variant="outline" className="clientes-export-excel-btn" onClick={exportExcel} disabled={equipos.length === 0}>
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary btn-sm clientes-export-excel-btn"
+                        style={{ backgroundColor: "rgba(13, 110, 253, 0.12)" }}
+                        onClick={exportExcel}
+                        disabled={equipos.length === 0}
+                      >
                         📊 Exportar Excel
-                      </AppButton>
+                      </button>
                     )}
                     {canDelete && (
-                      <AppButton variant="outline" className="clientes-borrar-todo-btn" onClick={handleDeleteAllClick}>
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary btn-sm clientes-borrar-todo-btn"
+                        style={{ backgroundColor: "rgba(220, 53, 69, 0.4)" }}
+                        onClick={handleDeleteAllClick}
+                      >
                         🗑️ Borrar todo
-                      </AppButton>
+                      </button>
                     )}
                   </div>
                 </div>
@@ -1008,19 +1027,36 @@ export function EquiposAsicPage() {
           </div>
 
           <div className="clientes-listado-wrap">
-            <Flex justify="space-between" align="center" mb={2} wrap="wrap" gap={2}>
-              <Heading size="sm" m={0}>
-                ⚙️ Listado de Equipos ASIC ({filteredEquipos.length}
+            <Flex justify="space-between" align={{ base: "flex-start", md: "center" }} mb={2} wrap="wrap" gap={2}>
+              <Box>
+                <Heading size="sm" m={0}>
+                  ⚙️ Listado de Equipos ASIC ({filteredEquipos.length})
+                </Heading>
                 {filteredEquipos.length > 0 ? (
-                  <Text as="span" color="gray.500" fontWeight="normal" fontSize="sm" ml={1}>
-                    · Tienda {equiposEnTienda.length} · Inventario {equiposFueraTienda.length}
+                  <Text color="gray.500" fontSize="sm" mt={0.5}>
+                    Tienda {equiposEnTienda.length} · Inventario {equiposFueraTienda.length}
                   </Text>
                 ) : null}
-                ){!canEdit && <Text as="span" color="gray.500" fontSize="sm" ml={2}>(solo consulta)</Text>}
-              </Heading>
+                {!canEdit ? (
+                  <Text color="gray.500" fontSize="sm" mt={0.5}>
+                    (solo consulta)
+                  </Text>
+                ) : null}
+                <Text color="gray.500" fontSize="sm" mt={0.5}>
+                  Equipos detalle de inventario ASIC. Filtros por búsqueda y estado de publicación.
+                </Text>
+              </Box>
               {canEdit && (
                 <AppButton
                   size="sm"
+                  minW="148px"
+                  h="36px"
+                  px={4}
+                  display="inline-flex"
+                  alignItems="center"
+                  justifyContent="center"
+                  gap={2}
+                  fontWeight="700"
                   onClick={() => {
                     setEditingEquipo(null);
                     setShowPrecioModal(false);
@@ -1028,7 +1064,8 @@ export function EquiposAsicPage() {
                     setShowAddModal(true);
                   }}
                 >
-                  ➕ Nuevo Equipo
+                  <i className="bi bi-plus-lg" aria-hidden style={{ fontSize: "0.78rem", lineHeight: 1 }} />
+                  Nuevo Equipo
                 </AppButton>
               )}
             </Flex>
@@ -1050,10 +1087,26 @@ export function EquiposAsicPage() {
             ) : (
               <div className="hrs-equipo-asic-listado-grupos">
                 <div className="mb-4 pb-2 hrs-equipo-asic-listado-grupos--tienda">
-                  <Flex as="h6" fontWeight="bold" mb={2} align="center" gap={2} wrap="wrap" borderBottomWidth="1px" borderColor="gray.200" pb={2}>
-                    <Badge colorPalette="green">Tienda online</Badge>
-                    <Text>Visibles en /marketplace</Text>
-                    <Text color="gray.500" fontWeight="normal" fontSize="sm">({equiposEnTienda.length})</Text>
+                  <Flex
+                    as="h6"
+                    fontWeight="bold"
+                    mb={2}
+                    align="center"
+                    gap={2}
+                    wrap="wrap"
+                    borderBottomWidth="1px"
+                    borderColor="gray.200"
+                    pb={2}
+                  >
+                    <Badge colorPalette="green" fontSize="xs" px={2} py={1}>
+                      Tienda online
+                    </Badge>
+                    <Text as="span" fontSize="sm" color="gray.800" fontWeight="semibold">
+                      Visibles en /marketplace
+                    </Text>
+                    <Text as="span" color="gray.500" fontWeight="normal" fontSize="sm">
+                      ({equiposEnTienda.length})
+                    </Text>
                   </Flex>
                   {equiposEnTienda.length === 0 ? (
                     <p className="text-muted small mb-0">
@@ -1102,7 +1155,7 @@ export function EquiposAsicPage() {
               </div>
             )}
           </div>
-        </AppCard>
+        </Box>
 
         <AppModal
           open={showDeleteConfirm1}

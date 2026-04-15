@@ -57,6 +57,7 @@ export function PendientesPage() {
   const [qMonth, setQMonth] = useState("");
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null);
   const canExportData = user ? canExport(user.role) : false;
+  const EPSILON = 0.0001;
 
   function fetchDocuments() {
     setLoading(true);
@@ -110,28 +111,37 @@ export function PendientesPage() {
     };
   }, []);
 
-  // Filtrar solo facturas pendientes (sin recibo ni nota de crédito relacionada)
-  const pendingInvoices = useMemo(() => {
-    return all.filter((inv) => {
-      // Solo facturas
-      if (inv.type !== "Factura") return false;
+  type PendingInvoiceView = {
+    invoice: Invoice;
+    originalTotal: number;
+    creditApplied: number;
+    paidApplied: number;
+    pendingAmount: number;
+    creditNotes: Invoice[];
+    receipts: Invoice[];
+  };
 
-      // Verificar si tiene recibo relacionado (por id o por número)
-      const hasReceipt = all.some((r) => r.type === "Recibo" && isLinkedToInvoice(r, inv));
-
-      // Verificar si tiene nota de crédito relacionada (por id o por número)
-      const hasCreditNote = all.some((nc) => nc.type === "Nota de Crédito" && isLinkedToInvoice(nc, inv));
-
-      // Es pendiente si no tiene recibo ni nota de crédito
-      return !hasReceipt && !hasCreditNote;
-    });
+  // Pendiente real = Factura - NC aplicadas - Recibos aplicados (permite mostrar facturas con NC parcial)
+  const pendingInvoices = useMemo<PendingInvoiceView[]>(() => {
+    const facturas = all.filter((inv) => inv.type === "Factura");
+    return facturas
+      .map((factura) => {
+        const creditNotes = all.filter((nc) => nc.type === "Nota de Crédito" && isLinkedToInvoice(nc, factura));
+        const receipts = all.filter((r) => r.type === "Recibo" && isLinkedToInvoice(r, factura));
+        const originalTotal = Math.abs(Number(factura.total) || 0);
+        const creditApplied = creditNotes.reduce((s, nc) => s + Math.abs(Number(nc.total) || 0), 0);
+        const paidApplied = receipts.reduce((s, r) => s + Math.abs(Number(r.total) || 0), 0);
+        const pendingAmount = Math.max(0, originalTotal - creditApplied - paidApplied);
+        return { invoice: factura, originalTotal, creditApplied, paidApplied, pendingAmount, creditNotes, receipts };
+      })
+      .filter((row) => row.pendingAmount > EPSILON);
   }, [all]);
 
   const filtered = useMemo(() => {
     const client = qClient.trim().toLowerCase();
     return pendingInvoices.filter((inv) => {
-      const okClient = !client || inv.clientName.toLowerCase().includes(client);
-      const okMonth = !qMonth || inv.month.startsWith(qMonth);
+      const okClient = !client || inv.invoice.clientName.toLowerCase().includes(client);
+      const okMonth = !qMonth || inv.invoice.month.startsWith(qMonth);
       return okClient && okMonth;
     });
   }, [pendingInvoices, qClient, qMonth]);
@@ -149,7 +159,7 @@ export function PendientesPage() {
 
   const stats = useMemo(() => {
     const totalPendientes = pendingInvoices.length;
-    const totalMontoPendiente = pendingInvoices.reduce((s, i) => s + (Number(i.total) || 0), 0);
+    const totalMontoPendiente = pendingInvoices.reduce((s, i) => s + i.pendingAmount, 0);
     return { totalPendientes, totalMontoPendiente };
   }, [pendingInvoices]);
 
@@ -169,20 +179,26 @@ export function PendientesPage() {
       { header: "Fecha Vencimiento", key: "dueDate", width: 18 },
       { header: "Total (S/Desc)", key: "subtotal", width: 16 },
       { header: "Descuento", key: "discounts", width: 12 },
-      { header: "Total", key: "total", width: 12 }
+      { header: "Total Factura", key: "total", width: 14 },
+      { header: "NC Aplicada", key: "creditApplied", width: 14 },
+      { header: "Cobros", key: "paidApplied", width: 12 },
+      { header: "Saldo Pendiente", key: "pendingAmount", width: 16 }
     ];
 
     filtered.forEach((inv) => {
-      const dueDate = inv.dueDate || calculateDueDate(inv.date);
+      const dueDate = inv.invoice.dueDate || calculateDueDate(inv.invoice.date);
       ws.addRow({
-        number: inv.number,
-        clientName: inv.clientName,
-        date: inv.date,
-        emissionTime: inv.emissionTime || "-",
+        number: inv.invoice.number,
+        clientName: inv.invoice.clientName,
+        date: inv.invoice.date,
+        emissionTime: inv.invoice.emissionTime || "-",
         dueDate: dueDate,
-        subtotal: inv.subtotal.toFixed(2),
-        discounts: inv.discounts.toFixed(2),
-        total: inv.total.toFixed(2)
+        subtotal: inv.invoice.subtotal.toFixed(2),
+        discounts: inv.invoice.discounts.toFixed(2),
+        total: inv.originalTotal.toFixed(2),
+        creditApplied: inv.creditApplied.toFixed(2),
+        paidApplied: inv.paidApplied.toFixed(2),
+        pendingAmount: inv.pendingAmount.toFixed(2),
       });
     });
 
@@ -365,7 +381,10 @@ export function PendientesPage() {
                   <th className="text-start">Fecha<br />Vencimiento</th>
                   <th className="text-start">Total (S/Desc)</th>
                   <th className="text-start">Descuento</th>
-                  <th className="text-start">Total</th>
+                  <th className="text-start">Total Factura</th>
+                  <th className="text-start">NC Aplicada</th>
+                  <th className="text-start">Cobros</th>
+                  <th className="text-start">Saldo Pendiente</th>
                   <th className="text-start">Estado</th>
                   <th className="text-start">Acciones</th>
                 </tr>
@@ -373,29 +392,32 @@ export function PendientesPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={10} className="text-center py-5">
+                    <td colSpan={13} className="text-center py-5">
                       <div className="spinner-border text-secondary" role="status" aria-label="Espere un momento" />
                     </td>
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="text-center text-muted py-4">
+                    <td colSpan={13} className="text-center text-muted py-4">
                       <small>{pendingInvoices.length === 0 ? "No hay facturas pendientes de cobro." : "No se encontraron facturas con los filtros aplicados."}</small>
                     </td>
                   </tr>
                 ) : (
                   paginated.map((inv) => {
-                    const dueDate = inv.dueDate || calculateDueDate(inv.date);
+                    const dueDate = inv.invoice.dueDate || calculateDueDate(inv.invoice.date);
                     return (
-                      <tr key={inv.id}>
-                        <td className="fw-bold text-start">{inv.number}</td>
-                        <td className="text-start">{inv.clientName}</td>
-                        <td className="text-start">{inv.date}</td>
-                        <td className="text-start">{inv.emissionTime || "-"}</td>
+                      <tr key={inv.invoice.id}>
+                        <td className="fw-bold text-start">{inv.invoice.number}</td>
+                        <td className="text-start">{inv.invoice.clientName}</td>
+                        <td className="text-start">{inv.invoice.date}</td>
+                        <td className="text-start">{inv.invoice.emissionTime || "-"}</td>
                         <td className="text-start">{dueDate}</td>
-                        <td className="text-start">{formatCurrency(inv.subtotal)}</td>
-                        <td className="text-start">{formatCurrency(inv.discounts)}</td>
-                        <td className="text-start fw-bold">{formatCurrency(inv.total)}</td>
+                        <td className="text-start">{formatCurrency(inv.invoice.subtotal)}</td>
+                        <td className="text-start">{formatCurrency(inv.invoice.discounts)}</td>
+                        <td className="text-start">{formatCurrency(inv.originalTotal)}</td>
+                        <td className="text-start text-info">- {formatCurrency(inv.creditApplied)}</td>
+                        <td className="text-start text-primary">- {formatCurrency(inv.paidApplied)}</td>
+                        <td className="text-start fw-bold text-danger">{formatCurrency(inv.pendingAmount)}</td>
                         <td className="text-center">
                           <span className="d-inline-flex" style={{ fontSize: "0.95rem", padding: "0.1rem 0.2rem", borderRadius: "50%", width: "1.05rem", height: "1.05rem", alignItems: "center", justifyContent: "center", backgroundColor: "transparent", color: "#ffc107" }} title="Factura pendiente de pago">
                             ⚠️
@@ -406,7 +428,7 @@ export function PendientesPage() {
                             <button
                               type="button"
                               className="btn btn-sm border"
-                              onClick={() => setDetailInvoice(inv)}
+                              onClick={() => setDetailInvoice(inv.invoice)}
                               title="Ver detalles"
                               style={{ width: "1.3rem", height: "1.3rem", padding: 0, fontSize: "1rem", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, backgroundColor: "#fff9c4", color: "#5d4037", borderColor: "#d4c44a" }}
                             >
@@ -414,7 +436,7 @@ export function PendientesPage() {
                             </button>
                             <button 
                               className="fact-btn fact-btn-primary btn-sm" 
-                              onClick={() => generatePdfFromHistory(inv)}
+                              onClick={() => generatePdfFromHistory(inv.invoice)}
                               title="PDF"
                               style={{ width: "1.3rem", height: "1.3rem", padding: 0, fontSize: "0.75rem", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}
                             >
@@ -493,6 +515,12 @@ export function PendientesPage() {
                   {(() => {
                     const inv = detailInvoice;
                     const dueDate = inv.dueDate || calculateDueDate(inv.date);
+                    const relatedCreditNotes = all.filter((nc) => nc.type === "Nota de Crédito" && isLinkedToInvoice(nc, inv));
+                    const relatedReceipts = all.filter((r) => r.type === "Recibo" && isLinkedToInvoice(r, inv));
+                    const originalTotal = Math.abs(Number(inv.total) || 0);
+                    const creditApplied = relatedCreditNotes.reduce((s, nc) => s + Math.abs(Number(nc.total) || 0), 0);
+                    const paidApplied = relatedReceipts.reduce((s, r) => s + Math.abs(Number(r.total) || 0), 0);
+                    const pendingAmount = Math.max(0, originalTotal - creditApplied - paidApplied);
                     return (
                       <>
                         <div className="row g-2 small mb-3">
@@ -537,10 +565,13 @@ export function PendientesPage() {
                         <div className="row g-2 small mb-3">
                           <div className="col-md-4 text-end"><strong>Total (S/Desc):</strong> {formatCurrency(inv.subtotal)}</div>
                           <div className="col-md-4 text-end"><strong>Descuento:</strong> {formatCurrency(inv.discounts)}</div>
-                          <div className="col-md-4 text-end"><strong>Total:</strong> {formatCurrency(inv.total)}</div>
+                          <div className="col-md-4 text-end"><strong>Total Factura:</strong> {formatCurrency(originalTotal)}</div>
+                          <div className="col-md-4 text-end text-info"><strong>NC aplicada:</strong> - {formatCurrency(creditApplied)}</div>
+                          <div className="col-md-4 text-end text-primary"><strong>Cobros aplicados:</strong> - {formatCurrency(paidApplied)}</div>
+                          <div className="col-md-4 text-end text-danger"><strong>Saldo pendiente:</strong> {formatCurrency(pendingAmount)}</div>
                         </div>
                         <div className="alert alert-warning">
-                          <strong>⚠️ Estado:</strong> Esta factura está pendiente de cobro. No tiene recibo ni nota de crédito relacionada.
+                          <strong>⚠️ Estado:</strong> Esta factura está pendiente de cobro con saldo neto (Factura - NC - Cobros).
                         </div>
                       </>
                     );

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Box, Flex, Grid, Heading, Text } from "@chakra-ui/react";
+import { Badge, Box, Flex, Grid, Heading, Text } from "@chakra-ui/react";
 import {
   getEquipos,
   getEquiposMarketplaceCorpBestSellingIds,
@@ -36,6 +36,15 @@ export function TiendaOnlineBannersHomePage() {
   const [interestingSlotIds, setInterestingSlotIds] = useState<string[]>(["", "", "", ""]);
   const [interestingLoadError, setInterestingLoadError] = useState<string | null>(null);
   const [interestingSaving, setInterestingSaving] = useState(false);
+
+  const selectedBestSellingCount = useMemo(
+    () => bestSellingSlotIds.filter((id) => id.trim().length > 0).length,
+    [bestSellingSlotIds]
+  );
+  const selectedInterestingCount = useMemo(
+    () => interestingSlotIds.filter((id) => id.trim().length > 0).length,
+    [interestingSlotIds]
+  );
 
   useEffect(() => {
     if (!canEditTienda) {
@@ -95,11 +104,13 @@ export function TiendaOnlineBannersHomePage() {
   }, [canEditTienda]);
 
   const equiposBestSellingSelectList = useMemo(() => {
-    return [...equipos].sort((a, b) => {
+    return [...equipos]
+      .filter((e) => Boolean(e.marketplaceVisible))
+      .sort((a, b) => {
       const la = `${a.numeroSerie ?? a.id} ${a.marcaEquipo} ${a.modelo}`.toLowerCase();
       const lb = `${b.numeroSerie ?? b.id} ${b.marcaEquipo} ${b.modelo}`.toLowerCase();
       return la.localeCompare(lb, "es");
-    });
+      });
   }, [equipos]);
 
   const equiposOptionsForBestSellingSlot = useCallback(
@@ -197,48 +208,58 @@ export function TiendaOnlineBannersHomePage() {
           </AppCard>
         ) : null}
 
-        <AppCard mt={4} p={{ base: 4, md: 5 }}>
-          <Text color="gray.600" fontSize="sm" mb={3}>
-            Definí qué equipos ASIC se muestran en <code>/marketplace/home</code> (sección «Equipos más vendidos» y «Otros Productos Interesantes»).
-          </Text>
-
+        <AppCard
+          mt={4}
+          p={{ base: 4, md: 6 }}
+          borderColor="#2D5D46"
+          borderWidth="1px"
+          boxShadow="md"
+        >
           <AppCard
             as="form"
-            borderColor="gray.200"
-            bg="gray.50"
-            mb={4}
-            aria-label="Bloqueo de seguridad para edición"
-            p={3}
+            mb={5}
+            p={{ base: 3, md: 4 }}
+            borderColor={isEditionLocked ? "orange.200" : "green.200"}
+            bg={isEditionLocked ? "orange.50" : "green.50"}
           >
-            <Flex align="center" gap={2} wrap="wrap">
-              <input
-                id="tienda-home-banners-lock"
-                className="form-check-input"
-                type="checkbox"
-                checked={isEditionLocked}
-                onChange={(ev) => setIsEditionLocked(ev.target.checked)}
-              />
-              <Text as="label" htmlFor="tienda-home-banners-lock" fontWeight="semibold" color="gray.800">
-                Bloquear cambios de banners (seguridad)
-              </Text>
+            <Flex direction={{ base: "column", md: "row" }} align={{ base: "flex-start", md: "center" }} justify="space-between" gap={3}>
+              <Flex align="center" gap={2}>
+                <input
+                  id="tienda-home-banners-lock"
+                  className="form-check-input"
+                  type="checkbox"
+                  checked={isEditionLocked}
+                  onChange={(ev) => setIsEditionLocked(ev.target.checked)}
+                />
+                <Text as="label" htmlFor="tienda-home-banners-lock" fontWeight="bold" color="gray.800">
+                  Bloquear cambios de banners
+                </Text>
+              </Flex>
+              <Badge colorPalette={isEditionLocked ? "orange" : "green"} variant="solid" borderRadius="full" px={3} py={1}>
+                {isEditionLocked ? "Protegido" : "Editable"}
+              </Badge>
             </Flex>
-            <Text fontSize="sm" color="gray.600" mt={2}>
+            <Text fontSize="sm" color="gray.700" mt={2}>
               {isEditionLocked
-                ? "Edición bloqueada. Desmarcá este tic para habilitar cambios temporales."
-                : "Edición habilitada temporalmente. Marcá el tic nuevamente para volver a bloquear."}
+                ? "Edición bloqueada. Desmarcá el check para habilitar cambios temporales."
+                : "Edición habilitada temporalmente. Volvé a marcar el check para proteger los cambios."}
             </Text>
           </AppCard>
 
-          <AppCard borderColor="green.300" mb={4} aria-labelledby="hrs-corp-best-h">
-            <Box mb={3}>
-              <Heading id="hrs-corp-best-h" size="sm" color="green.800">
-                ⭐ Equipos más vendidos (home pública)
-              </Heading>
-              <Text color="gray.700" fontSize="sm" mt={2}>
-                Elegí hasta <strong>4</strong> equipos del listado ASIC (tienda + inventario). Se publican en la sección homónima de{" "}
-                <code>/marketplace/home</code> (orden: posición 1 → 4).
-              </Text>
-            </Box>
+          <AppCard borderColor="green.200" mb={4} aria-labelledby="hrs-corp-best-h" p={{ base: 4, md: 5 }}>
+            <Flex direction={{ base: "column", md: "row" }} justify="space-between" align={{ base: "flex-start", md: "center" }} gap={2} mb={3}>
+              <Box>
+                <Heading id="hrs-corp-best-h" size="md" color="green.800">
+                  ⭐ Equipos más vendidos
+                </Heading>
+                <Text color="gray.700" fontSize="sm" mt={1}>
+                  Se muestran en la primera grilla de <code>/marketplace/home</code> (orden: posición 1 → 4).
+                </Text>
+              </Box>
+              <Badge colorPalette="green" variant="subtle" borderRadius="full" px={3} py={1}>
+                Seleccionados: {selectedBestSellingCount}/4
+              </Badge>
+            </Flex>
             <Box>
               {bestSellingLoadError ? (
                 <AppCard borderColor="orange.300" bg="orange.50" mb={3}>
@@ -251,7 +272,7 @@ export function TiendaOnlineBannersHomePage() {
                     key={slot}
                     label={`Posición ${slot + 1}`}
                     id={`hrs-corp-best-slot-${slot}`}
-                    size="sm"
+                    size="md"
                     rootProps={{ mb: 0 }}
                     placeholder="— Sin equipo —"
                     onChange={(ev) => setBestSellingSlot(slot, ev.target.value)}
@@ -267,28 +288,39 @@ export function TiendaOnlineBannersHomePage() {
                   </AppSelect>
                 ))}
               </Grid>
-              <Flex align="center" gap={2} mt={3}>
+              <Flex align="center" gap={2} mt={4} justify="flex-end">
                 <AppButton
                   onClick={() => void handleSaveCorpBestSelling()}
                   disabled={bestSellingSaving || loading || isEditionLocked}
                   loading={bestSellingSaving}
+                  size="md"
+                  minW={{ base: "100%", sm: "190px" }}
+                  h="42px"
+                  px={6}
+                  borderRadius="xl"
+                  fontWeight="bold"
+                  letterSpacing="0.01em"
                 >
-                  {bestSellingSaving ? "Guardando..." : "Guardar en la home"}
+                  {bestSellingSaving ? "Guardando..." : "Guardar sección"}
                 </AppButton>
               </Flex>
             </Box>
           </AppCard>
 
-          <AppCard borderColor="green.300" mb={0} aria-labelledby="hrs-corp-interesting-h">
-            <Box mb={3}>
-              <Heading id="hrs-corp-interesting-h" size="sm" color="green.800">
-                🛒 Otros Productos Interesantes (home pública)
-              </Heading>
-              <Text color="gray.700" fontSize="sm" mt={2}>
-                Elegí hasta <strong>4</strong> equipos del listado ASIC. Se muestran en la sección homónima de <code>/marketplace/home</code> (orden:
-                posición 1 → 4).
-              </Text>
-            </Box>
+          <AppCard borderColor="green.200" mb={0} aria-labelledby="hrs-corp-interesting-h" p={{ base: 4, md: 5 }}>
+            <Flex direction={{ base: "column", md: "row" }} justify="space-between" align={{ base: "flex-start", md: "center" }} gap={2} mb={3}>
+              <Box>
+                <Heading id="hrs-corp-interesting-h" size="md" color="green.800">
+                  🛒 Otros Productos Interesantes
+                </Heading>
+                <Text color="gray.700" fontSize="sm" mt={1}>
+                  Se muestran en la segunda grilla de <code>/marketplace/home</code> (orden: posición 1 → 4).
+                </Text>
+              </Box>
+              <Badge colorPalette="green" variant="subtle" borderRadius="full" px={3} py={1}>
+                Seleccionados: {selectedInterestingCount}/4
+              </Badge>
+            </Flex>
             <Box>
               {interestingLoadError ? (
                 <AppCard borderColor="orange.300" bg="orange.50" mb={3}>
@@ -301,7 +333,7 @@ export function TiendaOnlineBannersHomePage() {
                     key={slot}
                     label={`Posición ${slot + 1}`}
                     id={`hrs-corp-interesting-slot-${slot}`}
-                    size="sm"
+                    size="md"
                     rootProps={{ mb: 0 }}
                     placeholder="— Sin equipo —"
                     onChange={(ev) => setInterestingSlot(slot, ev.target.value)}
@@ -317,13 +349,20 @@ export function TiendaOnlineBannersHomePage() {
                   </AppSelect>
                 ))}
               </Grid>
-              <Flex align="center" gap={2} mt={3}>
+              <Flex align="center" gap={2} mt={4} justify="flex-end">
                 <AppButton
                   onClick={() => void handleSaveCorpInteresting()}
                   disabled={interestingSaving || loading || isEditionLocked}
                   loading={interestingSaving}
+                  size="md"
+                  minW={{ base: "100%", sm: "190px" }}
+                  h="42px"
+                  px={6}
+                  borderRadius="xl"
+                  fontWeight="bold"
+                  letterSpacing="0.01em"
                 >
-                  {interestingSaving ? "Guardando..." : "Guardar en la home"}
+                  {interestingSaving ? "Guardando..." : "Guardar sección"}
                 </AppButton>
               </Flex>
             </Box>
