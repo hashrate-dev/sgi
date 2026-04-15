@@ -24,11 +24,25 @@ import { isAdminABRole, logEquipoAsicAudit } from "../lib/equipoAsicAudit.js";
 import { mimeForSniffedFormat, sniffImageFormat } from "../lib/marketplaceImageSniff.js";
 import { resolveVitrinaListingKind } from "../lib/asicVitrinaMapper.js";
 import { mpVisibleFromDbValue } from "../lib/mpVisible.js";
+import {
+  readCorpBestSellingEquipoIds,
+  readCorpInterestingEquipoIds,
+  writeCorpBestSellingEquipoIds,
+  writeCorpInterestingEquipoIds,
+} from "../lib/marketplaceCorpBestSellingKv.js";
 
 export const equiposRouter = Router();
 
 const requireCanEdit = requireRole("admin_a", "admin_b", "operador");
 const requireAdminsEquipo = requireRole("admin_a", "admin_b");
+
+const CorpBestSellingBodySchema = z.object({
+  ids: z.array(z.string().min(1).max(220)).max(4),
+});
+
+const CorpInterestingBodySchema = z.object({
+  ids: z.array(z.string().min(1).max(220)).max(4),
+});
 
 /**
  * Imagen vitrina: ruta corta (`/images/marketplace-uploads/...`) o data URL en serverless
@@ -201,16 +215,115 @@ async function nextNumeroSerie(): Promise<string> {
   return `M${String(next).padStart(3, "0")}`;
 }
 
-const EQUIPOS_SELECT = `SELECT id, numero_serie, fecha_ingreso, marca_equipo, modelo, procesador, precio_usd, observaciones,
+/** Listado completo de columnas para mapear fila → vitrina / gestión. */
+export const EQUIPOS_ASIC_SELECT = `SELECT id, numero_serie, fecha_ingreso, marca_equipo, modelo, procesador, precio_usd, observaciones,
   mp_visible, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_sort_order,
   mp_price_label, mp_listing_kind, precio_historial_json
   FROM equipos_asic`;
+
+const EQUIPOS_SELECT = EQUIPOS_ASIC_SELECT;
 
 /** GET /equipos — listar todos */
 equiposRouter.get("/equipos", requireAuth, async (_req, res: Response) => {
   try {
     const rows = (await db.prepare(`${EQUIPOS_SELECT} ORDER BY marca_equipo ASC, modelo ASC, numero_serie ASC`).all()) as EquipoRow[];
     res.json({ items: rows.map(rowToItem) });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: { message: msg } });
+  }
+});
+
+/** GET /equipos/marketplace-corp-best-selling — ids guardados para home corporativa (hasta 4). */
+equiposRouter.get("/equipos/marketplace-corp-best-selling", requireAuth, async (_req, res: Response) => {
+  try {
+    const ids = await readCorpBestSellingEquipoIds();
+    res.json({ ids });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: { message: msg } });
+  }
+});
+
+/** PUT /equipos/marketplace-corp-best-selling — guardar destacados home (solo admin A/B). */
+equiposRouter.put("/equipos/marketplace-corp-best-selling", requireAuth, requireAdminsEquipo, async (req, res: Response) => {
+  const parsed = CorpBestSellingBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
+  }
+  try {
+    const incoming = parsed.data.ids.map((x) => String(x ?? "").trim()).filter(Boolean);
+    const uniq: string[] = [];
+    const seen = new Set<string>();
+    for (const id of incoming) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      uniq.push(id);
+      if (uniq.length >= 4) break;
+    }
+    if (uniq.length === 0) {
+      await writeCorpBestSellingEquipoIds([]);
+      return res.json({ ok: true, ids: [] });
+    }
+    const ph = uniq.map(() => "?").join(", ");
+    const found = (await db.prepare(`SELECT id FROM equipos_asic WHERE id IN (${ph})`).all(...uniq)) as { id: string }[];
+    const foundSet = new Set(found.map((r) => String(r.id)));
+    const missing = uniq.filter((id) => !foundSet.has(id));
+    if (missing.length > 0) {
+      return res.status(400).json({
+        error: { message: `ID no encontrado en equipos ASIC: ${missing.join(", ")}` },
+      });
+    }
+    await writeCorpBestSellingEquipoIds(uniq);
+    res.json({ ok: true, ids: uniq });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: { message: msg } });
+  }
+});
+
+/** GET /equipos/marketplace-corp-interesting — ids «Otros Productos Interesantes» (hasta 4). */
+equiposRouter.get("/equipos/marketplace-corp-interesting", requireAuth, async (_req, res: Response) => {
+  try {
+    const ids = await readCorpInterestingEquipoIds();
+    res.json({ ids });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: { message: msg } });
+  }
+});
+
+/** PUT /equipos/marketplace-corp-interesting — guardar sección home (solo admin A/B). */
+equiposRouter.put("/equipos/marketplace-corp-interesting", requireAuth, requireAdminsEquipo, async (req, res: Response) => {
+  const parsed = CorpInterestingBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
+  }
+  try {
+    const incoming = parsed.data.ids.map((x) => String(x ?? "").trim()).filter(Boolean);
+    const uniq: string[] = [];
+    const seen = new Set<string>();
+    for (const id of incoming) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      uniq.push(id);
+      if (uniq.length >= 4) break;
+    }
+    if (uniq.length === 0) {
+      await writeCorpInterestingEquipoIds([]);
+      return res.json({ ok: true, ids: [] });
+    }
+    const ph = uniq.map(() => "?").join(", ");
+    const found = (await db.prepare(`SELECT id FROM equipos_asic WHERE id IN (${ph})`).all(...uniq)) as { id: string }[];
+    const foundSet = new Set(found.map((r) => String(r.id)));
+    const missing = uniq.filter((id) => !foundSet.has(id));
+    if (missing.length > 0) {
+      return res.status(400).json({
+        error: { message: `ID no encontrado en equipos ASIC: ${missing.join(", ")}` },
+      });
+    }
+    await writeCorpInterestingEquipoIds(uniq);
+    res.json({ ok: true, ids: uniq });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     res.status(500).json({ error: { message: msg } });

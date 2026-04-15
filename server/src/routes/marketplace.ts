@@ -4,7 +4,13 @@ import { z } from "zod";
 import jwt from "jsonwebtoken";
 import { db, getDb } from "../db.js";
 import { env } from "../config/env.js";
-import { mapEquipoRowToVitrina, type EquipoAsicVitrinaRow } from "../lib/asicVitrinaMapper.js";
+import {
+  mapEquipoRowToVitrina,
+  mapEquipoRowToVitrinaWithAlgoFallback,
+  type EquipoAsicVitrinaRow,
+} from "../lib/asicVitrinaMapper.js";
+import { readCorpBestSellingEquipoIds, readCorpInterestingEquipoIds } from "../lib/marketplaceCorpBestSellingKv.js";
+import { EQUIPOS_ASIC_SELECT } from "./equipos.js";
 import {
   estimateAllYields,
   fetchNetworkMiningSnapshot,
@@ -327,6 +333,42 @@ function isPg(): boolean {
   return (getDb() as { isPostgres?: boolean }).isPostgres === true;
 }
 
+function equipoDbRowToVitrinaInput(raw: Record<string, unknown>): EquipoAsicVitrinaRow | null {
+  const r = rowKeysToLowercase(raw);
+  const id = String(r.id ?? "").trim();
+  if (!id) return null;
+  return {
+    id,
+    marca_equipo: String(r.marca_equipo ?? ""),
+    modelo: String(r.modelo ?? ""),
+    procesador: String(r.procesador ?? ""),
+    precio_usd: Math.max(0, Math.round(Number(r.precio_usd) || 0)),
+    mp_algo: typeof r.mp_algo === "string" && r.mp_algo.trim() ? r.mp_algo.trim() : null,
+    mp_hashrate_display: typeof r.mp_hashrate_display === "string" ? r.mp_hashrate_display : null,
+    mp_image_src: typeof r.mp_image_src === "string" ? r.mp_image_src : null,
+    mp_gallery_json: typeof r.mp_gallery_json === "string" ? r.mp_gallery_json : null,
+    mp_detail_rows_json: typeof r.mp_detail_rows_json === "string" ? r.mp_detail_rows_json : null,
+    mp_yield_json: typeof r.mp_yield_json === "string" ? r.mp_yield_json : null,
+    mp_price_label: typeof r.mp_price_label === "string" ? r.mp_price_label : null,
+    mp_listing_kind: typeof r.mp_listing_kind === "string" ? r.mp_listing_kind : null,
+  };
+}
+
+type CorpHomeVitrinaProduct = NonNullable<ReturnType<typeof mapEquipoRowToVitrinaWithAlgoFallback>>;
+
+async function corpHomeVitrinaProductsByEquipoIds(ids: string[]): Promise<CorpHomeVitrinaProduct[]> {
+  const products: CorpHomeVitrinaProduct[] = [];
+  for (const id of ids) {
+    const raw = (await db.prepare(`${EQUIPOS_ASIC_SELECT} WHERE id = ?`).get(id)) as Record<string, unknown> | undefined;
+    if (!raw) continue;
+    const row = equipoDbRowToVitrinaInput(raw);
+    if (!row) continue;
+    const p = mapEquipoRowToVitrinaWithAlgoFallback(row);
+    if (p) products.push(p);
+  }
+  return products;
+}
+
 function rowToProduct(r: Row) {
   const active = typeof r.is_active === "boolean" ? r.is_active : Number(r.is_active) === 1;
   return {
@@ -583,6 +625,42 @@ marketplaceRouter.get("/marketplace/garantia-quote-prices", async (req: Request,
 function sqlMarketplaceVisible(): string {
   return "(COALESCE(CAST(mp_visible AS INTEGER), 0) = 1)";
 }
+
+/**
+ * GET /marketplace/corp-best-selling — hasta 4 equipos elegidos en /marketplacedashboard para la home corporativa.
+ * Público (sin token). Orden = orden guardado en `marketplace_site_kv`.
+ */
+marketplaceRouter.get("/marketplace/corp-best-selling", async (req: Request, res: Response) => {
+  try {
+    await touchMarketplacePresence(req, "/marketplace/corp-best-selling");
+    const ids = await readCorpBestSellingEquipoIds();
+    const products = await corpHomeVitrinaProductsByEquipoIds(ids);
+    res.set("Cache-Control", "public, max-age=30, stale-while-revalidate=60");
+    res.json({ products });
+  } catch (e) {
+    console.error("[marketplace] corp-best-selling:", e);
+    res.set("Cache-Control", "no-store");
+    res.status(200).json({ products: [] });
+  }
+});
+
+/**
+ * GET /marketplace/corp-interesting — hasta 4 equipos para «Otros Productos Interesantes» en /marketplace/home.
+ * Público. Orden = orden guardado en `marketplace_site_kv`.
+ */
+marketplaceRouter.get("/marketplace/corp-interesting", async (req: Request, res: Response) => {
+  try {
+    await touchMarketplacePresence(req, "/marketplace/corp-interesting");
+    const ids = await readCorpInterestingEquipoIds();
+    const products = await corpHomeVitrinaProductsByEquipoIds(ids);
+    res.set("Cache-Control", "public, max-age=30, stale-while-revalidate=60");
+    res.json({ products });
+  } catch (e) {
+    console.error("[marketplace] corp-interesting:", e);
+    res.set("Cache-Control", "no-store");
+    res.status(200).json({ products: [] });
+  }
+});
 
 /** GET /marketplace/asic-vitrina — catálogo ASIC para /marketplace (sin token). Origen: equipos_asic con mp_visible. */
 marketplaceRouter.get("/marketplace/asic-vitrina", async (req: Request, res: Response) => {

@@ -268,3 +268,15 @@ CREATE TABLE IF NOT EXISTS tienda_online_client_seq (
 INSERT INTO tienda_online_client_seq (id, next_code_num) VALUES (1, 90001) ON CONFLICT (id) DO NOTHING;
 
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+
+-- Config sitio marketplace (p. ej. equipos destacados en home corporativa)
+CREATE TABLE IF NOT EXISTS marketplace_site_kv (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
+INSERT INTO marketplace_site_kv (key, value) VALUES ('corp_best_selling_asic_ids', '[]')
+ON CONFLICT (key) DO NOTHING;
+
+INSERT INTO marketplace_site_kv (key, value) VALUES ('corp_interesting_asic_ids', '[]')
+ON CONFLICT (key) DO NOTHING;

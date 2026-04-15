@@ -8,33 +8,36 @@
   overflow-x: hidden;
 }
 
+/* absolute (no fixed): así overflow-x del .fact-page recorta y no asoma franja verde del body */
 .fact-page::before {
   content: "";
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  position: absolute;
+  inset: 0;
+  min-height: 100%;
   background: 
     radial-gradient(circle at 20% 30%, rgba(7, 64, 37, 0.08) 0%, transparent 50%),
     radial-gradient(circle at 80% 70%, rgba(13, 93, 53, 0.06) 0%, transparent 50%),
     radial-gradient(circle at 50% 50%, rgba(0, 166, 82, 0.04) 0%, transparent 60%),
     linear-gradient(135deg, #f0fdf4 0%, #ffffff 30%, #f0f9f4 100%);
   z-index: -1;
+  pointer-events: none;
   animation: backgroundShift 20s ease-in-out infinite;
 }
 
 .fact-page::after {
   content: "";
-  position: fixed;
-  top: -20%;
-  right: -10%;
-  width: 600px;
-  height: 600px;
+  position: absolute;
+  top: -12%;
+  right: 0;
+  width: min(520px, 78vw);
+  height: min(520px, 78vw);
+  max-width: 100%;
+  transform: translateX(18%);
   background: radial-gradient(circle, rgba(7, 64, 37, 0.08) 0%, rgba(13, 93, 53, 0.04) 50%, transparent 70%);
   border-radius: 50%;
   z-index: -1;
-  animation: backgroundBubble 15s ease-in-out infinite;
+  pointer-events: none;
+  /* Sin animación aquí: los keyframes usaban transform y anulaban translateX, volviendo a desbordar a la derecha */
 }
 
 @keyframes backgroundShift {
@@ -79,6 +82,7 @@
   padding: 1.5rem 2rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   position: relative;
+  isolation: isolate;
   overflow: hidden;
   border: none;
   border-top: none;
@@ -6748,6 +6752,109 @@ a.fact-logo-container--link:focus-visible {
   font-weight: 700;
   font-size: 1.05rem;
   color: #074025;
+}
+
+/* ——— Home pública en dashboard ASIC: verde marca (#2D5D46, alineado con .fact-topbar) ——— */
+.hrs-asic-corp-home-panel {
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid #1a4333;
+  box-shadow: 0 4px 14px rgba(15, 61, 46, 0.12);
+}
+
+.hrs-asic-corp-home-panel__head {
+  position: relative;
+  z-index: 0;
+  padding: 1rem 1.25rem 1.05rem;
+  background: linear-gradient(180deg, #3d7a5c 0%, #2d5d46 52%, #234a38 100%);
+  color: #fff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.14);
+}
+
+.hrs-asic-corp-home-panel__head::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 80% at 100% 0%, rgba(255, 255, 255, 0.07) 0%, transparent 55%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.hrs-asic-corp-home-panel__title {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.01em;
+}
+
+.hrs-asic-corp-home-panel__lede {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.hrs-asic-corp-home-panel__lede strong {
+  color: #fff;
+  font-weight: 700;
+}
+
+.hrs-asic-corp-home-panel__lede code {
+  font-size: 0.78em;
+  padding: 0.12rem 0.4rem;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.22);
+  color: #ecfdf5;
+}
+
+.hrs-asic-corp-home-panel__body {
+  padding: 1rem 1.25rem 1.15rem;
+  background: linear-gradient(180deg, #fafefd 0%, #f4fbf8 100%);
+}
+
+.hrs-asic-corp-home-panel__body .form-label {
+  color: #166534;
+}
+
+.hrs-asic-corp-home-panel__body .form-select {
+  border-color: rgba(45, 93, 70, 0.3);
+}
+
+.hrs-asic-corp-home-panel__body .form-select:focus {
+  border-color: #2d5d46;
+  box-shadow: 0 0 0 0.2rem rgba(45, 93, 70, 0.18);
+}
+
+.hrs-asic-corp-home-panel__submit.btn {
+  color: #fff;
+  background: linear-gradient(180deg, #2d5d46 0%, #1f4d38 100%);
+  border: none;
+  box-shadow: 0 2px 8px rgba(31, 77, 56, 0.3);
+}
+
+.hrs-asic-corp-home-panel__submit.btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+  color: #fff;
+}
+
+.hrs-asic-corp-home-panel__submit.btn:disabled {
+  opacity: 0.62;
+}
+
+.hrs-asic-corp-home-panel__submit.btn:focus-visible {
+  outline: 2px solid #bbf7d0;
+  outline-offset: 2px;
+}
+
+.hrs-asic-corp-home-panel__footnote {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #3f6212;
 }
 
 /* ——— Gestión ASIC: grilla de tarjetas estilo marketplace (/marketplacedashboard) ——— */

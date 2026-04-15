@@ -175,6 +175,22 @@
   color: #fff;
 }
 
+/* Banners home corporativa / marketplace (admin A/B) — verde marca #2D5D46 */
+.hrs-home-card--tienda-banners {
+  border: 2px solid rgba(45, 93, 70, 0.42);
+  background: linear-gradient(180deg, #ffffff 0%, #ecfdf5 100%);
+}
+
+.hrs-home-card--tienda-banners .hrs-home-card-icon {
+  background: linear-gradient(135deg, #3d7a5c 0%, #2d5d46 100%);
+  color: #fff;
+}
+
+.hrs-home-card--tienda-banners:hover .hrs-home-card-icon {
+  background: linear-gradient(135deg, #458a68 0%, #356d52 100%);
+  color: #fff;
+}
+
 /* Cotizaciones marketplace (admin A/B): acceso desde inicio, misma línea visual menta que el marketplace */
 .hrs-home-card--marketplace-tickets {
   border: 1px solid rgba(5, 150, 105, 0.22);

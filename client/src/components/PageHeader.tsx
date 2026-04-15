@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { Box, Flex, Heading } from "@chakra-ui/react";
 import "../styles/facturacion.css";
 
 const LOGO_PRINCIPAL = "/images/HASHRATELOGO2.png";
@@ -42,8 +43,6 @@ export function PageHeader({
       src={logoSrc}
       alt="Hashrate"
       className={`fact-logo ${useFallback ? "" : "fact-logo--white"}`}
-      width={180}
-      height={48}
       loading="eager"
       decoding="async"
       onError={() => setLogoSrc(LOGO_FALLBACK)}
@@ -64,19 +63,33 @@ export function PageHeader({
   );
 
   return (
-    <header className="fact-topbar">
-      <div className="fact-topbar-left">
+    <Box as="header" className="fact-topbar" width="100%">
+      <Flex className="fact-topbar-left" align="center" wrap="wrap">
         {logoBlock}
-        <h1>{title}</h1>
-      </div>
-      <div className="fact-topbar-right">
+        <Heading
+          as="h1"
+          size="md"
+          color="#ffffff"
+          fontWeight="bold"
+          fontSize={{ base: "1.05rem", md: "1.15rem" }}
+          letterSpacing="-0.02em"
+          lineHeight="1.2"
+          m={0}
+          position="relative"
+          display="inline-block"
+          textShadow="0 2px 4px rgba(0, 0, 0, 0.2)"
+        >
+          {title}
+        </Heading>
+      </Flex>
+      <Flex className="fact-topbar-right" align="center" wrap="wrap">
         {rightContent}
         {showBackButton ? (
           <Link to={backTo} className="fact-back">
             {backText}
           </Link>
         ) : null}
-      </div>
-    </header>
+      </Flex>
+    </Box>
   );
 }

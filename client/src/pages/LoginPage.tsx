@@ -56,10 +56,11 @@ export function LoginPage() {
   }
 
   return (
-    <div className="container py-5">
-      <div className="row justify-content-center">
-        <div className="col-lg-4 col-md-6">
-          <div className="hrs-card p-4">
+    <div className="hrs-login-page">
+      <div className="container py-5">
+        <div className="row justify-content-center">
+          <div className="col-lg-4 col-md-6">
+            <div className="hrs-card p-4">
             <h2 className="hrs-title mb-4 text-center">Iniciar sesión</h2>
             <p className="text-muted small text-center mb-4">HRS Sistema de Gestión Interna</p>
             <form onSubmit={handleSubmit}>
@@ -96,6 +97,7 @@ export function LoginPage() {
                 Tienda online
               </Link>
             </p>
+            </div>
           </div>
         </div>
       </div>

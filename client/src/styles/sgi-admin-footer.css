@@ -3,6 +3,7 @@
 .sgi-protected-root--admin-footer {
   min-height: 100vh;
   box-sizing: border-box;
+  background-color: #f1f5f9;
   /* Altura aprox. del footer (1 fila); en móvil puede ser 2 filas */
   padding-bottom: 52px;
 }

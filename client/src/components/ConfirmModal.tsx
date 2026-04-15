@@ -1,5 +1,6 @@
 import { useId, type ReactNode } from "react";
-import "../styles/facturacion.css";
+import { Box, CloseButton, Dialog, Flex, Portal, Text } from "@chakra-ui/react";
+import { AppButton } from "./ui";
 
 type Variant = "info" | "warning" | "delete" | "success";
 
@@ -22,10 +23,10 @@ export interface ConfirmModalProps {
 }
 
 const VARIANT_CLASS: Record<Variant, string> = {
-  info: "professional-modal-info",
-  warning: "professional-modal-warning",
-  delete: "professional-modal-delete",
-  success: "professional-modal-success",
+  info: "blue",
+  warning: "orange",
+  delete: "red",
+  success: "green",
 };
 
 /** Icono de documento/PDF para confirmación de guardar */
@@ -70,46 +71,61 @@ export function ConfirmModal({
   const titleId = useId();
   if (!open) return null;
 
-  const modalClass = VARIANT_CLASS[variant];
-  const overlayClass =
-    "modal d-block professional-modal-overlay" + (elevated ? " professional-modal-overlay--elevated" : "");
+  const colorPalette = VARIANT_CLASS[variant];
 
   return (
-    <div className={overlayClass} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={titleId}>
-      <div className="modal-dialog modal-dialog-centered">
-        <div className={`modal-content professional-modal ${modalClass}`}>
-          <div className="professional-modal-header modal-header">
-            <div className="professional-modal-icon-wrapper">{variant === "delete" ? <DeleteDangerIcon /> : <DocIcon />}</div>
-            <h5 className="modal-title professional-modal-title" id={titleId}>
-              {title}
-            </h5>
-            <button type="button" className="professional-modal-close" onClick={onCancel} disabled={confirmPending} aria-label="Cerrar">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M18 6L6 18M6 6L18 18" strokeLinecap="round" />
-              </svg>
-            </button>
-          </div>
-          <div className="modal-body professional-modal-body">
-            <div style={{ fontSize: "1rem", color: "#374151", marginBottom: warningText ? "1rem" : 0 }}>{message}</div>
-            {warningText ? <div className="professional-modal-warning-box">{warningText}</div> : null}
-          </div>
-          <div className="modal-footer professional-modal-footer">
-            <button type="button" className="professional-btn professional-btn-secondary" onClick={onCancel} disabled={confirmPending}>
-              {cancelLabel}
-            </button>
-            <button type="button" className="professional-btn professional-btn-primary" onClick={onConfirm} disabled={confirmPending}>
-              {confirmPending ? (
-                <>
-                  <span className="professional-btn-spinner" />
-                  {confirmPendingLabel}
-                </>
-              ) : (
-                confirmLabel
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(details) => {
+        if (!details.open) onCancel();
+      }}
+      closeOnEscape={!confirmPending}
+      closeOnInteractOutside={!confirmPending}
+    >
+      <Portal>
+        <Dialog.Backdrop zIndex={elevated ? 1400 : undefined} />
+        <Dialog.Positioner zIndex={elevated ? 1401 : undefined}>
+          <Dialog.Content borderWidth="1px" borderColor={`${colorPalette}.300`} borderRadius="lg">
+            <Dialog.Header bg={`${colorPalette}.50`}>
+              <Flex align="center" gap={3} w="100%">
+                <Box w="28px" h="28px" color={`${colorPalette}.600`}>
+                  {variant === "delete" ? <DeleteDangerIcon /> : <DocIcon />}
+                </Box>
+                <Dialog.Title id={titleId}>{title}</Dialog.Title>
+                <Dialog.CloseTrigger asChild>
+                  <CloseButton
+                    size="sm"
+                    ml="auto"
+                    onClick={onCancel}
+                    disabled={confirmPending}
+                    aria-label="Cerrar"
+                  />
+                </Dialog.CloseTrigger>
+              </Flex>
+            </Dialog.Header>
+            <Dialog.Body>
+              <Text fontSize="md" color="gray.700" mb={warningText ? 4 : 0}>
+                {message}
+              </Text>
+              {warningText ? (
+                <Box borderWidth="1px" borderColor={`${colorPalette}.300`} bg={`${colorPalette}.50`} borderRadius="md" p={3}>
+                  <Text color={`${colorPalette}.800`} fontSize="sm" fontWeight="medium">
+                    {warningText}
+                  </Text>
+                </Box>
+              ) : null}
+            </Dialog.Body>
+            <Dialog.Footer>
+              <AppButton variant="outline" onClick={onCancel} disabled={confirmPending}>
+                {cancelLabel}
+              </AppButton>
+              <AppButton onClick={onConfirm} disabled={confirmPending} loading={confirmPending}>
+                {confirmPending ? confirmPendingLabel : confirmLabel}
+              </AppButton>
+            </Dialog.Footer>
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Portal>
+    </Dialog.Root>
   );
 }

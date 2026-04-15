@@ -1649,11 +1649,11 @@ export function ReportesPage() {
   }, [view, rankingLoading, rankingCumulativeChartModel]);
 
   return (
-    <div className="fact-page reportes-page-bg">
-      <div className="container py-3">
+    <div className="fact-page">
+      <div className="container">
         <PageHeader title="Reportes" />
 
-        <div className="hrs-card p-4 shadow-sm border-0" style={{ background: "rgba(255,255,255,0.92)" }}>
+        <div className="hrs-card p-4">
           {view === "menu" && (
             <div className="reportes-grid">
               {reportesMenuItems.map((item) => (

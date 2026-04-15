@@ -224,6 +224,13 @@ CREATE TABLE IF NOT EXISTS marketplace_presence (
 );
 CREATE INDEX IF NOT EXISTS idx_marketplace_presence_seen ON marketplace_presence(last_seen_at DESC);
 
+CREATE TABLE IF NOT EXISTS marketplace_site_kv (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+INSERT OR IGNORE INTO marketplace_site_kv (key, value) VALUES ('corp_best_selling_asic_ids', '[]');
+INSERT OR IGNORE INTO marketplace_site_kv (key, value) VALUES ('corp_interesting_asic_ids', '[]');
+
 CREATE TABLE IF NOT EXISTS equipos_asic_audit (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -395,6 +402,17 @@ CREATE INDEX IF NOT EXISTS idx_equipos_asic_audit_created ON equipos_asic_audit(
       if (!msg.includes("duplicate column")) throw e;
     }
   }
+
+  native.exec(`CREATE TABLE IF NOT EXISTS marketplace_site_kv (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  )`);
+  native
+    .prepare("INSERT OR IGNORE INTO marketplace_site_kv (key, value) VALUES (?, ?)")
+    .run("corp_best_selling_asic_ids", "[]");
+  native
+    .prepare("INSERT OR IGNORE INTO marketplace_site_kv (key, value) VALUES (?, ?)")
+    .run("corp_interesting_asic_ids", "[]");
 
   native.exec(`CREATE TABLE IF NOT EXISTS tienda_online_client_seq (
     id INTEGER PRIMARY KEY CHECK (id = 1),

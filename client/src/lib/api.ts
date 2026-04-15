@@ -784,6 +784,44 @@ export function getMarketplaceAsicVitrina(): Promise<{ products: import("./marke
   return api<{ products: import("./marketplaceAsicCatalog.js").AsicProduct[] }>("/api/marketplace/asic-vitrina");
 }
 
+/** Destacados “Equipos más vendidos” en /marketplace/home (público). */
+export function getMarketplaceCorpBestSelling(): Promise<{ products: import("./marketplaceAsicCatalog.js").AsicProduct[] }> {
+  return api<{ products: import("./marketplaceAsicCatalog.js").AsicProduct[] }>("/api/marketplace/corp-best-selling", {
+    cache: "no-store",
+  });
+}
+
+/** IDs destacados home corporativa (auth). */
+export function getEquiposMarketplaceCorpBestSellingIds(): Promise<{ ids: string[] }> {
+  return api<{ ids: string[] }>("/api/equipos/marketplace-corp-best-selling", { cache: "no-store" });
+}
+
+/** Guardar destacados (solo admin A/B en backend). */
+export function putEquiposMarketplaceCorpBestSelling(body: { ids: string[] }): Promise<{ ok: boolean; ids: string[] }> {
+  return api<{ ok: boolean; ids: string[] }>("/api/equipos/marketplace-corp-best-selling", {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+/** «Otros Productos Interesantes» en /marketplace/home (público, hasta 4 ítems). */
+export function getMarketplaceCorpInteresting(): Promise<{ products: import("./marketplaceAsicCatalog.js").AsicProduct[] }> {
+  return api<{ products: import("./marketplaceAsicCatalog.js").AsicProduct[] }>("/api/marketplace/corp-interesting", {
+    cache: "no-store",
+  });
+}
+
+export function getEquiposMarketplaceCorpInterestingIds(): Promise<{ ids: string[] }> {
+  return api<{ ids: string[] }>("/api/equipos/marketplace-corp-interesting", { cache: "no-store" });
+}
+
+export function putEquiposMarketplaceCorpInteresting(body: { ids: string[] }): Promise<{ ok: boolean; ids: string[] }> {
+  return api<{ ok: boolean; ids: string[] }>("/api/equipos/marketplace-corp-interesting", {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
 /**
  * Precios setup cotización: S02 (equipo completo) + S03 (fracción hashrate).
  * Público — mismo origen que la vitrina.

@@ -271,186 +271,15 @@ export function defaultAsicShelfImageSrc(brand: string, model: string): string {
   return `/images/${encodeURIComponent(file)}`;
 }
 
-/** Ruta pública bajo `client/public/images/` (codifica espacios en nombres de archivo). */
-function img(file: string): string {
-  return `/images/${encodeURIComponent(file)}`;
-}
-
-/** Misma foto oficial para los tres listados Antminer S21 (`client/public/images/S21-catalog.png`). */
-const IMG_S21 = img("S21-catalog.png");
-
-/** Galería del modal (detalle) — S21: fotos adicionales; el ítem del marketplace sigue usando `IMG_S21`. */
-const GALLERY_S21 = [img("S21 - 1.jpg"), img("S21 - 5.png"), img("S21 - 6.png"), img("S21 - 7.png")];
-
-/** Misma foto oficial para los cuatro listados Antminer L9 (`client/public/images/L9-catalog.png`). */
-const IMG_L9 = img("L9-catalog.png");
-
-/** Galería del modal (detalle) — L9: 3 fotos; la tarjeta del marketplace sigue usando `IMG_L9`. */
-const GALLERY_L9 = [img("L9 - 1.jpg"), img("L9 - 2.png"), img("L9 - 3.png")];
-
-/** Fallback local si la API no responde (mismo contenido que seed del servidor). */
-export const ASIC_MARKETPLACE_PRODUCTS: AsicProduct[] = [
-  /* —— Bitcoin / SHA-256: Antminer S21 —— */
-  {
-    id: "fallback-s21-pro-235",
-    algo: "sha256",
-    brand: "Bitmain",
-    model: "Antminer S21 Pro",
-    hashrate: "235 TH/s",
-    priceUsd: 4990,
-    imageSrc: IMG_S21,
-    gallerySrcs: GALLERY_S21,
-    detailRows: [
-      { icon: "bolt", text: "3.950 W" },
-      { icon: "chip", text: "BTC / BCH / BSV · SHA-256" },
-      { icon: "fan", text: "Minero de Aire" },
-      { icon: "btc", text: "Minería Bitcoin" },
-    ],
-    estimatedYield: {
-      line1: "Por día: ~0,000111 BTC",
-      line2: "Equivalente diario (USDT): ≈ 7,48 USDT",
-    },
-  },
-  {
-    id: "fallback-s21-pro-245",
-    algo: "sha256",
-    brand: "Bitmain",
-    model: "Antminer S21 Pro",
-    hashrate: "245 TH/s",
-    priceUsd: 5200,
-    imageSrc: IMG_S21,
-    gallerySrcs: GALLERY_S21,
-    detailRows: [
-      { icon: "bolt", text: "3.950 W" },
-      { icon: "chip", text: "BTC / BCH / BSV · SHA-256" },
-      { icon: "fan", text: "Minero de Aire" },
-      { icon: "btc", text: "Minería Bitcoin" },
-    ],
-    estimatedYield: {
-      line1: "~0,00011572 BTC",
-      line2: "≈ 7,80 USDT",
-    },
-  },
-  {
-    id: "fallback-s21-xp-270",
-    algo: "sha256",
-    brand: "Bitmain",
-    model: "Antminer S21 XP",
-    hashrate: "270 TH/s",
-    priceUsd: 5900,
-    imageSrc: IMG_S21,
-    gallerySrcs: GALLERY_S21,
-    detailRows: [
-      { icon: "bolt", text: "3.800 W" },
-      { icon: "chip", text: "BTC / BCH / BSV · SHA-256" },
-      { icon: "fan", text: "Minero de Aire" },
-      { icon: "btc", text: "Minería Bitcoin" },
-    ],
-    estimatedYield: {
-      line1: "~0,000127 BTC",
-      line2: "≈ 8,60 USDT",
-    },
-  },
-  /* —— Litecoin + Dogecoin / Scrypt: Antminer L9 —— */
-  {
-    id: "fallback-l9-15g",
-    algo: "scrypt",
-    brand: "Bitmain",
-    model: "Antminer L9",
-    hashrate: "15.000 MH/s",
-    priceUsd: 5700,
-    imageSrc: IMG_L9,
-    gallerySrcs: GALLERY_L9,
-    detailRows: [
-      { icon: "bolt", text: "3.400 W" },
-      { icon: "chip", text: "DOGE + LTC · Scrypt" },
-      { icon: "fan", text: "Minero de Aire" },
-      { icon: "dual", text: "Minería Dual" },
-    ],
-    estimatedYield: {
-      line1: "~0,01914 LTC + ~72 DOGE",
-      line2: "≈ 7,5 USDT",
-    },
-  },
-  {
-    id: "fallback-l9-16g",
-    algo: "scrypt",
-    brand: "Bitmain",
-    model: "Antminer L9",
-    hashrate: "16.000 MH/s",
-    priceUsd: 6100,
-    imageSrc: IMG_L9,
-    gallerySrcs: GALLERY_L9,
-    detailRows: [
-      { icon: "bolt", text: "3.400 W" },
-      { icon: "chip", text: "DOGE + LTC · Scrypt" },
-      { icon: "fan", text: "Minero de Aire" },
-      { icon: "dual", text: "Minería Dual" },
-    ],
-    estimatedYield: {
-      line1: "~0,02042 LTC + ~77 DOGE",
-      line2: "≈ 8 USDT",
-    },
-  },
-  {
-    id: "fallback-l9-165g",
-    algo: "scrypt",
-    brand: "Bitmain",
-    model: "Antminer L9",
-    hashrate: "16.500 MH/s",
-    priceUsd: 6200,
-    imageSrc: IMG_L9,
-    gallerySrcs: GALLERY_L9,
-    detailRows: [
-      { icon: "bolt", text: "3.400 W" },
-      { icon: "chip", text: "DOGE + LTC · Scrypt" },
-      { icon: "fan", text: "Minero de Aire" },
-      { icon: "dual", text: "Minería Dual" },
-    ],
-    estimatedYield: {
-      line1: "~0,02106 LTC + ~79 DOGE",
-      line2: "≈ 8,2 USDT",
-    },
-  },
-  {
-    id: "fallback-l9-17g",
-    algo: "scrypt",
-    brand: "Bitmain",
-    model: "Antminer L9",
-    hashrate: "17.000 MH/s",
-    priceUsd: 6600,
-    imageSrc: IMG_L9,
-    gallerySrcs: GALLERY_L9,
-    detailRows: [
-      { icon: "bolt", text: "3.400 W" },
-      { icon: "chip", text: "DOGE + LTC · Scrypt" },
-      { icon: "fan", text: "Minero de Aire" },
-      { icon: "dual", text: "Minería Dual" },
-    ],
-    estimatedYield: {
-      line1: "~0,02169 LTC + ~82 DOGE",
-      line2: "≈ 8,5 USDT",
-    },
-  },
-];
+/** Fallback local si la API no responde (vacío: vitrina solo desde BD). */
+export const ASIC_MARKETPLACE_PRODUCTS: AsicProduct[] = [];
 
 /** Extras de vitrina bajo “Servicio todo incluido” en `/marketplace/home` (vacío = sin fichas estáticas mergeadas). */
 export const CORP_HOME_GRID_PRODUCT_IDS = [] as const;
 
 /**
- * Sección “Equipos más vendidos” en `/marketplace/home`: mineros de catálogo (no infra Hydro/Antrack).
- * Orden: S21 XP → S21 Pro (2 hashrates) → L9 representativo.
- */
-export const CORP_HOME_BEST_SELLING_PRODUCT_IDS = [
-  "fallback-s21-xp-270",
-  "fallback-s21-pro-245",
-  "fallback-s21-pro-235",
-  "fallback-l9-16g",
-] as const;
-
-/**
- * Home “Otros Productos Interesantes”: elige hasta 5 equipos **solo** entre los que devuelve la vitrina (BD).
- * Orden: contenedor HW5 → MD5 → HD5 → rack Antrack → minero S21 Hydro.
+ * Heurística por nombre sobre el catálogo vitrina (HW5 → MD5 → HD5 → Antrack → S21 Hydro).
+ * La home `/marketplace/home` ya usa IDs guardados en BD; se exporta por si se reutiliza en otro flujo.
  */
 export function pickCorpHomeInterestingFromVitrina(products: AsicProduct[]): AsicProduct[] {
   const line = (p: AsicProduct) => `${p.brand} ${p.model} ${p.hashrate}`.toLowerCase().replace(/\s+/g, " ");
@@ -490,12 +319,11 @@ export const ASIC_FILTER_GROUPS: ReadonlyArray<{ id: MarketplaceCatalogFilter; l
 export const HASHRATE_SHARE_OPTIONS = [100, 75, 50, 25] as const;
 export type HashrateSharePct = (typeof HASHRATE_SHARE_OPTIONS)[number];
 
-/** Solo Antminer S21 XP a 270 TH/s (catálogo estático o misma ficha desde API). */
+/** Solo Antminer S21 XP a 270 TH/s (ficha desde API / vitrina). */
 export function productSupportsHashrateShare(product: AsicProduct): boolean {
   if (!asicProductShowsMinerEconomyContent(product)) return false;
   const raw = product.priceDisplayLabel?.trim();
   if (raw && normalizeConsultPriceLabelForDisplay(raw)) return false;
-  if (product.id === "fallback-s21-xp-270") return true;
   return /\bS21\s+XP\b/i.test(product.model.trim()) && /270/i.test(product.hashrate) && /TH\//i.test(product.hashrate);
 }
 

@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
+import { Box, Flex, Grid, Heading, Text } from "@chakra-ui/react";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
-import "../styles/facturacion.css";
+import { AppCard } from "../components/ui";
 
 const configMenuItems: Array<{ to: string; icon: string; label: string; desc: string }> = [
   {
@@ -20,34 +21,64 @@ export function ConfiguracionPage() {
   const isAdmin = user?.role === "admin_a" || user?.role === "admin_b";
 
   return (
-    <div className="fact-page">
-      <div className="container">
+    <Box minH="100vh" px={{ base: 4, md: 6 }} py={{ base: 5, md: 8 }} bgGradient="linear(135deg, #f0fdf4 0%, #ffffff 30%, #f0f9f4 100%)">
+      <Box maxW="1200px" mx="auto">
         <PageHeader title="Configuración" />
 
-        <div className="hrs-card p-4">
-          <p className="text-muted small mb-3">Opciones de configuración del sistema:</p>
-          <div className="reportes-grid">
+        <AppCard mt={4} p={{ base: 4, md: 5 }}>
+          <Text color="gray.600" fontSize="sm" mb={3}>Opciones de configuración del sistema:</Text>
+          <Grid templateColumns={{ base: "1fr", md: "repeat(2, minmax(0, 1fr))", xl: "repeat(3, minmax(0, 1fr))" }} gap={4}>
             {configMenuItems.map((item) => (
-              <Link key={item.to} to={item.to} className="reportes-card mineria-hub-card">
-                <div className="reportes-card-icon">
+              <Box
+                key={item.to}
+                as={Link}
+                to={item.to}
+                textDecoration="none"
+                _hover={{ textDecoration: "none" }}
+              >
+                <AppCard h="100%" transition="all 0.2s ease" _hover={{ transform: "translateY(-2px)", boxShadow: "md" }}>
+                  <Flex
+                    w="44px"
+                    h="44px"
+                    align="center"
+                    justify="center"
+                    borderRadius="12px"
+                    bg="green.50"
+                    color="green.700"
+                    fontSize="lg"
+                    mb={3}
+                  >
                   <i className={`bi ${item.icon}`} />
-                </div>
-                <h3 className="reportes-card-title">{item.label}</h3>
-                <p className="reportes-card-desc">{item.desc}</p>
-              </Link>
+                  </Flex>
+                  <Heading size="sm" color="gray.800" mb={1}>{item.label}</Heading>
+                  <Text fontSize="sm" color="gray.600">{item.desc}</Text>
+                </AppCard>
+              </Box>
             ))}
             {isAdmin && (
-              <Link to="/usuarios" className="reportes-card mineria-hub-card">
-                <div className="reportes-card-icon">
-                  <i className="bi bi-shield-lock" />
-                </div>
-                <h3 className="reportes-card-title">Usuarios y permisos</h3>
-                <p className="reportes-card-desc">Gestionar accesos y roles</p>
-              </Link>
+              <Box as={Link} to="/usuarios" textDecoration="none" _hover={{ textDecoration: "none" }}>
+                <AppCard h="100%" transition="all 0.2s ease" _hover={{ transform: "translateY(-2px)", boxShadow: "md" }}>
+                  <Flex
+                    w="44px"
+                    h="44px"
+                    align="center"
+                    justify="center"
+                    borderRadius="12px"
+                    bg="blue.50"
+                    color="blue.700"
+                    fontSize="lg"
+                    mb={3}
+                  >
+                    <i className="bi bi-shield-lock" />
+                  </Flex>
+                  <Heading size="sm" color="gray.800" mb={1}>Usuarios y permisos</Heading>
+                  <Text fontSize="sm" color="gray.600">Gestionar accesos y roles</Text>
+                </AppCard>
+              </Box>
             )}
-          </div>
-        </div>
-      </div>
-    </div>
+          </Grid>
+        </AppCard>
+      </Box>
+    </Box>
   );
 }

@@ -2,6 +2,8 @@
  * Mapea filas `equipos_asic` (con columnas marketplace) al JSON del catálogo ASIC vitrina.
  */
 
+import { resolveMarketplaceAlgoForPersist } from "./whattomineYield.js";
+
 export type AsicAlgo = "sha256" | "scrypt";
 export type AsicDetailIcon = "bolt" | "chip" | "sun" | "fan" | "droplet" | "btc" | "dual";
 
@@ -110,6 +112,18 @@ export type EquipoAsicVitrinaRow = {
   mp_price_label?: string | null;
   mp_listing_kind?: string | null;
 };
+
+/**
+ * Igual que `mapEquipoRowToVitrina`, pero si falta `mp_algo` (inventario sin tienda) infiere SHA-256/Scrypt desde el procesador.
+ */
+export function mapEquipoRowToVitrinaWithAlgoFallback(row: EquipoAsicVitrinaRow): VitrinaAsicProduct | null {
+  const ex = row.mp_algo === "sha256" || row.mp_algo === "scrypt" ? row.mp_algo : null;
+  const resolved = resolveMarketplaceAlgoForPersist({
+    marketplaceAlgo: ex,
+    procesador: row.procesador ?? "",
+  });
+  return mapEquipoRowToVitrina({ ...row, mp_algo: resolved });
+}
 
 export function mapEquipoRowToVitrina(row: EquipoAsicVitrinaRow): VitrinaAsicProduct | null {
   const algo = parseAlgo(row.mp_algo);

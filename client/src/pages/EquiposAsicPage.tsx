@@ -1,4 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Badge,
+  Box,
+  Button,
+  CloseButton,
+  Dialog,
+  Flex,
+  Heading,
+  Input,
+  NativeSelect,
+  Portal,
+  Text,
+} from "@chakra-ui/react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import {
@@ -26,6 +39,7 @@ import { codigoProductoVitrina as vitrinaCodigoFromSpecs } from "../lib/marketpl
 import { resolveMarketplaceListingKind } from "../lib/marketplaceAsicCatalog";
 import "../styles/facturacion.css";
 import "../styles/marketplace-hashrate.css";
+import { AppButton, AppCard, AppInput, AppModal } from "../components/ui";
 
 function findCol(headerRow: (string | number)[], ...names: string[]): number {
   for (let i = 1; i < headerRow.length; i++) {
@@ -371,12 +385,15 @@ export function EquiposAsicPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showDeleteConfirm1, setShowDeleteConfirm1] = useState(false);
   const [showDeleteConfirm2, setShowDeleteConfirm2] = useState(false);
+  /** Evita que el cierre programático del paso 1 dispare `handleDeleteCancel` y cancele el paso 2. */
+  const advancingDeleteAllWizardRef = useRef(false);
   /** Equipo a eliminar tras confirmar en el diálogo (un solo ítem). */
   const [equipoDeleteConfirm, setEquipoDeleteConfirm] = useState<EquipoASIC | null>(null);
   const [deletingSingleEquipo, setDeletingSingleEquipo] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [excelLoading, setExcelLoading] = useState(false);
+  const excelFileInputRef = useRef<HTMLInputElement>(null);
   const [editingEquipo, setEditingEquipo] = useState<EquipoASIC | null>(null);
   const [formData, setFormData] = useState<EquipoFormState>(emptyEquipoForm());
   const [detailEquipo, setDetailEquipo] = useState<EquipoASIC | null>(null);
@@ -613,6 +630,14 @@ export function EquiposAsicPage() {
   function closePrecioModal() {
     setShowPrecioModal(false);
     setPrecioModalSaving(false);
+  }
+
+  function dismissAddModal() {
+    setShowPrecioModal(false);
+    setPrecioHistorialFullPayload(null);
+    setShowAddModal(false);
+    setEditingEquipo(null);
+    setFormData(emptyEquipoForm());
   }
 
   async function handleConfirmPrecioModal() {
@@ -917,96 +942,85 @@ export function EquiposAsicPage() {
   );
 
   return (
-    <div className="fact-page clientes-page">
-      <div className="container">
+    <Box minH="100vh" px={{ base: 4, md: 6 }} py={{ base: 5, md: 8 }} bgGradient="linear(135deg, #f0fdf4 0%, #ffffff 30%, #f0f9f4 100%)">
+      <Box maxW="1300px" mx="auto">
         <PageHeader title="Equipos ASIC" />
 
-        <div className="hrs-card hrs-card--rect p-4">
+        <AppCard mt={4} p={{ base: 4, md: 5 }}>
           <div className="clientes-filtros-outer">
             <div className="clientes-filtros-container">
-              <div className="card clientes-filtros-card">
-                <h6 className="fw-bold border-bottom pb-2">🔍 Filtros</h6>
+              <AppCard className="clientes-filtros-card">
+                <Heading size="sm" borderBottomWidth="1px" borderColor="gray.200" pb={2} mb={2}>🔍 Filtros</Heading>
                 <div className="row g-2 align-items-end">
                   <div className="col-md-4">
-                    <label className="form-label small fw-bold">Buscar</label>
-                    <input
-                      type="text"
-                      className="form-control form-control-sm"
+                    <AppInput
+                      label="Buscar"
                       placeholder="Marca, modelo, código de producto o procesador..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
+                      size="sm"
+                      rootProps={{ mb: 0 }}
                     />
                   </div>
                   <div className="col-md-2 d-flex align-items-end filtros-limpiar-col">
-                    <button
-                      className="btn btn-outline-secondary btn-sm filtros-limpiar-btn"
-                    onClick={() => setSearchTerm("")}
-                  >
-                    Limpiar
-                    </button>
+                    <AppButton variant="outline" className="filtros-limpiar-btn" onClick={() => setSearchTerm("")}>
+                      Limpiar
+                    </AppButton>
                   </div>
                   <div className="col-md-auto d-flex align-items-end gap-2 ms-auto">
-                    {canEditTienda && (
-                      <label
-                        className="btn btn-outline-secondary btn-sm historial-import-excel-btn mb-0"
-                        style={{
-                          backgroundColor: "rgba(45, 93, 70, 0.35)",
-                          cursor: excelLoading ? "not-allowed" : "pointer",
-                        }}
-                      >
-                        {excelLoading ? "⏳ Importando..." : "📥 Importar Excel"}
-                        <input
+                    {canEditTienda ? (
+                      <>
+                        <Input
+                          ref={excelFileInputRef}
                           type="file"
                           accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                          className="d-none"
+                          display="none"
                           onChange={handleExcelImport}
                           disabled={excelLoading}
                         />
-                      </label>
-                    )}
+                        <AppButton
+                          type="button"
+                          variant="outline"
+                          className="historial-import-excel-btn mb-0"
+                          bg="rgba(45, 93, 70, 0.35)"
+                          cursor={excelLoading ? "not-allowed" : "pointer"}
+                          disabled={excelLoading}
+                          onClick={() => excelFileInputRef.current?.click()}
+                        >
+                          {excelLoading ? "⏳ Importando..." : "📥 Importar Excel"}
+                        </AppButton>
+                      </>
+                    ) : null}
                     {canExportData && (
-                      <button
-                        type="button"
-                        className="btn btn-outline-secondary btn-sm clientes-export-excel-btn"
-                        style={{ backgroundColor: "rgba(13, 110, 253, 0.12)" }}
-                        onClick={exportExcel}
-                        disabled={equipos.length === 0}
-                      >
+                      <AppButton variant="outline" className="clientes-export-excel-btn" onClick={exportExcel} disabled={equipos.length === 0}>
                         📊 Exportar Excel
-                      </button>
+                      </AppButton>
                     )}
                     {canDelete && (
-                      <button
-                        type="button"
-                        className="btn btn-outline-secondary btn-sm clientes-borrar-todo-btn"
-                        style={{ backgroundColor: "rgba(220, 53, 69, 0.4)" }}
-                        onClick={handleDeleteAllClick}
-                      >
+                      <AppButton variant="outline" className="clientes-borrar-todo-btn" onClick={handleDeleteAllClick}>
                         🗑️ Borrar todo
-                      </button>
+                      </AppButton>
                     )}
                   </div>
                 </div>
-              </div>
+              </AppCard>
             </div>
           </div>
 
           <div className="clientes-listado-wrap">
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <h6 className="fw-bold m-0">
+            <Flex justify="space-between" align="center" mb={2} wrap="wrap" gap={2}>
+              <Heading size="sm" m={0}>
                 ⚙️ Listado de Equipos ASIC ({filteredEquipos.length}
                 {filteredEquipos.length > 0 ? (
-                  <span className="text-muted fw-normal small ms-1">
+                  <Text as="span" color="gray.500" fontWeight="normal" fontSize="sm" ml={1}>
                     · Tienda {equiposEnTienda.length} · Inventario {equiposFueraTienda.length}
-                  </span>
+                  </Text>
                 ) : null}
-                ){!canEdit && <span className="text-muted small ms-2">(solo consulta)</span>}
-              </h6>
+                ){!canEdit && <Text as="span" color="gray.500" fontSize="sm" ml={2}>(solo consulta)</Text>}
+              </Heading>
               {canEdit && (
-                <button
-                  type="button"
-                  className="fact-btn fact-btn-primary btn-sm"
-                  style={{ fontSize: "0.8125rem", padding: "0.5rem 1rem", textDecoration: "none", display: "inline-block", color: "inherit" }}
+                <AppButton
+                  size="sm"
                   onClick={() => {
                     setEditingEquipo(null);
                     setShowPrecioModal(false);
@@ -1015,34 +1029,32 @@ export function EquiposAsicPage() {
                   }}
                 >
                   ➕ Nuevo Equipo
-                </button>
+                </AppButton>
               )}
-            </div>
+            </Flex>
 
             {loading ? (
-              <div className="fact-empty d-flex flex-column align-items-center justify-content-center py-5">
-                <div className="spinner-border text-secondary" role="status" aria-label="Espere un momento" style={{ width: "2.5rem", height: "2.5rem" }} />
-              </div>
+              <AppCard>
+                <Text color="gray.600">Cargando equipos...</Text>
+              </AppCard>
             ) : loadError ? (
-              <div className="fact-empty">
-                <div className="fact-empty-icon text-danger">⚠️</div>
-                <div className="fact-empty-text">{loadError}</div>
-              </div>
+              <AppCard borderColor="red.300" bg="red.50">
+                <Text color="red.700">⚠️ {loadError}</Text>
+              </AppCard>
             ) : filteredEquipos.length === 0 ? (
-              <div className="fact-empty">
-                <div className="fact-empty-icon">⚙️</div>
-                <div className="fact-empty-text">
+              <AppCard>
+                <Text color="gray.700">
                   {searchTerm ? "No se encontraron equipos con ese criterio de búsqueda." : "No hay equipos cargados. Agregá uno con el botón \"Nuevo Equipo\"."}
-                </div>
-              </div>
+                </Text>
+              </AppCard>
             ) : (
               <div className="hrs-equipo-asic-listado-grupos">
                 <div className="mb-4 pb-2 hrs-equipo-asic-listado-grupos--tienda">
-                  <h6 className="fw-bold mb-2 d-flex flex-wrap align-items-center gap-2 border-bottom pb-2">
-                    <span className="badge bg-success">Tienda online</span>
-                    <span>Visibles en /marketplace</span>
-                    <span className="text-muted fw-normal small">({equiposEnTienda.length})</span>
-                  </h6>
+                  <Flex as="h6" fontWeight="bold" mb={2} align="center" gap={2} wrap="wrap" borderBottomWidth="1px" borderColor="gray.200" pb={2}>
+                    <Badge colorPalette="green">Tienda online</Badge>
+                    <Text>Visibles en /marketplace</Text>
+                    <Text color="gray.500" fontWeight="normal" fontSize="sm">({equiposEnTienda.length})</Text>
+                  </Flex>
                   {equiposEnTienda.length === 0 ? (
                     <p className="text-muted small mb-0">
                       {searchTerm
@@ -1090,92 +1102,107 @@ export function EquiposAsicPage() {
               </div>
             )}
           </div>
-        </div>
+        </AppCard>
 
-        {showDeleteConfirm1 && (
-          <div className="modal d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} tabIndex={-1}>
-            <div className="modal-dialog modal-dialog-centered">
-              <div className="modal-content">
-                <div className="modal-header">
-                  <h5 className="modal-title">Confirmar eliminación</h5>
-                  <button type="button" className="btn-close" onClick={handleDeleteCancel} />
-                </div>
-                <div className="modal-body">
-                  <p>¿Estás seguro de que querés eliminar <strong>todos</strong> los equipos?</p>
-                </div>
-                <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary" onClick={handleDeleteCancel}>Cancelar</button>
-                  <button type="button" className="btn btn-danger" onClick={handleDeleteConfirm1}>Confirmar</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <AppModal
+          open={showDeleteConfirm1}
+          onOpenChange={(open) => {
+            if (!open) {
+              if (advancingDeleteAllWizardRef.current) {
+                advancingDeleteAllWizardRef.current = false;
+                return;
+              }
+              handleDeleteCancel();
+            }
+          }}
+          title="Confirmar eliminación"
+          footer={
+            <Flex gap={2} w="100%" justify="flex-end" wrap="wrap">
+              <AppButton variant="outline" onClick={handleDeleteCancel}>
+                Cancelar
+              </AppButton>
+              <AppButton colorPalette="red" onClick={handleDeleteConfirm1}>
+                Confirmar
+              </AppButton>
+            </Flex>
+          }
+        >
+          <Text>
+            ¿Estás seguro de que querés eliminar <strong>todos</strong> los equipos?
+          </Text>
+        </AppModal>
 
-        {showDeleteConfirm2 && (
-          <div className="modal d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} tabIndex={-1}>
-            <div className="modal-dialog modal-dialog-centered">
-              <div className="modal-content">
-                <div className="modal-header">
-                  <h5 className="modal-title">Confirmación final</h5>
-                  <button type="button" className="btn-close" onClick={handleDeleteCancel} />
-                </div>
-                <div className="modal-body">
-                  <p className="text-danger fw-bold">Esta acción no se puede deshacer.</p>
-                  <p>¿Realmente querés eliminar todos los equipos?</p>
-                </div>
-                <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary" onClick={handleDeleteCancel}>Cancelar</button>
-                  <button type="button" className="btn btn-danger" disabled={deleting} onClick={handleDeleteConfirm2}>
-                    {deleting ? "Eliminando..." : "Eliminar todo"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <AppModal
+          open={showDeleteConfirm2}
+          onOpenChange={(open) => {
+            if (!open && !deleting) handleDeleteCancel();
+          }}
+          title="Confirmación final"
+          closeOnInteractOutside={!deleting}
+          footer={
+            <Flex gap={2} w="100%" justify="flex-end" wrap="wrap">
+              <AppButton variant="outline" onClick={handleDeleteCancel} disabled={deleting}>
+                Cancelar
+              </AppButton>
+              <AppButton colorPalette="red" disabled={deleting} loading={deleting} onClick={handleDeleteConfirm2}>
+                {deleting ? "Eliminando..." : "Eliminar todo"}
+              </AppButton>
+            </Flex>
+          }
+        >
+          <Text color="red.600" fontWeight="bold">
+            Esta acción no se puede deshacer.
+          </Text>
+          <Text mt={2}>¿Realmente querés eliminar todos los equipos?</Text>
+        </AppModal>
 
-        {equipoDeleteConfirm ? (
-          <div className="modal d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} tabIndex={-1} role="dialog" aria-modal="true">
-            <div className="modal-dialog modal-dialog-centered">
-              <div className="modal-content">
-                <div className="modal-header">
-                  <h5 className="modal-title">Eliminar equipo</h5>
-                  <button type="button" className="btn-close" onClick={handleDeleteEquipoCancel} aria-label="Cerrar" />
-                </div>
-                <div className="modal-body">
-                  <p className="mb-2">¿Seguro que querés eliminar este producto?</p>
-                  <ul className="small text-muted mb-0">
-                    <li>
-                      <strong className="text-dark">{equipoDeleteConfirm.marcaEquipo}</strong>{" "}
-                      {equipoDeleteConfirm.modelo}
-                    </li>
-                    <li>
-                      Código: <strong className="text-dark">{equipoDeleteConfirm.numeroSerie ?? "—"}</strong>
-                    </li>
-                    {equipoDeleteConfirm.procesador ? (
-                      <li>{equipoDeleteConfirm.procesador}</li>
-                    ) : null}
-                  </ul>
-                  <p className="text-danger small fw-bold mt-3 mb-0">Esta acción no se puede deshacer.</p>
-                </div>
-                <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary" onClick={handleDeleteEquipoCancel}>
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-danger"
-                    disabled={deletingSingleEquipo}
-                    onClick={() => void handleDeleteEquipoConfirmado()}
-                  >
-                    {deletingSingleEquipo ? "Eliminando…" : "Eliminar"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
+        <AppModal
+          open={Boolean(equipoDeleteConfirm)}
+          onOpenChange={(open) => {
+            if (!open && !deletingSingleEquipo) handleDeleteEquipoCancel();
+          }}
+          title="Eliminar equipo"
+          closeOnInteractOutside={!deletingSingleEquipo}
+          footer={
+            <Flex gap={2} w="100%" justify="flex-end" wrap="wrap">
+              <AppButton variant="outline" onClick={handleDeleteEquipoCancel} disabled={deletingSingleEquipo}>
+                Cancelar
+              </AppButton>
+              <AppButton
+                colorPalette="red"
+                disabled={deletingSingleEquipo}
+                loading={deletingSingleEquipo}
+                onClick={() => void handleDeleteEquipoConfirmado()}
+              >
+                {deletingSingleEquipo ? "Eliminando…" : "Eliminar"}
+              </AppButton>
+            </Flex>
+          }
+        >
+          {equipoDeleteConfirm ? (
+            <>
+              <Text mb={2}>¿Seguro que querés eliminar este producto?</Text>
+              <Box as="ul" fontSize="sm" color="gray.600" pl={5} mb={0}>
+                <li>
+                  <Text as="span" fontWeight="semibold" color="gray.800">
+                    {equipoDeleteConfirm.marcaEquipo}
+                  </Text>{" "}
+                  {equipoDeleteConfirm.modelo}
+                </li>
+                <li>
+                  Código:{" "}
+                  <Text as="span" fontWeight="semibold" color="gray.800">
+                    {equipoDeleteConfirm.numeroSerie ?? "—"}
+                  </Text>
+                </li>
+                {equipoDeleteConfirm.procesador ? <li>{equipoDeleteConfirm.procesador}</li> : null}
+              </Box>
+              <Text color="red.600" fontSize="sm" fontWeight="bold" mt={3} mb={0}>
+                Esta acción no se puede deshacer.
+              </Text>
+            </>
+          ) : null}
+        </AppModal>
 
         {detailEquipo && equipoDetailModalProduct ? (
           <AsicProductModal
@@ -1235,10 +1262,14 @@ export function EquiposAsicPage() {
                     </table>
                   </>
                 ) : null}
-                <button
+                <Button
                   type="button"
+                  variant="plain"
                   className="product-modal__btn product-modal__btn--outline"
-                  style={{ marginTop: "0.75rem", width: "100%", textAlign: "center", fontSize: "0.8125rem" }}
+                  mt="0.75rem"
+                  w="100%"
+                  textAlign="center"
+                  fontSize="0.8125rem"
                   disabled={!detailEquipo.precioHistorial?.length}
                   title={
                     detailEquipo.precioHistorial?.length
@@ -1248,12 +1279,15 @@ export function EquiposAsicPage() {
                   onClick={() => detailEquipo && openPrecioHistorialFullFromEquipo(detailEquipo)}
                 >
                   Ver histórico completo
-                </button>
+                </Button>
                 {canEditTienda ? (
-                  <button
+                  <Button
                     type="button"
+                    variant="plain"
                     className="product-modal__btn product-modal__btn--solid"
-                    style={{ marginTop: "1rem", width: "100%", textAlign: "center" }}
+                    mt="1rem"
+                    w="100%"
+                    textAlign="center"
                     onClick={() => {
                       const row = detailEquipo;
                       closeEquipoDetail();
@@ -1265,17 +1299,32 @@ export function EquiposAsicPage() {
                     }}
                   >
                     Modificar precio
-                  </button>
+                  </Button>
                 ) : null}
               </div>
             }
           />
         ) : null}
 
-        {showAddModal && (
-          <div className="modal d-block professional-modal-overlay" tabIndex={-1}>
-            <div className="modal-dialog modal-dialog-centered modal-xl clientes-new-modal-dialog hrs-equipo-asic-modal-dialog">
-              <div className="modal-content professional-modal professional-modal-form clientes-new-modal-content hrs-equipo-asic-modal-content">
+        <Dialog.Root
+          open={showAddModal}
+          size="xl"
+          closeOnInteractOutside={false}
+          onOpenChange={(details) => {
+            if (!details.open) dismissAddModal();
+          }}
+        >
+          <Portal>
+            <Dialog.Backdrop className="professional-modal-overlay" />
+            <Dialog.Positioner>
+              <Box className="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable clientes-new-modal-dialog hrs-equipo-asic-modal-dialog">
+                <Dialog.Content
+                  className="modal-content professional-modal professional-modal-form clientes-new-modal-content hrs-equipo-asic-modal-content"
+                  maxH="92dvh"
+                  display="flex"
+                  flexDirection="column"
+                  overflow="hidden"
+                >
                 <div className="modal-header professional-modal-header">
                   <div className="professional-modal-icon-wrapper">
                     <svg className="professional-modal-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1285,13 +1334,9 @@ export function EquiposAsicPage() {
                   <h5 className="modal-title professional-modal-title">
                     {editingEquipo ? "Editar Equipo ASIC" : "Agregar nuevo equipo"}
                   </h5>
-                  <button type="button" className="professional-modal-close" onClick={() => { setShowPrecioModal(false); setPrecioHistorialFullPayload(null); setShowAddModal(false); setEditingEquipo(null); setFormData(emptyEquipoForm()); }} aria-label="Cerrar">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <path d="M18 6L6 18M6 6L18 18" strokeLinecap="round"/>
-                    </svg>
-                  </button>
+                  <CloseButton size="sm" className="professional-modal-close" onClick={dismissAddModal} aria-label="Cerrar" />
                 </div>
-                <div className="modal-body professional-modal-body">
+                <div className="modal-body professional-modal-body" style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
                   <div className="hrs-equipo-asic-modal-form">
                     <div className="hrs-equipo-asic-modal-form__main">
                       <div className="client-form-column hrs-equipo-asic-modal-form__left">
@@ -1302,7 +1347,7 @@ export function EquiposAsicPage() {
                           Boolean(editingEquipo?.numeroSerie) ? (
                             <div className="fact-field hrs-equipo-asic-modal-form__ident-field">
                               <label className="fact-label">Código de producto</label>
-                              <input
+                              <Input
                                 type="text"
                                 className="fact-input hrs-equipo-asic-modal-form__product-code-input"
                                 value={
@@ -1329,24 +1374,26 @@ export function EquiposAsicPage() {
                           <div className="fact-field hrs-equipo-asic-modal-form__ident-field">
                             <label className="fact-label">Fecha y hora de ingreso</label>
                             {editingEquipo ? (
-                              <input
+                              <Input
                                 type="text"
                                 className="fact-input hrs-equipo-asic-modal-form__product-code-input"
                                 readOnly
                                 value={formatFechaIngresoDisplay(formData.fechaIngreso)}
                                 title="Registrada al crear el equipo; no se puede modificar"
                                 aria-readonly="true"
-                                style={{ cursor: "not-allowed" }}
+                                cursor="not-allowed"
                               />
                             ) : (
-                              <input
+                              <Input
                                 type="text"
                                 className="fact-input"
                                 readOnly
                                 value="Al guardar se registra automáticamente (servidor)"
                                 title="La fecha y hora se fijan en el momento de crear el equipo"
                                 aria-readonly="true"
-                                style={{ backgroundColor: "#f9fafb", color: "#4b5563", cursor: "default" }}
+                                bg="#f9fafb"
+                                color="#4b5563"
+                                cursor="default"
                               />
                             )}
                           </div>
@@ -1380,54 +1427,56 @@ export function EquiposAsicPage() {
                         <div className="hrs-equipo-asic-modal-form__equipo-fields">
                           <div className="fact-field">
                             <label className="fact-label">Marca *</label>
-                            <select
-                              className={
-                                "fact-input" + (specsFieldsLocked ? " hrs-equipo-asic-modal-form__spec-input--locked" : "")
-                              }
-                              value={formData.marcaEquipo}
-                              onChange={(e) => setFormData({ ...formData, marcaEquipo: e.target.value })}
-                              disabled={specsFieldsLocked}
-                              required
-                              aria-label="Marca del equipo"
-                            >
-                              <option value="">Seleccionar…</option>
-                              {opcionesMarcaConActual(formData.marcaEquipo).map((m) => (
-                                <option key={m} value={m}>
-                                  {m}
-                                </option>
-                              ))}
-                            </select>
+                            <NativeSelect.Root disabled={specsFieldsLocked} width="100%">
+                              <NativeSelect.Field
+                                className={
+                                  "fact-input" + (specsFieldsLocked ? " hrs-equipo-asic-modal-form__spec-input--locked" : "")
+                                }
+                                value={formData.marcaEquipo}
+                                onChange={(e) => setFormData({ ...formData, marcaEquipo: e.target.value })}
+                                aria-label="Marca del equipo"
+                              >
+                                <option value="">Seleccionar…</option>
+                                {opcionesMarcaConActual(formData.marcaEquipo).map((m) => (
+                                  <option key={m} value={m}>
+                                    {m}
+                                  </option>
+                                ))}
+                              </NativeSelect.Field>
+                              <NativeSelect.Indicator />
+                            </NativeSelect.Root>
                           </div>
                           <div className="fact-field">
                             <label className="fact-label">Modelo *</label>
-                            <select
-                              className={
-                                "fact-input" + (specsFieldsLocked ? " hrs-equipo-asic-modal-form__spec-input--locked" : "")
-                              }
-                              value={(() => {
-                                const opts = opcionesModeloConActual(formData.modelo);
-                                return opts.includes(formData.modelo) ? formData.modelo : "";
-                              })()}
-                              onChange={(e) => {
-                                const v = e.target.value;
-                                const nuevoProc = procesadorTrasCambioModelo(formData.modelo, v, formData.procesador);
-                                setFormData({
-                                  ...formData,
-                                  modelo: v,
-                                  procesador: nuevoProc,
-                                });
-                              }}
-                              disabled={specsFieldsLocked}
-                              required
-                              aria-label="Modelo del equipo"
-                            >
-                              <option value="">Seleccionar…</option>
-                              {opcionesModeloConActual(formData.modelo).map((m) => (
-                                <option key={m} value={m}>
-                                  {m}
-                                </option>
-                              ))}
-                            </select>
+                            <NativeSelect.Root disabled={specsFieldsLocked} width="100%">
+                              <NativeSelect.Field
+                                className={
+                                  "fact-input" + (specsFieldsLocked ? " hrs-equipo-asic-modal-form__spec-input--locked" : "")
+                                }
+                                value={(() => {
+                                  const opts = opcionesModeloConActual(formData.modelo);
+                                  return opts.includes(formData.modelo) ? formData.modelo : "";
+                                })()}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  const nuevoProc = procesadorTrasCambioModelo(formData.modelo, v, formData.procesador);
+                                  setFormData({
+                                    ...formData,
+                                    modelo: v,
+                                    procesador: nuevoProc,
+                                  });
+                                }}
+                                aria-label="Modelo del equipo"
+                              >
+                                <option value="">Seleccionar…</option>
+                                {opcionesModeloConActual(formData.modelo).map((m) => (
+                                  <option key={m} value={m}>
+                                    {m}
+                                  </option>
+                                ))}
+                              </NativeSelect.Field>
+                              <NativeSelect.Indicator />
+                            </NativeSelect.Root>
                           </div>
                           <div className="fact-field">
                             <label className="fact-label">Procesador *</label>
@@ -1438,28 +1487,29 @@ export function EquiposAsicPage() {
                                 const val =
                                   formData.procesador && opts.includes(formData.procesador) ? formData.procesador : "";
                                 return (
-                                  <select
-                                    className={
-                                      "fact-input" +
-                                      (specsFieldsLocked ? " hrs-equipo-asic-modal-form__spec-input--locked" : "")
-                                    }
-                                    value={val}
-                                    onChange={(e) => setFormData({ ...formData, procesador: e.target.value })}
-                                    disabled={specsFieldsLocked}
-                                    required
-                                    aria-label="Hashrate (procesador)"
-                                  >
-                                    <option value="">Seleccionar hashrate…</option>
-                                    {opts.map((o) => (
-                                      <option key={o} value={o}>
-                                        {o}
-                                      </option>
-                                    ))}
-                                  </select>
+                                  <NativeSelect.Root disabled={specsFieldsLocked} width="100%">
+                                    <NativeSelect.Field
+                                      className={
+                                        "fact-input" +
+                                        (specsFieldsLocked ? " hrs-equipo-asic-modal-form__spec-input--locked" : "")
+                                      }
+                                      value={val}
+                                      onChange={(e) => setFormData({ ...formData, procesador: e.target.value })}
+                                      aria-label="Hashrate (procesador)"
+                                    >
+                                      <option value="">Seleccionar hashrate…</option>
+                                      {opts.map((o) => (
+                                        <option key={o} value={o}>
+                                          {o}
+                                        </option>
+                                      ))}
+                                    </NativeSelect.Field>
+                                    <NativeSelect.Indicator />
+                                  </NativeSelect.Root>
                                 );
                               }
                               return (
-                                <input
+                                <Input
                                   type="text"
                                   className={
                                     "fact-input" +
@@ -1494,8 +1544,9 @@ export function EquiposAsicPage() {
                               ? formData.precioUSD.toLocaleString("es-PY")
                               : "—"}
                         </p>
-                        <button
+                        <Button
                           type="button"
+                          variant="plain"
                           className="hrs-equipo-asic-modal-form__price-btn"
                           onClick={openPrecioModal}
                           disabled={!canEditTienda || formData.marketplacePriceConsultMode}
@@ -1508,7 +1559,7 @@ export function EquiposAsicPage() {
                           }
                         >
                           Modificar precio
-                        </button>
+                        </Button>
                         {canEditTienda ? (
                           <label className="hrs-equipo-asic-modal-form__price-consult-toggle hrs-equipo-asic-modal-form__price-consult-toggle--after-list-price">
                             <input
@@ -1535,8 +1586,9 @@ export function EquiposAsicPage() {
                           </label>
                         ) : null}
                         {formData.precioHistorialLocal.length > 0 ? (
-                          <button
+                          <Button
                             type="button"
+                            variant="plain"
                             className="hrs-equipo-asic-price-history-link"
                             onClick={() =>
                               setPrecioHistorialFullPayload({
@@ -1549,7 +1601,7 @@ export function EquiposAsicPage() {
                             }
                           >
                             {formData.precioHistorialLocal.length} cambio(s) en historial — ver todo
-                          </button>
+                          </Button>
                         ) : (
                           <p className="hrs-equipo-asic-modal-form__price-meta hrs-equipo-asic-modal-form__price-meta--dim">
                             Sin historial aún
@@ -1620,18 +1672,19 @@ export function EquiposAsicPage() {
                 </div>
                 <div className="modal-footer professional-modal-footer">
                   <div className="d-flex gap-2 flex-wrap w-100" style={{ justifyContent: "flex-end" }}>
-                    <button type="button" className="fact-btn fact-btn-secondary" onClick={() => { setShowPrecioModal(false); setPrecioHistorialFullPayload(null); setShowAddModal(false); setEditingEquipo(null); setFormData(emptyEquipoForm()); }}>
+                    <Button type="button" variant="plain" className="fact-btn fact-btn-secondary" onClick={dismissAddModal}>
                       Cancelar
-                    </button>
-                    <button type="button" className="fact-btn fact-btn-primary" onClick={handleSave}>
+                    </Button>
+                    <Button type="button" variant="plain" className="fact-btn fact-btn-primary" onClick={handleSave}>
                       {editingEquipo ? "Actualizar" : "Guardar"}
-                    </button>
+                    </Button>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-        )}
+                </Dialog.Content>
+              </Box>
+            </Dialog.Positioner>
+          </Portal>
+        </Dialog.Root>
         {precioHistorialFullPayload ? (
           <PrecioHistorialFullModal
             open
@@ -1643,27 +1696,42 @@ export function EquiposAsicPage() {
             codigoProducto={precioHistorialFullPayload.codigoProducto}
           />
         ) : null}
-        {showPrecioModal && (
-          <div
-            className="modal d-block professional-modal-overlay hrs-equipo-precio-modal-overlay"
-            tabIndex={-1}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="hrs-precio-modal-title"
-          >
-            <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable hrs-equipo-precio-modal-dialog">
-              <div className="modal-content professional-modal hrs-equipo-precio-modal-content">
+        <Dialog.Root
+          open={showPrecioModal}
+          size="md"
+          closeOnInteractOutside={!precioModalSaving}
+          closeOnEscape={!precioModalSaving}
+          onOpenChange={(details) => {
+            if (!details.open && !precioModalSaving) closePrecioModal();
+          }}
+        >
+          <Portal>
+            <Dialog.Backdrop className="professional-modal-overlay hrs-equipo-precio-modal-overlay" />
+            <Dialog.Positioner>
+              <Box className="modal-dialog modal-dialog-centered modal-dialog-scrollable hrs-equipo-precio-modal-dialog">
+                <Dialog.Content
+                  className="modal-content professional-modal hrs-equipo-precio-modal-content"
+                  maxH="88dvh"
+                  display="flex"
+                  flexDirection="column"
+                  overflow="hidden"
+                >
                 <div className="modal-header professional-modal-header">
                   <h5 id="hrs-precio-modal-title" className="modal-title professional-modal-title">
                     Modificar precio USD
                   </h5>
-                  <button type="button" className="professional-modal-close" onClick={closePrecioModal} aria-label="Cerrar">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <path d="M18 6L6 18M6 6L18 18" strokeLinecap="round" />
-                    </svg>
-                  </button>
+                  <CloseButton
+                    size="sm"
+                    className="professional-modal-close"
+                    onClick={closePrecioModal}
+                    disabled={precioModalSaving}
+                    aria-label="Cerrar"
+                  />
                 </div>
-                <div className="modal-body professional-modal-body hrs-equipo-precio-modal-body">
+                <div
+                  className="modal-body professional-modal-body hrs-equipo-precio-modal-body"
+                  style={{ overflowY: "auto", flex: 1, minHeight: 0 }}
+                >
                   <p className="small text-muted mb-3 hrs-equipo-precio-modal-intro">
                     Indicá el nuevo precio. La <strong>fecha y hora del cambio</strong> se guardan automáticamente en el
                     momento en que pulsás <strong>Guardar precio</strong>.{" "}
@@ -1671,7 +1739,7 @@ export function EquiposAsicPage() {
                   </p>
                   <div className="fact-field hrs-equipo-precio-modal-field">
                     <label className="fact-label">Precio USD *</label>
-                    <input
+                    <Input
                       type="number"
                       min={1}
                       className="fact-input hrs-equipo-precio-modal-input"
@@ -1716,18 +1784,31 @@ export function EquiposAsicPage() {
                   )}
                 </div>
                 <div className="modal-footer professional-modal-footer">
-                  <button type="button" className="fact-btn fact-btn-secondary" onClick={closePrecioModal} disabled={precioModalSaving}>
+                  <Button
+                    type="button"
+                    variant="plain"
+                    className="fact-btn fact-btn-secondary"
+                    onClick={closePrecioModal}
+                    disabled={precioModalSaving}
+                  >
                     Cancelar
-                  </button>
-                  <button type="button" className="fact-btn fact-btn-primary" onClick={handleConfirmPrecioModal} disabled={precioModalSaving}>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="plain"
+                    className="fact-btn fact-btn-primary"
+                    onClick={handleConfirmPrecioModal}
+                    disabled={precioModalSaving}
+                  >
                     {precioModalSaving ? "Guardando…" : "Guardar precio"}
-                  </button>
+                  </Button>
                 </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+                </Dialog.Content>
+              </Box>
+            </Dialog.Positioner>
+          </Portal>
+        </Dialog.Root>
+      </Box>
+    </Box>
   );
 }

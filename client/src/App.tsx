@@ -17,6 +17,7 @@ import { PendientesMineriaPage } from "./pages/PendientesMineriaPage";
 import { ClientesPage } from "./pages/ClientesPage";
 import { ClienteEditPage } from "./pages/ClienteEditPage";
 import { EquiposAsicPage } from "./pages/EquiposAsicPage";
+import { TiendaOnlineBannersHomePage } from "./pages/TiendaOnlineBannersHomePage";
 import { SetupPage } from "./pages/SetupPage";
 import { ReportesPage } from "./pages/ReportesPage";
 import { UsuariosPage } from "./pages/UsuariosPage";
@@ -351,6 +352,7 @@ function App() {
             <Route path="/kryptex" element={<KryptexPage />} />
             <Route path="/kryptex/detalle" element={<KryptexDetallePage />} />
             <Route path="/marketplacedashboard" element={<EquiposAsicPage />} />
+            <Route path="/tienda-online-banners-home" element={<TiendaOnlineBannersHomePage />} />
             <Route path="/hosting" element={<HostingHubPage />} />
             <Route path="/hosting/control-documentos-cobros" element={<FacturasMesHostingPage />} />
             <Route path="/facturacion-hosting" element={<FacturacionPage />} />

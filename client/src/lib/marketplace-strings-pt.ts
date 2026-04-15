@@ -101,7 +101,7 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
   "corp.home_row2.title": "Hydro, rack e contentores",
   "corp.home_row2.grid_aria": "Mais equipamentos do marketplace — Hydro, rack e AntSpace",
   "corp.interesting_products.title": "Outros Produtos Interessantes:",
-  "corp.interesting_products.grid_aria": "Equipamentos publicados na vitrine — contentores AntSpace HW5, MD5, HD5, rack Antrack e minerador S21 Hydro",
+  "corp.interesting_products.grid_aria": "Equipamentos em destaque na home — definidos no painel de gestão ASIC",
   "corp.market_shortcuts_aria": "Atalhos do marketplace — abrir ficha do equipamento",
   "corp.mp_card_link_aria": "Abrir no marketplace",
   "corp.play_video": "Assistir ao vídeo",

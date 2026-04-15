@@ -20,7 +20,8 @@ html {
 }
 
 body {
-  background: linear-gradient(135deg, #074025 0%, #49f227 100%);
+  /* Neutro global: evita franja verde (scrollbar / 100vw) en SGI. El verde de login va en .hrs-login-page */
+  background: #f1f5f9;
   min-height: 100vh;
   width: 100%;
   overflow-x: hidden;
@@ -30,9 +31,20 @@ body {
 }
 
 #root {
+  position: relative;
+  z-index: 1;
   min-height: 100vh;
   width: 100%;
   max-width: 100%;
+  background-color: #f1f5f9;
+  overflow-x: hidden;
+}
+
+/** Pantalla /login: recupera el fondo verde marca (body ya no lo lleva) */
+.hrs-login-page {
+  min-height: 100vh;
+  box-sizing: border-box;
+  background: linear-gradient(135deg, #074025 0%, #49f227 100%);
 }
 
 /* Base responsive global: evita desbordes y hace medios fluidos en todas las vistas. */
@@ -50,36 +62,12 @@ button {
   max-width: 100%;
 }
 
-body::before {
-  content: "";
-  position: fixed;
-  top: -50%;
-  right: -10%;
-  width: clamp(280px, 42vw, 500px);
-  height: clamp(280px, 42vw, 500px);
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 50%;
-  z-index: -1;
-}
-
-body::after {
-  content: "";
-  position: fixed;
-  bottom: -20%;
-  left: -5%;
-  width: clamp(240px, 34vw, 400px);
-  height: clamp(240px, 34vw, 400px);
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 50%;
-  z-index: -1;
-}
-
 .hrs-card {
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  /* Sin backdrop-filter: en Chrome/Windows generaba franjas grises (vertical/horizontal) al componer sobre #f1f5f9 */
   border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(10px);
-  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 10px 40px rgba(15, 23, 42, 0.1);
+  background: #ffffff;
 }
 
 .hrs-card--rect {

@@ -972,11 +972,6 @@
   }
 }
 
-.reportes-page-bg {
-  background: linear-gradient(180deg, #f1f5f9 0%, #f8fafc 35%, #fff 100%);
-  min-height: 100%;
-}
-
 /* Bloque variación % hosting (#reportes-hosting-tabla) */
 .reportes-hosting-var-chart {
   background: #fff;
@@ -1214,3 +1209,4 @@
     max-height: min(320px, 50vh);
   }
 }
+

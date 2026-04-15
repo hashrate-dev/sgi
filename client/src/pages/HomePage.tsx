@@ -1,34 +1,107 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Navigate, Link as RouterLink } from "react-router-dom";
+import { Badge, Box, Flex, Grid, Heading, Image as ChakraImage, Stack, Text } from "@chakra-ui/react";
 import { useAuth } from "../contexts/AuthContext";
 import { getMarketplacePresenceStats, getMarketplaceQuoteTicketsStats, updateMyPassword } from "../lib/api";
 import { canViewMarketplaceQuoteTickets } from "../lib/auth.js";
 import { playMarketplaceOrderNotificationSound } from "../lib/marketplaceCartSound";
 import { showToast } from "../components/ToastNotification";
-import "../styles/hrshome.css";
 import "../styles/marketplace-hashrate.css";
+import { AppButton, AppCard, AppInput, AppModal } from "../components/ui";
 
-const menuItems: Array<{ to: string; icon: string; label: string; desc: string; roles?: string[]; cardClass?: string }> = [
+type MenuItem = {
+  to: string;
+  icon?: string;
+  label: string;
+  desc: string;
+  roles?: string[];
+  /** Logo en la tarjeta (ej. Hosting = marca HASHRATE) en lugar del icono Bootstrap */
+  cardLogoSrc?: string;
+  cardLogoAlt?: string;
+};
+
+const ICON_SLOT_PROPS = {
+  w: "64px",
+  h: "64px",
+  align: "center" as const,
+  justify: "center" as const,
+  borderRadius: "xl",
+  bg: "green.50",
+  color: "green.700",
+  flexShrink: 0,
+  borderWidth: "1px",
+  borderColor: "green.100",
+};
+
+/** Tamaño uniforme de iconos Bootstrap en tarjetas del home (rellena más el recuadre) */
+const DASHBOARD_BI_ICON_SIZE = "2.125rem";
+
+const menuItems: MenuItem[] = [
   {
     to: "/marketplace",
     icon: "bi-bag-heart",
     label: "Tienda online",
     desc: "Catálogo público de equipos ASIC — vista cliente (sin administración)",
-    cardClass: "hrs-home-card--tienda-cliente",
   },
-  { to: "/hosting", icon: "bi-receipt", label: "Servicios de Hosting", desc: "Información de Facturación de Servicios de Hosting", roles: ["admin_a", "admin_b", "operador"] },
-  { to: "/equipos-asic", icon: "bi-cpu", label: "Equipos ASIC", desc: "Información de Facturación de Equipos de Minería ASIC", roles: ["admin_a", "admin_b", "operador"] },
-  { to: "/kryptex", icon: "bi-currency-bitcoin", label: "Kryptex", desc: "Información de Kryptex", roles: ["admin_a", "admin_b", "lector"] },
-  { to: "/cuenta-cliente", icon: "bi-journal-text", label: "Cuenta por cliente", desc: "Detalle histórico de movimientos por cliente (Hosting + ASIC)" },
+  {
+    to: "/hosting",
+    label: "Servicios de Hosting",
+    desc: "Información de facturación de servicios de hosting",
+    roles: ["admin_a", "admin_b", "operador"],
+    cardLogoSrc: "/images/LOGO-HASHRATE.png",
+    cardLogoAlt: "Hashrate",
+  },
+  {
+    to: "/equipos-asic",
+    icon: "bi-cpu",
+    label: "Equipos ASIC",
+    desc: "Información de facturación de equipos de minería ASIC",
+    roles: ["admin_a", "admin_b", "operador"],
+  },
+  {
+    to: "/kryptex",
+    icon: "bi-currency-bitcoin",
+    label: "Kryptex",
+    desc: "Información de Kryptex",
+    roles: ["admin_a", "admin_b", "lector"],
+  },
+  {
+    to: "/cuenta-cliente",
+    icon: "bi-journal-text",
+    label: "Cuenta por cliente",
+    desc: "Detalle histórico de movimientos por cliente (hosting + ASIC)",
+  },
   { to: "/historial", icon: "bi-clock-history", label: "Historial", desc: "Ver y gestionar comprobantes" },
   {
     to: "/clientes-hub",
     icon: "bi-people",
     label: "Clientes",
-    desc: "Administración de Bases de Clientes de Tienda Online & Clientes de Hosting",
+    desc: "Administración de clientes de tienda online y de hosting",
   },
-  { to: "/reportes", icon: "bi-graph-up", label: "Reportes", desc: "Estadísticas y análisis" }
+  { to: "/reportes", icon: "bi-graph-up", label: "Reportes", desc: "Estadísticas y análisis" },
 ];
+
+function DashboardCardIconSlot({ item }: { item: MenuItem }) {
+  if (item.cardLogoSrc) {
+    return (
+      <Flex {...ICON_SLOT_PROPS} mb={3}>
+        <img
+          src={item.cardLogoSrc}
+          alt={item.cardLogoAlt ?? "Hashrate"}
+          style={{ maxHeight: 44, width: "auto", maxWidth: 58, objectFit: "contain", display: "block" }}
+        />
+      </Flex>
+    );
+  }
+  if (item.icon) {
+    return (
+      <Flex {...ICON_SLOT_PROPS} mb={3}>
+        <Box as="i" className={`bi ${item.icon}`} fontSize={DASHBOARD_BI_ICON_SIZE} lineHeight={1} aria-hidden />
+      </Flex>
+    );
+  }
+  return null;
+}
 
 export function HomePage() {
   const { user, logout } = useAuth();
@@ -44,13 +117,12 @@ export function HomePage() {
   const [marketplaceOnlineAnon, setMarketplaceOnlineAnon] = useState(0);
   const prevOpenCountRef = useRef(0);
   const roleNorm = (r: string | undefined) => (r ?? "").toLowerCase().trim();
-const visibleMenuItems = menuItems.filter(
-  (item) => !item.roles || (user && item.roles.some((r) => roleNorm(r) === roleNorm(user.role)))
-);
+  const visibleMenuItems = menuItems.filter(
+    (item) => !item.roles || (user && item.roles.some((r) => roleNorm(r) === roleNorm(user.role)))
+  );
   const canSeeMarketplaceOrdersCard = Boolean(user && canViewMarketplaceQuoteTickets(user.role));
 
   useEffect(() => {
-    // Verificar que la imagen existe
     const img = new Image();
     img.onload = () => {
       setLogoSrc("/images/HRSLOGO.png");
@@ -140,8 +212,7 @@ const visibleMenuItems = menuItems.filter(
     };
   }, [canSeeMarketplaceOrdersCard]);
 
-  function handleChangePassword(e: React.FormEvent) {
-    e.preventDefault();
+  function handleChangePassword() {
     if (newPassword.length < 6) {
       showToast("La contraseña debe tener al menos 6 caracteres.", "error");
       return;
@@ -162,7 +233,22 @@ const visibleMenuItems = menuItems.filter(
       .finally(() => setSaving(false));
   }
 
-  // LECTOR solo ve Kryptex: redirigir a /kryptex
+  const cardTitleProps = {
+    as: "h2" as const,
+    fontSize: "md",
+    fontWeight: "semibold",
+    color: "gray.800",
+    lineHeight: "snug",
+    mb: 2,
+    letterSpacing: "-0.01em",
+  };
+
+  const cardDescProps = {
+    fontSize: "sm",
+    color: "gray.600",
+    lineHeight: "tall",
+  };
+
   if (user?.role === "lector") {
     return <Navigate to="/kryptex" replace />;
   }
@@ -171,173 +257,261 @@ const visibleMenuItems = menuItems.filter(
   }
 
   return (
-    <div className="hrs-home">
-      <div className="hrs-home-container">
-        <header className="sgi-unified-header sgi-unified-header--home">
-          <div className="container sgi-unified-header__inner">
-            <div className="sgi-unified-header__brand">
-              <img
+    <Box minH="100vh" px={{ base: 4, md: 6 }} py={{ base: 5, md: 8 }} bgGradient="linear(135deg, #074025 0%, #2d8f3a 55%, #49f227 100%)">
+      <Box maxW="1150px" mx="auto">
+        <AppCard mb={5} p={{ base: 4, md: 5 }} boxShadow="md">
+          <Flex
+            align="center"
+            justify="space-between"
+            gap={4}
+            flexWrap="wrap"
+            rowGap={4}
+          >
+            <Flex align="center" gap={4} minW={0} flex={{ base: "1 1 100%", lg: "0 1 auto" }}>
+              <ChakraImage
                 src={logoSrc}
                 alt="HRS Logo"
-                className="sgi-unified-header__home-logo"
+                h={{ base: "40px", md: "48px" }}
+                w="auto"
+                maxW={{ base: "120px", md: "160px" }}
+                objectFit="contain"
+                flexShrink={0}
                 onError={() => {
-                  console.error("Error loading HRSLOGO.png, trying fallback");
                   setLogoSrc("/images/HASHRATELOGO2.png");
                 }}
               />
-              <div>
-                <h1 className="sgi-unified-header__home-title">HRS GROUP S.A</h1>
-                <p className="sgi-unified-header__home-sub">Sistema de Gestión Interna</p>
-              </div>
-            </div>
+              <Box minW={0}>
+                <Heading size="md" color="gray.800" lineHeight="short">
+                  HRS GROUP S.A
+                </Heading>
+                <Text fontSize="sm" color="gray.600" mt={0.5}>
+                  Sistema de gestión interna
+                </Text>
+              </Box>
+            </Flex>
             {user ? (
-              <div className="sgi-unified-header__actions sgi-unified-header__actions--home hrs-home-user">
-                <span className="hrs-home-user-badge">
-                  <i className="bi bi-person-circle me-2" />
-                  <span className="hrs-home-user-email">{user.email || user.username}</span>
-                  <span className="hrs-home-user-role">{user.role}</span>
-                </span>
-                <button type="button" className="btn btn-link py-0 px-2" onClick={() => setShowPasswordModal(true)} title="Cambiar mi contraseña">
-                  <i className="bi bi-key" /> Cambiar contraseña
-                </button>
-                <button type="button" className="hrs-home-logout btn btn-link" onClick={logout}>
-                  <i className="bi bi-box-arrow-right me-1" />
-                  Cerrar sesión
-                </button>
-              </div>
+              <Flex
+                align="center"
+                justify={{ base: "flex-start", sm: "flex-end" }}
+                gap={2}
+                flexWrap="wrap"
+                flex={{ base: "1 1 100%", lg: "0 1 auto" }}
+                w={{ base: "100%", lg: "auto" }}
+              >
+                <Badge colorPalette="green" px={3} py={1.5} borderRadius="full" fontWeight="medium" maxW="100%">
+                  <Flex as="span" align="center" gap={2} minW={0}>
+                    <Box as="i" className="bi bi-person-circle" flexShrink={0} aria-hidden />
+                    <Text as="span" truncate fontSize="sm">
+                      {user.email || user.username} · {user.role}
+                    </Text>
+                  </Flex>
+                </Badge>
+                <AppButton variant="ghost" size="sm" onClick={() => setShowPasswordModal(true)}>
+                  <Flex align="center" gap={2}>
+                    <Box as="i" className="bi bi-key" aria-hidden />
+                    Cambiar contraseña
+                  </Flex>
+                </AppButton>
+                <AppButton variant="solid" size="sm" onClick={logout}>
+                  <Flex align="center" gap={2}>
+                    <Box as="i" className="bi bi-box-arrow-right" aria-hidden />
+                    Cerrar sesión
+                  </Flex>
+                </AppButton>
+              </Flex>
             ) : null}
-          </div>
-        </header>
+          </Flex>
+        </AppCard>
 
-        <main className="hrs-home-grid">
+        <Grid
+          templateColumns={{ base: "1fr", md: "repeat(2, minmax(0, 1fr))", xl: "repeat(3, minmax(0, 1fr))" }}
+          gap={4}
+          alignItems="stretch"
+        >
           {visibleMenuItems.map((item) => (
-            <Link key={item.to + (item.label || "")} to={item.to} className={`hrs-home-card${item.cardClass ? ` ${item.cardClass}` : ""}`}>
-              <div className="hrs-home-card-icon">
-                <i className={`bi ${item.icon}`} />
-              </div>
-              <h3 className="hrs-home-card-title">{item.label}</h3>
-              <p className="hrs-home-card-desc">{item.desc}</p>
-            </Link>
+            <RouterLink key={item.to + item.label} to={item.to} style={{ textDecoration: "none", color: "inherit", display: "block", minHeight: 0 }}>
+              <AppCard
+                h="100%"
+                minH="148px"
+                display="flex"
+                flexDirection="column"
+                transition="box-shadow 0.2s ease, transform 0.2s ease"
+                _hover={{ transform: "translateY(-2px)", boxShadow: "md", borderColor: "green.200" }}
+              >
+                <DashboardCardIconSlot item={item} />
+                <Heading {...cardTitleProps}>{item.label}</Heading>
+                <Text {...cardDescProps}>{item.desc}</Text>
+              </AppCard>
+            </RouterLink>
           ))}
-          {canSeeMarketplaceOrdersCard ? (
-            <Link to="/cotizaciones-marketplace" className="hrs-home-card hrs-home-card--marketplace-tickets">
-              <div className="hrs-home-card-icon hrs-home-card-icon--marketplace">
-                <i className="bi bi-ticket-perforated" aria-hidden />
-                {marketplaceOpenCount > 0 ? (
-                  <span
-                    className={
-                      "hrs-home-marketplace-badge" +
-                      (marketplaceBadgePulse ? " hrs-home-marketplace-badge--pulse" : "")
-                    }
-                    aria-label={`${marketplaceOpenCount} órdenes abiertas`}
-                    title={`${marketplaceOpenCount} órdenes abiertas`}
-                  >
-                    {marketplaceOpenCount > 99 ? "99+" : marketplaceOpenCount}
-                  </span>
-                ) : null}
-              </div>
-              <h3 className="hrs-home-card-title">Ordenes Marketplace</h3>
-              <p className="hrs-home-card-desc">Tickets y órdenes del carrito (monitoreo en vivo)</p>
-            </Link>
-          ) : null}
-          {canSeeMarketplaceOrdersCard ? (
-            <Link to="/marketplace-presencia" className="hrs-home-card hrs-home-card--marketplace-presence" role="status" aria-live="polite">
-              <div className="hrs-home-card-icon hrs-home-card-icon--marketplace-presence">
-                <i className="bi bi-broadcast-pin" aria-hidden />
-                <span className="hrs-home-marketplace-presence-dot" aria-hidden />
-              </div>
-              <h3 className="hrs-home-card-title">Marketplace en vivo</h3>
-              <p className="hrs-home-marketplace-presence-count">
-                {marketplaceOnlineTotal} online ahora
-              </p>
-              <p className="hrs-home-card-desc">
-                logueados: {marketplaceOnlineLogged} · sin cuenta: {marketplaceOnlineAnon}
-              </p>
-            </Link>
-          ) : null}
-          {user ? (
-            <Link to="/configuracion" className="hrs-home-card hrs-home-card-admin">
-              <div className="hrs-home-card-icon">
-                <i className="bi bi-gear-fill" aria-hidden />
-              </div>
-              <h3 className="hrs-home-card-title">Configuración</h3>
-              <p className="hrs-home-card-desc">
-                Tienda Online, equipos ASIC, Setup y Garantías
-                {(roleNorm(user?.role) === "admin_a" || roleNorm(user?.role) === "admin_b") ? "; Usuarios" : ""}
-              </p>
-            </Link>
-          ) : null}
-        </main>
-      </div>
 
-      {showPasswordModal && user && (
-        <div className="modal d-block professional-modal-overlay" tabIndex={-1}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content professional-modal professional-modal-form">
-              <div className="modal-header professional-modal-header">
-                <div className="professional-modal-icon-wrapper">
-                  <svg className="professional-modal-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 15C14.2091 15 16 13.2091 16 11C16 8.79086 14.2091 7 12 7C9.79086 7 8 8.79086 8 11C8 13.2091 9.79086 15 12 15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M3.41016 11C3.41016 16.5563 7.44365 21 12.9999 21C18.5562 21 22.5897 16.5563 22.5897 11C22.5897 5.44365 18.5562 1 12.9999 1C7.44365 1 3.41016 5.44365 3.41016 11Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M12 11V15M12 7V7.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-                <h5 className="modal-title professional-modal-title">Cambiar mi contraseña</h5>
-                <button type="button" className="professional-modal-close" onClick={() => setShowPasswordModal(false)} aria-label="Cerrar">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M18 6L6 18M6 6L18 18" strokeLinecap="round"/>
-                  </svg>
-                </button>
-              </div>
-              <form onSubmit={handleChangePassword}>
-                <div className="modal-body professional-modal-body">
-                  <div className="mb-3">
-                    <label className="form-label professional-modal-body .form-label">Usuario</label>
-                    <input type="text" className="form-control" value={user.email || user.username} readOnly disabled style={{ background: "#f3f4f6", cursor: "not-allowed" }} />
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label professional-modal-body .form-label">Nueva contraseña (mín. 6 caracteres)</label>
-                    <input
-                      type="password"
-                      className="form-control"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      required
-                      minLength={6}
-                      autoComplete="new-password"
-                    />
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label professional-modal-body .form-label">Confirmar nueva contraseña</label>
-                    <input
-                      type="password"
-                      className="form-control"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      required
-                      minLength={6}
-                      autoComplete="new-password"
-                    />
-                  </div>
-                </div>
-                <div className="modal-footer professional-modal-footer">
-                  <button type="button" className="professional-btn professional-btn-secondary" onClick={() => setShowPasswordModal(false)}>Cancelar</button>
-                  <button type="submit" className="professional-btn professional-btn-primary" disabled={saving}>
-                    {saving ? (
-                      <>
-                        <span className="professional-btn-spinner"></span>
-                        Guardando...
-                      </>
-                    ) : (
-                      "Guardar"
-                    )}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+          {canSeeMarketplaceOrdersCard ? (
+            <RouterLink to="/cotizaciones-marketplace" style={{ textDecoration: "none", color: "inherit", display: "block", minHeight: 0 }}>
+              <AppCard
+                h="100%"
+                minH="148px"
+                display="flex"
+                flexDirection="column"
+                borderLeftWidth="4px"
+                borderLeftColor="green.500"
+                transition="box-shadow 0.2s ease, transform 0.2s ease"
+                _hover={{ transform: "translateY(-2px)", boxShadow: "md", borderColor: "gray.200" }}
+              >
+                <Flex {...ICON_SLOT_PROPS} mb={3} position="relative">
+                  <Box as="i" className="bi bi-ticket-perforated" fontSize={DASHBOARD_BI_ICON_SIZE} lineHeight={1} aria-hidden />
+                  {marketplaceOpenCount > 0 ? (
+                    <Box
+                      position="absolute"
+                      top="-6px"
+                      right="-6px"
+                      minW="22px"
+                      h="22px"
+                      px={1.5}
+                      borderRadius="full"
+                      bg="red.500"
+                      color="white"
+                      fontSize="xs"
+                      fontWeight="bold"
+                      display="inline-flex"
+                      alignItems="center"
+                      justifyContent="center"
+                      transform={marketplaceBadgePulse ? "scale(1.08)" : "scale(1)"}
+                      transition="transform 0.2s ease"
+                      boxShadow="sm"
+                    >
+                      {marketplaceOpenCount > 99 ? "99+" : marketplaceOpenCount}
+                    </Box>
+                  ) : null}
+                </Flex>
+                <Heading {...cardTitleProps}>Órdenes marketplace</Heading>
+                <Text {...cardDescProps}>Tickets y órdenes del carrito (monitoreo en vivo)</Text>
+              </AppCard>
+            </RouterLink>
+          ) : null}
+
+          {canSeeMarketplaceOrdersCard ? (
+            <RouterLink
+              to="/marketplace-presencia"
+              role="status"
+              aria-live="polite"
+              style={{ textDecoration: "none", color: "inherit", display: "block", minHeight: 0 }}
+            >
+              <AppCard
+                h="100%"
+                minH="148px"
+                display="flex"
+                flexDirection="column"
+                transition="box-shadow 0.2s ease, transform 0.2s ease"
+                _hover={{ transform: "translateY(-2px)", boxShadow: "md", borderColor: "green.200" }}
+              >
+                <Flex {...ICON_SLOT_PROPS} mb={3}>
+                  <Box as="i" className="bi bi-broadcast-pin" fontSize={DASHBOARD_BI_ICON_SIZE} lineHeight={1} aria-hidden />
+                </Flex>
+                <Heading {...cardTitleProps}>Marketplace en vivo</Heading>
+                <Text fontSize="sm" fontWeight="semibold" color="gray.700" mb={1.5} lineHeight="short">
+                  {marketplaceOnlineTotal} en línea ahora
+                </Text>
+                <Text {...cardDescProps}>
+                  Logueados: {marketplaceOnlineLogged} · Sin cuenta: {marketplaceOnlineAnon}
+                </Text>
+              </AppCard>
+            </RouterLink>
+          ) : null}
+
+          {user && (roleNorm(user.role) === "admin_a" || roleNorm(user.role) === "admin_b") ? (
+            <RouterLink to="/tienda-online-banners-home" style={{ textDecoration: "none", color: "inherit", display: "block", minHeight: 0 }}>
+              <AppCard
+                h="100%"
+                minH="148px"
+                display="flex"
+                flexDirection="column"
+                transition="box-shadow 0.2s ease, transform 0.2s ease"
+                _hover={{ transform: "translateY(-2px)", boxShadow: "md", borderColor: "green.200" }}
+              >
+                <Flex {...ICON_SLOT_PROPS} mb={3}>
+                  <Box as="i" className="bi bi-images" fontSize={DASHBOARD_BI_ICON_SIZE} lineHeight={1} aria-hidden />
+                </Flex>
+                <Heading {...cardTitleProps}>Tienda online — banners home</Heading>
+                <Text {...cardDescProps}>Destacados de la home pública: más vendidos y otros productos</Text>
+              </AppCard>
+            </RouterLink>
+          ) : null}
+
+          {user ? (
+            <RouterLink to="/configuracion" style={{ textDecoration: "none", color: "inherit", display: "block", minHeight: 0 }}>
+              <AppCard
+                h="100%"
+                minH="148px"
+                display="flex"
+                flexDirection="column"
+                transition="box-shadow 0.2s ease, transform 0.2s ease"
+                _hover={{ transform: "translateY(-2px)", boxShadow: "md", borderColor: "green.200" }}
+              >
+                <Flex {...ICON_SLOT_PROPS} mb={3}>
+                  <Box as="i" className="bi bi-gear-fill" fontSize={DASHBOARD_BI_ICON_SIZE} lineHeight={1} aria-hidden />
+                </Flex>
+                <Heading {...cardTitleProps}>Configuración</Heading>
+                <Text {...cardDescProps}>
+                  Tienda online, equipos ASIC, setup y garantías
+                  {roleNorm(user?.role) === "admin_a" || roleNorm(user?.role) === "admin_b" ? "; usuarios" : ""}
+                </Text>
+              </AppCard>
+            </RouterLink>
+          ) : null}
+        </Grid>
+      </Box>
+
+      {showPasswordModal && user ? (
+        <AppModal
+          open={showPasswordModal}
+          onOpenChange={setShowPasswordModal}
+          title="Cambiar mi contraseña"
+          description="Elegí una contraseña segura. Mínimo 6 caracteres; podés combinar letras y números."
+          size="sm"
+          footer={
+            <>
+              <AppButton variant="outline" size="sm" onClick={() => setShowPasswordModal(false)}>
+                Cancelar
+              </AppButton>
+              <AppButton size="sm" onClick={handleChangePassword} loading={saving}>
+                Guardar contraseña
+              </AppButton>
+            </>
+          }
+        >
+          <Stack gap={5} align="stretch">
+            <AppInput
+              label="Usuario"
+              value={user.email || user.username}
+              readOnly
+              bg="gray.50"
+              color="gray.700"
+              cursor="default"
+              _readOnly={{ opacity: 1, cursor: "default" }}
+              helperText="Solo lectura. El usuario no se modifica desde aquí."
+            />
+            <AppInput
+              label="Nueva contraseña"
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              minLength={6}
+              autoComplete="new-password"
+              placeholder="Mínimo 6 caracteres"
+              helperText="No compartas esta contraseña con nadie."
+            />
+            <AppInput
+              label="Confirmar nueva contraseña"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              minLength={6}
+              autoComplete="new-password"
+              placeholder="Repetí la misma contraseña"
+            />
+          </Stack>
+        </AppModal>
+      ) : null}
+    </Box>
   );
 }

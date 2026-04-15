@@ -11,6 +11,7 @@ import { ConfirmModal } from "../components/ConfirmModal";
 import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import { canEditFacturacion } from "../lib/auth";
+import { isClienteTiendaOnline } from "../lib/clientTienda";
 import { formatCurrencyNumber, formatUSD } from "../lib/formatCurrency";
 import "../styles/facturacion.css";
 
@@ -163,9 +164,20 @@ export function FacturacionMineriaPage() {
 
   useEffect(() => {
     getClients()
-      .then((r) => setClients((r.clients ?? []) as Client[]))
+      .then((r) => {
+        const all = (r.clients ?? []) as Client[];
+        // Solo clientes de hosting (/clientes), no cuentas tienda online (/clientes-tienda-online).
+        setClients(all.filter((c) => !isClienteTiendaOnline(c)));
+      })
       .catch(() => setClients([]));
   }, []);
+
+  useEffect(() => {
+    if (!selectedClientId) return;
+    if (!clients.some((c) => String(c.id ?? "") === String(selectedClientId))) {
+      setSelectedClientId("");
+    }
+  }, [clients, selectedClientId]);
 
   /** Vista previa: pedir siguiente número sin consumir (peek) */
   useEffect(() => {

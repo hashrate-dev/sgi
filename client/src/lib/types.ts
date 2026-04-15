@@ -71,7 +71,7 @@ export type Invoice = {
 
 export type EquipoASIC = {
   id: string;
-  numeroSerie?: string; // Código de producto / serie (ej. M001 auto o VIT-L9-17G)
+  numeroSerie?: string; // Código de producto / serie (ej. M001 auto o VIT-HW5-…)
   fechaIngreso: string; // Fecha de ingreso
   marcaEquipo: string; // Marca del equipo
   modelo: string; // Modelo
