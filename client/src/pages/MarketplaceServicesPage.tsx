@@ -127,62 +127,60 @@ export function MarketplaceServicesPage() {
             </div>
           </section>
 
-          <div className="market-corp-inner">
-            <section className="market-corp-spotlight" aria-labelledby="services-spotlight-z15-title">
-              <div className="market-corp-spotlight__card">
-                <div className="market-corp-spotlight__text">
-                  <div className="market-corp-spotlight__tags">
-                    <span className="market-corp-spotlight__tag">{t("corp.spotlight.tag1")}</span>
-                  </div>
-                  <h2 id="services-spotlight-z15-title" className="market-corp-spotlight__h2">
-                    {t("corp.spotlight.title")}
-                  </h2>
-                  <ul className="market-corp-spotlight__specs" aria-label={t("corp.spotlight.specs_aria")}>
-                    <li className="market-corp-spotlight__spec">
-                      <span className="market-corp-spotlight__spec-value">{t("corp.spotlight.spec_v1")}</span>
-                      <span className="market-corp-spotlight__spec-label">{t("corp.spotlight.spec_l1")}</span>
-                    </li>
-                    <li className="market-corp-spotlight__spec">
-                      <span className="market-corp-spotlight__spec-value">{t("corp.spotlight.spec_v2")}</span>
-                      <span className="market-corp-spotlight__spec-label">{t("corp.spotlight.spec_l2")}</span>
-                    </li>
-                    <li className="market-corp-spotlight__spec">
-                      <span className="market-corp-spotlight__spec-value">{t("corp.spotlight.spec_v3")}</span>
-                      <span className="market-corp-spotlight__spec-label">{t("corp.spotlight.spec_l3")}</span>
-                    </li>
-                  </ul>
-                  <p className="market-corp-spotlight__body">{t("corp.spotlight.body")}</p>
-                  <Link to="/marketplace" className="market-corp-spotlight__cta">
-                    {t("corp.spotlight.cta")}
-                  </Link>
+          <section className="market-corp-spotlight" aria-labelledby="services-spotlight-z15-title">
+            <div className="market-corp-spotlight__card">
+              <div className="market-corp-spotlight__text">
+                <div className="market-corp-spotlight__tags">
+                  <span className="market-corp-spotlight__tag">{t("corp.spotlight.tag1")}</span>
                 </div>
-                <div className="market-corp-spotlight__visual">
-                  <div className="market-corp-spotlight__visual-grad" aria-hidden />
-                  <div className="market-corp-spotlight__visual-noise" aria-hidden />
+                <h2 id="services-spotlight-z15-title" className="market-corp-spotlight__h2">
+                  {t("corp.spotlight.title")}
+                </h2>
+                <ul className="market-corp-spotlight__specs" aria-label={t("corp.spotlight.specs_aria")}>
+                  <li className="market-corp-spotlight__spec">
+                    <span className="market-corp-spotlight__spec-value">{t("corp.spotlight.spec_v1")}</span>
+                    <span className="market-corp-spotlight__spec-label">{t("corp.spotlight.spec_l1")}</span>
+                  </li>
+                  <li className="market-corp-spotlight__spec">
+                    <span className="market-corp-spotlight__spec-value">{t("corp.spotlight.spec_v2")}</span>
+                    <span className="market-corp-spotlight__spec-label">{t("corp.spotlight.spec_l2")}</span>
+                  </li>
+                  <li className="market-corp-spotlight__spec">
+                    <span className="market-corp-spotlight__spec-value">{t("corp.spotlight.spec_v3")}</span>
+                    <span className="market-corp-spotlight__spec-label">{t("corp.spotlight.spec_l3")}</span>
+                  </li>
+                </ul>
+                <p className="market-corp-spotlight__body">{t("corp.spotlight.body")}</p>
+                <Link to="/marketplace" className="market-corp-spotlight__cta">
+                  {t("corp.spotlight.cta")}
+                </Link>
+              </div>
+              <div className="market-corp-spotlight__visual">
+                <div className="market-corp-spotlight__visual-grad" aria-hidden />
+                <div className="market-corp-spotlight__visual-noise" aria-hidden />
+                <img
+                  className="market-corp-spotlight__img"
+                  src={CORP_Z15_PROMO_IMG}
+                  alt={t("corp.spotlight.img_alt")}
+                  width={800}
+                  height={800}
+                  loading="lazy"
+                  decoding="async"
+                />
+                <div className="market-corp-spotlight__glass">
                   <img
-                    className="market-corp-spotlight__img"
-                    src={CORP_Z15_PROMO_IMG}
-                    alt={t("corp.spotlight.img_alt")}
-                    width={800}
-                    height={800}
+                    className="market-corp-spotlight__glass-logo"
+                    src={CORP_ZCASH_LOGO_IMG}
+                    alt={t("corp.spotlight.zcash_logo_alt")}
+                    width={56}
+                    height={56}
                     loading="lazy"
                     decoding="async"
                   />
-                  <div className="market-corp-spotlight__glass">
-                    <img
-                      className="market-corp-spotlight__glass-logo"
-                      src={CORP_ZCASH_LOGO_IMG}
-                      alt={t("corp.spotlight.zcash_logo_alt")}
-                      width={56}
-                      height={56}
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  </div>
                 </div>
               </div>
-            </section>
-          </div>
+            </div>
+          </section>
         </main>
         <MarketplaceSiteFooter />
       </div>

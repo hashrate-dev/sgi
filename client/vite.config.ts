@@ -17,8 +17,9 @@ export default defineConfig({
     host: "127.0.0.1",
     port: 5173,
     strictPort: false,
+    /** El front en dev llama a la API en el mismo host:puerto (ver `getApiBase` en api.ts); este proxy queda por si algo pide `/api` al origen de Vite. */
     proxy: {
-      "/api": { target: "http://127.0.0.1:8080", changeOrigin: true }
+      "/api": { target: "http://127.0.0.1:8080", changeOrigin: true },
     },
     headers: {
       "Cache-Control": "no-store, no-cache, must-revalidate"

@@ -1,11 +1,40 @@
 /* Marketplace ASIC — estilo claro (mockup: fondo gris, tarjetas blancas, precio rojo, verde acción) */
 
+/*
+ * Toda la tienda pública (`/marketplace`, home corp., etc.): mismo tratamiento de ancho que la home corp.
+ * `scrollbar-gutter: stable` + ancho útil ≠ `100vw` → franja; hrs.css deja verde en `body` si no tapamos.
+ */
+html:has(.marketplace-asic-page),
+body:has(.marketplace-asic-page) {
+  overflow-x: hidden;
+  max-width: 100%;
+  background: #f3f4f6;
+}
+
+body:has(.marketplace-asic-page) {
+  scrollbar-gutter: auto;
+}
+
+body:has(.marketplace-asic-page)::before,
+body:has(.marketplace-asic-page)::after {
+  display: none;
+}
+
+#root:has(.marketplace-asic-page) {
+  overflow-x: hidden;
+  max-width: 100%;
+  min-width: 0;
+  width: 100%;
+}
+
 .marketplace-asic-page {
   --marketplace-page-bg: #f3f4f6;
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+  width: 100%;
+  min-width: 0;
   background: var(--marketplace-page-bg);
   color: #1f2937;
   font-family: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -22,11 +51,16 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
 }
 
 .marketplace-asic-page #page-main {
   flex: 1 1 auto;
   min-height: 0;
+  min-width: 0;
+  width: 100%;
 }
 
 /* ——— Header claro ——— */
@@ -525,9 +559,21 @@
   border-color: #d1d5db;
 }
 
-/* ——— Intro ——— */
+/* ——— Catálogo /marketplace ——— */
 .page-main--market--asic {
   padding-bottom: 3rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+  box-sizing: border-box;
+  background: linear-gradient(160deg, #f0fdf4 0%, #ecfdf5 35%, #ffffff 100%);
+}
+
+.marketplace-asic-page .section--market-shelf {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .market-intro-wrap {
@@ -4664,6 +4710,10 @@ button.product-modal__btn--quote-cart:hover {
 /* ——— /marketplace/home — inicio corporativo (100 % React) ——— */
 .page-main--market--corp {
   padding-bottom: 0;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  overflow-x: clip;
 }
 
 /* Sin franja gris (#f3f4f6) entre la franja oscura y el footer */
@@ -4738,6 +4788,9 @@ button.product-modal__btn--quote-cart:hover {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 1rem 3rem;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .market-corp-anchor {
@@ -5009,6 +5062,8 @@ button.product-modal__btn--quote-cart:hover {
   color: #fff;
   overflow: visible;
   padding-bottom: clamp(1.25rem, 3vw, 2rem);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Banner: padding inferior alarga imagen + overlay (~5 cm) para que las stats queden dentro del área del hero */
@@ -5268,22 +5323,17 @@ button.product-modal__btn--quote-cart:hover {
   padding-top: clamp(1.75rem, 4vw, 2.75rem);
 }
 
-/* Sin franja gris entre hero (stats verdes) y faja blanca del Z15 */
-.market-corp-inner.market-corp-inner--flush-top:has(> .market-corp-spotlight:first-child) {
-  padding-top: 0;
-}
-
-.page-main--market--corp > .market-corp-hero-full:has(+ .market-corp-inner > .market-corp-spotlight:first-child) {
+.page-main--market--corp > .market-corp-hero-full:has(+ .market-corp-spotlight) {
   padding-bottom: 0;
 }
 
-/* Destacado producto (ej. Z15 PRO): faja blanca ancho viewport + tarjeta + columna visual */
+/* Destacado producto (ej. Z15 PRO): ancho del `main` (sin `100vw`) */
 .market-corp-spotlight {
   position: relative;
-  width: 100vw;
-  max-width: 100vw;
-  margin-left: calc(50% - 50vw);
-  margin-right: calc(50% - 50vw);
+  width: 100%;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
   box-sizing: border-box;
   margin-top: 0;
   margin-bottom: 0;
@@ -5293,7 +5343,7 @@ button.product-modal__btn--quote-cart:hover {
   border-bottom: 1px solid #eef2f6;
 }
 
-.market-corp-spotlight + .market-corp-products-title {
+.market-corp-spotlight + .market-corp-inner .market-corp-products-title {
   margin-top: clamp(1.5rem, 4vw, 2.25rem);
 }
 
@@ -5605,10 +5655,10 @@ button.product-modal__btn--quote-cart:hover {
 /* Faja ancho completo: “Servicio todo incluido” — foto de fondo + degradé Hashrate (estilo bloque Itaipu) */
 .market-corp-hosting-split-band {
   position: relative;
-  width: 100vw;
-  max-width: 100vw;
-  margin-left: calc(50% - 50vw);
-  margin-right: calc(50% - 50vw);
+  width: 100%;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
   box-sizing: border-box;
   overflow: hidden;
   background: #0f172a;
@@ -5690,10 +5740,10 @@ button.product-modal__btn--quote-cart:hover {
 /* Franja clara entre “Servicio todo incluido” y el bloque Itaipú / datacenters */
 .market-corp-interesting-slot {
   position: relative;
-  width: 100vw;
-  max-width: 100vw;
-  margin-left: calc(50% - 50vw);
-  margin-right: calc(50% - 50vw);
+  width: 100%;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
   box-sizing: border-box;
   background: #f1f5f9;
   border-top: 1px solid #e2e8f0;
@@ -5770,12 +5820,11 @@ button.product-modal__btn--quote-cart:hover {
 
 .market-corp-itaipu {
   position: relative;
-  /* Edge-to-edge como hero de referencia (ancho viewport) */
-  margin-left: calc(50% - 50vw);
-  margin-right: calc(50% - 50vw);
+  margin-left: 0;
+  margin-right: 0;
   margin-bottom: 2.5rem;
-  width: 100vw;
-  max-width: 100vw;
+  width: 100%;
+  max-width: none;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -6375,12 +6424,12 @@ button.product-modal__btn--quote-cart:hover {
 
 /* CTA / “Cómo funciona”: mismo tratamiento que overlay Itaipú (azul → verde, 0.8) */
 .market-corp-sales-cta {
-  width: 100vw;
+  width: 100%;
   max-width: none;
   margin-top: 1.5rem;
   margin-bottom: 2.25rem;
-  margin-left: calc(50% - 50vw);
-  margin-right: calc(50% - 50vw);
+  margin-left: 0;
+  margin-right: 0;
   position: relative;
   overflow: hidden;
 }
@@ -6993,9 +7042,9 @@ button.product-modal__btn--quote-cart:hover {
 
 @media (min-width: 768px) {
   .market-corp-strip {
-    margin-left: calc(50% - 50vw);
-    margin-right: calc(50% - 50vw);
-    width: 100vw;
+    margin-left: 0;
+    margin-right: 0;
+    width: 100%;
   }
 }
 

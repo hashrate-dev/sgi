@@ -14,6 +14,7 @@ import { requireAuth, requireRole } from "../middleware/auth.js";
 import { resolveSetupCompraHashrateUsd, resolveSetupEquipoCompletoUsd } from "../lib/marketplaceSetupHashratePrice.js";
 import { loadGarantiaQuoteRows } from "../lib/marketplaceGarantiaQuote.js";
 import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
+import { mpVisibleFromDbValue } from "../lib/mpVisible.js";
 
 export const marketplaceRouter = Router();
 
@@ -588,10 +589,16 @@ marketplaceRouter.get("/marketplace/asic-vitrina", async (req: Request, res: Res
   try {
     await touchMarketplacePresence(req, "/marketplace/asic-vitrina");
     const clause = sqlMarketplaceVisible();
-    const sql = `SELECT id, marca_equipo, modelo, procesador, precio_usd, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_price_label, mp_listing_kind
+    const sql = `SELECT id, marca_equipo, modelo, procesador, precio_usd, mp_visible, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_price_label, mp_listing_kind
       FROM equipos_asic WHERE ${clause} ORDER BY marca_equipo ASC, modelo ASC, procesador ASC`;
     const raw = (await db.prepare(sql).all()) as Record<string, unknown>[];
-    const rows = raw.map((r) => rowKeysToLowercase(r) as EquipoAsicVitrinaRow);
+    const rows = raw
+      .map((r) => rowKeysToLowercase(r) as Record<string, unknown>)
+      .filter((r) => mpVisibleFromDbValue(r.mp_visible))
+      .map((r) => {
+        const { mp_visible: _drop, ...rest } = r;
+        return rest as EquipoAsicVitrinaRow;
+      });
     const products = rows.map(mapEquipoRowToVitrina).filter((p): p is NonNullable<typeof p> => p != null);
     res.set("Cache-Control", "public, max-age=45, stale-while-revalidate=120");
     res.json({ products });

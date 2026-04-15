@@ -236,6 +236,41 @@ export type AsicProduct = {
   listingKind?: MarketplaceListingKind;
 };
 
+/**
+ * Prefijo correcto para `/images/...` cuando la app se publica bajo un subpath (`base` en Vite).
+ * No altera URLs absolutas ni `data:`.
+ */
+export function publicImageUrl(path: string): string {
+  const p = (path ?? "").trim();
+  if (!p) return "";
+  if (/^(https?:|data:)/i.test(p)) return p;
+  let normBase = "";
+  try {
+    const b = import.meta.env?.BASE_URL;
+    if (typeof b === "string" && b !== "/" && b.trim() !== "") {
+      normBase = b.replace(/\/$/, "");
+    }
+  } catch {
+    normBase = "";
+  }
+  const pathPart = p.startsWith("/") ? p : `/${p}`;
+  return normBase ? `${normBase}${pathPart}` : pathPart;
+}
+
+/**
+ * Foto de catálogo en `client/public/images` cuando `mp_image_src` está vacío o no carga
+ * (mismos assets que el seed de vitrina / catálogo estático).
+ */
+export function defaultAsicShelfImageSrc(brand: string, model: string): string {
+  const t = `${brand} ${model}`.toLowerCase().replace(/\s+/g, " ");
+  let file: string | null = null;
+  if (/\b(?:antminer\s+)?l9\b/.test(t)) file = "L9-catalog.png";
+  else if (/\b(?:antminer\s+)?s21\b/.test(t)) file = "S21-catalog.png";
+  else if (/\bz15\b/.test(t)) file = "bitmain-z15-pro.png";
+  if (!file) return "";
+  return `/images/${encodeURIComponent(file)}`;
+}
+
 /** Ruta pública bajo `client/public/images/` (codifica espacios en nombres de archivo). */
 function img(file: string): string {
   return `/images/${encodeURIComponent(file)}`;

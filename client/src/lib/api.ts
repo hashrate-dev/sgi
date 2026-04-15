@@ -16,12 +16,18 @@ const FALLBACK_API_URLS = [
 function getApiBase(): string {
   if (typeof window === "undefined") return "";
   const h = window.location?.hostname ?? "";
-  // En localhost: por defecto mismo origen (`/api/...`) → proxy Vite → 8080. Evita CORS si CORS_ORIGIN no incluye tu puerto (ej. 5174) y funciona aunque el front no sea 5173.
-  // Para forzar API directa: `VITE_API_URL=http://127.0.0.1:8080` en client/.env
+  /**
+   * En localhost: API **directa** al puerto del servidor (p. ej. 8080), no vía proxy de Vite.
+   * El proxy de Vite limita el cuerpo (~10MB) y devuelve **413** al guardar equipos con imagen vitrina en JSON (data URL / galería grande).
+   * Mismo `hostname` que la página (`localhost` vs `127.0.0.1`) para que CORS coincida con el `Origin` del navegador.
+   * Para otra URL/puerto: `VITE_API_URL` o `VITE_API_PORT` en `client/.env`.
+   */
   if (h === "localhost" || h === "127.0.0.1") {
     const build = typeof RAW === "string" ? RAW.replace(/\/+$/, "").trim() : "";
     if (build) return build;
-    return "";
+    const rawPort = (import.meta.env.VITE_API_PORT ?? "").trim();
+    const p = /^\d+$/.test(rawPort) ? rawPort : "8080";
+    return `http://${h}:${p}`;
   }
   // *.vercel.app y app.hashrate.space: API en mismo origen (Vercel serverless + Supabase). Sin CORS.
   if (h.endsWith(".vercel.app")) return "";

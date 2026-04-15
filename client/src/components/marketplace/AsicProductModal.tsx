@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AsicProduct } from "../../lib/marketplaceAsicCatalog.js";
 import {
   asicProductShowsMinerEconomyContent,
+  defaultAsicShelfImageSrc,
   formatAsicPriceUsd,
   normalizeConsultPriceLabelForDisplay,
   proratedEquipmentPriceUsd,
   productSupportsHashrateShare,
+  publicImageUrl,
   scaleDetailRowTextForShare,
   scaleHashrateDisplay,
   scaleYieldDisplayLine,
@@ -16,12 +18,20 @@ import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js
 import { AsicDetailSvg } from "./AsicDetailIcon.js";
 import { BackCircleArrowIcon, MailCtaIcon, WhatsAppCtaIcon } from "./MarketplaceCtaIcons.js";
 
-/** URLs únicas para miniaturas + hero; sin inventar fotos cuando no hay imagen ni galería. */
+/** URLs únicas para miniaturas + hero; catálogo local si la API no trae `imageSrc`. */
 function gallerySources(product: AsicProduct): string[] {
+  const toU = (s: string) => publicImageUrl(s);
   const main = (product.imageSrc ?? "").trim();
+  const fb = defaultAsicShelfImageSrc(product.brand, product.model);
   const g = product.gallerySrcs?.map((x) => String(x).trim()).filter(Boolean) ?? [];
-  if (g.length > 0) return g;
-  if (main) return [main];
+  const dedupe = (urls: string[]) => {
+    const seen = new Set<string>();
+    return urls.filter((u) => (seen.has(u) ? false : (seen.add(u), true)));
+  };
+  if (g.length > 0) return dedupe(g.map(toU));
+  if (main && fb && publicImageUrl(main) !== publicImageUrl(fb)) return dedupe([toU(main), toU(fb)]);
+  if (main) return [toU(main)];
+  if (fb) return [toU(fb)];
   return [];
 }
 
@@ -100,6 +110,10 @@ export function AsicProductModal({
     setHashrateShareView(false);
     setShareViewPct(75);
   }, [product]);
+
+  useEffect(() => {
+    setMainBroken(false);
+  }, [activeThumb]);
 
   /** Cada vez que se abre la vista porción, volver al 75% predeterminado. */
   useEffect(() => {
@@ -199,7 +213,13 @@ export function AsicProductModal({
                       className="product-modal__hero-img"
                       loading="eager"
                       decoding="async"
-                      onError={() => setMainBroken(true)}
+                      onError={() => {
+                        if (thumbs.length > 1 && activeThumb < thumbs.length - 1) {
+                          setActiveThumb((i) => i + 1);
+                          return;
+                        }
+                        setMainBroken(true);
+                      }}
                     />
                   )}
                 </div>

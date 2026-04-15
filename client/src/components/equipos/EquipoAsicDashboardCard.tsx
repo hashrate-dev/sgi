@@ -1,6 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { EquipoASIC } from "../../lib/types";
-import { formatAsicPriceUsd, normalizeConsultPriceLabelForDisplay } from "../../lib/marketplaceAsicCatalog";
+import {
+  defaultAsicShelfImageSrc,
+  formatAsicPriceUsd,
+  normalizeConsultPriceLabelForDisplay,
+  publicImageUrl,
+} from "../../lib/marketplaceAsicCatalog";
 import { AsicDetailSvg } from "../marketplace/AsicDetailIcon";
 import { parseDetailRowsJson } from "./MarketplaceDetailRowsEditor";
 
@@ -16,9 +21,20 @@ type Props = {
  * Tarjeta visual estilo vitrina para el listado de gestión (/marketplacedashboard).
  */
 export function EquipoAsicDashboardCard({ equipo: e, canEdit, onDetail, onEdit, onDelete }: Props) {
+  const explicit = e.marketplaceImageSrc?.trim() ?? "";
+  const fallbackPath = defaultAsicShelfImageSrc(e.marcaEquipo ?? "", e.modelo ?? "");
+  const [imgSrc, setImgSrc] = useState(() => publicImageUrl(explicit || fallbackPath));
   const [imgBroken, setImgBroken] = useState(false);
-  const src = e.marketplaceImageSrc?.trim() ?? "";
-  const hasPhoto = Boolean(src);
+
+  useEffect(() => {
+    const ex = e.marketplaceImageSrc?.trim() ?? "";
+    const fb = defaultAsicShelfImageSrc(e.marcaEquipo ?? "", e.modelo ?? "");
+    setImgSrc(publicImageUrl(ex || fb));
+    setImgBroken(false);
+  }, [e.id, e.marketplaceImageSrc, e.marcaEquipo, e.modelo]);
+
+  const src = imgSrc;
+  const hasPhoto = Boolean((explicit || fallbackPath).trim()) && !imgBroken;
   const detailRows = parseDetailRowsJson(e.marketplaceDetailRowsJson ?? "")
     .filter((r) => r.text.trim())
     .slice(0, 4);
@@ -46,7 +62,13 @@ export function EquipoAsicDashboardCard({ equipo: e, canEdit, onDetail, onEdit, 
                 loading="lazy"
                 decoding="async"
                 className="shelf-product__photo"
-                onError={() => setImgBroken(true)}
+                onError={() => {
+                  if (explicit && fallbackPath && imgSrc === publicImageUrl(explicit)) {
+                    setImgSrc(publicImageUrl(fallbackPath));
+                    return;
+                  }
+                  setImgBroken(true);
+                }}
               />
             )}
           </button>

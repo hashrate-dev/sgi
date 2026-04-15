@@ -23,6 +23,7 @@ import { codigoProductoVitrina } from "../lib/marketplaceProductCode.js";
 import { isAdminABRole, logEquipoAsicAudit } from "../lib/equipoAsicAudit.js";
 import { mimeForSniffedFormat, sniffImageFormat } from "../lib/marketplaceImageSniff.js";
 import { resolveVitrinaListingKind } from "../lib/asicVitrinaMapper.js";
+import { mpVisibleFromDbValue } from "../lib/mpVisible.js";
 
 export const equiposRouter = Router();
 
@@ -117,9 +118,7 @@ function mpVisibleToInt(visible: boolean): number {
 }
 
 function rowMpVisible(r: EquipoRow): boolean {
-  const v = r.mp_visible;
-  if (typeof v === "boolean") return v;
-  return Number(v) === 1;
+  return mpVisibleFromDbValue(r.mp_visible);
 }
 
 function rowToItem(r: EquipoRow) {

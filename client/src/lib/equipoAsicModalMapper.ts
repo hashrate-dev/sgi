@@ -5,6 +5,7 @@
 import {
   type AsicAlgo,
   type AsicProduct,
+  defaultAsicShelfImageSrc,
   normalizeConsultPriceLabelForDisplay,
   resolveMarketplaceListingKind,
 } from "./marketplaceAsicCatalog.js";
@@ -32,7 +33,8 @@ export function equipoASICToModalProduct(e: EquipoASIC): AsicProduct {
   const algo: AsicAlgo = e.marketplaceAlgo === "scrypt" ? "scrypt" : "sha256";
   const parsed = parseDetailRowsJson(e.marketplaceDetailRowsJson ?? "").filter((r) => r.text.trim());
   const detailRows = parsed.length > 0 ? parsed : defaultDetailRows(algo);
-  const imageSrc = e.marketplaceImageSrc?.trim() ?? "";
+  const explicitImg = e.marketplaceImageSrc?.trim() ?? "";
+  const imageSrc = explicitImg || defaultAsicShelfImageSrc(e.marcaEquipo ?? "", e.modelo ?? "");
   let gallerySrcs: string[] | undefined;
   if (e.marketplaceGalleryJson?.trim()) {
     try {
