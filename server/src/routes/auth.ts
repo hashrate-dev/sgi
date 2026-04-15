@@ -165,11 +165,13 @@ authRouter.post("/auth/register-cliente", registerClienteRateLimit, async (req, 
 });
 
 authRouter.post("/auth/login", loginRateLimit, async (req, res) => {
-  /* También en Vercel: si la tabla users está vacía (Supabase nuevo), crea defaults; si ya hay filas, no hace nada. */
-  try {
-    await ensureDefaultUser();
-  } catch (e) {
-    console.warn("ensureDefaultUser (no bloquea login):", e);
+  /* Solo desarrollo: evita sembrar credenciales por defecto en producción. */
+  if (env.NODE_ENV !== "production") {
+    try {
+      await ensureDefaultUser();
+    } catch (e) {
+      console.warn("ensureDefaultUser (no bloquea login):", e);
+    }
   }
   const parsed = LoginSchema.safeParse(req.body);
   if (!parsed.success) {

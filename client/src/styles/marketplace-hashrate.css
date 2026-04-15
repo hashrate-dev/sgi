@@ -5888,12 +5888,13 @@ button.product-modal__btn--quote-cart:hover {
 .market-corp-brands-block__title {
   font-size: clamp(1rem, 2vw, 1.25rem);
   font-weight: 800;
-  margin: 0 0 1.25rem;
+  margin: 0 auto 1.25rem;
   background: linear-gradient(to bottom right, #5087e5, #5cc866);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   max-width: 36rem;
+  text-align: center;
 }
 
 /* Fabricantes: solo grid sobre el fondo de la página (sin caja contenedora) */

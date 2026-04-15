@@ -214,6 +214,14 @@ function isLinkedToInvoice(comp: Invoice, factura: Invoice): boolean {
   return matchId || matchNumber;
 }
 
+function getCreditNoteMode(creditNote: Invoice | null | undefined, factura: Invoice | null | undefined): "partial" | "total" {
+  if (!creditNote || !factura) return "partial";
+  const ncAbs = Math.abs(Number(creditNote.total) || 0);
+  const facAbs = Math.abs(Number(factura.total) || 0);
+  if (facAbs <= 0) return "partial";
+  return ncAbs + 0.0001 >= facAbs ? "total" : "partial";
+}
+
 /** Convierte factura de la API al formato Invoice con _source */
 export function HistorialPage({ sourceFilter }: HistorialPageProps) {
   const { user } = useAuth();
@@ -400,7 +408,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
       if (inv.type === "Factura") {
         const hasReceipt = sameSource.some((r) => r.type === "Recibo" && isLinkedToInvoice(r, inv));
         const creditNotes = sameSource.filter((nc) => nc.type === "Nota de Crédito" && isLinkedToInvoice(nc, inv));
-        const hasCreditNote = creditNotes.length >= 1;
+        const hasCreditNote = creditNotes.some((nc) => getCreditNoteMode(nc, inv) === "total");
         isClosed = hasReceipt || hasCreditNote;
         isCancelledByNC = hasCreditNote;
       } else if (inv.type === "Recibo" && (inv.relatedInvoiceId || inv.relatedInvoiceNumber)) {
@@ -409,8 +417,9 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
         const relatedFactura = sameSource.find((f) => f.type === "Factura" && (String(f.id) === String(inv.relatedInvoiceId) || f.number === inv.relatedInvoiceNumber));
         const otherNCs = relatedFactura ? sameSource.filter((nc) => nc.type === "Nota de Crédito" && nc.id !== inv.id && isLinkedToInvoice(nc, relatedFactura)) : [];
         if (otherNCs.length === 0) {
+          const ncMode = getCreditNoteMode(inv, relatedFactura ?? undefined);
           isClosed = true;
-          isCancelledByNC = true;
+          isCancelledByNC = ncMode === "total";
         }
       }
 
@@ -430,10 +439,11 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
       // Fecha de pago: misma lógica que la tabla (solo mismo origen)
       const relatedReciboPayment = inv.type === "Factura" ? sameSource.find((r) => r.type === "Recibo" && isLinkedToInvoice(r, inv)) : null;
       const relatedNCPayment = inv.type === "Factura" ? sameSource.find((n) => n.type === "Nota de Crédito" && isLinkedToInvoice(n, inv)) : null;
+      const relatedNCPaymentMode = inv.type === "Factura" ? getCreditNoteMode(relatedNCPayment, inv) : "partial";
       let paymentDateExportCell: string;
       if (inv.type === "Factura") {
         if (relatedReciboPayment?.paymentDate) paymentDateExportCell = new Date(relatedReciboPayment.paymentDate).toLocaleDateString();
-        else if (relatedNCPayment) paymentDateExportCell = "Cancelada";
+        else if (relatedNCPayment) paymentDateExportCell = relatedNCPaymentMode === "total" ? "Cancelada" : "Parcial";
         else paymentDateExportCell = "Pendiente";
       } else if (inv.type === "Nota de Crédito") {
         paymentDateExportCell = inv.date || (inv.paymentDate ? new Date(inv.paymentDate).toLocaleDateString() : "-");
@@ -798,6 +808,30 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
         };
       });
 
+      const invWithSource = inv as InvoiceWithSource;
+      const sameSource = all.filter(
+        (x) => (x as InvoiceWithSource)._source === invWithSource._source
+      ) as InvoiceWithSource[];
+      const relatedForNc =
+        invoiceToUse.type === "Nota de Crédito"
+          ? sameSource.find(
+              (f) =>
+                f.type === "Factura" &&
+                (String(f.id) === String(invoiceToUse.relatedInvoiceId ?? "") ||
+                  f.number === invoiceToUse.relatedInvoiceNumber)
+            )
+          : undefined;
+      const relatedInvoiceNumberForPdf =
+        invoiceToUse.type === "Nota de Crédito"
+          ? invoiceToUse.relatedInvoiceNumber ?? relatedForNc?.number
+          : undefined;
+      const inferredNcMode =
+        invoiceToUse.type === "Nota de Crédito" && relatedForNc
+          ? Math.abs(Math.abs(invoiceToUse.total) - Math.abs(relatedForNc.total)) < 0.0001
+            ? "total"
+            : "partial"
+          : undefined;
+
       // Generar el PDF
       const doc = generateFacturaPdf(
         {
@@ -817,7 +851,9 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
           items: validItems,
           subtotal: invoiceToUse.subtotal || 0,
           discounts: invoiceToUse.discounts || 0,
-          total: invoiceToUse.total || 0
+          total: invoiceToUse.total || 0,
+          relatedInvoiceNumber: relatedInvoiceNumberForPdf,
+          creditNoteMode: inferredNcMode
         },
         { logoBase64 }
       );
@@ -981,11 +1017,12 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
                     // Fecha de pago: Factura = fecha del Recibo si pagada (solo mismo origen), "Cancelada" si cancelada por NC, sino "Pendiente"; NC = fecha emisión
                     const relatedReciboForPayment = inv.type === "Factura" ? sameSource.find((r) => r.type === "Recibo" && isLinkedToInvoice(r, inv)) : null;
                     const relatedNCForPayment = inv.type === "Factura" ? sameSource.find((n) => n.type === "Nota de Crédito" && isLinkedToInvoice(n, inv)) : null;
+                    const relatedNCMode = inv.type === "Factura" ? getCreditNoteMode(relatedNCForPayment, inv) : "partial";
                     const paymentDateDisplay = (inv.type === "Factura" && relatedReciboForPayment?.paymentDate) ? relatedReciboForPayment.paymentDate : inv.paymentDate;
                     let paymentDateCell: string;
                     if (inv.type === "Factura") {
                       if (relatedReciboForPayment?.paymentDate) paymentDateCell = new Date(relatedReciboForPayment.paymentDate).toLocaleDateString();
-                      else if (relatedNCForPayment) paymentDateCell = "Cancelada";
+                      else if (relatedNCForPayment) paymentDateCell = relatedNCMode === "total" ? "Cancelada" : "Parcial";
                       else paymentDateCell = "Pendiente";
                     } else if (inv.type === "Nota de Crédito") {
                       paymentDateCell = inv.date || (inv.paymentDate ? new Date(inv.paymentDate).toLocaleDateString() : "-");
@@ -998,7 +1035,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
                     if (inv.type === "Factura") {
                       const hasReceipt = sameSource.some((r) => r.type === "Recibo" && isLinkedToInvoice(r, inv));
                       const creditNotes = sameSource.filter((nc) => nc.type === "Nota de Crédito" && isLinkedToInvoice(nc, inv));
-                      const hasCreditNote = creditNotes.length >= 1;
+                      const hasCreditNote = creditNotes.some((nc) => getCreditNoteMode(nc, inv) === "total");
                       isClosed = hasReceipt || hasCreditNote;
                       isCancelledByNC = hasCreditNote;
                     } else if (inv.type === "Recibo" && (inv.relatedInvoiceId || inv.relatedInvoiceNumber)) {
@@ -1007,8 +1044,9 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
                       const relatedFactura = sameSource.find((f) => f.type === "Factura" && (String(f.id) === String(inv.relatedInvoiceId) || f.number === inv.relatedInvoiceNumber));
                       const otherNCs = relatedFactura ? sameSource.filter((nc) => nc.type === "Nota de Crédito" && nc.id !== inv.id && isLinkedToInvoice(nc, relatedFactura)) : [];
                       if (otherNCs.length === 0) {
+                        const ncMode = getCreditNoteMode(inv, relatedFactura ?? undefined);
                         isClosed = true;
-                        isCancelledByNC = true;
+                        isCancelledByNC = ncMode === "total";
                       }
                     }
                     return (
@@ -1264,6 +1302,8 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
                     const relatedRecibo = inv.type === "Factura" ? sameSource.find((r) => r.type === "Recibo" && isLinkedToInvoice(r, inv)) : null;
                     const relatedNC = inv.type === "Factura" ? sameSource.find((n) => n.type === "Nota de Crédito" && isLinkedToInvoice(n, inv)) : null;
                     const relatedFactura = (inv.relatedInvoiceId || inv.relatedInvoiceNumber) ? sameSource.find((f) => f.type === "Factura" && (String(f.id) === String(inv.relatedInvoiceId) || f.number === inv.relatedInvoiceNumber)) : null;
+                    const ncModeForFactura = inv.type === "Factura" ? getCreditNoteMode(relatedNC, inv) : "partial";
+                    const ncModeForNota = inv.type === "Nota de Crédito" ? getCreditNoteMode(inv, relatedFactura ?? undefined) : "partial";
                     return (
                       <>
                         <div className="row g-2 small mb-3">
@@ -1324,9 +1364,11 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
                         )}
                         {inv.type === "Factura" && relatedNC && (
                           <div className="rounded p-3" style={{ backgroundColor: "#e7f1ff", border: "1px solid #004085" }}>
-                            <strong style={{ color: "#004085" }}>✓ Factura cancelada</strong>
+                            <strong style={{ color: "#004085" }}>
+                              {ncModeForFactura === "total" ? "✓ Factura cancelada (NC total)" : "✓ Factura con NC parcial"}
+                            </strong>
                             <div className="mt-1 small" style={{ color: "#004085" }}>
-                              Nota de Crédito: <strong>{relatedNC.number}</strong>
+                              Nota de Crédito {ncModeForFactura === "total" ? "total" : "parcial"}: <strong>{relatedNC.number}</strong>
                               {relatedNC.date && <> — Emisión: <strong>{relatedNC.date}</strong></>}
                             </div>
                           </div>
@@ -1352,9 +1394,11 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
                         )}
                         {inv.type === "Nota de Crédito" && relatedFactura && (
                           <div className="rounded p-3" style={{ backgroundColor: "#e7f1ff", border: "1px solid #004085" }}>
-                            <strong style={{ color: "#004085" }}>✓ Factura cancelada</strong>
+                            <strong style={{ color: "#004085" }}>
+                              {ncModeForNota === "total" ? "✓ NC de anulación total" : "✓ NC de anulación parcial"}
+                            </strong>
                             <div className="mt-1 small" style={{ color: "#004085" }}>
-                              Factura: <strong>{relatedFactura.number}</strong>
+                              Factura relacionada: <strong>{relatedFactura.number}</strong>
                               {relatedFactura.date && <> — Emisión: <strong>{relatedFactura.date}</strong></>}
                             </div>
                           </div>

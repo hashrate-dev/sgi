@@ -282,13 +282,29 @@
 /* yFechas = PAGE_H / 2 + 12 + 50 + 30 = 240.5mm desde arriba */
 /* datesBlockH = 14mm, datesBlockTop = yFechas - datesBlockH / 2 = 233.5mm */
 /* Pero en realidad viene después de la tabla con y += 6 */
+.invoice-preview-dates-wrap {
+  width: 187mm; /* TABLE_W */
+  margin: 76mm auto 0 auto; /* posición vertical original del bloque de fechas */
+  flex-shrink: 0;
+}
+
 .invoice-preview-dates {
   width: 187mm; /* TABLE_W */
-  margin: 76mm auto 0 auto; /* 6mm + 70mm: +7 cm en total respecto al original */
+  margin: 0 auto;
   border: 0.5px solid rgb(226, 232, 240); /* TABLE_BORDER */
   border-radius: 2mm 2mm 0 0; /* TABLE_RADIUS solo arriba */
   overflow: hidden;
   background: #ffffff;
+}
+
+.invoice-preview-credit-note-ref {
+  width: 187mm;
+  margin: 0 0 3mm 0;
+  font-size: 12pt; /* mismo tamaño que el texto de recibos */
+  font-weight: normal;
+  color: #000000;
+  text-align: left;
+  line-height: 1.5; /* mismo ritmo visual que recibos */
 }
 
 .invoice-preview-dates-header {
@@ -380,6 +396,8 @@
   margin-bottom: 5mm; /* sube la fila TOTAL 0.5 cm respecto al pie */
   padding-bottom: 0; /* el padding 18mm de .invoice-preview ya define el margen inferior */
   display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   justify-content: flex-end;
   flex-shrink: 0;
 }
@@ -473,6 +491,7 @@
 
   .invoice-preview-client,
   .invoice-preview-table-container,
+  .invoice-preview-dates-wrap,
   .invoice-preview-dates,
   .invoice-preview-separator,
   .invoice-preview-total-wrap {
@@ -483,6 +502,11 @@
   .invoice-preview-total-wrap {
     margin: 0 auto;
     justify-content: flex-end;
+  }
+
+  .invoice-preview-credit-note-ref {
+    width: 100%;
+    max-width: 187mm;
   }
 
   .invoice-preview-total-box {

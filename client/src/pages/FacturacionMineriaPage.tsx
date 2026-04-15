@@ -506,6 +506,12 @@ export function FacturacionMineriaPage() {
       } catch {
         //
       }
+      const inferredNcMode =
+        type === "Nota de Crédito" && relatedInvoice
+          ? Math.abs(Math.abs(total) - Math.abs(relatedInvoice.total)) < 0.0001
+            ? "total"
+            : "partial"
+          : undefined;
       const doc = generateFacturaPdf(
         {
           number: numberToUse,
@@ -525,7 +531,9 @@ export function FacturacionMineriaPage() {
           subtotal,
           discounts,
           total,
-          dueDateDays
+          dueDateDays,
+          relatedInvoiceNumber: relatedInvoice?.number,
+          creditNoteMode: inferredNcMode
         },
         { logoBase64 }
       );
@@ -610,6 +618,20 @@ export function FacturacionMineriaPage() {
     } catch {
       //
     }
+    const relatedForNc =
+      inv.type === "Nota de Crédito"
+        ? invoices.find(
+            (i) =>
+              i.type === "Factura" &&
+              (i.number === inv.relatedInvoiceNumber || String(i.id) === String(inv.relatedInvoiceId ?? ""))
+          )
+        : undefined;
+    const inferredNcMode =
+      inv.type === "Nota de Crédito" && relatedForNc
+        ? Math.abs(Math.abs(inv.total) - Math.abs(relatedForNc.total)) < 0.0001
+          ? "total"
+          : "partial"
+        : undefined;
     const doc = generateFacturaPdf(
       {
         number: inv.number,
@@ -629,7 +651,9 @@ export function FacturacionMineriaPage() {
         subtotal,
         discounts,
         total,
-        dueDate: parseDueDateStr(inv.dueDate ?? "")
+        dueDate: parseDueDateStr(inv.dueDate ?? ""),
+        relatedInvoiceNumber: inv.relatedInvoiceNumber ?? relatedForNc?.number,
+        creditNoteMode: inferredNcMode
       },
       { logoBase64 }
     );
@@ -1261,6 +1285,23 @@ export function FacturacionMineriaPage() {
                       discounts={previewEmitted.invoice.discounts}
                       total={previewEmitted.invoice.total}
                       dueDateDays={dueDateDays}
+                      relatedInvoiceNumber={previewEmitted.invoice.relatedInvoiceNumber}
+                      creditNoteMode={
+                        previewEmitted.invoice.type === "Nota de Crédito"
+                          ? (() => {
+                              const related = invoices.find(
+                                (i) =>
+                                  i.type === "Factura" &&
+                                  (i.number === previewEmitted.invoice.relatedInvoiceNumber ||
+                                    String(i.id) === String(previewEmitted.invoice.relatedInvoiceId ?? ""))
+                              );
+                              if (!related) return undefined;
+                              return Math.abs(Math.abs(previewEmitted.invoice.total) - Math.abs(related.total)) < 0.0001
+                                ? "total"
+                                : "partial";
+                            })()
+                          : undefined
+                      }
                     />
                   ) : selectedClient && items.length > 0 ? (
                     <InvoicePreview
@@ -1273,6 +1314,22 @@ export function FacturacionMineriaPage() {
                       discounts={totals.discounts}
                       total={totals.total}
                       dueDateDays={dueDateDays}
+                      relatedInvoiceNumber={
+                        type === "Nota de Crédito"
+                          ? invoices.find((i) => String(i.id) === String(relatedInvoiceId))?.number
+                          : undefined
+                      }
+                      creditNoteMode={
+                        type === "Nota de Crédito"
+                          ? (() => {
+                              const related = invoices.find((i) => String(i.id) === String(relatedInvoiceId));
+                              if (!related) return undefined;
+                              return Math.abs(Math.abs(totals.total) - Math.abs(related.total)) < 0.0001
+                                ? "total"
+                                : "partial";
+                            })()
+                          : undefined
+                      }
                     />
                   ) : (
                     <div className="fact-panel-vista-previa-empty">

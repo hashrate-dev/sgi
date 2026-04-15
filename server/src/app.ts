@@ -32,6 +32,14 @@ export function createApp() {
     })
   );
   const corsAllowlist = env.CORS_ORIGIN?.split(",").map((o) => o.trim()).filter(Boolean) ?? [];
+  const defaultTrustedOrigins = new Set([
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "https://app.hashrate.space",
+    "https://sgi.hashrate.space",
+  ]);
   const corsOptions: CorsOptions = {
     credentials: true,
     ...(corsAllowlist.length > 0
@@ -42,7 +50,22 @@ export function createApp() {
             callback(null, false);
           },
         }
-      : { origin: true }),
+      : env.NODE_ENV === "production"
+        ? {
+            origin(origin, callback) {
+              // Producción segura por defecto: permitir solo orígenes confiables conocidos.
+              if (!origin) return callback(null, true);
+              if (defaultTrustedOrigins.has(origin)) return callback(null, true);
+              try {
+                const u = new URL(origin);
+                if (u.hostname.endsWith(".vercel.app")) return callback(null, true);
+              } catch {
+                /* origin inválido */
+              }
+              return callback(null, false);
+            },
+          }
+        : { origin: true }),
   };
   app.use(cors(corsOptions));
 

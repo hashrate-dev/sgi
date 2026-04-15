@@ -50,6 +50,10 @@ interface InvoicePreviewProps {
   total: number;
   /** Días para fecha de vencimiento (5, 6 o 7). Por defecto 6. */
   dueDateDays?: number;
+  /** Para Nota de Crédito: número de factura relacionada (referencia). */
+  relatedInvoiceNumber?: string;
+  /** Para Nota de Crédito: tipo de anulación respecto de la referencia. */
+  creditNoteMode?: "partial" | "total";
 }
 
 export function InvoicePreview({
@@ -60,6 +64,8 @@ export function InvoicePreview({
   items,
   total,
   dueDateDays = 6,
+  relatedInvoiceNumber,
+  creditNoteMode,
 }: InvoicePreviewProps) {
   const [logoSrc, setLogoSrc] = useState<string | null>(null);
 
@@ -267,14 +273,21 @@ export function InvoicePreview({
           );
         })()}
         {items.length > 0 && type !== "Recibo" && type !== "Recibo Devolución" && (
-          <div className="invoice-preview-dates">
-            <div className="invoice-preview-dates-header">
-              <div className="invoice-preview-dates-label">FECHA DE EMISIÓN:</div>
-              <div className="invoice-preview-dates-label">FECHA DE VENCIMIENTO:</div>
-            </div>
-            <div className="invoice-preview-dates-values">
-              <div className="invoice-preview-dates-value">{formatDDMMYY(date)}</div>
-              <div className="invoice-preview-dates-value">{formatDDMMYY(vencimiento)}</div>
+          <div className="invoice-preview-dates-wrap">
+            {type === "Nota de Crédito" && relatedInvoiceNumber && (
+              <div className="invoice-preview-credit-note-ref">
+                {`Anulación ${creditNoteMode === "partial" ? "Parcial" : "Total"} Factura N° ${relatedInvoiceNumber}`}
+              </div>
+            )}
+            <div className="invoice-preview-dates">
+              <div className="invoice-preview-dates-header">
+                <div className="invoice-preview-dates-label">FECHA DE EMISIÓN:</div>
+                <div className="invoice-preview-dates-label">FECHA DE VENCIMIENTO:</div>
+              </div>
+              <div className="invoice-preview-dates-values">
+                <div className="invoice-preview-dates-value">{formatDDMMYY(date)}</div>
+                <div className="invoice-preview-dates-value">{formatDDMMYY(vencimiento)}</div>
+              </div>
             </div>
           </div>
         )}

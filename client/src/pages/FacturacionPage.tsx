@@ -155,6 +155,8 @@ export function FacturacionPage() {
   const [relatedInvoiceId, setRelatedInvoiceId] = useState<string>("");
   const [paymentDate, setPaymentDate] = useState<string>("");
   const [itemsLocked, setItemsLocked] = useState(false); // Indica si los items están bloqueados por venir de factura relacionada
+  const [isPartialCreditNote, setIsPartialCreditNote] = useState(false);
+  const [partialCreditItems, setPartialCreditItems] = useState<LineItem[]>([]);
   /** Días para fecha de vencimiento (5, 6 o 7). Por defecto 6. */
   const [dueDateDays, setDueDateDays] = useState<5 | 6 | 7>(6);
 
@@ -309,7 +311,11 @@ export function FacturacionPage() {
     () => (nextNumFromApi !== null && nextNumFromApi !== "" ? nextNumFromApi : nextNumber(type, isHostingPath ? dbInvoices : invoices)),
     [type, invoices, dbInvoices, isHostingPath, nextNumFromApi]
   );
-  const totals = useMemo(() => calcTotals(items), [items]);
+  const activeItems = useMemo(
+    () => (type === "Nota de Crédito" && isPartialCreditNote ? partialCreditItems : items),
+    [type, isPartialCreditNote, partialCreditItems, items]
+  );
+  const totals = useMemo(() => calcTotals(activeItems), [activeItems]);
 
   /** La fila 4% se agrega manual (desde el selector de ítem). Solo actualizamos precio/cantidad de cada D (4% de la fila de servicio correspondiente) y orden: Servicio, 4%, Servicio, 4%, ... */
   useEffect(() => {
@@ -397,6 +403,10 @@ export function FacturacionPage() {
       setRelatedInvoiceId("");
       setItemsLocked(false);
     }
+    if (type !== "Nota de Crédito") {
+      setIsPartialCreditNote(false);
+      setPartialCreditItems([]);
+    }
   }, [type]);
 
   // Limpiar factura relacionada cuando cambia el cliente
@@ -404,6 +414,8 @@ export function FacturacionPage() {
     setRelatedInvoiceId("");
     setItems([]);
     setItemsLocked(false);
+    setIsPartialCreditNote(false);
+    setPartialCreditItems([]);
   }, [selectedClientId]);
 
   /** Sincronizar ítems con month vacío, inválido o anterior a 2025 al mes actual (solo 2025 para adelante) */
@@ -515,6 +527,31 @@ export function FacturacionPage() {
     }
   }, [relatedInvoiceId, type, selectedClient, invoicesAll]);
 
+  // NC parcial: inicializa grilla manual independiente (se emite con estos ítems)
+  useEffect(() => {
+    if (type !== "Nota de Crédito" || !isPartialCreditNote || !relatedInvoiceId) {
+      return;
+    }
+    const relatedInvoice = invoicesAll.find((inv) => String(inv.id) === String(relatedInvoiceId));
+    const monthDefault =
+      relatedInvoice?.month && /^\d{4}-\d{2}$/.test(relatedInvoice.month)
+        ? relatedInvoice.month
+        : currentMonthValue();
+    setPartialCreditItems((prev) => {
+      if (prev.length > 0) return prev;
+      return [
+        {
+          serviceKey: "A",
+          serviceName: serviceCatalog.A.name,
+          month: monthDefault,
+          quantity: 1,
+          price: 0,
+          discount: 0,
+        },
+      ];
+    });
+  }, [type, isPartialCreditNote, relatedInvoiceId, invoicesAll]);
+
   function addItem() {
     const def = serviceCatalog.A;
     const now = new Date();
@@ -545,6 +582,31 @@ export function FacturacionPage() {
       }
       return prev.filter((_, i) => i !== idx);
     });
+  }
+
+  function addPartialCreditItem() {
+    const def = serviceCatalog.A;
+    const now = new Date();
+    const monthDefault = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    setPartialCreditItems((prev) => [
+      ...prev,
+      {
+        serviceKey: "A",
+        serviceName: def.name,
+        month: monthDefault,
+        quantity: 1,
+        price: def.price,
+        discount: 0,
+      },
+    ]);
+  }
+
+  function updatePartialCreditItem(idx: number, patch: Partial<LineItem>) {
+    setPartialCreditItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+  }
+
+  function removePartialCreditItem(idx: number) {
+    setPartialCreditItems((prev) => prev.filter((_, i) => i !== idx));
   }
 
   function handleClickEmitir() {
@@ -580,15 +642,20 @@ export function FacturacionPage() {
         return;
       }
     }
-    if (items.length === 0) {
-      showToast("La factura no tiene ítems cargados.", "error");
+    if (activeItems.length === 0) {
+      showToast(
+        type === "Nota de Crédito" && isPartialCreditNote
+          ? "La NC parcial no tiene ítems manuales cargados."
+          : "La factura no tiene ítems cargados.",
+        "error"
+      );
       return;
     }
     if (totals.total === 0) {
       showToast("Hay que llenar los campos para emitir el documento. El total no puede ser cero.", "error");
       return;
     }
-    if (items.some((it) => !it.month)) {
+    if (activeItems.some((it) => !it.month)) {
       showToast("Por favor, indique el mes para todos los ítems.", "warning");
       return;
     }
@@ -601,11 +668,12 @@ export function FacturacionPage() {
 
     if (downloadPdf) showToast("Guardando documento...", "info");
 
-    const { subtotal, discounts, total } = calcTotals(items);
+    const itemsToEmit = activeItems;
+    const { subtotal, discounts, total } = calcTotals(itemsToEmit);
     const dateNow = new Date();
     const dateStr = todayLocale();
     const emissionTime = getCurrentTime();
-    const month = items[0]!.month;
+    const month = itemsToEmit[0]!.month;
     const dueDate = new Date(dateNow);
     dueDate.setDate(dueDate.getDate() + dueDateDays);
     const dueDateStr = dueDate.toLocaleDateString();
@@ -625,7 +693,7 @@ export function FacturacionPage() {
       subtotal: finalSubtotal,
       discounts: finalDiscounts,
       total: finalTotal,
-      items: items.map((it) => ({
+      items: itemsToEmit.map((it) => ({
         service: it.serviceName || "Servicio",
         month: it.month,
         quantity: it.quantity,
@@ -676,11 +744,18 @@ export function FacturacionPage() {
           clientAddress2: selectedClient.address2,
           clientCity2: selectedClient.city2,
           date: dateNow,
-          items,
+          items: itemsToEmit,
           subtotal,
           discounts,
           total,
-          dueDateDays
+          dueDateDays,
+          relatedInvoiceNumber: relatedInvoice?.number,
+          creditNoteMode:
+            type === "Nota de Crédito"
+              ? isPartialCreditNote
+                ? "partial"
+                : "total"
+              : undefined
         },
         { logoBase64 }
       );
@@ -715,7 +790,7 @@ export function FacturacionPage() {
       subtotal: finalSubtotal,
       discounts: finalDiscounts,
       total: finalTotal,
-      items,
+      items: itemsToEmit,
       relatedInvoiceId: relatedInvoice?.id,
       relatedInvoiceNumber: relatedInvoice?.number
     };
@@ -738,6 +813,7 @@ export function FacturacionPage() {
     ]);
     addEmittedDocument("hosting", inv as Record<string, unknown>, emittedAt).catch(() => {});
     setItems([]);
+    setPartialCreditItems([]);
     setRelatedInvoiceId("");
     setPaymentDate("");
     setItemsLocked(false);
@@ -771,6 +847,21 @@ export function FacturacionPage() {
     } catch {
       //
     }
+    const relatedForNc =
+      inv.type === "Nota de Crédito"
+        ? invoicesAll.find(
+            (i) =>
+              i.type === "Factura" &&
+              (i.number === inv.relatedInvoiceNumber || String(i.id) === String(inv.relatedInvoiceId ?? ""))
+          )
+        : undefined;
+    const inferredNcMode =
+      inv.type === "Nota de Crédito" && relatedForNc
+        ? Math.abs(Math.abs(inv.total) - Math.abs(relatedForNc.total)) < 0.0001
+          ? "total"
+          : "partial"
+        : undefined;
+
     const doc = generateFacturaPdf(
       {
         number: inv.number,
@@ -790,7 +881,9 @@ export function FacturacionPage() {
         subtotal,
         discounts,
         total,
-        dueDate: parseDueDateStr(inv.dueDate ?? "")
+        dueDate: parseDueDateStr(inv.dueDate ?? ""),
+        relatedInvoiceNumber: inv.relatedInvoiceNumber ?? relatedForNc?.number,
+        creditNoteMode: inferredNcMode
       },
       { logoBase64 }
     );
@@ -808,7 +901,7 @@ export function FacturacionPage() {
   /** Limpiar vista previa de documento emitido cuando el usuario edita el formulario */
   useEffect(() => {
     setPreviewEmitted(null);
-  }, [type, selectedClientId, items]);
+  }, [type, selectedClientId, items, partialCreditItems, isPartialCreditNote]);
 
   if (user && !canEditFacturacion(user.role)) {
     return (
@@ -952,6 +1045,30 @@ export function FacturacionPage() {
                             </small>
                           </div>
                         )}
+                        {relatedInvoiceId && (
+                          <label
+                            style={{
+                              marginTop: "0.65rem",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.5rem",
+                              color: "#fff",
+                              fontSize: "0.9rem",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isPartialCreditNote}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                setIsPartialCreditNote(checked);
+                                if (!checked) setPartialCreditItems([]);
+                              }}
+                            />
+                            Nota de Crédito parcial (mostrar ventana manual debajo)
+                          </label>
+                        )}
                       </>
                     )}
                   </div>
@@ -1047,7 +1164,19 @@ export function FacturacionPage() {
                             className="fact-detail-servicios-btn-add"
                             onClick={addItem}
                             disabled={itemsLocked || (type === "Nota de Crédito" && !relatedInvoiceId) || !selectedClient}
-                            title={itemsLocked ? "Los detalles están bloqueados porque vienen de una factura relacionada" : !selectedClient ? "Primero debe seleccionar un cliente" : type === "Nota de Crédito" && !relatedInvoiceId ? "Primero debe seleccionar una factura a cancelar" : (type === "Recibo" || type === "Nota de Crédito") && relatedInvoiceId ? "Los ítems se cargaron desde la factura relacionada" : ""}
+                            title={
+                              itemsLocked
+                                ? "Los detalles están bloqueados porque vienen de una factura relacionada"
+                                : !selectedClient
+                                  ? "Primero debe seleccionar un cliente"
+                                  : type === "Nota de Crédito" && !relatedInvoiceId
+                                    ? "Primero debe seleccionar una factura a cancelar"
+                                    : type === "Nota de Crédito" && relatedInvoiceId && isPartialCreditNote
+                                      ? "NC parcial activa: podés agregar líneas de descuento manualmente"
+                                      : (type === "Recibo" || type === "Nota de Crédito") && relatedInvoiceId
+                                        ? "Los ítems se cargaron desde la factura relacionada"
+                                        : ""
+                            }
                           >
                             + Agregar ítem
                           </button>
@@ -1063,7 +1192,9 @@ export function FacturacionPage() {
                       {type === "Nota de Crédito" && relatedInvoiceId && (
                         <div style={{ padding: "0.75rem", backgroundColor: "rgba(255, 255, 255, 0.15)", border: "1px solid rgba(255, 255, 255, 0.4)", borderRadius: "10px", marginBottom: "1rem" }}>
                           <small style={{ fontWeight: "bold", color: "#fff" }}>
-                            ✓ Nota de Crédito seleccionada para cancelar la factura correspondiente.
+                            {isPartialCreditNote
+                              ? "✍️ NC parcial activa: podés cargar y editar importes de descuento por servicio."
+                              : "✓ Nota de Crédito seleccionada para cancelar la factura correspondiente."}
                           </small>
                         </div>
                       )}
@@ -1269,7 +1400,152 @@ export function FacturacionPage() {
                   </table>
                       </div>
 
-                      {items.length > 0 && (
+                      {type === "Nota de Crédito" && relatedInvoiceId && isPartialCreditNote && (
+                        <div style={{ marginTop: "1rem", borderTop: "1px solid rgba(255,255,255,0.25)", paddingTop: "1rem" }}>
+                          <div className="fact-detail-servicios-header" style={{ marginBottom: "0.75rem" }}>
+                            <h2 className="fact-detail-servicios-title" style={{ fontSize: "1.05rem" }}>
+                              <span style={{ fontSize: "1.1em", lineHeight: 1 }}>✍️</span> Detalle manual NC parcial
+                            </h2>
+                            <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
+                              <button
+                                type="button"
+                                className="fact-detail-servicios-btn-clear"
+                                onClick={() => setPartialCreditItems([])}
+                                disabled={partialCreditItems.length === 0}
+                                title={partialCreditItems.length === 0 ? "No hay ítems manuales para borrar" : "Vaciar ítems manuales NC"}
+                              >
+                                🗑️ Borrar
+                              </button>
+                              <button
+                                type="button"
+                                className="fact-detail-servicios-btn-add"
+                                onClick={addPartialCreditItem}
+                              >
+                                + Agregar ítem
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="fact-detail-servicios-table-wrap">
+                            <table className="fact-table fact-table-hosting fact-detail-servicios-table">
+                              <thead>
+                                <tr>
+                                  <th>Servicio</th>
+                                  <th className="fact-cell-center">Mes</th>
+                                  <th className="fact-cell-center fact-col-cantidad">CANTIDAD</th>
+                                  <th className="fact-cell-center">PRECIO X EQ</th>
+                                  <th className="fact-cell-center">DTO x EQ</th>
+                                  <th className="fact-cell-center">Total</th>
+                                  <th />
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {partialCreditItems.length === 0 ? (
+                                  <tr>
+                                    <td colSpan={7} className="fact-detail-servicios-empty">
+                                      <span className="fact-detail-servicios-empty-icon">✍️</span>
+                                      <p className="fact-detail-servicios-empty-text">
+                                        Agregá ítems manuales para definir el descuento parcial de la Nota de Crédito.
+                                      </p>
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  partialCreditItems.map((it, idx) => {
+                                    const lineTotal = (it.price - it.discount) * it.quantity;
+                                    return (
+                                      <tr key={`partial-${idx}`}>
+                                        <td>
+                                          <select
+                                            className="fact-select"
+                                            style={{ padding: "0.4rem 0.5rem", fontSize: "0.8125rem", width: "100%", maxWidth: "100%" }}
+                                            value={it.serviceKey || ""}
+                                            onChange={(e) => {
+                                              const key = e.target.value as LineItem["serviceKey"];
+                                              if (key && serviceCatalog[key]) {
+                                                const def = serviceCatalog[key];
+                                                updatePartialCreditItem(idx, { serviceKey: key, serviceName: def.name, price: def.price });
+                                              }
+                                            }}
+                                          >
+                                            <option value="A">{serviceCatalog.A.name}</option>
+                                            <option value="B">{serviceCatalog.B.name}</option>
+                                            <option value="C">{serviceCatalog.C.name}</option>
+                                            <option value="D">{serviceCatalog.D.name}</option>
+                                          </select>
+                                        </td>
+                                        <td className="fact-cell-center">
+                                          <select
+                                            className="fact-select"
+                                            value={/^\d{4}-\d{2}$/.test(it.month || "") ? it.month : currentMonthValue()}
+                                            onChange={(e) => updatePartialCreditItem(idx, { month: e.target.value })}
+                                            style={{ width: "100%", maxWidth: "100%", padding: "0.4rem 0.5rem", fontSize: "0.8125rem" }}
+                                          >
+                                            {OPCIONES_MES.map((op) => (
+                                              <option key={op.value} value={op.value}>{op.label}</option>
+                                            ))}
+                                          </select>
+                                        </td>
+                                        <td className="fact-cell-center fact-col-cantidad">
+                                          <input
+                                            type="number"
+                                            className="fact-input"
+                                            style={{ padding: "0.4rem 0.35rem", fontSize: "0.8125rem", width: "100%", maxWidth: "100%", textAlign: "center", boxSizing: "border-box" }}
+                                            min={1}
+                                            value={it.quantity}
+                                            onChange={(e) => updatePartialCreditItem(idx, { quantity: Math.max(1, Number(e.target.value || 1)) })}
+                                          />
+                                        </td>
+                                        <td className="fact-cell-center">
+                                          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", width: "100%" }}>
+                                            <input
+                                              type="number"
+                                              className="fact-input"
+                                              value={it.price}
+                                              onChange={(e) => updatePartialCreditItem(idx, { price: Math.max(0, Math.round(Number(e.target.value) || 0)) })}
+                                              style={{ flex: 1, minWidth: 0, padding: "0.4rem 0.35rem", fontSize: "0.8125rem", textAlign: "center", boxSizing: "border-box" }}
+                                              min={0}
+                                              step={1}
+                                            />
+                                            <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#64748b", flexShrink: 0 }}>USD</span>
+                                          </div>
+                                        </td>
+                                        <td className="fact-cell-center">
+                                          <input
+                                            type="number"
+                                            className="fact-input"
+                                            style={{ padding: "0.4rem 0.35rem", fontSize: "0.8125rem", width: "100%", maxWidth: "100%", textAlign: "center", boxSizing: "border-box" }}
+                                            min={0}
+                                            value={it.discount}
+                                            onChange={(e) => updatePartialCreditItem(idx, { discount: Math.max(0, Number(e.target.value || 0)) })}
+                                          />
+                                        </td>
+                                        <td className="fact-cell-center fact-cell-total">
+                                          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", width: "100%" }}>
+                                            <input readOnly value={formatCurrencyNumber(lineTotal)} className="fact-detail-servicios-input-total" style={{ flex: 1, minWidth: 0 }} />
+                                            <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#64748b", flexShrink: 0 }}>USD</span>
+                                          </div>
+                                        </td>
+                                        <td className="fact-cell-center">
+                                          <button
+                                            type="button"
+                                            className="fact-detail-servicios-btn-remove"
+                                            onClick={() => removePartialCreditItem(idx)}
+                                            title="Quitar ítem manual de NC parcial"
+                                          >
+                                            ×
+                                          </button>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {activeItems.length > 0 && (
                         <div className="fact-detail-servicios-summary">
                           <div className="fact-summary-cards">
                             <div className="fact-summary-card fact-summary-card--sub">
@@ -1304,7 +1580,7 @@ export function FacturacionPage() {
                       📄 Documentos Emitidos
                     </h3>
                     <div className="fact-table-wrap">
-                      <table className="fact-table fact-emitted-table fact-emitted-table--7col" style={{ tableLayout: "fixed", width: "100%", minWidth: "640px" }}>
+                      <table className="fact-table fact-emitted-table fact-emitted-table--7col" style={{ tableLayout: "auto", width: "100%", minWidth: "980px" }}>
                         <thead className="fact-emitted-thead">
                           <tr>
                             <th style={{ borderLeft: "1px solid #2D5D46", borderRight: "1px solid #2D5D46" }}>Tipo</th>
@@ -1425,18 +1701,47 @@ export function FacturacionPage() {
                       discounts={previewEmitted.invoice.discounts}
                       total={previewEmitted.invoice.total}
                       dueDateDays={dueDateDays}
+                      relatedInvoiceNumber={previewEmitted.invoice.relatedInvoiceNumber}
+                      creditNoteMode={
+                        previewEmitted.invoice.type === "Nota de Crédito"
+                          ? (() => {
+                              const related = invoicesAll.find(
+                                (i) =>
+                                  i.type === "Factura" &&
+                                  (i.number === previewEmitted.invoice.relatedInvoiceNumber ||
+                                    String(i.id) === String(previewEmitted.invoice.relatedInvoiceId ?? ""))
+                              );
+                              if (!related) return undefined;
+                              return Math.abs(Math.abs(previewEmitted.invoice.total) - Math.abs(related.total)) < 0.0001
+                                ? "total"
+                                : "partial";
+                            })()
+                          : undefined
+                      }
                     />
-                  ) : selectedClient && items.length > 0 ? (
+                  ) : selectedClient && activeItems.length > 0 ? (
                     <InvoicePreview
                       type={type}
                       number={number}
                       client={selectedClient}
                       date={new Date()}
-                      items={items}
+                      items={activeItems}
                       subtotal={totals.subtotal}
                       discounts={totals.discounts}
                       total={totals.total}
                       dueDateDays={dueDateDays}
+                      relatedInvoiceNumber={
+                        type === "Nota de Crédito"
+                          ? invoicesAll.find((i) => String(i.id) === String(relatedInvoiceId))?.number
+                          : undefined
+                      }
+                      creditNoteMode={
+                        type === "Nota de Crédito"
+                          ? isPartialCreditNote
+                            ? "partial"
+                            : "total"
+                          : undefined
+                      }
                     />
                   ) : selectedClient ? (
                     <div className="fact-panel-vista-previa-empty">

@@ -42,6 +42,14 @@ function formatMonthLabel(monthStr: string): string {
   return `${mes}-${y}`;
 }
 
+function getCreditNoteMode(creditNote: Invoice | null | undefined, factura: Invoice | null | undefined): "partial" | "total" {
+  if (!creditNote || !factura) return "partial";
+  const ncAbs = Math.abs(Number(creditNote.total) || 0);
+  const facAbs = Math.abs(Number(factura.total) || 0);
+  if (facAbs <= 0) return "partial";
+  return ncAbs + 0.0001 >= facAbs ? "total" : "partial";
+}
+
 // Función auxiliar para encontrar columna en Excel por nombres posibles
 function findCol(headerRow: (string | number)[], ...names: string[]): number {
   for (let i = 1; i < headerRow.length; i++) {
@@ -336,9 +344,8 @@ export function HistorialMineriaPage() {
       let isCancelledByNC = false;
       if (inv.type === "Factura") {
         const hasReceipt = all.some((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id);
-        // Solo considerar válida si hay exactamente UNA Nota de Crédito relacionada
         const creditNotes = all.filter((nc) => nc.type === "Nota de Crédito" && nc.relatedInvoiceId === inv.id);
-        const hasCreditNote = creditNotes.length === 1;
+        const hasCreditNote = creditNotes.some((nc) => getCreditNoteMode(nc, inv) === "total");
         isClosed = hasReceipt || hasCreditNote;
         isCancelledByNC = hasCreditNote;
       } else if (inv.type === "Recibo" && inv.relatedInvoiceId) {
@@ -347,8 +354,10 @@ export function HistorialMineriaPage() {
         // Verificar que sea la única NC para esa factura
         const otherNCs = all.filter((nc) => nc.type === "Nota de Crédito" && nc.relatedInvoiceId === inv.relatedInvoiceId && nc.id !== inv.id);
         if (otherNCs.length === 0) {
+          const relatedFactura = all.find((f) => f.id === inv.relatedInvoiceId);
+          const ncMode = getCreditNoteMode(inv, relatedFactura ?? undefined);
           isClosed = true;
-          isCancelledByNC = true;
+          isCancelledByNC = ncMode === "total";
         }
       }
       
@@ -368,10 +377,11 @@ export function HistorialMineriaPage() {
       // Fecha de pago: misma lógica que la tabla (Factura pagada=fecha, cancelada por NC="Cancelada", sino "Pendiente"; NC=fecha emisión)
       const relatedReciboPayment = inv.type === "Factura" ? all.find((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id) : null;
       const relatedNCPayment = inv.type === "Factura" ? all.find((n) => n.type === "Nota de Crédito" && n.relatedInvoiceId === inv.id) : null;
+      const relatedNCPaymentMode = inv.type === "Factura" ? getCreditNoteMode(relatedNCPayment, inv) : "partial";
       let paymentDateExportCell: string;
       if (inv.type === "Factura") {
         if (relatedReciboPayment?.paymentDate) paymentDateExportCell = new Date(relatedReciboPayment.paymentDate).toLocaleDateString();
-        else if (relatedNCPayment) paymentDateExportCell = "Cancelada";
+        else if (relatedNCPayment) paymentDateExportCell = relatedNCPaymentMode === "total" ? "Cancelada" : "Parcial";
         else paymentDateExportCell = "Pendiente";
       } else if (inv.type === "Nota de Crédito") {
         paymentDateExportCell = inv.date || (inv.paymentDate ? new Date(inv.paymentDate).toLocaleDateString() : "-");
@@ -633,6 +643,26 @@ export function HistorialMineriaPage() {
         };
       });
 
+      const relatedForNc =
+        inv.type === "Nota de Crédito"
+          ? all.find(
+              (f) =>
+                f.type === "Factura" &&
+                (String(f.id) === String(inv.relatedInvoiceId ?? "") ||
+                  f.number === inv.relatedInvoiceNumber)
+            )
+          : undefined;
+      const relatedInvoiceNumberForPdf =
+        inv.type === "Nota de Crédito"
+          ? inv.relatedInvoiceNumber ?? relatedForNc?.number
+          : undefined;
+      const inferredNcMode =
+        inv.type === "Nota de Crédito" && relatedForNc
+          ? Math.abs(Math.abs(inv.total) - Math.abs(relatedForNc.total)) < 0.0001
+            ? "total"
+            : "partial"
+          : undefined;
+
       // Generar el PDF
       const doc = generateFacturaPdf(
         {
@@ -652,7 +682,9 @@ export function HistorialMineriaPage() {
           items: validItems,
           subtotal: inv.subtotal || 0,
           discounts: inv.discounts || 0,
-          total: inv.total || 0
+          total: inv.total || 0,
+          relatedInvoiceNumber: relatedInvoiceNumberForPdf,
+          creditNoteMode: inferredNcMode
         },
         { logoBase64 }
       );
@@ -819,11 +851,12 @@ export function HistorialMineriaPage() {
                     // Fecha de pago: Factura = fecha del Recibo si pagada, "Cancelada" si cancelada por NC, sino "Pendiente"; NC = fecha emisión
                     const relatedReciboForPayment = inv.type === "Factura" ? all.find((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id) : null;
                     const relatedNCForPayment = inv.type === "Factura" ? all.find((n) => n.type === "Nota de Crédito" && n.relatedInvoiceId === inv.id) : null;
+                    const relatedNCMode = inv.type === "Factura" ? getCreditNoteMode(relatedNCForPayment, inv) : "partial";
                     const paymentDateDisplay = (inv.type === "Factura" && relatedReciboForPayment?.paymentDate) ? relatedReciboForPayment.paymentDate : inv.paymentDate;
                     let paymentDateCell: string;
                     if (inv.type === "Factura") {
                       if (relatedReciboForPayment?.paymentDate) paymentDateCell = new Date(relatedReciboForPayment.paymentDate).toLocaleDateString();
-                      else if (relatedNCForPayment) paymentDateCell = "Cancelada";
+                      else if (relatedNCForPayment) paymentDateCell = relatedNCMode === "total" ? "Cancelada" : "Parcial";
                       else paymentDateCell = "Pendiente";
                     } else if (inv.type === "Nota de Crédito") {
                       paymentDateCell = inv.date || (inv.paymentDate ? new Date(inv.paymentDate).toLocaleDateString() : "-");
@@ -836,9 +869,8 @@ export function HistorialMineriaPage() {
                     if (inv.type === "Factura") {
                       // Buscar si existe un recibo relacionado con esta factura
                       const hasReceipt = all.some((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id);
-                      // Buscar si existe exactamente UNA Nota de Crédito relacionada con esta factura (no múltiples)
                       const creditNotes = all.filter((nc) => nc.type === "Nota de Crédito" && nc.relatedInvoiceId === inv.id);
-                      const hasCreditNote = creditNotes.length === 1; // Solo una NC válida
+                      const hasCreditNote = creditNotes.some((nc) => getCreditNoteMode(nc, inv) === "total");
                       isClosed = hasReceipt || hasCreditNote;
                       isCancelledByNC = hasCreditNote;
                     } else if (inv.type === "Recibo" && inv.relatedInvoiceId) {
@@ -849,8 +881,10 @@ export function HistorialMineriaPage() {
                       const otherNCs = all.filter((nc) => nc.type === "Nota de Crédito" && nc.relatedInvoiceId === inv.relatedInvoiceId && nc.id !== inv.id);
                       // Solo mostrar check si es la única NC para esa factura
                       if (otherNCs.length === 0) {
+                        const relatedFactura = all.find((f) => f.id === inv.relatedInvoiceId);
+                        const ncMode = getCreditNoteMode(inv, relatedFactura ?? undefined);
                         isClosed = true;
-                        isCancelledByNC = true;
+                        isCancelledByNC = ncMode === "total";
                       }
                     }
                     return (
@@ -1087,6 +1121,8 @@ export function HistorialMineriaPage() {
                     const relatedRecibo = all.find((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id);
                     const relatedNC = all.find((n) => n.type === "Nota de Crédito" && n.relatedInvoiceId === inv.id);
                     const relatedFactura = inv.relatedInvoiceId ? all.find((f) => f.id === inv.relatedInvoiceId) : null;
+                    const ncModeForFactura = inv.type === "Factura" ? getCreditNoteMode(relatedNC, inv) : "partial";
+                    const ncModeForNota = inv.type === "Nota de Crédito" ? getCreditNoteMode(inv, relatedFactura ?? undefined) : "partial";
                     return (
                       <>
                         <div className="row g-2 small mb-3">
@@ -1146,9 +1182,11 @@ export function HistorialMineriaPage() {
                         )}
                         {inv.type === "Factura" && relatedNC && (
                           <div className="rounded p-3" style={{ backgroundColor: "#e7f1ff", border: "1px solid #004085" }}>
-                            <strong style={{ color: "#004085" }}>✓ Factura cancelada</strong>
+                            <strong style={{ color: "#004085" }}>
+                              {ncModeForFactura === "total" ? "✓ Factura cancelada (NC total)" : "✓ Factura con NC parcial"}
+                            </strong>
                             <div className="mt-1 small" style={{ color: "#004085" }}>
-                              Nota de Crédito: <strong>{relatedNC.number}</strong>
+                              Nota de Crédito {ncModeForFactura === "total" ? "total" : "parcial"}: <strong>{relatedNC.number}</strong>
                               {relatedNC.date && <> — Emisión: <strong>{relatedNC.date}</strong></>}
                             </div>
                           </div>
@@ -1174,9 +1212,11 @@ export function HistorialMineriaPage() {
                         )}
                         {inv.type === "Nota de Crédito" && relatedFactura && (
                           <div className="rounded p-3" style={{ backgroundColor: "#e7f1ff", border: "1px solid #004085" }}>
-                            <strong style={{ color: "#004085" }}>✓ Factura cancelada</strong>
+                            <strong style={{ color: "#004085" }}>
+                              {ncModeForNota === "total" ? "✓ NC de anulación total" : "✓ NC de anulación parcial"}
+                            </strong>
                             <div className="mt-1 small" style={{ color: "#004085" }}>
-                              Factura: <strong>{relatedFactura.number}</strong>
+                              Factura relacionada: <strong>{relatedFactura.number}</strong>
                               {relatedFactura.date && <> — Emisión: <strong>{relatedFactura.date}</strong></>}
                             </div>
                           </div>

@@ -54,6 +54,10 @@ export type FacturaPdfData = {
   dueDateDays?: number;
   /** Si se reimprime un documento ya guardado, pasar la fecha de vencimiento ya calculada. */
   dueDate?: Date;
+  /** Para Nota de Crédito: número de factura relacionada (referencia). */
+  relatedInvoiceNumber?: string;
+  /** Para Nota de Crédito: tipo de anulación respecto de la referencia. */
+  creditNoteMode?: "partial" | "total";
 };
 
 export type FacturaPdfImages = {
@@ -479,6 +483,19 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
     doc.text(lineas, tableLeft + 3, yRecTop + recPaddingTop + 4);
     y = yRecTop + recBlockH;
   } else {
+    // Nota de Crédito: mostrar referencia arriba del bloque de fechas con el mismo estilo del texto de recibos
+    if (data.type === "Nota de Crédito" && data.relatedInvoiceNumber) {
+      const modeLabel = data.creditNoteMode === "partial" ? "Parcial" : "Total";
+      const refText = `Anulación ${modeLabel} Factura N° ${data.relatedInvoiceNumber}`;
+      const refLines = doc.splitTextToSize(refText, TABLE_W) as unknown as string[];
+      const refLineH = 6;
+      const refBaselineY = datesBlockTop - 4 - (refLines.length - 1) * refLineH;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(12);
+      doc.setTextColor(0, 0, 0);
+      doc.text(refLines, tableLeft, refBaselineY);
+    }
+
     // Factura / Nota de Crédito: tabla FECHA DE EMISIÓN y FECHA DE VENCIMIENTO
     const pathDatesHeaderGreen = [
       { op: "m" as const, c: [tableLeft + Rd, datesBlockTop] },

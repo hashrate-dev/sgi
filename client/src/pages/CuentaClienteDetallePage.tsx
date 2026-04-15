@@ -61,6 +61,30 @@ function isLinkedToInvoice(comp: InvoiceRow, factura: InvoiceRow): boolean {
   return matchId || matchNumber;
 }
 
+function parseInvoiceDateTime(valueDate: string, valueTime?: string): number {
+  const dRaw = String(valueDate ?? "").trim();
+  if (!dRaw) return 0;
+  const tRaw = String(valueTime ?? "").trim();
+  const tNorm = /^\d{1,2}:\d{2}(:\d{2})?$/.test(tRaw) ? (tRaw.length === 5 ? `${tRaw}:00` : tRaw) : "00:00:00";
+
+  // Formato esperado principal en SGI: dd/mm/yyyy
+  const dmy = dRaw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (dmy) {
+    const day = Number(dmy[1]);
+    const month = Number(dmy[2]);
+    const year = Number(dmy[3]);
+    const iso = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${tNorm}`;
+    const ms = Date.parse(iso);
+    return Number.isFinite(ms) ? ms : 0;
+  }
+
+  // Fallback: ISO u otros formatos parseables por Date.parse
+  const ms = Date.parse(`${dRaw}T${tNorm}`);
+  if (Number.isFinite(ms)) return ms;
+  const msDateOnly = Date.parse(dRaw);
+  return Number.isFinite(msDateOnly) ? msDateOnly : 0;
+}
+
 export function CuentaClienteDetallePage() {
   const [searchParams] = useSearchParams();
   const clientName = searchParams.get("cliente") ?? "";
@@ -103,12 +127,19 @@ export function CuentaClienteDetallePage() {
     loadInvoices();
   }, [loadInvoices]);
 
-  const pendingInvoices = useMemo(() => {
-    return invoices.filter((inv) => {
-      if (inv.type !== "Factura") return false;
-      const hasReceipt = invoices.some((r) => r.type === "Recibo" && isLinkedToInvoice(r, inv));
-      const hasCreditNote = invoices.some((nc) => nc.type === "Nota de Crédito" && isLinkedToInvoice(nc, inv));
-      return !hasReceipt && !hasCreditNote;
+  const facturaBalances = useMemo(() => {
+    const facturas = invoices.filter((inv) => inv.type === "Factura");
+    return facturas.map((factura) => {
+      const linkedDocs = invoices.filter(
+        (doc) => (doc.type === "Recibo" || doc.type === "Nota de Crédito") && isLinkedToInvoice(doc, factura)
+      );
+      const linkedTotal = linkedDocs.reduce((sum, doc) => sum + (Number(doc.total) || 0), 0);
+      const originalTotal = Number(factura.total) || 0;
+      const balance = originalTotal + linkedTotal;
+      return {
+        factura,
+        balance,
+      };
     });
   }, [invoices]);
 
@@ -145,8 +176,8 @@ export function CuentaClienteDetallePage() {
     });
     const totalHosting = facturasHosting - ncHosting;
     const totalAsic = facturasAsic - ncAsic;
-    pendingInvoices.forEach((inv) => {
-      totalPendiente += inv.total;
+    facturaBalances.forEach(({ balance }) => {
+      if (balance > 0) totalPendiente += balance;
     });
     return {
       hosting: totalHosting,
@@ -161,12 +192,12 @@ export function CuentaClienteDetallePage() {
       countRecibos,
       countNC,
     };
-  }, [invoices, pendingInvoices]);
+  }, [invoices, facturaBalances]);
 
   const sortedInvoices = useMemo(() => {
     return [...invoices].sort((a, b) => {
-      const da = new Date(a.date).getTime();
-      const db = new Date(b.date).getTime();
+      const da = parseInvoiceDateTime(a.date, a.emissionTime);
+      const db = parseInvoiceDateTime(b.date, b.emissionTime);
       if (da !== db) return db - da;
       return (b.id ?? 0) - (a.id ?? 0);
     });
@@ -250,7 +281,6 @@ export function CuentaClienteDetallePage() {
                           <div className="stat-value text-danger">
                             {formatCurrencyNumber(totals.pendiente)} <span className="currency">USD</span>
                           </div>
-                          {totals.pendiente > 0 && <small className="text-muted d-block mt-1">Facturas sin recibo ni NC</small>}
                         </div>
                       </div>
                     </div>
@@ -275,12 +305,19 @@ export function CuentaClienteDetallePage() {
                         <tbody>
                           {sortedInvoices.map((inv) => {
                             const dueDate = inv.dueDate || calculateDueDate(inv.date);
-                            const hasNC = invoices.some((nc) => nc.type === "Nota de Crédito" && isLinkedToInvoice(nc, inv));
-                            const relatedRecibo = invoices.find((r) => r.type === "Recibo" && isLinkedToInvoice(r, inv));
+                            const relatedRecibos = invoices.filter((r) => r.type === "Recibo" && isLinkedToInvoice(r, inv));
+                            const relatedNCs = invoices.filter((nc) => nc.type === "Nota de Crédito" && isLinkedToInvoice(nc, inv));
+                            const linkedSum = [...relatedRecibos, ...relatedNCs].reduce((sum, d) => sum + (Number(d.total) || 0), 0);
+                            const facturaOriginal = Number(inv.total) || 0;
+                            const facturaBalance = facturaOriginal + linkedSum;
                             let paymentDateCell: string;
                             if (inv.type === "Factura") {
-                              if (relatedRecibo?.paymentDate) paymentDateCell = relatedRecibo.paymentDate;
-                              else if (hasNC) paymentDateCell = "Cancelada";
+                              const lastReciboWithDate = [...relatedRecibos]
+                                .reverse()
+                                .find((r) => String(r.paymentDate || "").trim());
+                              if (facturaBalance <= 0) paymentDateCell = "Cancelada";
+                              else if (facturaBalance < facturaOriginal) paymentDateCell = "Parcial";
+                              else if (lastReciboWithDate?.paymentDate) paymentDateCell = lastReciboWithDate.paymentDate;
                               else paymentDateCell = "Pendiente";
                             } else if (inv.type === "Nota de Crédito") {
                               paymentDateCell = inv.date || (inv.paymentDate ?? "-");

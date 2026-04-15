@@ -28,7 +28,14 @@ export function LoginPage() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const apiUrl = params.get("api");
-    if (apiUrl && apiUrl.startsWith("http")) {
+    const host = window.location.hostname;
+    const isLocalHost =
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "::1" ||
+      host.endsWith(".local");
+    // Solo en entorno local permitimos override oculto de API.
+    if (isLocalHost && apiUrl && apiUrl.startsWith("http")) {
       setApiBaseUrl(apiUrl);
       window.history.replaceState({}, "", location.pathname + (location.hash || ""));
     }
