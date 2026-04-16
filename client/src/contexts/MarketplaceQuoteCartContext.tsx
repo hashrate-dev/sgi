@@ -96,6 +96,8 @@ type Ctx = {
   openQuoteWhatsApp: () => Promise<void>;
   /** Consulta en pipeline (un pedido activo por cuenta): el carrito se fusiona en ese ticket al sincronizar. */
   blockingPipelineOrder: { id: number; orderNumber: string; ticketCode: string } | null;
+  /** true cuando el carrito difiere de la última versión conocida de la orden en curso. */
+  hasPendingPipelineCartChanges: boolean;
   /** Refresca el bloqueo desde el servidor (tras cancelar orden, etc.). */
   refreshActiveOrderGate: () => Promise<void>;
 };
@@ -156,6 +158,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
     orderNumber: string;
     ticketCode: string;
   } | null>(null);
+  const [pipelineBase, setPipelineBase] = useState<{ orderId: number; sig: string } | null>(null);
   const [setupEquipoCompletoUsd, setSetupEquipoCompletoUsd] = useState(QUOTE_ADDON_SETUP_USD_FALLBACK);
   const [setupCompraHashrateUsd, setSetupCompraHashrateUsd] = useState(QUOTE_ADDON_SETUP_USD_FALLBACK);
   const [garantiaQuoteItems, setGarantiaQuoteItems] = useState<GarantiaQuotePriceItem[]>([]);
@@ -279,6 +282,14 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
     pipelineHydratedForIdRef.current = null;
   }, [user?.id]);
 
+  useEffect(() => {
+    if (!blockingPipelineOrder) {
+      setPipelineBase(null);
+      return;
+    }
+    setPipelineBase((prev) => (prev && prev.orderId === blockingPipelineOrder.id ? prev : null));
+  }, [blockingPipelineOrder?.id]);
+
   /**
    * Con orden en pipeline: traer ítems del ticket al carrito para que el usuario vea y edite el pedido completo
    * antes de sumar otro producto (misma regla de fusión que el servidor).
@@ -301,6 +312,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
         const { ticket } = await getMyMarketplaceQuoteTicket(bid);
         const fromServer = quoteCartLinesFromApiPayload(ticket.items as unknown[]);
         if (cancelled) return;
+        setPipelineBase({ orderId: bid, sig: cartLinesMergeSig(fromServer) });
         if (fromServer.length === 0) {
           pipelineHydratedForIdRef.current = bid;
           return;
@@ -316,6 +328,12 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
       cancelled = true;
     };
   }, [blockingPipelineOrder, canUseQuoteCart, loading]);
+
+  const hasPendingPipelineCartChanges = useMemo(() => {
+    if (!blockingPipelineOrder) return false;
+    if (!pipelineBase || pipelineBase.orderId !== blockingPipelineOrder.id) return false;
+    return cartLinesMergeSig(lines) !== pipelineBase.sig;
+  }, [blockingPipelineOrder, pipelineBase, lines]);
 
   useEffect(() => {
     if (!canUseQuoteCart) {
@@ -467,6 +485,9 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
     if (r.merged && Array.isArray(r.lines)) {
       const next = quoteCartLinesFromApiPayload(r.lines);
       setLines(next);
+      if (blockingPipelineOrder) {
+        setPipelineBase({ orderId: blockingPipelineOrder.id, sig: cartLinesMergeSig(next) });
+      }
       setTicketRef({ orderNumber: r.orderNumber, ticketCode: r.ticketCode });
       void refreshActiveOrderGate();
       window.dispatchEvent(new CustomEvent(MARKETPLACE_ACTIVE_ORDER_CHANGED_EVENT));
@@ -500,7 +521,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
       unitCount,
       lineCount,
     };
-  }, [canUseQuoteCart, lines, setupEquipoCompletoUsd, setupCompraHashrateUsd, garantiaQuoteItems, refreshActiveOrderGate]);
+  }, [canUseQuoteCart, lines, setupEquipoCompletoUsd, setupCompraHashrateUsd, garantiaQuoteItems, refreshActiveOrderGate, blockingPipelineOrder]);
 
   const openQuoteEmail = useCallback(async () => {
     let ref: QuoteTicketRef | undefined;
@@ -600,6 +621,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
       openQuoteEmail,
       openQuoteWhatsApp,
       blockingPipelineOrder,
+      hasPendingPipelineCartChanges,
       refreshActiveOrderGate,
     }),
     [
@@ -627,6 +649,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
       openQuoteEmail,
       openQuoteWhatsApp,
       blockingPipelineOrder,
+      hasPendingPipelineCartChanges,
       refreshActiveOrderGate,
     ]
   );

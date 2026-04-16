@@ -3736,6 +3736,21 @@ button.product-modal__btn--quote-cart:hover {
   box-shadow: 0 6px 18px rgba(5, 150, 105, 0.4);
 }
 
+.market-quote-drawer__btn--solid:disabled {
+  background: linear-gradient(180deg, #cbd5e1 0%, #94a3b8 100%);
+  color: #f8fafc !important;
+  border-color: rgba(100, 116, 139, 0.4);
+  box-shadow: none;
+  filter: none;
+  cursor: not-allowed;
+  opacity: 0.92;
+}
+
+.market-quote-drawer__btn--solid:disabled:hover {
+  filter: none;
+  box-shadow: none;
+}
+
 .market-quote-drawer__btn--neutral {
   background: linear-gradient(180deg, #f9fafb 0%, #f1f5f9 100%);
   color: #475569 !important;
@@ -3766,6 +3781,26 @@ button.product-modal__btn--quote-cart:hover {
 
 .market-quote-drawer__btn--ghost:hover {
   color: #64748b !important;
+}
+
+.market-quote-drawer__btn--close-order {
+  background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+  color: #fff !important;
+  border: 1px solid transparent;
+  box-shadow: 0 4px 14px rgba(217, 119, 6, 0.35);
+  min-height: 2.4rem;
+  font-size: 0.82rem;
+}
+
+.market-quote-drawer__btn--close-order:hover {
+  filter: brightness(1.05);
+  box-shadow: 0 6px 18px rgba(217, 119, 6, 0.4);
+}
+
+.market-quote-drawer__btn--close-order:disabled {
+  background: linear-gradient(180deg, #e2e8f0 0%, #94a3b8 100%);
+  box-shadow: none;
+  cursor: not-allowed;
 }
 
 /* —— Generar ticket (ancho completo) —— */
@@ -3870,6 +3905,30 @@ button.product-modal__btn--quote-cart:hover {
 .market-ticket-summary__lede strong {
   color: #334155;
   font-weight: 700;
+}
+
+.market-ticket-summary__sales-note {
+  margin: 0 0 1rem;
+  padding: 0.72rem 0.8rem;
+  border-radius: 12px;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  background: #ecfdf5;
+}
+
+.market-ticket-summary__sales-note-title {
+  margin: 0 0 0.2rem;
+  font-size: 0.73rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #047857;
+}
+
+.market-ticket-summary__sales-note-text {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: #065f46;
 }
 
 .market-ticket-summary__codes {
@@ -4136,8 +4195,8 @@ button.product-modal__btn--quote-cart:hover {
 }
 
 .market-mis-ord__badge--enviado_consulta {
-  background: #eff6ff;
-  color: #1d4ed8;
+  background: #ecfdf5;
+  color: #047857;
 }
 
 .market-mis-ord__badge--en_gestion {
@@ -4150,10 +4209,14 @@ button.product-modal__btn--quote-cart:hover {
   color: #047857;
 }
 
-.market-mis-ord__badge--cerrado,
-.market-mis-ord__badge--descartado {
+.market-mis-ord__badge--cerrado {
   background: #f1f5f9;
   color: #64748b;
+}
+
+.market-mis-ord__badge--descartado {
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .market-mis-ord__overlay {

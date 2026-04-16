@@ -311,8 +311,8 @@ button.hrs-mqt-ticket-card:hover {
   color: #475569;
 }
 .hrs-mqt-badge--enviado_consulta {
-  background: #fef3c7;
-  color: #b45309;
+  background: #d1fae5;
+  color: #047857;
 }
 .hrs-mqt-badge--en_gestion {
   background: #dbeafe;
@@ -322,10 +322,14 @@ button.hrs-mqt-ticket-card:hover {
   background: #d1fae5;
   color: #047857;
 }
-.hrs-mqt-badge--cerrado,
-.hrs-mqt-badge--descartado {
+.hrs-mqt-badge--cerrado {
   background: #e2e8f0;
   color: #475569;
+}
+
+.hrs-mqt-badge--descartado {
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .hrs-mqt-badge--nuevo {

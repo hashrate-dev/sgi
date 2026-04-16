@@ -55,6 +55,7 @@ const SyncSchema = z.object({
 const TICKET_SELECT =
   "t.id, t.session_id, t.order_number, t.ticket_code, t.status, t.items_json, t.subtotal_usd, t.line_count, t.unit_count, t.created_at, t.updated_at, t.last_contact_channel, t.contacted_at, t.notes_admin, t.ip_address, t.user_agent, t.user_id, t.contact_email, u.email AS user_join_email";
 const TICKET_FROM = "marketplace_quote_tickets t LEFT JOIN users u ON u.id = t.user_id";
+const REACTIVATE_CANCELLED_WINDOW_MS = 30 * 24 * 60 * 60 * 1000; // 1 mes
 
 type QuoteLine = z.infer<typeof LineSchema>;
 type TrustedQuoteLine = Omit<QuoteLine, "priceUsd"> & { priceUsd: number };
@@ -563,16 +564,25 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
       isSubmitTicket ? "portal" : event === "contact_email" ? "email" : event === "contact_whatsapp" ? "whatsapp" : undefined;
 
     const existing = (await db
-      .prepare("SELECT id, order_number, ticket_code, status FROM marketplace_quote_tickets WHERE session_id = ?")
+      .prepare("SELECT id, order_number, ticket_code, status, updated_at FROM marketplace_quote_tickets WHERE session_id = ?")
       .get(sessionId)) as
-      | { id: number; order_number: string | null; ticket_code: string; status: string }
+      | { id: number; order_number: string | null; ticket_code: string; status: string; updated_at: string | null }
       | undefined;
 
     if (existing) {
       const exSt = normalizeTicketStatusDb(existing.status);
-      const terminal = exSt === "cerrado" || exSt === "descartado";
+      const isCancelled = exSt === "descartado";
+      const cancelledAtMs = Date.parse(String(existing.updated_at ?? ""));
+      const canReactivateCancelled =
+        isCancelled &&
+        trustedLines.length > 0 &&
+        Number.isFinite(cancelledAtMs) &&
+        Date.now() - cancelledAtMs <= REACTIVATE_CANCELLED_WINDOW_MS;
+      const terminal = exSt === "cerrado" || (isCancelled && !canReactivateCancelled);
       const nextStatus = terminal
         ? existing.status
+        : canReactivateCancelled
+          ? "enviado_consulta"
         : resolveStatusAfterContact(existing.status, Boolean(contactChannel));
       if (
         singleMarketplaceOrderPolicy &&
@@ -666,6 +676,68 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
         ticketCode: existing.ticket_code,
         status: nextStatus,
       });
+    }
+
+    /**
+     * Si la cuenta tenía una orden cancelada reciente (<= 1 mes) y vuelve a agregar ítems,
+     * se reactiva esa misma orden en lugar de crear otra nueva.
+     */
+    if (singleMarketplaceOrderPolicy && trustedLines.length > 0) {
+      const latestCancelled = (await db
+        .prepare(
+          `SELECT id, order_number, ticket_code, updated_at
+           FROM marketplace_quote_tickets
+           WHERE user_id = ? AND status = 'descartado'
+           ORDER BY updated_at DESC LIMIT 1`
+        )
+        .get(userId)) as
+        | { id: number; order_number: string | null; ticket_code: string; updated_at: string | null }
+        | undefined;
+      const cancelledAtMs = Date.parse(String(latestCancelled?.updated_at ?? ""));
+      const canReactivate =
+        latestCancelled != null &&
+        Number.isFinite(cancelledAtMs) &&
+        Date.now() - cancelledAtMs <= REACTIVATE_CANCELLED_WINDOW_MS;
+      if (canReactivate && latestCancelled) {
+        await db
+          .prepare(
+            `UPDATE marketplace_quote_tickets SET
+              session_id = ?, status = 'enviado_consulta',
+              items_json = ?, subtotal_usd = ?, line_count = ?, unit_count = ?, updated_at = ?,
+              ip_address = ?, user_agent = ?, user_id = ?, contact_email = ?
+            WHERE id = ?`
+          )
+          .run(
+            sessionId,
+            itemsJson,
+            subtotal,
+            lineCount,
+            unitCount,
+            nowIso,
+            ip,
+            ua,
+            userId,
+            contactEmail,
+            latestCancelled.id
+          );
+        const orderNumber = latestCancelled.order_number ?? `ORD-${String(latestCancelled.id).padStart(7, "0")}`;
+        if (!latestCancelled.order_number) {
+          await db.prepare("UPDATE marketplace_quote_tickets SET order_number = ? WHERE id = ?").run(orderNumber, latestCancelled.id);
+        }
+        return res.json({
+          ok: true,
+          id: latestCancelled.id,
+          orderNumber,
+          ticketCode: latestCancelled.ticket_code,
+          status: "enviado_consulta",
+          merged: true,
+          reactivated: true,
+          lines: trustedLines,
+          subtotalUsd: subtotal,
+          lineCount,
+          unitCount,
+        });
+      }
     }
 
     const ticketCode = genTicketCode();

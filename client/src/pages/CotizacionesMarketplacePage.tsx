@@ -28,20 +28,20 @@ import "../styles/hrs-cotizaciones-marketplace.css";
 const STATUS_OPTS = [
   { value: "all", label: "Todos" },
   { value: "borrador", label: "Borrador" },
-  { value: "enviado_consulta", label: "Consulta enviada" },
+  { value: "enviado_consulta", label: "Activo" },
   { value: "en_gestion", label: "En gestión" },
   { value: "respondido", label: "Respondido" },
   { value: "cerrado", label: "Cerrado" },
-  { value: "descartado", label: "Descartado" },
+  { value: "descartado", label: "Cancelado" },
 ] as const;
 
 const STATUS_LABEL: Record<string, string> = {
   borrador: "Borrador",
-  enviado_consulta: "Consulta enviada",
+  enviado_consulta: "Activo",
   en_gestion: "En gestión",
   respondido: "Respondido",
   cerrado: "Cerrado",
-  descartado: "Descartado",
+  descartado: "Cancelado",
 };
 
 const NEW_TICKET_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;

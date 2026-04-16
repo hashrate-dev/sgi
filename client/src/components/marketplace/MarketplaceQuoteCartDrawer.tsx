@@ -194,46 +194,11 @@ export function MarketplaceQuoteCartDrawer() {
           <div
             className={`market-quote-drawer__body-scroll${compactCartChrome ? " market-quote-drawer__body-scroll--has-lines" : ""}`}
           >
-          {showPipelineOrderHint ? (
-            <div className="market-quote-drawer__one-active-order" role="status">
-              <p className="market-quote-drawer__one-active-order-title">{t("drawer.one_active_title")}</p>
-              <p className="market-quote-drawer__one-active-order-body">{t("drawer.one_active_body")}</p>
-              {blockingPipelineOrder?.orderNumber ? (
-                <p className="market-quote-drawer__one-active-order-ref small text-muted mb-2">
-                  <strong>{blockingPipelineOrder.orderNumber}</strong>
-                  {blockingPipelineOrder.ticketCode ? (
-                    <>
-                      {" "}
-                      · {blockingPipelineOrder.ticketCode}
-                    </>
-                  ) : null}
-                </p>
-              ) : null}
-              <button
-                type="button"
-                className="market-quote-drawer__btn market-quote-drawer__btn--solid market-quote-drawer__one-active-order-link"
-                onClick={switchDrawerToOrders}
-              >
-                {t("drawer.one_active_link")}
-              </button>
-            </div>
-          ) : null}
           {n === 0 ? (
             <div className="market-quote-drawer__empty">
               <EmptyCartIllustration />
               <p className="market-quote-drawer__empty-title">{t("drawer.empty_title")}</p>
               <p className="market-quote-drawer__hint">{t("drawer.empty_hint")}</p>
-              {canUseQuoteCart && blockingPipelineOrder ? (
-                <p className="market-quote-drawer__empty-pending-note">
-                  <button
-                    type="button"
-                    className="market-quote-drawer__empty-pending-link"
-                    onClick={switchDrawerToOrders}
-                  >
-                    {t("drawer.empty_pending_order_link")}
-                  </button>
-                </p>
-              ) : null}
             </div>
           ) : (
             <>
@@ -443,7 +408,7 @@ export function MarketplaceQuoteCartDrawer() {
             </p>
           ) : null}
           <div className="market-quote-drawer__cta">
-            {canUseQuoteCart && n > 0 ? (
+            {canUseQuoteCart && n > 0 && !showPipelineOrderHint ? (
               <div className="market-quote-drawer__cta-submit-wrap">
                 <button
                   type="button"
@@ -465,13 +430,19 @@ export function MarketplaceQuoteCartDrawer() {
                       .finally(() => setSubmitBusy(false));
                   }}
                 >
-                  {submitBusy
-                    ? showPipelineOrderHint
-                      ? t("drawer.gen_busy_update")
-                      : t("drawer.gen_busy")
-                    : showPipelineOrderHint
-                      ? t("drawer.gen_ticket_update")
-                      : t("drawer.gen_ticket")}
+                  {submitBusy ? t("drawer.gen_busy") : t("drawer.gen_ticket")}
+                </button>
+              </div>
+            ) : null}
+            {canUseQuoteCart && n > 0 && showPipelineOrderHint ? (
+              <div className="market-quote-drawer__cta-submit-wrap">
+                <button
+                  type="button"
+                  className="market-quote-drawer__btn market-quote-drawer__btn--close-order"
+                  disabled={submitBusy || contactBusy !== null}
+                  onClick={switchDrawerToOrders}
+                >
+                  {t("drawer.close_order_cta")}
                 </button>
               </div>
             ) : null}

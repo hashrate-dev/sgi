@@ -1,6 +1,7 @@
 import type { SubmittedConsultationSummary } from "../../contexts/MarketplaceQuoteCartContext.js";
 import { useMarketplaceQuoteCart } from "../../contexts/MarketplaceQuoteCartContext.js";
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
+import { useAuth } from "../../contexts/AuthContext.js";
 import { marketplaceLocale } from "../../lib/i18n.js";
 
 type Props = {
@@ -10,11 +11,20 @@ type Props = {
 
 export function MarketplaceTicketSummaryModal({ summary, onClose }: Props) {
   const { openDrawerOrders } = useMarketplaceQuoteCart();
-  const { lang, t } = useMarketplaceLang();
+  const { user } = useAuth();
+  const { lang, t, tf } = useMarketplaceLang();
   const loc = marketplaceLocale(lang);
   const stKey = `orders.status.${summary.status}`;
   const stTranslated = t(stKey);
   const stLabel = stTranslated !== stKey ? stTranslated : summary.status;
+  const userEmail = user?.email?.trim() || "—";
+  const userCelular = user?.celular?.trim();
+  const userTelefono = user?.telefono?.trim();
+  const salesContactNotice = userCelular
+    ? tf("orders.contact_status_email_whatsapp", { email: userEmail, whatsapp: userCelular })
+    : userTelefono
+      ? tf("orders.contact_status_email_phone", { email: userEmail, phone: userTelefono })
+      : tf("orders.contact_status_email", { email: userEmail });
 
   return (
     <div className="market-ticket-summary-root" role="dialog" aria-modal="true" aria-labelledby="market-ticket-summary-title">
@@ -30,6 +40,10 @@ export function MarketplaceTicketSummaryModal({ summary, onClose }: Props) {
           <strong>{t("drawer.pending_orders")}</strong>
           {t("ticket.summary_lede_after")}
         </p>
+        <div className="market-ticket-summary__sales-note" role="status" aria-live="polite">
+          <p className="market-ticket-summary__sales-note-title">{t("ticket.sales_notice_title")}</p>
+          <p className="market-ticket-summary__sales-note-text">{salesContactNotice}</p>
+        </div>
 
         <div className="market-ticket-summary__codes" aria-label={t("ticket.invoice_kicker")}>
           <div className="market-ticket-summary__code-box">
@@ -70,15 +84,19 @@ export function MarketplaceTicketSummaryModal({ summary, onClose }: Props) {
           <button
             type="button"
             className="market-ticket-summary__btn market-ticket-summary__btn--primary"
+            onClick={onClose}
+          >
+            {t("ticket.accept")}
+          </button>
+          <button
+            type="button"
+            className="market-ticket-summary__btn market-ticket-summary__btn--ghost"
             onClick={() => {
               onClose();
               openDrawerOrders();
             }}
           >
             {t("ticket.btn_orders")}
-          </button>
-          <button type="button" className="market-ticket-summary__btn market-ticket-summary__btn--ghost" onClick={onClose}>
-            {t("ticket.close")}
           </button>
         </div>
       </div>
