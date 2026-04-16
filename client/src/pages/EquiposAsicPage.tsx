@@ -433,6 +433,11 @@ export function EquiposAsicPage() {
   const [deletingSingleEquipo, setDeletingSingleEquipo] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [hashratePartDeleteConfirm, setHashratePartDeleteConfirm] = useState<{
+    idx: number;
+    sharePct: number;
+    setupUsd: number;
+  } | null>(null);
   const [excelLoading, setExcelLoading] = useState(false);
   const excelFileInputRef = useRef<HTMLInputElement>(null);
   const [editingEquipo, setEditingEquipo] = useState<EquipoASIC | null>(null);
@@ -691,9 +696,33 @@ export function EquiposAsicPage() {
   function dismissAddModal() {
     setShowPrecioModal(false);
     setPrecioHistorialFullPayload(null);
+    setHashratePartDeleteConfirm(null);
     setShowAddModal(false);
     setEditingEquipo(null);
     setFormData(emptyEquipoForm());
+  }
+
+  function handleHashratePartDeleteRequest(idx: number) {
+    const part = formData.marketplaceHashrateParts[idx];
+    if (!part) return;
+    setHashratePartDeleteConfirm({
+      idx,
+      sharePct: part.sharePct,
+      setupUsd: part.setupUsd,
+    });
+  }
+
+  function handleHashratePartDeleteCancel() {
+    setHashratePartDeleteConfirm(null);
+  }
+
+  function handleHashratePartDeleteConfirm() {
+    if (!hashratePartDeleteConfirm) return;
+    setFormData((prev) => ({
+      ...prev,
+      marketplaceHashrateParts: prev.marketplaceHashrateParts.filter((_, i) => i !== hashratePartDeleteConfirm.idx),
+    }));
+    setHashratePartDeleteConfirm(null);
   }
 
   async function handleConfirmPrecioModal() {
@@ -1313,6 +1342,47 @@ export function EquiposAsicPage() {
           ) : null}
         </AppModal>
 
+        <AppModal
+          open={Boolean(hashratePartDeleteConfirm)}
+          onOpenChange={(open) => {
+            if (!open) handleHashratePartDeleteCancel();
+          }}
+          title="Eliminar parte de hashrate"
+          footer={
+            <Flex gap={2} w="100%" justify="flex-end" wrap="wrap">
+              <AppButton variant="outline" onClick={handleHashratePartDeleteCancel}>
+                Cancelar
+              </AppButton>
+              <AppButton colorPalette="red" onClick={handleHashratePartDeleteConfirm}>
+                Eliminar
+              </AppButton>
+            </Flex>
+          }
+        >
+          {hashratePartDeleteConfirm ? (
+            <>
+              <Text mb={2}>Vas a eliminar esta parte de configuración:</Text>
+              <Box as="ul" fontSize="sm" color="gray.600" pl={5} mb={0}>
+                <li>
+                  <Text as="span" fontWeight="semibold" color="gray.800">
+                    {hashratePartDeleteConfirm.sharePct}%
+                  </Text>{" "}
+                  de hashrate
+                </li>
+                <li>
+                  Setup:{" "}
+                  <Text as="span" fontWeight="semibold" color="gray.800">
+                    {hashratePartDeleteConfirm.setupUsd} USD
+                  </Text>
+                </li>
+              </Box>
+              <Text color="red.600" fontSize="sm" fontWeight="bold" mt={3} mb={0}>
+                Esta acción no se puede deshacer.
+              </Text>
+            </>
+          ) : null}
+        </AppModal>
+
         {detailEquipo && equipoDetailModalProduct ? (
           <AsicProductModal
             product={equipoDetailModalProduct}
@@ -1832,21 +1902,17 @@ export function EquiposAsicPage() {
                                                 />
                                               </td>
                                               <td>
-                                                <Button
+                                                <button
                                                   type="button"
-                                                  size="xs"
-                                                  variant="outline"
-                                                  colorPalette="red"
-                                                  onClick={() =>
-                                                    setFormData((prev) => ({
-                                                      ...prev,
-                                                      marketplaceHashrateParts: prev.marketplaceHashrateParts.filter((_, i) => i !== idx),
-                                                    }))
-                                                  }
+                                                  className="btn btn-danger btn-sm"
+                                                  style={{ padding: "0.35rem 0.75rem", fontSize: "0.8125rem" }}
+                                                  onClick={() => handleHashratePartDeleteRequest(idx)}
                                                   disabled={formData.marketplaceHashrateParts.length <= 1}
+                                                  title="Quitar parte"
+                                                  aria-label="Quitar parte"
                                                 >
-                                                  Quitar
-                                                </Button>
+                                                  <i className="bi bi-trash" aria-hidden />
+                                                </button>
                                               </td>
                                             </tr>
                                           ))}
@@ -1864,7 +1930,8 @@ export function EquiposAsicPage() {
                                       <Button
                                         type="button"
                                         size="sm"
-                                        variant="outline"
+                                        variant="plain"
+                                        className="fact-btn fact-btn-primary"
                                         onClick={() =>
                                           setFormData((prev) => ({
                                             ...prev,
@@ -1880,7 +1947,8 @@ export function EquiposAsicPage() {
                                       <Button
                                         type="button"
                                         size="sm"
-                                        variant="ghost"
+                                        variant="plain"
+                                        className="fact-btn fact-btn-secondary"
                                         onClick={() =>
                                           setFormData((prev) => ({
                                             ...prev,

@@ -54,6 +54,21 @@ export const env: Env = EnvSchema.parse(process.env);
   }
 })();
 
+(() => {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = process.env.RESEND_FROM_EMAIL?.trim();
+  const to = (process.env.MARKETPLACE_NOTIFY_EMAIL_TO || "sales@hashrate.space").trim();
+  if (apiKey && from) {
+    // eslint-disable-next-line no-console
+    console.log(`[email] Avisos marketplace por email: activos (destino: ${to}).`);
+  } else {
+    // eslint-disable-next-line no-console
+    console.log(
+      "[email] Avisos marketplace por email: no configurados. Definí RESEND_API_KEY y RESEND_FROM_EMAIL en .env."
+    );
+  }
+})();
+
 if (env.NODE_ENV === "production") {
   if (env.JWT_SECRET.length < 32) {
     console.warn("[seguridad] JWT_SECRET debería tener al menos 32 caracteres en producción.");

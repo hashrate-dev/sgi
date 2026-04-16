@@ -7,6 +7,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { db, getDb } from "../db.js";
 import { notifyMarketplaceOrderWhatsApp } from "../lib/whatsappCloud.js";
+import { notifyMarketplaceOrderEmail } from "../lib/marketplaceOrderEmail.js";
 import { resolveSetupCompraHashrateUsd, resolveSetupEquipoCompletoUsd } from "../lib/marketplaceSetupHashratePrice.js";
 import {
   loadGarantiaQuoteRows,
@@ -661,6 +662,12 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
       }
       const prevStatus = String(existing.status ?? "").trim();
       if (isSubmitTicket && nextStatus === "enviado_consulta" && prevStatus === "borrador") {
+        void notifyMarketplaceOrderEmail({
+          orderNumber,
+          ticketCode: existing.ticket_code,
+          contactEmail: contactEmail ?? "",
+          subtotalUsd: subtotal,
+        }).catch((e) => console.error("[email] marketplace order notify:", e));
         void notifyMarketplaceOrderWhatsApp({
           orderNumber,
           ticketCode: existing.ticket_code,
@@ -739,6 +746,12 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
         });
         insertOk = true;
         if (isSubmitTicket && initialStatus === "enviado_consulta") {
+          void notifyMarketplaceOrderEmail({
+            orderNumber: created.orderNumber,
+            ticketCode: code,
+            contactEmail: contactEmail ?? "",
+            subtotalUsd: subtotal,
+          }).catch((e) => console.error("[email] marketplace order notify:", e));
           void notifyMarketplaceOrderWhatsApp({
             orderNumber: created.orderNumber,
             ticketCode: code,

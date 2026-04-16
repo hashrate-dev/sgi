@@ -83,10 +83,27 @@ export function ConfirmModal({
       closeOnInteractOutside={!confirmPending}
     >
       <Portal>
-        <Dialog.Backdrop zIndex={elevated ? 1400 : undefined} />
-        <Dialog.Positioner zIndex={elevated ? 1401 : undefined}>
-          <Dialog.Content borderWidth="1px" borderColor={`${colorPalette}.300`} borderRadius="lg">
-            <Dialog.Header bg={`${colorPalette}.50`}>
+        <Dialog.Backdrop zIndex={elevated ? 1400 : undefined} bg="blackAlpha.600" />
+        <Dialog.Positioner zIndex={elevated ? 1401 : undefined} px={4} py={8}>
+          <Dialog.Content
+            borderRadius="xl"
+            overflow="hidden"
+            boxShadow="xl"
+            borderWidth="1px"
+            borderColor="gray.200"
+            maxW="min(100%, 520px)"
+            bg="white"
+            display="flex"
+            flexDirection="column"
+          >
+            <Dialog.Header
+              px={6}
+              pt={5}
+              pb={4}
+              borderBottomWidth="1px"
+              borderColor="gray.100"
+              bg={`${colorPalette}.50`}
+            >
               <Flex align="center" gap={3} w="100%">
                 <Box w="28px" h="28px" color={`${colorPalette}.600`}>
                   {variant === "delete" ? <DeleteDangerIcon /> : <DocIcon />}
@@ -96,17 +113,19 @@ export function ConfirmModal({
                   <CloseButton
                     size="sm"
                     ml="auto"
-                    onClick={onCancel}
+                    mt={-0.5}
+                    borderRadius="md"
+                    colorPalette="gray"
                     disabled={confirmPending}
                     aria-label="Cerrar"
                   />
                 </Dialog.CloseTrigger>
               </Flex>
             </Dialog.Header>
-            <Dialog.Body>
-              <Text fontSize="md" color="gray.700" mb={warningText ? 4 : 0}>
+            <Dialog.Body px={6} py={6}>
+              <Box fontSize="md" color="gray.700" mb={warningText ? 4 : 0}>
                 {message}
-              </Text>
+              </Box>
               {warningText ? (
                 <Box borderWidth="1px" borderColor={`${colorPalette}.300`} bg={`${colorPalette}.50`} borderRadius="md" p={3}>
                   <Text color={`${colorPalette}.800`} fontSize="sm" fontWeight="medium">
@@ -115,11 +134,24 @@ export function ConfirmModal({
                 </Box>
               ) : null}
             </Dialog.Body>
-            <Dialog.Footer>
-              <AppButton variant="outline" onClick={onCancel} disabled={confirmPending}>
+            <Dialog.Footer
+              px={6}
+              py={4}
+              borderTopWidth="1px"
+              borderColor="gray.100"
+              bg="gray.50"
+              display="flex"
+              justifyContent="flex-end"
+              alignItems="center"
+              gap={3}
+              flexWrap="wrap"
+              rowGap={3}
+              flexShrink={0}
+            >
+              <AppButton variant="outline" onClick={onCancel} disabled={confirmPending} minH="42px" px={5}>
                 {cancelLabel}
               </AppButton>
-              <AppButton onClick={onConfirm} disabled={confirmPending} loading={confirmPending}>
+              <AppButton onClick={onConfirm} disabled={confirmPending} loading={confirmPending} minH="42px" px={5}>
                 {confirmPending ? confirmPendingLabel : confirmLabel}
               </AppButton>
             </Dialog.Footer>
