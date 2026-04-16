@@ -232,9 +232,11 @@ export function TiendaOnlineBannersHomePage() {
                   checked={isEditionLocked}
                   onChange={(ev) => setIsEditionLocked(ev.target.checked)}
                 />
-                <Text as="label" htmlFor="tienda-home-banners-lock" fontWeight="bold" color="gray.800">
-                  Bloquear cambios de banners
-                </Text>
+                <label htmlFor="tienda-home-banners-lock" style={{ cursor: "pointer" }}>
+                  <Text as="span" fontWeight="bold" color="gray.800">
+                    Bloquear cambios de banners
+                  </Text>
+                </label>
               </Flex>
               <Badge colorPalette={isEditionLocked ? "orange" : "green"} variant="solid" borderRadius="full" px={3} py={1}>
                 {isEditionLocked ? "Protegido" : "Editable"}

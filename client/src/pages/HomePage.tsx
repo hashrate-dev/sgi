@@ -42,7 +42,6 @@ const ICON_SLOT_PROPS = {
 };
 
 /** Tamaño uniforme de iconos Bootstrap en tarjetas del home (rellena más el recuadre) */
-const DASHBOARD_BI_ICON_SIZE = "2.125rem";
 const DASHBOARD_BI_ICON_SIZE_LG = "3rem";
 
 /** Enlace que ocupa toda la celda del grid para igualar alturas entre tarjetas (misma fila = misma altura) */

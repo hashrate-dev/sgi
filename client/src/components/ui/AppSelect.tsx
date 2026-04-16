@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import { Field, NativeSelect, type FieldRootProps, type NativeSelectFieldProps } from "@chakra-ui/react";
 
 type AppSelectProps = NativeSelectFieldProps & {
@@ -5,14 +6,18 @@ type AppSelectProps = NativeSelectFieldProps & {
   helperText?: string;
   errorText?: string;
   rootProps?: Omit<FieldRootProps, "invalid">;
+  size?: ComponentProps<typeof NativeSelect.Root>["size"];
+  disabled?: boolean;
 };
 
-export function AppSelect({ label, helperText, errorText, children, rootProps, ...fieldProps }: AppSelectProps) {
+export function AppSelect({ label, helperText, errorText, children, rootProps, size, disabled, ...fieldProps }: AppSelectProps) {
   return (
     <Field.Root invalid={Boolean(errorText)} {...rootProps}>
       {label ? <Field.Label>{label}</Field.Label> : null}
-      <NativeSelect.Root>
-        <NativeSelect.Field {...fieldProps}>{children}</NativeSelect.Field>
+      <NativeSelect.Root size={size} disabled={disabled}>
+        <NativeSelect.Field {...fieldProps}>
+          {children}
+        </NativeSelect.Field>
         <NativeSelect.Indicator />
       </NativeSelect.Root>
       {helperText ? <Field.HelperText>{helperText}</Field.HelperText> : null}

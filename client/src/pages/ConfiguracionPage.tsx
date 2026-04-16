@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link as RouterLink } from "react-router-dom";
 import { Box, Flex, Grid, Heading, Text } from "@chakra-ui/react";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
@@ -20,12 +20,7 @@ type ConfigCardItem = { to: string; icon: string; label: string; desc: string };
 
 function ConfigMenuCard(item: ConfigCardItem) {
   return (
-    <Box
-      as={Link}
-      to={item.to}
-      textDecoration="none"
-      _hover={{ textDecoration: "none" }}
-    >
+    <RouterLink to={item.to} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
       <AppCard
         className="reportes-card mineria-hub-card"
         h="100%"
@@ -51,7 +46,7 @@ function ConfigMenuCard(item: ConfigCardItem) {
           {item.desc}
         </Text>
       </AppCard>
-    </Box>
+    </RouterLink>
   );
 }
 
