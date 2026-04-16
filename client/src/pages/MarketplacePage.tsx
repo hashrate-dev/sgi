@@ -23,7 +23,7 @@ import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
 import { marketplaceLocale } from "../lib/i18n.js";
 import "../styles/marketplace-hashrate.css";
 
-const DOC_TITLE = "HashrateSpace - Marketplace";
+const DOC_TITLE = "Hashrate Space - Marketplace";
 const DOC_DESC =
   "Equipos ASIC para minería de Bitcoin y Scrypt. Hashrate Space — Paraguay y Uruguay: infraestructura, energía y soporte.";
 
