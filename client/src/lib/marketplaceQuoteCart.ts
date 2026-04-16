@@ -6,6 +6,7 @@ import type { AsicProduct } from "./marketplaceAsicCatalog.js";
 import {
   formatAsicPriceUsd,
   normalizeConsultPriceLabelForDisplay,
+  productHashrateShareParts,
   proratedEquipmentPriceUsd,
 } from "./marketplaceAsicCatalog.js";
 import {
@@ -64,6 +65,8 @@ function roundSetupUsd(n: unknown, fallback: number): number {
 /** Precio setup por unidad según la línea (100% → S02; 25/50/75 → S03). */
 export function quoteCartSetupUnitUsd(l: QuoteCartLine, pricing?: QuoteCartPricing): number {
   const pct = lineHashrateSharePct(l);
+  const setupPerPart = Number(l.hashrateSetupUsd);
+  if (Number.isFinite(setupPerPart) && setupPerPart >= 0) return Math.round(setupPerPart);
   const full = roundSetupUsd(pricing?.setupEquipoCompletoUsd, QUOTE_ADDON_SETUP_USD_FALLBACK);
   const share = roundSetupUsd(pricing?.setupCompraHashrateUsd, QUOTE_ADDON_SETUP_USD_FALLBACK);
   return pct < 100 ? share : full;
@@ -78,8 +81,12 @@ export type QuoteCartLine = {
   priceUsd: number;
   /** Precio formateado al momento de agregar (evita inconsistencias si cambia el catálogo). */
   priceLabel: string;
-  /** Fracción de hashrate de 1 equipo (omitido = equipo completo). Solo algunos modelos. */
-  hashrateSharePct?: 25 | 50 | 75;
+  /** Fracción de hashrate de 1 equipo (omitido = equipo completo). */
+  hashrateSharePct?: number;
+  /** % de garantía aplicado para la parte (sobre garantía total del equipo). */
+  hashrateWarrantyPct?: number;
+  /** Setup USD por parte configurado para este equipo (si aplica). */
+  hashrateSetupUsd?: number;
   /** Setup / instalación en granja (S02 equipo completo, S03 fracción hashrate). */
   includeSetup: boolean;
   /** Garantía ANDE (precio por ítem en gestión o fallback). */
@@ -88,7 +95,7 @@ export type QuoteCartLine = {
 
 export function quoteCartWarrantyUnitUsd(l: QuoteCartLine, pricing?: QuoteCartPricing): number {
   return resolveWarrantyUsdForQuoteLine(
-    { productId: l.productId, brand: l.brand, model: l.model },
+    { productId: l.productId, brand: l.brand, model: l.model, hashrate: l.hashrate },
     pricing?.garantiaItems
   );
 }
@@ -137,12 +144,14 @@ const MAX_QTY = 99;
 
 /** Clave única por producto + fracción de hashrate (misma máquina 100% y 25% = dos líneas). */
 export function quoteCartLineKey(l: Pick<QuoteCartLine, "productId" | "hashrateSharePct">): string {
-  return `${l.productId}:${l.hashrateSharePct ?? 100}`;
+  const n = Math.round(Number(l.hashrateSharePct));
+  const shareKey = Number.isFinite(n) && n >= 1 && n <= 100 ? String(n) : "full";
+  return `${l.productId}:${shareKey}`;
 }
 
 export function lineHashrateSharePct(l: QuoteCartLine): number {
-  const n = l.hashrateSharePct;
-  if (n === 25 || n === 50 || n === 75) return n;
+  const n = Math.round(Number(l.hashrateSharePct));
+  if (Number.isFinite(n) && n >= 1 && n <= 100) return n;
   return 100;
 }
 
@@ -165,8 +174,14 @@ function parseLine(x: unknown): QuoteCartLine | null {
   const includeSetup = x.includeSetup === true;
   const includeWarranty = x.includeWarranty === true;
   const rawShare = Number(x.hashrateSharePct);
-  const hashrateSharePct =
-    rawShare === 25 || rawShare === 50 || rawShare === 75 ? rawShare : undefined;
+  const hashrateSharePct = Number.isFinite(rawShare) && rawShare >= 1 && rawShare <= 100 ? Math.round(rawShare) : undefined;
+  const rawWarrantyPct = Number(x.hashrateWarrantyPct);
+  const hashrateWarrantyPct =
+    Number.isFinite(rawWarrantyPct) && rawWarrantyPct >= 0 && rawWarrantyPct <= 100
+      ? Math.round(rawWarrantyPct)
+      : undefined;
+  const rawSetupUsd = Number(x.hashrateSetupUsd);
+  const hashrateSetupUsd = Number.isFinite(rawSetupUsd) && rawSetupUsd >= 0 ? Math.round(rawSetupUsd) : undefined;
   if (!productId) return null;
   return {
     productId,
@@ -177,6 +192,8 @@ function parseLine(x: unknown): QuoteCartLine | null {
     priceUsd,
     priceLabel,
     ...(hashrateSharePct != null ? { hashrateSharePct } : {}),
+    ...(hashrateWarrantyPct != null ? { hashrateWarrantyPct } : {}),
+    ...(hashrateSetupUsd != null ? { hashrateSetupUsd } : {}),
     includeSetup,
     includeWarranty,
   };
@@ -201,8 +218,8 @@ export function marketplaceQuoteTicketLineDisplayName(
   const productId = String(row.productId ?? "").trim();
   const base = [brand, model].filter(Boolean).join(" ").trim() || productId || "—";
   const hr = String(row.hashrate ?? "").trim();
-  const rawShare = Number(row.hashrateSharePct);
-  const sharePct = rawShare === 25 || rawShare === 50 || rawShare === 75 ? rawShare : null;
+  const rawShare = Math.round(Number(row.hashrateSharePct));
+  const sharePct = Number.isFinite(rawShare) && rawShare >= 1 && rawShare < 100 ? rawShare : null;
   let out = base;
   if (hr) out = `${out} · ${hr}`;
   if (includeShare && sharePct != null) out = `${out} (${sharePct}% hashrate)`;
@@ -265,7 +282,7 @@ export function writeQuoteCartToStorage(lines: QuoteCartLine[]): void {
 
 export type AddQuoteLineOptions = {
   /** Fracción de hashrate (omitir = equipo completo). */
-  hashrateSharePct?: 25 | 50 | 75;
+  hashrateSharePct?: number;
 };
 
 function equipmentPriceLabelForLine(product: AsicProduct, sharePct: number): string {
@@ -280,8 +297,10 @@ function equipmentPriceLabelForLine(product: AsicProduct, sharePct: number): str
 
 export function productToQuoteLine(product: AsicProduct, qty: number, opts?: AddQuoteLineOptions): QuoteCartLine {
   const q = Math.min(MAX_QTY, Math.max(1, Math.round(qty) || 1));
-  const share = opts?.hashrateSharePct;
-  const pct = share === 25 || share === 50 || share === 75 ? share : 100;
+  const hasShare = opts?.hashrateSharePct != null;
+  const share = Math.round(Number(opts?.hashrateSharePct));
+  const pct = Number.isFinite(share) && share >= 1 && share <= 100 ? share : 100;
+  const sharePart = hasShare ? productHashrateShareParts(product).find((x) => x.sharePct === pct) : undefined;
   const priceUsd = proratedEquipmentPriceUsd(product, pct);
   const line: QuoteCartLine = {
     productId: product.id,
@@ -294,7 +313,13 @@ export function productToQuoteLine(product: AsicProduct, qty: number, opts?: Add
     includeSetup: true,
     includeWarranty: true,
   };
-  if (pct === 25 || pct === 50 || pct === 75) line.hashrateSharePct = pct;
+  if (hasShare) {
+    line.hashrateSharePct = pct;
+    if (sharePart) {
+      line.hashrateWarrantyPct = pct;
+      line.hashrateSetupUsd = sharePart.setupUsd;
+    }
+  }
   return line;
 }
 
@@ -305,12 +330,14 @@ export function mergeAddLine(
   opts?: AddQuoteLineOptions
 ): QuoteCartLine[] {
   const q = Math.min(MAX_QTY, Math.max(1, Math.round(addQty) || 1));
-  const share = opts?.hashrateSharePct;
-  const pct = share === 25 || share === 50 || share === 75 ? share : 100;
-  const idx = prev.findIndex((l) => l.productId === product.id && lineHashrateSharePct(l) === pct);
+  const hasShare = opts?.hashrateSharePct != null;
+  const share = Math.round(Number(opts?.hashrateSharePct));
+  const pct = Number.isFinite(share) && share >= 1 && share <= 100 ? share : 100;
+  const key = quoteCartLineKey({ productId: product.id, hashrateSharePct: hasShare ? pct : undefined });
+  const idx = prev.findIndex((l) => quoteCartLineKey(l) === key);
   if (idx < 0) {
     const addOpts: AddQuoteLineOptions | undefined =
-      pct === 25 || pct === 50 || pct === 75 ? { hashrateSharePct: pct } : undefined;
+      hasShare ? { hashrateSharePct: pct } : undefined;
     return [...prev, productToQuoteLine(product, q, addOpts)];
   }
   const next = [...prev];
@@ -328,8 +355,18 @@ export function mergeAddLine(
     includeSetup: cur.includeSetup,
     includeWarranty: cur.includeWarranty,
   };
-  if (pct === 25 || pct === 50 || pct === 75) base.hashrateSharePct = pct;
-  else delete base.hashrateSharePct;
+  if (hasShare) {
+    const sharePart = productHashrateShareParts(product).find((x) => x.sharePct === pct);
+    base.hashrateSharePct = pct;
+    if (sharePart) {
+      base.hashrateWarrantyPct = pct;
+      base.hashrateSetupUsd = sharePart.setupUsd;
+    }
+  } else {
+    delete base.hashrateSharePct;
+    delete base.hashrateWarrantyPct;
+    delete base.hashrateSetupUsd;
+  }
   next[idx] = base;
   return next;
 }
@@ -353,11 +390,12 @@ function shareAddonMult(l: QuoteCartLine): number {
  * La garantía sigue prorrateada al % cuando la línea es porción (25/50/75).
  */
 export function quoteCartLineAddonsUsd(l: QuoteCartLine, pricing?: QuoteCartPricing): number {
-  if (quoteCartLineIsEquipmentPricePending(l)) return 0;
+  const pendingEquipmentPrice = quoteCartLineIsEquipmentPricePending(l);
   const setupUnit = quoteCartSetupUnitUsd(l, pricing);
   const m = shareAddonMult(l);
   let a = 0;
-  if (l.includeSetup) a += l.qty * setupUnit;
+  // Con equipo "Solicita precio", setup se cotiza luego; garantía sí usa precio del sistema.
+  if (l.includeSetup && !pendingEquipmentPrice) a += l.qty * setupUnit;
   if (l.includeWarranty) a += Math.round(l.qty * quoteCartWarrantyUnitUsd(l, pricing) * m);
   return a;
 }
@@ -372,34 +410,44 @@ export function quoteCartSubtotalUsd(lines: QuoteCartLine[], pricing?: QuoteCart
 
 /** % hashrate desde ítem persistido en ticket (JSON). */
 export function ticketRowSharePct(row: Record<string, unknown>): number {
-  const raw = Number(row.hashrateSharePct);
-  if (raw === 25 || raw === 50 || raw === 75) return raw;
+  const raw = Math.round(Number(row.hashrateSharePct));
+  if (Number.isFinite(raw) && raw >= 1 && raw <= 100) return raw;
   return 100;
+}
+
+function ticketRowSetupUsd(row: Record<string, unknown>): number | null {
+  const raw = Math.round(Number(row.hashrateSetupUsd));
+  if (Number.isFinite(raw) && raw >= 0) return raw;
+  return null;
 }
 
 /** Subtotal de una línea de ticket (misma lógica que carrito). */
 export function ticketRowLineSubtotalUsd(row: Record<string, unknown>, pricing?: QuoteCartPricing): number {
   const qty = Number(row.qty) || 0;
   const pu = Number(row.priceUsd) || 0;
-  if (ticketRowIsEquipmentPricePending(row)) return qty * pu;
+  const pendingEquipmentPrice = ticketRowIsEquipmentPricePending(row);
   const pct = ticketRowSharePct(row);
+  const setupFromRow = ticketRowSetupUsd(row);
   const setupUnit =
-    pct < 100
-      ? roundSetupUsd(pricing?.setupCompraHashrateUsd, QUOTE_ADDON_SETUP_USD_FALLBACK)
-      : roundSetupUsd(pricing?.setupEquipoCompletoUsd, QUOTE_ADDON_SETUP_USD_FALLBACK);
-  const m = pct / 100;
+    setupFromRow != null
+      ? setupFromRow
+      : pct < 100
+        ? roundSetupUsd(pricing?.setupCompraHashrateUsd, QUOTE_ADDON_SETUP_USD_FALLBACK)
+        : roundSetupUsd(pricing?.setupEquipoCompletoUsd, QUOTE_ADDON_SETUP_USD_FALLBACK);
+  const mWarranty = pct / 100;
   let sub = qty * pu;
-  if (row.includeSetup === true) sub += qty * setupUnit;
+  if (row.includeSetup === true && !pendingEquipmentPrice) sub += qty * setupUnit;
   if (row.includeWarranty === true) {
     const wu = resolveWarrantyUsdForQuoteLine(
       {
         productId: String(row.productId ?? ""),
         brand: String(row.brand ?? ""),
         model: String(row.model ?? ""),
+        hashrate: String(row.hashrate ?? ""),
       },
       pricing?.garantiaItems
     );
-    sub += Math.round(qty * wu * m);
+    sub += Math.round(qty * wu * mWarranty);
   }
   return sub;
 }
@@ -442,19 +490,15 @@ export function buildQuoteMessage(
         }
       }
       if (l.includeWarranty) {
-        if (pending) {
-          addons.push(`Garantía: importe a cotizar con el equipo comercial de Hashrate (×${l.qty} u.)`);
-        } else {
-          const unit = Math.round(quoteCartWarrantyUnitUsd(l, pricing) * m);
-          addons.push(
-            `Garantía: ${unit.toLocaleString("es-PY")} USD × ${l.qty} u. = ${(l.qty * unit).toLocaleString("es-PY")} USD`
-          );
-        }
+        const unit = Math.round(quoteCartWarrantyUnitUsd(l, pricing) * m);
+        addons.push(
+          `Garantía: ${unit.toLocaleString("es-PY")} USD × ${l.qty} u. = ${(l.qty * unit).toLocaleString("es-PY")} USD`
+        );
       }
       const addonBlock = addons.length ? `\n   ${addons.join("\n   ")}` : "";
       const sub = quoteCartLineSubtotalUsd(l, pricing);
       const subLine = pending
-        ? "Subtotal línea: pendiente de cotización (equipo / setup / garantía)"
+        ? "Subtotal línea: equipo/setup a cotizar + garantía desde tarifa del sistema"
         : `Subtotal línea: ${sub.toLocaleString("es-PY")} USD`;
       return (
         `${i + 1}) ${l.brand} ${l.model} — ${l.hashrate}${shareNote}\n` +

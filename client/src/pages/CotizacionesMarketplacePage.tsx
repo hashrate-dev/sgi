@@ -397,6 +397,7 @@ export function CotizacionesMarketplacePage() {
                           productId: String(row.productId ?? ""),
                           brand: String(row.brand ?? ""),
                           model: String(row.model ?? ""),
+                          hashrate: String(row.hashrate ?? ""),
                         },
                         garantiaQuoteItems
                       ) * shareMult

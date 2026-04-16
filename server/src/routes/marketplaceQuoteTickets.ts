@@ -26,13 +26,17 @@ function isPg(): boolean {
 const LineSchema = z.object({
   productId: z.string().min(1).max(200),
   qty: z.number().int().min(1).max(99),
+  /** Compat legado: se ignora para cálculos (precio/metadata se resuelve server-side por productId). */
   brand: z.string().max(200).default(""),
   model: z.string().max(200).default(""),
   hashrate: z.string().max(200).default(""),
-  priceUsd: z.number().min(0).max(999999999),
+  priceUsd: z.number().min(0).max(999999999).optional(),
   priceLabel: z.string().max(120).default(""),
-  /** 25/50/75 = fracción de hashrate de 1 equipo; omitido o 100 = equipo completo */
-  hashrateSharePct: z.union([z.literal(25), z.literal(50), z.literal(75)]).optional(),
+  /** Fracción de hashrate de 1 equipo; omitido o 100 = equipo completo */
+  hashrateSharePct: z.number().int().min(1).max(100).optional(),
+  /** Compat: el servidor recalcula estos valores según configuración del equipo. */
+  hashrateWarrantyPct: z.number().int().min(0).max(100).optional(),
+  hashrateSetupUsd: z.number().int().min(0).max(999999).optional(),
   includeSetup: z.boolean().optional().default(false),
   includeWarranty: z.boolean().optional().default(false),
 });
@@ -51,6 +55,59 @@ const TICKET_SELECT =
   "t.id, t.session_id, t.order_number, t.ticket_code, t.status, t.items_json, t.subtotal_usd, t.line_count, t.unit_count, t.created_at, t.updated_at, t.last_contact_channel, t.contacted_at, t.notes_admin, t.ip_address, t.user_agent, t.user_id, t.contact_email, u.email AS user_join_email";
 const TICKET_FROM = "marketplace_quote_tickets t LEFT JOIN users u ON u.id = t.user_id";
 
+type QuoteLine = z.infer<typeof LineSchema>;
+type TrustedQuoteLine = Omit<QuoteLine, "priceUsd"> & { priceUsd: number };
+
+type SharePartRule = { sharePct: number; warrantyPct: number; setupUsd: number };
+
+function parseSharePartRules(raw: string | null | undefined): SharePartRule[] {
+  if (!raw?.trim()) return [];
+  try {
+    const v = JSON.parse(raw) as unknown;
+    if (!Array.isArray(v)) return [];
+    const out: SharePartRule[] = [];
+    for (const it of v) {
+      if (!it || typeof it !== "object") continue;
+      const o = it as { sharePct?: unknown; warrantyPct?: unknown; setupUsd?: unknown };
+      const sharePct = Math.round(Number(o.sharePct));
+      const setupUsd = Math.round(Number(o.setupUsd));
+      if (!Number.isFinite(sharePct) || sharePct <= 0 || sharePct > 100) continue;
+      if (!Number.isFinite(setupUsd) || setupUsd < 0 || setupUsd > 999999) continue;
+      out.push({ sharePct, warrantyPct: sharePct, setupUsd });
+    }
+    const uniq = new Map<number, SharePartRule>();
+    for (const it of out) uniq.set(it.sharePct, it);
+    return Array.from(uniq.values()).sort((a, b) => b.sharePct - a.sharePct);
+  } catch {
+    return [];
+  }
+}
+
+class QuoteValidationError extends Error {
+  statusCode: number;
+
+  constructor(message: string, statusCode = 400) {
+    super(message);
+    this.name = "QuoteValidationError";
+    this.statusCode = statusCode;
+  }
+}
+
+function isUniqueConstraintError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  const code = typeof e === "object" && e != null && "code" in e ? String((e as { code?: unknown }).code ?? "") : "";
+  return code === "23505" || msg.includes("UNIQUE") || msg.includes("unique");
+}
+
+function logQuoteRouteError(scope: string, e: unknown): void {
+  console.error(`[marketplace-quote] ${scope}:`, e);
+}
+
+function sendInternalError(res: Response, scope: string, e: unknown): Response {
+  logQuoteRouteError(scope, e);
+  return res.status(500).json({ error: { message: "Error interno del servidor." } });
+}
+
 function genTicketCode(): string {
   const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
   let s = "";
@@ -65,8 +122,8 @@ function clientIp(req: Request): string | null {
 }
 
 function lineShareMult(l: z.infer<typeof LineSchema>): number {
-  const p = l.hashrateSharePct;
-  if (p === 25 || p === 50 || p === 75) return p / 100;
+  const p = Math.round(Number(l.hashrateSharePct));
+  if (Number.isFinite(p) && p >= 1 && p <= 100) return p / 100;
   return 1;
 }
 
@@ -75,8 +132,12 @@ function setupUsdForLine(
   setupEquipoCompletoUsd: number,
   setupCompraHashrateUsd: number
 ): number {
-  const p = l.hashrateSharePct;
-  if (p === 25 || p === 50 || p === 75) return Math.max(0, Math.round(setupCompraHashrateUsd)) || 50;
+  const p = Math.round(Number(l.hashrateSharePct));
+  if (Number.isFinite(p) && p >= 1 && p <= 100) {
+    const setupUsd = Math.round(Number(l.hashrateSetupUsd));
+    if (Number.isFinite(setupUsd) && setupUsd >= 0) return setupUsd;
+    if (p < 100) return Math.max(0, Math.round(setupCompraHashrateUsd)) || 50;
+  }
   return Math.max(0, Math.round(setupEquipoCompletoUsd)) || 50;
 }
 
@@ -88,19 +149,111 @@ function lineEquipmentPricePending(l: { priceUsd: number; priceLabel: string }):
   return true;
 }
 
+type ServerCatalogRow = {
+  id: string;
+  marca_equipo: string;
+  modelo: string;
+  procesador: string;
+  precio_usd: number;
+  mp_hashrate_sell_enabled: number | boolean | null;
+  mp_hashrate_parts_json: string | null;
+  mp_price_label: string | null;
+};
+
+async function resolveTrustedQuoteLines(lines: QuoteLine[]): Promise<TrustedQuoteLine[]> {
+  if (lines.length === 0) return [];
+  const ids = Array.from(new Set(lines.map((l) => l.productId.trim()).filter(Boolean)));
+  if (ids.length === 0) return [];
+
+  const placeholders = ids.map(() => "?").join(", ");
+  let rows: ServerCatalogRow[];
+  try {
+    rows = (await db
+      .prepare(
+        `SELECT id, marca_equipo, modelo, procesador, precio_usd, mp_hashrate_sell_enabled, mp_hashrate_parts_json, mp_price_label
+         FROM equipos_asic WHERE id IN (${placeholders})`
+      )
+      .all(...ids)) as ServerCatalogRow[];
+  } catch (e) {
+    const m = e instanceof Error ? e.message : String(e);
+    if (m.toLowerCase().includes("mp_hashrate_sell_enabled") || m.toLowerCase().includes("mp_hashrate_parts_json")) {
+      type LegacyRow = Omit<ServerCatalogRow, "mp_hashrate_sell_enabled" | "mp_hashrate_parts_json">;
+      const legacyRows = (await db
+        .prepare(
+          `SELECT id, marca_equipo, modelo, procesador, precio_usd, mp_price_label
+           FROM equipos_asic WHERE id IN (${placeholders})`
+        )
+        .all(...ids)) as LegacyRow[];
+      rows = legacyRows.map((r) => ({
+        ...r,
+        mp_hashrate_sell_enabled: 0,
+        mp_hashrate_parts_json: null,
+      }));
+    } else {
+      throw e;
+    }
+  }
+
+  const byId = new Map(rows.map((r) => [String(r.id), r] as const));
+  const missing = ids.filter((id) => !byId.has(id));
+  if (missing.length > 0) {
+    throw new QuoteValidationError("Uno o más productos ya no están disponibles para cotizar.", 409);
+  }
+
+  return lines.map((line) => {
+    const server = byId.get(line.productId)!;
+    const sharePctRaw = Math.round(Number(line.hashrateSharePct));
+    const hasSharePct =
+      Object.prototype.hasOwnProperty.call(line, "hashrateSharePct") &&
+      Number.isFinite(sharePctRaw) &&
+      sharePctRaw >= 1 &&
+      sharePctRaw <= 100;
+    const sharePct = hasSharePct ? sharePctRaw : 100;
+    const shareRules = parseSharePartRules(server.mp_hashrate_parts_json);
+    const shareEnabled =
+      (server.mp_hashrate_sell_enabled === true || Number(server.mp_hashrate_sell_enabled) === 1) &&
+      shareRules.length > 0;
+    const matchedRule = hasSharePct ? shareRules.find((x) => x.sharePct === sharePct) : undefined;
+    if (hasSharePct && (!shareEnabled || !matchedRule)) {
+      throw new QuoteValidationError("La fracción de hashrate seleccionada no está habilitada para este equipo.", 400);
+    }
+    const basePriceUsd = Math.max(0, Math.round(Number(server.precio_usd) || 0));
+    const priceUsd = hasSharePct ? Math.max(0, Math.round((basePriceUsd * sharePct) / 100)) : basePriceUsd;
+    const fallbackLabel = priceUsd > 0 ? `${priceUsd} USD` : "SOLICITA PRECIO";
+    const priceLabel = String(server.mp_price_label ?? "").trim() || fallbackLabel;
+    return {
+      productId: line.productId,
+      qty: line.qty,
+      brand: String(server.marca_equipo ?? "").trim(),
+      model: String(server.modelo ?? "").trim(),
+      hashrate: String(server.procesador ?? "").trim(),
+      priceUsd,
+      priceLabel,
+      ...(hasSharePct ? { hashrateSharePct: sharePct } : {}),
+      ...(matchedRule ? { hashrateWarrantyPct: matchedRule.warrantyPct, hashrateSetupUsd: matchedRule.setupUsd } : {}),
+      includeSetup: Boolean(line.includeSetup),
+      includeWarranty: Boolean(line.includeWarranty),
+    };
+  });
+}
+
 function computeTotals(
-  lines: z.infer<typeof LineSchema>[],
+  lines: TrustedQuoteLine[],
   setupEquipoCompletoUsd: number,
   setupCompraHashrateUsd: number,
   garantiaItems: GarantiaQuoteRow[]
 ) {
   const subtotal = lines.reduce((a, l) => {
+    const pendingEquipmentPrice = lineEquipmentPricePending(l);
     let row = l.qty * l.priceUsd;
-    if (lineEquipmentPricePending(l)) return a + row;
-    if (l.includeSetup) row += l.qty * setupUsdForLine(l, setupEquipoCompletoUsd, setupCompraHashrateUsd);
+    /**
+     * Garantía SIEMPRE se toma del sistema (`items_garantia_ande`) aunque el equipo esté en "Solicita precio".
+     * Setup se mantiene a cotizar cuando no hay precio publicado del equipo.
+     */
+    if (l.includeSetup && !pendingEquipmentPrice) row += l.qty * setupUsdForLine(l, setupEquipoCompletoUsd, setupCompraHashrateUsd);
     if (l.includeWarranty) {
       const wu = resolveWarrantyUsdForQuoteLine(
-        { productId: l.productId, brand: l.brand, model: l.model },
+        { productId: l.productId, brand: l.brand, model: l.model, hashrate: l.hashrate },
         garantiaItems
       );
       row += Math.round(l.qty * wu * lineShareMult(l));
@@ -111,9 +264,9 @@ function computeTotals(
   return { subtotal, lineCount: lines.length, unitCount };
 }
 
-function quoteLineMergeKey(l: { productId: string; hashrateSharePct?: 25 | 50 | 75 }): string {
-  const p = l.hashrateSharePct;
-  const share = p === 25 || p === 50 || p === 75 ? p : 100;
+function quoteLineMergeKey(l: { productId: string; hashrateSharePct?: number }): string {
+  const p = Math.round(Number(l.hashrateSharePct));
+  const share = Number.isFinite(p) && p >= 1 && p <= 100 ? String(p) : "full";
   return `${l.productId}:${share}`;
 }
 
@@ -123,9 +276,9 @@ function quoteLineMergeKey(l: { productId: string; hashrateSharePct?: 25 | 50 | 
  */
 function mergePipelineCartLines(
   _existingJson: string,
-  incoming: z.infer<typeof LineSchema>[]
-): z.infer<typeof LineSchema>[] {
-  const map = new Map<string, z.infer<typeof LineSchema>>();
+  incoming: TrustedQuoteLine[]
+): TrustedQuoteLine[] {
+  const map = new Map<string, TrustedQuoteLine>();
   for (const l of incoming) {
     map.set(quoteLineMergeKey(l), l);
   }
@@ -215,6 +368,28 @@ function oneActiveOrder409Payload(blocking: { order_number: string | null; ticke
   };
 }
 
+function resolveStatusAfterContact(currentStatus: string, hasContactEvent: boolean): string {
+  if (!hasContactEvent) return currentStatus;
+  const n = normalizeTicketStatusDb(currentStatus);
+  if (n === "borrador") return "enviado_consulta";
+  return currentStatus;
+}
+
+function canTransitionTicketStatus(current: string, next: string): boolean {
+  const from = normalizeTicketStatusDb(current);
+  const to = normalizeTicketStatusDb(next);
+  if (from === to) return true;
+  const rules: Record<string, string[]> = {
+    borrador: ["enviado_consulta", "descartado"],
+    enviado_consulta: ["en_gestion", "respondido", "cerrado", "descartado"],
+    en_gestion: ["respondido", "cerrado", "descartado"],
+    respondido: ["cerrado", "descartado"],
+    cerrado: [],
+    descartado: [],
+  };
+  return (rules[from] ?? []).includes(to);
+}
+
 /** POST autenticado (cliente o admin A/B): guardar carrito / marcar consulta por mail o WhatsApp */
 const quoteSyncAuth = requireRole("cliente", "admin_a", "admin_b");
 marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quoteSyncAuth, async (req: Request, res: Response) => {
@@ -292,13 +467,14 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
       return res.json({ ok: true, cleared: true });
     }
 
+    const trustedLines = await resolveTrustedQuoteLines(lines);
     const [setupEquipoCompletoUsd, setupCompraHashrateUsd] = await Promise.all([
       resolveSetupEquipoCompletoUsd(),
       resolveSetupCompraHashrateUsd(),
     ]);
 
     /** Orden en pipeline → fusionar el carrito en ese ticket (mismas refs y estado). */
-    if (singleMarketplaceOrderPolicy && lines.length > 0) {
+    if (singleMarketplaceOrderPolicy && trustedLines.length > 0) {
       const blocking = (await db
         .prepare(
           `SELECT id, order_number, ticket_code, status, items_json FROM marketplace_quote_tickets
@@ -316,7 +492,7 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
           await db.prepare("DELETE FROM marketplace_quote_tickets WHERE id = ?").run(orphanDraft.id);
         }
 
-        const mergedLines = mergePipelineCartLines(String(blocking.items_json ?? "[]"), lines);
+        const mergedLines = mergePipelineCartLines(String(blocking.items_json ?? "[]"), trustedLines);
         const { subtotal: mergedSub, lineCount: mergedLc, unitCount: mergedUc } = computeTotals(
           mergedLines,
           setupEquipoCompletoUsd,
@@ -391,12 +567,12 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
     }
 
     const { subtotal, lineCount, unitCount } = computeTotals(
-      lines,
+      trustedLines,
       setupEquipoCompletoUsd,
       setupCompraHashrateUsd,
       garantiaItems
     );
-    const itemsJson = JSON.stringify(lines);
+    const itemsJson = JSON.stringify(trustedLines);
     const isSubmitTicket = event === "submit_ticket";
     const contactChannel =
       isSubmitTicket ? "portal" : event === "contact_email" ? "email" : event === "contact_whatsapp" ? "whatsapp" : undefined;
@@ -410,7 +586,9 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
     if (existing) {
       const exSt = normalizeTicketStatusDb(existing.status);
       const terminal = exSt === "cerrado" || exSt === "descartado";
-      const nextStatus = contactChannel ? (terminal ? existing.status : "enviado_consulta") : existing.status;
+      const nextStatus = terminal
+        ? existing.status
+        : resolveStatusAfterContact(existing.status, Boolean(contactChannel));
       if (
         singleMarketplaceOrderPolicy &&
         contactChannel &&
@@ -523,43 +701,46 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
     for (let attempt = 0; attempt < 5 && !insertOk; attempt++) {
       const code = attempt === 0 ? ticketCode : genTicketCode();
       try {
-        const ins = await db
-          .prepare(
-            `INSERT INTO marketplace_quote_tickets (
-              session_id, order_number, ticket_code, status, items_json, subtotal_usd, line_count, unit_count,
-              created_at, updated_at, ip_address, user_agent, last_contact_channel, contacted_at,
-              user_id, contact_email
-            ) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-          )
-          .run(
-            sessionId,
-            code,
-            initialStatus,
-            itemsJson,
-            subtotal,
-            lineCount,
-            unitCount,
-            nowIso,
-            nowIso,
-            ip,
-            ua,
-            contactChannel ?? null,
-            contactChannel ? nowIso : null,
-            userId,
-            contactEmail
-          );
-        const id = Number(ins.lastInsertRowid);
-        const orderNumber = `ORD-${String(id).padStart(7, "0")}`;
-        await db.prepare("UPDATE marketplace_quote_tickets SET order_number = ? WHERE id = ?").run(orderNumber, id);
-        if (isSubmitTicket) {
-          await db
-            .prepare("UPDATE marketplace_quote_tickets SET session_id = ? WHERE id = ?")
-            .run(submittedSessionId(userId, id), id);
-        }
+        const created = await db.transaction(async (tx) => {
+          const ins = await tx
+            .prepare(
+              `INSERT INTO marketplace_quote_tickets (
+                session_id, order_number, ticket_code, status, items_json, subtotal_usd, line_count, unit_count,
+                created_at, updated_at, ip_address, user_agent, last_contact_channel, contacted_at,
+                user_id, contact_email
+              ) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            )
+            .run(
+              sessionId,
+              code,
+              initialStatus,
+              itemsJson,
+              subtotal,
+              lineCount,
+              unitCount,
+              nowIso,
+              nowIso,
+              ip,
+              ua,
+              contactChannel ?? null,
+              contactChannel ? nowIso : null,
+              userId,
+              contactEmail
+            );
+          const id = Number(ins.lastInsertRowid);
+          const orderNumber = `ORD-${String(id).padStart(7, "0")}`;
+          await tx.prepare("UPDATE marketplace_quote_tickets SET order_number = ? WHERE id = ?").run(orderNumber, id);
+          if (isSubmitTicket) {
+            await tx
+              .prepare("UPDATE marketplace_quote_tickets SET session_id = ? WHERE id = ?")
+              .run(submittedSessionId(userId, id), id);
+          }
+          return { id, orderNumber };
+        });
         insertOk = true;
         if (isSubmitTicket && initialStatus === "enviado_consulta") {
           void notifyMarketplaceOrderWhatsApp({
-            orderNumber,
+            orderNumber: created.orderNumber,
             ticketCode: code,
             contactEmail: contactEmail ?? "",
             subtotalUsd: subtotal,
@@ -567,23 +748,39 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
         }
         return res.status(201).json({
           ok: true,
-          id,
-          orderNumber,
+          id: created.id,
+          orderNumber: created.orderNumber,
           ticketCode: code,
           status: initialStatus,
         });
       } catch (e) {
         lastErr = e;
-        const msg = e instanceof Error ? e.message : String(e);
-        if (msg.includes("UNIQUE") || msg.includes("unique")) continue;
+        if (isUniqueConstraintError(e)) continue;
         throw e;
       }
     }
-    const msg = lastErr instanceof Error ? lastErr.message : "No se pudo crear el ticket";
-    return res.status(500).json({ error: { message: msg } });
+    const existingBySession = (await db
+      .prepare("SELECT id, order_number, ticket_code, status FROM marketplace_quote_tickets WHERE session_id = ?")
+      .get(sessionId)) as
+      | { id: number; order_number: string | null; ticket_code: string; status: string }
+      | undefined;
+    if (existingBySession) {
+      return res.json({
+        ok: true,
+        id: existingBySession.id,
+        orderNumber: existingBySession.order_number ?? `ORD-${String(existingBySession.id).padStart(7, "0")}`,
+        ticketCode: existingBySession.ticket_code,
+        status: existingBySession.status,
+        recovered: true,
+      });
+    }
+    logQuoteRouteError("quote-sync.insert", lastErr);
+    return res.status(500).json({ error: { message: "No se pudo crear el ticket." } });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    res.status(500).json({ error: { message: msg } });
+    if (e instanceof QuoteValidationError) {
+      return res.status(e.statusCode).json({ error: { message: e.message } });
+    }
+    return sendInternalError(res, "quote-sync", e);
   }
 });
 
@@ -643,8 +840,7 @@ marketplaceQuoteTicketsRouter.get("/marketplace/my-quote-tickets", requireAuth, 
     const rows = (await db.prepare(sql).all(userId, emailNorm)) as Record<string, unknown>[];
     res.json({ tickets: rows.map(rowToTicketList) });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    res.status(500).json({ error: { message: msg } });
+    return sendInternalError(res, "my-quote-tickets.list", e);
   }
 });
 
@@ -689,8 +885,7 @@ marketplaceQuoteTicketsRouter.post(
         .run(nowIso, userId, id);
       res.json({ ok: true });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      res.status(500).json({ error: { message: msg } });
+      return sendInternalError(res, "my-quote-tickets.cancel", e);
     }
   }
 );
@@ -717,8 +912,7 @@ marketplaceQuoteTicketsRouter.get("/marketplace/my-quote-tickets/:id", requireAu
     }
     res.json({ ticket: rowToTicketList(row) });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    res.status(500).json({ error: { message: msg } });
+    return sendInternalError(res, "my-quote-tickets.detail", e);
   }
 });
 
@@ -732,8 +926,7 @@ marketplaceQuoteTicketsRouter.delete("/marketplace/my-quote-tickets", requireAut
     const deleted = Number(r.changes) || 0;
     res.json({ ok: true, deleted });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    res.status(500).json({ error: { message: msg } });
+    return sendInternalError(res, "my-quote-tickets.delete-all", e);
   }
 });
 
@@ -766,8 +959,7 @@ marketplaceQuoteTicketsRouter.delete("/marketplace/my-quote-tickets/:id", requir
     await db.prepare("DELETE FROM marketplace_quote_tickets WHERE id = ?").run(id);
     res.json({ ok: true });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    res.status(500).json({ error: { message: msg } });
+    return sendInternalError(res, "my-quote-tickets.delete-one", e);
   }
 });
 
@@ -817,8 +1009,7 @@ marketplaceQuoteTicketsRouter.get("/marketplace/quote-tickets", requireAuth, adm
       offset,
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    res.status(500).json({ error: { message: msg } });
+    return sendInternalError(res, "admin.list", e);
   }
 });
 
@@ -831,8 +1022,7 @@ marketplaceQuoteTicketsRouter.get("/marketplace/quote-tickets/:id", requireAuth,
     if (!row) return res.status(404).json({ error: { message: "Ticket no encontrado" } });
     res.json({ ticket: rowToTicketList(row) });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    res.status(500).json({ error: { message: msg } });
+    return sendInternalError(res, "admin.detail", e);
   }
 });
 
@@ -847,8 +1037,7 @@ marketplaceQuoteTicketsRouter.delete("/marketplace/quote-tickets/:id", requireAu
     }
     res.json({ ok: true });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    res.status(500).json({ error: { message: msg } });
+    return sendInternalError(res, "admin.delete", e);
   }
 });
 
@@ -865,13 +1054,20 @@ marketplaceQuoteTicketsRouter.patch("/marketplace/quote-tickets/:id", requireAut
     if (!parsed.success) {
       return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
     }
-    const ex = (await db.prepare("SELECT id FROM marketplace_quote_tickets WHERE id = ?").get(id)) as { id: number } | undefined;
+    const ex = (await db.prepare("SELECT id, status FROM marketplace_quote_tickets WHERE id = ?").get(id)) as
+      | { id: number; status: string }
+      | undefined;
     if (!ex) return res.status(404).json({ error: { message: "Ticket no encontrado" } });
 
     const nowIso = new Date().toISOString();
     const { status, notesAdmin } = parsed.data;
     if (status === undefined && notesAdmin === undefined) {
       return res.status(400).json({ error: { message: "Indicá estado y/o notas" } });
+    }
+    if (status !== undefined && !canTransitionTicketStatus(ex.status, status)) {
+      return res.status(400).json({
+        error: { message: `Transición de estado inválida: ${ex.status} -> ${status}` },
+      });
     }
     if (status !== undefined && notesAdmin !== undefined) {
       await db
@@ -885,8 +1081,7 @@ marketplaceQuoteTicketsRouter.patch("/marketplace/quote-tickets/:id", requireAut
     const row = (await db.prepare(`SELECT ${TICKET_SELECT} FROM ${TICKET_FROM} WHERE t.id = ?`).get(id)) as Record<string, unknown>;
     res.json({ ticket: rowToTicketList(row) });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    res.status(500).json({ error: { message: msg } });
+    return sendInternalError(res, "admin.patch", e);
   }
 });
 
@@ -914,7 +1109,6 @@ marketplaceQuoteTicketsRouter.get("/marketplace/quote-tickets-stats", requireAut
 
     res.json({ byStatus, total, todayCount });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    res.status(500).json({ error: { message: msg } });
+    return sendInternalError(res, "admin.stats", e);
   }
 });

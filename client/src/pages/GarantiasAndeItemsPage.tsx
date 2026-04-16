@@ -6,10 +6,12 @@ import {
   createGarantiaItem,
   deleteGarantiaItem,
   deleteGarantiasItemsAll,
+  getEquipos,
   getGarantiaItemPrecioHistorial,
   getGarantiasItems,
   updateGarantiaItem,
   wakeUpBackend,
+  type EquiposResponse,
   type GarantiasItemsResponse,
 } from "../lib/api";
 import type { ItemGarantiaAnde } from "../lib/types";
@@ -64,6 +66,7 @@ async function parseExcelGarantiasItems(file: File): Promise<Omit<ItemGarantiaAn
     modelo: findCol(headerRow, "modelo"),
     fechaIngreso: findCol(headerRow, "fecha ingreso", "fechaIngreso", "fecha"),
     precioGarantia: findCol(headerRow, "precio garantía", "precio garantia", "precioGarantia", "precio"),
+    marketplaceEquipoId: findCol(headerRow, "equipo marketplace", "marketplace equipo", "marketplaceEquipoId", "equipo marketplace id"),
     observaciones: findCol(headerRow, "observaciones"),
   };
 
@@ -94,6 +97,7 @@ async function parseExcelGarantiasItems(file: File): Promise<Omit<ItemGarantiaAn
     const fechaIngreso = idx.fechaIngreso >= 0 ? toYyyyMmDd(get(row, idx.fechaIngreso)) : toYyyyMmDd(get(row, 4));
     const precioRaw = idx.precioGarantia >= 0 ? get(row, idx.precioGarantia) : "";
     const precioGarantia = precioRaw ? precioFromFormField(precioRaw) : null;
+    const marketplaceEquipoId = idx.marketplaceEquipoId >= 0 ? get(row, idx.marketplaceEquipoId) : "";
     const observaciones = idx.observaciones >= 0 ? get(row, idx.observaciones) || undefined : undefined;
 
     result.push({
@@ -101,6 +105,7 @@ async function parseExcelGarantiasItems(file: File): Promise<Omit<ItemGarantiaAn
       marca: marca || "—",
       modelo: modelo || "—",
       fechaIngreso,
+      marketplaceEquipoId: marketplaceEquipoId || undefined,
       precioGarantia: precioGarantia ?? undefined,
       observaciones: observaciones || undefined,
     });
@@ -128,10 +133,14 @@ export function GarantiasAndeItemsPage() {
     codigo: "",
     marca: "",
     modelo: "",
+    marketplaceEquipoId: "",
     fechaIngreso: "",
     precioGarantia: "",
     observaciones: "",
   });
+  const [marketplaceEquipos, setMarketplaceEquipos] = useState<
+    Array<{ id: string; label: string; marca: string; modelo: string }>
+  >([]);
   const [precioHistorialOpen, setPrecioHistorialOpen] = useState(false);
   const [precioHistorialEntries, setPrecioHistorialEntries] = useState<PrecioHistorialModalEntry[]>([]);
   const [precioHistorialLoading, setPrecioHistorialLoading] = useState(false);
@@ -155,6 +164,25 @@ export function GarantiasAndeItemsPage() {
 
   useEffect(() => {
     loadItems();
+  }, []);
+
+  useEffect(() => {
+    wakeUpBackend()
+      .then(() => getEquipos())
+      .then((r: EquiposResponse) => {
+        const all = Array.isArray(r.items) ? r.items : [];
+        const mapped = all
+          .filter((x) => x?.id && x.marketplaceVisible === true)
+          .map((x) => ({
+            id: x.id,
+            marca: x.marcaEquipo ?? "",
+            modelo: x.modelo ?? "",
+            label: `${x.marcaEquipo ?? "—"} ${x.modelo ?? "—"} · ${x.procesador ?? "—"} · ${x.numeroSerie ?? x.id}`,
+          }))
+          .sort((a, b) => a.label.localeCompare(b.label, "es"));
+        setMarketplaceEquipos(mapped);
+      })
+      .catch(() => setMarketplaceEquipos([]));
   }, []);
 
   useEffect(() => {
@@ -235,6 +263,7 @@ export function GarantiasAndeItemsPage() {
           codigo: formData.codigo.trim(),
           marca: formData.marca.trim(),
           modelo: formData.modelo.trim(),
+          marketplaceEquipoId: formData.marketplaceEquipoId.trim() || undefined,
           fechaIngreso: formData.fechaIngreso.trim(),
           precioGarantia: precioVal,
           observaciones: formData.observaciones.trim() || undefined,
@@ -246,6 +275,7 @@ export function GarantiasAndeItemsPage() {
           codigo: formData.codigo.trim(),
           marca: formData.marca.trim(),
           modelo: formData.modelo.trim(),
+          marketplaceEquipoId: formData.marketplaceEquipoId.trim() || undefined,
           fechaIngreso: formData.fechaIngreso.trim(),
           precioGarantia: precioVal ?? undefined,
           observaciones: formData.observaciones.trim() || undefined,
@@ -256,7 +286,7 @@ export function GarantiasAndeItemsPage() {
       setItems(res.items);
       setShowAddModal(false);
       setEditingItem(null);
-      setFormData({ codigo: "", marca: "", modelo: "", fechaIngreso: "", precioGarantia: "", observaciones: "" });
+      setFormData({ codigo: "", marca: "", modelo: "", marketplaceEquipoId: "", fechaIngreso: "", precioGarantia: "", observaciones: "" });
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Error al guardar.", "error", "Items Garantía ANDE");
     }
@@ -268,6 +298,7 @@ export function GarantiasAndeItemsPage() {
       codigo: item.codigo,
       marca: item.marca ?? "",
       modelo: item.modelo ?? "",
+      marketplaceEquipoId: item.marketplaceEquipoId ?? "",
       fechaIngreso: item.fechaIngreso ?? "",
       precioGarantia: item.precioGarantia != null && Number.isFinite(Number(item.precioGarantia)) ? String(item.precioGarantia) : "",
       observaciones: item.observaciones ?? "",
@@ -332,6 +363,7 @@ export function GarantiasAndeItemsPage() {
       { header: "Código", key: "codigo", width: 14 },
       { header: "Marca", key: "marca", width: 22 },
       { header: "Modelo", key: "modelo", width: 22 },
+      { header: "Equipo marketplace", key: "marketplaceEquipoId", width: 26 },
       { header: "Fecha ingreso", key: "fechaIngreso", width: 16 },
       { header: "Precio garantía", key: "precioGarantia", width: 14 },
       { header: "Observaciones", key: "observaciones", width: 30 },
@@ -342,6 +374,7 @@ export function GarantiasAndeItemsPage() {
         codigo: i.codigo,
         marca: i.marca ?? "",
         modelo: i.modelo ?? "",
+        marketplaceEquipoId: i.marketplaceEquipoId ?? "",
         fechaIngreso: i.fechaIngreso ?? "",
         precioGarantia: i.precioGarantia != null && Number.isFinite(Number(i.precioGarantia)) ? Number(i.precioGarantia) : "",
         observaciones: i.observaciones ?? "",
@@ -453,11 +486,13 @@ export function GarantiasAndeItemsPage() {
       i.codigo?.toLowerCase().includes(searchLower) ||
       (i.marca ?? "").toLowerCase().includes(searchLower) ||
       (i.modelo ?? "").toLowerCase().includes(searchLower) ||
+      (i.marketplaceEquipoId ?? "").toLowerCase().includes(searchLower) ||
       (i.fechaIngreso ?? "").toLowerCase().includes(searchLower) ||
       String(i.precioGarantia ?? "").toLowerCase().includes(searchLower) ||
       (i.observaciones ?? "").toLowerCase().includes(searchLower)
     );
   });
+  const marketplaceById = new Map(marketplaceEquipos.map((x) => [x.id, x.label] as const));
 
   return (
     <div className="fact-page fact-page--cte-tienda-edit">
@@ -581,6 +616,7 @@ export function GarantiasAndeItemsPage() {
                             <th className="text-start">Código</th>
                             <th className="text-start">Marca</th>
                             <th className="text-start">Modelo</th>
+                            <th className="text-start">Equipo marketplace vinculado</th>
                             <th className="text-start">Fecha ingreso</th>
                             <th className="text-end">Precio garantía</th>
                             <th className="text-start">Observaciones</th>
@@ -602,6 +638,9 @@ export function GarantiasAndeItemsPage() {
                               </td>
                               <td>
                                 <span className="clientes-skeleton" style={{ width: "8em" }} />
+                              </td>
+                              <td>
+                                <span className="clientes-skeleton" style={{ width: "12em" }} />
                               </td>
                               <td>
                                 <span className="clientes-skeleton" style={{ width: "5em" }} />
@@ -652,6 +691,7 @@ export function GarantiasAndeItemsPage() {
                             <th className="text-start">Código</th>
                             <th className="text-start">Marca</th>
                             <th className="text-start">Modelo</th>
+                            <th className="text-start">Equipo marketplace vinculado</th>
                             <th className="text-start">Fecha ingreso</th>
                             <th className="text-end">Precio garantía</th>
                             <th className="text-start">Observaciones</th>
@@ -668,6 +708,11 @@ export function GarantiasAndeItemsPage() {
                               <td className="text-start fw-bold">{i.codigo}</td>
                               <td className="text-start">{i.marca ?? "—"}</td>
                               <td className="text-start">{i.modelo ?? "—"}</td>
+                              <td className="text-start text-muted small">
+                                {i.marketplaceEquipoId
+                                  ? (marketplaceById.get(i.marketplaceEquipoId) ?? i.marketplaceEquipoId)
+                                  : "—"}
+                              </td>
                               <td className="text-start">
                                 {i.fechaIngreso
                                   ? new Date(i.fechaIngreso + "T12:00:00").toLocaleDateString("es-AR")
@@ -803,6 +848,27 @@ export function GarantiasAndeItemsPage() {
                               onChange={(e) => setFormData({ ...formData, modelo: e.target.value })}
                               placeholder="Ej: S19 Pro"
                             />
+                          </div>
+                          <div className="mb-2">
+                            <label className="form-label market-registro-label" htmlFor="gar-edit-marketplace-equipo">
+                              Equipo marketplace vinculado
+                            </label>
+                            <select
+                              id="gar-edit-marketplace-equipo"
+                              className="form-select"
+                              value={formData.marketplaceEquipoId}
+                              onChange={(e) => setFormData({ ...formData, marketplaceEquipoId: e.target.value })}
+                            >
+                              <option value="">— Sin vínculo explícito —</option>
+                              {marketplaceEquipos.map((eq) => (
+                                <option key={eq.id} value={eq.id}>
+                                  {eq.label}
+                                </option>
+                              ))}
+                            </select>
+                            <div className="market-registro-hint text-muted">
+                              Si lo vinculás, la garantía del carrito usa este equipo como match prioritario.
+                            </div>
                           </div>
                           <div className="mb-2">
                             <label className="form-label market-registro-label" htmlFor="gar-edit-fecha">

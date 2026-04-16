@@ -180,6 +180,7 @@ CREATE TABLE IF NOT EXISTS items_garantia_ande (
   codigo TEXT NOT NULL,
   marca TEXT NOT NULL,
   modelo TEXT NOT NULL,
+  marketplace_equipo_id TEXT,
   fecha_ingreso TEXT NOT NULL,
   observaciones TEXT,
   precio_garantia REAL
@@ -188,6 +189,12 @@ CREATE TABLE IF NOT EXISTS items_garantia_ande (
 
   try {
     db.exec("ALTER TABLE items_garantia_ande ADD COLUMN precio_garantia REAL");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+  try {
+    db.exec("ALTER TABLE items_garantia_ande ADD COLUMN marketplace_equipo_id TEXT");
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     if (!msg.includes("duplicate column")) throw e;

@@ -111,8 +111,14 @@ function linesToPayload(lines: QuoteCartLine[]) {
     hashrate: l.hashrate,
     priceUsd: l.priceUsd,
     priceLabel: l.priceLabel,
-    ...(l.hashrateSharePct === 25 || l.hashrateSharePct === 50 || l.hashrateSharePct === 75
-      ? { hashrateSharePct: l.hashrateSharePct }
+    ...(Number.isFinite(Number(l.hashrateSharePct)) && Number(l.hashrateSharePct) >= 1 && Number(l.hashrateSharePct) <= 100
+      ? { hashrateSharePct: Math.round(Number(l.hashrateSharePct)) }
+      : {}),
+    ...(Number.isFinite(Number(l.hashrateWarrantyPct)) && Number(l.hashrateWarrantyPct) >= 0 && Number(l.hashrateWarrantyPct) <= 100
+      ? { hashrateWarrantyPct: Math.round(Number(l.hashrateWarrantyPct)) }
+      : {}),
+    ...(Number.isFinite(Number(l.hashrateSetupUsd)) && Number(l.hashrateSetupUsd) >= 0
+      ? { hashrateSetupUsd: Math.round(Number(l.hashrateSetupUsd)) }
       : {}),
     includeSetup: l.includeSetup,
     includeWarranty: l.includeWarranty,

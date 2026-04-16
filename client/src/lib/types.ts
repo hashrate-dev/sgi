@@ -89,6 +89,14 @@ export type EquipoASIC = {
   marketplaceDetailRowsJson?: string | null;
   marketplaceYieldJson?: string | null;
   marketplaceSortOrder?: number;
+  /** Habilita venta por partes de hashrate para este equipo en marketplace. */
+  marketplaceHashrateSellEnabled?: boolean;
+  /** Config por parte: % hashrate, % garantía y setup USD por parte. */
+  marketplaceHashrateParts?: Array<{
+    sharePct: number;
+    warrantyPct: number;
+    setupUsd: number;
+  }> | null;
   /** Texto comercial en vitrina si no hay precio USD (ej. cotización bajo consulta). */
   marketplacePriceLabel?: string | null;
   /**
@@ -110,6 +118,8 @@ export type ItemGarantiaAnde = {
   codigo: string;
   marca: string;
   modelo: string;
+  /** Vínculo explícito a equipos_asic.id para match exacto en marketplace. */
+  marketplaceEquipoId?: string;
   fechaIngreso: string;
   observaciones?: string;
   /** Precio del ítem de garantía (ej. USD). */

@@ -349,6 +349,8 @@ function equipoDbRowToVitrinaInput(raw: Record<string, unknown>): EquipoAsicVitr
     mp_gallery_json: typeof r.mp_gallery_json === "string" ? r.mp_gallery_json : null,
     mp_detail_rows_json: typeof r.mp_detail_rows_json === "string" ? r.mp_detail_rows_json : null,
     mp_yield_json: typeof r.mp_yield_json === "string" ? r.mp_yield_json : null,
+    mp_hashrate_sell_enabled: r.mp_hashrate_sell_enabled as number | boolean | null,
+    mp_hashrate_parts_json: typeof r.mp_hashrate_parts_json === "string" ? r.mp_hashrate_parts_json : null,
     mp_price_label: typeof r.mp_price_label === "string" ? r.mp_price_label : null,
     mp_listing_kind: typeof r.mp_listing_kind === "string" ? r.mp_listing_kind : null,
   };
@@ -610,6 +612,7 @@ marketplaceRouter.get("/marketplace/garantia-quote-prices", async (req: Request,
         codigo: x.codigo,
         marca: x.marca,
         modelo: x.modelo,
+        ...(x.marketplaceEquipoId ? { marketplaceEquipoId: x.marketplaceEquipoId } : {}),
         precioGarantia: Math.round(x.precioGarantia),
       }));
     res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
@@ -670,9 +673,21 @@ marketplaceRouter.get("/marketplace/asic-vitrina", async (req: Request, res: Res
       console.warn("[marketplace] asic-vitrina presence:", err);
     });
     const clause = sqlMarketplaceVisible();
-    const sql = `SELECT id, marca_equipo, modelo, procesador, precio_usd, mp_visible, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_price_label, mp_listing_kind
+    const sql = `SELECT id, marca_equipo, modelo, procesador, precio_usd, mp_visible, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_hashrate_sell_enabled, mp_hashrate_parts_json, mp_price_label, mp_listing_kind
       FROM equipos_asic WHERE ${clause} ORDER BY marca_equipo ASC, modelo ASC, procesador ASC`;
-    const raw = (await db.prepare(sql).all()) as Record<string, unknown>[];
+    let raw: Record<string, unknown>[];
+    try {
+      raw = (await db.prepare(sql).all()) as Record<string, unknown>[];
+    } catch (e) {
+      const m = e instanceof Error ? e.message : String(e);
+      if (m.toLowerCase().includes("mp_hashrate_sell_enabled") || m.toLowerCase().includes("mp_hashrate_parts_json")) {
+        const legacySql = `SELECT id, marca_equipo, modelo, procesador, precio_usd, mp_visible, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_price_label, mp_listing_kind
+          FROM equipos_asic WHERE ${clause} ORDER BY marca_equipo ASC, modelo ASC, procesador ASC`;
+        raw = (await db.prepare(legacySql).all()) as Record<string, unknown>[];
+      } else {
+        throw e;
+      }
+    }
     const rows = raw
       .map((r) => rowKeysToLowercase(r) as Record<string, unknown>)
       .filter((r) => mpVisibleFromDbValue(r.mp_visible))

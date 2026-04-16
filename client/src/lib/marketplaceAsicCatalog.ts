@@ -234,6 +234,14 @@ export type AsicProduct = {
    * En API vitrina suele venir resuelto desde `mp_listing_kind` + inferencia.
    */
   listingKind?: MarketplaceListingKind;
+  /** Habilita venta por fracciones de hashrate para este equipo. */
+  hashrateShareEnabled?: boolean;
+  /** Configuración por parte: % de hashrate, % garantía y setup USD por parte. */
+  hashrateShareParts?: Array<{
+    sharePct: number;
+    warrantyPct: number;
+    setupUsd: number;
+  }>;
 };
 
 /**
@@ -315,16 +323,58 @@ export const ASIC_FILTER_GROUPS: ReadonlyArray<{ id: MarketplaceCatalogFilter; l
   { id: "other", label: "Otros" },
 ];
 
-/** Compra por fracción de hashrate de **un** equipo (cotización). Incluye equipo completo. */
-export const HASHRATE_SHARE_OPTIONS = [100, 75, 50, 25] as const;
-export type HashrateSharePct = (typeof HASHRATE_SHARE_OPTIONS)[number];
+function normalizeSharePart(
+  raw: unknown
+): { sharePct: number; warrantyPct: number; setupUsd: number } | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as { sharePct?: unknown; setupUsd?: unknown };
+  const sharePct = Math.round(Number(o.sharePct));
+  const setupUsd = Math.round(Number(o.setupUsd));
+  if (!Number.isFinite(sharePct) || sharePct <= 0 || sharePct > 100) return null;
+  if (!Number.isFinite(setupUsd) || setupUsd < 0 || setupUsd > 999999) return null;
+  return { sharePct, warrantyPct: sharePct, setupUsd };
+}
 
-/** Solo Antminer S21 XP a 270 TH/s (ficha desde API / vitrina). */
+function legacySupportsHashrateShare(product: AsicProduct): boolean {
+  if (!asicProductShowsMinerEconomyContent(product)) return false;
+  const brand = product.brand.trim();
+  const model = product.model.trim();
+  const hashrate = product.hashrate.trim();
+  if (!/\bbitmain\b/i.test(brand)) return false;
+  if (!/\bs21\b/i.test(model)) return false;
+  // Compatibilidad histórica: Antminer S21 270 TH/s (con o sin "XP" en el modelo).
+  return (/270/i.test(model) || /270/i.test(hashrate)) && /TH\//i.test(hashrate);
+}
+
+export function productHashrateShareParts(product: AsicProduct): Array<{
+  sharePct: number;
+  warrantyPct: number;
+  setupUsd: number;
+}> {
+  if (product.hashrateShareEnabled && Array.isArray(product.hashrateShareParts)) {
+    const out = product.hashrateShareParts
+      .map((x) => normalizeSharePart(x))
+      .filter((x): x is { sharePct: number; warrantyPct: number; setupUsd: number } => x != null)
+      .sort((a, b) => b.sharePct - a.sharePct);
+    const dedup = new Map<number, { sharePct: number; warrantyPct: number; setupUsd: number }>();
+    for (const it of out) dedup.set(it.sharePct, it);
+    return Array.from(dedup.values());
+  }
+  if (legacySupportsHashrateShare(product)) {
+    return [
+      { sharePct: 75, warrantyPct: 75, setupUsd: 40 },
+      { sharePct: 50, warrantyPct: 50, setupUsd: 40 },
+      { sharePct: 25, warrantyPct: 25, setupUsd: 40 },
+    ];
+  }
+  return [];
+}
+
 export function productSupportsHashrateShare(product: AsicProduct): boolean {
   if (!asicProductShowsMinerEconomyContent(product)) return false;
   const raw = product.priceDisplayLabel?.trim();
   if (raw && normalizeConsultPriceLabelForDisplay(raw)) return false;
-  return /\bS21\s+XP\b/i.test(product.model.trim()) && /270/i.test(product.hashrate) && /TH\//i.test(product.hashrate);
+  return productHashrateShareParts(product).length > 0;
 }
 
 /** Precio referencial USD del equipo según % de hashrate (redondeado). */

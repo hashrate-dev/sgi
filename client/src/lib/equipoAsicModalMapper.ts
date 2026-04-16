@@ -73,5 +73,14 @@ export function equipoASICToModalProduct(e: EquipoASIC): AsicProduct {
       line2: "—",
     },
     listingKind,
+    hashrateShareEnabled: e.marketplaceHashrateSellEnabled ?? undefined,
+    hashrateShareParts:
+      e.marketplaceHashrateParts && Array.isArray(e.marketplaceHashrateParts)
+        ? e.marketplaceHashrateParts.map((x) => ({
+            sharePct: Math.round(Number(x.sharePct) || 0),
+            warrantyPct: Math.round(Number(x.warrantyPct) || 0),
+            setupUsd: Math.round(Number(x.setupUsd) || 0),
+          }))
+        : undefined,
   };
 }

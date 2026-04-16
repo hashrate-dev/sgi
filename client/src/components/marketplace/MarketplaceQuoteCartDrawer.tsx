@@ -244,7 +244,11 @@ export function MarketplaceQuoteCartDrawer() {
                 {lines.map((l, lineIdx) => {
                   const lk = quoteCartLineKey(l);
                   const sharePct = lineHashrateSharePct(l);
-                  const addonMult = sharePct / 100;
+                  const warrantyPctRaw = Math.round(Number(l.hashrateWarrantyPct));
+                  const addonMult =
+                    Number.isFinite(warrantyPctRaw) && warrantyPctRaw >= 0 && warrantyPctRaw <= 100
+                      ? warrantyPctRaw / 100
+                      : sharePct / 100;
                   const setupUnit = quoteCartSetupUnitUsd(l, pricing);
                   const warrantyUnit = Math.round(quoteCartWarrantyUnitUsd(l, pricing) * addonMult);
                   const equipmentPricePending = quoteCartLineIsEquipmentPricePending(l);

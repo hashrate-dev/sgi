@@ -5,6 +5,7 @@ import { db } from "../db.js";
 import { env } from "../config/env.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { ensureItemsGarantiaAndePrecioColumn } from "../lib/ensureItemsGarantiaAndePrecio.js";
+import { ensureItemsGarantiaAndeMarketplaceEquipoColumn } from "../lib/ensureItemsGarantiaAndeMarketplaceEquipoColumn.js";
 import {
   ensureItemsGarantiaAndePrecioHistorial,
   pricesDiffer,
@@ -75,6 +76,7 @@ const ItemGarantiaSchema = z.object({
   codigo: z.string(),
   marca: z.string(),
   modelo: z.string(),
+  marketplaceEquipoId: z.string().max(200).optional().nullable(),
   fechaIngreso: z.string(),
   observaciones: z.string().optional(),
   /** Precio de la garantía (USD u otra moneda de referencia del negocio). */
@@ -206,6 +208,7 @@ garantiasRouter.delete("/garantias/emitted", requireAuth, requireRole("admin_a")
 /** GET /garantias/items — listar ítems de garantía ANDE */
 garantiasRouter.get("/garantias/items", authGarantias, async (_req, res) => {
   await ensureItemsGarantiaAndePrecioColumn();
+  await ensureItemsGarantiaAndeMarketplaceEquipoColumn();
   await ensureItemsGarantiaAndePrecioHistorial();
 
   type Row = {
@@ -216,18 +219,25 @@ garantiasRouter.get("/garantias/items", authGarantias, async (_req, res) => {
     fecha_ingreso: string;
     observaciones: string | null;
     precio_garantia?: number | null;
+    marketplace_equipo_id?: string | null;
   };
 
   let rows: Row[];
   try {
     rows = (await db
       .prepare(
-        `SELECT id, codigo, marca, modelo, fecha_ingreso, observaciones, precio_garantia FROM items_garantia_ande ORDER BY codigo`
+        `SELECT id, codigo, marca, modelo, fecha_ingreso, observaciones, precio_garantia, marketplace_equipo_id FROM items_garantia_ande ORDER BY codigo`
       )
       .all()) as Row[];
   } catch (e) {
     const m = e instanceof Error ? e.message : String(e);
-    if (
+    if (m.toLowerCase().includes("marketplace_equipo_id")) {
+      rows = (await db
+        .prepare(
+          `SELECT id, codigo, marca, modelo, fecha_ingreso, observaciones, precio_garantia FROM items_garantia_ande ORDER BY codigo`
+        )
+        .all()) as Row[];
+    } else if (
       m.toLowerCase().includes("precio_garantia") ||
       m.includes("no such column") ||
       m.includes("42703") /* PostgreSQL undefined_column */
@@ -255,6 +265,10 @@ garantiasRouter.get("/garantias/items", authGarantias, async (_req, res) => {
     observaciones: r.observaciones ?? undefined,
     precioGarantia:
       r.precio_garantia != null && Number.isFinite(Number(r.precio_garantia)) ? Number(r.precio_garantia) : undefined,
+    marketplaceEquipoId:
+      r.marketplace_equipo_id != null && String(r.marketplace_equipo_id).trim()
+        ? String(r.marketplace_equipo_id).trim()
+        : undefined,
   }));
 
   res.json({ items });
@@ -310,6 +324,7 @@ garantiasRouter.get("/garantias/items/:id/precio-historial", authGarantias, asyn
 /** POST /garantias/items — crear ítem */
 garantiasRouter.post("/garantias/items", authGarantias, requireCanPostGarantias, async (req, res) => {
   await ensureItemsGarantiaAndePrecioColumn();
+  await ensureItemsGarantiaAndeMarketplaceEquipoColumn();
   await ensureItemsGarantiaAndePrecioHistorial();
   const parsed = ItemGarantiaSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -317,15 +332,24 @@ garantiasRouter.post("/garantias/items", authGarantias, requireCanPostGarantias,
       .status(400)
       .json({ error: { message: "Body inválido", details: parsed.error.flatten() } });
   }
-  const { id, codigo, marca, modelo, fechaIngreso, observaciones, precioGarantia } = parsed.data;
+  const { id, codigo, marca, modelo, marketplaceEquipoId, fechaIngreso, observaciones, precioGarantia } = parsed.data;
   const precioSql =
     precioGarantia != null && Number.isFinite(Number(precioGarantia)) ? Number(precioGarantia) : null;
 
   try {
     await db.prepare(
-      `INSERT INTO items_garantia_ande (id, codigo, marca, modelo, fecha_ingreso, observaciones, precio_garantia)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).run(id, codigo, marca, modelo, fechaIngreso, observaciones ?? null, precioSql);
+      `INSERT INTO items_garantia_ande (id, codigo, marca, modelo, marketplace_equipo_id, fecha_ingreso, observaciones, precio_garantia)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      id,
+      codigo,
+      marca,
+      modelo,
+      marketplaceEquipoId != null && String(marketplaceEquipoId).trim() ? String(marketplaceEquipoId).trim() : null,
+      fechaIngreso,
+      observaciones ?? null,
+      precioSql
+    );
     if (precioSql != null) {
       const ts = new Date().toISOString();
       try {
@@ -358,6 +382,7 @@ garantiasRouter.put(
   requireCanPostGarantias,
   async (req, res) => {
     await ensureItemsGarantiaAndePrecioColumn();
+    await ensureItemsGarantiaAndeMarketplaceEquipoColumn();
     await ensureItemsGarantiaAndePrecioHistorial();
     const id = paramStr(req.params.id);
     if (!id) return res.status(400).json({ error: { message: "id requerido" } });
@@ -371,6 +396,8 @@ garantiasRouter.put(
     const codigo = patch.codigo;
     const marca = patch.marca;
     const modelo = patch.modelo;
+    const marketplaceEquipoIdProvided = Object.prototype.hasOwnProperty.call(patch, "marketplaceEquipoId");
+    const marketplaceEquipoId = patch.marketplaceEquipoId;
     const fechaIngreso = patch.fechaIngreso;
     const observaciones = patch.observaciones;
     const precioProvided = Object.prototype.hasOwnProperty.call(patch, "precioGarantia");
@@ -385,7 +412,19 @@ garantiasRouter.put(
       "fecha_ingreso = COALESCE(?, fecha_ingreso)",
       "observaciones = ?",
     ];
-    const runParams: unknown[] = [codigo ?? null, marca ?? null, modelo ?? null, fechaIngreso ?? null, observaciones ?? null];
+    const runParams: unknown[] = [
+      codigo ?? null,
+      marca ?? null,
+      modelo ?? null,
+      fechaIngreso ?? null,
+      observaciones ?? null,
+    ];
+    if (marketplaceEquipoIdProvided) {
+      setClauses.push("marketplace_equipo_id = ?");
+      runParams.push(
+        marketplaceEquipoId != null && String(marketplaceEquipoId).trim() ? String(marketplaceEquipoId).trim() : null
+      );
+    }
     if (precioProvided) {
       setClauses.push("precio_garantia = ?");
       runParams.push(precioSql);

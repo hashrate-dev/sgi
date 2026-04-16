@@ -5,6 +5,7 @@ import {
   defaultAsicShelfImageSrc,
   formatAsicPriceUsd,
   normalizeConsultPriceLabelForDisplay,
+  productHashrateShareParts,
   proratedEquipmentPriceUsd,
   productSupportsHashrateShare,
   publicImageUrl,
@@ -62,7 +63,8 @@ export function AsicProductModal({
   const showMinerEconomy = asicProductShowsMinerEconomyContent(product);
   const quoteLabel = addToQuoteLabel ?? t("catalog.add_short");
   const [hashrateShareView, setHashrateShareView] = useState(false);
-  const [shareViewPct, setShareViewPct] = useState<25 | 50 | 75>(75);
+  const shareParts = useMemo(() => productHashrateShareParts(product), [product]);
+  const [shareViewPct, setShareViewPct] = useState<number>(75);
   const shareFactor = hashrateShareView ? shareViewPct / 100 : 1;
   const displayHashrate = useMemo(
     () => scaleHashrateDisplay(product.hashrate, shareFactor, lang),
@@ -108,8 +110,8 @@ export function AsicProductModal({
     setActiveThumb(0);
     setMainBroken(false);
     setHashrateShareView(false);
-    setShareViewPct(75);
-  }, [product]);
+    setShareViewPct(shareParts[0]?.sharePct ?? 75);
+  }, [product, shareParts]);
 
   useEffect(() => {
     setMainBroken(false);
@@ -117,8 +119,8 @@ export function AsicProductModal({
 
   /** Cada vez que se abre la vista porción, volver al 75% predeterminado. */
   useEffect(() => {
-    if (hashrateShareView) setShareViewPct(75);
-  }, [hashrateShareView]);
+    if (hashrateShareView) setShareViewPct(shareParts[0]?.sharePct ?? 75);
+  }, [hashrateShareView, shareParts]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -290,18 +292,18 @@ export function AsicProductModal({
                       role="group"
                       aria-label={t("modal.hashrate_share_popover_title")}
                     >
-                      {([25, 50, 75] as const).map((pct) => (
+                      {shareParts.map((part) => (
                         <button
-                          key={pct}
+                          key={part.sharePct}
                           type="button"
                           className={
                             "product-modal__hashrate-popover-pill" +
-                            (shareViewPct === pct ? " product-modal__hashrate-popover-pill--active" : "")
+                            (shareViewPct === part.sharePct ? " product-modal__hashrate-popover-pill--active" : "")
                           }
-                          aria-pressed={shareViewPct === pct}
-                          onClick={() => setShareViewPct(pct)}
+                          aria-pressed={shareViewPct === part.sharePct}
+                          onClick={() => setShareViewPct(part.sharePct)}
                         >
-                          {tf("modal.hashrate_share_of", { pct: String(pct) })}
+                          {tf("modal.hashrate_share_of", { pct: String(part.sharePct) })}
                         </button>
                       ))}
                     </div>
@@ -411,7 +413,7 @@ export function AsicProductModal({
                               aria-pressed={false}
                               onClick={() => {
                                 setHashrateShareView(true);
-                                setShareViewPct(75);
+                                setShareViewPct(shareParts[0]?.sharePct ?? 75);
                               }}
                             >
                               {t("modal.hashrate_share_btn")}

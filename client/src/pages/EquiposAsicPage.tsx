@@ -288,6 +288,12 @@ type EquipoFormState = {
   precioHistorialLocal: PrecioHistEntry[];
   observaciones: string;
   marketplaceVisible: boolean;
+  marketplaceHashrateSellEnabled: boolean;
+  marketplaceHashrateParts: Array<{
+    sharePct: number;
+    warrantyPct: number;
+    setupUsd: number;
+  }>;
   /** Publicar en tienda sin importe USD: se muestra `marketplacePriceLabel` en la vitrina. */
   marketplacePriceConsultMode: boolean;
   marketplacePriceLabel: string;
@@ -295,6 +301,29 @@ type EquipoFormState = {
   marketplaceGalleryLines: string;
   marketplaceDetailRowsJson: string;
 };
+
+const DEFAULT_HASHRATE_PARTS: Array<{ sharePct: number; warrantyPct: number; setupUsd: number }> = [
+  { sharePct: 75, warrantyPct: 75, setupUsd: 40 },
+  { sharePct: 50, warrantyPct: 50, setupUsd: 40 },
+  { sharePct: 25, warrantyPct: 25, setupUsd: 40 },
+];
+
+function normalizeHashrateParts(
+  parts: Array<{ sharePct: number; warrantyPct: number; setupUsd: number }>
+): Array<{ sharePct: number; warrantyPct: number; setupUsd: number }> {
+  const normalized = parts
+    .map((x) => ({
+      sharePct: Math.max(1, Math.min(100, Math.round(Number(x.sharePct) || 0))),
+      // Regla: la garantía sigue automáticamente el mismo % de hashrate.
+      warrantyPct: Math.max(1, Math.min(100, Math.round(Number(x.sharePct) || 0))),
+      setupUsd: Math.max(0, Math.min(999999, Math.round(Number(x.setupUsd) || 0))),
+    }))
+    .filter((x) => Number.isFinite(x.sharePct) && x.sharePct >= 1 && x.sharePct <= 100)
+    .sort((a, b) => b.sharePct - a.sharePct);
+  const byPct = new Map<number, { sharePct: number; warrantyPct: number; setupUsd: number }>();
+  for (const p of normalized) byPct.set(p.sharePct, p);
+  return Array.from(byPct.values());
+}
 
 function buildMarketplacePayload(form: EquipoFormState): {
   marketplaceVisible: boolean;
@@ -305,6 +334,12 @@ function buildMarketplacePayload(form: EquipoFormState): {
   marketplaceDetailRowsJson: string | null;
   marketplaceYieldJson: string | null;
   marketplaceSortOrder: number;
+  marketplaceHashrateSellEnabled: boolean;
+  marketplaceHashrateParts: Array<{
+    sharePct: number;
+    warrantyPct: number;
+    setupUsd: number;
+  }> | null;
   marketplacePriceLabel: string | null;
   marketplaceListingKind: "miner" | "infrastructure" | null;
 } {
@@ -315,6 +350,8 @@ function buildMarketplacePayload(form: EquipoFormState): {
   const detailJson = vis && detailTrim ? sanitizeDetailRowsForApi(form.marketplaceDetailRowsJson) : null;
   const consult = vis && form.marketplacePriceConsultMode === true;
   const labelTrim = form.marketplacePriceLabel.trim();
+  const shareEnabled = form.marketplaceHashrateSellEnabled === true;
+  const shareParts = shareEnabled ? normalizeHashrateParts(form.marketplaceHashrateParts) : [];
   const marketplacePriceLabel =
     consult ? (labelTrim || DEFAULT_MARKETPLACE_PRICE_LABEL).slice(0, 120) : null;
   /** Siempre automático (heurística marca/modelo en vitrina); sin override manual en formulario. */
@@ -328,6 +365,8 @@ function buildMarketplacePayload(form: EquipoFormState): {
     marketplaceDetailRowsJson: detailJson,
     marketplaceYieldJson: null,
     marketplaceSortOrder: 0,
+    marketplaceHashrateSellEnabled: shareEnabled,
+    marketplaceHashrateParts: shareEnabled && shareParts.length > 0 ? shareParts : null,
     marketplacePriceLabel,
     marketplaceListingKind,
   };
@@ -365,6 +404,8 @@ function emptyEquipoForm(): EquipoFormState {
     precioHistorialLocal: [],
     observaciones: "",
     marketplaceVisible: false,
+    marketplaceHashrateSellEnabled: false,
+    marketplaceHashrateParts: [],
     marketplacePriceConsultMode: false,
     marketplacePriceLabel: "",
     marketplaceImageSrc: "",
@@ -497,6 +538,13 @@ export function EquiposAsicPage() {
       showToast("Debe completar Marca, Modelo y Procesador.", "error", "Equipos ASIC");
       return;
     }
+    if (formData.marketplaceHashrateSellEnabled) {
+      const shareParts = normalizeHashrateParts(formData.marketplaceHashrateParts);
+      if (shareParts.length === 0) {
+        showToast("Definí al menos una parte de hashrate para habilitar esta modalidad.", "error", "Equipos ASIC");
+        return;
+      }
+    }
     if (formData.marketplaceVisible) {
       if (formData.marketplacePriceConsultMode) {
         const lbl = (formData.marketplacePriceLabel.trim() || DEFAULT_MARKETPLACE_PRICE_LABEL).slice(0, 120);
@@ -538,6 +586,8 @@ export function EquiposAsicPage() {
                   marketplaceDetailRowsJson: mp.marketplaceDetailRowsJson,
                   marketplaceYieldJson: mp.marketplaceYieldJson,
                   marketplaceSortOrder: mp.marketplaceSortOrder,
+                  marketplaceHashrateSellEnabled: mp.marketplaceHashrateSellEnabled,
+                  marketplaceHashrateParts: mp.marketplaceHashrateParts,
                   marketplacePriceLabel: mp.marketplacePriceLabel ?? null,
                   marketplaceListingKind: mp.marketplaceListingKind ?? null,
                 }
@@ -572,6 +622,8 @@ export function EquiposAsicPage() {
             marketplaceDetailRowsJson: mp.marketplaceDetailRowsJson,
             marketplaceYieldJson: mp.marketplaceYieldJson,
             marketplaceSortOrder: mp.marketplaceSortOrder,
+            marketplaceHashrateSellEnabled: mp.marketplaceHashrateSellEnabled,
+            marketplaceHashrateParts: mp.marketplaceHashrateParts,
             marketplacePriceLabel: mp.marketplacePriceLabel ?? null,
             marketplaceListingKind: mp.marketplaceListingKind ?? null,
           },
@@ -608,6 +660,10 @@ export function EquiposAsicPage() {
       precioHistorialLocal: sortPrecioHistorialAsc(e.precioHistorial ?? []),
       observaciones: e.observaciones ?? "",
       marketplaceVisible: e.marketplaceVisible ?? false,
+      marketplaceHashrateSellEnabled: e.marketplaceHashrateSellEnabled ?? false,
+      marketplaceHashrateParts: normalizeHashrateParts(
+        Array.isArray(e.marketplaceHashrateParts) ? e.marketplaceHashrateParts : []
+      ),
       marketplacePriceConsultMode: Boolean(e.marketplacePriceLabel?.trim()) && (e.precioUSD ?? 0) <= 0,
       marketplacePriceLabel: e.marketplacePriceLabel?.trim() ?? "",
       marketplaceImageSrc: e.marketplaceImageSrc ?? "",
@@ -1701,6 +1757,145 @@ export function EquiposAsicPage() {
                               </div>
                             </div>
                           </div>
+                          {canEditTienda ? (
+                            <div
+                              className="hrs-equipo-asic-modal-form__vitrina-callout mt-2"
+                              style={{ background: "rgba(255,255,255,0.72)" }}
+                            >
+                              <div className="hrs-equipo-asic-modal-form__vitrina-callout-inner align-items-start">
+                                <input
+                                  type="checkbox"
+                                  id="mp-hashrate-enabled"
+                                  className="hrs-equipo-asic-modal-form__vitrina-checkbox"
+                                  checked={formData.marketplaceHashrateSellEnabled}
+                                  onChange={(e) =>
+                                    setFormData((prev) => ({
+                                      ...prev,
+                                      marketplaceHashrateSellEnabled: e.target.checked,
+                                      marketplaceHashrateParts:
+                                        e.target.checked && prev.marketplaceHashrateParts.length === 0
+                                          ? [...DEFAULT_HASHRATE_PARTS]
+                                          : prev.marketplaceHashrateParts,
+                                    }))
+                                  }
+                                />
+                                <div className="hrs-equipo-asic-modal-form__vitrina-callout-text w-100">
+                                  <label htmlFor="mp-hashrate-enabled" className="hrs-equipo-asic-modal-form__vitrina-callout-title">
+                                    Vender por partes de hashrate (%)
+                                  </label>
+                                  <p className="hrs-equipo-asic-modal-form__vitrina-callout-sub mb-2">
+                                    Configurá porcentajes y setup USD por parte para este equipo.
+                                  </p>
+                                  {formData.marketplaceHashrateSellEnabled ? (
+                                    <div className="table-responsive">
+                                      <table className="table table-sm align-middle mb-2">
+                                        <thead>
+                                          <tr>
+                                            <th style={{ minWidth: 120 }}>% hashrate</th>
+                                            <th style={{ minWidth: 130 }}>Setup USD</th>
+                                            <th style={{ width: 90 }}>Acción</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {formData.marketplaceHashrateParts.map((part, idx) => (
+                                            <tr key={`${part.sharePct}-${idx}`}>
+                                              <td>
+                                                <Input
+                                                  type="number"
+                                                  min={1}
+                                                  max={100}
+                                                  value={part.sharePct}
+                                                  onChange={(e) => {
+                                                    const v = Math.max(1, Math.min(100, Math.round(Number(e.target.value) || 0)));
+                                                    setFormData((prev) => {
+                                                      const next = [...prev.marketplaceHashrateParts];
+                                                      next[idx] = { ...next[idx], sharePct: v, warrantyPct: v };
+                                                      return { ...prev, marketplaceHashrateParts: next };
+                                                    });
+                                                  }}
+                                                />
+                                              </td>
+                                              <td>
+                                                <Input
+                                                  type="number"
+                                                  min={0}
+                                                  max={999999}
+                                                  value={part.setupUsd}
+                                                  onChange={(e) => {
+                                                    const v = Math.max(0, Math.min(999999, Math.round(Number(e.target.value) || 0)));
+                                                    setFormData((prev) => {
+                                                      const next = [...prev.marketplaceHashrateParts];
+                                                      next[idx] = { ...next[idx], setupUsd: v };
+                                                      return { ...prev, marketplaceHashrateParts: next };
+                                                    });
+                                                  }}
+                                                />
+                                              </td>
+                                              <td>
+                                                <Button
+                                                  type="button"
+                                                  size="xs"
+                                                  variant="outline"
+                                                  colorPalette="red"
+                                                  onClick={() =>
+                                                    setFormData((prev) => ({
+                                                      ...prev,
+                                                      marketplaceHashrateParts: prev.marketplaceHashrateParts.filter((_, i) => i !== idx),
+                                                    }))
+                                                  }
+                                                  disabled={formData.marketplaceHashrateParts.length <= 1}
+                                                >
+                                                  Quitar
+                                                </Button>
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  ) : null}
+                                  {formData.marketplaceHashrateSellEnabled ? (
+                                    <p className="small text-muted mb-2">
+                                      El % de garantía se ajusta automáticamente al mismo % de hashrate.
+                                    </p>
+                                  ) : null}
+                                  {formData.marketplaceHashrateSellEnabled ? (
+                                    <div className="d-flex gap-2">
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                          setFormData((prev) => ({
+                                            ...prev,
+                                            marketplaceHashrateParts: [
+                                              ...prev.marketplaceHashrateParts,
+                                              { sharePct: 25, warrantyPct: 25, setupUsd: 40 },
+                                            ],
+                                          }))
+                                        }
+                                      >
+                                        + Agregar parte
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() =>
+                                          setFormData((prev) => ({
+                                            ...prev,
+                                            marketplaceHashrateParts: [...DEFAULT_HASHRATE_PARTS],
+                                          }))
+                                        }
+                                      >
+                                        Restaurar sugeridos
+                                      </Button>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
                         {canEditTienda ? (
                           <div className="client-form-column hrs-equipo-asic-modal-form__col-media">

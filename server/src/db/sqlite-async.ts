@@ -133,6 +133,7 @@ CREATE TABLE IF NOT EXISTS items_garantia_ande (
   codigo TEXT NOT NULL,
   marca TEXT NOT NULL,
   modelo TEXT NOT NULL,
+  marketplace_equipo_id TEXT,
   fecha_ingreso TEXT NOT NULL,
   observaciones TEXT,
   precio_garantia REAL
@@ -171,6 +172,8 @@ CREATE TABLE IF NOT EXISTS equipos_asic (
   mp_detail_rows_json TEXT,
   mp_yield_json TEXT,
   mp_sort_order INTEGER NOT NULL DEFAULT 0,
+  mp_hashrate_sell_enabled INTEGER NOT NULL DEFAULT 0,
+  mp_hashrate_parts_json TEXT,
   precio_historial_json TEXT,
   mp_price_label TEXT
 );
@@ -372,6 +375,8 @@ CREATE INDEX IF NOT EXISTS idx_equipos_asic_audit_created ON equipos_asic_audit(
     "mp_detail_rows_json TEXT",
     "mp_yield_json TEXT",
     "mp_sort_order INTEGER NOT NULL DEFAULT 0",
+    "mp_hashrate_sell_enabled INTEGER NOT NULL DEFAULT 0",
+    "mp_hashrate_parts_json TEXT",
     "precio_historial_json TEXT",
     "mp_price_label TEXT",
     "mp_listing_kind TEXT",
@@ -428,6 +433,12 @@ CREATE INDEX IF NOT EXISTS idx_equipos_asic_audit_created ON equipos_asic_audit(
 
   try {
     native.exec("ALTER TABLE items_garantia_ande ADD COLUMN precio_garantia REAL");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+  try {
+    native.exec("ALTER TABLE items_garantia_ande ADD COLUMN marketplace_equipo_id TEXT");
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     if (!msg.includes("duplicate column")) throw e;

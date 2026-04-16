@@ -52,6 +52,12 @@ const MARKETPLACE_IMAGE_SRC_MAX_LEN = 6_000_000;
 /** Galería JSON puede incluir varias URLs / data URLs. */
 const MARKETPLACE_GALLERY_JSON_MAX_LEN = 12_000_000;
 
+const HashratePartSchema = z.object({
+  sharePct: z.number().int().min(1).max(100),
+  warrantyPct: z.number().int().min(0).max(100),
+  setupUsd: z.number().int().min(0).max(999999),
+});
+
 const EquipoBodySchema = z
   .object({
     /** En POST se ignora (se asigna en servidor). En PUT se ignora (no se puede cambiar). */
@@ -70,6 +76,8 @@ const EquipoBodySchema = z
     marketplaceDetailRowsJson: z.string().max(32000).optional().nullable(),
     marketplaceYieldJson: z.string().max(8000).optional().nullable(),
     marketplaceSortOrder: z.number().int().min(0).max(999999).optional().default(0),
+    marketplaceHashrateSellEnabled: z.boolean().optional().default(false),
+    marketplaceHashrateParts: z.array(HashratePartSchema).max(12).optional().nullable(),
     /**
      * Texto comercial en vitrina cuando no hay precio USD (ej. «SOLICITA PRECIO»).
      * Si `precioUSD` > 0, se ignora y no se persiste.
@@ -86,6 +94,16 @@ const EquipoBodySchema = z
     marketplaceListingKind: z.union([z.literal("miner"), z.literal("infrastructure")]).nullable().optional(),
   })
   .superRefine((d, ctx) => {
+    if (d.marketplaceHashrateSellEnabled) {
+      const parts = Array.isArray(d.marketplaceHashrateParts) ? d.marketplaceHashrateParts : [];
+      if (parts.length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Definí al menos una parte de hashrate para habilitar esta modalidad.",
+          path: ["marketplaceHashrateParts"],
+        });
+      }
+    }
     if (!d.marketplaceVisible) return;
     const precio = Math.round(Number(d.precioUSD) || 0);
     const label = (d.marketplacePriceLabel ?? "").trim();
@@ -116,6 +134,8 @@ type EquipoRow = {
   mp_detail_rows_json?: string | null;
   mp_yield_json?: string | null;
   mp_sort_order?: number | null;
+  mp_hashrate_sell_enabled?: number | boolean | null;
+  mp_hashrate_parts_json?: string | null;
   mp_price_label?: string | null;
   mp_listing_kind?: string | null;
   precio_historial_json?: string | null;
@@ -136,6 +156,25 @@ function rowMpVisible(r: EquipoRow): boolean {
 }
 
 function rowToItem(r: EquipoRow) {
+  let marketplaceHashrateParts: Array<{ sharePct: number; warrantyPct: number; setupUsd: number }> | null = null;
+  if (r.mp_hashrate_parts_json?.trim()) {
+    try {
+      const raw = JSON.parse(r.mp_hashrate_parts_json);
+      if (Array.isArray(raw)) {
+        marketplaceHashrateParts = raw
+          .map((x) => HashratePartSchema.safeParse(x))
+          .filter((x) => x.success)
+          .map((x) => ({
+            ...x.data,
+            // Regla vigente: la garantía prorratea con el mismo % de hashrate.
+            warrantyPct: x.data.sharePct,
+          }))
+          .sort((a, b) => b.sharePct - a.sharePct);
+      }
+    } catch {
+      marketplaceHashrateParts = null;
+    }
+  }
   return {
     id: r.id,
     numeroSerie: r.numero_serie ?? undefined,
@@ -153,6 +192,8 @@ function rowToItem(r: EquipoRow) {
     marketplaceDetailRowsJson: r.mp_detail_rows_json ?? null,
     marketplaceYieldJson: r.mp_yield_json ?? null,
     marketplaceSortOrder: Number(r.mp_sort_order) || 0,
+    marketplaceHashrateSellEnabled: mpVisibleFromDbValue(r.mp_hashrate_sell_enabled),
+    marketplaceHashrateParts: marketplaceHashrateParts?.length ? marketplaceHashrateParts : null,
     marketplacePriceLabel: r.mp_price_label?.trim() ? r.mp_price_label.trim() : null,
     marketplaceListingKind: mpListingKindPersistValue(r.mp_listing_kind),
     precioHistorial: parsePrecioHistorialJson(r.precio_historial_json ?? null),
@@ -175,6 +216,20 @@ function mpPayloadFromBody(d: z.infer<typeof EquipoBodySchema>) {
   const lk = d.marketplaceListingKind;
   const mp_listing_kind =
     vis && (lk === "miner" || lk === "infrastructure") ? lk : null;
+  const shareEnabled = d.marketplaceHashrateSellEnabled === true;
+  const shareParts = shareEnabled && Array.isArray(d.marketplaceHashrateParts) ? d.marketplaceHashrateParts : [];
+  const normalizedShareParts = shareParts
+    .map((x) => HashratePartSchema.safeParse(x))
+    .filter((x) => x.success)
+    .map((x) => ({
+      ...x.data,
+      // No confiamos en payload cliente: garantía siempre = % hashrate.
+      warrantyPct: x.data.sharePct,
+    }))
+    .sort((a, b) => b.sharePct - a.sharePct);
+  const uniqByPct = new Map<number, z.infer<typeof HashratePartSchema>>();
+  for (const it of normalizedShareParts) uniqByPct.set(it.sharePct, it);
+  const dedupShareParts = Array.from(uniqByPct.values());
   return {
     mp_visible: mpVisibleToInt(vis),
     mp_algo: vis ? resolveMarketplaceAlgoForPersist(d) : null,
@@ -184,6 +239,9 @@ function mpPayloadFromBody(d: z.infer<typeof EquipoBodySchema>) {
     mp_detail_rows_json: vis ? (d.marketplaceDetailRowsJson?.trim() || null) : null,
     mp_yield_json: null,
     mp_sort_order: vis ? sort : 0,
+    mp_hashrate_sell_enabled: shareEnabled ? mpVisibleToInt(true) : mpVisibleToInt(false),
+    mp_hashrate_parts_json:
+      shareEnabled && dedupShareParts.length > 0 ? JSON.stringify(dedupShareParts) : null,
     mp_price_label,
     mp_listing_kind,
   };
@@ -200,6 +258,8 @@ function mpPayloadFromExistingRow(r: EquipoRow) {
     mp_detail_rows_json: r.mp_detail_rows_json ?? null,
     mp_yield_json: r.mp_yield_json ?? null,
     mp_sort_order: Number(r.mp_sort_order) || 0,
+    mp_hashrate_sell_enabled: mpVisibleToInt(mpVisibleFromDbValue(r.mp_hashrate_sell_enabled)),
+    mp_hashrate_parts_json: r.mp_hashrate_parts_json ?? null,
     mp_price_label: r.mp_price_label?.trim() ? r.mp_price_label.trim() : null,
     mp_listing_kind: mpListingKindPersistValue(r.mp_listing_kind),
   };
@@ -218,6 +278,7 @@ async function nextNumeroSerie(): Promise<string> {
 /** Listado completo de columnas para mapear fila → vitrina / gestión. */
 export const EQUIPOS_ASIC_SELECT = `SELECT id, numero_serie, fecha_ingreso, marca_equipo, modelo, procesador, precio_usd, observaciones,
   mp_visible, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_sort_order,
+  mp_hashrate_sell_enabled, mp_hashrate_parts_json,
   mp_price_label, mp_listing_kind, precio_historial_json
   FROM equipos_asic`;
 
@@ -408,9 +469,9 @@ equiposRouter.post("/equipos", requireAuth, requireCanEdit, async (req, res: Res
     await db
       .prepare(
         `INSERT INTO equipos_asic (id, numero_serie, fecha_ingreso, marca_equipo, modelo, procesador, precio_usd, observaciones,
-          mp_visible, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_sort_order,
+          mp_visible, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_sort_order, mp_hashrate_sell_enabled, mp_hashrate_parts_json,
           mp_price_label, mp_listing_kind, precio_historial_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         id,
@@ -429,6 +490,8 @@ equiposRouter.post("/equipos", requireAuth, requireCanEdit, async (req, res: Res
         mp.mp_detail_rows_json,
         mp.mp_yield_json,
         mp.mp_sort_order,
+        mp.mp_hashrate_sell_enabled,
+        mp.mp_hashrate_parts_json,
         mp.mp_price_label ?? null,
         mp.mp_listing_kind ?? null,
         historialInicial
@@ -601,7 +664,7 @@ equiposRouter.put("/equipos/:id", requireAuth, requireCanEdit, async (req, res: 
       .prepare(
         `UPDATE equipos_asic SET fecha_ingreso = ?, marca_equipo = ?, modelo = ?, procesador = ?, precio_usd = ?, observaciones = ?,
           numero_serie = ?, mp_visible = ?, mp_algo = ?, mp_hashrate_display = ?, mp_image_src = ?, mp_gallery_json = ?, mp_detail_rows_json = ?, mp_yield_json = ?, mp_sort_order = ?,
-          mp_price_label = ?, mp_listing_kind = ?, precio_historial_json = ?
+          mp_hashrate_sell_enabled = ?, mp_hashrate_parts_json = ?, mp_price_label = ?, mp_listing_kind = ?, precio_historial_json = ?
           WHERE id = ?`
       )
       .run(
@@ -620,6 +683,8 @@ equiposRouter.put("/equipos/:id", requireAuth, requireCanEdit, async (req, res: 
         mp.mp_detail_rows_json,
         mp.mp_yield_json,
         mp.mp_sort_order,
+        mp.mp_hashrate_sell_enabled,
+        mp.mp_hashrate_parts_json,
         mp.mp_price_label ?? null,
         mp.mp_listing_kind ?? null,
         historialJson,
@@ -640,6 +705,8 @@ equiposRouter.put("/equipos/:id", requireAuth, requireCanEdit, async (req, res: 
       mp_gallery_len: (r.mp_gallery_json ?? "").length,
       mp_detail_len: (r.mp_detail_rows_json ?? "").length,
       mp_sort: Number(r.mp_sort_order) || 0,
+      mp_hashrate_sell_enabled: mpVisibleFromDbValue(r.mp_hashrate_sell_enabled),
+      mp_hashrate_parts_json: (r.mp_hashrate_parts_json ?? "").trim() || null,
       mp_price_label: (r.mp_price_label ?? "").trim() || null,
       mp_listing_kind: mpListingKindPersistValue(r.mp_listing_kind),
     });
@@ -650,6 +717,8 @@ equiposRouter.put("/equipos/:id", requireAuth, requireCanEdit, async (req, res: 
       mp_gallery_len: (mp.mp_gallery_json ?? "").length,
       mp_detail_len: (mp.mp_detail_rows_json ?? "").length,
       mp_sort: mp.mp_sort_order,
+      mp_hashrate_sell_enabled: mp.mp_hashrate_sell_enabled === 1,
+      mp_hashrate_parts_json: (mp.mp_hashrate_parts_json ?? "").trim() || null,
       mp_price_label: (mp.mp_price_label ?? "").trim() || null,
       mp_listing_kind: mpListingKindPersistValue(mp.mp_listing_kind),
     };
@@ -732,9 +801,9 @@ equiposRouter.post("/equipos/bulk", requireAuth, requireAdminsEquipo, async (req
     await db
       .prepare(
         `INSERT INTO equipos_asic (id, numero_serie, fecha_ingreso, marca_equipo, modelo, procesador, precio_usd, observaciones,
-          mp_visible, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_sort_order,
+          mp_visible, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_sort_order, mp_hashrate_sell_enabled, mp_hashrate_parts_json,
           mp_price_label, mp_listing_kind, precio_historial_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, ?)`
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, NULL, NULL, NULL, ?)`
       )
       .run(id, ns, fechaIngreso, marcaEquipo.trim(), modelo.trim(), procesador.trim(), precioUSD, observaciones ?? null, historialInicial);
   }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { createGarantiaItem, getGarantiasItems, type GarantiasItemsResponse } from "../lib/api";
+import { createGarantiaItem, getEquipos, getGarantiasItems, wakeUpBackend, type EquiposResponse, type GarantiasItemsResponse } from "../lib/api";
 import type { ItemGarantiaAnde } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
 import { showToast } from "../components/ToastNotification";
@@ -32,12 +32,14 @@ export function GarantiaAndeItemNewPage() {
   const canEdit = user ? canEditClientes(user.role) : false;
   const [items, setItems] = useState<ItemGarantiaAnde[]>([]);
   const [, setLoading] = useState(true);
+  const [marketplaceEquipos, setMarketplaceEquipos] = useState<Array<{ id: string; label: string }>>([]);
 
   const nextCodigo = getNextCodigoGarantia(items);
 
   const [formData, setFormData] = useState({
     marca: "",
     modelo: "",
+    marketplaceEquipoId: "",
     fechaIngreso: new Date().toISOString().slice(0, 10),
     precioGarantia: "",
     observaciones: "",
@@ -48,6 +50,23 @@ export function GarantiaAndeItemNewPage() {
       .then((r: GarantiasItemsResponse) => setItems(r.items))
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    wakeUpBackend()
+      .then(() => getEquipos())
+      .then((r: EquiposResponse) => {
+        const all = Array.isArray(r.items) ? r.items : [];
+        const mapped = all
+          .filter((x) => x?.id && x.marketplaceVisible === true)
+          .map((x) => ({
+            id: x.id,
+            label: `${x.marcaEquipo ?? "—"} ${x.modelo ?? "—"} · ${x.procesador ?? "—"} · ${x.numeroSerie ?? x.id}`,
+          }))
+          .sort((a, b) => a.label.localeCompare(b.label, "es"));
+        setMarketplaceEquipos(mapped);
+      })
+      .catch(() => setMarketplaceEquipos([]));
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -66,6 +85,7 @@ export function GarantiaAndeItemNewPage() {
       codigo,
       marca: formData.marca.trim(),
       modelo: formData.modelo.trim(),
+      marketplaceEquipoId: formData.marketplaceEquipoId.trim() || undefined,
       fechaIngreso: formData.fechaIngreso.trim(),
       precioGarantia,
       observaciones: formData.observaciones.trim() || undefined,
@@ -202,6 +222,27 @@ export function GarantiaAndeItemNewPage() {
                             required
                             autoComplete="off"
                           />
+                        </div>
+                        <div className="mb-2">
+                          <label className="form-label market-registro-label" htmlFor="gar-new-marketplace-equipo">
+                            Equipo marketplace vinculado
+                          </label>
+                          <select
+                            id="gar-new-marketplace-equipo"
+                            className="form-select"
+                            value={formData.marketplaceEquipoId}
+                            onChange={(e) => setFormData({ ...formData, marketplaceEquipoId: e.target.value })}
+                          >
+                            <option value="">— Sin vínculo explícito —</option>
+                            {marketplaceEquipos.map((eq) => (
+                              <option key={eq.id} value={eq.id}>
+                                {eq.label}
+                              </option>
+                            ))}
+                          </select>
+                          <div className="market-registro-hint text-muted">
+                            Este vínculo fuerza el match de garantía para ese equipo del marketplace.
+                          </div>
                         </div>
                         <div className="mb-0">
                           <label className="form-label market-registro-label" htmlFor="gar-new-precio">

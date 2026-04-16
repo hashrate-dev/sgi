@@ -59,6 +59,8 @@ export type VitrinaAsicProduct = {
   estimatedYield: { line1: string; line2: string };
   /** Minero vs rack/PDU: la tienda oculta rendimiento estimado y tarifa hosting si no es minero. */
   listingKind: VitrinaListingKind;
+  hashrateShareEnabled?: boolean;
+  hashrateShareParts?: Array<{ sharePct: number; warrantyPct: number; setupUsd: number }>;
 };
 
 function defaultDetailRows(algo: AsicAlgo): VitrinaAsicProduct["detailRows"] {
@@ -109,6 +111,8 @@ export type EquipoAsicVitrinaRow = {
   mp_gallery_json: string | null;
   mp_detail_rows_json: string | null;
   mp_yield_json: string | null;
+  mp_hashrate_sell_enabled?: number | boolean | null;
+  mp_hashrate_parts_json?: string | null;
   mp_price_label?: string | null;
   mp_listing_kind?: string | null;
 };
@@ -181,6 +185,31 @@ export function mapEquipoRowToVitrina(row: EquipoAsicVitrinaRow): VitrinaAsicPro
   const priceDisplayLabel = priceUsd <= 0 && labelNorm ? labelNorm : undefined;
 
   const listingKind = resolveVitrinaListingKind(row);
+  let hashrateShareParts: Array<{ sharePct: number; warrantyPct: number; setupUsd: number }> = [];
+  if (row.mp_hashrate_parts_json?.trim()) {
+    try {
+      const raw = JSON.parse(row.mp_hashrate_parts_json) as unknown;
+      if (Array.isArray(raw)) {
+        hashrateShareParts = raw
+          .map((x) => {
+            if (!x || typeof x !== "object") return null;
+            const o = x as { sharePct?: unknown; warrantyPct?: unknown; setupUsd?: unknown };
+            const sharePct = Math.round(Number(o.sharePct));
+            const warrantyPct = Math.round(Number(o.warrantyPct));
+            const setupUsd = Math.round(Number(o.setupUsd));
+            if (!Number.isFinite(sharePct) || sharePct <= 0 || sharePct > 100) return null;
+            if (!Number.isFinite(warrantyPct) || warrantyPct < 0 || warrantyPct > 100) return null;
+            if (!Number.isFinite(setupUsd) || setupUsd < 0 || setupUsd > 999999) return null;
+            return { sharePct, warrantyPct, setupUsd };
+          })
+          .filter((x): x is { sharePct: number; warrantyPct: number; setupUsd: number } => x != null)
+          .sort((a, b) => b.sharePct - a.sharePct);
+      }
+    } catch {
+      hashrateShareParts = [];
+    }
+  }
+  const hashrateShareEnabled = (row.mp_hashrate_sell_enabled === true || Number(row.mp_hashrate_sell_enabled) === 1) && hashrateShareParts.length > 0;
 
   return {
     id: row.id,
@@ -195,5 +224,6 @@ export function mapEquipoRowToVitrina(row: EquipoAsicVitrinaRow): VitrinaAsicPro
     detailRows,
     estimatedYield,
     listingKind,
+    ...(hashrateShareEnabled ? { hashrateShareEnabled: true, hashrateShareParts } : {}),
   };
 }

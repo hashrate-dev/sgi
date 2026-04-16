@@ -842,9 +842,9 @@ export function getMarketplaceSetupQuotePrices(): Promise<{
 
 /** Ítems con precio garantía ANDE (misma BD que /equipos-asic/items-garantia). Público. */
 export function getMarketplaceGarantiaQuotePrices(): Promise<{
-  items: Array<{ codigo: string; marca: string; modelo: string; precioGarantia: number }>;
+  items: Array<{ codigo: string; marca: string; modelo: string; marketplaceEquipoId?: string; precioGarantia: number }>;
 }> {
-  return api<{ items: Array<{ codigo: string; marca: string; modelo: string; precioGarantia: number }> }>(
+  return api<{ items: Array<{ codigo: string; marca: string; modelo: string; marketplaceEquipoId?: string; precioGarantia: number }> }>(
     "/api/marketplace/garantia-quote-prices"
   );
 }
@@ -882,6 +882,12 @@ export type EquipoMarketplacePayload = {
   marketplaceDetailRowsJson?: string | null;
   marketplaceYieldJson?: string | null;
   marketplaceSortOrder?: number;
+  marketplaceHashrateSellEnabled?: boolean;
+  marketplaceHashrateParts?: Array<{
+    sharePct: number;
+    warrantyPct: number;
+    setupUsd: number;
+  }> | null;
   marketplacePriceLabel?: string | null;
   /** null = automático (heurística); solo aplica con tienda visible. */
   marketplaceListingKind?: "miner" | "infrastructure" | null;
@@ -1097,7 +1103,9 @@ export type QuoteSyncLinePayload = {
   hashrate: string;
   priceUsd: number;
   priceLabel: string;
-  hashrateSharePct?: 25 | 50 | 75;
+  hashrateSharePct?: number;
+  hashrateWarrantyPct?: number;
+  hashrateSetupUsd?: number;
   includeSetup?: boolean;
   includeWarranty?: boolean;
 };
@@ -1137,6 +1145,8 @@ export type MarketplaceQuoteTicketItem = {
   priceUsd?: number;
   priceLabel?: string;
   hashrateSharePct?: number;
+  hashrateWarrantyPct?: number;
+  hashrateSetupUsd?: number;
   includeSetup?: boolean;
   includeWarranty?: boolean;
 };

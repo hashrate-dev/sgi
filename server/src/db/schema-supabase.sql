@@ -103,12 +103,14 @@ CREATE TABLE IF NOT EXISTS items_garantia_ande (
   codigo TEXT NOT NULL,
   marca TEXT NOT NULL,
   modelo TEXT NOT NULL,
+  marketplace_equipo_id TEXT,
   fecha_ingreso TEXT NOT NULL,
   observaciones TEXT,
   precio_garantia DOUBLE PRECISION
 );
 
 ALTER TABLE items_garantia_ande ADD COLUMN IF NOT EXISTS precio_garantia DOUBLE PRECISION;
+ALTER TABLE items_garantia_ande ADD COLUMN IF NOT EXISTS marketplace_equipo_id TEXT;
 
 CREATE TABLE IF NOT EXISTS items_garantia_ande_precio_historial (
   id BIGSERIAL PRIMARY KEY,
@@ -142,6 +144,8 @@ CREATE TABLE IF NOT EXISTS equipos_asic (
   mp_detail_rows_json TEXT,
   mp_yield_json TEXT,
   mp_sort_order INTEGER NOT NULL DEFAULT 0,
+  mp_hashrate_sell_enabled INTEGER NOT NULL DEFAULT 0,
+  mp_hashrate_parts_json TEXT,
   precio_historial_json TEXT,
   mp_price_label TEXT
 );
@@ -156,6 +160,8 @@ ALTER TABLE equipos_asic ADD COLUMN IF NOT EXISTS mp_gallery_json TEXT;
 ALTER TABLE equipos_asic ADD COLUMN IF NOT EXISTS mp_detail_rows_json TEXT;
 ALTER TABLE equipos_asic ADD COLUMN IF NOT EXISTS mp_yield_json TEXT;
 ALTER TABLE equipos_asic ADD COLUMN IF NOT EXISTS mp_sort_order INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE equipos_asic ADD COLUMN IF NOT EXISTS mp_hashrate_sell_enabled INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE equipos_asic ADD COLUMN IF NOT EXISTS mp_hashrate_parts_json TEXT;
 ALTER TABLE equipos_asic ADD COLUMN IF NOT EXISTS mp_price_label TEXT;
 ALTER TABLE equipos_asic ADD COLUMN IF NOT EXISTS mp_listing_kind TEXT;
 
