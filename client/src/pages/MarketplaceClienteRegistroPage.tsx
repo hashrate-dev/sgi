@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import { canUseMarketplaceQuoteCart } from "../lib/auth.js";
 import { useAuth } from "../contexts/AuthContext";
-import { isEmailAlreadyRegisteredError, registerMarketplaceCliente, wakeUpBackend } from "../lib/api";
+import { isDocumentAlreadyRegisteredError, isEmailAlreadyRegisteredError, registerMarketplaceCliente, wakeUpBackend } from "../lib/api";
 import { MarketplacePasswordField } from "../components/marketplace/MarketplacePasswordField";
 import { MarketplaceSiteHeader } from "../components/marketplace/MarketplaceSiteHeader";
 import { MarketplaceSiteFooter } from "../components/marketplace/MarketplaceSiteFooter";
@@ -258,7 +258,7 @@ export function MarketplaceClienteRegistroPage() {
       });
       applyLoginResponse(res);
     } catch (err) {
-      if (isEmailAlreadyRegisteredError(err)) {
+      if (isEmailAlreadyRegisteredError(err) || isDocumentAlreadyRegisteredError(err)) {
         setErrorKind("duplicate");
         setError(err instanceof Error ? err.message : t("reg.err.duplicate_fallback"));
       } else {

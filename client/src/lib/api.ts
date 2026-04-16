@@ -121,6 +121,7 @@ function fetchWithTimeout(url: string, opts: RequestInit, timeoutMs: number): Pr
 export type ApiHttpError = Error & { status?: number; code?: string };
 
 export const API_ERROR_EMAIL_ALREADY_REGISTERED = "EMAIL_ALREADY_REGISTERED";
+export const API_ERROR_DOCUMENT_ALREADY_REGISTERED = "DOCUMENT_ALREADY_REGISTERED";
 /** Marketplace: ya hay una consulta en curso para esta cuenta (una orden activa). */
 export const API_ERROR_ONE_ACTIVE_ORDER = "ONE_ACTIVE_ORDER";
 
@@ -160,6 +161,14 @@ export function isEmailAlreadyRegisteredError(err: unknown): boolean {
   if (e.code === API_ERROR_EMAIL_ALREADY_REGISTERED) return true;
   const msg = String(e?.message ?? "").toLowerCase();
   return msg.includes("correo electrónico") && msg.includes("asociado a una cuenta");
+}
+
+export function isDocumentAlreadyRegisteredError(err: unknown): boolean {
+  const e = err as ApiHttpError;
+  if (e?.status !== 409) return false;
+  if (e.code === API_ERROR_DOCUMENT_ALREADY_REGISTERED) return true;
+  const msg = String(e?.message ?? "").toLowerCase();
+  return msg.includes("documento") || msg.includes("cédula") || msg.includes("cedula");
 }
 
 export function isOneActiveOrderError(err: unknown): boolean {

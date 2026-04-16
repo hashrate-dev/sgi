@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { z } from "zod";
+import { z, type ZodError } from "zod";
 import { db } from "../db.js";
 import { env } from "../config/env.js";
 import { allocateNextTiendaOnlineClientCode, type TiendaSeqTx } from "../lib/tiendaOnlineClientCode.js";
@@ -52,11 +52,65 @@ function isEmailUniqueViolation(err: unknown): boolean {
   return (
     haystack.includes("users.username") ||
     haystack.includes("users.email") ||
+    haystack.includes("clients.email") ||
     haystack.includes("users_username_key") ||
     haystack.includes("users_email_key") ||
+    haystack.includes("clients_email_key") ||
     haystack.includes(" username ") ||
     haystack.includes(" email ")
   );
+}
+
+function isDocumentoUniqueViolation(err: unknown): boolean {
+  const e = err as { message?: unknown; detail?: unknown; constraint?: unknown; column?: unknown };
+  const haystack = [
+    String(e?.message ?? ""),
+    String(e?.detail ?? ""),
+    String(e?.constraint ?? ""),
+    String(e?.column ?? ""),
+  ]
+    .join(" ")
+    .toLowerCase();
+  return (
+    haystack.includes("documento_identidad") ||
+    haystack.includes("clients_documento") ||
+    haystack.includes("idx_clients_documento")
+  );
+}
+
+function normalizeDocumentoIdentidad(input: string): string {
+  return String(input ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+function registerFieldLabel(path: string): string {
+  const k = path.toLowerCase();
+  if (k === "email") return "correo electrónico";
+  if (k === "password") return "contraseña";
+  if (k === "nombre") return "nombre";
+  if (k === "apellidos") return "apellidos";
+  if (k === "documentoidentidad") return "documento/cédula";
+  if (k === "country") return "país";
+  if (k === "city") return "ciudad";
+  if (k === "direccion") return "dirección";
+  if (k === "celular") return "celular";
+  if (k === "telefono") return "teléfono";
+  return path;
+}
+
+function formatRegisterValidationMessage(zerr: ZodError): string {
+  const issue = zerr.issues[0];
+  if (!issue) {
+    return "Completá todos los datos requeridos para crear la cuenta.";
+  }
+  const field = issue.path.length > 0 ? String(issue.path[0]) : "datos";
+  const label = registerFieldLabel(field);
+  const msg = String(issue.message || "").trim();
+  if (!msg) return `Revisá el campo ${label}.`;
+  if (msg.toLowerCase().includes("required")) return `Completá el campo ${label}.`;
+  return `Revisá ${label}: ${msg}.`;
 }
 
 /** Asegurar que los usuarios por defecto existan (crear si no existen). */
@@ -93,13 +147,14 @@ authRouter.post("/auth/register-cliente", registerClienteRateLimit, async (req, 
   if (!parsed.success) {
     return res.status(400).json({
       error: {
-        message:
-          "Completá todos los datos: correo, contraseña (mín. 6), nombre, apellidos, documento, país, ciudad, dirección, celular y teléfono opcional.",
+        code: "REGISTER_VALIDATION_ERROR",
+        message: formatRegisterValidationMessage(parsed.error),
       },
     });
   }
   const body = parsed.data;
   const emailNorm = body.email.trim().toLowerCase();
+  const documentoNorm = normalizeDocumentoIdentidad(body.documentoIdentidad);
   const password = body.password;
   const hash = bcrypt.hashSync(password, 10);
   const telefonoFijo = body.telefono?.trim() ? body.telefono.trim() : null;
@@ -120,6 +175,36 @@ authRouter.post("/auth/register-cliente", registerClienteRateLimit, async (req, 
         },
       });
     }
+    const dupClientEmail = (await db
+      .prepare("SELECT id, user_id FROM clients WHERE LOWER(TRIM(COALESCE(email, ''))) = ? LIMIT 1")
+      .get(emailNorm)) as { id: number; user_id?: number | null } | undefined;
+    let reusableClientId: number | null = null;
+    if (dupClientEmail) {
+      const linkedUserId = Number(dupClientEmail.user_id ?? 0);
+      if (Number.isFinite(linkedUserId) && linkedUserId > 0) {
+        return res.status(409).json({
+          error: {
+            code: "EMAIL_ALREADY_REGISTERED",
+            message:
+              "Este correo electrónico ya está asociado a una cuenta en el sistema. No podés crear una cuenta nueva con el mismo correo. Si ya tenés usuario, iniciá sesión con tu contraseña.",
+          },
+        });
+      }
+      const cid = Number(dupClientEmail.id);
+      reusableClientId = Number.isFinite(cid) && cid > 0 ? cid : null;
+    }
+    const dupDocumento = (await db
+      .prepare("SELECT id FROM clients WHERE LOWER(TRIM(COALESCE(documento_identidad, ''))) = ? LIMIT 1")
+      .get(documentoNorm)) as { id: number } | undefined;
+    if (dupDocumento) {
+      return res.status(409).json({
+        error: {
+          code: "DOCUMENT_ALREADY_REGISTERED",
+          message:
+            "Este documento/cédula ya está asociado a una cuenta en el sistema. No podés crear otra cuenta con el mismo documento.",
+        },
+      });
+    }
 
     await db.transaction(async (tx) => {
       const insUser = await tx
@@ -133,26 +218,59 @@ authRouter.post("/auth/register-cliente", registerClienteRateLimit, async (req, 
       if (uid == null || !Number.isFinite(Number(uid))) {
         throw new Error("No se obtuvo el id de usuario tras el registro.");
       }
-      const code = await allocateNextTiendaOnlineClientCode(tx as TiendaSeqTx);
-      await tx
-        .prepare(
-          `INSERT INTO clients (code, name, name2, phone, phone2, email, email2, address, address2, city, city2, usuario, documento_identidad, country, user_id)
-           VALUES (?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, NULL, ?, ?, ?, ?)`
-        )
-        .run(
-          code,
-          body.nombre.trim(),
-          body.apellidos.trim(),
-          body.celular.trim(),
-          telefonoFijo,
-          emailNorm,
-          body.direccion.trim(),
-          body.city.trim(),
-          emailNorm,
-          body.documentoIdentidad.trim(),
-          body.country.trim(),
-          uid
-        );
+      if (reusableClientId != null) {
+        await tx
+          .prepare(
+            `UPDATE clients
+               SET name = ?,
+                   name2 = ?,
+                   phone = ?,
+                   phone2 = ?,
+                   email = ?,
+                   address = ?,
+                   city = ?,
+                   usuario = ?,
+                   documento_identidad = ?,
+                   country = ?,
+                   user_id = ?
+             WHERE id = ?`
+          )
+          .run(
+            body.nombre.trim(),
+            body.apellidos.trim(),
+            body.celular.trim(),
+            telefonoFijo,
+            emailNorm,
+            body.direccion.trim(),
+            body.city.trim(),
+            emailNorm,
+            body.documentoIdentidad.trim(),
+            body.country.trim(),
+            uid,
+            reusableClientId
+          );
+      } else {
+        const code = await allocateNextTiendaOnlineClientCode(tx as TiendaSeqTx);
+        await tx
+          .prepare(
+            `INSERT INTO clients (code, name, name2, phone, phone2, email, email2, address, address2, city, city2, usuario, documento_identidad, country, user_id)
+             VALUES (?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, NULL, ?, ?, ?, ?)`
+          )
+          .run(
+            code,
+            body.nombre.trim(),
+            body.apellidos.trim(),
+            body.celular.trim(),
+            telefonoFijo,
+            emailNorm,
+            body.direccion.trim(),
+            body.city.trim(),
+            emailNorm,
+            body.documentoIdentidad.trim(),
+            body.country.trim(),
+            uid
+          );
+      }
     });
   } catch (e: unknown) {
     if (isUniqueViolation(e)) {
@@ -162,6 +280,15 @@ authRouter.post("/auth/register-cliente", registerClienteRateLimit, async (req, 
             code: "EMAIL_ALREADY_REGISTERED",
             message:
               "Este correo electrónico ya está asociado a una cuenta en el sistema. No podés crear una cuenta nueva con el mismo correo. Si ya tenés usuario, iniciá sesión con tu contraseña.",
+          },
+        });
+      }
+      if (isDocumentoUniqueViolation(e)) {
+        return res.status(409).json({
+          error: {
+            code: "DOCUMENT_ALREADY_REGISTERED",
+            message:
+              "Este documento/cédula ya está asociado a una cuenta en el sistema. No podés crear otra cuenta con el mismo documento.",
           },
         });
       }
@@ -175,7 +302,15 @@ authRouter.post("/auth/register-cliente", registerClienteRateLimit, async (req, 
     }
     const msg = e instanceof Error ? e.message : String(e);
     console.error("register-cliente:", e);
-    return res.status(500).json({ error: { message: env.NODE_ENV === "development" ? msg : "No se pudo crear la cuenta." } });
+    const msgNorm = String(msg || "").toLowerCase();
+    const userFacingMsg = msgNorm.includes("check constraint")
+      ? "Hay datos inválidos en el formulario. Revisá los campos e intentá nuevamente."
+      : msgNorm.includes("foreign key")
+        ? "Hay una referencia inválida en los datos enviados. Revisá país, ciudad o documento."
+        : env.NODE_ENV === "development"
+          ? msg
+          : "No se pudo crear la cuenta por un error del servidor. Intentá nuevamente en unos minutos.";
+    return res.status(500).json({ error: { code: "REGISTER_FAILED", message: userFacingMsg } });
   }
   let row: { id: number; username: string; email?: string | null; password_hash: string; role: string; usuario?: string | null } | undefined;
   try {
