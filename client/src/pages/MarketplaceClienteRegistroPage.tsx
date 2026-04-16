@@ -48,6 +48,7 @@ export function MarketplaceClienteRegistroPage() {
   const [celularLocal, setCelularLocal] = useState("");
   const [error, setError] = useState("");
   const [errorKind, setErrorKind] = useState<"client" | "duplicate" | "generic">("client");
+  const [duplicateReason, setDuplicateReason] = useState<"email" | "document" | "other">("other");
   const [submitting, setSubmitting] = useState(false);
   const [ready, setReady] = useState(false);
   const [emailSuggestFocus, setEmailSuggestFocus] = useState(false);
@@ -86,6 +87,19 @@ export function MarketplaceClienteRegistroPage() {
     emailLocal.length > 0 &&
     !emailHasExactDomain &&
     emailDomainSuggestions.length > 0;
+
+  const duplicateHeading =
+    duplicateReason === "document"
+      ? "Este documento/cédula ya está registrado"
+      : duplicateReason === "email"
+        ? t("reg.dup_heading")
+        : "No se pudo crear la cuenta";
+  const duplicateDetailMessage =
+    duplicateReason === "document"
+      ? "Este documento ya se está utilizando en el sistema."
+      : duplicateReason === "email"
+        ? "Este email ya se está utilizando en el sistema."
+        : error;
 
   function applyEmailDomain(domain: string) {
     const base = emailLocal.trim();
@@ -165,6 +179,7 @@ export function MarketplaceClienteRegistroPage() {
     e.preventDefault();
     setError("");
     setErrorKind("client");
+    setDuplicateReason("other");
     if (password.length < 6) {
       setErrorKind("client");
       setError(t("reg.err.password_short"));
@@ -258,11 +273,15 @@ export function MarketplaceClienteRegistroPage() {
       });
       applyLoginResponse(res);
     } catch (err) {
-      if (isEmailAlreadyRegisteredError(err) || isDocumentAlreadyRegisteredError(err)) {
+      const isDupEmail = isEmailAlreadyRegisteredError(err);
+      const isDupDocument = isDocumentAlreadyRegisteredError(err);
+      if (isDupEmail || isDupDocument) {
         setErrorKind("duplicate");
+        setDuplicateReason(isDupDocument ? "document" : "email");
         setError(err instanceof Error ? err.message : t("reg.err.duplicate_fallback"));
       } else {
         setErrorKind("generic");
+        setDuplicateReason("other");
         setError(err instanceof Error ? err.message : t("reg.err.register_fail"));
       }
     } finally {
@@ -634,8 +653,8 @@ export function MarketplaceClienteRegistroPage() {
                             <div className="d-flex gap-2 align-items-start">
                               <i className="bi bi-envelope-exclamation fs-5 flex-shrink-0 text-warning-emphasis" aria-hidden />
                               <div>
-                                <strong className="d-block text-body">{t("reg.dup_heading")}</strong>
-                                <p className="mt-1 mb-2 small text-body-secondary">{error}</p>
+                                <strong className="d-block text-body">{duplicateHeading}</strong>
+                                <p className="mt-1 mb-2 small text-body-secondary">{duplicateDetailMessage}</p>
                                 <p className="mb-0 small">
                                   <Link
                                     to="/marketplace/login"
