@@ -72,6 +72,7 @@ export function ConfirmModal({
   if (!open) return null;
 
   const colorPalette = VARIANT_CLASS[variant];
+  const confirmColorPalette = variant === "delete" ? "red" : variant === "warning" ? "orange" : "green";
 
   return (
     <Dialog.Root
@@ -151,7 +152,14 @@ export function ConfirmModal({
               <AppButton variant="outline" onClick={onCancel} disabled={confirmPending} minH="42px" px={5}>
                 {cancelLabel}
               </AppButton>
-              <AppButton onClick={onConfirm} disabled={confirmPending} loading={confirmPending} minH="42px" px={5}>
+              <AppButton
+                colorPalette={confirmColorPalette}
+                onClick={onConfirm}
+                disabled={confirmPending}
+                loading={confirmPending}
+                minH="42px"
+                px={5}
+              >
                 {confirmPending ? confirmPendingLabel : confirmLabel}
               </AppButton>
             </Dialog.Footer>

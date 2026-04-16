@@ -300,36 +300,20 @@ function normalizeTicketStatusDb(s: string): string {
     .replace(/[\s-]+/g, "_");
 }
 
-function normalizeEmailAddr(email: string | null | undefined): string {
-  return String(email ?? "")
-    .trim()
-    .toLowerCase();
-}
-
 /**
  * El ticket pertenece a la sesión si coincide `user_id` (p. ej. SQLite puede devolver string)
- * o, solo como respaldo legacy, si `user_id` es NULL y el email del ticket coincide con el de la cuenta.
+ * (regla estricta por cuenta; sin fallback por email).
  */
 function ticketOwnedBySessionUser(
   row: { user_id: unknown; contact_email?: unknown; user_join_email?: unknown },
-  sessionUser: { id: number; email: string }
+  sessionUser: { id: number }
 ): boolean {
   const sid = Number(sessionUser.id);
   const rawUid = row.user_id;
   const ticketUid =
     rawUid == null || rawUid === "" ? null : Number(rawUid as number | string);
-  if (ticketUid != null && Number.isFinite(ticketUid) && ticketUid === sid) {
-    return true;
-  }
-  const ce = row.contact_email != null && String(row.contact_email).trim() !== "" ? String(row.contact_email) : "";
-  const uje =
-    row.user_join_email != null && String(row.user_join_email).trim() !== "" ? String(row.user_join_email) : "";
-  const rowEmail = normalizeEmailAddr(ce || uje);
-  const sessionEmail = normalizeEmailAddr(sessionUser.email);
-  if (!rowEmail || !sessionEmail || rowEmail !== sessionEmail) {
-    return false;
-  }
-  return ticketUid == null || !Number.isFinite(ticketUid);
+  // Regla estricta por cuenta: ownership solo por user_id (sin fallback por email).
+  return ticketUid != null && Number.isFinite(ticketUid) && ticketUid === sid;
 }
 
 function isPipelineStatus(s: string): boolean {
@@ -843,14 +827,10 @@ const quoteOwnerAuth = requireRole("cliente", "admin_a", "admin_b");
 marketplaceQuoteTicketsRouter.get("/marketplace/my-quote-tickets", requireAuth, quoteOwnerAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
-    const emailNorm = normalizeEmailAddr(req.user!.email);
-    const sql = `SELECT ${TICKET_SELECT} FROM ${TICKET_FROM} WHERE (
-        t.user_id = ? OR (
-          t.user_id IS NULL
-          AND LOWER(TRIM(COALESCE(t.contact_email, ''))) = ?
-        )
-      ) AND t.status != 'borrador' ORDER BY t.updated_at DESC LIMIT 100`;
-    const rows = (await db.prepare(sql).all(userId, emailNorm)) as Record<string, unknown>[];
+    const sql = `SELECT ${TICKET_SELECT} FROM ${TICKET_FROM}
+      WHERE t.user_id = ? AND t.status != 'borrador'
+      ORDER BY t.updated_at DESC LIMIT 100`;
+    const rows = (await db.prepare(sql).all(userId)) as Record<string, unknown>[];
     res.json({ tickets: rows.map(rowToTicketList) });
   } catch (e) {
     return sendInternalError(res, "my-quote-tickets.list", e);
@@ -893,7 +873,15 @@ marketplaceQuoteTicketsRouter.post(
       const nowIso = new Date().toISOString();
       await db
         .prepare(
-          "UPDATE marketplace_quote_tickets SET status = 'descartado', updated_at = ?, user_id = COALESCE(user_id, ?) WHERE id = ?"
+          `UPDATE marketplace_quote_tickets
+           SET status = 'descartado',
+               items_json = '[]',
+               subtotal_usd = 0,
+               line_count = 0,
+               unit_count = 0,
+               updated_at = ?,
+               user_id = COALESCE(user_id, ?)
+           WHERE id = ?`
         )
         .run(nowIso, userId, id);
       res.json({ ok: true });

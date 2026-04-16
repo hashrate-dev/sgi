@@ -66,7 +66,7 @@ export function MarketplaceCartOrdersPanel({ onBackToCart }: Props) {
   const { user } = useAuth();
   const userCelular = user?.celular?.trim();
   const userTelefono = user?.telefono?.trim();
-  const { refreshActiveOrderGate } = useMarketplaceQuoteCart();
+  const { refreshActiveOrderGate, clearCart } = useMarketplaceQuoteCart();
   const [tickets, setTickets] = useState<MarketplaceQuoteTicket[]>([]);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [loadingList, setLoadingList] = useState(true);
@@ -252,6 +252,8 @@ export function MarketplaceCartOrdersPanel({ onBackToCart }: Props) {
     setCancelBusyId(tk.id);
     try {
       await cancelMyMarketplaceQuoteTicket(tk.id);
+      // Regla UX/negocio: cancelar orden en curso siempre vacía el carrito local.
+      clearCart();
       const list = await load();
       setCancelUi(null);
       setSelected((s) => (s?.id === tk.id ? null : s));
@@ -267,7 +269,7 @@ export function MarketplaceCartOrdersPanel({ onBackToCart }: Props) {
     } finally {
       setCancelBusyId(null);
     }
-  }, [cancelUi, load, onBackToCart, t, refreshActiveOrderGate]);
+  }, [cancelUi, load, onBackToCart, t, refreshActiveOrderGate, clearCart]);
 
   const exportExcel = useCallback(() => {
     if (filtered.length === 0) {

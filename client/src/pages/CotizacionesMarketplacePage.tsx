@@ -503,15 +503,17 @@ export function CotizacionesMarketplacePage() {
         title="Eliminar orden del sistema"
         message={
           deleteModalTicket ? (
-            <p style={{ fontSize: "1rem", color: "#374151", margin: 0 }}>
-              ¿Eliminar definitivamente la orden{" "}
-              <strong>{orderLabel(deleteModalTicket)}</strong> ({deleteModalTicket.ticketCode})? Esta acción no se puede deshacer.
-            </p>
+            <div style={{ fontSize: "1rem", color: "#374151" }}>
+              <p style={{ margin: 0 }}>
+                ¿Eliminar definitivamente la orden <strong>{orderLabel(deleteModalTicket)}</strong> ({deleteModalTicket.ticketCode})?
+              </p>
+              <p style={{ margin: "0.4rem 0 0 0" }}>Esta acción no se puede deshacer.</p>
+            </div>
           ) : null
         }
         warningText="Se borrará el ticket de la base de datos, incluido el historial visible para el cliente."
         cancelLabel="Cancelar"
-        confirmLabel="Eliminar"
+        confirmLabel="Sí, eliminar orden"
         confirmPending={deleteBusy}
         confirmPendingLabel="Eliminando…"
         onCancel={() => {
