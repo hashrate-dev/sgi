@@ -276,14 +276,21 @@ button.hrs-mqt-ticket-card:hover {
   margin-bottom: 0.65rem;
 }
 
+.hrs-mqt-ticket-card__badges {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.38rem;
+}
+
 .hrs-mqt-ticket-card__ord {
-  font-size: 1.05rem;
+  font-size: 1.16rem;
   font-weight: 700;
   color: #0f172a;
 }
 
 .hrs-mqt-ticket-card__tkt {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 600;
   color: #64748b;
   font-variant-numeric: tabular-nums;
@@ -291,7 +298,7 @@ button.hrs-mqt-ticket-card:hover {
 
 .hrs-mqt-badge {
   flex-shrink: 0;
-  font-size: 0.62rem;
+  font-size: 0.66rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -321,28 +328,48 @@ button.hrs-mqt-ticket-card:hover {
   color: #475569;
 }
 
+.hrs-mqt-badge--nuevo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+  box-shadow: 0 1px 4px rgba(220, 38, 38, 0.18);
+}
+
+.hrs-mqt-badge--nuevo i {
+  font-size: 0.56rem;
+  line-height: 1;
+}
+
 .hrs-mqt-ticket-card__row {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  font-size: 0.82rem;
+  font-size: 0.88rem;
   color: #64748b;
 }
 
 .hrs-mqt-ticket-card__total {
-  font-size: 1.05rem;
+  font-size: 1.22rem;
   font-weight: 800;
   color: var(--hrs-mqt-host);
   font-variant-numeric: tabular-nums;
 }
 
 .hrs-mqt-ticket-card__meta {
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   color: #94a3b8;
   margin-top: 0.65rem;
   padding-top: 0.65rem;
   padding-right: 2.5rem;
   border-top: 1px solid #f1f5f9;
+}
+
+.hrs-mqt-ticket-card__email {
+  color: #2563eb;
+  font-weight: 500;
 }
 
 .hrs-mqt-drawer__danger-zone {

@@ -172,7 +172,7 @@ export function MarketplaceQuoteCartDrawer() {
                   {t("drawer.hint.p1")}{" "}
                   <Link to="/marketplace/login">{t("drawer.login_link")}</Link>
                   {t("drawer.hint.p2")}
-                  <Link to="/marketplace/registro">{t("drawer.register_link")}</Link>
+                  <Link to="/marketplace/signup">{t("drawer.register_link")}</Link>
                   {t("drawer.hint.p5")}
                 </p>
               </div>

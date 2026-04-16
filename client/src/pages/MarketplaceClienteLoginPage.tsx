@@ -215,7 +215,7 @@ export function MarketplaceClienteLoginPage() {
                     </p>
                     <p className="text-center small text-muted mt-2 mb-0">
                       {t("login.no_account")}{" "}
-                      <Link to="/marketplace/registro" state={fromQuote ? { from: "quote" } : undefined}>
+                      <Link to="/marketplace/signup" state={fromQuote ? { from: "quote" } : undefined}>
                         {t("login.register")}
                       </Link>
                     </p>

@@ -44,6 +44,8 @@ const STATUS_LABEL: Record<string, string> = {
   descartado: "Descartado",
 };
 
+const NEW_TICKET_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
+
 function badgeClass(status: string): string {
   const k = status.replace(/[^a-z_]/gi, "_");
   return `hrs-mqt-badge hrs-mqt-badge--${k}`;
@@ -57,6 +59,13 @@ function formatWhen(iso: string): string {
   } catch {
     return iso;
   }
+}
+
+function isNewTicketBadgeVisible(t: MarketplaceQuoteTicket): boolean {
+  if (t.status === "cerrado" || t.status === "descartado") return false;
+  const createdAtMs = Date.parse(t.createdAt);
+  if (!Number.isFinite(createdAtMs)) return false;
+  return Date.now() - createdAtMs <= NEW_TICKET_MAX_AGE_MS;
 }
 
 export function CotizacionesMarketplacePage() {
@@ -293,7 +302,15 @@ export function CotizacionesMarketplacePage() {
                         <div className="hrs-mqt-ticket-card__ord">{t.orderNumber ?? `— (#${t.id})`}</div>
                         <div className="hrs-mqt-ticket-card__tkt">{t.ticketCode}</div>
                       </div>
-                      <span className={badgeClass(t.status)}>{STATUS_LABEL[t.status] ?? t.status}</span>
+                      <div className="hrs-mqt-ticket-card__badges">
+                        <span className={badgeClass(t.status)}>{STATUS_LABEL[t.status] ?? t.status}</span>
+                        {isNewTicketBadgeVisible(t) ? (
+                          <span className="hrs-mqt-badge hrs-mqt-badge--nuevo">
+                            <i className="bi bi-bell-fill" aria-hidden />
+                            Nuevo
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                     <div className="hrs-mqt-ticket-card__row">
                       <span>
@@ -302,7 +319,9 @@ export function CotizacionesMarketplacePage() {
                       <span className="hrs-mqt-ticket-card__total">{t.subtotalUsd.toLocaleString("es-PY")} USD</span>
                     </div>
                     <div className="hrs-mqt-ticket-card__meta">
-                      {t.contactEmail ? <span className="d-block text-truncate mb-1">{t.contactEmail}</span> : null}
+                      {t.contactEmail ? (
+                        <span className="d-block text-truncate mb-1 hrs-mqt-ticket-card__email">{t.contactEmail}</span>
+                      ) : null}
                       Actualizado {formatWhen(t.updatedAt)}
                       {t.lastContactChannel ? ` · vía ${t.lastContactChannel}` : ""}
                     </div>

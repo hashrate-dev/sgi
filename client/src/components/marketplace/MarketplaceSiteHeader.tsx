@@ -57,7 +57,7 @@ export function MarketplaceSiteHeader() {
           </>
         ) : (
           <div className="site-header__auth-actions">
-            <Link to="/marketplace/registro" className="site-header__auth-link site-header__auth-link--primary">
+            <Link to="/marketplace/signup" className="site-header__auth-link site-header__auth-link--primary">
               {t("header.register")}
             </Link>
           </div>

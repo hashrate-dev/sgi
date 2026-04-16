@@ -157,7 +157,9 @@ function extractJsonErrorMessage(data: unknown, res: Response, fallback: string)
 export function isEmailAlreadyRegisteredError(err: unknown): boolean {
   const e = err as ApiHttpError;
   if (e?.status !== 409) return false;
-  return !e.code || e.code === API_ERROR_EMAIL_ALREADY_REGISTERED;
+  if (e.code === API_ERROR_EMAIL_ALREADY_REGISTERED) return true;
+  const msg = String(e?.message ?? "").toLowerCase();
+  return msg.includes("correo electrónico") && msg.includes("asociado a una cuenta");
 }
 
 export function isOneActiveOrderError(err: unknown): boolean {

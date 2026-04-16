@@ -21,7 +21,7 @@ import {
   parseStoredPhoneToDialLocal,
 } from "../lib/marketplaceRegistroGeo";
 
-/** Cliente creado desde /marketplace/registro (código A90001… o histórico WEB-). */
+/** Cliente creado desde /marketplace/signup (legacy: /marketplace/registro) (código A90001… o histórico WEB-). */
 function isClienteTiendaOnline(code: string | undefined): boolean {
   const c = (code ?? "").trim().toUpperCase();
   return c.startsWith("WEB-") || /^A9\d+$/.test(c);
@@ -65,7 +65,7 @@ export function ClienteEditPage() {
   const [deleting, setDeleting] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  /** Campos alineados con `/marketplace/registro` (solo edición cliente tienda). */
+  /** Campos alineados con `/marketplace/signup` (legacy: `/marketplace/registro`) (solo edición cliente tienda). */
   const [teCountryId, setTeCountryId] = useState("");
   const [teCity, setTeCity] = useState("");
   const [teCityOther, setTeCityOther] = useState("");

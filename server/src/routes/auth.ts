@@ -32,6 +32,33 @@ const DEFAULT_USERS: Array<{ email: string; password: string; role: "admin_a" | 
   { email: "fb@hashrate.space", password: "123456", role: "admin_b" },
 ];
 
+function isUniqueViolation(err: unknown): boolean {
+  const e = err as { code?: unknown; message?: unknown };
+  const code = String(e?.code ?? "");
+  const msg = String(e?.message ?? "").toLowerCase();
+  return code.includes("23505") || msg.includes("unique");
+}
+
+function isEmailUniqueViolation(err: unknown): boolean {
+  const e = err as { message?: unknown; detail?: unknown; constraint?: unknown; column?: unknown };
+  const haystack = [
+    String(e?.message ?? ""),
+    String(e?.detail ?? ""),
+    String(e?.constraint ?? ""),
+    String(e?.column ?? ""),
+  ]
+    .join(" ")
+    .toLowerCase();
+  return (
+    haystack.includes("users.username") ||
+    haystack.includes("users.email") ||
+    haystack.includes("users_username_key") ||
+    haystack.includes("users_email_key") ||
+    haystack.includes(" username ") ||
+    haystack.includes(" email ")
+  );
+}
+
 /** Asegurar que los usuarios por defecto existan (crear si no existen). */
 async function ensureDefaultUser(): Promise<void> {
   for (const { email, password, role } of DEFAULT_USERS) {
@@ -128,13 +155,21 @@ authRouter.post("/auth/register-cliente", registerClienteRateLimit, async (req, 
         );
     });
   } catch (e: unknown) {
-    const err = e as { code?: string; message?: string };
-    if (String(err?.code ?? "").includes("23505") || String(err?.message ?? "").toLowerCase().includes("unique")) {
+    if (isUniqueViolation(e)) {
+      if (isEmailUniqueViolation(e)) {
+        return res.status(409).json({
+          error: {
+            code: "EMAIL_ALREADY_REGISTERED",
+            message:
+              "Este correo electrónico ya está asociado a una cuenta en el sistema. No podés crear una cuenta nueva con el mismo correo. Si ya tenés usuario, iniciá sesión con tu contraseña.",
+          },
+        });
+      }
       return res.status(409).json({
         error: {
-          code: "EMAIL_ALREADY_REGISTERED",
+          code: "REGISTER_DUPLICATE_DATA",
           message:
-            "Este correo electrónico ya está asociado a una cuenta en el sistema. No podés crear una cuenta nueva con el mismo correo. Si ya tenés usuario, iniciá sesión con tu contraseña.",
+            "Ya existe un registro con alguno de estos datos (documento, teléfono u otro campo único). Verificá la información e intentá nuevamente.",
         },
       });
     }

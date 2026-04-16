@@ -192,7 +192,7 @@ export function parseStoredPhoneToDialLocal(phone: string): { dialId: string; lo
   return { dialId: "PY", local: p };
 }
 
-/** Mismo orden que el select de celular en `/marketplace/registro`. */
+/** Mismo orden que el select de celular en `/marketplace/signup` (legacy: `/marketplace/registro`). */
 export const DEFAULT_PHONE_DIAL_COUNTRY_ID = "PY" as const;
 
 export function countriesForPhoneSelect(): CountryRegistro[] {

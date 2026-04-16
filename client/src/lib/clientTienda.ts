@@ -1,7 +1,7 @@
 import type { Client } from "./types";
 
 /**
- * Cliente de la tienda online (/marketplace/registro): códigos A90001… o histórico WEB-{id}.
+ * Cliente de la tienda online (/marketplace/signup; legacy: /marketplace/registro): códigos A90001… o histórico WEB-{id}.
  * No deben mezclarse en listados de clientes Hosting / facturación corporativa.
  */
 export function isClienteTiendaOnline(client: Pick<Client, "code">): boolean {

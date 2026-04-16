@@ -213,6 +213,7 @@ export function TiendaOnlineBannersHomePage() {
           p={{ base: 3, md: 4 }}
           borderColor="#2D5D46"
           borderWidth="1px"
+          bg="#2D5D46"
           boxShadow="md"
         >
           <AppCard

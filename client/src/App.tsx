@@ -315,7 +315,7 @@ function MarketplacePresenceBeacon() {
   return null;
 }
 
-/** Outlet para anidar /marketplace, /marketplace/login, /marketplace/registro (matching estable en RR7). */
+/** Outlet para anidar /marketplace, /marketplace/login, /marketplace/signup (matching estable en RR7). */
 function MarketplaceLayout() {
   return (
     <MarketplaceLanguageProvider>
@@ -332,7 +332,7 @@ function App() {
         <ScrollToTop />
         <ToastContainer />
         <Routes>
-          {/* Tienda primero: catálogo público + login/registro cliente (anidado para matching estable en RR7) */}
+          {/* Tienda primero: catálogo público + login/signup cliente (anidado para matching estable en RR7) */}
           <Route path="/marketplace" element={<MarketplaceLayout />}>
             <Route index element={<MarketplacePage />} />
             <Route path="home" element={<MarketplaceCorporateHomePage />} />
@@ -341,7 +341,8 @@ function App() {
             <Route path="faq" element={<MarketplaceFaqPage />} />
             <Route path="contact" element={<MarketplaceContactPage />} />
             <Route path="login" element={<MarketplaceClienteLoginPage />} />
-            <Route path="registro" element={<MarketplaceClienteRegistroPage />} />
+            <Route path="signup" element={<MarketplaceClienteRegistroPage />} />
+            <Route path="registro" element={<Navigate to="/marketplace/signup" replace />} />
             <Route path="mis-ordenes" element={<Navigate to="/marketplace" replace />} />
           </Route>
           <Route path="/marketplace/" element={<Navigate to="/marketplace" replace />} />

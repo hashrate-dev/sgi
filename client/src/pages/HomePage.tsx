@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import type { CSSProperties } from "react";
+import { keyframes } from "@emotion/react";
 import { Navigate, Link as RouterLink } from "react-router-dom";
 import { Badge, Box, Flex, Grid, Heading, Image as ChakraImage, Stack, Text } from "@chakra-ui/react";
 import { useAuth } from "../contexts/AuthContext";
@@ -42,7 +43,7 @@ const ICON_SLOT_PROPS = {
 
 /** Tamaño uniforme de iconos Bootstrap en tarjetas del home (rellena más el recuadre) */
 const DASHBOARD_BI_ICON_SIZE = "2.125rem";
-const DASHBOARD_BI_ICON_SIZE_LG = "2.55rem";
+const DASHBOARD_BI_ICON_SIZE_LG = "3rem";
 
 /** Enlace que ocupa toda la celda del grid para igualar alturas entre tarjetas (misma fila = misma altura) */
 const DASHBOARD_CARD_LINK_STYLE: CSSProperties = {
@@ -53,6 +54,50 @@ const DASHBOARD_CARD_LINK_STYLE: CSSProperties = {
   height: "100%",
   alignSelf: "stretch",
 };
+
+const marketplaceLiveAlertPulse = keyframes`
+  0%, 100% {
+    background: #f0fdf4;
+    border-color: #dcfce7;
+    box-shadow: 0 0 0 rgba(249, 115, 22, 0);
+  }
+  50% {
+    background: #ffedd5;
+    border-color: #fb923c;
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.24);
+  }
+`;
+
+const marketplaceLiveIconFlash = keyframes`
+  0%, 100% {
+    filter: none;
+  }
+  50% {
+    filter: sepia(1) saturate(9) hue-rotate(-18deg) brightness(1.04);
+  }
+`;
+
+const marketplaceOrdersAlertPulse = keyframes`
+  0%, 100% {
+    background: #f0fdf4;
+    border-color: #dcfce7;
+    box-shadow: 0 0 0 rgba(239, 68, 68, 0);
+  }
+  50% {
+    background: #fee2e2;
+    border-color: #f87171;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.22);
+  }
+`;
+
+const marketplaceOrdersIconFlash = keyframes`
+  0%, 100% {
+    color: #15803d;
+  }
+  50% {
+    color: #dc2626;
+  }
+`;
 
 const menuItems: MenuItem[] = [
   {
@@ -138,11 +183,21 @@ function DashboardCardIconSlot({ item }: { item: MenuItem }) {
   }
   if (item.cardLogoSrc) {
     return (
-      <Flex {...ICON_SLOT_PROPS} mb={3}>
+      <Flex
+        {...ICON_SLOT_PROPS}
+        className="dashboard-card-icon-slot"
+        mb={3}
+      >
         <img
           src={item.cardLogoSrc}
           alt={item.cardLogoAlt ?? "Hashrate"}
-          style={{ maxHeight: 70, width: "auto", maxWidth: 82, objectFit: "contain", display: "block" }}
+          style={{
+            maxHeight: 70,
+            width: "auto",
+            maxWidth: 82,
+            objectFit: "contain",
+            display: "block",
+          }}
         />
       </Flex>
     );
@@ -478,8 +533,23 @@ export function HomePage() {
                   },
                 }}
               >
-                <Flex {...ICON_SLOT_PROPS} className="dashboard-card-icon-slot" mb={3} position="relative">
-                  <Box as="i" className="bi bi-ticket-perforated" fontSize={DASHBOARD_BI_ICON_SIZE_LG} lineHeight={1} aria-hidden />
+                <Flex
+                  {...ICON_SLOT_PROPS}
+                  className="dashboard-card-icon-slot"
+                  mb={3}
+                  position="relative"
+                  animation={marketplaceOpenCount > 0 ? `${marketplaceOrdersAlertPulse} 1.12s ease-in-out infinite` : undefined}
+                >
+                  <Box
+                    as="i"
+                    className="bi bi-ticket-perforated"
+                    fontSize={DASHBOARD_BI_ICON_SIZE_LG}
+                    lineHeight={1}
+                    aria-hidden
+                    style={{
+                      animation: marketplaceOpenCount > 0 ? `${marketplaceOrdersIconFlash} 1.12s ease-in-out infinite` : undefined,
+                    }}
+                  />
                   {marketplaceOpenCount > 0 ? (
                     <Box
                       position="absolute"
@@ -523,8 +593,22 @@ export function HomePage() {
                   },
                 }}
               >
-                <Flex {...ICON_SLOT_PROPS} className="dashboard-card-icon-slot" mb={3}>
-                  <Box as="i" className="bi bi-broadcast-pin" fontSize={DASHBOARD_BI_ICON_SIZE_LG} lineHeight={1} aria-hidden />
+                <Flex
+                  {...ICON_SLOT_PROPS}
+                  className="dashboard-card-icon-slot"
+                  mb={3}
+                  animation={marketplaceOnlineTotal > 0 ? `${marketplaceLiveAlertPulse} 1.12s ease-in-out infinite` : undefined}
+                >
+                  <Box
+                    as="i"
+                    className="bi bi-broadcast-pin"
+                    fontSize={DASHBOARD_BI_ICON_SIZE_LG}
+                    lineHeight={1}
+                    aria-hidden
+                    style={{
+                      animation: marketplaceOnlineTotal > 0 ? `${marketplaceLiveIconFlash} 1.12s ease-in-out infinite` : undefined,
+                    }}
+                  />
                 </Flex>
                 <Heading {...cardTitleProps}>Marketplace en vivo</Heading>
                 <Text fontSize="sm" fontWeight="semibold" color="gray.700" mb={1.5} lineHeight="short">
@@ -570,10 +654,21 @@ export function HomePage() {
                     color: "green.800",
                     borderColor: "green.300",
                   },
+                  "& .dashboard-card-icon--gear": {
+                    transform: "rotate(18deg)",
+                  },
                 }}
               >
                 <Flex {...ICON_SLOT_PROPS} className="dashboard-card-icon-slot" mb={3}>
-                  <Box as="i" className="bi bi-gear-fill" fontSize={DASHBOARD_BI_ICON_SIZE_LG} lineHeight={1} aria-hidden />
+                  <Box
+                    as="i"
+                    className="bi bi-gear-fill dashboard-card-icon--gear"
+                    fontSize={DASHBOARD_BI_ICON_SIZE_LG}
+                    lineHeight={1}
+                    aria-hidden
+                    transition="transform 0.22s ease"
+                    transformOrigin="center"
+                  />
                 </Flex>
                 <Heading {...cardTitleProps}>Configuración</Heading>
                 <Text {...cardDescProps}>
