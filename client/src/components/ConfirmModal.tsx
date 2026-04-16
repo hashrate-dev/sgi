@@ -69,7 +69,6 @@ export function ConfirmModal({
   elevated = false,
 }: ConfirmModalProps) {
   const titleId = useId();
-  if (!open) return null;
 
   const colorPalette = VARIANT_CLASS[variant];
   const confirmColorPalette = variant === "delete" ? "red" : variant === "warning" ? "orange" : "green";
