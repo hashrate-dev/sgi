@@ -394,7 +394,7 @@ export function HomePage() {
       bgGradient="linear(135deg, #074025 0%, #2d8f3a 55%, #49f227 100%)"
     >
       <Box maxW="1320px" mx="auto">
-        <AppCard mb={3} p={{ base: 3, md: 4 }} boxShadow="md">
+        <AppCard mb={3} p={{ base: 3, md: 4 }} boxShadow="md" className="hrs-dashboard-glass-top">
           <Flex
             align="center"
             justify="space-between"

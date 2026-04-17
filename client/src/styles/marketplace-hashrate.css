@@ -6,7 +6,8 @@
  */
 html:has(.marketplace-asic-page),
 body:has(.marketplace-asic-page) {
-  overflow-x: hidden;
+  /* `hidden` fuerza eje opuesto ≠ visible y rompe `position: sticky` del header; `clip` recorta sin ese efecto secundario. */
+  overflow-x: clip;
   max-width: 100%;
   background: #f3f4f6;
 }
@@ -21,7 +22,7 @@ body:has(.marketplace-asic-page)::after {
 }
 
 #root:has(.marketplace-asic-page) {
-  overflow-x: hidden;
+  overflow-x: clip;
   max-width: 100%;
   min-width: 0;
   width: 100%;
@@ -63,14 +64,61 @@ body:has(.marketplace-asic-page)::after {
   width: 100%;
 }
 
-/* ——— Header claro ——— */
+/* ——— Superficie cristal / barra flotante (marketplace INICIO·SERVICIOS·FAQ…, cabecera SGI unificada, home dashboard) ——— */
+.hrs-glass-topbar-surface,
+.sgi-unified-header:not(.sgi-unified-header--home) {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.94) 0%,
+    rgba(248, 250, 252, 0.9) 48%,
+    rgba(241, 245, 249, 0.88) 100%
+  );
+  border-bottom: 1px solid rgba(226, 232, 240, 0.85);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.75) inset,
+    0 14px 36px -10px rgba(15, 23, 42, 0.14),
+    0 4px 14px -4px rgba(15, 23, 42, 0.07);
+  backdrop-filter: blur(14px) saturate(1.35);
+  -webkit-backdrop-filter: blur(14px) saturate(1.35);
+}
+
+/* Tarjeta superior home SGI (Chakra AppCard): mismo lenguaje visual, sin borde inferior de barra full-bleed */
+.hrs-dashboard-glass-top {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.94) 0%,
+    rgba(248, 250, 252, 0.9) 48%,
+    rgba(241, 245, 249, 0.88) 100%
+  ) !important;
+  border-color: rgba(226, 232, 240, 0.92) !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.75) inset,
+    0 14px 36px -10px rgba(15, 23, 42, 0.12),
+    0 4px 14px -4px rgba(15, 23, 42, 0.06) !important;
+  backdrop-filter: blur(14px) saturate(1.35);
+  -webkit-backdrop-filter: blur(14px) saturate(1.35);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .hrs-glass-topbar-surface,
+  .sgi-unified-header:not(.sgi-unified-header--home),
+  .hrs-dashboard-glass-top,
+  .sgi-unified-header--home .sgi-unified-header__inner {
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 52%, #eef2f7 100%) !important;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+}
+
+/* ——— Header claro (layout) ——— */
 .site-header--marketplace {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: #fff;
-  border-bottom: 1px solid #e5e7eb;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  align-self: flex-start;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .site-header__inner {
@@ -148,9 +196,12 @@ body:has(.marketplace-asic-page)::after {
   display: inline-flex;
   border-radius: 0.5rem;
   overflow: hidden;
-  border: 1px solid #d1d5db;
-  background: #f9fafb;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(209, 213, 219, 0.95);
+  background: linear-gradient(180deg, #ffffff 0%, #f3f4f6 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 2px 6px rgba(15, 23, 42, 0.06),
+    0 6px 16px -6px rgba(15, 23, 42, 0.1);
 }
 
 /* Marketplace: idiomas pegados al extremo derecho de la barra (cuenta + carrito a la izquierda del bloque) */
@@ -379,13 +430,32 @@ body:has(.marketplace-asic-page)::after {
   font-weight: 800;
   font-family: inherit;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.85) inset,
+    0 2px 6px rgba(5, 150, 105, 0.12),
+    0 8px 20px -6px rgba(5, 150, 105, 0.22);
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
 }
 
 .market-quote-cart-trigger:hover {
   background: linear-gradient(180deg, #d1fae5 0%, #a7f3d0 100%);
   border-color: #059669;
-  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.15);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.75) inset,
+    0 4px 12px rgba(5, 150, 105, 0.18),
+    0 14px 28px -8px rgba(5, 150, 105, 0.28);
+  transform: translateY(-1px);
+}
+
+.market-quote-cart-trigger:active {
+  transform: translateY(0);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.5) inset,
+    0 1px 4px rgba(5, 150, 105, 0.14);
 }
 
 /* Icono carrito + badge de cantidad (esquina, alto contraste) */
@@ -449,10 +519,25 @@ body:has(.marketplace-asic-page)::after {
   font-size: 0.8rem;
   font-weight: 600;
   border-radius: 8px;
-  border: 1px solid #d1d5db;
-  background: #fff;
+  border: 1px solid rgba(209, 213, 219, 0.95);
+  background: linear-gradient(180deg, #ffffff 0%, #f3f4f6 100%);
   color: #374151;
   cursor: pointer;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 2px 6px rgba(15, 23, 42, 0.06);
+  transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+}
+
+.nav-toggle:hover {
+  border-color: #a7f3d0;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.85) inset,
+    0 3px 10px rgba(15, 23, 42, 0.08);
+}
+
+.nav-toggle:active {
+  transform: translateY(1px);
 }
 
 @media (min-width: 900px) {
@@ -557,6 +642,42 @@ body:has(.marketplace-asic-page)::after {
   color: #1f2937;
   background: #e5e7eb;
   border-color: #d1d5db;
+}
+
+/* Marketplace: profundidad suave en enlaces del menú */
+.site-header .nav-main a {
+  transition:
+    color 0.18s ease,
+    background 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.site-header .nav-main a:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+.site-header .nav-main a.is-current {
+  background: linear-gradient(180deg, #f3f4f6 0%, #e5e7eb 100%);
+  border-color: rgba(209, 213, 219, 0.95);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.85) inset,
+    0 3px 10px rgba(15, 23, 42, 0.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .market-quote-cart-trigger,
+  .market-quote-cart-trigger:hover,
+  .market-quote-cart-trigger:active,
+  .nav-toggle,
+  .nav-toggle:active,
+  .site-header .nav-main a,
+  .site-header .nav-main a:hover {
+    transition: none;
+    transform: none;
+  }
 }
 
 /* ——— Catálogo /marketplace ——— */
@@ -1239,8 +1360,17 @@ button.market-link-hrs {
   position: absolute;
   inset: 0;
   z-index: 0;
-  background: linear-gradient(135deg, #015b93 0%, #5cc866 100%);
-  opacity: 0.88;
+  /* Varios stops + opacidad en los propios colores → menos “bandas” y sin franja rara entre links y © */
+  background: linear-gradient(
+    135deg,
+    rgba(1, 91, 147, 0.9) 0%,
+    rgba(6, 103, 146, 0.9) 18%,
+    rgba(14, 128, 136, 0.88) 38%,
+    rgba(40, 167, 118, 0.88) 58%,
+    rgba(82, 199, 106, 0.9) 82%,
+    rgba(92, 200, 102, 0.9) 100%
+  );
+  opacity: 1;
   pointer-events: none;
 }
 
@@ -5174,8 +5304,16 @@ button.product-modal__btn--quote-cart:hover {
   position: absolute;
   inset: 0;
   z-index: 0;
-  background: linear-gradient(135deg, #015b93 0%, #5cc866 100%);
-  opacity: 0.88;
+  background: linear-gradient(
+    135deg,
+    rgba(1, 91, 147, 0.9) 0%,
+    rgba(6, 103, 146, 0.9) 18%,
+    rgba(14, 128, 136, 0.88) 38%,
+    rgba(40, 167, 118, 0.88) 58%,
+    rgba(82, 199, 106, 0.9) 82%,
+    rgba(92, 200, 102, 0.9) 100%
+  );
+  opacity: 1;
   pointer-events: none;
 }
 
@@ -8025,9 +8163,7 @@ button.product-modal__btn--quote-cart:hover {
   top: 0;
   z-index: 100;
   width: 100%;
-  background: #fff;
-  border-bottom: 1px solid #e5e7eb;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  /* Fondo/sombra: ver bloque `.hrs-glass-topbar-surface` + `:not(.sgi-unified-header--home)` */
   font-family: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
   margin-bottom: 1rem;
 }
@@ -8051,12 +8187,19 @@ button.product-modal__btn--quote-cart:hover {
 }
 
 .sgi-unified-header--home .sgi-unified-header__inner {
-  background: #fff;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(248, 250, 252, 0.92) 100%
+  );
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.65);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.85) inset,
-    0 8px 28px rgba(2, 6, 23, 0.12);
+    0 14px 36px -12px rgba(2, 6, 23, 0.14),
+    0 4px 14px -4px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(14px) saturate(1.35);
+  -webkit-backdrop-filter: blur(14px) saturate(1.35);
 }
 
 @media (min-width: 900px) {

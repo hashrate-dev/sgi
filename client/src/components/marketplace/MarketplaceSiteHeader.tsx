@@ -67,7 +67,7 @@ export function MarketplaceSiteHeader() {
   }
 
   return (
-    <header className="site-header site-header--marketplace">
+    <header className="site-header site-header--marketplace hrs-glass-topbar-surface">
       <div className="container site-header__inner">
         <Link className="logo-link logo-link--main" to="/marketplace/home" aria-label={t("header.logo_aria")}>
           <img

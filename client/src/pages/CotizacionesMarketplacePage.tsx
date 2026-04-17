@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import {
   deleteMarketplaceQuoteTicketAdmin,
@@ -137,94 +137,23 @@ const NEW_TICKET_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
 
 type MqtLaneHelpId = "general" | "pendiente" | "cerrados";
 
-const MQT_LANE_HELP_TITLE: Record<MqtLaneHelpId, string> = {
-  general: "Qué es este panel",
-  pendiente: "Carril Pendiente y embudo operativo",
-  cerrados: "Carril Cerrados",
+const MQT_LANE_HELP_TOOLTIP: Record<MqtLaneHelpId, string> = {
+  general:
+    "Monitoreo de listas de cotización ASIC: orden, ticket, ítems y totales referenciales. Solo cuentas AdministradorA y AdministradorB.",
+  pendiente:
+    "Este carril reúne lo activo: carritos abiertos y órdenes en seguimiento comercial (pendiente, contacto por equipo, en gestión, pagada, en viaje e instalado).",
+  cerrados:
+    "Aquí se muestran órdenes cerradas o eliminadas para control y auditoría del proceso.",
 };
-
-function MqtLaneHelpModalBody({ id }: { id: MqtLaneHelpId }): ReactNode {
-  switch (id) {
-    case "general":
-      return (
-        <>
-          <p className="mb-0">
-            Monitoreo de listas de cotización ASIC: orden, ticket, ítems y totales referenciales. Solo cuentas{" "}
-            <strong>AdministradorA</strong> y <strong>AdministradorB</strong>.
-          </p>
-        </>
-      );
-    case "pendiente":
-      return (
-        <>
-          <p>
-            Este carril reúne todo lo <strong>activo</strong> antes de cierres definitivos:{" "}
-            <strong>carritos abiertos</strong> (productos en carrito sin orden generada) y órdenes ya generadas hasta
-            instalación.
-          </p>
-          <p className="mb-2">
-            <strong>Carrito abierto</strong> (estado técnico «borrador»): el cliente cargó equipos en el carrito de la
-            tienda y aún <strong>no confirmó la orden de compra</strong>. En el panel se muestra la etiqueta{" "}
-            <strong>ABIERTO</strong>.
-          </p>
-          <p className="mb-1">
-            <strong>Pendiente</strong> (primer paso tras generar la orden): ventas inicia el seguimiento (teléfono,
-            WhatsApp, correo, etc.).
-          </p>
-          <p className="mb-1">
-            <strong>Embudo operativo</strong> (siguientes etapas, en orden típico):
-          </p>
-          <ul className="hrs-mqt-help-list">
-            <li>
-              <strong>Contacto por equipo</strong>: el equipo ya está gestionando la orden con el cliente.
-            </li>
-            <li>
-              <strong>En gestión</strong>: la venta está <strong>casi cerrada</strong> (negociación avanzada).
-            </li>
-            <li>
-              <strong>Pagada</strong>: el cliente pagó; la operación quedó concretada a nivel comercial.
-            </li>
-            <li>
-              <strong>En viaje</strong>: equipos en tránsito (p. ej. desde China hacia destino).
-            </li>
-            <li>
-              <strong>Instalado</strong>: equipos operando en la granja del cliente.
-            </li>
-          </ul>
-          <p className="mb-0 small text-muted">
-            Las transiciones de estado las controla el servidor; en el detalle de cada orden ves el embudo visual y las
-            notas internas.
-          </p>
-        </>
-      );
-    case "cerrados":
-      return (
-        <>
-          <p>
-            <strong>Cerrada</strong>: se archivó la operación <strong>sin completar</strong> el embudo hasta instalado
-            (cierre comercial u operativo sin entrega final en granja).
-          </p>
-          <p className="mb-0">
-            <strong>Eliminada</strong> (descartada): cancelación por el cliente o por staff desde el flujo; el registro
-            puede seguir visible acá para auditoría (quién dio de baja se ve en el detalle de la orden).
-          </p>
-        </>
-      );
-    default:
-      return null;
-  }
-}
 
 function MqtLaneTitleWithHelp({
   title,
   titleId,
   helpId,
-  onOpenHelp,
 }: {
   title: string;
   titleId: string;
   helpId: "pendiente" | "cerrados";
-  onOpenHelp: (id: MqtLaneHelpId) => void;
 }) {
   return (
     <div className="hrs-mqt-lane__head-row">
@@ -233,11 +162,11 @@ function MqtLaneTitleWithHelp({
       </h3>
       <button
         type="button"
-        className="hrs-mqt-help-trigger"
+        className="hrs-mqt-help-trigger hrs-mqt-help-trigger--lane"
         aria-label={`Ayuda: qué órdenes van en el carril ${title}`}
-        onClick={() => onOpenHelp(helpId)}
+        data-tooltip={MQT_LANE_HELP_TOOLTIP[helpId]}
       >
-        <i className="bi bi-eye" aria-hidden />
+        <i className="bi bi-info-circle-fill" aria-hidden />
       </button>
     </div>
   );
@@ -335,16 +264,6 @@ export function CotizacionesMarketplacePage() {
   const [garantiaQuoteItems, setGarantiaQuoteItems] = useState<GarantiaQuotePriceItem[]>([]);
   const [deleteModalTicket, setDeleteModalTicket] = useState<MarketplaceQuoteTicket | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
-  const [laneHelpOpen, setLaneHelpOpen] = useState<MqtLaneHelpId | null>(null);
-
-  useEffect(() => {
-    if (!laneHelpOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setLaneHelpOpen(null);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [laneHelpOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -538,19 +457,22 @@ export function CotizacionesMarketplacePage() {
 
         <div className="hrs-mqt-panel">
           <div className="hrs-mqt-panel-lede-row mb-3">
-            <p className="text-muted small mb-0 flex-grow-1" style={{ minWidth: "12rem" }}>
-              Listas de cotización ASIC: orden, ticket, ítems y totales referenciales. Acceso{" "}
-              <strong>AdministradorA</strong> / <strong>AdministradorB</strong>. Las definiciones del proceso están en el
-              ícono de ojo del encabezado y de cada carril (Pendiente / Cerrados).
-            </p>
-            <button
-              type="button"
-              className="hrs-mqt-help-trigger hrs-mqt-help-trigger--panel"
-              aria-label="Qué es este panel (resumen)"
-              onClick={() => setLaneHelpOpen("general")}
-            >
-              <i className="bi bi-eye" aria-hidden />
-            </button>
+            <div className="hrs-mqt-panel-lede-title-group">
+              <p
+                className="mb-0 fw-bold text-uppercase text-white"
+                style={{ minWidth: 0, letterSpacing: "0.04em", fontSize: "clamp(0.82rem, 1.4vw, 1.05rem)", lineHeight: 1.25 }}
+              >
+                MONITOR DE OPERACIONES DE ORDENES DE COMPRA
+              </p>
+              <button
+                type="button"
+                className="hrs-mqt-help-trigger hrs-mqt-help-trigger--panel"
+                aria-label="Qué es este panel (resumen)"
+                data-tooltip={MQT_LANE_HELP_TOOLTIP.general}
+              >
+                <i className="bi bi-info-circle-fill" aria-hidden />
+              </button>
+            </div>
           </div>
           {err ? <div className="hrs-mqt-err">{err}</div> : null}
 
@@ -620,7 +542,6 @@ export function CotizacionesMarketplacePage() {
                     title="Pendiente"
                     titleId="hrs-mqt-lane-pend-title"
                     helpId="pendiente"
-                    onOpenHelp={setLaneHelpOpen}
                   />
                   {lanesWhenAll.activos.length === 0 ? (
                     <p className="hrs-mqt-lane__empty">Ninguna orden en este carril con la búsqueda actual.</p>
@@ -637,7 +558,6 @@ export function CotizacionesMarketplacePage() {
                     title="Cerrados"
                     titleId="hrs-mqt-lane-cerr-title"
                     helpId="cerrados"
-                    onOpenHelp={setLaneHelpOpen}
                   />
                   {lanesWhenAll.cerrados.length === 0 ? (
                     <p className="hrs-mqt-lane__empty">Ninguna orden cerrada o eliminada con la búsqueda actual.</p>
@@ -662,42 +582,6 @@ export function CotizacionesMarketplacePage() {
           </div>
         </div>
       </div>
-
-      {laneHelpOpen ? (
-        <div
-          className="hrs-mqt-help-overlay"
-          role="presentation"
-          onClick={() => setLaneHelpOpen(null)}
-        >
-          <div
-            className="hrs-mqt-help-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="hrs-mqt-help-dialog-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <header className="hrs-mqt-help-dialog__head">
-              <h2 id="hrs-mqt-help-dialog-title">{MQT_LANE_HELP_TITLE[laneHelpOpen]}</h2>
-              <button
-                type="button"
-                className="hrs-mqt-help-dialog__close"
-                aria-label="Cerrar ayuda"
-                onClick={() => setLaneHelpOpen(null)}
-              >
-                ×
-              </button>
-            </header>
-            <div className="hrs-mqt-help-dialog__body">
-              <MqtLaneHelpModalBody id={laneHelpOpen} />
-            </div>
-            <footer className="hrs-mqt-help-dialog__footer">
-              <button type="button" className="btn btn-sm btn-dark" onClick={() => setLaneHelpOpen(null)}>
-                Entendido
-              </button>
-            </footer>
-          </div>
-        </div>
-      ) : null}
 
       {selected ? (
         <div
