@@ -30,6 +30,8 @@
     "build:vercel": "npm run build -w client && node copy-dist.cjs",
     "start": "npm run start -w server",
     "deploy:vercel": "node scripts/deploy-vercel.cjs",
+    "vercel:env:resend": "node scripts/push-resend-env-vercel.cjs",
+    "resend:init": "node scripts/init-resend-env-local.cjs",
     "supabase:set": "node scripts/set-supabase-url.cjs",
     "legacy:dev": "nodemon ./src/app.js",
     "legacy:start": "node ./src/app.js"

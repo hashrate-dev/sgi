@@ -1,5 +1,6 @@
 node_modules/
 .env
+.env.resend.local
 .DS_Store
 *.log
 dist/

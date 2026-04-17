@@ -1,6 +1,8 @@
+import { effectiveResendFromEmail } from "../config/resendFrom.js";
+
 /**
  * Aviso por email (Resend) cuando una orden marketplace pasa de borrador a enviada.
- * En desarrollo, si faltan credenciales Resend, el mismo texto se registra en consola
+ * En desarrollo, si falta la API key, el mismo texto se registra en consola
  * (desactivar con MARKETPLACE_EMAIL_DEV_CONSOLE=0). En producción sin credenciales, no envía.
  */
 
@@ -32,7 +34,7 @@ function moneyUsd(v: number): string {
  * Envía un email transaccional por Resend.
  * Requiere:
  * - RESEND_API_KEY
- * - RESEND_FROM_EMAIL (dominio verificado en Resend)
+ * - RESEND_FROM_EMAIL opcional (si falta y hay key, se usa onboarding@resend.dev)
  * Opcionales:
  * - MARKETPLACE_NOTIFY_EMAIL_TO (default sales@hashrate.space)
  * - MARKETPLACE_NOTIFY_SUBJECT_PREFIX (default [Marketplace])
@@ -40,7 +42,7 @@ function moneyUsd(v: number): string {
  */
 export async function notifyMarketplaceOrderEmail(p: MarketplaceOrderEmailPayload): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY?.trim();
-  const from = process.env.RESEND_FROM_EMAIL?.trim();
+  const from = effectiveResendFromEmail();
   const to = (process.env.MARKETPLACE_NOTIFY_EMAIL_TO || DEFAULT_TO).trim();
   const subjectPrefix = (process.env.MARKETPLACE_NOTIFY_SUBJECT_PREFIX || DEFAULT_SUBJECT_PREFIX).trim();
   const panelUrl = (process.env.MARKETPLACE_QUOTES_PANEL_URL || DEFAULT_PANEL_URL).trim();
@@ -79,7 +81,7 @@ export async function notifyMarketplaceOrderEmail(p: MarketplaceOrderEmailPayloa
     </div>
   `.trim();
 
-  if (!apiKey || !from) {
+  if (!apiKey) {
     const devConsole =
       process.env.NODE_ENV !== "production" && process.env.MARKETPLACE_EMAIL_DEV_CONSOLE !== "0";
     if (devConsole) {
@@ -92,9 +94,7 @@ export async function notifyMarketplaceOrderEmail(p: MarketplaceOrderEmailPayloa
     if (!warnedMissingEnv) {
       warnedMissingEnv = true;
       // eslint-disable-next-line no-console
-      console.warn(
-        "[email] Aviso marketplace omitido: faltan RESEND_API_KEY o RESEND_FROM_EMAIL."
-      );
+      console.warn("[email] Aviso marketplace omitido: falta RESEND_API_KEY.");
     }
     return;
   }

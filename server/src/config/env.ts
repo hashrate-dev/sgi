@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import dotenv from "dotenv";
+import { effectiveResendFromEmail, RESEND_DEFAULT_ONBOARDING_FROM } from "./resendFrom.js";
 
 // Cargar .env desde múltiples ubicaciones (localhost puede ejecutarse desde raíz o server/)
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -17,6 +18,12 @@ if (fs.existsSync(serverEnv)) dotenv.config({ path: serverEnv, override: true })
 // 3) raíz del proyecto .env (set-supabase-url.cjs escribe aquí)
 const rootEnv = path.join(projectRoot, ".env");
 if (fs.existsSync(rootEnv)) dotenv.config({ path: rootEnv, override: true });
+// 4) raíz .env.local (secretos locales frecuentes con Vite)
+const rootLocal = path.join(projectRoot, ".env.local");
+if (fs.existsSync(rootLocal)) dotenv.config({ path: rootLocal, override: true });
+// 5) Resend solo (gitignored); evita mezclar con el .env principal
+const resendLocal = path.join(projectRoot, ".env.resend.local");
+if (fs.existsSync(resendLocal)) dotenv.config({ path: resendLocal, override: true });
 
 const defaultSqlitePath = process.env.VERCEL ? "/tmp/data.db" : "data.db";
 const EnvSchema = z.object({
@@ -56,22 +63,34 @@ export const env: Env = EnvSchema.parse(process.env);
 
 (() => {
   const apiKey = process.env.RESEND_API_KEY?.trim();
-  const from = process.env.RESEND_FROM_EMAIL?.trim();
+  const from = effectiveResendFromEmail();
   const to = (process.env.MARKETPLACE_NOTIFY_EMAIL_TO || "sales@hashrate.space").trim();
   const devConsole =
     process.env.NODE_ENV !== "production" && process.env.MARKETPLACE_EMAIL_DEV_CONSOLE !== "0";
+  if (apiKey && !apiKey.startsWith("re_")) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[email] RESEND_API_KEY no parece una clave de Resend (debería empezar con re_). Si pegaste un token de Vercel (vcp_…) u otro servicio, el envío fallará: creá una API key en https://resend.com/api-keys"
+    );
+  }
   if (apiKey && from) {
     // eslint-disable-next-line no-console
-    console.log(`[email] Avisos marketplace por email: activos (destino: ${to}).`);
+    console.log(`[email] Avisos marketplace por email: activos (destino: ${to}, desde: ${from}).`);
+    if (!process.env.RESEND_FROM_EMAIL?.trim() && from === RESEND_DEFAULT_ONBOARDING_FROM) {
+      // eslint-disable-next-line no-console
+      console.log(
+        "[email] Si no llegan correos: con remitente de prueba Resend a veces solo se entrega a tu email de cuenta o hay que verificar dominio. Probá MARKETPLACE_NOTIFY_EMAIL_TO=tu_email@... (o delivered@resend.dev), revisá dashboard Resend → Emails y spam."
+      );
+    }
   } else if (devConsole) {
     // eslint-disable-next-line no-console
     console.log(
-      `[email] Avisos marketplace (desarrollo): sin Resend — cada aviso se imprime en consola (destino sería ${to}). Definí RESEND_API_KEY y RESEND_FROM_EMAIL para envío real.`
+      `[email] Avisos marketplace (desarrollo): sin API key — cada aviso se imprime en consola (destino sería ${to}). Definí RESEND_API_KEY en .env.resend.local (npm run resend:init) o en .env.`
     );
   } else {
     // eslint-disable-next-line no-console
     console.log(
-      "[email] Avisos marketplace por email: no configurados. Definí RESEND_API_KEY y RESEND_FROM_EMAIL en el .env de la raíz del repo o en server/.env (sin comillas; reiniciá el proceso después de guardar)."
+      "[email] Avisos marketplace por email: no configurados. Definí RESEND_API_KEY (y opcional RESEND_FROM_EMAIL) en .env.resend.local o en el .env de la raíz / server/.env; reiniciá el proceso después de guardar."
     );
   }
 })();
