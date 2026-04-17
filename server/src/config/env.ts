@@ -3,7 +3,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import dotenv from "dotenv";
-import { effectiveResendFromEmail, RESEND_DEFAULT_ONBOARDING_FROM } from "./resendFrom.js";
+import {
+  effectiveResendFromEmail,
+  normalizeResendApiKey,
+  RESEND_DEFAULT_ONBOARDING_FROM,
+  resendApiKeyLooksInvalid,
+} from "./resendFrom.js";
 
 // Cargar .env desde múltiples ubicaciones (localhost puede ejecutarse desde raíz o server/)
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -24,6 +29,22 @@ if (fs.existsSync(rootLocal)) dotenv.config({ path: rootLocal, override: true })
 // 5) Resend solo (gitignored); evita mezclar con el .env principal
 const resendLocal = path.join(projectRoot, ".env.resend.local");
 if (fs.existsSync(resendLocal)) dotenv.config({ path: resendLocal, override: true });
+
+/** Evita 401 de Resend por `re_re_…` (doble prefijo) o comillas en .env. */
+(() => {
+  const raw = process.env.RESEND_API_KEY;
+  if (raw === undefined) return;
+  const norm = normalizeResendApiKey(raw);
+  if (norm !== String(raw).trim()) {
+    process.env.RESEND_API_KEY = norm;
+    if (process.env.NODE_ENV !== "production" && norm.length > 0) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        "[email] RESEND_API_KEY se normalizó (comillas envolventes o prefijo re_ duplicado). Si Resend sigue con 401, creá otra clave en https://resend.com/api-keys"
+      );
+    }
+  }
+})();
 
 const defaultSqlitePath = process.env.VERCEL ? "/tmp/data.db" : "data.db";
 const EnvSchema = z.object({
@@ -62,18 +83,19 @@ export const env: Env = EnvSchema.parse(process.env);
 })();
 
 (() => {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const apiKey = normalizeResendApiKey(process.env.RESEND_API_KEY);
   const from = effectiveResendFromEmail();
   const to = (process.env.MARKETPLACE_NOTIFY_EMAIL_TO || "sales@hashrate.space").trim();
   const devConsole =
     process.env.NODE_ENV !== "production" && process.env.MARKETPLACE_EMAIL_DEV_CONSOLE !== "0";
-  if (apiKey && !apiKey.startsWith("re_")) {
+  const badResendKey = Boolean(apiKey && resendApiKeyLooksInvalid(apiKey));
+  if (badResendKey) {
     // eslint-disable-next-line no-console
     console.warn(
-      "[email] RESEND_API_KEY no parece una clave de Resend (debería empezar con re_). Si pegaste un token de Vercel (vcp_…) u otro servicio, el envío fallará: creá una API key en https://resend.com/api-keys"
+      "[email] RESEND_API_KEY inválida o mezclada con token de Vercel (no uses re_vcp_…). Creá una clave nueva en https://resend.com/api-keys (solo re_… de Resend)."
     );
   }
-  if (apiKey && from) {
+  if (apiKey && from && !badResendKey) {
     // eslint-disable-next-line no-console
     console.log(`[email] Avisos marketplace por email: activos (destino: ${to}, desde: ${from}).`);
     if (!process.env.RESEND_FROM_EMAIL?.trim() && from === RESEND_DEFAULT_ONBOARDING_FROM) {
@@ -85,7 +107,9 @@ export const env: Env = EnvSchema.parse(process.env);
   } else if (devConsole) {
     // eslint-disable-next-line no-console
     console.log(
-      `[email] Avisos marketplace (desarrollo): sin API key — cada aviso se imprime en consola (destino sería ${to}). Definí RESEND_API_KEY en .env.resend.local (npm run resend:init) o en .env.`
+      badResendKey
+        ? "[email] Avisos marketplace (desarrollo): clave Resend inválida — cada aviso se imprime en consola. Corregí RESEND_API_KEY (solo la clave re_… del dashboard de Resend)."
+        : `[email] Avisos marketplace (desarrollo): sin API key — cada aviso se imprime en consola (destino sería ${to}). Definí RESEND_API_KEY en .env.resend.local (npm run resend:init) o en .env.`
     );
   } else {
     // eslint-disable-next-line no-console

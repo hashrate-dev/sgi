@@ -24,6 +24,8 @@ export const MARKETPLACE_PIPELINE_BLOCKING_STATUSES = [
   "en_gestion",
   "pagada",
   "en_viaje",
+  /** Legacy / migraciones; debe coincidir con `isMarketplaceOrderPipelineBlockingStatus` y con el IN SQL de quote-sync. */
+  "respondido",
 ] as const;
 
 export function normalizeTicketStatusDb(s: string): string {

@@ -1,4 +1,9 @@
-import { effectiveResendFromEmail } from "../config/resendFrom.js";
+import {
+  effectiveResendFromEmail,
+  normalizeResendApiKey,
+  RESEND_DEFAULT_ONBOARDING_FROM,
+  resendApiKeyLooksInvalid,
+} from "../config/resendFrom.js";
 
 /**
  * Aviso por email (Resend) cuando una orden marketplace pasa de borrador a enviada.
@@ -12,6 +17,8 @@ const DEFAULT_SUBJECT_PREFIX = "[Marketplace]";
 const DEFAULT_PANEL_URL = "https://app.hashrate.space/cotizaciones-marketplace";
 
 let warnedMissingEnv = false;
+let warnedOnboardingExternalTo = false;
+let loggedResendDeliveryHint = false;
 
 export type MarketplaceOrderEmailPayload = {
   orderNumber: string;
@@ -30,6 +37,51 @@ function moneyUsd(v: number): string {
   return `${Number(v || 0).toLocaleString("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
 }
 
+function resendErrorDetail(bodyText: string): string {
+  try {
+    const j = JSON.parse(bodyText) as { message?: string; error?: string };
+    return String(j.message || j.error || bodyText);
+  } catch {
+    return bodyText;
+  }
+}
+
+function resend403UnverifiedFromDomain(detail: string): boolean {
+  const d = detail.toLowerCase();
+  return (
+    d.includes("not verified") ||
+    d.includes("verify your domain") ||
+    d.includes("domain is not verified") ||
+    d.includes("unauthorized domain")
+  );
+}
+
+async function resendPostEmail(opts: {
+  apiKey: string;
+  from: string;
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+}): Promise<{ res: Response; bodyText: string }> {
+  const res = await fetch(RESEND_API_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${opts.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: opts.from,
+      to: [opts.to],
+      subject: opts.subject,
+      text: opts.text,
+      html: opts.html,
+    }),
+  });
+  const bodyText = await res.text();
+  return { res, bodyText };
+}
+
 /**
  * Envía un email transaccional por Resend.
  * Requiere:
@@ -41,7 +93,9 @@ function moneyUsd(v: number): string {
  * - MARKETPLACE_QUOTES_PANEL_URL (default https://app.hashrate.space/cotizaciones-marketplace)
  */
 export async function notifyMarketplaceOrderEmail(p: MarketplaceOrderEmailPayload): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
+  // eslint-disable-next-line no-console
+  console.log(`[email] aviso marketplace (handler) orden=${String(p.orderNumber || "?").slice(0, 24)} ticket=${String(p.ticketCode || "?").slice(0, 16)}`);
+  const apiKey = normalizeResendApiKey(process.env.RESEND_API_KEY);
   const from = effectiveResendFromEmail();
   const to = (process.env.MARKETPLACE_NOTIFY_EMAIL_TO || DEFAULT_TO).trim();
   const subjectPrefix = (process.env.MARKETPLACE_NOTIFY_SUBJECT_PREFIX || DEFAULT_SUBJECT_PREFIX).trim();
@@ -81,48 +135,85 @@ export async function notifyMarketplaceOrderEmail(p: MarketplaceOrderEmailPayloa
     </div>
   `.trim();
 
-  if (!apiKey) {
+  if (!apiKey || resendApiKeyLooksInvalid(apiKey)) {
     const devConsole =
       process.env.NODE_ENV !== "production" && process.env.MARKETPLACE_EMAIL_DEV_CONSOLE !== "0";
     if (devConsole) {
       // eslint-disable-next-line no-console
       console.log(
-        `[email] (dev, sin Resend) aviso marketplace → destino sería ${to}\n${subject}\n${text}`
+        `[email] (dev, sin envío Resend) aviso marketplace → destino sería ${to}\n${subject}\n${text}${
+          apiKey && resendApiKeyLooksInvalid(apiKey)
+            ? "\n\nMotivo: RESEND_API_KEY no es válida (ej. re_vcp_…). Usá solo la clave re_… de https://resend.com/api-keys"
+            : ""
+        }`
       );
       return;
     }
     if (!warnedMissingEnv) {
       warnedMissingEnv = true;
       // eslint-disable-next-line no-console
-      console.warn("[email] Aviso marketplace omitido: falta RESEND_API_KEY.");
+      console.warn(
+        apiKey && resendApiKeyLooksInvalid(apiKey)
+          ? "[email] Aviso marketplace omitido: RESEND_API_KEY inválida (no uses token Vercel ni re_vcp_…)."
+          : "[email] Aviso marketplace omitido: falta RESEND_API_KEY."
+      );
     }
     return;
   }
 
-  const res = await fetch(RESEND_API_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from,
-      to: [to],
-      subject,
-      text,
-      html,
-    }),
+  const toLower = to.toLowerCase();
+  const isResendTestInbox = toLower.endsWith("@resend.dev");
+  if (from === RESEND_DEFAULT_ONBOARDING_FROM && !isResendTestInbox && !warnedOnboardingExternalTo) {
+    warnedOnboardingExternalTo = true;
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[email] Enviando desde remitente de prueba (${from}) hacia ${to}. Resend a menudo no entrega a buzones externos en este modo. Si no llega: probá MARKETPLACE_NOTIFY_EMAIL_TO=delivered@resend.dev, el email de tu cuenta Resend, o verificá dominio y RESEND_FROM_EMAIL.`
+    );
+  }
+
+  // eslint-disable-next-line no-console
+  console.log(`[email] Enviando aviso marketplace a ${to} (desde ${from})…`);
+
+  let sendFrom = from;
+  let { res, bodyText } = await resendPostEmail({
+    apiKey,
+    from: sendFrom,
+    to,
+    subject,
+    text,
+    html,
   });
 
-  const bodyText = await res.text();
-  if (!res.ok) {
-    let detail = bodyText;
-    try {
-      const j = JSON.parse(bodyText) as { message?: string; error?: string };
-      detail = String(j.message || j.error || bodyText);
-    } catch {
-      /* keep raw text */
+  if (!res.ok && res.status === 403 && sendFrom !== RESEND_DEFAULT_ONBOARDING_FROM) {
+    const detail403 = resendErrorDetail(bodyText);
+    if (resend403UnverifiedFromDomain(detail403)) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[email] Resend rechazó el remitente (${sendFrom}): dominio no verificado. Reintentando con ${RESEND_DEFAULT_ONBOARDING_FROM}. Verificá hashrate.space en https://resend.com/domains o comentá RESEND_FROM_EMAIL en .env.resend.local hasta entonces.`
+      );
+      sendFrom = RESEND_DEFAULT_ONBOARDING_FROM;
+      const second = await resendPostEmail({
+        apiKey,
+        from: sendFrom,
+        to,
+        subject,
+        text,
+        html,
+      });
+      res = second.res;
+      bodyText = second.bodyText;
+      if (sendFrom === RESEND_DEFAULT_ONBOARDING_FROM && !isResendTestInbox && !warnedOnboardingExternalTo) {
+        warnedOnboardingExternalTo = true;
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[email] Enviando desde remitente de prueba (${sendFrom}) hacia ${to}. Resend a menudo no entrega a buzones externos en este modo. Si no llega: probá MARKETPLACE_NOTIFY_EMAIL_TO=delivered@resend.dev, el email de tu cuenta Resend, o verificá dominio y RESEND_FROM_EMAIL.`
+        );
+      }
     }
+  }
+
+  if (!res.ok) {
+    const detail = resendErrorDetail(bodyText);
     throw new Error(`Resend API ${res.status}: ${detail}`);
   }
 
@@ -130,6 +221,13 @@ export async function notifyMarketplaceOrderEmail(p: MarketplaceOrderEmailPayloa
     const j = JSON.parse(bodyText) as { id?: string };
     // eslint-disable-next-line no-console
     console.log(`[email] Aviso de orden marketplace enviado a ${to}${j.id ? ` (id: ${j.id})` : ""}`);
+    if (!loggedResendDeliveryHint) {
+      loggedResendDeliveryHint = true;
+      // eslint-disable-next-line no-console
+      console.log(
+        `[email] Entrega: el log anterior es la respuesta OK de Resend, no garantiza que ${to} lo tenga en la bandeja. Revisá spam, filtros de Google/Microsoft, y en https://resend.com/emails el estado (delivered / bounced). Sin dominio verificado, desde onboarding@resend.dev a menudo no llega a buzones externos.`
+      );
+    }
   } catch {
     // eslint-disable-next-line no-console
     console.log(`[email] Aviso de orden marketplace enviado a ${to}`);

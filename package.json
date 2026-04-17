@@ -32,6 +32,7 @@
     "deploy:vercel": "node scripts/deploy-vercel.cjs",
     "vercel:env:resend": "node scripts/push-resend-env-vercel.cjs",
     "resend:init": "node scripts/init-resend-env-local.cjs",
+    "resend:test": "node scripts/test-resend-marketplace.cjs",
     "supabase:set": "node scripts/set-supabase-url.cjs",
     "legacy:dev": "nodemon ./src/app.js",
     "legacy:start": "node ./src/app.js"

@@ -171,6 +171,19 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
   const pipelineHydratedForIdRef = useRef<number | null>(null);
   /** Tras generar consulta (carrito vacío): no enviar clearPipelineCart al servidor (evitaría borrar el ticket recién creado). */
   const skipEmptyPipelineSyncRef = useRef(false);
+  /**
+   * Cada cambio de carrito (o logout) incrementa el contador; quote-sync en vuelo solo aplica merge
+   * si el valor sigue igual al capturado al enviar (evita que una respuesta vieja pise quitar/agregar).
+   */
+  const quoteCartRemoteApplyGenRef = useRef(0);
+  const canUseQuoteCartRef = useRef(canUseQuoteCart);
+  canUseQuoteCartRef.current = canUseQuoteCart;
+
+  useEffect(() => {
+    if (!canUseQuoteCart) {
+      quoteCartRemoteApplyGenRef.current += 1;
+    }
+  }, [canUseQuoteCart]);
 
   const refreshActiveOrderGate = useCallback(async () => {
     if (!canUseQuoteCart || !user) {
@@ -352,6 +365,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
     if (!canUseQuoteCart) {
       return;
     }
+    quoteCartRemoteApplyGenRef.current += 1;
     const isEmpty = lines.length === 0;
     if (isEmpty) {
       setTicketRef(null);
@@ -374,18 +388,25 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
     const delayMs = blockingPipelineOrder?.id != null ? 420 : 880;
     const t = window.setTimeout(() => {
       void (async () => {
+        const genAtSend = quoteCartRemoteApplyGenRef.current;
         try {
           const res = await syncMarketplaceQuoteTicket({
             lines: linesToPayload(lines),
             event: "sync",
             ...(isEmpty ? { clearPipelineCart: true as const } : {}),
           });
+          if (!canUseQuoteCartRef.current) return;
+          if (genAtSend !== quoteCartRemoteApplyGenRef.current) return;
           if (res.orderNumber && res.ticketCode) {
             setTicketRef({ orderNumber: res.orderNumber, ticketCode: res.ticketCode });
           }
           if (res.merged && Array.isArray(res.lines)) {
+            if (genAtSend !== quoteCartRemoteApplyGenRef.current) return;
             const next = quoteCartLinesFromApiPayload(res.lines);
-            setLines((prev) => (cartLinesMergeSig(prev) === cartLinesMergeSig(next) ? prev : next));
+            if (cartLinesMergeSig(lines) === cartLinesMergeSig(next)) {
+              return;
+            }
+            setLines(next);
             window.dispatchEvent(new CustomEvent(MARKETPLACE_ACTIVE_ORDER_CHANGED_EVENT));
           }
         } catch (e) {
@@ -484,6 +505,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
     if (lines.length === 0) {
       throw new Error("Agregá al menos un equipo a la lista.");
     }
+    quoteCartRemoteApplyGenRef.current += 1;
     const subtotalUsd = quoteCartSubtotalUsd(lines, {
       setupEquipoCompletoUsd,
       setupCompraHashrateUsd,
@@ -548,19 +570,27 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
     let mailLines = lines;
     try {
       if (canUseQuoteCart && lines.length > 0) {
+        quoteCartRemoteApplyGenRef.current += 1;
+        const genAtSend = quoteCartRemoteApplyGenRef.current;
         const r = await syncMarketplaceQuoteTicket({
           lines: linesToPayload(lines),
           event: "contact_email",
         });
-        if (r.orderNumber && r.ticketCode) {
-          ref = { orderNumber: r.orderNumber, ticketCode: r.ticketCode };
-          setTicketRef(ref);
-        }
-        if (r.merged && Array.isArray(r.lines)) {
-          const next = quoteCartLinesFromApiPayload(r.lines);
-          setLines((prev) => (cartLinesMergeSig(prev) === cartLinesMergeSig(next) ? prev : next));
-          mailLines = next;
-          window.dispatchEvent(new CustomEvent(MARKETPLACE_ACTIVE_ORDER_CHANGED_EVENT));
+        if (!canUseQuoteCartRef.current || genAtSend !== quoteCartRemoteApplyGenRef.current) {
+          /* Respuesta obsoleta o sesión cambiada: no pisar el carrito. */
+        } else {
+          if (r.orderNumber && r.ticketCode) {
+            ref = { orderNumber: r.orderNumber, ticketCode: r.ticketCode };
+            setTicketRef(ref);
+          }
+          if (r.merged && Array.isArray(r.lines)) {
+            const next = quoteCartLinesFromApiPayload(r.lines);
+            if (cartLinesMergeSig(lines) !== cartLinesMergeSig(next)) {
+              setLines(next);
+              mailLines = next;
+              window.dispatchEvent(new CustomEvent(MARKETPLACE_ACTIVE_ORDER_CHANGED_EVENT));
+            }
+          }
         }
       }
     } catch (e) {
@@ -582,19 +612,27 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
     let waLines = lines;
     try {
       if (canUseQuoteCart && lines.length > 0) {
+        quoteCartRemoteApplyGenRef.current += 1;
+        const genAtSend = quoteCartRemoteApplyGenRef.current;
         const r = await syncMarketplaceQuoteTicket({
           lines: linesToPayload(lines),
           event: "contact_whatsapp",
         });
-        if (r.orderNumber && r.ticketCode) {
-          ref = { orderNumber: r.orderNumber, ticketCode: r.ticketCode };
-          setTicketRef(ref);
-        }
-        if (r.merged && Array.isArray(r.lines)) {
-          const next = quoteCartLinesFromApiPayload(r.lines);
-          setLines((prev) => (cartLinesMergeSig(prev) === cartLinesMergeSig(next) ? prev : next));
-          waLines = next;
-          window.dispatchEvent(new CustomEvent(MARKETPLACE_ACTIVE_ORDER_CHANGED_EVENT));
+        if (!canUseQuoteCartRef.current || genAtSend !== quoteCartRemoteApplyGenRef.current) {
+          /* Respuesta obsoleta o sesión cambiada. */
+        } else {
+          if (r.orderNumber && r.ticketCode) {
+            ref = { orderNumber: r.orderNumber, ticketCode: r.ticketCode };
+            setTicketRef(ref);
+          }
+          if (r.merged && Array.isArray(r.lines)) {
+            const next = quoteCartLinesFromApiPayload(r.lines);
+            if (cartLinesMergeSig(lines) !== cartLinesMergeSig(next)) {
+              setLines(next);
+              waLines = next;
+              window.dispatchEvent(new CustomEvent(MARKETPLACE_ACTIVE_ORDER_CHANGED_EVENT));
+            }
+          }
         }
       }
     } catch (e) {

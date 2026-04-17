@@ -28,6 +28,9 @@ export const marketplaceQuoteTicketsRouter = Router();
 
 const adminAB = requireRole("admin_a", "admin_b");
 
+/** Evita inundar la consola en debounce; solo diagnóstico en desarrollo. */
+let lastQuoteSyncPipelineMissLogMs = 0;
+
 /** Fragmento SQL estático `IN (...)` para órdenes que bloquean otra compra activa. */
 const MQT_PIPELINE_STATUS_IN_SQL = marketplacePipelineBlockingInSql();
 
@@ -304,6 +307,29 @@ function mergePipelineCartLines(
   return Array.from(map.values()).sort((a, b) => quoteLineMergeKey(a).localeCompare(quoteLineMergeKey(b)));
 }
 
+/** Driver PG / capas: `items_json` puede venir como string o ya parseado. */
+function rowItemsJsonAsString(raw: unknown): string {
+  if (raw == null || raw === "") return "[]";
+  if (typeof raw === "string") {
+    const t = raw.trim();
+    return t.length > 0 ? t : "[]";
+  }
+  try {
+    return JSON.stringify(raw);
+  } catch {
+    return "[]";
+  }
+}
+
+/** Comparar carritos ignorando espacios u orden de keys en JSON. */
+function canonicalItemsJsonForCompare(json: string): string {
+  try {
+    return JSON.stringify(JSON.parse(json));
+  } catch {
+    return json.trim();
+  }
+}
+
 /** Libera session_id `u:{userId}` para el próximo borrador (ticket ya enviado al dashboard). */
 function submittedSessionId(userId: number, ticketId: number): string {
   return `u:${userId}:submitted:${ticketId}`;
@@ -399,10 +425,11 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
         const blocking = (await db
           .prepare(
             `SELECT id, order_number, ticket_code, status FROM marketplace_quote_tickets
-             WHERE user_id = ? AND status IN (${MQT_PIPELINE_STATUS_IN_SQL})
+             WHERE status IN (${MQT_PIPELINE_STATUS_IN_SQL})
+             AND (session_id = ? OR session_id LIKE ?)
              ORDER BY updated_at DESC LIMIT 1`
           )
-          .get(userId)) as
+          .get(sessionId, `${sessionId}:%`)) as
           | { id: number; order_number: string | null; ticket_code: string; status: string }
           | undefined;
         if (blocking) {
@@ -440,6 +467,12 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
     }
 
     const trustedLines = await resolveTrustedQuoteLines(lines);
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.log(
+        `[quote-sync] in user=${userId} event=${String(event)} linesIn=${lines.length} trusted=${trustedLines.length} session=${sessionId}`
+      );
+    }
     const [setupEquipoCompletoUsd, setupCompraHashrateUsd] = await Promise.all([
       resolveSetupEquipoCompletoUsd(),
       resolveSetupCompraHashrateUsd(),
@@ -450,12 +483,23 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
       const blocking = (await db
         .prepare(
           `SELECT id, order_number, ticket_code, status, items_json FROM marketplace_quote_tickets
-           WHERE user_id = ? AND status IN (${MQT_PIPELINE_STATUS_IN_SQL})
+           WHERE status IN (${MQT_PIPELINE_STATUS_IN_SQL})
+           AND (session_id = ? OR session_id LIKE ?)
            ORDER BY updated_at DESC LIMIT 1`
         )
-        .get(userId)) as
+        .get(sessionId, `${sessionId}:%`)) as
         | { id: number; order_number: string | null; ticket_code: string; status: string; items_json: string | null }
         | undefined;
+      if (!blocking && process.env.NODE_ENV !== "production") {
+        const t = Date.now();
+        if (t - lastQuoteSyncPipelineMissLogMs > 45_000) {
+          lastQuoteSyncPipelineMissLogMs = t;
+          // eslint-disable-next-line no-console
+          console.warn(
+            `[quote-sync] sin fila pipeline para session=${sessionId} (ni LIKE '${sessionId}:%'); revisá status y session_id en marketplace_quote_tickets`
+          );
+        }
+      }
       if (blocking) {
         const orphanDraft = (await db
           .prepare("SELECT id FROM marketplace_quote_tickets WHERE session_id = ? AND status = 'borrador'")
@@ -464,7 +508,7 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
           await db.prepare("DELETE FROM marketplace_quote_tickets WHERE id = ?").run(orphanDraft.id);
         }
 
-        const mergedLines = mergePipelineCartLines(String(blocking.items_json ?? "[]"), trustedLines);
+        const mergedLines = mergePipelineCartLines(rowItemsJsonAsString(blocking.items_json), trustedLines);
         const { subtotal: mergedSub, lineCount: mergedLc, unitCount: mergedUc } = computeTotals(
           mergedLines,
           setupEquipoCompletoUsd,
@@ -472,6 +516,7 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
           garantiaItems
         );
         const itemsJsonMerged = JSON.stringify(mergedLines);
+        const prevItemsSnapshot = rowItemsJsonAsString(blocking.items_json);
         const isSubmitTicketMerge = event === "submit_ticket";
         const contactChannelMerge =
           isSubmitTicketMerge ? "portal" : event === "contact_email" ? "email" : event === "contact_whatsapp" ? "whatsapp" : undefined;
@@ -523,6 +568,34 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
           await db.prepare("UPDATE marketplace_quote_tickets SET order_number = ? WHERE id = ?").run(orderNumber, blocking.id);
         }
 
+        /**
+         * Aviso a ventas en fusión con orden en pipeline:
+         * - submit_ticket (confirmación explícita), o
+         * - sync automático cuando el JSON de ítems cambió respecto a BD (agregar/quitar/editar sin botón «Actualizar»).
+         */
+        const mergeItemsChanged =
+          itemsJsonMerged.trim() !== prevItemsSnapshot.trim() ||
+          canonicalItemsJsonForCompare(itemsJsonMerged) !== canonicalItemsJsonForCompare(prevItemsSnapshot);
+        const syncLikeEvent = event == null || event === "sync";
+        const notifyMergeOrder =
+          !terminalMerge && mergeItemsChanged && (isSubmitTicketMerge || syncLikeEvent);
+        if (notifyMergeOrder) {
+          // eslint-disable-next-line no-console
+          console.log(`[email] quote-sync merge → aviso ticket=${blocking.id} order=${orderNumber}`);
+          void notifyMarketplaceOrderEmail({
+            orderNumber,
+            ticketCode: blocking.ticket_code,
+            contactEmail: contactEmail ?? "",
+            subtotalUsd: mergedSub,
+          }).catch((e) => console.error("[email] marketplace order notify (merge):", e));
+          void notifyMarketplaceOrderWhatsApp({
+            orderNumber,
+            ticketCode: blocking.ticket_code,
+            contactEmail: contactEmail ?? "",
+            subtotalUsd: mergedSub,
+          }).catch((e) => console.error("[whatsapp] marketplace order notify (merge):", e));
+        }
+
         return res.json({
           ok: true,
           id: blocking.id,
@@ -535,6 +608,12 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
           lineCount: mergedLc,
           unitCount: mergedUc,
         });
+      }
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.log(
+          `[quote-sync] merge skipped (no pipeline row for session / status not in pipeline IN) session=${sessionId}`
+        );
       }
     }
 
@@ -549,11 +628,32 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
     const contactChannel =
       isSubmitTicket ? "portal" : event === "contact_email" ? "email" : event === "contact_whatsapp" ? "whatsapp" : undefined;
 
-    const existing = (await db
-      .prepare("SELECT id, order_number, ticket_code, status, updated_at FROM marketplace_quote_tickets WHERE session_id = ?")
-      .get(sessionId)) as
-      | { id: number; order_number: string | null; ticket_code: string; status: string; updated_at: string | null }
-      | undefined;
+    type ExistingRow = {
+      id: number;
+      order_number: string | null;
+      ticket_code: string;
+      status: string;
+      updated_at: string | null;
+      items_json: string | null;
+      subtotal_usd: unknown;
+      line_count: unknown;
+      unit_count: unknown;
+    };
+
+    const existingSelect =
+      "SELECT id, order_number, ticket_code, status, updated_at, items_json, subtotal_usd, line_count, unit_count FROM marketplace_quote_tickets";
+
+    let existing = (await db.prepare(`${existingSelect} WHERE session_id = ?`).get(sessionId)) as ExistingRow | undefined;
+    /** Tras «Generar orden» el `session_id` pasa a `u:{id}:submitted:{ticketId}`; el cliente sigue usando `u:{id}` para el sync. */
+    if (!existing && singleMarketplaceOrderPolicy) {
+      existing = (await db
+        .prepare(
+          `${existingSelect} WHERE status IN (${MQT_PIPELINE_STATUS_IN_SQL})
+           AND (session_id = ? OR session_id LIKE ?)
+           ORDER BY updated_at DESC LIMIT 1`
+        )
+        .get(sessionId, `${sessionId}:%`)) as ExistingRow | undefined;
+    }
 
     if (existing) {
       const exSt = normalizeTicketStatusDb(existing.status);
@@ -641,11 +741,16 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
           .prepare("UPDATE marketplace_quote_tickets SET session_id = ? WHERE id = ?")
           .run(submittedSessionId(userId, existing.id), existing.id);
       }
-      const prevStatus = String(existing.status ?? "").trim();
+      const prevNorm = normalizeTicketStatusDb(String(existing.status ?? ""));
+      const nextNorm = normalizeTicketStatusDb(String(nextStatus ?? ""));
+      /** `sync` / contacto reactiva descartado reciente → enviado_consulta antes de un submit; sin esto nunca se llama notify y el submit posterior ve ya «enviado». */
+      const reactivatedDescartadoToEnviado =
+        isCancelled && canReactivateCancelled && nextNorm === "enviado_consulta" && prevNorm === "descartado";
+
       if (
         isSubmitTicket &&
         nextStatus === "enviado_consulta" &&
-        (prevStatus === "borrador" || prevStatus === "descartado")
+        (prevNorm === "borrador" || prevNorm === "descartado")
       ) {
         void notifyMarketplaceOrderEmail({
           orderNumber,
@@ -659,6 +764,63 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
           contactEmail: contactEmail ?? "",
           subtotalUsd: subtotal,
         }).catch((e) => console.error("[whatsapp] marketplace order notify:", e));
+      } else if (!isSubmitTicket && reactivatedDescartadoToEnviado) {
+        // eslint-disable-next-line no-console
+        console.log(`[email] quote-sync reactivate descartado → aviso ticket=${existing.id} order=${orderNumber}`);
+        void notifyMarketplaceOrderEmail({
+          orderNumber,
+          ticketCode: existing.ticket_code,
+          contactEmail: contactEmail ?? "",
+          subtotalUsd: subtotal,
+        }).catch((e) => console.error("[email] marketplace order notify (reactivate):", e));
+        void notifyMarketplaceOrderWhatsApp({
+          orderNumber,
+          ticketCode: existing.ticket_code,
+          contactEmail: contactEmail ?? "",
+          subtotalUsd: subtotal,
+        }).catch((e) => console.error("[whatsapp] marketplace order notify (reactivate):", e));
+      } else if (isSubmitTicket && nextStatus === "enviado_consulta") {
+        console.log(
+          `[email] Sin aviso re-envío ticket ${existing.id}: prev "${prevNorm}" (solo borrador/descartado→enviado o submit fusionado en orden activa).`
+        );
+      }
+      /**
+       * Orden en pipeline guardada por `session_id` (p. ej. `u:5`) sin pasar por la fusión `user_id`:
+       * el POST ~373 bytes va a esta rama; hay que avisar en sync cuando cambia el carrito.
+       */
+      const prevJsonPipeline = rowItemsJsonAsString(existing.items_json);
+      const cartChangedPipelineSync =
+        itemsJson.trim() !== prevJsonPipeline.trim() ||
+        canonicalItemsJsonForCompare(itemsJson) !== canonicalItemsJsonForCompare(prevJsonPipeline) ||
+        Math.abs(Number(existing.subtotal_usd ?? 0) - subtotal) > 0.01 ||
+        Number(existing.line_count ?? 0) !== lineCount ||
+        Number(existing.unit_count ?? 0) !== unitCount;
+      const pipelineBlockingRow = isMarketplaceOrderPipelineBlockingStatus(existing.status);
+      if (!contactChannel && !terminal && pipelineBlockingRow) {
+        if (cartChangedPipelineSync) {
+          // eslint-disable-next-line no-console
+          console.log(`[email] quote-sync session → aviso ticket=${existing.id} order=${orderNumber}`);
+          void notifyMarketplaceOrderEmail({
+            orderNumber,
+            ticketCode: existing.ticket_code,
+            contactEmail: contactEmail ?? "",
+            subtotalUsd: subtotal,
+          }).catch((e) => console.error("[email] marketplace order notify (pipeline-session-sync):", e));
+          void notifyMarketplaceOrderWhatsApp({
+            orderNumber,
+            ticketCode: existing.ticket_code,
+            contactEmail: contactEmail ?? "",
+            subtotalUsd: subtotal,
+          }).catch((e) => console.error("[whatsapp] marketplace order notify (pipeline-session-sync):", e));
+        }
+      }
+      if (process.env.NODE_ENV !== "production") {
+        const sessionEmailWouldFire =
+          !contactChannel && !terminal && pipelineBlockingRow && cartChangedPipelineSync;
+        // eslint-disable-next-line no-console
+        console.log(
+          `[quote-sync] existing id=${existing.id} status=${existing.status} terminal=${terminal} pipelineBlocking=${pipelineBlockingRow} contact=${contactChannel ?? "none"} cartChangedVsDb=${cartChangedPipelineSync} sessionEmail=${sessionEmailWouldFire}`
+        );
       }
       return res.json({
         ok: true,

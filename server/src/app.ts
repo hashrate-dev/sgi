@@ -24,7 +24,8 @@ import { errorHandler } from "./middleware/errorHandler.js";
 export function createApp() {
   const app = express();
 
-  app.set("trust proxy", true);
+  // express-rate-limit rechaza trust proxy = true (ERR_ERL_PERMISSIVE_TRUST_PROXY). En Vercel basta 1 hop.
+  app.set("trust proxy", env.NODE_ENV === "production" ? 1 : false);
 
   app.use(
     helmet({
@@ -47,6 +48,8 @@ export function createApp() {
           origin(origin, callback) {
             if (!origin) return callback(null, true);
             if (corsAllowlist.includes(origin)) return callback(null, true);
+            // Misma app con Vite: a veces abrís localhost:5173 y otras 127.0.0.1:5173; CORS_ORIGIN suele listar solo uno.
+            if (env.NODE_ENV !== "production" && defaultTrustedOrigins.has(origin)) return callback(null, true);
             callback(null, false);
           },
         }
