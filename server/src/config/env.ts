@@ -58,13 +58,20 @@ export const env: Env = EnvSchema.parse(process.env);
   const apiKey = process.env.RESEND_API_KEY?.trim();
   const from = process.env.RESEND_FROM_EMAIL?.trim();
   const to = (process.env.MARKETPLACE_NOTIFY_EMAIL_TO || "sales@hashrate.space").trim();
+  const devConsole =
+    process.env.NODE_ENV !== "production" && process.env.MARKETPLACE_EMAIL_DEV_CONSOLE !== "0";
   if (apiKey && from) {
     // eslint-disable-next-line no-console
     console.log(`[email] Avisos marketplace por email: activos (destino: ${to}).`);
+  } else if (devConsole) {
+    // eslint-disable-next-line no-console
+    console.log(
+      `[email] Avisos marketplace (desarrollo): sin Resend — cada aviso se imprime en consola (destino sería ${to}). Definí RESEND_API_KEY y RESEND_FROM_EMAIL para envío real.`
+    );
   } else {
     // eslint-disable-next-line no-console
     console.log(
-      "[email] Avisos marketplace por email: no configurados. Definí RESEND_API_KEY y RESEND_FROM_EMAIL en .env."
+      "[email] Avisos marketplace por email: no configurados. Definí RESEND_API_KEY y RESEND_FROM_EMAIL en el .env de la raíz del repo o en server/.env (sin comillas; reiniciá el proceso después de guardar)."
     );
   }
 })();

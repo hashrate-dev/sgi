@@ -642,7 +642,11 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
           .run(submittedSessionId(userId, existing.id), existing.id);
       }
       const prevStatus = String(existing.status ?? "").trim();
-      if (isSubmitTicket && nextStatus === "enviado_consulta" && prevStatus === "borrador") {
+      if (
+        isSubmitTicket &&
+        nextStatus === "enviado_consulta" &&
+        (prevStatus === "borrador" || prevStatus === "descartado")
+      ) {
         void notifyMarketplaceOrderEmail({
           orderNumber,
           ticketCode: existing.ticket_code,
@@ -713,6 +717,20 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
         const orderNumber = latestCancelled.order_number ?? `ORD-${String(latestCancelled.id).padStart(7, "0")}`;
         if (!latestCancelled.order_number) {
           await db.prepare("UPDATE marketplace_quote_tickets SET order_number = ? WHERE id = ?").run(orderNumber, latestCancelled.id);
+        }
+        if (isSubmitTicket) {
+          void notifyMarketplaceOrderEmail({
+            orderNumber,
+            ticketCode: latestCancelled.ticket_code,
+            contactEmail: contactEmail ?? "",
+            subtotalUsd: subtotal,
+          }).catch((e) => console.error("[email] marketplace order notify:", e));
+          void notifyMarketplaceOrderWhatsApp({
+            orderNumber,
+            ticketCode: latestCancelled.ticket_code,
+            contactEmail: contactEmail ?? "",
+            subtotalUsd: subtotal,
+          }).catch((e) => console.error("[whatsapp] marketplace order notify:", e));
         }
         return res.json({
           ok: true,

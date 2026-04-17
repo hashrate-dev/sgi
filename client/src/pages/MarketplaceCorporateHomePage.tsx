@@ -80,19 +80,33 @@ export function MarketplaceCorporateHomePage() {
   const { pathname, hash } = useLocation();
   const navigate = useNavigate();
 
-  const [corpBestSellingProducts, setCorpBestSellingProducts] = useState<AsicProduct[]>([]);
+  const localHomeProductsPool = useMemo(
+    () => ASIC_MARKETPLACE_PRODUCTS.filter((p) => Boolean(p.imageSrc)).slice(0, 12),
+    []
+  );
+  const corpBestSellingFallback = useMemo(() => localHomeProductsPool.slice(0, 4), [localHomeProductsPool]);
+  const interestingFallback = useMemo(() => {
+    const rest = localHomeProductsPool.slice(4, 8);
+    return rest.length > 0 ? rest : localHomeProductsPool.slice(0, 4);
+  }, [localHomeProductsPool]);
+
+  /** Render inmediato: fallback local y luego refresco con API. */
+  const [corpBestSellingProducts, setCorpBestSellingProducts] = useState<AsicProduct[]>(() => corpBestSellingFallback);
 
   /** Segunda fila (debajo de “Servicio todo incluido”): extras de catálogo + `/marketplace?asic=`. */
   const corpMarketplaceAfterHostingProducts = useMemo(
-    () =>
-      CORP_HOME_GRID_PRODUCT_IDS.map((id) => ASIC_MARKETPLACE_PRODUCTS.find((p) => p.id === id)).filter(
+    () => {
+      const byIds = CORP_HOME_GRID_PRODUCT_IDS.map((id) => ASIC_MARKETPLACE_PRODUCTS.find((p) => p.id === id)).filter(
         (p): p is AsicProduct => Boolean(p)
-      ),
-    []
+      );
+      if (byIds.length > 0) return byIds;
+      return localHomeProductsPool.slice(8, 12);
+    },
+    [localHomeProductsPool]
   );
 
   /** Equipos elegidos en el panel ASIC (hasta 4); vacío si no hay selección o la API falla. */
-  const [interestingVitrina, setInterestingVitrina] = useState<AsicProduct[]>([]);
+  const [interestingVitrina, setInterestingVitrina] = useState<AsicProduct[]>(() => interestingFallback);
 
   const goCorpHash = useCallback((id: (typeof CORP_ANCHOR_IDS)[number]) => {
     navigate({ pathname, hash: `#${id}` });
@@ -109,23 +123,25 @@ export function MarketplaceCorporateHomePage() {
     void getMarketplaceCorpInteresting()
       .then((res) => {
         if (cancelled) return;
-        setInterestingVitrina(res.products ?? []);
+        const list = res.products ?? [];
+        if (list.length > 0) setInterestingVitrina(list);
       })
       .catch(() => {
-        if (!cancelled) setInterestingVitrina([]);
+        if (cancelled) return;
       });
     void getMarketplaceCorpBestSelling()
       .then((res) => {
         if (cancelled) return;
-        setCorpBestSellingProducts(res.products ?? []);
+        const list = res.products ?? [];
+        if (list.length > 0) setCorpBestSellingProducts(list);
       })
       .catch(() => {
-        if (!cancelled) setCorpBestSellingProducts([]);
+        if (cancelled) return;
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [corpBestSellingFallback, interestingFallback]);
 
   useEffect(() => {
     const prevTitle = document.title;
@@ -321,7 +337,7 @@ export function MarketplaceCorporateHomePage() {
             <div className="market-corp-inner market-corp-inner--flush-top">
               <h2 className="market-corp-products-title">{t("corp.best_selling.title")}</h2>
               <div className="market-corp-mp-shortcuts" aria-label={t("corp.market_shortcuts_aria")}>
-                {corpBestSellingProducts.map((p) => {
+                {corpBestSellingProducts.map((p, idx) => {
                   const to = `/marketplace?asic=${encodeURIComponent(p.id)}`;
                   const aria = `${p.brand} ${p.model} ${p.hashrate} — ${t("corp.mp_card_link_aria")}`;
                   const goAsic = () => {
@@ -338,7 +354,8 @@ export function MarketplaceCorporateHomePage() {
                                 alt=""
                                 width={400}
                                 height={400}
-                                loading="lazy"
+                                loading={idx < 2 ? "eager" : "lazy"}
+                                fetchPriority={idx < 2 ? "high" : "auto"}
                                 decoding="async"
                                 className="shelf-product__photo"
                               />
@@ -423,7 +440,7 @@ export function MarketplaceCorporateHomePage() {
                   className="market-corp-mp-shortcuts market-corp-interesting-slot__shortcuts"
                   aria-label={t("corp.interesting_products.grid_aria")}
                 >
-                  {interestingVitrina.map((p) => {
+                  {interestingVitrina.map((p, idx) => {
                     const to = `/marketplace?asic=${encodeURIComponent(p.id)}`;
                     const aria = `${p.brand} ${p.model} ${p.hashrate} — ${t("corp.mp_card_link_aria")}`;
                     const goAsic = () => {
@@ -440,7 +457,8 @@ export function MarketplaceCorporateHomePage() {
                                   alt=""
                                   width={400}
                                   height={400}
-                                  loading="lazy"
+                                  loading={idx < 2 ? "eager" : "lazy"}
+                                  fetchPriority={idx < 2 ? "high" : "auto"}
                                   decoding="async"
                                   className="shelf-product__photo"
                                 />
@@ -493,7 +511,7 @@ export function MarketplaceCorporateHomePage() {
                   {t("corp.home_row2.title")}
                 </h2>
                 <div className="market-corp-mp-shortcuts" aria-label={t("corp.home_row2.grid_aria")}>
-                  {corpMarketplaceAfterHostingProducts.map((p) => {
+                  {corpMarketplaceAfterHostingProducts.map((p, idx) => {
                     const to = `/marketplace?asic=${encodeURIComponent(p.id)}`;
                     const aria = `${p.brand} ${p.model} ${p.hashrate} — ${t("corp.mp_card_link_aria")}`;
                     const goAsic = () => {
@@ -510,7 +528,8 @@ export function MarketplaceCorporateHomePage() {
                                   alt=""
                                   width={400}
                                   height={400}
-                                  loading="lazy"
+                                  loading={idx < 2 ? "eager" : "lazy"}
+                                  fetchPriority={idx < 2 ? "high" : "auto"}
                                   decoding="async"
                                   className="shelf-product__photo"
                                 />

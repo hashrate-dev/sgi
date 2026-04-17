@@ -174,27 +174,47 @@ function MarketplacePageBody() {
 
   useEffect(() => {
     let cancelled = false;
+    let fallbackApplied = false;
+    const localFallbackProducts = mergeAsicCatalogWithCorpGridExtras(ASIC_MARKETPLACE_PRODUCTS);
+
+    const applyLocalFallback = () => {
+      if (cancelled) return;
+      fallbackApplied = true;
+      setProducts(localFallbackProducts);
+      setCatalogFromApi(false);
+    };
+
+    /**
+     * En localhost, si el backend está apagado/lento, `api()` puede tardar varios reintentos.
+     * Evita que la vitrina quede en skeleton por minutos.
+     */
+    const fallbackTimer = window.setTimeout(() => {
+      if (fallbackApplied) return;
+      applyLocalFallback();
+    }, 12000);
+
     /** No encadenar: el GET a la vitrina ya despierta el backend; evita espera extra en cold start. */
     void wakeUpBackend();
     getMarketplaceAsicVitrina()
       .then((res) => {
         if (cancelled) return;
+        window.clearTimeout(fallbackTimer);
         const list = res.products ?? [];
         if (list.length > 0) {
           setProducts(mergeAsicCatalogWithCorpGridExtras(list));
           setCatalogFromApi(true);
         } else {
-          setProducts(mergeAsicCatalogWithCorpGridExtras(ASIC_MARKETPLACE_PRODUCTS));
-          setCatalogFromApi(false);
+          applyLocalFallback();
         }
       })
       .catch(() => {
         if (cancelled) return;
-        setProducts(mergeAsicCatalogWithCorpGridExtras(ASIC_MARKETPLACE_PRODUCTS));
-        setCatalogFromApi(false);
+        window.clearTimeout(fallbackTimer);
+        applyLocalFallback();
       });
     return () => {
       cancelled = true;
+      window.clearTimeout(fallbackTimer);
     };
   }, []);
 

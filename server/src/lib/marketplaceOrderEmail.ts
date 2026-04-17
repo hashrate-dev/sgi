@@ -1,6 +1,7 @@
 /**
  * Aviso por email (Resend) cuando una orden marketplace pasa de borrador a enviada.
- * Si faltan variables de entorno, no interrumpe el flujo del ticket.
+ * En desarrollo, si faltan credenciales Resend, el mismo texto se registra en consola
+ * (desactivar con MARKETPLACE_EMAIL_DEV_CONSOLE=0). En producción sin credenciales, no envía.
  */
 
 const RESEND_API_URL = "https://api.resend.com/emails";
@@ -44,17 +45,6 @@ export async function notifyMarketplaceOrderEmail(p: MarketplaceOrderEmailPayloa
   const subjectPrefix = (process.env.MARKETPLACE_NOTIFY_SUBJECT_PREFIX || DEFAULT_SUBJECT_PREFIX).trim();
   const panelUrl = (process.env.MARKETPLACE_QUOTES_PANEL_URL || DEFAULT_PANEL_URL).trim();
 
-  if (!apiKey || !from) {
-    if (!warnedMissingEnv) {
-      warnedMissingEnv = true;
-      // eslint-disable-next-line no-console
-      console.warn(
-        "[email] Aviso marketplace omitido: faltan RESEND_API_KEY o RESEND_FROM_EMAIL."
-      );
-    }
-    return;
-  }
-
   const order = clip(p.orderNumber || "—", 64);
   const ticket = clip(p.ticketCode || "—", 64);
   const contact = clip(p.contactEmail || "—", 200);
@@ -88,6 +78,26 @@ export async function notifyMarketplaceOrderEmail(p: MarketplaceOrderEmailPayloa
       </p>
     </div>
   `.trim();
+
+  if (!apiKey || !from) {
+    const devConsole =
+      process.env.NODE_ENV !== "production" && process.env.MARKETPLACE_EMAIL_DEV_CONSOLE !== "0";
+    if (devConsole) {
+      // eslint-disable-next-line no-console
+      console.log(
+        `[email] (dev, sin Resend) aviso marketplace → destino sería ${to}\n${subject}\n${text}`
+      );
+      return;
+    }
+    if (!warnedMissingEnv) {
+      warnedMissingEnv = true;
+      // eslint-disable-next-line no-console
+      console.warn(
+        "[email] Aviso marketplace omitido: faltan RESEND_API_KEY o RESEND_FROM_EMAIL."
+      );
+    }
+    return;
+  }
 
   const res = await fetch(RESEND_API_URL, {
     method: "POST",
