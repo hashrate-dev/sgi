@@ -21,7 +21,7 @@ export function MarketplaceTicketSummaryModal({ summary, onClose }: Props) {
   const userCelular = user?.celular?.trim();
   const userTelefono = user?.telefono?.trim();
   const salesContactNotice = userCelular
-    ? tf("orders.contact_status_email_whatsapp", { email: userEmail, whatsapp: userCelular })
+    ? tf("orders.contact_status_email_whatsapp", { email: userEmail, phone: userCelular })
     : userTelefono
       ? tf("orders.contact_status_email_phone", { email: userEmail, phone: userTelefono })
       : tf("orders.contact_status_email", { email: userEmail });
@@ -41,8 +41,13 @@ export function MarketplaceTicketSummaryModal({ summary, onClose }: Props) {
           {t("ticket.summary_lede_after")}
         </p>
         <div className="market-ticket-summary__sales-note" role="status" aria-live="polite">
-          <p className="market-ticket-summary__sales-note-title">{t("ticket.sales_notice_title")}</p>
-          <p className="market-ticket-summary__sales-note-text">{salesContactNotice}</p>
+          <span className="market-ticket-summary__sales-note-icon" aria-hidden>
+            <i className="bi bi-megaphone-fill" />
+          </span>
+          <div className="market-ticket-summary__sales-note-body">
+            <p className="market-ticket-summary__sales-note-title">{t("ticket.sales_notice_title")}</p>
+            <p className="market-ticket-summary__sales-note-text">{salesContactNotice}</p>
+          </div>
         </div>
 
         <div className="market-ticket-summary__codes" aria-label={t("ticket.invoice_kicker")}>

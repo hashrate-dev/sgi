@@ -1169,6 +1169,10 @@ export type MarketplaceQuoteTicket = {
   userAgent: string | null;
   userId: number | null;
   contactEmail: string | null;
+  /** Email de la cuenta que marcó la orden como eliminada (cancelar, vaciar carrito o staff). */
+  discardByEmail?: string | null;
+  /** Si existe: la orden volvió a activa tras haber estado eliminada (reactivación desde carrito). */
+  reactivatedAt?: string | null;
   items: MarketplaceQuoteTicketItem[];
 };
 

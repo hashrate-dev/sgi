@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, Navigate } from "react-router-dom";
 import {
   deleteMarketplaceQuoteTicketAdmin,
   getMarketplaceGarantiaQuotePrices,
   getMarketplaceQuoteTickets,
+  getMarketplaceQuoteTicket,
   getMarketplaceQuoteTicketsStats,
   getMarketplaceSetupQuotePrices,
   patchMarketplaceQuoteTicket,
@@ -27,28 +28,235 @@ import "../styles/hrs-cotizaciones-marketplace.css";
 
 const STATUS_OPTS = [
   { value: "all", label: "Todos" },
-  { value: "borrador", label: "Borrador" },
-  { value: "enviado_consulta", label: "Activo" },
+  { value: "borrador", label: "Carrito abierto" },
+  { value: "enviado_consulta", label: "Pendiente" },
+  { value: "en_contacto_equipo", label: "Contacto por equipo" },
   { value: "en_gestion", label: "En gestión" },
-  { value: "respondido", label: "Respondido" },
+  { value: "pagada", label: "Pagada" },
+  { value: "en_viaje", label: "En viaje" },
+  { value: "instalado", label: "Instalado" },
   { value: "cerrado", label: "Cerrado" },
-  { value: "descartado", label: "Cancelado" },
+  { value: "descartado", label: "Eliminada" },
 ] as const;
 
 const STATUS_LABEL: Record<string, string> = {
-  borrador: "Borrador",
-  enviado_consulta: "Activo",
+  borrador: "ABIERTO",
+  enviado_consulta: "Pendiente",
+  en_contacto_equipo: "EN CONTACTO",
   en_gestion: "En gestión",
-  respondido: "Respondido",
+  pagada: "Pagada",
+  en_viaje: "En viaje",
+  instalado: "Instalado",
+  respondido: "Respondido (legado)",
   cerrado: "Cerrado",
-  descartado: "Cancelado",
+  descartado: "Eliminada",
 };
 
+/** Pasos del embudo post «generar orden» (misma semántica que el servidor). */
+const OPERATION_FLOW: readonly { key: string; label: string }[] = [
+  { key: "borrador", label: "ABIERTO" },
+  { key: "enviado_consulta", label: "Pendiente" },
+  { key: "en_contacto_equipo", label: "Contacto por equipo" },
+  { key: "en_gestion", label: "En gestión" },
+  { key: "pagada", label: "Pagada" },
+  { key: "en_viaje", label: "En viaje" },
+  { key: "instalado", label: "Instalado" },
+  { key: "cerrado", label: "CERRADO" },
+  { key: "descartado", label: "ELIMINADO" },
+] as const;
+
+function isMarketplaceTicketCerradoLaneStatus(status: string): boolean {
+  const st = String(status ?? "").trim().toLowerCase();
+  return st === "cerrado" || st === "descartado";
+}
+
+/** Orden dentro del carril «Pendiente» amplio: carrito abierto → pendiente inicial → embudo → instalado. */
+function statusActivoLaneOrder(status: string): number {
+  const st = String(status ?? "").trim().toLowerCase();
+  if (st === "borrador") return 5;
+  if (st === "enviado_consulta") return 10;
+  if (st === "respondido") return 15;
+  const order: Record<string, number> = {
+    en_contacto_equipo: 20,
+    en_gestion: 30,
+    pagada: 40,
+    en_viaje: 50,
+    instalado: 60,
+  };
+  return order[st] ?? 80;
+}
+
+function MqtOperationalFlowStrip({ status }: { status: string }) {
+  const st = String(status ?? "").trim().toLowerCase();
+  if (st === "borrador") {
+    return (
+      <div className="hrs-mqt-flow-strip hrs-mqt-flow-strip--note hrs-mqt-flow-strip--note-cart mb-0" role="note">
+        <span className="hrs-mqt-flow-strip__note-icon" aria-hidden>
+          i
+        </span>
+        <div className="hrs-mqt-flow-strip__note-copy">
+          <p className="hrs-mqt-flow-strip__note-title mb-1">Carrito abierto</p>
+          <p className="hrs-mqt-flow-strip__note-text mb-0">
+            Hay productos guardados, pero la orden de compra todavía no fue generada. El embudo comercial comienza
+            cuando se confirma la orden.
+          </p>
+        </div>
+      </div>
+    );
+  }
+  const flowIdx = (() => {
+    if (st === "respondido") return 1;
+    const i = OPERATION_FLOW.findIndex((s) => s.key === st);
+    return i >= 0 ? i : 0;
+  })();
+  return (
+    <div className="hrs-mqt-flow-strip" aria-label="Embudo operativo de la orden">
+      <p className="hrs-mqt-flow-strip__title">Embudo operativo</p>
+      <div className="hrs-mqt-flow-strip__track">
+        {OPERATION_FLOW.map((step, i) => (
+          <div
+            key={step.key}
+            className={
+              "hrs-mqt-flow-strip__step" +
+              (i === flowIdx ? " hrs-mqt-flow-strip__step--current" : "") +
+              (i < flowIdx ? " hrs-mqt-flow-strip__step--done" : "")
+            }
+          >
+            <span className="hrs-mqt-flow-strip__dot" aria-hidden>
+              {i < flowIdx ? "✓" : i + 1}
+            </span>
+            <span className="hrs-mqt-flow-strip__lbl">{step.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const NEW_TICKET_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
+
+type MqtLaneHelpId = "general" | "pendiente" | "cerrados";
+
+const MQT_LANE_HELP_TITLE: Record<MqtLaneHelpId, string> = {
+  general: "Qué es este panel",
+  pendiente: "Carril Pendiente y embudo operativo",
+  cerrados: "Carril Cerrados",
+};
+
+function MqtLaneHelpModalBody({ id }: { id: MqtLaneHelpId }): ReactNode {
+  switch (id) {
+    case "general":
+      return (
+        <>
+          <p className="mb-0">
+            Monitoreo de listas de cotización ASIC: orden, ticket, ítems y totales referenciales. Solo cuentas{" "}
+            <strong>AdministradorA</strong> y <strong>AdministradorB</strong>.
+          </p>
+        </>
+      );
+    case "pendiente":
+      return (
+        <>
+          <p>
+            Este carril reúne todo lo <strong>activo</strong> antes de cierres definitivos:{" "}
+            <strong>carritos abiertos</strong> (productos en carrito sin orden generada) y órdenes ya generadas hasta
+            instalación.
+          </p>
+          <p className="mb-2">
+            <strong>Carrito abierto</strong> (estado técnico «borrador»): el cliente cargó equipos en el carrito de la
+            tienda y aún <strong>no confirmó la orden de compra</strong>. En el panel se muestra la etiqueta{" "}
+            <strong>ABIERTO</strong>.
+          </p>
+          <p className="mb-1">
+            <strong>Pendiente</strong> (primer paso tras generar la orden): ventas inicia el seguimiento (teléfono,
+            WhatsApp, correo, etc.).
+          </p>
+          <p className="mb-1">
+            <strong>Embudo operativo</strong> (siguientes etapas, en orden típico):
+          </p>
+          <ul className="hrs-mqt-help-list">
+            <li>
+              <strong>Contacto por equipo</strong>: el equipo ya está gestionando la orden con el cliente.
+            </li>
+            <li>
+              <strong>En gestión</strong>: la venta está <strong>casi cerrada</strong> (negociación avanzada).
+            </li>
+            <li>
+              <strong>Pagada</strong>: el cliente pagó; la operación quedó concretada a nivel comercial.
+            </li>
+            <li>
+              <strong>En viaje</strong>: equipos en tránsito (p. ej. desde China hacia destino).
+            </li>
+            <li>
+              <strong>Instalado</strong>: equipos operando en la granja del cliente.
+            </li>
+          </ul>
+          <p className="mb-0 small text-muted">
+            Las transiciones de estado las controla el servidor; en el detalle de cada orden ves el embudo visual y las
+            notas internas.
+          </p>
+        </>
+      );
+    case "cerrados":
+      return (
+        <>
+          <p>
+            <strong>Cerrada</strong>: se archivó la operación <strong>sin completar</strong> el embudo hasta instalado
+            (cierre comercial u operativo sin entrega final en granja).
+          </p>
+          <p className="mb-0">
+            <strong>Eliminada</strong> (descartada): cancelación por el cliente o por staff desde el flujo; el registro
+            puede seguir visible acá para auditoría (quién dio de baja se ve en el detalle de la orden).
+          </p>
+        </>
+      );
+    default:
+      return null;
+  }
+}
+
+function MqtLaneTitleWithHelp({
+  title,
+  titleId,
+  helpId,
+  onOpenHelp,
+}: {
+  title: string;
+  titleId: string;
+  helpId: "pendiente" | "cerrados";
+  onOpenHelp: (id: MqtLaneHelpId) => void;
+}) {
+  return (
+    <div className="hrs-mqt-lane__head-row">
+      <h3 id={titleId} className="hrs-mqt-lane__title">
+        {title}
+      </h3>
+      <button
+        type="button"
+        className="hrs-mqt-help-trigger"
+        aria-label={`Ayuda: qué órdenes van en el carril ${title}`}
+        onClick={() => onOpenHelp(helpId)}
+      >
+        <i className="bi bi-eye" aria-hidden />
+      </button>
+    </div>
+  );
+}
 
 function badgeClass(status: string): string {
   const k = status.replace(/[^a-z_]/gi, "_");
   return `hrs-mqt-badge hrs-mqt-badge--${k}`;
+}
+
+/** Consulta reactivada tras eliminación: badge distinto (verde más oscuro). */
+function pipelinePrimaryBadge(t: MarketplaceQuoteTicket): { label: string; className: string } {
+  if (t.status === "borrador") {
+    return { label: STATUS_LABEL.borrador, className: "hrs-mqt-badge hrs-mqt-badge--carrito_abierto" };
+  }
+  if (t.status === "enviado_consulta" && t.reactivatedAt) {
+    return { label: "RE-ACTIVO", className: "hrs-mqt-badge hrs-mqt-badge--re_activo" };
+  }
+  return { label: STATUS_LABEL[t.status] ?? t.status, className: badgeClass(t.status) };
 }
 
 function formatWhen(iso: string): string {
@@ -62,10 +270,46 @@ function formatWhen(iso: string): string {
 }
 
 function isNewTicketBadgeVisible(t: MarketplaceQuoteTicket): boolean {
-  if (t.status === "cerrado" || t.status === "descartado") return false;
+  if (t.status === "cerrado" || t.status === "descartado" || t.status === "instalado") return false;
   const createdAtMs = Date.parse(t.createdAt);
   if (!Number.isFinite(createdAtMs)) return false;
   return Date.now() - createdAtMs <= NEW_TICKET_MAX_AGE_MS;
+}
+
+function MqtTicketCardButton({ t, onOpen }: { t: MarketplaceQuoteTicket; onOpen: (x: MarketplaceQuoteTicket) => void }) {
+  const primaryBadge = pipelinePrimaryBadge(t);
+  return (
+    <button type="button" className="hrs-mqt-ticket-card" onClick={() => onOpen(t)}>
+      <div className="hrs-mqt-ticket-card__top">
+        <div>
+          <div className="hrs-mqt-ticket-card__ord">{t.orderNumber ?? `— (#${t.id})`}</div>
+          <div className="hrs-mqt-ticket-card__tkt">{t.ticketCode}</div>
+        </div>
+        <div className="hrs-mqt-ticket-card__badges">
+          <span className={primaryBadge.className}>{primaryBadge.label}</span>
+          {isNewTicketBadgeVisible(t) ? (
+            <span className="hrs-mqt-badge hrs-mqt-badge--nuevo">
+              <i className="bi bi-bell-fill" aria-hidden />
+              Nuevo
+            </span>
+          ) : null}
+        </div>
+      </div>
+      <div className="hrs-mqt-ticket-card__row">
+        <span>
+          {t.lineCount === 1 ? "1 línea" : `${t.lineCount} líneas`} · {t.unitCount} u.
+        </span>
+        <span className="hrs-mqt-ticket-card__total">{t.subtotalUsd.toLocaleString("es-PY")} USD</span>
+      </div>
+      <div className="hrs-mqt-ticket-card__meta">
+        {t.contactEmail ? (
+          <span className="d-block text-truncate mb-1 hrs-mqt-ticket-card__email">{t.contactEmail}</span>
+        ) : null}
+        Actualizado {formatWhen(t.updatedAt)}
+        {t.lastContactChannel ? ` · vía ${t.lastContactChannel}` : ""}
+      </div>
+    </button>
+  );
 }
 
 export function CotizacionesMarketplacePage() {
@@ -79,6 +323,9 @@ export function CotizacionesMarketplacePage() {
   const [q, setQ] = useState("");
   const [qDebounced, setQDebounced] = useState("");
   const [selected, setSelected] = useState<MarketplaceQuoteTicket | null>(null);
+  /** Mientras el detalle GET no devuelve líneas: evita tabla vacía (solo thead). */
+  const [drawerDetailLoading, setDrawerDetailLoading] = useState(false);
+  const drawerFetchGenRef = useRef(0);
   const [saving, setSaving] = useState(false);
 
   const [editStatus, setEditStatus] = useState("");
@@ -88,6 +335,16 @@ export function CotizacionesMarketplacePage() {
   const [garantiaQuoteItems, setGarantiaQuoteItems] = useState<GarantiaQuotePriceItem[]>([]);
   const [deleteModalTicket, setDeleteModalTicket] = useState<MarketplaceQuoteTicket | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [laneHelpOpen, setLaneHelpOpen] = useState<MqtLaneHelpId | null>(null);
+
+  useEffect(() => {
+    if (!laneHelpOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLaneHelpOpen(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [laneHelpOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -168,10 +425,59 @@ export function CotizacionesMarketplacePage() {
     }
   }, [selected]);
 
-  const pendingContact = useMemo(() => {
+  const closeTicketDrawer = useCallback(() => {
+    drawerFetchGenRef.current += 1;
+    setDrawerDetailLoading(false);
+    setSelected(null);
+  }, []);
+
+  const openTicketDrawer = useCallback((t: MarketplaceQuoteTicket) => {
+    const gen = ++drawerFetchGenRef.current;
+    setSelected(t);
+    const hasRows = Array.isArray(t.items) && t.items.length > 0;
+    setDrawerDetailLoading(!hasRows);
+    void getMarketplaceQuoteTicket(t.id)
+      .then(({ ticket }) => {
+        if (drawerFetchGenRef.current !== gen) return;
+        setSelected(ticket);
+      })
+      .catch(() => {
+        /* se mantiene el snapshot del listado */
+      })
+      .finally(() => {
+        if (drawerFetchGenRef.current !== gen) return;
+        setDrawerDetailLoading(false);
+      });
+  }, []);
+
+  /** Órdenes en embudo después de «Pendiente»: contacto, gestión, pago y envío. */
+  const embudoActivoCount = useMemo(() => {
     if (!stats?.byStatus) return 0;
-    return (stats.byStatus["enviado_consulta"] ?? 0) + (stats.byStatus["en_gestion"] ?? 0);
+    const keys = ["en_contacto_equipo", "en_gestion", "pagada", "en_viaje"] as const;
+    return keys.reduce((a, k) => a + (Number(stats.byStatus[k]) || 0), 0);
   }, [stats]);
+
+  /**
+   * Con filtro «Todos»: dos carriles — Pendiente (carrito abierto + operativo) | Cerrados.
+   * Incluye `borrador` (carrito con productos, sin orden generada) y el resto salvo cerrada/eliminada.
+   */
+  const lanesWhenAll = useMemo(() => {
+    if (statusFilter !== "all") return null;
+    const activos = tickets
+      .filter((x) => !isMarketplaceTicketCerradoLaneStatus(x.status))
+      .slice()
+      .sort((a, b) => {
+        const oa = statusActivoLaneOrder(a.status);
+        const ob = statusActivoLaneOrder(b.status);
+        if (oa !== ob) return oa - ob;
+        return Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
+      });
+    const cerrados = tickets
+      .filter((x) => isMarketplaceTicketCerradoLaneStatus(x.status))
+      .slice()
+      .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+    return { activos, cerrados };
+  }, [tickets, statusFilter]);
 
   if (!user || !canViewMarketplaceQuoteTickets(user.role)) {
     return <Navigate to="/" replace />;
@@ -185,6 +491,7 @@ export function CotizacionesMarketplacePage() {
         status: editStatus,
         notesAdmin: editNotes || null,
       });
+      setDrawerDetailLoading(false);
       setSelected(ticket);
       void load();
     } catch (e) {
@@ -204,7 +511,7 @@ export function CotizacionesMarketplacePage() {
     try {
       await deleteMarketplaceQuoteTicketAdmin(id);
       setDeleteModalTicket(null);
-      if (selected?.id === id) setSelected(null);
+      if (selected?.id === id) closeTicketDrawer();
       showToast(`Orden ${label} eliminada del sistema.`, "success", "Cotizaciones tienda");
       void load();
     } catch (e) {
@@ -213,6 +520,7 @@ export function CotizacionesMarketplacePage() {
       setDeleteBusy(false);
     }
   };
+  const selectedPrimaryBadge = selected ? pipelinePrimaryBadge(selected) : null;
 
   return (
     <div className="fact-page hrs-mqt-page">
@@ -229,10 +537,21 @@ export function CotizacionesMarketplacePage() {
         />
 
         <div className="hrs-mqt-panel">
-          <p className="text-muted small mb-3">
-            Monitoreo de listas de cotización ASIC: orden, ticket, ítems y totales referenciales. Solo AdministradorA y
-            AdministradorB.
-          </p>
+          <div className="hrs-mqt-panel-lede-row mb-3">
+            <p className="text-muted small mb-0 flex-grow-1" style={{ minWidth: "12rem" }}>
+              Listas de cotización ASIC: orden, ticket, ítems y totales referenciales. Acceso{" "}
+              <strong>AdministradorA</strong> / <strong>AdministradorB</strong>. Las definiciones del proceso están en el
+              ícono de ojo del encabezado y de cada carril (Pendiente / Cerrados).
+            </p>
+            <button
+              type="button"
+              className="hrs-mqt-help-trigger hrs-mqt-help-trigger--panel"
+              aria-label="Qué es este panel (resumen)"
+              onClick={() => setLaneHelpOpen("general")}
+            >
+              <i className="bi bi-eye" aria-hidden />
+            </button>
+          </div>
           {err ? <div className="hrs-mqt-err">{err}</div> : null}
 
           {stats ? (
@@ -247,11 +566,11 @@ export function CotizacionesMarketplacePage() {
               </div>
               <div className="hrs-mqt-stat">
                 <div className="hrs-mqt-stat__val">{stats.byStatus["enviado_consulta"] ?? 0}</div>
-                <div className="hrs-mqt-stat__lbl">Consultas enviadas</div>
+                <div className="hrs-mqt-stat__lbl">Pendientes (orden generada)</div>
               </div>
               <div className="hrs-mqt-stat">
-                <div className="hrs-mqt-stat__val">{pendingContact}</div>
-                <div className="hrs-mqt-stat__lbl">Pipeline activo</div>
+                <div className="hrs-mqt-stat__val">{embudoActivoCount}</div>
+                <div className="hrs-mqt-stat__lbl">Embudo activo (post pendiente)</div>
               </div>
             </div>
           ) : null}
@@ -289,43 +608,54 @@ export function CotizacionesMarketplacePage() {
 
             {!loading && tickets.length === 0 ? (
               <p className="hrs-mqt-msg">
-                No hay tickets con estos filtros. {total === 0 ? "Cuando los clientes armen listas en /marketplace, aparecerán acá." : ""}
+                No hay tickets con estos filtros.{" "}
+                {total === 0 ? "Cuando los clientes armen listas en /marketplace, aparecerán acá." : ""}
               </p>
             ) : null}
 
-            {!loading && tickets.length > 0 ? (
+            {!loading && tickets.length > 0 && lanesWhenAll ? (
+              <div className="hrs-mqt-lanes">
+                <section className="hrs-mqt-lane hrs-mqt-lane--pendiente" aria-labelledby="hrs-mqt-lane-pend-title">
+                  <MqtLaneTitleWithHelp
+                    title="Pendiente"
+                    titleId="hrs-mqt-lane-pend-title"
+                    helpId="pendiente"
+                    onOpenHelp={setLaneHelpOpen}
+                  />
+                  {lanesWhenAll.activos.length === 0 ? (
+                    <p className="hrs-mqt-lane__empty">Ninguna orden en este carril con la búsqueda actual.</p>
+                  ) : (
+                    <div className="hrs-mqt-ticket-grid">
+                      {lanesWhenAll.activos.map((t) => (
+                        <MqtTicketCardButton key={t.id} t={t} onOpen={openTicketDrawer} />
+                      ))}
+                    </div>
+                  )}
+                </section>
+                <section className="hrs-mqt-lane hrs-mqt-lane--cerrados" aria-labelledby="hrs-mqt-lane-cerr-title">
+                  <MqtLaneTitleWithHelp
+                    title="Cerrados"
+                    titleId="hrs-mqt-lane-cerr-title"
+                    helpId="cerrados"
+                    onOpenHelp={setLaneHelpOpen}
+                  />
+                  {lanesWhenAll.cerrados.length === 0 ? (
+                    <p className="hrs-mqt-lane__empty">Ninguna orden cerrada o eliminada con la búsqueda actual.</p>
+                  ) : (
+                    <div className="hrs-mqt-ticket-grid">
+                      {lanesWhenAll.cerrados.map((t) => (
+                        <MqtTicketCardButton key={t.id} t={t} onOpen={openTicketDrawer} />
+                      ))}
+                    </div>
+                  )}
+                </section>
+              </div>
+            ) : null}
+
+            {!loading && tickets.length > 0 && !lanesWhenAll ? (
               <div className="hrs-mqt-ticket-grid">
                 {tickets.map((t) => (
-                  <button key={t.id} type="button" className="hrs-mqt-ticket-card" onClick={() => setSelected(t)}>
-                    <div className="hrs-mqt-ticket-card__top">
-                      <div>
-                        <div className="hrs-mqt-ticket-card__ord">{t.orderNumber ?? `— (#${t.id})`}</div>
-                        <div className="hrs-mqt-ticket-card__tkt">{t.ticketCode}</div>
-                      </div>
-                      <div className="hrs-mqt-ticket-card__badges">
-                        <span className={badgeClass(t.status)}>{STATUS_LABEL[t.status] ?? t.status}</span>
-                        {isNewTicketBadgeVisible(t) ? (
-                          <span className="hrs-mqt-badge hrs-mqt-badge--nuevo">
-                            <i className="bi bi-bell-fill" aria-hidden />
-                            Nuevo
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className="hrs-mqt-ticket-card__row">
-                      <span>
-                        {t.lineCount} líneas · {t.unitCount} u.
-                      </span>
-                      <span className="hrs-mqt-ticket-card__total">{t.subtotalUsd.toLocaleString("es-PY")} USD</span>
-                    </div>
-                    <div className="hrs-mqt-ticket-card__meta">
-                      {t.contactEmail ? (
-                        <span className="d-block text-truncate mb-1 hrs-mqt-ticket-card__email">{t.contactEmail}</span>
-                      ) : null}
-                      Actualizado {formatWhen(t.updatedAt)}
-                      {t.lastContactChannel ? ` · vía ${t.lastContactChannel}` : ""}
-                    </div>
-                  </button>
+                  <MqtTicketCardButton key={t.id} t={t} onOpen={openTicketDrawer} />
                 ))}
               </div>
             ) : null}
@@ -333,58 +663,132 @@ export function CotizacionesMarketplacePage() {
         </div>
       </div>
 
+      {laneHelpOpen ? (
+        <div
+          className="hrs-mqt-help-overlay"
+          role="presentation"
+          onClick={() => setLaneHelpOpen(null)}
+        >
+          <div
+            className="hrs-mqt-help-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="hrs-mqt-help-dialog-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header className="hrs-mqt-help-dialog__head">
+              <h2 id="hrs-mqt-help-dialog-title">{MQT_LANE_HELP_TITLE[laneHelpOpen]}</h2>
+              <button
+                type="button"
+                className="hrs-mqt-help-dialog__close"
+                aria-label="Cerrar ayuda"
+                onClick={() => setLaneHelpOpen(null)}
+              >
+                ×
+              </button>
+            </header>
+            <div className="hrs-mqt-help-dialog__body">
+              <MqtLaneHelpModalBody id={laneHelpOpen} />
+            </div>
+            <footer className="hrs-mqt-help-dialog__footer">
+              <button type="button" className="btn btn-sm btn-dark" onClick={() => setLaneHelpOpen(null)}>
+                Entendido
+              </button>
+            </footer>
+          </div>
+        </div>
+      ) : null}
+
       {selected ? (
         <div
           className="hrs-mqt-drawer-overlay"
           role="presentation"
           onClick={(e) => {
-            if (e.target === e.currentTarget) setSelected(null);
+            if (e.target === e.currentTarget) closeTicketDrawer();
           }}
         >
           <aside className="hrs-mqt-drawer" role="dialog" aria-modal="true" aria-labelledby="hrs-mqt-drawer-title">
             <div className="hrs-mqt-drawer__head">
-              <div>
+              <div className="hrs-mqt-drawer__head-main">
+                <p className="hrs-mqt-drawer__eyebrow mb-1">Orden de carrito</p>
                 <h2 id="hrs-mqt-drawer-title">{selected.orderNumber ?? `Ticket #${selected.id}`}</h2>
                 <div className="hrs-mqt-drawer__sub">
-                  {selected.ticketCode} · {STATUS_LABEL[selected.status] ?? selected.status}
+                  <span className="hrs-mqt-drawer__code">TX: {selected.ticketCode}</span>
+                  {selectedPrimaryBadge ? <span className="hrs-mqt-drawer__status-chip">{selectedPrimaryBadge.label}</span> : null}
                 </div>
               </div>
-              <button type="button" className="hrs-mqt-drawer__close" onClick={() => setSelected(null)} aria-label="Cerrar">
+              <button type="button" className="hrs-mqt-drawer__close" onClick={closeTicketDrawer} aria-label="Cerrar">
                 ×
               </button>
             </div>
 
             <div className="hrs-mqt-drawer__body">
-              <dl className="hrs-mqt-timeline">
-                <dt>Creado</dt>
-                <dd>{formatWhen(selected.createdAt)}</dd>
-                <dt>Última actualización</dt>
-                <dd>{formatWhen(selected.updatedAt)}</dd>
-                <dt>Canal de contacto</dt>
-                <dd>{selected.lastContactChannel ?? "—"}</dd>
-                <dt>Contacto registrado</dt>
-                <dd>{selected.contactedAt ? formatWhen(selected.contactedAt) : "—"}</dd>
-                <dt>IP (última sync)</dt>
-                <dd>{selected.ipAddress ?? "—"}</dd>
-                <dt>Cliente (correo)</dt>
-                <dd>{selected.contactEmail ?? "—"}</dd>
-                <dt>ID usuario</dt>
-                <dd>{selected.userId != null ? selected.userId : "—"}</dd>
-                <dt>Clave sesión</dt>
-                <dd style={{ wordBreak: "break-all", fontSize: "0.7rem" }}>{selected.sessionId}</dd>
-              </dl>
+              <section className="hrs-mqt-meta-card" aria-label="Resumen del ticket">
+                <div className="hrs-mqt-meta-card__row">
+                  <span className="hrs-mqt-meta-card__label">Creado</span>
+                  <span className="hrs-mqt-meta-card__value">{formatWhen(selected.createdAt)}</span>
+                </div>
+                <div className="hrs-mqt-meta-card__row">
+                  <span className="hrs-mqt-meta-card__label">Última actualización</span>
+                  <span className="hrs-mqt-meta-card__value">{formatWhen(selected.updatedAt)}</span>
+                </div>
+                <div className="hrs-mqt-meta-card__row">
+                  <span className="hrs-mqt-meta-card__label">Canal de contacto</span>
+                  <span className="hrs-mqt-meta-card__value">{selected.lastContactChannel ?? "—"}</span>
+                </div>
+                <div className="hrs-mqt-meta-card__row">
+                  <span className="hrs-mqt-meta-card__label">Contacto registrado</span>
+                  <span className="hrs-mqt-meta-card__value">{selected.contactedAt ? formatWhen(selected.contactedAt) : "—"}</span>
+                </div>
+                <div className="hrs-mqt-meta-card__row">
+                  <span className="hrs-mqt-meta-card__label">IP (última sync)</span>
+                  <span className="hrs-mqt-meta-card__value hrs-mqt-meta-card__value--mono">{selected.ipAddress ?? "—"}</span>
+                </div>
+                <div className="hrs-mqt-meta-card__row">
+                  <span className="hrs-mqt-meta-card__label">Cliente (correo)</span>
+                  <span className="hrs-mqt-meta-card__value hrs-mqt-meta-card__value--mono">{selected.contactEmail ?? "—"}</span>
+                </div>
+                {selected.status === "descartado" ? (
+                  <div className="hrs-mqt-meta-card__row">
+                    <span className="hrs-mqt-meta-card__label">Eliminación registrada por</span>
+                    <span className="hrs-mqt-meta-card__value hrs-mqt-meta-card__value--mono">
+                      {selected.discardByEmail ?? "— (sin registro previo a esta función)"}
+                    </span>
+                  </div>
+                ) : null}
+                <div className="hrs-mqt-meta-card__row">
+                  <span className="hrs-mqt-meta-card__label">ID usuario</span>
+                  <span className="hrs-mqt-meta-card__value hrs-mqt-meta-card__value--mono">
+                    {selected.userId != null ? selected.userId : "—"}
+                  </span>
+                </div>
+                <div className="hrs-mqt-meta-card__row">
+                  <span className="hrs-mqt-meta-card__label">Clave sesión</span>
+                  <span className="hrs-mqt-meta-card__value hrs-mqt-meta-card__value--mono hrs-mqt-meta-card__value--break">
+                    {selected.sessionId}
+                  </span>
+                </div>
+              </section>
 
-              <table className="hrs-mqt-items">
-                <thead>
-                  <tr>
-                    <th>Equipo</th>
-                    <th>Cant.</th>
-                    <th>P. unit.</th>
-                    <th>Subt.</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(selected.items as Array<Record<string, unknown>>).map((row, i) => {
+              <MqtOperationalFlowStrip status={selected.status} />
+
+              {drawerDetailLoading ? (
+                <div className="hrs-mqt-items-loading d-flex justify-content-center py-4" role="status" aria-busy="true">
+                  <div className="spinner-border text-secondary" aria-label="Cargando líneas del pedido" />
+                </div>
+              ) : (
+              <div className="hrs-mqt-items-wrap">
+                <table className="hrs-mqt-items">
+                  <thead>
+                    <tr>
+                      <th>Equipo</th>
+                      <th>Cant.</th>
+                      <th>P. unit.</th>
+                      <th>Subt.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(Array.isArray(selected.items) ? selected.items : ([] as Array<Record<string, unknown>>)).map((row, i) => {
                     const qty = Number(row.qty) || 0;
                     const pu = Number(row.priceUsd) || 0;
                     const inclSetup = row.includeSetup === true;
@@ -413,41 +817,43 @@ export function CotizacionesMarketplacePage() {
                     return (
                       <tr key={i}>
                         <td>
-                          <div style={{ fontWeight: 700, color: "#0f172a" }}>{name}</div>
+                          <div className="hrs-mqt-item-name">{name}</div>
                           {inclSetup || inclGar ? (
-                            <div
-                              style={{
-                                fontSize: "0.68rem",
-                                color: linePending ? "#b91c1c" : "#0d6efd",
-                                marginTop: "0.35rem",
-                              }}
-                            >
-                              {inclSetup
-                                ? linePending
-                                  ? "+ Setup: solicitar valor / u."
-                                  : `+ Setup ${setupLbl} USD/u`
-                                : null}
-                              {inclSetup && inclGar ? " · " : null}
-                              {inclGar
-                                ? linePending
-                                  ? "Garantía: solicitar valor / u."
-                                  : `Garantía ${warrantyUnit} USD/u`
-                                : null}
+                            <div className="hrs-mqt-item-addons">
+                              {inclSetup ? (
+                                <span className={"hrs-mqt-item-addon-pill" + (linePending ? " hrs-mqt-item-addon-pill--pending" : "")}>
+                                  {linePending ? "Setup: solicitar valor/u" : `Setup ${setupLbl} USD/u`}
+                                </span>
+                              ) : null}
+                              {inclGar ? (
+                                <span className={"hrs-mqt-item-addon-pill" + (linePending ? " hrs-mqt-item-addon-pill--pending" : "")}>
+                                  {linePending ? "Garantía: solicitar valor/u" : `Garantía ${warrantyUnit} USD/u`}
+                                </span>
+                              ) : null}
                             </div>
                           ) : null}
                         </td>
-                        <td>{qty}</td>
-                        <td>{String(row.priceLabel ?? pu)}</td>
-                        <td style={{ fontWeight: 700 }}>
-                          {linePending ? "Cotización pendiente" : `${sub.toLocaleString("es-PY")} USD`}
+                        <td className="hrs-mqt-items__num">{qty}</td>
+                        <td className="hrs-mqt-items__money">{String(row.priceLabel ?? pu)}</td>
+                        <td className="hrs-mqt-items__subtotal">
+                          {linePending ? (
+                            <span className="hrs-mqt-items__pending-chip">Cotización pendiente</span>
+                          ) : (
+                            `${sub.toLocaleString("es-PY")} USD`
+                          )}
                         </td>
                       </tr>
                     );
-                  })}
-                </tbody>
-              </table>
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              )}
 
-              <div className="hrs-mqt-total-line">Precio Total: {selected.subtotalUsd.toLocaleString("es-PY")} USD</div>
+              <div className="hrs-mqt-total-line" role="status" aria-label="Precio total de la orden">
+                <span className="hrs-mqt-total-line__label">Precio total</span>
+                <span className="hrs-mqt-total-line__value">{selected.subtotalUsd.toLocaleString("es-PY")} USD</span>
+              </div>
 
               <div className="hrs-mqt-admin-form">
                 <label htmlFor="hrs-mqt-status">Estado del ticket</label>
@@ -465,32 +871,25 @@ export function CotizacionesMarketplacePage() {
                   onChange={(e) => setEditNotes(e.target.value)}
                   placeholder="Seguimiento comercial, llamadas, etc."
                 />
-                <button type="button" className="hrs-mqt-btn-save" disabled={saving} onClick={() => void saveDetail()}>
-                  {saving ? "Guardando…" : "Guardar cambios"}
-                </button>
-              </div>
-
-              <div className="hrs-mqt-drawer__danger-zone">
-                <p className="hrs-mqt-drawer__danger-label">Zona de administración</p>
-                <button
-                  type="button"
-                  className="hrs-mqt-btn-delete-order"
-                  disabled={deleteBusy}
-                  onClick={() => setDeleteModalTicket(selected)}
-                >
-                  <i className="bi bi-trash3 me-2" aria-hidden />
-                  Eliminar orden del sistema
-                </button>
-                <p className="hrs-mqt-drawer__danger-hint">
-                  Borra el registro por completo. El cliente ya no lo verá en «Mis órdenes». No se puede deshacer.
+                <div className="hrs-mqt-admin-actions">
+                  <button type="button" className="hrs-mqt-btn-save" disabled={saving} onClick={() => void saveDetail()}>
+                    {saving ? "Guardando…" : "Guardar cambios"}
+                  </button>
+                  <button
+                    type="button"
+                    className="hrs-mqt-btn-delete-order"
+                    disabled={deleteBusy}
+                    onClick={() => setDeleteModalTicket(selected)}
+                  >
+                    <i className="bi bi-trash3 me-2" aria-hidden />
+                    Eliminar orden
+                  </button>
+                </div>
+                <p className="hrs-mqt-admin-actions__hint">
+                  <strong>Zona de administración:</strong> al eliminar, la orden se borra del sistema y no se puede deshacer.
                 </p>
               </div>
 
-              {selected.userAgent ? (
-                <p style={{ fontSize: "0.68rem", color: "#94a3b8", marginTop: "1rem", wordBreak: "break-word" }}>
-                  UA: {selected.userAgent}
-                </p>
-              ) : null}
             </div>
           </aside>
         </div>
@@ -507,7 +906,9 @@ export function CotizacionesMarketplacePage() {
               <p style={{ margin: 0 }}>
                 ¿Eliminar definitivamente la orden <strong>{orderLabel(deleteModalTicket)}</strong> ({deleteModalTicket.ticketCode})?
               </p>
-              <p style={{ margin: "0.4rem 0 0 0" }}>Esta acción no se puede deshacer.</p>
+              <p style={{ margin: "0.4rem 0 0 0" }}>
+                Esta acción elimina la orden del sistema y no se puede deshacer. ¿Estás seguro de borrarla?
+              </p>
             </div>
           ) : null
         }

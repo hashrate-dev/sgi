@@ -33,10 +33,20 @@ export function normalizeMarketplaceQuoteTicketStatus(s: string): string {
     .replace(/[\s-]+/g, "_");
 }
 
-/** Consulta “en curso” que bloquea una segunda orden para el mismo cliente. */
+/**
+ * Orden en embudo comercial (bloquea otra orden activa hasta instalación / cierre / baja).
+ * Alineado con servidor: pendiente → contacto → gestión → pagada → en viaje (no incluye `instalado`).
+ */
 export function isMarketplacePipelineTicketStatus(s: string): boolean {
   const x = normalizeMarketplaceQuoteTicketStatus(s);
-  return x === "enviado_consulta" || x === "en_gestion" || x === "respondido";
+  if (x === "respondido") return true;
+  return (
+    x === "enviado_consulta" ||
+    x === "en_contacto_equipo" ||
+    x === "en_gestion" ||
+    x === "pagada" ||
+    x === "en_viaje"
+  );
 }
 export const QUOTE_EMAIL = "dl@hashrate.space";
 export const QUOTE_WA_PHONE = "595994392728";
@@ -421,35 +431,73 @@ function ticketRowSetupUsd(row: Record<string, unknown>): number | null {
   return null;
 }
 
-/** Subtotal de una línea de ticket (misma lógica que carrito). */
-export function ticketRowLineSubtotalUsd(row: Record<string, unknown>, pricing?: QuoteCartPricing): number {
-  const qty = Number(row.qty) || 0;
-  const pu = Number(row.priceUsd) || 0;
-  const pendingEquipmentPrice = ticketRowIsEquipmentPricePending(row);
+/** Partes de precio de una línea persistida en ticket (equipo + add-ons); misma regla que el carrito. */
+export type TicketRowLineBreakdown = {
+  qty: number;
+  priceUsd: number;
+  priceLabel: string;
+  pendingEquipmentPrice: boolean;
+  sharePct: number;
+  includeSetup: boolean;
+  includeWarranty: boolean;
+  /** USD/unidad de setup que usa el cálculo (S02/S03 o `hashrateSetupUsd` en la línea). */
+  setupUnitUsd: number;
+  equipmentSubtotalUsd: number;
+  setupLineTotalUsd: number;
+  /** Garantía referencial por equipo completo (100%), antes del % de hashrate. */
+  warrantyCatalogUnitUsd: number;
+  warrantyLineTotalUsd: number;
+};
+
+export function ticketRowLineBreakdown(row: Record<string, unknown>, pricing?: QuoteCartPricing): TicketRowLineBreakdown {
+  const qty = Math.max(0, Math.round(Number(row.qty) || 0));
+  const priceUsd = Math.max(0, Math.round(Number(row.priceUsd) || 0));
+  const pl = row.priceLabel;
+  const priceLabel = typeof pl === "string" ? pl : formatAsicPriceUsd(priceUsd);
+  const pendingEquipmentPrice = quoteLineEquipmentPricePendingFromFields(priceUsd, priceLabel);
   const pct = ticketRowSharePct(row);
   const setupFromRow = ticketRowSetupUsd(row);
-  const setupUnit =
+  const setupUnitUsd =
     setupFromRow != null
       ? setupFromRow
       : pct < 100
         ? roundSetupUsd(pricing?.setupCompraHashrateUsd, QUOTE_ADDON_SETUP_USD_FALLBACK)
         : roundSetupUsd(pricing?.setupEquipoCompletoUsd, QUOTE_ADDON_SETUP_USD_FALLBACK);
   const mWarranty = pct / 100;
-  let sub = qty * pu;
-  if (row.includeSetup === true && !pendingEquipmentPrice) sub += qty * setupUnit;
-  if (row.includeWarranty === true) {
-    const wu = resolveWarrantyUsdForQuoteLine(
-      {
-        productId: String(row.productId ?? ""),
-        brand: String(row.brand ?? ""),
-        model: String(row.model ?? ""),
-        hashrate: String(row.hashrate ?? ""),
-      },
-      pricing?.garantiaItems
-    );
-    sub += Math.round(qty * wu * mWarranty);
-  }
-  return sub;
+  const includeSetup = row.includeSetup === true;
+  const includeWarranty = row.includeWarranty === true;
+  const warrantyCatalogUnitUsd = resolveWarrantyUsdForQuoteLine(
+    {
+      productId: String(row.productId ?? ""),
+      brand: String(row.brand ?? ""),
+      model: String(row.model ?? ""),
+      hashrate: String(row.hashrate ?? ""),
+    },
+    pricing?.garantiaItems
+  );
+  const equipmentSubtotalUsd = qty * priceUsd;
+  const setupLineTotalUsd = includeSetup && !pendingEquipmentPrice ? qty * setupUnitUsd : 0;
+  const warrantyLineTotalUsd = includeWarranty ? Math.round(qty * warrantyCatalogUnitUsd * mWarranty) : 0;
+  return {
+    qty,
+    priceUsd,
+    priceLabel,
+    pendingEquipmentPrice,
+    sharePct: pct,
+    includeSetup,
+    includeWarranty,
+    setupUnitUsd,
+    equipmentSubtotalUsd,
+    setupLineTotalUsd,
+    warrantyCatalogUnitUsd,
+    warrantyLineTotalUsd,
+  };
+}
+
+/** Subtotal de una línea de ticket (misma lógica que carrito). */
+export function ticketRowLineSubtotalUsd(row: Record<string, unknown>, pricing?: QuoteCartPricing): number {
+  const b = ticketRowLineBreakdown(row, pricing);
+  return b.equipmentSubtotalUsd + b.setupLineTotalUsd + b.warrantyLineTotalUsd;
 }
 
 /** Texto plano para WhatsApp / cuerpo de mail. */

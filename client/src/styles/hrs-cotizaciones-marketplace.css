@@ -61,6 +61,43 @@
   color: rgba(255, 255, 255, 0.78) !important;
 }
 
+.hrs-mqt-panel-lede-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.hrs-mqt-help-trigger {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.95);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.hrs-mqt-help-trigger:hover {
+  background: rgba(255, 255, 255, 0.24);
+  border-color: rgba(255, 255, 255, 0.55);
+}
+
+.hrs-mqt-help-trigger:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 2px;
+}
+
+.hrs-mqt-help-trigger--panel {
+  margin-top: 0.05rem;
+}
+
 .hrs-mqt-stats {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -234,9 +271,9 @@
 
 .hrs-mqt-ticket-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 1rem;
-  padding: 1.1rem;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+  padding: 0.85rem;
   margin: 0 -0.15rem;
   background: rgba(0, 0, 0, 0.12);
   border-radius: 14px;
@@ -244,17 +281,88 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
-/* Tarjetas ticket: hoja blanca sobre panel verde */
+/* Filtro «Todos»: carriles apilados (pendiente amplio / cerrados) */
+.hrs-mqt-lanes {
+  display: flex;
+  flex-direction: column;
+  gap: 1.35rem;
+}
+
+.hrs-mqt-lane {
+  margin: 0;
+}
+
+.hrs-mqt-lane__head-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin: 0 0 0.5rem 0.15rem;
+}
+
+.hrs-mqt-lane__head-row .hrs-mqt-lane__title {
+  margin: 0;
+}
+
+.hrs-mqt-lane__title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.88);
+  margin: 0 0 0.5rem 0.2rem;
+}
+
+.hrs-mqt-lane--pendiente .hrs-mqt-lane__title {
+  color: #ffedd5;
+}
+
+.hrs-mqt-lane--borrador .hrs-mqt-lane__title {
+  color: rgba(248, 250, 252, 0.92);
+}
+
+.hrs-mqt-lane--otros .hrs-mqt-lane__title {
+  color: rgba(226, 232, 240, 0.9);
+}
+
+.hrs-mqt-lane--cerrados .hrs-mqt-lane__title {
+  color: #e2e8f0;
+}
+
+.hrs-mqt-lane__lede {
+  margin: 0;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.62);
+  max-width: 52rem;
+}
+
+.hrs-mqt-lane__lede strong {
+  color: rgba(255, 255, 255, 0.88);
+  font-weight: 700;
+}
+
+.hrs-mqt-lane__empty {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.72);
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+}
+
+/* Tarjetas ticket: hoja blanca sobre panel verde (compactas) */
 button.hrs-mqt-ticket-card {
   display: flex;
   flex-direction: column;
   align-items: stretch;
   text-align: left;
-  padding: 1.25rem;
+  padding: 0.85rem 0.95rem;
   background: #ffffff;
-  border-radius: 16px;
+  border-radius: 13px;
   border: 1px solid rgba(255, 255, 255, 0.25);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   cursor: pointer;
   font: inherit;
   color: inherit;
@@ -272,25 +380,35 @@ button.hrs-mqt-ticket-card:hover {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 0.75rem;
-  margin-bottom: 0.65rem;
+  gap: 0.55rem;
+  margin-bottom: 0.48rem;
+}
+
+.hrs-mqt-ticket-card__top > div:first-of-type {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .hrs-mqt-ticket-card__badges {
   display: inline-flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 0.38rem;
+  gap: 0.28rem;
 }
 
 .hrs-mqt-ticket-card__ord {
-  font-size: 1.16rem;
+  font-size: 0.98rem;
   font-weight: 700;
   color: #0f172a;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .hrs-mqt-ticket-card__tkt {
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   font-weight: 600;
   color: #64748b;
   font-variant-numeric: tabular-nums;
@@ -298,25 +416,68 @@ button.hrs-mqt-ticket-card:hover {
 
 .hrs-mqt-badge {
   flex-shrink: 0;
-  font-size: 0.66rem;
+  font-size: 0.6rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  padding: 0.3rem 0.5rem;
-  border-radius: 8px;
+  padding: 0.22rem 0.42rem;
+  border-radius: 7px;
 }
 
 .hrs-mqt-badge--borrador {
   background: #f1f5f9;
   color: #475569;
 }
+
+/* Carrito con productos, orden aún no generada (misma fila BD «borrador») */
+.hrs-mqt-badge--carrito_abierto {
+  background: #fff7ed;
+  color: #9a3412;
+  border: 1px solid #fdba74;
+  white-space: nowrap;
+  letter-spacing: 0.035em;
+  font-size: 0.56rem;
+  line-height: 1.25;
+  padding: 0.26rem 0.48rem;
+  text-align: center;
+}
 .hrs-mqt-badge--enviado_consulta {
-  background: #d1fae5;
-  color: #047857;
+  background: #ffedd5;
+  color: #9a3412;
+  border: 1px solid #fdba74;
+}
+
+/* Orden reactivada (volvió desde eliminada): verde más oscuro que «Pendiente» */
+.hrs-mqt-badge--re_activo {
+  background: #166534;
+  color: #ecfdf5;
+  border: 1px solid #14532d;
+  box-shadow: 0 1px 4px rgba(22, 101, 52, 0.35);
 }
 .hrs-mqt-badge--en_gestion {
   background: #dbeafe;
   color: #1d4ed8;
+}
+.hrs-mqt-badge--en_contacto_equipo {
+  background: #cffafe;
+  color: #0e7490;
+  border: 1px solid #67e8f9;
+}
+.hrs-mqt-badge--pagada {
+  background: #d1fae5;
+  color: #047857;
+  border: 1px solid #6ee7b7;
+}
+.hrs-mqt-badge--en_viaje {
+  background: #e0e7ff;
+  color: #3730a3;
+  border: 1px solid #a5b4fc;
+}
+.hrs-mqt-badge--instalado {
+  background: #14532d;
+  color: #ecfdf5;
+  border: 1px solid #166534;
+  box-shadow: 0 1px 4px rgba(20, 83, 45, 0.25);
 }
 .hrs-mqt-badge--respondido {
   background: #d1fae5;
@@ -351,29 +512,331 @@ button.hrs-mqt-ticket-card:hover {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  font-size: 0.88rem;
+  font-size: 0.8rem;
   color: #64748b;
+  gap: 0.35rem;
 }
 
+.hrs-mqt-status-help {
+  margin: 0 0 0.6rem;
+  padding: 0.64rem 0.72rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.62rem;
+  border-radius: 11px;
+  border: 1px solid #dbeafe;
+  background: linear-gradient(180deg, #f8fbff 0%, #f1f7ff 100%);
+  color: #475569;
+}
+.hrs-mqt-status-help__icon {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.04rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+  color: #fff;
+  font-size: 0.64rem;
+  font-weight: 800;
+  box-shadow: 0 3px 8px rgba(37, 99, 235, 0.24);
+}
+.hrs-mqt-status-help__copy {
+  min-width: 0;
+}
+.hrs-mqt-status-help__title {
+  margin: 0;
+  font-size: 0.66rem;
+  line-height: 1.2;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #1e3a8a;
+}
+.hrs-mqt-status-help__flow {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.28rem 0.34rem;
+  font-size: 0.71rem;
+  line-height: 1.25;
+  color: #334155;
+}
+.hrs-mqt-status-help__flow--disabled .hrs-mqt-status-help__state {
+  opacity: 0.6;
+}
+.hrs-mqt-status-help__flow--disabled .hrs-mqt-status-help__arrow {
+  opacity: 0.4;
+}
+.hrs-mqt-status-help__state {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.08rem 0.36rem;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid #dbeafe;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+.hrs-mqt-status-help__state--current {
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
+}
+.hrs-mqt-status-help__state--current.hrs-mqt-status-help__state--borrador {
+  background: #0ea5e9;
+}
+.hrs-mqt-status-help__state--current.hrs-mqt-status-help__state--enviado_consulta {
+  background: #d97706;
+}
+.hrs-mqt-status-help__state--current.hrs-mqt-status-help__state--en_contacto_equipo {
+  background: #2563eb;
+}
+.hrs-mqt-status-help__state--current.hrs-mqt-status-help__state--en_gestion {
+  background: #7c3aed;
+}
+.hrs-mqt-status-help__state--current.hrs-mqt-status-help__state--pagada {
+  background: #059669;
+}
+.hrs-mqt-status-help__state--current.hrs-mqt-status-help__state--en_viaje {
+  background: #ea580c;
+}
+.hrs-mqt-status-help__state--current.hrs-mqt-status-help__state--instalado {
+  background: #15803d;
+}
+.hrs-mqt-status-help__arrow {
+  color: #2563eb;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.hrs-mqt-status-help__meta {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.32rem 0.38rem;
+}
+
+.hrs-mqt-status-help__meta-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.42rem;
+  border-radius: 999px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 0.65rem;
+  font-weight: 800;
+  white-space: nowrap;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hrs-mqt-status-help__meta-chip--current {
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
+}
+
+.hrs-mqt-status-help__meta-chip--current.hrs-mqt-status-help__meta-chip--cerrada {
+  background: #7c3aed;
+}
+
+.hrs-mqt-status-help__meta-chip--current.hrs-mqt-status-help__meta-chip--eliminada {
+  background: #dc2626;
+}
+
+.hrs-mqt-status-help__meta-text {
+  font-size: 0.7rem;
+  line-height: 1.35;
+  color: #475569;
+}
+
+/* Embudo operativo (drawer admin) */
+.hrs-mqt-flow-strip {
+  margin: 0 0 0.95rem;
+  padding: 0.72rem 0.82rem;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+.hrs-mqt-flow-strip--note {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.85rem;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  color: #64748b;
+}
+.hrs-mqt-flow-strip--note-cart {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.68rem;
+  padding: 0.72rem 0.82rem;
+  border-style: solid;
+  border-color: #dbeafe;
+  background: linear-gradient(180deg, #f8fbff 0%, #f1f7ff 100%);
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.05);
+}
+.hrs-mqt-flow-strip__note-icon {
+  flex-shrink: 0;
+  width: 1.4rem;
+  height: 1.4rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.28);
+}
+.hrs-mqt-flow-strip__note-copy {
+  min-width: 0;
+}
+.hrs-mqt-flow-strip__note-title {
+  color: #1e3a8a;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+.hrs-mqt-flow-strip__note-text {
+  color: #475569;
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+.hrs-mqt-flow-strip__title {
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin: 0 0 0.5rem;
+}
+.hrs-mqt-flow-strip__track {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.36rem 0.4rem;
+  align-items: stretch;
+}
+.hrs-mqt-flow-strip__step {
+  flex: 1 1 78px;
+  min-width: 70px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.34rem 0.24rem;
+  border-radius: 9px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  font-size: 0.6rem;
+  line-height: 1.2;
+  text-align: center;
+  color: #64748b;
+}
+.hrs-mqt-flow-strip__step--done {
+  border-color: #86efac;
+  background: #ecfdf5;
+  color: #166534;
+}
+.hrs-mqt-flow-strip__step--current {
+  border-color: #7c3aed;
+  background: #f5f3ff;
+  color: #5b21b6;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.18);
+}
+.hrs-mqt-flow-strip__dot {
+  width: 1.12rem;
+  height: 1.12rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #e2e8f0;
+  font-size: 0.5rem;
+  font-weight: 800;
+  color: #475569;
+}
+.hrs-mqt-flow-strip__step--done .hrs-mqt-flow-strip__dot {
+  background: #22c55e;
+  color: #fff;
+}
+.hrs-mqt-flow-strip__step--current .hrs-mqt-flow-strip__dot {
+  background: #7c3aed;
+  color: #fff;
+}
+.hrs-mqt-flow-strip__lbl {
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+
 .hrs-mqt-ticket-card__total {
-  font-size: 1.22rem;
+  font-size: 0.98rem;
   font-weight: 800;
   color: var(--hrs-mqt-host);
   font-variant-numeric: tabular-nums;
+  line-height: 1.2;
 }
 
 .hrs-mqt-ticket-card__meta {
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   color: #94a3b8;
-  margin-top: 0.65rem;
-  padding-top: 0.65rem;
-  padding-right: 2.5rem;
+  margin-top: 0.48rem;
+  padding-top: 0.48rem;
+  padding-right: 0.25rem;
   border-top: 1px solid #f1f5f9;
 }
 
 .hrs-mqt-ticket-card__email {
   color: #2563eb;
   font-weight: 500;
+}
+
+/* Carril Cerrados: tarjetas un poco más chicas (menos padding / tipo) */
+.hrs-mqt-lane--cerrados button.hrs-mqt-ticket-card {
+  padding: 0.58rem 0.72rem;
+  border-radius: 11px;
+}
+.hrs-mqt-lane--cerrados .hrs-mqt-ticket-card__top {
+  margin-bottom: 0.32rem;
+  gap: 0.38rem;
+}
+.hrs-mqt-lane--cerrados .hrs-mqt-ticket-card__ord {
+  font-size: 0.92rem;
+}
+.hrs-mqt-lane--cerrados .hrs-mqt-ticket-card__tkt {
+  font-size: 0.65rem;
+}
+.hrs-mqt-lane--cerrados .hrs-mqt-ticket-card__row {
+  font-size: 0.74rem;
+}
+.hrs-mqt-lane--cerrados .hrs-mqt-ticket-card__total {
+  font-size: 0.92rem;
+}
+.hrs-mqt-lane--cerrados .hrs-mqt-ticket-card__meta {
+  font-size: 0.65rem;
+  margin-top: 0.34rem;
+  padding-top: 0.34rem;
+}
+.hrs-mqt-lane--cerrados .hrs-mqt-ticket-card__badges {
+  gap: 0.2rem;
+}
+.hrs-mqt-lane--cerrados .hrs-mqt-badge {
+  font-size: 0.54rem;
+  padding: 0.15rem 0.3rem;
+  border-radius: 6px;
+}
+.hrs-mqt-lane--cerrados button.hrs-mqt-ticket-card:hover {
+  transform: translateY(-1px);
 }
 
 .hrs-mqt-drawer__danger-zone {
@@ -396,19 +859,24 @@ button.hrs-mqt-ticket-card:hover {
   align-items: center;
   width: 100%;
   justify-content: center;
-  padding: 0.6rem 1rem;
-  font-size: 0.88rem;
-  font-weight: 600;
+  min-height: 2.45rem;
+  padding: 0.58rem 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
   color: #fff;
-  background: #b91c1c;
-  border: none;
-  border-radius: 10px;
+  background: linear-gradient(135deg, #b91c1c 0%, #dc2626 100%);
+  border: 1px solid rgba(127, 29, 29, 0.45);
+  border-radius: 11px;
   cursor: pointer;
-  transition: background 0.15s ease;
+  box-shadow: 0 2px 8px rgba(185, 28, 28, 0.24);
+  transition: background 0.15s ease, box-shadow 0.2s ease, transform 0.15s ease;
 }
 
 .hrs-mqt-btn-delete-order:hover:not(:disabled) {
-  background: #991b1b;
+  background: linear-gradient(135deg, #991b1b 0%, #b91c1c 100%);
+  box-shadow: 0 4px 12px rgba(185, 28, 28, 0.32);
+  transform: translateY(-1px);
 }
 
 .hrs-mqt-btn-delete-order:disabled {
@@ -423,6 +891,98 @@ button.hrs-mqt-ticket-card:hover {
   line-height: 1.45;
 }
 
+/* Ayuda por carril (debajo del drawer de detalle, z-index 3000) */
+.hrs-mqt-help-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2800;
+  background: rgba(15, 23, 42, 0.48);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.hrs-mqt-help-dialog {
+  width: 100%;
+  max-width: 26.5rem;
+  max-height: min(88vh, 34rem);
+  overflow: auto;
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 22px 55px rgba(0, 0, 0, 0.28);
+  border: 1px solid #e2e8f0;
+}
+
+.hrs-mqt-help-dialog__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1rem 0.65rem;
+  border-bottom: 1px solid #f1f5f9;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
+}
+
+.hrs-mqt-help-dialog__head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+}
+
+.hrs-mqt-help-dialog__close {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hrs-mqt-help-dialog__close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.hrs-mqt-help-dialog__body {
+  padding: 0.85rem 1rem 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: #334155;
+}
+
+.hrs-mqt-help-dialog__body strong {
+  color: #0f172a;
+}
+
+.hrs-mqt-help-list {
+  margin: 0.35rem 0 0.65rem;
+  padding-left: 1.15rem;
+}
+
+.hrs-mqt-help-list li {
+  margin-bottom: 0.35rem;
+}
+
+.hrs-mqt-help-dialog__footer {
+  padding: 0 1rem 1rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
 /* Panel detalle (overlay) */
 .hrs-mqt-drawer-overlay {
   position: fixed;
@@ -435,7 +995,7 @@ button.hrs-mqt-ticket-card:hover {
 }
 
 .hrs-mqt-drawer {
-  width: min(520px, 100vw);
+  width: min(460px, 100vw);
   max-height: 100%;
   overflow-y: auto;
   background: #f8fafc;
@@ -445,45 +1005,110 @@ button.hrs-mqt-ticket-card:hover {
 .hrs-mqt-drawer__head {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
-  padding: 1.25rem 1.35rem;
-  background: #2d5d46;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.82rem 0.9rem 0.84rem;
+  background: linear-gradient(130deg, #214a37 0%, #2d5d46 52%, #34775a 100%);
   color: #fff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  position: relative;
+  overflow: hidden;
+}
+
+.hrs-mqt-drawer__head::after {
+  content: "";
+  position: absolute;
+  top: -70%;
+  right: -8%;
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 72%);
+  pointer-events: none;
+}
+
+.hrs-mqt-drawer__head-main {
+  min-width: 0;
+}
+
+.hrs-mqt-drawer__eyebrow {
+  margin: 0;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .hrs-mqt-drawer__head h2 {
   margin: 0;
-  font-size: 1.15rem;
-  font-weight: 700;
+  font-size: 1.02rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
   color: #fff;
 }
 
 .hrs-mqt-drawer__sub {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.85);
-  margin-top: 0.35rem;
+  margin-top: 0.32rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.42rem;
+}
+
+.hrs-mqt-drawer__code {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.38rem;
+  border-radius: 999px;
+  font-size: 0.63rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.hrs-mqt-drawer__status-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.44rem;
+  border-radius: 999px;
+  font-size: 0.63rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #ecfdf5;
+  background: rgba(22, 163, 74, 0.28);
+  border: 1px solid rgba(187, 247, 208, 0.5);
 }
 
 .hrs-mqt-drawer__close {
-  border: none;
-  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.18);
   color: #fff;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 1.9rem;
+  height: 1.9rem;
   border-radius: 10px;
   cursor: pointer;
-  font-size: 1.25rem;
+  font-size: 1rem;
+  font-weight: 700;
   line-height: 1;
   flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
 }
 
 .hrs-mqt-drawer__close:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.27);
+  border-color: rgba(255, 255, 255, 0.42);
+  transform: translateY(-1px);
 }
 
 .hrs-mqt-drawer__body {
-  padding: 1.25rem 1.35rem 2rem;
+  padding: 0.92rem 0.95rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.24rem;
 }
 
 .hrs-mqt-timeline {
@@ -510,32 +1135,101 @@ button.hrs-mqt-ticket-card:hover {
   color: #0f172a;
 }
 
-.hrs-mqt-items {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.78rem;
+.hrs-mqt-meta-card {
+  margin-bottom: 0.95rem;
+  padding: 0.72rem 0.76rem;
   background: #fff;
   border-radius: 12px;
-  overflow: hidden;
   border: 1px solid #e2e8f0;
-  margin-bottom: 1.25rem;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+}
+
+.hrs-mqt-meta-card__row {
+  display: grid;
+  grid-template-columns: minmax(108px, 146px) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.52rem 0.72rem;
+  padding: 0.3rem 0.08rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.hrs-mqt-meta-card__row:last-child {
+  border-bottom: none;
+}
+
+.hrs-mqt-meta-card__label {
+  font-size: 0.58rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+
+.hrs-mqt-meta-card__value {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #0f172a;
+  font-weight: 600;
+  min-width: 0;
+}
+
+.hrs-mqt-meta-card__value--mono {
+  font-family:
+    "SFMono-Regular",
+    Menlo,
+    Monaco,
+    Consolas,
+    "Liberation Mono",
+    "Courier New",
+    monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #1e3a8a;
+}
+
+.hrs-mqt-meta-card__value--break {
+  word-break: break-all;
+}
+
+.hrs-mqt-items-loading {
+  min-height: 5.5rem;
+  margin-bottom: 0.95rem;
+}
+
+.hrs-mqt-items-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  box-shadow: 0 2px 9px rgba(15, 23, 42, 0.05);
+  margin-bottom: 0.85rem;
+}
+
+.hrs-mqt-items {
+  width: 100%;
+  min-width: 385px;
+  border-collapse: collapse;
+  font-size: 0.74rem;
+  background: #fff;
 }
 
 .hrs-mqt-items th,
 .hrs-mqt-items td {
-  padding: 0.5rem 0.65rem;
+  padding: 0.48rem 0.56rem;
   text-align: left;
   border-bottom: 1px solid #f1f5f9;
+  vertical-align: top;
 }
 
 /* Cabecera tabla drawer: mismo verde que tablas hosting */
 .hrs-mqt-items th {
-  background: #2d5d46;
+  background: linear-gradient(135deg, #254f3b 0%, #2d5d46 100%);
   font-weight: 700;
   color: #fff;
   text-transform: uppercase;
-  font-size: 0.62rem;
-  letter-spacing: 0.05em;
+  font-size: 0.61rem;
+  letter-spacing: 0.06em;
   border-bottom-color: rgba(255, 255, 255, 0.12);
 }
 
@@ -543,49 +1237,134 @@ button.hrs-mqt-ticket-card:hover {
   border-bottom: none;
 }
 
-.hrs-mqt-total-line {
-  font-size: 0.95rem;
+.hrs-mqt-item-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.3;
+}
+
+.hrs-mqt-item-addons {
+  margin-top: 0.3rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.hrs-mqt-item-addon-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.33rem;
+  border-radius: 999px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.6rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.hrs-mqt-item-addon-pill--pending {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.hrs-mqt-items__num {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.hrs-mqt-items__money {
+  color: #334155;
+  font-weight: 600;
+}
+
+.hrs-mqt-items__subtotal {
   font-weight: 800;
-  margin-bottom: 1rem;
-  color: #2d5d46;
+  color: #0f172a;
+}
+
+.hrs-mqt-items__pending-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.36rem;
+  border-radius: 999px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 0.61rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.hrs-mqt-total-line {
+  margin-bottom: 0.85rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 11px;
+  border: 1px solid #bbf7d0;
+  background: linear-gradient(180deg, #f0fdf4 0%, #ecfdf5 100%);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.hrs-mqt-total-line__label {
+  text-transform: uppercase;
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  font-weight: 800;
+  color: #166534;
+}
+
+.hrs-mqt-total-line__value {
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: #14532d;
+  font-variant-numeric: tabular-nums;
 }
 
 .hrs-mqt-admin-form label {
   display: block;
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #64748b;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.28rem;
 }
 
 .hrs-mqt-admin-form select,
 .hrs-mqt-admin-form textarea {
   width: 100%;
-  padding: 0.5rem 0.65rem;
+  padding: 0.44rem 0.56rem;
   border-radius: 10px;
   border: 1px solid #cbd5e1;
-  font-size: 0.85rem;
-  margin-bottom: 0.85rem;
+  font-size: 0.8rem;
+  margin-bottom: 0.65rem;
   font-family: inherit;
 }
 
 .hrs-mqt-admin-form textarea {
-  min-height: 88px;
+  min-height: 74px;
   resize: vertical;
+  margin-bottom: 0.65rem;
 }
 
 /* Botón guardar: mismo primary que .fact-btn-primary */
 .hrs-mqt-btn-save {
   width: 100%;
-  padding: 0.65rem 1rem;
-  border: none;
-  border-radius: 10px;
+  min-height: 2.2rem;
+  padding: 0.5rem 0.72rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 11px;
   background: linear-gradient(135deg, var(--hrs-mqt-primary) 0%, var(--hrs-mqt-primary-bright) 100%);
   color: #fff;
-  font-weight: 700;
-  font-size: 0.875rem;
+  font-weight: 800;
+  font-size: 0.77rem;
+  letter-spacing: 0.02em;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 166, 82, 0.3);
   transition: transform 0.15s, box-shadow 0.2s;
@@ -602,6 +1381,24 @@ button.hrs-mqt-ticket-card:hover {
   transform: none;
 }
 
+.hrs-mqt-admin-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.45rem;
+  margin-top: 0.15rem;
+}
+
+.hrs-mqt-admin-actions__hint {
+  margin: 0.58rem 0 0;
+  font-size: 0.66rem;
+  line-height: 1.35;
+  color: #64748b;
+}
+
+.hrs-mqt-admin-actions__hint strong {
+  color: #b91c1c;
+}
+
 .hrs-mqt-header-actions {
   display: flex;
   flex-wrap: wrap;
@@ -616,6 +1413,17 @@ button.hrs-mqt-ticket-card:hover {
 }
 
 @media (max-width: 576px) {
+  .hrs-mqt-admin-actions {
+    grid-template-columns: 1fr;
+    gap: 0.48rem;
+  }
+
+  .hrs-mqt-meta-card__row {
+    grid-template-columns: 1fr;
+    gap: 0.22rem;
+    padding: 0.42rem 0.08rem;
+  }
+
   .hrs-mqt-ticket-grid {
     grid-template-columns: 1fr;
     margin: 0;

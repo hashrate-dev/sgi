@@ -159,6 +159,8 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
     ticketCode: string;
   } | null>(null);
   const [pipelineBase, setPipelineBase] = useState<{ orderId: number; sig: string } | null>(null);
+  /** Tras la 1.ª respuesta de hidratación del ticket en pipeline (evita POST vacío+clearPipeline antes de fusionar ítems al loguear). */
+  const [pipelineHydrationReadyId, setPipelineHydrationReadyId] = useState<number | null>(null);
   const [setupEquipoCompletoUsd, setSetupEquipoCompletoUsd] = useState(QUOTE_ADDON_SETUP_USD_FALLBACK);
   const [setupCompraHashrateUsd, setSetupCompraHashrateUsd] = useState(QUOTE_ADDON_SETUP_USD_FALLBACK);
   const [garantiaQuoteItems, setGarantiaQuoteItems] = useState<GarantiaQuotePriceItem[]>([]);
@@ -280,13 +282,16 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
 
   useEffect(() => {
     pipelineHydratedForIdRef.current = null;
+    setPipelineHydrationReadyId(null);
   }, [user?.id]);
 
   useEffect(() => {
     if (!blockingPipelineOrder) {
       setPipelineBase(null);
+      setPipelineHydrationReadyId(null);
       return;
     }
+    setPipelineHydrationReadyId(null);
     setPipelineBase((prev) => (prev && prev.orderId === blockingPipelineOrder.id ? prev : null));
   }, [blockingPipelineOrder?.id]);
 
@@ -304,7 +309,10 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
       return;
     }
     const bid = blockingPipelineOrder.id;
-    if (pipelineHydratedForIdRef.current === bid) return;
+    if (pipelineHydratedForIdRef.current === bid) {
+      setPipelineHydrationReadyId(bid);
+      return;
+    }
 
     let cancelled = false;
     void (async () => {
@@ -315,12 +323,17 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
         setPipelineBase({ orderId: bid, sig: cartLinesMergeSig(fromServer) });
         if (fromServer.length === 0) {
           pipelineHydratedForIdRef.current = bid;
+          setPipelineHydrationReadyId(bid);
           return;
         }
         setLines((prev) => mergeCartLinesForPipelineOrder(fromServer, prev));
         pipelineHydratedForIdRef.current = bid;
+        setPipelineHydrationReadyId(bid);
       } catch {
-        /* sin marcar id: se reintenta si cambia el gate o el usuario navega */
+        if (!cancelled) {
+          /* Desbloquear sync vacío si el fetch falla (evita carrito colgado); el ref no marca id para permitir reintento. */
+          setPipelineHydrationReadyId(bid);
+        }
       }
     })();
 
@@ -344,6 +357,13 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
       setTicketRef(null);
       /** Sin orden en pipeline no hace falta POST vacío aquí (clearCart ya llama a la API). */
       if (blockingPipelineOrder?.id == null) {
+        return;
+      }
+      /**
+       * Con orden en pipeline y carrito aún vacío en el cliente (p. ej. recién logueado): no enviar clearPipeline
+       * hasta haber intentado hidratar desde el servidor; si no, el debounce borraba la orden antes del merge.
+       */
+      if (pipelineHydrationReadyId !== blockingPipelineOrder.id) {
         return;
       }
       if (skipEmptyPipelineSyncRef.current) {
@@ -374,7 +394,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
       })();
     }, delayMs);
     return () => window.clearTimeout(t);
-  }, [lines, canUseQuoteCart, refreshActiveOrderGate, blockingPipelineOrder?.id]);
+  }, [lines, canUseQuoteCart, refreshActiveOrderGate, blockingPipelineOrder?.id, pipelineHydrationReadyId]);
 
   const openDrawer = useCallback(() => {
     setDrawerSubView("cart");

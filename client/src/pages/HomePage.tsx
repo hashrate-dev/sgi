@@ -258,8 +258,9 @@ export function HomePage() {
       if (!byStatus) return 0;
       const cerrado = Number(byStatus.cerrado ?? 0) || 0;
       const descartado = Number(byStatus.descartado ?? 0) || 0;
+      const instalado = Number(byStatus.instalado ?? 0) || 0;
       const total = Object.values(byStatus).reduce((s, n) => s + (Number(n) || 0), 0);
-      return Math.max(0, total - cerrado - descartado);
+      return Math.max(0, total - cerrado - descartado - instalado);
     };
     const refresh = async () => {
       try {
@@ -574,7 +575,9 @@ export function HomePage() {
                   ) : null}
                 </Flex>
                 <Heading {...cardTitleProps}>Órdenes marketplace</Heading>
-                <Text {...cardDescProps}>Tickets y órdenes del carrito (monitoreo en vivo)</Text>
+                <Text {...cardDescProps}>
+                  Borrador = carrito sin orden; pendiente = orden generada para cierre por ventas (tel./WhatsApp).
+                </Text>
               </AppCard>
             </RouterLink>
           ) : null}

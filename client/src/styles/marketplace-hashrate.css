@@ -2446,7 +2446,7 @@ button.product-modal__btn--quote-cart:hover {
   --mq-accent-soft: #ecfdf5;
   position: relative;
   z-index: 1;
-  width: min(420px, 100vw);
+  width: min(462px, 100vw);
   max-height: 100%;
   max-height: 100dvh;
   height: 100%;
@@ -2471,8 +2471,29 @@ button.product-modal__btn--quote-cart:hover {
 }
 
 .market-quote-drawer__panel--has-lines .market-quote-drawer__top--compact {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.97) 0%, rgba(248, 250, 252, 0.92) 100%);
-  border-bottom: 1px solid rgba(15, 23, 42, 0.05);
+  background: linear-gradient(130deg, #214a37 0%, #2d5d46 56%, #34775a 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.market-quote-drawer__panel--has-lines .market-quote-drawer__top--compact .market-quote-drawer__title {
+  color: #fff;
+}
+
+.market-quote-drawer__panel--has-lines .market-quote-drawer__top--compact .market-quote-drawer__subtitle {
+  color: rgba(236, 253, 245, 0.92);
+}
+
+.market-quote-drawer__panel--has-lines .market-quote-drawer__top--compact .market-quote-drawer__close {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.26);
+  color: #fff;
+  box-shadow: none;
+}
+
+.market-quote-drawer__panel--has-lines .market-quote-drawer__top--compact .market-quote-drawer__close:hover {
+  background: rgba(255, 255, 255, 0.28);
+  border-color: rgba(255, 255, 255, 0.38);
+  color: #fff;
 }
 
 .market-quote-drawer__top--compact .market-quote-drawer__head {
@@ -2481,13 +2502,13 @@ button.product-modal__btn--quote-cart:hover {
 }
 
 .market-quote-drawer__top--compact .market-quote-drawer__title {
-  font-size: 1.05rem;
+  font-size: 1.14rem;
   letter-spacing: -0.025em;
 }
 
 .market-quote-drawer__top--compact .market-quote-drawer__subtitle {
   margin-top: 0.15rem;
-  font-size: 0.68rem;
+  font-size: 0.72rem;
 }
 
 .market-quote-drawer__lede-wrap--compact {
@@ -2552,15 +2573,15 @@ button.product-modal__btn--quote-cart:hover {
 }
 
 .market-quote-drawer__body-scroll--has-lines {
-  padding: 0.5rem 1rem 0.65rem;
+  padding: 0.5rem 0.4rem 0.65rem;
 }
 
 .market-quote-drawer__cart-sticky-summary {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.28rem;
-  padding: 0.35rem 1.25rem 0.5rem;
+  gap: 0.52rem;
+  padding: 0.55rem 1.25rem 0.72rem;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, #f8fafc 100%);
   border-top: 1px solid rgba(15, 23, 42, 0.08);
   box-shadow: 0 -6px 24px rgba(15, 23, 42, 0.07);
@@ -2635,18 +2656,30 @@ button.product-modal__btn--quote-cart:hover {
 
 .market-quote-drawer__panel--has-lines .market-quote-drawer__addons {
   margin-top: 0.4rem;
-  padding: 0.5rem 0.55rem 0.45rem;
-  border-radius: 10px;
+  padding: 0.56rem 0.62rem 0.52rem;
+  border-radius: 12px;
+  background: linear-gradient(160deg, #f8fffc 0%, #f7fafc 100%);
+  border: 1px solid rgba(15, 23, 42, 0.09);
 }
 
 .market-quote-drawer__panel--has-lines .market-quote-drawer__addons-hint {
-  font-size: 0.62rem;
-  margin-bottom: 0.28rem;
+  font-size: 0.74rem;
+  margin-bottom: 0.4rem;
+}
+
+.market-quote-drawer__panel--has-lines .market-quote-drawer__addons-info-toggle {
+  font-size: 0.7rem;
+  padding: 0.3rem 0.46rem;
+}
+
+.market-quote-drawer__panel--has-lines .market-quote-drawer__addons-explainer-row {
+  font-size: 0.7rem;
 }
 
 .market-quote-drawer__panel--has-lines .market-quote-drawer__addon {
-  padding: 0.22rem 0;
-  font-size: 0.74rem;
+  padding: 0.34rem 0.36rem;
+  font-size: 0.84rem;
+  border-radius: 10px;
 }
 
 .market-quote-drawer__panel--has-lines .market-quote-drawer__line-sub {
@@ -2655,27 +2688,27 @@ button.product-modal__btn--quote-cart:hover {
 }
 
 .market-quote-drawer__panel--has-lines .market-quote-drawer__cart-sticky-summary .market-quote-drawer__total {
-  padding: 0.7rem 0.95rem;
-  border-radius: 13px;
+  padding: 0.92rem 1rem;
+  border-radius: 14px;
 }
 
 .market-quote-drawer__panel--has-lines .market-quote-drawer__cart-sticky-summary .market-quote-drawer__total-amt {
-  font-size: 1.2rem;
+  font-size: 1.42rem;
 }
 
 .market-quote-drawer__panel--has-lines .market-quote-drawer__cart-sticky-summary .market-quote-drawer__ticket-ref {
   margin-top: 0;
-  padding: 0.22rem 0.38rem;
-  border-radius: 6px;
+  padding: 0.54rem 0.64rem;
+  border-radius: 10px;
 }
 
 .market-quote-drawer__panel--has-lines .market-quote-drawer__cart-sticky-summary .market-quote-drawer__ticket-ref-label {
-  font-size: 0.5rem;
-  letter-spacing: 0.04em;
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
 }
 
 .market-quote-drawer__panel--has-lines .market-quote-drawer__cart-sticky-summary .market-quote-drawer__ticket-ref-codes {
-  font-size: 0.55rem;
+  font-size: 0.74rem;
 }
 
 .market-quote-drawer__panel--has-lines .market-quote-drawer__cart-sticky-summary .market-quote-drawer__ticket-ref-codes strong {
@@ -2724,12 +2757,16 @@ button.product-modal__btn--quote-cart:hover {
 
 .market-quote-drawer__foot--compact .market-quote-drawer__cart-policy {
   margin-top: 0.4rem;
-  padding: 0.42rem 0.52rem;
+  padding: 0.5rem 0.62rem;
 }
 
 .market-quote-drawer__foot--compact .market-quote-drawer__cart-policy-text {
-  font-size: 0.64rem;
-  line-height: 1.34;
+  font-size: 0.69rem;
+  line-height: 1.4;
+}
+
+.market-quote-drawer__foot--compact .market-quote-drawer__cart-policy-title {
+  font-size: 0.68rem;
 }
 
 @keyframes market-quote-drawer-in {
@@ -2802,7 +2839,7 @@ button.product-modal__btn--quote-cart:hover {
 
 .market-quote-drawer__title {
   margin: 0;
-  font-size: 1.28rem;
+  font-size: 1.34rem;
   font-weight: 800;
   letter-spacing: -0.03em;
   color: #0f172a;
@@ -3064,11 +3101,11 @@ button.product-modal__btn--quote-cart:hover {
 
 .market-quote-drawer__section-label {
   margin: 0 0 0.65rem;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.075em;
   text-transform: uppercase;
-  color: #94a3b8;
+  color: #64748b;
 }
 
 .market-quote-drawer__empty {
@@ -3142,11 +3179,11 @@ button.product-modal__btn--quote-cart:hover {
 .market-quote-drawer__line {
   position: relative;
   border-radius: 12px;
-  padding: 0.6rem 0.7rem 0.55rem;
+  padding: 0.64rem 0.72rem 0.58rem;
   background: #fff;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 1px 6px rgba(15, 23, 42, 0.035);
-  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+  overflow: visible;
 }
 
 .market-quote-drawer__line::before {
@@ -3155,8 +3192,8 @@ button.product-modal__btn--quote-cart:hover {
   left: 0;
   top: 0;
   bottom: 0;
-  width: 3px;
-  background: linear-gradient(180deg, #34d399 0%, var(--mq-accent) 100%);
+  width: 2px;
+  background: linear-gradient(180deg, #86efac 0%, #10b981 100%);
   border-radius: 12px 0 0 12px;
 }
 
@@ -3170,11 +3207,11 @@ button.product-modal__btn--quote-cart:hover {
 
 .market-quote-drawer__line-name {
   margin: 0;
-  font-size: 0.84rem;
-  font-weight: 700;
+  font-size: 0.9rem;
+  font-weight: 800;
   color: #0f172a;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
+  letter-spacing: -0.01em;
+  line-height: 1.26;
   padding-right: 0.2rem;
 }
 
@@ -3191,13 +3228,13 @@ button.product-modal__btn--quote-cart:hover {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0.4rem 0.75rem;
-  margin-bottom: 0.4rem;
+  gap: 0.35rem 0.7rem;
+  margin-bottom: 0.34rem;
 }
 
 .market-quote-drawer__line-unit {
-  font-size: 0.8rem;
-  font-weight: 700;
+  font-size: 0.92rem;
+  font-weight: 800;
   color: var(--mq-accent);
   font-variant-numeric: tabular-nums;
 }
@@ -3208,9 +3245,9 @@ button.product-modal__btn--quote-cart:hover {
 
 .market-quote-drawer__line-unit-suffix {
   font-weight: 600;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: #64748b;
-  margin-left: 0.15rem;
+  margin-left: 0.12rem;
 }
 
 .market-quote-drawer__line-pending-hint {
@@ -3255,15 +3292,15 @@ button.product-modal__btn--quote-cart:hover {
 .market-quote-drawer__stepper {
   display: inline-flex;
   align-items: center;
-  border-radius: 10px;
+  border-radius: 9px;
   border: 1px solid rgba(15, 23, 42, 0.1);
-  background: #f8fafc;
+  background: #f9fafb;
   overflow: hidden;
 }
 
 .market-quote-drawer__stepper-btn {
-  width: 2.25rem;
-  height: 2.125rem;
+  width: 2.1rem;
+  height: 2rem;
   border: none;
   background: transparent;
   color: #334155;
@@ -3287,53 +3324,295 @@ button.product-modal__btn--quote-cart:hover {
 }
 
 .market-quote-drawer__stepper-val {
-  min-width: 1.65rem;
+  min-width: 1.55rem;
   text-align: center;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: #0f172a;
 }
 
 .market-quote-drawer__addons {
-  margin-top: 0.35rem;
-  padding: 0.35rem 0.45rem 0.3rem;
-  border-radius: 8px;
-  background: rgba(15, 23, 42, 0.04);
-  border: 1px solid rgba(15, 23, 42, 0.06);
+  margin-top: 0.3rem;
+  padding: 0.42rem 0.5rem 0.36rem;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.1);
 }
 
 .market-quote-drawer__addons-hint {
-  margin: 0 0 0.2rem;
-  font-size: 0.6rem;
-  line-height: 1.25;
-  color: #64748b;
+  margin: 0 0 0.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: #475569;
+  font-weight: 600;
+}
+
+.market-quote-drawer__addons-hint-copy {
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.market-quote-drawer__addons-hint-info {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.02rem;
+  height: 1.02rem;
+  border-radius: 999px;
+  color: #0f766e;
+  background: rgba(15, 118, 110, 0.12);
+  cursor: help;
+  outline: none;
+}
+
+.market-quote-drawer__addons-hint-info i {
+  color: #0f766e;
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.market-quote-drawer__addons-hint-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.45rem);
+  transform: translateX(-50%) translateY(4px);
+  width: min(340px, calc(100vw - 2.2rem));
+  max-width: 340px;
+  padding: 0.58rem 0.68rem;
+  border-radius: 10px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 0.72rem;
+  line-height: 1.45;
   font-weight: 500;
+  white-space: normal;
+  word-break: break-word;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.35);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease,
+    visibility 0.16s ease;
+  z-index: 9;
+}
+
+.market-quote-drawer__addons-hint-tooltip::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  border-width: 6px 6px 0;
+  border-style: solid;
+  border-color: #0f172a transparent transparent;
+}
+
+.market-quote-drawer__addons-hint-info:hover .market-quote-drawer__addons-hint-tooltip,
+.market-quote-drawer__addons-hint-info:focus-visible .market-quote-drawer__addons-hint-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.market-quote-drawer__addons-info-toggle {
+  width: 100%;
+  margin: 0 0 0.34rem;
+  padding: 0.28rem 0.42rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: #ffffff;
+  color: #334155;
+  font-size: 0.66rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    border-color 0.14s ease,
+    background 0.14s ease,
+    color 0.14s ease;
+}
+
+.market-quote-drawer__addons-info-toggle:hover {
+  border-color: rgba(15, 23, 42, 0.2);
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.market-quote-drawer__addons-explainer {
+  margin: 0 0 0.34rem;
+  padding: 0.34rem 0.42rem;
+  border-radius: 8px;
+  background: rgba(15, 118, 110, 0.07);
+  border: 1px solid rgba(15, 118, 110, 0.2);
+}
+
+.market-quote-drawer__addons-explainer-row {
+  margin: 0;
+  font-size: 0.67rem;
+  line-height: 1.35;
+  color: #334155;
+}
+
+.market-quote-drawer__addons-explainer-row + .market-quote-drawer__addons-explainer-row {
+  margin-top: 0.22rem;
+}
+
+.market-quote-drawer__addons-explainer-row strong {
+  color: #0f766e;
 }
 
 .market-quote-drawer__addon {
   display: flex;
   align-items: flex-start;
-  gap: 0.35rem;
+  gap: 0.42rem;
   margin: 0;
-  padding: 0.18rem 0;
-  font-size: 0.72rem;
+  padding: 0.28rem 0.3rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  color: #334155;
+  color: #1f2937;
   cursor: pointer;
   user-select: none;
+  border-radius: 9px;
+  transition:
+    background 0.14s ease,
+    border-color 0.14s ease,
+    box-shadow 0.14s ease;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.7);
 }
 
 .market-quote-drawer__addon + .market-quote-drawer__addon {
-  border-top: 1px solid rgba(15, 23, 42, 0.05);
+  margin-top: 0.18rem;
 }
 
 .market-quote-drawer__addon input {
-  margin-top: 0.08rem;
-  width: 0.85rem;
-  height: 0.85rem;
+  margin-top: 0.12rem;
+  width: 0.92rem;
+  height: 0.92rem;
   accent-color: #198754;
   flex-shrink: 0;
+}
+
+.market-quote-drawer__addon-copy {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.market-quote-drawer__addon-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.34rem;
+  line-height: 1.2;
+}
+
+.market-quote-drawer__addon-desc {
+  font-size: 0.71rem;
+  line-height: 1.36;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.market-quote-drawer__addon-info {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.02rem;
+  height: 1.02rem;
+  border-radius: 999px;
+  color: #0f766e;
+  background: rgba(15, 118, 110, 0.12);
+  cursor: help;
+  outline: none;
+}
+
+.market-quote-drawer__addon-info i {
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.market-quote-drawer__addon-tooltip {
+  position: absolute;
+  left: 50%;
+  right: auto;
+  bottom: calc(100% + 0.5rem);
+  transform: translateX(-50%) translateY(4px);
+  width: min(360px, calc(100vw - 2.2rem));
+  max-width: 360px;
+  padding: 0.62rem 0.72rem;
+  border-radius: 10px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  font-weight: 500;
+  white-space: normal;
+  word-break: break-word;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.35);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease,
+    visibility 0.16s ease;
+  z-index: 8;
+}
+
+.market-quote-drawer__addon-tooltip::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  border-width: 6px 6px 0;
+  border-style: solid;
+  border-color: #0f172a transparent transparent;
+}
+
+.market-quote-drawer__addon-info:hover .market-quote-drawer__addon-tooltip,
+.market-quote-drawer__addon-info:focus-visible .market-quote-drawer__addon-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.market-quote-drawer__addon:hover {
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.1);
+}
+
+.market-quote-drawer__addon input:checked + span {
+  color: #065f46;
+}
+
+.market-quote-drawer__addon input:checked {
+  filter: saturate(1.08);
+}
+
+.market-quote-drawer__addon input:checked + span .market-quote-drawer__addon-price {
+  color: #047857;
+}
+
+.market-quote-drawer__addon input:checked + span,
+.market-quote-drawer__addon input:checked + span .market-quote-drawer__addon-muted {
+  font-weight: 700;
+}
+
+.market-quote-drawer__addon input:checked + span .market-quote-drawer__addon-desc {
+  font-weight: 500;
 }
 
 .market-quote-drawer__addon-price {
@@ -3358,10 +3637,10 @@ button.product-modal__btn--quote-cart:hover {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  padding-top: 0.4rem;
+  padding-top: 0.36rem;
   margin-top: 0.05rem;
-  border-top: 1px dashed rgba(15, 23, 42, 0.1);
-  font-size: 0.65rem;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  font-size: 0.62rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -3369,7 +3648,7 @@ button.product-modal__btn--quote-cart:hover {
 }
 
 .market-quote-drawer__line-sub-amt {
-  font-size: 0.8rem;
+  font-size: 0.86rem;
   font-weight: 800;
   color: #0f172a;
   font-variant-numeric: tabular-nums;
@@ -3390,8 +3669,8 @@ button.product-modal__btn--quote-cart:hover {
   align-items: center;
   gap: 0.25rem;
   flex-shrink: 0;
-  padding: 0.2rem 0.35rem;
-  font-size: 0.68rem;
+  padding: 0.16rem 0.3rem;
+  font-size: 0.66rem;
   font-weight: 600;
   border: none;
   border-radius: 8px;
@@ -3404,8 +3683,8 @@ button.product-modal__btn--quote-cart:hover {
 }
 
 .market-quote-drawer__remove:hover {
-  background: #fef2f2;
-  color: #b91c1c;
+  background: #f8fafc;
+  color: #64748b;
 }
 
 .market-quote-drawer__remove-txt {
@@ -3422,16 +3701,29 @@ button.product-modal__btn--quote-cart:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  margin-top: 1.1rem;
-  padding: 1rem 1.1rem;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 55%, #0f172a 100%);
-  color: #e2e8f0;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 1.1rem;
+  margin-top: 0.75rem;
+  padding: 1rem 1.12rem;
+  border-radius: 16px;
+  background: linear-gradient(140deg, #214a37 0%, #2d5d46 58%, #214a37 100%);
+  color: #ecfdf5;
+  border: 1px solid rgba(187, 247, 208, 0.34);
   box-shadow:
-    0 12px 32px rgba(15, 23, 42, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    0 12px 28px rgba(17, 24, 39, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.market-quote-drawer__total::after {
+  content: "";
+  position: absolute;
+  right: -28px;
+  top: -32px;
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0) 72%);
+  pointer-events: none;
 }
 
 .market-quote-drawer__total-copy {
@@ -3442,16 +3734,17 @@ button.product-modal__btn--quote-cart:hover {
 }
 
 .market-quote-drawer__total-label {
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.11em;
   text-transform: uppercase;
-  color: rgba(248, 250, 252, 0.88);
+  color: rgba(236, 253, 245, 0.88);
 }
 
 .market-quote-drawer__total-note {
-  font-size: 0.72rem;
-  color: rgba(226, 232, 240, 0.65);
+  font-size: 0.8rem;
+  color: rgba(220, 252, 231, 0.9);
+  font-weight: 600;
 }
 
 .market-quote-drawer__total--mixed {
@@ -3465,12 +3758,13 @@ button.product-modal__btn--quote-cart:hover {
 }
 
 .market-quote-drawer__total-amt {
-  font-size: 1.35rem;
+  font-size: 1.62rem;
   font-weight: 800;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   color: #fff;
   white-space: nowrap;
+  text-shadow: 0 2px 8px rgba(15, 23, 42, 0.28);
 }
 
 .market-quote-drawer__total-amt--partial {
@@ -3498,9 +3792,9 @@ button.product-modal__btn--quote-cart:hover {
 .market-quote-drawer__cart-policy {
   display: flex;
   align-items: flex-start;
-  gap: 0.55rem;
+  gap: 0.62rem;
   margin-top: 0.65rem;
-  padding: 0.55rem 0.65rem;
+  padding: 0.62rem 0.72rem;
   border-radius: 10px;
   background: rgba(30, 64, 52, 0.05);
   border: 1px solid rgba(5, 150, 105, 0.15);
@@ -3511,35 +3805,35 @@ button.product-modal__btn--quote-cart:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 1.9rem;
+  height: 1.9rem;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.85);
   color: #047857;
-  font-size: 0.95rem;
+  font-size: 1.02rem;
 }
 
 .market-quote-drawer__cart-policy-body {
   display: flex;
   flex-direction: column;
-  gap: 0.08rem;
+  gap: 0.12rem;
   min-width: 0;
 }
 
 .market-quote-drawer__cart-policy-title {
-  font-size: 0.65rem;
+  font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #1e4034;
-  line-height: 1.2;
+  line-height: 1.24;
 }
 
 .market-quote-drawer__cart-policy-text {
-  font-size: 0.68rem;
+  font-size: 0.74rem;
   font-weight: 500;
   color: #475569;
-  line-height: 1.38;
+  line-height: 1.44;
 }
 
 .market-quote-drawer__foot-kicker {
@@ -3595,15 +3889,15 @@ button.product-modal__btn--quote-cart:hover {
 }
 
 .market-quote-drawer__cta-pair .market-quote-drawer__btn--neutral {
-  background: #f8fafc;
-  color: #64748b !important;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #dbeafe;
+  color: #1d4ed8 !important;
+  border: 1px solid rgba(37, 99, 235, 0.28);
 }
 
 .market-quote-drawer__cta-pair .market-quote-drawer__btn--neutral:hover {
-  background: #f1f5f9;
-  border-color: rgba(15, 23, 42, 0.12);
-  color: #475569 !important;
+  background: #bfdbfe;
+  border-color: rgba(29, 78, 216, 0.36);
+  color: #1e40af !important;
   filter: none;
 }
 
@@ -3654,40 +3948,59 @@ button.product-modal__btn--quote-cart:hover {
 }
 
 .market-quote-drawer__ticket-ref {
-  margin: 0.35rem 0 0;
-  padding: 0.28rem 0.42rem;
-  border-radius: 6px;
-  background: rgba(15, 23, 42, 0.028);
-  border: 1px solid rgba(15, 23, 42, 0.055);
-  font-size: 0.58rem;
-  color: #94a3b8;
+  margin: 0.15rem 0 0;
+  padding: 0.56rem 0.66rem;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid #dbeafe;
+  box-shadow: 0 2px 10px rgba(30, 58, 138, 0.08);
+  font-size: 0.68rem;
+  color: #64748b;
   display: flex;
-  flex-direction: column;
-  gap: 0.06rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.28rem 0.42rem;
 }
 
 .market-quote-drawer__ticket-ref-label {
-  font-weight: 600;
-  letter-spacing: 0.045em;
+  font-weight: 700;
+  letter-spacing: 0.075em;
   text-transform: uppercase;
-  font-size: 0.52rem;
+  font-size: 0.6rem;
   color: #94a3b8;
 }
 
 .market-quote-drawer__ticket-ref-codes {
   font-variant-numeric: tabular-nums;
-  font-size: 0.58rem;
-  color: #64748b;
+  font-size: 0.8rem;
+  color: #1e293b;
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0.24rem;
 }
 
 .market-quote-drawer__ticket-ref-codes strong {
-  font-weight: 700;
+  font-weight: 800;
   color: #0f766e;
+  padding: 0.08rem 0.34rem;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.22);
+}
+
+.market-quote-drawer__ticket-ref-codes > span:not(.market-quote-drawer__ticket-ref-sep) {
+  padding: 0.08rem 0.34rem;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.22);
+  color: #475569;
+  white-space: nowrap;
 }
 
 .market-quote-drawer__ticket-ref-sep {
-  margin: 0 0.2rem;
-  opacity: 0.38;
+  margin: 0;
+  opacity: 0.32;
 }
 
 .market-quote-drawer__btn {
@@ -3771,16 +4084,22 @@ button.product-modal__btn--quote-cart:hover {
 }
 
 .market-quote-drawer__btn--ghost {
-  background: transparent;
-  color: #94a3b8 !important;
-  font-weight: 600;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  color: #475569 !important;
+  font-weight: 700;
   font-size: 0.78rem;
   padding-top: 0.5rem;
-  padding-bottom: 0.35rem;
+  padding-bottom: 0.4rem;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  border-radius: 10px;
+  text-decoration: none;
 }
 
 .market-quote-drawer__btn--ghost:hover {
-  color: #64748b !important;
+  color: #334155 !important;
+  background: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%);
+  border-color: rgba(15, 23, 42, 0.2);
+  text-decoration: none;
 }
 
 .market-quote-drawer__btn--close-order {
@@ -3909,26 +4228,51 @@ button.product-modal__btn--quote-cart:hover {
 
 .market-ticket-summary__sales-note {
   margin: 0 0 1rem;
-  padding: 0.72rem 0.8rem;
-  border-radius: 12px;
-  border: 1px solid rgba(16, 185, 129, 0.35);
-  background: #ecfdf5;
+  padding: 0.78rem 0.86rem;
+  border-radius: 13px;
+  border: 1px solid rgba(16, 185, 129, 0.42);
+  background: linear-gradient(180deg, #ecfdf5 0%, #dcfce7 100%);
+  box-shadow:
+    0 6px 16px rgba(5, 150, 105, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.68rem;
+}
+
+.market-ticket-summary__sales-note-icon {
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 4px 10px rgba(5, 150, 105, 0.28);
+  font-size: 0.7rem;
+}
+
+.market-ticket-summary__sales-note-body {
+  min-width: 0;
 }
 
 .market-ticket-summary__sales-note-title {
   margin: 0 0 0.2rem;
-  font-size: 0.73rem;
+  font-size: 0.74rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.075em;
   text-transform: uppercase;
-  color: #047857;
+  color: #065f46;
 }
 
 .market-ticket-summary__sales-note-text {
   margin: 0;
-  font-size: 0.8rem;
-  line-height: 1.45;
-  color: #065f46;
+  font-size: 0.84rem;
+  line-height: 1.48;
+  color: #14532d;
+  font-weight: 500;
 }
 
 .market-ticket-summary__codes {
@@ -4194,14 +4538,45 @@ button.product-modal__btn--quote-cart:hover {
   color: #475569;
 }
 
+.market-mis-ord__badge--borrador {
+  background: #fff7ed;
+  color: #9a3412;
+  border: 1px solid #fdba74;
+}
+
 .market-mis-ord__badge--enviado_consulta {
-  background: #ecfdf5;
-  color: #047857;
+  background: #ffedd5;
+  color: #9a3412;
+  border: 1px solid #fdba74;
 }
 
 .market-mis-ord__badge--en_gestion {
   background: #fef3c7;
   color: #b45309;
+}
+
+.market-mis-ord__badge--en_contacto_equipo {
+  background: #cffafe;
+  color: #0e7490;
+  border: 1px solid #67e8f9;
+}
+
+.market-mis-ord__badge--pagada {
+  background: #d1fae5;
+  color: #047857;
+  border: 1px solid #6ee7b7;
+}
+
+.market-mis-ord__badge--en_viaje {
+  background: #e0e7ff;
+  color: #3730a3;
+  border: 1px solid #a5b4fc;
+}
+
+.market-mis-ord__badge--instalado {
+  background: #14532d;
+  color: #ecfdf5;
+  border: 1px solid #166534;
 }
 
 .market-mis-ord__badge--respondido {

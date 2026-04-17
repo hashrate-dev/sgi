@@ -212,7 +212,7 @@ CREATE TABLE IF NOT EXISTS marketplace_quote_tickets (
   session_id TEXT NOT NULL UNIQUE,
   order_number TEXT UNIQUE,
   ticket_code TEXT NOT NULL UNIQUE,
-  status TEXT NOT NULL DEFAULT 'borrador' CHECK (status IN ('borrador', 'enviado_consulta', 'en_gestion', 'respondido', 'cerrado', 'descartado')),
+  status TEXT NOT NULL DEFAULT 'borrador' CHECK (status IN ('borrador', 'enviado_consulta', 'en_contacto_equipo', 'en_gestion', 'pagada', 'en_viaje', 'instalado', 'cerrado', 'descartado')),
   items_json TEXT NOT NULL,
   subtotal_usd REAL NOT NULL DEFAULT 0,
   line_count INTEGER NOT NULL DEFAULT 0,
@@ -225,7 +225,9 @@ CREATE TABLE IF NOT EXISTS marketplace_quote_tickets (
   ip_address TEXT,
   user_agent TEXT,
   user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-  contact_email TEXT
+  contact_email TEXT,
+  discard_by_email TEXT,
+  reactivated_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS idx_mq_quote_status_updated ON marketplace_quote_tickets(status, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_mq_quote_created ON marketplace_quote_tickets(created_at DESC);
@@ -263,6 +265,8 @@ WHERE NOT EXISTS (SELECT 1 FROM marketplace_products LIMIT 1);
 -- Proyectos ya existentes: ampliar rol y columnas de tickets (idempotente si se ejecuta de nuevo)
 ALTER TABLE marketplace_quote_tickets ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE marketplace_quote_tickets ADD COLUMN IF NOT EXISTS contact_email TEXT;
+ALTER TABLE marketplace_quote_tickets ADD COLUMN IF NOT EXISTS discard_by_email TEXT;
+ALTER TABLE marketplace_quote_tickets ADD COLUMN IF NOT EXISTS reactivated_at TIMESTAMPTZ;
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin_a', 'admin_b', 'operador', 'lector', 'cliente'));
 
@@ -286,3 +290,8 @@ ON CONFLICT (key) DO NOTHING;
 
 INSERT INTO marketplace_site_kv (key, value) VALUES ('corp_interesting_asic_ids', '[]')
 ON CONFLICT (key) DO NOTHING;
+
+-- Marketplace tickets: embudo operativo (idempotente en despliegues sucesivos)
+ALTER TABLE marketplace_quote_tickets DROP CONSTRAINT IF EXISTS marketplace_quote_tickets_status_check;
+UPDATE marketplace_quote_tickets SET status = 'en_contacto_equipo' WHERE status = 'respondido';
+ALTER TABLE marketplace_quote_tickets ADD CONSTRAINT marketplace_quote_tickets_status_check CHECK (status IN ('borrador', 'enviado_consulta', 'en_contacto_equipo', 'en_gestion', 'pagada', 'en_viaje', 'instalado', 'cerrado', 'descartado'));

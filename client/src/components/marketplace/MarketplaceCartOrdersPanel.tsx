@@ -13,11 +13,12 @@ import {
 } from "../../lib/api.js";
 import { MARKETPLACE_ACTIVE_ORDER_CHANGED_EVENT, useMarketplaceQuoteCart } from "../../contexts/MarketplaceQuoteCartContext.js";
 import {
+  ticketRowLineBreakdown,
   ticketRowLineSubtotalUsd,
-  ticketRowIsEquipmentPricePending,
   QUOTE_ADDON_SETUP_USD_FALLBACK,
   isMarketplacePipelineTicketStatus,
   marketplaceQuoteTicketLineDisplayName,
+  type QuoteCartPricing,
 } from "../../lib/marketplaceQuoteCart.js";
 import type { GarantiaQuotePriceItem } from "../../lib/marketplaceGarantiaQuote.js";
 import { canBulkManageMarketplaceMyOrders, enforceSingleMarketplaceOrderForRole } from "../../lib/auth.js";
@@ -56,6 +57,10 @@ function MooRow({ icon, label, value }: { icon: string; label: string; value: st
       </div>
     </div>
   );
+}
+
+function fmtUsd(n: number, loc: string): string {
+  return `${n.toLocaleString(loc)} USD`;
 }
 
 type Props = { onBackToCart: () => void };
@@ -367,7 +372,7 @@ export function MarketplaceCartOrdersPanel({ onBackToCart }: Props) {
     <div
       className={`moo-cart-orders-panel${soloUnTicketDetalle ? " moo-cart-orders-panel--solo-detalle-cliente" : ""}`}
     >
-      {!soloUnTicketDetalle ? (
+      {!soloUnTicketDetalle && !loadingList ? (
         <div className="cti-unified-panel moo-cart-orders-panel__intro">
           <div className="cti-unified-panel__toolbar">
             <div className="cti-filter-search-block">
@@ -425,24 +430,14 @@ export function MarketplaceCartOrdersPanel({ onBackToCart }: Props) {
       ) : null}
 
       {loadingList ? (
-        singleOrderAccount ? (
-          <div className="moo-cart-single-detail-loading" aria-busy="true" role="status">
-            <div className="moo-cart-single-detail-loading__head" />
-            <div className="moo-cart-single-detail-loading__body">
-              <div className="moo-cart-single-detail-loading__row moo-cart-single-detail-loading__row--meta" />
-              <div className="moo-cart-single-detail-loading__row moo-cart-single-detail-loading__row--wide" />
-              <div className="moo-cart-single-detail-loading__row" />
-              <div className="moo-cart-single-detail-loading__row" />
-              <div className="moo-cart-single-detail-loading__row moo-cart-single-detail-loading__row--short" />
-            </div>
-          </div>
-        ) : (
-          <div className="cti-skeleton-grid" aria-hidden>
-            {[1, 2].map((i) => (
-              <div key={i} className="cti-skeleton-card" />
-            ))}
-          </div>
-        )
+        <div
+          className="moo-cart-orders-panel-loading"
+          role="status"
+          aria-busy="true"
+          aria-label={t("orders.panel_loading_title")}
+        >
+          <div className="spinner-border text-success" role="presentation" />
+        </div>
       ) : null}
 
       {!loadingList && cartScopeTickets.length === 0 ? (
@@ -643,62 +638,141 @@ export function MarketplaceCartOrdersPanel({ onBackToCart }: Props) {
 
             <div className="moo-order-detail-pro__lines-section">
               <p className="moo-order-detail-pro__section-kicker">{t("orders.your_order")}</p>
-              {detailHydratingId === selected.id ? (
-                <div className="moo-order-detail-pro__lines-status" role="status">
-                  <div className="spinner-border spinner-border-sm text-success" aria-hidden />
-                  <span>{t("orders.detail_lines_loading")}</span>
-                </div>
-              ) : (() => {
-                  const rawItems = selected.items as Array<Record<string, unknown>> | undefined;
-                  const lineItems = Array.isArray(rawItems) ? rawItems : [];
-                  if (lineItems.length === 0) {
-                    return (
-                      <div className="moo-order-detail-pro__lines-status moo-order-detail-pro__lines-status--summary">
-                        <p className="mb-0">
-                          {tf("orders.detail_lines_summary", {
-                            lines: String(selected.lineCount),
-                            units: String(selected.unitCount),
-                            total: selected.subtotalUsd.toLocaleString(loc),
-                          })}
-                        </p>
-                      </div>
-                    );
-                  }
+              {(() => {
+                const rawItems = selected.items as Array<Record<string, unknown>> | undefined;
+                const lineItems = Array.isArray(rawItems) ? rawItems : [];
+                const hydrating = detailHydratingId === selected.id;
+                if (hydrating && lineItems.length === 0) {
                   return (
-                    <ul className="market-mis-ord__items moo-order-detail-pro__items">
+                    <div
+                      className="moo-cart-orders-panel-loading moo-cart-orders-panel-loading--compact"
+                      role="status"
+                      aria-busy="true"
+                      aria-label={t("orders.detail_lines_loading")}
+                    >
+                      <div className="spinner-border spinner-border-sm text-success" role="presentation" />
+                    </div>
+                  );
+                }
+                if (lineItems.length === 0) {
+                  return (
+                    <div className="moo-order-detail-pro__lines-status moo-order-detail-pro__lines-status--summary">
+                      <p className="mb-0">
+                        {tf("orders.detail_lines_summary", {
+                          lines: String(selected.lineCount),
+                          units: String(selected.unitCount),
+                          total: selected.subtotalUsd.toLocaleString(loc),
+                        })}
+                      </p>
+                    </div>
+                  );
+                }
+                const pricing: QuoteCartPricing = {
+                  setupEquipoCompletoUsd,
+                  setupCompraHashrateUsd,
+                  garantiaItems: garantiaQuoteItems,
+                };
+                let sumEq = 0;
+                let sumSt = 0;
+                let sumWa = 0;
+                for (const row of lineItems) {
+                  const br = ticketRowLineBreakdown(row, pricing);
+                  sumEq += br.equipmentSubtotalUsd;
+                  sumSt += br.setupLineTotalUsd;
+                  sumWa += br.warrantyLineTotalUsd;
+                }
+                const sumLines = sumEq + sumSt + sumWa;
+                const serverTotal = Math.round(Number(selected.subtotalUsd) || 0);
+                const hasPendingEquipmentWithSubtotal = lineItems.some((row) => {
+                  const br = ticketRowLineBreakdown(row, pricing);
+                  const sub = ticketRowLineSubtotalUsd(row, pricing);
+                  return br.pendingEquipmentPrice && sub > 0;
+                });
+                return (
+                  <>
+                    <ul className="market-mis-ord__items moo-order-detail-pro__items moo-order-detail-pro__items--compact">
                       {lineItems.map((row, i) => {
-                        const qty = Number(row.qty) || 0;
+                        const b = ticketRowLineBreakdown(row, pricing);
+                        const sub = ticketRowLineSubtotalUsd(row, pricing);
+                        const linePending = b.pendingEquipmentPrice;
                         const name = marketplaceQuoteTicketLineDisplayName(row);
-                        const linePending = ticketRowIsEquipmentPricePending(row);
-                        const sub = ticketRowLineSubtotalUsd(row, {
-                          setupEquipoCompletoUsd,
-                          setupCompraHashrateUsd,
-                          garantiaItems: garantiaQuoteItems,
-                        });
+                        const qty = b.qty;
+                        const addonLabels: string[] = [];
+                        if (b.includeSetup) addonLabels.push(t("orders.compact_addon_setup"));
+                        if (b.includeWarranty) addonLabels.push(t("orders.compact_addon_warranty"));
+                        const addonsStr = addonLabels.length ? addonLabels.join(" · ") : null;
                         return (
                           <li key={i}>
                             <span className="market-mis-ord__item-name moo-order-detail-pro__item-name">{name}</span>
                             <span className="market-mis-ord__item-qty moo-order-detail-pro__item-qty">×{qty}</span>
                             <span className="market-mis-ord__item-sub moo-order-detail-pro__item-sub">
-                              {linePending ? t("orders.detail_line_subtotal_pending") : `${sub.toLocaleString(loc)} USD`}
+                              {linePending && sub === 0
+                                ? t("orders.detail_line_subtotal_pending")
+                                : linePending
+                                  ? `${fmtUsd(sub, loc)}*`
+                                  : fmtUsd(sub, loc)}
                             </span>
+                            {addonsStr ? (
+                              <span className="moo-order-detail-pro__item-addons" title={addonsStr}>
+                                {b.includeSetup ? (
+                                  <span className="moo-order-detail-pro__addon-chip">
+                                    <span className="moo-order-detail-pro__addon-tick" aria-hidden>
+                                      ✓
+                                    </span>
+                                    {t("orders.compact_addon_setup")}
+                                  </span>
+                                ) : null}
+                                {b.includeWarranty ? (
+                                  <span className="moo-order-detail-pro__addon-chip">
+                                    <span className="moo-order-detail-pro__addon-tick" aria-hidden>
+                                      ✓
+                                    </span>
+                                    {t("orders.compact_addon_warranty")}
+                                  </span>
+                                ) : null}
+                              </span>
+                            ) : null}
                           </li>
                         );
                       })}
                     </ul>
-                  );
-                })()}
+                    <p className="moo-order-detail-pro__composition-inline" title={t("orders.detail_composition_title")}>
+                      {tf("orders.detail_composition_compact", {
+                        eq: fmtUsd(sumEq, loc),
+                        st: fmtUsd(sumSt, loc),
+                        wa: fmtUsd(sumWa, loc),
+                      })}
+                    </p>
+                    {Math.abs(serverTotal - sumLines) > 1 ? (
+                      <p className="moo-order-detail-pro__composition-foot" role="note">
+                        {tf("orders.detail_total_mismatch", {
+                          server: serverTotal.toLocaleString(loc),
+                          sum: sumLines.toLocaleString(loc),
+                        })}
+                      </p>
+                    ) : null}
+                    {hasPendingEquipmentWithSubtotal ? (
+                      <p className="moo-order-detail-pro__pending-footnote">* {t("orders.detail_equipment_pending_note_short")}</p>
+                    ) : null}
+                  </>
+                );
+              })()}
             </div>
 
             <p className="moo-order-detail-pro__disclaimer">{t("orders.footer_note")}</p>
 
             {user && isMarketplacePipelineTicketStatus(selected.status) ? (
               <div className="moo-order-detail-pro__contact-note" role="status">
-                {userCelular
-                  ? tf("orders.contact_status_email_whatsapp", { email: user.email, whatsapp: userCelular })
-                  : userTelefono
-                    ? tf("orders.contact_status_email_phone", { email: user.email, phone: userTelefono })
-                    : tf("orders.contact_status_email", { email: user.email })}
+                <span className="moo-order-detail-pro__contact-note-icon" aria-hidden>
+                  <i className="bi bi-headset" />
+                </span>
+                <p className="moo-order-detail-pro__contact-note-text">
+                  {userCelular
+                    ? tf("orders.contact_status_email_whatsapp", { email: user.email, phone: userCelular })
+                    : userTelefono
+                      ? tf("orders.contact_status_email_phone", { email: user.email, phone: userTelefono })
+                      : tf("orders.contact_status_email", { email: user.email })}
+                </p>
               </div>
             ) : null}
 

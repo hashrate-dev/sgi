@@ -217,6 +217,7 @@ export function MarketplaceQuoteCartDrawer() {
                   const setupUnit = quoteCartSetupUnitUsd(l, pricing);
                   const warrantyUnit = Math.round(quoteCartWarrantyUnitUsd(l, pricing) * addonMult);
                   const equipmentPricePending = quoteCartLineIsEquipmentPricePending(l);
+                  const equipmentUnitPriceLabel = equipmentPricePending ? l.priceLabel : `${Math.round(l.priceUsd).toLocaleString("es-PY")} USD`;
                   return (
                   <li key={`${lk}#${lineIdx}`} className="market-quote-drawer__line">
                     <div className="market-quote-drawer__line-top">
@@ -252,7 +253,7 @@ export function MarketplaceQuoteCartDrawer() {
                           (equipmentPricePending ? " market-quote-drawer__line-unit--pending" : "")
                         }
                       >
-                        {l.priceLabel}
+                        {equipmentUnitPriceLabel}
                         <span className="market-quote-drawer__line-unit-suffix">{t("drawer.per_unit")}</span>
                       </span>
                       <div className="market-quote-drawer__stepper" role="group" aria-label={tf("drawer.qty_aria", { model: l.model })}>
@@ -281,7 +282,15 @@ export function MarketplaceQuoteCartDrawer() {
                     </div>
                     <div className="market-quote-drawer__addons" role="group" aria-label={tf("drawer.addons_aria", { model: l.model })}>
                       <p className="market-quote-drawer__addons-hint">
-                        {equipmentPricePending ? t("drawer.addons_hint_pending_line") : t("drawer.addons_hint")}
+                        <span className="market-quote-drawer__addons-hint-copy">
+                          {equipmentPricePending ? t("drawer.addons_hint_pending_line") : t("drawer.addons_hint")}
+                        </span>
+                        <span className="market-quote-drawer__addons-hint-info" tabIndex={0} aria-label={t("drawer.addons_hint_info_aria")}>
+                          <i className="bi bi-info-circle-fill" aria-hidden />
+                          <span className="market-quote-drawer__addons-hint-tooltip" role="tooltip">
+                            {t("drawer.addons_hint_tooltip")}
+                          </span>
+                        </span>
                       </p>
                       <label className="market-quote-drawer__addon">
                         <input
@@ -289,19 +298,22 @@ export function MarketplaceQuoteCartDrawer() {
                           checked={l.includeSetup}
                           onChange={(e) => setLineAddons(lk, { includeSetup: e.target.checked })}
                         />
-                        <span>
-                          {t("drawer.setup")}
-                          {equipmentPricePending ? (
-                            <span className="market-quote-drawer__addon-muted"> {t("drawer.per_u")}</span>
-                          ) : (
-                            <>
-                              {" "}
-                              <span className="market-quote-drawer__addon-price">
-                                {setupUnit.toLocaleString(loc)} USD
-                              </span>{" "}
-                              {t("drawer.per_u")}
-                            </>
-                          )}
+                        <span className="market-quote-drawer__addon-copy">
+                          <span className="market-quote-drawer__addon-main">
+                            {t("drawer.setup")}
+                            {equipmentPricePending ? (
+                              <span className="market-quote-drawer__addon-muted"> {t("drawer.per_u")}</span>
+                            ) : (
+                              <>
+                                {" "}
+                                <span className="market-quote-drawer__addon-price">
+                                  {setupUnit.toLocaleString(loc)} USD
+                                </span>{" "}
+                                {t("drawer.per_u")}
+                              </>
+                            )}
+                          </span>
+                          <span className="market-quote-drawer__addon-desc">{t("drawer.addons_info_setup")}</span>
                         </span>
                       </label>
                       <label className="market-quote-drawer__addon">
@@ -310,19 +322,36 @@ export function MarketplaceQuoteCartDrawer() {
                           checked={l.includeWarranty}
                           onChange={(e) => setLineAddons(lk, { includeWarranty: e.target.checked })}
                         />
-                        <span>
-                          {t("drawer.warranty")}
-                          {equipmentPricePending ? (
-                            <span className="market-quote-drawer__addon-muted"> {t("drawer.per_u")}</span>
-                          ) : (
-                            <>
-                              {" "}
-                              <span className="market-quote-drawer__addon-price">
-                                {warrantyUnit.toLocaleString(loc)} USD
-                              </span>{" "}
-                              {t("drawer.per_u")}
-                            </>
-                          )}
+                        <span className="market-quote-drawer__addon-copy">
+                          <span className="market-quote-drawer__addon-main">
+                            {t("drawer.warranty")}
+                            {equipmentPricePending ? (
+                              <>
+                                <span className="market-quote-drawer__addon-muted"> {t("drawer.per_u")}</span>
+                                <span className="market-quote-drawer__addon-info" tabIndex={0} aria-label={t("drawer.warranty_info_aria")}>
+                                  <i className="bi bi-info-circle-fill" aria-hidden />
+                                  <span className="market-quote-drawer__addon-tooltip" role="tooltip">
+                                    {t("drawer.warranty_tooltip")}
+                                  </span>
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                {" "}
+                                <span className="market-quote-drawer__addon-price">
+                                  {warrantyUnit.toLocaleString(loc)} USD
+                                </span>{" "}
+                                {t("drawer.per_u")}
+                                <span className="market-quote-drawer__addon-info" tabIndex={0} aria-label={t("drawer.warranty_info_aria")}>
+                                  <i className="bi bi-info-circle-fill" aria-hidden />
+                                  <span className="market-quote-drawer__addon-tooltip" role="tooltip">
+                                    {t("drawer.warranty_tooltip")}
+                                  </span>
+                                </span>
+                              </>
+                            )}
+                          </span>
+                          <span className="market-quote-drawer__addon-desc">{t("drawer.addons_info_warranty")}</span>
                         </span>
                       </label>
                     </div>
