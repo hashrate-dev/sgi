@@ -172,6 +172,11 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
   /** Tras generar consulta (carrito vacío): no enviar clearPipelineCart al servidor (evitaría borrar el ticket recién creado). */
   const skipEmptyPipelineSyncRef = useRef(false);
   /**
+   * Tras submit_ticket con fusión (`merged`): `setLines` dispara el debounce de quote-sync y el servidor
+   * puede mandar el mismo mail que el submit. «Ver Orden» solo cambia vista; el duplicado viene de ese sync.
+   */
+  const skipNextDebouncedQuoteSyncRef = useRef(false);
+  /**
    * Cada cambio de carrito (o logout) incrementa el contador; quote-sync en vuelo solo aplica merge
    * si el valor sigue igual al capturado al enviar (evita que una respuesta vieja pise quitar/agregar).
    */
@@ -363,6 +368,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
 
   useEffect(() => {
     if (!canUseQuoteCart) {
+      skipNextDebouncedQuoteSyncRef.current = false;
       return;
     }
     quoteCartRemoteApplyGenRef.current += 1;
@@ -371,6 +377,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
       setTicketRef(null);
       /** Sin orden en pipeline no hace falta POST vacío aquí (clearCart ya llama a la API). */
       if (blockingPipelineOrder?.id == null) {
+        skipNextDebouncedQuoteSyncRef.current = false;
         return;
       }
       /**
@@ -388,6 +395,10 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
     const delayMs = blockingPipelineOrder?.id != null ? 420 : 880;
     const t = window.setTimeout(() => {
       void (async () => {
+        if (skipNextDebouncedQuoteSyncRef.current) {
+          skipNextDebouncedQuoteSyncRef.current = false;
+          return;
+        }
         const genAtSend = quoteCartRemoteApplyGenRef.current;
         try {
           const res = await syncMarketplaceQuoteTicket({
@@ -525,6 +536,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
       throw new Error("No se pudo registrar el ticket. Probá de nuevo.");
     }
     if (r.merged && Array.isArray(r.lines)) {
+      skipNextDebouncedQuoteSyncRef.current = true;
       const next = quoteCartLinesFromApiPayload(r.lines);
       setLines(next);
       if (blockingPipelineOrder) {
