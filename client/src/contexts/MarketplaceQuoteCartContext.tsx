@@ -408,9 +408,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
           });
           if (!canUseQuoteCartRef.current) return;
           if (genAtSend !== quoteCartRemoteApplyGenRef.current) return;
-          if (res.orderNumber && res.ticketCode) {
-            setTicketRef({ orderNumber: res.orderNumber, ticketCode: res.ticketCode });
-          }
+          /** En sync automático se mantiene como borrador: no exponer referencia ORD/TKT hasta confirmación explícita. */
           if (res.merged && Array.isArray(res.lines)) {
             if (genAtSend !== quoteCartRemoteApplyGenRef.current) return;
             const next = quoteCartLinesFromApiPayload(res.lines);
@@ -591,10 +589,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
         if (!canUseQuoteCartRef.current || genAtSend !== quoteCartRemoteApplyGenRef.current) {
           /* Respuesta obsoleta o sesión cambiada: no pisar el carrito. */
         } else {
-          if (r.orderNumber && r.ticketCode) {
-            ref = { orderNumber: r.orderNumber, ticketCode: r.ticketCode };
-            setTicketRef(ref);
-          }
+          if (r.orderNumber && r.ticketCode) ref = { orderNumber: r.orderNumber, ticketCode: r.ticketCode };
           if (r.merged && Array.isArray(r.lines)) {
             const next = quoteCartLinesFromApiPayload(r.lines);
             if (cartLinesMergeSig(lines) !== cartLinesMergeSig(next)) {
@@ -633,10 +628,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
         if (!canUseQuoteCartRef.current || genAtSend !== quoteCartRemoteApplyGenRef.current) {
           /* Respuesta obsoleta o sesión cambiada. */
         } else {
-          if (r.orderNumber && r.ticketCode) {
-            ref = { orderNumber: r.orderNumber, ticketCode: r.ticketCode };
-            setTicketRef(ref);
-          }
+          if (r.orderNumber && r.ticketCode) ref = { orderNumber: r.orderNumber, ticketCode: r.ticketCode };
           if (r.merged && Array.isArray(r.lines)) {
             const next = quoteCartLinesFromApiPayload(r.lines);
             if (cartLinesMergeSig(lines) !== cartLinesMergeSig(next)) {

@@ -414,7 +414,7 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
     "Gere o ticket para registrar a consulta no sistema. Você também pode nos escrever por e-mail ou WhatsApp.",
   "drawer.next_guest":
     "Faça login (cliente ou administrador A/B) para gerar o ticket e ver o status em «Pedidos pendentes».",
-  "drawer.gen_ticket": "Gerar pedido de compra",
+  "drawer.gen_ticket": "Ver pedido",
   "drawer.gen_ticket_update": "Atualizar pedido",
   "drawer.gen_busy": "Gerando ticket…",
   "drawer.gen_busy_update": "Salvando…",

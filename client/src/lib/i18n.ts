@@ -432,7 +432,7 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
       "Generá el ticket para registrar la consulta en el sistema. También podés escribirnos por correo o WhatsApp.",
     "drawer.next_guest":
       "Iniciá sesión para generar el ticket y ver el estado en «Órdenes pendientes».",
-    "drawer.gen_ticket": "Generar Orden de Compra",
+    "drawer.gen_ticket": "Ver Orden",
     "drawer.gen_ticket_update": "Actualizar Orden",
     "drawer.gen_busy": "Generando ticket…",
     "drawer.gen_busy_update": "Guardando…",
@@ -1137,7 +1137,7 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
       "Generate a ticket to register your inquiry in the system. You can also email or WhatsApp us.",
     "drawer.next_guest":
       "Log in (client or admin A/B) to generate a ticket and track status under “Pending orders”.",
-    "drawer.gen_ticket": "Generate inquiry ticket",
+    "drawer.gen_ticket": "View order",
     "drawer.gen_ticket_update": "Update order",
     "drawer.gen_busy": "Generating ticket…",
     "drawer.gen_busy_update": "Saving…",
