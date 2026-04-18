@@ -11,7 +11,9 @@ import {
   parsePowerWattsFromDetails,
   parseScryptGhs,
   parseSha256Ths,
+  parseZcashKhForWtm,
 } from "./miningYieldEstimate.js";
+import type { AsicYieldResult } from "./miningYieldEstimate.js";
 
 /** DOGE aux por 1 LTC en merge (referencia WhatToMine). */
 const MERGED_DOGE_PER_LTC_COIN = 81.552731 / 0.021694;
@@ -21,6 +23,8 @@ export const WHATTOMINE_ELECTRICITY_USD_PER_KWH = 0.078;
 const WTM_BTC_COIN = 1;
 const WTM_LTC_COIN = 4;
 const WTM_DOGE_COIN = 6;
+/** Zcash Equihash — misma API que https://whattomine.com/coins/166-zec-equihash */
+const WTM_ZEC_COIN = 166;
 
 const UA = "HashrateSpace-SGI/1.0";
 
@@ -37,7 +41,11 @@ function fmtEs(n: number, maxFrac: number): string {
 
 function parseRewardNumber(s: string | undefined): number | null {
   if (s == null || typeof s !== "string") return null;
-  const n = parseFloat(s.replace(/,/g, ""));
+  let t = s.trim().replace(/\s/g, "");
+  if (!t) return null;
+  if (t.includes(",") && !t.includes(".")) t = t.replace(",", ".");
+  else if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(t)) t = t.replace(/\./g, "").replace(",", ".");
+  const n = parseFloat(t.replace(/,/g, ""));
   return Number.isFinite(n) ? n : null;
 }
 
@@ -49,7 +57,7 @@ function parseUsdString(s: string | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-async function fetchWtmJson(coinId: number, hr: number, powerW: number): Promise<WtmResponse | null> {
+export async function fetchWtmJson(coinId: number, hr: number, powerW: number): Promise<WtmResponse | null> {
   const q = new URLSearchParams({
     hr: String(hr),
     p: String(Math.max(1, Math.round(powerW))),
@@ -120,6 +128,30 @@ export function resolveMarketplaceAlgoForPersist(body: {
   return "sha256";
 }
 
+/**
+ * Rendimiento en vivo / persistencia: ZEC desde API `coins/166.json` (misma base que la calculadora web).
+ */
+export async function fetchZecWhatToMineYieldForItem(item: {
+  id: string;
+  hashrate: string;
+  detailRows?: Array<{ icon: string; text: string }>;
+}): Promise<AsicYieldResult | null> {
+  const kh = parseZcashKhForWtm(item.hashrate);
+  if (kh == null) return null;
+  const powerW = parsePowerWattsFromDetails(item.detailRows) ?? 2800;
+  const j = await fetchWtmJson(WTM_ZEC_COIN, kh, powerW);
+  if (!j) return null;
+  const zecDay = parseRewardNumber(j.estimated_rewards);
+  const revenueUsd = parseUsdString(j.revenue);
+  if (zecDay == null || zecDay <= 0 || revenueUsd == null) return null;
+  return {
+    id: item.id,
+    line1: `≈ ${fmtEs(zecDay, 5)} ZEC`,
+    line2: `≈ ${fmtEs(revenueUsd, 2)} USDT`,
+    note: `WhatToMine ZEC (Equihash) · ${kh} kh/s · electricidad ${WHATTOMINE_ELECTRICITY_USD_PER_KWH} USD/kWh · bruto diario (revenue).`,
+  };
+}
+
 export async function estimateYieldWhatToMineForEquipo(row: {
   mp_algo: string | null;
   procesador: string;
@@ -143,6 +175,23 @@ export async function estimateYieldWhatToMineForEquipo(row: {
 
   const powerW = parsePowerWattsFromDetails(detailRows) ?? null;
 
+  const zKh = parseZcashKhForWtm(hashrate);
+  if (zKh != null) {
+    const p = powerW ?? 2800;
+    const j = await fetchWtmJson(WTM_ZEC_COIN, zKh, p);
+    if (!j) return null;
+    const zecDay = parseRewardNumber(j.estimated_rewards);
+    const revenueUsd = parseUsdString(j.revenue);
+    if (zecDay == null || zecDay <= 0 || revenueUsd == null) return null;
+    return {
+      line1: `Por día: ≈ ${fmtEs(zecDay, 5)} ZEC`,
+      line2: `Equivalente diario (USDT): ≈ ${fmtEs(revenueUsd, 2)} USDT`,
+      source: "whattomine",
+      electricityUsdPerKwh: WHATTOMINE_ELECTRICITY_USD_PER_KWH,
+      note: `WhatToMine ZEC (Equihash) · ${zKh} kh/s · electricidad ${WHATTOMINE_ELECTRICITY_USD_PER_KWH} USD/kWh · bruto (revenue).`,
+    };
+  }
+
   const algo = inferAlgo(row);
   if (algo === "sha256") {
     const ths = parseSha256Ths(hashrate);
@@ -154,7 +203,7 @@ export async function estimateYieldWhatToMineForEquipo(row: {
     const revenueUsd = parseUsdString(j.revenue);
     if (btcDay == null || btcDay <= 0 || revenueUsd == null) return null;
     return {
-      line1: `Por día: ~${fmtEs(btcDay, 6)} BTC`,
+      line1: `Por día: ≈ ${fmtEs(btcDay, 6)} BTC`,
       line2: `Equivalente diario (USDT): ≈ ${fmtEs(revenueUsd, 2)} USDT`,
       source: "whattomine",
       electricityUsdPerKwh: WHATTOMINE_ELECTRICITY_USD_PER_KWH,
@@ -180,7 +229,7 @@ export async function estimateYieldWhatToMineForEquipo(row: {
     const dogeUsd = dogeDay * dogeBtc * btcUsd;
     const grossUsd = ltcRevenueUsd + dogeUsd;
     return {
-      line1: `Por día: ~${fmtEs(ltcDay, 5)} LTC + ~${dogeFmt} DOGE`,
+      line1: `Por día: ≈ ${fmtEs(ltcDay, 5)} LTC + ≈ ${dogeFmt} DOGE`,
       line2: `Equivalente diario (USDT): ≈ ${fmtEs(grossUsd, 2)} USDT`,
       source: "whattomine",
       electricityUsdPerKwh: WHATTOMINE_ELECTRICITY_USD_PER_KWH,
@@ -192,6 +241,6 @@ export async function estimateYieldWhatToMineForEquipo(row: {
 }
 
 export function explainInferAlgoFailure(row: { mp_algo: string | null; procesador: string }): string {
-  if (inferAlgo(row)) return "";
-  return "No se detectó algoritmo ni hashrate en Procesador (ej. TH/s para Bitcoin, GH/s o MH/s para Scrypt). Completá Procesador con la especificación del minero.";
+  if (inferAlgo(row) || parseZcashKhForWtm((row.procesador ?? "").trim())) return "";
+  return "No se detectó algoritmo ni hashrate en Procesador (ej. TH/s para Bitcoin, GH/s o MH/s para Scrypt, kSol/s para Zcash/Z15). Completá Procesador con la especificación del minero.";
 }

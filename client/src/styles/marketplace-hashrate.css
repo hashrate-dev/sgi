@@ -688,7 +688,8 @@ body:has(.marketplace-asic-page)::after {
   min-width: 0;
   overflow-x: clip;
   box-sizing: border-box;
-  background: linear-gradient(160deg, #f0fdf4 0%, #ecfdf5 35%, #ffffff 100%);
+  /* Mismo gris que body / `.marketplace-asic-page` — sin gradiente (evita dos tonos izq/der o banda central). */
+  background: var(--marketplace-page-bg, #f3f4f6);
 }
 
 .marketplace-asic-page .section--market-shelf {
@@ -765,11 +766,11 @@ button.market-link-hrs {
 
 /* ——— Login cliente: fondo como el catálogo (gradiente + “estantería” de fondo) ——— */
 .marketplace-login-page.marketplace-asic-page {
-  background: #ecfdf5;
+  background: #eef1f4;
 }
 
 .marketplace-login-page .page-main.page-main--market {
-  background: linear-gradient(160deg, #f0fdf4 0%, #ecfdf5 28%, #ffffff 92%);
+  background: linear-gradient(160deg, #e8eaed 0%, #f1f5f9 32%, #f8fafc 92%);
   flex: 1 1 auto;
   min-height: 0;
 }
@@ -1341,6 +1342,237 @@ button.market-link-hrs {
   transform: translateY(1px);
 }
 
+/* ——— Catálogo /marketplace: tarjetas estilo retail (fondo claro, badge, favoritos, foto en blanco) ——— */
+.market-shelf-grid--catalog-v2 {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1.15rem 1rem;
+}
+
+@media (min-width: 640px) {
+  .market-shelf-grid--catalog-v2 {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  .market-shelf-grid--catalog-v2 {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+}
+
+.page-main--market--asic .market-shelf-wrap--catalog-v2 {
+  background: transparent;
+  border-radius: 0;
+  /* No usar margin-inline negativo: anula el margin:auto de .market-shelf-wrap y desplaza todo a la izquierda. */
+  width: 100%;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+  padding-bottom: 2.5rem;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  border-radius: 12px;
+  border: 1px solid #e8eaed;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.06);
+  contain-intrinsic-size: 380px;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product:hover {
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.06), 0 12px 28px rgba(15, 23, 42, 0.1);
+  transform: translateY(-3px);
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__media {
+  padding: 0;
+  background: #fff;
+  border-radius: 12px 12px 0 0;
+  border: none;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__media-inner {
+  position: relative;
+  background: #fff;
+  border-radius: 12px 12px 0 0;
+  border-bottom: 1px solid #eef0f3;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__media-gradient {
+  display: none;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__imglink {
+  aspect-ratio: 1;
+  background: #fff;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__photo {
+  object-fit: contain;
+  object-position: center;
+  padding: 0.75rem;
+  filter: none;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__photo--fallback {
+  background: linear-gradient(145deg, #f8fafc, #f1f5f9);
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__body {
+  padding: 0.85rem 1rem 1rem;
+  gap: 0.5rem;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__title-line {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 700;
+  color: #020617;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  letter-spacing: -0.02em;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__title-brand {
+  font-weight: 800;
+  color: #020617;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__subtitle {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #94a3b8;
+  line-height: 1.28;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__price-stack {
+  margin-top: 0.08rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__price-current {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: #020617;
+  letter-spacing: -0.045em;
+  line-height: 1.15;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__price-current--consult {
+  font-size: 1.12rem;
+  font-weight: 800;
+  color: #020617;
+  letter-spacing: -0.02em;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__chip-row {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__chip {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  font-size: 0.74rem;
+  line-height: 1.32;
+  color: #64748b;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__chip .shelf-detail-strip__svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  margin-top: 0.04rem;
+  color: #0d9488;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__chip-txt {
+  flex: 1;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__cta-row {
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__cta {
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.86rem;
+  padding: 0.58rem 0.78rem;
+  background: #fff;
+  color: #0f766e;
+  border: 1px solid #cbd5e1;
+  box-shadow: none;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__cta:hover {
+  filter: none;
+  background: #f8fafc;
+  border-color: #0d9488;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__quote-btn {
+  border-radius: 8px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  padding: 0.58rem 0.78rem;
+  border: none;
+  color: #fff;
+  background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 2px 0 #047857;
+  transition: filter 0.15s, transform 0.1s, box-shadow 0.1s;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__quote-btn:hover {
+  filter: brightness(1.05);
+  background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+  border-color: transparent;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__quote-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 #047857;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product--skeleton .shelf-product__media-inner {
+  min-height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product--skeleton .shelf-product__skeleton-photo {
+  width: 72%;
+  aspect-ratio: 1;
+  max-height: 160px;
+  border-radius: 8px;
+}
+
 /* ——— Footer marketplace: misma franja que home corporativa (gradiente + Empresa / Inversores + ©) ——— */
 .site-footer--marketplace {
   margin-top: auto;
@@ -1455,10 +1687,10 @@ button.market-link-hrs {
 .product-modal__dialog {
   position: relative;
   background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 16px;
+  border: 1px solid #e8eaed;
+  border-radius: 12px;
   padding: 1.35rem 1.25rem 1.25rem;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 12px 40px rgba(15, 23, 42, 0.12);
 }
 
 .product-modal__dialog--layout {
@@ -1466,10 +1698,11 @@ button.market-link-hrs {
   /* Galería + centro flexible + columna CTAs/hosting */
   /* Columna galería → hero cuadrado (imagen principal) */
   grid-template-columns: minmax(0, 530px) minmax(0, 1fr) minmax(0, 260px);
-  gap: 1.35rem 1.5rem;
+  gap: 1.45rem 1.65rem;
   /* +2 cm de altura total (1 cm arriba + 1 cm abajo), sin tocar ancho */
   padding: calc(1.65rem + 1cm) 1.5rem calc(1.5rem + 1cm) 1.35rem;
   align-items: start;
+  -webkit-font-smoothing: antialiased;
 }
 
 .product-modal__close {
@@ -1557,35 +1790,34 @@ button.market-link-hrs {
 .product-modal__hero-gradient {
   position: relative;
   border-radius: 12px;
-  border: 1px solid rgba(0, 25, 18, 0.55);
+  border: 1px solid rgba(0, 25, 18, 0.45);
   background: linear-gradient(135deg, #004e75 0%, #0d6b58 42%, #42cc66 100%);
   aspect-ratio: 1;
   overflow: hidden;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
-  /* Un poco de aire para que el logo de esquina no roce el borde redondeado */
-  padding: 8px;
+  /* Misma línea que tarjeta catálogo v2: foto contenida sobre degradado */
+  padding: 0.75rem;
   box-sizing: border-box;
 }
 
-/* Igual que `.shelf-product__photo`: cover + centro para alinear con la tarjeta del catálogo.
-   `contain` mostraba el PNG completo y dejaba visible la marca lateral (p. ej. en "Ver más"). */
+/* Alineado con `.market-shelf-grid--catalog-v2 .shelf-product__photo`: contain + centro */
 .product-modal__hero-img {
   position: absolute;
-  left: 8px;
-  top: 8px;
-  width: calc(100% - 16px);
-  height: calc(100% - 16px);
-  object-fit: cover;
+  left: 0.75rem;
+  top: 0.75rem;
+  width: calc(100% - 1.5rem);
+  height: calc(100% - 1.5rem);
+  object-fit: contain;
   object-position: center;
   display: block;
 }
 
 .product-modal__hero-fallback {
   position: absolute;
-  left: 8px;
-  top: 8px;
-  width: calc(100% - 16px);
-  height: calc(100% - 16px);
+  left: 0.75rem;
+  top: 0.75rem;
+  width: calc(100% - 1.5rem);
+  height: calc(100% - 1.5rem);
   background: rgba(255, 255, 255, 0.12);
   border-radius: 8px;
 }
@@ -1604,7 +1836,7 @@ button.market-link-hrs {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  font-size: 0.8rem;
+  font-size: 0.94rem;
   font-weight: 700;
   color: #111827;
 }
@@ -1632,84 +1864,91 @@ button.market-link-hrs {
 }
 
 .product-modal__store-sub {
-  margin: 0 0 0.85rem;
-  font-size: 0.75rem;
-  color: #6b7280;
+  margin: 0 0 0.55rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #94a3b8;
 }
 
 .product-modal__title {
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   margin: 0 2rem 0.3rem 0;
-  color: #111827;
+  color: #020617;
   font-weight: 700;
 }
 
 .product-modal__title--xl {
-  font-size: 1.35rem;
-  margin: 0 0 0.25rem;
+  font-size: clamp(1.2rem, 0.42vw + 1.06rem, 1.38rem);
+  margin: 0 0 0.12rem;
   padding-right: 2rem;
-  line-height: 1.2;
+  line-height: 1.28;
+  font-weight: 700;
+  color: #020617;
+  letter-spacing: -0.02em;
+}
+
+.product-modal__title-brand {
+  font-weight: 800;
 }
 
 .product-modal__hashrate {
   margin: 0 0 0.4rem;
-  color: #059669;
-  font-weight: 600;
-  font-size: 0.9rem;
+  color: #94a3b8;
+  font-weight: 500;
+  font-size: 0.88rem;
 }
 
 .product-modal__hashrate--xl {
-  font-size: 1.05rem;
-  margin-bottom: 0.65rem;
+  font-size: 0.88rem;
+  margin-bottom: 0;
 }
 
-/* Contenedor TH/s compacto (pill pequeña, alineada al título) */
+/* Misma jerarquía que tarjeta catálogo: hashrate como texto secundario, sin pill verde */
 .product-modal__hashrate-badge {
-  display: inline-flex;
-  align-items: center;
-  margin: 0 0 0.5rem;
-  padding: 0.28rem 0.68rem;
+  display: block;
+  margin: 0 0 0.35rem;
+  padding: 0;
   max-width: 100%;
-  border-radius: 999px;
-  border: 1px solid #86efac;
-  background: linear-gradient(145deg, #f0fdf4 0%, #ecfdf5 55%, #d1fae5 100%);
-  box-shadow: 0 1px 4px rgba(5, 150, 105, 0.08);
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
   box-sizing: border-box;
 }
 
 .product-modal__hashrate-badge--share {
-  border-color: #34d399;
-  background: linear-gradient(145deg, #ecfdf5 0%, #d1fae5 50%, #a7f3d0 100%);
-  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.12);
-  padding: 0.3rem 0.72rem;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
 }
 
 .product-modal__hashrate--in-badge {
   margin: 0;
   font-size: 0.88rem;
-  font-weight: 800;
-  color: #047857;
-  letter-spacing: -0.02em;
-  line-height: 1.15;
+  font-weight: 500;
+  color: #94a3b8;
+  letter-spacing: 0;
+  line-height: 1.28;
 }
 
 .product-modal__hashrate-badge--share .product-modal__hashrate--in-badge {
-  font-size: 0.92rem;
-  color: #065f46;
+  font-size: 0.88rem;
+  color: #64748b;
 }
 
 .product-modal__pills {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  margin-bottom: 0.65rem;
+  margin: 0 0 0.5rem;
 }
 
 .product-modal__pill {
   display: inline-block;
-  padding: 0.2rem 0.55rem;
-  border-radius: 6px;
-  font-size: 0.72rem;
+  padding: 0.3rem 0.74rem;
+  border-radius: 999px;
+  font-size: 0.845rem;
   font-weight: 700;
 }
 
@@ -1718,125 +1957,115 @@ button.market-link-hrs {
   color: #fff;
 }
 
+.product-modal__pill--equihash {
+  background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
+  color: #fff;
+}
+
 .product-modal__pill--coins {
   background: #fff;
-  color: #4b5563;
-  border: 1px solid #d1d5db;
+  color: #475569;
+  border: 1px solid #e2e8f0;
 }
 
 .product-modal__price {
   margin: 0 0 0.85rem;
-  font-size: 1.35rem;
-  font-weight: 800;
-  color: #dc2626;
+  font-size: 1.54rem;
+  font-weight: 900;
+  color: #020617;
 }
 
 .product-modal__price--xl {
-  font-size: 1.65rem;
+  font-size: 1.84rem;
   margin: 0 0 0.35rem;
 }
 
-/* Mismo rojo que el importe en tarjeta / caja del modal */
+/* Precio alineado a tarjeta catálogo v2 (negro intenso, con o sin texto comercial) */
 .product-modal__price--consult {
-  font-weight: 800 !important;
-  line-height: 1.2 !important;
-  letter-spacing: -0.02em !important;
+  font-weight: 900 !important;
+  line-height: 1.15 !important;
+  letter-spacing: -0.045em !important;
   text-wrap: balance;
-  color: #dc2626 !important;
-  font-size: 1.35rem !important;
+  color: #020617 !important;
+  font-size: 1.54rem !important;
 }
 
 .product-modal__price--in-box.product-modal__price--consult {
-  font-size: 1.78rem !important;
-  line-height: 1.1 !important;
-  color: #be123c !important;
+  font-size: 1.52rem !important;
+  line-height: 1.15 !important;
+  color: #020617 !important;
 }
 
 .product-modal__price-box--share .product-modal__price--in-box.product-modal__price--consult {
-  font-size: 1.9rem !important;
-  color: #9f1239 !important;
+  font-size: 1.6rem !important;
+  color: #020617 !important;
 }
 
 .product-modal__price-note {
   margin: 0 0 1rem;
-  font-size: 0.7rem;
-  line-height: 1.45;
+  font-size: 0.84rem;
+  line-height: 1.5;
   color: #6b7280;
 }
 
-/* Precio destacado (modal detalle) — rosa/rojo suave, mismo “idioma” de color que el importe */
+/* Caja precio: misma línea neutra que el cuerpo de la tarjeta (sin rosa/rojo) */
 .product-modal__price-box {
-  margin: 0 0 0.85rem;
-  padding: 0.85rem 1.1rem;
-  border-radius: 14px;
-  border: 1px solid #fecdd3; /* rose-200: borde fino, menos “caja fuerte” que 2px rojo */
-  background: linear-gradient(
-    168deg,
-    #ffffff 0%,
-    #fffafb 38%,
-    #ffe4e6 100%
-  );
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.98),
-    0 1px 2px rgba(15, 23, 42, 0.04),
-    0 6px 22px rgba(190, 18, 60, 0.07);
+  margin: 0 0 0.55rem;
+  padding: 0.75rem 0.95rem;
+  border-radius: 10px;
+  border: 1px solid #e8eaed;
+  background: #fff;
+  box-shadow: none;
   box-sizing: border-box;
 }
 
-/* Vista porción: un poco más de presencia sin cambiar la familia cromática */
 .product-modal__price-box--share {
-  border-color: #fda4af; /* rose-300 */
-  background: linear-gradient(
-    168deg,
-    #ffffff 0%,
-    #fff1f2 32%,
-    #fecdd3 100%
-  );
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    0 2px 4px rgba(15, 23, 42, 0.05),
-    0 10px 30px rgba(190, 18, 60, 0.11);
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  box-shadow: none;
 }
 
 .product-modal__price-box-label {
   display: block;
-  margin: 0 0 0.4rem;
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
+  margin: 0 0 0.32rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: #9f1239; /* rose-800: legible sin gritar como rojo puro */
+  color: #64748b;
 }
 
 .product-modal__price--in-box {
-  margin: 0 0 0.45rem;
-  font-size: 1.78rem;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-  color: #be123c; /* rose-700: armoniza con el fondo rose */
+  margin: 0 0 0.35rem;
+  font-size: 1.52rem;
+  line-height: 1.15;
+  letter-spacing: -0.045em;
+  font-weight: 900;
+  color: #020617;
 }
 
 .product-modal__price-box--share .product-modal__price--in-box {
-  font-size: 1.9rem;
-  color: #9f1239;
+  font-size: 1.6rem;
+  color: #020617;
 }
 
 .product-modal__price-note--in-box {
   margin: 0;
-  font-size: 0.65rem;
-  line-height: 1.45;
-  color: #64748b;
-  border-top: 1px solid rgba(253, 164, 175, 0.35);
+  font-size: 0.81rem;
+  line-height: 1.5;
+  color: #94a3b8;
+  border-top: 1px solid #eef0f3;
   padding-top: 0.5rem;
-  margin-top: 0.1rem;
+  margin-top: 0.05rem;
 }
 
+/* Lista técnica = chips de tarjeta (fondo blanco, iconos teal) */
 .product-modal__spec-card {
-  background: linear-gradient(180deg, #eff6ff 0%, #e0f2fe 100%);
-  border: 1px solid #bfdbfe;
-  border-radius: 12px;
-  padding: 0.75rem 0.85rem;
-  margin-bottom: 0.85rem;
+  background: #fff;
+  border: 1px solid #e8eaed;
+  border-radius: 10px;
+  padding: 0.72rem 0.82rem;
+  margin-bottom: 0.65rem;
 }
 
 .product-modal__spec-list {
@@ -1845,22 +2074,22 @@ button.market-link-hrs {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
+  gap: 0.35rem;
 }
 
 .product-modal__spec-row {
   display: flex;
   align-items: flex-start;
-  gap: 0.5rem;
-  font-size: 0.8rem;
-  color: #1e3a5f;
-  line-height: 1.35;
+  gap: 0.45rem;
+  font-size: 0.89rem;
+  color: #64748b;
+  line-height: 1.38;
 }
 
 .product-modal__spec-icon {
   flex-shrink: 0;
-  color: #2563eb;
-  margin-top: 1px;
+  color: #0d9488;
+  margin-top: 0.06rem;
 }
 
 .product-modal__spec-icon .shelf-detail-strip__svg {
@@ -1876,26 +2105,26 @@ button.market-link-hrs {
 .product-modal__yield-card {
   border: 1px solid #e8eaed;
   border-radius: 10px;
-  padding: 0.7rem 0.75rem;
+  padding: 0.82rem 0.88rem;
   background: #fff;
 }
 
 .product-modal__yield-title {
-  margin: 0 0 0.45rem;
-  font-size: 0.8rem;
-  font-weight: 600;
+  margin: 0 0 0.5rem;
+  font-size: 0.98rem;
+  font-weight: 700;
   color: #1f2937;
 }
 
 .product-modal__yield-line {
   margin: 0 0 0.35rem;
-  font-size: 0.8rem;
+  font-size: 0.935rem;
   color: #374151;
 }
 
 .product-modal__yield-loading {
   margin: 0 0 0.35rem;
-  font-size: 0.72rem;
+  font-size: 0.87rem;
   color: #6b7280;
   font-weight: 400;
 }
@@ -1923,10 +2152,10 @@ button.market-link-hrs {
 }
 
 .product-modal__yield-lbl {
-  font-size: 0.68rem;
-  font-weight: 500;
+  font-size: 0.83rem;
+  font-weight: 600;
   color: #6b7280;
-  line-height: 1.2;
+  line-height: 1.25;
   flex-shrink: 0;
 }
 
@@ -1936,13 +2165,13 @@ button.market-link-hrs {
   align-items: center;
   justify-content: flex-start;
   border-radius: 8px;
-  padding: 0.5rem 0.62rem;
-  font-size: 0.72rem;
-  font-weight: 500;
+  padding: 0.62rem 0.78rem;
+  font-size: 0.93rem;
+  font-weight: 600;
   color: #111827;
-  line-height: 1.35;
+  line-height: 1.4;
   background: #fff;
-  min-height: 2.85rem;
+  min-height: 3.28rem;
   border: 1px solid #d1d5db;
   box-sizing: border-box;
   word-break: break-word;
@@ -1962,10 +2191,10 @@ button.market-link-hrs {
 }
 
 .product-modal__yield-foot {
-  margin: 0.4rem 0 0;
-  font-size: 0.65rem;
+  margin: 0.45rem 0 0;
+  font-size: 0.81rem;
   color: #9ca3af;
-  line-height: 1.3;
+  line-height: 1.4;
 }
 
 /* Columna acciones */
@@ -1986,30 +2215,13 @@ button.market-link-hrs {
   display: flex;
   flex-direction: row;
   align-items: stretch;
-  gap: 0.5rem;
+  gap: 0.4rem;
   width: 100%;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.4rem;
 }
 
 .product-modal__quote-dual > .product-modal__btn {
   margin-bottom: 0;
-}
-
-.product-modal__btn--quote-cart--grow {
-  flex: 1 1 0;
-  min-width: 0;
-  margin-bottom: 0;
-}
-
-/* Misma anchura y altura en fila (evita «+ Solicitar Hashrate» más alto por wrap) */
-.product-modal__quote-dual:not(.product-modal__quote-dual--stack) > button.product-modal__btn--quote-cart.product-modal__btn--quote-cart--grow,
-.product-modal__quote-dual:not(.product-modal__quote-dual--stack) > .product-modal__btn--hashrate-toggle {
-  width: auto;
-  flex: 1 1 0;
-  min-width: 0;
-  align-self: stretch;
-  min-height: 2.85rem;
-  padding: 0.55rem 0.6rem;
 }
 
 .product-modal__quote-dual--stack {
@@ -2020,7 +2232,7 @@ button.market-link-hrs {
 .product-modal__quote-dual--stack > .product-modal__btn {
   width: 100%;
   max-width: none;
-  margin-bottom: 0.45rem;
+  margin-bottom: 0.4rem;
 }
 
 .product-modal__quote-dual--stack > .product-modal__btn:last-child {
@@ -2031,25 +2243,25 @@ button.market-link-hrs {
 .product-modal__hashrate-add-disclaimer {
   margin: 0.55rem 0 0;
   padding: 0;
-  font-size: 0.72rem;
-  line-height: 1.45;
+  font-size: 0.86rem;
+  line-height: 1.5;
   font-weight: 500;
   color: #64748b;
 }
 
 .product-modal__share-banner {
-  margin: 0 0 0.65rem;
-  padding: 0.65rem 0.75rem;
-  border-radius: 12px;
-  border: 1px solid #a5f3fc;
-  background: linear-gradient(180deg, #ecfeff 0%, #f0fdfa 100%);
+  margin: 0 0 0.55rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  border: 1px solid #e8eaed;
+  background: #f8fafc;
 }
 
 .product-modal__share-banner-lede {
-  margin: 0 0 0.5rem;
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #0f766e;
+  margin: 0 0 0.45rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #475569;
 }
 
 /* Texto aclaratorio / legal: hashrate del equipo vs. porción cotizada */
@@ -2064,7 +2276,7 @@ button.market-link-hrs {
 
 .product-modal__hashrate-legal-title {
   margin: 0 0 0.45rem;
-  font-size: 0.68rem;
+  font-size: 0.8rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -2074,7 +2286,7 @@ button.market-link-hrs {
 
 .product-modal__hashrate-legal-p {
   margin: 0 0 0.5rem;
-  font-size: 0.62rem;
+  font-size: 0.78rem;
   line-height: 1.55;
   color: #334155;
 }
@@ -2131,9 +2343,9 @@ button.market-link-hrs {
   flex: 1 1 0;
   min-width: 2.65rem;
   max-width: none;
-  min-height: 1.75rem;
-  padding: 0.18rem 0.26rem;
-  font-size: 0.64rem;
+  min-height: 1.95rem;
+  padding: 0.22rem 0.3rem;
+  font-size: 0.76rem;
   font-weight: 700;
   line-height: 1.1;
   display: flex;
@@ -2158,12 +2370,12 @@ button.market-link-hrs {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.75rem;
-  padding: 0.55rem 0.85rem;
-  border-radius: 12px;
+  min-height: 0;
+  padding: 0.58rem 0.78rem;
+  border-radius: 8px;
   font-weight: 600;
-  font-size: 0.76rem;
-  line-height: 1.2;
+  font-size: 0.86rem;
+  line-height: 1.25;
   text-align: center;
   border: 1px solid rgba(20, 184, 166, 0.42);
   background: linear-gradient(180deg, #ffffff 0%, #ecfdf5 55%, #e6fffa 100%);
@@ -2200,15 +2412,15 @@ button.market-link-hrs {
 
 .product-modal__hashrate-popover-title {
   margin: 0 0 0.35rem;
-  font-size: 0.78rem;
+  font-size: 0.9rem;
   font-weight: 700;
   color: #0f766e;
 }
 
 .product-modal__hashrate-popover-hint {
   margin: 0 0 0.55rem;
-  font-size: 0.65rem;
-  line-height: 1.35;
+  font-size: 0.78rem;
+  line-height: 1.4;
   color: #64748b;
 }
 
@@ -2222,8 +2434,8 @@ button.market-link-hrs {
 .product-modal__hashrate-popover-pill {
   flex: 1 1 30%;
   min-width: 4.25rem;
-  padding: 0.4rem 0.35rem;
-  font-size: 0.68rem;
+  padding: 0.44rem 0.4rem;
+  font-size: 0.8rem;
   font-weight: 700;
   border-radius: 8px;
   border: 1px solid #cbd5e1;
@@ -2247,7 +2459,7 @@ button.market-link-hrs {
 
 .product-modal__hashrate-popover-ref {
   margin: 0 0 0.55rem;
-  font-size: 0.68rem;
+  font-size: 0.8rem;
   color: #64748b;
   display: flex;
   flex-direction: column;
@@ -2255,16 +2467,16 @@ button.market-link-hrs {
 }
 
 .product-modal__hashrate-popover-ref strong {
-  font-size: 0.88rem;
+  font-size: 1rem;
   color: #dc2626;
 }
 
 .product-modal__btn--hashrate-confirm {
   width: 100%;
   margin-bottom: 0;
-  padding: 0.55rem 0.75rem;
-  font-size: 0.78rem;
-  border-radius: 10px;
+  padding: 0.58rem 0.78rem;
+  font-size: 0.86rem;
+  border-radius: 8px;
   border: none;
   font-weight: 700;
   cursor: pointer;
@@ -2283,41 +2495,53 @@ button.market-link-hrs {
   box-sizing: border-box;
 }
 
+/* Contacto (correo / WA) vs cotización (agregar / hashrate): dos grupos visuales */
+.product-modal__cta-group {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.product-modal__cta-group--contact > .product-modal__btn:last-of-type {
+  margin-bottom: 0;
+}
+
+.product-modal__cta-group--quote {
+  margin-top: 0.55rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid #e8eaed;
+}
+
 /* Fila + Agregar / Solicitar Hashrate: mismo ancho que correo, WA y tarjeta hosting */
-.product-modal__cta-block > .product-modal__quote-dual {
+.product-modal__cta-block .product-modal__quote-dual {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
 }
 
-/* Correo + WhatsApp + botón agregar (mismo ancho que la tarjeta Hashrate Space) */
-.product-modal__cta-block > a.product-modal__btn,
-.product-modal__cta-block > button.product-modal__btn {
+/* Botones del bloque CTAs: ancho completo (dentro de cada grupo) */
+.product-modal__cta-block .product-modal__cta-group a.product-modal__btn,
+.product-modal__cta-block .product-modal__cta-group button.product-modal__btn {
   width: 100%;
   max-width: none;
-  min-height: 2.75rem;
+  min-height: 0;
   box-sizing: border-box;
-}
-
-.product-modal__cta-heading {
-  margin: 0 0 0.65rem;
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: #111827;
 }
 
 .product-modal__btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   text-align: center;
-  padding: 0.65rem 1rem;
-  border-radius: 12px;
+  padding: 0.58rem 0.78rem;
+  border-radius: 8px;
   font-weight: 600;
   text-decoration: none;
-  font-size: 0.82rem;
-  margin-bottom: 0.5rem;
+  font-size: 0.86rem;
+  margin-bottom: 0.4rem;
   box-sizing: border-box;
 }
 
@@ -2334,26 +2558,28 @@ button.market-link-hrs {
 .product-modal__btn--solid {
   background: linear-gradient(180deg, #10b981 0%, #059669 100%);
   color: #fff !important;
+  font-weight: 700;
   /* 1px como --neutral para misma caja visual */
   border: 1px solid transparent;
+  box-shadow: 0 2px 0 #047857;
 }
 
 .product-modal__btn--solid:hover {
   filter: brightness(1.03);
 }
 
-/* Correo: estilo neutro (secundario) */
+/* Correo: misma línea que «Ver más» en tarjeta (blanco, borde gris, texto teal) */
 .product-modal__btn--neutral {
-  background: linear-gradient(180deg, #f9fafb 0%, #f1f5f9 100%);
-  color: #475569 !important;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+  background: #fff;
+  color: #0f766e !important;
+  border: 1px solid #cbd5e1;
+  box-shadow: none;
 }
 
 .product-modal__btn--neutral:hover {
-  background: #f1f5f9;
-  border-color: rgba(15, 23, 42, 0.14);
-  color: #334155 !important;
+  background: #f8fafc;
+  border-color: #0d9488;
+  color: #0d9488 !important;
 }
 
 .product-modal__btn--outline {
@@ -2380,26 +2606,32 @@ button.product-modal__btn--quote-cart {
   align-self: stretch;
   cursor: pointer;
   font-family: inherit;
-  background: linear-gradient(180deg, #ffffff 0%, #f0fdfa 100%);
-  color: #0f766e !important;
-  border: 1px solid rgba(45, 212, 191, 0.5);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  font-weight: 700;
+  border: none;
+  color: #fff !important;
+  background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 2px 0 #047857;
+  transition: filter 0.15s, transform 0.1s, box-shadow 0.1s;
 }
 
 button.product-modal__btn--quote-cart:hover {
-  background: linear-gradient(180deg, #f0fdfa 0%, #ccfbf1 100%);
-  border-color: rgba(20, 184, 166, 0.65);
-  box-shadow: 0 2px 6px rgba(20, 184, 166, 0.12);
+  filter: brightness(1.05);
+  border-color: transparent;
+}
+
+button.product-modal__btn--quote-cart:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 #047857;
 }
 
 .product-modal__host-card {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 0.9rem 1rem 0.85rem;
-  background: #f3f4f6;
+  border: 1px solid #e8eaed;
+  border-radius: 10px;
+  padding: 0.85rem 0.95rem 0.8rem;
+  background: #fff;
 }
 
 /* Volver: debajo de tarjeta hosting en vista porción hashrate */
@@ -2412,7 +2644,7 @@ button.product-modal__btn--quote-cart:hover {
 
 .product-modal__host-title {
   margin: 0 0 0.45rem;
-  font-size: 0.9rem;
+  font-size: 1.06rem;
   font-weight: 700;
   color: #111827;
   letter-spacing: -0.01em;
@@ -2423,7 +2655,7 @@ button.product-modal__btn--quote-cart:hover {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  font-size: 0.78rem;
+  font-size: 0.91rem;
   color: #6b7280;
   flex-wrap: wrap;
 }
@@ -2432,7 +2664,7 @@ button.product-modal__btn--quote-cart:hover {
   width: 15px;
   height: 15px;
   flex-shrink: 0;
-  color: #2563eb;
+  color: #0d9488;
 }
 
 .product-modal__host-loc-txt {
@@ -2464,7 +2696,7 @@ button.product-modal__btn--quote-cart:hover {
 
 .product-modal__host-table {
   width: 100%;
-  font-size: 0.78rem;
+  font-size: 0.91rem;
   border-collapse: collapse;
   color: #374151;
 }
@@ -2500,7 +2732,7 @@ button.product-modal__btn--quote-cart:hover {
   margin: 0 0 1rem;
   padding-left: 1.1rem;
   color: #4b5563;
-  font-size: 0.82rem;
+  font-size: 0.89rem;
   line-height: 1.45;
 }
 
@@ -4839,11 +5071,11 @@ button.product-modal__btn--quote-cart:hover {
 
 /* ——— Registro cliente: layout amplio + panel lateral (misma línea visual que login tienda) ——— */
 .marketplace-registro-page.marketplace-asic-page {
-  background: #ecfdf5;
+  background: #eef1f4;
 }
 
 .marketplace-registro-page .page-main.page-main--market {
-  background: linear-gradient(165deg, #f0fdf4 0%, #ecfdf5 22%, #f8fafc 55%, #ffffff 100%);
+  background: linear-gradient(165deg, #e8eaed 0%, #f1f5f9 28%, #f8fafc 55%, #ffffff 100%);
   flex: 1 1 auto;
   min-height: 0;
 }

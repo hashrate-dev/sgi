@@ -288,6 +288,7 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
   "shelf.seemore_aria": "Ver mais — {{model}} — {{hash}}",
   "shelf.techspecs": "Dados técnicos do modelo",
   "shelf.add_title": "Adicionar à lista de orçamento (conta cliente ou administrador A/B)",
+  "shelf.chips_aria": "Resumo técnico (primeiras linhas)",
 
   "modal.close_win": "Fechar janela",
   "modal.detail_aria": "Detalhe do produto e solicitação",
@@ -307,7 +308,6 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
   "modal.yield_usdt": "Bruto USDT",
   "modal.yield_foot_loading": "…",
   "modal.yield_foot_ref": "Valores referenciais (catálogo).",
-  "modal.cta_title": "Solicitar orçamento",
   "modal.email_btn": "Consultar por e-mail",
   "modal.wa_btn": "Consultar por WhatsApp",
   "modal.add_quote_aria": "Adicionar ao carrinho",

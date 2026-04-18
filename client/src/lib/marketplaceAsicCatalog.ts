@@ -314,6 +314,64 @@ export function mergeAsicCatalogWithCorpGridExtras(apiProducts: AsicProduct[]): 
   return [...apiProducts, ...extras];
 }
 
+type DetailRow = AsicProduct["detailRows"][number];
+
+function isShelfCoolingRow(r: DetailRow): boolean {
+  if (r.icon !== "sun" && r.icon !== "fan" && r.icon !== "droplet") return false;
+  const t = r.text.trim().toUpperCase();
+  if (!t) return true;
+  if (t.includes("HYDR")) return true;
+  if (t.includes("AIRE") || t.includes("AIR")) return true;
+  return false;
+}
+
+function isShelfCoinChipRow(r: DetailRow): boolean {
+  if (r.icon !== "chip") return false;
+  const t = r.text.trim().toUpperCase();
+  const hasBtcFamily =
+    (t.includes("BTC") || t.includes("BCH") || t.includes("BSV")) && (t.includes("SHA") || t.includes("BTC"));
+  const hasScryptFamily =
+    (t.includes("DOGE") && (t.includes("LTC") || t.includes("LITECOIN"))) ||
+    (t.includes("LTC") && t.includes("DOGE")) ||
+    (t.includes("SCRYPT") && !t.includes("SHA-256"));
+  const hasZcashFamily = t.includes("ZCASH") || t.includes("ZEC");
+  const eth = t.includes("RJ45") || (t.includes("ETHERNET") && (t.includes("10/100") || t.includes("100M")));
+  const cap = t.includes("CAPACIDAD") && (t.includes("UNIDAD") || t.includes("MAX"));
+  return hasBtcFamily || hasScryptFamily || hasZcashFamily || eth || cap;
+}
+
+function isShelfMiningRow(r: DetailRow): boolean {
+  if (r.icon === "btc") return true;
+  if (r.icon !== "dual") return false;
+  const t = r.text.trim().toUpperCase();
+  return (
+    t.includes("MINER") ||
+    t.includes("BITCOIN") ||
+    t.includes("ZCASH") ||
+    t.includes("ZEC") ||
+    t.includes("DUAL")
+  );
+}
+
+/**
+ * Chip strip del listado: potencia, monedas/algoritmo, aire/hydro, tipo de minería
+ * (Bitcoin / Dual / Zcash), alineado con `mp_detail_rows_json` / editor de vitrina.
+ */
+export function pickMarketplaceShelfSpecRows(rows: AsicProduct["detailRows"]): AsicProduct["detailRows"] {
+  if (!rows.length) return [];
+  const bolt = rows.find((r) => r.icon === "bolt");
+  const chip = rows.find((r) => isShelfCoinChipRow(r)) ?? rows.find((r) => r.icon === "chip");
+  const cooling = rows.find((r) => isShelfCoolingRow(r));
+  const mining = rows.find((r) => isShelfMiningRow(r));
+  const out: AsicProduct["detailRows"] = [];
+  if (bolt) out.push(bolt);
+  if (chip) out.push(chip);
+  if (cooling) out.push(cooling);
+  if (mining) out.push(mining);
+  if (out.length) return out;
+  return rows.slice(0, 4);
+}
+
 export type MarketplaceCatalogFilter = "sha256" | "scrypt" | "zcash" | "other";
 
 export const ASIC_FILTER_GROUPS: ReadonlyArray<{ id: MarketplaceCatalogFilter; label: string }> = [

@@ -49,7 +49,7 @@ function ShelfSkeletonGrid({ count = SKELETON_GRID_COUNT }: { count?: number }) 
       {Array.from({ length: count }, (_, i) => (
         <div key={i} className="shelf-product shelf-product--skeleton" aria-hidden>
           <div className="shelf-product__media">
-            <div className="shelf-product__media-gradient">
+            <div className="shelf-product__media-inner">
               <div className="shelf-product__skeleton-photo" />
             </div>
           </div>
@@ -110,7 +110,6 @@ function MarketplacePageBody() {
   const [catalogFromApi, setCatalogFromApi] = useState<boolean | null>(null);
   const [liveYieldsById, setLiveYieldsById] = useState<Record<string, MarketplaceAsicLiveYield>>({});
   const [yieldsLoading, setYieldsLoading] = useState(false);
-
   const handleAddToQuote = useCallback(
     (p: AsicProduct, opts?: AddQuoteLineOptions) => {
       if (loading) return;
@@ -164,6 +163,17 @@ function MarketplacePageBody() {
         "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&display=swap"
       );
       document.head.appendChild(linkGoogle);
+    }
+    let linkInter = document.querySelector('link[data-hrs-font="inter-catalog"]');
+    if (!linkInter) {
+      linkInter = document.createElement("link");
+      linkInter.setAttribute("rel", "stylesheet");
+      linkInter.setAttribute(
+        "href",
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      );
+      linkInter.setAttribute("data-hrs-font", "inter-catalog");
+      document.head.appendChild(linkInter);
     }
 
     return () => {
@@ -313,14 +323,14 @@ function MarketplacePageBody() {
                 ) : null}
               </header>
             </div>
-            <div className="market-shelf-wrap">
+            <div className="market-shelf-wrap market-shelf-wrap--catalog-v2">
               <MarketplaceCatalogFilters value={filterAlgo} onChange={setFilterAlgo} />
               {catalogFromApi === null ? (
                 <p className="text-muted small mb-3 market-catalog-sync-hint" aria-live="polite">
                   {t("catalog.syncing")}
                 </p>
               ) : null}
-              <div className="shelf-grid">
+              <div className="shelf-grid market-shelf-grid--catalog-v2">
                 {catalogFromApi === null ? (
                   <ShelfSkeletonGrid />
                 ) : (

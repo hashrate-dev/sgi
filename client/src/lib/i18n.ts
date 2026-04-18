@@ -305,6 +305,7 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "shelf.seemore_aria": "Ver más — {{model}} — {{hash}}",
     "shelf.techspecs": "Datos técnicos del modelo",
     "shelf.add_title": "Agregar a la lista para cotización (con tu cuenta)",
+    "shelf.chips_aria": "Resumen técnico (primeras líneas)",
 
     // Modal producto
     "modal.close_win": "Cerrar ventana",
@@ -325,7 +326,6 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "modal.yield_usdt": "Bruto USDT",
     "modal.yield_foot_loading": "…",
     "modal.yield_foot_ref": "Valores referenciales (catálogo).",
-    "modal.cta_title": "SOLICITA PRECIO",
     "modal.email_btn": "Consultar por Correo",
     "modal.wa_btn": "Consultar por Whatsapp",
     "modal.add_quote_aria": "Agregar al carrito",
@@ -1012,6 +1012,7 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "shelf.seemore_aria": "See more — {{model}} — {{hash}}",
     "shelf.techspecs": "Technical specs",
     "shelf.add_title": "Add to quote list (client or admin A/B account)",
+    "shelf.chips_aria": "Technical summary (first lines)",
 
     "modal.close_win": "Close window",
     "modal.detail_aria": "Product detail and request",
@@ -1031,7 +1032,6 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "modal.yield_usdt": "Gross USDT",
     "modal.yield_foot_loading": "…",
     "modal.yield_foot_ref": "Reference values (catalog).",
-    "modal.cta_title": "Request a quote",
     "modal.email_btn": "Email us",
     "modal.wa_btn": "WhatsApp",
     "modal.add_quote_aria": "Add to quote list",

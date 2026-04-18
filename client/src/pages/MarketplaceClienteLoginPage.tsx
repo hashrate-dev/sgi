@@ -159,7 +159,7 @@ export function MarketplaceClienteLoginPage() {
             <div className="market-login-page__backdrop">
               <div className="market-login-page__stack">
                 <div className="market-shelf-wrap market-login-page__shelf-real">
-                  <div className="shelf-grid market-login-page__shelf-grid" aria-hidden>
+                  <div className="shelf-grid market-shelf-grid--catalog-v2 market-login-page__shelf-grid" aria-hidden>
                     {shelfProducts.map((p, i) => (
                       <AsicShelfProduct
                         key={p.id}

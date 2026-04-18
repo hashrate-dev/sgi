@@ -161,8 +161,15 @@ export function AsicProductModal({
   const mainSrc = thumbs[Math.min(activeThumb, thumbs.length - 1)] ?? product.imageSrc;
 
   const chipRow = product.detailRows.find((r) => r.icon === "chip");
-  const algoBadge =
-    product.algo === "sha256" ? { label: "SHA-256", className: "product-modal__pill product-modal__pill--algo" } : { label: "Scrypt", className: "product-modal__pill product-modal__pill--algo" };
+  const isZecProductUi = useMemo(() => {
+    const blob = `${product.brand} ${product.model} ${product.hashrate} ${chipRow?.text ?? ""}`.toLowerCase();
+    return /\bz15\b|\bzcash\b|\bzec\b|equihash|k.sol|ksol/.test(blob);
+  }, [product.brand, product.model, product.hashrate, chipRow?.text]);
+  const algoBadge = isZecProductUi
+    ? { label: "Equihash", className: "product-modal__pill product-modal__pill--equihash" }
+    : product.algo === "sha256"
+      ? { label: "SHA-256", className: "product-modal__pill product-modal__pill--algo" }
+      : { label: "Scrypt", className: "product-modal__pill product-modal__pill--algo" };
   const coinsBadge = {
     label: chipRow ? chipRow.text.split("·")[0]?.trim() ?? chipRow.text : product.algo === "sha256" ? "BTC / BCH / BSV" : "DOGE + LTC",
     className: "product-modal__pill product-modal__pill--coins",
@@ -265,7 +272,7 @@ export function AsicProductModal({
             </p>
 
             <h2 id="product-modal-heading" className="product-modal__title product-modal__title--xl">
-              {product.brand} {product.model}
+              <span className="product-modal__title-brand">{product.brand}</span> {product.model}
             </h2>
 
             <div
@@ -377,79 +384,78 @@ export function AsicProductModal({
             ) : (
               <>
                 <div className="product-modal__cta-block">
-                  <h3 className="product-modal__cta-heading">{t("modal.cta_title")}</h3>
-                  <a className="product-modal__btn product-modal__btn--neutral" href={mailto}>
-                    <span className="product-modal__btn-icon" aria-hidden>
-                      <MailCtaIcon />
-                    </span>
-                    {t("modal.email_btn")}
-                  </a>
-                  <a className="product-modal__btn product-modal__btn--solid" href={waUrl} target="_blank" rel="noopener noreferrer">
-                    <span className="product-modal__btn-icon" aria-hidden>
-                      <WhatsAppCtaIcon />
-                    </span>
-                    {t("modal.wa_btn")}
-                  </a>
+                  <div className="product-modal__cta-group product-modal__cta-group--contact">
+                    <a className="product-modal__btn product-modal__btn--neutral" href={mailto}>
+                      <span className="product-modal__btn-icon" aria-hidden>
+                        <MailCtaIcon />
+                      </span>
+                      {t("modal.email_btn")}
+                    </a>
+                    <a className="product-modal__btn product-modal__btn--solid" href={waUrl} target="_blank" rel="noopener noreferrer">
+                      <span className="product-modal__btn-icon" aria-hidden>
+                        <WhatsAppCtaIcon />
+                      </span>
+                      {t("modal.wa_btn")}
+                    </a>
+                  </div>
                   {onAddToQuote ? (
-                    productSupportsHashrateShare(product) ? (
-                      <div
-                        className={
-                          "product-modal__quote-dual" + (hashrateShareView ? " product-modal__quote-dual--stack" : "")
-                        }
-                      >
-                        {!hashrateShareView ? (
-                          <>
+                    <div className="product-modal__cta-group product-modal__cta-group--quote">
+                      {productSupportsHashrateShare(product) ? (
+                        <div className="product-modal__quote-dual product-modal__quote-dual--stack">
+                          {!hashrateShareView ? (
+                            <>
+                              <button
+                                type="button"
+                                className="product-modal__btn product-modal__btn--quote-cart"
+                                onClick={() => onAddToQuote(product, undefined)}
+                                aria-label={t("modal.add_quote_aria")}
+                              >
+                                {quoteLabel}
+                              </button>
+                              <button
+                                type="button"
+                                className="product-modal__btn product-modal__btn--hashrate-toggle"
+                                aria-pressed={false}
+                                onClick={() => {
+                                  setHashrateShareView(true);
+                                  setShareViewPct(shareParts[0]?.sharePct ?? 75);
+                                }}
+                              >
+                                {t("modal.hashrate_share_btn")}
+                              </button>
+                            </>
+                          ) : (
                             <button
                               type="button"
-                              className="product-modal__btn product-modal__btn--quote-cart product-modal__btn--quote-cart--grow"
-                              onClick={() => onAddToQuote(product, undefined)}
-                              aria-label={t("modal.add_quote_aria")}
+                              className="product-modal__btn product-modal__btn--quote-cart"
+                              onClick={() => onAddToQuote(product, { hashrateSharePct: shareViewPct })}
+                              aria-label={t("modal.hashrate_share_add")}
+                              aria-describedby="product-modal-hashrate-add-disclaimer"
                             >
-                              {quoteLabel}
+                              {t("modal.hashrate_share_add_short")}
                             </button>
-                            <button
-                              type="button"
-                              className="product-modal__btn product-modal__btn--hashrate-toggle"
-                              aria-pressed={false}
-                              onClick={() => {
-                                setHashrateShareView(true);
-                                setShareViewPct(shareParts[0]?.sharePct ?? 75);
-                              }}
-                            >
-                              {t("modal.hashrate_share_btn")}
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            type="button"
-                            className="product-modal__btn product-modal__btn--quote-cart product-modal__btn--quote-cart--grow"
-                            onClick={() => onAddToQuote(product, { hashrateSharePct: shareViewPct })}
-                            aria-label={t("modal.hashrate_share_add")}
-                            aria-describedby="product-modal-hashrate-add-disclaimer"
-                          >
-                            {t("modal.hashrate_share_add_short")}
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        className="product-modal__btn product-modal__btn--quote-cart"
-                        onClick={() => onAddToQuote(product, undefined)}
-                        aria-label={t("modal.add_quote_aria")}
-                      >
-                        {quoteLabel}
-                      </button>
-                    )
-                  ) : null}
-                  {onAddToQuote && productSupportsHashrateShare(product) && hashrateShareView ? (
-                    <p
-                      id="product-modal-hashrate-add-disclaimer"
-                      className="product-modal__hashrate-add-disclaimer"
-                      role="note"
-                    >
-                      {t("modal.hashrate_share_add_disclaimer")}
-                    </p>
+                          )}
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className="product-modal__btn product-modal__btn--quote-cart"
+                          onClick={() => onAddToQuote(product, undefined)}
+                          aria-label={t("modal.add_quote_aria")}
+                        >
+                          {quoteLabel}
+                        </button>
+                      )}
+                      {productSupportsHashrateShare(product) && hashrateShareView ? (
+                        <p
+                          id="product-modal-hashrate-add-disclaimer"
+                          className="product-modal__hashrate-add-disclaimer"
+                          role="note"
+                        >
+                          {t("modal.hashrate_share_add_disclaimer")}
+                        </p>
+                      ) : null}
+                    </div>
                   ) : null}
                 </div>
 

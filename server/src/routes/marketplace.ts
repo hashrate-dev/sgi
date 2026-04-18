@@ -12,10 +12,12 @@ import {
 import { readCorpBestSellingEquipoIds, readCorpInterestingEquipoIds } from "../lib/marketplaceCorpBestSellingKv.js";
 import { EQUIPOS_ASIC_SELECT } from "./equipos.js";
 import {
+  detectZecEquihashYieldItem,
   estimateAllYields,
   fetchNetworkMiningSnapshot,
   type AsicYieldItem,
 } from "../lib/miningYieldEstimate.js";
+import { fetchZecWhatToMineYieldForItem } from "../lib/whattomineYield.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { resolveSetupCompraHashrateUsd, resolveSetupEquipoCompletoUsd } from "../lib/marketplaceSetupHashratePrice.js";
 import { loadGarantiaQuoteRows } from "../lib/marketplaceGarantiaQuote.js";
@@ -735,13 +737,21 @@ marketplaceRouter.post("/marketplace/asic-yields", async (req: Request, res: Res
       return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
     }
     const snap = await fetchNetworkMiningSnapshot();
+    const items = parsed.data.items as AsicYieldItem[];
+    const zecItems = items.filter(detectZecEquihashYieldItem);
+    const otherItems = items.filter((it) => !detectZecEquihashYieldItem(it));
     let yields: ReturnType<typeof estimateAllYields> = [];
     try {
-      yields = estimateAllYields(parsed.data.items as AsicYieldItem[], snap);
+      const zecYields = await Promise.all(zecItems.map((it) => fetchZecWhatToMineYieldForItem(it)));
+      yields = [
+        ...zecYields.filter((y): y is NonNullable<(typeof zecYields)[number]> => y != null),
+        ...estimateAllYields(otherItems, snap),
+      ];
     } catch (estErr) {
       console.error("[marketplace] asic-yields estimate:", estErr);
     }
-    res.json({ ok: true, yields, networkOk: snap != null });
+    const networkOk = snap != null || yields.length > 0;
+    res.json({ ok: true, yields, networkOk });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[marketplace] asic-yields:", e);

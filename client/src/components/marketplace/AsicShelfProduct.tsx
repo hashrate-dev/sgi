@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { AsicProduct } from "../../lib/marketplaceAsicCatalog.js";
 import {
   defaultAsicShelfImageSrc,
   formatAsicProductPriceDisplay,
   normalizeConsultPriceLabelForDisplay,
+  pickMarketplaceShelfSpecRows,
   publicImageUrl,
 } from "../../lib/marketplaceAsicCatalog.js";
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
@@ -49,6 +50,9 @@ export function AsicShelfProduct({
     : "";
   const eagerImg = productIndex < EAGER_IMAGE_ABOVE_INDEX;
 
+  /** Potencia, monedas/algo, aire/hydro, minería Bitcoin/Dual/Zcash (`mp_detail_rows_json`). */
+  const specChips = useMemo(() => pickMarketplaceShelfSpecRows(product.detailRows), [product.detailRows]);
+
   if (filteredHidden) {
     return <article className="shelf-product shelf-product--filtered-out" aria-hidden />;
   }
@@ -56,7 +60,7 @@ export function AsicShelfProduct({
   return (
     <article className="shelf-product" data-algo={product.algo} data-product-index={productIndex}>
       <div className="shelf-product__media">
-        <div className="shelf-product__media-gradient">
+        <div className="shelf-product__media-inner">
           <button type="button" className="shelf-product__imglink" aria-label={ariaLabel} onClick={() => onOpenModal(productIndex)}>
             {!hasPhoto || imgBroken ? (
               <div className="shelf-product__photo shelf-product__photo--fallback" aria-hidden />
@@ -83,30 +87,31 @@ export function AsicShelfProduct({
         </div>
       </div>
       <div className="shelf-product__body">
-        <div className="shelf-product__identity">
-          <p className="shelf-product__brand">{product.brand}</p>
-          <h3 className="shelf-product__title">{product.model}</h3>
-          <p className="shelf-product__hashrate">{product.hashrate}</p>
+        <div className="shelf-product__title-block">
+          <h3 className="shelf-product__title-line">
+            <span className="shelf-product__title-brand">{product.brand}</span> {product.model}
+          </h3>
+          <p className="shelf-product__subtitle">{product.hashrate}</p>
         </div>
-        <div className="shelf-product__price-box">
+        <div className="shelf-product__price-stack">
           <span
             className={
-              "shelf-product__price-value" + (consultLabel ? " shelf-product__price-value--consult" : "")
+              "shelf-product__price-current" + (consultLabel ? " shelf-product__price-current--consult" : "")
             }
           >
             {formatAsicProductPriceDisplay(product, lang)}
           </span>
         </div>
-        <div className="shelf-product__specs-box" role="group" aria-label={t("shelf.techspecs")}>
-          <ul className="shelf-detail-strip">
-            {product.detailRows.map((row, i) => (
-              <li key={i} className="shelf-detail-strip__row">
+        {specChips.length > 0 ? (
+          <ul className="shelf-product__chip-row" aria-label={t("shelf.chips_aria")}>
+            {specChips.map((row, i) => (
+              <li key={i} className="shelf-product__chip">
                 <AsicDetailSvg kind={row.icon} />
-                <span className="shelf-detail-strip__txt">{row.text}</span>
+                <span className="shelf-product__chip-txt">{row.text}</span>
               </li>
             ))}
           </ul>
-        </div>
+        ) : null}
         <div className="shelf-product__cta-row">
           <button type="button" className="shelf-product__cta" onClick={() => onOpenModal(productIndex)}>
             {t("shelf.seemore")}

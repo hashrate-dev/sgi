@@ -63,6 +63,34 @@ export function parseSha256Ths(hashrate: string): number | null {
 }
 
 /** Scrypt en Gh/s (WhatToMine merged usa Gh/s para LTC y DOGE) */
+/**
+ * Hashrate para WhatToMine ZEC (coin 166): parámetro `hr` en **kh/s** (coincide con la calculadora web).
+ * Ej.: "840 kSol/s", "840.000 kSol/s" (miles con punto y decimales en cero → 840).
+ */
+export function parseZcashKhForWtm(hashrate: string): number | null {
+  const t = hashrate.trim().replace(/\s+/g, " ");
+  const m = /([\d.,]+)\s*kSol\s*\/\s*s/i.exec(t);
+  if (!m?.[1]) return null;
+  const raw = m[1].trim();
+  const parts = raw.split(".");
+  if (parts.length === 2 && parts[1]!.length === 3 && /^\d+$/.test(parts[0]!) && /^\d{3}$/.test(parts[1]!)) {
+    const hi = parseInt(parts[0]!, 10);
+    const lo = parseInt(parts[1]!, 10);
+    if (hi > 0 && hi <= 5000 && lo === 0) return hi;
+  }
+  const n = parseEuNumber(raw);
+  return n != null && n > 0 && n < 1e6 ? n : null;
+}
+
+/** Minero ZEC/Equihash (p. ej. Antminer Z15): rendimiento vía WhatToMine, no vía snapshot LTC/BTC. */
+export function detectZecEquihashYieldItem(item: AsicYieldItem): boolean {
+  if (parseZcashKhForWtm(item.hashrate) != null) return true;
+  const blob = `${item.hashrate} ${(item.detailRows ?? []).map((r) => r.text).join(" ")}`.toLowerCase();
+  if (/\bz15\b/.test(blob) && /k\s*sol|ksol/.test(blob)) return true;
+  if ((/\bzcash\b/.test(blob) || /\bzec\b/.test(blob) || /equihash/.test(blob)) && /k\s*sol|ksol/.test(blob)) return true;
+  return false;
+}
+
 export function parseScryptGhs(hashrate: string): number | null {
   const t = hashrate.trim().replace(/\s+/g, " ");
   let m = /([\d.,]+)\s*GH\s*\/?\s*s/i.exec(t);
@@ -179,7 +207,7 @@ export function estimateYieldForItem(item: AsicYieldItem, snap: NetworkMiningSna
     const grossUsd = btcDay * snap.prices.btc;
     return {
       id: item.id,
-      line1: `~${fmtEsCompact(btcDay, 6)} BTC`,
+      line1: `≈ ${fmtEsCompact(btcDay, 6)} BTC`,
       line2: `≈ ${fmtEsCompact(grossUsd, 2)} USDT`,
       note: "Estimación orientativa · sujeta a red y precios.",
     };
@@ -195,7 +223,7 @@ export function estimateYieldForItem(item: AsicYieldItem, snap: NetworkMiningSna
 
   return {
     id: item.id,
-    line1: `~${fmtEsCompact(ltc, 5)} LTC + ~${dogeFmt} DOGE`,
+    line1: `≈ ${fmtEsCompact(ltc, 5)} LTC + ≈ ${dogeFmt} DOGE`,
     line2: `≈ ${fmtEsCompact(grossUsd, 2)} USDT`,
     note: "Estimación orientativa · sujeta a red y precios.",
   };
