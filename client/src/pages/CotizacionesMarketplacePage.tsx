@@ -21,6 +21,7 @@ import {
   type MarketplaceQuoteTicket,
 } from "../lib/api.js";
 import { canViewMarketplaceQuoteTickets } from "../lib/auth.js";
+import { playMarketplacePendienteLaneInSound } from "../lib/marketplaceCartSound.js";
 import {
   ticketRowLineSubtotalUsd,
   ticketRowIsEquipmentPricePending,
@@ -556,7 +557,7 @@ function MqtTicketCardButton({
       onClick={() => onOpen(t)}
     >
       <div className="hrs-mqt-ticket-card__top">
-        <div>
+        <div className="hrs-mqt-ticket-card__ids">
           <div className="hrs-mqt-ticket-card__ord">{t.orderNumber ?? `— (#${t.id})`}</div>
           <div className="hrs-mqt-ticket-card__tkt">{t.ticketCode}</div>
         </div>
@@ -624,6 +625,10 @@ export function CotizacionesMarketplacePage() {
   const [garantiaQuoteItems, setGarantiaQuoteItems] = useState<GarantiaQuotePriceItem[]>([]);
   const [deleteModalTicket, setDeleteModalTicket] = useState<MarketplaceQuoteTicket | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  /** IDs vistos en carril Pendiente: detectar altas y avisar con sonido (sin disparar en la primera carga tras montar / cambio de filtro). */
+  const knownPendienteIdsRef = useRef<Set<number>>(new Set());
+  const pendienteLaneSoundPrimedRef = useRef(false);
+  const loadRequestIdRef = useRef(0);
   /** Modal «más datos» (canal, IP, descarte) sobre el drawer de detalle. */
   const [metaExtraOpen, setMetaExtraOpen] = useState(false);
   /** Modal historial de líneas del carrito (altas/bajas/cambios). */
@@ -674,26 +679,72 @@ export function CotizacionesMarketplacePage() {
     return () => window.clearTimeout(t);
   }, [q]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setErr(null);
+  useEffect(() => {
+    knownPendienteIdsRef.current = new Set();
+    pendienteLaneSoundPrimedRef.current = false;
+  }, [laneFilter, qDebounced]);
+
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
+    const rid = ++loadRequestIdRef.current;
+    if (!silent) {
+      setLoading(true);
+      setErr(null);
+    }
     try {
-      const [st, list] = await Promise.all([
+      const listParams = {
+        ...(laneFilter === "all" ? {} : { lane: laneFilter }),
+        q: qDebounced || undefined,
+        limit: 100,
+        offset: 0,
+      };
+      const needPendienteSidecar = laneFilter !== "all" && laneFilter !== "pendiente";
+      const pendienteSidecarPromise = needPendienteSidecar
+        ? getMarketplaceQuoteTickets({
+            lane: "pendiente",
+            q: qDebounced || undefined,
+            limit: 100,
+            offset: 0,
+          })
+        : Promise.resolve(null);
+
+      const [st, list, pendSnapshot] = await Promise.all([
         getMarketplaceQuoteTicketsStats(),
-        getMarketplaceQuoteTickets({
-          ...(laneFilter === "all" ? {} : { lane: laneFilter }),
-          q: qDebounced || undefined,
-          limit: 100,
-          offset: 0,
-        }),
+        getMarketplaceQuoteTickets(listParams),
+        pendienteSidecarPromise,
       ]);
+
+      if (rid !== loadRequestIdRef.current) return;
+
       setStats(st);
       setTickets(list.tickets);
       setTotal(list.total);
+
+      const pendienteIds: number[] =
+        laneFilter === "all"
+          ? list.tickets.filter((x) => isMarketplaceTicketPendienteLaneStatus(x.status)).map((t) => t.id)
+          : laneFilter === "pendiente"
+            ? list.tickets.map((t) => t.id)
+            : (pendSnapshot?.tickets ?? []).map((t) => t.id);
+
+      const prevKnown = knownPendienteIdsRef.current;
+      let anyNewInPendienteLane = false;
+      for (const id of pendienteIds) {
+        if (!prevKnown.has(id)) {
+          anyNewInPendienteLane = true;
+          break;
+        }
+      }
+      if (pendienteLaneSoundPrimedRef.current && anyNewInPendienteLane) {
+        playMarketplacePendienteLaneInSound();
+      }
+      knownPendienteIdsRef.current = new Set(pendienteIds);
+      pendienteLaneSoundPrimedRef.current = true;
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      if (rid !== loadRequestIdRef.current) return;
+      if (!silent) setErr(e instanceof Error ? e.message : String(e));
     } finally {
-      setLoading(false);
+      if (rid === loadRequestIdRef.current && !silent) setLoading(false);
     }
   }, [laneFilter, qDebounced]);
 
@@ -707,6 +758,16 @@ export function CotizacionesMarketplacePage() {
     };
     window.addEventListener(MARKETPLACE_ACTIVE_ORDER_CHANGED_EVENT, fn);
     return () => window.removeEventListener(MARKETPLACE_ACTIVE_ORDER_CHANGED_EVENT, fn);
+  }, [load]);
+
+  /** Refresco en segundo plano: detecta órdenes nuevas en Pendiente aunque no haya evento del carrito. */
+  useEffect(() => {
+    const tick = () => {
+      if (document.visibilityState !== "visible") return;
+      void load({ silent: true });
+    };
+    const id = window.setInterval(tick, 28000);
+    return () => window.clearInterval(id);
   }, [load]);
 
   useEffect(() => {

@@ -123,3 +123,22 @@ export function playMarketplaceOrderNotificationSound(): void {
     /* ignore */
   }
 }
+
+/** Arpegio mayor breve (Do–Mi–Sol ascendente): nueva orden en carril Pendiente (staff). */
+export function playMarketplacePendienteLaneInSound(): void {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  const t0 = ctx.currentTime;
+  const out = ctx.createGain();
+  out.gain.value = 0.26;
+  out.connect(ctx.destination);
+
+  try {
+    blip(ctx, out, t0, 523.25, 0.095, 0.21); /* C5 */
+    blip(ctx, out, t0 + 0.075, 659.25, 0.095, 0.19); /* E5 */
+    blip(ctx, out, t0 + 0.15, 783.99, 0.11, 0.2); /* G5 */
+  } catch {
+    /* ignore */
+  }
+}

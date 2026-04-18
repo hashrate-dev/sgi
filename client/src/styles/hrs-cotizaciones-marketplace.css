@@ -769,22 +769,23 @@ button.hrs-mqt-ticket-card:hover {
 
 .hrs-mqt-ticket-card__top {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 0.45rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.38rem;
   margin-bottom: 0.32rem;
 }
 
-.hrs-mqt-ticket-card__top > div:first-of-type {
-  flex: 1 1 auto;
+.hrs-mqt-ticket-card__ids {
   min-width: 0;
 }
 
 .hrs-mqt-ticket-card__badges {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.18rem;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.22rem 0.35rem;
 }
 
 .hrs-mqt-ticket-card__ord {
@@ -793,9 +794,6 @@ button.hrs-mqt-ticket-card:hover {
   color: #0f172a;
   line-height: 1.2;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
 }
 
 .hrs-mqt-ticket-card__tkt {
@@ -847,6 +845,10 @@ button.hrs-mqt-ticket-card:hover {
   background: #ecfdf5;
   color: #14532d;
   border: 1px solid #86efac;
+  white-space: nowrap;
+  font-size: 0.56rem;
+  padding: 0.18rem 0.36rem;
+  line-height: 1.2;
 }
 .hrs-mqt-badge--enviado_consulta,
 .hrs-mqt-ticket-card__badges [data-mqt-status="enviado_consulta"] {
@@ -1285,8 +1287,7 @@ button.hrs-mqt-ticket-card.hrs-mqt-ticket-card--eliminada {
 }
 .hrs-mqt-lane--cerrados .hrs-mqt-ticket-card__top {
   margin-bottom: 0.22rem;
-  gap: 0.3rem;
-  align-items: center;
+  gap: 0.28rem;
 }
 .hrs-mqt-lane--cerrados .hrs-mqt-ticket-card__ord {
   font-size: 0.84rem;
