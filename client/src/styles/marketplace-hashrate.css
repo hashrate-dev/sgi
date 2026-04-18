@@ -6415,6 +6415,11 @@ button.product-modal__btn--quote-cart:active {
   }
 }
 
+/* Home corp.: tarjetas ASIC con misma grilla que `/marketplace` (`.market-shelf-grid--catalog-v2`) */
+.market-corp-home-shelf-grid {
+  margin-bottom: 2rem;
+}
+
 .market-corp-product-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -6574,7 +6579,7 @@ button.product-modal__btn--quote-cart:active {
   letter-spacing: 0.02em;
 }
 
-/* Misma grilla que “Equipos más vendidos” (.market-corp-mp-shortcuts): 2 col móvil, 4 col ≥768px */
+/* Grilla “Otros productos”: sin margen extra (el slot ya lleva padding inferior) */
 .market-corp-interesting-slot .market-corp-interesting-slot__shortcuts {
   margin-bottom: 0;
 }
