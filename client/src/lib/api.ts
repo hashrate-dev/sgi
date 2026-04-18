@@ -1151,6 +1151,28 @@ export type MarketplaceQuoteTicketItem = {
   includeWarranty?: boolean;
 };
 
+export type MarketplaceQuoteCartHistoryChange = {
+  action: "added" | "removed" | "updated";
+  productId: string;
+  productLabel: string;
+  qty?: number;
+  previousQty?: number;
+  includeSetup?: boolean;
+  previousIncludeSetup?: boolean;
+  includeWarranty?: boolean;
+  previousIncludeWarranty?: boolean;
+  hashrateSharePct?: number | null;
+  previousHashrateSharePct?: number | null;
+  priceUsd?: number;
+  priceLabel?: string;
+};
+
+export type MarketplaceQuoteCartHistoryEntry = {
+  at: string;
+  source: "sync";
+  changes: MarketplaceQuoteCartHistoryChange[];
+};
+
 export type MarketplaceQuoteTicket = {
   id: number;
   sessionId: string;
@@ -1174,6 +1196,8 @@ export type MarketplaceQuoteTicket = {
   /** Si existe: la orden volvió a activa tras haber estado eliminada (reactivación desde carrito). */
   reactivatedAt?: string | null;
   items: MarketplaceQuoteTicketItem[];
+  /** Registro de altas/bajas/cambios en el carrito (solo en GET detalle). */
+  itemsCartHistory?: MarketplaceQuoteCartHistoryEntry[];
 };
 
 /** Tickets enviados del usuario actual (marketplace). */
@@ -1262,11 +1286,14 @@ export function getMarketplacePresenceLive(): Promise<{
 
 export function getMarketplaceQuoteTickets(params?: {
   status?: string;
+  /** Filtro por carril del tablero admin (prioridad sobre `status` en el servidor). */
+  lane?: "pendiente" | "compra_confirmada" | "eliminadas";
   q?: string;
   limit?: number;
   offset?: number;
 }): Promise<{ tickets: MarketplaceQuoteTicket[]; total: number; limit: number; offset: number }> {
   const qs = new URLSearchParams();
+  if (params?.lane) qs.set("lane", params.lane);
   if (params?.status) qs.set("status", params.status);
   if (params?.q) qs.set("q", params.q);
   if (params?.limit != null) qs.set("limit", String(params.limit));

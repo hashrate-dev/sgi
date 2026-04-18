@@ -349,6 +349,10 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
   "drawer.sub_one": "1 equipamento na sua lista",
   "drawer.sub_many": "{{n}} equipamentos na sua lista",
   "drawer.lede": "Preencha o carrinho com os equipamentos que desejar:",
+  "drawer.lede_guest_has_items":
+    "Sua lista neste navegador: você pode adicionar equipamentos e ver totais referenciais sem iniciar sessão.",
+  "drawer.hint_guest_has_items.p1": "Para salvar o orçamento na sua conta, gerar o pedido e o acompanhamento com vendas,",
+  "drawer.hint_guest_has_items.p2": " ou ",
   "drawer.hint.p1": "Para adicionar equipamentos e salvar seu orçamento no sistema,",
   "drawer.login_link": "faça login",
   "drawer.hint.p2": " com a sua conta; se não tiver uma conta, ",
@@ -411,10 +415,13 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
   "drawer.ref_label": "Sua referência",
   "drawer.next": "Próximo passo",
   "drawer.next_logged":
-    "Gere o ticket para registrar a consulta no sistema. Você também pode nos escrever por e-mail ou WhatsApp.",
+    "Ao adicionar itens, o pedido fica Pendente. Toque em «Gerar pedido» para avisar as vendas e passar a Pedido pronto; depois o botão principal é «Ver pedido».",
   "drawer.next_guest":
     "Faça login (cliente ou administrador A/B) para gerar o ticket e ver o status em «Pedidos pendentes».",
-  "drawer.gen_ticket": "Ver pedido",
+  "drawer.next_guest_with_items":
+    "A lista fica guardada neste dispositivo. Faça login para sincronizar com a sua conta, gerar o pedido e ver o acompanhamento.",
+  "drawer.gen_ticket": "Gerar pedido",
+  "drawer.view_order": "Ver pedido",
   "drawer.gen_ticket_update": "Atualizar pedido",
   "drawer.gen_busy": "Gerando ticket…",
   "drawer.gen_busy_update": "Salvando…",
@@ -475,7 +482,7 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
     "Aqui só aparece seu pedido ativo (um por vez). Consultas canceladas ou fechadas não aparecem no carrinho; a equipe as vê na gestão de orçamentos.",
   "orders.empty_title": "Você ainda não tem consultas registradas.",
   "orders.empty_p1": "Monte sua lista no catálogo e toque em",
-  "orders.empty_strong": "Gerar pedido de compra",
+  "orders.empty_strong": "Gerar pedido",
   "orders.empty_p2": "no carrinho.",
   "orders.card_items": "{{lines}} itens · {{units}} u.",
   "orders.updated": "Atualizado {{when}}",
@@ -526,7 +533,9 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
   "orders.contact_status_email":
     "Nossa equipe de vendas entrará em contato por WhatsApp, chamada telefônica ou e-mail ({{email}}).",
   "orders.status.borrador": "Carrinho aberto",
-  "orders.status.enviado_consulta": "Pendente",
+  "orders.status.pendiente": "Pendente",
+  "orders.status.orden_lista": "Pedido pronto",
+  "orders.status.enviado_consulta": "Aberta",
   "orders.status.en_contacto_equipo": "Contato pela equipe",
   "orders.status.en_gestion": "Em gestão",
   "orders.status.pagada": "Paga",

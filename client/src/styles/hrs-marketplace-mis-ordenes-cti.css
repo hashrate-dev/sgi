@@ -577,6 +577,27 @@
   color: #0f172a;
 }
 
+.moo-order-detail-pro__item-name.mq-equipment-title--stacked {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.mq-equipment-title__model {
+  display: block;
+}
+
+.mq-equipment-title__spec {
+  display: block;
+  font-size: 0.88em;
+  font-weight: 600;
+  color: #475569;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
 .moo-order-detail-pro__item-qty {
   color: #64748b;
   font-weight: 700;

@@ -7,8 +7,10 @@ const DEFAULT_GRAPH_VERSION = "v21.0";
 
 let warnedMissingEnv = false;
 
-function clip(s: string, max: number): string {
-  const t = s.trim();
+function clip(s: unknown, max: number): string {
+  const t = String(s ?? "")
+    .trim()
+    .replace(/\u0000/g, "");
   if (t.length <= max) return t;
   return `${t.slice(0, max - 1)}…`;
 }
@@ -51,12 +53,13 @@ export async function notifyMarketplaceOrderWhatsApp(p: MarketplaceOrderWhatsApp
     return;
   }
 
-  const subtotalStr = `${p.subtotalUsd.toLocaleString("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
+  const subtotalNum = Number.isFinite(Number(p.subtotalUsd)) ? Number(p.subtotalUsd) : 0;
+  const subtotalStr = `${subtotalNum.toLocaleString("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
 
   const parameters = [
     clip(p.orderNumber, 64),
     clip(p.ticketCode, 32),
-    clip(p.contactEmail || "—", 128),
+    clip(p.contactEmail ?? "—", 128),
     clip(subtotalStr, 64),
   ].map((text) => ({ type: "text" as const, text }));
 

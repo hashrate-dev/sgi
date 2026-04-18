@@ -7,7 +7,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { db, getDb } from "../db.js";
 import { notifyMarketplaceOrderWhatsApp } from "../lib/whatsappCloud.js";
-import { notifyMarketplaceOrderEmail } from "../lib/marketplaceOrderEmail.js";
+import { notifyMarketplaceOrderEmail, notifyMarketplaceOrderGeneradaEmail } from "../lib/marketplaceOrderEmail.js";
 import { resolveSetupCompraHashrateUsd, resolveSetupEquipoCompletoUsd } from "../lib/marketplaceSetupHashratePrice.js";
 import {
   loadGarantiaQuoteRows,
@@ -22,6 +22,13 @@ import {
   marketplacePipelineBlockingInSql,
   normalizeTicketStatusDb,
 } from "../lib/marketplaceQuoteTicketStatuses.js";
+import {
+  appendMarketplaceTicketCartHistory,
+  buildCartHistoryEntryFromDiff,
+  parseItemsCartHistoryFromRow,
+  type QuoteLineHistorySnap,
+} from "../lib/marketplaceQuoteCartHistory.js";
+import { markClientsVentaMarketplaceAfterInstalado } from "../lib/marketplaceVentaCliente.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 
 export const marketplaceQuoteTicketsRouter = Router();
@@ -71,7 +78,7 @@ const CLIENT_EMAIL_SUBQUERY =
   "(SELECT NULLIF(TRIM(c.email), '') FROM clients c WHERE c.user_id = t.user_id ORDER BY c.id DESC LIMIT 1)";
 
 const TICKET_SELECT =
-  "t.id, t.session_id, t.order_number, t.ticket_code, t.status, t.items_json, t.subtotal_usd, t.line_count, t.unit_count, t.created_at, t.updated_at, t.last_contact_channel, t.contacted_at, t.notes_admin, t.ip_address, t.user_agent, t.user_id, t.contact_email, t.discard_by_email, t.reactivated_at, " +
+  "t.id, t.session_id, t.order_number, t.ticket_code, t.status, t.items_json, t.items_history_json, t.subtotal_usd, t.line_count, t.unit_count, t.created_at, t.updated_at, t.last_contact_channel, t.contacted_at, t.notes_admin, t.ip_address, t.user_agent, t.user_id, t.contact_email, t.discard_by_email, t.reactivated_at, " +
   "COALESCE(NULLIF(TRIM(u.email), ''), NULLIF(TRIM(u.username), '')) AS user_join_email, " +
   `${CLIENT_EMAIL_SUBQUERY} AS client_join_email`;
 const TICKET_FROM = "marketplace_quote_tickets t LEFT JOIN users u ON u.id = t.user_id";
@@ -265,7 +272,7 @@ function computeTotals(
   setupCompraHashrateUsd: number,
   garantiaItems: GarantiaQuoteRow[]
 ) {
-  const subtotal = lines.reduce((a, l) => {
+  const subtotalRaw = lines.reduce((a, l) => {
     const pendingEquipmentPrice = lineEquipmentPricePending(l);
     let row = l.qty * l.priceUsd;
     /**
@@ -282,6 +289,7 @@ function computeTotals(
     }
     return a + row;
   }, 0);
+  const subtotal = Number.isFinite(subtotalRaw) ? Math.round(subtotalRaw) : 0;
   const unitCount = lines.reduce((a, l) => a + l.qty, 0);
   return { subtotal, lineCount: lines.length, unitCount };
 }
@@ -327,6 +335,20 @@ function canonicalItemsJsonForCompare(json: string): string {
     return JSON.stringify(JSON.parse(json));
   } catch {
     return json.trim();
+  }
+}
+
+async function tryAppendQuoteCartHistory(
+  ticketId: number,
+  prevItemsJson: string,
+  nextLines: TrustedQuoteLine[],
+  nowIso: string
+): Promise<void> {
+  try {
+    const entry = buildCartHistoryEntryFromDiff(prevItemsJson, nextLines as QuoteLineHistorySnap[], nowIso);
+    if (entry) await appendMarketplaceTicketCartHistory(ticketId, entry);
+  } catch (e) {
+    logQuoteRouteError("quote-sync.cart-history", e);
   }
 }
 
@@ -388,8 +410,34 @@ function oneActiveOrder409Payload(blocking: { order_number: string | null; ticke
 function resolveStatusAfterContact(currentStatus: string, hasContactEvent: boolean): string {
   if (!hasContactEvent) return currentStatus;
   const n = normalizeTicketStatusDb(currentStatus);
-  if (n === "borrador") return "enviado_consulta";
+  /** Contacto (mail/WA) no dispara aviso a ventas: solo deja la orden persistida en pendiente. */
+  if (n === "borrador") return "pendiente";
   return currentStatus;
+}
+
+/**
+ * Resend «Nueva orden»: `pendiente` / `borrador` / reactivación desde `descartado` → `orden_lista`.
+ * Desde `enviado_consulta` (ABIERTA) se usa `shouldNotifyResendOrderGenerada` + `notifyMarketplaceOrderGeneradaEmail`.
+ */
+function shouldNotifyResendNuevaOrdenLista(prevNorm: string, nextNorm: string, isSubmit: boolean): boolean {
+  if (!isSubmit || nextNorm !== "orden_lista") return false;
+  return prevNorm === "pendiente" || prevNorm === "borrador" || prevNorm === "descartado";
+}
+
+/** Resend «ORDEN GENERADA»: solo `enviado_consulta` → `orden_lista` (botón Generar orden en carrito). */
+function shouldNotifyResendOrderGenerada(prevNorm: string, nextNorm: string, isSubmit: boolean): boolean {
+  if (!isSubmit || nextNorm !== "orden_lista") return false;
+  return prevNorm === "enviado_consulta";
+}
+
+function shouldNotifySalesWhatsappOrderLista(prevNorm: string, nextNorm: string, isSubmit: boolean): boolean {
+  if (!isSubmit || nextNorm !== "orden_lista") return false;
+  return (
+    prevNorm === "pendiente" ||
+    prevNorm === "borrador" ||
+    prevNorm === "descartado" ||
+    prevNorm === "enviado_consulta"
+  );
 }
 
 /** POST autenticado (cliente o admin A/B): guardar carrito / marcar consulta por mail o WhatsApp */
@@ -414,13 +462,11 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
     const nowIso = new Date().toISOString();
 
     if (lines.length === 0) {
-      const ex = (await db
-        .prepare("SELECT id, status FROM marketplace_quote_tickets WHERE session_id = ?")
-        .get(sessionId)) as { id: number; status: string } | undefined;
-      if (ex && ex.status === "borrador") {
-        await db.prepare("DELETE FROM marketplace_quote_tickets WHERE id = ?").run(ex.id);
-      }
-      /** Solo con intención explícita (vaciar carrito con orden en curso). Nunca con el POST vacío post-submit. */
+      /**
+       * «Vaciar carrito» (`clearPipelineCart`): marcar la orden en embudo como `descartado` (riel **Cerrados** en admin).
+       * Debe ejecutarse **antes** del borrado por `session_id`: si la fila era `pendiente`/`orden_lista` en `u:{id}`,
+       * el `DELETE` previo eliminaba el ticket y nunca quedaba en cerrados.
+       */
       if (singleMarketplaceOrderPolicy && clearPipelineCart === true) {
         const blocking = (await db
           .prepare(
@@ -433,7 +479,7 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
           | { id: number; order_number: string | null; ticket_code: string; status: string }
           | undefined;
         if (blocking) {
-          /** Sin ítems en cliente: marcar descartado pero conservar ítems/totales en BD (auditoría: qué iba a comprar). */
+          /** Conservar ítems/totales en BD (auditoría). */
           const clearedStatus = "descartado";
           const discardActorEmail = String(req.user!.email ?? "").trim() || null;
           await db
@@ -462,6 +508,12 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
             unitCount: 0,
           });
         }
+      }
+      const ex = (await db
+        .prepare("SELECT id, status FROM marketplace_quote_tickets WHERE session_id = ?")
+        .get(sessionId)) as { id: number; status: string } | undefined;
+      if (ex && (ex.status === "borrador" || ex.status === "pendiente" || ex.status === "orden_lista")) {
+        await db.prepare("DELETE FROM marketplace_quote_tickets WHERE id = ?").run(ex.id);
       }
       return res.json({ ok: true, cleared: true });
     }
@@ -502,9 +554,9 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
       }
       if (blocking) {
         const orphanDraft = (await db
-          .prepare("SELECT id FROM marketplace_quote_tickets WHERE session_id = ? AND status = 'borrador'")
+          .prepare("SELECT id FROM marketplace_quote_tickets WHERE session_id = ? AND status IN ('borrador','pendiente','orden_lista')")
           .get(sessionId)) as { id: number } | undefined;
-        if (orphanDraft) {
+        if (orphanDraft && orphanDraft.id !== blocking.id) {
           await db.prepare("DELETE FROM marketplace_quote_tickets WHERE id = ?").run(orphanDraft.id);
         }
 
@@ -516,13 +568,16 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
           garantiaItems
         );
         const itemsJsonMerged = JSON.stringify(mergedLines);
-        const prevItemsSnapshot = rowItemsJsonAsString(blocking.items_json);
         const isSubmitTicketMerge = event === "submit_ticket";
         const contactChannelMerge =
           isSubmitTicketMerge ? "portal" : event === "contact_email" ? "email" : event === "contact_whatsapp" ? "whatsapp" : undefined;
         const keepStatus = String(blocking.status ?? "").trim();
         const stNorm = normalizeTicketStatusDb(keepStatus);
         const terminalMerge = isTerminalMarketplaceTicketStatus(stNorm);
+        let rowStatusOut = keepStatus;
+        if (isSubmitTicketMerge && (stNorm === "pendiente" || stNorm === "borrador" || stNorm === "enviado_consulta")) {
+          rowStatusOut = "orden_lista";
+        }
 
         if (contactChannelMerge) {
           await db
@@ -541,7 +596,7 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
               mergedLc,
               mergedUc,
               nowIso,
-              keepStatus,
+              rowStatusOut,
               ip,
               ua,
               userId,
@@ -563,37 +618,44 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
             .run(itemsJsonMerged, mergedSub, mergedLc, mergedUc, nowIso, ip, ua, userId, contactEmail, blocking.id);
         }
 
+        await tryAppendQuoteCartHistory(blocking.id, rowItemsJsonAsString(blocking.items_json), mergedLines, nowIso);
+
         let orderNumber = blocking.order_number ?? `ORD-${String(blocking.id).padStart(7, "0")}`;
         if (!blocking.order_number) {
           await db.prepare("UPDATE marketplace_quote_tickets SET order_number = ? WHERE id = ?").run(orderNumber, blocking.id);
         }
 
-        /**
-         * Aviso a ventas en fusión con orden en pipeline:
-         * - submit_ticket (confirmación explícita), o
-         * - sync automático cuando el JSON de ítems cambió respecto a BD (agregar/quitar/editar sin botón «Actualizar»).
-         */
-        const mergeItemsChanged =
-          itemsJsonMerged.trim() !== prevItemsSnapshot.trim() ||
-          canonicalItemsJsonForCompare(itemsJsonMerged) !== canonicalItemsJsonForCompare(prevItemsSnapshot);
-        const syncLikeEvent = event == null || event === "sync";
-        const notifyMergeOrder =
-          !terminalMerge && mergeItemsChanged && (isSubmitTicketMerge || syncLikeEvent);
-        if (notifyMergeOrder) {
-          // eslint-disable-next-line no-console
-          console.log(`[email] quote-sync merge → aviso ticket=${blocking.id} order=${orderNumber}`);
+        const mergePrevNorm = stNorm;
+        const mergeNextNorm = normalizeTicketStatusDb(rowStatusOut);
+        if (shouldNotifyResendNuevaOrdenLista(mergePrevNorm, mergeNextNorm, isSubmitTicketMerge)) {
           void notifyMarketplaceOrderEmail({
             orderNumber,
             ticketCode: blocking.ticket_code,
             contactEmail: contactEmail ?? "",
             subtotalUsd: mergedSub,
-          }).catch((e) => console.error("[email] marketplace order notify (merge):", e));
+          }).catch((e) => console.error("[email] marketplace order notify (merge submit):", e));
+        }
+        if (shouldNotifyResendOrderGenerada(mergePrevNorm, mergeNextNorm, isSubmitTicketMerge)) {
+          void notifyMarketplaceOrderGeneradaEmail({
+            orderNumber,
+            ticketCode: blocking.ticket_code,
+            contactEmail: contactEmail ?? "",
+            subtotalUsd: mergedSub,
+          }).catch((e) => console.error("[email] marketplace ORDEN GENERADA (merge submit):", e));
+        }
+        if (shouldNotifySalesWhatsappOrderLista(mergePrevNorm, mergeNextNorm, isSubmitTicketMerge)) {
           void notifyMarketplaceOrderWhatsApp({
             orderNumber,
             ticketCode: blocking.ticket_code,
             contactEmail: contactEmail ?? "",
             subtotalUsd: mergedSub,
-          }).catch((e) => console.error("[whatsapp] marketplace order notify (merge):", e));
+          }).catch((e) => console.error("[whatsapp] marketplace order notify (merge submit):", e));
+        }
+
+        if (isSubmitTicketMerge && mergeNextNorm === "orden_lista") {
+          await db
+            .prepare("UPDATE marketplace_quote_tickets SET session_id = ? WHERE id = ?")
+            .run(submittedSessionId(userId, blocking.id), blocking.id);
         }
 
         return res.json({
@@ -601,7 +663,7 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
           id: blocking.id,
           orderNumber,
           ticketCode: blocking.ticket_code,
-          status: keepStatus,
+          status: rowStatusOut,
           merged: true,
           lines: mergedLines,
           subtotalUsd: mergedSub,
@@ -643,13 +705,17 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
     const existingSelect =
       "SELECT id, order_number, ticket_code, status, updated_at, items_json, subtotal_usd, line_count, unit_count FROM marketplace_quote_tickets";
 
-    let existing = (await db.prepare(`${existingSelect} WHERE session_id = ?`).get(sessionId)) as ExistingRow | undefined;
+    /** Órdenes `instalado` / `cerrado` no se reutilizan: nueva compra → INSERT con otro `id` y otro `ORD-…`. */
+    let existing = (await db
+      .prepare(`${existingSelect} WHERE session_id = ? AND status NOT IN ('instalado', 'cerrado')`)
+      .get(sessionId)) as ExistingRow | undefined;
     /** Tras «Generar orden» el `session_id` pasa a `u:{id}:submitted:{ticketId}`; el cliente sigue usando `u:{id}` para el sync. */
     if (!existing && singleMarketplaceOrderPolicy) {
       existing = (await db
         .prepare(
           `${existingSelect} WHERE status IN (${MQT_PIPELINE_STATUS_IN_SQL})
            AND (session_id = ? OR session_id LIKE ?)
+           AND status NOT IN ('instalado', 'cerrado')
            ORDER BY updated_at DESC LIMIT 1`
         )
         .get(sessionId, `${sessionId}:%`)) as ExistingRow | undefined;
@@ -665,16 +731,32 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
         Number.isFinite(cancelledAtMs) &&
         Date.now() - cancelledAtMs <= REACTIVATE_CANCELLED_WINDOW_MS;
       const terminal = exSt === "cerrado" || exSt === "instalado" || (isCancelled && !canReactivateCancelled);
-      const nextStatus = terminal
+      let nextStatus = terminal
         ? existing.status
         : canReactivateCancelled
-          ? "enviado_consulta"
-        : resolveStatusAfterContact(existing.status, Boolean(contactChannel));
+          ? isSubmitTicket
+            ? "orden_lista"
+            : "pendiente"
+          : resolveStatusAfterContact(existing.status, Boolean(contactChannel));
+      if (!terminal && trustedLines.length > 0) {
+        const nxt = normalizeTicketStatusDb(String(nextStatus));
+        if (nxt === "borrador") nextStatus = "pendiente";
+      }
+      /** «Generar orden» (submit): pendiente / borrador / ABIERTA (`enviado_consulta`) → orden lista + avisos. */
+      if (isSubmitTicket && !terminal) {
+        const prevSt = normalizeTicketStatusDb(String(existing.status ?? ""));
+        if (prevSt === "pendiente" || prevSt === "borrador" || prevSt === "enviado_consulta") {
+          nextStatus = "orden_lista";
+        }
+      }
+      const nextNormFor409 = normalizeTicketStatusDb(String(nextStatus));
       if (
         singleMarketplaceOrderPolicy &&
         contactChannel &&
         !terminal &&
-        nextStatus === "enviado_consulta" &&
+        (nextNormFor409 === "enviado_consulta" ||
+          nextNormFor409 === "orden_lista" ||
+          nextNormFor409 === "pendiente") &&
         (await countPipelineTicketsForUser(userId, existing.id)) > 0
       ) {
         const blocking = (await db
@@ -726,100 +808,47 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
           )
           .run(itemsJson, subtotal, lineCount, unitCount, nowIso, nextStatus, ip, ua, userId, contactEmail, existing.id);
       }
+      await tryAppendQuoteCartHistory(existing.id, rowItemsJsonAsString(existing.items_json), trustedLines, nowIso);
+
       const orderNumber = existing.order_number ?? `ORD-${String(existing.id).padStart(7, "0")}`;
       if (!existing.order_number) {
         await db.prepare("UPDATE marketplace_quote_tickets SET order_number = ? WHERE id = ?").run(orderNumber, existing.id);
       }
-      if (
-        isSubmitTicket &&
-        nextStatus === "enviado_consulta" &&
-        existing.status !== "cerrado" &&
-        existing.status !== "descartado" &&
-        existing.status !== "instalado"
-      ) {
+      const prevNorm = normalizeTicketStatusDb(String(existing.status ?? ""));
+      const nextNorm = normalizeTicketStatusDb(String(nextStatus ?? ""));
+      if (isSubmitTicket && nextNorm === "orden_lista") {
         await db
           .prepare("UPDATE marketplace_quote_tickets SET session_id = ? WHERE id = ?")
           .run(submittedSessionId(userId, existing.id), existing.id);
       }
-      const prevNorm = normalizeTicketStatusDb(String(existing.status ?? ""));
-      const nextNorm = normalizeTicketStatusDb(String(nextStatus ?? ""));
-      /** `sync` / contacto reactiva descartado reciente → enviado_consulta antes de un submit; sin esto nunca se llama notify y el submit posterior ve ya «enviado». */
-      const reactivatedDescartadoToEnviado =
-        isCancelled && canReactivateCancelled && nextNorm === "enviado_consulta" && prevNorm === "descartado";
-
-      if (
-        isSubmitTicket &&
-        nextStatus === "enviado_consulta" &&
-        (prevNorm === "borrador" || prevNorm === "descartado")
-      ) {
+      if (shouldNotifyResendNuevaOrdenLista(prevNorm, nextNorm, isSubmitTicket)) {
         void notifyMarketplaceOrderEmail({
           orderNumber,
           ticketCode: existing.ticket_code,
           contactEmail: contactEmail ?? "",
           subtotalUsd: subtotal,
         }).catch((e) => console.error("[email] marketplace order notify:", e));
+      }
+      if (shouldNotifyResendOrderGenerada(prevNorm, nextNorm, isSubmitTicket)) {
+        void notifyMarketplaceOrderGeneradaEmail({
+          orderNumber,
+          ticketCode: existing.ticket_code,
+          contactEmail: contactEmail ?? "",
+          subtotalUsd: subtotal,
+        }).catch((e) => console.error("[email] marketplace ORDEN GENERADA:", e));
+      }
+      if (shouldNotifySalesWhatsappOrderLista(prevNorm, nextNorm, isSubmitTicket)) {
         void notifyMarketplaceOrderWhatsApp({
           orderNumber,
           ticketCode: existing.ticket_code,
           contactEmail: contactEmail ?? "",
           subtotalUsd: subtotal,
         }).catch((e) => console.error("[whatsapp] marketplace order notify:", e));
-      } else if (!isSubmitTicket && reactivatedDescartadoToEnviado) {
-        // eslint-disable-next-line no-console
-        console.log(`[email] quote-sync reactivate descartado → aviso ticket=${existing.id} order=${orderNumber}`);
-        void notifyMarketplaceOrderEmail({
-          orderNumber,
-          ticketCode: existing.ticket_code,
-          contactEmail: contactEmail ?? "",
-          subtotalUsd: subtotal,
-        }).catch((e) => console.error("[email] marketplace order notify (reactivate):", e));
-        void notifyMarketplaceOrderWhatsApp({
-          orderNumber,
-          ticketCode: existing.ticket_code,
-          contactEmail: contactEmail ?? "",
-          subtotalUsd: subtotal,
-        }).catch((e) => console.error("[whatsapp] marketplace order notify (reactivate):", e));
-      } else if (isSubmitTicket && nextStatus === "enviado_consulta") {
-        console.log(
-          `[email] Sin aviso re-envío ticket ${existing.id}: prev "${prevNorm}" (solo borrador/descartado→enviado o submit fusionado en orden activa).`
-        );
-      }
-      /**
-       * Orden en pipeline guardada por `session_id` (p. ej. `u:5`) sin pasar por la fusión `user_id`:
-       * el POST ~373 bytes va a esta rama; hay que avisar en sync cuando cambia el carrito.
-       */
-      const prevJsonPipeline = rowItemsJsonAsString(existing.items_json);
-      const cartChangedPipelineSync =
-        itemsJson.trim() !== prevJsonPipeline.trim() ||
-        canonicalItemsJsonForCompare(itemsJson) !== canonicalItemsJsonForCompare(prevJsonPipeline) ||
-        Math.abs(Number(existing.subtotal_usd ?? 0) - subtotal) > 0.01 ||
-        Number(existing.line_count ?? 0) !== lineCount ||
-        Number(existing.unit_count ?? 0) !== unitCount;
-      const pipelineBlockingRow = isMarketplaceOrderPipelineBlockingStatus(existing.status);
-      if (!contactChannel && !terminal && pipelineBlockingRow) {
-        if (cartChangedPipelineSync) {
-          // eslint-disable-next-line no-console
-          console.log(`[email] quote-sync session → aviso ticket=${existing.id} order=${orderNumber}`);
-          void notifyMarketplaceOrderEmail({
-            orderNumber,
-            ticketCode: existing.ticket_code,
-            contactEmail: contactEmail ?? "",
-            subtotalUsd: subtotal,
-          }).catch((e) => console.error("[email] marketplace order notify (pipeline-session-sync):", e));
-          void notifyMarketplaceOrderWhatsApp({
-            orderNumber,
-            ticketCode: existing.ticket_code,
-            contactEmail: contactEmail ?? "",
-            subtotalUsd: subtotal,
-          }).catch((e) => console.error("[whatsapp] marketplace order notify (pipeline-session-sync):", e));
-        }
       }
       if (process.env.NODE_ENV !== "production") {
-        const sessionEmailWouldFire =
-          !contactChannel && !terminal && pipelineBlockingRow && cartChangedPipelineSync;
         // eslint-disable-next-line no-console
         console.log(
-          `[quote-sync] existing id=${existing.id} status=${existing.status} terminal=${terminal} pipelineBlocking=${pipelineBlockingRow} contact=${contactChannel ?? "none"} cartChangedVsDb=${cartChangedPipelineSync} sessionEmail=${sessionEmailWouldFire}`
+          `[quote-sync] existing id=${existing.id} prev=${prevNorm} next=${nextNorm} submit=${isSubmitTicket} resendNueva=${shouldNotifyResendNuevaOrdenLista(prevNorm, nextNorm, isSubmitTicket)} resendGenerada=${shouldNotifyResendOrderGenerada(prevNorm, nextNorm, isSubmitTicket)} wa=${shouldNotifySalesWhatsappOrderLista(prevNorm, nextNorm, isSubmitTicket)}`
         );
       }
       return res.json({
@@ -838,13 +867,19 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
     if (singleMarketplaceOrderPolicy && trustedLines.length > 0) {
       const latestCancelled = (await db
         .prepare(
-          `SELECT id, order_number, ticket_code, updated_at
+          `SELECT id, order_number, ticket_code, updated_at, items_json
            FROM marketplace_quote_tickets
            WHERE user_id = ? AND status = 'descartado'
            ORDER BY updated_at DESC LIMIT 1`
         )
         .get(userId)) as
-        | { id: number; order_number: string | null; ticket_code: string; updated_at: string | null }
+        | {
+            id: number;
+            order_number: string | null;
+            ticket_code: string;
+            updated_at: string | null;
+            items_json: string | null;
+          }
         | undefined;
       const cancelledAtMs = Date.parse(String(latestCancelled?.updated_at ?? ""));
       const canReactivate =
@@ -852,10 +887,11 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
         Number.isFinite(cancelledAtMs) &&
         Date.now() - cancelledAtMs <= REACTIVATE_CANCELLED_WINDOW_MS;
       if (canReactivate && latestCancelled) {
+        const reactivatedStatus = isSubmitTicket ? "orden_lista" : "pendiente";
         await db
           .prepare(
             `UPDATE marketplace_quote_tickets SET
-              session_id = ?, status = 'enviado_consulta',
+              session_id = ?, status = ?,
               items_json = ?, subtotal_usd = ?, line_count = ?, unit_count = ?, updated_at = ?,
               ip_address = ?, user_agent = ?, user_id = ?, contact_email = ?,
               discard_by_email = NULL,
@@ -864,6 +900,7 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
           )
           .run(
             sessionId,
+            reactivatedStatus,
             itemsJson,
             subtotal,
             lineCount,
@@ -876,30 +913,40 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
             nowIso,
             latestCancelled.id
           );
+        await tryAppendQuoteCartHistory(
+          latestCancelled.id,
+          rowItemsJsonAsString(latestCancelled.items_json),
+          trustedLines,
+          nowIso
+        );
         const orderNumber = latestCancelled.order_number ?? `ORD-${String(latestCancelled.id).padStart(7, "0")}`;
         if (!latestCancelled.order_number) {
           await db.prepare("UPDATE marketplace_quote_tickets SET order_number = ? WHERE id = ?").run(orderNumber, latestCancelled.id);
         }
-        if (isSubmitTicket) {
+        if (isSubmitTicket && reactivatedStatus === "orden_lista") {
+          await db
+            .prepare("UPDATE marketplace_quote_tickets SET session_id = ? WHERE id = ?")
+            .run(submittedSessionId(userId, latestCancelled.id), latestCancelled.id);
+          const ordNum = latestCancelled.order_number ?? `ORD-${String(latestCancelled.id).padStart(7, "0")}`;
           void notifyMarketplaceOrderEmail({
-            orderNumber,
+            orderNumber: ordNum,
             ticketCode: latestCancelled.ticket_code,
             contactEmail: contactEmail ?? "",
             subtotalUsd: subtotal,
-          }).catch((e) => console.error("[email] marketplace order notify:", e));
+          }).catch((e) => console.error("[email] marketplace order notify (reactivate submit):", e));
           void notifyMarketplaceOrderWhatsApp({
-            orderNumber,
+            orderNumber: ordNum,
             ticketCode: latestCancelled.ticket_code,
             contactEmail: contactEmail ?? "",
             subtotalUsd: subtotal,
-          }).catch((e) => console.error("[whatsapp] marketplace order notify:", e));
+          }).catch((e) => console.error("[whatsapp] marketplace order notify (reactivate submit):", e));
         }
         return res.json({
           ok: true,
           id: latestCancelled.id,
           orderNumber,
           ticketCode: latestCancelled.ticket_code,
-          status: "enviado_consulta",
+          status: reactivatedStatus,
           merged: true,
           reactivated: true,
           lines: trustedLines,
@@ -911,13 +958,8 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
     }
 
     const ticketCode = genTicketCode();
-    const initialStatus = contactChannel ? "enviado_consulta" : "borrador";
-    if (
-      singleMarketplaceOrderPolicy &&
-      contactChannel &&
-      initialStatus === "enviado_consulta" &&
-      (await countPipelineTicketsForUser(userId, null)) > 0
-    ) {
+    const initialStatus = "pendiente";
+    if (singleMarketplaceOrderPolicy && (await countPipelineTicketsForUser(userId, null)) > 0) {
       const blocking = (await db
         .prepare(
           `SELECT order_number, ticket_code FROM marketplace_quote_tickets
@@ -965,13 +1007,21 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
           await tx.prepare("UPDATE marketplace_quote_tickets SET order_number = ? WHERE id = ?").run(orderNumber, id);
           if (isSubmitTicket) {
             await tx
-              .prepare("UPDATE marketplace_quote_tickets SET session_id = ? WHERE id = ?")
-              .run(submittedSessionId(userId, id), id);
+              .prepare(
+                `UPDATE marketplace_quote_tickets SET
+                  session_id = ?,
+                  status = 'orden_lista',
+                  last_contact_channel = 'portal',
+                  contacted_at = COALESCE(contacted_at, ?)
+                WHERE id = ?`
+              )
+              .run(submittedSessionId(userId, id), nowIso, id);
           }
           return { id, orderNumber };
         });
         insertOk = true;
-        if (isSubmitTicket && initialStatus === "enviado_consulta") {
+        await tryAppendQuoteCartHistory(created.id, "[]", trustedLines, nowIso);
+        if (isSubmitTicket) {
           void notifyMarketplaceOrderEmail({
             orderNumber: created.orderNumber,
             ticketCode: code,
@@ -990,7 +1040,7 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
           id: created.id,
           orderNumber: created.orderNumber,
           ticketCode: code,
-          status: initialStatus,
+          status: isSubmitTicket ? "orden_lista" : initialStatus,
         });
       } catch (e) {
         lastErr = e;
@@ -1023,12 +1073,27 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
   }
 });
 
+const ListQueryLaneSchema = z.enum(["pendiente", "compra_confirmada", "eliminadas"]);
+
 const ListQuerySchema = z.object({
+  /** Filtro por carril del tablero (prioridad sobre `status` si ambos vinieran). */
+  lane: ListQueryLaneSchema.optional(),
   status: z.string().max(40).optional(),
   q: z.string().max(120).optional(),
   limit: z.coerce.number().int().min(1).max(200).optional(),
   offset: z.coerce.number().int().min(0).max(100000).optional(),
 });
+
+/** Misma semántica que el panel: pre-pago / post-pago (incl. cerrado) / solo descartado. */
+function quoteTicketsLaneAndClause(lane: z.infer<typeof ListQueryLaneSchema>): string {
+  if (lane === "pendiente") {
+    return " AND t.status NOT IN ('pagada','en_viaje','instalado','cerrado','descartado')";
+  }
+  if (lane === "compra_confirmada") {
+    return " AND t.status IN ('pagada','en_viaje','instalado','cerrado')";
+  }
+  return " AND t.status = 'descartado'";
+}
 
 /** Si `contact_email` guardó el username (p. ej. "admin"), preferir email real de `users` o `clients`. */
 function pickContactEmailDisplay(
@@ -1048,7 +1113,7 @@ function pickContactEmailDisplay(
 }
 
 /** Misma lógica que la vista al persistir `contact_email` en quote-sync. */
-async function resolveContactEmailForMarketplaceSync(userId: number, fallback: string): Promise<string> {
+async function resolveContactEmailForMarketplaceSync(userId: number, fallback: string | undefined): Promise<string> {
   const row = (await db
     .prepare(
       `SELECT TRIM(u.email) AS email, TRIM(u.username) AS username,
@@ -1056,10 +1121,12 @@ async function resolveContactEmailForMarketplaceSync(userId: number, fallback: s
        FROM users u WHERE u.id = ?`
     )
     .get(userId)) as { email: string | null; username: string | null; client_email: string | null } | undefined;
-  if (!row) return fallback;
+  if (!row) return String(fallback ?? "").trim();
   const uje = row.email?.trim() || row.username?.trim() || null;
   const cje = row.client_email?.trim() || null;
-  return pickContactEmailDisplay(null, uje, cje) ?? fallback;
+  const picked = pickContactEmailDisplay(null, uje, cje);
+  if (picked && picked.trim()) return picked.trim();
+  return String(fallback ?? "").trim();
 }
 
 function rowToTicketList(r: Record<string, unknown>) {
@@ -1077,7 +1144,7 @@ function rowToTicketList(r: Record<string, unknown>) {
     sessionId: String(r.session_id ?? ""),
     orderNumber: r.order_number != null ? String(r.order_number) : null,
     ticketCode: String(r.ticket_code ?? ""),
-    status: String(r.status ?? ""),
+    status: normalizeTicketStatusDb(String(r.status ?? "")),
     subtotalUsd: Number(r.subtotal_usd) || 0,
     lineCount: Number(r.line_count) || 0,
     unitCount: Number(r.unit_count) || 0,
@@ -1098,6 +1165,13 @@ function rowToTicketList(r: Record<string, unknown>) {
     reactivatedAt:
       r.reactivated_at != null && String(r.reactivated_at).trim() !== "" ? String(r.reactivated_at).trim() : null,
     items,
+  };
+}
+
+function rowToTicketDetail(row: Record<string, unknown>) {
+  return {
+    ...rowToTicketList(row),
+    itemsCartHistory: parseItemsCartHistoryFromRow(row.items_history_json),
   };
 }
 
@@ -1192,7 +1266,7 @@ marketplaceQuoteTicketsRouter.get("/marketplace/my-quote-tickets/:id", requireAu
     ) {
       return res.status(403).json({ error: { message: "No autorizado" } });
     }
-    res.json({ ticket: rowToTicketList(row) });
+    res.json({ ticket: rowToTicketDetail(row) });
   } catch (e) {
     return sendInternalError(res, "my-quote-tickets.detail", e);
   }
@@ -1252,10 +1326,12 @@ marketplaceQuoteTicketsRouter.get("/marketplace/quote-tickets", requireAuth, adm
     if (!parsed.success) {
       return res.status(400).json({ error: { message: "Parámetros inválidos" } });
     }
-    const { status, q, limit = 80, offset = 0 } = parsed.data;
+    const { lane, status, q, limit = 80, offset = 0 } = parsed.data;
     const params: unknown[] = [];
     let sql = `SELECT ${TICKET_SELECT} FROM ${TICKET_FROM} WHERE 1=1`;
-    if (status && status !== "all") {
+    if (lane) {
+      sql += quoteTicketsLaneAndClause(lane);
+    } else if (status && status !== "all") {
       sql += " AND t.status = ?";
       params.push(status);
     }
@@ -1269,14 +1345,17 @@ marketplaceQuoteTicketsRouter.get("/marketplace/quote-tickets", requireAuth, adm
     params.push(limit, offset);
 
     const rows = (await db.prepare(sql).all(...params)) as Record<string, unknown>[];
+    let countStatusTail = "";
+    if (lane) countStatusTail = quoteTicketsLaneAndClause(lane);
+    else if (status && status !== "all") countStatusTail = " AND t.status = ?";
     const countSqlBase =
       `SELECT COUNT(*) as c FROM ${TICKET_FROM} WHERE 1=1` +
-      (status && status !== "all" ? " AND t.status = ?" : "") +
+      countStatusTail +
       (q && q.trim()
         ? " AND (LOWER(COALESCE(t.order_number,'')) LIKE ? OR LOWER(t.ticket_code) LIKE ? OR LOWER(t.items_json) LIKE ? OR LOWER(COALESCE(t.contact_email,'')) LIKE ? OR LOWER(COALESCE(u.email,'')) LIKE ?)"
         : "");
     const countParams: unknown[] = [];
-    if (status && status !== "all") countParams.push(status);
+    if (!lane && status && status !== "all") countParams.push(status);
     if (q && q.trim()) {
       const term = `%${q.trim().toLowerCase()}%`;
       countParams.push(term, term, term, term, term);
@@ -1302,7 +1381,7 @@ marketplaceQuoteTicketsRouter.get("/marketplace/quote-tickets/:id", requireAuth,
     if (!Number.isFinite(id)) return res.status(400).json({ error: { message: "ID inválido" } });
     const row = (await db.prepare(`SELECT ${TICKET_SELECT} FROM ${TICKET_FROM} WHERE t.id = ?`).get(id)) as Record<string, unknown> | undefined;
     if (!row) return res.status(404).json({ error: { message: "Ticket no encontrado" } });
-    res.json({ ticket: rowToTicketList(row) });
+    res.json({ ticket: rowToTicketDetail(row) });
   } catch (e) {
     return sendInternalError(res, "admin.detail", e);
   }
@@ -1344,6 +1423,8 @@ marketplaceQuoteTicketsRouter.patch("/marketplace/quote-tickets/:id", requireAut
     const nowIso = new Date().toISOString();
     const { status, notesAdmin } = parsed.data;
     const exNorm = normalizeTicketStatusDb(ex.status);
+    const becameInstalado =
+      status !== undefined && normalizeTicketStatusDb(status) === "instalado" && exNorm !== "instalado";
     const discardActorEmail = String(req.user!.email ?? "").trim() || null;
     if (status === undefined && notesAdmin === undefined) {
       return res.status(400).json({ error: { message: "Indicá estado y/o notas" } });
@@ -1379,8 +1460,11 @@ marketplaceQuoteTicketsRouter.patch("/marketplace/quote-tickets/:id", requireAut
     } else if (notesAdmin !== undefined) {
       await db.prepare("UPDATE marketplace_quote_tickets SET notes_admin = ?, updated_at = ? WHERE id = ?").run(notesAdmin, nowIso, id);
     }
+    if (becameInstalado) {
+      await markClientsVentaMarketplaceAfterInstalado(id);
+    }
     const row = (await db.prepare(`SELECT ${TICKET_SELECT} FROM ${TICKET_FROM} WHERE t.id = ?`).get(id)) as Record<string, unknown>;
-    res.json({ ticket: rowToTicketList(row) });
+    res.json({ ticket: rowToTicketDetail(row) });
   } catch (e) {
     return sendInternalError(res, "admin.patch", e);
   }

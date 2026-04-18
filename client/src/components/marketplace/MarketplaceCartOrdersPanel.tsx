@@ -17,7 +17,7 @@ import {
   ticketRowLineSubtotalUsd,
   QUOTE_ADDON_SETUP_USD_FALLBACK,
   isMarketplacePipelineTicketStatus,
-  marketplaceQuoteTicketLineDisplayName,
+  marketplaceQuoteTicketLineDisplayParts,
   type QuoteCartPricing,
 } from "../../lib/marketplaceQuoteCart.js";
 import type { GarantiaQuotePriceItem } from "../../lib/marketplaceGarantiaQuote.js";
@@ -695,7 +695,7 @@ export function MarketplaceCartOrdersPanel({ onBackToCart }: Props) {
                         const b = ticketRowLineBreakdown(row, pricing);
                         const sub = ticketRowLineSubtotalUsd(row, pricing);
                         const linePending = b.pendingEquipmentPrice;
-                        const name = marketplaceQuoteTicketLineDisplayName(row);
+                        const titleParts = marketplaceQuoteTicketLineDisplayParts(row);
                         const qty = b.qty;
                         const addonLabels: string[] = [];
                         if (b.includeSetup) addonLabels.push(t("orders.compact_addon_setup"));
@@ -703,7 +703,12 @@ export function MarketplaceCartOrdersPanel({ onBackToCart }: Props) {
                         const addonsStr = addonLabels.length ? addonLabels.join(" · ") : null;
                         return (
                           <li key={i}>
-                            <span className="market-mis-ord__item-name moo-order-detail-pro__item-name">{name}</span>
+                            <span className="market-mis-ord__item-name moo-order-detail-pro__item-name mq-equipment-title--stacked">
+                              <span className="mq-equipment-title__model">{titleParts.brandModel}</span>
+                              {titleParts.specLine ? (
+                                <span className="mq-equipment-title__spec">{titleParts.specLine}</span>
+                              ) : null}
+                            </span>
                             <span className="market-mis-ord__item-qty moo-order-detail-pro__item-qty">×{qty}</span>
                             <span className="market-mis-ord__item-sub moo-order-detail-pro__item-sub">
                               {linePending && sub === 0

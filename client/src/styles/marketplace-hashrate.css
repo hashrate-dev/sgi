@@ -3011,6 +3011,10 @@ button.product-modal__btn--quote-cart:active {
   font-weight: 800;
 }
 
+.market-quote-drawer__panel--has-lines .market-quote-drawer__line-name-spec {
+  font-size: 0.8em;
+}
+
 .market-quote-drawer__panel--has-lines .market-quote-drawer__line-mid {
   margin-top: 0.15rem;
   margin-bottom: 0.45rem;
@@ -3575,6 +3579,24 @@ button.product-modal__btn--quote-cart:active {
   letter-spacing: -0.01em;
   line-height: 1.26;
   padding-right: 0.2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.12rem;
+}
+
+.market-quote-drawer__line-name-model {
+  display: block;
+}
+
+.market-quote-drawer__line-name-spec {
+  display: block;
+  font-size: 0.82em;
+  font-weight: 700;
+  color: #475569;
+  letter-spacing: 0;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .market-quote-drawer__line-meta {
@@ -4906,10 +4928,23 @@ button.product-modal__btn--quote-cart:active {
   border: 1px solid #fdba74;
 }
 
-.market-mis-ord__badge--enviado_consulta {
-  background: #ffedd5;
-  color: #9a3412;
+.market-mis-ord__badge--pendiente {
+  background: #fff4e5;
+  color: #c2410c;
   border: 1px solid #fdba74;
+  border-radius: 999px;
+}
+
+.market-mis-ord__badge--orden_lista {
+  background: #ecfdf5;
+  color: #14532d;
+  border: 1px solid #86efac;
+}
+
+.market-mis-ord__badge--enviado_consulta {
+  background: #fef9c3;
+  color: #713f12;
+  border: 1px solid #facc15;
 }
 
 .market-mis-ord__badge--en_gestion {

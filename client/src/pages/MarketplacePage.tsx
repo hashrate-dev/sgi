@@ -12,13 +12,12 @@ import type { AddQuoteLineOptions } from "../lib/marketplaceQuoteCart.js";
 import { getMarketplaceAsicVitrina, postMarketplaceAsicYields, wakeUpBackend, type MarketplaceAsicLiveYield } from "../lib/api.js";
 import { canUseMarketplaceQuoteCart } from "../lib/auth.js";
 import { useAuth } from "../contexts/AuthContext";
-import { MarketplaceQuoteCartProvider, useMarketplaceQuoteCart } from "../contexts/MarketplaceQuoteCartContext.js";
+import { useMarketplaceQuoteCart } from "../contexts/MarketplaceQuoteCartContext.js";
 import { MarketplaceSiteHeader } from "../components/marketplace/MarketplaceSiteHeader.js";
 import { MarketplaceSiteFooter } from "../components/marketplace/MarketplaceSiteFooter.js";
 import { MarketplaceCatalogFilters } from "../components/marketplace/MarketplaceCatalogFilters.js";
 import { AsicShelfProduct } from "../components/marketplace/AsicShelfProduct.js";
 import { AsicProductModal } from "../components/marketplace/AsicProductModal.js";
-import { MarketplaceQuoteCartDrawer } from "../components/marketplace/MarketplaceQuoteCartDrawer.js";
 import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
 import { marketplaceLocale } from "../lib/i18n.js";
 import "../styles/marketplace-hashrate.css";
@@ -88,11 +87,7 @@ function matchesCatalogFilter(p: AsicProduct, f: MarketplaceCatalogFilter): bool
 }
 
 export function MarketplacePage() {
-  return (
-    <MarketplaceQuoteCartProvider>
-      <MarketplacePageBody />
-    </MarketplaceQuoteCartProvider>
-  );
+  return <MarketplacePageBody />;
 }
 
 function MarketplacePageBody() {
@@ -362,7 +357,6 @@ function MarketplacePageBody() {
           addToQuoteLabel={addToQuoteLabel}
         />
       ) : null}
-      <MarketplaceQuoteCartDrawer />
     </div>
   );
 }

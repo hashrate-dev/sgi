@@ -41,6 +41,8 @@ export function isMarketplacePipelineTicketStatus(s: string): boolean {
   const x = normalizeMarketplaceQuoteTicketStatus(s);
   if (x === "respondido") return true;
   return (
+    x === "pendiente" ||
+    x === "orden_lista" ||
     x === "enviado_consulta" ||
     x === "en_contacto_equipo" ||
     x === "en_gestion" ||
@@ -214,26 +216,50 @@ export type MarketplaceQuoteLineDisplayOpts = {
   includeShareSuffix?: boolean;
 };
 
+/** Marca+modelo en una línea; hashrate (y % si aplica) en otra — evita cortar "235" y "TH/s". */
+export type MarketplaceQuoteLineTitleParts = {
+  brandModel: string;
+  specLine: string | null;
+};
+
 /**
- * Nombre para listados de ticket (drawer pedido, cotizaciones): marca + modelo + hashrate
- * para distinguir variantes (ej. varios Antminer L9 por MH/s) y, si aplica, fracción de hashrate.
+ * Partes del título de línea: arriba marca y modelo; abajo hashrate (p. ej. `235 TH/s`) junto con `white-space: nowrap` en UI.
+ */
+export function marketplaceQuoteTicketLineDisplayParts(
+  row: Record<string, unknown>,
+  opts?: MarketplaceQuoteLineDisplayOpts
+): MarketplaceQuoteLineTitleParts {
+  const includeShare = opts?.includeShareSuffix !== false;
+  const brand = String(row.brand ?? "").trim();
+  const model = String(row.model ?? "").trim();
+  const productId = String(row.productId ?? "").trim();
+  const brandModel = [brand, model].filter(Boolean).join(" ").trim() || productId || "—";
+  const hr = String(row.hashrate ?? "").trim();
+  const rawShare = Math.round(Number(row.hashrateSharePct));
+  const sharePct = Number.isFinite(rawShare) && rawShare >= 1 && rawShare < 100 ? rawShare : null;
+
+  let specLine: string | null = null;
+  if (hr) specLine = hr;
+  if (includeShare && sharePct != null) {
+    const tail = `(${sharePct}% hashrate)`;
+    specLine = specLine ? `${specLine} ${tail}` : tail;
+  }
+  return { brandModel, specLine };
+}
+
+/**
+ * Nombre en una sola cadena (listados, búsquedas): marca + modelo · hashrate (+ % si aplica).
  */
 export function marketplaceQuoteTicketLineDisplayName(
   row: Record<string, unknown>,
   opts?: MarketplaceQuoteLineDisplayOpts
 ): string {
-  const includeShare = opts?.includeShareSuffix !== false;
-  const brand = String(row.brand ?? "").trim();
-  const model = String(row.model ?? "").trim();
-  const productId = String(row.productId ?? "").trim();
-  const base = [brand, model].filter(Boolean).join(" ").trim() || productId || "—";
-  const hr = String(row.hashrate ?? "").trim();
-  const rawShare = Math.round(Number(row.hashrateSharePct));
-  const sharePct = Number.isFinite(rawShare) && rawShare >= 1 && rawShare < 100 ? rawShare : null;
-  let out = base;
-  if (hr) out = `${out} · ${hr}`;
-  if (includeShare && sharePct != null) out = `${out} (${sharePct}% hashrate)`;
-  return out;
+  const { brandModel, specLine } = marketplaceQuoteTicketLineDisplayParts(row, opts);
+  if (!specLine) return brandModel;
+  const hasHr = String(row.hashrate ?? "").trim().length > 0;
+  /** Con hashrate se usa « · » como antes; solo fracción: espacio antes del paréntesis (sin punto medio). */
+  const joiner = hasHr ? " · " : " ";
+  return `${brandModel}${joiner}${specLine}`;
 }
 
 /** Líneas devueltas por POST /quote-sync (fusión con orden en curso) u items del ticket. */

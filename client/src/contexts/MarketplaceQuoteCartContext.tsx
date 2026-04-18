@@ -90,12 +90,12 @@ type Ctx = {
   setLineAddons: (lineKey: string, patch: { includeSetup?: boolean; includeWarranty?: boolean }) => void;
   clearCart: () => void;
   ticketRef: QuoteTicketRef | null;
-  /** Registra el ticket en la BD (estado enviado_consulta) y vacía el carrito. */
+  /** Confirma «Generar orden» (envía aviso a ventas) o devuelve resumen si la orden ya estaba enviada. */
   submitConsultationTicket: () => Promise<SubmittedConsultationSummary>;
   openQuoteEmail: () => Promise<void>;
   openQuoteWhatsApp: () => Promise<void>;
   /** Consulta en pipeline (un pedido activo por cuenta): el carrito se fusiona en ese ticket al sincronizar. */
-  blockingPipelineOrder: { id: number; orderNumber: string; ticketCode: string } | null;
+  blockingPipelineOrder: { id: number; orderNumber: string; ticketCode: string; status: string } | null;
   /** true cuando el carrito difiere de la última versión conocida de la orden en curso. */
   hasPendingPipelineCartChanges: boolean;
   /** Refresca el bloqueo desde el servidor (tras cancelar orden, etc.). */
@@ -157,6 +157,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
     id: number;
     orderNumber: string;
     ticketCode: string;
+    status: string;
   } | null>(null);
   const [pipelineBase, setPipelineBase] = useState<{ orderId: number; sig: string } | null>(null);
   /** Tras la 1.ª respuesta de hidratación del ticket en pipeline (evita POST vacío+clearPipeline antes de fusionar ítems al loguear). */
@@ -208,6 +209,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
               id: b.id,
               orderNumber: b.orderNumber ?? "",
               ticketCode: b.ticketCode,
+              status: b.status ?? "",
             }
           : null
       );
@@ -286,15 +288,24 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
       return;
     }
 
+    /** Sin cuenta cliente/admin A/B: no carrito persistente ni contador en header (evita «1» con REGISTRO). */
+    if (!canUseQuoteCart) {
+      writeQuoteCartToStorageKey(QUOTE_CART_GUEST_KEY, []);
+      setLines([]);
+      setTicketRef(null);
+      prevMarketplaceCartUserIdRef.current = cartUserId;
+      return;
+    }
+
     setLines(readQuoteCartFromStorageKey(storageKey));
-    if (!canUseQuoteCart) setTicketRef(null);
     prevMarketplaceCartUserIdRef.current = cartUserId;
   }, [loading, storageKey, canUseQuoteCart, user?.id, user?.role]);
 
   useEffect(() => {
     if (loading) return;
+    if (!canUseQuoteCart) return;
     writeQuoteCartToStorageKey(storageKey, lines);
-  }, [lines, storageKey, loading]);
+  }, [lines, storageKey, loading, canUseQuoteCart]);
 
   const totalUnits = useMemo(() => quoteCartTotalUnits(lines), [lines]);
 
@@ -408,7 +419,15 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
           });
           if (!canUseQuoteCartRef.current) return;
           if (genAtSend !== quoteCartRemoteApplyGenRef.current) return;
-          /** En sync automático se mantiene como borrador: no exponer referencia ORD/TKT hasta confirmación explícita. */
+          if (res.orderNumber && res.ticketCode) {
+            const st = String(res.status ?? "").toLowerCase();
+            if (st === "pendiente" || st === "orden_lista" || st === "borrador") {
+              setTicketRef({ orderNumber: res.orderNumber, ticketCode: res.ticketCode });
+            } else {
+              setTicketRef(null);
+            }
+            if (st === "orden_lista" || st === "enviado_consulta") void refreshActiveOrderGate();
+          }
           if (res.merged && Array.isArray(res.lines)) {
             if (genAtSend !== quoteCartRemoteApplyGenRef.current) return;
             const next = quoteCartLinesFromApiPayload(res.lines);
@@ -496,16 +515,18 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
   const clearCart = useCallback(() => {
     setLines([]);
     if (!canUseQuoteCart) return;
+    /** Evita que el debounce de `lines=[]` dispare un segundo quote-sync vacío tras este POST explícito. */
+    skipEmptyPipelineSyncRef.current = true;
     void (async () => {
       try {
-        /** Con orden en pipeline el effect de sync envía `[]` al servidor (evita doble POST). */
-        if (blockingPipelineOrder?.id != null) return;
         await syncMarketplaceQuoteTicket({ lines: [], event: "sync", clearPipelineCart: true });
+        void refreshActiveOrderGate();
+        window.dispatchEvent(new CustomEvent(MARKETPLACE_ACTIVE_ORDER_CHANGED_EVENT));
       } catch {
         /* ignore */
       }
     })();
-  }, [canUseQuoteCart, blockingPipelineOrder?.id]);
+  }, [canUseQuoteCart, refreshActiveOrderGate]);
 
   const submitConsultationTicket = useCallback(async () => {
     if (!canUseQuoteCart) {
@@ -547,7 +568,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
         id: r.id,
         orderNumber: r.orderNumber,
         ticketCode: r.ticketCode,
-        status: r.status ?? "enviado_consulta",
+        status: r.status ?? "orden_lista",
         subtotalUsd:
           r.subtotalUsd ??
           quoteCartSubtotalUsd(next, {
@@ -568,7 +589,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
       id: r.id,
       orderNumber: r.orderNumber,
       ticketCode: r.ticketCode,
-      status: r.status ?? "enviado_consulta",
+      status: r.status ?? "orden_lista",
       subtotalUsd,
       unitCount,
       lineCount,

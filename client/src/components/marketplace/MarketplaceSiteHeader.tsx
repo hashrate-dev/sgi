@@ -15,6 +15,7 @@ export function MarketplaceSiteHeader() {
   const onCompanyPage = pathname === "/marketplace/company" || pathname === "/marketplace/company/";
   const onFaqPage = pathname === "/marketplace/faq" || pathname === "/marketplace/faq/";
   const onContactPage = pathname === "/marketplace/contact" || pathname === "/marketplace/contact/";
+  const onClienteLoginPage = pathname === "/marketplace/login" || pathname === "/marketplace/login/";
   const corpHashCurrent = (id: string) =>
     onCorporateHome && hash === `#${id}` ? ("is-current" as const) : undefined;
   const { user, logout } = useAuth();
@@ -57,9 +58,11 @@ export function MarketplaceSiteHeader() {
           </>
         ) : (
           <div className="site-header__auth-actions">
-            <Link to="/marketplace/signup" className="site-header__auth-link site-header__auth-link--primary">
-              {t("header.register")}
-            </Link>
+            {!onClienteLoginPage ? (
+              <Link to="/marketplace/signup" className="site-header__auth-link site-header__auth-link--primary">
+                {t("header.register")}
+              </Link>
+            ) : null}
           </div>
         )}
       </div>

@@ -5,6 +5,10 @@
 
 export const MARKETPLACE_TICKET_STATUSES = [
   "borrador",
+  /** Ítems persistidos; el cliente aún no pulsó «Generar orden» (sin aviso a ventas). */
+  "pendiente",
+  /** Cliente confirmó «Generar orden»; aviso a ventas enviado. */
+  "orden_lista",
   "enviado_consulta",
   "en_contacto_equipo",
   "en_gestion",
@@ -19,6 +23,8 @@ export type MarketplaceTicketStatusSlug = (typeof MARKETPLACE_TICKET_STATUSES)[n
 
 /** Una sola orden “activa” por cuenta: embudo hasta envío (excluye instalado = venta cerrada en sitio). */
 export const MARKETPLACE_PIPELINE_BLOCKING_STATUSES = [
+  "pendiente",
+  "orden_lista",
   "enviado_consulta",
   "en_contacto_equipo",
   "en_gestion",
@@ -51,8 +57,10 @@ export function canTransitionTicketStatus(current: string, next: string): boolea
   const to = normalizeTicketStatusDb(next);
   if (from === to) return true;
   const rules: Record<string, string[]> = {
-    borrador: ["enviado_consulta", "descartado"],
-    enviado_consulta: ["en_contacto_equipo", "en_gestion", "descartado", "cerrado"],
+    borrador: ["pendiente", "orden_lista", "enviado_consulta", "descartado"],
+    pendiente: ["orden_lista", "enviado_consulta", "descartado"],
+    orden_lista: ["en_contacto_equipo", "en_gestion", "enviado_consulta", "descartado", "cerrado"],
+    enviado_consulta: ["orden_lista", "en_contacto_equipo", "en_gestion", "descartado", "cerrado"],
     en_contacto_equipo: ["en_gestion", "enviado_consulta", "descartado", "cerrado"],
     en_gestion: ["pagada", "en_contacto_equipo", "descartado", "cerrado"],
     pagada: ["en_viaje", "en_gestion", "descartado", "cerrado"],
@@ -60,7 +68,7 @@ export function canTransitionTicketStatus(current: string, next: string): boolea
     instalado: ["en_viaje"],
     cerrado: [],
     descartado: [],
-    respondido: ["en_contacto_equipo", "en_gestion", "cerrado", "descartado"],
+    respondido: ["enviado_consulta", "en_contacto_equipo", "en_gestion", "cerrado", "descartado"],
   };
   return (rules[from] ?? []).includes(to);
 }

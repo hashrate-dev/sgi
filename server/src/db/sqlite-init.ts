@@ -236,6 +236,12 @@ CREATE INDEX IF NOT EXISTS idx_marketplace_presence_seen ON marketplace_presence
     const msg = e instanceof Error ? e.message : String(e);
     if (!msg.includes("duplicate column")) throw e;
   }
+  try {
+    db.exec("ALTER TABLE clients ADD COLUMN tienda_marketplace_etiqueta TEXT");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
 
   return db;
 }

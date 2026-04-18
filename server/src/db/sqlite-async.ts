@@ -196,7 +196,7 @@ CREATE TABLE IF NOT EXISTS marketplace_quote_tickets (
   session_id TEXT NOT NULL UNIQUE,
   order_number TEXT UNIQUE,
   ticket_code TEXT NOT NULL UNIQUE,
-  status TEXT NOT NULL DEFAULT 'borrador' CHECK (status IN ('borrador', 'enviado_consulta', 'en_contacto_equipo', 'en_gestion', 'pagada', 'en_viaje', 'instalado', 'cerrado', 'descartado')),
+  status TEXT NOT NULL DEFAULT 'borrador' CHECK (status IN ('borrador', 'pendiente', 'orden_lista', 'enviado_consulta', 'en_contacto_equipo', 'en_gestion', 'pagada', 'en_viaje', 'instalado', 'cerrado', 'descartado')),
   items_json TEXT NOT NULL,
   subtotal_usd REAL NOT NULL DEFAULT 0,
   line_count INTEGER NOT NULL DEFAULT 0,
@@ -392,7 +392,13 @@ CREATE INDEX IF NOT EXISTS idx_equipos_asic_audit_created ON equipos_asic_audit(
     }
   }
 
-  for (const colDef of ["user_id INTEGER", "contact_email TEXT", "discard_by_email TEXT", "reactivated_at TEXT"]) {
+  for (const colDef of [
+    "user_id INTEGER",
+    "contact_email TEXT",
+    "discard_by_email TEXT",
+    "reactivated_at TEXT",
+    "items_history_json TEXT",
+  ]) {
     try {
       native.exec(`ALTER TABLE marketplace_quote_tickets ADD COLUMN ${colDef}`);
     } catch (e: unknown) {
@@ -428,6 +434,12 @@ CREATE INDEX IF NOT EXISTS idx_equipos_asic_audit_created ON equipos_asic_audit(
   native.prepare("INSERT OR IGNORE INTO tienda_online_client_seq (id, next_code_num) VALUES (1, 90001)").run();
   try {
     native.exec("ALTER TABLE clients ADD COLUMN user_id INTEGER");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+  try {
+    native.exec("ALTER TABLE clients ADD COLUMN tienda_marketplace_etiqueta TEXT");
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     if (!msg.includes("duplicate column")) throw e;
@@ -493,7 +505,7 @@ CREATE INDEX IF NOT EXISTS idx_equipos_asic_audit_created ON equipos_asic_audit(
           session_id TEXT NOT NULL UNIQUE,
           order_number TEXT UNIQUE,
           ticket_code TEXT NOT NULL UNIQUE,
-          status TEXT NOT NULL DEFAULT 'borrador' CHECK (status IN ('borrador','enviado_consulta','en_contacto_equipo','en_gestion','pagada','en_viaje','instalado','cerrado','descartado')),
+          status TEXT NOT NULL DEFAULT 'borrador' CHECK (status IN ('borrador','orden_lista','enviado_consulta','en_contacto_equipo','en_gestion','pagada','en_viaje','instalado','cerrado','descartado')),
           items_json TEXT NOT NULL,
           subtotal_usd REAL NOT NULL DEFAULT 0,
           line_count INTEGER NOT NULL DEFAULT 0,
@@ -541,6 +553,142 @@ CREATE INDEX IF NOT EXISTS idx_equipos_asic_audit_created ON equipos_asic_audit(
         native.exec("PRAGMA foreign_keys=ON");
       }
     }
+  }
+
+  /** Migra tablas antiguas cuyo CHECK de `status` no incluye `orden_lista`. */
+  {
+    const mqRow = native.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='marketplace_quote_tickets'").get() as
+      | { sql: string }
+      | undefined;
+    if (mqRow?.sql && !mqRow.sql.includes("'orden_lista'")) {
+      native.exec("PRAGMA foreign_keys=OFF");
+      native.exec("BEGIN");
+      try {
+        native.exec(`CREATE TABLE marketplace_quote_tickets__orden_lista (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          session_id TEXT NOT NULL UNIQUE,
+          order_number TEXT UNIQUE,
+          ticket_code TEXT NOT NULL UNIQUE,
+          status TEXT NOT NULL DEFAULT 'borrador' CHECK (status IN ('borrador','orden_lista','enviado_consulta','en_contacto_equipo','en_gestion','pagada','en_viaje','instalado','cerrado','descartado')),
+          items_json TEXT NOT NULL,
+          subtotal_usd REAL NOT NULL DEFAULT 0,
+          line_count INTEGER NOT NULL DEFAULT 0,
+          unit_count INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+          last_contact_channel TEXT,
+          contacted_at TEXT,
+          notes_admin TEXT,
+          ip_address TEXT,
+          user_agent TEXT,
+          user_id INTEGER,
+          contact_email TEXT,
+          discard_by_email TEXT,
+          reactivated_at TEXT,
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        )`);
+        native.exec(`
+          INSERT INTO marketplace_quote_tickets__orden_lista (
+            id, session_id, order_number, ticket_code, status,
+            items_json, subtotal_usd, line_count, unit_count,
+            created_at, updated_at, last_contact_channel, contacted_at, notes_admin,
+            ip_address, user_agent, user_id, contact_email, discard_by_email, reactivated_at
+          )
+          SELECT id, session_id, order_number, ticket_code, status,
+            items_json, subtotal_usd, line_count, unit_count,
+            created_at, updated_at, last_contact_channel, contacted_at, notes_admin,
+            ip_address, user_agent, user_id, contact_email, discard_by_email, reactivated_at
+          FROM marketplace_quote_tickets
+        `);
+        native.exec("DROP TABLE marketplace_quote_tickets");
+        native.exec("ALTER TABLE marketplace_quote_tickets__orden_lista RENAME TO marketplace_quote_tickets");
+        native.exec("CREATE INDEX IF NOT EXISTS idx_mq_quote_status_updated ON marketplace_quote_tickets(status, updated_at DESC)");
+        native.exec("CREATE INDEX IF NOT EXISTS idx_mq_quote_created ON marketplace_quote_tickets(created_at DESC)");
+        native.exec("COMMIT");
+      } catch (e) {
+        try {
+          native.exec("ROLLBACK");
+        } catch {
+          /* ignore */
+        }
+        throw e;
+      } finally {
+        native.exec("PRAGMA foreign_keys=ON");
+      }
+    }
+  }
+
+  /** Estado `pendiente`: CHECK en BD + migración de `orden_lista` (carrito sin «Generar orden») a `pendiente`. */
+  {
+    const mqRow = native.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='marketplace_quote_tickets'").get() as
+      | { sql: string }
+      | undefined;
+    if (mqRow?.sql && !mqRow.sql.includes("'pendiente'")) {
+      native.exec("PRAGMA foreign_keys=OFF");
+      native.exec("BEGIN");
+      try {
+        native.exec(`CREATE TABLE marketplace_quote_tickets__pendiente (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          session_id TEXT NOT NULL UNIQUE,
+          order_number TEXT UNIQUE,
+          ticket_code TEXT NOT NULL UNIQUE,
+          status TEXT NOT NULL DEFAULT 'borrador' CHECK (status IN ('borrador','pendiente','orden_lista','enviado_consulta','en_contacto_equipo','en_gestion','pagada','en_viaje','instalado','cerrado','descartado')),
+          items_json TEXT NOT NULL,
+          subtotal_usd REAL NOT NULL DEFAULT 0,
+          line_count INTEGER NOT NULL DEFAULT 0,
+          unit_count INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+          last_contact_channel TEXT,
+          contacted_at TEXT,
+          notes_admin TEXT,
+          ip_address TEXT,
+          user_agent TEXT,
+          user_id INTEGER,
+          contact_email TEXT,
+          discard_by_email TEXT,
+          reactivated_at TEXT,
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        )`);
+        native.exec(`
+          INSERT INTO marketplace_quote_tickets__pendiente (
+            id, session_id, order_number, ticket_code, status,
+            items_json, subtotal_usd, line_count, unit_count,
+            created_at, updated_at, last_contact_channel, contacted_at, notes_admin,
+            ip_address, user_agent, user_id, contact_email, discard_by_email, reactivated_at
+          )
+          SELECT id, session_id, order_number, ticket_code, status,
+            items_json, subtotal_usd, line_count, unit_count,
+            created_at, updated_at, last_contact_channel, contacted_at, notes_admin,
+            ip_address, user_agent, user_id, contact_email, discard_by_email, reactivated_at
+          FROM marketplace_quote_tickets
+        `);
+        native.exec(
+          "UPDATE marketplace_quote_tickets__pendiente SET status = 'pendiente' WHERE status = 'orden_lista'"
+        );
+        native.exec("DROP TABLE marketplace_quote_tickets");
+        native.exec("ALTER TABLE marketplace_quote_tickets__pendiente RENAME TO marketplace_quote_tickets");
+        native.exec("CREATE INDEX IF NOT EXISTS idx_mq_quote_status_updated ON marketplace_quote_tickets(status, updated_at DESC)");
+        native.exec("CREATE INDEX IF NOT EXISTS idx_mq_quote_created ON marketplace_quote_tickets(created_at DESC)");
+        native.exec("COMMIT");
+      } catch (e) {
+        try {
+          native.exec("ROLLBACK");
+        } catch {
+          /* ignore */
+        }
+        throw e;
+      } finally {
+        native.exec("PRAGMA foreign_keys=ON");
+      }
+    }
+  }
+
+  try {
+    native.exec("ALTER TABLE marketplace_quote_tickets ADD COLUMN items_history_json TEXT");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
   }
 
   const txWrap = {

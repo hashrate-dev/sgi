@@ -45,6 +45,8 @@ import { CuentaClienteDetallePage } from "./pages/CuentaClienteDetallePage";
 import { ToastContainer } from "./components/ToastNotification";
 import { ScrollToTop } from "./components/ScrollToTop";
 import { MarketplaceLanguageProvider } from "./contexts/MarketplaceLanguageContext";
+import { MarketplaceQuoteCartProvider } from "./contexts/MarketplaceQuoteCartContext";
+import { MarketplaceQuoteCartDrawer } from "./components/marketplace/MarketplaceQuoteCartDrawer";
 import { getStoredUser } from "./lib/auth";
 import type { MarketplacePresenceViewerType } from "./lib/api";
 
@@ -319,8 +321,11 @@ function MarketplacePresenceBeacon() {
 function MarketplaceLayout() {
   return (
     <MarketplaceLanguageProvider>
-      <MarketplacePresenceBeacon />
-      <Outlet />
+      <MarketplaceQuoteCartProvider>
+        <MarketplacePresenceBeacon />
+        <Outlet />
+        <MarketplaceQuoteCartDrawer />
+      </MarketplaceQuoteCartProvider>
     </MarketplaceLanguageProvider>
   );
 }

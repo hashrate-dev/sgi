@@ -12,7 +12,7 @@ import {
   lineHashrateSharePct,
   quoteCartSetupUnitUsd,
   quoteCartWarrantyUnitUsd,
-  marketplaceQuoteTicketLineDisplayName,
+  marketplaceQuoteTicketLineDisplayParts,
   quoteCartLineIsEquipmentPricePending,
   quoteCartHasEquipmentPricePending,
   quoteCartHasMixedPricedAndConsultLines,
@@ -103,9 +103,26 @@ export function MarketplaceQuoteCartDrawer() {
   const n = lines.length;
   const subtitle =
     n === 0 ? null : n === 1 ? t("drawer.sub_one") : tf("drawer.sub_many", { n: String(n) });
-  /** Orden en pipeline: cliente y admin A/B ven el aviso y el carrito se fusiona con esa orden. */
-  const showPipelineOrderHint = Boolean(canUseQuoteCart && blockingPipelineOrder && n > 0);
-  const showTicketRef = Boolean(ticketRef);
+  /** Orden persistida (pendiente / orden lista / embudo): con ítems en carrito. */
+  const blockingSt = (blockingPipelineOrder?.status ?? "").trim().toLowerCase();
+  /**
+   * Aún no quedó en «orden lista»: `pendiente`/`borrador`, o `enviado_consulta` (ABIERTA en panel)
+   * hasta que el cliente pulse «Generar orden».
+   */
+  const isGenerarOrdenPipeline =
+    blockingSt === "pendiente" || blockingSt === "borrador" || blockingSt === "enviado_consulta";
+  const hasActivePipelineOrder = Boolean(canUseQuoteCart && blockingPipelineOrder && n > 0);
+  /** Orden ya generada en BD (`orden_lista` o posterior): el mismo CTA pasa a «Ver orden». */
+  const orderListaGenerada = hasActivePipelineOrder && !isGenerarOrdenPipeline;
+  /** Un solo botón: Generar hasta confirmar; Ver orden cuando ya está en lista / embudo comercial. */
+  const showGenerarOrdenButton = Boolean(canUseQuoteCart && n > 0 && (!hasActivePipelineOrder || isGenerarOrdenPipeline));
+  const showPrimaryOrderCta = showGenerarOrdenButton || orderListaGenerada;
+  const refBanner =
+    ticketRef ??
+    ((isGenerarOrdenPipeline || blockingSt === "orden_lista") && blockingPipelineOrder
+      ? { orderNumber: blockingPipelineOrder.orderNumber, ticketCode: blockingPipelineOrder.ticketCode }
+      : null);
+  const showTicketRef = Boolean(refBanner);
   /** Caja «Orden en curso» / política una orden: con ítems en carrito (cuentas con carrito marketplace). */
   const showCartPolicyFooter =
     drawerSubView === "cart" &&
@@ -176,7 +193,7 @@ export function MarketplaceQuoteCartDrawer() {
                   {t("drawer.hint.p5")}
                 </p>
               </div>
-            ) : showPipelineOrderHint ? null : n === 0 ? (
+            ) : orderListaGenerada ? null : n === 0 ? (
               <div className="market-quote-drawer__lede-wrap">
                 <p className="market-quote-drawer__lede">{t("drawer.lede")}</p>
               </div>
@@ -218,13 +235,17 @@ export function MarketplaceQuoteCartDrawer() {
                   const warrantyUnit = Math.round(quoteCartWarrantyUnitUsd(l, pricing) * addonMult);
                   const equipmentPricePending = quoteCartLineIsEquipmentPricePending(l);
                   const equipmentUnitPriceLabel = equipmentPricePending ? l.priceLabel : `${Math.round(l.priceUsd).toLocaleString("es-PY")} USD`;
+                  const titleParts = marketplaceQuoteTicketLineDisplayParts(l as unknown as Record<string, unknown>, {
+                    includeShareSuffix: false,
+                  });
                   return (
                   <li key={`${lk}#${lineIdx}`} className="market-quote-drawer__line">
                     <div className="market-quote-drawer__line-top">
                       <h3 className="market-quote-drawer__line-name">
-                        {marketplaceQuoteTicketLineDisplayName(l as unknown as Record<string, unknown>, {
-                          includeShareSuffix: false,
-                        })}
+                        <span className="market-quote-drawer__line-name-model">{titleParts.brandModel}</span>
+                        {titleParts.specLine ? (
+                          <span className="market-quote-drawer__line-name-spec">{titleParts.specLine}</span>
+                        ) : null}
                       </h3>
                       <button
                         type="button"
@@ -377,13 +398,13 @@ export function MarketplaceQuoteCartDrawer() {
           </div>
           {n > 0 ? (
             <div className="market-quote-drawer__cart-sticky-summary" role="region" aria-labelledby="market-quote-drawer-total-heading">
-              {showTicketRef && ticketRef ? (
+              {showTicketRef && refBanner ? (
                 <p className="market-quote-drawer__ticket-ref" aria-live="polite">
                   <span className="market-quote-drawer__ticket-ref-label">{t("drawer.ref_label")}</span>
                   <span className="market-quote-drawer__ticket-ref-codes">
-                    <strong>{ticketRef.orderNumber}</strong>
+                    <strong>{refBanner.orderNumber}</strong>
                     <span className="market-quote-drawer__ticket-ref-sep">·</span>
-                    <span>{ticketRef.ticketCode}</span>
+                    <span>{refBanner.ticketCode}</span>
                   </span>
                 </p>
               ) : null}
@@ -437,13 +458,22 @@ export function MarketplaceQuoteCartDrawer() {
             </p>
           ) : null}
           <div className="market-quote-drawer__cta">
-            {canUseQuoteCart && n > 0 && !showPipelineOrderHint ? (
+            {showPrimaryOrderCta ? (
               <div className="market-quote-drawer__cta-submit-wrap">
                 <button
                   type="button"
-                  className="market-quote-drawer__btn market-quote-drawer__btn--solid"
+                  className={
+                    orderListaGenerada
+                      ? "market-quote-drawer__btn market-quote-drawer__btn--close-order"
+                      : "market-quote-drawer__btn market-quote-drawer__btn--solid"
+                  }
                   disabled={submitBusy || contactBusy !== null}
+                  aria-label={orderListaGenerada ? t("drawer.view_order") : t("drawer.gen_ticket")}
                   onClick={() => {
+                    if (orderListaGenerada) {
+                      switchDrawerToOrders();
+                      return;
+                    }
                     setSubmitErr("");
                     setSubmitBusy(true);
                     void submitConsultationTicket()
@@ -459,19 +489,7 @@ export function MarketplaceQuoteCartDrawer() {
                       .finally(() => setSubmitBusy(false));
                   }}
                 >
-                  {submitBusy ? t("drawer.gen_busy") : t("drawer.gen_ticket")}
-                </button>
-              </div>
-            ) : null}
-            {canUseQuoteCart && n > 0 && showPipelineOrderHint ? (
-              <div className="market-quote-drawer__cta-submit-wrap">
-                <button
-                  type="button"
-                  className="market-quote-drawer__btn market-quote-drawer__btn--close-order"
-                  disabled={submitBusy || contactBusy !== null}
-                  onClick={switchDrawerToOrders}
-                >
-                  {t("drawer.close_order_cta")}
+                  {orderListaGenerada ? t("drawer.view_order") : submitBusy ? t("drawer.gen_busy") : t("drawer.gen_ticket")}
                 </button>
               </div>
             ) : null}
