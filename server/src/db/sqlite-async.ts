@@ -229,6 +229,22 @@ CREATE TABLE IF NOT EXISTS marketplace_presence (
 );
 CREATE INDEX IF NOT EXISTS idx_marketplace_presence_seen ON marketplace_presence(last_seen_at DESC);
 
+CREATE TABLE IF NOT EXISTS marketplace_presence_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  visitor_id TEXT NOT NULL,
+  viewer_type TEXT NOT NULL,
+  country_code TEXT,
+  country_name TEXT,
+  client_ip TEXT,
+  user_email TEXT,
+  current_path TEXT,
+  locale TEXT,
+  timezone TEXT,
+  recorded_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_recorded ON marketplace_presence_history(recorded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_visitor ON marketplace_presence_history(visitor_id, recorded_at DESC);
+
 CREATE TABLE IF NOT EXISTS marketplace_site_kv (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
@@ -415,6 +431,24 @@ CREATE INDEX IF NOT EXISTS idx_equipos_asic_audit_created ON equipos_asic_audit(
       if (!msg.includes("duplicate column")) throw e;
     }
   }
+
+  native.exec(`
+CREATE TABLE IF NOT EXISTS marketplace_presence_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  visitor_id TEXT NOT NULL,
+  viewer_type TEXT NOT NULL,
+  country_code TEXT,
+  country_name TEXT,
+  client_ip TEXT,
+  user_email TEXT,
+  current_path TEXT,
+  locale TEXT,
+  timezone TEXT,
+  recorded_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_recorded ON marketplace_presence_history(recorded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_visitor ON marketplace_presence_history(visitor_id, recorded_at DESC);
+`);
 
   native.exec(`CREATE TABLE IF NOT EXISTS marketplace_site_kv (
     key TEXT PRIMARY KEY,

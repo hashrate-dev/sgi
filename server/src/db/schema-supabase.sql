@@ -243,6 +243,23 @@ CREATE TABLE IF NOT EXISTS marketplace_presence (
   last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_marketplace_presence_seen ON marketplace_presence(last_seen_at DESC);
+
+CREATE TABLE IF NOT EXISTS marketplace_presence_history (
+  id BIGSERIAL PRIMARY KEY,
+  visitor_id TEXT NOT NULL,
+  viewer_type TEXT NOT NULL,
+  country_code TEXT,
+  country_name TEXT,
+  client_ip TEXT,
+  user_email TEXT,
+  current_path TEXT,
+  locale TEXT,
+  timezone TEXT,
+  recorded_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_recorded ON marketplace_presence_history(recorded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_visitor ON marketplace_presence_history(visitor_id, recorded_at DESC);
+
 ALTER TABLE marketplace_presence ADD COLUMN IF NOT EXISTS country_code TEXT;
 ALTER TABLE marketplace_presence ADD COLUMN IF NOT EXISTS country_name TEXT;
 ALTER TABLE marketplace_presence ADD COLUMN IF NOT EXISTS client_ip TEXT;

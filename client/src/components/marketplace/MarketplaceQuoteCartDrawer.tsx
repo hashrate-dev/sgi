@@ -103,7 +103,6 @@ export function MarketplaceQuoteCartDrawer() {
   const n = lines.length;
   const subtitle =
     n === 0 ? null : n === 1 ? t("drawer.sub_one") : tf("drawer.sub_many", { n: String(n) });
-  /** Orden persistida (pendiente / orden lista / embudo): con ítems en carrito. */
   const blockingSt = (blockingPipelineOrder?.status ?? "").trim().toLowerCase();
   /**
    * Aún no quedó en «orden lista»: `pendiente`/`borrador`, o `enviado_consulta` (ABIERTA en panel)
@@ -111,22 +110,21 @@ export function MarketplaceQuoteCartDrawer() {
    */
   const isGenerarOrdenPipeline =
     blockingSt === "pendiente" || blockingSt === "borrador" || blockingSt === "enviado_consulta";
-  const hasActivePipelineOrder = Boolean(canUseQuoteCart && blockingPipelineOrder && n > 0);
-  /** Orden ya generada en BD (`orden_lista` o posterior): el mismo CTA pasa a «Ver orden». */
-  const orderListaGenerada = hasActivePipelineOrder && !isGenerarOrdenPipeline;
-  const pipelinePortalSubmitted =
-    String(blockingPipelineOrder?.lastContactChannel ?? "")
-      .trim()
-      .toLowerCase() === "portal";
+  /** Hay orden en embudo (aunque el carrito local esté vacío: refs + «Generar orden» siguen aplicando). */
+  const hasBlockingOrder = Boolean(canUseQuoteCart && blockingPipelineOrder);
   /**
-   * CTA principal «Ver orden»: embudo ya pasó de «solo carrito», o bien `pendiente` tras haber generado por portal
-   * (p. ej. carrito re-editado y gate/estado aún no alineados) — no volver a ofrecer «Generar orden».
+   * Orden ya generada en BD: `orden_lista` o estados posteriores del embudo (no `pendiente` / `borrador` / ABIERTA).
+   * Solo entonces el CTA pasa a «Ver orden»; antes siempre «Generar orden» (la orden se crea/confirmá solo con ese click).
    */
-  const primaryCtaViewMode =
-    orderListaGenerada ||
-    (hasActivePipelineOrder && pipelinePortalSubmitted && blockingSt === "pendiente");
+  const orderListaGenerada = hasBlockingOrder && !isGenerarOrdenPipeline;
+  /** true → botón naranja abre seguimiento; false → mismo botón ejecuta `submitConsultationTicket` («Generar orden»). */
+  const primaryCtaViewMode = orderListaGenerada;
   /** Un solo botón: Generar hasta confirmar; Ver orden cuando ya está en lista / embudo comercial. */
-  const showGenerarOrdenButton = Boolean(canUseQuoteCart && n > 0 && (!hasActivePipelineOrder || isGenerarOrdenPipeline));
+  const showGenerarOrdenButton = Boolean(
+    canUseQuoteCart &&
+      (n > 0 || (hasBlockingOrder && isGenerarOrdenPipeline)) &&
+      (!hasBlockingOrder || isGenerarOrdenPipeline)
+  );
   const showPrimaryOrderCta = showGenerarOrdenButton || orderListaGenerada;
   const refBanner =
     ticketRef ??
@@ -134,10 +132,10 @@ export function MarketplaceQuoteCartDrawer() {
       ? { orderNumber: blockingPipelineOrder.orderNumber, ticketCode: blockingPipelineOrder.ticketCode }
       : null);
   const showTicketRef = Boolean(refBanner);
-  /** Caja «Orden en curso» / política una orden: con ítems en carrito (cuentas con carrito marketplace). */
+  /** Caja «Orden en curso» / política una orden: ítems en carrito u orden en pipeline visible sin líneas locales. */
   const showCartPolicyFooter =
     drawerSubView === "cart" &&
-    n > 0 &&
+    (n > 0 || hasBlockingOrder) &&
     Boolean(user && canUseQuoteCart && enforceSingleMarketplaceOrderForRole(user.role));
 
   /** Priorizar altura útil de la lista: encabezado/pie más bajos cuando ya hay equipos */
@@ -198,9 +196,13 @@ export function MarketplaceQuoteCartDrawer() {
                 <p className="market-quote-drawer__lede">{t("drawer.lede")}</p>
                 <p className="market-quote-drawer__login-hint" role="note">
                   {t("drawer.hint.p1")}{" "}
-                  <Link to="/marketplace/login">{t("drawer.login_link")}</Link>
+                  <Link to="/marketplace/login" onClick={closeDrawer}>
+                    {t("drawer.login_link")}
+                  </Link>
                   {t("drawer.hint.p2")}
-                  <Link to="/marketplace/signup">{t("drawer.register_link")}</Link>
+                  <Link to="/marketplace/signup" onClick={closeDrawer}>
+                    {t("drawer.register_link")}
+                  </Link>
                   {t("drawer.hint.p5")}
                 </p>
               </div>
@@ -407,10 +409,14 @@ export function MarketplaceQuoteCartDrawer() {
             </>
           )}
           </div>
-          {n > 0 ? (
-            <div className="market-quote-drawer__cart-sticky-summary" role="region" aria-labelledby="market-quote-drawer-total-heading">
+          {n > 0 || (hasBlockingOrder && showTicketRef && refBanner) ? (
+            <div
+              className="market-quote-drawer__cart-sticky-summary"
+              role="region"
+              aria-labelledby={n > 0 ? "market-quote-drawer-total-heading" : "market-quote-drawer-ref-stripe"}
+            >
               {showTicketRef && refBanner ? (
-                <p className="market-quote-drawer__ticket-ref" aria-live="polite">
+                <p id="market-quote-drawer-ref-stripe" className="market-quote-drawer__ticket-ref" aria-live="polite">
                   <span className="market-quote-drawer__ticket-ref-label">{t("drawer.ref_label")}</span>
                   <span className="market-quote-drawer__ticket-ref-codes">
                     <strong>{refBanner.orderNumber}</strong>
@@ -419,6 +425,7 @@ export function MarketplaceQuoteCartDrawer() {
                   </span>
                 </p>
               ) : null}
+              {n > 0 ? (
               <div
                 className={
                   "market-quote-drawer__total" +
@@ -454,6 +461,7 @@ export function MarketplaceQuoteCartDrawer() {
                     : `${totalRef.toLocaleString(loc)} USD`}
                 </strong>
               </div>
+              ) : null}
             </div>
           ) : null}
             </>
@@ -555,7 +563,11 @@ export function MarketplaceQuoteCartDrawer() {
                 </button>
               </div>
             ) : (
-              <Link to="/marketplace/login" className="market-quote-drawer__btn market-quote-drawer__btn--solid text-center text-decoration-none">
+              <Link
+                to="/marketplace/login"
+                className="market-quote-drawer__btn market-quote-drawer__btn--solid text-center text-decoration-none"
+                onClick={closeDrawer}
+              >
                 {t("drawer.login_cta")}
               </Link>
             )}

@@ -30,6 +30,8 @@ export const marketplaceRouter = Router();
 const canManage = requireRole("admin_a", "admin_b", "operador");
 const adminAB = requireRole("admin_a", "admin_b");
 const MARKETPLACE_PRESENCE_ONLINE_WINDOW_MS = 90_000;
+/** Evita duplicar filas cuando el cliente envía dos heartbeats seguidos (locale/IP) con el mismo estado. */
+const MARKETPLACE_PRESENCE_HISTORY_DEDUPE_MS = 15_000;
 const IP_COUNTRY_CACHE_TTL_MS = 60 * 60 * 1000;
 const ipCountryCache = new Map<string, { countryCode: string; countryName: string; expiresAt: number }>();
 
@@ -353,6 +355,86 @@ function isPg(): boolean {
   return (getDb() as { isPostgres?: boolean }).isPostgres === true;
 }
 
+type MarketplacePresenceHistorySnapshot = {
+  visitorId: string;
+  viewerType: string;
+  countryCode: string;
+  countryName: string;
+  clientIp: string;
+  userEmail: string;
+  currentPath: string;
+  locale: string;
+  timezone: string;
+};
+
+function presenceHistorySignature(s: MarketplacePresenceHistorySnapshot): string {
+  return JSON.stringify([
+    s.viewerType,
+    s.countryCode,
+    s.countryName,
+    s.clientIp,
+    s.userEmail,
+    s.currentPath,
+    s.locale,
+    s.timezone,
+  ]);
+}
+
+async function maybeRecordMarketplacePresenceHistory(
+  snap: MarketplacePresenceHistorySnapshot,
+  recordedAtIso: string
+): Promise<void> {
+  try {
+    const lastRaw = (await db
+      .prepare(
+        `SELECT visitor_id, viewer_type, country_code, country_name, client_ip, user_email, current_path, locale, timezone, recorded_at
+         FROM marketplace_presence_history WHERE visitor_id = ? ORDER BY id DESC LIMIT 1`
+      )
+      .get(snap.visitorId)) as Record<string, unknown> | undefined;
+    if (lastRaw) {
+      const lr = rowKeysToLowercase(lastRaw) as Record<string, string>;
+      const prev: MarketplacePresenceHistorySnapshot = {
+        visitorId: snap.visitorId,
+        viewerType: String(lr.viewer_type || ""),
+        countryCode: normalizeCountryCode(lr.country_code),
+        countryName: String(lr.country_name || "").trim(),
+        clientIp: String(lr.client_ip || "").trim(),
+        userEmail: String(lr.user_email || "").trim().toLowerCase(),
+        currentPath: String(lr.current_path || "").trim(),
+        locale: String(lr.locale || "").trim(),
+        timezone: String(lr.timezone || "").trim(),
+      };
+      const lastMs = new Date(String(lr.recorded_at || "")).getTime();
+      if (
+        presenceHistorySignature(prev) === presenceHistorySignature(snap) &&
+        Number.isFinite(lastMs) &&
+        Date.now() - lastMs < MARKETPLACE_PRESENCE_HISTORY_DEDUPE_MS
+      ) {
+        return;
+      }
+    }
+    await db
+      .prepare(
+        `INSERT INTO marketplace_presence_history (visitor_id, viewer_type, country_code, country_name, client_ip, user_email, current_path, locale, timezone, recorded_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        snap.visitorId.slice(0, 120),
+        snap.viewerType,
+        snap.countryCode.slice(0, 2),
+        snap.countryName.slice(0, 80),
+        snap.clientIp.slice(0, 80),
+        snap.userEmail.slice(0, 200),
+        snap.currentPath.slice(0, 200),
+        snap.locale.slice(0, 20),
+        snap.timezone.slice(0, 60),
+        recordedAtIso
+      );
+  } catch {
+    /* historial no debe romper el heartbeat */
+  }
+}
+
 function equipoDbRowToVitrinaInput(raw: Record<string, unknown>): EquipoAsicVitrinaRow | null {
   const r = rowKeysToLowercase(raw);
   const id = String(r.id ?? "").trim();
@@ -457,6 +539,23 @@ marketplaceRouter.post("/marketplace/presence/heartbeat", async (req: Request, r
       await db.prepare(upsertSql).run(parsed.data.visitorId, viewerType, countryCode, countryName, clientIp, userEmail, currentPath, nowIso);
     }
     await db.prepare("DELETE FROM marketplace_presence WHERE last_seen_at < ?").run(cutoffIso);
+    const visitorKey = String(parsed.data.visitorId || "").trim();
+    if (visitorKey.length >= 8) {
+      await maybeRecordMarketplacePresenceHistory(
+        {
+          visitorId: visitorKey,
+          viewerType,
+          countryCode: normalizeCountryCode(countryCode),
+          countryName: String(countryName || "").trim().slice(0, 80),
+          clientIp: String(clientIp || "").trim().slice(0, 80),
+          userEmail,
+          currentPath,
+          locale: String(parsed.data.locale || "").trim().slice(0, 20),
+          timezone: String(parsed.data.timezone || "").trim().slice(0, 60),
+        },
+        nowIso
+      );
+    }
     res.status(204).send();
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -612,6 +711,53 @@ marketplaceRouter.get("/marketplace/presence-live", requireAuth, adminAB, async 
       windowSeconds: Math.floor(MARKETPLACE_PRESENCE_ONLINE_WINDOW_MS / 1000),
       asOf: new Date().toISOString(),
     });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: { message: msg } });
+  }
+});
+
+/** Historial de heartbeats del marketplace (staff / cliente / invitado), persistido en BD. */
+marketplaceRouter.get("/marketplace/presence-history", requireAuth, adminAB, async (req: Request, res: Response) => {
+  try {
+    const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 200));
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+    const qRaw = String(req.query.q || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[%_\\]/g, "")
+      .slice(0, 120);
+    const pat = qRaw ? `%${qRaw}%` : "";
+    const where = qRaw
+      ? ` WHERE LOWER(visitor_id) LIKE ? OR LOWER(COALESCE(user_email,'')) LIKE ? OR LOWER(COALESCE(current_path,'')) LIKE ? OR LOWER(COALESCE(client_ip,'')) LIKE ? OR LOWER(COALESCE(country_name,'')) LIKE ?`
+      : "";
+    const countRow = (await db
+      .prepare(`SELECT COUNT(*) as c FROM marketplace_presence_history${where}`)
+      .get(...(qRaw ? [pat, pat, pat, pat, pat] : []))) as { c: number } | undefined;
+    const total = Number(countRow?.c) || 0;
+    const rowsRaw = (await db
+      .prepare(
+        `SELECT id, visitor_id, viewer_type, country_code, country_name, client_ip, user_email, current_path, locale, timezone, recorded_at
+         FROM marketplace_presence_history${where} ORDER BY recorded_at DESC, id DESC LIMIT ? OFFSET ?`
+      )
+      .all(...(qRaw ? [pat, pat, pat, pat, pat, limit, offset] : [limit, offset]))) as Array<Record<string, unknown>>;
+    const rows = rowsRaw.map((raw) => {
+      const r = rowKeysToLowercase(raw) as Record<string, string | number | null | undefined>;
+      return {
+        id: Number(r.id) || 0,
+        visitorId: String(r.visitor_id || ""),
+        viewerType: String(r.viewer_type || ""),
+        countryCode: normalizeCountryCode(r.country_code) || "UN",
+        countryName: String(r.country_name || "").trim() || "Desconocido",
+        clientIp: String(r.client_ip || "").trim(),
+        userEmail: String(r.user_email || "").trim(),
+        currentPath: String(r.current_path || "").trim() || "/marketplace",
+        locale: String(r.locale || "").trim(),
+        timezone: String(r.timezone || "").trim(),
+        recordedAt: String(r.recorded_at || ""),
+      };
+    });
+    res.json({ rows, total, limit, offset });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     res.status(500).json({ error: { message: msg } });

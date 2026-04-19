@@ -42,12 +42,13 @@ import { MarketplaceAsicEmailInquiryPage } from "./pages/MarketplaceAsicEmailInq
 import { MarketplaceClienteLoginPage } from "./pages/MarketplaceClienteLoginPage";
 import { MarketplaceClienteRegistroPage } from "./pages/MarketplaceClienteRegistroPage";
 import { MarketplacePresencePage } from "./pages/MarketplacePresencePage";
+import { MarketplacePresenceHistorialPage } from "./pages/MarketplacePresenceHistorialPage";
 import { CuentaClientePage } from "./pages/CuentaClientePage";
 import { CuentaClienteDetallePage } from "./pages/CuentaClienteDetallePage";
 import { ToastContainer } from "./components/ToastNotification";
 import { ScrollToTop } from "./components/ScrollToTop";
 import { MarketplaceLanguageProvider } from "./contexts/MarketplaceLanguageContext";
-import { MarketplaceQuoteCartProvider } from "./contexts/MarketplaceQuoteCartContext";
+import { MarketplaceQuoteCartProvider, useMarketplaceQuoteCart } from "./contexts/MarketplaceQuoteCartContext";
 import { MarketplaceQuoteCartDrawer } from "./components/marketplace/MarketplaceQuoteCartDrawer";
 import { getStoredUser } from "./lib/auth";
 import type { MarketplacePresenceViewerType } from "./lib/api";
@@ -319,11 +320,25 @@ function MarketplacePresenceBeacon() {
   return null;
 }
 
+/** Cierra el drawer del carrito en login/registro para no tapar ni mezclar blur con el formulario. */
+function MarketplaceCloseCartOnAuthRoute() {
+  const { pathname } = useLocation();
+  const { closeDrawer } = useMarketplaceQuoteCart();
+  useEffect(() => {
+    const p = pathname.replace(/\/+$/, "") || "/";
+    if (p === "/marketplace/login" || p === "/marketplace/signup") {
+      closeDrawer();
+    }
+  }, [pathname, closeDrawer]);
+  return null;
+}
+
 /** Outlet para anidar /marketplace, /marketplace/login, /marketplace/signup (matching estable en RR7). */
 function MarketplaceLayout() {
   return (
     <MarketplaceLanguageProvider>
       <MarketplaceQuoteCartProvider>
+        <MarketplaceCloseCartOnAuthRoute />
         <MarketplacePresenceBeacon />
         <Outlet />
         <MarketplaceQuoteCartDrawer />
@@ -400,6 +415,7 @@ function App() {
               element={<CotizacionesMarketplaceHistorialDetallePage />}
             />
             <Route path="/cotizaciones-marketplace" element={<CotizacionesMarketplacePage />} />
+            <Route path="/marketplace-presencia/historial" element={<MarketplacePresenceHistorialPage />} />
             <Route path="/marketplace-presencia" element={<MarketplacePresencePage />} />
             <Route path="/usuarios/*" element={<UsuariosPage />} />
           </Route>

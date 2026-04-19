@@ -71,6 +71,11 @@ const SyncSchema = z.object({
    * Sin esto, un POST vacío tras “generar consulta” borraba el ticket recién creado.
    */
   clearPipelineCart: z.boolean().optional(),
+  /**
+   * true solo al pulsar «Generar orden» en el carrito (no en sync ni en «Ver orden»).
+   * Habilita el correo «ORDEN GENERADA» cuando el estado pasa de ABIERTA (`enviado_consulta`) a `orden_lista`.
+   */
+  confirmGenerarOrden: z.boolean().optional(),
 });
 
 /** Último email de ficha tienda (`clients`) por usuario; usado si `contact_email` quedó como username. */
@@ -86,6 +91,22 @@ const REACTIVATE_CANCELLED_WINDOW_MS = 30 * 24 * 60 * 60 * 1000; // 1 mes
 
 type QuoteLine = z.infer<typeof LineSchema>;
 type TrustedQuoteLine = Omit<QuoteLine, "priceUsd"> & { priceUsd: number };
+
+/** Líneas persistidas en `items_json` del ticket (mismo shape que el cliente en quote-sync). */
+function parseStoredQuoteLinesJson(itemsJsonRaw: string): QuoteLine[] {
+  try {
+    const v = JSON.parse(String(itemsJsonRaw || "[]")) as unknown;
+    if (!Array.isArray(v)) return [];
+    const out: QuoteLine[] = [];
+    for (const el of v) {
+      const p = LineSchema.safeParse(el);
+      if (p.success) out.push(p.data);
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
 
 type SharePartRule = { sharePct: number; warrantyPct: number; setupUsd: number };
 
@@ -416,22 +437,41 @@ function resolveStatusAfterContact(currentStatus: string, hasContactEvent: boole
 }
 
 /**
- * Resend «Nueva orden»: `pendiente` / `borrador` / reactivación desde `descartado` → `orden_lista`.
- * Desde `enviado_consulta` (ABIERTA) se usa `shouldNotifyResendOrderGenerada` + `notifyMarketplaceOrderGeneradaEmail`.
+ * Resend «Nueva orden»: `pendiente` / `borrador` / `descartado` → `orden_lista` solo con `submit_ticket` y
+ * `confirmGenerarOrden: true` (pulsación explícita de «Generar orden»). Los `sync` de carrito no envían el flag → silencio.
  */
-function shouldNotifyResendNuevaOrdenLista(prevNorm: string, nextNorm: string, isSubmit: boolean): boolean {
+function shouldNotifyResendNuevaOrdenLista(
+  prevNorm: string,
+  nextNorm: string,
+  isSubmit: boolean,
+  confirmGenerarOrden: boolean
+): boolean {
   if (!isSubmit || nextNorm !== "orden_lista") return false;
+  if (!confirmGenerarOrden) return false;
   return prevNorm === "pendiente" || prevNorm === "borrador" || prevNorm === "descartado";
 }
 
-/** Resend «ORDEN GENERADA»: solo `enviado_consulta` → `orden_lista` (botón Generar orden en carrito). */
-function shouldNotifyResendOrderGenerada(prevNorm: string, nextNorm: string, isSubmit: boolean): boolean {
+/** Resend «ORDEN GENERADA»: `enviado_consulta` → `orden_lista` y confirmación explícita del cliente. */
+function shouldNotifyResendOrderGenerada(
+  prevNorm: string,
+  nextNorm: string,
+  isSubmit: boolean,
+  confirmGenerarOrden: boolean
+): boolean {
   if (!isSubmit || nextNorm !== "orden_lista") return false;
-  return prevNorm === "enviado_consulta";
+  if (prevNorm !== "enviado_consulta") return false;
+  return confirmGenerarOrden === true;
 }
 
-function shouldNotifySalesWhatsappOrderLista(prevNorm: string, nextNorm: string, isSubmit: boolean): boolean {
+/** WhatsApp aviso de orden lista: misma regla que los mails (solo `submit_ticket` + confirm explícita). */
+function shouldNotifySalesWhatsappOrderLista(
+  prevNorm: string,
+  nextNorm: string,
+  isSubmit: boolean,
+  confirmGenerarOrden: boolean
+): boolean {
   if (!isSubmit || nextNorm !== "orden_lista") return false;
+  if (!confirmGenerarOrden) return false;
   return (
     prevNorm === "pendiente" ||
     prevNorm === "borrador" ||
@@ -448,7 +488,8 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
     if (!parsed.success) {
       return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
     }
-    const { lines, event, clearPipelineCart } = parsed.data;
+    let { lines, event, clearPipelineCart } = parsed.data;
+    const confirmGenerarOrden = parsed.data.confirmGenerarOrden === true;
     const garantiaItems = await loadGarantiaQuoteRows();
     const userId = req.user!.id;
     const userRole = String(req.user!.role ?? "").toLowerCase().trim();
@@ -460,6 +501,32 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
     const ip = clientIp(req);
     const ua = (typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : "").slice(0, 500);
     const nowIso = new Date().toISOString();
+
+    /**
+     * Carrito vacío en cliente pero «Generar orden»: usar ítems ya guardados en la orden en pipeline
+     * (p. ej. tras vaciar lista local o desincronización) para no borrar el ticket ni fallar el submit.
+     */
+    if (
+      lines.length === 0 &&
+      event === "submit_ticket" &&
+      singleMarketplaceOrderPolicy &&
+      clearPipelineCart !== true
+    ) {
+      const blockingItems = (await db
+        .prepare(
+          `SELECT items_json FROM marketplace_quote_tickets
+           WHERE status IN (${MQT_PIPELINE_STATUS_IN_SQL})
+           AND (session_id = ? OR session_id LIKE ?)
+           ORDER BY updated_at DESC LIMIT 1`
+        )
+        .get(sessionId, `${sessionId}:%`)) as { items_json: string | null } | undefined;
+      if (blockingItems) {
+        const restored = parseStoredQuoteLinesJson(rowItemsJsonAsString(blockingItems.items_json));
+        if (restored.length > 0) {
+          lines = restored;
+        }
+      }
+    }
 
     if (lines.length === 0) {
       /**
@@ -627,7 +694,7 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
 
         const mergePrevNorm = stNorm;
         const mergeNextNorm = normalizeTicketStatusDb(rowStatusOut);
-        if (shouldNotifyResendNuevaOrdenLista(mergePrevNorm, mergeNextNorm, isSubmitTicketMerge)) {
+        if (shouldNotifyResendNuevaOrdenLista(mergePrevNorm, mergeNextNorm, isSubmitTicketMerge, confirmGenerarOrden)) {
           void notifyMarketplaceOrderEmail({
             orderNumber,
             ticketCode: blocking.ticket_code,
@@ -635,7 +702,7 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
             subtotalUsd: mergedSub,
           }).catch((e) => console.error("[email] marketplace order notify (merge submit):", e));
         }
-        if (shouldNotifyResendOrderGenerada(mergePrevNorm, mergeNextNorm, isSubmitTicketMerge)) {
+        if (shouldNotifyResendOrderGenerada(mergePrevNorm, mergeNextNorm, isSubmitTicketMerge, confirmGenerarOrden)) {
           void notifyMarketplaceOrderGeneradaEmail({
             orderNumber,
             ticketCode: blocking.ticket_code,
@@ -643,7 +710,7 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
             subtotalUsd: mergedSub,
           }).catch((e) => console.error("[email] marketplace ORDEN GENERADA (merge submit):", e));
         }
-        if (shouldNotifySalesWhatsappOrderLista(mergePrevNorm, mergeNextNorm, isSubmitTicketMerge)) {
+        if (shouldNotifySalesWhatsappOrderLista(mergePrevNorm, mergeNextNorm, isSubmitTicketMerge, confirmGenerarOrden)) {
           void notifyMarketplaceOrderWhatsApp({
             orderNumber,
             ticketCode: blocking.ticket_code,
@@ -821,7 +888,7 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
           .prepare("UPDATE marketplace_quote_tickets SET session_id = ? WHERE id = ?")
           .run(submittedSessionId(userId, existing.id), existing.id);
       }
-      if (shouldNotifyResendNuevaOrdenLista(prevNorm, nextNorm, isSubmitTicket)) {
+      if (shouldNotifyResendNuevaOrdenLista(prevNorm, nextNorm, isSubmitTicket, confirmGenerarOrden)) {
         void notifyMarketplaceOrderEmail({
           orderNumber,
           ticketCode: existing.ticket_code,
@@ -829,7 +896,7 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
           subtotalUsd: subtotal,
         }).catch((e) => console.error("[email] marketplace order notify:", e));
       }
-      if (shouldNotifyResendOrderGenerada(prevNorm, nextNorm, isSubmitTicket)) {
+      if (shouldNotifyResendOrderGenerada(prevNorm, nextNorm, isSubmitTicket, confirmGenerarOrden)) {
         void notifyMarketplaceOrderGeneradaEmail({
           orderNumber,
           ticketCode: existing.ticket_code,
@@ -837,7 +904,7 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
           subtotalUsd: subtotal,
         }).catch((e) => console.error("[email] marketplace ORDEN GENERADA:", e));
       }
-      if (shouldNotifySalesWhatsappOrderLista(prevNorm, nextNorm, isSubmitTicket)) {
+      if (shouldNotifySalesWhatsappOrderLista(prevNorm, nextNorm, isSubmitTicket, confirmGenerarOrden)) {
         void notifyMarketplaceOrderWhatsApp({
           orderNumber,
           ticketCode: existing.ticket_code,
@@ -848,7 +915,7 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
       if (process.env.NODE_ENV !== "production") {
         // eslint-disable-next-line no-console
         console.log(
-          `[quote-sync] existing id=${existing.id} prev=${prevNorm} next=${nextNorm} submit=${isSubmitTicket} resendNueva=${shouldNotifyResendNuevaOrdenLista(prevNorm, nextNorm, isSubmitTicket)} resendGenerada=${shouldNotifyResendOrderGenerada(prevNorm, nextNorm, isSubmitTicket)} wa=${shouldNotifySalesWhatsappOrderLista(prevNorm, nextNorm, isSubmitTicket)}`
+          `[quote-sync] existing id=${existing.id} prev=${prevNorm} next=${nextNorm} submit=${isSubmitTicket} confirmGen=${confirmGenerarOrden} resendNueva=${shouldNotifyResendNuevaOrdenLista(prevNorm, nextNorm, isSubmitTicket, confirmGenerarOrden)} resendGenerada=${shouldNotifyResendOrderGenerada(prevNorm, nextNorm, isSubmitTicket, confirmGenerarOrden)} wa=${shouldNotifySalesWhatsappOrderLista(prevNorm, nextNorm, isSubmitTicket, confirmGenerarOrden)}`
         );
       }
       return res.json({
@@ -927,19 +994,21 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
           await db
             .prepare("UPDATE marketplace_quote_tickets SET session_id = ? WHERE id = ?")
             .run(submittedSessionId(userId, latestCancelled.id), latestCancelled.id);
-          const ordNum = latestCancelled.order_number ?? `ORD-${String(latestCancelled.id).padStart(7, "0")}`;
-          void notifyMarketplaceOrderEmail({
-            orderNumber: ordNum,
-            ticketCode: latestCancelled.ticket_code,
-            contactEmail: contactEmail ?? "",
-            subtotalUsd: subtotal,
-          }).catch((e) => console.error("[email] marketplace order notify (reactivate submit):", e));
-          void notifyMarketplaceOrderWhatsApp({
-            orderNumber: ordNum,
-            ticketCode: latestCancelled.ticket_code,
-            contactEmail: contactEmail ?? "",
-            subtotalUsd: subtotal,
-          }).catch((e) => console.error("[whatsapp] marketplace order notify (reactivate submit):", e));
+          if (confirmGenerarOrden) {
+            const ordNum = latestCancelled.order_number ?? `ORD-${String(latestCancelled.id).padStart(7, "0")}`;
+            void notifyMarketplaceOrderEmail({
+              orderNumber: ordNum,
+              ticketCode: latestCancelled.ticket_code,
+              contactEmail: contactEmail ?? "",
+              subtotalUsd: subtotal,
+            }).catch((e) => console.error("[email] marketplace order notify (reactivate submit):", e));
+            void notifyMarketplaceOrderWhatsApp({
+              orderNumber: ordNum,
+              ticketCode: latestCancelled.ticket_code,
+              contactEmail: contactEmail ?? "",
+              subtotalUsd: subtotal,
+            }).catch((e) => console.error("[whatsapp] marketplace order notify (reactivate submit):", e));
+          }
         }
         return res.json({
           ok: true,
@@ -1021,7 +1090,7 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quote
         });
         insertOk = true;
         await tryAppendQuoteCartHistory(created.id, "[]", trustedLines, nowIso);
-        if (isSubmitTicket) {
+        if (isSubmitTicket && confirmGenerarOrden) {
           void notifyMarketplaceOrderEmail({
             orderNumber: created.orderNumber,
             ticketCode: code,

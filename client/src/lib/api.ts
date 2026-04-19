@@ -1116,6 +1116,8 @@ export function syncMarketplaceQuoteTicket(payload: {
   event?: "sync" | "contact_email" | "contact_whatsapp" | "submit_ticket";
   /** Si true con lines vacío: vaciar ítems en la orden marketplace en curso (no usar tras generar consulta). */
   clearPipelineCart?: boolean;
+  /** Solo con `event: "submit_ticket"`: pulsación explícita de «Generar orden» (habilita mail ORDEN GENERADA si aplica). */
+  confirmGenerarOrden?: true;
 }): Promise<{
   ok: boolean;
   cleared?: boolean;
@@ -1371,6 +1373,33 @@ export function getMarketplacePresenceLive(): Promise<{
   asOf: string;
 }> {
   return api("/api/marketplace/presence-live");
+}
+
+export type MarketplacePresenceHistoryRow = {
+  id: number;
+  visitorId: string;
+  viewerType: string;
+  countryCode: string;
+  countryName: string;
+  clientIp: string;
+  userEmail: string;
+  currentPath: string;
+  locale: string;
+  timezone: string;
+  recordedAt: string;
+};
+
+export function getMarketplacePresenceHistory(params?: {
+  limit?: number;
+  offset?: number;
+  q?: string;
+}): Promise<{ rows: MarketplacePresenceHistoryRow[]; total: number; limit: number; offset: number }> {
+  const qs = new URLSearchParams();
+  if (params?.limit != null) qs.set("limit", String(params.limit));
+  if (params?.offset != null) qs.set("offset", String(params.offset));
+  if (params?.q) qs.set("q", params.q);
+  const suf = qs.toString();
+  return api(`/api/marketplace/presence-history${suf ? `?${suf}` : ""}`);
 }
 
 export function getMarketplaceQuoteTickets(params?: {

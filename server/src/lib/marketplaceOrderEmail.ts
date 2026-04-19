@@ -7,8 +7,9 @@ import {
 
 /**
  * Avisos por email (Resend) al pasar a `orden_lista`:
- * - `notifyMarketplaceOrderEmail`: desde `pendiente` / `borrador` / reactivación.
- * - `notifyMarketplaceOrderGeneradaEmail`: solo desde `enviado_consulta` (ABIERTA) al pulsar «Generar orden» en el carrito.
+ * - `notifyMarketplaceOrderEmail` / `notifyMarketplaceOrderGeneradaEmail`: solo si el cliente envía
+ *   `confirmGenerarOrden: true` en `POST /marketplace/quote-sync` con `event: submit_ticket` (botón «Generar orden»).
+ *   Los `sync` del carrito (cambios de ítems con orden ya creada) no llevan ese flag → sin correos Resend.
  * En desarrollo, si falta la API key, el texto se registra en consola (MARKETPLACE_EMAIL_DEV_CONSOLE=0 para silenciar).
  */
 

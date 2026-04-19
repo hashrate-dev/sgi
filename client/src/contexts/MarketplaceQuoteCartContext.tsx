@@ -540,21 +540,28 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
     if (!canUseQuoteCart) {
       throw new Error("Iniciá sesión para generar un ticket.");
     }
-    if (lines.length === 0) {
+    if (lines.length === 0 && !blockingPipelineOrder) {
       throw new Error("Agregá al menos un equipo a la lista.");
     }
     quoteCartRemoteApplyGenRef.current += 1;
-    const subtotalUsd = quoteCartSubtotalUsd(lines, {
-      setupEquipoCompletoUsd,
-      setupCompraHashrateUsd,
-      garantiaItems: garantiaQuoteItems,
-    });
-    const unitCount = quoteCartTotalUnits(lines);
-    const lineCount = lines.length;
+    const subtotalUsd =
+      lines.length > 0
+        ? quoteCartSubtotalUsd(lines, {
+            setupEquipoCompletoUsd,
+            setupCompraHashrateUsd,
+            garantiaItems: garantiaQuoteItems,
+          })
+        : 0;
+    const unitCount = lines.length > 0 ? quoteCartTotalUnits(lines) : 0;
+    const lineCount = lines.length > 0 ? lines.length : 0;
     const payload = linesToPayload(lines);
     let r: Awaited<ReturnType<typeof syncMarketplaceQuoteTicket>>;
     try {
-      r = await syncMarketplaceQuoteTicket({ lines: payload, event: "submit_ticket" });
+      r = await syncMarketplaceQuoteTicket({
+        lines: payload,
+        event: "submit_ticket",
+        confirmGenerarOrden: true,
+      });
     } catch (e) {
       if (isOneActiveOrderError(e)) void refreshActiveOrderGate();
       throw e;

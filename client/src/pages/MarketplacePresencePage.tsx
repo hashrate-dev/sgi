@@ -127,9 +127,15 @@ export function MarketplacePresencePage() {
           title="Marketplace en vivo"
           logoHref="/"
           rightContent={
-            <Link to="/cotizaciones-marketplace" className="fact-back">
-              Ver órdenes marketplace
-            </Link>
+            <div className="d-flex flex-wrap gap-2 align-items-center">
+              <Link to="/marketplace-presencia/historial" className="fact-back">
+                <i className="bi bi-table me-1" aria-hidden />
+                Historial detalle
+              </Link>
+              <Link to="/cotizaciones-marketplace" className="fact-back">
+                Ver órdenes marketplace
+              </Link>
+            </div>
           }
         />
 
