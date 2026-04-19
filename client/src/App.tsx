@@ -25,6 +25,7 @@ import { ConfiguracionPage } from "./pages/ConfiguracionPage";
 import { ClientesTiendaOnlinePage } from "./pages/ClientesTiendaOnlinePage";
 import { ClientesHubPage } from "./pages/ClientesHubPage";
 import { CotizacionesMarketplacePage } from "./pages/CotizacionesMarketplacePage";
+import { CotizacionesMarketplaceHistorialDetallePage } from "./pages/CotizacionesMarketplaceHistorialDetallePage";
 import { GarantiaAndePage } from "./pages/GarantiaAndePage";
 import { GarantiasAndeItemsPage } from "./pages/GarantiasAndeItemsPage";
 import { GarantiaAndeItemNewPage } from "./pages/GarantiaAndeItemNewPage";
@@ -394,6 +395,10 @@ function App() {
             <Route path="/reportes" element={<ReportesPage />} />
             <Route path="/configuracion" element={<ConfiguracionPage />} />
             <Route path="/clientes-tienda-online" element={<ClientesTiendaOnlinePage />} />
+            <Route
+              path="/cotizaciones-marketplace/historial-detalle"
+              element={<CotizacionesMarketplaceHistorialDetallePage />}
+            />
             <Route path="/cotizaciones-marketplace" element={<CotizacionesMarketplacePage />} />
             <Route path="/marketplace-presencia" element={<MarketplacePresencePage />} />
             <Route path="/usuarios/*" element={<UsuariosPage />} />

@@ -8,7 +8,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import {
   deleteMarketplaceQuoteTicketAdmin,
   getMarketplaceGarantiaQuotePrices,
@@ -611,6 +611,7 @@ function MqtTicketCardButton({
 
 export function CotizacionesMarketplacePage() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [stats, setStats] = useState<{ byStatus: Record<string, number>; total: number; todayCount: number } | null>(null);
   const [tickets, setTickets] = useState<MarketplaceQuoteTicket[]>([]);
   const [total, setTotal] = useState(0);
@@ -820,6 +821,28 @@ export function CotizacionesMarketplacePage() {
   }, []);
 
   useEffect(() => {
+    const raw = searchParams.get("openTicket");
+    if (!raw) return;
+    const id = Number(raw);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("openTicket");
+        return next;
+      },
+      { replace: true }
+    );
+    if (!Number.isFinite(id) || id <= 0) return;
+    void getMarketplaceQuoteTicket(id)
+      .then(({ ticket }) => {
+        openTicketDrawer(ticket);
+      })
+      .catch(() => {
+        showToast("No se encontró la orden solicitada.", "warning", "Cotizaciones tienda");
+      });
+  }, [searchParams, setSearchParams, openTicketDrawer]);
+
+  useEffect(() => {
     if (!metaExtraOpen && !cartHistoryOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -934,9 +957,9 @@ export function CotizacionesMarketplacePage() {
           title="Centro de Ordenes - Tienda Online"
           logoHref="/"
           rightContent={
-            <Link to="/configuracion" className="fact-back">
-              <i className="bi bi-gear me-1" aria-hidden />
-              Configuración
+            <Link to="/cotizaciones-marketplace/historial-detalle" className="fact-back">
+              <i className="bi bi-table me-1" aria-hidden />
+              Historial detalle
             </Link>
           }
         />
