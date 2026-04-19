@@ -3,7 +3,10 @@ import { Link, Navigate, useLocation } from "react-router-dom";
 import { canUseMarketplaceQuoteCart } from "../lib/auth.js";
 import { useAuth } from "../contexts/AuthContext";
 import { getMarketplaceAsicVitrina, wakeUpBackend } from "../lib/api";
-import { ASIC_MARKETPLACE_PRODUCTS, mergeAsicCatalogWithCorpGridExtras } from "../lib/marketplaceAsicCatalog.js";
+import {
+  getMarketplaceAuthShelfFallbackProducts,
+  mergeAsicCatalogWithCorpGridExtras,
+} from "../lib/marketplaceAsicCatalog.js";
 import type { AsicProduct } from "../lib/marketplaceAsicCatalog.js";
 import { AsicShelfProduct } from "../components/marketplace/AsicShelfProduct.js";
 import { MarketplaceSiteHeader } from "../components/marketplace/MarketplaceSiteHeader";
@@ -24,9 +27,7 @@ export function MarketplaceClienteLoginPage() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [ready, setReady] = useState(false);
-  const [bgProducts, setBgProducts] = useState<AsicProduct[]>(() =>
-    mergeAsicCatalogWithCorpGridExtras(ASIC_MARKETPLACE_PRODUCTS)
-  );
+  const [bgProducts, setBgProducts] = useState<AsicProduct[]>(() => getMarketplaceAuthShelfFallbackProducts());
 
   useEffect(() => {
     const timeoutId = setTimeout(() => setReady(true), 25000);
@@ -44,7 +45,9 @@ export function MarketplaceClienteLoginPage() {
       .then((res) => {
         if (cancelled) return;
         const list = res.products ?? [];
-        if (list.length > 0) setBgProducts(mergeAsicCatalogWithCorpGridExtras(list));
+        setBgProducts(
+          list.length > 0 ? mergeAsicCatalogWithCorpGridExtras(list) : getMarketplaceAuthShelfFallbackProducts()
+        );
       })
       .catch(() => {});
     return () => {

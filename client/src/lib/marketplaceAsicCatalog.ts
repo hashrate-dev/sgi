@@ -340,6 +340,70 @@ export function mergeAsicCatalogWithCorpGridExtras(apiProducts: AsicProduct[]): 
   return [...apiProducts, ...extras];
 }
 
+const AUTH_SHELF_FALLBACK_YIELD: AsicEstimatedYield = {
+  line1: "~0,00010 BTC",
+  line2: "≈ 6,00 USD",
+};
+
+/**
+ * Tarjetas decorativas para fondo de `/marketplace/login` mientras no hay vitrina desde API.
+ * Ids ficticios `mp-auth-bg-*`; al cargar la vitrina se sustituyen por datos reales.
+ */
+export function getMarketplaceAuthShelfFallbackProducts(): AsicProduct[] {
+  const airBtc = (w: string): AsicProduct["detailRows"] => [
+    { icon: "bolt", text: w },
+    { icon: "chip", text: "SHA-256 · Bitcoin" },
+    { icon: "fan", text: "Refrigeración por aire" },
+  ];
+  const z15Rows: AsicProduct["detailRows"] = [
+    { icon: "bolt", text: "3.600 W" },
+    { icon: "chip", text: "Equihash · Zcash" },
+    { icon: "fan", text: "Refrigeración por aire" },
+  ];
+  const mk = (
+    id: string,
+    algo: AsicAlgo,
+    brand: string,
+    model: string,
+    hashrate: string,
+    detailRows: AsicProduct["detailRows"]
+  ): AsicProduct => ({
+    id,
+    algo,
+    brand,
+    model,
+    hashrate,
+    priceUsd: 0,
+    priceDisplayLabel: "Consultar",
+    imageSrc: "",
+    detailRows,
+    estimatedYield: AUTH_SHELF_FALLBACK_YIELD,
+    listingKind: "miner",
+  });
+  return [
+    mk("mp-auth-bg-1", "sha256", "Bitmain", "Antminer S21", "200 TH/s", airBtc("3.550 W")),
+    mk("mp-auth-bg-2", "sha256", "Bitmain", "Antminer S21 XP", "270 TH/s", airBtc("3.650 W")),
+    mk("mp-auth-bg-3", "sha256", "Bitmain", "Antminer S21 Hydro", "335 TH/s", [
+      { icon: "bolt", text: "5.360 W" },
+      { icon: "chip", text: "SHA-256 · Bitcoin" },
+      { icon: "droplet", text: "Refrigeración por agua" },
+    ]),
+    mk("mp-auth-bg-4", "sha256", "Bitmain", "Antminer S21 Pro", "234 TH/s", airBtc("3.510 W")),
+    mk("mp-auth-bg-5", "scrypt", "Bitmain", "Antminer L9", "16 GH/s", [
+      { icon: "bolt", text: "3.260 W" },
+      { icon: "chip", text: "Scrypt · Litecoin / Dogecoin" },
+      { icon: "fan", text: "Refrigeración por aire" },
+    ]),
+    mk("mp-auth-bg-6", "scrypt", "Bitmain", "Antminer L9", "17 GH/s", [
+      { icon: "bolt", text: "3.400 W" },
+      { icon: "chip", text: "Scrypt · Litecoin / Dogecoin" },
+      { icon: "fan", text: "Refrigeración por aire" },
+    ]),
+    mk("mp-auth-bg-7", "scrypt", "Bitmain", "Antminer Z15 Pro", "420 ksol/s", z15Rows),
+    mk("mp-auth-bg-8", "scrypt", "Bitmain", "Antminer Z15 Pro", "450 ksol/s", z15Rows),
+  ];
+}
+
 type DetailRow = AsicProduct["detailRows"][number];
 
 function isShelfCoolingRow(r: DetailRow): boolean {
