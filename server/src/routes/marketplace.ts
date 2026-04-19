@@ -23,6 +23,7 @@ import { resolveSetupCompraHashrateUsd, resolveSetupEquipoCompletoUsd } from "..
 import { loadGarantiaQuoteRows } from "../lib/marketplaceGarantiaQuote.js";
 import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
 import { mpVisibleFromDbValue } from "../lib/mpVisible.js";
+import { sendMarketplaceAsicInquiryEmail, sendMarketplaceContactEmail } from "../lib/marketplaceContactEmail.js";
 
 export const marketplaceRouter = Router();
 
@@ -42,6 +43,23 @@ const MarketplacePresenceHeartbeatSchema = z.object({
   locale: z.string().trim().max(20).optional(),
   timezone: z.string().trim().max(60).optional(),
   currentPath: z.string().max(200).trim().optional(),
+});
+
+const MarketplaceContactPublicSchema = z.object({
+  name: z.string().min(1).max(120).trim(),
+  lastName: z.string().min(1).max(120).trim(),
+  email: z.string().email().max(254).trim(),
+  subject: z.string().min(1).max(200).trim(),
+  phone: z.string().min(1).max(50).trim(),
+  message: z.string().min(1).max(2000).trim(),
+});
+
+const MarketplaceAsicInquiryPublicSchema = z.object({
+  email: z.string().email().max(254).trim(),
+  name: z.string().max(120).trim().optional(),
+  subject: z.string().min(1).max(250).trim(),
+  message: z.string().min(1).max(4000).trim(),
+  source: z.enum(["asic", "cart"]).optional(),
 });
 
 const ProductCreateSchema = z.object({
@@ -443,6 +461,49 @@ marketplaceRouter.post("/marketplace/presence/heartbeat", async (req: Request, r
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     res.status(500).json({ error: { message: msg } });
+  }
+});
+
+/** Formulario público «Contacto» (sin mailto): envía por Resend en el servidor. */
+marketplaceRouter.post("/marketplace/contact", async (req: Request, res: Response) => {
+  const parsed = MarketplaceContactPublicSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
+  }
+  try {
+    const { simulated } = await sendMarketplaceContactEmail({
+      firstName: parsed.data.name,
+      lastName: parsed.data.lastName,
+      email: parsed.data.email,
+      subject: parsed.data.subject,
+      phone: parsed.data.phone,
+      message: parsed.data.message,
+    });
+    res.json({ ok: true as const, simulated });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(502).json({ error: { message: msg } });
+  }
+});
+
+/** Consulta por correo desde ficha ASIC o desde carrito (`source: cart`, sin mailto). */
+marketplaceRouter.post("/marketplace/asic-inquiry", async (req: Request, res: Response) => {
+  const parsed = MarketplaceAsicInquiryPublicSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
+  }
+  try {
+    const { simulated } = await sendMarketplaceAsicInquiryEmail({
+      visitorEmail: parsed.data.email,
+      visitorName: parsed.data.name,
+      subject: parsed.data.subject,
+      message: parsed.data.message,
+      source: parsed.data.source,
+    });
+    res.json({ ok: true as const, simulated });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(502).json({ error: { message: msg } });
   }
 });
 

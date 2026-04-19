@@ -208,7 +208,7 @@ export function estimateYieldForItem(item: AsicYieldItem, snap: NetworkMiningSna
     return {
       id: item.id,
       line1: `≈ ${fmtEsCompact(btcDay, 6)} BTC`,
-      line2: `≈ ${fmtEsCompact(grossUsd, 2)} USDT`,
+      line2: `≈ ${fmtEsCompact(grossUsd, 2)} USD`,
       note: "Estimación orientativa · sujeta a red y precios.",
     };
   }
@@ -224,7 +224,7 @@ export function estimateYieldForItem(item: AsicYieldItem, snap: NetworkMiningSna
   return {
     id: item.id,
     line1: `≈ ${fmtEsCompact(ltc, 5)} LTC + ≈ ${dogeFmt} DOGE`,
-    line2: `≈ ${fmtEsCompact(grossUsd, 2)} USDT`,
+    line2: `≈ ${fmtEsCompact(grossUsd, 2)} USD`,
     note: "Estimación orientativa · sujeta a red y precios.",
   };
 }

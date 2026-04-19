@@ -76,9 +76,10 @@ export function scaleDetailRowTextForShare(
   return row.text;
 }
 
-/** Escala cantidades en líneas de rendimiento (~BTC, USDT, LTC, DOGE). */
+/** Escala cantidades en líneas de rendimiento (~BTC, USD/USDT, LTC, DOGE). */
 export function scaleYieldDisplayLine(line: string, factor: number, lang?: string): string {
-  if (factor >= 0.999) return line;
+  const normalizeUsdSuffix = (s: string) => s.replace(/\bUSDT\b/g, "USD");
+  if (factor >= 0.999) return normalizeUsdSuffix(line);
   const loc = marketplaceLocale(lang ?? "es");
   const fmtBtc = (n: number) =>
     n.toLocaleString(loc, { minimumFractionDigits: 6, maximumFractionDigits: 10 });
@@ -94,9 +95,9 @@ export function scaleYieldDisplayLine(line: string, factor: number, lang?: strin
     const v = parseLocaleNumberForDisplay(num);
     return v == null ? `${colon}${tilde}${num}${suf}` : `${colon}${tilde}${fmtBtc(v * factor)}${suf}`;
   });
-  out = out.replace(/(≈\s*)([\d.,]+)(\s*USDT)/gi, (_m, pre: string, num: string, suf: string) => {
+  out = out.replace(/(≈\s*)([\d.,]+)(\s*(?:USDT|USD))\b/gi, (_m, pre: string, num: string, suf: string) => {
     const v = parseLocaleNumberForDisplay(num);
-    return v == null ? `${pre}${num}${suf}` : `${pre}${fmtDec(v * factor, 2)}${suf}`;
+    return v == null ? `${pre}${num}${suf}` : `${pre}${fmtDec(v * factor, 2)} USD`;
   });
   out = out.replace(/(~\s*)([\d.,]+)(\s*LTC)/gi, (_m, pre: string, num: string, suf: string) => {
     const v = parseLocaleNumberForDisplay(num);
@@ -106,14 +107,25 @@ export function scaleYieldDisplayLine(line: string, factor: number, lang?: strin
     const v = parseLocaleNumberForDisplay(num);
     return v == null ? `${pre}${num}${suf}` : `${pre}${Math.round(v * factor).toLocaleString(loc)}${suf}`;
   });
-  return out;
+  return normalizeUsdSuffix(out);
+}
+
+/**
+ * Parte una línea de rendimiento en trozos por `+` (p. ej. «≈ X LTC + ≈ Y DOGE»)
+ * para mostrar cada moneda en bloque y evitar cortes de línea entre el `+` y el segundo ≈.
+ */
+export function splitYieldLineByPlus(line: string): string[] {
+  const trimmed = line.trim();
+  if (!trimmed) return [""];
+  const parts = trimmed.split(/\s*\+\s*/).map((p) => p.trim()).filter((p) => p.length > 0);
+  return parts.length > 1 ? parts : [trimmed];
 }
 
 /** Textos de rendimiento (compactos: las etiquetas del modal dan el contexto). */
 export type AsicEstimatedYield = {
   /** Ej: "~0,00011572 BTC" */
   line1: string;
-  /** Ej: "≈ 7,80 USDT" */
+  /** Ej: "≈ 7,80 USD" */
   line2: string;
 };
 
@@ -263,6 +275,20 @@ export function publicImageUrl(path: string): string {
   }
   const pathPart = p.startsWith("/") ? p : `/${p}`;
   return normBase ? `${normBase}${pathPart}` : pathPart;
+}
+
+const MAX_IMAGE_QUERY_PARAM_LEN = 1200;
+
+/**
+ * URLs seguras para incluir en `?img=` (p. ej. ventana «consultar por correo»).
+ * Los `data:`… hacen la URL enorme y suelen provocar **HTTP 431** (request line / headers demasiado grandes) en Vite, Node o proxies.
+ */
+export function isImageSrcSafeForQueryString(url: string): boolean {
+  const u = String(url ?? "").trim();
+  if (!u) return false;
+  if (/^data:/i.test(u)) return false;
+  if (u.length > MAX_IMAGE_QUERY_PARAM_LEN) return false;
+  return true;
 }
 
 /**

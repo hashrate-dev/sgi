@@ -305,9 +305,11 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
   "modal.yield_title": "Rendimento estimado",
   "modal.yield_loading": "…",
   "modal.yield_daily": "Produção diária",
-  "modal.yield_usdt": "Bruto USDT",
+  "modal.yield_usdt": "Bruto USD",
   "modal.yield_foot_loading": "…",
   "modal.yield_foot_ref": "Valores referenciais (catálogo).",
+  "modal.yield_legal_short":
+    "Valores orientativos: os mercados de criptoativos são dinâmicos e os rendimentos exibidos são estimativas que podem variar conforme o momento. O time comercial pode passar o panorama atualizado a cada consulta.",
   "modal.email_btn": "Consultar por e-mail",
   "modal.wa_btn": "Consultar por WhatsApp",
   "modal.add_quote_aria": "Adicionar ao carrinho",
@@ -342,6 +344,8 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
     "Orçamento marketplace ASIC — {{brand}} {{model}} {{hash}} ({{price}})",
   "modal.wa.body":
     "Olá, escrevo pelo hashrate.space e gostaria de solicitar orçamento: {{brand}} {{model}} {{hash}} — {{price}}.",
+  "modal.email_inquiry_default_body":
+    "Olá, escrevo pelo hashrate.space e gostaria de mais informações e de esclarecer dúvidas sobre o equipamento {{brand}} {{model}} {{hash}} — {{price}}.",
 
   "drawer.close_aria": "Fechar painel de orçamento",
   "drawer.close": "Fechar",
@@ -432,6 +436,9 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
   "drawer.wa": "WhatsApp",
   "drawer.email_aria": "Consultar por e-mail",
   "drawer.email_opening": "Abrindo e-mail",
+  "drawer.email_inquiry_subject": "Consulta do carrinho — Hashrate Space",
+  "drawer.email_inquiry_default_body":
+    "Olá, escrevo pelo hashrate.space. Tenho itens no carrinho de cotação e gostaria de mais informações e de esclarecer dúvidas em geral (serviços, preços ou processo). Obrigado.",
   "drawer.wa_aria": "Consultar por WhatsApp",
   "drawer.wa_opening": "Abrindo WhatsApp",
   "drawer.login_cta": "Entrar ou cadastrar-se",

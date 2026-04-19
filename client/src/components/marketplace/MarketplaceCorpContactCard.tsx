@@ -1,5 +1,6 @@
 import { useCallback, useState, type FormEvent } from "react";
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
+import { postMarketplaceContactPublic } from "../../lib/api.js";
 
 export type MarketplaceCorpContactCardProps = {
   /** id del <h2> para aria-labelledby en la section */
@@ -18,24 +19,38 @@ export function MarketplaceCorpContactCard({ titleId, anchorId }: MarketplaceCor
     phone: "",
     message: "",
   });
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formSuccess, setFormSuccess] = useState(false);
+  const [successWasSimulated, setSuccessWasSimulated] = useState(false);
 
   const submitForm = useCallback(
-    (e: FormEvent) => {
+    async (e: FormEvent) => {
       e.preventDefault();
-      const body = [
-        `${t("corp.form.name")}: ${form.name}`,
-        `${t("corp.form.last_name")}: ${form.last}`,
-        `${t("corp.form.email")}: ${form.email}`,
-        `${t("corp.form.phone")}: ${form.phone}`,
-        "",
-        form.message,
-      ].join("\n");
-      const sales = "sales@hashrate.space";
-      const q = new URLSearchParams({
-        subject: form.subject || "Marketplace contact",
-        body,
-      });
-      window.location.href = `mailto:${sales}?${q.toString()}`;
+      setFormError(null);
+      setFormSuccess(false);
+      setSuccessWasSimulated(false);
+      setSubmitting(true);
+      try {
+        const r = await postMarketplaceContactPublic({
+          name: form.name.trim(),
+          lastName: form.last.trim(),
+          email: form.email.trim(),
+          subject: form.subject.trim(),
+          phone: form.phone.trim(),
+          message: form.message.trim(),
+        });
+        if (r.ok) {
+          setFormSuccess(true);
+          setSuccessWasSimulated(Boolean(r.simulated));
+          setForm({ name: "", last: "", email: "", subject: "", phone: "", message: "" });
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setFormError(msg || t("corp.form.error_generic"));
+      } finally {
+        setSubmitting(false);
+      }
     },
     [form, t]
   );
@@ -186,8 +201,22 @@ export function MarketplaceCorpContactCard({ titleId, anchorId }: MarketplaceCor
                 />
               </label>
               <p className="market-corp-form-wp__hint">{t("corp.form.hint")}</p>
-              <button type="submit" className="market-corp-btn market-corp-btn--submit">
-                {t("corp.form.submit")}
+              {formError ? (
+                <p className="market-corp-form-wp__msg market-corp-form-wp__msg--error" role="alert">
+                  {formError}
+                </p>
+              ) : null}
+              {formSuccess ? (
+                <p className="market-corp-form-wp__msg market-corp-form-wp__msg--success" role="status">
+                  {successWasSimulated ? t("corp.form.success_simulated") : t("corp.form.success")}
+                </p>
+              ) : null}
+              <button
+                type="submit"
+                className="market-corp-btn market-corp-btn--submit"
+                disabled={submitting}
+              >
+                {submitting ? t("corp.form.sending") : t("corp.form.submit")}
               </button>
             </form>
           </div>

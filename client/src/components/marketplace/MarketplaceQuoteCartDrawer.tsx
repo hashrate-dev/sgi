@@ -114,6 +114,17 @@ export function MarketplaceQuoteCartDrawer() {
   const hasActivePipelineOrder = Boolean(canUseQuoteCart && blockingPipelineOrder && n > 0);
   /** Orden ya generada en BD (`orden_lista` o posterior): el mismo CTA pasa a «Ver orden». */
   const orderListaGenerada = hasActivePipelineOrder && !isGenerarOrdenPipeline;
+  const pipelinePortalSubmitted =
+    String(blockingPipelineOrder?.lastContactChannel ?? "")
+      .trim()
+      .toLowerCase() === "portal";
+  /**
+   * CTA principal «Ver orden»: embudo ya pasó de «solo carrito», o bien `pendiente` tras haber generado por portal
+   * (p. ej. carrito re-editado y gate/estado aún no alineados) — no volver a ofrecer «Generar orden».
+   */
+  const primaryCtaViewMode =
+    orderListaGenerada ||
+    (hasActivePipelineOrder && pipelinePortalSubmitted && blockingSt === "pendiente");
   /** Un solo botón: Generar hasta confirmar; Ver orden cuando ya está en lista / embudo comercial. */
   const showGenerarOrdenButton = Boolean(canUseQuoteCart && n > 0 && (!hasActivePipelineOrder || isGenerarOrdenPipeline));
   const showPrimaryOrderCta = showGenerarOrdenButton || orderListaGenerada;
@@ -193,7 +204,7 @@ export function MarketplaceQuoteCartDrawer() {
                   {t("drawer.hint.p5")}
                 </p>
               </div>
-            ) : orderListaGenerada ? null : n === 0 ? (
+            ) : primaryCtaViewMode ? null : n === 0 ? (
               <div className="market-quote-drawer__lede-wrap">
                 <p className="market-quote-drawer__lede">{t("drawer.lede")}</p>
               </div>
@@ -463,14 +474,14 @@ export function MarketplaceQuoteCartDrawer() {
                 <button
                   type="button"
                   className={
-                    orderListaGenerada
+                    primaryCtaViewMode
                       ? "market-quote-drawer__btn market-quote-drawer__btn--close-order"
                       : "market-quote-drawer__btn market-quote-drawer__btn--solid"
                   }
                   disabled={submitBusy || contactBusy !== null}
-                  aria-label={orderListaGenerada ? t("drawer.view_order") : t("drawer.gen_ticket")}
+                  aria-label={primaryCtaViewMode ? t("drawer.view_order") : t("drawer.gen_ticket")}
                   onClick={() => {
-                    if (orderListaGenerada) {
+                    if (primaryCtaViewMode) {
                       switchDrawerToOrders();
                       return;
                     }
@@ -489,7 +500,7 @@ export function MarketplaceQuoteCartDrawer() {
                       .finally(() => setSubmitBusy(false));
                   }}
                 >
-                  {orderListaGenerada ? t("drawer.view_order") : submitBusy ? t("drawer.gen_busy") : t("drawer.gen_ticket")}
+                  {primaryCtaViewMode ? t("drawer.view_order") : submitBusy ? t("drawer.gen_busy") : t("drawer.gen_ticket")}
                 </button>
               </div>
             ) : null}

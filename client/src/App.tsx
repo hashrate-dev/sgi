@@ -37,6 +37,7 @@ import { MarketplaceServicesPage } from "./pages/MarketplaceServicesPage";
 import { MarketplaceCompanyPage } from "./pages/MarketplaceCompanyPage";
 import { MarketplaceFaqPage } from "./pages/MarketplaceFaqPage";
 import { MarketplaceContactPage } from "./pages/MarketplaceContactPage";
+import { MarketplaceAsicEmailInquiryPage } from "./pages/MarketplaceAsicEmailInquiryPage";
 import { MarketplaceClienteLoginPage } from "./pages/MarketplaceClienteLoginPage";
 import { MarketplaceClienteRegistroPage } from "./pages/MarketplaceClienteRegistroPage";
 import { MarketplacePresencePage } from "./pages/MarketplacePresencePage";
@@ -345,6 +346,8 @@ function App() {
             <Route path="company" element={<MarketplaceCompanyPage />} />
             <Route path="faq" element={<MarketplaceFaqPage />} />
             <Route path="contact" element={<MarketplaceContactPage />} />
+            <Route path="consultar-correo" element={<MarketplaceAsicEmailInquiryPage />} />
+            <Route path="consultar-correo-carrito" element={<MarketplaceAsicEmailInquiryPage />} />
             <Route path="login" element={<MarketplaceClienteLoginPage />} />
             <Route path="signup" element={<MarketplaceClienteRegistroPage />} />
             <Route path="registro" element={<Navigate to="/marketplace/signup" replace />} />

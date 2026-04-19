@@ -545,6 +545,8 @@ function MqtTicketCardButton({
   trainCarIndex?: number;
 }) {
   const primaryBadge = pipelinePrimaryBadge(t);
+  const stNorm = normalizeMqtTicketStatus(t.status);
+  const showInstaladoOk = stNorm === "instalado";
   const eliminadaCls = isMarketplaceTicketEliminadaLaneStatus(t.status) ? " hrs-mqt-ticket-card--eliminada" : "";
   const trainCls = trainCarIndex !== undefined ? " hrs-mqt-ticket-card--train-car" : "";
   const trainStyle: CSSProperties | undefined =
@@ -557,12 +559,19 @@ function MqtTicketCardButton({
       onClick={() => onOpen(t)}
     >
       <div className="hrs-mqt-ticket-card__top">
-        <div className="hrs-mqt-ticket-card__ids">
-          <div className="hrs-mqt-ticket-card__ord">{t.orderNumber ?? `— (#${t.id})`}</div>
-          <div className="hrs-mqt-ticket-card__tkt">{t.ticketCode}</div>
+        <div className="hrs-mqt-ticket-card__top-row">
+          <div className="hrs-mqt-ticket-card__ids">
+            <div className="hrs-mqt-ticket-card__ord">{t.orderNumber ?? `— (#${t.id})`}</div>
+            <div className="hrs-mqt-ticket-card__tkt">{t.ticketCode}</div>
+          </div>
+          {showInstaladoOk ? (
+            <span className="hrs-mqt-ticket-card__instalado-ok" title="Instalación confirmada" aria-hidden>
+              <i className="bi bi-check-circle-fill" />
+            </span>
+          ) : null}
         </div>
         <div className="hrs-mqt-ticket-card__badges">
-          <span className={primaryBadge.className} data-mqt-status={normalizeMqtTicketStatus(t.status)}>
+          <span className={primaryBadge.className} data-mqt-status={stNorm}>
             {primaryBadge.label}
           </span>
           {isNewTicketBadgeVisible(t) ? (

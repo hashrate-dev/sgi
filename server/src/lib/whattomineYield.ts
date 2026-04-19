@@ -147,7 +147,7 @@ export async function fetchZecWhatToMineYieldForItem(item: {
   return {
     id: item.id,
     line1: `≈ ${fmtEs(zecDay, 5)} ZEC`,
-    line2: `≈ ${fmtEs(revenueUsd, 2)} USDT`,
+    line2: `≈ ${fmtEs(revenueUsd, 2)} USD`,
     note: `WhatToMine ZEC (Equihash) · ${kh} kh/s · electricidad ${WHATTOMINE_ELECTRICITY_USD_PER_KWH} USD/kWh · bruto diario (revenue).`,
   };
 }
@@ -185,7 +185,7 @@ export async function estimateYieldWhatToMineForEquipo(row: {
     if (zecDay == null || zecDay <= 0 || revenueUsd == null) return null;
     return {
       line1: `Por día: ≈ ${fmtEs(zecDay, 5)} ZEC`,
-      line2: `Equivalente diario (USDT): ≈ ${fmtEs(revenueUsd, 2)} USDT`,
+      line2: `Equivalente diario (USD): ≈ ${fmtEs(revenueUsd, 2)} USD`,
       source: "whattomine",
       electricityUsdPerKwh: WHATTOMINE_ELECTRICITY_USD_PER_KWH,
       note: `WhatToMine ZEC (Equihash) · ${zKh} kh/s · electricidad ${WHATTOMINE_ELECTRICITY_USD_PER_KWH} USD/kWh · bruto (revenue).`,
@@ -204,7 +204,7 @@ export async function estimateYieldWhatToMineForEquipo(row: {
     if (btcDay == null || btcDay <= 0 || revenueUsd == null) return null;
     return {
       line1: `Por día: ≈ ${fmtEs(btcDay, 6)} BTC`,
-      line2: `Equivalente diario (USDT): ≈ ${fmtEs(revenueUsd, 2)} USDT`,
+      line2: `Equivalente diario (USD): ≈ ${fmtEs(revenueUsd, 2)} USD`,
       source: "whattomine",
       electricityUsdPerKwh: WHATTOMINE_ELECTRICITY_USD_PER_KWH,
       note: `WhatToMine · electricidad ${WHATTOMINE_ELECTRICITY_USD_PER_KWH} USD/kWh · bruto (sin descontar pool).`,
@@ -230,7 +230,7 @@ export async function estimateYieldWhatToMineForEquipo(row: {
     const grossUsd = ltcRevenueUsd + dogeUsd;
     return {
       line1: `Por día: ≈ ${fmtEs(ltcDay, 5)} LTC + ≈ ${dogeFmt} DOGE`,
-      line2: `Equivalente diario (USDT): ≈ ${fmtEs(grossUsd, 2)} USDT`,
+      line2: `Equivalente diario (USD): ≈ ${fmtEs(grossUsd, 2)} USD`,
       source: "whattomine",
       electricityUsdPerKwh: WHATTOMINE_ELECTRICITY_USD_PER_KWH,
       note: `WhatToMine (LTC + DOGE merge) · electricidad ${WHATTOMINE_ELECTRICITY_USD_PER_KWH} USD/kWh · estimación bruta.`,

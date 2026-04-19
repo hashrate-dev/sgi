@@ -26,7 +26,6 @@ import {
   quoteCartSubtotalUsd,
   quoteCartLinesFromApiPayload,
   mergeCartLinesForPipelineOrder,
-  buildQuoteMailto,
   buildQuoteWhatsAppUrl,
   quoteCartStorageKeyForUser,
   quoteCartLineKey,
@@ -95,7 +94,14 @@ type Ctx = {
   openQuoteEmail: () => Promise<void>;
   openQuoteWhatsApp: () => Promise<void>;
   /** Consulta en pipeline (un pedido activo por cuenta): el carrito se fusiona en ese ticket al sincronizar. */
-  blockingPipelineOrder: { id: number; orderNumber: string; ticketCode: string; status: string } | null;
+  blockingPipelineOrder: {
+    id: number;
+    orderNumber: string;
+    ticketCode: string;
+    status: string;
+    /** `portal` tras «Generar orden»; sirve para CTA «Ver orden» si el estado vuelve a `pendiente` tras editar el carrito. */
+    lastContactChannel: string | null;
+  } | null;
   /** true cuando el carrito difiere de la última versión conocida de la orden en curso. */
   hasPendingPipelineCartChanges: boolean;
   /** Refresca el bloqueo desde el servidor (tras cancelar orden, etc.). */
@@ -158,6 +164,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
     orderNumber: string;
     ticketCode: string;
     status: string;
+    lastContactChannel: string | null;
   } | null>(null);
   const [pipelineBase, setPipelineBase] = useState<{ orderId: number; sig: string } | null>(null);
   /** Tras la 1.ª respuesta de hidratación del ticket en pipeline (evita POST vacío+clearPipeline antes de fusionar ítems al loguear). */
@@ -210,6 +217,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
               orderNumber: b.orderNumber ?? "",
               ticketCode: b.ticketCode,
               status: b.status ?? "",
+              lastContactChannel: b.lastContactChannel ?? null,
             }
           : null
       );
@@ -426,7 +434,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
             } else {
               setTicketRef(null);
             }
-            if (st === "orden_lista" || st === "enviado_consulta") void refreshActiveOrderGate();
+            void refreshActiveOrderGate();
           }
           if (res.merged && Array.isArray(res.lines)) {
             if (genAtSend !== quoteCartRemoteApplyGenRef.current) return;
@@ -597,8 +605,6 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
   }, [canUseQuoteCart, lines, setupEquipoCompletoUsd, setupCompraHashrateUsd, garantiaQuoteItems, refreshActiveOrderGate, blockingPipelineOrder]);
 
   const openQuoteEmail = useCallback(async () => {
-    let ref: QuoteTicketRef | undefined;
-    let mailLines = lines;
     try {
       if (canUseQuoteCart && lines.length > 0) {
         quoteCartRemoteApplyGenRef.current += 1;
@@ -610,12 +616,10 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
         if (!canUseQuoteCartRef.current || genAtSend !== quoteCartRemoteApplyGenRef.current) {
           /* Respuesta obsoleta o sesión cambiada: no pisar el carrito. */
         } else {
-          if (r.orderNumber && r.ticketCode) ref = { orderNumber: r.orderNumber, ticketCode: r.ticketCode };
           if (r.merged && Array.isArray(r.lines)) {
             const next = quoteCartLinesFromApiPayload(r.lines);
             if (cartLinesMergeSig(lines) !== cartLinesMergeSig(next)) {
               setLines(next);
-              mailLines = next;
               window.dispatchEvent(new CustomEvent(MARKETPLACE_ACTIVE_ORDER_CHANGED_EVENT));
             }
           }
@@ -626,13 +630,20 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
         void refreshActiveOrderGate();
         throw e;
       }
-      /* mailto igual */
+      /* sin sync remoto: abrimos el formulario igual */
     }
-    window.location.href = buildQuoteMailto(mailLines, ref, {
-      setupEquipoCompletoUsd,
-      setupCompraHashrateUsd,
-      garantiaItems: garantiaQuoteItems,
-    });
+    const url = `${window.location.origin}/marketplace/consultar-correo-carrito`;
+    const popW = 332;
+    const popH = 432;
+    const ax = window.screenX ?? window.screenLeft ?? 0;
+    const ay = window.screenY ?? window.screenTop ?? 0;
+    const aw = window.outerWidth || window.innerWidth || 900;
+    const ah = window.outerHeight || window.innerHeight || 700;
+    const left = Math.max(0, Math.round(ax + (aw - popW) / 2));
+    const top = Math.max(0, Math.round(ay + (ah - popH) / 2));
+    const feats = `width=${popW},height=${popH},left=${left},top=${top},scrollbars=yes,resizable=yes`;
+    const win = window.open(url, "_blank", feats);
+    if (win) win.opener = null;
   }, [lines, canUseQuoteCart, setupEquipoCompletoUsd, setupCompraHashrateUsd, garantiaQuoteItems, refreshActiveOrderGate]);
 
   const openQuoteWhatsApp = useCallback(async () => {

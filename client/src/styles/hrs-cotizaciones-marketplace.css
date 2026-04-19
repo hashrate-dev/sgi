@@ -775,6 +775,21 @@ button.hrs-mqt-ticket-card:hover {
   margin-bottom: 0.32rem;
 }
 
+.hrs-mqt-ticket-card__top-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.4rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.hrs-mqt-ticket-card__top-row .hrs-mqt-ticket-card__ids {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .hrs-mqt-ticket-card__ids {
   min-width: 0;
 }
@@ -888,6 +903,24 @@ button.hrs-mqt-ticket-card:hover {
   color: #ecfdf5;
   border: 1px solid #166534;
   box-shadow: 0 1px 4px rgba(20, 83, 45, 0.25);
+}
+
+/* Tic OK arriba a la derecha (alineado con ORD) cuando está instalado. */
+.hrs-mqt-ticket-card__instalado-ok {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  margin-top: 0.06rem;
+  color: #16a34a;
+  font-size: 1.14rem;
+  line-height: 1;
+  flex-shrink: 0;
+  filter: drop-shadow(0 1px 1px rgba(22, 101, 52, 0.2));
+}
+
+.hrs-mqt-ticket-card__instalado-ok i {
+  display: block;
 }
 .hrs-mqt-badge--respondido {
   background: #d1fae5;

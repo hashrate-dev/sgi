@@ -1673,6 +1673,10 @@ button.market-link-hrs {
   backdrop-filter: blur(3px);
 }
 
+body:has(.asic-email-window) {
+  margin: 0;
+}
+
 .product-modal__frame {
   position: relative;
   z-index: 1;
@@ -2008,48 +2012,59 @@ button.market-link-hrs {
   color: #6b7280;
 }
 
-/* Caja precio: misma línea neutra que el cuerpo de la tarjeta (sin rosa/rojo) */
+/* Caja precio referencial: acento marca + relieve suave (comercial, sin gritar) */
 .product-modal__price-box {
-  margin: 0 0 0.55rem;
-  padding: 0.75rem 0.95rem;
-  border-radius: 10px;
-  border: 1px solid #e8eaed;
-  background: #fff;
-  box-shadow: none;
+  position: relative;
+  margin: 0 0 0.6rem;
+  padding: 0.82rem 1rem 0.78rem;
+  border-radius: 12px;
+  border: 1px solid rgba(13, 148, 136, 0.22);
   box-sizing: border-box;
+  background-color: #fff;
+  background-image: linear-gradient(180deg, #14b8a6 0, #0d9488 3px, rgba(255, 255, 255, 0) 3px);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 14px 36px -18px rgba(13, 148, 136, 0.16);
 }
 
 .product-modal__price-box--share {
-  border-color: #e2e8f0;
-  background: #f8fafc;
-  box-shadow: none;
+  border-color: rgba(71, 85, 105, 0.28);
+  background-image: linear-gradient(180deg, #64748b 0, #475569 3px, rgba(255, 255, 255, 0) 3px);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 12px 32px -16px rgba(15, 23, 42, 0.12);
 }
 
 .product-modal__price-box-label {
   display: block;
-  margin: 0 0 0.32rem;
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.07em;
+  margin: 0 0 0.38rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
+  color: #0f766e;
+}
+
+.product-modal__price-box--share .product-modal__price-box-label {
   color: #64748b;
 }
 
 .product-modal__price--in-box {
-  margin: 0 0 0.35rem;
-  font-size: 1.52rem;
-  line-height: 1.15;
+  margin: 0 0 0.38rem;
+  font-size: 1.64rem;
+  line-height: 1.12;
   letter-spacing: -0.045em;
   font-weight: 900;
-  color: #020617;
+  color: #064e3b;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
 }
 
 .product-modal__price-box--share .product-modal__price--in-box {
-  font-size: 1.6rem;
-  color: #020617;
+  font-size: 1.68rem;
+  color: #064e3b;
 }
 
 .product-modal__price-note--in-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.42rem;
   margin: 0;
   font-size: 0.81rem;
   line-height: 1.5;
@@ -2057,6 +2072,19 @@ button.market-link-hrs {
   border-top: 1px solid #eef0f3;
   padding-top: 0.5rem;
   margin-top: 0.05rem;
+}
+
+.product-modal__price-note-icon {
+  flex-shrink: 0;
+  margin-top: 0.06rem;
+  font-size: 0.88rem;
+  line-height: 1;
+  color: #94a3b8;
+}
+
+.product-modal__price-note-txt {
+  flex: 1;
+  min-width: 0;
 }
 
 /* Lista técnica = chips de tarjeta (fondo blanco, iconos teal) */
@@ -2092,7 +2120,8 @@ button.market-link-hrs {
   margin-top: 0.06rem;
 }
 
-.product-modal__spec-icon .shelf-detail-strip__svg {
+.product-modal__spec-icon .shelf-detail-strip__svg,
+.product-modal__spec-icon > svg {
   width: 17px;
   height: 17px;
   display: block;
@@ -2190,11 +2219,68 @@ button.market-link-hrs {
   background: #fff;
 }
 
+.product-modal__yield-parts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.28rem 0.45rem;
+  width: 100%;
+}
+
+.product-modal__yield-parts--stack {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 0.22rem;
+}
+
+.product-modal__yield-chip-row {
+  display: block;
+  max-width: 100%;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.product-modal__yield-sep {
+  color: #94a3b8;
+  font-weight: 700;
+  font-size: 0.92em;
+  line-height: 1;
+  user-select: none;
+}
+
 .product-modal__yield-foot {
   margin: 0.45rem 0 0;
   font-size: 0.81rem;
   color: #9ca3af;
   line-height: 1.4;
+}
+
+.product-modal__yield-legal {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.42rem;
+  margin: 0.55rem 0 0;
+  padding-top: 0.55rem;
+  border-top: 1px solid #f1f5f9;
+  font-size: 0.7rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: #94a3b8;
+}
+
+.product-modal__yield-legal-icon {
+  flex-shrink: 0;
+  margin-top: 0.06rem;
+  font-size: 0.88rem;
+  line-height: 1;
+  color: #94a3b8;
+}
+
+.product-modal__yield-legal-txt {
+  flex: 1;
+  min-width: 0;
 }
 
 /* Columna acciones */
@@ -2598,6 +2684,250 @@ button.market-link-hrs {
   opacity: 0.5;
   cursor: not-allowed;
   pointer-events: none;
+}
+
+.product-modal__inquiry-form {
+  width: 100%;
+  max-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-bottom: 0.35rem;
+  box-sizing: border-box;
+}
+
+.product-modal__inquiry-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.product-modal__inquiry-form input,
+.product-modal__inquiry-form textarea {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-family: inherit;
+  font-size: 0.82rem;
+  color: #0f172a;
+}
+
+.product-modal__inquiry-form textarea {
+  min-height: 5rem;
+  resize: vertical;
+}
+
+.product-modal__inquiry-msg {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.product-modal__inquiry-msg--ok {
+  color: #047857;
+}
+
+.product-modal__inquiry-msg--err {
+  color: #b91c1c;
+}
+
+.product-modal__inquiry-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.15rem;
+}
+
+.product-modal__inquiry-actions button {
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.48rem 0.85rem;
+  border-radius: 8px;
+}
+
+.product-modal__inquiry-submit {
+  border: none;
+  background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+  color: #fff;
+}
+
+.product-modal__inquiry-submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.product-modal__inquiry-cancel {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #334155;
+}
+
+/* Solo formulario «consultar por correo» (/marketplace/consultar-correo) — ventana chica */
+.asic-email-window {
+  color: #0f172a;
+  font-family: inherit;
+  -webkit-font-smoothing: antialiased;
+}
+
+.asic-email-window--solo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 0.28rem 0.35rem 0.4rem;
+  box-sizing: border-box;
+  background: #eef2f7;
+}
+
+.asic-email-window__solo-card {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0.72rem 0.75rem 0.75rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 12px 36px rgba(15, 23, 42, 0.08);
+  box-sizing: border-box;
+}
+
+.asic-email-window__solo-x {
+  position: absolute;
+  top: 0.48rem;
+  right: 0.48rem;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: #f3f4f6;
+  color: #4b5563;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.asic-email-window__solo-x:hover {
+  background: #e5e7eb;
+}
+
+.asic-email-window__form-heading {
+  margin: 0 2rem 0.38rem 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.38rem;
+  font-size: 0.98rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.asic-email-window__form-heading-icon {
+  flex-shrink: 0;
+  color: #0f766e;
+  width: 20px;
+  height: 20px;
+}
+
+.asic-email-window__form-lede {
+  margin: 0 0 0.65rem;
+  font-size: 0.8rem;
+  line-height: 1.42;
+  color: #64748b;
+}
+
+.asic-email-window__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.asic-email-window__label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+}
+
+.asic-email-window__label-txt {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #475569;
+}
+
+.asic-email-window__form input,
+.asic-email-window__form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.48rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-family: inherit;
+  font-size: 0.84rem;
+  color: #0f172a;
+}
+
+.asic-email-window__form textarea {
+  min-height: 4.75rem;
+  max-height: min(26vh, 9.5rem);
+  resize: vertical;
+}
+
+.asic-email-window__msg {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.asic-email-window__msg--err {
+  color: #b91c1c;
+}
+
+.asic-email-window__msg--ok {
+  color: #047857;
+  font-weight: 600;
+}
+
+.asic-email-window__msg-hint {
+  display: block;
+  margin-top: 0.4rem;
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.asic-email-window__actions {
+  margin-top: 0.2rem;
+}
+
+.asic-email-window__submit {
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  padding: 0.48rem 1.1rem;
+  border-radius: 8px;
+  border: none;
+  color: #fff;
+  background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 2px 0 #047857;
+}
+
+.asic-email-window__submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 button.product-modal__btn--quote-cart {
@@ -7800,6 +8130,22 @@ button.product-modal__btn--quote-cart:active {
   opacity: 0.92;
   line-height: 1.45;
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+}
+
+.market-corp-form-wp__msg {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+}
+
+.market-corp-form-wp__msg--error {
+  color: #fecaca;
+}
+
+.market-corp-form-wp__msg--success {
+  color: #a7f3d0;
 }
 
 .market-corp-btn--submit {

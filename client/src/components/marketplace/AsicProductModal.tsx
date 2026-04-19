@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AsicProduct } from "../../lib/marketplaceAsicCatalog.js";
 import {
   asicProductShowsMinerEconomyContent,
@@ -12,12 +12,29 @@ import {
   scaleDetailRowTextForShare,
   scaleHashrateDisplay,
   scaleYieldDisplayLine,
+  splitYieldLineByPlus,
 } from "../../lib/marketplaceAsicCatalog.js";
 import type { AddQuoteLineOptions } from "../../lib/marketplaceQuoteCart.js";
 import type { MarketplaceAsicLiveYield } from "../../lib/api.js";
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
 import { AsicDetailSvg } from "./AsicDetailIcon.js";
 import { BackCircleArrowIcon, MailCtaIcon, WhatsAppCtaIcon } from "./MarketplaceCtaIcons.js";
+
+/** Varias monedas en «X + Y»: una fila por moneda y el `+` al inicio de la segunda (evita cortes feos al hacer wrap). */
+function renderYieldLineParts(text: string): ReactNode {
+  const parts = splitYieldLineByPlus(text);
+  if (parts.length <= 1) return text;
+  return (
+    <span className="product-modal__yield-parts product-modal__yield-parts--stack">
+      {parts.map((part, i) => (
+        <span key={`${i}-${part.slice(0, 32)}`} className="product-modal__yield-chip-row">
+          {i > 0 ? <span className="product-modal__yield-sep">+ </span> : null}
+          {part}
+        </span>
+      ))}
+    </span>
+  );
+}
 
 /** URLs únicas para miniaturas + hero; catálogo local si la API no trae `imageSrc`. */
 function gallerySources(product: AsicProduct): string[] {
@@ -79,27 +96,46 @@ export function AsicProductModal({
       ? `${priceLabelNorm} (${shareViewPct}%)`
       : priceLabelNorm
     : formatAsicPriceUsd(displayPriceUsd, lang);
-  const { mailto, waUrl } = useMemo(() => {
-    const subject = encodeURIComponent(
-      tf("modal.mail.subject", {
-        brand: product.brand,
-        model: product.model,
-        hash: displayHashrate,
-        price: displayPriceStr,
-      })
-    );
-    const mailtoInner = `mailto:dl@hashrate.space?subject=${subject}`;
-    const waText = encodeURIComponent(
-      tf("modal.wa.body", {
-        brand: product.brand,
-        model: product.model,
-        hash: displayHashrate,
-        price: displayPriceStr,
-      })
-    );
-    const waUrlInner = `https://wa.me/595994392728?text=${waText}`;
-    return { mailto: mailtoInner, waUrl: waUrlInner };
+  const mailText = useMemo(() => {
+    const subject = tf("modal.mail.subject", {
+      brand: product.brand,
+      model: product.model,
+      hash: displayHashrate,
+      price: displayPriceStr,
+    });
+    const body = tf("modal.wa.body", {
+      brand: product.brand,
+      model: product.model,
+      hash: displayHashrate,
+      price: displayPriceStr,
+    });
+    return { subject, body };
   }, [product.brand, product.model, displayHashrate, displayPriceStr, tf]);
+
+  const waUrl = useMemo(() => {
+    const waText = encodeURIComponent(mailText.body);
+    return `https://wa.me/595994392728?text=${waText}`;
+  }, [mailText.body]);
+
+  const openEmailInquiryWindow = useCallback(() => {
+    const params = new URLSearchParams();
+    params.set("b", product.brand);
+    params.set("m", product.model);
+    params.set("h", displayHashrate);
+    params.set("p", displayPriceStr);
+    const url = `${window.location.origin}/marketplace/consultar-correo?${params.toString()}`;
+    const popW = 332;
+    const popH = 432;
+    const ax = window.screenX ?? window.screenLeft ?? 0;
+    const ay = window.screenY ?? window.screenTop ?? 0;
+    const aw = window.outerWidth || window.innerWidth || 900;
+    const ah = window.outerHeight || window.innerHeight || 700;
+    const left = Math.max(0, Math.round(ax + (aw - popW) / 2));
+    const top = Math.max(0, Math.round(ay + (ah - popH) / 2));
+    const feats = `width=${popW},height=${popH},left=${left},top=${top},scrollbars=yes,resizable=yes`;
+    const win = window.open(url, "_blank", feats);
+    if (win) win.opener = null;
+  }, [product, displayHashrate, displayPriceStr]);
 
   const thumbs = useMemo(() => gallerySources(product), [product]);
   const hasAnyPhoto = thumbs.length > 0;
@@ -146,7 +182,7 @@ export function AsicProductModal({
   const y2 =
     hashrateShareView && shareFactor < 1 && !liveYieldLoading
       ? scaleYieldDisplayLine(rawY2, shareFactor, lang)
-      : rawY2;
+      : scaleYieldDisplayLine(rawY2, 1, lang);
   /** Pie: carga en vivo vs texto de referencia del catálogo. */
   const yieldFootShort = hashrateShareView
     ? liveYieldLoading
@@ -336,7 +372,10 @@ export function AsicProductModal({
               >
                 {displayPriceStr}
               </p>
-              <p className="product-modal__price-note product-modal__price-note--in-box">{t("modal.price_note")}</p>
+              <p className="product-modal__price-note product-modal__price-note--in-box" role="note">
+                <i className="bi bi-info-circle-fill product-modal__price-note-icon" aria-hidden />
+                <span className="product-modal__price-note-txt">{t("modal.price_note")}</span>
+              </p>
             </div>
 
             <div className="product-modal__pills">
@@ -366,14 +405,18 @@ export function AsicProductModal({
                 <div className="product-modal__yield-grid">
                   <div className="product-modal__yield-cell">
                     <span className="product-modal__yield-lbl">{t("modal.yield_daily")}</span>
-                    <div className="product-modal__yield-box product-modal__yield-box--primary">{y1}</div>
+                    <div className="product-modal__yield-box product-modal__yield-box--primary">{renderYieldLineParts(y1)}</div>
                   </div>
                   <div className="product-modal__yield-cell">
                     <span className="product-modal__yield-lbl">{t("modal.yield_usdt")}</span>
-                    <div className="product-modal__yield-box product-modal__yield-box--secondary">{y2}</div>
+                    <div className="product-modal__yield-box product-modal__yield-box--secondary">{renderYieldLineParts(y2)}</div>
                   </div>
                 </div>
                 {yieldFootShort ? <p className="product-modal__yield-foot">{yieldFootShort}</p> : null}
+                <p className="product-modal__yield-legal" role="note">
+                  <i className="bi bi-info-circle-fill product-modal__yield-legal-icon" aria-hidden />
+                  <span className="product-modal__yield-legal-txt">{t("modal.yield_legal_short")}</span>
+                </p>
               </div>
             ) : null}
           </div>
@@ -385,12 +428,17 @@ export function AsicProductModal({
               <>
                 <div className="product-modal__cta-block">
                   <div className="product-modal__cta-group product-modal__cta-group--contact">
-                    <a className="product-modal__btn product-modal__btn--neutral" href={mailto}>
+                    <button
+                      type="button"
+                      className="product-modal__btn product-modal__btn--neutral"
+                      title={t("modal.email_inquiry_opens_new")}
+                      onClick={openEmailInquiryWindow}
+                    >
                       <span className="product-modal__btn-icon" aria-hidden>
                         <MailCtaIcon />
                       </span>
                       {t("modal.email_btn")}
-                    </a>
+                    </button>
                     <a className="product-modal__btn product-modal__btn--solid" href={waUrl} target="_blank" rel="noopener noreferrer">
                       <span className="product-modal__btn-icon" aria-hidden>
                         <WhatsAppCtaIcon />
@@ -500,6 +548,7 @@ export function AsicProductModal({
                     </table>
                   </div>
                 ) : null}
+
                 {hashrateShareView && onAddToQuote && productSupportsHashrateShare(product) ? (
                   <button
                     type="button"

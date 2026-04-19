@@ -1251,6 +1251,95 @@ export function postMarketplacePresenceHeartbeat(payload: {
   });
 }
 
+const MARKETPLACE_CONTACT_POST_TIMEOUT_MS = 25_000;
+
+export type MarketplaceContactPublicPayload = {
+  name: string;
+  lastName: string;
+  email: string;
+  subject: string;
+  phone: string;
+  message: string;
+};
+
+/** Formulario contacto marketplace: un solo POST (sin reintentos 502/503 de `api()`). */
+export async function postMarketplaceContactPublic(
+  payload: MarketplaceContactPublicPayload
+): Promise<{ ok: boolean; simulated?: boolean }> {
+  const token = getStoredToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let base = getApiBase();
+  const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
+  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") base = "";
+  const path = "/api/marketplace/contact";
+  const url = base && base.trim() !== "" ? `${base}${path}` : path;
+  if ((!base || base.trim() === "") && h !== "localhost" && h !== "127.0.0.1" && !h.endsWith(".vercel.app") && h !== "app.hashrate.space") {
+    throw new Error(getNoApiMessage());
+  }
+  const res = await fetchWithTimeout(
+    url,
+    { method: "POST", headers, credentials: "include", body: JSON.stringify(payload) },
+    MARKETPLACE_CONTACT_POST_TIMEOUT_MS
+  );
+  const data = (await res.json().catch(() => ({}))) as { ok?: boolean; simulated?: boolean; error?: { message?: string } };
+  if (res.status === 401) {
+    clearStoredAuth();
+    const cb = typeof window !== "undefined" ? (window as unknown as { __on401?: () => void }).__on401 : undefined;
+    if (typeof cb === "function") cb();
+    throw new Error(data?.error?.message ?? "Sesión expirada.");
+  }
+  if (!res.ok) {
+    const msg = data?.error?.message ?? res.statusText ?? "No se pudo enviar el mensaje.";
+    throw new Error(msg.trim() || "No se pudo enviar el mensaje.");
+  }
+  return { ok: Boolean(data.ok), simulated: Boolean(data.simulated) };
+}
+
+const MARKETPLACE_ASIC_INQUIRY_POST_TIMEOUT_MS = 25_000;
+
+export type MarketplaceAsicInquiryPublicPayload = {
+  email: string;
+  name?: string;
+  subject: string;
+  message: string;
+  source?: "asic" | "cart";
+};
+
+/** Consulta por correo desde ficha ASIC: un solo POST (sin reintentos 502/503 de `api()`). */
+export async function postMarketplaceAsicInquiryPublic(
+  payload: MarketplaceAsicInquiryPublicPayload
+): Promise<{ ok: boolean; simulated?: boolean }> {
+  const token = getStoredToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let base = getApiBase();
+  const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
+  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") base = "";
+  const path = "/api/marketplace/asic-inquiry";
+  const url = base && base.trim() !== "" ? `${base}${path}` : path;
+  if ((!base || base.trim() === "") && h !== "localhost" && h !== "127.0.0.1" && !h.endsWith(".vercel.app") && h !== "app.hashrate.space") {
+    throw new Error(getNoApiMessage());
+  }
+  const res = await fetchWithTimeout(
+    url,
+    { method: "POST", headers, credentials: "include", body: JSON.stringify(payload) },
+    MARKETPLACE_ASIC_INQUIRY_POST_TIMEOUT_MS
+  );
+  const data = (await res.json().catch(() => ({}))) as { ok?: boolean; simulated?: boolean; error?: { message?: string } };
+  if (res.status === 401) {
+    clearStoredAuth();
+    const cb = typeof window !== "undefined" ? (window as unknown as { __on401?: () => void }).__on401 : undefined;
+    if (typeof cb === "function") cb();
+    throw new Error(data?.error?.message ?? "Sesión expirada.");
+  }
+  if (!res.ok) {
+    const msg = data?.error?.message ?? res.statusText ?? "No se pudo enviar el mensaje.";
+    throw new Error(msg.trim() || "No se pudo enviar el mensaje.");
+  }
+  return { ok: Boolean(data.ok), simulated: Boolean(data.simulated) };
+}
+
 export function getMarketplacePresenceStats(): Promise<{
   onlineTotal: number;
   byViewerType: Record<string, number>;
