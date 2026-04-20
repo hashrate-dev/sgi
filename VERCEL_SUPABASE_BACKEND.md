@@ -15,15 +15,22 @@ En [vercel.com](https://vercel.com) → tu proyecto → **Settings**:
 
 ## 2. Variables de entorno
 
-En **Settings → Environment Variables** agregá:
+En **Settings → Environment Variables** agregá las mismas claves para **Production** y, si usás previews, **Preview** (y **Development** solo si corrés `vercel dev` con secretos).
 
 | Nombre | Valor | Obligatorio |
 |--------|--------|-------------|
 | `SUPABASE_DATABASE_URL` | Connection string de Supabase. Ej: `postgresql://postgres:TU_PASSWORD@db.xxx.supabase.co:5432/postgres` | **Sí** |
 | `JWT_SECRET` | String largo (mín. 16 caracteres) para firmar el JWT del login | **Sí** |
-| `RESEND_API_KEY` | API key de [Resend](https://resend.com) (avisos de órdenes marketplace por email) | Recomendado |
-| `RESEND_FROM_EMAIL` | Remitente verificado en Resend, ej. `Onboarding <onboarding@resend.dev>` o tu dominio | Recomendado |
-| `MARKETPLACE_NOTIFY_EMAIL_TO` | Destino de los avisos (default interno: `sales@hashrate.space`) | Opcional |
+| `RESEND_API_KEY` | API key `re_…` de [Resend](https://resend.com/api-keys) | **Sí** si querés correo (marketplace + reset) |
+| `RESEND_FROM_EMAIL` | Remitente para avisos marketplace, ej. `HashrateSpace <noreply@hashrate.space>` (dominio **verificado** en Resend) | Recomendado |
+| `PASSWORD_RESET_FROM_EMAIL` | Remitente del mail de reset; mismo dominio verificado en Resend, ej. `HashrateSpace <noreply@hashrate.space>`. Si no está, se usa `RESEND_FROM_EMAIL` / prueba `onboarding@resend.dev` | Recomendado |
+| `MARKETPLACE_NOTIFY_EMAIL_TO` | Destino de avisos de órdenes marketplace (default en código: `sales@hashrate.space`) | Opcional |
+| `APP_PUBLIC_URL` | URL pública del front para links en mails (ej. `https://app.hashrate.space`). Si falta, el servidor intenta deducirla del request | Opcional |
+| `FRONTEND_ORIGIN` | Alternativa a `APP_PUBLIC_URL` (misma idea: base del enlace de reset) | Opcional |
+
+**Reset de contraseña y Resend:** en [Resend → Domains](https://resend.com/domains) tené `hashrate.space` (o el dominio que uses) en estado **Verified** y usá `From` con ese dominio. Sin dominio verificado, Resend en prueba suele no entregar a correos arbitrarios.
+
+**SMTP opcional del reset** (solo si configurás envío alternativo): `PASSWORD_RESET_SMTP_HOST`, `PASSWORD_RESET_SMTP_PORT`, `PASSWORD_RESET_SMTP_SECURE`, `PASSWORD_RESET_SMTP_USER`, `PASSWORD_RESET_SMTP_PASS`, `PASSWORD_RESET_SMTP_FROM` — ver `.env.resend.local.example`.
 
 Obtener `SUPABASE_DATABASE_URL`: Supabase Dashboard → Project Settings → Database → Connection string → URI.
 

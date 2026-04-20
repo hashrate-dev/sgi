@@ -43,6 +43,7 @@ import { MarketplaceClienteLoginPage } from "./pages/MarketplaceClienteLoginPage
 import { MarketplaceClienteRegistroPage } from "./pages/MarketplaceClienteRegistroPage";
 import { MarketplacePresencePage } from "./pages/MarketplacePresencePage";
 import { MarketplacePresenceHistorialPage } from "./pages/MarketplacePresenceHistorialPage";
+import { PasswordResetPage } from "./pages/PasswordResetPage";
 import { CuentaClientePage } from "./pages/CuentaClientePage";
 import { CuentaClienteDetallePage } from "./pages/CuentaClienteDetallePage";
 import { ToastContainer } from "./components/ToastNotification";
@@ -371,6 +372,7 @@ function App() {
           </Route>
           <Route path="/marketplace/" element={<Navigate to="/marketplace" replace />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/reset-password" element={<PasswordResetPage />} />
           <Route element={<ProtectedRoute><ProtectedAppLayout /></ProtectedRoute>}>
             {/* `index`: en layout sin path, `path="/"` como hijo puede no matchear `/` y el * devuelve bucle infinito */}
             <Route index element={<HomePage />} />

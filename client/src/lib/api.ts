@@ -121,6 +121,8 @@ function fetchWithTimeout(url: string, opts: RequestInit, timeoutMs: number): Pr
 export type ApiHttpError = Error & { status?: number; code?: string };
 
 export const API_ERROR_EMAIL_ALREADY_REGISTERED = "EMAIL_ALREADY_REGISTERED";
+/** Reset de contraseña: correo no registrado en `users`. */
+export const API_ERROR_INVALID_EMAIL = "INVALID_EMAIL";
 export const API_ERROR_DOCUMENT_ALREADY_REGISTERED = "DOCUMENT_ALREADY_REGISTERED";
 /** Marketplace: ya hay una consulta en curso para esta cuenta (una orden activa). */
 export const API_ERROR_ONE_ACTIVE_ORDER = "ONE_ACTIVE_ORDER";
@@ -309,16 +311,30 @@ export function login(username: string, password: string): Promise<LoginResponse
   return api<LoginResponse>("/api/auth/login", { method: "POST", body: JSON.stringify({ username, password }) });
 }
 
+/** Solicita enlace de restablecimiento. Si el correo no está en la BD → 404 `INVALID_EMAIL` / "MAIL INVALIDO". */
+export function requestPasswordReset(email: string): Promise<{ ok: boolean; message: string }> {
+  return api<{ ok: boolean; message: string }>("/api/auth/password-reset-request", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+/** Restablece contraseña usando token enviado por email. */
+export function confirmPasswordReset(token: string, password: string): Promise<{ ok: boolean }> {
+  return api<{ ok: boolean }>("/api/auth/password-reset-confirm", {
+    method: "POST",
+    body: JSON.stringify({ token, password }),
+  });
+}
+
 /** Registro tienda: crea usuario rol `cliente` + registro en tabla `clients`. */
 export function registerMarketplaceCliente(body: {
   email: string;
   password: string;
   nombre: string;
   apellidos: string;
-  documentoIdentidad: string;
   country: string;
   city: string;
-  direccion: string;
   celular: string;
   telefono?: string;
 }): Promise<LoginResponse> {

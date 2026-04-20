@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import { canUseMarketplaceQuoteCart } from "../lib/auth.js";
 import { useAuth } from "../contexts/AuthContext";
-import { isDocumentAlreadyRegisteredError, isEmailAlreadyRegisteredError, registerMarketplaceCliente, wakeUpBackend } from "../lib/api";
+import { isEmailAlreadyRegisteredError, registerMarketplaceCliente, wakeUpBackend } from "../lib/api";
 import { MarketplacePasswordField } from "../components/marketplace/MarketplacePasswordField";
 import { MarketplaceSiteHeader } from "../components/marketplace/MarketplaceSiteHeader";
 import { MarketplaceSiteFooter } from "../components/marketplace/MarketplaceSiteFooter";
@@ -10,8 +10,6 @@ import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
 import "../styles/marketplace-hashrate.css";
 import {
   COUNTRIES_REGISTRO,
-  CITY_OTHER_VALUE,
-  DOCUMENTO_TIPO_OPTIONS,
   countryById,
   normalizeLocalPhoneInput,
 } from "../lib/marketplaceRegistroGeo";
@@ -37,18 +35,14 @@ export function MarketplaceClienteRegistroPage() {
   const [password2, setPassword2] = useState("");
   const [nombre, setNombre] = useState("");
   const [apellidos, setApellidos] = useState("");
-  const [documentoTipo, setDocumentoTipo] = useState<string>(DOCUMENTO_TIPO_OPTIONS[0].value);
-  const [documentoNumero, setDocumentoNumero] = useState("");
   const [countryId, setCountryId] = useState("");
   const [city, setCity] = useState("");
-  const [cityOther, setCityOther] = useState("");
-  const [direccion, setDireccion] = useState("");
   /** País asociado al prefijo E.164 (independiente del país de dirección; se sincroniza con él al cambiar). */
   const [celularDialId, setCelularDialId] = useState(DEFAULT_PHONE_DIAL_COUNTRY_ID);
   const [celularLocal, setCelularLocal] = useState("");
   const [error, setError] = useState("");
   const [errorKind, setErrorKind] = useState<"client" | "duplicate" | "generic">("client");
-  const [duplicateReason, setDuplicateReason] = useState<"email" | "document" | "other">("other");
+  const [duplicateReason, setDuplicateReason] = useState<"email" | "other">("other");
   const [submitting, setSubmitting] = useState(false);
   const [ready, setReady] = useState(false);
   const [emailSuggestFocus, setEmailSuggestFocus] = useState(false);
@@ -88,18 +82,9 @@ export function MarketplaceClienteRegistroPage() {
     !emailHasExactDomain &&
     emailDomainSuggestions.length > 0;
 
-  const duplicateHeading =
-    duplicateReason === "document"
-      ? "Este documento/cédula ya está registrado"
-      : duplicateReason === "email"
-        ? t("reg.dup_heading")
-        : "No se pudo crear la cuenta";
+  const duplicateHeading = duplicateReason === "email" ? t("reg.dup_heading") : "No se pudo crear la cuenta";
   const duplicateDetailMessage =
-    duplicateReason === "document"
-      ? "Este documento ya se está utilizando en el sistema."
-      : duplicateReason === "email"
-        ? "Este email ya se está utilizando en el sistema."
-        : error;
+    duplicateReason === "email" ? "Este email ya se está utilizando en el sistema." : error;
 
   function applyEmailDomain(domain: string) {
     const base = emailLocal.trim();
@@ -111,7 +96,6 @@ export function MarketplaceClienteRegistroPage() {
 
   useEffect(() => {
     setCity("");
-    setCityOther("");
     if (countryId) {
       setCelularDialId(countryId);
     }
@@ -202,11 +186,6 @@ export function MarketplaceClienteRegistroPage() {
       setError(t("reg.err.apellidos"));
       return;
     }
-    if (documentoNumero.trim().length < 3) {
-      setErrorKind("client");
-      setError(t("reg.err.documento"));
-      return;
-    }
     if (!countryId) {
       setErrorKind("client");
       setError(t("reg.err.country"));
@@ -218,21 +197,15 @@ export function MarketplaceClienteRegistroPage() {
       setError(t("reg.err.country_bad"));
       return;
     }
-    const cityFinal =
-      city === CITY_OTHER_VALUE ? cityOther.trim() : city.trim();
-    if (!city) {
+    const cityFinal = city.trim();
+    if (!cityFinal) {
       setErrorKind("client");
       setError(t("reg.err.city"));
       return;
     }
-    if (city === CITY_OTHER_VALUE && cityFinal.length < 2) {
+    if (cityFinal.length < 2) {
       setErrorKind("client");
       setError(t("reg.err.city_other"));
-      return;
-    }
-    if (direccion.trim().length < 3) {
-      setErrorKind("client");
-      setError(t("reg.err.address"));
       return;
     }
     if (!celularDialId) {
@@ -254,7 +227,6 @@ export function MarketplaceClienteRegistroPage() {
       return;
     }
     const celularFull = `${dialCel}${celDigits}`;
-    const documentoIdentidad = `${documentoTipo} ${documentoNumero.trim()}`.trim();
     setSubmitting(true);
     try {
       if (typeof window !== "undefined" && window.location.hostname.endsWith(".vercel.app")) {
@@ -265,19 +237,16 @@ export function MarketplaceClienteRegistroPage() {
         password,
         nombre: nombreTrim,
         apellidos: apellidosTrim,
-        documentoIdentidad,
         country: pais.name,
         city: cityFinal,
-        direccion: direccion.trim(),
         celular: celularFull,
       });
       applyLoginResponse(res);
     } catch (err) {
       const isDupEmail = isEmailAlreadyRegisteredError(err);
-      const isDupDocument = isDocumentAlreadyRegisteredError(err);
-      if (isDupEmail || isDupDocument) {
+      if (isDupEmail) {
         setErrorKind("duplicate");
-        setDuplicateReason(isDupDocument ? "document" : "email");
+        setDuplicateReason("email");
         setError(err instanceof Error ? err.message : t("reg.err.duplicate_fallback"));
       } else {
         setErrorKind("generic");
@@ -499,101 +468,34 @@ export function MarketplaceClienteRegistroPage() {
                                 <label className="form-label market-registro-label" htmlFor="reg-ciudad">
                                   {t("reg.label_city")}
                                 </label>
-                                <select
+                                <input
                                   id="reg-ciudad"
-                                  className="form-select"
+                                  type="text"
+                                  className="form-control"
                                   value={city}
                                   onChange={(e) => setCity(e.target.value)}
                                   autoComplete="address-level2"
                                   aria-label={t("reg.label_city")}
+                                  placeholder={paisSeleccionado ? t("reg.city_pick") : t("reg.city_need_country")}
+                                  list={paisSeleccionado?.cities.length ? "reg-city-suggestions" : undefined}
                                   disabled={!paisSeleccionado}
                                   required
-                                >
-                                  <option value="">
-                                    {paisSeleccionado ? t("reg.city_pick") : t("reg.city_need_country")}
-                                  </option>
-                                  {paisSeleccionado?.cities.map((c) => (
-                                    <option key={c} value={c}>
-                                      {c}
-                                    </option>
-                                  ))}
-                                  {paisSeleccionado ? <option value={CITY_OTHER_VALUE}>{t("reg.city_other")}</option> : null}
-                                </select>
-                                {paisSeleccionado && city === CITY_OTHER_VALUE ? (
-                                  <input
-                                    type="text"
-                                    className="form-control mt-2"
-                                    value={cityOther}
-                                    onChange={(e) => setCityOther(e.target.value)}
-                                    placeholder={t("reg.ph_city_other")}
-                                    autoComplete="address-level2"
-                                    aria-label={t("reg.ph_city_other")}
-                                  />
+                                />
+                                {paisSeleccionado?.cities.length ? (
+                                  <datalist id="reg-city-suggestions">
+                                    {paisSeleccionado.cities.map((c) => (
+                                      <option key={c} value={c} />
+                                    ))}
+                                  </datalist>
                                 ) : null}
                               </div>
-                            </div>
-                            <div className="mb-0">
-                              <label className="form-label market-registro-label" htmlFor="reg-direccion">
-                                {t("reg.label_address")}
-                              </label>
-                              <input
-                                id="reg-direccion"
-                                type="text"
-                                className="form-control"
-                                value={direccion}
-                                onChange={(e) => setDireccion(e.target.value)}
-                                autoComplete="street-address"
-                                placeholder={t("reg.ph_address")}
-                                required
-                                minLength={3}
-                              />
                             </div>
                           </div>
                         </div>
                       </div>
 
                       <div className="row g-4 market-registro-doc-contact-row align-items-stretch mb-2">
-                        <div className="col-md-6">
-                          <div
-                            className="market-registro-fieldset market-registro-fieldset--panel market-registro-fieldset--panel--wide mb-0 h-100"
-                            role="group"
-                            aria-labelledby="reg-legend-doc"
-                          >
-                            <div id="reg-legend-doc" className="market-registro-fieldset__legend">
-                              <i className="bi bi-card-text" aria-hidden />
-                              {t("reg.legend_id")}
-                            </div>
-                            <div className="market-registro-doc-grid">
-                              <select
-                                id="reg-doc-tipo"
-                                className="form-select market-registro-doc-select"
-                                value={documentoTipo}
-                                onChange={(e) => setDocumentoTipo(e.target.value)}
-                                aria-label={t("reg.id_doc_type")}
-                                required
-                              >
-                                {DOCUMENTO_TIPO_OPTIONS.map((o) => (
-                                  <option key={o.value} value={o.value}>
-                                    {o.label}
-                                  </option>
-                                ))}
-                              </select>
-                              <input
-                                id="reg-doc-numero"
-                                type="text"
-                                className="form-control"
-                                value={documentoNumero}
-                                onChange={(e) => setDocumentoNumero(e.target.value)}
-                                autoComplete="off"
-                                placeholder={t("reg.id_doc_num_ph")}
-                                aria-label={t("reg.id_doc_num_ph")}
-                                required
-                                minLength={3}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                        <div className="col-md-6">
+                        <div className="col-md-12">
                           <div
                             className="market-registro-fieldset market-registro-fieldset--panel market-registro-fieldset--panel--wide mb-0 h-100"
                             role="group"
@@ -604,34 +506,42 @@ export function MarketplaceClienteRegistroPage() {
                               {t("reg.legend_contact_block")}
                             </div>
                             <div className="mb-0 market-registro-phone-block">
-                              <label className="form-label market-registro-label" htmlFor="reg-cel-num">
-                                {t("reg.label_mobile")}
-                              </label>
-                              <div className="input-group flex-nowrap hrs-reg-phone-input-group">
-                                <select
-                                  className="form-select flex-shrink-0 hrs-reg-phone-dial market-registro-phone-dial"
-                                  value={celularDialId}
-                                  onChange={(e) => setCelularDialId(e.target.value)}
-                                  aria-label={t("reg.dial_aria")}
-                                  required
-                                >
-                                  {countriesForPhoneSelect.map((c) => (
-                                    <option key={c.id} value={c.id}>
-                                      {c.dial} · {c.name}
-                                    </option>
-                                  ))}
-                                </select>
-                                <input
-                                  id="reg-cel-num"
-                                  type="tel"
-                                  className="form-control flex-grow-1 min-w-0"
-                                  value={celularLocal}
-                                  onChange={(e) => setCelularLocal(e.target.value)}
-                                  autoComplete="tel-national"
-                                  placeholder={t("reg.phone_ph")}
-                                  inputMode="numeric"
-                                  required
-                                />
+                              <div className="row g-3">
+                                <div className="col-6">
+                                  <label className="form-label market-registro-label" htmlFor="reg-cel-dial">
+                                    {t("reg.dial_aria")}
+                                  </label>
+                                  <select
+                                    id="reg-cel-dial"
+                                    className="form-select market-registro-phone-dial"
+                                    value={celularDialId}
+                                    onChange={(e) => setCelularDialId(e.target.value)}
+                                    aria-label={t("reg.dial_aria")}
+                                    required
+                                  >
+                                    {countriesForPhoneSelect.map((c) => (
+                                      <option key={c.id} value={c.id}>
+                                        {c.dial} · {c.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div className="col-6">
+                                  <label className="form-label market-registro-label" htmlFor="reg-cel-num">
+                                    {t("reg.label_mobile")}
+                                  </label>
+                                  <input
+                                    id="reg-cel-num"
+                                    type="tel"
+                                    className="form-control"
+                                    value={celularLocal}
+                                    onChange={(e) => setCelularLocal(e.target.value)}
+                                    autoComplete="tel-national"
+                                    placeholder={t("reg.phone_ph")}
+                                    inputMode="numeric"
+                                    required
+                                  />
+                                </div>
                               </div>
 
                             </div>

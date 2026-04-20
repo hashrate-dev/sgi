@@ -1,9 +1,16 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
+import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import nodemailer from "nodemailer";
 import { z, type ZodError } from "zod";
 import { db } from "../db.js";
 import { env } from "../config/env.js";
+import {
+  effectiveResendFromEmail,
+  normalizeResendApiKey,
+  resendApiKeyLooksInvalid,
+} from "../config/resendFrom.js";
 import { allocateNextTiendaOnlineClientCode, type TiendaSeqTx } from "../lib/tiendaOnlineClientCode.js";
 import { getTiendaPhonesForUserId } from "../lib/tiendaClientContact.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -13,16 +20,17 @@ import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
 
 const authRouter = Router();
 const JWT_SECRET = env.JWT_SECRET;
+const PASSWORD_RESET_TTL_MINUTES = 30;
+const RESEND_API_URL = "https://api.resend.com/emails";
+let passwordResetStorageReady = false;
 const LoginSchema = z.object({ username: z.string().min(1).max(200), password: z.string().min(1) });
 const RegisterClienteSchema = z.object({
   email: z.string().email().max(200),
   password: z.string().min(6).max(100),
   nombre: z.string().min(1).max(120).trim(),
   apellidos: z.string().min(1).max(120).trim(),
-  documentoIdentidad: z.string().min(3).max(120).trim(),
   country: z.string().min(2).max(100).trim(),
   city: z.string().min(1).max(100).trim(),
-  direccion: z.string().min(3).max(300).trim(),
   celular: z.string().min(6).max(40).trim(),
   telefono: z.string().max(40).trim().optional(),
 });
@@ -61,40 +69,14 @@ function isEmailUniqueViolation(err: unknown): boolean {
   );
 }
 
-function isDocumentoUniqueViolation(err: unknown): boolean {
-  const e = err as { message?: unknown; detail?: unknown; constraint?: unknown; column?: unknown };
-  const haystack = [
-    String(e?.message ?? ""),
-    String(e?.detail ?? ""),
-    String(e?.constraint ?? ""),
-    String(e?.column ?? ""),
-  ]
-    .join(" ")
-    .toLowerCase();
-  return (
-    haystack.includes("documento_identidad") ||
-    haystack.includes("clients_documento") ||
-    haystack.includes("idx_clients_documento")
-  );
-}
-
-function normalizeDocumentoIdentidad(input: string): string {
-  return String(input ?? "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .toLowerCase();
-}
-
 function registerFieldLabel(path: string): string {
   const k = path.toLowerCase();
   if (k === "email") return "correo electrónico";
   if (k === "password") return "contraseña";
   if (k === "nombre") return "nombre";
   if (k === "apellidos") return "apellidos";
-  if (k === "documentoidentidad") return "documento/cédula";
   if (k === "country") return "país";
   if (k === "city") return "ciudad";
-  if (k === "direccion") return "dirección";
   if (k === "celular") return "celular";
   if (k === "telefono") return "teléfono";
   return path;
@@ -111,6 +93,219 @@ function formatRegisterValidationMessage(zerr: ZodError): string {
   if (!msg) return `Revisá el campo ${label}.`;
   if (msg.toLowerCase().includes("required")) return `Completá el campo ${label}.`;
   return `Revisá ${label}: ${msg}.`;
+}
+
+function resolvePublicAppOrigin(req: Request): string {
+  const fromEnv = (process.env.APP_PUBLIC_URL || process.env.FRONTEND_ORIGIN || "").trim();
+  if (fromEnv) return fromEnv.replace(/\/+$/, "");
+  const origin = String(req.headers.origin || "").trim();
+  if (/^https?:\/\//i.test(origin)) return origin.replace(/\/+$/, "");
+  const host = String(req.headers.host || "").trim();
+  if (/localhost|127\.0\.0\.1/i.test(host)) return "http://localhost:5173";
+  return "https://app.hashrate.space";
+}
+
+/** Resend en API key de prueba a veces solo permite entregar a un buzón (lo suele indicar en el JSON del 403). */
+function parseResendSandboxInboxFrom403(bodyText: string): string | null {
+  try {
+    const j = JSON.parse(bodyText) as { message?: string };
+    const msg = String(j.message || "");
+    const m = msg.match(/\(\s*([^\s)]+@[^)\s]+)\s*\)/);
+    if (m?.[1]) return m[1].trim().toLowerCase();
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function isResendTestingRecipientRestriction403(status: number, bodyText: string): boolean {
+  if (status !== 403 && status !== 422) return false;
+  const t = bodyText.toLowerCase();
+  return (
+    t.includes("only send testing emails") ||
+    t.includes("testing emails to your own") ||
+    t.includes("send emails to other recipients")
+  );
+}
+
+function passwordResetSandboxRelayEnabled(): boolean {
+  const v = String(process.env.PASSWORD_RESET_RESEND_SANDBOX_RELAY ?? "").trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes";
+}
+
+function passwordResetRelayInbox(): string {
+  const explicit = String(process.env.PASSWORD_RESET_RESEND_RELAY_TO || "").trim().toLowerCase();
+  if (explicit) return explicit;
+  const notify = String(process.env.MARKETPLACE_NOTIFY_EMAIL_TO || "").trim().toLowerCase();
+  if (notify) return notify;
+  return "sales@hashrate.space";
+}
+
+/** Remitente solo para reset (no pisa avisos marketplace). Si no hay override, usa el mismo criterio que el resto de Resend. */
+function passwordResetFromAddress(): string {
+  const explicit = String(process.env.PASSWORD_RESET_FROM_EMAIL || "").trim();
+  if (explicit) return explicit;
+  return effectiveResendFromEmail();
+}
+
+function passwordResetSmtpConfigured(): boolean {
+  const host = String(process.env.PASSWORD_RESET_SMTP_HOST || "").trim();
+  const user = String(process.env.PASSWORD_RESET_SMTP_USER || "").trim();
+  const pass = String(process.env.PASSWORD_RESET_SMTP_PASS || "").trim();
+  return !!(host && user && pass);
+}
+
+/**
+ * Si definís PASSWORD_RESET_SMTP_* (p. ej. buzón de Google Workspace), el mismo mail con el enlace
+ * se envía por SMTP al correo que pidió el reset — útil cuando Resend en prueba no entrega a ese destinatario.
+ */
+async function tryPasswordResetSmtpFallback(to: string, subject: string, text: string, html: string): Promise<boolean> {
+  if (!passwordResetSmtpConfigured()) return false;
+  const host = String(process.env.PASSWORD_RESET_SMTP_HOST || "").trim();
+  const user = String(process.env.PASSWORD_RESET_SMTP_USER || "").trim();
+  const pass = String(process.env.PASSWORD_RESET_SMTP_PASS || "").trim();
+  const rawPort = String(process.env.PASSWORD_RESET_SMTP_PORT || "587").trim();
+  const parsedPort = Number.parseInt(rawPort, 10);
+  const port = Number.isFinite(parsedPort) && parsedPort > 0 ? parsedPort : 587;
+  const secureRaw = String(process.env.PASSWORD_RESET_SMTP_SECURE || "").trim().toLowerCase();
+  const secure = secureRaw === "true" || secureRaw === "1" || port === 465;
+  const from =
+    String(process.env.PASSWORD_RESET_SMTP_FROM || process.env.PASSWORD_RESET_FROM_EMAIL || "").trim() || user;
+  const transporter = nodemailer.createTransport({ host, port, secure, auth: { user, pass } });
+  await transporter.sendMail({ from, to, subject, text, html });
+  return true;
+}
+
+type PasswordResetSendMeta = { sandboxRelayTo?: string };
+
+async function sendPasswordResetEmail(to: string, resetUrl: string, meta?: PasswordResetSendMeta): Promise<void> {
+  const subject = "Recuperar contraseña · Hashrate Space";
+  const text = `Recibimos una solicitud para restablecer tu contraseña.\n\nAbrí este enlace (válido por ${PASSWORD_RESET_TTL_MINUTES} minutos):\n${resetUrl}\n\nSi no solicitaste este cambio, podés ignorar este correo.`;
+  const html = `<p>Recibimos una solicitud para restablecer tu contraseña.</p><p><a href="${resetUrl}">Restablecer contraseña</a> (válido por ${PASSWORD_RESET_TTL_MINUTES} minutos).</p><p>Si no solicitaste este cambio, podés ignorar este correo.</p>`;
+
+  /** Resend en API key de prueba no entrega a mails arbitrarios; SMTP (p. ej. Workspace) sí → en local intentamos primero al destinatario real. */
+  if (env.NODE_ENV !== "production" && passwordResetSmtpConfigured()) {
+    try {
+      if (await tryPasswordResetSmtpFallback(to, subject, text, html)) return;
+    } catch (smtpErr) {
+      console.error("[auth] password-reset SMTP (local primero):", smtpErr);
+    }
+  }
+
+  const apiKey = normalizeResendApiKey(process.env.RESEND_API_KEY);
+  const fromInitial = passwordResetFromAddress();
+  if (!apiKey || resendApiKeyLooksInvalid(apiKey) || !fromInitial) {
+    if (env.NODE_ENV !== "production") {
+      try {
+        if (await tryPasswordResetSmtpFallback(to, subject, text, html)) return;
+      } catch (smtpErr) {
+        console.error("[auth] password-reset SMTP (sin Resend):", smtpErr);
+      }
+      throw new Error(`RESET_EMAIL_NOT_CONFIGURED::${resetUrl}`);
+    }
+    throw new Error("Email provider no configurado.");
+  }
+
+  async function resendPost(from: string, recipient: string, subj: string, txt: string, htm: string, replyTo?: string) {
+    const payload: Record<string, unknown> = {
+      from,
+      to: [recipient],
+      subject: subj,
+      text: txt,
+      html: htm,
+    };
+    if (replyTo?.trim()) payload.reply_to = replyTo.trim();
+    return fetch(RESEND_API_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  }
+
+  let sendFrom = fromInitial;
+  let res = await resendPost(sendFrom, to, subject, text, html);
+  let body = await res.text().catch(() => "");
+
+  if (!res.ok && res.status === 403 && /domain.+not.+verified|verify.+domain|unauthorized domain/i.test(body)) {
+    sendFrom = "onboarding@resend.dev";
+    res = await resendPost(sendFrom, to, subject, text, html);
+    body = await res.text().catch(() => "");
+  }
+
+  if (!res.ok) {
+    try {
+      if (await tryPasswordResetSmtpFallback(to, subject, text, html)) {
+        return;
+      }
+    } catch (smtpErr) {
+      console.error("[auth] password-reset SMTP fallback:", smtpErr);
+    }
+  }
+
+  /** En local: si el envío directo falla (casi siempre modo prueba Resend), mandamos el mismo enlace al buzón permitido del proyecto. En prod: solo si PASSWORD_RESET_RESEND_SANDBOX_RELAY y el error es el de “testing”. */
+  const trySandboxRelay =
+    !res.ok &&
+    res.status !== 401 &&
+    (env.NODE_ENV !== "production" ||
+      (passwordResetSandboxRelayEnabled() && isResendTestingRecipientRestriction403(res.status, body)));
+
+  if (trySandboxRelay) {
+    const parsedInbox = parseResendSandboxInboxFrom403(body);
+    const relay = (parsedInbox || passwordResetRelayInbox()).trim().toLowerCase();
+    if (relay && relay !== to.trim().toLowerCase()) {
+      const relaySubject = `${subject} (cuenta: ${to})`;
+      const relayText = `Solicitud de restablecimiento para la cuenta: ${to}\n\nAbrí este enlace (válido por ${PASSWORD_RESET_TTL_MINUTES} minutos):\n${resetUrl}\n\nSi no solicitaste este cambio, ignorá este correo. Podés responder para contactar a ${to}.\n`;
+      const relayHtml = `<p>Restablecimiento de contraseña para la cuenta <strong>${escapeHtml(to)}</strong>.</p><p><a href="${resetUrl}">Restablecer contraseña</a> (válido por ${PASSWORD_RESET_TTL_MINUTES} minutos).</p><p>Si no solicitaste este cambio, ignorá este correo. Reply-to: ${escapeHtml(to)}</p>`;
+      const preferredFrom = String(process.env.PASSWORD_RESET_FROM_EMAIL || "").trim();
+      const relayFromCandidates = [...new Set(["onboarding@resend.dev", preferredFrom, sendFrom].filter((x) => x.length > 0))];
+      let lastRelayStatus = 0;
+      let lastRelayBody = "";
+      for (const rf of relayFromCandidates) {
+        const resRelay = await resendPost(rf, relay, relaySubject, relayText, relayHtml, to);
+        const bodyRelay = await resRelay.text().catch(() => "");
+        lastRelayStatus = resRelay.status;
+        lastRelayBody = bodyRelay;
+        if (resRelay.ok) {
+          if (meta) meta.sandboxRelayTo = relay;
+          if (process.env.NODE_ENV !== "production") {
+            // eslint-disable-next-line no-console
+            console.log(`[auth] password-reset: Resend modo prueba → entregado a ${relay} (solicitó ${to}, from=${rf})`);
+          }
+          return;
+        }
+      }
+      throw new Error(`Resend ${lastRelayStatus}: ${lastRelayBody || "relay failed"}`);
+    }
+  }
+
+  if (!res.ok) throw new Error(`Resend ${res.status}: ${body || res.statusText}`);
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+async function ensurePasswordResetStorage(): Promise<void> {
+  if (passwordResetStorageReady) return;
+  await db.prepare(
+    `CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      token_hash TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      email TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      used_at TEXT,
+      requested_ip TEXT,
+      requested_user_agent TEXT
+    )`
+  ).run();
+  await db.prepare("CREATE INDEX IF NOT EXISTS idx_pwd_reset_user_created ON password_reset_tokens(user_id, created_at)").run();
+  await db.prepare("CREATE INDEX IF NOT EXISTS idx_pwd_reset_email_created ON password_reset_tokens(email, created_at)").run();
+  passwordResetStorageReady = true;
 }
 
 /** Asegurar que los usuarios por defecto existan (crear si no existen). */
@@ -154,7 +349,6 @@ authRouter.post("/auth/register-cliente", registerClienteRateLimit, async (req, 
   }
   const body = parsed.data;
   const emailNorm = body.email.trim().toLowerCase();
-  const documentoNorm = normalizeDocumentoIdentidad(body.documentoIdentidad);
   const password = body.password;
   const hash = bcrypt.hashSync(password, 10);
   const telefonoFijo = body.telefono?.trim() ? body.telefono.trim() : null;
@@ -193,19 +387,6 @@ authRouter.post("/auth/register-cliente", registerClienteRateLimit, async (req, 
       const cid = Number(dupClientEmail.id);
       reusableClientId = Number.isFinite(cid) && cid > 0 ? cid : null;
     }
-    const dupDocumento = (await db
-      .prepare("SELECT id FROM clients WHERE LOWER(TRIM(COALESCE(documento_identidad, ''))) = ? LIMIT 1")
-      .get(documentoNorm)) as { id: number } | undefined;
-    if (dupDocumento) {
-      return res.status(409).json({
-        error: {
-          code: "DOCUMENT_ALREADY_REGISTERED",
-          message:
-            "Este documento/cédula ya está asociado a una cuenta en el sistema. No podés crear otra cuenta con el mismo documento.",
-        },
-      });
-    }
-
     await db.transaction(async (tx) => {
       const insUser = await tx
         .prepare("INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, 'cliente')")
@@ -241,10 +422,10 @@ authRouter.post("/auth/register-cliente", registerClienteRateLimit, async (req, 
             body.celular.trim(),
             telefonoFijo,
             emailNorm,
-            body.direccion.trim(),
+            null,
             body.city.trim(),
             emailNorm,
-            body.documentoIdentidad.trim(),
+            null,
             body.country.trim(),
             uid,
             reusableClientId
@@ -263,10 +444,10 @@ authRouter.post("/auth/register-cliente", registerClienteRateLimit, async (req, 
             body.celular.trim(),
             telefonoFijo,
             emailNorm,
-            body.direccion.trim(),
+            null,
             body.city.trim(),
             emailNorm,
-            body.documentoIdentidad.trim(),
+            null,
             body.country.trim(),
             uid
           );
@@ -283,20 +464,11 @@ authRouter.post("/auth/register-cliente", registerClienteRateLimit, async (req, 
           },
         });
       }
-      if (isDocumentoUniqueViolation(e)) {
-        return res.status(409).json({
-          error: {
-            code: "DOCUMENT_ALREADY_REGISTERED",
-            message:
-              "Este documento/cédula ya está asociado a una cuenta en el sistema. No podés crear otra cuenta con el mismo documento.",
-          },
-        });
-      }
       return res.status(409).json({
         error: {
           code: "REGISTER_DUPLICATE_DATA",
           message:
-            "Ya existe un registro con alguno de estos datos (documento, teléfono u otro campo único). Verificá la información e intentá nuevamente.",
+            "Ya existe un registro con alguno de estos datos (correo, teléfono u otro campo único). Verificá la información e intentá nuevamente.",
         },
       });
     }
@@ -306,7 +478,7 @@ authRouter.post("/auth/register-cliente", registerClienteRateLimit, async (req, 
     const userFacingMsg = msgNorm.includes("check constraint")
       ? "Hay datos inválidos en el formulario. Revisá los campos e intentá nuevamente."
       : msgNorm.includes("foreign key")
-        ? "Hay una referencia inválida en los datos enviados. Revisá país, ciudad o documento."
+        ? "Hay una referencia inválida en los datos enviados. Revisá país, ciudad o celular."
         : env.NODE_ENV === "development"
           ? msg
           : "No se pudo crear la cuenta por un error del servidor. Intentá nuevamente en unos minutos.";
@@ -332,6 +504,130 @@ authRouter.post("/auth/register-cliente", registerClienteRateLimit, async (req, 
   };
   const token = jwt.sign({ sub: row.username, userId: row.id }, JWT_SECRET, { expiresIn: "7d" });
   return res.status(201).json({ token, user });
+});
+
+const PasswordResetRequestSchema = z.object({
+  email: z.string().email().max(200),
+});
+
+const PasswordResetConfirmSchema = z.object({
+  token: z.string().min(20).max(300),
+  password: z.string().min(6).max(100),
+});
+
+/** Solicitud de restablecimiento: valida que el correo exista; envía solo al correo indicado (sin reenvío salvo PASSWORD_RESET_RESEND_SANDBOX_RELAY). */
+authRouter.post("/auth/password-reset-request", loginRateLimit, async (req, res) => {
+  const parsed = PasswordResetRequestSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: { code: "VALIDATION", message: "Ingresá un correo electrónico válido." },
+    });
+  }
+  const emailNorm = parsed.data.email.trim().toLowerCase();
+  try {
+    await ensurePasswordResetStorage();
+    const sendMeta: PasswordResetSendMeta = {};
+    const row = (await db
+      .prepare("SELECT id, username, email FROM users WHERE LOWER(TRIM(COALESCE(email, username))) = ? LIMIT 1")
+      .get(emailNorm)) as { id: number; username: string; email?: string | null } | undefined;
+    if (!row?.id) {
+      return res.status(404).json({
+        error: { code: "INVALID_EMAIL", message: "MAIL INVALIDO" },
+      });
+    }
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+    const now = new Date();
+    const exp = new Date(now.getTime() + PASSWORD_RESET_TTL_MINUTES * 60_000);
+    const userId = Number(row.id);
+    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket?.remoteAddress || "";
+    const ua = String(req.headers["user-agent"] || "").slice(0, 500);
+    await db.prepare("UPDATE password_reset_tokens SET used_at = ? WHERE user_id = ? AND used_at IS NULL").run(now.toISOString(), userId);
+    await db
+      .prepare(
+        `INSERT INTO password_reset_tokens (token_hash, user_id, email, expires_at, created_at, requested_ip, requested_user_agent)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(tokenHash, userId, emailNorm, exp.toISOString(), now.toISOString(), ip, ua);
+    const origin = resolvePublicAppOrigin(req);
+    const resetUrl = `${origin}/reset-password?token=${encodeURIComponent(rawToken)}`;
+    try {
+      await sendPasswordResetEmail(emailNorm, resetUrl, sendMeta);
+    } catch (mailErr) {
+      console.error("[auth] password-reset-request email:", mailErr);
+      const mailMsg = mailErr instanceof Error ? mailErr.message : String(mailErr);
+      if (env.NODE_ENV !== "production") {
+        const missingKeyHint = mailMsg.startsWith("RESET_EMAIL_NOT_CONFIGURED::")
+          ? " Falta `RESEND_API_KEY` en `.env.resend.local` (reiniciá `npm run dev`)."
+          : " En local, Resend a menudo no entrega a destinatarios que no sean el buzón autorizado del proyecto (modo prueba).";
+        return res.status(200).json({
+          ok: true,
+          message: `Desarrollo: el correo no se pudo enviar a ${emailNorm}.${missingKeyHint} Usá este enlace (el token quedó guardado): ${resetUrl}`,
+        });
+      }
+      try {
+        await db.prepare("DELETE FROM password_reset_tokens WHERE token_hash = ?").run(tokenHash);
+      } catch (delErr) {
+        console.error("[auth] password-reset-request rollback token:", delErr);
+      }
+      return res.status(422).json({
+        error: {
+          code: "EMAIL_SEND_FAILED",
+          message: `No se pudo enviar el correo a ${emailNorm}. Verificá el dominio en Resend y el remitente (PASSWORD_RESET_FROM_EMAIL).`,
+        },
+      });
+    }
+    const relayNote = sendMeta.sandboxRelayTo
+      ? ` Revisá también ${sendMeta.sandboxRelayTo} si no ves el correo en ${emailNorm} (envío de respaldo en modo prueba Resend).`
+      : "";
+    return res.status(200).json({
+      ok: true,
+      message: `Te enviamos un enlace para restablecer la contraseña. Revisá tu correo (incluido spam).${relayNote}`,
+    });
+  } catch (e) {
+    console.error("password-reset-request:", e);
+    return res.status(500).json({ error: { message: "Error interno." } });
+  }
+});
+
+/** Confirmación de restablecimiento: token de un solo uso. */
+authRouter.post("/auth/password-reset-confirm", loginRateLimit, async (req, res) => {
+  const parsed = PasswordResetConfirmSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: { message: "Token y contraseña válidos son obligatorios." } });
+  }
+  const tokenHash = crypto.createHash("sha256").update(parsed.data.token.trim()).digest("hex");
+  const nowIso = new Date().toISOString();
+  try {
+    await ensurePasswordResetStorage();
+    const tok = (await db
+      .prepare(
+        `SELECT token_hash, user_id, expires_at, used_at
+         FROM password_reset_tokens
+         WHERE token_hash = ?
+         ORDER BY created_at DESC
+         LIMIT 1`
+      )
+      .get(tokenHash)) as { token_hash: string; user_id: number; expires_at: string; used_at?: string | null } | undefined;
+    if (!tok || tok.used_at) {
+      return res.status(400).json({ error: { message: "El enlace es inválido o ya fue utilizado." } });
+    }
+    if (String(tok.expires_at || "") <= nowIso) {
+      return res.status(400).json({ error: { message: "El enlace expiró. Solicitá uno nuevo." } });
+    }
+    const newHash = bcrypt.hashSync(parsed.data.password, 10);
+    await db.transaction(async (tx) => {
+      await tx.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(newHash, tok.user_id);
+      await tx.prepare("UPDATE password_reset_tokens SET used_at = ? WHERE token_hash = ?").run(nowIso, tok.token_hash);
+      await tx
+        .prepare("UPDATE password_reset_tokens SET used_at = ? WHERE user_id = ? AND token_hash <> ? AND used_at IS NULL")
+        .run(nowIso, tok.user_id, tok.token_hash);
+    });
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error("password-reset-confirm:", e);
+    return res.status(500).json({ error: { message: "No se pudo restablecer la contraseña." } });
+  }
 });
 
 authRouter.post("/auth/login", loginRateLimit, async (req, res) => {

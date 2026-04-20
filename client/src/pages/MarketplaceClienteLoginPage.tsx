@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import { canUseMarketplaceQuoteCart } from "../lib/auth.js";
 import { useAuth } from "../contexts/AuthContext";
-import { getMarketplaceAsicVitrina, wakeUpBackend } from "../lib/api";
+import { getMarketplaceAsicVitrina, requestPasswordReset, wakeUpBackend } from "../lib/api";
 import {
   getMarketplaceAuthShelfFallbackProducts,
   mergeAsicCatalogWithCorpGridExtras,
@@ -27,6 +27,8 @@ export function MarketplaceClienteLoginPage() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [ready, setReady] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetMsg, setResetMsg] = useState("");
   const [bgProducts, setBgProducts] = useState<AsicProduct[]>(() => getMarketplaceAuthShelfFallbackProducts());
 
   useEffect(() => {
@@ -143,6 +145,25 @@ export function MarketplaceClienteLoginPage() {
     }
   }
 
+  async function handleForgotPassword() {
+    setError("");
+    setResetMsg("");
+    if (!email.trim()) {
+      setError("Ingresá tu correo para enviarte el enlace de recuperación.");
+      return;
+    }
+    setResetBusy(true);
+    try {
+      const r = await requestPasswordReset(email.trim());
+      setResetMsg(r.message || "Te enviamos un enlace para restablecer la contraseña.");
+    } catch (err) {
+      setResetMsg("");
+      setError(err instanceof Error ? err.message : "No se pudo iniciar el restablecimiento.");
+    } finally {
+      setResetBusy(false);
+    }
+  }
+
   return (
     <div className="marketplace-asic-page marketplace-login-page">
       <div className="bg-mesh" aria-hidden />
@@ -200,9 +221,24 @@ export function MarketplaceClienteLoginPage() {
                         autoComplete="current-password"
                         required
                       />
+                      <div className="d-flex justify-content-end mb-3">
+                        <button
+                          type="button"
+                          className="btn btn-link btn-sm p-0 text-decoration-none"
+                          onClick={() => void handleForgotPassword()}
+                          disabled={resetBusy}
+                        >
+                          {resetBusy ? "Enviando..." : "Olvidé mi contraseña"}
+                        </button>
+                      </div>
                       {error ? (
                         <div className="alert alert-danger py-2 small" role="alert">
                           {error}
+                        </div>
+                      ) : null}
+                      {resetMsg ? (
+                        <div className="alert alert-success py-2 small" role="status">
+                          {resetMsg}
                         </div>
                       ) : null}
                       <button type="submit" className="btn btn-primary w-100" disabled={submitting || !ready}>

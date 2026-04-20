@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import { MarketplacePasswordField } from "../components/marketplace/MarketplacePasswordField";
 import { useAuth } from "../contexts/AuthContext";
-import { setApiBaseUrl, wakeUpBackend } from "../lib/api";
+import { requestPasswordReset, setApiBaseUrl, wakeUpBackend } from "../lib/api";
 import "../styles/facturacion.css";
 
 export function LoginPage() {
@@ -13,6 +13,8 @@ export function LoginPage() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [ready, setReady] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetMsg, setResetMsg] = useState("");
 
   // En Vercel: warmup (DB+app) antes de permitir login. En Render: health.
   useEffect(() => {
@@ -62,6 +64,25 @@ export function LoginPage() {
     }
   }
 
+  async function handleForgotPassword() {
+    setError("");
+    setResetMsg("");
+    if (!username.trim()) {
+      setError("Ingresá tu correo para enviarte el enlace de recuperación.");
+      return;
+    }
+    setResetBusy(true);
+    try {
+      const r = await requestPasswordReset(username.trim());
+      setResetMsg(r.message || "Te enviamos un enlace para restablecer la contraseña.");
+    } catch (err) {
+      setResetMsg("");
+      setError(err instanceof Error ? err.message : "No se pudo iniciar el restablecimiento.");
+    } finally {
+      setResetBusy(false);
+    }
+  }
+
   return (
     <div className="hrs-login-page">
       <div className="container py-5">
@@ -89,9 +110,24 @@ export function LoginPage() {
                 autoComplete="current-password"
                 required
               />
+              <div className="d-flex justify-content-end mb-3">
+                <button
+                  type="button"
+                  className="btn btn-link btn-sm p-0 text-decoration-none"
+                  onClick={() => void handleForgotPassword()}
+                  disabled={resetBusy}
+                >
+                  {resetBusy ? "Enviando..." : "Olvidé mi contraseña"}
+                </button>
+              </div>
               {error && (
                 <div className="alert alert-danger py-2 small" role="alert">
                   {error}
+                </div>
+              )}
+              {resetMsg && (
+                <div className="alert alert-success py-2 small" role="status">
+                  {resetMsg}
                 </div>
               )}
               <button type="submit" className="btn btn-primary w-100" disabled={submitting || !ready}>

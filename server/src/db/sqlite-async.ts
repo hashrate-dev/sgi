@@ -91,6 +91,21 @@ CREATE TABLE IF NOT EXISTS user_activity (
 
 CREATE INDEX IF NOT EXISTS idx_user_activity_user_created ON user_activity(user_id, created_at);
 
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  email TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  used_at TEXT,
+  requested_ip TEXT,
+  requested_user_agent TEXT,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_pwd_reset_user_created ON password_reset_tokens(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pwd_reset_email_created ON password_reset_tokens(email, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS invoice_sequences (
   type TEXT PRIMARY KEY CHECK (type IN ('Factura', 'Recibo', 'Nota de Crédito')),
   last_number INTEGER NOT NULL DEFAULT 1000

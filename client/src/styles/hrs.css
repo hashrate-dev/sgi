@@ -89,6 +89,23 @@ body.hrs-protected-green-bg {
   min-height: 100vh;
   box-sizing: border-box;
   background: linear-gradient(135deg, #074025 0%, #49f227 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.hrs-login-page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(7, 64, 37, 0.22);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  pointer-events: none;
+}
+
+.hrs-login-page > .container {
+  position: relative;
+  z-index: 1;
 }
 
 /* Base responsive global: evita desbordes y hace medios fluidos en todas las vistas. */
