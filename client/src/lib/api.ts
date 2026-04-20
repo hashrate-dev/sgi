@@ -1393,11 +1393,14 @@ export function getMarketplacePresenceHistory(params?: {
   limit?: number;
   offset?: number;
   q?: string;
+  /** Filtro exacto por `viewer_type` en BD: anon | cliente | staff */
+  viewerType?: "anon" | "cliente" | "staff" | "";
 }): Promise<{ rows: MarketplacePresenceHistoryRow[]; total: number; limit: number; offset: number }> {
   const qs = new URLSearchParams();
   if (params?.limit != null) qs.set("limit", String(params.limit));
   if (params?.offset != null) qs.set("offset", String(params.offset));
   if (params?.q) qs.set("q", params.q);
+  if (params?.viewerType) qs.set("viewerType", params.viewerType);
   const suf = qs.toString();
   return api(`/api/marketplace/presence-history${suf ? `?${suf}` : ""}`);
 }

@@ -223,3 +223,85 @@
   color: #64748b !important;
   padding: 1.25rem 0.75rem !important;
 }
+
+/* Paginación historial (fondo verde del panel): sin encoger el ul en flex padre + sin márgenes negativos de BS */
+.hrs-mplive-pagination .hrs-mplive-pagination__pages {
+  display: flex;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.5rem;
+  list-style: none;
+  padding-left: 0;
+}
+
+.hrs-mplive-pagination .hrs-mplive-pagination__pages .page-item {
+  margin: 0;
+}
+
+.hrs-mplive-pagination .hrs-mplive-pagination__pages .page-link {
+  margin-left: 0 !important;
+  border-radius: 10px;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.1rem;
+  padding: 0.35rem 0.95rem;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  color: #14532d;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.hrs-mplive-pagination .hrs-mplive-pagination__pages .page-item:not(.disabled) .page-link:hover {
+  background: #fff;
+  border-color: rgba(255, 255, 255, 0.75);
+  color: #064e3b;
+}
+
+.hrs-mplive-pagination .hrs-mplive-pagination__pages .page-item.disabled .page-link {
+  background: rgba(255, 255, 255, 0.45);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: rgba(20, 83, 45, 0.45);
+  opacity: 1;
+}
+
+/* Filtros estilo FACTURACIÓN dentro del panel verde */
+.hrs-mplive-panel .historial-filtros-outer.hrs-mplive-presencia-historial-filtros {
+  margin-left: -1.5rem;
+  margin-right: -1.5rem;
+  margin-top: 0.25rem;
+  margin-bottom: 0;
+}
+
+.hrs-mplive-panel .historial-listado-wrap.hrs-mplive-presencia-listado {
+  margin-left: -1.5rem;
+  margin-right: -1.5rem;
+}
+
+/* Paginación sobre el bloque listado blanco */
+.hrs-mplive-presencia-listado .hrs-mplive-pagination--in-listado {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.hrs-mplive-presencia-listado .hrs-mplive-pagination__pages .page-link {
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  color: #166534;
+}
+
+.hrs-mplive-presencia-listado .hrs-mplive-pagination__pages .page-item:not(.disabled) .page-link:hover {
+  background: #f0fdf4;
+  border-color: #86efac;
+  color: #14532d;
+}
+
+.hrs-mplive-presencia-listado .hrs-mplive-pagination__pages .page-item.disabled .page-link {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+}

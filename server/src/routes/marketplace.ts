@@ -728,19 +728,34 @@ marketplaceRouter.get("/marketplace/presence-history", requireAuth, adminAB, asy
       .replace(/[%_\\]/g, "")
       .slice(0, 120);
     const pat = qRaw ? `%${qRaw}%` : "";
-    const where = qRaw
-      ? ` WHERE LOWER(visitor_id) LIKE ? OR LOWER(COALESCE(user_email,'')) LIKE ? OR LOWER(COALESCE(current_path,'')) LIKE ? OR LOWER(COALESCE(client_ip,'')) LIKE ? OR LOWER(COALESCE(country_name,'')) LIKE ?`
-      : "";
+    const vtRaw = String(req.query.viewerType || "")
+      .trim()
+      .toLowerCase();
+    const viewerFilter =
+      vtRaw === "anon" || vtRaw === "cliente" || vtRaw === "staff" ? vtRaw : "";
+    const whereParts: string[] = [];
+    const whereParams: unknown[] = [];
+    if (qRaw) {
+      whereParts.push(
+        `(LOWER(visitor_id) LIKE ? OR LOWER(COALESCE(user_email,'')) LIKE ? OR LOWER(COALESCE(current_path,'')) LIKE ? OR LOWER(COALESCE(client_ip,'')) LIKE ? OR LOWER(COALESCE(country_name,'')) LIKE ? OR LOWER(COALESCE(country_code,'')) LIKE ?)`
+      );
+      whereParams.push(pat, pat, pat, pat, pat, pat);
+    }
+    if (viewerFilter) {
+      whereParts.push(`LOWER(TRIM(viewer_type)) = ?`);
+      whereParams.push(viewerFilter);
+    }
+    const where = whereParts.length ? ` WHERE ${whereParts.join(" AND ")}` : "";
     const countRow = (await db
       .prepare(`SELECT COUNT(*) as c FROM marketplace_presence_history${where}`)
-      .get(...(qRaw ? [pat, pat, pat, pat, pat] : []))) as { c: number } | undefined;
+      .get(...whereParams)) as { c: number } | undefined;
     const total = Number(countRow?.c) || 0;
     const rowsRaw = (await db
       .prepare(
         `SELECT id, visitor_id, viewer_type, country_code, country_name, client_ip, user_email, current_path, locale, timezone, recorded_at
          FROM marketplace_presence_history${where} ORDER BY recorded_at DESC, id DESC LIMIT ? OFFSET ?`
       )
-      .all(...(qRaw ? [pat, pat, pat, pat, pat, limit, offset] : [limit, offset]))) as Array<Record<string, unknown>>;
+      .all(...whereParams, limit, offset)) as Array<Record<string, unknown>>;
     const rows = rowsRaw.map((raw) => {
       const r = rowKeysToLowercase(raw) as Record<string, string | number | null | undefined>;
       return {
