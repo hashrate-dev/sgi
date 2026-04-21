@@ -178,7 +178,11 @@ function passwordResetRelayInbox(): string {
 function passwordResetFromAddress(): string {
   const explicit = String(process.env.PASSWORD_RESET_FROM_EMAIL || "").trim();
   if (explicit) return explicit;
-  return effectiveResendFromEmail();
+  const resendFrom = effectiveResendFromEmail();
+  if (resendFrom) return resendFrom;
+  // Fallback seguro para producción/local si olvidaron publicar RESEND_FROM_EMAIL.
+  // Debe coincidir con dominio verificado en Resend (mail.hashrate.space).
+  return "Hashrate Space <noreply@mail.hashrate.space>";
 }
 
 function passwordResetSmtpConfigured(): boolean {
@@ -259,7 +263,7 @@ async function sendPasswordResetEmail(to: string, resetUrl: string, meta?: Passw
   }
 
   const resendFromGlobal = String(process.env.RESEND_FROM_EMAIL || "").trim();
-  const fromCandidates = [fromInitial, resendFromGlobal]
+  const fromCandidates = [fromInitial, resendFromGlobal, "Hashrate Space <noreply@mail.hashrate.space>"]
     .map((x) => x.trim())
     .filter((x, i, arr) => x.length > 0 && arr.findIndex((y) => y.toLowerCase() === x.toLowerCase()) === i);
 

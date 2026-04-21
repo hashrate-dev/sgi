@@ -80,7 +80,8 @@ export function LoginPage() {
       setResetMsg("Te enviamos un enlace para restablecer la contraseña. Revisá tu correo (incluido spam).");
     } catch (err) {
       setResetMsg("");
-      setError(err instanceof Error ? err.message : "No se pudo iniciar el restablecimiento.");
+      const raw = err instanceof Error ? err.message : "No se pudo iniciar el restablecimiento.";
+      setError(raw.toUpperCase().includes("MAIL INVALIDO") ? "MAIL INVALIDO" : "No pudimos enviar el enlace en este momento. Probá nuevamente en unos minutos.");
     } finally {
       setResetBusy(false);
     }

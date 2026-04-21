@@ -113,6 +113,11 @@ async function main() {
   const merged = { ...rootEnv, ...resendLocal };
   const apiKey = (merged.RESEND_API_KEY || process.env.RESEND_API_KEY || "").trim();
   let from = (merged.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || "").trim();
+  const resetFrom = (
+    merged.PASSWORD_RESET_FROM_EMAIL ||
+    process.env.PASSWORD_RESET_FROM_EMAIL ||
+    from
+  ).trim();
   const notifyTo = (
     merged.MARKETPLACE_NOTIFY_EMAIL_TO ||
     process.env.MARKETPLACE_NOTIFY_EMAIL_TO ||
@@ -136,6 +141,7 @@ async function main() {
   const pairs = [
     { key: "RESEND_API_KEY", value: apiKey, type: "sensitive" },
     { key: "RESEND_FROM_EMAIL", value: from, type: "encrypted" },
+    { key: "PASSWORD_RESET_FROM_EMAIL", value: resetFrom, type: "encrypted" },
   ];
   if (notifyTo) pairs.push({ key: "MARKETPLACE_NOTIFY_EMAIL_TO", value: notifyTo, type: "encrypted" });
 
