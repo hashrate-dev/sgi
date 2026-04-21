@@ -18,6 +18,7 @@ import { MarketplaceSiteFooter } from "../components/marketplace/MarketplaceSite
 import { MarketplaceCatalogFilters } from "../components/marketplace/MarketplaceCatalogFilters.js";
 import { AsicShelfProduct } from "../components/marketplace/AsicShelfProduct.js";
 import { AsicProductModal } from "../components/marketplace/AsicProductModal.js";
+import { MarketplaceInlineLoginModal } from "../components/marketplace/MarketplaceInlineLoginModal.js";
 import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
 import { marketplaceLocale } from "../lib/i18n.js";
 import "../styles/marketplace-hashrate.css";
@@ -70,6 +71,7 @@ const MemoAsicShelfProduct = memo(AsicShelfProduct, (prev, next) => {
     prev.product === next.product &&
     prev.productIndex === next.productIndex &&
     prev.filteredHidden === next.filteredHidden &&
+    prev.showPrice === next.showPrice &&
     prev.addToQuoteLabel === next.addToQuoteLabel &&
     prev.onAddToQuote === next.onAddToQuote &&
     prev.onOpenModal === next.onOpenModal
@@ -97,6 +99,8 @@ function MarketplacePageBody() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { addProduct, openDrawer } = useMarketplaceQuoteCart();
+  const [hidePricesForGuests, setHidePricesForGuests] = useState(true);
+  const canViewMarketplacePrices = Boolean(!loading && (user || !hidePricesForGuests));
   const [filterAlgo, setFilterAlgo] = useState<MarketplaceCatalogFilter | null>(null);
   const [modalIndex, setModalIndex] = useState<number | null>(null);
   /** Vacío hasta la vitrina: evita pintar catálogo placeholder y reemplazarlo por el de la API (doble trabajo y “ola” visual). */
@@ -105,17 +109,25 @@ function MarketplacePageBody() {
   const [catalogFromApi, setCatalogFromApi] = useState<boolean | null>(null);
   const [liveYieldsById, setLiveYieldsById] = useState<Record<string, MarketplaceAsicLiveYield>>({});
   const [yieldsLoading, setYieldsLoading] = useState(false);
+  const loginModalOpen = searchParams.get("login") === "1";
+  const closeInlineLoginModal = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("login");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
   const handleAddToQuote = useCallback(
     (p: AsicProduct, opts?: AddQuoteLineOptions) => {
       if (loading) return;
       if (!user || !canUseMarketplaceQuoteCart(user.role)) {
-        navigate("/marketplace/login", { replace: false, state: { from: "quote" } });
+        const next = new URLSearchParams(searchParams);
+        next.set("login", "1");
+        setSearchParams(next, { replace: false });
         return;
       }
       addProduct(p, 1, opts);
       openDrawer();
     },
-    [addProduct, openDrawer, user, loading, navigate]
+    [addProduct, openDrawer, user, loading, searchParams, setSearchParams]
   );
 
   const addToQuoteLabel = t("catalog.add_short");
@@ -178,6 +190,9 @@ function MarketplacePageBody() {
   }, []);
 
   useEffect(() => {
+    /** Si el primer fetch corre antes de que `getMe()` termine, puede salir sin Bearer y quedar “anon” en el servidor. */
+    if (loading) return;
+
     let cancelled = false;
     let fallbackApplied = false;
     const localFallbackProducts = mergeAsicCatalogWithCorpGridExtras(ASIC_MARKETPLACE_PRODUCTS);
@@ -198,12 +213,15 @@ function MarketplacePageBody() {
       applyLocalFallback();
     }, 12000);
 
+    setCatalogFromApi(null);
+
     /** No encadenar: el GET a la vitrina ya despierta el backend; evita espera extra en cold start. */
     void wakeUpBackend();
     getMarketplaceAsicVitrina()
       .then((res) => {
         if (cancelled) return;
         window.clearTimeout(fallbackTimer);
+        setHidePricesForGuests(res.hidePricesForGuests !== false);
         const list = res.products ?? [];
         if (list.length > 0) {
           setProducts(mergeAsicCatalogWithCorpGridExtras(list));
@@ -221,7 +239,7 @@ function MarketplacePageBody() {
       cancelled = true;
       window.clearTimeout(fallbackTimer);
     };
-  }, []);
+  }, [loading, user?.id]);
 
   useEffect(() => {
     /** Evita POST de yields hasta tener catálogo definitivo y dar tiempo al primer paint de la grilla. */
@@ -308,7 +326,7 @@ function MarketplacePageBody() {
       <div id="app" data-page="marketplace">
         <MarketplaceSiteHeader />
         <main id="page-main" className="page-main page-main--market page-main--market--asic">
-          <section className="section section--market-shelf">
+          <section className={`section section--market-shelf${loginModalOpen ? " section--market-shelf--blurred" : ""}`}>
             <div className="market-intro-wrap">
               <header className="market-intro">
                 <p className="market-intro__kicker">{t("catalog.kicker")}</p>
@@ -335,6 +353,7 @@ function MarketplacePageBody() {
                       product={p}
                       productIndex={i}
                       filteredHidden={filterAlgo != null && !matchesCatalogFilter(p, filterAlgo)}
+                      showPrice={canViewMarketplacePrices}
                       onOpenModal={setModalIndex}
                       onAddToQuote={handleAddToQuote}
                       addToQuoteLabel={addToQuoteLabel}
@@ -353,10 +372,12 @@ function MarketplacePageBody() {
           onClose={() => setModalIndex(null)}
           liveYield={modalLiveYield}
           liveYieldLoading={yieldsLoading && !modalLiveYield}
+          showPrice={canViewMarketplacePrices}
           onAddToQuote={handleAddToQuote}
           addToQuoteLabel={addToQuoteLabel}
         />
       ) : null}
+      <MarketplaceInlineLoginModal open={loginModalOpen} onClose={closeInlineLoginModal} />
     </div>
   );
 }

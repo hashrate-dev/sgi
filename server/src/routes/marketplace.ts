@@ -9,7 +9,11 @@ import {
   mapEquipoRowToVitrinaWithAlgoFallback,
   type EquipoAsicVitrinaRow,
 } from "../lib/asicVitrinaMapper.js";
-import { readCorpBestSellingEquipoIds, readCorpInterestingEquipoIds } from "../lib/marketplaceCorpBestSellingKv.js";
+import {
+  readCorpBestSellingEquipoIds,
+  readCorpInterestingEquipoIds,
+  readMarketplaceHidePricesForGuests,
+} from "../lib/marketplaceCorpBestSellingKv.js";
 import { EQUIPOS_ASIC_SELECT } from "./equipos.js";
 import {
   detectZecEquihashYieldItem,
@@ -178,6 +182,14 @@ async function resolveAuthSnapshot(req: Request): Promise<{ viewerType: "anon" |
   } catch {
     return { viewerType: "anon", email: "" };
   }
+}
+
+function withMarketplacePriceVisibility<T extends { priceUsd: number; priceDisplayLabel?: string }>(
+  products: T[],
+  canViewPrices: boolean
+): T[] {
+  if (canViewPrices) return products;
+  return products.map((p) => ({ ...p, priceUsd: 0, priceDisplayLabel: "SOLICITAR PRECIO" }));
 }
 
 function normalizeCountryCode(raw: unknown): string {
@@ -860,14 +872,23 @@ function sqlMarketplaceVisible(): string {
 marketplaceRouter.get("/marketplace/corp-best-selling", async (req: Request, res: Response) => {
   try {
     await touchMarketplacePresence(req, "/marketplace/corp-best-selling");
+    const auth = await resolveAuthSnapshot(req);
+    const hidePricesForGuests = await readMarketplaceHidePricesForGuests();
+    const canViewPrices = auth.viewerType !== "anon" || !hidePricesForGuests;
     const ids = await readCorpBestSellingEquipoIds();
     const products = await corpHomeVitrinaProductsByEquipoIds(ids);
-    res.set("Cache-Control", "public, max-age=30, stale-while-revalidate=60");
-    res.json({ products });
+    const visibleProducts = withMarketplacePriceVisibility(products, canViewPrices);
+    const cacheControl = hidePricesForGuests
+      ? auth.viewerType === "anon"
+        ? "public, max-age=30, stale-while-revalidate=60"
+        : "private, no-store"
+      : "public, max-age=30, stale-while-revalidate=60";
+    res.set("Cache-Control", cacheControl);
+    res.json({ products: visibleProducts, hidePricesForGuests });
   } catch (e) {
     console.error("[marketplace] corp-best-selling:", e);
     res.set("Cache-Control", "no-store");
-    res.status(200).json({ products: [] });
+    res.status(200).json({ products: [], hidePricesForGuests: true });
   }
 });
 
@@ -878,20 +899,32 @@ marketplaceRouter.get("/marketplace/corp-best-selling", async (req: Request, res
 marketplaceRouter.get("/marketplace/corp-interesting", async (req: Request, res: Response) => {
   try {
     await touchMarketplacePresence(req, "/marketplace/corp-interesting");
+    const auth = await resolveAuthSnapshot(req);
+    const hidePricesForGuests = await readMarketplaceHidePricesForGuests();
+    const canViewPrices = auth.viewerType !== "anon" || !hidePricesForGuests;
     const ids = await readCorpInterestingEquipoIds();
     const products = await corpHomeVitrinaProductsByEquipoIds(ids);
-    res.set("Cache-Control", "public, max-age=30, stale-while-revalidate=60");
-    res.json({ products });
+    const visibleProducts = withMarketplacePriceVisibility(products, canViewPrices);
+    const cacheControl = hidePricesForGuests
+      ? auth.viewerType === "anon"
+        ? "public, max-age=30, stale-while-revalidate=60"
+        : "private, no-store"
+      : "public, max-age=30, stale-while-revalidate=60";
+    res.set("Cache-Control", cacheControl);
+    res.json({ products: visibleProducts, hidePricesForGuests });
   } catch (e) {
     console.error("[marketplace] corp-interesting:", e);
     res.set("Cache-Control", "no-store");
-    res.status(200).json({ products: [] });
+    res.status(200).json({ products: [], hidePricesForGuests: true });
   }
 });
 
 /** GET /marketplace/asic-vitrina — catálogo ASIC para /marketplace (sin token). Origen: equipos_asic con mp_visible. */
 marketplaceRouter.get("/marketplace/asic-vitrina", async (req: Request, res: Response) => {
   try {
+    const auth = await resolveAuthSnapshot(req);
+    const hidePricesForGuests = await readMarketplaceHidePricesForGuests();
+    const canViewPrices = auth.viewerType !== "anon" || !hidePricesForGuests;
     // No bloquear la respuesta del catálogo por telemetría/presencia.
     void touchMarketplacePresence(req, "/marketplace/asic-vitrina").catch((err) => {
       console.warn("[marketplace] asic-vitrina presence:", err);
@@ -920,13 +953,19 @@ marketplaceRouter.get("/marketplace/asic-vitrina", async (req: Request, res: Res
         return rest as EquipoAsicVitrinaRow;
       });
     const products = rows.map(mapEquipoRowToVitrina).filter((p): p is NonNullable<typeof p> => p != null);
-    res.set("Cache-Control", "public, max-age=45, stale-while-revalidate=120");
-    res.json({ products });
+    const visibleProducts = withMarketplacePriceVisibility(products, canViewPrices);
+    const cacheControl = hidePricesForGuests
+      ? auth.viewerType === "anon"
+        ? "public, max-age=45, stale-while-revalidate=120"
+        : "private, no-store"
+      : "public, max-age=45, stale-while-revalidate=120";
+    res.set("Cache-Control", cacheControl);
+    res.json({ products: visibleProducts, hidePricesForGuests });
   } catch (e) {
     console.error("[marketplace] asic-vitrina:", e);
     /* Evitar 500 en el cliente: catálogo vacío hasta corregir BD/migraciones. */
     res.set("Cache-Control", "no-store");
-    res.status(200).json({ products: [] });
+    res.status(200).json({ products: [], hidePricesForGuests: true });
   }
 });
 

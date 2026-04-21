@@ -266,6 +266,7 @@ CREATE TABLE IF NOT EXISTS marketplace_site_kv (
 );
 INSERT OR IGNORE INTO marketplace_site_kv (key, value) VALUES ('corp_best_selling_asic_ids', '[]');
 INSERT OR IGNORE INTO marketplace_site_kv (key, value) VALUES ('corp_interesting_asic_ids', '[]');
+INSERT OR IGNORE INTO marketplace_site_kv (key, value) VALUES ('marketplace_hide_prices_for_guests', '1');
 
 CREATE TABLE IF NOT EXISTS equipos_asic_audit (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -475,6 +476,9 @@ CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_visitor ON marketplace_presence_
   native
     .prepare("INSERT OR IGNORE INTO marketplace_site_kv (key, value) VALUES (?, ?)")
     .run("corp_interesting_asic_ids", "[]");
+  native
+    .prepare("INSERT OR IGNORE INTO marketplace_site_kv (key, value) VALUES (?, ?)")
+    .run("marketplace_hide_prices_for_guests", "1");
 
   native.exec(`CREATE TABLE IF NOT EXISTS tienda_online_client_seq (
     id INTEGER PRIMARY KEY CHECK (id = 1),

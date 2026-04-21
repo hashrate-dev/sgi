@@ -7,6 +7,7 @@ import {
   pickMarketplaceShelfSpecRows,
   publicImageUrl,
 } from "../../lib/marketplaceAsicCatalog.js";
+import { Link } from "react-router-dom";
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
 import { AsicDetailSvg } from "./AsicDetailIcon.js";
 
@@ -19,6 +20,7 @@ export function AsicShelfProduct({
   onOpenModal,
   onAddToQuote,
   addToQuoteLabel,
+  showPrice = true,
 }: {
   product: AsicProduct;
   productIndex: number;
@@ -28,6 +30,8 @@ export function AsicShelfProduct({
   onAddToQuote?: (product: AsicProduct) => void;
   /** Texto del botón cotización; si no se pasa, usa i18n del marketplace. */
   addToQuoteLabel?: string;
+  /** Oculta precio para visitantes sin sesión. */
+  showPrice?: boolean;
 }) {
   const { lang, t, tf } = useMarketplaceLang();
   const quoteLabel = addToQuoteLabel ?? t("catalog.add_short");
@@ -48,6 +52,18 @@ export function AsicShelfProduct({
   const consultLabel = product.priceDisplayLabel?.trim()
     ? normalizeConsultPriceLabelForDisplay(product.priceDisplayLabel.trim())
     : "";
+  const lockedPriceLabel = lang === "en"
+    ? "Login to view price"
+    : lang === "pt"
+      ? "Faca login para ver o preco"
+      : "Registrate para ver precio";
+  const lockedPriceKicker = lang === "en" ? "Online special price" : lang === "pt" ? "Preco especial online" : "Precio especial online";
+  const lockedPriceHint = lang === "en"
+    ? "Sign in and unlock this price"
+    : lang === "pt"
+      ? "Faca login e desbloqueie o preco"
+      : "Inicia sesion y desbloquea el precio";
+  const lockedPriceCta = lang === "en" ? "Sign in now" : lang === "pt" ? "Entrar agora" : "Iniciar sesion";
   const eagerImg = productIndex < EAGER_IMAGE_ABOVE_INDEX;
 
   /** Potencia, monedas/algo, aire/hydro, minería Bitcoin/Dual/Zcash (`mp_detail_rows_json`). */
@@ -94,13 +110,32 @@ export function AsicShelfProduct({
           <p className="shelf-product__subtitle">{product.hashrate}</p>
         </div>
         <div className="shelf-product__price-stack">
-          <span
-            className={
-              "shelf-product__price-current" + (consultLabel ? " shelf-product__price-current--consult" : "")
-            }
-          >
-            {formatAsicProductPriceDisplay(product, lang)}
-          </span>
+          {showPrice ? (
+            <span
+              className={
+                "shelf-product__price-current" + (consultLabel ? " shelf-product__price-current--consult" : "")
+              }
+            >
+              {formatAsicProductPriceDisplay(product, lang)}
+            </span>
+          ) : (
+            <div className="shelf-product__price-locked" role="note" aria-label={lockedPriceLabel}>
+              <span className="shelf-product__price-locked-kicker">
+                <i className="bi bi-lightning-charge-fill" aria-hidden />
+                {lockedPriceKicker}
+              </span>
+              <span className="shelf-product__price-locked-main">{lockedPriceLabel}</span>
+              <span className="shelf-product__price-locked-hint">{lockedPriceHint}</span>
+              <Link
+                to="/marketplace?login=1"
+                className="shelf-product__price-locked-cta"
+                aria-label={lockedPriceCta}
+              >
+                <i className="bi bi-shield-lock-fill" aria-hidden />
+                {lockedPriceCta}
+              </Link>
+            </div>
+          )}
         </div>
         {specChips.length > 0 ? (
           <ul className="shelf-product__chip-row" aria-label={t("shelf.chips_aria")}>

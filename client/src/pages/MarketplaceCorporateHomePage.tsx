@@ -14,6 +14,7 @@ import {
 import type { AsicProduct } from "../lib/marketplaceAsicCatalog.js";
 import { getMarketplaceCorpBestSelling, getMarketplaceCorpInteresting, wakeUpBackend } from "../lib/api.js";
 import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
+import { useAuth } from "../contexts/AuthContext";
 import "../styles/marketplace-hashrate.css";
 
 const DOC_TITLE = "Hashrate – Space";
@@ -78,8 +79,16 @@ const BRAND_LOGOS = [
  */
 export function MarketplaceCorporateHomePage() {
   const { t, lang } = useMarketplaceLang();
+  const { user, loading } = useAuth();
   const { pathname, hash } = useLocation();
   const navigate = useNavigate();
+  const [hidePricesForGuests, setHidePricesForGuests] = useState(true);
+  const canViewMarketplacePrices = Boolean(!loading && (user || !hidePricesForGuests));
+  const hiddenPriceLabel = lang === "en"
+    ? "Login to view price"
+    : lang === "pt"
+      ? "Faca login para ver o preco"
+      : "Registrate para ver precio";
 
   const localHomeProductsPool = useMemo(
     () => ASIC_MARKETPLACE_PRODUCTS.filter((p) => Boolean(p.imageSrc)).slice(0, 12),
@@ -124,6 +133,7 @@ export function MarketplaceCorporateHomePage() {
     void getMarketplaceCorpInteresting()
       .then((res) => {
         if (cancelled) return;
+        setHidePricesForGuests(res.hidePricesForGuests !== false);
         const list = res.products ?? [];
         if (list.length > 0) setInterestingVitrina(list);
       })
@@ -133,6 +143,7 @@ export function MarketplaceCorporateHomePage() {
     void getMarketplaceCorpBestSelling()
       .then((res) => {
         if (cancelled) return;
+        setHidePricesForGuests(res.hidePricesForGuests !== false);
         const list = res.products ?? [];
         if (list.length > 0) setCorpBestSellingProducts(list);
       })
@@ -344,6 +355,7 @@ export function MarketplaceCorporateHomePage() {
                     product={p}
                     productIndex={idx}
                     filteredHidden={false}
+                    showPrice={canViewMarketplacePrices}
                     onOpenModal={(i) => {
                       const x = corpBestSellingProducts[i];
                       if (x) void navigate(`/marketplace?asic=${encodeURIComponent(x.id)}`);
@@ -403,6 +415,7 @@ export function MarketplaceCorporateHomePage() {
                       product={p}
                       productIndex={idx}
                       filteredHidden={false}
+                      showPrice={canViewMarketplacePrices}
                       onOpenModal={(i) => {
                         const x = interestingVitrina[i];
                         if (x) void navigate(`/marketplace?asic=${encodeURIComponent(x.id)}`);
@@ -459,7 +472,9 @@ export function MarketplaceCorporateHomePage() {
                             <p className="shelf-product__hashrate">{p.hashrate}</p>
                           </div>
                           <div className="shelf-product__price-box">
-                            <span className="shelf-product__price-value">{formatAsicProductPriceDisplay(p, lang)}</span>
+                            <span className="shelf-product__price-value">
+                              {canViewMarketplacePrices ? formatAsicProductPriceDisplay(p, lang) : hiddenPriceLabel}
+                            </span>
                           </div>
                           <div className="shelf-product__specs-box" role="group" aria-label={t("shelf.techspecs")}>
                             <ul className="shelf-detail-strip">

@@ -5,8 +5,10 @@ import {
   getEquipos,
   getEquiposMarketplaceCorpBestSellingIds,
   getEquiposMarketplaceCorpInterestingIds,
+  getEquiposMarketplaceHidePricesForGuests,
   putEquiposMarketplaceCorpBestSelling,
   putEquiposMarketplaceCorpInteresting,
+  putEquiposMarketplaceHidePricesForGuests,
   wakeUpBackend,
 } from "../lib/api";
 import type { EquipoASIC } from "../lib/types";
@@ -36,6 +38,9 @@ export function TiendaOnlineBannersHomePage() {
   const [interestingSlotIds, setInterestingSlotIds] = useState<string[]>(["", "", "", ""]);
   const [interestingLoadError, setInterestingLoadError] = useState<string | null>(null);
   const [interestingSaving, setInterestingSaving] = useState(false);
+  const [hidePricesForGuests, setHidePricesForGuests] = useState(true);
+  const [hidePricesLoadError, setHidePricesLoadError] = useState<string | null>(null);
+  const [hidePricesSaving, setHidePricesSaving] = useState(false);
 
   const selectedBestSellingCount = useMemo(
     () => bestSellingSlotIds.filter((id) => id.trim().length > 0).length,
@@ -97,6 +102,15 @@ export function TiendaOnlineBannersHomePage() {
       })
       .catch(() => {
         if (!cancelled) setInterestingLoadError("No se pudieron cargar «Otros Productos Interesantes».");
+      });
+    void getEquiposMarketplaceHidePricesForGuests()
+      .then((res) => {
+        if (cancelled) return;
+        setHidePricesForGuests(Boolean(res.enabled));
+        setHidePricesLoadError(null);
+      })
+      .catch(() => {
+        if (!cancelled) setHidePricesLoadError("No se pudo cargar la configuración de visibilidad de precios.");
       });
     return () => {
       cancelled = true;
@@ -193,6 +207,23 @@ export function TiendaOnlineBannersHomePage() {
     }
   }, [interestingSlotIds, canEditTienda]);
 
+  const handleSaveHidePricesForGuests = useCallback(async () => {
+    if (!canEditTienda) {
+      showToast("No tenés permisos para modificar esta sección.", "error", "Permisos");
+      return;
+    }
+    setHidePricesSaving(true);
+    try {
+      await putEquiposMarketplaceHidePricesForGuests({ enabled: hidePricesForGuests });
+      showToast("Preferencia de precios para visitantes actualizada.", "success", "Tienda online");
+      setHidePricesLoadError(null);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "No se pudo guardar", "error", "Tienda online");
+    } finally {
+      setHidePricesSaving(false);
+    }
+  }, [canEditTienda, hidePricesForGuests]);
+
   if (!user || !canEditTienda) {
     return <Navigate to="/" replace />;
   }
@@ -247,6 +278,58 @@ export function TiendaOnlineBannersHomePage() {
                 ? "Edición bloqueada. Desmarcá el check para habilitar cambios temporales."
                 : "Edición habilitada temporalmente. Volvé a marcar el check para proteger los cambios."}
             </Text>
+          </AppCard>
+
+          <AppCard borderColor="green.200" mb={4} aria-labelledby="hrs-price-visibility-h" p={{ base: 4, md: 5 }}>
+            <Flex direction={{ base: "column", md: "row" }} justify="space-between" align={{ base: "flex-start", md: "center" }} gap={2} mb={3}>
+              <Box>
+                <Heading id="hrs-price-visibility-h" size="md" color="green.800">
+                  💵 Visibilidad de precios (tienda online)
+                </Heading>
+                <Text color="gray.700" fontSize="sm" mt={1}>
+                  Controla si los visitantes sin login ven los precios en <code>/marketplace</code> y <code>/marketplace/home</code>.
+                </Text>
+              </Box>
+              <Badge colorPalette={hidePricesForGuests ? "orange" : "green"} variant="subtle" borderRadius="full" px={3} py={1}>
+                {hidePricesForGuests ? "Ocultos para visitantes" : "Visibles para visitantes"}
+              </Badge>
+            </Flex>
+            {hidePricesLoadError ? (
+              <AppCard borderColor="orange.300" bg="orange.50" mb={3}>
+                <Text color="orange.700" fontSize="sm">{hidePricesLoadError}</Text>
+              </AppCard>
+            ) : null}
+            <Flex direction={{ base: "column", md: "row" }} align={{ base: "flex-start", md: "center" }} justify="space-between" gap={3}>
+              <Flex align="center" gap={2}>
+                <input
+                  id="tienda-home-hide-prices"
+                  className="form-check-input"
+                  type="checkbox"
+                  checked={hidePricesForGuests}
+                  onChange={(ev) => setHidePricesForGuests(ev.target.checked)}
+                  disabled={isEditionLocked}
+                />
+                <label htmlFor="tienda-home-hide-prices" style={{ cursor: isEditionLocked ? "not-allowed" : "pointer" }}>
+                  <Text as="span" fontWeight="bold" color="gray.800">
+                    Ocultar precios a usuarios no logueados
+                  </Text>
+                </label>
+              </Flex>
+              <AppButton
+                onClick={() => void handleSaveHidePricesForGuests()}
+                disabled={hidePricesSaving || isEditionLocked}
+                loading={hidePricesSaving}
+                size="md"
+                minW={{ base: "100%", sm: "220px" }}
+                h="42px"
+                px={6}
+                borderRadius="xl"
+                fontWeight="bold"
+                letterSpacing="0.01em"
+              >
+                {hidePricesSaving ? "Guardando..." : "Guardar preferencia"}
+              </AppButton>
+            </Flex>
           </AppCard>
 
           <AppCard borderColor="green.200" mb={4} aria-labelledby="hrs-corp-best-h" p={{ base: 4, md: 5 }}>

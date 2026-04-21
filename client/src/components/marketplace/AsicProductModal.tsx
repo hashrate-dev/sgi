@@ -64,6 +64,7 @@ export function AsicProductModal({
   storeSub,
   onAddToQuote,
   addToQuoteLabel,
+  showPrice = true,
 }: {
   product: AsicProduct;
   onClose: () => void;
@@ -76,6 +77,8 @@ export function AsicProductModal({
   /** Solo tienda pública: agrega ítem y abre panel de cotización. */
   onAddToQuote?: (product: AsicProduct, opts?: AddQuoteLineOptions) => void;
   addToQuoteLabel?: string;
+  /** Oculta precio para visitantes sin sesión. */
+  showPrice?: boolean;
 }) {
   const { lang, t, tf } = useMarketplaceLang();
   const showMinerEconomy = asicProductShowsMinerEconomyContent(product);
@@ -97,21 +100,27 @@ export function AsicProductModal({
       ? `${priceLabelNorm} (${shareViewPct}%)`
       : priceLabelNorm
     : formatAsicPriceUsd(displayPriceUsd, lang);
+  const hiddenPriceLabel = lang === "en"
+    ? "Sign up to see the price"
+    : lang === "pt"
+      ? "Registre-se para ver o preço"
+      : "Registrate para ver precio";
+  const safePriceForDisplay = showPrice ? displayPriceStr : hiddenPriceLabel;
   const mailText = useMemo(() => {
     const subject = tf("modal.mail.subject", {
       brand: product.brand,
       model: product.model,
       hash: displayHashrate,
-      price: displayPriceStr,
+      price: safePriceForDisplay,
     });
     const body = tf("modal.wa.body", {
       brand: product.brand,
       model: product.model,
       hash: displayHashrate,
-      price: displayPriceStr,
+      price: safePriceForDisplay,
     });
     return { subject, body };
-  }, [product.brand, product.model, displayHashrate, displayPriceStr, tf]);
+  }, [product.brand, product.model, displayHashrate, safePriceForDisplay, tf]);
 
   const waUrl = useMemo(() => {
     const waText = encodeURIComponent(mailText.body);
@@ -357,12 +366,14 @@ export function AsicProductModal({
                   (priceLabelNorm ? " product-modal__price--consult" : "")
                 }
               >
-                {displayPriceStr}
+                {safePriceForDisplay}
               </p>
-              <p className="product-modal__price-note product-modal__price-note--in-box" role="note">
-                <i className="bi bi-info-circle-fill product-modal__price-note-icon" aria-hidden />
-                <span className="product-modal__price-note-txt">{t("modal.price_note")}</span>
-              </p>
+              {showPrice ? (
+                <p className="product-modal__price-note product-modal__price-note--in-box" role="note">
+                  <i className="bi bi-info-circle-fill product-modal__price-note-icon" aria-hidden />
+                  <span className="product-modal__price-note-txt">{t("modal.price_note")}</span>
+                </p>
+              ) : null}
             </div>
 
             <div className="product-modal__pills">

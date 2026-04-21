@@ -25,8 +25,10 @@ import { mimeForSniffedFormat, sniffImageFormat } from "../lib/marketplaceImageS
 import { resolveVitrinaListingKind } from "../lib/asicVitrinaMapper.js";
 import { mpVisibleFromDbValue } from "../lib/mpVisible.js";
 import {
+  readMarketplaceHidePricesForGuests,
   readCorpBestSellingEquipoIds,
   readCorpInterestingEquipoIds,
+  writeMarketplaceHidePricesForGuests,
   writeCorpBestSellingEquipoIds,
   writeCorpInterestingEquipoIds,
 } from "../lib/marketplaceCorpBestSellingKv.js";
@@ -42,6 +44,10 @@ const CorpBestSellingBodySchema = z.object({
 
 const CorpInterestingBodySchema = z.object({
   ids: z.array(z.string().min(1).max(220)).max(4),
+});
+
+const MarketplaceHidePricesBodySchema = z.object({
+  enabled: z.boolean(),
 });
 
 /**
@@ -348,6 +354,32 @@ equiposRouter.get("/equipos/marketplace-corp-interesting", requireAuth, async (_
   try {
     const ids = await readCorpInterestingEquipoIds();
     res.json({ ids });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: { message: msg } });
+  }
+});
+
+/** GET /equipos/marketplace-hide-prices-for-guests — configuración global de visibilidad de precios sin login. */
+equiposRouter.get("/equipos/marketplace-hide-prices-for-guests", requireAuth, async (_req, res: Response) => {
+  try {
+    const enabled = await readMarketplaceHidePricesForGuests();
+    res.json({ enabled });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: { message: msg } });
+  }
+});
+
+/** PUT /equipos/marketplace-hide-prices-for-guests — actualizar visibilidad de precios sin login (solo admin A/B). */
+equiposRouter.put("/equipos/marketplace-hide-prices-for-guests", requireAuth, requireAdminsEquipo, async (req, res: Response) => {
+  const parsed = MarketplaceHidePricesBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
+  }
+  try {
+    await writeMarketplaceHidePricesForGuests(parsed.data.enabled);
+    res.json({ ok: true, enabled: parsed.data.enabled });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     res.status(500).json({ error: { message: msg } });

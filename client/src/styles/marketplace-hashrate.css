@@ -1516,6 +1516,230 @@ button.market-link-hrs {
   letter-spacing: -0.02em;
 }
 
+.market-shelf-grid--catalog-v2 .shelf-product__price-locked {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin-top: 0.06rem;
+  padding: 0.5rem 0.62rem 0.54rem;
+  border-radius: 11px;
+  border: 1px solid #f59e0b;
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+  box-shadow: 0 8px 18px rgba(245, 158, 11, 0.16);
+  animation: shelfPriceLockedPulse 2.6s ease-in-out infinite;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__price-locked::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: 11px;
+  pointer-events: none;
+  border: 1px solid rgba(251, 146, 60, 0.55);
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__price-locked-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #c2410c;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__price-locked-kicker .bi {
+  font-size: 0.72rem;
+  color: #ea580c;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__price-locked-main {
+  font-size: 1.07rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+  color: #9a3412;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__price-locked-hint {
+  font-size: 0.71rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #7c2d12;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__price-locked-cta {
+  margin-top: 0.28rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  padding: 0.34rem 0.58rem;
+  font-size: 0.73rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  text-decoration: none;
+  color: #fff;
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  box-shadow: 0 6px 14px rgba(21, 128, 61, 0.25);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__price-locked-cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 9px 16px rgba(21, 128, 61, 0.3);
+  filter: brightness(1.02);
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__price-locked-cta:active {
+  transform: translateY(0);
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__price-locked-cta .bi {
+  font-size: 0.69rem;
+}
+
+@keyframes shelfPriceLockedPulse {
+  0%,
+  100% {
+    box-shadow: 0 8px 18px rgba(245, 158, 11, 0.16);
+    transform: translateY(0);
+  }
+  50% {
+    box-shadow: 0 10px 22px rgba(245, 158, 11, 0.24);
+    transform: translateY(-1px);
+  }
+}
+
+.section--market-shelf--blurred {
+  filter: blur(5px) saturate(0.96);
+  pointer-events: none;
+  user-select: none;
+}
+
+.market-login-inline {
+  position: fixed;
+  inset: 0;
+  z-index: 1800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.market-login-inline__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(5, 20, 12, 0.5);
+  backdrop-filter: blur(2px);
+  animation: marketLoginBackdropIn 0.22s ease-out both;
+}
+
+.market-login-inline__dialog {
+  position: relative;
+  z-index: 1;
+  width: min(520px, calc(100vw - 1.5rem));
+  border-radius: 18px;
+  border: 1px solid #d1fae5;
+  background: #ffffff;
+  box-shadow: 0 20px 56px rgba(2, 44, 34, 0.32);
+  padding: 1.1rem 1.1rem 1rem;
+  transform-origin: 50% 42%;
+  animation: marketLoginDialogIn 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.market-login-inline__close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  font-size: 1.45rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.market-login-inline__head {
+  padding-right: 1.3rem;
+  margin-bottom: 0.5rem;
+}
+
+.market-login-inline__kicker {
+  margin: 0 0 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #0ea5e9;
+}
+
+.market-login-inline__title {
+  margin: 0;
+  font-size: 1.3rem;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+.market-login-inline__desc {
+  margin: 0.28rem 0 0;
+  color: #475569;
+  font-size: 0.9rem;
+  line-height: 1.32;
+}
+
+.market-login-inline__links {
+  margin: 0.78rem 0 0;
+  font-size: 0.82rem;
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.market-login-inline__links a {
+  color: #0284c7;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.market-login-inline__links a:hover {
+  text-decoration: underline;
+}
+
+@keyframes marketLoginBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes marketLoginDialogIn {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .market-login-inline__backdrop,
+  .market-login-inline__dialog {
+    animation: none;
+  }
+}
+
 .market-shelf-grid--catalog-v2 .shelf-product__chip-row {
   list-style: none;
   margin: 0.35rem 0 0;
@@ -6407,6 +6631,47 @@ button.product-modal__btn--quote-cart:active {
   display: grid;
   gap: 2rem;
   align-items: center;
+}
+
+@media (max-width: 899px) {
+  .market-corp-hero-full__banner {
+    /* En móvil evitamos superposición: las stats pasan a flujo normal. */
+    padding-bottom: clamp(1rem, 4vw, 1.5rem);
+  }
+
+  .market-corp-hero-full__stats-bridge {
+    position: relative;
+    left: auto;
+    bottom: auto;
+    width: 100%;
+    max-width: none;
+    transform: none;
+    margin: 0;
+    padding: 0 1rem 0.75rem;
+    pointer-events: auto;
+  }
+
+  .market-corp-hero-full__stats-bridge .market-corp-stats--wp {
+    margin-top: 0.25rem;
+  }
+
+  .market-corp-hero-full__stats-bridge .market-corp-stats__item.market-corp-stats__item--wp {
+    min-height: 0;
+    padding: 0.85rem 0.55rem 0.95rem;
+  }
+
+  .market-corp-hero-full__stats-bridge .market-corp-stats__icon {
+    width: 84px;
+    height: 84px;
+  }
+
+  .market-corp-hero-full__stats-bridge .market-corp-stats__label--top {
+    font-size: 0.66rem;
+  }
+
+  .market-corp-hero-full__stats-bridge .market-corp-stats__item--wp .market-corp-stats__value {
+    font-size: 1.16rem;
+  }
 }
 
 @media (min-width: 900px) {

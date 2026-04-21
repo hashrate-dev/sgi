@@ -804,13 +804,25 @@ export async function uploadMarketplaceAsicImage(file: File): Promise<{ url: str
 }
 
 /** Catálogo ASIC para /marketplace (público, sin auth). */
-export function getMarketplaceAsicVitrina(): Promise<{ products: import("./marketplaceAsicCatalog.js").AsicProduct[] }> {
-  return api<{ products: import("./marketplaceAsicCatalog.js").AsicProduct[] }>("/api/marketplace/asic-vitrina");
+export function getMarketplaceAsicVitrina(): Promise<{
+  products: import("./marketplaceAsicCatalog.js").AsicProduct[];
+  hidePricesForGuests: boolean;
+}> {
+  return api<{
+    products: import("./marketplaceAsicCatalog.js").AsicProduct[];
+    hidePricesForGuests: boolean;
+  }>("/api/marketplace/asic-vitrina", { cache: "no-store" });
 }
 
 /** Destacados “Equipos más vendidos” en /marketplace/home (público). */
-export function getMarketplaceCorpBestSelling(): Promise<{ products: import("./marketplaceAsicCatalog.js").AsicProduct[] }> {
-  return api<{ products: import("./marketplaceAsicCatalog.js").AsicProduct[] }>("/api/marketplace/corp-best-selling", {
+export function getMarketplaceCorpBestSelling(): Promise<{
+  products: import("./marketplaceAsicCatalog.js").AsicProduct[];
+  hidePricesForGuests: boolean;
+}> {
+  return api<{
+    products: import("./marketplaceAsicCatalog.js").AsicProduct[];
+    hidePricesForGuests: boolean;
+  }>("/api/marketplace/corp-best-selling", {
     cache: "no-store",
   });
 }
@@ -828,9 +840,28 @@ export function putEquiposMarketplaceCorpBestSelling(body: { ids: string[] }): P
   });
 }
 
+/** Config global: ocultar precios de productos a visitantes sin sesión. */
+export function getEquiposMarketplaceHidePricesForGuests(): Promise<{ enabled: boolean }> {
+  return api<{ enabled: boolean }>("/api/equipos/marketplace-hide-prices-for-guests", { cache: "no-store" });
+}
+
+/** Guardar config global de visibilidad de precios sin login (solo admin A/B). */
+export function putEquiposMarketplaceHidePricesForGuests(body: { enabled: boolean }): Promise<{ ok: boolean; enabled: boolean }> {
+  return api<{ ok: boolean; enabled: boolean }>("/api/equipos/marketplace-hide-prices-for-guests", {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
 /** «Otros Productos Interesantes» en /marketplace/home (público, hasta 4 ítems). */
-export function getMarketplaceCorpInteresting(): Promise<{ products: import("./marketplaceAsicCatalog.js").AsicProduct[] }> {
-  return api<{ products: import("./marketplaceAsicCatalog.js").AsicProduct[] }>("/api/marketplace/corp-interesting", {
+export function getMarketplaceCorpInteresting(): Promise<{
+  products: import("./marketplaceAsicCatalog.js").AsicProduct[];
+  hidePricesForGuests: boolean;
+}> {
+  return api<{
+    products: import("./marketplaceAsicCatalog.js").AsicProduct[];
+    hidePricesForGuests: boolean;
+  }>("/api/marketplace/corp-interesting", {
     cache: "no-store",
   });
 }
