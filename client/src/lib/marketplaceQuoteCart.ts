@@ -51,7 +51,7 @@ export function isMarketplacePipelineTicketStatus(s: string): boolean {
   );
 }
 export const QUOTE_EMAIL = "dl@hashrate.space";
-export const QUOTE_WA_PHONE = "595994392728";
+export const QUOTE_WA_PHONE = "595993358387";
 
 /** Opcionales por unidad de equipo (instalación en granja / garantía). */
 /** Fallback si no se puede leer S02/S03 desde la API. */

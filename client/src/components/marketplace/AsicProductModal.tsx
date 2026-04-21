@@ -114,7 +114,7 @@ export function AsicProductModal({
 
   const waUrl = useMemo(() => {
     const waText = encodeURIComponent(mailText.body);
-    return `https://wa.me/595994392728?text=${waText}`;
+    return `https://wa.me/595993358387?text=${waText}`;
   }, [mailText.body]);
 
   const openEmailInquiryWindow = useCallback(() => {
