@@ -9,6 +9,7 @@ import { env } from "../config/env.js";
 import {
   effectiveResendFromEmail,
   normalizeResendApiKey,
+  normalizeResendFromEmailForVerifiedDomain,
   resendApiKeyLooksInvalid,
 } from "../config/resendFrom.js";
 import { allocateNextTiendaOnlineClientCode, type TiendaSeqTx } from "../lib/tiendaOnlineClientCode.js";
@@ -176,7 +177,8 @@ function passwordResetRelayInbox(): string {
 
 /** Remitente solo para reset (no pisa avisos marketplace). Si no hay override, usa RESEND_FROM_EMAIL. */
 function passwordResetFromAddress(): string {
-  const explicit = String(process.env.PASSWORD_RESET_FROM_EMAIL || "").trim();
+  const explicitRaw = String(process.env.PASSWORD_RESET_FROM_EMAIL || "").trim();
+  const explicit = explicitRaw ? normalizeResendFromEmailForVerifiedDomain(explicitRaw) : "";
   if (explicit) return explicit;
   const resendFrom = effectiveResendFromEmail();
   if (resendFrom) return resendFrom;

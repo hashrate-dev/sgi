@@ -22,8 +22,54 @@ export function resendApiKeyLooksInvalid(apiKey: string): boolean {
   return false;
 }
 
-/** `RESEND_FROM_EMAIL` explícito; no usamos fallback onboarding automáticamente. */
+/** Parsea `Nombre <correo@dominio>` o solo la dirección. */
+function parseResendFromHeader(raw: string): { display: string; address: string } {
+  const t = raw.trim();
+  const m = t.match(/^(.+?)\s*<([^<>]+)>$/);
+  if (m) {
+    const g1 = m[1];
+    const g2 = m[2];
+    if (g1 != null && g2 != null) {
+      let display = g1.trim();
+      if (
+        (display.startsWith('"') && display.endsWith('"')) ||
+        (display.startsWith("'") && display.endsWith("'"))
+      ) {
+        display = display.slice(1, -1).trim();
+      }
+      return { display, address: g2.trim() };
+    }
+  }
+  return { display: "", address: t };
+}
+
+function formatResendFromHeader(display: string, address: string): string {
+  const a = address.trim();
+  if (!a) return "";
+  const d = display.trim();
+  if (d) return `${d} <${a}>`;
+  return a;
+}
+
+/**
+ * En Resend suele estar verificado solo el subdominio `mail.hashrate.space`.
+ * Remitentes en el apex `@hashrate.space` devuelven 403; muchos `.env` de ejemplo usaban `no-reply@hashrate.space`.
+ */
+export function normalizeResendFromEmailForVerifiedDomain(raw: string): string {
+  const t = raw.trim();
+  if (!t) return "";
+  const { display, address } = parseResendFromHeader(t);
+  const at = address.lastIndexOf("@");
+  if (at < 1 || at >= address.length - 1) return t;
+  let local = address.slice(0, at).trim();
+  const host = address.slice(at + 1).trim().toLowerCase();
+  if (host !== "hashrate.space") return t;
+  if (local.toLowerCase() === "no-reply") local = "noreply";
+  return formatResendFromHeader(display, `${local}@mail.hashrate.space`);
+}
+
+/** Valor efectivo de `RESEND_FROM_EMAIL` (normalizado a dominio verificado si aplica). */
 export function effectiveResendFromEmail(): string {
   const explicit = process.env.RESEND_FROM_EMAIL?.trim();
-  return explicit || "";
+  return normalizeResendFromEmailForVerifiedDomain(explicit || "");
 }
