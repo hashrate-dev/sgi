@@ -462,7 +462,7 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
   "login.logout_switch": "Sair e entrar com outra conta",
   "login.hrs_home": "Ir ao início HRS (painel interno)",
   "login.kicker": "Loja online",
-  "login.intro": "Faça login para montar sua lista e solicitar orçamento.",
+  "login.intro": "Entre na Hashrate para realizar sua compra na Loja Online.",
   "login.intro_strong": "Faça login",
   "login.intro_after": "para montar sua lista e solicitar orçamento.",
   "login.form_title": "Entrar na sua conta",

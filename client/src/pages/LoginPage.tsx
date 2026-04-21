@@ -5,6 +5,8 @@ import { useAuth } from "../contexts/AuthContext";
 import { requestPasswordReset, setApiBaseUrl, wakeUpBackend } from "../lib/api";
 import "../styles/facturacion.css";
 
+const HASHRATE_LOGO = "https://hashrate.space/wp-content/uploads/hashrate-LOGO.png";
+
 export function LoginPage() {
   const { user, login } = useAuth();
   const location = useLocation();
@@ -89,9 +91,10 @@ export function LoginPage() {
       <div className="container py-5">
         <div className="row justify-content-center">
           <div className="col-lg-4 col-md-6">
-            <div className="hrs-card p-4">
-            <h2 className="hrs-title mb-4 text-center">Iniciar sesión</h2>
-            <p className="text-muted small text-center mb-4">HRS Sistema de Gestión Interna</p>
+            <div className="hrs-card hrs-auth-card p-4">
+            <img src={HASHRATE_LOGO} alt="Hashrate Space" className="hrs-auth-logo" />
+            <h2 className="hrs-auth-welcome mb-2 text-center">Welcome</h2>
+            <p className="text-muted text-center mb-4 hrs-auth-lead">Log in to Hashrate to continue.</p>
             <form onSubmit={handleSubmit}>
               <div className="mb-3">
                 <label className="form-label">Usuario o correo</label>

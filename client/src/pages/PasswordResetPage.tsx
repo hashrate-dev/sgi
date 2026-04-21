@@ -4,6 +4,8 @@ import { confirmPasswordReset, requestPasswordReset } from "../lib/api";
 import { MarketplacePasswordField } from "../components/marketplace/MarketplacePasswordField";
 import "../styles/facturacion.css";
 
+const HASHRATE_LOGO = "https://hashrate.space/wp-content/uploads/hashrate-LOGO.png";
+
 export function PasswordResetPage() {
   const [search] = useSearchParams();
   const navigate = useNavigate();
@@ -85,7 +87,8 @@ export function PasswordResetPage() {
       <div className="container py-5">
         <div className="row justify-content-center">
           <div className="col-lg-5 col-md-7">
-            <div className="hrs-card p-4">
+            <div className="hrs-card hrs-auth-card p-4">
+              <img src={HASHRATE_LOGO} alt="Hashrate Space" className="hrs-auth-logo" />
               <h2 className="hrs-title mb-3 text-center">{pageTitle}</h2>
               <p className="text-muted small text-center mb-4">
                 {hasToken

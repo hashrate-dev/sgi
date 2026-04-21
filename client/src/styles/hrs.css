@@ -131,6 +131,11 @@ button {
   background: #ffffff;
 }
 
+/* Login / reset: contorno más recto (pedido UX). */
+.hrs-auth-card {
+  border-radius: 12px;
+}
+
 .hrs-card--rect {
   border-radius: 0;
 }
@@ -143,6 +148,56 @@ button {
   font-size: 2.2rem;
   font-weight: 900;
   letter-spacing: -1.5px;
+}
+
+.hrs-auth-logo {
+  display: block;
+  width: min(250px, 78%);
+  height: auto;
+  margin: 0 auto 0.6rem;
+}
+
+.hrs-auth-welcome {
+  color: #1f2937;
+  font-size: clamp(1.9rem, 4vw, 2.4rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.hrs-auth-lead {
+  max-width: 420px;
+  margin-left: auto;
+  margin-right: auto;
+  font-size: 1.02rem;
+}
+
+.hrs-auth-input {
+  height: 54px;
+  border-radius: 6px;
+  border: 1px solid #9ca3af;
+  font-size: 1.05rem;
+  padding-inline: 1rem;
+}
+
+.hrs-auth-input::placeholder {
+  color: #6b7280;
+}
+
+.hrs-auth-continue-btn {
+  min-height: 54px;
+  border-radius: 6px;
+  border: 1px solid #0fdc82;
+  background: #0fdc82;
+  color: #083b2a;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.hrs-auth-continue-btn:hover,
+.hrs-auth-continue-btn:focus-visible {
+  background: #0bc975;
+  border-color: #0bc975;
+  color: #083b2a;
 }
 
 .hrs-subtitle {

@@ -1,24 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import { canUseMarketplaceQuoteCart } from "../lib/auth.js";
 import { useAuth } from "../contexts/AuthContext";
-import { getMarketplaceAsicVitrina, requestPasswordReset, wakeUpBackend } from "../lib/api";
-import {
-  getMarketplaceAuthShelfFallbackProducts,
-  mergeAsicCatalogWithCorpGridExtras,
-} from "../lib/marketplaceAsicCatalog.js";
-import type { AsicProduct } from "../lib/marketplaceAsicCatalog.js";
-import { AsicShelfProduct } from "../components/marketplace/AsicShelfProduct.js";
+import { requestPasswordReset, wakeUpBackend } from "../lib/api";
 import { MarketplaceSiteHeader } from "../components/marketplace/MarketplaceSiteHeader";
 import { MarketplaceSiteFooter } from "../components/marketplace/MarketplaceSiteFooter";
-import { MarketplacePasswordField } from "../components/marketplace/MarketplacePasswordField";
 import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
-import { marketplaceLocale } from "../lib/i18n.js";
 import "../styles/marketplace-hashrate.css";
 import "../styles/facturacion.css";
 
+const HASHRATE_LOGO = "https://hashrate.space/wp-content/uploads/hashrate-LOGO.png";
+
 export function MarketplaceClienteLoginPage() {
-  const { lang, t, tf } = useMarketplaceLang();
+  const { t, tf } = useMarketplaceLang();
   const { user, loading, login, logout } = useAuth();
   const location = useLocation();
   const fromQuote = (location.state as { from?: string } | null)?.from === "quote";
@@ -29,7 +23,7 @@ export function MarketplaceClienteLoginPage() {
   const [ready, setReady] = useState(false);
   const [resetBusy, setResetBusy] = useState(false);
   const [resetMsg, setResetMsg] = useState("");
-  const [bgProducts, setBgProducts] = useState<AsicProduct[]>(() => getMarketplaceAuthShelfFallbackProducts());
+  const [forgotMode, setForgotMode] = useState(false);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => setReady(true), 25000);
@@ -39,35 +33,6 @@ export function MarketplaceClienteLoginPage() {
     });
     return () => clearTimeout(timeoutId);
   }, []);
-
-  /** Misma vitrina que el catálogo: equipos reales de fondo en /marketplace/login */
-  useEffect(() => {
-    let cancelled = false;
-    void getMarketplaceAsicVitrina()
-      .then((res) => {
-        if (cancelled) return;
-        const list = res.products ?? [];
-        setBgProducts(
-          list.length > 0 ? mergeAsicCatalogWithCorpGridExtras(list) : getMarketplaceAuthShelfFallbackProducts()
-        );
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const shelfProducts = useMemo(() => {
-    const list = [...bgProducts];
-    const label = (p: AsicProduct) => `${p.brand} ${p.model}`.toLowerCase();
-    list.sort((a, b) => {
-      const ma = a.algo === "sha256" ? 0 : 1;
-      const mb = b.algo === "sha256" ? 0 : 1;
-      if (ma !== mb) return ma - mb;
-      return label(a).localeCompare(label(b), marketplaceLocale(lang));
-    });
-    return list;
-  }, [bgProducts, lang]);
 
   if (!loading && user && canUseMarketplaceQuoteCart(user.role)) {
     return (
@@ -165,6 +130,11 @@ export function MarketplaceClienteLoginPage() {
     }
   }
 
+  function handleForgotPasswordSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    void handleForgotPassword();
+  }
+
   return (
     <div className="marketplace-asic-page marketplace-login-page">
       <div className="bg-mesh" aria-hidden />
@@ -173,65 +143,57 @@ export function MarketplaceClienteLoginPage() {
         <MarketplaceSiteHeader />
         <main id="page-main" className="page-main page-main--market page-main--market--asic">
           <section className="section section--market-shelf market-login-page__section">
-            <div className="market-intro-wrap">
-              <header className="market-intro">
-                <p className="market-intro__kicker">{t("login.kicker")}</p>
-                <p className="market-intro__desc mb-0">
-                  <strong>{t("login.intro_strong")}</strong> {t("login.intro_after")}
-                </p>
-              </header>
-            </div>
-            <div className="market-login-page__backdrop">
-              <div className="market-login-page__stack">
-                <div className="market-shelf-wrap market-login-page__shelf-real">
-                  <div className="shelf-grid market-shelf-grid--catalog-v2 market-login-page__shelf-grid" aria-hidden>
-                    {shelfProducts.map((p, i) => (
-                      <AsicShelfProduct
-                        key={p.id}
-                        product={p}
-                        productIndex={i}
-                        filteredHidden={false}
-                        onOpenModal={() => {}}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <div className="market-login-page__card-float">
-                  <div className="hrs-card p-4 market-login-page__form-card">
-                    <h2 className="hrs-title mb-4 text-center">{t("login.form_title")}</h2>
-
-                    <form onSubmit={(e) => void handleSubmit(e)}>
+            <div className="container py-5">
+              <div className="row justify-content-center">
+                <div className="col-lg-5 col-md-7">
+                  <div className="hrs-card hrs-auth-card p-4 market-login-page__form-card">
+                    <img src={HASHRATE_LOGO} alt="Hashrate Space" className="hrs-auth-logo" />
+                    <p className="text-muted text-center mb-4 hrs-auth-lead">{forgotMode ? "Te enviaremos un enlace para crear una nueva contraseña." : t("login.intro")}</p>
+                    <form onSubmit={forgotMode ? handleForgotPasswordSubmit : (e) => void handleSubmit(e)}>
                       <div className="mb-3">
-                        <label className="form-label" htmlFor="marketplace-login-user">
-                          {t("login.user_label")}
-                        </label>
                         <input
                           id="marketplace-login-user"
                           type="text"
-                          className="form-control"
+                          className="form-control hrs-auth-input"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           autoComplete="username"
+                          placeholder={`${t("login.user_label")} *`}
+                          aria-label={t("login.user_label")}
                           required
                         />
                       </div>
-                      <MarketplacePasswordField
-                        label={t("login.password")}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        autoComplete="current-password"
-                        required
-                      />
-                      <div className="d-flex justify-content-end mb-3">
-                        <button
-                          type="button"
-                          className="btn btn-link btn-sm p-0 text-decoration-none"
-                          onClick={() => void handleForgotPassword()}
-                          disabled={resetBusy}
-                        >
-                          {resetBusy ? "Enviando..." : "Olvidé mi contraseña"}
-                        </button>
-                      </div>
+                      {!forgotMode ? (
+                        <div className="mb-3">
+                          <input
+                            id="marketplace-login-pass"
+                            type="password"
+                            className="form-control hrs-auth-input"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder={`${t("login.password")} *`}
+                            aria-label={t("login.password")}
+                            autoComplete="current-password"
+                            required
+                          />
+                        </div>
+                      ) : null}
+                      {!forgotMode ? (
+                        <div className="d-flex justify-content-end mb-3">
+                          <button
+                            type="button"
+                            className="btn btn-link btn-sm p-0 text-decoration-none"
+                            onClick={() => {
+                              setError("");
+                              setResetMsg("");
+                              setForgotMode(true);
+                            }}
+                            disabled={resetBusy}
+                          >
+                            Olvidé mi contraseña
+                          </button>
+                        </div>
+                      ) : null}
                       {error ? (
                         <div className="alert alert-danger py-2 small" role="alert">
                           {error}
@@ -242,16 +204,40 @@ export function MarketplaceClienteLoginPage() {
                           {resetMsg}
                         </div>
                       ) : null}
-                      <button type="submit" className="btn btn-primary w-100" disabled={submitting || !ready}>
-                        {!ready ? t("login.preparing") : submitting ? t("login.entering") : t("login.submit")}
+                      <button
+                        type="submit"
+                        className="btn hrs-auth-continue-btn w-100"
+                        disabled={forgotMode ? resetBusy : submitting || !ready}
+                      >
+                        {forgotMode
+                          ? resetBusy
+                            ? "Enviando..."
+                            : "Enviar enlace"
+                          : !ready
+                            ? t("login.preparing")
+                            : submitting
+                              ? t("login.entering")
+                              : t("login.submit")}
                       </button>
+                      {forgotMode ? (
+                        <button
+                          type="button"
+                          className="btn btn-outline-secondary w-100 mt-2"
+                          onClick={() => {
+                            setError("");
+                            setResetMsg("");
+                            setForgotMode(false);
+                          }}
+                        >
+                          Volver al login
+                        </button>
+                      ) : null}
                     </form>
                     <p className="text-center small text-muted mt-3 mb-0">
                       <Link to="/marketplace" className="text-decoration-none">
                         <i className="bi bi-bag-heart me-1" aria-hidden />
                         {t("login.back_shop")}
                       </Link>
-  
                     </p>
                     <p className="text-center small text-muted mt-2 mb-0">
                       {t("login.no_account")}{" "}
