@@ -57,7 +57,6 @@ export function AsicShelfProduct({
     : lang === "pt"
       ? "Faca login para ver o preco"
       : "Registrate para ver precio";
-  const lockedPriceKicker = lang === "en" ? "Online special price" : lang === "pt" ? "Preco especial online" : "Precio especial online";
   const lockedPriceHint = lang === "en"
     ? "Sign in and unlock this price"
     : lang === "pt"
@@ -120,10 +119,6 @@ export function AsicShelfProduct({
             </span>
           ) : (
             <div className="shelf-product__price-locked" role="note" aria-label={lockedPriceLabel}>
-              <span className="shelf-product__price-locked-kicker">
-                <i className="bi bi-lightning-charge-fill" aria-hidden />
-                {lockedPriceKicker}
-              </span>
               <span className="shelf-product__price-locked-main">{lockedPriceLabel}</span>
               <span className="shelf-product__price-locked-hint">{lockedPriceHint}</span>
               <Link
