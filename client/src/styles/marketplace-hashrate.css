@@ -9357,3 +9357,124 @@ button.product-modal__btn--quote-cart:active {
     grid-template-columns: 1fr;
   }
 }
+
+/* ================================
+   Cart Drawer Visual Refresh (2026)
+   ================================ */
+.market-quote-drawer__panel {
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 22%);
+}
+
+.market-quote-drawer__top {
+  background: linear-gradient(130deg, #1f4f39 0%, #2d6b4f 56%, #2f8f66 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.market-quote-drawer__title {
+  color: #ffffff;
+}
+
+.market-quote-drawer__subtitle {
+  color: rgba(236, 253, 245, 0.92);
+}
+
+.market-quote-drawer__close {
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  box-shadow: none;
+}
+
+.market-quote-drawer__close:hover {
+  background: rgba(255, 255, 255, 0.28);
+  border-color: rgba(255, 255, 255, 0.34);
+  color: #fff;
+}
+
+.market-quote-drawer__lede-wrap {
+  background: #ecfdf5;
+  border-color: rgba(5, 150, 105, 0.18);
+  border-radius: 12px;
+}
+
+.market-quote-drawer__login-hint {
+  border-radius: 11px;
+  background: linear-gradient(180deg, #eff6ff 0%, #e9f1ff 100%);
+}
+
+.market-quote-drawer__body-scroll {
+  padding: 0.85rem 0.95rem 1rem;
+}
+
+.market-quote-drawer__empty {
+  margin-top: 0.15rem;
+  border: 1px dashed #cbd5e1;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  min-height: 320px;
+  justify-content: center;
+}
+
+.market-quote-drawer__line {
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.09);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 8px 22px rgba(15, 23, 42, 0.08);
+}
+
+.market-quote-drawer__line::before {
+  width: 3px;
+}
+
+.market-quote-drawer__line-sub {
+  border-top: 1px solid rgba(148, 163, 184, 0.24);
+}
+
+.market-quote-drawer__cart-sticky-summary {
+  border-top-color: rgba(15, 23, 42, 0.12);
+}
+
+.market-quote-drawer__total {
+  border-radius: 14px;
+  background: linear-gradient(135deg, #0f5f46 0%, #1b8c67 100%);
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 6px 24px rgba(15, 95, 70, 0.25);
+}
+
+.market-quote-drawer__total-label,
+.market-quote-drawer__total-note {
+  color: rgba(236, 253, 245, 0.9);
+}
+
+.market-quote-drawer__total-amt {
+  color: #ffffff;
+}
+
+.market-quote-drawer__btn {
+  border-radius: 11px;
+}
+
+.market-quote-drawer__btn--solid {
+  background: linear-gradient(180deg, #16d997 0%, #0fb179 100%);
+  border: 1px solid #10b981;
+  color: #053a2a;
+  font-weight: 800;
+}
+
+.market-quote-drawer__btn--solid:hover {
+  filter: brightness(1.03);
+}
+
+.market-quote-drawer__btn--neutral {
+  border: 1px solid #bfdbfe;
+  background: #f8fbff;
+  color: #1d4ed8;
+}
+
+.market-quote-drawer__btn--contact-wa {
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  color: #047857;
+}
