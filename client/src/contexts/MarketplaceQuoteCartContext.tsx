@@ -92,6 +92,8 @@ type Ctx = {
   /** Confirma «Generar orden» (envía aviso a ventas) o devuelve resumen si la orden ya estaba enviada. */
   submitConsultationTicket: () => Promise<SubmittedConsultationSummary>;
   openQuoteEmail: () => Promise<void>;
+  emailInquiryOpen: boolean;
+  closeEmailInquiry: () => void;
   openQuoteWhatsApp: () => Promise<void>;
   /** Consulta en pipeline (un pedido activo por cuenta): el carrito se fusiona en ese ticket al sincronizar. */
   blockingPipelineOrder: {
@@ -159,6 +161,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerSubView, setDrawerSubView] = useState<MarketplaceCartDrawerSubView>("cart");
   const [ticketRef, setTicketRef] = useState<QuoteTicketRef | null>(null);
+  const [emailInquiryOpen, setEmailInquiryOpen] = useState(false);
   const [blockingPipelineOrder, setBlockingPipelineOrder] = useState<{
     id: number;
     orderNumber: string;
@@ -459,6 +462,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
   }, []);
   const closeDrawer = useCallback(() => {
     setDrawerSubView("cart");
+    setEmailInquiryOpen(false);
     setDrawerOpen(false);
   }, []);
   const toggleDrawer = useCallback(() => {
@@ -639,19 +643,12 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
       }
       /* sin sync remoto: abrimos el formulario igual */
     }
-    const url = `${window.location.origin}/marketplace/consultar-correo-carrito`;
-    const popW = 332;
-    const popH = 432;
-    const ax = window.screenX ?? window.screenLeft ?? 0;
-    const ay = window.screenY ?? window.screenTop ?? 0;
-    const aw = window.outerWidth || window.innerWidth || 900;
-    const ah = window.outerHeight || window.innerHeight || 700;
-    const left = Math.max(0, Math.round(ax + (aw - popW) / 2));
-    const top = Math.max(0, Math.round(ay + (ah - popH) / 2));
-    const feats = `width=${popW},height=${popH},left=${left},top=${top},scrollbars=yes,resizable=yes`;
-    const win = window.open(url, "_blank", feats);
-    if (win) win.opener = null;
+    setEmailInquiryOpen(true);
   }, [lines, canUseQuoteCart, setupEquipoCompletoUsd, setupCompraHashrateUsd, garantiaQuoteItems, refreshActiveOrderGate]);
+
+  const closeEmailInquiry = useCallback(() => {
+    setEmailInquiryOpen(false);
+  }, []);
 
   const openQuoteWhatsApp = useCallback(async () => {
     let ref: QuoteTicketRef | undefined;
@@ -720,6 +717,8 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
       ticketRef,
       submitConsultationTicket,
       openQuoteEmail,
+      emailInquiryOpen,
+      closeEmailInquiry,
       openQuoteWhatsApp,
       blockingPipelineOrder,
       hasPendingPipelineCartChanges,
@@ -748,6 +747,8 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
       ticketRef,
       submitConsultationTicket,
       openQuoteEmail,
+      emailInquiryOpen,
+      closeEmailInquiry,
       openQuoteWhatsApp,
       blockingPipelineOrder,
       hasPendingPipelineCartChanges,

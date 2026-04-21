@@ -93,7 +93,7 @@ export function GarantiaAndeItemNewPage() {
     try {
       await createGarantiaItem(newItem);
       showToast("Ítem agregado correctamente.", "success", "Items Garantía ANDE");
-      navigate("/equipos-asic/items-garantia");
+      navigate("/asic/warranty-items");
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Error al guardar.", "error", "Items Garantía ANDE");
     }
@@ -110,7 +110,7 @@ export function GarantiaAndeItemNewPage() {
                 <div className="market-registro-card cte-edit-market__card cte-edit-market__card--full">
                   <div className="p-3 text-muted">No tenés permisos para crear ítems.</div>
                   <div className="px-3 pb-3">
-                    <Link to="/equipos-asic/items-garantia" className="btn btn-outline-secondary">
+                    <Link to="/asic/warranty-items" className="btn btn-outline-secondary">
                       Volver al listado
                     </Link>
                   </div>
@@ -288,7 +288,7 @@ export function GarantiaAndeItemNewPage() {
                   </div>
 
                   <div className="market-registro-submit-row d-flex flex-wrap gap-2 justify-content-end align-items-center cte-edit-tienda-actions">
-                    <Link to="/equipos-asic/items-garantia" className="btn btn-outline-secondary order-2 order-md-1">
+                    <Link to="/asic/warranty-items" className="btn btn-outline-secondary order-2 order-md-1">
                       Cancelar
                     </Link>
                     <button type="submit" className="btn btn-success market-registro-submit order-1 order-md-3">

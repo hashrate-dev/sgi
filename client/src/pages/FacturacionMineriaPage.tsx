@@ -141,13 +141,13 @@ export function FacturacionMineriaPage() {
   }
 
   useEffect(() => {
-    if (location.pathname !== "/facturacion-equipos") return;
+    if (location.pathname !== "/asic/billing" && location.pathname !== "/asic/billing/") return;
     fetchEmittedAsic();
   }, [location.pathname]);
 
   /** Refrescar lista al volver a esta pestaña (p. ej. después de borrar en Historial) */
   useEffect(() => {
-    if (location.pathname !== "/facturacion-equipos") return;
+    if (location.pathname !== "/asic/billing" && location.pathname !== "/asic/billing/") return;
     const onFocus = () => fetchEmittedAsic();
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);

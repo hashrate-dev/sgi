@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AsicProduct } from "../../lib/marketplaceAsicCatalog.js";
 import {
   asicProductShowsMinerEconomyContent,
@@ -19,6 +19,7 @@ import type { MarketplaceAsicLiveYield } from "../../lib/api.js";
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
 import { AsicDetailSvg } from "./AsicDetailIcon.js";
 import { BackCircleArrowIcon, MailCtaIcon, WhatsAppCtaIcon } from "./MarketplaceCtaIcons.js";
+import { MarketplaceProductEmailInquiryModal } from "./MarketplaceProductEmailInquiryModal.js";
 
 /** Varias monedas en «X + Y»: una fila por moneda y el `+` al inicio de la segunda (evita cortes feos al hacer wrap). */
 function renderYieldLineParts(text: string): ReactNode {
@@ -117,30 +118,11 @@ export function AsicProductModal({
     return `https://wa.me/595993358387?text=${waText}`;
   }, [mailText.body]);
 
-  const openEmailInquiryWindow = useCallback(() => {
-    const params = new URLSearchParams();
-    params.set("b", product.brand);
-    params.set("m", product.model);
-    params.set("h", displayHashrate);
-    params.set("p", displayPriceStr);
-    const url = `${window.location.origin}/marketplace/consultar-correo?${params.toString()}`;
-    const popW = 332;
-    const popH = 432;
-    const ax = window.screenX ?? window.screenLeft ?? 0;
-    const ay = window.screenY ?? window.screenTop ?? 0;
-    const aw = window.outerWidth || window.innerWidth || 900;
-    const ah = window.outerHeight || window.innerHeight || 700;
-    const left = Math.max(0, Math.round(ax + (aw - popW) / 2));
-    const top = Math.max(0, Math.round(ay + (ah - popH) / 2));
-    const feats = `width=${popW},height=${popH},left=${left},top=${top},scrollbars=yes,resizable=yes`;
-    const win = window.open(url, "_blank", feats);
-    if (win) win.opener = null;
-  }, [product, displayHashrate, displayPriceStr]);
-
   const thumbs = useMemo(() => gallerySources(product), [product]);
   const hasAnyPhoto = thumbs.length > 0;
   const [activeThumb, setActiveThumb] = useState(0);
   const [mainBroken, setMainBroken] = useState(false);
+  const [emailInquiryOpen, setEmailInquiryOpen] = useState(false);
 
   useEffect(() => {
     setActiveThumb(0);
@@ -161,6 +143,11 @@ export function AsicProductModal({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      if (emailInquiryOpen) {
+        e.stopPropagation();
+        setEmailInquiryOpen(false);
+        return;
+      }
       if (hashrateShareView) {
         e.stopPropagation();
         setHashrateShareView(false);
@@ -170,7 +157,7 @@ export function AsicProductModal({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, hashrateShareView]);
+  }, [onClose, hashrateShareView, emailInquiryOpen]);
 
   const hasLive = Boolean(liveYield?.line1);
   const rawY1 = hasLive ? liveYield!.line1 : liveYieldLoading ? t("modal.yield_loading") : product.estimatedYield.line1;
@@ -431,8 +418,7 @@ export function AsicProductModal({
                     <button
                       type="button"
                       className="product-modal__btn product-modal__btn--neutral"
-                      title={t("modal.email_inquiry_opens_new")}
-                      onClick={openEmailInquiryWindow}
+                      onClick={() => setEmailInquiryOpen(true)}
                     >
                       <span className="product-modal__btn-icon" aria-hidden>
                         <MailCtaIcon />
@@ -567,6 +553,12 @@ export function AsicProductModal({
           </div>
         </div>
       </div>
+      <MarketplaceProductEmailInquiryModal
+        open={emailInquiryOpen}
+        onClose={() => setEmailInquiryOpen(false)}
+        subject={mailText.subject}
+        defaultBody={mailText.body}
+      />
     </div>
   );
 }

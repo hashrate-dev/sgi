@@ -547,7 +547,7 @@ export function GarantiaAndePage() {
                 )}
 
                 <div className="mt-2">
-                  <Link to="/equipos-asic" className="btn btn-sm btn-outline-secondary">← Volver a Equipos ASIC</Link>
+                  <Link to="/asic" className="btn btn-sm btn-outline-secondary">← Volver a Equipos ASIC</Link>
                 </div>
               </div>
             </div>

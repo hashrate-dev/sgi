@@ -128,11 +128,11 @@ export function MarketplacePresencePage() {
           logoHref="/"
           rightContent={
             <div className="d-flex flex-wrap gap-2 align-items-center">
-              <Link to="/marketplace-presencia/historial" className="fact-back">
+              <Link to="/marketplace/presence/history" className="fact-back">
                 <i className="bi bi-table me-1" aria-hidden />
                 Historial detalle
               </Link>
-              <Link to="/cotizaciones-marketplace" className="fact-back">
+              <Link to="/marketplace/orders" className="fact-back">
                 Ver órdenes marketplace
               </Link>
             </div>

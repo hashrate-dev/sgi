@@ -119,7 +119,7 @@ const menuItems: MenuItem[] = [
     roles: ["admin_a", "admin_b", "operador"],
   },
   {
-    to: "/equipos-asic",
+    to: "/asic",
     icon: "bi-cpu",
     label: "Equipos ASIC",
     desc: "Información de facturación de equipos de minería ASIC",
@@ -133,19 +133,19 @@ const menuItems: MenuItem[] = [
     roles: ["admin_a", "admin_b", "lector"],
   },
   {
-    to: "/cuenta-cliente",
+    to: "/clients/account",
     icon: "bi-journal-text",
     label: "Cuenta por cliente",
     desc: "Detalle histórico de movimientos por cliente (hosting + ASIC)",
   },
-  { to: "/historial", icon: "bi-clock-history", label: "Historial", desc: "Ver y gestionar comprobantes" },
+  { to: "/history", icon: "bi-clock-history", label: "Historial", desc: "Ver y gestionar comprobantes" },
   {
-    to: "/clientes-hub",
+    to: "/clients",
     icon: "bi-people",
     label: "Clientes",
     desc: "Administración de clientes de tienda online y de hosting",
   },
-  { to: "/reportes", icon: "bi-graph-up", label: "Reportes", desc: "Estadísticas y análisis" },
+  { to: "/reports", icon: "bi-graph-up", label: "Reportes", desc: "Estadísticas y análisis" },
 ];
 
 function DashboardCardIconSlot({ item }: { item: MenuItem }) {
@@ -517,7 +517,7 @@ export function HomePage() {
           ))}
 
           {canSeeMarketplaceOrdersCard ? (
-            <RouterLink to="/cotizaciones-marketplace" style={DASHBOARD_CARD_LINK_STYLE}>
+            <RouterLink to="/marketplace/orders" style={DASHBOARD_CARD_LINK_STYLE}>
               <AppCard
                 {...dashboardCardProps}
                 borderLeftWidth="4px"
@@ -583,7 +583,7 @@ export function HomePage() {
           ) : null}
 
           {canSeeMarketplaceOrdersCard ? (
-            <RouterLink to="/marketplace-presencia" role="status" aria-live="polite" style={DASHBOARD_CARD_LINK_STYLE}>
+            <RouterLink to="/marketplace/presence" role="status" aria-live="polite" style={DASHBOARD_CARD_LINK_STYLE}>
               <AppCard
                 {...dashboardCardProps}
                 _hover={{
@@ -624,7 +624,7 @@ export function HomePage() {
           ) : null}
 
           {user && (roleNorm(user.role) === "admin_a" || roleNorm(user.role) === "admin_b") ? (
-            <RouterLink to="/tienda-online-banners-home" style={DASHBOARD_CARD_LINK_STYLE}>
+            <RouterLink to="/marketplace/home-banners" style={DASHBOARD_CARD_LINK_STYLE}>
               <AppCard
                 {...dashboardCardProps}
                 _hover={{
@@ -646,7 +646,7 @@ export function HomePage() {
           ) : null}
 
           {user ? (
-            <RouterLink to="/configuracion" style={DASHBOARD_CARD_LINK_STYLE}>
+            <RouterLink to="/settings" style={DASHBOARD_CARD_LINK_STYLE}>
               <AppCard
                 {...dashboardCardProps}
                 _hover={{

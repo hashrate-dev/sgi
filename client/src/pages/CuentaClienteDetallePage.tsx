@@ -207,10 +207,10 @@ export function CuentaClienteDetallePage() {
     return (
       <div className="fact-page clientes-page cuenta-cliente-page">
         <div className="container">
-          <PageHeader title="Detalle de cuenta" showBackButton backTo="/cuenta-cliente" backText="Volver al directorio" />
+          <PageHeader title="Detalle de cuenta" showBackButton backTo="/clients/account" backText="Volver al directorio" />
           <div className="text-center text-muted py-5">
             <p className="mb-1">No se especificó un cliente.</p>
-            <Link to="/cuenta-cliente">Volver al directorio de clientes</Link>
+            <Link to="/clients/account">Volver al directorio de clientes</Link>
           </div>
         </div>
       </div>
@@ -223,7 +223,7 @@ export function CuentaClienteDetallePage() {
         <PageHeader
           title={`Cuenta: ${clientName}`}
           showBackButton
-          backTo="/cuenta-cliente"
+          backTo="/clients/account"
           backText="Volver al directorio"
         />
       </div>
@@ -236,7 +236,7 @@ export function CuentaClienteDetallePage() {
                 <p className="mb-1">No se encontraron movimientos para &quot;{clientName}&quot;</p>
                 <small>Verificá el nombre del cliente o probá con parte del nombre.</small>
                 <div className="mt-3">
-                  <Link to="/cuenta-cliente" className="btn btn-sm btn-outline-secondary">Volver al directorio</Link>
+                  <Link to="/clients/account" className="btn btn-sm btn-outline-secondary">Volver al directorio</Link>
                 </div>
               </div>
             ) : (

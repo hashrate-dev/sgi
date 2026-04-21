@@ -591,7 +591,7 @@ export function GarantiasAndeItemsPage() {
                     </h6>
                     {canEdit && (
                       <Link
-                        to="/equipos-asic/items-garantia/nuevo"
+                        to="/asic/warranty-items/new"
                         className="fact-btn fact-btn-primary btn-sm"
                         style={{
                           fontSize: "0.8125rem",

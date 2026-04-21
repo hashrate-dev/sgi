@@ -332,7 +332,7 @@ export function ClientesPage() {
                     <>
                       No hay clientes de hosting en la base: los registros actuales son de{" "}
                       <strong>tienda online</strong> (<code>A9…</code>, <code>WEB-…</code>). Gestionalos en{" "}
-                      <Link to="/clientes-tienda-online">Clientes · Tienda online</Link>.
+                      <Link to="/clients/store">Clientes · Tienda online</Link>.
                     </>
                   ) : (
                     "No hay clientes de hosting cargados. Agregá uno con «Nuevo Cliente»."

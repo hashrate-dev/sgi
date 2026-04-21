@@ -3,11 +3,11 @@ import { PageHeader } from "../components/PageHeader";
 import "../styles/facturacion.css";
 
 const asicMenuItems: Array<{ to: string; icon: string; label: string; desc: string }> = [
-  { to: "/facturacion-equipos", icon: "bi-receipt", label: "Emitir Facturas de Equipos ASIC", desc: "Emisión de Facturas, Notas de Crédito y Recibos" },
-  { to: "/historial-equipos", icon: "bi-clock-history", label: "Historial Venta de ASIC", desc: "Ver y gestionar comprobantes por Ventas de Equipos ASIC" },
-  { to: "/pendientes-equipos", icon: "bi-hourglass-split", label: "Pendientes de Cobro", desc: "Facturas pendientes de cobro por venta de Equipos ASIC" },
-  { to: "/equipos-asic/garantia-ande", icon: "bi-file-earmark-text", label: "Recibos Garantía ANDE", desc: "Emisión de recibos de garantía ANDE para equipos" },
-  { to: "/equipos-asic/garantias-historial", icon: "bi-clock-history", label: "Historial Garantías ANDE", desc: "Ver y gestionar documentos de Garantia ANDE" },
+  { to: "/asic/billing", icon: "bi-receipt", label: "Emitir Facturas de Equipos ASIC", desc: "Emisión de Facturas, Notas de Crédito y Recibos" },
+  { to: "/asic/history", icon: "bi-clock-history", label: "Historial Venta de ASIC", desc: "Ver y gestionar comprobantes por Ventas de Equipos ASIC" },
+  { to: "/asic/pending", icon: "bi-hourglass-split", label: "Pendientes de Cobro", desc: "Facturas pendientes de cobro por venta de Equipos ASIC" },
+  { to: "/asic/ande-warranty", icon: "bi-file-earmark-text", label: "Recibos Garantía ANDE", desc: "Emisión de recibos de garantía ANDE para equipos" },
+  { to: "/asic/warranties-history", icon: "bi-clock-history", label: "Historial Garantías ANDE", desc: "Ver y gestionar documentos de Garantia ANDE" },
 ];
 
 export function MineriaHubPage() {

@@ -4,13 +4,13 @@ import "../styles/facturacion.css";
 
 const hubItems: Array<{ to: string; icon: string; label: string; desc: string }> = [
   {
-    to: "/clientes",
+    to: "/clients/hosting",
     icon: "bi-hdd-stack",
     label: "Clientes · Hosting",
     desc: "Administración de Clientes Hosting.",
   },
   {
-    to: "/clientes-tienda-online",
+    to: "/clients/store",
     icon: "bi-bag-heart",
     label: "Clientes · Tienda online",
     desc: "Administración de Cuentas Registradas en Tienda Online",

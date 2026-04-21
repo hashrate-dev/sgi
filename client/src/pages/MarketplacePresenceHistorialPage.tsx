@@ -167,7 +167,7 @@ export function MarketplacePresenceHistorialPage() {
           title="Historial detalle — Presencia marketplace"
           logoHref="/"
           showBackButton
-          backTo="/marketplace-presencia"
+          backTo="/marketplace/presence"
           backText="Volver al monitor"
         />
 

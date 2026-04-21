@@ -267,7 +267,7 @@ export function CotizacionesMarketplaceHistorialDetallePage() {
         <PageHeader
           title="Historial detalle — Cotizaciones marketplace"
           showBackButton
-          backTo="/cotizaciones-marketplace"
+          backTo="/marketplace/orders"
           backText="Volver al tablero"
         />
 

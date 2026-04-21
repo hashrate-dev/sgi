@@ -3,11 +3,11 @@ import { PageHeader } from "../components/PageHeader";
 import "../styles/facturacion.css";
 
 const hostingMenuItems: Array<{ to: string; icon: string; label: string; desc: string }> = [
-  { to: "/facturacion-hosting", icon: "bi-receipt", label: "Emitir Facturas de Hosting", desc: "Emisión de Facturas, Notas de Crédito y Recibos" },
-  { to: "/historial-hosting", icon: "bi-clock-history", label: "Historial Servicios de Hosting", desc: "Ver y gestionar comprobantes por Servicios de Hosting" },
-  { to: "/pendientes-hosting", icon: "bi-hourglass-split", label: "Pendientes de Cobro", desc: "Facturas pendientes de cobro por venta de Servicios de Hosting" },
-  { to: "/hosting/control-documentos-cobros", icon: "bi-envelope-check", label: "Flujo de Emails", desc: "Documentos del mes y control de envío por mail" },
-  { to: "/reportes", icon: "bi-graph-up", label: "Reportes", desc: "Estadísticas y análisis de facturación" },
+  { to: "/hosting/billing", icon: "bi-receipt", label: "Emitir Facturas de Hosting", desc: "Emisión de Facturas, Notas de Crédito y Recibos" },
+  { to: "/hosting/history", icon: "bi-clock-history", label: "Historial Servicios de Hosting", desc: "Ver y gestionar comprobantes por Servicios de Hosting" },
+  { to: "/hosting/pending", icon: "bi-hourglass-split", label: "Pendientes de Cobro", desc: "Facturas pendientes de cobro por venta de Servicios de Hosting" },
+  { to: "/hosting/email-flow", icon: "bi-envelope-check", label: "Flujo de Emails", desc: "Documentos del mes y control de envío por mail" },
+  { to: "/reports", icon: "bi-graph-up", label: "Reportes", desc: "Estadísticas y análisis de facturación" },
 ];
 
 export function HostingHubPage() {

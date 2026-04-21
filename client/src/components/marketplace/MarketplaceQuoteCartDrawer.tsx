@@ -5,6 +5,7 @@ import { MarketplaceCartOrdersPanel } from "./MarketplaceCartOrdersPanel.js";
 import { isOneActiveOrderError } from "../../lib/api.js";
 import type { SubmittedConsultationSummary } from "../../contexts/MarketplaceQuoteCartContext.js";
 import { MarketplaceTicketSummaryModal } from "./MarketplaceTicketSummaryModal.js";
+import { MarketplaceCartEmailInquiryModal } from "./MarketplaceCartEmailInquiryModal.js";
 import {
   quoteCartSubtotalUsd,
   quoteCartLineSubtotalUsd,
@@ -48,6 +49,8 @@ export function MarketplaceQuoteCartDrawer() {
     clearCart,
     ticketRef,
     openQuoteEmail,
+    emailInquiryOpen,
+    closeEmailInquiry,
     openQuoteWhatsApp,
     submitConsultationTicket,
     canUseQuoteCart,
@@ -595,6 +598,7 @@ export function MarketplaceQuoteCartDrawer() {
     {ticketSummary ? (
       <MarketplaceTicketSummaryModal summary={ticketSummary} onClose={() => setTicketSummary(null)} />
     ) : null}
+    <MarketplaceCartEmailInquiryModal open={emailInquiryOpen} onClose={closeEmailInquiry} />
     </>
   );
 }

@@ -378,47 +378,75 @@ function App() {
             <Route index element={<HomePage />} />
             <Route path="/kryptex" element={<KryptexPage />} />
             <Route path="/kryptex/detalle" element={<KryptexDetallePage />} />
-            <Route path="/marketplacedashboard" element={<EquiposAsicPage />} />
-            <Route path="/tienda-online-banners-home" element={<TiendaOnlineBannersHomePage />} />
+            <Route path="/asic/equipment" element={<EquiposAsicPage />} />
+            <Route path="/marketplace/home-banners" element={<TiendaOnlineBannersHomePage />} />
             <Route path="/hosting" element={<HostingHubPage />} />
-            <Route path="/hosting/control-documentos-cobros" element={<FacturasMesHostingPage />} />
-            <Route path="/facturacion-hosting" element={<FacturacionPage />} />
-            <Route path="/historial" element={<HistorialPage />} />
-            <Route path="/historial-hosting" element={<HistorialPage sourceFilter="hosting" />} />
-            <Route path="/pendientes-hosting" element={<PendientesPage />} />
-            <Route path="/facturacion" element={<Navigate to="/facturacion-hosting" replace />} />
-            <Route path="/pendientes" element={<Navigate to="/pendientes-hosting" replace />} />
-            <Route path="/equipos-asic" element={<MineriaHubPage />} />
-            <Route path="/equipos-asic/equipos" element={<EquiposAsicPage />} />
-            <Route path="/equipos-asic/equipos/nuevos" element={<Navigate to="/equipos-asic/equipos" replace />} />
-            <Route path="/equipos-asic/setup" element={<SetupPage />} />
-            <Route path="/equipos-asic/garantia-ande" element={<GarantiaAndePage />} />
-            <Route path="/equipos-asic/items-garantia" element={<GarantiasAndeItemsPage />} />
-            <Route path="/equipos-asic/items-garantia/nuevo" element={<GarantiaAndeItemNewPage />} />
-            <Route path="/equipos-asic/garantias-historial" element={<HistorialGarantiasPage />} />
-            <Route path="/mineria" element={<Navigate to="/equipos-asic" replace />} />
-            <Route path="/facturacion-equipos" element={<FacturacionMineriaPage />} />
-            <Route path="/historial-equipos" element={<HistorialMineriaPage />} />
-            <Route path="/pendientes-equipos" element={<PendientesMineriaPage />} />
-            <Route path="/facturacion-mineria" element={<Navigate to="/facturacion-equipos" replace />} />
-            <Route path="/historial-mineria" element={<Navigate to="/historial-equipos" replace />} />
-            <Route path="/pendientes-mineria" element={<Navigate to="/pendientes-equipos" replace />} />
-            <Route path="/clientes-hub" element={<ClientesHubPage />} />
-            <Route path="/clientes" element={<ClientesPage />} />
-            <Route path="/cuenta-cliente" element={<CuentaClientePage />} />
+            <Route path="/hosting/email-flow" element={<FacturasMesHostingPage />} />
+            <Route path="/hosting/billing" element={<FacturacionPage />} />
+            <Route path="/history" element={<HistorialPage />} />
+            <Route path="/hosting/history" element={<HistorialPage sourceFilter="hosting" />} />
+            <Route path="/hosting/pending" element={<PendientesPage />} />
+            <Route path="/asic" element={<MineriaHubPage />} />
+            <Route path="/asic/setup" element={<SetupPage />} />
+            <Route path="/asic/ande-warranty" element={<GarantiaAndePage />} />
+            <Route path="/asic/warranty-items" element={<GarantiasAndeItemsPage />} />
+            <Route path="/asic/warranty-items/new" element={<GarantiaAndeItemNewPage />} />
+            <Route path="/asic/warranties-history" element={<HistorialGarantiasPage />} />
+            <Route path="/asic/billing" element={<FacturacionMineriaPage />} />
+            <Route path="/asic/history" element={<HistorialMineriaPage />} />
+            <Route path="/asic/pending" element={<PendientesMineriaPage />} />
+            <Route path="/clients" element={<ClientesHubPage />} />
+            <Route path="/clients/hosting" element={<ClientesPage />} />
+            <Route path="/clients/account" element={<CuentaClientePage />} />
+            <Route path="/clients/account/detail" element={<CuentaClienteDetallePage />} />
+            <Route path="/clients/hosting/new" element={<Navigate to="/clients/hosting" replace />} />
+            <Route path="/clients/hosting/:id/edit" element={<ClienteEditPage />} />
+            <Route path="/reports" element={<ReportesPage />} />
+            <Route path="/settings" element={<ConfiguracionPage />} />
+            <Route path="/clients/store" element={<ClientesTiendaOnlinePage />} />
+            <Route path="/marketplace/orders/history-detail" element={<CotizacionesMarketplaceHistorialDetallePage />} />
+            <Route path="/marketplace/orders" element={<CotizacionesMarketplacePage />} />
+            <Route path="/marketplace/presence/history" element={<MarketplacePresenceHistorialPage />} />
+            <Route path="/marketplace/presence" element={<MarketplacePresencePage />} />
+
+            {/* Compatibilidad legacy ES -> EN */}
+            <Route path="/marketplacedashboard" element={<Navigate to="/asic/equipment" replace />} />
+            <Route path="/tienda-online-banners-home" element={<Navigate to="/marketplace/home-banners" replace />} />
+            <Route path="/hosting/control-documentos-cobros" element={<Navigate to="/hosting/email-flow" replace />} />
+            <Route path="/facturacion-hosting" element={<Navigate to="/hosting/billing" replace />} />
+            <Route path="/historial" element={<Navigate to="/history" replace />} />
+            <Route path="/historial-hosting" element={<Navigate to="/hosting/history" replace />} />
+            <Route path="/pendientes-hosting" element={<Navigate to="/hosting/pending" replace />} />
+            <Route path="/facturacion" element={<Navigate to="/hosting/billing" replace />} />
+            <Route path="/pendientes" element={<Navigate to="/hosting/pending" replace />} />
+            <Route path="/equipos-asic" element={<Navigate to="/asic" replace />} />
+            <Route path="/equipos-asic/equipos" element={<Navigate to="/asic/equipment" replace />} />
+            <Route path="/equipos-asic/equipos/nuevos" element={<Navigate to="/asic/equipment" replace />} />
+            <Route path="/equipos-asic/setup" element={<Navigate to="/asic/setup" replace />} />
+            <Route path="/equipos-asic/garantia-ande" element={<Navigate to="/asic/ande-warranty" replace />} />
+            <Route path="/equipos-asic/items-garantia" element={<Navigate to="/asic/warranty-items" replace />} />
+            <Route path="/equipos-asic/items-garantia/nuevo" element={<Navigate to="/asic/warranty-items/new" replace />} />
+            <Route path="/equipos-asic/garantias-historial" element={<Navigate to="/asic/warranties-history" replace />} />
+            <Route path="/mineria" element={<Navigate to="/asic" replace />} />
+            <Route path="/facturacion-equipos" element={<Navigate to="/asic/billing" replace />} />
+            <Route path="/historial-equipos" element={<Navigate to="/asic/history" replace />} />
+            <Route path="/pendientes-equipos" element={<Navigate to="/asic/pending" replace />} />
+            <Route path="/facturacion-mineria" element={<Navigate to="/asic/billing" replace />} />
+            <Route path="/historial-mineria" element={<Navigate to="/asic/history" replace />} />
+            <Route path="/pendientes-mineria" element={<Navigate to="/asic/pending" replace />} />
+            <Route path="/clientes-hub" element={<Navigate to="/clients" replace />} />
+            <Route path="/clientes" element={<Navigate to="/clients/hosting" replace />} />
+            <Route path="/cuenta-cliente" element={<Navigate to="/clients/account" replace />} />
             <Route path="/cuenta-cliente/detalle" element={<CuentaClienteDetallePage />} />
-            <Route path="/clientes/nuevo" element={<Navigate to="/clientes" replace />} />
+            <Route path="/clientes/nuevo" element={<Navigate to="/clients/hosting/new" replace />} />
             <Route path="/clientes/:id/edit" element={<ClienteEditPage />} />
-            <Route path="/reportes" element={<ReportesPage />} />
-            <Route path="/configuracion" element={<ConfiguracionPage />} />
-            <Route path="/clientes-tienda-online" element={<ClientesTiendaOnlinePage />} />
-            <Route
-              path="/cotizaciones-marketplace/historial-detalle"
-              element={<CotizacionesMarketplaceHistorialDetallePage />}
-            />
-            <Route path="/cotizaciones-marketplace" element={<CotizacionesMarketplacePage />} />
+            <Route path="/reportes" element={<Navigate to="/reports" replace />} />
+            <Route path="/configuracion" element={<Navigate to="/settings" replace />} />
+            <Route path="/clientes-tienda-online" element={<Navigate to="/clients/store" replace />} />
+            <Route path="/cotizaciones-marketplace/historial-detalle" element={<CotizacionesMarketplaceHistorialDetallePage />} />
+            <Route path="/cotizaciones-marketplace" element={<Navigate to="/marketplace/orders" replace />} />
             <Route path="/marketplace-presencia/historial" element={<MarketplacePresenceHistorialPage />} />
-            <Route path="/marketplace-presencia" element={<MarketplacePresencePage />} />
+            <Route path="/marketplace-presencia" element={<Navigate to="/marketplace/presence" replace />} />
             <Route path="/usuarios/*" element={<UsuariosPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

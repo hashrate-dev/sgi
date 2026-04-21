@@ -76,7 +76,7 @@ export function ClienteEditPage() {
   const teCountryPrevRef = useRef<string | null>(null);
   const countriesPhoneSel = useMemo(() => countriesForPhoneSelect(), []);
 
-  if (user && !canEdit) return <Navigate to="/clientes" replace />;
+  if (user && !canEdit) return <Navigate to="/clients/hosting" replace />;
 
   useEffect(() => {
     if (!id) {
@@ -260,7 +260,7 @@ export function ClienteEditPage() {
       .then(() => {
         setMessage({ type: "ok", text: "Cliente actualizado correctamente." });
         setTimeout(
-          () => navigate(isClienteTiendaOnline(client.code) ? "/clientes-tienda-online" : "/clientes"),
+          () => navigate(isClienteTiendaOnline(client.code) ? "/clients/store" : "/clients/hosting"),
           1500
         );
       })
@@ -283,7 +283,7 @@ export function ClienteEditPage() {
       .then(() => {
         setMessage({ type: "ok", text: "Cliente eliminado." });
         setTimeout(() => {
-          navigate(isClienteTiendaOnline(client.code) ? "/clientes-tienda-online" : "/clientes");
+          navigate(isClienteTiendaOnline(client.code) ? "/clients/store" : "/clients/hosting");
         }, 1500);
       })
       .catch((err) => {
@@ -620,7 +620,7 @@ export function ClienteEditPage() {
                   ) : null}
 
                   <div className="market-registro-submit-row d-flex flex-wrap gap-2 justify-content-end align-items-center cte-edit-tienda-actions">
-                    <Link to="/clientes-tienda-online" className="btn btn-outline-secondary order-3 order-md-1">
+                    <Link to="/clients/store" className="btn btn-outline-secondary order-3 order-md-1">
                       Cancelar
                     </Link>
                     {canDelete ? (
@@ -831,7 +831,7 @@ export function ClienteEditPage() {
                   </div>
                 )}
                 <div className="d-flex gap-2 mt-3 flex-wrap" style={{ gridColumn: "1 / -1", justifyContent: "flex-end", marginTop: "1.5rem" }}>
-                  <Link to="/clientes" className="fact-btn fact-btn-secondary">
+                  <Link to="/clients/hosting" className="fact-btn fact-btn-secondary">
                     Cancelar
                   </Link>
                   {canDelete && (

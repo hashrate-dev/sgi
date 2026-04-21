@@ -146,7 +146,7 @@ function isLinkedToInvoice(comp: Invoice, factura: Invoice): boolean {
 export function FacturacionPage() {
   const { user } = useAuth();
   const location = useLocation();
-  const isHostingPath = location.pathname === "/facturacion-hosting" || location.pathname === "/facturacion-hosting/";
+  const isHostingPath = location.pathname === "/hosting/billing" || location.pathname === "/hosting/billing/";
   const [type, setType] = useState<ComprobanteType>("Factura");
   const [clientQuery, setClientQuery] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
@@ -1662,7 +1662,7 @@ export function FacturacionPage() {
                         <span className="fact-emitted-count-period"> emitidos en los últimos 10 días</span>
                       </span>
                       <Link
-                        to="/hosting/control-documentos-cobros"
+                        to="/hosting/email-flow"
                         className="fact-emitted-monitor-btn"
                       >
                         ✉️ Monitor

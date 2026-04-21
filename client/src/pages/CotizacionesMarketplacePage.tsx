@@ -957,7 +957,7 @@ export function CotizacionesMarketplacePage() {
           title="Centro de Ordenes - Tienda Online"
           logoHref="/"
           rightContent={
-            <Link to="/cotizaciones-marketplace/historial-detalle" className="fact-back">
+            <Link to="/marketplace/orders/history-detail" className="fact-back">
               <i className="bi bi-table me-1" aria-hidden />
               Historial detalle
             </Link>

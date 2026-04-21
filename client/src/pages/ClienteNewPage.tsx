@@ -27,7 +27,7 @@ export function ClienteNewPage() {
   const [message, setMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [excelLoading, setExcelLoading] = useState(false);
-  if (user && !canEditClientes(user.role)) return <Navigate to="/clientes" replace />;
+  if (user && !canEditClientes(user.role)) return <Navigate to="/clients/hosting" replace />;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -55,7 +55,7 @@ export function ClienteNewPage() {
         setMessage({ type: "ok", text: "Cliente agregado correctamente." });
         setForm(emptyForm);
         setTimeout(() => {
-          navigate("/clientes");
+          navigate("/clients/hosting");
         }, 1500);
       })
       .catch((err) => setMessage({ type: "err", text: err instanceof Error ? err.message : "Error al crear" }));
@@ -98,7 +98,7 @@ export function ClienteNewPage() {
       } else {
         setMessage({ type: "ok", text: `Se agregaron ${inserted}. ${skipped} omitidos (código ya existía).` });
       }
-      if (inserted > 0) setTimeout(() => navigate("/clientes"), 2000);
+      if (inserted > 0) setTimeout(() => navigate("/clients/hosting"), 2000);
     } catch (err) {
       setMessage({
         type: "err",
@@ -112,7 +112,7 @@ export function ClienteNewPage() {
   return (
     <div className="fact-page clientes-new-page">
       <div className="container">
-        <PageHeader title="Nuevo Cliente" showBackButton backTo="/clientes" backText="Volver a clientes" />
+        <PageHeader title="Nuevo Cliente" showBackButton backTo="/clients/hosting" backText="Volver a clientes" />
 
         <div className="usuarios-page-card">
           <div className="usuarios-page-header">
@@ -274,7 +274,7 @@ export function ClienteNewPage() {
                 </div>
               )}
               <div className="clientes-new-actions">
-                <Link to="/clientes" className="fact-btn fact-btn-secondary">
+                <Link to="/clients/hosting" className="fact-btn fact-btn-secondary">
                   Cancelar
                 </Link>
                 <button type="submit" className="fact-btn fact-btn-primary">
