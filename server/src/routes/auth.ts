@@ -9,6 +9,7 @@ import { env } from "../config/env.js";
 import {
   effectiveResendFromEmail,
   normalizeResendApiKey,
+  RESEND_DEFAULT_ONBOARDING_FROM,
   resendApiKeyLooksInvalid,
 } from "../config/resendFrom.js";
 import { allocateNextTiendaOnlineClientCode, type TiendaSeqTx } from "../lib/tiendaOnlineClientCode.js";
@@ -128,8 +129,29 @@ function isResendTestingRecipientRestriction403(status: number, bodyText: string
   );
 }
 
+/** Si Resend rechazó el remitente (dominio/from), probamos otro candidato antes de rendirnos. */
+function shouldTryNextPasswordResetFrom(res: Response, bodyText: string): boolean {
+  if (res.ok || res.status === 401) return false;
+  if (isResendTestingRecipientRestriction403(res.status, bodyText)) return false;
+  const t = bodyText.toLowerCase();
+  if (res.status === 422 || res.status === 403 || res.status === 400) {
+    return (
+      /domain|verify|not verified|unauthorized|invalid|sender|from.?field|from_address|not allowed to use/i.test(
+        bodyText
+      ) || t.includes("validation_error")
+    );
+  }
+  return false;
+}
+
 function passwordResetSandboxRelayEnabled(): boolean {
   const v = String(process.env.PASSWORD_RESET_RESEND_SANDBOX_RELAY ?? "").trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes";
+}
+
+/** Si Resend falla por cualquier motivo (p. ej. dominio), enviar copia con el enlace a PASSWORD_RESET_RESEND_RELAY_TO / sales (solo con este flag en producción). */
+function passwordResetRelayOnAnyFailure(): boolean {
+  const v = String(process.env.PASSWORD_RESET_RELAY_ON_FAILURE ?? "").trim().toLowerCase();
   return v === "1" || v === "true" || v === "yes";
 }
 
@@ -222,14 +244,22 @@ async function sendPasswordResetEmail(to: string, resetUrl: string, meta?: Passw
     });
   }
 
-  let sendFrom = fromInitial;
-  let res = await resendPost(sendFrom, to, subject, text, html);
-  let body = await res.text().catch(() => "");
+  const resendFromGlobal = String(process.env.RESEND_FROM_EMAIL || "").trim();
+  const fromCandidates = [fromInitial, resendFromGlobal, RESEND_DEFAULT_ONBOARDING_FROM]
+    .map((x) => x.trim())
+    .filter((x, i, arr) => x.length > 0 && arr.findIndex((y) => y.toLowerCase() === x.toLowerCase()) === i);
 
-  if (!res.ok && res.status === 403 && /domain.+not.+verified|verify.+domain|unauthorized domain/i.test(body)) {
-    sendFrom = "onboarding@resend.dev";
+  let sendFrom = fromInitial;
+  let res!: Response;
+  let body = "";
+  for (let i = 0; i < fromCandidates.length; i++) {
+    sendFrom = fromCandidates[i]!;
     res = await resendPost(sendFrom, to, subject, text, html);
     body = await res.text().catch(() => "");
+    if (res.ok) break;
+    if (res.status === 401) break;
+    const tryNext = i < fromCandidates.length - 1 && shouldTryNextPasswordResetFrom(res, body);
+    if (!tryNext) break;
   }
 
   if (!res.ok) {
@@ -242,12 +272,16 @@ async function sendPasswordResetEmail(to: string, resetUrl: string, meta?: Passw
     }
   }
 
-  /** En local: si el envío directo falla (casi siempre modo prueba Resend), mandamos el mismo enlace al buzón permitido del proyecto. En prod: solo si PASSWORD_RESET_RESEND_SANDBOX_RELAY y el error es el de “testing”. */
+  /**
+   * Local: ante cualquier fallo de entrega directa (salvo 401), relay al buzón del proyecto.
+   * Prod: relay si PASSWORD_RESET_RESEND_SANDBOX_RELAY + error “testing”, o si PASSWORD_RESET_RELAY_ON_FAILURE=1 (respaldo operativo).
+   */
   const trySandboxRelay =
     !res.ok &&
     res.status !== 401 &&
     (env.NODE_ENV !== "production" ||
-      (passwordResetSandboxRelayEnabled() && isResendTestingRecipientRestriction403(res.status, body)));
+      (passwordResetSandboxRelayEnabled() && isResendTestingRecipientRestriction403(res.status, body)) ||
+      passwordResetRelayOnAnyFailure());
 
   if (trySandboxRelay) {
     const parsedInbox = parseResendSandboxInboxFrom403(body);
@@ -573,7 +607,7 @@ authRouter.post("/auth/password-reset-request", loginRateLimit, async (req, res)
       return res.status(422).json({
         error: {
           code: "EMAIL_SEND_FAILED",
-          message: `No se pudo enviar el correo a ${emailNorm}. Verificá el dominio en Resend y el remitente (PASSWORD_RESET_FROM_EMAIL).`,
+          message: `No se pudo enviar el correo a ${emailNorm}. En Vercel/Resend: RESEND_FROM_EMAIL / PASSWORD_RESET_FROM_EMAIL con el dominio que figura Verified (p. ej. noreply@mail.hashrate.space). Respaldo: SMTP o PASSWORD_RESET_RELAY_ON_FAILURE=1.`,
         },
       });
     }

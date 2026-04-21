@@ -191,7 +191,7 @@ export async function notifyMarketplaceOrderEmail(p: MarketplaceOrderEmailPayloa
     if (resend403UnverifiedFromDomain(detail403)) {
       // eslint-disable-next-line no-console
       console.warn(
-        `[email] Resend rechazó el remitente (${sendFrom}): dominio no verificado. Reintentando con ${RESEND_DEFAULT_ONBOARDING_FROM}. Verificá hashrate.space en https://resend.com/domains o comentá RESEND_FROM_EMAIL en .env.resend.local hasta entonces.`
+        `[email] Resend rechazó el remitente (${sendFrom}): dominio no verificado. Reintentando con ${RESEND_DEFAULT_ONBOARDING_FROM}. Verificá tu dominio en https://resend.com/domains (p. ej. mail.hashrate.space) y usá From con ese dominio o comentá RESEND_FROM_EMAIL en .env.resend.local hasta entonces.`
       );
       sendFrom = RESEND_DEFAULT_ONBOARDING_FROM;
       const second = await resendPostEmail({
@@ -336,7 +336,7 @@ export async function notifyMarketplaceOrderGeneradaEmail(p: MarketplaceOrderEma
     if (resend403UnverifiedFromDomain(detail403)) {
       // eslint-disable-next-line no-console
       console.warn(
-        `[email] Resend rechazó el remitente (${sendFrom}): dominio no verificado. Reintentando con ${RESEND_DEFAULT_ONBOARDING_FROM}. Verificá hashrate.space en https://resend.com/domains o comentá RESEND_FROM_EMAIL en .env.resend.local hasta entonces.`
+        `[email] Resend rechazó el remitente (${sendFrom}): dominio no verificado. Reintentando con ${RESEND_DEFAULT_ONBOARDING_FROM}. Verificá tu dominio en https://resend.com/domains (p. ej. mail.hashrate.space) y usá From con ese dominio o comentá RESEND_FROM_EMAIL en .env.resend.local hasta entonces.`
       );
       sendFrom = RESEND_DEFAULT_ONBOARDING_FROM;
       const second = await resendPostEmail({
