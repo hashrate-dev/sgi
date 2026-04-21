@@ -123,9 +123,10 @@ function isResendTestingRecipientRestriction403(status: number, bodyText: string
   if (status !== 403 && status !== 422) return false;
   const t = bodyText.toLowerCase();
   return (
-    t.includes("only send testing emails") ||
-    t.includes("testing emails to your own") ||
-    t.includes("send emails to other recipients")
+    t.includes("only send testing") ||
+    t.includes("testing emails") ||
+    t.includes("send emails to other recipients") ||
+    (t.includes("recipient") && t.includes("testing"))
   );
 }
 
@@ -205,24 +206,27 @@ async function sendPasswordResetEmail(to: string, resetUrl: string, meta?: Passw
   const text = `Recibimos una solicitud para restablecer tu contraseña.\n\nAbrí este enlace (válido por ${PASSWORD_RESET_TTL_MINUTES} minutos):\n${resetUrl}\n\nSi no solicitaste este cambio, podés ignorar este correo.`;
   const html = `<p>Recibimos una solicitud para restablecer tu contraseña.</p><p><a href="${resetUrl}">Restablecer contraseña</a> (válido por ${PASSWORD_RESET_TTL_MINUTES} minutos).</p><p>Si no solicitaste este cambio, podés ignorar este correo.</p>`;
 
-  /** Resend en API key de prueba no entrega a mails arbitrarios; SMTP (p. ej. Workspace) sí → en local intentamos primero al destinatario real. */
-  if (env.NODE_ENV !== "production" && passwordResetSmtpConfigured()) {
+  /**
+   * SMTP (Workspace, etc.) entrega al correo que pidió el reset. En prod y en local va **antes** que Resend
+   * para que el usuario reciba el mail en su buzón y no dependa del relay a sales@.
+   */
+  if (passwordResetSmtpConfigured()) {
     try {
       if (await tryPasswordResetSmtpFallback(to, subject, text, html)) return;
     } catch (smtpErr) {
-      console.error("[auth] password-reset SMTP (local primero):", smtpErr);
+      console.error("[auth] password-reset SMTP (prioritario al destinatario):", smtpErr);
     }
   }
 
   const apiKey = normalizeResendApiKey(process.env.RESEND_API_KEY);
   const fromInitial = passwordResetFromAddress();
   if (!apiKey || resendApiKeyLooksInvalid(apiKey) || !fromInitial) {
+    try {
+      if (await tryPasswordResetSmtpFallback(to, subject, text, html)) return;
+    } catch (smtpErr) {
+      console.error("[auth] password-reset SMTP (sin Resend válido):", smtpErr);
+    }
     if (env.NODE_ENV !== "production") {
-      try {
-        if (await tryPasswordResetSmtpFallback(to, subject, text, html)) return;
-      } catch (smtpErr) {
-        console.error("[auth] password-reset SMTP (sin Resend):", smtpErr);
-      }
       throw new Error(`RESET_EMAIL_NOT_CONFIGURED::${resetUrl}`);
     }
     throw new Error("Email provider no configurado.");
@@ -273,15 +277,18 @@ async function sendPasswordResetEmail(to: string, resetUrl: string, meta?: Passw
   }
 
   /**
-   * Local: ante cualquier fallo de entrega directa (salvo 401), relay al buzón del proyecto.
-   * Prod: relay si PASSWORD_RESET_RESEND_SANDBOX_RELAY + error “testing”, o si PASSWORD_RESET_RELAY_ON_FAILURE=1 (respaldo operativo).
+   * Local: ante fallo Resend (salvo 401), relay al buzón del proyecto (modo prueba).
+   * Producción: **no** relay a sales salvo que lo actives (`PASSWORD_RESET_RELAY_ON_FAILURE=1` o
+   * `PASSWORD_RESET_RESEND_SANDBOX_RELAY=1` + error de prueba / remitente). Así el éxito implica entrega al usuario vía Resend o SMTP.
    */
+  const testingRecipientBlock = isResendTestingRecipientRestriction403(res.status, body);
   const trySandboxRelay =
     !res.ok &&
     res.status !== 401 &&
     (env.NODE_ENV !== "production" ||
-      (passwordResetSandboxRelayEnabled() && isResendTestingRecipientRestriction403(res.status, body)) ||
-      passwordResetRelayOnAnyFailure());
+      passwordResetRelayOnAnyFailure() ||
+      (passwordResetSandboxRelayEnabled() &&
+        (testingRecipientBlock || shouldTryNextPasswordResetFrom(res, body))));
 
   if (trySandboxRelay) {
     const parsedInbox = parseResendSandboxInboxFrom403(body);
@@ -304,6 +311,11 @@ async function sendPasswordResetEmail(to: string, resetUrl: string, meta?: Passw
           if (process.env.NODE_ENV !== "production") {
             // eslint-disable-next-line no-console
             console.log(`[auth] password-reset: Resend modo prueba → entregado a ${relay} (solicitó ${to}, from=${rf})`);
+          } else if (testingRecipientBlock) {
+            // eslint-disable-next-line no-console
+            console.warn(
+              `[auth] password-reset: envío directo a ${to} rechazado por Resend; enlace enviado por relay a ${relay}. Revisá clave API y dominio verificado (From @mail.hashrate.space).`
+            );
           }
           return;
         }
@@ -607,7 +619,7 @@ authRouter.post("/auth/password-reset-request", loginRateLimit, async (req, res)
       return res.status(422).json({
         error: {
           code: "EMAIL_SEND_FAILED",
-          message: `No se pudo enviar el correo a ${emailNorm}. En Vercel/Resend: RESEND_FROM_EMAIL / PASSWORD_RESET_FROM_EMAIL con el dominio que figura Verified (p. ej. noreply@mail.hashrate.space). Respaldo: SMTP o PASSWORD_RESET_RELAY_ON_FAILURE=1.`,
+          message: `No se pudo enviar el correo a ${emailNorm}. Usá clave Resend de producción y From @mail.hashrate.space, o definí PASSWORD_RESET_SMTP_* para enviar al usuario desde tu servidor de correo. Relay opcional a sales: PASSWORD_RESET_RELAY_ON_FAILURE=1.`,
         },
       });
     }
