@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { requestPasswordReset, wakeUpBackend } from "../lib/api";
 import { MarketplaceSiteHeader } from "../components/marketplace/MarketplaceSiteHeader";
 import { MarketplaceSiteFooter } from "../components/marketplace/MarketplaceSiteFooter";
+import { MarketplacePasswordField } from "../components/marketplace/MarketplacePasswordField";
 import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
 import "../styles/marketplace-hashrate.css";
 import "../styles/facturacion.css";
@@ -159,25 +160,22 @@ export function MarketplaceClienteLoginPage() {
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           autoComplete="username"
-                          placeholder={`${t("login.user_label")} *`}
+                          placeholder={t("login.user_label")}
                           aria-label={t("login.user_label")}
                           required
                         />
                       </div>
                       {!forgotMode ? (
-                        <div className="mb-3">
-                          <input
-                            id="marketplace-login-pass"
-                            type="password"
-                            className="form-control hrs-auth-input"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder={`${t("login.password")} *`}
-                            aria-label={t("login.password")}
-                            autoComplete="current-password"
-                            required
-                          />
-                        </div>
+                        <MarketplacePasswordField
+                          label={t("login.password")}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          autoComplete="current-password"
+                          placeholder={t("login.password")}
+                          inputClassName="form-control hrs-auth-input"
+                          labelClassName="visually-hidden"
+                          required
+                        />
                       ) : null}
                       {!forgotMode ? (
                         <div className="d-flex justify-content-end mb-3">

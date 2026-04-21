@@ -377,7 +377,7 @@ body:has(.marketplace-asic-page)::after {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   text-decoration: none;
-  border-radius: 999px;
+  border-radius: 8px;
   border: 1px solid #d1d5db;
   color: #374151;
   background: #fff;
@@ -518,7 +518,7 @@ body:has(.marketplace-asic-page)::after {
   padding: 0.45rem 0.85rem;
   font-size: 0.8rem;
   font-weight: 600;
-  border-radius: 8px;
+  border-radius: 6px;
   border: 1px solid rgba(209, 213, 219, 0.95);
   background: linear-gradient(180deg, #ffffff 0%, #f3f4f6 100%);
   color: #374151;
@@ -629,7 +629,7 @@ body:has(.marketplace-asic-page)::after {
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  border-radius: 999px;
+  border-radius: 7px;
   border: 1px solid transparent;
 }
 
@@ -766,13 +766,38 @@ button.market-link-hrs {
 
 /* ——— Login cliente: fondo como el catálogo (gradiente + “estantería” de fondo) ——— */
 .marketplace-login-page.marketplace-asic-page {
-  background: #eef1f4;
+  background: #ffffff !important;
 }
 
-.marketplace-login-page .page-main.page-main--market {
-  background: linear-gradient(160deg, #e8eaed 0%, #f1f5f9 32%, #f8fafc 92%);
+.marketplace-login-page .page-main.page-main--market.page-main--market--asic {
+  background: #ffffff !important;
   flex: 1 1 auto;
   min-height: 0;
+}
+
+.marketplace-login-page .market-login-page__section {
+  background: #ffffff;
+}
+
+/* En login marketplace: el footer no debe transparentar la imagen de fondo. */
+.marketplace-login-page .site-footer--marketplace {
+  background: #0b6f8f;
+}
+
+.marketplace-login-page .site-footer--marketplace--standalone .site-footer--marketplace__band {
+  background: #0b6f8f;
+}
+
+.marketplace-login-page .site-footer--marketplace__band-grad {
+  background: linear-gradient(
+    135deg,
+    #015b93 0%,
+    #066792 18%,
+    #0e8088 38%,
+    #28a776 58%,
+    #52c76a 82%,
+    #5cc866 100%
+  );
 }
 
 .market-login-page__section {
@@ -1031,7 +1056,7 @@ button.market-link-hrs {
   color: #4b5563;
   background: #fff;
   border: 1px solid #e5e7eb;
-  border-radius: 999px;
+  border-radius: 7px;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }

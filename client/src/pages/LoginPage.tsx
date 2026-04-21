@@ -94,17 +94,17 @@ export function LoginPage() {
           <div className="col-lg-4 col-md-6">
             <div className="hrs-card hrs-auth-card p-4">
             <img src={HASHRATE_LOGO} alt="Hashrate Space" className="hrs-auth-logo" />
-            <h2 className="hrs-auth-welcome mb-2 text-center">Welcome</h2>
-            <p className="text-muted text-center mb-4 hrs-auth-lead">Log in to Hashrate to continue.</p>
+            <p className="text-muted text-center mb-4 hrs-auth-lead">Ingresa a Hashrate Space</p>
             <form onSubmit={handleSubmit}>
               <div className="mb-3">
-                <label className="form-label">Usuario o correo</label>
                 <input
                   type="text"
-                  className="form-control"
+                  className="form-control hrs-auth-input"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   autoComplete="username"
+                  placeholder="Usuario o correo"
+                  aria-label="Usuario o correo"
                   required
                 />
               </div>
@@ -113,6 +113,9 @@ export function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="current-password"
+                placeholder="Contraseña"
+                inputClassName="form-control hrs-auth-input"
+                labelClassName="visually-hidden"
                 required
               />
               <div className="d-flex justify-content-end mb-3">
@@ -135,7 +138,7 @@ export function LoginPage() {
                   {resetMsg}
                 </div>
               )}
-              <button type="submit" className="btn btn-primary w-100" disabled={submitting || !ready}>
+              <button type="submit" className="btn hrs-auth-continue-btn w-100" disabled={submitting || !ready}>
                 {!ready ? "Preparando..." : submitting ? "Entrando..." : "Entrar"}
               </button>
             </form>
