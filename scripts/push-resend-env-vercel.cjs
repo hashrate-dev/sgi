@@ -125,7 +125,12 @@ async function main() {
     );
     process.exit(1);
   }
-  if (!from) from = "onboarding@resend.dev";
+  if (!from) {
+    console.error(
+      "Falta RESEND_FROM_EMAIL en .env o .env.resend.local. Debe ser un remitente verificado (ej. noreply@mail.hashrate.space)."
+    );
+    process.exit(1);
+  }
 
   const target = ["production", "preview"];
   const pairs = [

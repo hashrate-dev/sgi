@@ -22,8 +22,8 @@ En **Settings → Environment Variables** agregá las mismas claves para **Produ
 | `SUPABASE_DATABASE_URL` | Connection string de Supabase. Ej: `postgresql://postgres:TU_PASSWORD@db.xxx.supabase.co:5432/postgres` | **Sí** |
 | `JWT_SECRET` | String largo (mín. 16 caracteres) para firmar el JWT del login | **Sí** |
 | `RESEND_API_KEY` | API key `re_…` de [Resend](https://resend.com/api-keys) | **Sí** si querés correo (marketplace + reset) |
-| `RESEND_FROM_EMAIL` | Remitente marketplace, ej. `HashrateSpace <noreply@mail.hashrate.space>` (el dominio exacto que figura **Verified** en Resend) | Recomendado |
-| `PASSWORD_RESET_FROM_EMAIL` | Remitente del reset; mismo dominio verificado, ej. `HashrateSpace <noreply@mail.hashrate.space>`. Si no está, se usa `RESEND_FROM_EMAIL` / `onboarding@resend.dev` | Recomendado |
+| `RESEND_FROM_EMAIL` | Remitente marketplace, ej. `Hashrate Space <noreply@mail.hashrate.space>` (el dominio exacto que figura **Verified** en Resend) | Recomendado |
+| `PASSWORD_RESET_FROM_EMAIL` | Remitente del reset; mismo dominio verificado, ej. `Hashrate Space <noreply@mail.hashrate.space>`. Si no está, se usa `RESEND_FROM_EMAIL` | Recomendado |
 | `MARKETPLACE_NOTIFY_EMAIL_TO` | Destino de avisos de órdenes marketplace (default en código: `sales@hashrate.space`) | Opcional |
 | `APP_PUBLIC_URL` | URL pública del front para links en mails (ej. `https://app.hashrate.space`). Si falta, el servidor intenta deducirla del request | Opcional |
 | `FRONTEND_ORIGIN` | Alternativa a `APP_PUBLIC_URL` (misma idea: base del enlace de reset) | Opcional |

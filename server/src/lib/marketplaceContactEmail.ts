@@ -1,7 +1,6 @@
 import {
   effectiveResendFromEmail,
   normalizeResendApiKey,
-  RESEND_DEFAULT_ONBOARDING_FROM,
   resendApiKeyLooksInvalid,
 } from "../config/resendFrom.js";
 
@@ -10,7 +9,6 @@ const DEFAULT_CONTACT_TO = "sales@hashrate.space";
 const DEFAULT_SUBJECT_PREFIX = "[Marketplace contact]";
 
 let warnedMissingEnv = false;
-let warnedOnboardingExternalTo = false;
 
 export type MarketplaceContactEmailPayload = {
   firstName: string;
@@ -125,17 +123,9 @@ async function deliverMarketplaceResendEmail(args: {
     throw new Error("El envío de correo no está configurado en el servidor (RESEND_API_KEY).");
   }
 
-  let from = fromInitial || RESEND_DEFAULT_ONBOARDING_FROM;
-  if (!from) from = RESEND_DEFAULT_ONBOARDING_FROM;
-
-  const toLower = to.toLowerCase();
-  const isResendTestInbox = toLower.endsWith("@resend.dev");
-  if (from === RESEND_DEFAULT_ONBOARDING_FROM && !isResendTestInbox && !warnedOnboardingExternalTo) {
-    warnedOnboardingExternalTo = true;
-    // eslint-disable-next-line no-console
-    console.warn(
-      `[email] ${devLogTag}: remitente de prueba (${from}) hacia ${to}. Si no llega, verificá dominio en Resend o usá un buzón @resend.dev para pruebas.`
-    );
+  const from = fromInitial.trim();
+  if (!from) {
+    throw new Error("Definí RESEND_FROM_EMAIL con un remitente verificado (ej. noreply@mail.hashrate.space).");
   }
 
   // eslint-disable-next-line no-console
@@ -152,25 +142,12 @@ async function deliverMarketplaceResendEmail(args: {
     html,
   });
 
-  if (!res.ok && res.status === 403 && sendFrom !== RESEND_DEFAULT_ONBOARDING_FROM) {
+  if (!res.ok && res.status === 403) {
     const detail403 = resendErrorDetail(bodyText);
     if (resend403UnverifiedFromDomain(detail403)) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        `[email] Resend rechazó el remitente (${sendFrom}). Reintentando con ${RESEND_DEFAULT_ONBOARDING_FROM}.`
+      throw new Error(
+        `Resend rechazó el remitente (${sendFrom}): verificá dominio y RESEND_FROM_EMAIL (ej. noreply@mail.hashrate.space).`
       );
-      sendFrom = RESEND_DEFAULT_ONBOARDING_FROM;
-      const second = await resendPostEmail({
-        apiKey,
-        from: sendFrom,
-        to,
-        replyTo,
-        subject,
-        text,
-        html,
-      });
-      res = second.res;
-      bodyText = second.bodyText;
     }
   }
 

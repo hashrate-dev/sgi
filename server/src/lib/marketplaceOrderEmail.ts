@@ -1,7 +1,6 @@
 import {
   effectiveResendFromEmail,
   normalizeResendApiKey,
-  RESEND_DEFAULT_ONBOARDING_FROM,
   resendApiKeyLooksInvalid,
 } from "../config/resendFrom.js";
 
@@ -19,7 +18,6 @@ const DEFAULT_SUBJECT_PREFIX = "[Marketplace]";
 const DEFAULT_PANEL_URL = "https://app.hashrate.space/cotizaciones-marketplace";
 
 let warnedMissingEnv = false;
-let warnedOnboardingExternalTo = false;
 let loggedResendDeliveryHint = false;
 
 export type MarketplaceOrderEmailPayload = {
@@ -88,7 +86,7 @@ async function resendPostEmail(opts: {
  * Envía un email transaccional por Resend.
  * Requiere:
  * - RESEND_API_KEY
- * - RESEND_FROM_EMAIL opcional (si falta y hay key, se usa onboarding@resend.dev)
+ * - RESEND_FROM_EMAIL (debe estar definido y verificado, ej. noreply@mail.hashrate.space)
  * Opcionales:
  * - MARKETPLACE_NOTIFY_EMAIL_TO (default sales@hashrate.space)
  * - MARKETPLACE_NOTIFY_SUBJECT_PREFIX (default [Marketplace])
@@ -132,7 +130,7 @@ export async function notifyMarketplaceOrderEmail(p: MarketplaceOrderEmailPayloa
         <li><strong>Subtotal:</strong> ${subtotal}</li>
       </ul>
       <p style="margin:0">
-        <a href="${panelLink}" target="_blank" rel="noreferrer">Abrir panel de cotizaciones marketplace</a>
+        <a href="${panelLink}" target="_blank" rel="noreferrer">Abrir login de Tienda Online Hashrate Space</a>
       </p>
     </div>
   `.trim();
@@ -163,14 +161,8 @@ export async function notifyMarketplaceOrderEmail(p: MarketplaceOrderEmailPayloa
     return;
   }
 
-  const toLower = to.toLowerCase();
-  const isResendTestInbox = toLower.endsWith("@resend.dev");
-  if (from === RESEND_DEFAULT_ONBOARDING_FROM && !isResendTestInbox && !warnedOnboardingExternalTo) {
-    warnedOnboardingExternalTo = true;
-    // eslint-disable-next-line no-console
-    console.warn(
-      `[email] Enviando desde remitente de prueba (${from}) hacia ${to}. Resend a menudo no entrega a buzones externos en este modo. Si no llega: probá MARKETPLACE_NOTIFY_EMAIL_TO=delivered@resend.dev, el email de tu cuenta Resend, o verificá dominio y RESEND_FROM_EMAIL.`
-    );
+  if (!from) {
+    throw new Error("Definí RESEND_FROM_EMAIL con un remitente verificado (ej. noreply@mail.hashrate.space).");
   }
 
   // eslint-disable-next-line no-console
@@ -186,31 +178,12 @@ export async function notifyMarketplaceOrderEmail(p: MarketplaceOrderEmailPayloa
     html,
   });
 
-  if (!res.ok && res.status === 403 && sendFrom !== RESEND_DEFAULT_ONBOARDING_FROM) {
+  if (!res.ok && res.status === 403) {
     const detail403 = resendErrorDetail(bodyText);
     if (resend403UnverifiedFromDomain(detail403)) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        `[email] Resend rechazó el remitente (${sendFrom}): dominio no verificado. Reintentando con ${RESEND_DEFAULT_ONBOARDING_FROM}. Verificá tu dominio en https://resend.com/domains (p. ej. mail.hashrate.space) y usá From con ese dominio o comentá RESEND_FROM_EMAIL en .env.resend.local hasta entonces.`
+      throw new Error(
+        `Resend rechazó el remitente (${sendFrom}): dominio no verificado. Usá RESEND_FROM_EMAIL con @mail.hashrate.space.`
       );
-      sendFrom = RESEND_DEFAULT_ONBOARDING_FROM;
-      const second = await resendPostEmail({
-        apiKey,
-        from: sendFrom,
-        to,
-        subject,
-        text,
-        html,
-      });
-      res = second.res;
-      bodyText = second.bodyText;
-      if (sendFrom === RESEND_DEFAULT_ONBOARDING_FROM && !isResendTestInbox && !warnedOnboardingExternalTo) {
-        warnedOnboardingExternalTo = true;
-        // eslint-disable-next-line no-console
-        console.warn(
-          `[email] Enviando desde remitente de prueba (${sendFrom}) hacia ${to}. Resend a menudo no entrega a buzones externos en este modo. Si no llega: probá MARKETPLACE_NOTIFY_EMAIL_TO=delivered@resend.dev, el email de tu cuenta Resend, o verificá dominio y RESEND_FROM_EMAIL.`
-        );
-      }
     }
   }
 
@@ -227,7 +200,7 @@ export async function notifyMarketplaceOrderEmail(p: MarketplaceOrderEmailPayloa
       loggedResendDeliveryHint = true;
       // eslint-disable-next-line no-console
       console.log(
-        `[email] Entrega: el log anterior es la respuesta OK de Resend, no garantiza que ${to} lo tenga en la bandeja. Revisá spam, filtros de Google/Microsoft, y en https://resend.com/emails el estado (delivered / bounced). Sin dominio verificado, desde onboarding@resend.dev a menudo no llega a buzones externos.`
+        `[email] Entrega: el log anterior es la respuesta OK de Resend, no garantiza que ${to} lo tenga en la bandeja. Revisá spam, filtros de Google/Microsoft, y en https://resend.com/emails el estado (delivered / bounced).`
       );
     }
   } catch {
@@ -277,7 +250,7 @@ export async function notifyMarketplaceOrderGeneradaEmail(p: MarketplaceOrderEma
         <li><strong>Subtotal:</strong> ${subtotal}</li>
       </ul>
       <p style="margin:0">
-        <a href="${panelLink}" target="_blank" rel="noreferrer">Abrir panel de cotizaciones marketplace</a>
+        <a href="${panelLink}" target="_blank" rel="noreferrer">Abrir login de Tienda Online de Hashrate Space
       </p>
     </div>
   `.trim();
@@ -308,14 +281,8 @@ export async function notifyMarketplaceOrderGeneradaEmail(p: MarketplaceOrderEma
     return;
   }
 
-  const toLower = to.toLowerCase();
-  const isResendTestInbox = toLower.endsWith("@resend.dev");
-  if (from === RESEND_DEFAULT_ONBOARDING_FROM && !isResendTestInbox && !warnedOnboardingExternalTo) {
-    warnedOnboardingExternalTo = true;
-    // eslint-disable-next-line no-console
-    console.warn(
-      `[email] Enviando desde remitente de prueba (${from}) hacia ${to}. Resend a menudo no entrega a buzones externos en este modo. Si no llega: probá MARKETPLACE_NOTIFY_EMAIL_TO=delivered@resend.dev, el email de tu cuenta Resend, o verificá dominio y RESEND_FROM_EMAIL.`
-    );
+  if (!from) {
+    throw new Error("Definí RESEND_FROM_EMAIL con un remitente verificado (ej. noreply@mail.hashrate.space).");
   }
 
   // eslint-disable-next-line no-console
@@ -331,31 +298,12 @@ export async function notifyMarketplaceOrderGeneradaEmail(p: MarketplaceOrderEma
     html,
   });
 
-  if (!res.ok && res.status === 403 && sendFrom !== RESEND_DEFAULT_ONBOARDING_FROM) {
+  if (!res.ok && res.status === 403) {
     const detail403 = resendErrorDetail(bodyText);
     if (resend403UnverifiedFromDomain(detail403)) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        `[email] Resend rechazó el remitente (${sendFrom}): dominio no verificado. Reintentando con ${RESEND_DEFAULT_ONBOARDING_FROM}. Verificá tu dominio en https://resend.com/domains (p. ej. mail.hashrate.space) y usá From con ese dominio o comentá RESEND_FROM_EMAIL en .env.resend.local hasta entonces.`
+      throw new Error(
+        `Resend rechazó el remitente (${sendFrom}): dominio no verificado. Usá RESEND_FROM_EMAIL con @mail.hashrate.space.`
       );
-      sendFrom = RESEND_DEFAULT_ONBOARDING_FROM;
-      const second = await resendPostEmail({
-        apiKey,
-        from: sendFrom,
-        to,
-        subject,
-        text,
-        html,
-      });
-      res = second.res;
-      bodyText = second.bodyText;
-      if (sendFrom === RESEND_DEFAULT_ONBOARDING_FROM && !isResendTestInbox && !warnedOnboardingExternalTo) {
-        warnedOnboardingExternalTo = true;
-        // eslint-disable-next-line no-console
-        console.warn(
-          `[email] Enviando desde remitente de prueba (${sendFrom}) hacia ${to}. Resend a menudo no entrega a buzones externos en este modo. Si no llega: probá MARKETPLACE_NOTIFY_EMAIL_TO=delivered@resend.dev, el email de tu cuenta Resend, o verificá dominio y RESEND_FROM_EMAIL.`
-        );
-      }
     }
   }
 
@@ -372,7 +320,7 @@ export async function notifyMarketplaceOrderGeneradaEmail(p: MarketplaceOrderEma
       loggedResendDeliveryHint = true;
       // eslint-disable-next-line no-console
       console.log(
-        `[email] Entrega: el log anterior es la respuesta OK de Resend, no garantiza que ${to} lo tenga en la bandeja. Revisá spam, filtros de Google/Microsoft, y en https://resend.com/emails el estado (delivered / bounced). Sin dominio verificado, desde onboarding@resend.dev a menudo no llega a buzones externos.`
+        `[email] Entrega: el log anterior es la respuesta OK de Resend, no garantiza que ${to} lo tenga en la bandeja. Revisá spam, filtros de Google/Microsoft, y en https://resend.com/emails el estado (delivered / bounced).`
       );
     }
   } catch {

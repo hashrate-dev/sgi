@@ -50,7 +50,11 @@ async function main() {
     process.exit(1);
   }
 
-  const from = (merged.RESEND_FROM_EMAIL || "").trim() || "onboarding@resend.dev";
+  const from = (merged.RESEND_FROM_EMAIL || "").trim();
+  if (!from) {
+    console.error("Falta RESEND_FROM_EMAIL en .env/.env.resend.local (ej. Hashrate Space <noreply@mail.hashrate.space>).");
+    process.exit(1);
+  }
   const to = "delivered@resend.dev";
 
   const res = await fetch("https://api.resend.com/emails", {

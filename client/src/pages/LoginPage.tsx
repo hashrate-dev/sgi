@@ -73,8 +73,9 @@ export function LoginPage() {
     }
     setResetBusy(true);
     try {
-      const r = await requestPasswordReset(username.trim());
-      setResetMsg(r.message || "Te enviamos un enlace para restablecer la contraseña.");
+      await requestPasswordReset(username.trim(), "sgi");
+      // En el login no mostramos detalles sensibles (token/URL de desarrollo).
+      setResetMsg("Te enviamos un enlace para restablecer la contraseña. Revisá tu correo (incluido spam).");
     } catch (err) {
       setResetMsg("");
       setError(err instanceof Error ? err.message : "No se pudo iniciar el restablecimiento.");

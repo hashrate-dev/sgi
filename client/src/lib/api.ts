@@ -312,10 +312,13 @@ export function login(username: string, password: string): Promise<LoginResponse
 }
 
 /** Solicita enlace de restablecimiento. Si el correo no está en la BD → 404 `INVALID_EMAIL` / "MAIL INVALIDO". */
-export function requestPasswordReset(email: string): Promise<{ ok: boolean; message: string }> {
+export function requestPasswordReset(
+  email: string,
+  source?: "sgi" | "marketplace"
+): Promise<{ ok: boolean; message: string }> {
   return api<{ ok: boolean; message: string }>("/api/auth/password-reset-request", {
     method: "POST",
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, ...(source ? { source } : {}) }),
   });
 }
 

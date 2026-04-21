@@ -33,6 +33,18 @@ export function createApp() {
     })
   );
   const corsAllowlist = env.CORS_ORIGIN?.split(",").map((o) => o.trim()).filter(Boolean) ?? [];
+  const isLocalDevOrigin = (origin: string): boolean => {
+    if (env.NODE_ENV === "production") return false;
+    try {
+      const u = new URL(origin);
+      const isLocalHost = u.hostname === "localhost" || u.hostname === "127.0.0.1";
+      if (!isLocalHost) return false;
+      const p = Number.parseInt(u.port || "80", 10);
+      return Number.isFinite(p) && p >= 3000 && p <= 5999;
+    } catch {
+      return false;
+    }
+  };
   const defaultTrustedOrigins = new Set([
     "http://localhost:5173",
     "http://localhost:5174",
@@ -49,7 +61,7 @@ export function createApp() {
             if (!origin) return callback(null, true);
             if (corsAllowlist.includes(origin)) return callback(null, true);
             // Misma app con Vite: a veces abrís localhost:5173 y otras 127.0.0.1:5173; CORS_ORIGIN suele listar solo uno.
-            if (env.NODE_ENV !== "production" && defaultTrustedOrigins.has(origin)) return callback(null, true);
+            if (defaultTrustedOrigins.has(origin) || isLocalDevOrigin(origin)) return callback(null, true);
             callback(null, false);
           },
         }

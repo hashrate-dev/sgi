@@ -247,6 +247,39 @@ async function resolveTrustedQuoteLines(lines: QuoteLine[]): Promise<TrustedQuot
   const byId = new Map(rows.map((r) => [String(r.id), r] as const));
   const missing = ids.filter((id) => !byId.has(id));
   if (missing.length > 0) {
+    /**
+     * Tolerancia ante recargas/migraciones del catálogo:
+     * si cambió el `id` del equipo pero marca+modelo+hashrate coinciden, recuperamos la línea.
+     */
+    for (const missingId of missing) {
+      const sample = lines.find((l) => l.productId.trim() === missingId);
+      if (!sample) continue;
+      const brand = String(sample.brand ?? "").trim();
+      const model = String(sample.model ?? "").trim();
+      const hashrate = String(sample.hashrate ?? "").trim();
+      if (!brand || !model) continue;
+      const rowByIdentity = (await db
+        .prepare(
+          `SELECT id, marca_equipo, modelo, procesador, precio_usd, mp_hashrate_sell_enabled, mp_hashrate_parts_json, mp_price_label
+           FROM equipos_asic
+           WHERE LOWER(TRIM(marca_equipo)) = LOWER(TRIM(?))
+             AND LOWER(TRIM(modelo)) = LOWER(TRIM(?))
+             AND LOWER(TRIM(COALESCE(procesador, ''))) = LOWER(TRIM(?))
+           ORDER BY id DESC
+           LIMIT 1`
+        )
+        .get(brand, model, hashrate)) as ServerCatalogRow | undefined;
+      if (rowByIdentity) {
+        byId.set(missingId, rowByIdentity);
+      }
+    }
+  }
+  const unresolved = ids.filter((id) => !byId.has(id));
+  if (unresolved.length > 0) {
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.warn(`[quote-sync] productos no disponibles tras fallback por identidad: ${unresolved.join(", ")}`);
+    }
     throw new QuoteValidationError("Uno o más productos ya no están disponibles para cotizar.", 409);
   }
 

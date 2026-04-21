@@ -9,7 +9,6 @@ import { env } from "../config/env.js";
 import {
   effectiveResendFromEmail,
   normalizeResendApiKey,
-  RESEND_DEFAULT_ONBOARDING_FROM,
   resendApiKeyLooksInvalid,
 } from "../config/resendFrom.js";
 import { allocateNextTiendaOnlineClientCode, type TiendaSeqTx } from "../lib/tiendaOnlineClientCode.js";
@@ -156,6 +155,17 @@ function passwordResetRelayOnAnyFailure(): boolean {
   return v === "1" || v === "true" || v === "yes";
 }
 
+function passwordResetRelayGloballyDisabled(): boolean {
+  const v = String(process.env.PASSWORD_RESET_DISABLE_RELAY ?? "").trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes";
+}
+
+/** En local, relay a sales@ solo si lo pedís explícito (por defecto OFF: no mandamos copia a sales). */
+function passwordResetDevRelayEnabled(): boolean {
+  const v = String(process.env.PASSWORD_RESET_DEV_RELAY ?? "").trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes";
+}
+
 function passwordResetRelayInbox(): string {
   const explicit = String(process.env.PASSWORD_RESET_RESEND_RELAY_TO || "").trim().toLowerCase();
   if (explicit) return explicit;
@@ -164,7 +174,7 @@ function passwordResetRelayInbox(): string {
   return "sales@hashrate.space";
 }
 
-/** Remitente solo para reset (no pisa avisos marketplace). Si no hay override, usa el mismo criterio que el resto de Resend. */
+/** Remitente solo para reset (no pisa avisos marketplace). Si no hay override, usa RESEND_FROM_EMAIL. */
 function passwordResetFromAddress(): string {
   const explicit = String(process.env.PASSWORD_RESET_FROM_EMAIL || "").trim();
   if (explicit) return explicit;
@@ -249,7 +259,7 @@ async function sendPasswordResetEmail(to: string, resetUrl: string, meta?: Passw
   }
 
   const resendFromGlobal = String(process.env.RESEND_FROM_EMAIL || "").trim();
-  const fromCandidates = [fromInitial, resendFromGlobal, RESEND_DEFAULT_ONBOARDING_FROM]
+  const fromCandidates = [fromInitial, resendFromGlobal]
     .map((x) => x.trim())
     .filter((x, i, arr) => x.length > 0 && arr.findIndex((y) => y.toLowerCase() === x.toLowerCase()) === i);
 
@@ -277,15 +287,16 @@ async function sendPasswordResetEmail(to: string, resetUrl: string, meta?: Passw
   }
 
   /**
-   * Local: ante fallo Resend (salvo 401), relay al buzón del proyecto (modo prueba).
-   * Producción: **no** relay a sales salvo que lo actives (`PASSWORD_RESET_RELAY_ON_FAILURE=1` o
-   * `PASSWORD_RESET_RESEND_SANDBOX_RELAY=1` + error de prueba / remitente). Así el éxito implica entrega al usuario vía Resend o SMTP.
+   * Relay a sales@: nunca si PASSWORD_RESET_DISABLE_RELAY=1.
+   * Local: solo si PASSWORD_RESET_DEV_RELAY=1 (antes era automático y por eso solo veías sales@).
+   * Prod: PASSWORD_RESET_RELAY_ON_FAILURE=1 o PASSWORD_RESET_RESEND_SANDBOX_RELAY=1 + error de prueba/remitente.
    */
   const testingRecipientBlock = isResendTestingRecipientRestriction403(res.status, body);
   const trySandboxRelay =
     !res.ok &&
     res.status !== 401 &&
-    (env.NODE_ENV !== "production" ||
+    !passwordResetRelayGloballyDisabled() &&
+    ((env.NODE_ENV !== "production" && passwordResetDevRelayEnabled()) ||
       passwordResetRelayOnAnyFailure() ||
       (passwordResetSandboxRelayEnabled() &&
         (testingRecipientBlock || shouldTryNextPasswordResetFrom(res, body))));
@@ -298,7 +309,7 @@ async function sendPasswordResetEmail(to: string, resetUrl: string, meta?: Passw
       const relayText = `Solicitud de restablecimiento para la cuenta: ${to}\n\nAbrí este enlace (válido por ${PASSWORD_RESET_TTL_MINUTES} minutos):\n${resetUrl}\n\nSi no solicitaste este cambio, ignorá este correo. Podés responder para contactar a ${to}.\n`;
       const relayHtml = `<p>Restablecimiento de contraseña para la cuenta <strong>${escapeHtml(to)}</strong>.</p><p><a href="${resetUrl}">Restablecer contraseña</a> (válido por ${PASSWORD_RESET_TTL_MINUTES} minutos).</p><p>Si no solicitaste este cambio, ignorá este correo. Reply-to: ${escapeHtml(to)}</p>`;
       const preferredFrom = String(process.env.PASSWORD_RESET_FROM_EMAIL || "").trim();
-      const relayFromCandidates = [...new Set(["onboarding@resend.dev", preferredFrom, sendFrom].filter((x) => x.length > 0))];
+      const relayFromCandidates = [...new Set([preferredFrom, sendFrom].filter((x) => x.length > 0))];
       let lastRelayStatus = 0;
       let lastRelayBody = "";
       for (const rf of relayFromCandidates) {
@@ -554,6 +565,7 @@ authRouter.post("/auth/register-cliente", registerClienteRateLimit, async (req, 
 
 const PasswordResetRequestSchema = z.object({
   email: z.string().email().max(200),
+  source: z.enum(["sgi", "marketplace"]).optional(),
 });
 
 const PasswordResetConfirmSchema = z.object({
@@ -561,7 +573,7 @@ const PasswordResetConfirmSchema = z.object({
   password: z.string().min(6).max(100),
 });
 
-/** Solicitud de restablecimiento: valida que el correo exista; envía solo al correo indicado (sin reenvío salvo PASSWORD_RESET_RESEND_SANDBOX_RELAY). */
+/** Solicitud de restablecimiento: valida que el correo exista; relay a sales solo con flags (ver PASSWORD_RESET_DEV_RELAY en local). */
 authRouter.post("/auth/password-reset-request", loginRateLimit, async (req, res) => {
   const parsed = PasswordResetRequestSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -596,7 +608,9 @@ authRouter.post("/auth/password-reset-request", loginRateLimit, async (req, res)
       )
       .run(tokenHash, userId, emailNorm, exp.toISOString(), now.toISOString(), ip, ua);
     const origin = resolvePublicAppOrigin(req);
-    const resetUrl = `${origin}/reset-password?token=${encodeURIComponent(rawToken)}`;
+    const qp = new URLSearchParams({ token: rawToken });
+    if (parsed.data.source) qp.set("source", parsed.data.source);
+    const resetUrl = `${origin}/reset-password?${qp.toString()}`;
     try {
       await sendPasswordResetEmail(emailNorm, resetUrl, sendMeta);
     } catch (mailErr) {
@@ -626,9 +640,13 @@ authRouter.post("/auth/password-reset-request", loginRateLimit, async (req, res)
     const relayNote = sendMeta.sandboxRelayTo
       ? ` Revisá también ${sendMeta.sandboxRelayTo} si no ves el correo en ${emailNorm} (envío de respaldo en modo prueba Resend).`
       : "";
+    const devLinkNote =
+      env.NODE_ENV !== "production"
+        ? ` En desarrollo podés abrir este enlace directo: ${resetUrl}`
+        : "";
     return res.status(200).json({
       ok: true,
-      message: `Te enviamos un enlace para restablecer la contraseña. Revisá tu correo (incluido spam).${relayNote}`,
+      message: `Te enviamos un enlace para restablecer la contraseña. Revisá tu correo (incluido spam).${relayNote}${devLinkNote}`,
     });
   } catch (e) {
     console.error("password-reset-request:", e);

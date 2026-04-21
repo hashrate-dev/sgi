@@ -1,13 +1,17 @@
-import { useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { confirmPasswordReset, requestPasswordReset } from "../lib/api";
 import { MarketplacePasswordField } from "../components/marketplace/MarketplacePasswordField";
 import "../styles/facturacion.css";
 
 export function PasswordResetPage() {
   const [search] = useSearchParams();
+  const navigate = useNavigate();
   const token = (search.get("token") || "").trim();
+  const resetSource = (search.get("source") || "").trim().toLowerCase();
   const hasToken = token.length > 0;
+  const showSgiLoginLink = resetSource !== "marketplace";
+  const showMarketplaceLoginLink = resetSource !== "sgi";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -15,11 +19,20 @@ export function PasswordResetPage() {
   const [busy, setBusy] = useState(false);
   const [okMsg, setOkMsg] = useState("");
   const [errMsg, setErrMsg] = useState("");
+  const [resetDone, setResetDone] = useState(false);
 
   const pageTitle = useMemo(
     () => (hasToken ? "Restablecer contraseña" : "Recuperar acceso"),
     [hasToken]
   );
+
+  useEffect(() => {
+    if (!hasToken || !resetDone) return;
+    const t = window.setTimeout(() => {
+      navigate("/login", { replace: true });
+    }, 1200);
+    return () => window.clearTimeout(t);
+  }, [hasToken, resetDone, navigate]);
 
   async function submitRequest(e: React.FormEvent) {
     e.preventDefault();
@@ -44,6 +57,7 @@ export function PasswordResetPage() {
     e.preventDefault();
     setErrMsg("");
     setOkMsg("");
+    setResetDone(false);
     if (password.length < 6) {
       setErrMsg("La contraseña debe tener al menos 6 caracteres.");
       return;
@@ -56,6 +70,7 @@ export function PasswordResetPage() {
     try {
       await confirmPasswordReset(token, password);
       setOkMsg("Contraseña actualizada. Ya podés iniciar sesión.");
+      setResetDone(true);
       setPassword("");
       setPassword2("");
     } catch (err) {
@@ -118,25 +133,33 @@ export function PasswordResetPage() {
                     {okMsg}
                   </div>
                 ) : null}
-                <button type="submit" className="btn btn-primary w-100" disabled={busy}>
+                <button type="submit" className="btn btn-primary w-100" disabled={busy || resetDone}>
                   {busy
                     ? hasToken
                       ? "Actualizando..."
                       : "Enviando..."
+                    : resetDone
+                      ? "Redirigiendo al login..."
                     : hasToken
                       ? "Guardar nueva contraseña"
                       : "Enviar enlace por correo"}
                 </button>
               </form>
-              <p className="text-center small text-muted mt-3 mb-0">
-                <Link to="/login" className="text-decoration-none">
-                  Volver al login SGI
-                </Link>
-                <span className="mx-2">·</span>
-                <Link to="/marketplace/login" className="text-decoration-none">
-                  Login marketplace
-                </Link>
-              </p>
+              {(showSgiLoginLink || showMarketplaceLoginLink) && (
+                <p className="text-center small text-muted mt-3 mb-0">
+                  {showSgiLoginLink ? (
+                    <Link to="/login" className="text-decoration-none">
+                      Volver al login SGI
+                    </Link>
+                  ) : null}
+                  {showSgiLoginLink && showMarketplaceLoginLink ? <span className="mx-2">·</span> : null}
+                  {showMarketplaceLoginLink ? (
+                    <Link to="/marketplace/login" className="text-decoration-none">
+                      Login marketplace
+                    </Link>
+                  ) : null}
+                </p>
+              )}
             </div>
           </div>
         </div>

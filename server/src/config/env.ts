@@ -6,7 +6,6 @@ import dotenv from "dotenv";
 import {
   effectiveResendFromEmail,
   normalizeResendApiKey,
-  RESEND_DEFAULT_ONBOARDING_FROM,
   resendApiKeyLooksInvalid,
 } from "./resendFrom.js";
 
@@ -98,18 +97,12 @@ export const env: Env = EnvSchema.parse(process.env);
   if (apiKey && from && !badResendKey) {
     // eslint-disable-next-line no-console
     console.log(`[email] Avisos marketplace por email: activos (destino: ${to}, desde: ${from}).`);
-    if (!process.env.RESEND_FROM_EMAIL?.trim() && from === RESEND_DEFAULT_ONBOARDING_FROM) {
-      // eslint-disable-next-line no-console
-      console.log(
-        "[email] Si no llegan correos: con remitente de prueba Resend a veces solo se entrega a tu email de cuenta o hay que verificar dominio. Probá MARKETPLACE_NOTIFY_EMAIL_TO=tu_email@... (o delivered@resend.dev), revisá dashboard Resend → Emails y spam."
-      );
-    }
   } else if (devConsole) {
     // eslint-disable-next-line no-console
     console.log(
       badResendKey
         ? "[email] Avisos marketplace (desarrollo): clave Resend inválida — cada aviso se imprime en consola. Corregí RESEND_API_KEY (solo la clave re_… del dashboard de Resend)."
-        : `[email] Avisos marketplace (desarrollo): sin API key — cada aviso se imprime en consola (destino sería ${to}). Definí RESEND_API_KEY en .env.resend.local (npm run resend:init) o en .env.`
+        : `[email] Avisos marketplace (desarrollo): falta RESEND_API_KEY o RESEND_FROM_EMAIL — cada aviso se imprime en consola (destino sería ${to}). Definí ambos en .env.resend.local (npm run resend:init) o en .env.`
     );
   } else {
     // eslint-disable-next-line no-console
