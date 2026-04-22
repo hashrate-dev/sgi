@@ -24,6 +24,7 @@ const JWT_SECRET = env.JWT_SECRET;
 const PASSWORD_RESET_TTL_MINUTES = 30;
 const RESEND_API_URL = "https://api.resend.com/emails";
 let passwordResetStorageReady = false;
+type PasswordResetLang = "es" | "en" | "pt";
 const LoginSchema = z.object({ username: z.string().min(1).max(200), password: z.string().min(1) });
 const RegisterClienteSchema = z.object({
   email: z.string().email().max(200),
@@ -175,6 +176,67 @@ function passwordResetRelayInbox(): string {
   return "sales@hashrate.space";
 }
 
+function normalizePasswordResetLang(raw?: string | null): PasswordResetLang | null {
+  const v = String(raw || "").trim().toLowerCase();
+  if (!v) return null;
+  if (v.startsWith("pt")) return "pt";
+  if (v.startsWith("en")) return "en";
+  if (v.startsWith("es")) return "es";
+  return null;
+}
+
+function resolvePasswordResetLang(req: Request, preferred?: string | null): PasswordResetLang {
+  const explicit = normalizePasswordResetLang(preferred);
+  if (explicit) return explicit;
+  const hdr = String(req.headers["accept-language"] || "").trim();
+  const first = hdr.split(",")[0]?.trim() || "";
+  const byHeader = normalizePasswordResetLang(first);
+  if (byHeader) return byHeader;
+  return "es";
+}
+
+function passwordResetEmailCopy(lang: PasswordResetLang): {
+  subject: string;
+  headline: string;
+  lead: string;
+  cta: string;
+  validity: string;
+  ignore: string;
+  plainText: string;
+} {
+  if (lang === "en") {
+    return {
+      subject: "Reset your password - Hashrate Space",
+      headline: "Reset your password",
+      lead: "We received a request to reset your account password.",
+      cta: "Reset password",
+      validity: `This link expires in ${PASSWORD_RESET_TTL_MINUTES} minutes.`,
+      ignore: "If you did not request this change, you can safely ignore this email.",
+      plainText: `We received a request to reset your account password.\n\nOpen this link (valid for ${PASSWORD_RESET_TTL_MINUTES} minutes):\n`,
+    };
+  }
+  if (lang === "pt") {
+    return {
+      subject: "Redefinir senha - Hashrate Space",
+      headline: "Redefinir sua senha",
+      lead: "Recebemos uma solicitacao para redefinir a senha da sua conta.",
+      cta: "Redefinir senha",
+      validity: `Este link expira em ${PASSWORD_RESET_TTL_MINUTES} minutos.`,
+      ignore: "Se voce nao solicitou essa alteracao, pode ignorar este e-mail com seguranca.",
+      plainText: `Recebemos uma solicitacao para redefinir a senha da sua conta.\n\nAbra este link (valido por ${PASSWORD_RESET_TTL_MINUTES} minutos):\n`,
+    };
+  }
+  return {
+    subject: "Restablecer contrasena - Hashrate Space",
+    headline: "Restablecer tu contrasena",
+    lead: "Recibimos una solicitud para restablecer la contrasena de tu cuenta.",
+    cta: "Restablecer contrasena",
+    validity: `Este enlace expira en ${PASSWORD_RESET_TTL_MINUTES} minutos.`,
+    ignore: "Si no solicitaste este cambio, podes ignorar este correo.",
+    plainText: `Recibimos una solicitud para restablecer tu contrasena.\n\nAbri este enlace (valido por ${PASSWORD_RESET_TTL_MINUTES} minutos):\n`,
+  };
+}
+
 /** Remitente solo para reset (no pisa avisos marketplace). Si no hay override, usa RESEND_FROM_EMAIL. */
 function passwordResetFromAddress(): string {
   const explicitRaw = String(process.env.PASSWORD_RESET_FROM_EMAIL || "").trim();
@@ -217,10 +279,35 @@ async function tryPasswordResetSmtpFallback(to: string, subject: string, text: s
 
 type PasswordResetSendMeta = { sandboxRelayTo?: string };
 
-async function sendPasswordResetEmail(to: string, resetUrl: string, meta?: PasswordResetSendMeta): Promise<void> {
-  const subject = "Recuperar contraseña · Hashrate Space";
-  const text = `Recibimos una solicitud para restablecer tu contraseña.\n\nAbrí este enlace (válido por ${PASSWORD_RESET_TTL_MINUTES} minutos):\n${resetUrl}\n\nSi no solicitaste este cambio, podés ignorar este correo.`;
-  const html = `<p>Recibimos una solicitud para restablecer tu contraseña.</p><p><a href="${resetUrl}">Restablecer contraseña</a> (válido por ${PASSWORD_RESET_TTL_MINUTES} minutos).</p><p>Si no solicitaste este cambio, podés ignorar este correo.</p>`;
+async function sendPasswordResetEmail(
+  to: string,
+  resetUrl: string,
+  lang: PasswordResetLang,
+  meta?: PasswordResetSendMeta
+): Promise<void> {
+  const copy = passwordResetEmailCopy(lang);
+  const subject = copy.subject;
+  const text = `${copy.plainText}${resetUrl}\n\n${copy.ignore}`;
+  const html = `
+    <div style="margin:0;padding:24px;background:#ffffff;font-family:Inter,Segoe UI,Arial,sans-serif;color:#000000">
+      <div style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #d1d5db;border-radius:16px;overflow:hidden">
+        <div style="padding:24px 28px 14px;background:#ffffff">
+          <img src="https://hashrate.space/wp-content/uploads/hashrate-LOGO.png" alt="Hashrate Space" style="height:44px;width:auto;display:block" />
+        </div>
+        <div style="padding:8px 28px 26px">
+          <h1 style="margin:0 0 12px;font-size:30px;line-height:1.15;color:#000000">${escapeHtml(copy.headline)}</h1>
+          <p style="margin:0 0 20px;font-size:16px;line-height:1.6;color:#000000">${escapeHtml(copy.lead)}</p>
+          <a
+            href="${resetUrl}"
+            style="display:inline-block;background:#16a34a;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;line-height:1;padding:13px 20px;border-radius:10px"
+          >${escapeHtml(copy.cta)}</a>
+          <hr style="border:none;border-top:1px solid #d1d5db;margin:24px 0 16px" />
+          <p style="margin:0 0 8px;font-size:13px;line-height:1.5;color:#000000">${escapeHtml(copy.validity)}</p>
+          <p style="margin:0;font-size:13px;line-height:1.5;color:#000000">${escapeHtml(copy.ignore)}</p>
+        </div>
+      </div>
+    </div>
+  `.trim();
 
   /**
    * SMTP (Workspace, etc.) entrega al correo que pidió el reset. En prod y en local va **antes** que Resend
@@ -572,6 +659,7 @@ authRouter.post("/auth/register-cliente", registerClienteRateLimit, async (req, 
 const PasswordResetRequestSchema = z.object({
   email: z.string().email().max(200),
   source: z.enum(["sgi", "marketplace"]).optional(),
+  lang: z.enum(["es", "en", "pt"]).optional(),
 });
 
 const PasswordResetConfirmSchema = z.object({
@@ -588,6 +676,7 @@ authRouter.post("/auth/password-reset-request", loginRateLimit, async (req, res)
     });
   }
   const emailNorm = parsed.data.email.trim().toLowerCase();
+  const locale = resolvePasswordResetLang(req, parsed.data.lang);
   try {
     await ensurePasswordResetStorage();
     const sendMeta: PasswordResetSendMeta = {};
@@ -616,9 +705,10 @@ authRouter.post("/auth/password-reset-request", loginRateLimit, async (req, res)
     const origin = resolvePublicAppOrigin(req);
     const qp = new URLSearchParams({ token: rawToken });
     if (parsed.data.source) qp.set("source", parsed.data.source);
+    qp.set("lang", locale);
     const resetUrl = `${origin}/reset-password?${qp.toString()}`;
     try {
-      await sendPasswordResetEmail(emailNorm, resetUrl, sendMeta);
+      await sendPasswordResetEmail(emailNorm, resetUrl, locale, sendMeta);
     } catch (mailErr) {
       console.error("[auth] password-reset-request email:", mailErr);
       const mailMsg = mailErr instanceof Error ? mailErr.message : String(mailErr);

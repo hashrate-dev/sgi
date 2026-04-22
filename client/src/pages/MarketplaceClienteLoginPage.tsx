@@ -13,7 +13,7 @@ import "../styles/facturacion.css";
 const HASHRATE_LOGO = "https://hashrate.space/wp-content/uploads/hashrate-LOGO.png";
 
 export function MarketplaceClienteLoginPage() {
-  const { t, tf } = useMarketplaceLang();
+  const { t, tf, lang } = useMarketplaceLang();
   const { user, loading, login, logout } = useAuth();
   const location = useLocation();
   const fromQuote = (location.state as { from?: string } | null)?.from === "quote";
@@ -120,7 +120,7 @@ export function MarketplaceClienteLoginPage() {
     }
     setResetBusy(true);
     try {
-      await requestPasswordReset(email.trim(), "marketplace");
+      await requestPasswordReset(email.trim(), "marketplace", lang);
       // En el login no mostramos detalles sensibles (token/URL de desarrollo).
       setResetMsg(t("login.forgot_success"));
     } catch (err) {
