@@ -115,18 +115,21 @@ export function MarketplaceClienteLoginPage() {
     setError("");
     setResetMsg("");
     if (!email.trim()) {
-      setError("Ingresá tu correo para enviarte el enlace de recuperación.");
+      setError(t("login.forgot_email_required"));
       return;
     }
     setResetBusy(true);
     try {
       await requestPasswordReset(email.trim(), "marketplace");
       // En el login no mostramos detalles sensibles (token/URL de desarrollo).
-      setResetMsg("Te enviamos un enlace para restablecer la contraseña. Revisá tu correo (incluido spam).");
+      setResetMsg(t("login.forgot_success"));
     } catch (err) {
       setResetMsg("");
-      const raw = err instanceof Error ? err.message : "No se pudo iniciar el restablecimiento.";
-      setError(raw.toUpperCase().includes("MAIL INVALIDO") ? "MAIL INVALIDO" : "No pudimos enviar el enlace en este momento. Probá nuevamente en unos minutos.");
+      const raw = err instanceof Error ? err.message : t("login.forgot_err_start");
+      const upper = raw.toUpperCase();
+      const mailInvalid =
+        upper.includes("MAIL INVALIDO") || upper.includes("INVALID EMAIL") || upper.includes("E-MAIL INVALID");
+      setError(mailInvalid ? t("login.forgot_err_mail_invalid") : t("login.forgot_err_send"));
     } finally {
       setResetBusy(false);
     }
@@ -150,7 +153,9 @@ export function MarketplaceClienteLoginPage() {
                 <div className="col-lg-5 col-md-7">
                   <div className="hrs-card hrs-auth-card p-4 market-login-page__form-card">
                     <img src={HASHRATE_LOGO} alt="Hashrate Space" className="hrs-auth-logo" />
-                    <p className="text-muted text-center mb-4 hrs-auth-lead">{forgotMode ? "Te enviaremos un enlace para crear una nueva contraseña." : t("login.intro")}</p>
+                    <p className="text-muted text-center mb-4 hrs-auth-lead">
+                      {forgotMode ? t("login.forgot_lead") : t("login.intro")}
+                    </p>
                     <form onSubmit={forgotMode ? handleForgotPasswordSubmit : (e) => void handleSubmit(e)}>
                       <div className="mb-3">
                         <input
@@ -189,7 +194,7 @@ export function MarketplaceClienteLoginPage() {
                             }}
                             disabled={resetBusy}
                           >
-                            Olvidé mi contraseña
+                            {t("login.forgot_password")}
                           </button>
                         </div>
                       ) : null}
@@ -210,8 +215,8 @@ export function MarketplaceClienteLoginPage() {
                       >
                         {forgotMode
                           ? resetBusy
-                            ? "Enviando..."
-                            : "Enviar enlace"
+                            ? t("login.forgot_sending")
+                            : t("login.forgot_send_link")
                           : !ready
                             ? t("login.preparing")
                             : submitting
@@ -228,7 +233,7 @@ export function MarketplaceClienteLoginPage() {
                             setForgotMode(false);
                           }}
                         >
-                          Volver al login
+                          {t("login.forgot_back")}
                         </button>
                       ) : null}
                     </form>

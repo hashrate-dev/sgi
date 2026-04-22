@@ -475,6 +475,17 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
   "login.back_shop": "Voltar à loja",
   "login.no_account": "Ainda não tem conta?",
   "login.register": "Cadastre-se",
+  "login.forgot_password": "Esqueci minha senha",
+  "login.forgot_lead": "Enviaremos um link para criar uma nova senha.",
+  "login.forgot_email_required": "Informe seu e-mail para receber o link de recuperação.",
+  "login.forgot_success":
+    "Enviamos um link para redefinir a senha. Verifique seu e-mail (incluindo o spam).",
+  "login.forgot_err_start": "Não foi possível iniciar a redefinição da senha.",
+  "login.forgot_err_send": "Não foi possível enviar o link agora. Tente novamente em alguns minutos.",
+  "login.forgot_err_mail_invalid": "E-mail inválido",
+  "login.forgot_sending": "Enviando…",
+  "login.forgot_send_link": "Enviar link",
+  "login.forgot_back": "Voltar ao login",
 
   "orders.loading": "",
   "orders.back": "← Voltar ao catálogo",

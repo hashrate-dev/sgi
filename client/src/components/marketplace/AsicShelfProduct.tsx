@@ -122,7 +122,7 @@ export function AsicShelfProduct({
               <span className="shelf-product__price-locked-main">{lockedPriceLabel}</span>
               <span className="shelf-product__price-locked-hint">{lockedPriceHint}</span>
               <Link
-                to="/marketplace?login=1"
+                to="/marketplace/login"
                 className="shelf-product__price-locked-cta"
                 aria-label={lockedPriceCta}
               >
