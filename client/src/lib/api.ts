@@ -533,6 +533,74 @@ export function deleteAllClients(): Promise<void> {
   return api<void>("/api/clients-all", { method: "DELETE" });
 }
 
+export type HostingFxOperationType = "usdt_to_usd" | "usd_to_usdt";
+export type HostingFxUsdtSide = "buy_usdt" | "sell_usdt";
+export type HostingFxDeliveryMethod = "usd_to_bank" | "usdt_to_hrs_binance";
+
+export type HostingFxOperation = {
+  id: number;
+  ticketCode?: string;
+  clientId: number;
+  operationDate: string;
+  operationAmount: number;
+  operationType: HostingFxOperationType;
+  hrsCommissionPct: number;
+  bankFeeAmount: number;
+  deliveryMethod: HostingFxDeliveryMethod;
+  clientTotalPayment: number;
+  bankName: string;
+  accountNumber: string;
+  currency: string;
+  bankBranch: string;
+  accountHolderName: string;
+  usdtSide: HostingFxUsdtSide;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  clientCode?: string;
+  clientName?: string;
+  clientLastName?: string;
+};
+
+export type HostingFxOperationPayload = {
+  clientId: number;
+  operationDate: string;
+  operationAmount: number;
+  hrsCommissionPct: number;
+  bankFeeAmount: number;
+  deliveryMethod: HostingFxDeliveryMethod;
+  clientTotalPayment?: number;
+  bankName: string;
+  accountNumber: string;
+  currency: string;
+  bankBranch: string;
+  accountHolderName: string;
+  usdtSide: HostingFxUsdtSide;
+  notes?: string;
+};
+
+export function getHostingFxOperations(): Promise<{ operations: HostingFxOperation[] }> {
+  return api<{ operations: HostingFxOperation[] }>("/api/hosting/fx-operations");
+}
+
+export function createHostingFxOperation(body: HostingFxOperationPayload): Promise<{ ok: boolean }> {
+  return api<{ ok: boolean }>("/api/hosting/fx-operations", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateHostingFxOperation(id: number, body: Partial<HostingFxOperationPayload>): Promise<{ ok: boolean }> {
+  return api<{ ok: boolean }>(`/api/hosting/fx-operations/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+export function deleteHostingFxOperation(id: number): Promise<{ ok: boolean }> {
+  return api<{ ok: boolean }>(`/api/hosting/fx-operations/${id}`, { method: "DELETE" });
+}
+
 /** Crear factura/recibo/NC en la base de datos (numeración única, no se repiten). */
 export type InvoiceCreateBody = {
   number?: string; /* opcional: el servidor genera el número */

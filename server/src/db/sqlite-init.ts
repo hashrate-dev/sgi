@@ -258,6 +258,70 @@ CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_recorded ON marketplace_presence
 CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_visitor ON marketplace_presence_history(visitor_id, recorded_at DESC);
 `);
 
+  db.exec(`
+CREATE TABLE IF NOT EXISTS hosting_fx_operations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  client_id INTEGER NOT NULL,
+  operation_date TEXT NOT NULL,
+  operation_amount REAL NOT NULL DEFAULT 0,
+  operation_type TEXT NOT NULL CHECK (operation_type IN ('usdt_to_usd', 'usd_to_usdt')),
+  hrs_commission_pct REAL NOT NULL DEFAULT 0,
+  bank_fee_amount REAL NOT NULL DEFAULT 0,
+  delivery_method TEXT NOT NULL DEFAULT 'usd_to_bank' CHECK (delivery_method IN ('usd_to_bank', 'usdt_to_hrs_binance')),
+  client_total_payment REAL NOT NULL DEFAULT 0,
+  bank_name TEXT NOT NULL,
+  account_number TEXT NOT NULL,
+  currency TEXT NOT NULL,
+  bank_branch TEXT NOT NULL,
+  account_holder_name TEXT NOT NULL DEFAULT '',
+  ticket_code TEXT,
+  usdt_side TEXT NOT NULL CHECK (usdt_side IN ('buy_usdt', 'sell_usdt')),
+  notes TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (client_id) REFERENCES clients(id)
+);
+CREATE INDEX IF NOT EXISTS idx_hosting_fx_op_date ON hosting_fx_operations(operation_date DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_hosting_fx_client ON hosting_fx_operations(client_id, operation_date DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_hosting_fx_ticket_code_unique ON hosting_fx_operations(ticket_code);
+`);
+  try {
+    db.exec("ALTER TABLE hosting_fx_operations ADD COLUMN operation_amount REAL NOT NULL DEFAULT 0");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+  try {
+    db.exec("ALTER TABLE hosting_fx_operations ADD COLUMN bank_fee_amount REAL NOT NULL DEFAULT 0");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+  try {
+    db.exec("ALTER TABLE hosting_fx_operations ADD COLUMN delivery_method TEXT NOT NULL DEFAULT 'usd_to_bank'");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+  try {
+    db.exec("ALTER TABLE hosting_fx_operations ADD COLUMN account_holder_name TEXT NOT NULL DEFAULT ''");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+  try {
+    db.exec("ALTER TABLE hosting_fx_operations ADD COLUMN ticket_code TEXT");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_hosting_fx_ticket_code_unique ON hosting_fx_operations(ticket_code)");
+  db.exec(`CREATE TABLE IF NOT EXISTS hosting_fx_ticket_seq (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    next_num INTEGER NOT NULL
+  )`);
+  db.prepare("INSERT OR IGNORE INTO hosting_fx_ticket_seq (id, next_num) VALUES (1, 100)").run();
+
   db.exec(`CREATE TABLE IF NOT EXISTS tienda_online_client_seq (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     next_code_num INTEGER NOT NULL

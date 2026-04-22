@@ -2016,6 +2016,606 @@ a.fact-logo-container--link:focus-visible {
   border-bottom: none;
 }
 
+/* Listado operaciones de cambio USDT/USD (Hosting) — indicadores y tabla */
+.hosting-fx-ops-indicators {
+  --fx-kpi-gutter: 1.25rem;
+  --fx-kpi-gutter-r: 1.5rem;
+  padding: 0;
+  overflow: visible;
+}
+.hosting-fx-ops-indicators__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 1.25rem;
+  align-items: stretch;
+  overflow: visible;
+}
+@media (min-width: 1200px) {
+  .hosting-fx-ops-indicators__grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (max-width: 767.98px) {
+  .hosting-fx-ops-indicators__grid {
+    grid-template-columns: 1fr;
+  }
+}
+.hosting-fx-ops-metric {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  margin: 0;
+  padding: 1.15rem var(--fx-kpi-gutter-r) 1.2rem;
+  background: #fff;
+  border: 1px solid #e8ecf0;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(15, 23, 42, 0.02) inset;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  overflow: visible;
+}
+@media (hover: hover) and (pointer: fine) {
+  .hosting-fx-ops-metric:hover {
+    border-color: #dce3ea;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.07);
+  }
+}
+.hosting-fx-ops-metric--profit {
+  background: linear-gradient(180deg, #fbfffe 0%, #fff 32%);
+  border-color: #e0ebe5;
+  border-left: 3px solid #2D5D46;
+}
+.hosting-fx-ops-metric--count {
+  background: linear-gradient(180deg, #fafbfc 0%, #fff 32%);
+  border-color: #e5e8ec;
+  border-left: 3px solid #64748b;
+}
+/* Flujos USDT/USD: venta (USDT→USD) y compra (USD→USDT) — misma base verde */
+.hosting-fx-ops-metric--sell,
+.hosting-fx-ops-metric--buy {
+  background: linear-gradient(180deg, #f6fdf9 0%, #fff 32%);
+  border-color: #d1e3d9;
+  border-left: 3px solid #2D5D46;
+}
+.hosting-fx-ops-metric__top {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  margin-bottom: 0.1rem;
+}
+.hosting-fx-ops-metric__icon {
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+.hosting-fx-ops-metric--profit .hosting-fx-ops-metric__icon {
+  background: linear-gradient(145deg, #ecfdf3 0%, #d1fae0 100%);
+  color: #0d6840;
+  box-shadow: 0 1px 0 rgba(13, 104, 64, 0.08) inset;
+}
+.hosting-fx-ops-metric--count .hosting-fx-ops-metric__icon {
+  background: linear-gradient(145deg, #f1f5f9 0%, #e2e8f0 100%);
+  color: #334155;
+  box-shadow: 0 1px 0 rgba(51, 65, 85, 0.07) inset;
+}
+.hosting-fx-ops-metric--sell .hosting-fx-ops-metric__icon,
+.hosting-fx-ops-metric--buy .hosting-fx-ops-metric__icon {
+  background: linear-gradient(145deg, #ecfdf3 0%, #a7f3d0 100%);
+  color: #14532d;
+  box-shadow: 0 1px 0 rgba(20, 83, 45, 0.12) inset;
+}
+.hosting-fx-ops-metric__intro {
+  min-width: 0;
+  flex: 1;
+}
+.hosting-fx-ops-metric__eyebrow {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+  line-height: 1.2;
+  margin-bottom: 0.2rem;
+}
+.hosting-fx-ops-metric--profit .hosting-fx-ops-metric__eyebrow {
+  color: #3d7a5e;
+}
+.hosting-fx-ops-metric--count .hosting-fx-ops-metric__eyebrow {
+  color: #5b6b7d;
+}
+.hosting-fx-ops-metric--sell .hosting-fx-ops-metric__eyebrow,
+.hosting-fx-ops-metric--buy .hosting-fx-ops-metric__eyebrow {
+  color: #2D5D46;
+}
+.hosting-fx-ops-metric__title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+.hosting-fx-ops-metric__title-with-info {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 0.1rem 0.25rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+.hosting-fx-ops-metric__title-with-info .hosting-fx-ops-metric__title {
+  flex: 1 1 min(0, 11rem);
+  min-width: 0;
+  padding-right: 0.1rem;
+}
+.hosting-fx-ops-metric__info-trig {
+  position: relative;
+  flex: 0 0 auto;
+  line-height: 1;
+  margin-top: 0.08rem;
+  align-self: flex-start;
+}
+.hosting-fx-ops-metric--sell .hosting-fx-ops-metric__info-btn,
+.hosting-fx-ops-metric--buy .hosting-fx-ops-metric__info-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(45, 93, 70, 0.1);
+  color: #1e4d2f;
+  font-size: 0.8rem;
+  line-height: 1;
+  cursor: help;
+  transition: color 0.15s, background 0.15s, box-shadow 0.15s;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.hosting-fx-ops-metric--sell .hosting-fx-ops-metric__info-btn .bi,
+.hosting-fx-ops-metric--buy .hosting-fx-ops-metric__info-btn .bi {
+  display: block;
+  margin-top: 1px;
+}
+.hosting-fx-ops-metric--sell .hosting-fx-ops-metric__info-btn:hover,
+.hosting-fx-ops-metric--sell .hosting-fx-ops-metric__info-btn:focus-visible,
+.hosting-fx-ops-metric--buy .hosting-fx-ops-metric__info-btn:hover,
+.hosting-fx-ops-metric--buy .hosting-fx-ops-metric__info-btn:focus-visible {
+  color: #11301f;
+  background: rgba(45, 93, 70, 0.18);
+  box-shadow: 0 0 0 2px rgba(45, 93, 70, 0.28);
+  outline: none;
+}
+.hosting-fx-ops-metric__info-bubble {
+  position: absolute;
+  z-index: 40;
+  right: 0;
+  left: auto;
+  bottom: calc(100% + 0.45rem);
+  width: max-content;
+  max-width: min(18.5rem, calc(100vw - 1.5rem));
+  margin: 0;
+  padding: 0.55rem 0.7rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: #0f172a;
+  text-align: left;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.12);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(4px);
+  transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s;
+}
+.hosting-fx-ops-metric__info-bubble::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  right: 0.55rem;
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid #fff;
+  filter: drop-shadow(0 1px 0 rgba(203, 213, 225, 0.8));
+}
+.hosting-fx-ops-metric__info-trig:hover .hosting-fx-ops-metric__info-bubble,
+.hosting-fx-ops-metric__info-trig:focus-within .hosting-fx-ops-metric__info-bubble {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+@media (max-width: 1199.98px) {
+  .hosting-fx-ops-metric__info-bubble {
+    right: auto;
+    left: 0;
+  }
+  .hosting-fx-ops-metric__info-bubble::after {
+    right: auto;
+    left: 0.55rem;
+  }
+}
+.hosting-fx-ops-metric__figure-stack {
+  margin: 0.65rem 0 0.45rem;
+}
+.hosting-fx-ops-metric__figure-stack .hosting-fx-ops-metric__figure {
+  margin: 0 0 0.12rem;
+}
+.hosting-fx-ops-metric__figure {
+  font-size: clamp(1.5rem, 2.4vw, 1.9rem);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  margin: 0.65rem 0 0.45rem;
+  padding: 0;
+  color: #0f3d24;
+  letter-spacing: -0.02em;
+}
+.hosting-fx-ops-metric__figure-sub {
+  font-size: clamp(0.9rem, 1.25vw, 1.05rem);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  margin: 0;
+  padding: 0;
+  letter-spacing: -0.02em;
+}
+.hosting-fx-ops-metric__figure-sub--transfer-usdt-neg {
+  color: #b91c1c;
+}
+.hosting-fx-ops-metric__figure-sub--transfer-usdt-neg .hosting-fx-ops-metric__unit {
+  color: #991b1b;
+  font-size: 0.58em;
+}
+.hosting-fx-ops-metric--profit .hosting-fx-ops-metric__figure {
+  color: #14532d;
+}
+.hosting-fx-ops-metric__figure--count {
+  color: #0f172a;
+  font-size: clamp(1.5rem, 2.4vw, 1.85rem);
+}
+.hosting-fx-ops-metric__figure--usdt {
+  color: #0f172a;
+  font-size: clamp(1.25rem, 2vw, 1.6rem);
+}
+.hosting-fx-ops-metric--sell .hosting-fx-ops-metric__figure--usdt,
+.hosting-fx-ops-metric--buy .hosting-fx-ops-metric__figure--usdt {
+  color: #14532d;
+}
+.hosting-fx-ops-metric__unit {
+  display: inline;
+  font-size: 0.55em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  text-transform: uppercase;
+  vertical-align: 0.08em;
+  margin-left: 0.1em;
+}
+.hosting-fx-ops-metric--sell .hosting-fx-ops-metric__unit,
+.hosting-fx-ops-metric--buy .hosting-fx-ops-metric__unit {
+  color: #3d6b4f;
+}
+.hosting-fx-ops-metric__loading {
+  color: #94a3b8;
+  font-size: 0.95em;
+  font-weight: 500;
+}
+.hosting-fx-ops-table-wrap {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  overflow: auto;
+  max-height: min(62vh, 520px);
+  background: #fff;
+  width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+.hosting-fx-ops-table {
+  width: 100%;
+  min-width: 1200px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.875rem;
+  table-layout: auto;
+}
+.hosting-fx-ops-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #2D5D46;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.7rem 0.55rem;
+  text-align: left;
+  vertical-align: middle;
+  border: 1px solid #2D5D46;
+  border-top: none;
+  border-bottom: none;
+  white-space: nowrap;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.12);
+}
+.hosting-fx-ops-table thead th.hosting-fx-ops-th--end,
+.hosting-fx-ops-table td.hosting-fx-ops-td--end {
+  text-align: right;
+}
+.hosting-fx-ops-table thead th.hosting-fx-ops-th--center,
+.hosting-fx-ops-table td.hosting-fx-ops-td--center {
+  text-align: center;
+}
+.hosting-fx-ops-table tbody td {
+  padding: 0.5rem 0.55rem;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: middle;
+  color: #334155;
+  background: #fff;
+}
+.hosting-fx-ops-table tbody tr:nth-child(even) td {
+  background: #f8fafc;
+}
+.hosting-fx-ops-table tbody tr:hover td {
+  background: #f0fdf4;
+}
+.hosting-fx-ops-table .hosting-fx-ops-num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.hosting-fx-ops-table .hosting-fx-ops-actions {
+  min-width: 11.5rem;
+}
+/* Acciones: misma lógica visual que la referencia (i azul, documento verde, papelera) */
+.hosting-fx-ops-icon-row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+.hosting-fx-ops-icon-btn {
+  width: 1.75rem;
+  height: 1.75rem;
+  min-width: 1.75rem;
+  min-height: 1.75rem;
+  padding: 0;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  border-radius: 5px;
+  border: 2px solid transparent;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  font: inherit;
+  font-size: 0.7rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.hosting-fx-ops-icon-btn:focus-visible {
+  outline: 2px solid #0f172a;
+  outline-offset: 2px;
+}
+.hosting-fx-ops-icon-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.16);
+  filter: brightness(1.05);
+}
+.hosting-fx-ops-icon-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+  transform: none;
+  filter: grayscale(0.1);
+  box-shadow: none;
+}
+.hosting-fx-ops-icon-btn--edit {
+  background: #fff9c4;
+  border-color: #d4c44a;
+  color: #5d4037;
+}
+.hosting-fx-ops-icon-btn--edit:hover:not(:disabled) {
+  background: #fff3a0;
+  border-color: #c4b23e;
+  color: #3e2723;
+}
+.hosting-fx-ops-icon-btn--info {
+  background: #2563eb;
+  border-color: #fef3c7;
+  color: #fff;
+}
+.hosting-fx-ops-icon-btn--info:hover:not(:disabled) {
+  background: #1d4ed8;
+  border-color: #fef9c3;
+  color: #fff;
+}
+.hosting-fx-ops-ico-info {
+  display: block;
+  font-weight: 800;
+  font-size: 0.85rem;
+  font-style: normal;
+  line-height: 1;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  margin-top: 1px;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
+  user-select: none;
+}
+.hosting-fx-ops-icon-btn--pdf {
+  background: #16a34a;
+  border-color: #b7e4c7;
+  color: #fff;
+}
+.hosting-fx-ops-icon-btn--pdf:hover:not(:disabled) {
+  background: #15803d;
+  border-color: #9fd9b0;
+  color: #fff;
+}
+.hosting-fx-ops-icon-btn--pdf .bi {
+  font-size: 0.9rem;
+}
+.hosting-fx-ops-icon-btn--delete {
+  background: #dc2626;
+  border-color: #fecaca;
+  color: #fff;
+}
+.hosting-fx-ops-icon-btn--delete:hover:not(:disabled) {
+  background: #b91c1c;
+  border-color: #fecaca;
+  color: #fff;
+}
+.hosting-fx-ops-icon-btn--delete .bi {
+  font-size: 0.8rem;
+}
+.hosting-fx-ops-icon-btn--edit .bi {
+  font-size: 0.68rem;
+}
+.hosting-fx-ops-table .hosting-fx-ops-actions-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: flex-end;
+  align-items: center;
+}
+@media (max-width: 991.98px) {
+  .hosting-fx-ops-table .hosting-fx-ops-actions-inner {
+    justify-content: center;
+  }
+}
+
+/* Modal ticket - operaciones de cambio */
+.hosting-fx-ticket-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2200;
+  background: rgba(15, 23, 42, 0.58);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.hosting-fx-ticket-modal-dialog {
+  width: min(920px, 96vw);
+  max-height: 98vh;
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.28);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.hosting-fx-ticket-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+  background: linear-gradient(135deg, #2d5d46 0%, #1f4a37 100%);
+}
+.hosting-fx-ticket-modal-eyebrow {
+  color: #b9f5cf;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+}
+.hosting-fx-ticket-modal-head h5 {
+  color: #fff;
+}
+.hosting-fx-ticket-modal-head .btn-outline-secondary {
+  color: #e2e8f0;
+  border-color: rgba(226, 232, 240, 0.7);
+}
+.hosting-fx-ticket-modal-head .btn-outline-secondary:hover {
+  color: #0f172a;
+  background: #e2e8f0;
+  border-color: #e2e8f0;
+}
+.hosting-fx-ticket-modal-body {
+  padding: 1rem 1.25rem 1.25rem;
+  overflow: auto;
+  background: linear-gradient(180deg, #effaf3 0%, #f8fafc 100%);
+}
+.hosting-fx-ticket-card {
+  border: 1px solid #cde8d8;
+  border-radius: 12px;
+  background: #fff;
+  padding: 1rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+.hosting-fx-ticket-details-col {
+  display: grid;
+  gap: 0.6rem;
+}
+.hosting-fx-ticket-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 1.25rem;
+  margin-bottom: 0.85rem;
+  padding-bottom: 0.35rem;
+}
+.hosting-fx-ticket-brand {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-height: 3.25rem;
+}
+.hosting-fx-ticket-brand-logo {
+  height: 64px;
+  width: auto;
+  max-width: min(100%, 280px);
+  display: block;
+  object-fit: contain;
+  object-position: left center;
+  filter: drop-shadow(0 2px 4px rgba(15, 23, 42, 0.1));
+}
+@media (max-width: 576px) {
+  .hosting-fx-ticket-brand-logo {
+    height: 52px;
+    max-width: 220px;
+  }
+  .hosting-fx-ticket-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .hosting-fx-ticket-card-header .d-flex.justify-content-end {
+    width: 100%;
+    justify-content: flex-start !important;
+  }
+}
+@media (max-width: 768px) {
+  .hosting-fx-ticket-modal-head {
+    padding: 0.85rem 1rem;
+  }
+  .hosting-fx-ticket-modal-body {
+    padding: 0.85rem 1rem 1rem;
+  }
+  .hosting-fx-ticket-card {
+    padding: 0.85rem;
+  }
+}
+
 /* Tabla Hosting 7 columnas: Servicio, Mes, CANTIDAD, PRECIO X EQ, DTO x EQ, Total, Acciones */
 .fact-detail-servicios-table.fact-table-hosting th:first-child,
 .fact-detail-servicios-table.fact-table-hosting td:first-child { width: 38%; min-width: 20rem; }

@@ -97,6 +97,42 @@ CREATE TABLE IF NOT EXISTS emitted_documents (
 );
 CREATE INDEX IF NOT EXISTS idx_emitted_source_at ON emitted_documents(source, emitted_at);
 
+CREATE TABLE IF NOT EXISTS hosting_fx_operations (
+  id BIGSERIAL PRIMARY KEY,
+  client_id INTEGER NOT NULL REFERENCES clients(id),
+  operation_date TEXT NOT NULL,
+  operation_amount DOUBLE PRECISION NOT NULL DEFAULT 0,
+  operation_type TEXT NOT NULL CHECK (operation_type IN ('usdt_to_usd', 'usd_to_usdt')),
+  hrs_commission_pct DOUBLE PRECISION NOT NULL DEFAULT 0,
+  bank_fee_amount DOUBLE PRECISION NOT NULL DEFAULT 0,
+  delivery_method TEXT NOT NULL DEFAULT 'usd_to_bank' CHECK (delivery_method IN ('usd_to_bank', 'usdt_to_hrs_binance')),
+  client_total_payment DOUBLE PRECISION NOT NULL DEFAULT 0,
+  bank_name TEXT NOT NULL,
+  account_number TEXT NOT NULL,
+  currency TEXT NOT NULL,
+  bank_branch TEXT NOT NULL,
+  account_holder_name TEXT NOT NULL DEFAULT '',
+  ticket_code TEXT,
+  usdt_side TEXT NOT NULL CHECK (usdt_side IN ('buy_usdt', 'sell_usdt')),
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_hosting_fx_op_date ON hosting_fx_operations(operation_date DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_hosting_fx_client ON hosting_fx_operations(client_id, operation_date DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_hosting_fx_ticket_code_unique ON hosting_fx_operations(ticket_code);
+ALTER TABLE hosting_fx_operations ADD COLUMN IF NOT EXISTS operation_amount DOUBLE PRECISION NOT NULL DEFAULT 0;
+ALTER TABLE hosting_fx_operations ADD COLUMN IF NOT EXISTS bank_fee_amount DOUBLE PRECISION NOT NULL DEFAULT 0;
+ALTER TABLE hosting_fx_operations ADD COLUMN IF NOT EXISTS delivery_method TEXT NOT NULL DEFAULT 'usd_to_bank';
+ALTER TABLE hosting_fx_operations ADD COLUMN IF NOT EXISTS account_holder_name TEXT NOT NULL DEFAULT '';
+ALTER TABLE hosting_fx_operations ADD COLUMN IF NOT EXISTS ticket_code TEXT;
+CREATE TABLE IF NOT EXISTS hosting_fx_ticket_seq (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  next_num BIGINT NOT NULL
+);
+INSERT INTO hosting_fx_ticket_seq (id, next_num) VALUES (1, 100)
+ON CONFLICT (id) DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS garantia_sequences (
   type TEXT PRIMARY KEY CHECK (type IN ('Recibo', 'Recibo Devolución')),
   last_number INTEGER NOT NULL DEFAULT 100

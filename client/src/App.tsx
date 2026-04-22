@@ -9,6 +9,7 @@ import { FacturacionPage } from "./pages/FacturacionPage";
 import { FacturacionMineriaPage } from "./pages/FacturacionMineriaPage";
 import { HostingHubPage } from "./pages/HostingHubPage";
 import { FacturasMesHostingPage } from "./pages/FacturasMesHostingPage";
+import { HostingExchangeOperationsPage } from "./pages/HostingExchangeOperationsPage";
 import { MineriaHubPage } from "./pages/MineriaHubPage";
 import { HistorialPage } from "./pages/HistorialPage";
 import { HistorialMineriaPage } from "./pages/HistorialMineriaPage";
@@ -382,6 +383,7 @@ function App() {
             <Route path="/marketplace/home-banners" element={<TiendaOnlineBannersHomePage />} />
             <Route path="/hosting" element={<HostingHubPage />} />
             <Route path="/hosting/email-flow" element={<FacturasMesHostingPage />} />
+            <Route path="/hosting/exchange-operations" element={<HostingExchangeOperationsPage />} />
             <Route path="/hosting/billing" element={<FacturacionPage />} />
             <Route path="/history" element={<HistorialPage />} />
             <Route path="/hosting/history" element={<HistorialPage sourceFilter="hosting" />} />
