@@ -71,6 +71,24 @@ function calcTotals(items: LineItem[]) {
   return { subtotal, discounts, total };
 }
 
+function isLinkedToInvoice(comp: Invoice, factura: Invoice): boolean {
+  const matchId = comp.relatedInvoiceId != null && String(comp.relatedInvoiceId) === String(factura.id);
+  const matchNumber = comp.relatedInvoiceNumber != null && comp.relatedInvoiceNumber === factura.number;
+  return matchId || matchNumber;
+}
+
+const INVOICE_BALANCE_EPS = 0.0001;
+
+/** Saldo pendiente de cobro: factura − NC vinculadas − recibos vinculados (permite NC parcial). */
+function invoicePendingCollectionAmount(factura: Invoice, all: Invoice[]): number {
+  const ncs = all.filter((inv) => inv.type === "Nota de Crédito" && isLinkedToInvoice(inv, factura));
+  const recibos = all.filter((inv) => inv.type === "Recibo" && isLinkedToInvoice(inv, factura));
+  const originalTotal = Math.abs(Number(factura.total) || 0);
+  const creditApplied = ncs.reduce((s, nc) => s + Math.abs(Number(nc.total) || 0), 0);
+  const paidApplied = recibos.reduce((s, r) => s + Math.abs(Number(r.total) || 0), 0);
+  return Math.max(0, originalTotal - creditApplied - paidApplied);
+}
+
 export function FacturacionMineriaPage() {
   const { user } = useAuth();
   const location = useLocation();
@@ -240,29 +258,13 @@ export function FacturacionMineriaPage() {
     );
   }, [invoices, selectedClient, type]);
 
-  // Obtener facturas sin recibo conectado y que no estén canceladas por NC (para recibos)
+  // Recibo: facturas del cliente con saldo pendiente (NC parcial + recibo del resto)
   const invoicesWithoutReceipt = useMemo(() => {
     if (!selectedClient || type !== "Recibo") return [];
-    // Obtener todas las facturas del cliente
     const facturas = invoices.filter(
       (inv) => inv.clientName === selectedClient.name && inv.type === "Factura"
     );
-    // Obtener IDs de facturas que ya tienen recibo conectado
-    const facturasConRecibo = new Set(
-      invoices
-        .filter((inv) => inv.type === "Recibo" && inv.relatedInvoiceId)
-        .map((inv) => inv.relatedInvoiceId)
-    );
-    // Obtener IDs de facturas canceladas por Nota de Crédito (no se puede hacer recibo)
-    const facturasCanceladasPorNC = new Set(
-      invoices
-        .filter((inv) => inv.type === "Nota de Crédito" && inv.relatedInvoiceId)
-        .map((inv) => inv.relatedInvoiceId)
-    );
-    // Filtrar: no tener recibo Y no estar cancelada por NC
-    return facturas.filter(
-      (inv) => !facturasConRecibo.has(inv.id) && !facturasCanceladasPorNC.has(inv.id)
-    );
+    return facturas.filter((f) => invoicePendingCollectionAmount(f, invoices) > INVOICE_BALANCE_EPS);
   }, [invoices, selectedClient, type]);
 
   // Limpiar factura relacionada cuando cambia el tipo o el cliente
@@ -412,11 +414,12 @@ export function FacturacionMineriaPage() {
       return;
     }
     if (type === "Recibo" && relatedInvoiceId) {
-      const facturaCanceladaPorNC = invoices.some(
-        (inv) => inv.type === "Nota de Crédito" && inv.relatedInvoiceId === relatedInvoiceId
-      );
-      if (facturaCanceladaPorNC) {
-        showToast("Esta factura fue cancelada con Nota de Crédito. No se puede crear un recibo para ella.", "error");
+      const factura = invoices.find((i) => i.type === "Factura" && String(i.id) === String(relatedInvoiceId)) ?? null;
+      if (factura && invoicePendingCollectionAmount(factura, invoices) <= INVOICE_BALANCE_EPS) {
+        showToast(
+          "Esta factura no tiene saldo pendiente de cobro (puede estar totalmente pagada o cancelada por nota(s) de crédito).",
+          "error"
+        );
         return;
       }
     }

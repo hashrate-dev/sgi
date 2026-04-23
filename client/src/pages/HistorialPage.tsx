@@ -6,7 +6,9 @@ import { serviceCatalog } from "../lib/constants";
 import { dispatchEmittedChanged } from "../lib/emittedEvents";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadInvoices, loadInvoicesAsic, saveInvoices, saveInvoicesAsic } from "../lib/storage";
-import type { ComprobanteType, Invoice } from "../lib/types";
+import type { ComprobanteType, Invoice, LineItem } from "../lib/types";
+import { buildReciboConceptLine, getReciboConceptParts } from "../lib/reciboConceptText";
+import { getReceiptSettlementRowKind, reciboHasSettlementRows, reciboIsPaymentLineSettledTable } from "../lib/receiptSettlementLine";
 import { PageHeader } from "../components/PageHeader";
 import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
@@ -723,6 +725,22 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
           }
           const loadedItems = apiItems.map((item) => {
             const serviceName = item.service || "";
+            const base: LineItem = {
+              serviceName: serviceName || "",
+              service: item.service,
+              month: item.month || inv.month,
+              quantity: item.quantity || 1,
+              price: item.price || 0,
+              discount: item.discount || 0,
+            };
+            const settlement = getReceiptSettlementRowKind(base);
+            if (settlement) {
+              return {
+                ...base,
+                reciboLineKind: settlement,
+                serviceName: serviceName || "Documento",
+              };
+            }
             const key = (["A", "B", "C", "D"] as const).find((k) => serviceCatalog[k].name === serviceName || serviceCatalog[k].price === item.price) ?? "A";
             return {
               serviceKey: key,
@@ -730,7 +748,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
               month: item.month || inv.month,
               quantity: item.quantity || 1,
               price: item.price || 0,
-              discount: item.discount || 0
+              discount: item.discount || 0,
             };
           });
           invoiceToUse = { ...inv, items: loadedItems };
@@ -785,6 +803,23 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
 
       // Validar y asegurar que los items tengan la estructura correcta
       const validItems = invoiceToUse.items.map((item) => {
+        const line: LineItem = {
+          ...item,
+          serviceName: item.serviceName || "",
+          service: item.service,
+        };
+        const settlement = line.reciboLineKind ?? getReceiptSettlementRowKind(line);
+        if (settlement) {
+          return {
+            reciboLineKind: settlement,
+            serviceName: item.serviceName || "Servicio",
+            service: item.service,
+            month: item.month || invoiceToUse.month,
+            quantity: item.quantity || 1,
+            price: item.price || 0,
+            discount: item.discount || 0,
+          };
+        }
         // Asegurar que serviceKey existe, si no, intentar inferirlo desde serviceName
         let serviceKey: "A" | "B" | "C" | "D" = (item.serviceKey as "A" | "B" | "C" | "D") || "A";
         if (!item.serviceKey && item.serviceName) {
@@ -797,7 +832,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
             serviceKey = "C";
           }
         }
-        
+
         return {
           serviceKey,
           serviceName: item.serviceName || "Servicio",
@@ -824,13 +859,31 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
       const relatedInvoiceNumberForPdf =
         invoiceToUse.type === "Nota de Crédito"
           ? invoiceToUse.relatedInvoiceNumber ?? relatedForNc?.number
-          : undefined;
+          : invoiceToUse.type === "Recibo"
+            ? invoiceToUse.relatedInvoiceNumber
+            : undefined;
       const inferredNcMode =
         invoiceToUse.type === "Nota de Crédito" && relatedForNc
           ? Math.abs(Math.abs(invoiceToUse.total) - Math.abs(relatedForNc.total)) < 0.0001
             ? "total"
             : "partial"
           : undefined;
+
+      let reciboConceptTextHistorial: string | undefined;
+      if (invoiceToUse.type === "Recibo" && reciboHasSettlementRows(validItems) && !reciboIsPaymentLineSettledTable(validItems)) {
+        const factura = sameSource.find((i) => {
+          if (i.type !== "Factura") return false;
+          if (invoiceToUse.relatedInvoiceId != null && String(invoiceToUse.relatedInvoiceId) !== "")
+            return String(i.id) === String(invoiceToUse.relatedInvoiceId);
+          if (invoiceToUse.relatedInvoiceNumber) return i.number === invoiceToUse.relatedInvoiceNumber;
+          return false;
+        });
+        if (factura) {
+          reciboConceptTextHistorial = buildReciboConceptLine(
+            getReciboConceptParts(factura, sameSource as Invoice[], { excludeReciboId: String(invoiceToUse.id) })
+          );
+        }
+      }
 
       // Generar el PDF
       const doc = generateFacturaPdf(
@@ -853,6 +906,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
           discounts: invoiceToUse.discounts || 0,
           total: invoiceToUse.total || 0,
           relatedInvoiceNumber: relatedInvoiceNumberForPdf,
+          reciboConceptText: reciboConceptTextHistorial,
           creditNoteMode: inferredNcMode
         },
         { logoBase64 }

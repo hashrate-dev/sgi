@@ -1,6 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import type { Client, ComprobanteType, LineItem } from "../lib/types";
 import { formatUSD } from "../lib/formatCurrency";
+import {
+  collapseLegacyReciboSettlementItemsForPdf,
+  getReceiptSettlementRowKind,
+  reciboIsPaymentLineSettledTable,
+} from "../lib/receiptSettlementLine";
 import { recibimosMontoEnDosLineas } from "../lib/numberToWords";
 import "../styles/invoice-preview.css";
 
@@ -54,6 +59,8 @@ interface InvoicePreviewProps {
   relatedInvoiceNumber?: string;
   /** Para Nota de Crédito: tipo de anulación respecto de la referencia. */
   creditNoteMode?: "partial" | "total";
+  /** Recibo: bloque de concepto (pago sobre factura + NC / recibos previos). */
+  reciboConceptText?: string;
 }
 
 export function InvoicePreview({
@@ -66,6 +73,7 @@ export function InvoicePreview({
   dueDateDays = 6,
   relatedInvoiceNumber,
   creditNoteMode,
+  reciboConceptText,
 }: InvoicePreviewProps) {
   const [logoSrc, setLogoSrc] = useState<string | null>(null);
 
@@ -91,6 +99,12 @@ export function InvoicePreview({
   vencimiento.setDate(vencimiento.getDate() + dueDateDays);
 
   const hasText = (s?: string) => Boolean(s && s.trim());
+
+  const displayItems = useMemo(
+    () => collapseLegacyReciboSettlementItemsForPdf(type, items, relatedInvoiceNumber),
+    [type, items, relatedInvoiceNumber]
+  );
+  const showReciboConceptBlock = type === "Recibo" && hasText(reciboConceptText) && !reciboIsPaymentLineSettledTable(displayItems);
 
   // Manejar nombres con guion para dividirlos en líneas
   const getClientNameLines = (name?: string): string[] => {
@@ -183,8 +197,12 @@ export function InvoicePreview({
           </div>
         )}
 
+        {showReciboConceptBlock && (
+          <div className="invoice-preview-recibo-concept">{String(reciboConceptText).trim()}</div>
+        )}
+
         {/* Tabla de ítems */}
-        {items.length > 0 && (
+        {displayItems.length > 0 && (
           <div className="invoice-preview-table-container">
             <table className="invoice-preview-table">
               <thead>
@@ -196,8 +214,51 @@ export function InvoicePreview({
                 </tr>
               </thead>
               <tbody>
-                {items.map((item, idx) => {
+                {displayItems.map((item, idx) => {
+                  const settlementKind = getReceiptSettlementRowKind(item);
                   const lineTotalServicio = item.price * item.quantity;
+
+                  if (settlementKind === "payment_line") {
+                    const desc = String(item.serviceName ?? "").trim() || "Pago";
+                    return (
+                      <React.Fragment key={idx}>
+                        <tr>
+                          <td className="invoice-preview-td-desc">{desc.substring(0, 80)}</td>
+                          <td className="invoice-preview-td-precio">{formatUSD(item.price)}</td>
+                          <td className="invoice-preview-td-cant">{item.quantity}</td>
+                          <td className="invoice-preview-td-total">{formatUSD(lineTotalServicio)}</td>
+                        </tr>
+                      </React.Fragment>
+                    );
+                  }
+                  if (settlementKind === "invoice_ref") {
+                    const desc = item.month ? `${item.serviceName ?? "Factura"} - ${ymToMonthYear(item.month)}` : (item.serviceName ?? "Factura");
+                    return (
+                      <React.Fragment key={idx}>
+                        <tr>
+                          <td className="invoice-preview-td-desc">{desc.substring(0, 80)}</td>
+                          <td className="invoice-preview-td-precio">{formatUSD(item.price)}</td>
+                          <td className="invoice-preview-td-cant">{item.quantity}</td>
+                          <td className="invoice-preview-td-total">{formatUSD(lineTotalServicio)}</td>
+                        </tr>
+                      </React.Fragment>
+                    );
+                  }
+                  if (settlementKind === "credit_note" || settlementKind === "prior_receipt") {
+                    const amt = item.discount * item.quantity;
+                    const desc = item.month ? `${item.serviceName ?? ""} - ${ymToMonthYear(item.month)}` : (item.serviceName ?? "");
+                    return (
+                      <React.Fragment key={idx}>
+                        <tr>
+                          <td className="invoice-preview-td-desc">{desc.substring(0, 80)}</td>
+                          <td className="invoice-preview-td-precio">—</td>
+                          <td className="invoice-preview-td-cant">{item.quantity}</td>
+                          <td className="invoice-preview-td-total">- {formatUSD(amt)}</td>
+                        </tr>
+                      </React.Fragment>
+                    );
+                  }
+
                   // Determinar la descripción: Setup, equipos ASIC, Garantía ANDE, servicios de Hosting
                   let desc = "";
                   if (item.setupId && item.setupNombre) {
@@ -225,7 +286,7 @@ export function InvoicePreview({
                         <td className="invoice-preview-td-cant">{item.quantity}</td>
                         <td className="invoice-preview-td-total">{formatUSD(lineTotalServicio)}</td>
                       </tr>
-                      {item.discount > 0 && (
+                      {item.discount > 0 && getReceiptSettlementRowKind(item) == null && (
                         <tr>
                           <td className="invoice-preview-td-desc">
                             {item.setupId && item.setupNombre
@@ -254,7 +315,7 @@ export function InvoicePreview({
         )}
 
         {/* Recibo / Recibo Devolución: "Recibimos la cantidad de..." o "Se devuelve la cantidad de..." */}
-        {items.length > 0 && (type === "Recibo" || type === "Recibo Devolución") && (() => {
+        {displayItems.length > 0 && (type === "Recibo" || type === "Recibo Devolución") && (() => {
           const { line1, line2 } = recibimosMontoEnDosLineas(total, type);
           const notaGuarani = "El monto que se devuelve puede ser distinto al monto contable, debido a que se ajusta por el valor del Guaraní a la fecha.";
           return (
@@ -272,7 +333,7 @@ export function InvoicePreview({
             </div>
           );
         })()}
-        {items.length > 0 && type !== "Recibo" && type !== "Recibo Devolución" && (
+        {displayItems.length > 0 && type !== "Recibo" && type !== "Recibo Devolución" && (
           <div className="invoice-preview-dates-wrap">
             {type === "Nota de Crédito" && relatedInvoiceNumber && (
               <div className="invoice-preview-credit-note-ref">
@@ -305,7 +366,7 @@ export function InvoicePreview({
         )}
 
         {/* Empty State */}
-        {items.length === 0 && (
+        {displayItems.length === 0 && (
           <div className="invoice-preview-empty">
             <p>Agregá ítems para ver la vista previa de la factura</p>
           </div>

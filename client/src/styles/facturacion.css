@@ -1348,6 +1348,10 @@ a.fact-logo-container--link:focus-visible {
   padding: 0.75rem 1rem 0.5rem;
   text-align: center;
   border-bottom: 2px solid rgba(0, 0, 0, 0.08);
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
+  line-height: 1.25;
 }
 
 .fact-summary-card-currency {
@@ -1368,6 +1372,7 @@ a.fact-logo-container--link:focus-visible {
   font-variant-numeric: tabular-nums;
   padding: 0.5rem 1rem 1.25rem;
   text-align: center;
+  white-space: nowrap;
 }
 
 /* Subtotal: mismo fondo */
@@ -1411,6 +1416,8 @@ a.fact-logo-container--link:focus-visible {
 
 /* Total: mismo fondo verde */
 .fact-summary-card--total {
+  flex: 1;
+  min-width: 160px;
   background: linear-gradient(145deg, #166534 0%, #2D5D46 50%, #14532d 100%);
   border: none;
   box-shadow: 0 6px 20px rgba(45, 93, 70, 0.4), 0 2px 8px rgba(0, 0, 0, 0.15);
@@ -1423,6 +1430,7 @@ a.fact-logo-container--link:focus-visible {
 .fact-summary-card--total .fact-summary-card-label {
   color: #fff;
   border-bottom-color: rgba(255, 255, 255, 0.25);
+  letter-spacing: 0.06em;
 }
 
 .fact-summary-card--total .fact-summary-card-currency {
@@ -1431,7 +1439,7 @@ a.fact-logo-container--link:focus-visible {
 
 .fact-summary-card--total .fact-summary-card-value {
   color: #fff;
-  font-size: 2rem;
+  font-size: clamp(1.4rem, 2.5vw, 1.95rem);
   font-weight: 800;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
@@ -1779,11 +1787,11 @@ a.fact-logo-container--link:focus-visible {
   line-height: 1.5;
 }
 
-/* Totales y botón Emitir dentro del panel verde (estilo Filtros) */
+/* Totales y botón Emitir: columna para no comprimir las tarjetas contra el botón */
 .fact-detail-servicios-summary {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 1rem;
   margin-top: 1.25rem;
   padding-top: 1.25rem;
@@ -1792,8 +1800,43 @@ a.fact-logo-container--link:focus-visible {
 
 .fact-detail-servicios-summary .fact-summary-cards {
   margin-top: 0;
-  flex: 1;
+  flex: none;
+  width: 100%;
   min-width: 0;
+}
+
+.fact-detail-servicios-summary .fact-detail-servicios-btn-emitir {
+  align-self: flex-end;
+}
+
+/* Franja explícita: NC / recibos ya descontados vs total del recibo */
+.fact-recibo-nc-adjust {
+  width: 100%;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem 1.25rem;
+  align-items: center;
+  padding: 0.65rem 1rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #fff;
+  font-size: 0.875rem;
+}
+
+.fact-recibo-nc-adjust__label {
+  opacity: 0.92;
+}
+
+.fact-recibo-nc-adjust__value {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.fact-recibo-nc-adjust__value--emph {
+  font-size: 1.05rem;
 }
 
 .fact-detail-servicios-btn-emitir {

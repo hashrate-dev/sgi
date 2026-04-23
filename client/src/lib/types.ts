@@ -1,5 +1,12 @@
 export type ComprobanteType = "Factura" | "Recibo" | "Recibo Devolución" | "Nota de Crédito";
 
+/** Líneas de recibo por liquidación (factura + NC / recibos previos), no detalle de producto. */
+export type ReciboSettlementLineKind =
+  | "invoice_ref"
+  | "credit_note"
+  | "prior_receipt"
+  | "payment_line";
+
 export type Client = {
   id?: number | string;
   code: string;
@@ -22,6 +29,8 @@ export type Client = {
 export type LineItem = {
   serviceKey?: "A" | "B" | "C" | "D"; // Para facturas de Hosting
   serviceName?: string; // Para facturas de Hosting
+  /** Respaldo del texto de API/DB (getInvoice) cuando no se copió a serviceName. */
+  service?: string;
   // Campos para equipos ASIC:
   equipoId?: string; // ID del equipo ASIC
   marcaEquipo?: string; // Marca del equipo
@@ -39,6 +48,8 @@ export type LineItem = {
   quantity: number;
   price: number;
   discount: number;
+  /** Solo recibos de hosting en modo liquidación (PDF / vista previa). */
+  reciboLineKind?: ReciboSettlementLineKind;
 };
 
 export type Invoice = {

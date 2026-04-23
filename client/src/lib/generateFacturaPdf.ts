@@ -2,6 +2,12 @@ import { jsPDF } from "jspdf";
 import type { ComprobanteType, LineItem } from "./types";
 import { formatUSD } from "./formatCurrency";
 import { recibimosMontoEnDosLineas } from "./numberToWords";
+import {
+  collapseLegacyReciboSettlementItemsForPdf,
+  countItemTableRows,
+  getReceiptSettlementRowKind,
+  reciboIsPaymentLineSettledTable,
+} from "./receiptSettlementLine";
 
 /** Colores HRS (verde marca) */
 const HRS_GREEN = { r: 0, g: 166, b: 82 };
@@ -58,6 +64,8 @@ export type FacturaPdfData = {
   relatedInvoiceNumber?: string;
   /** Para Nota de Crédito: tipo de anulación respecto de la referencia. */
   creditNoteMode?: "partial" | "total";
+  /** Recibo: explicación de pago sobre factura y NC / recibos previos (bloque bajo el cliente, antes de la tabla). */
+  reciboConceptText?: string;
 };
 
 export type FacturaPdfImages = {
@@ -102,6 +110,7 @@ const LOGO_HEIGHT_MM = 14; // Altura ajustada para mantener proporción (relaci�
  */
 export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImages): jsPDF {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const pdfItems = collapseLegacyReciboSettlementItemsForPdf(data.type, data.items, data.relatedInvoiceNumber);
   const now = data.date;
   const vencimiento = data.dueDate
     ? new Date(data.dueDate)
@@ -330,14 +339,30 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   y = yClientStart + hMax;
   if (hMax > 0) y += 10;
   y += 8; // separación antes de la tabla
+  if (data.type === "Recibo" && data.reciboConceptText?.trim() && !reciboIsPaymentLineSettledTable(pdfItems)) {
+    const concept = data.reciboConceptText.trim();
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9.5);
+    const maxW = TABLE_W - 6;
+    const lines = doc.splitTextToSize(concept, maxW) as string[];
+    const lineH = 4.0;
+    const padY = 3.5;
+    const boxH = Math.max(lines.length * lineH + padY * 2, 11);
+    doc.setFillColor(236, 253, 245);
+    doc.setDrawColor(TABLE_BORDER.r, TABLE_BORDER.g, TABLE_BORDER.b);
+    doc.setLineWidth(0.35);
+    doc.roundedRect(tableLeft, y, TABLE_W, boxH, 1.2, 1.2, "FD");
+    doc.setTextColor(20, 95, 50);
+    doc.text(lines, tableLeft + 3, y + padY + 3.2);
+    y += boxH + 5;
+  }
   const tableTop = y;
 
   // ---------- Tabla: encabezado verde; solo los 2 extremos de arriba redondeados, resto rectos ----------
   const centerPrecio = tableLeft + COL_DESC + COL_PRECIO / 2;
   const centerCant = tableLeft + COL_DESC + COL_PRECIO + COL_CANT / 2;
   const centerTotal = tableLeft + COL_DESC + COL_PRECIO + COL_CANT + COL_TOTAL / 2;
-  const numDiscountRows = data.items.filter((it) => it.discount > 0).length;
-  const numDataRows = data.items.length + numDiscountRows;
+  const numDataRows = pdfItems.reduce((s, it) => s + countItemTableRows(it), 0);
   const tableTotalH = HEADER_ROW_H + numDataRows * ROW_H;
   const R = TABLE_RADIUS;
   const k = 0.5522847498; // Bezier para arco 90°
@@ -390,8 +415,48 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11); /* igual que vista previa: tbody td 11pt */
 
-  for (const it of data.items) {
+  for (const it of pdfItems) {
+    const settlementKind = getReceiptSettlementRowKind(it);
     const lineTotalServicio = it.price * it.quantity;
+
+    if (settlementKind === "payment_line") {
+      const desc = String(it.serviceName ?? "").trim() || "Pago";
+      doc.text(desc.substring(0, 72), tableLeft + 3, y + 5.5);
+      doc.text(formatUSD(it.price), centerPrecio, y + 5.5, { align: "center" });
+      doc.text(String(it.quantity), centerCant, y + 5.5, { align: "center" });
+      doc.text(formatUSD(lineTotalServicio), centerTotal, y + 5.5, { align: "center" });
+      if (y + ROW_H < tableTop + tableTotalH) {
+        doc.line(tableLeft, y + ROW_H, tableLeft + TABLE_W, y + ROW_H);
+      }
+      y += ROW_H;
+      continue;
+    }
+    if (settlementKind === "invoice_ref") {
+      const desc = it.month ? `${it.serviceName ?? "Factura"} - ${ymToMonthYear(it.month)}` : (it.serviceName ?? "Factura");
+      doc.text(desc.substring(0, 60), tableLeft + 3, y + 5.5);
+      doc.text(formatUSD(it.price), centerPrecio, y + 5.5, { align: "center" });
+      doc.text(String(it.quantity), centerCant, y + 5.5, { align: "center" });
+      doc.text(formatUSD(lineTotalServicio), centerTotal, y + 5.5, { align: "center" });
+      if (y + ROW_H < tableTop + tableTotalH) {
+        doc.line(tableLeft, y + ROW_H, tableLeft + TABLE_W, y + ROW_H);
+      }
+      y += ROW_H;
+      continue;
+    }
+    if (settlementKind === "credit_note" || settlementKind === "prior_receipt") {
+      const amt = it.discount * it.quantity;
+      const desc = it.month ? `${it.serviceName ?? ""} - ${ymToMonthYear(it.month)}` : (it.serviceName ?? "");
+      doc.text(desc.substring(0, 60), tableLeft + 3, y + 5.5);
+      doc.text("—", centerPrecio, y + 5.5, { align: "center" });
+      doc.text(String(it.quantity), centerCant, y + 5.5, { align: "center" });
+      doc.text("- " + formatUSD(amt), centerTotal, y + 5.5, { align: "center" });
+      if (y + ROW_H < tableTop + tableTotalH) {
+        doc.line(tableLeft, y + ROW_H, tableLeft + TABLE_W, y + ROW_H);
+      }
+      y += ROW_H;
+      continue;
+    }
+
     // Determinar la descripción: Setup, equipos ASIC, Garantía ANDE, servicios de Hosting
     let desc = "";
     if (it.setupId && it.setupNombre) {
@@ -420,7 +485,7 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
     }
     y += ROW_H;
 
-    if (it.discount > 0) {
+    if (it.discount > 0 && getReceiptSettlementRowKind(it) == null) {
       const discountAmount = it.discount * it.quantity;
       let descDescuento = "";
       if (it.setupId && it.setupNombre) {

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { db, getDb } from "../db.js";
+import { rebuildReciboSettlementByNumber } from "../lib/rebuildReciboSettlement.js";
 import { requireRole } from "../middleware/auth.js";
 
 const isPg = () => (getDb() as { isPostgres?: boolean }).isPostgres === true;
@@ -307,4 +308,29 @@ invoicesRouter.delete("/invoices/:id", requireRole("admin_a", "admin_b"), async 
     return res.status(404).json({ error: { message: "Invoice not found" } });
   }
   res.json({ ok: true });
+});
+
+/** POST /invoices/rebuild-recibo-settlement — reescribe ítems de un recibo al formato liquidación (admin). */
+invoicesRouter.post("/invoices/rebuild-recibo-settlement", requireRole("admin_a", "admin_b"), async (req, res) => {
+  const parsed = z
+    .object({
+      number: z.string().min(1).max(50),
+      source: z.enum(["hosting", "asic"]).optional(),
+    })
+    .safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: { message: "Body inválido: se requiere { number: string, source?: 'hosting'|'asic' }" } });
+  }
+  try {
+    const result = await rebuildReciboSettlementByNumber(getDb, parsed.data.number, {
+      source: parsed.data.source ?? "hosting",
+    });
+    if (!result.ok) {
+      return res.status(400).json({ error: { message: result.error } });
+    }
+    return res.json({ ok: true, id: result.id, number: result.number, itemCount: result.itemCount });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e ?? "Error");
+    return res.status(500).json({ error: { message: msg } });
+  }
 });

@@ -667,6 +667,17 @@ export function getInvoiceById(id: number): Promise<InvoiceWithItemsResponse> {
   return api<InvoiceWithItemsResponse>(`/api/invoices/${id}`);
 }
 
+/** Reconstruir ítems de un recibo a formato liquidación (admin; alinea PDF con factura+NC+recibos previos). */
+export function rebuildReciboSettlement(
+  number: string,
+  options?: { source?: "hosting" | "asic" }
+): Promise<{ ok: boolean; id: number; number: string; itemCount: number }> {
+  return api("/api/invoices/rebuild-recibo-settlement", {
+    method: "POST",
+    body: JSON.stringify({ number, source: options?.source ?? "hosting" }),
+  });
+}
+
 /** Eliminar una factura por id (solo admin_a, admin_b). */
 export function deleteInvoice(id: number): Promise<{ ok: boolean }> {
   return api<{ ok: boolean }>(`/api/invoices/${id}`, { method: "DELETE" });

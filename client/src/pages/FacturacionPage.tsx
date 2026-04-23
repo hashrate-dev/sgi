@@ -23,6 +23,9 @@ import { useAuth } from "../contexts/AuthContext";
 import { canEditFacturacion } from "../lib/auth";
 import { formatCurrencyNumber, formatUSD } from "../lib/formatCurrency";
 import { isClienteTiendaOnline } from "../lib/clientTienda";
+import { isLinkedToInvoice } from "../lib/invoiceLinks";
+import { buildReciboPaymentLineDescription, buildReciboConceptLine, getReciboConceptParts } from "../lib/reciboConceptText";
+import { reciboHasSettlementRows, reciboIsPaymentLineSettledTable } from "../lib/receiptSettlementLine";
 import "../styles/facturacion.css";
 
 function todayLocale() {
@@ -136,11 +139,102 @@ function isNumericId(id: string | undefined): boolean {
   return typeof id === "string" && /^\d+$/.test(id);
 }
 
-/** Link robusto: usa relatedInvoiceId o relatedInvoiceNumber */
-function isLinkedToInvoice(comp: Invoice, factura: Invoice): boolean {
-  const matchId = comp.relatedInvoiceId != null && String(comp.relatedInvoiceId) === String(factura.id);
-  const matchNumber = comp.relatedInvoiceNumber != null && comp.relatedInvoiceNumber === factura.number;
-  return matchId || matchNumber;
+const INVOICE_BALANCE_EPS = 0.0001;
+
+function roundMoney(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/** Saldo pendiente de cobro (misma lógica que Pendientes): factura − NC vinculadas − recibos vinculados. */
+function invoicePendingCollectionAmount(factura: Invoice, all: Invoice[]): number {
+  const ncs = all.filter((inv) => inv.type === "Nota de Crédito" && isLinkedToInvoice(inv, factura));
+  const recibos = all.filter((inv) => inv.type === "Recibo" && isLinkedToInvoice(inv, factura));
+  const originalTotal = Math.abs(Number(factura.total) || 0);
+  const creditApplied = ncs.reduce((s, nc) => s + Math.abs(Number(nc.total) || 0), 0);
+  const paidApplied = recibos.reduce((s, r) => s + Math.abs(Number(r.total) || 0), 0);
+  return Math.max(0, originalTotal - creditApplied - paidApplied);
+}
+
+type ReciboLinkedEmitResult = {
+  items: LineItem[];
+  lineTotals: { subtotal: number; discounts: number; total: number };
+  pending: number;
+  creditApplied: number;
+  paidApplied: number;
+  finalTotals: { subtotal: number; discounts: number; total: number };
+};
+
+/**
+ * Recibo sobre factura bloqueada:
+ * - Si ya hubo NC o recibos previos: ítems de **liquidación** (factura + documentos − saldo), sin repetir líneas de servicio.
+ * - Si no: mismas líneas que la factura; si el neto de líneas no coincide con el saldo, una línea de ajuste (Zod: price/discount ≥ 0).
+ */
+function buildReciboLinkedEmitItems(
+  type: ComprobanteType,
+  relatedInvoiceId: string,
+  itemsLocked: boolean,
+  activeItems: LineItem[],
+  invoicesAll: Invoice[]
+): ReciboLinkedEmitResult | null {
+  if (type !== "Recibo" || !relatedInvoiceId || !itemsLocked || activeItems.length === 0) return null;
+  const factura = invoicesAll.find((i) => i.type === "Factura" && String(i.id) === String(relatedInvoiceId));
+  if (!factura) return null;
+  const lineTotals = calcTotals(activeItems);
+  const pending = invoicePendingCollectionAmount(factura, invoicesAll);
+  const ncs = invoicesAll.filter((inv) => inv.type === "Nota de Crédito" && isLinkedToInvoice(inv, factura));
+  const recs = invoicesAll.filter((inv) => inv.type === "Recibo" && isLinkedToInvoice(inv, factura));
+  const creditApplied = ncs.reduce((s, nc) => s + Math.abs(Number(nc.total) || 0), 0);
+  const paidApplied = recs.reduce((s, r) => s + Math.abs(Number(r.total) || 0), 0);
+  const priorDocs = creditApplied + paidApplied;
+  const delta = pending - lineTotals.total;
+
+  let items: LineItem[];
+  if (priorDocs > INVOICE_BALANCE_EPS) {
+    const month = activeItems[0]?.month || factura.month || currentMonthValue();
+    const pay = roundMoney(pending);
+    const parts = getReciboConceptParts(factura, invoicesAll);
+    const desc = buildReciboPaymentLineDescription(
+      parts.facturaNumber,
+      parts.creditNoteNumbers,
+      parts.priorReceiptNumbers
+    );
+    items = [
+      {
+        reciboLineKind: "payment_line",
+        serviceName: desc,
+        month,
+        quantity: 1,
+        price: pay,
+        discount: 0,
+      },
+    ];
+  } else {
+    items = activeItems;
+    if (Math.abs(delta) > INVOICE_BALANCE_EPS) {
+      const month = activeItems[0]!.month || currentMonthValue();
+      const price = delta > 0 ? delta : 0;
+      const discount = delta < 0 ? Math.abs(delta) : 0;
+      items = [
+        ...activeItems,
+        {
+          serviceName: "Ajuste: notas de crédito y/o recibos ya aplicados a la factura relacionada",
+          month,
+          quantity: 1,
+          price,
+          discount,
+        },
+      ];
+    }
+  }
+
+  return {
+    items,
+    lineTotals,
+    pending,
+    creditApplied,
+    paidApplied,
+    finalTotals: calcTotals(items),
+  };
 }
 
 export function FacturacionPage() {
@@ -317,6 +411,79 @@ export function FacturacionPage() {
   );
   const totals = useMemo(() => calcTotals(activeItems), [activeItems]);
 
+  const reciboLinkedEmit = useMemo(
+    () => buildReciboLinkedEmitItems(type, relatedInvoiceId, itemsLocked, activeItems, invoicesAll),
+    [type, relatedInvoiceId, itemsLocked, activeItems, invoicesAll]
+  );
+
+  const displaySummary = useMemo(() => {
+    if (reciboLinkedEmit) {
+      const invNet = roundMoney(reciboLinkedEmit.lineTotals.subtotal - reciboLinkedEmit.lineTotals.discounts);
+      const showNote = Math.abs(reciboLinkedEmit.pending - reciboLinkedEmit.lineTotals.total) > INVOICE_BALANCE_EPS;
+      return {
+        subtotal: roundMoney(reciboLinkedEmit.finalTotals.subtotal),
+        discounts: roundMoney(reciboLinkedEmit.finalTotals.discounts),
+        total: roundMoney(reciboLinkedEmit.pending),
+        invoiceNetLines: invNet,
+        previewItems: reciboLinkedEmit.items,
+        previewSubtotal: roundMoney(reciboLinkedEmit.finalTotals.subtotal),
+        previewDiscounts: roundMoney(reciboLinkedEmit.finalTotals.discounts),
+        previewTotal: roundMoney(reciboLinkedEmit.finalTotals.total),
+        showPendingNote: showNote,
+        creditApplied: roundMoney(reciboLinkedEmit.creditApplied),
+        paidApplied: roundMoney(reciboLinkedEmit.paidApplied),
+      };
+    }
+    return {
+      subtotal: totals.subtotal,
+      discounts: totals.discounts,
+      total: totals.total,
+      invoiceNetLines: roundMoney(totals.subtotal - totals.discounts),
+      previewItems: activeItems,
+      previewSubtotal: totals.subtotal,
+      previewDiscounts: totals.discounts,
+      previewTotal: totals.total,
+      showPendingNote: false,
+      creditApplied: 0,
+      paidApplied: 0,
+    };
+  }, [reciboLinkedEmit, totals, activeItems]);
+
+  /** Texto de concepto del recibo (PDF / vista previa) y aviso si hay NC sobre la factura. */
+  const reciboConceptForForm = useMemo(() => {
+    if (type !== "Recibo" || !relatedInvoiceId) {
+      return { line: "", hasLinkedNc: false };
+    }
+    const factura = invoicesAll.find((i) => i.type === "Factura" && String(i.id) === String(relatedInvoiceId));
+    if (!factura) return { line: "", hasLinkedNc: false };
+    const parts = getReciboConceptParts(factura, invoicesAll);
+    return {
+      line: buildReciboConceptLine(parts),
+      hasLinkedNc: parts.creditNoteNumbers.length > 0,
+    };
+  }, [type, relatedInvoiceId, invoicesAll]);
+
+  const reciboModeIndicator = useMemo(() => {
+    if (type !== "Recibo" || !relatedInvoiceId) return null;
+    const isPartial = reciboIsPaymentLineSettledTable(displaySummary.previewItems);
+    if (isPartial) {
+      return {
+        label: "PARCIAL",
+        detail: "El PDF saldrá con una sola línea de liquidación (pago neto pendiente).",
+        bg: "rgba(59, 130, 246, 0.2)",
+        border: "1px solid rgba(96, 165, 250, 0.5)",
+        color: "#e0f2fe",
+      };
+    }
+    return {
+      label: "TOTAL",
+      detail: "El PDF saldrá con todos los ítems de la factura (formato completo).",
+      bg: "rgba(16, 185, 129, 0.2)",
+      border: "1px solid rgba(52, 211, 153, 0.5)",
+      color: "#dcfce7",
+    };
+  }, [type, relatedInvoiceId, displaySummary.previewItems]);
+
   /** La fila 4% se agrega manual (desde el selector de ítem). Solo actualizamos precio/cantidad de cada D (4% de la fila de servicio correspondiente) y orden: Servicio, 4%, Servicio, 4%, ... */
   useEffect(() => {
     setItems((prev) => {
@@ -385,16 +552,12 @@ export function FacturacionPage() {
     return facturas.filter((f) => !recibos.some((r) => isLinkedToInvoice(r, f)) && !ncs.some((nc) => isLinkedToInvoice(nc, f)));
   }, [invoicesAll, selectedClient, type]);
 
-  // Obtener facturas sin recibo conectado y que no estén canceladas por NC (para recibos)
+  // Recibo sobre factura: listar si queda saldo por cobrar (permite NC parcial + recibo del saldo restante)
   const invoicesWithoutReceipt = useMemo(() => {
     if (!selectedClient || type !== "Recibo") return [];
     const clientNorm = normalizeClientName(selectedClient.name);
-    // Obtener todas las facturas del cliente (comparando nombre normalizado)
     const facturas = invoicesAll.filter((inv) => inv.type === "Factura" && normalizeClientName(inv.clientName) === clientNorm);
-    const recibos = invoicesAll.filter((inv) => inv.type === "Recibo");
-    const ncs = invoicesAll.filter((inv) => inv.type === "Nota de Crédito");
-    // Disponibles para Recibo: no tienen recibo ni NC vinculados
-    return facturas.filter((f) => !recibos.some((r) => isLinkedToInvoice(r, f)) && !ncs.some((nc) => isLinkedToInvoice(nc, f)));
+    return facturas.filter((f) => invoicePendingCollectionAmount(f, invoicesAll) > INVOICE_BALANCE_EPS);
   }, [invoicesAll, selectedClient, type]);
 
   // Limpiar factura relacionada cuando cambia el tipo o el cliente
@@ -636,9 +799,11 @@ export function FacturacionPage() {
     }
     if (type === "Recibo" && relatedInvoiceId) {
       const factura = invoicesAll.find((i) => i.type === "Factura" && String(i.id) === String(relatedInvoiceId)) || null;
-      const facturaCanceladaPorNC = !!factura && invoicesAll.some((inv) => inv.type === "Nota de Crédito" && isLinkedToInvoice(inv, factura));
-      if (facturaCanceladaPorNC) {
-        showToast("Esta factura fue cancelada con Nota de Crédito. No se puede crear un recibo para ella.", "error");
+      if (factura && invoicePendingCollectionAmount(factura, invoicesAll) <= INVOICE_BALANCE_EPS) {
+        showToast(
+          "Esta factura no tiene saldo pendiente de cobro (puede estar totalmente pagada o cancelada por nota(s) de crédito).",
+          "error"
+        );
         return;
       }
     }
@@ -651,7 +816,7 @@ export function FacturacionPage() {
       );
       return;
     }
-    if (totals.total === 0) {
+    if (Math.abs(displaySummary.total) < INVOICE_BALANCE_EPS) {
       showToast("Hay que llenar los campos para emitir el documento. El total no puede ser cero.", "error");
       return;
     }
@@ -668,8 +833,9 @@ export function FacturacionPage() {
 
     if (downloadPdf) showToast("Guardando documento...", "info");
 
-    const itemsToEmit = activeItems;
-    const { subtotal, discounts, total } = calcTotals(itemsToEmit);
+    const linkedEmit = buildReciboLinkedEmitItems(type, relatedInvoiceId, itemsLocked, activeItems, invoicesAll);
+    const itemsToEmit = linkedEmit?.items ?? activeItems;
+    const { subtotal, discounts, total } = linkedEmit?.finalTotals ?? calcTotals(itemsToEmit);
     const dateNow = new Date();
     const dateStr = todayLocale();
     const emissionTime = getCurrentTime();
@@ -678,7 +844,13 @@ export function FacturacionPage() {
     dueDate.setDate(dueDate.getDate() + dueDateDays);
     const dueDateStr = dueDate.toLocaleDateString();
 
-    const relatedInvoice = relatedInvoiceId ? invoicesAll.find((inv) => inv.id === relatedInvoiceId) : null;
+    const relatedInvoice = relatedInvoiceId
+      ? invoicesAll.find((inv) => inv.type === "Factura" && String(inv.id) === String(relatedInvoiceId))
+      : null;
+    const reciboConceptText =
+      type === "Recibo" && relatedInvoice && reciboHasSettlementRows(itemsToEmit)
+        ? buildReciboConceptLine(getReciboConceptParts(relatedInvoice, invoicesAll))
+        : undefined;
     const isNegativeType = type === "Recibo" || type === "Nota de Crédito";
     const finalSubtotal = isNegativeType ? -(Math.abs(subtotal)) : subtotal;
     const finalDiscounts = isNegativeType ? -(Math.abs(discounts)) : discounts;
@@ -750,6 +922,7 @@ export function FacturacionPage() {
           total,
           dueDateDays,
           relatedInvoiceNumber: relatedInvoice?.number,
+          reciboConceptText,
           creditNoteMode:
             type === "Nota de Crédito"
               ? isPartialCreditNote
@@ -862,6 +1035,19 @@ export function FacturacionPage() {
           : "partial"
         : undefined;
 
+    const relatedForReciboConcept =
+      inv.type === "Recibo"
+        ? invoicesAll.find(
+            (i) =>
+              i.type === "Factura" &&
+              (String(i.id) === String(inv.relatedInvoiceId ?? "") || i.number === inv.relatedInvoiceNumber)
+          )
+        : undefined;
+    const reciboConceptTextForSession =
+      inv.type === "Recibo" && relatedForReciboConcept && reciboHasSettlementRows(inv.items)
+        ? buildReciboConceptLine(getReciboConceptParts(relatedForReciboConcept, invoicesAll, { excludeReciboId: String(inv.id) }))
+        : undefined;
+
     const doc = generateFacturaPdf(
       {
         number: inv.number,
@@ -883,6 +1069,7 @@ export function FacturacionPage() {
         total,
         dueDate: parseDueDateStr(inv.dueDate ?? ""),
         relatedInvoiceNumber: inv.relatedInvoiceNumber ?? relatedForNc?.number,
+        reciboConceptText: reciboConceptTextForSession,
         creditNoteMode: inferredNcMode
       },
       { logoBase64 }
@@ -1202,6 +1389,38 @@ export function FacturacionPage() {
                         <div style={{ padding: "0.75rem", backgroundColor: "rgba(255, 255, 255, 0.15)", border: "1px solid rgba(255, 255, 255, 0.4)", borderRadius: "10px", marginBottom: "1rem" }}>
                           <small style={{ fontWeight: "bold", color: "#fff" }}>
                             🔒 Recibo relacionado con factura. Los detalles están bloqueados.
+                          </small>
+                        </div>
+                      )}
+                      {reciboModeIndicator && (
+                        <div
+                          style={{
+                            padding: "0.75rem 1rem",
+                            backgroundColor: reciboModeIndicator.bg,
+                            border: reciboModeIndicator.border,
+                            borderRadius: "10px",
+                            marginBottom: "1rem",
+                          }}
+                        >
+                          <small style={{ fontWeight: "bold", color: reciboModeIndicator.color, lineHeight: 1.45, display: "block" }}>
+                            Modo automático de recibo: <strong>{reciboModeIndicator.label}</strong>. {reciboModeIndicator.detail}
+                          </small>
+                        </div>
+                      )}
+                      {type === "Recibo" && relatedInvoiceId && reciboConceptForForm.hasLinkedNc && (
+                        <div
+                          style={{
+                            padding: "0.75rem 1rem",
+                            backgroundColor: "rgba(59, 130, 246, 0.2)",
+                            border: "1px solid rgba(96, 165, 250, 0.5)",
+                            borderRadius: "10px",
+                            marginBottom: "1rem",
+                          }}
+                        >
+                          <small style={{ fontWeight: "bold", color: "#e0f2fe", lineHeight: 1.45, display: "block" }}>
+                            Importante: hay nota(s) de crédito aplicada(s) a la factura. El sistema calcula el saldo pendiente; el PDF del recibo incluirá el{" "}
+                            <strong>concepto de pago</strong> y el detalle de <strong>liquidación</strong> (no se repite el listado completo de ítems de la
+                            factura). Los importes y totales siguen alineados con la cuenta corriente.
                           </small>
                         </div>
                       )}
@@ -1550,20 +1769,42 @@ export function FacturacionPage() {
                           <div className="fact-summary-cards">
                             <div className="fact-summary-card fact-summary-card--sub">
                               <span className="fact-summary-card-label">Subtotal</span>
-                              <span className="fact-summary-card-value">{formatCurrencyNumber(totals.subtotal)}</span>
+                              <span className="fact-summary-card-value">{formatCurrencyNumber(displaySummary.subtotal)}</span>
                               <span className="fact-summary-card-currency">USD</span>
                             </div>
                             <div className="fact-summary-card fact-summary-card--disc">
                               <span className="fact-summary-card-label">Descuentos</span>
-                              <span className="fact-summary-card-value">− {formatCurrencyNumber(totals.discounts)}</span>
+                              <span className="fact-summary-card-value">− {formatCurrencyNumber(displaySummary.discounts)}</span>
                               <span className="fact-summary-card-currency">USD</span>
                             </div>
                             <div className="fact-summary-card fact-summary-card--total">
-                              <span className="fact-summary-card-label">Total</span>
-                              <span className="fact-summary-card-value">{formatCurrencyNumber(totals.total)}</span>
+                              <span className="fact-summary-card-label">
+                                {displaySummary.showPendingNote ? "Total a cobrar" : "Total"}
+                              </span>
+                              <span className="fact-summary-card-value">{formatCurrencyNumber(displaySummary.total)}</span>
                               <span className="fact-summary-card-currency">USD</span>
                             </div>
                           </div>
+                          {displaySummary.showPendingNote ? (
+                            <div
+                              className="fact-recibo-nc-adjust"
+                              role="region"
+                              aria-label="Desglose: neto de líneas, descuentos por documentos previos y total del recibo"
+                            >
+                              <span className="fact-recibo-nc-adjust__label">Neto de líneas (como en la factura)</span>
+                              <span className="fact-recibo-nc-adjust__value">
+                                {formatCurrencyNumber(displaySummary.invoiceNetLines)} USD
+                              </span>
+                              <span className="fact-recibo-nc-adjust__label">Menos NC y recibos previos</span>
+                              <span className="fact-recibo-nc-adjust__value">
+                                − {formatCurrencyNumber(displaySummary.creditApplied + displaySummary.paidApplied)} USD
+                              </span>
+                              <span className="fact-recibo-nc-adjust__label">Total de este recibo</span>
+                              <span className="fact-recibo-nc-adjust__value fact-recibo-nc-adjust__value--emph">
+                                {formatCurrencyNumber(displaySummary.total)} USD
+                              </span>
+                            </div>
+                          ) : null}
                           <button type="button" className="fact-detail-servicios-btn-emitir" onClick={handleClickEmitir}>
                             📄 Emitir documento
                           </button>
@@ -1718,6 +1959,24 @@ export function FacturacionPage() {
                             })()
                           : undefined
                       }
+                      reciboConceptText={
+                        previewEmitted.invoice.type === "Recibo" && reciboHasSettlementRows(previewEmitted.invoice.items)
+                          ? (() => {
+                              const f = invoicesAll.find(
+                                (i) =>
+                                  i.type === "Factura" &&
+                                  (String(i.id) === String(previewEmitted.invoice.relatedInvoiceId ?? "") ||
+                                    (previewEmitted.invoice.relatedInvoiceNumber != null &&
+                                      i.number === previewEmitted.invoice.relatedInvoiceNumber))
+                              );
+                              return f
+                                ? buildReciboConceptLine(
+                                    getReciboConceptParts(f, invoicesAll, { excludeReciboId: String(previewEmitted.invoice.id) })
+                                  )
+                                : undefined;
+                            })()
+                          : undefined
+                      }
                     />
                   ) : selectedClient && activeItems.length > 0 ? (
                     <InvoicePreview
@@ -1725,10 +1984,10 @@ export function FacturacionPage() {
                       number={number}
                       client={selectedClient}
                       date={new Date()}
-                      items={activeItems}
-                      subtotal={totals.subtotal}
-                      discounts={totals.discounts}
-                      total={totals.total}
+                      items={displaySummary.previewItems}
+                      subtotal={displaySummary.previewSubtotal}
+                      discounts={displaySummary.previewDiscounts}
+                      total={displaySummary.previewTotal}
                       dueDateDays={dueDateDays}
                       relatedInvoiceNumber={
                         type === "Nota de Crédito"
@@ -1740,6 +1999,11 @@ export function FacturacionPage() {
                           ? isPartialCreditNote
                             ? "partial"
                             : "total"
+                          : undefined
+                      }
+                      reciboConceptText={
+                        type === "Recibo" && reciboConceptForForm.line && reciboHasSettlementRows(displaySummary.previewItems)
+                          ? reciboConceptForForm.line
                           : undefined
                       }
                     />
