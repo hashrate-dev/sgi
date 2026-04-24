@@ -377,7 +377,7 @@ body:has(.marketplace-asic-page)::after {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   text-decoration: none;
-  border-radius: 8px;
+  border-radius: 2px;
   border: 1px solid #d1d5db;
   color: #374151;
   background: #fff;
@@ -1520,21 +1520,23 @@ button.market-link-hrs {
   position: relative;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 0.1rem;
   margin-top: 0.06rem;
   padding: 0.5rem 0.62rem 0.54rem;
-  border-radius: 11px;
+  border-radius: 6px;
   border: 1px solid rgba(34, 197, 94, 0.45);
   background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
   box-shadow: 0 8px 18px rgba(22, 163, 74, 0.12);
   animation: shelfPriceLockedPulse 2.6s ease-in-out infinite;
+  text-align: center;
 }
 
 .market-shelf-grid--catalog-v2 .shelf-product__price-locked::before {
   content: "";
   position: absolute;
   inset: -1px;
-  border-radius: 11px;
+  border-radius: 6px;
   pointer-events: none;
   border: 1px solid rgba(74, 222, 128, 0.4);
 }
@@ -1556,11 +1558,12 @@ button.market-link-hrs {
 
 .market-shelf-grid--catalog-v2 .shelf-product__price-locked-cta {
   margin-top: 0.28rem;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  border-radius: 999px;
+  border-radius: 8px;
+  width: 100%;
   padding: 0.34rem 0.58rem;
   font-size: 0.73rem;
   font-weight: 800;
@@ -5365,7 +5368,7 @@ button.product-modal__btn--quote-cart:active {
   height: 6px;
   margin: 0.85rem 0 0.65rem;
   border: none;
-  border-radius: 2px;
+  border-radius: 0;
   background: repeating-linear-gradient(
     90deg,
     transparent,

@@ -53,16 +53,16 @@ export function AsicShelfProduct({
     ? normalizeConsultPriceLabelForDisplay(product.priceDisplayLabel.trim())
     : "";
   const lockedPriceLabel = lang === "en"
-    ? "Login to view price"
+    ? "Sign up to view price"
     : lang === "pt"
-      ? "Faca login para ver o preco"
+      ? "Registre-se para ver preco"
       : "Registrate para ver precio";
   const lockedPriceHint = lang === "en"
-    ? "Sign in and unlock this price"
+    ? "Sign in and unlock the price"
     : lang === "pt"
-      ? "Faca login e desbloqueie o preco"
+      ? "Inicie sessao e desbloqueie o preco"
       : "Inicia sesion y desbloquea el precio";
-  const lockedPriceCta = lang === "en" ? "Sign in now" : lang === "pt" ? "Entrar agora" : "Iniciar sesion";
+  const lockedPriceCta = lang === "en" ? "Sign in" : lang === "pt" ? "Iniciar sessao" : "Iniciar sesion";
   const eagerImg = productIndex < EAGER_IMAGE_ABOVE_INDEX;
 
   /** Potencia, monedas/algo, aire/hydro, minería Bitcoin/Dual/Zcash (`mp_detail_rows_json`). */
