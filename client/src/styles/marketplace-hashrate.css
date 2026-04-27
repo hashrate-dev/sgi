@@ -5176,6 +5176,8 @@ button.product-modal__btn--quote-cart:active {
   max-width: 428px;
   padding: 1.35rem 1.5rem 1.4rem;
   border-radius: 8px;
+  /* La franja superior absolute comparte radio con la tarjeta (evita que el verde “salga” de las esquinas) */
+  overflow: hidden;
   box-shadow:
     0 4px 6px rgba(15, 23, 42, 0.04),
     0 22px 48px rgba(15, 23, 42, 0.16);
@@ -5188,7 +5190,7 @@ button.product-modal__btn--quote-cart:active {
   left: 0;
   right: 0;
   height: 5px;
-  border-radius: 8px 8px 0 0;
+  border-radius: 0;
   background: linear-gradient(90deg, #10b981 0%, #059669 50%, #047857 100%);
 }
 
