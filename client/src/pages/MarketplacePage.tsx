@@ -5,7 +5,6 @@ import {
   asicProductShowsMinerEconomyContent,
   compareMarketplaceShelfProducts,
   inferMarketplaceCatalogFilter,
-  marketplaceShelfPrimaryGroup,
   mergeAsicCatalogWithCorpGridExtras,
 } from "../lib/marketplaceAsicCatalog.js";
 import type { AsicProduct, MarketplaceCatalogFilter } from "../lib/marketplaceAsicCatalog.js";

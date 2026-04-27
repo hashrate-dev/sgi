@@ -14,7 +14,7 @@ import type { Setup } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
 import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
-import { canDeleteClientes, canEditClientes, canExport } from "../lib/auth";
+import { canEditClientes, canExport } from "../lib/auth";
 import { isSetupCompraHashrateProtected } from "../lib/setupCompraHashrateProtected";
 import "../styles/facturacion.css";
 
@@ -71,7 +71,6 @@ async function parseExcelSetups(file: File): Promise<{ nombre: string; precioUSD
 
 export function SetupPage() {
   const { user } = useAuth();
-  const canDelete = user ? canDeleteClientes(user.role) : false;
   const canEdit = user ? canEditClientes(user.role) : false;
   const canExportData = user ? canExport(user.role) : false;
   const [setups, setSetups] = useState<Setup[]>([]);
@@ -175,10 +174,6 @@ export function SetupPage() {
     if (!deleteConfirmSetup) return;
     handleDelete(deleteConfirmSetup);
     setDeleteConfirmSetup(null);
-  }
-
-  function handleDeleteAllClick() {
-    setShowDeleteConfirm1(true);
   }
 
   function handleDeleteConfirm1() {
