@@ -117,7 +117,6 @@ export function MarketplaceCompanyPage() {
         <MarketplaceSiteHeader />
         <main id="page-main" className="page-main page-main--market page-main--market--corp page-main--market--company">
           <div className="market-corp-inner market-corp-inner--flush-top market-corp-company">
-            {/* Intro — dos columnas (WP) */}
             <section className="market-corp-company-intro" aria-labelledby="company-intro-h3">
               <div className="market-corp-company-intro__grid">
                 <div className="market-corp-company-intro__copy">
@@ -153,7 +152,6 @@ export function MarketplaceCompanyPage() {
               </div>
             </section>
 
-            {/* Liderazgo + equipo */}
             <section className="market-corp-company-team" aria-labelledby="company-lead-h2">
               <div className="market-corp-company-team__grid">
                 <div className="market-corp-company-team__lead">

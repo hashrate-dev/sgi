@@ -1436,7 +1436,13 @@ export function getMarketplaceQuoteTicketsStats(): Promise<{
 
 export type MarketplacePresenceViewerType = "anon" | "cliente" | "staff";
 
-export function postMarketplacePresenceHeartbeat(payload: {
+const MARKETPLACE_PRESENCE_HEARTBEAT_TIMEOUT_MS = 12_000;
+
+/**
+ * Presencia marketplace: un POST directo (misma base que `getApiBase`, sin reintentos de `api()`).
+ * No lanza: backend apagado o 5xx no deben romper la UI ni spamear toasts.
+ */
+export async function postMarketplacePresenceHeartbeat(payload: {
   visitorId: string;
   viewerType?: MarketplacePresenceViewerType;
   userEmail?: string;
@@ -1446,11 +1452,38 @@ export function postMarketplacePresenceHeartbeat(payload: {
   locale?: string;
   timezone?: string;
   currentPath?: string;
-}): Promise<{ ok?: boolean }> {
-  return api("/api/marketplace/presence/heartbeat", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+}): Promise<void> {
+  const token = getStoredToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let base = getApiBase();
+  const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
+  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") base = "";
+  const path = "/api/marketplace/presence/heartbeat";
+  const url = base && base.trim() !== "" ? `${base}${path}` : path;
+  if (
+    (!base || base.trim() === "") &&
+    h !== "localhost" &&
+    h !== "127.0.0.1" &&
+    !h.endsWith(".vercel.app") &&
+    h !== "app.hashrate.space"
+  ) {
+    return;
+  }
+  try {
+    const res = await fetchWithTimeout(
+      url,
+      { method: "POST", headers, credentials: "include", body: JSON.stringify(payload) },
+      MARKETPLACE_PRESENCE_HEARTBEAT_TIMEOUT_MS
+    );
+    if (res.status === 401) {
+      clearStoredAuth();
+      const cb = typeof window !== "undefined" ? (window as unknown as { __on401?: () => void }).__on401 : undefined;
+      if (typeof cb === "function") cb();
+    }
+  } catch {
+    /* red / API apagada: best-effort */
+  }
 }
 
 const MARKETPLACE_CONTACT_POST_TIMEOUT_MS = 25_000;

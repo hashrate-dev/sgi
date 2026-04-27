@@ -39,15 +39,16 @@ const MARKETPLACE_PRESENCE_HISTORY_DEDUPE_MS = 15_000;
 const IP_COUNTRY_CACHE_TTL_MS = 60 * 60 * 1000;
 const ipCountryCache = new Map<string, { countryCode: string; countryName: string; expiresAt: number }>();
 
+const emptyToUndef = (v: unknown) => (v === "" || v === null || v === undefined ? undefined : v);
 const MarketplacePresenceHeartbeatSchema = z.object({
   visitorId: z.string().min(8).max(120).trim(),
   viewerType: z.enum(["anon", "cliente", "staff"]).optional(),
-  userEmail: z.string().trim().max(200).optional(),
-  countryCode: z.string().trim().min(2).max(2).optional(),
-  countryName: z.string().trim().max(80).optional(),
-  clientIp: z.string().trim().max(80).optional(),
-  locale: z.string().trim().max(20).optional(),
-  timezone: z.string().trim().max(60).optional(),
+  userEmail: z.preprocess(emptyToUndef, z.string().trim().max(200).optional()),
+  countryCode: z.preprocess(emptyToUndef, z.string().trim().min(2).max(2).optional()),
+  countryName: z.preprocess(emptyToUndef, z.string().trim().max(80).optional()),
+  clientIp: z.preprocess(emptyToUndef, z.string().trim().max(80).optional()),
+  locale: z.preprocess(emptyToUndef, z.string().trim().max(20).optional()),
+  timezone: z.preprocess(emptyToUndef, z.string().trim().max(60).optional()),
   currentPath: z.string().max(200).trim().optional(),
 });
 
@@ -571,6 +572,8 @@ marketplaceRouter.post("/marketplace/presence/heartbeat", async (req: Request, r
     res.status(204).send();
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    // eslint-disable-next-line no-console
+    console.error("[marketplace] POST /marketplace/presence/heartbeat", msg);
     res.status(500).json({ error: { message: msg } });
   }
 });

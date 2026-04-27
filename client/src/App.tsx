@@ -54,7 +54,7 @@ import { MarketplaceLanguageProvider } from "./contexts/MarketplaceLanguageConte
 import { MarketplaceQuoteCartProvider, useMarketplaceQuoteCart } from "./contexts/MarketplaceQuoteCartContext";
 import { MarketplaceQuoteCartDrawer } from "./components/marketplace/MarketplaceQuoteCartDrawer";
 import { getStoredUser } from "./lib/auth";
-import type { MarketplacePresenceViewerType } from "./lib/api";
+import { postMarketplacePresenceHeartbeat, type MarketplacePresenceViewerType } from "./lib/api";
 
 const MARKETPLACE_PRESENCE_VISITOR_KEY = "hrs_marketplace_presence_visitor_id";
 const MARKETPLACE_PRESENCE_COUNTRY_CACHE_KEY = "hrs_marketplace_presence_country_v1";
@@ -76,25 +76,6 @@ function resolveMarketplaceViewerType(): MarketplacePresenceViewerType {
   if (role === "cliente") return "cliente";
   if (role === "admin_a" || role === "admin_b" || role === "operador" || role === "lector") return "staff";
   return "anon";
-}
-
-async function sendMarketplacePresenceHeartbeat(payload: {
-  visitorId: string;
-  viewerType: MarketplacePresenceViewerType;
-  userEmail?: string;
-  countryCode?: string;
-  countryName?: string;
-  clientIp?: string;
-  locale?: string;
-  timezone?: string;
-  currentPath: string;
-}): Promise<void> {
-  await fetch("/api/marketplace/presence/heartbeat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-    credentials: "include",
-  });
 }
 
 function getBrowserCountryInfo(): { countryCode: string; countryName: string } {
@@ -274,7 +255,7 @@ function MarketplacePresenceBeacon() {
     const sendBeat = async () => {
       if (cancelled) return;
       // 1) Enviar de inmediato con timezone/locale para no depender de APIs externas.
-      await sendMarketplacePresenceHeartbeat({
+      await postMarketplacePresenceHeartbeat({
         visitorId,
         viewerType,
         userEmail: userEmail || undefined,
@@ -283,7 +264,7 @@ function MarketplacePresenceBeacon() {
         locale,
         timezone,
         currentPath,
-      }).catch(() => {});
+      });
 
       // 2) Enriquecer con IP pública/geo cuando esté disponible.
       const [ipCountry, clientIp] = await Promise.all([
@@ -291,7 +272,7 @@ function MarketplacePresenceBeacon() {
         getPublicIpAddress().catch(() => ""),
       ]);
       if (cancelled) return;
-      await sendMarketplacePresenceHeartbeat({
+      await postMarketplacePresenceHeartbeat({
         visitorId,
         viewerType,
         userEmail: userEmail || undefined,
@@ -301,7 +282,7 @@ function MarketplacePresenceBeacon() {
         locale,
         timezone,
         currentPath,
-      }).catch(() => {});
+      });
     };
     void sendBeat();
     const intervalId = window.setInterval(() => {
