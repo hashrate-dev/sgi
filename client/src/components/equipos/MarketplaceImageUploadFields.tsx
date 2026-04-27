@@ -51,6 +51,58 @@ async function isAcceptableMarketplaceImageFile(file: File): Promise<boolean> {
   return false;
 }
 
+async function loadImageElement(file: File): Promise<HTMLImageElement> {
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.decoding = "async";
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("No se pudo leer la imagen."));
+      img.src = objectUrl;
+    });
+    return img;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+/**
+ * Reduce tamaño antes de subir (clave para evitar 413 al guardar equipos con galería inline).
+ * - Mantiene GIF sin tocar (animación).
+ * - Resto: redimensiona (máx. 1600px) y exporta JPEG/WebP con calidad media.
+ */
+async function optimizeMarketplaceImage(file: File): Promise<File> {
+  if (!file.type.startsWith("image/")) return file;
+  if (file.type === "image/gif") return file;
+  if (file.size <= 450_000) return file;
+  try {
+    const img = await loadImageElement(file);
+    const maxDim = 1600;
+    const ratio = Math.min(1, maxDim / Math.max(img.width, img.height));
+    const width = Math.max(1, Math.round(img.width * ratio));
+    const height = Math.max(1, Math.round(img.height * ratio));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(img, 0, 0, width, height);
+    const outType = file.type === "image/png" ? "image/png" : "image/jpeg";
+    const quality = outType === "image/png" ? undefined : 0.82;
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, outType, quality)
+    );
+    if (!blob || blob.size <= 0) return file;
+    if (blob.size >= file.size * 0.98) return file;
+    const ext = outType === "image/png" ? "png" : "jpg";
+    const base = file.name.replace(/\.[^.]+$/, "");
+    return new File([blob], `${base}.${ext}`, { type: outType });
+  } catch {
+    return file;
+  }
+}
+
 /** Imagen tarjeta: dropzone + vista previa (solo subida de archivo). */
 export function CardImageUploadField({
   value,
@@ -73,7 +125,8 @@ export function CardImageUploadField({
     }
     setUploading(true);
     try {
-      const { url } = await uploadMarketplaceAsicImage(file);
+      const optimized = await optimizeMarketplaceImage(file);
+      const { url } = await uploadMarketplaceAsicImage(optimized);
       onChange(url);
       showToast("Imagen subida correctamente.", "success", "Equipos ASIC");
     } catch (err) {
@@ -244,7 +297,8 @@ export function GalleryImagesUploadField({
     try {
       const newUrls: string[] = [];
       for (const file of list) {
-        const { url } = await uploadMarketplaceAsicImage(file);
+        const optimized = await optimizeMarketplaceImage(file);
+        const { url } = await uploadMarketplaceAsicImage(optimized);
         newUrls.push(url);
       }
       onLinesChange([...urls, ...newUrls].join("\n"));
