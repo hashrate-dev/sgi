@@ -133,6 +133,11 @@ type MergedCoinDayMetrics = {
   revUsdDay: number | null;
 };
 
+type CoinDayMetrics = {
+  revBtcDay: number | null;
+  revUsdDay: number | null;
+};
+
 async function fetchMergedCoinDayMetricsFromWhatToMine(url: string): Promise<MergedCoinDayMetrics | null> {
   try {
     const u = new URL(url);
@@ -186,6 +191,51 @@ async function fetchMergedCoinDayMetricsFromWhatToMine(url: string): Promise<Mer
   }
 }
 
+async function fetchCoinDayMetricsFromWhatToMine(url: string): Promise<CoinDayMetrics | null> {
+  try {
+    const u = new URL(url);
+    const hr = Number(u.searchParams.get("hr"));
+    if (!Number.isFinite(hr) || hr <= 0) return null;
+    const r = await fetch(url, {
+      headers: { Accept: "text/html,application/xhtml+xml", "User-Agent": UA },
+    });
+    if (!r.ok) return null;
+    const html = await r.text();
+    const row = html.match(/<tr[^>]*>\s*<td[^>]*>\s*Day\s*<\/td>[\s\S]*?<\/tr>/i)?.[0] ?? null;
+    if (!row) return null;
+    const tablePrefix = html.slice(0, html.indexOf(row));
+    const headerMatches = Array.from(tablePrefix.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/gi));
+    const headers = headerMatches
+      .map((m) => String(m[1] ?? "").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim())
+      .filter(Boolean)
+      .slice(-8); // Per | Fees | Est. Rewards | Rev. BTC | Rev. $ | Cost | Profit
+    const cells = Array.from(row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi))
+      .map((m) => String(m[1] ?? "").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim());
+    if (cells.length < 5) return null;
+    const idxRevBtc = headers.findIndex((h) => /rev\.\s*btc/i.test(h) || /rev\s*btc/i.test(h));
+    const idxRevUsd = headers.findIndex((h) => /rev\.\s*\$/i.test(h) || /rev\$\b/i.test(h));
+    const revBtcDay =
+      idxRevBtc >= 0 && cells[idxRevBtc] != null
+        ? parseRewardNumber(cells[idxRevBtc])
+        : (() => {
+            const btcLike = cells.find((c) => /^0[.,]\d+/.test(c.trim()));
+            return btcLike ? parseRewardNumber(btcLike) : null;
+          })();
+    const revUsdDay =
+      idxRevUsd >= 0 && cells[idxRevUsd] != null
+        ? parseUsdString(cells[idxRevUsd])
+        : (() => {
+            const usdTokens = Array.from(row.matchAll(/\$[\d,.]+/g))
+              .map((m) => parseUsdTokenToNumber(m[0]))
+              .filter((x): x is number => x != null);
+            return usdTokens[0] ?? null;
+          })();
+    return { revBtcDay, revUsdDay };
+  } catch {
+    return null;
+  }
+}
+
 export async function estimateYieldFromCustomWhatToMine(
   config: WhatToMineCustomConfig
 ): Promise<WhatToMineYieldResult | null> {
@@ -201,6 +251,19 @@ export async function estimateYieldFromCustomWhatToMine(
         source: "whattomine",
         electricityUsdPerKwh: Number(config.electricityUsdPerKwh),
         note: "WhatToMine merged coins · fila Day (Rewards LTC/DOGE y Rev.$) tomada del resultado de la calculadora.",
+      };
+    }
+  }
+  if (/\/coins\//i.test(config.url)) {
+    const day = await fetchCoinDayMetricsFromWhatToMine(config.url);
+    if (day?.revUsdDay != null) {
+      const revBtc = day.revBtcDay != null ? `≈ ${fmtEs(day.revBtcDay, 6)} BTC` : "—";
+      return {
+        line1: revBtc,
+        line2: `≈ ${fmtEs(day.revUsdDay, 2)} USD`,
+        source: "whattomine",
+        electricityUsdPerKwh: Number(config.electricityUsdPerKwh),
+        note: "WhatToMine coins · fila Day (Rev.BTC y Rev.$) tomada del resultado de la calculadora.",
       };
     }
   }
