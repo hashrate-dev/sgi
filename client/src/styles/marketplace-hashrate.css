@@ -8895,8 +8895,8 @@ button.product-modal__btn--quote-cart:active {
 
 .market-corp-company-team__cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: clamp(1rem, 2.5vw, 1.5rem);
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: clamp(1.35rem, 3.1vw, 2.1rem);
 }
 
 @media (min-width: 640px) {
@@ -8948,15 +8948,18 @@ button.product-modal__btn--quote-cart:active {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center 24%;
   display: block;
+  transform: scale(1.3);
+  transform-origin: center;
 }
 
 .market-corp-team-card__meta {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  padding: 0.85rem 0.75rem 1rem;
-  min-height: 118px;
+  padding: 1rem 0.9rem 1.1rem;
+  min-height: 130px;
   justify-content: flex-start;
   flex: 1 1 auto;
   background: #fff;
@@ -8974,7 +8977,7 @@ button.product-modal__btn--quote-cart:active {
 }
 
 .market-corp-team-card__name {
-  font-size: 1.05rem;
+  font-size: 1.18rem;
   font-weight: 800;
   color: #111827;
   line-height: 1.2;
