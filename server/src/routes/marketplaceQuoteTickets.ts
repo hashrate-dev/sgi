@@ -184,8 +184,6 @@ function setupUsdForLine(
 ): number {
   const p = Math.round(Number(l.hashrateSharePct));
   if (Number.isFinite(p) && p >= 1 && p <= 100) {
-    const setupUsd = Math.round(Number(l.hashrateSetupUsd));
-    if (Number.isFinite(setupUsd) && setupUsd >= 0) return setupUsd;
     if (p < 100) return Math.max(0, Math.round(setupCompraHashrateUsd)) || 50;
   }
   return Math.max(0, Math.round(setupEquipoCompletoUsd)) || 50;

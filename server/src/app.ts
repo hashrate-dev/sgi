@@ -18,6 +18,7 @@ import { marketplaceRouter } from "./routes/marketplace.js";
 import { marketplaceQuoteTicketsRouter } from "./routes/marketplaceQuoteTickets.js";
 import { kryptexRouter } from "./routes/kryptex.js";
 import { hostingFxOperationsRouter } from "./routes/hostingFxOperations.js";
+import { asicCostosRouter } from "./routes/asicCostos.js";
 import { requireAuth } from "./middleware/auth.js";
 import { notFound } from "./middleware/notFound.js";
 import { errorHandler } from "./middleware/errorHandler.js";
@@ -117,6 +118,7 @@ export function createApp() {
   app.use("/api", requireAuth, setupsRouter);
   app.use("/api", requireAuth, equiposRouter);
   app.use("/api", requireAuth, hostingFxOperationsRouter);
+  app.use("/api", requireAuth, asicCostosRouter);
 
   app.use(notFound);
   app.use(errorHandler);

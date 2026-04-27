@@ -57,12 +57,17 @@ function parseUsdString(s: string | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export async function fetchWtmJson(coinId: number, hr: number, powerW: number): Promise<WtmResponse | null> {
+export async function fetchWtmJson(
+  coinId: number,
+  hr: number,
+  powerW: number,
+  electricityUsdPerKwh = WHATTOMINE_ELECTRICITY_USD_PER_KWH
+): Promise<WtmResponse | null> {
   const q = new URLSearchParams({
     hr: String(hr),
     p: String(Math.max(1, Math.round(powerW))),
     fee: "0",
-    cost: String(WHATTOMINE_ELECTRICITY_USD_PER_KWH),
+    cost: String(electricityUsdPerKwh),
   });
   const url = `https://whattomine.com/coins/${coinId}.json?${q.toString()}`;
   try {
@@ -92,12 +97,147 @@ async function fetchDogeBtcFromWtm(): Promise<number | null> {
   return x;
 }
 
+function parseCoinIdFromWhatToMineUrl(url: string): number | null {
+  const m = String(url ?? "").match(/\/coins\/(\d+)-/i);
+  if (!m?.[1]) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) && n > 0 ? Math.trunc(n) : null;
+}
+
+function parseHrFromWhatToMineUrl(url: string): number | null {
+  try {
+    const u = new URL(url);
+    const hr = Number(u.searchParams.get("hr"));
+    return Number.isFinite(hr) && hr > 0 ? hr : null;
+  } catch {
+    return null;
+  }
+}
+
+function coinSymbolFromCoinId(coinId: number): string {
+  if (coinId === 101) return "XMR";
+  if (coinId === 166) return "ZEC";
+  if (coinId === 1) return "BTC";
+  if (coinId === 4) return "LTC";
+  return "COIN";
+}
+
+function parseUsdTokenToNumber(token: string): number | null {
+  const n = parseFloat(token.replace(/\$/g, "").replace(/,/g, "").trim());
+  return Number.isFinite(n) ? n : null;
+}
+
+type MergedCoinDayMetrics = {
+  rewardsLtcDay: number | null;
+  rewardsDogeDay: number | null;
+  revUsdDay: number | null;
+};
+
+async function fetchMergedCoinDayMetricsFromWhatToMine(url: string): Promise<MergedCoinDayMetrics | null> {
+  try {
+    const u = new URL(url);
+    const hr =
+      Number(u.searchParams.get("hr")) ||
+      Number(u.searchParams.get("hr_ltc")) ||
+      Number(u.searchParams.get("hashrate")) ||
+      0;
+    if (!Number.isFinite(hr) || hr <= 0) return null;
+    const r = await fetch(url, {
+      headers: { Accept: "text/html,application/xhtml+xml", "User-Agent": UA },
+    });
+    if (!r.ok) return null;
+    const html = await r.text();
+    const row = html.match(/<tr[^>]*>\s*<td[^>]*>\s*Day\s*<\/td>[\s\S]*?<\/tr>/i)?.[0] ?? null;
+    if (!row) return null;
+    const tablePrefix = html.slice(0, html.indexOf(row));
+    const headerMatches = Array.from(tablePrefix.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/gi));
+    const headers = headerMatches
+      .map((m) => String(m[1] ?? "").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim())
+      .filter(Boolean)
+      .slice(-9); // Per | Fee LTC | Rewards LTC | Fee DOGE | Rewards DOGE | Rev. BTC | Rev. $ | Cost | Profit
+
+    const cells = Array.from(row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi))
+      .map((m) => String(m[1] ?? "").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim());
+    if (cells.length < 7) return null;
+
+    const idxRewardsLtc = headers.findIndex((h) => /rewards\s*ltc/i.test(h));
+    const idxRewardsDoge = headers.findIndex((h) => /rewards\s*doge/i.test(h));
+    const idxRevUsd = headers.findIndex((h) => /rev\.\s*\$/i.test(h) || /rev\$\b/i.test(h));
+
+    const rewardsLtcDay =
+      idxRewardsLtc >= 0 && cells[idxRewardsLtc] != null ? parseRewardNumber(cells[idxRewardsLtc]) : null;
+    const rewardsDogeDay =
+      idxRewardsDoge >= 0 && cells[idxRewardsDoge] != null ? parseRewardNumber(cells[idxRewardsDoge]) : null;
+    const revUsdDay =
+      idxRevUsd >= 0 && cells[idxRevUsd] != null
+        ? parseUsdString(cells[idxRevUsd])
+        : (() => {
+            // Fallback defensivo: en esta tabla Rev.$ suele ser el penúltimo USD antes de Cost/Profit.
+            const usdTokens = Array.from(row.matchAll(/\$[\d,.]+/g))
+              .map((m) => parseUsdTokenToNumber(m[0]))
+              .filter((x): x is number => x != null);
+            if (usdTokens.length >= 2) return usdTokens[0] ?? null;
+            return usdTokens[0] ?? null;
+          })();
+
+    return { rewardsLtcDay, rewardsDogeDay, revUsdDay };
+  } catch {
+    return null;
+  }
+}
+
+export async function estimateYieldFromCustomWhatToMine(
+  config: WhatToMineCustomConfig
+): Promise<WhatToMineYieldResult | null> {
+  if (/\/merged_coins\//i.test(config.url)) {
+    const day = await fetchMergedCoinDayMetricsFromWhatToMine(config.url);
+    if (day?.revUsdDay != null) {
+      const ltc = day.rewardsLtcDay != null ? `≈ ${fmtEs(day.rewardsLtcDay, 6)} LTC` : null;
+      const doge = day.rewardsDogeDay != null ? `≈ ${fmtEs(day.rewardsDogeDay, 2)} DOGE` : null;
+      const estCoin = [ltc, doge].filter(Boolean).join(" + ") || `≈ ${fmtEs(day.revUsdDay, 2)} USD`;
+      return {
+        line1: estCoin,
+        line2: `≈ ${fmtEs(day.revUsdDay, 2)} USD`,
+        source: "whattomine",
+        electricityUsdPerKwh: Number(config.electricityUsdPerKwh),
+        note: "WhatToMine merged coins · fila Day (Rewards LTC/DOGE y Rev.$) tomada del resultado de la calculadora.",
+      };
+    }
+  }
+  const coinId = parseCoinIdFromWhatToMineUrl(config.url);
+  const hr = parseHrFromWhatToMineUrl(config.url);
+  const powerW = Math.max(1, Math.round(Number(config.powerW) || 0));
+  const cost = Number(config.electricityUsdPerKwh);
+  if (coinId == null || hr == null || !Number.isFinite(cost) || cost < 0) return null;
+  const j = await fetchWtmJson(coinId, hr, powerW, cost);
+  if (!j) return null;
+  const coinDay = parseRewardNumber(j.estimated_rewards);
+  const revenueUsd = parseUsdString(j.revenue);
+  if (coinDay == null || coinDay <= 0 || revenueUsd == null) return null;
+  const electricityCostPerDay = (powerW / 1000) * 24 * cost;
+  const profitDayUsd = revenueUsd - electricityCostPerDay;
+  const coin = coinSymbolFromCoinId(coinId);
+  return {
+    line1: `≈ ${fmtEs(coinDay, 6)} ${coin}`,
+    line2: `≈ ${fmtEs(profitDayUsd, 2)} USD`,
+    source: "whattomine",
+    electricityUsdPerKwh: cost,
+    note: `WhatToMine manual · coinId ${coinId} · hr ${fmtEs(hr, 3)} · ${powerW} W · electricidad ${cost} USD/kWh · profit diario estimado (revenue - costo eléctrico).`,
+  };
+}
+
 export type WhatToMineYieldResult = {
   line1: string;
   line2: string;
   source: "whattomine";
   electricityUsdPerKwh: number;
   note: string;
+};
+
+export type WhatToMineCustomConfig = {
+  url: string;
+  powerW: number;
+  electricityUsdPerKwh: number;
 };
 
 function inferAlgo(row: { mp_algo: string | null; procesador: string }): "sha256" | "scrypt" | null {
@@ -184,7 +324,7 @@ export async function estimateYieldWhatToMineForEquipo(row: {
     const revenueUsd = parseUsdString(j.revenue);
     if (zecDay == null || zecDay <= 0 || revenueUsd == null) return null;
     return {
-      line1: `Por día: ≈ ${fmtEs(zecDay, 5)} ZEC`,
+      line1: `≈ ${fmtEs(zecDay, 5)} ZEC`,
       line2: `Equivalente diario (USD): ≈ ${fmtEs(revenueUsd, 2)} USD`,
       source: "whattomine",
       electricityUsdPerKwh: WHATTOMINE_ELECTRICITY_USD_PER_KWH,
@@ -203,7 +343,7 @@ export async function estimateYieldWhatToMineForEquipo(row: {
     const revenueUsd = parseUsdString(j.revenue);
     if (btcDay == null || btcDay <= 0 || revenueUsd == null) return null;
     return {
-      line1: `Por día: ≈ ${fmtEs(btcDay, 6)} BTC`,
+      line1: `≈ ${fmtEs(btcDay, 6)} BTC`,
       line2: `Equivalente diario (USD): ≈ ${fmtEs(revenueUsd, 2)} USD`,
       source: "whattomine",
       electricityUsdPerKwh: WHATTOMINE_ELECTRICITY_USD_PER_KWH,
@@ -229,7 +369,7 @@ export async function estimateYieldWhatToMineForEquipo(row: {
     const dogeUsd = dogeDay * dogeBtc * btcUsd;
     const grossUsd = ltcRevenueUsd + dogeUsd;
     return {
-      line1: `Por día: ≈ ${fmtEs(ltcDay, 5)} LTC + ≈ ${dogeFmt} DOGE`,
+      line1: `≈ ${fmtEs(ltcDay, 5)} LTC + ≈ ${dogeFmt} DOGE`,
       line2: `Equivalente diario (USD): ≈ ${fmtEs(grossUsd, 2)} USD`,
       source: "whattomine",
       electricityUsdPerKwh: WHATTOMINE_ELECTRICITY_USD_PER_KWH,

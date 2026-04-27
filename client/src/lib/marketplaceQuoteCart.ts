@@ -74,11 +74,9 @@ function roundSetupUsd(n: unknown, fallback: number): number {
   return fallback;
 }
 
-/** Precio setup por unidad según la línea (100% → S02; 25/50/75 → S03). */
+/** Precio setup por unidad según la línea (100% → S02; fracción → S03). */
 export function quoteCartSetupUnitUsd(l: QuoteCartLine, pricing?: QuoteCartPricing): number {
   const pct = lineHashrateSharePct(l);
-  const setupPerPart = Number(l.hashrateSetupUsd);
-  if (Number.isFinite(setupPerPart) && setupPerPart >= 0) return Math.round(setupPerPart);
   const full = roundSetupUsd(pricing?.setupEquipoCompletoUsd, QUOTE_ADDON_SETUP_USD_FALLBACK);
   const share = roundSetupUsd(pricing?.setupCompraHashrateUsd, QUOTE_ADDON_SETUP_USD_FALLBACK);
   return pct < 100 ? share : full;
@@ -466,7 +464,7 @@ export type TicketRowLineBreakdown = {
   sharePct: number;
   includeSetup: boolean;
   includeWarranty: boolean;
-  /** USD/unidad de setup que usa el cálculo (S02/S03 o `hashrateSetupUsd` en la línea). */
+  /** USD/unidad de setup que usa el cálculo (S02 para equipo completo, S03 para fracción). */
   setupUnitUsd: number;
   equipmentSubtotalUsd: number;
   setupLineTotalUsd: number;
@@ -484,7 +482,7 @@ export function ticketRowLineBreakdown(row: Record<string, unknown>, pricing?: Q
   const pct = ticketRowSharePct(row);
   const setupFromRow = ticketRowSetupUsd(row);
   const setupUnitUsd =
-    setupFromRow != null
+    pct >= 100 && setupFromRow != null
       ? setupFromRow
       : pct < 100
         ? roundSetupUsd(pricing?.setupCompraHashrateUsd, QUOTE_ADDON_SETUP_USD_FALLBACK)

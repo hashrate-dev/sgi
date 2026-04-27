@@ -4,6 +4,7 @@ import {
   ASIC_MARKETPLACE_PRODUCTS,
   asicProductShowsMinerEconomyContent,
   compareMarketplaceShelfProducts,
+  inferMarketplaceCatalogFilter,
   marketplaceShelfPrimaryGroup,
   mergeAsicCatalogWithCorpGridExtras,
 } from "../lib/marketplaceAsicCatalog.js";
@@ -80,12 +81,7 @@ const MemoAsicShelfProduct = memo(AsicShelfProduct, (prev, next) => {
 MemoAsicShelfProduct.displayName = "AsicShelfProduct";
 
 function matchesCatalogFilter(p: AsicProduct, f: MarketplaceCatalogFilter): boolean {
-  const g = marketplaceShelfPrimaryGroup(p);
-  if (f === "sha256") return g === 0;
-  if (f === "scrypt") return g === 2;
-  if (f === "zcash") return g === 1;
-  // Otros = infraestructura (contenedores/racks/PDU).
-  return g === 5;
+  return inferMarketplaceCatalogFilter(p) === f;
 }
 
 export function MarketplacePage() {
@@ -300,6 +296,19 @@ function MarketplacePageBody() {
     return list;
   }, [products, filterAlgo, sortLoc]);
 
+  const availableFilters = useMemo<MarketplaceCatalogFilter[]>(() => {
+    const seen = new Set<MarketplaceCatalogFilter>();
+    for (const p of shelfProducts) seen.add(inferMarketplaceCatalogFilter(p));
+    const order: MarketplaceCatalogFilter[] = ["sha256", "scrypt", "zcash", "monero", "other"];
+    return order.filter((f) => seen.has(f));
+  }, [shelfProducts]);
+
+  useEffect(() => {
+    if (filterAlgo != null && !availableFilters.includes(filterAlgo)) {
+      setFilterAlgo(null);
+    }
+  }, [filterAlgo, availableFilters]);
+
   /** Deep link desde home corporativa: `/marketplace?asic=<id>` abre el modal de esa ficha. */
   useEffect(() => {
     if (catalogFromApi === null) return;
@@ -337,7 +346,11 @@ function MarketplacePageBody() {
               </header>
             </div>
             <div className="market-shelf-wrap market-shelf-wrap--catalog-v2">
-              <MarketplaceCatalogFilters value={filterAlgo} onChange={setFilterAlgo} />
+              <MarketplaceCatalogFilters
+                value={filterAlgo}
+                onChange={setFilterAlgo}
+                availableFilters={availableFilters}
+              />
               {catalogFromApi === null ? (
                 <p className="text-muted small mb-3 market-catalog-sync-hint" aria-live="polite">
                   {t("catalog.syncing")}

@@ -462,14 +462,29 @@ export function pickMarketplaceShelfSpecRows(rows: AsicProduct["detailRows"]): A
   return rows.slice(0, 4);
 }
 
-export type MarketplaceCatalogFilter = "sha256" | "scrypt" | "zcash" | "other";
+export type MarketplaceCatalogFilter = "sha256" | "scrypt" | "zcash" | "monero" | "other";
 
 export const ASIC_FILTER_GROUPS: ReadonlyArray<{ id: MarketplaceCatalogFilter; label: string }> = [
   { id: "sha256", label: "Bitcoin" },
   { id: "scrypt", label: "DOGE + LTC" },
   { id: "zcash", label: "Zcash" },
+  { id: "monero", label: "Monero" },
   { id: "other", label: "Otros" },
 ];
+
+/**
+ * Clasifica automáticamente el filtro del catálogo según contenido del equipo.
+ * Prioriza textos en filas técnicas (chip/minería) para evitar hardcode por modelo.
+ */
+export function inferMarketplaceCatalogFilter(p: AsicProduct): MarketplaceCatalogFilter {
+  const g = marketplaceShelfPrimaryGroup(p);
+  const t = `${p.brand} ${p.model} ${p.hashrate} ${p.detailRows.map((r) => r.text).join(" ")}`.toLowerCase();
+  if (/\b(monero|xmr|zephyr|zeph|randomx)\b/.test(t)) return "monero";
+  if (g === 0) return "sha256";
+  if (g === 2) return "scrypt";
+  if (g === 1) return "zcash";
+  return "other";
+}
 
 function normalizeSharePart(
   raw: unknown

@@ -6,17 +6,24 @@ const FILTER_LABEL_KEY: Record<MarketplaceCatalogFilter, string> = {
   sha256: "filter.bitcoin",
   scrypt: "filter.doge_ltc",
   zcash: "filter.zcash",
+  monero: "filter.monero",
   other: "filter.others",
 };
 
 export function MarketplaceCatalogFilters({
   value,
   onChange,
+  availableFilters,
 }: {
   value: MarketplaceCatalogFilter | null;
   onChange: (next: MarketplaceCatalogFilter | null) => void;
+  availableFilters?: MarketplaceCatalogFilter[];
 }) {
   const { t } = useMarketplaceLang();
+  const visibleGroups =
+    Array.isArray(availableFilters) && availableFilters.length > 0
+      ? ASIC_FILTER_GROUPS.filter((g) => availableFilters.includes(g.id))
+      : ASIC_FILTER_GROUPS;
   return (
     <div className="market-filter-simple">
       <span className="market-filter-simple__label" id="market-filter-label">
@@ -34,7 +41,7 @@ export function MarketplaceCatalogFilters({
         >
           {t("filter.all")}
         </button>
-        {ASIC_FILTER_GROUPS.map((g) => (
+        {visibleGroups.map((g) => (
           <button
             key={g.id}
             type="button"

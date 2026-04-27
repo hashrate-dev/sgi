@@ -7,6 +7,7 @@ import {
   updateSetup,
   deleteSetup,
   deleteSetupsAll,
+  applyMarketplaceSetupGlobal,
   type SetupsResponse,
 } from "../lib/api";
 import type { Setup } from "../lib/types";
@@ -83,6 +84,8 @@ export function SetupPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingSetup, setEditingSetup] = useState<Setup | null>(null);
   const [excelLoading, setExcelLoading] = useState(false);
+  const [setupGlobalMarketplaceUsd, setSetupGlobalMarketplaceUsd] = useState<0 | 50>(50);
+  const [applyingSetupGlobal, setApplyingSetupGlobal] = useState(false);
   const [formData, setFormData] = useState({
     nombre: "",
     precioUSD: 0,
@@ -208,6 +211,31 @@ export function SetupPage() {
   function handleDeleteCancel() {
     setShowDeleteConfirm1(false);
     setShowDeleteConfirm2(false);
+  }
+
+  async function handleApplySetupGlobalMarketplace() {
+    if (!canEdit) {
+      showToast("No tiene permisos para aplicar setup global.", "error", "Setup");
+      return;
+    }
+    const target = Number(setupGlobalMarketplaceUsd) === 0 ? 0 : 50;
+    const ok = window.confirm(
+      `¿Aplicar setup global de ${target} USD a todos los equipos del marketplace? (Setup Compra Hashrate S03 queda aparte en 40 USD)`
+    );
+    if (!ok) return;
+    setApplyingSetupGlobal(true);
+    try {
+      const result = await applyMarketplaceSetupGlobal(target);
+      showToast(
+        `Setup global aplicado: ${target} USD (S02). Equipos actualizados: ${result.updatedCount}. Omitidos: ${result.skippedCount}. Compra Hashrate (S03) fijado en ${result.hashratePinnedUsd} USD.`,
+        "success",
+        "Setup"
+      );
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Error al aplicar setup global.", "error", "Setup");
+    } finally {
+      setApplyingSetupGlobal(false);
+    }
   }
 
   function exportExcel() {
@@ -344,18 +372,6 @@ export function SetupPage() {
                         </label>
                       </>
                     )}
-                    {canDelete &&
-                      setups.length > 0 &&
-                      setups.some((s) => !isSetupCompraHashrateProtected(s.codigo, s.nombre)) && (
-                      <button
-                        type="button"
-                        className="btn btn-outline-secondary btn-sm clientes-borrar-todo-btn"
-                        style={{ backgroundColor: "rgba(220, 53, 69, 0.4)" }}
-                        onClick={handleDeleteAllClick}
-                      >
-                        🗑️ Borrar todo
-                      </button>
-                    )}
                   </div>
                 </div>
               </div>
@@ -453,25 +469,12 @@ export function SetupPage() {
                               >
                                 Editar
                               </button>
-                              {canDelete &&
-                                (isSetupCompraHashrateProtected(s.codigo, s.nombre) ? (
-                                  <span
-                                    className="text-muted small align-self-center px-1"
-                                    title="No se puede eliminar: ítem reservado para cotizaciones con fracción de hashrate en la tienda (S03)."
-                                  >
-                                    <i className="bi bi-lock-fill" aria-hidden />
-                                  </span>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    className="btn btn-danger btn-sm"
-                                    style={{ padding: "0.35rem 0.75rem", fontSize: "0.8125rem" }}
-                                    onClick={() => setDeleteConfirmSetup(s)}
-                                    title="Eliminar"
-                                  >
-                                    <i className="bi bi-trash" />
-                                  </button>
-                                ))}
+                              <span
+                                className="text-muted small align-self-center px-1"
+                                title="Eliminación bloqueada para todos los Setup."
+                              >
+                                <i className="bi bi-lock-fill" aria-hidden />
+                              </span>
                             </div>
                           </td>
                         )}
@@ -482,6 +485,47 @@ export function SetupPage() {
               </div>
             )}
           </div>
+
+          {canEdit && (
+            <div className="setup-global-marketplace-panel mt-4">
+              <div className="setup-global-marketplace-panel__head">
+                <div>
+                  <h6 className="setup-global-marketplace-panel__title mb-1">Setup global marketplace</h6>
+                  <p className="setup-global-marketplace-panel__desc mb-0">
+                    Aplicá a todos los equipos del marketplace, solo con compra completa de unidad. No incluye compra de Hashrate (% de Equipo ASIC).
+                  </p>
+                </div>
+                <span className="setup-global-marketplace-panel__badge">
+                  {setupGlobalMarketplaceUsd === 50 ? "Modo ON · 50 USD" : "Modo OFF · 0 USD"}
+                </span>
+              </div>
+              <div className="setup-global-marketplace-panel__controls">
+                <div className="form-check form-switch setup-global-marketplace-panel__switch">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    id="setup-global-marketplace-switch"
+                    checked={setupGlobalMarketplaceUsd === 50}
+                    onChange={(e) => setSetupGlobalMarketplaceUsd(e.target.checked ? 50 : 0)}
+                    disabled={applyingSetupGlobal}
+                  />
+                  <label className="form-check-label" htmlFor="setup-global-marketplace-switch">
+                    {setupGlobalMarketplaceUsd === 50 ? "Setup activado (50 USD)" : "Setup desactivado (0 USD)"}
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  className="fact-btn fact-btn-primary setup-global-marketplace-panel__apply"
+                  onClick={() => void handleApplySetupGlobalMarketplace()}
+                  disabled={applyingSetupGlobal}
+                  title="Aplica setupUsd a todos los equipos del marketplace con fracciones de hashrate"
+                >
+                  {applyingSetupGlobal ? "Aplicando..." : "⚡ Aplicar a todo marketplace"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {showAddModal && (

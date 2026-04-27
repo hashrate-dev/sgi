@@ -9,6 +9,7 @@ import {
   uploadMarketplaceImageMw,
 } from "../middleware/marketplaceImageUpload.js";
 import {
+  estimateYieldFromCustomWhatToMine,
   estimateYieldWhatToMineForEquipo,
   explainInferAlgoFailure,
   resolveMarketplaceAlgoForPersist,
@@ -243,7 +244,7 @@ function mpPayloadFromBody(d: z.infer<typeof EquipoBodySchema>) {
     mp_image_src: vis ? (d.marketplaceImageSrc?.trim() || null) : null,
     mp_gallery_json: vis ? (d.marketplaceGalleryJson?.trim() || null) : null,
     mp_detail_rows_json: vis ? (d.marketplaceDetailRowsJson?.trim() || null) : null,
-    mp_yield_json: null,
+    mp_yield_json: vis ? (d.marketplaceYieldJson?.trim() || null) : null,
     mp_sort_order: vis ? sort : 0,
     mp_hashrate_sell_enabled: shareEnabled ? mpVisibleToInt(true) : mpVisibleToInt(false),
     mp_hashrate_parts_json:
@@ -251,6 +252,58 @@ function mpPayloadFromBody(d: z.infer<typeof EquipoBodySchema>) {
     mp_price_label,
     mp_listing_kind,
   };
+}
+
+function parseCustomYieldConfig(raw: string | null | undefined): {
+  url: string;
+  powerW: number;
+  electricityUsdPerKwh: number;
+} | null {
+  const t = String(raw ?? "").trim();
+  if (!t) return null;
+  const parseUrlDefaults = (url: string, fallbackPower = 2600, fallbackCost = 0.078) => {
+    try {
+      const u = new URL(url);
+      const powerQ = Math.max(1, Math.round(Number(u.searchParams.get("p")) || 0)) || fallbackPower;
+      const costQ = Number(u.searchParams.get("cost"));
+      const electricityQ = Number.isFinite(costQ) && costQ >= 0 ? costQ : fallbackCost;
+      return { url, powerW: powerQ, electricityUsdPerKwh: electricityQ };
+    } catch {
+      return null;
+    }
+  };
+  if (/^https?:\/\//i.test(t)) return parseUrlDefaults(t);
+  try {
+    const parsed = JSON.parse(t) as {
+      type?: unknown;
+      url?: unknown;
+      powerW?: unknown;
+      electricityUsdPerKwh?: unknown;
+      power?: unknown;
+      cost?: unknown;
+    };
+    const url = String(parsed.url ?? "").trim();
+    if (!url) return null;
+    const isCustom = String(parsed.type ?? "") === "wtm_custom" || parsed.type == null;
+    if (!isCustom) return null;
+    const powerW = Math.max(1, Math.round(Number(parsed.powerW) || 0));
+    const electricityUsdPerKwhRaw =
+      Number.isFinite(Number(parsed.electricityUsdPerKwh))
+        ? Number(parsed.electricityUsdPerKwh)
+        : Number(parsed.cost);
+    const fallback = parseUrlDefaults(url);
+    if (!fallback) return null;
+    return {
+      url,
+      powerW: Number.isFinite(powerW) && powerW > 0 ? powerW : fallback.powerW,
+      electricityUsdPerKwh:
+        Number.isFinite(electricityUsdPerKwhRaw) && electricityUsdPerKwhRaw >= 0
+          ? electricityUsdPerKwhRaw
+          : fallback.electricityUsdPerKwh,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** Mantiene columnas de tienda sin cambios (Operador al editar equipo). */
@@ -450,6 +503,11 @@ equiposRouter.get("/equipos/:id/whattomine-yield", requireAuth, async (req, res:
       procesador: row.procesador ?? "",
       mp_detail_rows_json: row.mp_detail_rows_json ?? null,
     };
+    const customYieldCfg = parseCustomYieldConfig(row.mp_yield_json ?? null);
+    if (customYieldCfg) {
+      const custom = await estimateYieldFromCustomWhatToMine(customYieldCfg);
+      if (custom) return res.json({ ok: true, yield: custom });
+    }
     const hintFail = explainInferAlgoFailure(payload);
     const y = await estimateYieldWhatToMineForEquipo(payload);
     if (!y) {

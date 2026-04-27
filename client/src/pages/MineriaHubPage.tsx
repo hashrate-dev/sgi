@@ -3,6 +3,12 @@ import { PageHeader } from "../components/PageHeader";
 import "../styles/facturacion.css";
 
 const asicMenuItems: Array<{ to: string; icon: string; label: string; desc: string }> = [
+  {
+    to: "/asic/cotizador-china-py",
+    icon: "bi-calculator",
+    label: "Cotizador China → Paraguay",
+    desc: "Cotizador de equipos ASIC de China a Paraguay",
+  },
   { to: "/asic/billing", icon: "bi-receipt", label: "Emitir Facturas de Equipos ASIC", desc: "Emisión de Facturas, Notas de Crédito y Recibos" },
   { to: "/asic/history", icon: "bi-clock-history", label: "Historial Venta de ASIC", desc: "Ver y gestionar comprobantes por Ventas de Equipos ASIC" },
   { to: "/asic/pending", icon: "bi-hourglass-split", label: "Pendientes de Cobro", desc: "Facturas pendientes de cobro por venta de Equipos ASIC" },

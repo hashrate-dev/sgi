@@ -16,6 +16,10 @@ const SetupBodySchema = z.object({
   precioUSD: z.coerce.number().int().min(0).max(99999),
 });
 
+const SetupGlobalMarketplaceBodySchema = z.object({
+  setupUsd: z.coerce.number().int().min(0).max(999999),
+});
+
 type SetupRow = { id: string; codigo: string | null; nombre: string; precioUSD?: number; preciousd?: number; precio_usd?: number };
 
 /** Siguiente código S01, S02, ... S99 (2 cifras), sin repetir. Postgres: ~ '^S[0-9]{2}$'; SQLite: GLOB. */
@@ -104,6 +108,81 @@ setupsRouter.put("/setups/:id", requireAuth, requireCanEdit, async (req, res: Re
     const result = await db.prepare("UPDATE setups SET nombre = ?, precio_usd = ? WHERE id = ?").run(nombre.trim(), precioUSD, id);
     if (result.changes === 0) return res.status(404).json({ error: { message: "Setup no encontrado" } });
     res.json({ ok: true });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: { message: msg } });
+  }
+});
+
+/** PUT /setups/marketplace/setup-global — aplica setupUsd en bloque a todos los equipos marketplace con partes hashrate */
+setupsRouter.put("/setups/marketplace/setup-global", requireAuth, requireCanEdit, async (req, res: Response) => {
+  const parsed = SetupGlobalMarketplaceBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
+  }
+  const setupUsd = parsed.data.setupUsd;
+  try {
+    const rows = (await db
+      .prepare(
+        `SELECT id, mp_hashrate_parts_json
+         FROM equipos_asic
+         WHERE mp_hashrate_parts_json IS NOT NULL AND TRIM(mp_hashrate_parts_json) <> ''`
+      )
+      .all()) as Array<{ id: string; mp_hashrate_parts_json: string | null }>;
+
+    let updatedCount = 0;
+    let skippedCount = 0;
+    for (const row of rows) {
+      const raw = String(row.mp_hashrate_parts_json ?? "").trim();
+      if (!raw) {
+        skippedCount++;
+        continue;
+      }
+      try {
+        const parts = JSON.parse(raw);
+        if (!Array.isArray(parts) || parts.length === 0) {
+          skippedCount++;
+          continue;
+        }
+        const normalized = parts.map((x: unknown) => {
+          const p = x as { sharePct?: unknown; warrantyPct?: unknown; setupUsd?: unknown };
+          const sharePct = Number.isFinite(Number(p.sharePct)) ? Math.trunc(Number(p.sharePct)) : 0;
+          const warrantyPct = Number.isFinite(Number(p.warrantyPct)) ? Math.trunc(Number(p.warrantyPct)) : sharePct;
+          return { sharePct, warrantyPct, setupUsd };
+        });
+        await db.prepare("UPDATE equipos_asic SET mp_hashrate_parts_json = ? WHERE id = ?").run(JSON.stringify(normalized), row.id);
+        updatedCount++;
+      } catch {
+        skippedCount++;
+      }
+    }
+    const setupEquipoCompleto = await db
+      .prepare(
+        `UPDATE setups
+         SET precio_usd = ?
+         WHERE UPPER(TRIM(COALESCE(codigo, ''))) = 'S02'`
+      )
+      .run(setupUsd);
+
+    const pinnedSetupHashrate = await db
+      .prepare(
+        `UPDATE setups
+         SET precio_usd = 40
+         WHERE UPPER(TRIM(COALESCE(codigo, ''))) = 'S03'
+            OR LOWER(TRIM(COALESCE(nombre, ''))) LIKE '%setup compra hashrate%'`
+      )
+      .run();
+
+    res.json({
+      ok: true,
+      setupUsd,
+      updatedCount,
+      skippedCount,
+      setupEquipoCompletoUsd: setupUsd,
+      setupEquipoCompletoCount: setupEquipoCompleto.changes ?? 0,
+      hashratePinnedUsd: 40,
+      hashratePinnedCount: pinnedSetupHashrate.changes ?? 0,
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     res.status(500).json({ error: { message: msg } });

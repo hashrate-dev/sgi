@@ -2358,6 +2358,214 @@ a.fact-logo-container--link:focus-visible {
   font-size: 0.95em;
   font-weight: 500;
 }
+
+/* Cotizador ASIC — Parámetros: cada campo con bloque blanco, borde y acento verde (igual que Margen USD) */
+.fact-panel-nuevo-documento .asic-cotizador-field-wrap {
+  padding: 0.75rem 0.9rem;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-left: 3px solid #2d5d46;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+}
+.fact-panel-nuevo-documento .asic-cotizador-field-wrap .fact-label {
+  color: #334155;
+  font-weight: 600;
+}
+.fact-panel-nuevo-documento .asic-cotizador-field-wrap .fact-input {
+  background: #fff;
+  border-color: #cbd5e1;
+  color: #0f172a;
+  font-weight: 600;
+}
+.fact-panel-nuevo-documento .asic-cotizador-field-wrap .fact-input:focus {
+  border-color: #2d5d46;
+  box-shadow: 0 0 0 0.12rem rgba(45, 93, 70, 0.2);
+  outline: none;
+}
+.fact-panel-nuevo-documento .asic-cotizador-field-wrap .fact-input::placeholder {
+  color: #94a3b8;
+  opacity: 0.9;
+}
+.fact-panel-nuevo-documento .asic-cotizador-field-wrap .fact-select {
+  background: #fff;
+  border-color: #cbd5e1;
+  color: #0f172a;
+  font-weight: 600;
+}
+.fact-panel-nuevo-documento .asic-cotizador-field-wrap .fact-select:focus {
+  border-color: #2d5d46;
+  box-shadow: 0 0 0 0.12rem rgba(45, 93, 70, 0.2);
+  outline: none;
+}
+.fact-panel-nuevo-documento .asic-cotizador-field-wrap .fact-select:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  opacity: 0.9;
+  cursor: not-allowed;
+}
+
+/* Parámetros — campos de costo (precio, monto, coef., proveedor): tono rojo suave */
+.fact-panel-nuevo-documento .asic-cotizador-field-wrap--costo {
+  background: linear-gradient(180deg, #fff1f2 0%, #ffe4e6 45%, #fff1f2 100%);
+  border: 1px solid #fecdd3;
+  border-left: 3px solid #b91c1c;
+  box-shadow: 0 1px 4px rgba(185, 28, 28, 0.08);
+}
+.fact-panel-nuevo-documento .asic-cotizador-field-wrap--costo .fact-label {
+  color: #7f1d1d;
+}
+.fact-panel-nuevo-documento .asic-cotizador-field-wrap--costo .fact-label .text-muted {
+  color: #9f1239;
+  opacity: 0.9;
+}
+.fact-panel-nuevo-documento .asic-cotizador-field-wrap--costo .fact-input {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: #fb7185;
+  color: #1f2937;
+}
+.fact-panel-nuevo-documento .asic-cotizador-field-wrap--costo .fact-input:focus {
+  border-color: #b91c1c;
+  box-shadow: 0 0 0 0.12rem rgba(220, 38, 38, 0.22);
+  outline: none;
+}
+.fact-panel-nuevo-documento .asic-cotizador-field-wrap--costo .fact-input::placeholder {
+  color: #e11d48;
+  opacity: 0.45;
+}
+
+/* Margen USD: solo este campo resaltado en ambar (resto de Parámetros queda blanco) */
+.fact-panel-nuevo-documento .asic-cotizador-field-wrap--margen-amarillo {
+  background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 55%, #fffbeb 100%);
+  border: 1px solid #fcd34d;
+  border-left: 3px solid #d97706;
+  box-shadow: 0 1px 4px rgba(180, 83, 9, 0.1);
+}
+.fact-panel-nuevo-documento .asic-cotizador-field-wrap--margen-amarillo .fact-label {
+  color: #78350f;
+}
+.fact-panel-nuevo-documento .asic-cotizador-field-wrap--margen-amarillo .fact-input {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: #fbbf24;
+  color: #78350f;
+}
+.fact-panel-nuevo-documento .asic-cotizador-field-wrap--margen-amarillo .fact-input:focus {
+  border-color: #d97706;
+  box-shadow: 0 0 0 0.12rem rgba(245, 158, 11, 0.4);
+  outline: none;
+}
+.fact-panel-nuevo-documento .asic-cotizador-field-wrap--margen-amarillo .fact-input::placeholder {
+  color: #d97706;
+  opacity: 0.7;
+}
+
+/* Cotizador ASIC — listado registros con look&feel SGI */
+.asic-cotizador-registros-wrap {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+  overflow: auto;
+}
+.asic-cotizador-registros-table {
+  margin-bottom: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 1120px;
+}
+.asic-cotizador-registros-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #2d5d46;
+  color: #f8fafc;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border: 0;
+  padding: 0.6rem 0.55rem;
+  white-space: nowrap;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.14);
+}
+.asic-cotizador-registros-table tbody td {
+  padding: 0.56rem 0.55rem;
+  border-top: 0;
+  border-bottom: 1px solid #e2e8f0;
+  color: #334155;
+  vertical-align: middle;
+  background: #fff;
+  white-space: nowrap;
+  font-size: 0.84rem;
+}
+.asic-cotizador-registros-table tbody tr:nth-child(even) td {
+  background: #f8fafc;
+}
+.asic-cotizador-registros-table tbody tr:hover td {
+  background: #f0fdf4;
+}
+.asic-cotizador-registros-table tbody td.text-end {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Cotizador ASIC — margen editable dentro de tarjeta KPI (misma fila que precio / total) */
+.hosting-fx-ops-metric--margen-input .hosting-fx-ops-metric__field {
+  margin-top: 0.15rem;
+}
+.hosting-fx-ops-metric__margen-debajo {
+  margin: 0 0 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+.hosting-fx-ops-metric__field-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0.2rem 0 0.4rem;
+  font-size: clamp(1.35rem, 2.1vw, 1.75rem);
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.15;
+  border: none;
+  border-bottom: 2px solid #e2e8f0;
+  background: transparent;
+  border-radius: 0;
+}
+.hosting-fx-ops-metric__field-input::placeholder {
+  color: #94a3b8;
+  font-weight: 600;
+}
+.hosting-fx-ops-metric__field-input:focus {
+  outline: none;
+  border-bottom-color: #2d5d46;
+}
+
+@media (min-width: 1400px) {
+  .hosting-fx-ops-indicators--asic-quoter .hosting-fx-ops-indicators__grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+.hosting-fx-ops-metric__figure--pct {
+  color: #14532d;
+  font-size: clamp(1.35rem, 2.1vw, 1.75rem);
+}
+.hosting-fx-ops-metric__unit--suffix-pct {
+  font-size: 0.5em;
+  margin-left: 0.06em;
+  vertical-align: 0.15em;
+}
+.hosting-fx-ops-metric__figure-sub--pct-hint {
+  margin-top: 0.25rem;
+  margin-bottom: 0;
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
 .hosting-fx-ops-table-wrap {
   border-radius: 12px;
   border: 1px solid #e2e8f0;
@@ -5342,6 +5550,72 @@ a.fact-logo-container--link:focus-visible {
 
 .clientes-new-actions .fact-btn {
   min-width: 120px;
+}
+
+/* Setup global marketplace - panel moderno */
+.setup-global-marketplace-panel {
+  background: linear-gradient(145deg, #f8fafc 0%, #ffffff 65%);
+  border: 1px solid #dbe5ef;
+  border-left: 4px solid #2d5d46;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  padding: 0.95rem 1rem;
+}
+.setup-global-marketplace-panel__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+.setup-global-marketplace-panel__title {
+  color: #0f172a;
+  font-weight: 700;
+}
+.setup-global-marketplace-panel__desc {
+  color: #64748b;
+  font-size: 0.825rem;
+}
+.setup-global-marketplace-panel__badge {
+  background: #ecfdf3;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.setup-global-marketplace-panel__controls {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.setup-global-marketplace-panel__switch {
+  margin: 0;
+}
+.setup-global-marketplace-panel__switch .form-check-input {
+  width: 2.65rem;
+  height: 1.35rem;
+  margin-top: 0.1rem;
+  cursor: pointer;
+}
+.setup-global-marketplace-panel__switch .form-check-input:checked {
+  background-color: #16a34a;
+  border-color: #16a34a;
+}
+.setup-global-marketplace-panel__switch .form-check-label {
+  color: #334155;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-left: 0.4rem;
+}
+.setup-global-marketplace-panel__apply {
+  font-size: 0.8125rem;
+  padding: 0.5rem 0.9rem;
 }
 
 /* Formulario cliente ordenado: Código arriba + dos contactos (cada uno con nombre, tel, email, dirección, ciudad) */

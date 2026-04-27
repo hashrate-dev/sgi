@@ -21,7 +21,7 @@ import {
   fetchNetworkMiningSnapshot,
   type AsicYieldItem,
 } from "../lib/miningYieldEstimate.js";
-import { fetchZecWhatToMineYieldForItem } from "../lib/whattomineYield.js";
+import { estimateYieldFromCustomWhatToMine, fetchZecWhatToMineYieldForItem } from "../lib/whattomineYield.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { resolveSetupCompraHashrateUsd, resolveSetupEquipoCompletoUsd } from "../lib/marketplaceSetupHashratePrice.js";
 import { loadGarantiaQuoteRows } from "../lib/marketplaceGarantiaQuote.js";
@@ -983,6 +983,58 @@ const AsicYieldRequestSchema = z.object({
     .max(48),
 });
 
+function parseCustomYieldConfig(raw: string | null | undefined): {
+  url: string;
+  powerW: number;
+  electricityUsdPerKwh: number;
+} | null {
+  const t = String(raw ?? "").trim();
+  if (!t) return null;
+  const parseUrlDefaults = (url: string, fallbackPower = 2600, fallbackCost = 0.078) => {
+    try {
+      const u = new URL(url);
+      const powerQ = Math.max(1, Math.round(Number(u.searchParams.get("p")) || 0)) || fallbackPower;
+      const costQ = Number(u.searchParams.get("cost"));
+      const electricityQ = Number.isFinite(costQ) && costQ >= 0 ? costQ : fallbackCost;
+      return { url, powerW: powerQ, electricityUsdPerKwh: electricityQ };
+    } catch {
+      return null;
+    }
+  };
+  if (/^https?:\/\//i.test(t)) return parseUrlDefaults(t);
+  try {
+    const parsed = JSON.parse(t) as {
+      type?: unknown;
+      url?: unknown;
+      powerW?: unknown;
+      electricityUsdPerKwh?: unknown;
+      power?: unknown;
+      cost?: unknown;
+    };
+    const url = String(parsed.url ?? "").trim();
+    if (!url) return null;
+    const isCustom = String(parsed.type ?? "") === "wtm_custom" || parsed.type == null;
+    if (!isCustom) return null;
+    const powerW = Math.max(1, Math.round(Number(parsed.powerW) || 0));
+    const electricityUsdPerKwhRaw =
+      Number.isFinite(Number(parsed.electricityUsdPerKwh))
+        ? Number(parsed.electricityUsdPerKwh)
+        : Number(parsed.cost);
+    const fallback = parseUrlDefaults(url);
+    if (!fallback) return null;
+    return {
+      url,
+      powerW: Number.isFinite(powerW) && powerW > 0 ? powerW : fallback.powerW,
+      electricityUsdPerKwh:
+        Number.isFinite(electricityUsdPerKwhRaw) && electricityUsdPerKwhRaw >= 0
+          ? electricityUsdPerKwhRaw
+          : fallback.electricityUsdPerKwh,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * POST /marketplace/asic-yields — estimación de rendimiento en vivo (sin token).
  * Usa difficulty/emisiones de red públicas + CoinGecko; merge LTC+DOGE calibrado vs WhatToMine.
@@ -997,14 +1049,45 @@ marketplaceRouter.post("/marketplace/asic-yields", async (req: Request, res: Res
     if (!parsed.success) {
       return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
     }
-    const snap = await fetchNetworkMiningSnapshot();
     const items = parsed.data.items as AsicYieldItem[];
-    const zecItems = items.filter(detectZecEquihashYieldItem);
-    const otherItems = items.filter((it) => !detectZecEquihashYieldItem(it));
+    const ids = Array.from(new Set(items.map((x) => String(x.id ?? "").trim()).filter(Boolean)));
+    const customById = new Map<string, { url: string; powerW: number; electricityUsdPerKwh: number }>();
+    if (ids.length > 0) {
+      const ph = ids.map(() => "?").join(", ");
+      const rows = (await db
+        .prepare(`SELECT id, mp_yield_json FROM equipos_asic WHERE id IN (${ph})`)
+        .all(...ids)) as Array<{ id: string; mp_yield_json: string | null }>;
+      for (const r of rows) {
+        const cfg = parseCustomYieldConfig(r.mp_yield_json);
+        if (cfg) customById.set(String(r.id), cfg);
+      }
+    }
+    const customItems = items.filter((it) => customById.has(String(it.id)));
+    const nonCustomItemsBase = items.filter((it) => !customById.has(String(it.id)));
+    const snap = await fetchNetworkMiningSnapshot();
+    const fallbackFromCustom: AsicYieldItem[] = [];
+    const customYieldRows: Array<{ id: string; line1: string; line2: string; note: string }> = [];
+    for (const it of customItems) {
+      const cfg = customById.get(String(it.id));
+      if (!cfg) {
+        fallbackFromCustom.push(it);
+        continue;
+      }
+      const y = await estimateYieldFromCustomWhatToMine(cfg);
+      if (!y) {
+        fallbackFromCustom.push(it);
+        continue;
+      }
+      customYieldRows.push({ id: String(it.id), line1: y.line1, line2: y.line2, note: y.note });
+    }
+    const nonCustomItems = [...nonCustomItemsBase, ...fallbackFromCustom];
+    const zecItems = nonCustomItems.filter(detectZecEquihashYieldItem);
+    const otherItems = nonCustomItems.filter((it) => !detectZecEquihashYieldItem(it));
     let yields: ReturnType<typeof estimateAllYields> = [];
     try {
       const zecYields = await Promise.all(zecItems.map((it) => fetchZecWhatToMineYieldForItem(it)));
       yields = [
+        ...customYieldRows,
         ...zecYields.filter((y): y is NonNullable<(typeof zecYields)[number]> => y != null),
         ...estimateAllYields(otherItems, snap),
       ];

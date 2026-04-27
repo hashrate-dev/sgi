@@ -601,6 +601,49 @@ export function deleteHostingFxOperation(id: number): Promise<{ ok: boolean }> {
   return api<{ ok: boolean }>(`/api/hosting/fx-operations/${id}`, { method: "DELETE" });
 }
 
+export type AsicCostoEquipoItem = {
+  id: number;
+  createdAt: string;
+  marca: string;
+  modelo: string;
+  procesador: string;
+  precioOrigen: number;
+  montoUsd: number;
+  coeficiente: number;
+  proveedorPy: number;
+  margenUsd: number;
+  totalNacionalizado: number;
+  precioVenta: number;
+  pctMargen: number;
+};
+
+export type AsicCostoEquipoPayload = {
+  marca?: string;
+  modelo?: string;
+  procesador?: string;
+  precioOrigen: number;
+  montoUsd: number;
+  coeficiente: number;
+  proveedorPy: number;
+  margenUsd: number;
+  totalNacionalizado: number;
+  precioVenta: number;
+  pctMargen: number;
+};
+
+export function getAsicCostosEquipos(): Promise<{ items: AsicCostoEquipoItem[] }> {
+  return api<{ items: AsicCostoEquipoItem[] }>("/api/asic/costos-equipos");
+}
+
+export function createAsicCostoEquipo(
+  body: AsicCostoEquipoPayload
+): Promise<{ ok: boolean; item: AsicCostoEquipoItem | null }> {
+  return api<{ ok: boolean; item: AsicCostoEquipoItem | null }>("/api/asic/costos-equipos", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
 /** Crear factura/recibo/NC en la base de datos (numeración única, no se repiten). */
 export type InvoiceCreateBody = {
   number?: string; /* opcional: el servidor genera el número */
@@ -828,6 +871,33 @@ export function deleteSetup(id: string): Promise<void> {
 
 export function deleteSetupsAll(): Promise<{ ok: boolean; deletedCount?: number }> {
   return api<{ ok: boolean; deletedCount?: number }>("/api/setups", { method: "DELETE" });
+}
+
+export function applyMarketplaceSetupGlobal(
+  setupUsd: number
+): Promise<{
+  ok: boolean;
+  setupUsd: number;
+  updatedCount: number;
+  skippedCount: number;
+  setupEquipoCompletoUsd: number;
+  setupEquipoCompletoCount: number;
+  hashratePinnedUsd: number;
+  hashratePinnedCount: number;
+}> {
+  return api<{
+    ok: boolean;
+    setupUsd: number;
+    updatedCount: number;
+    skippedCount: number;
+    setupEquipoCompletoUsd: number;
+    setupEquipoCompletoCount: number;
+    hashratePinnedUsd: number;
+    hashratePinnedCount: number;
+  }>(
+    "/api/setups/marketplace/setup-global",
+    { method: "PUT", body: JSON.stringify({ setupUsd }) }
+  );
 }
 
 // ——— Equipos ASIC (backend) ———

@@ -57,6 +57,7 @@ const MARCAS_EQUIPO_OPCIONES = ["Bitmain"] as const;
 /** Modelos del desplegable; en edición, si en BD hay otro texto se ofrece como opción extra. */
 const MODELOS_EQUIPO_OPCIONES = [
   "Antminer S21",
+  "Antminer X9",
   "Antminer L7",
   "Antminer L9",
   "Antminer Z15",
@@ -300,6 +301,9 @@ type EquipoFormState = {
   marketplaceImageSrc: string;
   marketplaceGalleryLines: string;
   marketplaceDetailRowsJson: string;
+  marketplaceYieldSourceUrl: string;
+  marketplaceYieldPowerW: number;
+  marketplaceYieldElectricityUsdPerKwh: number;
 };
 
 const DEFAULT_HASHRATE_PARTS: Array<{ sharePct: number; warrantyPct: number; setupUsd: number }> = [
@@ -307,6 +311,39 @@ const DEFAULT_HASHRATE_PARTS: Array<{ sharePct: number; warrantyPct: number; set
   { sharePct: 50, warrantyPct: 50, setupUsd: 40 },
   { sharePct: 25, warrantyPct: 25, setupUsd: 40 },
 ];
+
+type MarketplaceYieldConfig = {
+  type: "wtm_custom";
+  url: string;
+  powerW: number;
+  electricityUsdPerKwh: number;
+};
+
+function parseMarketplaceYieldConfig(raw: string | null | undefined): MarketplaceYieldConfig | null {
+  const t = String(raw ?? "").trim();
+  if (!t) return null;
+  try {
+    const p = JSON.parse(t) as {
+      type?: unknown;
+      url?: unknown;
+      powerW?: unknown;
+      electricityUsdPerKwh?: unknown;
+    };
+    if (String(p.type ?? "") !== "wtm_custom") return null;
+    const url = String(p.url ?? "").trim();
+    const powerW = Math.max(1, Math.round(Number(p.powerW) || 0));
+    const electricityUsdPerKwh = Number(p.electricityUsdPerKwh);
+    if (!url || !Number.isFinite(powerW) || !Number.isFinite(electricityUsdPerKwh) || electricityUsdPerKwh < 0) return null;
+    return {
+      type: "wtm_custom",
+      url,
+      powerW,
+      electricityUsdPerKwh,
+    };
+  } catch {
+    return null;
+  }
+}
 
 function normalizeHashrateParts(
   parts: Array<{ sharePct: number; warrantyPct: number; setupUsd: number }>
@@ -352,6 +389,18 @@ function buildMarketplacePayload(form: EquipoFormState): {
   const labelTrim = form.marketplacePriceLabel.trim();
   const shareEnabled = form.marketplaceHashrateSellEnabled === true;
   const shareParts = shareEnabled ? normalizeHashrateParts(form.marketplaceHashrateParts) : [];
+  const customYieldUrl = form.marketplaceYieldSourceUrl.trim();
+  const customYieldPower = Math.max(1, Math.round(Number(form.marketplaceYieldPowerW) || 0));
+  const customYieldCost = Number(form.marketplaceYieldElectricityUsdPerKwh);
+  const marketplaceYieldJson =
+    vis && customYieldUrl && Number.isFinite(customYieldCost) && customYieldCost >= 0
+      ? JSON.stringify({
+          type: "wtm_custom",
+          url: customYieldUrl,
+          powerW: customYieldPower,
+          electricityUsdPerKwh: customYieldCost,
+        } satisfies MarketplaceYieldConfig)
+      : null;
   const marketplacePriceLabel =
     consult ? (labelTrim || DEFAULT_MARKETPLACE_PRICE_LABEL).slice(0, 120) : null;
   /** Siempre automático (heurística marca/modelo en vitrina); sin override manual en formulario. */
@@ -363,7 +412,7 @@ function buildMarketplacePayload(form: EquipoFormState): {
     marketplaceImageSrc: vis ? (form.marketplaceImageSrc.trim() || null) : null,
     marketplaceGalleryJson: galleryJson,
     marketplaceDetailRowsJson: detailJson,
-    marketplaceYieldJson: null,
+    marketplaceYieldJson,
     marketplaceSortOrder: 0,
     marketplaceHashrateSellEnabled: shareEnabled,
     marketplaceHashrateParts: shareEnabled && shareParts.length > 0 ? shareParts : null,
@@ -411,6 +460,9 @@ function emptyEquipoForm(): EquipoFormState {
     marketplaceImageSrc: "",
     marketplaceGalleryLines: "",
     marketplaceDetailRowsJson: "",
+    marketplaceYieldSourceUrl: "",
+    marketplaceYieldPowerW: 2600,
+    marketplaceYieldElectricityUsdPerKwh: 0.078,
   };
 }
 
@@ -566,6 +618,21 @@ export function EquiposAsicPage() {
         return;
       }
     }
+    const customYieldUrl = formData.marketplaceYieldSourceUrl.trim();
+    if (customYieldUrl) {
+      try {
+        const u = new URL(customYieldUrl);
+        const isWhatToMine = u.hostname.toLowerCase().includes("whattomine.com");
+        const hasHr = Number.isFinite(Number(u.searchParams.get("hr")));
+        if (!isWhatToMine || !hasHr) {
+          showToast("El link de WhatToMine debe incluir dominio whattomine.com y parámetro hr.", "error", "Equipos ASIC");
+          return;
+        }
+      } catch {
+        showToast("El link de WhatToMine no es válido.", "error", "Equipos ASIC");
+        return;
+      }
+    }
     const mp = buildMarketplacePayload(formData);
     const basePayload = buildEquipoSavePayload(formData);
 
@@ -654,6 +721,7 @@ export function EquiposAsicPage() {
   }
 
   function handleEdit(e: EquipoASIC) {
+    const yieldCfg = parseMarketplaceYieldConfig(e.marketplaceYieldJson ?? null);
     setEditingEquipo(e);
     setShowPrecioModal(false);
     setFormData({
@@ -674,6 +742,9 @@ export function EquiposAsicPage() {
       marketplaceImageSrc: e.marketplaceImageSrc ?? "",
       marketplaceGalleryLines: galleryLinesFromJson(e.marketplaceGalleryJson),
       marketplaceDetailRowsJson: e.marketplaceDetailRowsJson ?? "",
+      marketplaceYieldSourceUrl: yieldCfg?.url ?? "",
+      marketplaceYieldPowerW: yieldCfg?.powerW ?? 2600,
+      marketplaceYieldElectricityUsdPerKwh: yieldCfg?.electricityUsdPerKwh ?? 0.078,
     });
     setShowAddModal(true);
   }
@@ -1805,6 +1876,59 @@ export function EquiposAsicPage() {
                                 onChange={(marketplaceDetailRowsJson) => setFormData({ ...formData, marketplaceDetailRowsJson })}
                                 disabled={!canEditTienda}
                               />
+                              <div className="mt-3 p-3 rounded border bg-light">
+                                <h6 className="mb-2" style={{ fontSize: "0.86rem", fontWeight: 700 }}>
+                                  Rendimiento estimado (WhatToMine personalizado por equipo)
+                                </h6>
+                                <p className="small text-muted mb-2">
+                                  Si completás estos campos, este equipo usa esta configuración manual. Los demás equipos no se modifican.
+                                </p>
+                                <div className="row g-2">
+                                  <div className="col-12">
+                                    <label className="fact-label">Link WhatToMine</label>
+                                    <Input
+                                      type="text"
+                                      className="fact-input"
+                                      placeholder="https://whattomine.com/coins/..."
+                                      value={formData.marketplaceYieldSourceUrl}
+                                      onChange={(e) =>
+                                        setFormData((prev) => ({ ...prev, marketplaceYieldSourceUrl: e.target.value }))
+                                      }
+                                    />
+                                  </div>
+                                  <div className="col-md-6">
+                                    <label className="fact-label">Consumo (W)</label>
+                                    <Input
+                                      type="number"
+                                      min={1}
+                                      className="fact-input"
+                                      value={formData.marketplaceYieldPowerW}
+                                      onChange={(e) =>
+                                        setFormData((prev) => ({
+                                          ...prev,
+                                          marketplaceYieldPowerW: Math.max(1, Math.round(Number(e.target.value) || 0)),
+                                        }))
+                                      }
+                                    />
+                                  </div>
+                                  <div className="col-md-6">
+                                    <label className="fact-label">Energía (USD/kWh)</label>
+                                    <Input
+                                      type="number"
+                                      min={0}
+                                      step="0.001"
+                                      className="fact-input"
+                                      value={formData.marketplaceYieldElectricityUsdPerKwh}
+                                      onChange={(e) =>
+                                        setFormData((prev) => ({
+                                          ...prev,
+                                          marketplaceYieldElectricityUsdPerKwh: Math.max(0, Number(e.target.value) || 0),
+                                        }))
+                                      }
+                                    />
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                           ) : null}
                           <div className="hrs-equipo-asic-modal-form__vitrina-callout hrs-equipo-asic-modal-form__vitrina-callout--under-detail-rows">
