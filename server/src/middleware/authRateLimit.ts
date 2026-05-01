@@ -24,3 +24,12 @@ export const registerClienteRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+/** POST públicos del marketplace (contacto, yields, presencia): mitiga spam y coste de email/DB. */
+export const marketplacePublicPostRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isProd ? 60 : 300,
+  message: { error: { message: "Demasiadas solicitudes desde esta red. Probá de nuevo en unos minutos." } },
+  standardHeaders: true,
+  legacyHeaders: false,
+});

@@ -23,9 +23,16 @@ export function getStoredToken(): string | null {
   }
 }
 
-export function setStoredAuth(token: string, user: AuthUser): void {
-  localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
+/** Si `token` es null/undefined/vacío, no se guarda JWT (sesión solo por cookie httpOnly en producción). */
+export function setStoredAuth(token: string | null | undefined, user: AuthUser): void {
+  try {
+    const t = typeof token === "string" ? token.trim() : "";
+    if (t) localStorage.setItem(TOKEN_KEY, t);
+    else localStorage.removeItem(TOKEN_KEY);
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+  } catch {
+    /* sin localStorage */
+  }
 }
 
 export function clearStoredAuth(): void {

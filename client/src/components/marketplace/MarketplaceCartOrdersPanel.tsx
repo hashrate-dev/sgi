@@ -359,15 +359,6 @@ export function MarketplaceCartOrdersPanel({ onBackToCart }: Props) {
   /** Una sola orden en curso en el carrito: vista solo-detalle. */
   const soloUnTicketDetalle = Boolean(user && singleOrderAccount) && cartScopeTickets.length === 1;
 
-  const detailClose = () => {
-    setDetailHydratingId(null);
-    if (soloUnTicketDetalle) {
-      onBackToCart();
-    } else {
-      setSelected(null);
-    }
-  };
-
   return (
     <div
       className={`moo-cart-orders-panel${soloUnTicketDetalle ? " moo-cart-orders-panel--solo-detalle-cliente" : ""}`}
@@ -598,14 +589,6 @@ export function MarketplaceCartOrdersPanel({ onBackToCart }: Props) {
                 <span className={`moo-order-detail-pro__status-pill ${badgeClass(selected.status)}`}>{statusLabel(selected.status)}</span>
               </div>
             </div>
-            <button
-              type="button"
-              className="market-mis-ord__drawer-close moo-order-detail-pro__close"
-              onClick={detailClose}
-              aria-label={soloUnTicketDetalle ? t("drawer.back_to_cart") : t("orders.drawer_close")}
-            >
-              ×
-            </button>
           </div>
           <div className="market-mis-ord__drawer-body moo-order-detail-pro__body">
             <div className="moo-order-detail-pro__meta-card">

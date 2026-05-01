@@ -446,7 +446,7 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "drawer.total_mixed_label": "Suma referencial",
     "drawer.total_note_mixed":
       "Suma solo equipos con precio publicado. En la lista también hay ítems «Solicita precio»: no es el total final. Hashrate te contactará con la cotización completa.",
-    "drawer.total_note": "Suma de la lista · USD",
+    "drawer.total_note": "Suma de la lista",
     "drawer.total_note_addons_only": "Suma visible: solo opcionales (setup / garantía) · USD",
     "drawer.total_note_pending_quote": "Sin total en lista: Hashrate cotiza minero, setup y garantía.",
     "drawer.total_pending_placeholder": "—",
@@ -455,7 +455,7 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "drawer.pending_equipment_total_title": "Sin total fijo",
     "drawer.pending_equipment_total_body":
       "Hashrate cotizará minero, setup y garantía en los ítems marcados como consulta.",
-    "drawer.ref_label": "Tu referencia",
+    "drawer.ref_label": "Referencia",
     "drawer.next": "Siguiente paso",
     "drawer.next_logged":
       "Al sumar equipos tu orden queda en estado Pendiente. Tocá «Generar orden» para avisar a ventas y pasar a Orden lista; después el botón principal es «Ver orden». También podés escribirnos por correo o WhatsApp.",

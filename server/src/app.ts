@@ -32,6 +32,9 @@ export function createApp() {
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: "cross-origin" },
+      hidePoweredBy: true,
+      frameguard: { action: "deny" },
+      referrerPolicy: { policy: "strict-origin-when-cross-origin" },
     })
   );
   const corsAllowlist = env.CORS_ORIGIN?.split(",").map((o) => o.trim()).filter(Boolean) ?? [];
@@ -85,6 +88,20 @@ export function createApp() {
         : { origin: true }),
   };
   app.use(cors(corsOptions));
+
+  /** POST públicos del marketplace: JSON pequeño (mitiga DoS por body enorme); el resto sigue en 32MB (data URLs vitrina). */
+  const marketplacePublicJsonPaths = new Set([
+    "/api/marketplace/contact",
+    "/api/marketplace/asic-inquiry",
+    "/api/marketplace/presence/heartbeat",
+    "/api/marketplace/asic-yields",
+  ]);
+  app.use((req, res, next) => {
+    if (req.method === "POST" && marketplacePublicJsonPaths.has(req.path)) {
+      return express.json({ limit: "512kb" })(req, res, next);
+    }
+    next();
+  });
 
   // Equipos ASIC pueden enviar mp_image_src como data URL (Vercel / modo memoria); 1mb cortaba el guardado.
   /** Vitrina: varias data URLs (imagen + galería) en un solo PUT pueden superar 15MB. */

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { getStoredToken, setStoredAuth, clearStoredAuth } from "../lib/auth";
+import { setStoredAuth, clearStoredAuth } from "../lib/auth";
 import type { AuthUser } from "../lib/auth";
 import { getMe, login as apiLogin, logoutApi, type LoginResponse } from "../lib/api";
 
@@ -19,27 +19,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = getStoredToken();
-    if (!token) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
+    let cancelled = false;
     const t = setTimeout(() => {
-      setLoading(false);
-      setUser(null);
-      clearStoredAuth();
-    }, 5000);
-    getMe()
-      .then(({ user: u }) => setUser(u))
-      .catch(() => {
-        clearStoredAuth();
+      if (!cancelled) {
+        setLoading(false);
         setUser(null);
+        clearStoredAuth();
+      }
+    }, 8000);
+    getMe()
+      .then(({ user: u }) => {
+        if (!cancelled) setUser(u);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          clearStoredAuth();
+          setUser(null);
+        }
       })
       .finally(() => {
         clearTimeout(t);
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       });
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
   }, []);
 
   useEffect(() => {
@@ -52,13 +57,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async (username: string, password: string) => {
-    const { token, user: u } = await apiLogin(username, password);
-    setStoredAuth(token, u);
-    setUser(u);
+    const r = await apiLogin(username, password);
+    setStoredAuth(r.token ?? null, r.user);
+    setUser(r.user);
   }, []);
 
   const applyLoginResponse = useCallback((r: LoginResponse) => {
-    setStoredAuth(r.token, r.user);
+    setStoredAuth(r.token ?? null, r.user);
     setUser(r.user);
   }, []);
 

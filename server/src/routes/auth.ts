@@ -18,6 +18,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { loginRateLimit, registerClienteRateLimit } from "../middleware/authRateLimit.js";
 import type { AuthUser } from "../middleware/auth.js";
 import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
+import { appendAuthCookie, appendClearAuthCookie } from "../lib/authSessionCookie.js";
 
 const authRouter = Router();
 const JWT_SECRET = env.JWT_SECRET;
@@ -37,10 +38,22 @@ const RegisterClienteSchema = z.object({
   telefono: z.string().max(40).trim().optional(),
 });
 
-const DEFAULT_USERS: Array<{ email: string; password: string; role: "admin_a" | "admin_b" | "operador" | "lector" }> = [
-  { email: "jv@hashrate.space", password: "admin123", role: "admin_a" },
-  { email: "fb@hashrate.space", password: "123456", role: "admin_b" },
-];
+const DevSeedUserSchema = z.object({
+  email: z.string().email().max(200),
+  password: z.string().min(1).max(200),
+  role: z.enum(["admin_a", "admin_b", "operador", "lector"]),
+});
+
+function parseDevSeedUsersFromEnv(): Array<z.infer<typeof DevSeedUserSchema>> {
+  const raw = env.DEV_SEED_USERS_JSON?.trim();
+  if (!raw) return [];
+  try {
+    return z.array(DevSeedUserSchema).parse(JSON.parse(raw) as unknown);
+  } catch (e) {
+    console.warn("[auth] DEV_SEED_USERS_JSON no válido; no se crean usuarios de seed.", e);
+    return [];
+  }
+}
 
 function isUniqueViolation(err: unknown): boolean {
   const e = err as { code?: unknown; message?: unknown };
@@ -458,9 +471,9 @@ async function ensurePasswordResetStorage(): Promise<void> {
   passwordResetStorageReady = true;
 }
 
-/** Asegurar que los usuarios por defecto existan (crear si no existen). */
+/** Asegurar que los usuarios definidos en `DEV_SEED_USERS_JSON` existan (solo no-producción). */
 async function ensureDefaultUser(): Promise<void> {
-  for (const { email, password, role } of DEFAULT_USERS) {
+  for (const { email, password, role } of parseDevSeedUsersFromEnv()) {
     let existing = (await db.prepare("SELECT id FROM users WHERE username = ?").get(email)) as { id: number } | undefined;
     if (!existing) {
       try {
@@ -653,6 +666,10 @@ authRouter.post("/auth/register-cliente", registerClienteRateLimit, async (req, 
     telefono: telefonoFijo ?? undefined,
   };
   const token = jwt.sign({ sub: row.username, userId: row.id }, JWT_SECRET, { expiresIn: "7d" });
+  appendAuthCookie(res, token);
+  if (env.NODE_ENV === "production") {
+    return res.status(201).json({ user });
+  }
   return res.status(201).json({ token, user });
 });
 
@@ -853,12 +870,16 @@ authRouter.post("/auth/login", loginRateLimit, async (req, res) => {
       telefono,
     };
     const token = jwt.sign({ sub: row.username, userId }, JWT_SECRET, { expiresIn: "7d" });
+    appendAuthCookie(res, token);
     const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket?.remoteAddress || "";
     const userAgent = (req.headers["user-agent"] as string) || "";
     try {
       await db.prepare("INSERT INTO user_activity (user_id, event, ip_address, user_agent) VALUES (?, 'login', ?, ?)").run(userId, ip, userAgent);
     } catch (e) {
       console.error("user_activity login insert:", e);
+    }
+    if (env.NODE_ENV === "production") {
+      return res.json({ user });
     }
     return res.json({ token, user });
   } catch (e) {
@@ -894,17 +915,6 @@ authRouter.post("/auth/verify-password", requireAuth, async (req, res) => {
   if (valid) {
     return res.json({ valid: true });
   }
-  /* Solo desarrollo: bypass conocido para columnas raras en SQLite/Postgres (no usar en producción). */
-  const isAdminA = req.user!.role === "admin_a" || row.username === "jv@hashrate.space";
-  if (env.NODE_ENV !== "production" && isAdminA && password === "admin123") {
-    try {
-      const newHash = bcrypt.hashSync("admin123", 10);
-      await db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(newHash, userId);
-      return res.json({ valid: true });
-    } catch (e) {
-      console.error("verify-password repair:", e);
-    }
-  }
   return res.status(401).json({ error: { message: "Contraseña incorrecta" } });
 });
 
@@ -929,6 +939,7 @@ authRouter.post("/auth/logout", requireAuth, async (req, res) => {
   } catch (e) {
     console.error("user_activity logout:", e);
   }
+  appendClearAuthCookie(res);
   res.status(204).send();
 });
 

@@ -22,7 +22,9 @@ import {
   type AsicYieldItem,
 } from "../lib/miningYieldEstimate.js";
 import { estimateYieldFromCustomWhatToMine, fetchZecWhatToMineYieldForItem } from "../lib/whattomineYield.js";
+import { getAuthTokenFromRequest } from "../lib/authSessionCookie.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
+import { marketplacePublicPostRateLimit } from "../middleware/authRateLimit.js";
 import { resolveSetupCompraHashrateUsd, resolveSetupEquipoCompletoUsd } from "../lib/marketplaceSetupHashratePrice.js";
 import { loadGarantiaQuoteRows } from "../lib/marketplaceGarantiaQuote.js";
 import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
@@ -165,8 +167,7 @@ function selectBestPresenceIp(req: Request, clientIpRaw?: string): string {
 }
 
 async function resolveAuthSnapshot(req: Request): Promise<{ viewerType: "anon" | "cliente" | "staff"; email: string }> {
-  const authHeader = String(req.headers.authorization || "");
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+  const token = getAuthTokenFromRequest(req)?.trim() ?? "";
   if (!token) return { viewerType: "anon", email: "" };
   try {
     const payload = jwt.verify(token, env.JWT_SECRET) as { userId?: number; sub?: string };
@@ -503,7 +504,7 @@ function rowToProduct(r: Row) {
 }
 
 /** Conteo de navegantes activos del marketplace (cliente/invitado/staff). */
-marketplaceRouter.post("/marketplace/presence/heartbeat", async (req: Request, res: Response) => {
+marketplaceRouter.post("/marketplace/presence/heartbeat", marketplacePublicPostRateLimit, async (req: Request, res: Response) => {
   const parsed = MarketplacePresenceHeartbeatSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
@@ -579,7 +580,7 @@ marketplaceRouter.post("/marketplace/presence/heartbeat", async (req: Request, r
 });
 
 /** Formulario público «Contacto» (sin mailto): envía por Resend en el servidor. */
-marketplaceRouter.post("/marketplace/contact", async (req: Request, res: Response) => {
+marketplaceRouter.post("/marketplace/contact", marketplacePublicPostRateLimit, async (req: Request, res: Response) => {
   const parsed = MarketplaceContactPublicSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
@@ -601,7 +602,7 @@ marketplaceRouter.post("/marketplace/contact", async (req: Request, res: Respons
 });
 
 /** Consulta por correo desde ficha ASIC o desde carrito (`source: cart`, sin mailto). */
-marketplaceRouter.post("/marketplace/asic-inquiry", async (req: Request, res: Response) => {
+marketplaceRouter.post("/marketplace/asic-inquiry", marketplacePublicPostRateLimit, async (req: Request, res: Response) => {
   const parsed = MarketplaceAsicInquiryPublicSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
@@ -1042,7 +1043,7 @@ function parseCustomYieldConfig(raw: string | null | undefined): {
  * POST /marketplace/asic-yields — estimación de rendimiento en vivo (sin token).
  * Usa difficulty/emisiones de red públicas + CoinGecko; merge LTC+DOGE calibrado vs WhatToMine.
  */
-marketplaceRouter.post("/marketplace/asic-yields", async (req: Request, res: Response) => {
+marketplaceRouter.post("/marketplace/asic-yields", marketplacePublicPostRateLimit, async (req: Request, res: Response) => {
   try {
     // El cálculo de yields en vivo no debe esperar telemetría.
     void touchMarketplacePresence(req, "/marketplace/asic-yields").catch((err) => {

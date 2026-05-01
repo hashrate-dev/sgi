@@ -3553,8 +3553,9 @@ button.product-modal__btn--quote-cart:active {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.52rem;
-  padding: 0.55rem 1.25rem 0.72rem;
+  gap: 0.28rem;
+  margin-top: 0.5cm;
+  padding: 0.38rem 1rem 0.52rem;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, #f8fafc 100%);
   border-top: 1px solid rgba(15, 23, 42, 0.08);
   box-shadow: 0 -6px 24px rgba(15, 23, 42, 0.07);
@@ -3562,10 +3563,12 @@ button.product-modal__btn--quote-cart:active {
 
 .market-quote-drawer__cart-sticky-summary .market-quote-drawer__ticket-ref {
   margin-top: 0;
+  padding: 0.4rem 0.55rem;
 }
 
 .market-quote-drawer__cart-sticky-summary .market-quote-drawer__total {
   margin-top: 0;
+  padding: 0.58rem 0.85rem;
 }
 
 .market-quote-drawer__panel--has-lines .market-quote-drawer__one-active-order {
@@ -3617,13 +3620,13 @@ button.product-modal__btn--quote-cart:active {
 }
 
 .market-quote-drawer__panel--has-lines .market-quote-drawer__line-name {
-  font-size: 0.93rem;
+  font-size: 1.02rem;
   line-height: 1.38;
   font-weight: 800;
 }
 
 .market-quote-drawer__panel--has-lines .market-quote-drawer__line-name-spec {
-  font-size: 0.8em;
+  font-size: 0.86em;
 }
 
 .market-quote-drawer__panel--has-lines .market-quote-drawer__line-mid {
@@ -3640,22 +3643,22 @@ button.product-modal__btn--quote-cart:active {
 }
 
 .market-quote-drawer__panel--has-lines .market-quote-drawer__addons-hint {
-  font-size: 0.74rem;
+  font-size: 0.82rem;
   margin-bottom: 0.4rem;
 }
 
 .market-quote-drawer__panel--has-lines .market-quote-drawer__addons-info-toggle {
-  font-size: 0.7rem;
+  font-size: 0.76rem;
   padding: 0.3rem 0.46rem;
 }
 
 .market-quote-drawer__panel--has-lines .market-quote-drawer__addons-explainer-row {
-  font-size: 0.7rem;
+  font-size: 0.76rem;
 }
 
 .market-quote-drawer__panel--has-lines .market-quote-drawer__addon {
   padding: 0.34rem 0.36rem;
-  font-size: 0.84rem;
+  font-size: 0.92rem;
   border-radius: 6px;
 }
 
@@ -3665,27 +3668,27 @@ button.product-modal__btn--quote-cart:active {
 }
 
 .market-quote-drawer__panel--has-lines .market-quote-drawer__cart-sticky-summary .market-quote-drawer__total {
-  padding: 0.92rem 1rem;
+  padding: 0.58rem 0.85rem;
   border-radius: 8px;
 }
 
 .market-quote-drawer__panel--has-lines .market-quote-drawer__cart-sticky-summary .market-quote-drawer__total-amt {
-  font-size: 1.42rem;
+  font-size: 1.72rem;
 }
 
 .market-quote-drawer__panel--has-lines .market-quote-drawer__cart-sticky-summary .market-quote-drawer__ticket-ref {
   margin-top: 0;
-  padding: 0.54rem 0.64rem;
+  padding: 0.4rem 0.55rem;
   border-radius: 6px;
 }
 
 .market-quote-drawer__panel--has-lines .market-quote-drawer__cart-sticky-summary .market-quote-drawer__ticket-ref-label {
-  font-size: 0.58rem;
+  font-size: 0.64rem;
   letter-spacing: 0.06em;
 }
 
 .market-quote-drawer__panel--has-lines .market-quote-drawer__cart-sticky-summary .market-quote-drawer__ticket-ref-codes {
-  font-size: 0.74rem;
+  font-size: 0.8rem;
 }
 
 .market-quote-drawer__panel--has-lines .market-quote-drawer__cart-sticky-summary .market-quote-drawer__ticket-ref-codes strong {
@@ -3738,12 +3741,12 @@ button.product-modal__btn--quote-cart:active {
 }
 
 .market-quote-drawer__foot--compact .market-quote-drawer__cart-policy-text {
-  font-size: 0.69rem;
+  font-size: 0.74rem;
   line-height: 1.4;
 }
 
 .market-quote-drawer__foot--compact .market-quote-drawer__cart-policy-title {
-  font-size: 0.68rem;
+  font-size: 0.72rem;
 }
 
 @keyframes market-quote-drawer-in {
@@ -3816,7 +3819,7 @@ button.product-modal__btn--quote-cart:active {
 
 .market-quote-drawer__title {
   margin: 0;
-  font-size: 1.34rem;
+  font-size: 1.42rem;
   font-weight: 800;
   letter-spacing: -0.03em;
   color: #0f172a;
@@ -3825,7 +3828,7 @@ button.product-modal__btn--quote-cart:active {
 
 .market-quote-drawer__subtitle {
   margin: 0.35rem 0 0;
-  font-size: 0.78rem;
+  font-size: 0.85rem;
   font-weight: 600;
   color: var(--mq-accent);
   letter-spacing: 0.02em;
@@ -4078,7 +4081,7 @@ button.product-modal__btn--quote-cart:active {
 
 .market-quote-drawer__section-label {
   margin: 0 0 0.65rem;
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 800;
   letter-spacing: 0.075em;
   text-transform: uppercase;
@@ -4107,7 +4110,7 @@ button.product-modal__btn--quote-cart:active {
 
 .market-quote-drawer__empty-title {
   margin: 0 0 0.5rem;
-  font-size: 1rem;
+  font-size: 1.06rem;
   font-weight: 700;
   color: #0f172a;
 }
@@ -4115,7 +4118,7 @@ button.product-modal__btn--quote-cart:active {
 .market-quote-drawer__hint {
   margin: 0;
   max-width: 16rem;
-  font-size: 0.82rem;
+  font-size: 0.88rem;
   color: #64748b;
   line-height: 1.45;
 }
@@ -4184,7 +4187,7 @@ button.product-modal__btn--quote-cart:active {
 
 .market-quote-drawer__line-name {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.98rem;
   font-weight: 800;
   color: #0f172a;
   letter-spacing: -0.01em;
@@ -4202,12 +4205,18 @@ button.product-modal__btn--quote-cart:active {
 
 .market-quote-drawer__line-name-spec {
   display: block;
-  font-size: 0.82em;
+  font-size: 0.88em;
   font-weight: 700;
   color: #475569;
   letter-spacing: 0;
   line-height: 1.2;
   white-space: nowrap;
+}
+
+/* Sobrescribe Bootstrap `.small` en la fila de participación hashrate */
+.market-quote-drawer__line-share {
+  font-size: 0.8rem !important;
+  line-height: 1.35;
 }
 
 .market-quote-drawer__line-meta {
@@ -4228,7 +4237,7 @@ button.product-modal__btn--quote-cart:active {
 }
 
 .market-quote-drawer__line-unit {
-  font-size: 0.92rem;
+  font-size: 1rem;
   font-weight: 800;
   color: var(--mq-accent);
   font-variant-numeric: tabular-nums;
@@ -4240,7 +4249,7 @@ button.product-modal__btn--quote-cart:active {
 
 .market-quote-drawer__line-unit-suffix {
   font-weight: 600;
-  font-size: 0.75rem;
+  font-size: 0.82rem;
   color: #64748b;
   margin-left: 0.12rem;
 }
@@ -4321,7 +4330,7 @@ button.product-modal__btn--quote-cart:active {
 .market-quote-drawer__stepper-val {
   min-width: 1.55rem;
   text-align: center;
-  font-size: 0.82rem;
+  font-size: 0.9rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: #0f172a;
@@ -4341,7 +4350,7 @@ button.product-modal__btn--quote-cart:active {
   align-items: center;
   justify-content: flex-start;
   gap: 0.35rem;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   line-height: 1.35;
   color: #475569;
   font-weight: 600;
@@ -4384,7 +4393,7 @@ button.product-modal__btn--quote-cart:active {
   border-radius: 6px;
   background: #0f172a;
   color: #e2e8f0;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   line-height: 1.45;
   font-weight: 500;
   white-space: normal;
@@ -4430,7 +4439,7 @@ button.product-modal__btn--quote-cart:active {
   border: 1px solid rgba(15, 23, 42, 0.12);
   background: #ffffff;
   color: #334155;
-  font-size: 0.66rem;
+  font-size: 0.72rem;
   font-weight: 700;
   cursor: pointer;
   transition:
@@ -4455,7 +4464,7 @@ button.product-modal__btn--quote-cart:active {
 
 .market-quote-drawer__addons-explainer-row {
   margin: 0;
-  font-size: 0.67rem;
+  font-size: 0.73rem;
   line-height: 1.35;
   color: #334155;
 }
@@ -4474,7 +4483,7 @@ button.product-modal__btn--quote-cart:active {
   gap: 0.42rem;
   margin: 0;
   padding: 0.28rem 0.3rem;
-  font-size: 0.8rem;
+  font-size: 0.88rem;
   font-weight: 600;
   color: #1f2937;
   cursor: pointer;
@@ -4513,7 +4522,7 @@ button.product-modal__btn--quote-cart:active {
 }
 
 .market-quote-drawer__addon-desc {
-  font-size: 0.71rem;
+  font-size: 0.78rem;
   line-height: 1.36;
   color: #64748b;
   font-weight: 500;
@@ -4550,7 +4559,7 @@ button.product-modal__btn--quote-cart:active {
   border-radius: 6px;
   background: #0f172a;
   color: #e2e8f0;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   line-height: 1.5;
   font-weight: 500;
   white-space: normal;
@@ -4624,7 +4633,7 @@ button.product-modal__btn--quote-cart:active {
 .market-quote-drawer__addon-muted {
   color: #64748b;
   font-weight: 600;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
 }
 
 .market-quote-drawer__line-sub {
@@ -4635,7 +4644,7 @@ button.product-modal__btn--quote-cart:active {
   padding-top: 0.36rem;
   margin-top: 0.05rem;
   border-top: 1px solid rgba(15, 23, 42, 0.08);
-  font-size: 0.62rem;
+  font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -4643,7 +4652,7 @@ button.product-modal__btn--quote-cart:active {
 }
 
 .market-quote-drawer__line-sub-amt {
-  font-size: 0.86rem;
+  font-size: 0.93rem;
   font-weight: 800;
   color: #0f172a;
   font-variant-numeric: tabular-nums;
@@ -4653,7 +4662,7 @@ button.product-modal__btn--quote-cart:active {
 
 .market-quote-drawer__line-sub-amt--pending {
   color: #b91c1c;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0;
   text-transform: none;
@@ -4665,7 +4674,7 @@ button.product-modal__btn--quote-cart:active {
   gap: 0.25rem;
   flex-shrink: 0;
   padding: 0.16rem 0.3rem;
-  font-size: 0.66rem;
+  font-size: 0.72rem;
   font-weight: 600;
   border: none;
   border-radius: 5px;
@@ -4698,7 +4707,7 @@ button.product-modal__btn--quote-cart:active {
   justify-content: space-between;
   gap: 1.1rem;
   margin-top: 0.75rem;
-  padding: 1rem 1.12rem;
+  padding: 0.65rem 1rem;
   border-radius: 8px;
   background: linear-gradient(140deg, #214a37 0%, #2d5d46 58%, #214a37 100%);
   color: #ecfdf5;
@@ -4724,12 +4733,12 @@ button.product-modal__btn--quote-cart:active {
 .market-quote-drawer__total-copy {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.1rem;
   min-width: 0;
 }
 
 .market-quote-drawer__total-label {
-  font-size: 0.72rem;
+  font-size: 0.9rem;
   font-weight: 800;
   letter-spacing: 0.11em;
   text-transform: uppercase;
@@ -4737,7 +4746,7 @@ button.product-modal__btn--quote-cart:active {
 }
 
 .market-quote-drawer__total-note {
-  font-size: 0.8rem;
+  font-size: 0.96rem;
   color: rgba(220, 252, 231, 0.9);
   font-weight: 600;
 }
@@ -4747,13 +4756,13 @@ button.product-modal__btn--quote-cart:active {
 }
 
 .market-quote-drawer__total-note--mixed {
-  font-size: 0.74rem;
+  font-size: 0.9rem;
   line-height: 1.45;
   color: rgba(254, 243, 199, 0.9);
 }
 
 .market-quote-drawer__total-amt {
-  font-size: 1.62rem;
+  font-size: 1.95rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
@@ -4763,13 +4772,13 @@ button.product-modal__btn--quote-cart:active {
 }
 
 .market-quote-drawer__total-amt--partial {
-  font-size: 1.2rem;
+  font-size: 1.34rem;
   color: #fef9c3;
 }
 
 .market-quote-drawer__total-amt--pending {
   color: #fecaca;
-  font-size: 1.45rem;
+  font-size: 1.62rem;
   letter-spacing: 0.06em;
 }
 
@@ -4816,7 +4825,7 @@ button.product-modal__btn--quote-cart:active {
 }
 
 .market-quote-drawer__cart-policy-title {
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -4825,7 +4834,7 @@ button.product-modal__btn--quote-cart:active {
 }
 
 .market-quote-drawer__cart-policy-text {
-  font-size: 0.74rem;
+  font-size: 0.8rem;
   font-weight: 500;
   color: #475569;
   line-height: 1.44;
@@ -4833,7 +4842,7 @@ button.product-modal__btn--quote-cart:active {
 
 .market-quote-drawer__foot-kicker {
   margin: 0 0 0.15rem;
-  font-size: 0.65rem;
+  font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -4842,7 +4851,7 @@ button.product-modal__btn--quote-cart:active {
 
 .market-quote-drawer__foot-lede {
   margin: 0 0 0.5rem;
-  font-size: 0.78rem;
+  font-size: 0.85rem;
   color: #64748b;
   font-weight: 500;
 }
@@ -4938,7 +4947,7 @@ button.product-modal__btn--quote-cart:active {
   width: 100%;
   min-height: 2.75rem;
   box-sizing: border-box;
-  font-size: 0.82rem;
+  font-size: 0.88rem;
   font-weight: 600;
 }
 
@@ -4949,7 +4958,7 @@ button.product-modal__btn--quote-cart:active {
   background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
   border: 1px solid #dbeafe;
   box-shadow: 0 2px 10px rgba(30, 58, 138, 0.08);
-  font-size: 0.68rem;
+  font-size: 0.74rem;
   color: #64748b;
   display: flex;
   flex-wrap: wrap;
@@ -4961,13 +4970,13 @@ button.product-modal__btn--quote-cart:active {
   font-weight: 700;
   letter-spacing: 0.075em;
   text-transform: uppercase;
-  font-size: 0.6rem;
+  font-size: 0.66rem;
   color: #94a3b8;
 }
 
 .market-quote-drawer__ticket-ref-codes {
   font-variant-numeric: tabular-nums;
-  font-size: 0.8rem;
+  font-size: 0.86rem;
   color: #1e293b;
   display: inline-flex;
   align-items: center;
@@ -5007,7 +5016,7 @@ button.product-modal__btn--quote-cart:active {
   padding: 0.65rem 1rem;
   border-radius: 6px;
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   text-decoration: none;
   font-family: inherit;
   cursor: pointer;
@@ -5149,39 +5158,69 @@ button.product-modal__btn--quote-cart:active {
   justify-content: center;
   padding: 1rem;
   box-sizing: border-box;
+  animation: market-ticket-summary-root-in 0.28s ease-out;
+}
+
+@keyframes market-ticket-summary-root-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .market-ticket-summary__backdrop {
   position: absolute;
   inset: 0;
   border: none;
-  background: rgba(15, 23, 42, 0.5);
   cursor: pointer;
+  background:
+    radial-gradient(ellipse 120% 80% at 50% 45%, rgba(15, 23, 42, 0.42) 0%, rgba(15, 23, 42, 0.62) 100%);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 .market-ticket-summary__card {
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 400px;
-  padding: 1.25rem 1.35rem;
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  max-width: 472px;
+  padding: 1.3rem 1.45rem;
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #fafcfb 52%, #f6faf8 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.92) inset,
+    0 4px 6px rgba(15, 23, 42, 0.03),
+    0 26px 56px rgba(15, 23, 42, 0.14),
+    0 0 0 1px rgba(16, 185, 129, 0.06);
+  border: 1px solid rgba(15, 23, 42, 0.065);
 }
 
 /* Variante documento / ticket fiscal informal */
 .market-ticket-summary__invoice {
-  max-width: 428px;
-  padding: 1.35rem 1.5rem 1.4rem;
-  border-radius: 8px;
-  /* La franja superior absolute comparte radio con la tarjeta (evita que el verde “salga” de las esquinas) */
+  max-width: 472px;
+  padding: 1.52rem 1.62rem 1.42rem;
+  border-radius: 16px;
   overflow: hidden;
+  animation: market-ticket-summary-card-in 0.36s cubic-bezier(0.22, 1, 0.36, 1);
   box-shadow:
-    0 4px 6px rgba(15, 23, 42, 0.04),
-    0 22px 48px rgba(15, 23, 42, 0.16);
-  border: 1px solid rgba(15, 23, 42, 0.06);
+    0 1px 0 rgba(255, 255, 255, 0.95) inset,
+    0 8px 18px rgba(5, 150, 105, 0.07),
+    0 28px 64px rgba(15, 23, 42, 0.12),
+    0 0 0 1px rgba(15, 23, 42, 0.055);
+}
+
+@keyframes market-ticket-summary-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .market-ticket-summary__invoice-top {
@@ -5189,66 +5228,91 @@ button.product-modal__btn--quote-cart:active {
   top: 0;
   left: 0;
   right: 0;
-  height: 5px;
+  height: 6px;
   border-radius: 0;
-  background: linear-gradient(90deg, #10b981 0%, #059669 50%, #047857 100%);
+  background: linear-gradient(90deg, #34d399 0%, #10b981 28%, #059669 72%, #047857 100%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset;
 }
 
 .market-ticket-summary__kicker {
-  margin: 0.35rem 0 0.5rem;
-  font-size: 0.65rem;
+  margin: 0.45rem 0 0.45rem;
+  font-size: 0.73rem;
   font-weight: 800;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.17em;
   text-transform: uppercase;
-  color: #059669;
+  color: #047857;
+}
+
+@supports (-webkit-background-clip: text) or (background-clip: text) {
+  .market-ticket-summary__kicker {
+    background: linear-gradient(90deg, #059669 0%, #047857 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
 }
 
 .market-ticket-summary__title {
-  margin: 0 0 0.5rem;
-  font-size: 1.2rem;
+  margin: 0 0 0.45rem;
+  font-size: 1.32rem;
   font-weight: 800;
   color: #0f172a;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.028em;
+  line-height: 1.2;
 }
 
 .market-ticket-summary__lede {
-  margin: 0 0 1.05rem;
-  font-size: 0.8125rem;
-  line-height: 1.5;
+  margin: 0 0 1rem;
+  font-size: 0.8675rem;
+  line-height: 1.52;
   color: #64748b;
 }
 
 .market-ticket-summary__lede strong {
-  color: #334155;
+  color: #475569;
   font-weight: 700;
 }
 
+/* Bloque destacado contacto ventas — prioridad visual suave pero premium */
 .market-ticket-summary__sales-note {
   margin: 0 0 1rem;
-  padding: 0.78rem 0.86rem;
-  border-radius: 6px;
-  border: 1px solid rgba(16, 185, 129, 0.42);
-  background: linear-gradient(180deg, #ecfdf5 0%, #dcfce7 100%);
+  padding: 0.94rem 1rem 0.98rem;
+  border-radius: 8px;
+  border: 1px solid rgba(16, 185, 129, 0.32);
+  background:
+    linear-gradient(
+      135deg,
+      rgba(236, 253, 245, 0.98) 0%,
+      rgba(209, 250, 229, 0.95) 45%,
+      rgba(220, 252, 231, 1) 100%
+    );
   box-shadow:
-    0 6px 16px rgba(5, 150, 105, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    0 1px 0 rgba(255, 255, 255, 0.75) inset,
+    0 10px 28px rgba(5, 150, 105, 0.11),
+    0 2px 6px rgba(5, 150, 105, 0.06),
+    0 0 0 1px rgba(255, 255, 255, 0.5) inset;
   display: flex;
   align-items: flex-start;
-  gap: 0.68rem;
+  gap: 0.82rem;
 }
 
 .market-ticket-summary__sales-note-icon {
   flex-shrink: 0;
-  width: 1.5rem;
-  height: 1.5rem;
-  border-radius: 5px;
+  width: 2.38rem;
+  height: 2.38rem;
+  border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: #fff;
-  background: linear-gradient(180deg, #10b981 0%, #059669 100%);
-  box-shadow: 0 4px 10px rgba(5, 150, 105, 0.28);
-  font-size: 0.7rem;
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.35) 0%, transparent 45%),
+    linear-gradient(160deg, #22c55e 0%, #10b981 45%, #047857 100%);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow:
+    0 6px 16px rgba(5, 150, 105, 0.32),
+    0 1px 0 rgba(255, 255, 255, 0.3) inset;
+  font-size: 0.9625rem;
 }
 
 .market-ticket-summary__sales-note-body {
@@ -5256,50 +5320,54 @@ button.product-modal__btn--quote-cart:active {
 }
 
 .market-ticket-summary__sales-note-title {
-  margin: 0 0 0.2rem;
-  font-size: 0.74rem;
+  margin: 0 0 0.28rem;
+  font-size: 0.7425rem;
   font-weight: 800;
-  letter-spacing: 0.075em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #065f46;
 }
 
 .market-ticket-summary__sales-note-text {
   margin: 0;
-  font-size: 0.84rem;
-  line-height: 1.48;
+  font-size: 0.9175rem;
+  line-height: 1.5;
   color: #14532d;
   font-weight: 500;
+  letter-spacing: -0.01em;
 }
 
 .market-ticket-summary__codes {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-  margin-bottom: 1.05rem;
+  gap: 0.82rem;
+  margin-bottom: 1rem;
 }
 
 .market-ticket-summary__code-box {
-  padding: 0.65rem 0.7rem;
+  padding: 0.78rem 0.85rem;
   border-radius: 6px;
-  background: #ecfdf5;
-  border: 1px solid rgba(16, 185, 129, 0.22);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  background:
+    linear-gradient(180deg, #f4fdf9 0%, #ecfdf5 100%);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.85) inset,
+    0 4px 12px rgba(5, 150, 105, 0.07);
 }
 
 .market-ticket-summary__lbl {
   display: block;
-  font-size: 0.62rem;
+  font-size: 0.75rem;
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #059669;
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.32rem;
 }
 
 .market-ticket-summary__code-val {
   display: block;
-  font-size: 0.9rem;
+  font-size: 1.085rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   font-family: ui-monospace, "Cascadia Code", "Segoe UI", system-ui, sans-serif;
@@ -5308,12 +5376,16 @@ button.product-modal__btn--quote-cart:active {
 }
 
 .market-ticket-summary__meta-wrap {
-  margin-bottom: 0.25rem;
+  margin-bottom: 0;
 }
 
 .market-ticket-summary__meta {
   margin: 0;
-  padding: 0;
+  padding: 0.45rem 0.78rem;
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.9) 0%, rgba(241, 245, 249, 0.75) 100%);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -5324,9 +5396,9 @@ button.product-modal__btn--quote-cart:active {
   justify-content: space-between;
   align-items: baseline;
   gap: 1rem;
-  font-size: 0.8125rem;
-  padding: 0.5rem 0;
-  border-bottom: 1px dashed rgba(148, 163, 184, 0.65);
+  font-size: 0.9575rem;
+  padding: 0.58rem 0.08rem;
+  border-bottom: 1px dashed rgba(148, 163, 184, 0.45);
 }
 
 .market-ticket-summary__meta-row:last-of-type {
@@ -5334,16 +5406,18 @@ button.product-modal__btn--quote-cart:active {
 }
 
 .market-ticket-summary__meta-row--total {
-  margin-top: 0.15rem;
-  padding-top: 0.65rem;
-  border-top: 1px dashed rgba(148, 163, 184, 0.5);
+  margin-top: 0.12rem;
+  padding: 0.72rem 0.45rem 0.58rem;
+  border-top: 1px dashed rgba(148, 163, 184, 0.4);
   border-bottom: none;
+  border-radius: 6px;
+  background: rgba(236, 253, 245, 0.55);
 }
 
 .market-ticket-summary__meta dt {
   margin: 0;
   font-weight: 600;
-  color: #94a3b8;
+  color: #64748b;
   flex-shrink: 0;
 }
 
@@ -5355,54 +5429,54 @@ button.product-modal__btn--quote-cart:active {
 }
 
 .market-ticket-summary__meta-row--total dt {
-  color: #64748b;
+  color: #475569;
   font-weight: 700;
 }
 
 .market-ticket-summary__total-amt {
-  font-size: 1.05rem;
+  font-size: 1.3rem;
   font-weight: 800;
   color: #0f172a;
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
+/* “Perforación” tipo ticket físico */
 .market-ticket-summary__perforation {
-  height: 6px;
-  margin: 0.85rem 0 0.65rem;
+  position: relative;
+  height: 10px;
+  margin: 0.95rem 0 0.72rem;
   border: none;
   border-radius: 0;
-  background: repeating-linear-gradient(
-    90deg,
-    transparent,
-    transparent 5px,
-    rgba(148, 163, 184, 0.5) 5px,
-    rgba(148, 163, 184, 0.5) 7px
-  );
-  opacity: 0.9;
+  background: radial-gradient(circle at center, rgba(148, 163, 184, 0.62) 0%, transparent 55%);
+  background-size: 9px 9px;
+  background-repeat: repeat-x;
+  background-position: center;
+  opacity: 0.75;
 }
 
 .market-ticket-summary__fine-print {
   margin: 0 0 1rem;
-  font-size: 0.62rem;
-  line-height: 1.45;
+  font-size: 0.6675rem;
+  line-height: 1.5;
   color: #94a3b8;
   text-align: center;
-  padding: 0 0.25rem;
+  padding: 0 0.35rem;
 }
 
 .market-ticket-summary__actions {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.45rem;
 }
 
 .market-ticket-summary__btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.72rem 1rem;
-  border-radius: 6px;
-  font-size: 0.875rem;
+  padding: 0.82rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9375rem;
   font-weight: 700;
   font-family: inherit;
   cursor: pointer;
@@ -5410,31 +5484,47 @@ button.product-modal__btn--quote-cart:active {
   text-decoration: none;
   box-sizing: border-box;
   transition:
-    transform 0.12s ease,
-    box-shadow 0.12s ease;
+    transform 0.14s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.14s ease;
 }
 
 .market-ticket-summary__btn--primary {
-  background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+  background: linear-gradient(180deg, #22c55e 0%, #10b981 38%, #059669 100%);
   color: #fff !important;
-  box-shadow: 0 4px 16px rgba(5, 150, 105, 0.38);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.22) inset,
+    0 6px 20px rgba(5, 150, 105, 0.35);
 }
 
 .market-ticket-summary__btn--primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(5, 150, 105, 0.45);
+  transform: translateY(-2px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.28) inset,
+    0 10px 28px rgba(5, 150, 105, 0.42);
 }
 
 .market-ticket-summary__btn--ghost {
   background: transparent;
   color: #64748b !important;
   font-weight: 600;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
 .market-ticket-summary__btn--ghost:hover {
-  color: #334155 !important;
-  background: rgba(148, 163, 184, 0.12);
+  color: #1e293b !important;
+  background: rgba(100, 116, 139, 0.1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .market-ticket-summary-root {
+    animation: none;
+  }
+  .market-ticket-summary__invoice {
+    animation: none;
+  }
+  .market-ticket-summary__btn--primary:hover {
+    transform: none;
+  }
 }
 
 /* —— Mis órdenes (cliente marketplace) —— */

@@ -1,16 +1,11 @@
-import type { Request, Response, NextFunction } from "express";
 import { Router } from "express";
 import { z } from "zod";
 import { db } from "../db.js";
-import { env } from "../config/env.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 
 export const emittedRouter = Router();
 
-/** En desarrollo no exige auth (localhost sin login); en producción exige token */
-const authEmitted = env.NODE_ENV === "development" ? (_req: Request, _res: Response, next: NextFunction) => next() : requireAuth;
-/** En desarrollo cualquiera puede subir; en producción solo admin/operador */
-const requireCanPostEmitted = env.NODE_ENV === "development" ? (_req: unknown, _res: unknown, next: () => void) => next() : requireRole("admin_a", "admin_b", "operador");
+const requireCanPostEmitted = requireRole("admin_a", "admin_b", "operador");
 
 const MS_24H = 24 * 60 * 60 * 1000;
 const MS_15_DAYS = 15 * 24 * 60 * 60 * 1000;
@@ -22,7 +17,7 @@ const AddEmittedSchema = z.object({
 });
 
 /** GET /emitted?source=hosting|asic — últimos 20 días en ambos */
-emittedRouter.get("/emitted", authEmitted, async (req, res) => {
+emittedRouter.get("/emitted", requireAuth, async (req, res) => {
   const q = z.object({ source: z.enum(["hosting", "asic"]) }).safeParse(req.query);
   if (!q.success) {
     return res.status(400).json({ error: { message: "source debe ser hosting o asic" } });
@@ -45,7 +40,7 @@ emittedRouter.get("/emitted", authEmitted, async (req, res) => {
 });
 
 /** POST /emitted — registrar documento emitido (en producción: admin/operador; en localhost: cualquier usuario logueado) */
-emittedRouter.post("/emitted", authEmitted, requireCanPostEmitted, async (req, res) => {
+emittedRouter.post("/emitted", requireAuth, requireCanPostEmitted, async (req, res) => {
   const parsed = AddEmittedSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: { message: "Body inválido", details: parsed.error.flatten() } });

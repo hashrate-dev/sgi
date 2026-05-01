@@ -46,20 +46,52 @@ if (fs.existsSync(resendLocal)) dotenv.config({ path: resendLocal, override: tru
 })();
 
 const defaultSqlitePath = process.env.VERCEL ? "/tmp/data.db" : "data.db";
-const EnvSchema = z.object({
-  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  PORT: z.coerce.number().int().positive().default(8080),
-  SQLITE_PATH: z.string().default(defaultSqlitePath),
-  /** Orígenes permitidos separados por coma (ej. https://app.tudominio.com,http://localhost:5174). Si no se define, CORS refleja el Origin del cliente (modo actual). */
-  CORS_ORIGIN: z.string().optional(),
-  JWT_SECRET: z.string().min(16).default("cambiar-en-produccion-secreto-jwt-muy-largo"),
-  /** API key de Render (https://dashboard.render.com → Account Settings → API Keys). Usado para listar servicios y disparar deploy desde la app. */
-  RENDER_API_KEY: z.string().optional(),
-  /** Supabase: conexión directa a Postgres. Si está definida, la app usa PostgreSQL (Supabase) en lugar de SQLite. */
-  SUPABASE_DATABASE_URL: z.string().min(10).optional(),
-  /** Host del pooler (ej. aws-1-us-east-1.pooler.supabase.com). Copiar desde Supabase Dashboard. */
-  SUPABASE_POOLER_HOST: z.string().optional()
-});
+/** Valor por defecto del schema; en producción está prohibido (firma de JWT trivial). */
+export const JWT_SECRET_DEV_DEFAULT = "cambiar-en-produccion-secreto-jwt-muy-largo";
+
+const EnvSchema = z
+  .object({
+    NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+    PORT: z.coerce.number().int().positive().default(8080),
+    SQLITE_PATH: z.string().default(defaultSqlitePath),
+    /** Orígenes permitidos separados por coma (ej. https://app.tudominio.com,http://localhost:5174). Si no se define, CORS refleja el Origin del cliente (modo actual). */
+    CORS_ORIGIN: z.string().optional(),
+    JWT_SECRET: z.string().min(16).default(JWT_SECRET_DEV_DEFAULT),
+    /** API key de Render (https://dashboard.render.com → Account Settings → API Keys). Usado para listar servicios y disparar deploy desde la app. */
+    RENDER_API_KEY: z.string().optional(),
+    /** Supabase: conexión directa a Postgres. Si está definida, la app usa PostgreSQL (Supabase) en lugar de SQLite. */
+    SUPABASE_DATABASE_URL: z.string().min(10).optional(),
+    /** Host del pooler (ej. aws-1-us-east-1.pooler.supabase.com). Copiar desde Supabase Dashboard. */
+    SUPABASE_POOLER_HOST: z.string().optional(),
+    /**
+     * Cookie de sesión (`hrs_auth`) en producción: `none` si el front y la API son distintos sitios (ej. sgi → Render);
+     * `lax` si comparten sitio y solo cambian subdominios según política del navegador.
+     */
+    AUTH_COOKIE_SAMESITE: z.enum(["lax", "none", "strict"]).optional(),
+    /**
+     * Solo desarrollo/test: JSON opcional para crear usuarios al primer login.
+     * Ej.: [{"email":"admin@local.test","password":"...","role":"admin_a"}]
+     */
+    DEV_SEED_USERS_JSON: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.NODE_ENV !== "production") return;
+    const s = data.JWT_SECRET;
+    if (s === JWT_SECRET_DEV_DEFAULT || s.includes("cambiar-en-produccion")) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "En producción definí JWT_SECRET con un valor aleatorio largo (≥32 caracteres). No uses el placeholder de desarrollo.",
+        path: ["JWT_SECRET"],
+      });
+    } else if (s.length < 32) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "En producción JWT_SECRET debe tener al menos 32 caracteres.",
+        path: ["JWT_SECRET"],
+      });
+    }
+  });
 
 export type Env = z.infer<typeof EnvSchema>;
 export const env: Env = EnvSchema.parse(process.env);
@@ -113,12 +145,6 @@ export const env: Env = EnvSchema.parse(process.env);
 })();
 
 if (env.NODE_ENV === "production") {
-  if (env.JWT_SECRET.length < 32) {
-    console.warn("[seguridad] JWT_SECRET debería tener al menos 32 caracteres en producción.");
-  }
-  if (env.JWT_SECRET.includes("cambiar-en-produccion") || env.JWT_SECRET === "cambiar-en-produccion-secreto-jwt-muy-largo") {
-    console.warn("[seguridad] Cambiá JWT_SECRET: detectado valor por defecto de desarrollo.");
-  }
   if (!env.CORS_ORIGIN?.trim()) {
     console.warn(
       "[seguridad] Definí CORS_ORIGIN en producción (URLs del front separadas por coma) para acotar orígenes permitidos."

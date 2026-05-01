@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
 import { db } from "../db.js";
+import { getAuthTokenFromRequest } from "../lib/authSessionCookie.js";
 import { getTiendaPhonesForUserId } from "../lib/tiendaClientContact.js";
 
 export type UserRole = "admin_a" | "admin_b" | "operador" | "lector" | "cliente";
@@ -27,8 +28,7 @@ declare global {
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const token = getAuthTokenFromRequest(req);
   if (!token) {
     res.status(401).json({ error: { message: "Token requerido" } });
     return;

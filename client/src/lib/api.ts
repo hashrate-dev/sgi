@@ -232,7 +232,11 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
     if (i > 0) await delay(RETRY_DELAYS_MS[i]!);
     let res: Response;
     try {
-      res = await fetchWithTimeout(url, { ...options, headers }, FETCH_TIMEOUT_MS);
+      res = await fetchWithTimeout(
+        url,
+        { credentials: (options as RequestInit | undefined)?.credentials ?? "include", ...options, headers },
+        FETCH_TIMEOUT_MS
+      );
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
       // Detectar errores de CORS (generalmente "Failed to fetch" o "NetworkError")
@@ -280,7 +284,11 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
     for (const fallback of FALLBACK_API_URLS) {
       if (fallback === currentBase) continue;
       try {
-        const res = await fetchWithTimeout(`${fallback}${path}`, { ...options, headers }, FETCH_TIMEOUT_MS);
+        const res = await fetchWithTimeout(
+          `${fallback}${path}`,
+          { credentials: (options as RequestInit | undefined)?.credentials ?? "include", ...options, headers },
+          FETCH_TIMEOUT_MS
+        );
         const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
         setApiBaseUrl(fallback);
         if (res.status === 401) {
@@ -304,7 +312,7 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   throw lastError ?? new Error(getNoApiMessage());
 }
 
-export type LoginResponse = { token: string; user: AuthUser };
+export type LoginResponse = { user: AuthUser; token?: string };
 export type MeResponse = { user: AuthUser };
 
 export function login(username: string, password: string): Promise<LoginResponse> {
@@ -357,11 +365,14 @@ export async function verifyPassword(password: string): Promise<{ valid: boolean
   const token = getStoredToken();
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) headers.Authorization = `Bearer ${token}`;
-  const base = getApiBase();
-  const url = `${base}/api/auth/verify-password`;
-  const res = await fetch(url, {
+  let base = getApiBase();
+  const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
+  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") base = "";
+  const urlNorm = base && base.trim() !== "" ? `${base.replace(/\/+$/, "")}/api/auth/verify-password` : "/api/auth/verify-password";
+  const res = await fetch(urlNorm, {
     method: "POST",
     headers,
+    credentials: "include",
     body: JSON.stringify({ password }),
   });
   const data = await res.json().catch(() => ({}));
@@ -926,7 +937,11 @@ export async function uploadMarketplaceAsicImage(file: File): Promise<{ url: str
 
   let res: Response;
   try {
-    res = await fetchWithTimeout(url, { method: "POST", body: formData, headers }, FETCH_TIMEOUT_MS);
+    res = await fetchWithTimeout(
+      url,
+      { method: "POST", body: formData, headers, credentials: "include" },
+      FETCH_TIMEOUT_MS
+    );
   } catch (e) {
     const isAbort =
       (e instanceof Error && e.name === "AbortError") ||
