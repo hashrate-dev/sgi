@@ -506,7 +506,11 @@ export function AsicCotizadorChinaPyPage() {
             ) : (
               <>
                 <div className="d-flex justify-content-end mb-2">
-                  <button type="button" className="btn btn-sm btn-outline-success" onClick={() => setShowHoyModal(true)}>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-success asic-cotizador-hoy-btn"
+                    onClick={() => setShowHoyModal(true)}
+                  >
                     <i className="bi bi-card-list me-1" />
                     Equipos de hoy
                   </button>

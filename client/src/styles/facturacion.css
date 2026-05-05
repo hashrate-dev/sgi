@@ -2593,6 +2593,27 @@ a.fact-logo-container--link:focus-visible {
   font-style: italic;
 }
 
+.asic-cotizador-hoy-btn {
+  border-color: #1f8f5f;
+  color: #15724c;
+  background: linear-gradient(180deg, #ffffff 0%, #f3fbf7 100%);
+  border-radius: 10px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  padding: 0.38rem 0.82rem;
+  box-shadow: 0 2px 8px rgba(21, 114, 76, 0.12);
+  transition: all 0.18s ease;
+}
+
+.asic-cotizador-hoy-btn:hover,
+.asic-cotizador-hoy-btn:focus {
+  color: #ffffff;
+  border-color: #15724c;
+  background: linear-gradient(180deg, #28a76e 0%, #15724c 100%);
+  box-shadow: 0 6px 14px rgba(21, 114, 76, 0.25);
+  transform: translateY(-1px);
+}
+
 /* Cotizador ASIC — margen editable dentro de tarjeta KPI (misma fila que precio / total) */
 .hosting-fx-ops-metric--margen-input .hosting-fx-ops-metric__field {
   margin-top: 0.15rem;
