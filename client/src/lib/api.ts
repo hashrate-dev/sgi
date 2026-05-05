@@ -659,6 +659,12 @@ export function createAsicCostoEquipo(
   });
 }
 
+export function deleteAsicCostoEquipo(id: number): Promise<void> {
+  return api<void>(`/api/asic/costos-equipos/${encodeURIComponent(String(id))}`, {
+    method: "DELETE",
+  });
+}
+
 export type ProveedorHrs = {
   id: number;
   supplierNumber: string;

@@ -178,3 +178,20 @@ asicCostosRouter.post(
   }
 );
 
+asicCostosRouter.delete(
+  "/asic/costos-equipos/:id",
+  requireRole("admin_a", "admin_b", "operador", "lector"),
+  async (req, res) => {
+    await ensureAsicCostosSchema();
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) {
+      return res.status(400).json({ error: { message: "Invalid id" } });
+    }
+    const info = await db.prepare("DELETE FROM asic_costos_equipos WHERE id = ?").run(id);
+    if (info.changes === 0) {
+      return res.status(404).json({ error: { message: "Registro no encontrado" } });
+    }
+    return res.status(204).send();
+  }
+);
+

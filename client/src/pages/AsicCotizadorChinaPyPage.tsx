@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "../components/PageHeader";
-import { createAsicCostoEquipo, getAsicCostosEquipos, type AsicCostoEquipoItem } from "../lib/api";
+import { createAsicCostoEquipo, deleteAsicCostoEquipo, getAsicCostosEquipos, type AsicCostoEquipoItem } from "../lib/api";
 import "../styles/facturacion.css";
 
-/** Valores por defecto de la fórmula: PRECIO ORIGEN + (220 USD) × 1,17 + 300 */
+/** Valores por defecto de la fórmula: ((PRECIO ORIGEN + 220 USD) × 1,17) + 300 */
 const DEFAULT_BLOQUE_USD = 220;
 const DEFAULT_MULT = 1.17;
 const DEFAULT_PROVEEDOR_USD = 300;
+const HASHRATE_LOGO = "https://hashrate.space/wp-content/uploads/hashrate-LOGO.png";
 
 const ASIC_MODELOS = ["S21", "L7", "L9", "Z15", "X9"] as const;
 
@@ -15,7 +16,7 @@ const PROCESADOR_POR_MODELO: Record<(typeof ASIC_MODELOS)[number], readonly stri
   S21: ["200 ths", "234 ths", "235 ths", "245 ths", "270 ths", "473 ths hydro"],
   L7: ["8800 mhs", "9050 mhs", "9500 mhs"],
   L9: ["15.000 mhs", "16.000 mhs", "16.500 mhs", "17.000 mhs"],
-  Z15: ["840 kSol/s"],
+  Z15: ["840 kSol/s", "860 kSol/s"],
   X9: ["1.000K"],
 };
 
@@ -43,13 +44,6 @@ function formatDisplayNumber(raw: string): string {
   return n.toLocaleString("es-PY", { maximumFractionDigits: 6 });
 }
 
-function displayAsNegative(raw: string): string {
-  if (!raw.trim()) return "";
-  const n = Number(raw);
-  if (!Number.isFinite(n) || n === 0) return "0";
-  return `-${formatDisplayNumber(raw).replace(/^-+/, "")}`;
-}
-
 function displayAsPositive(raw: string): string {
   if (!raw.trim()) return "";
   return `+${formatDisplayNumber(raw).replace(/^[+-]+/, "")}`;
@@ -71,6 +65,8 @@ export function AsicCotizadorChinaPyPage() {
   const [registros, setRegistros] = useState<AsicCostoEquipoItem[]>([]);
   const [registrosLoading, setRegistrosLoading] = useState(false);
   const [registrosError, setRegistrosError] = useState("");
+  const [eliminandoIds, setEliminandoIds] = useState<Set<number>>(() => new Set());
+  const [showHoyModal, setShowHoyModal] = useState(false);
 
   const opcionesProcesador = useMemo((): string[] => {
     if (modelo && modelo in PROCESADOR_POR_MODELO) {
@@ -115,11 +111,11 @@ export function AsicCotizadorChinaPyPage() {
 
   const { precioNum, totalNacionalizado } = useMemo(() => {
     const p = parseMoney(precioOrigen);
-    const bloque = Math.max(0, parseMoney(bloqueUsd));
+    const montoUsd = Math.max(0, parseMoney(bloqueUsd));
     const mult = Math.max(0, parseMoney(multiplicador));
-    const montoBloque = bloque * mult;
     const prov = Math.max(0, parseMoney(proveedorPy));
-    return { precioNum: p, totalNacionalizado: p + montoBloque + prov };
+    const totalSinMargen = (p + montoUsd) * mult + prov;
+    return { precioNum: p, totalNacionalizado: totalSinMargen };
   }, [precioOrigen, bloqueUsd, multiplicador, proveedorPy]);
 
   const precioVenta = useMemo(() => totalNacionalizado + parseMoney(margen), [margen, totalNacionalizado]);
@@ -130,6 +126,36 @@ export function AsicCotizadorChinaPyPage() {
     if (precioVenta <= 0) return 0;
     return (m / precioVenta) * 100;
   }, [margen, precioVenta]);
+
+  const registrosHoy = useMemo(() => {
+    const hoy = new Date();
+    const y = hoy.getFullYear();
+    const m = hoy.getMonth();
+    const d = hoy.getDate();
+    const prioridadModelo = (modeloRaw: string): number => {
+      const modeloNorm = modeloRaw.trim().toUpperCase();
+      if (modeloNorm === "S21") return 0;
+      if (modeloNorm === "L9") return 1;
+      return 2;
+    };
+
+    return registros
+      .filter((r) => {
+        const f = new Date(r.createdAt);
+        return f.getFullYear() === y && f.getMonth() === m && f.getDate() === d;
+      })
+      .sort((a, b) => prioridadModelo(a.modelo) - prioridadModelo(b.modelo));
+  }, [registros]);
+
+  const fechaActualizacionHoy = useMemo(
+    () =>
+      new Intl.DateTimeFormat("es-PY", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date()),
+    []
+  );
 
   async function generarYRegistrarPrecio(): Promise<void> {
     setRegistrosError("");
@@ -150,6 +176,38 @@ export function AsicCotizadorChinaPyPage() {
       if (resp.item) setRegistros((prev) => [resp.item!, ...prev]);
     } catch (e) {
       setRegistrosError(e instanceof Error ? e.message : "No se pudo registrar la cotización.");
+    }
+  }
+
+  async function handleEliminarRegistro(item: AsicCostoEquipoItem): Promise<void> {
+    if (eliminandoIds.has(item.id)) return;
+    const confirmed = window.confirm("¿Eliminar este registro de cotización?");
+    if (!confirmed) return;
+    setRegistrosError("");
+    setEliminandoIds((prev) => {
+      const next = new Set(prev);
+      next.add(item.id);
+      return next;
+    });
+
+    // Optimista: sacar la fila inmediatamente; si el DELETE falla, re-cargamos.
+    setRegistros((prev) => prev.filter((r) => r.id !== item.id));
+    try {
+      await deleteAsicCostoEquipo(item.id);
+    } catch (e) {
+      setRegistrosError(e instanceof Error ? e.message : "No se pudo eliminar el registro.");
+      try {
+        const r = await getAsicCostosEquipos();
+        setRegistros(r.items || []);
+      } catch {
+        // Si falla el refresh, al menos mantenemos el mensaje de error.
+      }
+    } finally {
+      setEliminandoIds((prev) => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
     }
   }
 
@@ -356,7 +414,7 @@ export function AsicCotizadorChinaPyPage() {
                     inputMode="decimal"
                     autoComplete="off"
                     placeholder="0"
-                    value={displayAsNegative(precioOrigen)}
+                    value={displayAsPositive(precioOrigen)}
                     onChange={(e) => setPrecioOrigen(sanitizeNumberInput(removeMinus(e.target.value)))}
                   />
                 </div>
@@ -371,7 +429,7 @@ export function AsicCotizadorChinaPyPage() {
                     inputMode="decimal"
                     autoComplete="off"
                     placeholder={String(DEFAULT_BLOQUE_USD)}
-                    value={displayAsNegative(bloqueUsd)}
+                    value={displayAsPositive(bloqueUsd)}
                     onChange={(e) => setBloqueUsd(sanitizeNumberInput(removeMinus(e.target.value)))}
                   />
                 </div>
@@ -386,7 +444,7 @@ export function AsicCotizadorChinaPyPage() {
                     inputMode="decimal"
                     autoComplete="off"
                     placeholder={String(DEFAULT_MULT)}
-                    value={displayAsNegative(multiplicador)}
+                    value={displayAsPositive(multiplicador)}
                     onChange={(e) => setMultiplicador(sanitizeNumberInput(removeMinus(e.target.value)))}
                   />
                 </div>
@@ -401,7 +459,7 @@ export function AsicCotizadorChinaPyPage() {
                     inputMode="decimal"
                     autoComplete="off"
                     placeholder={String(DEFAULT_PROVEEDOR_USD)}
-                    value={displayAsNegative(proveedorPy)}
+                    value={displayAsPositive(proveedorPy)}
                     onChange={(e) => setProveedorPy(sanitizeNumberInput(removeMinus(e.target.value)))}
                   />
                 </div>
@@ -446,8 +504,15 @@ export function AsicCotizadorChinaPyPage() {
             ) : registros.length === 0 ? (
               <div className="text-muted small">Todavia no hay cotizaciones registradas.</div>
             ) : (
-              <div className="table-responsive asic-cotizador-registros-wrap">
-                <table className="table table-sm align-middle asic-cotizador-registros-table">
+              <>
+                <div className="d-flex justify-content-end mb-2">
+                  <button type="button" className="btn btn-sm btn-outline-success" onClick={() => setShowHoyModal(true)}>
+                    <i className="bi bi-card-list me-1" />
+                    Equipos de hoy
+                  </button>
+                </div>
+                <div className="table-responsive asic-cotizador-registros-wrap">
+                  <table className="table table-sm align-middle asic-cotizador-registros-table">
                   <thead>
                     <tr>
                       <th>Fecha</th>
@@ -462,6 +527,7 @@ export function AsicCotizadorChinaPyPage() {
                       <th className="text-end">Margen</th>
                       <th className="text-end">% Margen</th>
                       <th className="text-end">Precio venta</th>
+                      <th className="text-end">Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -500,14 +566,103 @@ export function AsicCotizadorChinaPyPage() {
                         <td className="text-end fw-bold">
                           {new Intl.NumberFormat("es-PY", { style: "currency", currency: "USD" }).format(r.precioVenta)}
                         </td>
+                        <td className="text-end">
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline-danger"
+                            title="Eliminar registro"
+                            onClick={() => void handleEliminarRegistro(r)}
+                            disabled={eliminandoIds.has(r.id)}
+                          >
+                            <i className="bi bi-trash" aria-hidden="true" />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
-                </table>
-              </div>
+                  </table>
+                </div>
+              </>
             )}
           </div>
         </div>
+
+        {showHoyModal ? (
+          <>
+            <div className="modal fade show d-block" tabIndex={-1} role="dialog" aria-modal="true">
+              <div className="modal-dialog modal-lg modal-dialog-scrollable" role="document">
+                <div className="modal-content asic-cotizador-hoy-modal__content">
+                  <div className="modal-header asic-cotizador-hoy-modal__header">
+                    <h5 className="modal-title asic-cotizador-hoy-modal__title">
+                      <img
+                        src={HASHRATE_LOGO}
+                        alt="Hashrate"
+                        className="asic-cotizador-hoy-modal__logo"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                      <span className="asic-cotizador-hoy-modal__title-text">
+                        Cotización de Precios EQUIPOS ASIC ({registrosHoy.length})
+                      </span>
+                    </h5>
+                    <button
+                      type="button"
+                      className="btn-close"
+                      aria-label="Cerrar"
+                      onClick={() => setShowHoyModal(false)}
+                    />
+                  </div>
+                  <div className="modal-body">
+                    {registrosHoy.length === 0 ? (
+                      <div className="text-muted small">Hoy todavia no hay equipos registrados.</div>
+                    ) : (
+                      <div>
+                        <div className="table-responsive asic-cotizador-registros-wrap asic-cotizador-hoy-modal__table-wrap">
+                          <table className="table table-sm align-middle mb-0 asic-cotizador-registros-table asic-cotizador-hoy-modal__table">
+                            <thead>
+                              <tr>
+                                <th>Marca</th>
+                                <th>Modelo</th>
+                                <th>Procesador</th>
+                                <th>Fecha de Actualización</th>
+                                <th className="text-end">Precio venta</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {registrosHoy.map((r) => (
+                                <tr key={`hoy-${r.id}`}>
+                                  <td>{r.marca || "-"}</td>
+                                  <td>{r.modelo || "-"}</td>
+                                  <td>{r.procesador || "-"}</td>
+                                  <td className="asic-cotizador-hoy-modal__date-cell">{fechaActualizacionHoy}</td>
+                                  <td className="text-end fw-semibold asic-cotizador-hoy-modal__price-cell">
+                                    {new Intl.NumberFormat("es-PY", {
+                                      style: "currency",
+                                      currency: "USD",
+                                      minimumFractionDigits: 0,
+                                      maximumFractionDigits: 0,
+                                    }).format(Math.ceil(r.precioVenta))}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        <p className="asic-cotizador-hoy-modal__nota mb-0 mt-2">*No incluye precios de Garantias</p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="modal-footer">
+                    <button type="button" className="btn btn-secondary" onClick={() => setShowHoyModal(false)}>
+                      Cerrar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="modal-backdrop fade show" onClick={() => setShowHoyModal(false)} />
+          </>
+        ) : null}
       </div>
     </div>
   );
