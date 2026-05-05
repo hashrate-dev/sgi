@@ -92,7 +92,6 @@ export function GastosPorRubroDonut({
           maintainAspectRatio: false,
           cutout: "68%",
           animation: false,
-          interaction: { mode: "none", intersect: false },
           events: [],
           plugins: {
             legend: { display: false },
