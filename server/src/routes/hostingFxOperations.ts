@@ -113,21 +113,35 @@ const FxOperationCreateSchema = z
     }
   });
 
-const FxOperationUpdateSchema = z.object({
-  clientId: z.coerce.number().int().positive().optional(),
-  operationDate: z.string().min(1).max(40).trim().optional(),
-  operationAmount: z.coerce.number().min(0).optional(),
-  hrsCommissionPct: z.coerce.number().min(0).max(100).optional(),
-  bankFeeAmount: z.coerce.number().min(0).optional(),
-  deliveryMethod: FxDeliveryMethodSchema.optional(),
-  bankName: z.string().min(1).max(160).trim().optional(),
-  accountNumber: z.string().min(1).max(120).trim().optional(),
-  currency: z.string().min(1).max(24).trim().optional(),
-  bankBranch: z.string().min(1).max(160).trim().optional(),
-  accountHolderName: z.string().min(1).max(200).trim().optional(),
-  usdtSide: FxUsdtSideSchema.optional(),
-  notes: z.string().max(1000).trim().optional(),
-});
+/** PUT puede mandar banco en blanco cuando el envío es USDT a Binance; antes `.min(1).optional()` rechazaba `""`. */
+const FxOperationUpdateSchema = z
+  .object({
+    clientId: z.coerce.number().int().positive().optional(),
+    operationDate: z.string().min(1).max(40).trim().optional(),
+    operationAmount: z.coerce.number().min(0).optional(),
+    hrsCommissionPct: z.coerce.number().min(0).max(100).optional(),
+    bankFeeAmount: z.coerce.number().min(0).optional(),
+    deliveryMethod: FxDeliveryMethodSchema.optional(),
+    bankName: z.string().max(160).trim().optional(),
+    accountNumber: z.string().max(120).trim().optional(),
+    currency: z.string().max(24).trim().optional(),
+    bankBranch: z.string().max(160).trim().optional(),
+    accountHolderName: z.string().max(200).trim().optional(),
+    usdtSide: FxUsdtSideSchema.optional(),
+    notes: z.string().max(1000).trim().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.usdtSide === "buy_usdt" && data.deliveryMethod != null && data.deliveryMethod !== "usdt_to_hrs_binance") {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["deliveryMethod"], message: "Compra de USDT usa USDT a Binance." });
+    }
+    if (data.deliveryMethod === "usd_to_bank") {
+      if (!data.bankName?.trim()) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["bankName"] });
+      if (!data.accountNumber?.trim()) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["accountNumber"] });
+      if (!data.currency?.trim()) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["currency"] });
+      if (!data.bankBranch?.trim()) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["bankBranch"] });
+      if (!data.accountHolderName?.trim()) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["accountHolderName"] });
+    }
+  });
 
 type FxRow = {
   id: number;

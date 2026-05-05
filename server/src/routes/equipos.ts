@@ -8,6 +8,8 @@ import {
   marketplaceImageUploadUsesMemory,
   uploadMarketplaceImageMw,
 } from "../middleware/marketplaceImageUpload.js";
+import { isBitmainAntminerRandomXMinerBlob } from "../lib/miningYieldEstimate.js";
+import { applyBitmainRandomXYieldBtcToXmrWhenNeeded } from "../lib/yieldBtcToXmrDisplay.js";
 import {
   estimateYieldFromCustomWhatToMine,
   estimateYieldWhatToMineForEquipo,
@@ -76,7 +78,7 @@ const EquipoBodySchema = z
     observaciones: z.string().optional(),
     numeroSerie: z.string().optional(),
     marketplaceVisible: z.boolean().optional().default(false),
-    marketplaceAlgo: z.enum(["sha256", "scrypt"]).optional().nullable(),
+    marketplaceAlgo: z.enum(["sha256", "scrypt", "randomx"]).optional().nullable(),
     marketplaceHashrateDisplay: z.string().max(200).optional().nullable(),
     marketplaceImageSrc: z.string().max(MARKETPLACE_IMAGE_SRC_MAX_LEN).optional().nullable(),
     marketplaceGalleryJson: z.string().max(MARKETPLACE_GALLERY_JSON_MAX_LEN).optional().nullable(),
@@ -192,7 +194,7 @@ function rowToItem(r: EquipoRow) {
     precioUSD: Number(r.precio_usd) || 0,
     observaciones: r.observaciones ?? undefined,
     marketplaceVisible: rowMpVisible(r),
-    marketplaceAlgo: (r.mp_algo ?? null) as "sha256" | "scrypt" | null,
+    marketplaceAlgo: (r.mp_algo ?? null) as "sha256" | "scrypt" | "randomx" | null,
     marketplaceHashrateDisplay: r.mp_hashrate_display ?? null,
     marketplaceImageSrc: r.mp_image_src ?? null,
     marketplaceGalleryJson: r.mp_gallery_json ?? null,
@@ -306,11 +308,37 @@ function parseCustomYieldConfig(raw: string | null | undefined): {
   }
 }
 
+function equipoTextBlobForYieldHint(r: EquipoRow): string {
+  let detailJoin = "";
+  if (r.mp_detail_rows_json?.trim()) {
+    try {
+      const d = JSON.parse(r.mp_detail_rows_json) as unknown;
+      if (Array.isArray(d)) {
+        detailJoin = d
+          .filter((x) => x && typeof x === "object" && typeof (x as { text?: unknown }).text === "string")
+          .map((x) => String((x as { text: string }).text))
+          .join(" ");
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return `${r.marca_equipo ?? ""} ${r.modelo ?? ""} ${r.procesador ?? ""} ${detailJoin}`;
+}
+
+/** Primer segmento `/coins/{id}` en URL WhatToMine (1 = Bitcoin, 101 = Monero RandomX, etc.). */
+function whatToMineUrlCoinId(url: string): number | null {
+  const m = String(url ?? "").match(/\/coins\/(\d+)/i);
+  if (!m?.[1]) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) && n > 0 ? Math.trunc(n) : null;
+}
+
 /** Mantiene columnas de tienda sin cambios (Operador al editar equipo). */
 function mpPayloadFromExistingRow(r: EquipoRow) {
   return {
     mp_visible: mpVisibleToInt(rowMpVisible(r)),
-    mp_algo: (r.mp_algo ?? null) as "sha256" | "scrypt" | null,
+    mp_algo: (r.mp_algo ?? null) as "sha256" | "scrypt" | "randomx" | null,
     mp_hashrate_display: r.mp_hashrate_display ?? null,
     mp_image_src: r.mp_image_src ?? null,
     mp_gallery_json: r.mp_gallery_json ?? null,
@@ -502,11 +530,28 @@ equiposRouter.get("/equipos/:id/whattomine-yield", requireAuth, async (req, res:
       mp_algo: row.mp_algo ?? null,
       procesador: row.procesador ?? "",
       mp_detail_rows_json: row.mp_detail_rows_json ?? null,
+      marca_equipo: row.marca_equipo ?? "",
+      modelo: row.modelo ?? "",
     };
+    const ctxBlob = equipoTextBlobForYieldHint(row);
+    const isRandomXMinerCtx =
+      (row.mp_algo ?? "").trim().toLowerCase() === "randomx" ||
+      isBitmainAntminerRandomXMinerBlob(ctxBlob) ||
+      /\b(monero|xmr|zephyr|randomx)\b/i.test(ctxBlob);
+
     const customYieldCfg = parseCustomYieldConfig(row.mp_yield_json ?? null);
     if (customYieldCfg) {
-      const custom = await estimateYieldFromCustomWhatToMine(customYieldCfg);
-      if (custom) return res.json({ ok: true, yield: custom });
+      const wtmCoinId = whatToMineUrlCoinId(customYieldCfg.url);
+      /** Minero Monero/RandomX: no aplicar link WhatToMine de Bitcoin u otros coins salvo XMR (101). */
+      const useCustomFirst =
+        !isRandomXMinerCtx || wtmCoinId === 101;
+      if (useCustomFirst) {
+        const custom = await estimateYieldFromCustomWhatToMine(customYieldCfg);
+        if (custom) {
+          const yieldOut = await applyBitmainRandomXYieldBtcToXmrWhenNeeded(ctxBlob, custom);
+          return res.json({ ok: true, yield: yieldOut });
+        }
+      }
     }
     const hintFail = explainInferAlgoFailure(payload);
     const y = await estimateYieldWhatToMineForEquipo(payload);
@@ -517,7 +562,8 @@ equiposRouter.get("/equipos/:id/whattomine-yield", requireAuth, async (req, res:
         hint: hintFail || "No se pudo obtener datos de WhatToMine. Probá de nuevo en unos segundos.",
       });
     }
-    res.json({ ok: true, yield: y });
+    const yieldOut = await applyBitmainRandomXYieldBtcToXmrWhenNeeded(ctxBlob, y);
+    res.json({ ok: true, yield: yieldOut });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     res.status(500).json({ error: { message: msg } });

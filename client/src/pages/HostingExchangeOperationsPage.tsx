@@ -13,6 +13,7 @@ import {
   type HostingFxOperationPayload,
 } from "../lib/api";
 import { downloadHostingFxTicketPdf } from "../lib/generateHostingFxTicketPdf";
+import { hostingFxOperationProfitUsd } from "../lib/hostingFxOperationProfit";
 import "../styles/facturacion.css";
 
 type FxFormState = HostingFxOperationPayload;
@@ -47,11 +48,6 @@ function normalizeHrsCommissionPct(n: number): number {
   if (!Number.isFinite(n)) return 1;
   if (allowed.includes(n)) return n;
   return allowed.reduce((best, c) => (Math.abs(c - n) < Math.abs(best - n) ? c : best), allowed[0]!);
-}
-
-/** Misma fórmula que la columna «Ganancia operación» del listado. */
-function hostingFxOperationProfit(op: HostingFxOperation): number {
-  return Math.max(0, op.operationAmount - op.clientTotalPayment - op.bankFeeAmount);
 }
 
 export function HostingExchangeOperationsPage() {
@@ -157,7 +153,7 @@ export function HostingExchangeOperationsPage() {
     /** Suma de monto transferencia con Cliente: Compra de USDT (buy_usdt). */
     let montoTransferenciaCompraDeUsdt = 0;
     for (const op of operations) {
-      totalGanancias += hostingFxOperationProfit(op);
+      totalGanancias += hostingFxOperationProfitUsd(op);
       const amt = Number.isFinite(op.operationAmount) ? op.operationAmount : 0;
       const transfer = Number.isFinite(op.clientTotalPayment) ? op.clientTotalPayment : 0;
       if (op.usdtSide === "sell_usdt") {
@@ -772,7 +768,7 @@ export function HostingExchangeOperationsPage() {
                       </td>
                       <td className="hosting-fx-ops-td--end">
                         <span className="hosting-fx-ops-num">
-                          {hostingFxOperationProfit(op).toFixed(2)}
+                          {hostingFxOperationProfitUsd(op).toFixed(2)}
                         </span>
                       </td>
                       <td className="text-center hosting-fx-ops-actions">

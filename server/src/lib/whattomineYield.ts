@@ -5,10 +5,13 @@
  * Unidades de `hr` según WTM:
  * - Bitcoin (id=1): TH/s
  * - Litecoin Scrypt (id=4): GH/s
+ * - Monero RandomX (id=101): kH/s (ej. 1 MH/s → hr=1000)
  */
 
 import {
+  isBitmainAntminerRandomXMinerBlob,
   parsePowerWattsFromDetails,
+  parseRandomXKhsForWtm,
   parseScryptGhs,
   parseSha256Ths,
   parseZcashKhForWtm,
@@ -25,6 +28,8 @@ const WTM_LTC_COIN = 4;
 const WTM_DOGE_COIN = 6;
 /** Zcash Equihash — misma API que https://whattomine.com/coins/166-zec-equihash */
 const WTM_ZEC_COIN = 166;
+/** Monero RandomX — misma API que https://whattomine.com/coins/101-xmr-randomx */
+const WTM_XMR_RANDOMX_COIN = 101;
 
 const UA = "HashrateSpace-SGI/1.0";
 
@@ -303,7 +308,27 @@ export type WhatToMineCustomConfig = {
   electricityUsdPerKwh: number;
 };
 
-function inferAlgo(row: { mp_algo: string | null; procesador: string }): "sha256" | "scrypt" | null {
+function isRandomXMoneroEquipoContext(
+  row: { mp_algo: string | null; procesador: string; marca_equipo?: string; modelo?: string },
+  detailText: string
+): boolean {
+  const a = (row.mp_algo ?? "").trim().toLowerCase();
+  if (a === "randomx") return true;
+  const titleBlob = `${row.marca_equipo ?? ""} ${row.modelo ?? ""} ${row.procesador ?? ""} ${detailText}`;
+  if (isBitmainAntminerRandomXMinerBlob(titleBlob)) return true;
+  const blob = `${row.procesador ?? ""} ${row.mp_algo ?? ""} ${detailText}`.toLowerCase();
+  return /\b(monero|xmr|zephyr|zeph|randomx)\b/.test(blob);
+}
+
+function inferAlgo(row: {
+  mp_algo: string | null;
+  procesador: string;
+  marca_equipo?: string;
+  modelo?: string;
+}): "sha256" | "scrypt" | null {
+  const titleProbe = `${row.marca_equipo ?? ""} ${row.modelo ?? ""} ${row.procesador ?? ""}`;
+  /** Antminer X* = RandomX: no inferir SHA-256 aunque `mp_algo` en BD siga en sha256. */
+  if (isBitmainAntminerRandomXMinerBlob(titleProbe)) return null;
   const a = (row.mp_algo ?? "").trim().toLowerCase();
   if (a === "sha256" || a === "scrypt") return a;
   const hashrate = (row.procesador ?? "").trim() || "";
@@ -318,11 +343,15 @@ function inferAlgo(row: { mp_algo: string | null; procesador: string }): "sha256
  * y por defecto SHA-256 para que la vitrina siempre tenga un algo válido.
  */
 export function resolveMarketplaceAlgoForPersist(body: {
-  marketplaceAlgo?: "sha256" | "scrypt" | null;
+  marketplaceAlgo?: "sha256" | "scrypt" | "randomx" | null;
   procesador: string;
-}): "sha256" | "scrypt" {
+  marcaEquipo?: string;
+  modelo?: string;
+}): "sha256" | "scrypt" | "randomx" {
   const ex = body.marketplaceAlgo;
-  if (ex === "sha256" || ex === "scrypt") return ex;
+  if (ex === "sha256" || ex === "scrypt" || ex === "randomx") return ex;
+  const titleBlob = `${body.marcaEquipo ?? ""} ${body.modelo ?? ""} ${body.procesador ?? ""}`;
+  if (isBitmainAntminerRandomXMinerBlob(titleBlob)) return "randomx";
   const inferred = inferAlgo({ mp_algo: null, procesador: body.procesador });
   if (inferred) return inferred;
   const p = (body.procesador ?? "").toLowerCase();
@@ -355,10 +384,36 @@ export async function fetchZecWhatToMineYieldForItem(item: {
   };
 }
 
+/**
+ * Rendimiento en vivo: XMR (RandomX) desde API `coins/101.json` (misma base que la calculadora web).
+ */
+export async function fetchRandomXWhatToMineYieldForItem(item: {
+  id: string;
+  hashrate: string;
+  detailRows?: Array<{ icon: string; text: string }>;
+}): Promise<AsicYieldResult | null> {
+  const khs = parseRandomXKhsForWtm(item.hashrate);
+  if (khs == null) return null;
+  const powerW = parsePowerWattsFromDetails(item.detailRows) ?? 2600;
+  const j = await fetchWtmJson(WTM_XMR_RANDOMX_COIN, khs, powerW);
+  if (!j) return null;
+  const xmrDay = parseRewardNumber(j.estimated_rewards);
+  const revenueUsd = parseUsdString(j.revenue);
+  if (xmrDay == null || xmrDay <= 0 || revenueUsd == null) return null;
+  return {
+    id: item.id,
+    line1: `≈ ${fmtEs(xmrDay, 6)} XMR`,
+    line2: `≈ ${fmtEs(revenueUsd, 2)} USD`,
+    note: `WhatToMine XMR (RandomX) · ${fmtEs(khs, 1)} kH/s · electricidad ${WHATTOMINE_ELECTRICITY_USD_PER_KWH} USD/kWh · bruto diario (revenue).`,
+  };
+}
+
 export async function estimateYieldWhatToMineForEquipo(row: {
   mp_algo: string | null;
   procesador: string;
   mp_detail_rows_json: string | null;
+  marca_equipo?: string;
+  modelo?: string;
 }): Promise<WhatToMineYieldResult | null> {
   const hashrate = (row.procesador ?? "").trim() || "";
 
@@ -393,6 +448,28 @@ export async function estimateYieldWhatToMineForEquipo(row: {
       electricityUsdPerKwh: WHATTOMINE_ELECTRICITY_USD_PER_KWH,
       note: `WhatToMine ZEC (Equihash) · ${zKh} kh/s · electricidad ${WHATTOMINE_ELECTRICITY_USD_PER_KWH} USD/kWh · bruto (revenue).`,
     };
+  }
+
+  const detailText = (detailRows ?? []).map((r) => r.text).join(" ");
+  if (isRandomXMoneroEquipoContext(row, detailText)) {
+    const khs = parseRandomXKhsForWtm(hashrate);
+    if (khs != null) {
+      const p = powerW ?? 2600;
+      const j = await fetchWtmJson(WTM_XMR_RANDOMX_COIN, khs, p);
+      if (!j) return null;
+      const xmrDay = parseRewardNumber(j.estimated_rewards);
+      const revenueUsd = parseUsdString(j.revenue);
+      if (xmrDay == null || xmrDay <= 0 || revenueUsd == null) return null;
+      return {
+        line1: `≈ ${fmtEs(xmrDay, 6)} XMR`,
+        line2: `Equivalente diario (USD): ≈ ${fmtEs(revenueUsd, 2)} USD`,
+        source: "whattomine",
+        electricityUsdPerKwh: WHATTOMINE_ELECTRICITY_USD_PER_KWH,
+        note: `WhatToMine XMR (RandomX) · ${fmtEs(khs, 1)} kH/s · ${p} W · electricidad ${WHATTOMINE_ELECTRICITY_USD_PER_KWH} USD/kWh · bruto (revenue).`,
+      };
+    }
+    /** Contexto Monero/RandomX pero hashrate no parseable como kH/s: no usar rama BTC. */
+    return null;
   }
 
   const algo = inferAlgo(row);
@@ -443,7 +520,21 @@ export async function estimateYieldWhatToMineForEquipo(row: {
   return null;
 }
 
-export function explainInferAlgoFailure(row: { mp_algo: string | null; procesador: string }): string {
-  if (inferAlgo(row) || parseZcashKhForWtm((row.procesador ?? "").trim())) return "";
-  return "No se detectó algoritmo ni hashrate en Procesador (ej. TH/s para Bitcoin, GH/s o MH/s para Scrypt, kSol/s para Zcash/Z15). Completá Procesador con la especificación del minero.";
+export function explainInferAlgoFailure(row: {
+  mp_algo: string | null;
+  procesador: string;
+  marca_equipo?: string;
+  modelo?: string;
+}): string {
+  const proc = (row.procesador ?? "").trim();
+  if (inferAlgo(row) || parseZcashKhForWtm(proc)) return "";
+  const titleBlob = `${row.marca_equipo ?? ""} ${row.modelo ?? ""} ${proc}`;
+  if (
+    (isBitmainAntminerRandomXMinerBlob(titleBlob) ||
+      /\b(monero|xmr|zephyr|zeph|randomx)\b/i.test(`${proc} ${row.mp_algo ?? ""}`)) &&
+    parseRandomXKhsForWtm(proc) == null
+  ) {
+    return "Equipo RandomX/Monero: indicá el hashrate en kH/s o MH/s en Procesador (WhatToMine usa kH/s; 1 MH/s = 1000 kH/s).";
+  }
+  return "No se detectó algoritmo ni hashrate en Procesador (ej. TH/s para Bitcoin, GH/s o MH/s para Scrypt, kSol/s para Zcash/Z15, kH/s o MH/s para Monero RandomX). Completá Procesador con la especificación del minero.";
 }

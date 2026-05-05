@@ -365,3 +365,58 @@ ALTER TABLE marketplace_quote_tickets DROP CONSTRAINT IF EXISTS marketplace_quot
 UPDATE marketplace_quote_tickets SET status = 'en_contacto_equipo' WHERE status = 'respondido';
 UPDATE marketplace_quote_tickets SET status = 'pendiente' WHERE status = 'orden_lista';
 ALTER TABLE marketplace_quote_tickets ADD CONSTRAINT marketplace_quote_tickets_status_check CHECK (status IN ('borrador', 'pendiente', 'orden_lista', 'enviado_consulta', 'en_contacto_equipo', 'en_gestion', 'pagada', 'en_viaje', 'instalado', 'cerrado', 'descartado'));
+
+-- Proveedores HRS — base «Proveedores HRS», código automático único P001, P002, …
+CREATE TABLE IF NOT EXISTS proveedores_hrs_seq (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  next_num BIGINT NOT NULL DEFAULT 0
+);
+
+INSERT INTO proveedores_hrs_seq (id, next_num) VALUES (1, 0)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS proveedores_hrs (
+  id SERIAL PRIMARY KEY,
+  supplier_number TEXT NOT NULL UNIQUE,
+  supplier_name TEXT NOT NULL,
+  country TEXT NOT NULL DEFAULT '',
+  ruc TEXT NOT NULL DEFAULT '',
+  rubro TEXT NOT NULL DEFAULT '',
+  contact_first_name TEXT NOT NULL,
+  contact_last_name TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE proveedores_hrs ADD COLUMN IF NOT EXISTS rubro TEXT NOT NULL DEFAULT '';
+
+CREATE INDEX IF NOT EXISTS idx_proveedores_hrs_created ON proveedores_hrs(created_at DESC);
+
+-- Contabilidad: gastos de empresa (FK a Proveedores HRS)
+CREATE TABLE IF NOT EXISTS contabilidad_gastos (
+  id SERIAL PRIMARY KEY,
+  fecha DATE NOT NULL,
+  proveedor_id INTEGER NOT NULL REFERENCES proveedores_hrs(id) ON DELETE RESTRICT,
+  supplier_number TEXT NOT NULL,
+  supplier_name TEXT NOT NULL,
+  numero_factura TEXT NOT NULL DEFAULT '',
+  descripcion TEXT NOT NULL,
+  observaciones TEXT NOT NULL DEFAULT '',
+  mes_servicio TEXT NOT NULL DEFAULT '',
+  presupuesto_mes TEXT NOT NULL DEFAULT '',
+  medio_pago TEXT NOT NULL DEFAULT '',
+  moneda TEXT NOT NULL CHECK (moneda IN ('UYU', 'USD', 'PYG')),
+  monto NUMERIC(18, 4) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE contabilidad_gastos ADD COLUMN IF NOT EXISTS numero_factura TEXT NOT NULL DEFAULT '';
+ALTER TABLE contabilidad_gastos ADD COLUMN IF NOT EXISTS observaciones TEXT NOT NULL DEFAULT '';
+ALTER TABLE contabilidad_gastos ADD COLUMN IF NOT EXISTS mes_servicio TEXT NOT NULL DEFAULT '';
+ALTER TABLE contabilidad_gastos ADD COLUMN IF NOT EXISTS presupuesto_mes TEXT NOT NULL DEFAULT '';
+ALTER TABLE contabilidad_gastos ADD COLUMN IF NOT EXISTS medio_pago TEXT NOT NULL DEFAULT '';
+ALTER TABLE contabilidad_gastos ADD COLUMN IF NOT EXISTS tipo_cambio NUMERIC(18, 6);
+ALTER TABLE contabilidad_gastos ADD COLUMN IF NOT EXISTS monto_original NUMERIC(18, 4);
+ALTER TABLE contabilidad_gastos ADD COLUMN IF NOT EXISTS factura_pdf_adjunto SMALLINT NOT NULL DEFAULT 0;
+
+CREATE INDEX IF NOT EXISTS idx_contabilidad_gastos_fecha ON contabilidad_gastos(fecha DESC);
+CREATE INDEX IF NOT EXISTS idx_contabilidad_gastos_prov ON contabilidad_gastos(proveedor_id);

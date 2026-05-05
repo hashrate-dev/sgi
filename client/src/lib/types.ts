@@ -93,7 +93,7 @@ export type EquipoASIC = {
   observaciones?: string;
   /** Publicado en /marketplace (catálogo vitrina) */
   marketplaceVisible?: boolean;
-  marketplaceAlgo?: "sha256" | "scrypt" | null;
+  marketplaceAlgo?: "sha256" | "scrypt" | "randomx" | null;
   marketplaceHashrateDisplay?: string | null;
   marketplaceImageSrc?: string | null;
   marketplaceGalleryJson?: string | null;

@@ -5,7 +5,7 @@
 
 import { marketplaceLocale } from "./i18n.js";
 
-export type AsicAlgo = "sha256" | "scrypt";
+export type AsicAlgo = "sha256" | "scrypt" | "randomx";
 
 export type AsicDetailIcon = "bolt" | "chip" | "sun" | "fan" | "droplet" | "btc" | "dual";
 
@@ -107,6 +107,10 @@ export function scaleYieldDisplayLine(line: string, factor: number, lang?: strin
     const v = parseLocaleNumberForDisplay(num);
     return v == null ? `${pre}${num}${suf}` : `${pre}${Math.round(v * factor).toLocaleString(loc)}${suf}`;
   });
+  out = out.replace(/([~≈]\s*)([\d.,]+)(\s*XMR)/gi, (_m, pre: string, num: string, suf: string) => {
+    const v = parseLocaleNumberForDisplay(num);
+    return v == null ? `${pre}${num}${suf}` : `${pre}${fmtDec(v * factor, 6)}${suf}`;
+  });
   return normalizeUsdSuffix(out);
 }
 
@@ -193,6 +197,23 @@ function isZcashAirFamily(p: AsicProduct): boolean {
   return false;
 }
 
+/** Antminer X5 / X9 … = RandomX Monero (alineado con servidor `isBitmainAntminerRandomXMinerBlob`). */
+export function isBitmainAntminerRandomXCatalogBlob(blob: string): boolean {
+  const t = blob.toLowerCase().replace(/\s+/g, " ").trim();
+  if (!t) return false;
+  if (!/\b(bitmain|antminer)\b/.test(t)) return false;
+  if (/\bz15\b|zcash|equihash|\bzec\b/.test(t)) return false;
+  if (/\bk\s*sol|ksol\/s/.test(t)) return false;
+  if (/\b(?:antminer\s+)?l[79]\b/.test(t)) return false;
+  if (/\b(?:antminer\s+)?s\d{2,}\b/.test(t) || /\bs19\b|\bs21\b/.test(t)) return false;
+  return /\b(?:antminer\s+)?x\d+\b/.test(t);
+}
+
+function isAntminerRandomXAirFamily(p: AsicProduct): boolean {
+  if (p.algo === "randomx") return true;
+  return isBitmainAntminerRandomXCatalogBlob(textBlobForShelfSort(p));
+}
+
 function isAntminerL9(p: AsicProduct): boolean {
   return /\bl9\b/i.test(`${p.brand} ${p.model}`);
 }
@@ -201,19 +222,21 @@ function isAntminerL9(p: AsicProduct): boolean {
  * Grupo para ordenar la grilla `/marketplace` (app.hashrate.space):
  * 0 = minero de aire Bitcoin (SHA-256, sin Z15/Zcash),
  * 1 = Zcash / Z15 / Equihash,
- * 2 = Antminer L9,
- * 3 = otro minero de aire,
- * 4 = Hydro / líquido,
- * 5 = infra (contenedores, racks, PDU…).
+ * 2 = Monero RandomX (Antminer X*),
+ * 3 = Antminer L9,
+ * 4 = otro minero de aire,
+ * 5 = Hydro / líquido,
+ * 6 = infra (contenedores, racks, PDU…).
  */
 export function marketplaceShelfPrimaryGroup(p: AsicProduct): number {
-  if (resolveMarketplaceListingKind(p) === "infrastructure") return 5;
-  if (!asicProductShowsMinerEconomyContent(p)) return 5;
-  if (isHydroOrLiquidCooledMiner(p)) return 4;
+  if (resolveMarketplaceListingKind(p) === "infrastructure") return 6;
+  if (!asicProductShowsMinerEconomyContent(p)) return 6;
+  if (isHydroOrLiquidCooledMiner(p)) return 5;
   if (isZcashAirFamily(p)) return 1;
-  if (isAntminerL9(p)) return 2;
+  if (isAntminerRandomXAirFamily(p)) return 2;
+  if (isAntminerL9(p)) return 3;
   if (p.algo === "sha256") return 0;
-  return 3;
+  return 4;
 }
 
 export function compareMarketplaceShelfProducts(a: AsicProduct, b: AsicProduct, sortLocale: string): number {
@@ -425,9 +448,11 @@ function isShelfCoinChipRow(r: DetailRow): boolean {
     (t.includes("LTC") && t.includes("DOGE")) ||
     (t.includes("SCRYPT") && !t.includes("SHA-256"));
   const hasZcashFamily = t.includes("ZCASH") || t.includes("ZEC");
+  const hasMoneroFamily =
+    (t.includes("MONERO") || t.includes("XMR") || t.includes("RANDOMX")) && !t.includes("RJ45");
   const eth = t.includes("RJ45") || (t.includes("ETHERNET") && (t.includes("10/100") || t.includes("100M")));
   const cap = t.includes("CAPACIDAD") && (t.includes("UNIDAD") || t.includes("MAX"));
-  return hasBtcFamily || hasScryptFamily || hasZcashFamily || eth || cap;
+  return hasBtcFamily || hasScryptFamily || hasZcashFamily || hasMoneroFamily || eth || cap;
 }
 
 function isShelfMiningRow(r: DetailRow): boolean {
@@ -477,12 +502,14 @@ export const ASIC_FILTER_GROUPS: ReadonlyArray<{ id: MarketplaceCatalogFilter; l
  * Prioriza textos en filas técnicas (chip/minería) para evitar hardcode por modelo.
  */
 export function inferMarketplaceCatalogFilter(p: AsicProduct): MarketplaceCatalogFilter {
-  const g = marketplaceShelfPrimaryGroup(p);
   const t = `${p.brand} ${p.model} ${p.hashrate} ${p.detailRows.map((r) => r.text).join(" ")}`.toLowerCase();
+  if (p.algo === "randomx" || isBitmainAntminerRandomXCatalogBlob(t)) return "monero";
   if (/\b(monero|xmr|zephyr|zeph|randomx)\b/.test(t)) return "monero";
+  const g = marketplaceShelfPrimaryGroup(p);
   if (g === 0) return "sha256";
-  if (g === 2) return "scrypt";
   if (g === 1) return "zcash";
+  if (g === 2) return "monero";
+  if (g === 3 || g === 4) return "scrypt";
   return "other";
 }
 

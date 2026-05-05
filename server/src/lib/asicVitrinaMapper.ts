@@ -2,9 +2,10 @@
  * Mapea filas `equipos_asic` (con columnas marketplace) al JSON del catálogo ASIC vitrina.
  */
 
+import { isBitmainAntminerRandomXMinerBlob } from "./miningYieldEstimate.js";
 import { resolveMarketplaceAlgoForPersist } from "./whattomineYield.js";
 
-export type AsicAlgo = "sha256" | "scrypt";
+export type AsicAlgo = "sha256" | "scrypt" | "randomx";
 export type AsicDetailIcon = "bolt" | "chip" | "sun" | "fan" | "droplet" | "btc" | "dual";
 
 /** Alineado con client/src/lib/marketplaceAsicCatalog (sufijos / textos legacy en mp_price_label). */
@@ -72,6 +73,14 @@ function defaultDetailRows(algo: AsicAlgo): VitrinaAsicProduct["detailRows"] {
       { icon: "btc", text: "Minería Bitcoin" },
     ];
   }
+  if (algo === "randomx") {
+    return [
+      { icon: "bolt", text: "—" },
+      { icon: "chip", text: "Monero (XMR) · RandomX" },
+      { icon: "fan", text: "Minero de Aire" },
+      { icon: "btc", text: "Minería Monero" },
+    ];
+  }
   return [
     { icon: "bolt", text: "—" },
     { icon: "chip", text: "DOGE + LTC · Scrypt" },
@@ -81,7 +90,7 @@ function defaultDetailRows(algo: AsicAlgo): VitrinaAsicProduct["detailRows"] {
 }
 
 function defaultYield(algo: AsicAlgo): { line1: string; line2: string } {
-  if (algo === "sha256") {
+  if (algo === "sha256" || algo === "randomx") {
     return {
       line1: "Consultar rendimiento",
       line2: "—",
@@ -93,10 +102,20 @@ function defaultYield(algo: AsicAlgo): { line1: string; line2: string } {
   };
 }
 
-function parseAlgo(v: string | null | undefined): AsicAlgo | null {
-  const s = (v ?? "").trim().toLowerCase();
-  if (s === "sha256" || s === "scrypt") return s;
-  return null;
+/**
+ * Efectivo en vitrina: prioriza Antminer X* = Monero aunque `mp_algo` en BD siga en sha256.
+ */
+function resolveEffectiveMarketplaceAlgo(row: EquipoAsicVitrinaRow): AsicAlgo {
+  const titleBlob = `${row.marca_equipo ?? ""} ${row.modelo ?? ""} ${row.procesador ?? ""}`;
+  if (isBitmainAntminerRandomXMinerBlob(titleBlob)) return "randomx";
+  const raw = (row.mp_algo ?? "").trim().toLowerCase();
+  const explicit = raw === "sha256" || raw === "scrypt" || raw === "randomx" ? raw : null;
+  return resolveMarketplaceAlgoForPersist({
+    marketplaceAlgo: explicit,
+    procesador: row.procesador ?? "",
+    marcaEquipo: row.marca_equipo ?? "",
+    modelo: row.modelo ?? "",
+  });
 }
 
 export type EquipoAsicVitrinaRow = {
@@ -121,17 +140,11 @@ export type EquipoAsicVitrinaRow = {
  * Igual que `mapEquipoRowToVitrina`, pero si falta `mp_algo` (inventario sin tienda) infiere SHA-256/Scrypt desde el procesador.
  */
 export function mapEquipoRowToVitrinaWithAlgoFallback(row: EquipoAsicVitrinaRow): VitrinaAsicProduct | null {
-  const ex = row.mp_algo === "sha256" || row.mp_algo === "scrypt" ? row.mp_algo : null;
-  const resolved = resolveMarketplaceAlgoForPersist({
-    marketplaceAlgo: ex,
-    procesador: row.procesador ?? "",
-  });
-  return mapEquipoRowToVitrina({ ...row, mp_algo: resolved });
+  return mapEquipoRowToVitrina(row);
 }
 
 export function mapEquipoRowToVitrina(row: EquipoAsicVitrinaRow): VitrinaAsicProduct | null {
-  const algo = parseAlgo(row.mp_algo);
-  if (!algo) return null;
+  const algo = resolveEffectiveMarketplaceAlgo(row);
 
   const hashrate = (row.procesador ?? "").trim() || "—";
 

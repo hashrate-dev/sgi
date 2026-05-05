@@ -587,7 +587,7 @@ export function buildQuoteMessage(
     (anyPending
       ? "Líneas en consulta: precios de minero, setup y garantía serán confirmados por el equipo comercial de Hashrate al contactarte.\n"
       : "") +
-    `Total referencial (USD): ${total.toLocaleString("es-PY")} — sujeto a confirmación, impuestos y disponibilidad.\n\nGracias.`;
+    `Total (USD): ${total.toLocaleString("es-PY")} — sujeto a confirmación, impuestos y disponibilidad.\n\nGracias.`;
   let out = header + body + footer;
   if (ref) out += ticketRefFooter(ref.orderNumber, ref.ticketCode);
   return out;

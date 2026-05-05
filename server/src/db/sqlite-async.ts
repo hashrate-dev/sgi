@@ -744,6 +744,104 @@ CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_visitor ON marketplace_presence_
     if (!msg.includes("duplicate column")) throw e;
   }
 
+  /** Proveedores HRS — numeración única P001+, persistido localmente (SQLite). */
+  {
+    native.exec(`CREATE TABLE IF NOT EXISTS proveedores_hrs_seq (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      next_num INTEGER NOT NULL DEFAULT 0
+    )`);
+    native.exec(`INSERT OR IGNORE INTO proveedores_hrs_seq (id, next_num) VALUES (1, 0)`);
+    native.exec(`CREATE TABLE IF NOT EXISTS proveedores_hrs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      supplier_number TEXT NOT NULL UNIQUE,
+      supplier_name TEXT NOT NULL,
+      country TEXT NOT NULL DEFAULT '',
+      ruc TEXT NOT NULL DEFAULT '',
+      rubro TEXT NOT NULL DEFAULT '',
+      contact_first_name TEXT NOT NULL,
+      contact_last_name TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`);
+    native.exec(`CREATE INDEX IF NOT EXISTS idx_proveedores_hrs_created ON proveedores_hrs(created_at DESC)`);
+  }
+
+  try {
+    native.exec("ALTER TABLE proveedores_hrs ADD COLUMN rubro TEXT NOT NULL DEFAULT ''");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+
+  /** Gastos de empresa (Contabilidad); proveedor ligado a Proveedores HRS. */
+  native.exec(`CREATE TABLE IF NOT EXISTS contabilidad_gastos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fecha TEXT NOT NULL,
+    proveedor_id INTEGER NOT NULL,
+    supplier_number TEXT NOT NULL DEFAULT '',
+    supplier_name TEXT NOT NULL DEFAULT '',
+    numero_factura TEXT NOT NULL DEFAULT '',
+    descripcion TEXT NOT NULL,
+    observaciones TEXT NOT NULL DEFAULT '',
+    mes_servicio TEXT NOT NULL DEFAULT '',
+    presupuesto_mes TEXT NOT NULL DEFAULT '',
+    medio_pago TEXT NOT NULL DEFAULT '',
+    moneda TEXT NOT NULL CHECK (moneda IN ('UYU','USD','PYG')),
+    monto REAL NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (proveedor_id) REFERENCES proveedores_hrs(id)
+  )`);
+  native.exec(`CREATE INDEX IF NOT EXISTS idx_contabilidad_gastos_fecha ON contabilidad_gastos(fecha DESC)`);
+  native.exec(`CREATE INDEX IF NOT EXISTS idx_contabilidad_gastos_prov ON contabilidad_gastos(proveedor_id)`);
+
+  try {
+    native.exec("ALTER TABLE contabilidad_gastos ADD COLUMN numero_factura TEXT NOT NULL DEFAULT ''");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+  try {
+    native.exec("ALTER TABLE contabilidad_gastos ADD COLUMN observaciones TEXT NOT NULL DEFAULT ''");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+  try {
+    native.exec("ALTER TABLE contabilidad_gastos ADD COLUMN mes_servicio TEXT NOT NULL DEFAULT ''");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+  try {
+    native.exec("ALTER TABLE contabilidad_gastos ADD COLUMN presupuesto_mes TEXT NOT NULL DEFAULT ''");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+  try {
+    native.exec("ALTER TABLE contabilidad_gastos ADD COLUMN medio_pago TEXT NOT NULL DEFAULT ''");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+  try {
+    native.exec("ALTER TABLE contabilidad_gastos ADD COLUMN tipo_cambio REAL");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+  try {
+    native.exec("ALTER TABLE contabilidad_gastos ADD COLUMN monto_original REAL");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+  try {
+    native.exec("ALTER TABLE contabilidad_gastos ADD COLUMN factura_pdf_adjunto INTEGER NOT NULL DEFAULT 0");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+
   const txWrap = {
     prepare: (sql: string) => createStatement(native, sql),
   };

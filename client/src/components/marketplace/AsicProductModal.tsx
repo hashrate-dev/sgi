@@ -4,6 +4,7 @@ import {
   asicProductShowsMinerEconomyContent,
   defaultAsicShelfImageSrc,
   formatAsicPriceUsd,
+  isBitmainAntminerRandomXCatalogBlob,
   normalizeConsultPriceLabelForDisplay,
   productHashrateShareParts,
   proratedEquipmentPriceUsd,
@@ -198,9 +199,12 @@ export function AsicProductModal({
     return /\bz15\b|\bzcash\b|\bzec\b|equihash|k.sol|ksol/.test(blob);
   }, [product.brand, product.model, product.hashrate, chipRow?.text]);
   const isMoneroProductUi = useMemo(() => {
-    const blob = `${product.brand} ${product.model} ${product.hashrate} ${chipRow?.text ?? ""}`.toLowerCase();
+    if (product.algo === "randomx") return true;
+    const blobFull = `${product.brand} ${product.model} ${product.hashrate} ${chipRow?.text ?? ""}`;
+    if (isBitmainAntminerRandomXCatalogBlob(blobFull)) return true;
+    const blob = blobFull.toLowerCase();
     return /\bmonero\b|\bxmr\b|\bzephyr\b|randomx/.test(blob);
-  }, [product.brand, product.model, product.hashrate, chipRow?.text]);
+  }, [product.algo, product.brand, product.model, product.hashrate, chipRow?.text]);
   const algoBadge = isZecProductUi
     ? { label: "Equihash", className: "product-modal__pill product-modal__pill--equihash" }
     : isMoneroProductUi
@@ -209,7 +213,13 @@ export function AsicProductModal({
         ? { label: "SHA-256", className: "product-modal__pill product-modal__pill--algo" }
         : { label: "Scrypt", className: "product-modal__pill product-modal__pill--algo" };
   const coinsBadge = {
-    label: chipRow ? chipRow.text.split("·")[0]?.trim() ?? chipRow.text : product.algo === "sha256" ? "BTC / BCH / BSV" : "DOGE + LTC",
+    label: chipRow
+      ? chipRow.text.split("·")[0]?.trim() ?? chipRow.text
+      : product.algo === "sha256"
+        ? "BTC / BCH / BSV"
+        : product.algo === "randomx"
+          ? "XMR"
+          : "DOGE + LTC",
     className: "product-modal__pill product-modal__pill--coins",
   };
 

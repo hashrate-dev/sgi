@@ -255,6 +255,8 @@ function MarketplacePageBody() {
           algo: p.algo,
           hashrate: p.hashrate,
           detailRows: p.detailRows,
+          brand: p.brand,
+          model: p.model,
         }))
       )
         .then((res) => {

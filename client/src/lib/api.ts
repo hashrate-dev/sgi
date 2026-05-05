@@ -13,7 +13,7 @@ const FALLBACK_API_URLS = [
   "https://hashrate-app.onrender.com",
 ];
 
-function getApiBase(): string {
+export function getApiBase(): string {
   if (typeof window === "undefined") return "";
   const h = window.location?.hostname ?? "";
   /**
@@ -210,7 +210,11 @@ async function apiNoRetry<T>(path: string, timeoutMs = 10000): Promise<T> {
 
 export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const token = getStoredToken();
-  const headers: Record<string, string> = { "Content-Type": "application/json", ...(options?.headers as Record<string, string>) };
+  const isFormData = typeof FormData !== "undefined" && options?.body instanceof FormData;
+  const headers: Record<string, string> = {
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
+    ...((options?.headers as Record<string, string>) ?? {}),
+  };
   if (token) headers.Authorization = `Bearer ${token}`;
   let base = getApiBase();
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
@@ -655,6 +659,205 @@ export function createAsicCostoEquipo(
   });
 }
 
+export type ProveedorHrs = {
+  id: number;
+  supplierNumber: string;
+  supplierName: string;
+  country: string;
+  ruc: string;
+  rubro: string;
+  contactFirstName: string;
+  contactLastName: string;
+  createdAt: string;
+};
+
+export type ProveedorHrsPayload = {
+  supplierName: string;
+  country: string;
+  ruc: string;
+  rubro: string;
+  contactFirstName: string;
+  contactLastName: string;
+};
+
+export function getProveedoresHrs(): Promise<{ items: ProveedorHrs[] }> {
+  return api<{ items: ProveedorHrs[] }>("/api/proveedores-hrs");
+}
+
+export function createProveedorHrs(body: ProveedorHrsPayload): Promise<{ ok: boolean; item: ProveedorHrs }> {
+  return api<{ ok: boolean; item: ProveedorHrs }>("/api/proveedores-hrs", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateProveedorHrs(
+  id: number,
+  body: ProveedorHrsPayload
+): Promise<{ ok: boolean; item: ProveedorHrs }> {
+  return api<{ ok: boolean; item: ProveedorHrs }>(`/api/proveedores-hrs/${encodeURIComponent(String(id))}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+export function deleteProveedorHrs(id: number): Promise<{ ok: boolean }> {
+  return api<{ ok: boolean }>(`/api/proveedores-hrs/${encodeURIComponent(String(id))}`, { method: "DELETE" });
+}
+
+export type ContabilidadMoneda = "UYU" | "USD" | "PYG";
+
+export const CONTABILIDAD_MEDIOS_PAGO = [
+  "USD BANCO SANTANDER UY",
+  "USD BANCO INTERFISA",
+  "USDT BINANCE",
+  "USDC BINANCE",
+  "USD CONTADO",
+  "PESOS URUGUAYOS CONTADO",
+  "GS CONTADO",
+] as const;
+
+export type ContabilidadMedioPago = (typeof CONTABILIDAD_MEDIOS_PAGO)[number];
+
+export type ContabilidadGasto = {
+  id: number;
+  fecha: string;
+  proveedorId: number;
+  supplierNumber: string;
+  supplierName: string;
+  numeroFactura: string;
+  descripcion: string;
+  observaciones: string;
+  mesServicio: string;
+  presupuestoMes: string;
+  medioPago: string;
+  moneda: ContabilidadMoneda;
+  /** Equivalente en USD (valor contable principal). */
+  monto: number;
+  /** Importe en la moneda de la operación (factura / pago). */
+  montoOriginal: number;
+  /** Manual: moneda local por USD (UYU/PYG); null si el gasto fue en USD. */
+  tipoCambio: number | null;
+  createdAt: string;
+  /** True si se adjuntó el PDF al guardar (escaneo / mismo archivo del formulario). */
+  hasFacturaPdf?: boolean;
+};
+
+export type ContabilidadGastoPayload = {
+  fecha: string;
+  proveedorId: number;
+  descripcion: string;
+  numeroFactura?: string;
+  observaciones?: string;
+  mesServicio: string;
+  presupuestoMes: string;
+  medioPago: ContabilidadMedioPago;
+  moneda: ContabilidadMoneda;
+  /** Monto en moneda de la operación; el servidor persiste el equivalente en USD en `monto`. */
+  monto: number;
+  /** UYU/PYG: obligatorio. USD: `null`. */
+  tipoCambio?: number | null;
+};
+
+export function getContabilidadGastos(): Promise<{ items: ContabilidadGasto[] }> {
+  return api<{ items: ContabilidadGasto[] }>("/api/contabilidad/gastos");
+}
+
+export function createContabilidadGasto(body: ContabilidadGastoPayload): Promise<{ ok: boolean; item: ContabilidadGasto }> {
+  return api<{ ok: boolean; item: ContabilidadGasto }>("/api/contabilidad/gastos", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateContabilidadGasto(id: number, body: ContabilidadGastoPayload): Promise<{ ok: boolean; item: ContabilidadGasto }> {
+  return api<{ ok: boolean; item: ContabilidadGasto }>(`/api/contabilidad/gastos/${encodeURIComponent(String(id))}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+export function deleteContabilidadGasto(id: number): Promise<{ ok: boolean }> {
+  return api<{ ok: boolean }>(`/api/contabilidad/gastos/${encodeURIComponent(String(id))}`, {
+    method: "DELETE",
+  });
+}
+
+export function uploadContabilidadGastoFacturaPdf(id: number, file: File): Promise<{ ok: boolean }> {
+  const fd = new FormData();
+  fd.append("pdf", file);
+  return api<{ ok: boolean }>(`/api/contabilidad/gastos/${encodeURIComponent(String(id))}/factura-pdf`, {
+    method: "POST",
+    body: fd,
+  });
+}
+
+/** Descarga el PDF adjunto (Bearer); usar p. ej. con URL.createObjectURL. */
+export async function fetchContabilidadGastoFacturaPdfBlob(id: number): Promise<Blob> {
+  const token = getStoredToken();
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const base = getApiBase();
+  const h = typeof window !== "undefined" ? (window.location?.hostname ?? "") : "";
+  if ((!base || base.trim() === "") && h !== "localhost" && h !== "127.0.0.1" && !h.endsWith(".vercel.app") && h !== "app.hashrate.space") {
+    throw new Error(getNoApiMessage());
+  }
+  const path = `/api/contabilidad/gastos/${encodeURIComponent(String(id))}/factura-pdf`;
+  const url = base && base.trim() !== "" ? `${base}${path}` : path;
+  const res = await fetch(url, { method: "GET", headers, credentials: "include" });
+  if (res.status === 401) {
+    clearStoredAuth();
+    const cb = typeof window !== "undefined" ? (window as unknown as { __on401?: () => void }).__on401 : undefined;
+    if (typeof cb === "function") cb();
+    throw new Error("Sesión expirada.");
+  }
+  if (!res.ok) {
+    let msg = res.statusText;
+    try {
+      const j = (await res.json()) as { error?: { message?: string } };
+      if (j?.error?.message) msg = j.error.message;
+    } catch {
+      /* body no JSON */
+    }
+    throw new Error(msg || `Error ${res.status}`);
+  }
+  return res.blob();
+}
+
+/** Borrador inferido desde texto del PDF (revisar siempre antes de guardar). */
+export type ContabilidadFacturaPdfScanDraft = {
+  fecha: string | null;
+  numeroFactura: string | null;
+  descripcion: string | null;
+  monto: number | null;
+  moneda: ContabilidadMoneda | null;
+  proveedorId: number | null;
+  mesServicio: string | null;
+  presupuestoMes: string | null;
+  observaciones: string | null;
+};
+
+/** Misma columna BD `numero_factura`; la UI distingue etiqueta según el tipo de documento. */
+export type ContabilidadPdfDocumentKind = "factura" | "transferencia_brou";
+
+export type ContabilidadFacturaPdfScanResponse = {
+  ok: true;
+  draft: ContabilidadFacturaPdfScanDraft;
+  detected: string[];
+  warnings: string[];
+  textLength: number;
+  documentKind: ContabilidadPdfDocumentKind;
+};
+
+export function scanContabilidadFacturaPdf(file: File): Promise<ContabilidadFacturaPdfScanResponse> {
+  const fd = new FormData();
+  fd.append("pdf", file);
+  return api<ContabilidadFacturaPdfScanResponse>("/api/contabilidad/gastos/scan-factura-pdf", {
+    method: "POST",
+    body: fd,
+  });
+}
+
 /** Crear factura/recibo/NC en la base de datos (numeración única, no se repiten). */
 export type InvoiceCreateBody = {
   number?: string; /* opcional: el servidor genera el número */
@@ -1077,9 +1280,11 @@ export type MarketplaceAsicLiveYield = { id: string; line1: string; line2: strin
 export function postMarketplaceAsicYields(
   items: Array<{
     id: string;
-    algo: "sha256" | "scrypt";
+    algo: "sha256" | "scrypt" | "randomx";
     hashrate: string;
     detailRows?: Array<{ icon: string; text: string }>;
+    brand?: string;
+    model?: string;
   }>
 ): Promise<{ ok: boolean; yields: MarketplaceAsicLiveYield[]; networkOk: boolean }> {
   return api<{ ok: boolean; yields: MarketplaceAsicLiveYield[]; networkOk: boolean }>("/api/marketplace/asic-yields", {
@@ -1090,7 +1295,7 @@ export function postMarketplaceAsicYields(
 
 export type EquipoMarketplacePayload = {
   marketplaceVisible?: boolean;
-  marketplaceAlgo?: "sha256" | "scrypt" | null;
+  marketplaceAlgo?: "sha256" | "scrypt" | "randomx" | null;
   marketplaceHashrateDisplay?: string | null;
   marketplaceImageSrc?: string | null;
   marketplaceGalleryJson?: string | null;

@@ -16,12 +16,17 @@ import {
 } from "../lib/marketplaceCorpBestSellingKv.js";
 import { EQUIPOS_ASIC_SELECT } from "./equipos.js";
 import {
+  detectRandomXMoneroYieldItem,
   detectZecEquihashYieldItem,
   estimateAllYields,
   fetchNetworkMiningSnapshot,
   type AsicYieldItem,
 } from "../lib/miningYieldEstimate.js";
-import { estimateYieldFromCustomWhatToMine, fetchZecWhatToMineYieldForItem } from "../lib/whattomineYield.js";
+import {
+  estimateYieldFromCustomWhatToMine,
+  fetchRandomXWhatToMineYieldForItem,
+  fetchZecWhatToMineYieldForItem,
+} from "../lib/whattomineYield.js";
 import { getAuthTokenFromRequest } from "../lib/authSessionCookie.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { marketplacePublicPostRateLimit } from "../middleware/authRateLimit.js";
@@ -978,9 +983,11 @@ const AsicYieldRequestSchema = z.object({
     .array(
       z.object({
         id: z.string().min(1).max(200),
-        algo: z.enum(["sha256", "scrypt"]),
+        algo: z.enum(["sha256", "scrypt", "randomx"]),
         hashrate: z.string().min(1).max(200),
         detailRows: z.array(z.object({ icon: z.string(), text: z.string() })).optional(),
+        brand: z.string().max(120).optional(),
+        model: z.string().max(120).optional(),
       })
     )
     .min(1)
@@ -1086,13 +1093,21 @@ marketplaceRouter.post("/marketplace/asic-yields", marketplacePublicPostRateLimi
     }
     const nonCustomItems = [...nonCustomItemsBase, ...fallbackFromCustom];
     const zecItems = nonCustomItems.filter(detectZecEquihashYieldItem);
-    const otherItems = nonCustomItems.filter((it) => !detectZecEquihashYieldItem(it));
+    const withoutZec = nonCustomItems.filter((it) => !detectZecEquihashYieldItem(it));
+    const randomxItems = withoutZec.filter(
+      (it) => detectRandomXMoneroYieldItem(it) || it.algo === "randomx"
+    );
+    const otherItems = withoutZec.filter((it) => !detectRandomXMoneroYieldItem(it));
     let yields: ReturnType<typeof estimateAllYields> = [];
     try {
-      const zecYields = await Promise.all(zecItems.map((it) => fetchZecWhatToMineYieldForItem(it)));
+      const [zecYields, randomxYields] = await Promise.all([
+        Promise.all(zecItems.map((it) => fetchZecWhatToMineYieldForItem(it))),
+        Promise.all(randomxItems.map((it) => fetchRandomXWhatToMineYieldForItem(it))),
+      ]);
       yields = [
         ...customYieldRows,
         ...zecYields.filter((y): y is NonNullable<(typeof zecYields)[number]> => y != null),
+        ...randomxYields.filter((y): y is NonNullable<(typeof randomxYields)[number]> => y != null),
         ...estimateAllYields(otherItems, snap),
       ];
     } catch (estErr) {

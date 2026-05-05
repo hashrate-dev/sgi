@@ -8,6 +8,11 @@ import { LoginPage } from "./pages/LoginPage";
 import { FacturacionPage } from "./pages/FacturacionPage";
 import { FacturacionMineriaPage } from "./pages/FacturacionMineriaPage";
 import { HostingHubPage } from "./pages/HostingHubPage";
+import { GestionAdministrativaPage } from "./pages/GestionAdministrativaPage";
+import { GestionFinancieraHubPage } from "./pages/GestionFinancieraHubPage";
+import { ProveedoresHrsPage } from "./pages/ProveedoresHrsPage";
+import { ContabilidadGastosPage } from "./pages/ContabilidadGastosPage";
+import { MonitorFinancieroPage } from "./pages/MonitorFinancieroPage";
 import { FacturasMesHostingPage } from "./pages/FacturasMesHostingPage";
 import { HostingExchangeOperationsPage } from "./pages/HostingExchangeOperationsPage";
 import { MineriaHubPage } from "./pages/MineriaHubPage";
@@ -363,6 +368,11 @@ function App() {
             <Route path="/kryptex/detalle" element={<KryptexDetallePage />} />
             <Route path="/asic/equipment" element={<EquiposAsicPage />} />
             <Route path="/marketplace/home-banners" element={<TiendaOnlineBannersHomePage />} />
+            <Route path="/gestion-administrativa" element={<GestionAdministrativaPage />} />
+            <Route path="/gestion-financiera" element={<GestionFinancieraHubPage />} />
+            <Route path="/gestion-financiera/proveedores" element={<ProveedoresHrsPage />} />
+            <Route path="/gestion-financiera/contabilidad" element={<ContabilidadGastosPage />} />
+            <Route path="/gestion-financiera/monitor-financiero" element={<MonitorFinancieroPage />} />
             <Route path="/hosting" element={<HostingHubPage />} />
             <Route path="/hosting/email-flow" element={<FacturasMesHostingPage />} />
             <Route path="/hosting/exchange-operations" element={<HostingExchangeOperationsPage />} />

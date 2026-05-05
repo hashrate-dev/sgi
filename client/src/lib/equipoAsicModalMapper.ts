@@ -21,6 +21,14 @@ function defaultDetailRows(algo: AsicAlgo): AsicProduct["detailRows"] {
       { icon: "btc", text: "Minería Bitcoin" },
     ];
   }
+  if (algo === "randomx") {
+    return [
+      { icon: "bolt", text: "—" },
+      { icon: "chip", text: "Monero (XMR) · RandomX" },
+      { icon: "fan", text: "Minero de Aire" },
+      { icon: "btc", text: "Minería Monero" },
+    ];
+  }
   return [
     { icon: "bolt", text: "—" },
     { icon: "chip", text: "DOGE + LTC · Scrypt" },
@@ -30,7 +38,8 @@ function defaultDetailRows(algo: AsicAlgo): AsicProduct["detailRows"] {
 }
 
 export function equipoASICToModalProduct(e: EquipoASIC): AsicProduct {
-  const algo: AsicAlgo = e.marketplaceAlgo === "scrypt" ? "scrypt" : "sha256";
+  const algo: AsicAlgo =
+    e.marketplaceAlgo === "scrypt" ? "scrypt" : e.marketplaceAlgo === "randomx" ? "randomx" : "sha256";
   const parsed = parseDetailRowsJson(e.marketplaceDetailRowsJson ?? "").filter((r) => r.text.trim());
   const detailRows = parsed.length > 0 ? parsed : defaultDetailRows(algo);
   const explicitImg = e.marketplaceImageSrc?.trim() ?? "";

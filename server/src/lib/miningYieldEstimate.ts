@@ -21,9 +21,13 @@ const COINGECKO_SIMPLE =
 
 export type AsicYieldItem = {
   id: string;
-  algo: "sha256" | "scrypt";
+  /** En vitrina: incluye `randomx` (Monero / Antminer X*). */
+  algo: "sha256" | "scrypt" | "randomx";
   hashrate: string;
   detailRows?: Array<{ icon: string; text: string }>;
+  /** Opcional: mejora detección Monero (Antminer X5/X9…) en `/asic-yields`. */
+  brand?: string;
+  model?: string;
 };
 
 export type AsicYieldResult = {
@@ -118,7 +122,7 @@ export function parseScryptGhs(hashrate: string): number | null {
   return null;
 }
 
-function parseEuNumber(s: string): number | null {
+export function parseEuNumber(s: string): number | null {
   const hasComa = s.includes(",");
   const hasDot = s.includes(".");
   if (hasComa && hasDot) {
@@ -129,6 +133,53 @@ function parseEuNumber(s: string): number | null {
   if (hasDot && /^(\d+)\.(\d{3})$/.test(s)) return parseFloat(s.replace(".", ""));
   const n = parseFloat(s.replace(/\./g, "").replace(",", "."));
   return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * RandomX (Monero, WhatToMine coin 101): parámetro `hr` en **kH/s** (misma calculadora que
+ * https://whattomine.com/coins/101-xmr-randomx). `1 MH/s` → 1000 kH/s.
+ * Solo usar cuando el contexto del equipo ya indica Monero/RandomX (no confundir con Scrypt MH/s).
+ */
+export function parseRandomXKhsForWtm(hashrate: string): number | null {
+  const t = hashrate.trim().replace(/\s+/g, " ");
+  let m = /([\d.,]+)\s*kH\s*\/?\s*s/i.exec(t);
+  if (m?.[1]) {
+    const n = parseEuNumber(m[1]);
+    return n != null && n > 0 && n < 1e9 ? n : null;
+  }
+  m = /([\d.,]+)\s*MH\s*\/?\s*s/i.exec(t);
+  if (m?.[1]) {
+    const mhs = parseEuNumber(m[1]);
+    if (mhs != null && mhs > 0 && mhs < 1e6) return mhs * 1000;
+    return null;
+  }
+  return null;
+}
+
+/**
+ * Antminer serie **X** (p. ej. X5, X9) = RandomX / Monero. Excluye L7/L9 (Scrypt), S* (SHA-256), Z15/ZEC (Equihash).
+ */
+export function isBitmainAntminerRandomXMinerBlob(blob: string): boolean {
+  const t = blob.toLowerCase().replace(/\s+/g, " ").trim();
+  if (!t) return false;
+  if (!/\b(bitmain|antminer)\b/.test(t)) return false;
+  if (/\bz15\b|zcash|equihash|\bzec\b/.test(t)) return false;
+  if (/\bk\s*sol|ksol\/s/.test(t)) return false;
+  if (/\b(?:antminer\s+)?l[79]\b/.test(t)) return false;
+  if (/\b(?:antminer\s+)?s\d{2,}\b/.test(t) || /\bs19\b|\bs21\b/.test(t)) return false;
+  return /\b(?:antminer\s+)?x\d+\b/.test(t);
+}
+
+/** Catálogo vitrina: mineros RandomX/Monero (no ZEC kSol). */
+export function detectRandomXMoneroYieldItem(item: AsicYieldItem): boolean {
+  if (parseZcashKhForWtm(item.hashrate) != null) return false;
+  if (item.algo === "randomx") return parseRandomXKhsForWtm(item.hashrate) != null;
+  const fromRows = `${item.hashrate} ${(item.detailRows ?? []).map((r) => r.text).join(" ")}`;
+  const title = `${item.brand ?? ""} ${item.model ?? ""} ${fromRows}`;
+  if (isBitmainAntminerRandomXMinerBlob(title)) return parseRandomXKhsForWtm(item.hashrate) != null;
+  const blob = fromRows.toLowerCase();
+  if (!/\b(monero|xmr|zephyr|zeph|randomx)\b/.test(blob)) return false;
+  return parseRandomXKhsForWtm(item.hashrate) != null;
 }
 
 function fmtEsCompact(n: number, maxFrac: number): string {
@@ -199,6 +250,7 @@ function ltcDogePerDay(ghs: number, snap: NetworkMiningSnapshot): { ltc: number;
 }
 
 export function estimateYieldForItem(item: AsicYieldItem, snap: NetworkMiningSnapshot): AsicYieldResult | null {
+  if (item.algo === "randomx") return null;
   if (item.algo === "sha256") {
     const ths = parseSha256Ths(item.hashrate);
     if (ths == null) return null;
