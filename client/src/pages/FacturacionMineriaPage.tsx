@@ -11,6 +11,7 @@ import { ConfirmModal } from "../components/ConfirmModal";
 import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import { canEditFacturacion, lectorAllowsModule } from "../lib/auth";
+import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
 import { isClienteTiendaOnline } from "../lib/clientTienda";
 import { formatCurrencyNumber, formatUSD } from "../lib/formatCurrency";
 import "../styles/facturacion.css";
@@ -524,7 +525,7 @@ export function FacturacionMineriaPage() {
           clientEmail: selectedClient.email,
           clientAddress: selectedClient.address,
           clientCity: selectedClient.city,
-          clientName2: selectedClient.name2,
+          clientName2: clientName2ForComprobante(selectedClient.name, selectedClient.name2),
           clientPhone2: selectedClient.phone2,
           clientEmail2: selectedClient.email2,
           clientAddress2: selectedClient.address2,
@@ -558,7 +559,7 @@ export function FacturacionMineriaPage() {
       clientEmail: selectedClient.email,
       clientAddress: selectedClient.address,
       clientCity: selectedClient.city,
-      clientName2: selectedClient.name2,
+      clientName2: clientName2ForComprobante(selectedClient.name, selectedClient.name2),
       clientPhone2: selectedClient.phone2,
       clientEmail2: selectedClient.email2,
       clientAddress2: selectedClient.address2,
@@ -644,7 +645,7 @@ export function FacturacionMineriaPage() {
         clientEmail: inv.clientEmail,
         clientAddress: inv.clientAddress,
         clientCity: inv.clientCity,
-        clientName2: inv.clientName2,
+        clientName2: clientName2ForComprobante(inv.clientName, inv.clientName2),
         clientPhone2: inv.clientPhone2,
         clientEmail2: inv.clientEmail2,
         clientAddress2: inv.clientAddress2,
@@ -1275,7 +1276,10 @@ export function FacturacionMineriaPage() {
                       client={{
                         code: "",
                         name: previewEmitted.invoice.clientName,
-                        name2: previewEmitted.invoice.clientName2,
+                        name2: clientName2ForComprobante(
+                          previewEmitted.invoice.clientName,
+                          previewEmitted.invoice.clientName2
+                        ),
                         phone: previewEmitted.invoice.clientPhone,
                         phone2: previewEmitted.invoice.clientPhone2,
                         email: previewEmitted.invoice.clientEmail,

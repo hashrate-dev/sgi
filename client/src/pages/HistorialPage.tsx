@@ -3,6 +3,7 @@ import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { addEmittedDocument, deleteAllInvoices, deleteEmittedDocumentOne, deleteEmittedDocumentsAll, deleteInvoice, getClients, getInvoiceById, getInvoices, verifyPassword, wakeUpBackend } from "../lib/api";
 import { serviceCatalog } from "../lib/constants";
+import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
 import { dispatchEmittedChanged } from "../lib/emittedEvents";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadInvoices, loadInvoicesAsic, saveInvoices, saveInvoicesAsic } from "../lib/storage";
@@ -895,7 +896,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
           clientEmail: client.email,
           clientAddress: client.address,
           clientCity: client.city,
-          clientName2: client.name2,
+          clientName2: clientName2ForComprobante(client.name, client.name2),
           clientPhone2: client.phone2,
           clientEmail2: client.email2,
           clientAddress2: client.address2,

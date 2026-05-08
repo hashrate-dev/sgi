@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
+import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import {
   addGarantiaEmitted,
@@ -339,7 +340,7 @@ export function HistorialGarantiasPage() {
         clientEmail: inv.clientEmail,
         clientAddress: inv.clientAddress,
         clientCity: inv.clientCity,
-        clientName2: inv.clientName2,
+        clientName2: clientName2ForComprobante(inv.clientName, inv.clientName2),
         clientPhone2: inv.clientPhone2,
         clientEmail2: inv.clientEmail2,
         clientAddress2: inv.clientAddress2,

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
+import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
 import { getClients } from "../lib/api";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadInvoicesAsic } from "../lib/storage";
@@ -209,7 +210,7 @@ export function PendientesMineriaPage() {
           clientEmail: client.email,
           clientAddress: client.address,
           clientCity: client.city,
-          clientName2: client.name2,
+          clientName2: clientName2ForComprobante(client.name, client.name2),
           clientPhone2: client.phone2,
           clientEmail2: client.email2,
           clientAddress2: client.address2,

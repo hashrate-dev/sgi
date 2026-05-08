@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import type { ComprobanteType, LineItem } from "./types";
+import { effectiveInvoiceClientName2 } from "./clientInvoiceDisplay";
 import { formatUSD } from "./formatCurrency";
 import { recibimosMontoEnDosLineas } from "./numberToWords";
 import {
@@ -279,6 +280,8 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
     return yy - yStart;
   };
 
+  const clientName2Pdf = effectiveInvoiceClientName2(data.clientName, data.clientName2);
+
   const yClientStart = y;
   const colGap = 4; // mm entre columnas
   const colW = (TABLE_W - colGap * 2) / 3;
@@ -314,9 +317,10 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
 
   // Si ambos tienen nombre, alinearlos a la misma altura
   // Si solo el primero tiene nombre, el segundo comienza después del nombre del primero
-  const yClient2Start = (hasText(data.clientName) && hasText(data.clientName2))
-    ? yClientStart // Ambos tienen nombre: misma altura
-    : yClientStart + client1NameHeight; // Solo el primero tiene nombre: segundo después
+  const yClient2Start =
+    hasText(data.clientName) && hasText(clientName2Pdf)
+      ? yClientStart // Ambos tienen nombre: misma altura
+      : yClientStart + client1NameHeight; // Solo el primero tiene nombre: segundo después
   
   const h1 = drawClientColumn(tableLeft, yClientStart, colW, {
     name: data.clientName,
@@ -327,7 +331,7 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   });
   
   const h2 = drawClientColumn(tableLeft + colW + colGap, yClient2Start, colW, {
-    name: data.clientName2,
+    name: clientName2Pdf,
     phone: data.clientPhone2,
     email: data.clientEmail2,
     address: data.clientAddress2,

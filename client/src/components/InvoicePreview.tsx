@@ -7,6 +7,7 @@ import {
   reciboIsPaymentLineSettledTable,
 } from "../lib/receiptSettlementLine";
 import { recibimosMontoEnDosLineas } from "../lib/numberToWords";
+import { effectiveInvoiceClientName2, hasSecondaryClientColumn } from "../lib/clientInvoiceDisplay";
 import "../styles/invoice-preview.css";
 
 const EMISOR = {
@@ -122,7 +123,8 @@ export function InvoicePreview({
   };
 
   const client1NameLines = getClientNameLines(client?.name);
-  const client2NameLines = getClientNameLines(client?.name2);
+  const clientName2Effective = client ? effectiveInvoiceClientName2(client.name, client.name2) : "";
+  const client2NameLines = getClientNameLines(clientName2Effective);
 
   return (
     <div className="invoice-preview-container">
@@ -175,7 +177,14 @@ export function InvoicePreview({
                 <div className="invoice-preview-client-detail">{client.city?.toUpperCase() ?? ""}</div>
               )}
             </div>
-            {(hasText(client.name2) || hasText(client.phone2) || hasText(client.email2) || hasText(client.address2) || hasText(client.city2)) && (
+            {hasSecondaryClientColumn(
+              client.name,
+              client.name2,
+              client.phone2,
+              client.email2,
+              client.address2,
+              client.city2
+            ) && (
               <div className="invoice-preview-client-col">
                 {client2NameLines.map((line, idx) => (
                   <div key={idx} className="invoice-preview-client-name">{line}</div>
