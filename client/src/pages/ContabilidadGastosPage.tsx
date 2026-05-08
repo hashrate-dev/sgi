@@ -86,7 +86,9 @@ function formatYmDisplay(ym: string): string {
   const d = new Date(y, mo - 1, 1);
   if (Number.isNaN(d.getTime())) return t;
   const label = d.toLocaleDateString("es-UY", { month: "long", year: "numeric" });
-  return label ? label.charAt(0).toUpperCase() + label.slice(1) : t;
+  if (!label) return t;
+  const cap = label.charAt(0).toUpperCase() + label.slice(1);
+  return cap.replace(/\s+de\s+/gi, " ");
 }
 
 function formatRegistroAt(iso: string): string {
@@ -235,6 +237,16 @@ export function ContabilidadGastosPage() {
     return { kind: "ok" as const, usd: m / tc, hint };
   }, [montoStr, tipoCambioStr, moneda]);
 
+  const proveedorRubroById = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const p of proveedores) {
+      const id = Number(p.id);
+      if (!Number.isFinite(id)) continue;
+      m.set(id, String(p.rubro ?? "").trim());
+    }
+    return m;
+  }, [proveedores]);
+
   const gastosFiltrados = useMemo(() => {
     const q = gastosListBuscar.trim().toLowerCase();
     const pid = gastosListProveedorId.trim();
@@ -252,6 +264,7 @@ export function ContabilidadGastosPage() {
       const haystack = [
         row.supplierNumber,
         row.supplierName,
+        proveedorRubroById.get(Number(row.proveedorId)) ?? "",
         row.numeroFactura,
         row.descripcion,
         row.observaciones ?? "",
@@ -267,7 +280,7 @@ export function ContabilidadGastosPage() {
         .toLowerCase();
       return haystack.indexOf(q) >= 0;
     });
-  }, [items, gastosListBuscar, gastosListProveedorId, gastosListPresupuestoYm]);
+  }, [items, gastosListBuscar, gastosListProveedorId, gastosListPresupuestoYm, proveedorRubroById]);
 
   const gastosListaTotalPages = Math.max(1, Math.ceil(gastosFiltrados.length / gastosListPageSize));
 
@@ -890,6 +903,9 @@ export function ContabilidadGastosPage() {
                           <th className="contabilidad-gastos-th contabilidad-gastos-col-nombre" scope="col" title="Nombre del proveedor">
                             Proveedor
                           </th>
+                          <th className="contabilidad-gastos-th contabilidad-gastos-col-rubro" scope="col" title="Rubro del proveedor">
+                            Rubro
+                          </th>
                           <th
                             className="contabilidad-gastos-th contabilidad-gastos-col-factura text-start"
                             scope="col"
@@ -915,7 +931,9 @@ export function ContabilidadGastosPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {gastosPagina.map((row) => (
+                        {gastosPagina.map((row) => {
+                    const rubroLabel = proveedorRubroById.get(Number(row.proveedorId)) || "—";
+                    return (
                     <tr key={row.id} className={editingId === row.id ? "table-active" : undefined}>
                       <td className="contabilidad-gastos-col-fecha text-nowrap small" title={row.fecha || undefined}>
                         {formatGastoFechaTabla(row.fecha)}
@@ -924,7 +942,16 @@ export function ContabilidadGastosPage() {
                         <code>{row.supplierNumber}</code>
                       </td>
                       <td className="contabilidad-gastos-td-wrap contabilidad-gastos-col-nombre">{row.supplierName}</td>
-                      <td className="contabilidad-gastos-col-factura contabilidad-gastos-col-factura-td text-start small">
+                      <td
+                        className="contabilidad-gastos-td-wrap contabilidad-gastos-col-rubro"
+                        title={rubroLabel !== "—" ? rubroLabel : undefined}
+                      >
+                        {rubroLabel}
+                      </td>
+                      <td
+                        className="contabilidad-gastos-col-factura contabilidad-gastos-col-factura-td text-start"
+                        title={row.numeroFactura || undefined}
+                      >
                         {row.numeroFactura || "—"}
                       </td>
                       <td className="contabilidad-gastos-col-mes-svc contabilidad-gastos-col-mes-td small" title={row.mesServicio || undefined}>
@@ -996,7 +1023,8 @@ export function ContabilidadGastosPage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  );
+                  })}
                       </tbody>
                     </table>
                   </div>
