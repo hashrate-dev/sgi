@@ -57,7 +57,6 @@ export function ClienteNewForm({ onSuccess, onCancel, variant = "card" }: Props)
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const payload = {
-      code: form.code.trim(),
       name: form.name.trim(),
       name2: form.name2.trim() || undefined,
       phone: form.phone.trim() || undefined,

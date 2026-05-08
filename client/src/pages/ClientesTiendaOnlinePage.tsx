@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
-import { getClients, syncTiendaOnlineClientsFromUsers } from "../lib/api.js";
+import { getStoreClients, syncTiendaOnlineClientsFromUsers } from "../lib/api.js";
 import type { Client } from "../lib/types.js";
 import { canEditClientes, canExport } from "../lib/auth.js";
 import { useAuth } from "../contexts/AuthContext.js";
@@ -75,7 +75,7 @@ export function ClientesTiendaOnlinePage() {
         console.warn("syncTiendaOnlineClientsFromUsers:", e);
       }
       try {
-        const r = await getClients();
+        const r = await getStoreClients();
         setClients((r.clients ?? []) as Client[]);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Error al cargar clientes");

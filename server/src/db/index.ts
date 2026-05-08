@@ -31,6 +31,7 @@ async function loadDb() {
           }
           /* Columnas nuevas (p.ej. lector_grants_json): garantizar aunque el split SQL del archivo fallara en algo previo */
           await ensureSupabaseCriticalUserColumns(pool);
+          await ensureSupabaseClientsEmailIsNotUnique(pool);
           await pool.query("SELECT 1");
         })(),
         new Promise((_, rej) =>
@@ -65,6 +66,23 @@ async function ensureSupabaseCriticalUserColumns(pool: Pool) {
     const msg = e instanceof Error ? e.message : String(e);
     // eslint-disable-next-line no-console
     console.warn("[DB] ensureSupabaseCriticalUserColumns:", msg);
+  }
+}
+
+async function ensureSupabaseClientsEmailIsNotUnique(pool: Pool) {
+  try {
+    await pool.query(`ALTER TABLE clients DROP CONSTRAINT IF EXISTS clients_email_key`);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // eslint-disable-next-line no-console
+    console.warn("[DB] drop clients_email_key constraint:", msg);
+  }
+  try {
+    await pool.query(`DROP INDEX IF EXISTS clients_email_key`);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // eslint-disable-next-line no-console
+    console.warn("[DB] drop clients_email_key index:", msg);
   }
 }
 

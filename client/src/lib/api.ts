@@ -578,6 +578,10 @@ export function getClients(): Promise<ClientsResponse> {
   return api<ClientsResponse>("/api/clients");
 }
 
+export function getStoreClients(): Promise<ClientsResponse> {
+  return api<ClientsResponse>("/api/clients/store");
+}
+
 export function getNextClientCode(): Promise<NextClientCodeResponse> {
   return api<NextClientCodeResponse>("/api/clients/next-code");
 }

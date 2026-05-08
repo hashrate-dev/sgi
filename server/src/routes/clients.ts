@@ -42,32 +42,68 @@ const ClientUpdateSchema = z.object({
 
 const selectFields =
   "id, code, name, name2, phone, phone2, email, email2, address, address2, city, city2, usuario, documento_identidad, country";
+const storeIdentityWhereSql = `
+(
+  UPPER(TRIM(COALESCE(code, ''))) LIKE 'A9%'
+  OR UPPER(TRIM(COALESCE(code, ''))) LIKE 'WEB-%'
+  OR EXISTS (
+    SELECT 1
+    FROM users u
+    WHERE u.id = clients.user_id
+      AND LOWER(TRIM(COALESCE(u.role, ''))) = 'cliente'
+  )
+)`;
+const hostingOnlyWhereSql = "NOT (UPPER(TRIM(COALESCE(code, ''))) LIKE 'A9%' OR UPPER(TRIM(COALESCE(code, ''))) LIKE 'WEB-%')";
+const storeOnlyWhereSql = storeIdentityWhereSql;
 
-function buildNextCodeFromLast(lastCode: string | null | undefined): string {
-  const raw = String(lastCode ?? "").trim();
-  if (!raw) return "C01";
-  const match = raw.match(/^(.*?)(\d+)$/);
-  if (!match) return "C01";
-  const prefix = match[1] ?? "";
-  const numRaw = match[2] ?? "";
-  const next = Number.parseInt(numRaw, 10) + 1;
-  if (!Number.isFinite(next) || next <= 0) return "C01";
-  return `${prefix}${String(next).padStart(numRaw.length, "0")}`;
-}
-
-async function getLatestClientCode(): Promise<string | null> {
-  const row = await db.prepare("SELECT code FROM clients ORDER BY id DESC LIMIT 1").get() as { code?: string } | undefined;
-  return row?.code ?? null;
+function buildNextHostingCode(codes: string[]): string {
+  let max = 0;
+  let width = 2;
+  for (const codeRaw of codes) {
+    const code = String(codeRaw ?? "").trim().toUpperCase();
+    const m = code.match(/^C(\d+)$/);
+    if (!m) continue;
+    const numRaw = m[1] ?? "";
+    const num = Number.parseInt(numRaw, 10);
+    if (!Number.isFinite(num) || num <= 0) continue;
+    if (num > max) max = num;
+    if (numRaw.length > width) width = numRaw.length;
+  }
+  const next = max + 1;
+  return `C${String(next).padStart(width, "0")}`;
 }
 
 async function getNextClientCodeFromDb(): Promise<string> {
-  const last = await getLatestClientCode();
-  return buildNextCodeFromLast(last);
+  const rows = await db.prepare(`SELECT code FROM clients WHERE ${hostingOnlyWhereSql}`).all() as Array<{ code?: string }>;
+  return buildNextHostingCode(rows.map((r) => String(r.code ?? "")));
 }
 
 function isUniqueCodeError(err: unknown): boolean {
-  const e = err as { code?: string };
-  return Boolean(e?.code && (String(e.code).includes("SQLITE_CONSTRAINT") || e.code === "23505"));
+  const e = err as { code?: string; message?: string; constraint?: string };
+  const code = String(e?.code ?? "");
+  const msg = String(e?.message ?? "").toLowerCase();
+  const constraint = String(e?.constraint ?? "").toLowerCase();
+  if (!(code.includes("SQLITE_CONSTRAINT") || code === "23505")) return false;
+  return (
+    constraint.includes("clients_code_key") ||
+    msg.includes("clients.code") ||
+    msg.includes("clients_code_key") ||
+    msg.includes("unique constraint failed: clients.code")
+  );
+}
+
+function isUniqueEmailError(err: unknown): boolean {
+  const e = err as { code?: string; message?: string; constraint?: string };
+  const code = String(e?.code ?? "");
+  const msg = String(e?.message ?? "").toLowerCase();
+  const constraint = String(e?.constraint ?? "").toLowerCase();
+  if (!(code.includes("SQLITE_CONSTRAINT") || code === "23505")) return false;
+  return (
+    constraint.includes("clients_email_key") ||
+    msg.includes("clients.email") ||
+    msg.includes("clients_email_key") ||
+    msg.includes("unique constraint failed: clients.email")
+  );
 }
 
 clientsRouter.post(
@@ -174,7 +210,20 @@ clientsRouter.get(
   requireRole("admin_a", "admin_b", "operador", "lector"),
   requireModuleGrant("clientes"),
   async (_req, res) => {
-  const rows = await db.prepare(`SELECT ${selectFields} FROM clients ORDER BY code ASC`).all();
+  const rows = await db
+    .prepare(`SELECT ${selectFields} FROM clients WHERE ${hostingOnlyWhereSql} ORDER BY code ASC`)
+    .all();
+  res.json({ clients: rows });
+});
+
+clientsRouter.get(
+  "/clients/store",
+  requireRole("admin_a", "admin_b", "operador", "lector"),
+  requireModuleGrant("clientes"),
+  async (_req, res) => {
+  const rows = await db
+    .prepare(`SELECT ${selectFields} FROM clients WHERE ${storeOnlyWhereSql} ORDER BY code ASC`)
+    .all();
   res.json({ clients: rows });
 });
 
@@ -246,9 +295,11 @@ clientsRouter.post(
       const client = await db.prepare(`SELECT ${selectFields} FROM clients WHERE id = ?`).get(Number(id));
       return res.status(201).json({ client: client ?? { ...d, id } });
     } catch (e: unknown) {
-      const err = e as { code?: string };
-      if (err?.code && (String(err.code).includes("SQLITE_CONSTRAINT") || err.code === "23505")) {
+      if (isUniqueCodeError(e)) {
         return res.status(409).json({ error: { message: "Ya existe un cliente con ese código" } });
+      }
+      if (isUniqueEmailError(e)) {
+        return res.status(409).json({ error: { message: "Ya existe un cliente con ese email" } });
       }
       console.error("POST /clients error:", e);
       return res.status(500).json({ error: { message: "Error al crear cliente. Revisá la conexión a la base de datos." } });

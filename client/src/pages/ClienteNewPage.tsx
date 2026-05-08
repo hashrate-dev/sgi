@@ -54,7 +54,6 @@ export function ClienteNewPage() {
     e.preventDefault();
     setMessage(null);
     const payload = {
-      code: form.code.trim(),
       name: form.name.trim(),
       name2: form.name2.trim() || undefined,
       phone: form.phone.trim() || undefined,
