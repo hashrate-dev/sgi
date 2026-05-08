@@ -4,11 +4,11 @@ import { z } from "zod";
 import { db, getDb } from "../db.js";
 import { isSetupCompraHashrateProtected } from "../lib/marketplaceSetupHashratePrice.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
+import { requireModuleGrant } from "../middleware/moduleGrant.js";
 
 export const setupsRouter = Router();
 
-const requireCanEdit =
-  requireRole("admin_a", "admin_b", "operador");
+const requireCanEdit = [requireRole("admin_a", "admin_b", "operador"), requireModuleGrant("setups")];
 
 const SetupBodySchema = z.object({
   nombre: z.string().min(1, "Nombre requerido"),
@@ -52,7 +52,12 @@ async function backfillCodigos(): Promise<void> {
 }
 
 /** GET /setups — listar todos */
-setupsRouter.get("/setups", requireAuth, async (_req, res: Response) => {
+setupsRouter.get(
+  "/setups",
+  requireAuth,
+  requireRole("admin_a", "admin_b", "operador", "lector"),
+  requireModuleGrant("setups"),
+  async (_req, res: Response) => {
   try {
     await backfillCodigos();
     /* Postgres sin comillas en el alias → "precioUSD" pasa a preciousd y el cliente ve undefined. */
@@ -78,7 +83,7 @@ setupsRouter.get("/setups", requireAuth, async (_req, res: Response) => {
 });
 
 /** POST /setups — crear */
-setupsRouter.post("/setups", requireAuth, requireCanEdit, async (req, res: Response) => {
+setupsRouter.post("/setups", requireAuth, ...requireCanEdit, async (req, res: Response) => {
   const parsed = SetupBodySchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
@@ -96,7 +101,7 @@ setupsRouter.post("/setups", requireAuth, requireCanEdit, async (req, res: Respo
 });
 
 /** PUT /setups/:id — actualizar */
-setupsRouter.put("/setups/:id", requireAuth, requireCanEdit, async (req, res: Response) => {
+setupsRouter.put("/setups/:id", requireAuth, ...requireCanEdit, async (req, res: Response) => {
   const id = (typeof req.params.id === "string" ? req.params.id : req.params.id?.[0] ?? "").trim();
   if (!id) return res.status(400).json({ error: { message: "ID requerido" } });
   const parsed = SetupBodySchema.safeParse(req.body);
@@ -115,7 +120,7 @@ setupsRouter.put("/setups/:id", requireAuth, requireCanEdit, async (req, res: Re
 });
 
 /** PUT /setups/marketplace/setup-global — aplica setupUsd en bloque a todos los equipos marketplace con partes hashrate */
-setupsRouter.put("/setups/marketplace/setup-global", requireAuth, requireCanEdit, async (req, res: Response) => {
+setupsRouter.put("/setups/marketplace/setup-global", requireAuth, ...requireCanEdit, async (req, res: Response) => {
   const parsed = SetupGlobalMarketplaceBodySchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
@@ -190,7 +195,7 @@ setupsRouter.put("/setups/marketplace/setup-global", requireAuth, requireCanEdit
 });
 
 /** DELETE /setups/:id — eliminar uno */
-setupsRouter.delete("/setups/:id", requireAuth, requireCanEdit, async (req, res: Response) => {
+setupsRouter.delete("/setups/:id", requireAuth, ...requireCanEdit, async (req, res: Response) => {
   const id = (typeof req.params.id === "string" ? req.params.id : req.params.id?.[0] ?? "").trim();
   if (!id) return res.status(400).json({ error: { message: "ID requerido" } });
   try {
@@ -216,7 +221,12 @@ setupsRouter.delete("/setups/:id", requireAuth, requireCanEdit, async (req, res:
 });
 
 /** DELETE /setups — eliminar todos (conserva S03 / Setup Compra Hashrate para el marketplace) */
-setupsRouter.delete("/setups", requireAuth, requireRole("admin_a", "admin_b"), async (_req, res: Response) => {
+setupsRouter.delete(
+  "/setups",
+  requireAuth,
+  requireRole("admin_a", "admin_b"),
+  requireModuleGrant("setups"),
+  async (_req, res: Response) => {
   try {
     const result = await db
       .prepare(

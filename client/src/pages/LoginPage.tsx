@@ -46,7 +46,12 @@ export function LoginPage() {
   }, [location.search, location.pathname, location.hash]);
 
   if (user) {
-    const to = user.role === "lector" ? "/kryptex" : user.role === "cliente" ? "/marketplace" : "/";
+    let to = "/";
+    if (user.role === "cliente") to = "/marketplace";
+    else if (user.role === "lector") {
+      const g = user.lector_grants;
+      to = Array.isArray(g) && g.length > 0 ? "/" : "/kryptex";
+    }
     return <Navigate to={to} replace />;
   }
 

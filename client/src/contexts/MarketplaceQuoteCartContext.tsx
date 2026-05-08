@@ -150,12 +150,12 @@ function cartLinesMergeSig(ls: QuoteCartLine[]): string {
 
 export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
-  const canUseQuoteCart = Boolean(!loading && canUseMarketplaceQuoteCart(user?.role));
+  const canUseQuoteCart = Boolean(!loading && canUseMarketplaceQuoteCart(user ?? null));
 
   const storageKey = useMemo(() => {
-    if (!loading && user && canUseMarketplaceQuoteCart(user.role)) return quoteCartStorageKeyForUser(user.id);
+    if (!loading && user && canUseMarketplaceQuoteCart(user)) return quoteCartStorageKeyForUser(user.id);
     return QUOTE_CART_GUEST_KEY;
-  }, [loading, user?.id, user?.role]);
+  }, [loading, user]);
 
   const [lines, setLines] = useState<QuoteCartLine[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -206,7 +206,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
       setBlockingPipelineOrder(null);
       return;
     }
-    if (!enforceSingleMarketplaceOrderForRole(user.role)) {
+    if (!enforceSingleMarketplaceOrderForRole(user)) {
       setBlockingPipelineOrder(null);
       return;
     }
@@ -227,7 +227,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
     } catch {
       setBlockingPipelineOrder(null);
     }
-  }, [canUseQuoteCart, user?.id, user?.role]);
+  }, [canUseQuoteCart, user]);
 
   useEffect(() => {
     if (loading || !canUseQuoteCart) return;
@@ -288,7 +288,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
     if (loading) return;
 
     const prevCartUserId = prevMarketplaceCartUserIdRef.current;
-    const cartUserId = user && canUseMarketplaceQuoteCart(user.role) ? user.id : null;
+    const cartUserId = user && canUseMarketplaceQuoteCart(user) ? user.id : null;
 
     /* Cerró sesión: no mostrar el carrito de la cuenta. Sigue guardado solo en la clave del usuario (_u{id}). */
     if (prevCartUserId != null && cartUserId == null) {
@@ -310,7 +310,7 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
 
     setLines(readQuoteCartFromStorageKey(storageKey));
     prevMarketplaceCartUserIdRef.current = cartUserId;
-  }, [loading, storageKey, canUseQuoteCart, user?.id, user?.role]);
+  }, [loading, storageKey, canUseQuoteCart, user]);
 
   useEffect(() => {
     if (loading) return;

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "../db.js";
 import { env } from "../config/env.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
+import { requireModuleGrant } from "../middleware/moduleGrant.js";
 import { ensureItemsGarantiaAndePrecioColumn } from "../lib/ensureItemsGarantiaAndePrecio.js";
 import { ensureItemsGarantiaAndeMarketplaceEquipoColumn } from "../lib/ensureItemsGarantiaAndeMarketplaceEquipoColumn.js";
 import {
@@ -14,7 +15,11 @@ export const garantiasRouter = Router();
 
 const MS_15_DAYS = 15 * 24 * 60 * 60 * 1000;
 
-const requireCanPostGarantias = requireRole("admin_a", "admin_b", "operador");
+const garantiasRw = [requireRole("admin_a", "admin_b", "operador"), requireModuleGrant("garantias")];
+const garantiasRead = [
+  requireRole("admin_a", "admin_b", "operador", "lector"),
+  requireModuleGrant("garantias"),
+];
 
 const AddEmittedGarantiaSchema = z.object({
   invoice: z.record(z.string(), z.unknown()),
@@ -80,7 +85,7 @@ function paramStr(p: unknown): string {
 }
 
 /** GET /garantias/next-number?type=Recibo|Recibo Devolución&peek=1 — siguiente número. peek=1 no consume. */
-garantiasRouter.get("/garantias/next-number", requireAuth, requireCanPostGarantias, async (req, res) => {
+garantiasRouter.get("/garantias/next-number", requireAuth, ...garantiasRw, async (req, res) => {
   const q = z
     .object({
       type: z.enum(["Recibo", "Recibo Devolución"]),
@@ -101,7 +106,7 @@ garantiasRouter.get("/garantias/next-number", requireAuth, requireCanPostGaranti
 });
 
 /** GET /garantias/emitted — últimos 15 días */
-garantiasRouter.get("/garantias/emitted", requireAuth, async (_req, res) => {
+garantiasRouter.get("/garantias/emitted", requireAuth, ...garantiasRead, async (_req, res) => {
   const cutoff = new Date(Date.now() - MS_15_DAYS).toISOString();
   const rows = (await db
     .prepare(
@@ -120,7 +125,7 @@ garantiasRouter.get("/garantias/emitted", requireAuth, async (_req, res) => {
 });
 
 /** POST /garantias/emitted — registrar recibo de garantía emitido. El servidor asigna el número (evita duplicados). preserveNumber=true para import histórico. */
-garantiasRouter.post("/garantias/emitted", requireAuth, requireCanPostGarantias, async (req, res) => {
+garantiasRouter.post("/garantias/emitted", requireAuth, ...garantiasRw, async (req, res) => {
   const parsed = AddEmittedGarantiaSchema.safeParse(req.body);
   if (!parsed.success) {
     return res
@@ -166,6 +171,7 @@ garantiasRouter.delete(
   "/garantias/emitted/:invoiceNumber",
   requireAuth,
   requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("garantias"),
   async (req, res) => {
     const invoiceNumber = paramStr(req.params.invoiceNumber);
     if (!invoiceNumber) {
@@ -198,7 +204,7 @@ garantiasRouter.delete("/garantias/emitted", requireAuth, requireRole("admin_a")
 });
 
 /** GET /garantias/items — listar ítems de garantía ANDE */
-garantiasRouter.get("/garantias/items", requireAuth, async (_req, res) => {
+garantiasRouter.get("/garantias/items", requireAuth, ...garantiasRead, async (_req, res) => {
   await ensureItemsGarantiaAndePrecioColumn();
   await ensureItemsGarantiaAndeMarketplaceEquipoColumn();
   await ensureItemsGarantiaAndePrecioHistorial();
@@ -267,7 +273,7 @@ garantiasRouter.get("/garantias/items", requireAuth, async (_req, res) => {
 });
 
 /** GET /garantias/items/:id/precio-historial — historial de cambios de precio (USD) */
-garantiasRouter.get("/garantias/items/:id/precio-historial", requireAuth, async (req, res) => {
+garantiasRouter.get("/garantias/items/:id/precio-historial", requireAuth, ...garantiasRead, async (req, res) => {
   await ensureItemsGarantiaAndePrecioColumn();
   await ensureItemsGarantiaAndePrecioHistorial();
   const id = paramStr(req.params.id);
@@ -314,7 +320,7 @@ garantiasRouter.get("/garantias/items/:id/precio-historial", requireAuth, async 
 });
 
 /** POST /garantias/items — crear ítem */
-garantiasRouter.post("/garantias/items", requireAuth, requireCanPostGarantias, async (req, res) => {
+garantiasRouter.post("/garantias/items", requireAuth, ...garantiasRw, async (req, res) => {
   await ensureItemsGarantiaAndePrecioColumn();
   await ensureItemsGarantiaAndeMarketplaceEquipoColumn();
   await ensureItemsGarantiaAndePrecioHistorial();
@@ -371,7 +377,7 @@ garantiasRouter.post("/garantias/items", requireAuth, requireCanPostGarantias, a
 garantiasRouter.put(
   "/garantias/items/:id",
   requireAuth,
-  requireCanPostGarantias,
+  ...garantiasRw,
   async (req, res) => {
     await ensureItemsGarantiaAndePrecioColumn();
     await ensureItemsGarantiaAndeMarketplaceEquipoColumn();
@@ -482,7 +488,7 @@ garantiasRouter.delete("/garantias/items", requireAuth, requireRole("admin_a"), 
 garantiasRouter.delete(
   "/garantias/items/:id",
   requireAuth,
-  requireCanPostGarantias,
+  ...garantiasRw,
   async (req, res) => {
     await ensureItemsGarantiaAndePrecioHistorial();
     const id = paramStr(req.params.id);

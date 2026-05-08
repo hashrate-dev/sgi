@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { setStoredAuth, clearStoredAuth } from "../lib/auth";
+import { setStoredAuth, clearStoredAuth, getStoredToken } from "../lib/auth";
 import type { AuthUser } from "../lib/auth";
 import { getMe, login as apiLogin, logoutApi, type LoginResponse } from "../lib/api";
 
@@ -9,6 +9,8 @@ type AuthContextValue = {
   login: (username: string, password: string) => Promise<void>;
   /** Tras registro marketplace o login: persiste token y actualiza estado. */
   applyLoginResponse: (r: LoginResponse) => void;
+  /** Actualiza usuario desde `/api/me` (p. ej. tras cambiar permisos AdministradorB). */
+  refreshSession: () => Promise<void>;
   logout: () => void;
 };
 
@@ -67,13 +69,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(r.user);
   }, []);
 
+  const refreshSession = useCallback(async () => {
+    const { user: u } = await getMe();
+    setStoredAuth(getStoredToken(), u);
+    setUser(u);
+  }, []);
+
   const logout = useCallback(() => {
     logoutApi().catch(() => {});
     clearStoredAuth();
     setUser(null);
   }, []);
 
-  const value: AuthContextValue = { user, loading, login, applyLoginResponse, logout };
+  const value: AuthContextValue = { user, loading, login, applyLoginResponse, refreshSession, logout };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

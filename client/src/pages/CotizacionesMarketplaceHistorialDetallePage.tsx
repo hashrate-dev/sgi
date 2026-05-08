@@ -159,7 +159,7 @@ export function CotizacionesMarketplaceHistorialDetallePage() {
   const [qMonth, setQMonth] = useState("");
   const [excelBusy, setExcelBusy] = useState(false);
 
-  const canExportData = Boolean(user && canExport(user.role));
+  const canExportData = Boolean(user && canExport(user));
 
   useEffect(() => {
     const t = window.setTimeout(() => setQDebounced(qClient.trim()), 350);
@@ -257,7 +257,7 @@ export function CotizacionesMarketplaceHistorialDetallePage() {
     }
   }, [filtered]);
 
-  if (!user || !canViewMarketplaceQuoteTickets(user.role)) {
+  if (!user || !canViewMarketplaceQuoteTickets(user)) {
     return <Navigate to="/" replace />;
   }
 

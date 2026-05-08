@@ -46,7 +46,7 @@ export function MarketplaceInlineLoginModal({ open, onClose }: Props) {
 
   useEffect(() => {
     if (!open || loading) return;
-    if (user && canUseMarketplaceQuoteCart(user.role)) onClose();
+    if (user && canUseMarketplaceQuoteCart(user)) onClose();
   }, [open, loading, user, onClose]);
 
   async function handleSubmit(e: React.FormEvent) {

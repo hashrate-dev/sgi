@@ -419,7 +419,7 @@ export function GarantiaAndePage() {
     showToast(`PDF ${inv.number} descargado.`, "success");
   }
 
-  const canEdit = !user || canEditFacturacion(user.role);
+  const canEdit = !user || canEditFacturacion(user);
 
   return (
     <div className="fact-page">

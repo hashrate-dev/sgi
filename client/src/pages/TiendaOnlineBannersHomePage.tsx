@@ -24,7 +24,7 @@ import { AppButton, AppCard, AppSelect } from "../components/ui";
  */
 export function TiendaOnlineBannersHomePage() {
   const { user } = useAuth();
-  const canEditTienda = user ? canEditEquipoMarketplacePrecioYTienda(user.role) : false;
+  const canEditTienda = user ? canEditEquipoMarketplacePrecioYTienda(user) : false;
 
   const [equipos, setEquipos] = useState<EquipoASIC[]>([]);
   const [loading, setLoading] = useState(true);

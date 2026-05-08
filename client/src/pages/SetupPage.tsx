@@ -71,8 +71,8 @@ async function parseExcelSetups(file: File): Promise<{ nombre: string; precioUSD
 
 export function SetupPage() {
   const { user } = useAuth();
-  const canEdit = user ? canEditClientes(user.role) : false;
-  const canExportData = user ? canExport(user.role) : false;
+  const canEdit = user ? canEditClientes(user) : false;
+  const canExportData = user ? canExport(user) : false;
   const [setups, setSetups] = useState<Setup[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");

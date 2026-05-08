@@ -5,7 +5,8 @@ import { Navigate, Link as RouterLink } from "react-router-dom";
 import { Badge, Box, Flex, Grid, Heading, Image as ChakraImage, Stack, Text } from "@chakra-ui/react";
 import { useAuth } from "../contexts/AuthContext";
 import { getMarketplacePresenceStats, getMarketplaceQuoteTicketsStats, updateMyPassword } from "../lib/api";
-import { canViewMarketplaceQuoteTickets } from "../lib/auth.js";
+import { canViewMarketplaceQuoteTickets, lectorHasExplicitGrantList } from "../lib/auth.js";
+import { canLectorSeeHomeMenuTo } from "../lib/lectorPermissionsCatalog.js";
 import { playMarketplaceOrderNotificationSound } from "../lib/marketplaceCartSound";
 import { showToast } from "../components/ToastNotification";
 import "../styles/marketplace-hashrate.css";
@@ -125,6 +126,19 @@ const menuItems: MenuItem[] = [
     iconHoverBorderColor: "#cbd5e1",
   },
   {
+    to: "/gestion-financiera",
+    icon: "bi-cash-stack",
+    label: "Gestión Financiera",
+    desc: "Contabilidad, proveedores, monitor financiero y operaciones de cambio",
+    roles: ["admin_a", "admin_b", "operador"],
+    iconBg: "#ecfdf5",
+    iconColor: "#065f46",
+    iconBorderColor: "#a7f3d0",
+    iconHoverBg: "#d1fae5",
+    iconHoverColor: "#064e3b",
+    iconHoverBorderColor: "#34d399",
+  },
+  {
     to: "/kryptex",
     icon: "bi-currency-bitcoin",
     label: "Kryptex",
@@ -232,10 +246,14 @@ export function HomePage() {
   const [marketplaceOnlineAnon, setMarketplaceOnlineAnon] = useState(0);
   const prevOpenCountRef = useRef(0);
   const roleNorm = (r: string | undefined) => (r ?? "").toLowerCase().trim();
-  const visibleMenuItems = menuItems.filter(
-    (item) => !item.roles || (user && item.roles.some((r) => roleNorm(r) === roleNorm(user.role)))
-  );
-  const canSeeMarketplaceOrdersCard = Boolean(user && canViewMarketplaceQuoteTickets(user.role));
+  const visibleMenuItems = menuItems.filter((item) => {
+    if (!user) return false;
+    if (user.role === "lector") {
+      return canLectorSeeHomeMenuTo(user, item.to);
+    }
+    return !item.roles || item.roles.some((r) => roleNorm(r) === roleNorm(user.role));
+  });
+  const canSeeMarketplaceOrdersCard = Boolean(user && canViewMarketplaceQuoteTickets(user));
 
   useEffect(() => {
     const img = new Image();
@@ -378,7 +396,9 @@ export function HomePage() {
   };
 
   if (user?.role === "lector") {
-    return <Navigate to="/kryptex" replace />;
+    if (!lectorHasExplicitGrantList(user) || (user.lector_grants?.length ?? 0) === 0) {
+      return <Navigate to="/kryptex" replace />;
+    }
   }
   if (user?.role === "cliente") {
     return <Navigate to="/marketplace" replace />;

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { db } from "../db.js";
 import { requireRole } from "../middleware/auth.js";
+import { requireModuleGrant } from "../middleware/moduleGrant.js";
 import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
 
 export const asicCostosRouter = Router();
@@ -113,6 +114,7 @@ function mapAsicCostoRow(raw: Record<string, unknown>) {
 asicCostosRouter.get(
   "/asic/costos-equipos",
   requireRole("admin_a", "admin_b", "operador", "lector"),
+  requireModuleGrant("finanzas_asic_costos"),
   async (_req, res) => {
     await ensureAsicCostosSchema();
     const rows = (await db
@@ -130,6 +132,7 @@ asicCostosRouter.get(
 asicCostosRouter.post(
   "/asic/costos-equipos",
   requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("finanzas_asic_costos"),
   async (req, res) => {
     await ensureAsicCostosSchema();
     const parsed = AsicCostoPayloadSchema.safeParse(req.body);
@@ -181,6 +184,7 @@ asicCostosRouter.post(
 asicCostosRouter.delete(
   "/asic/costos-equipos/:id",
   requireRole("admin_a", "admin_b", "operador", "lector"),
+  requireModuleGrant("finanzas_asic_costos"),
   async (req, res) => {
     await ensureAsicCostosSchema();
     const id = Number(req.params.id);

@@ -17,7 +17,7 @@ export function MarketplaceSiteFooter({ variant = "default" }: Props) {
   const year = new Date().getFullYear();
   const { user, loading } = useAuth();
   const { t, tf } = useMarketplaceLang();
-  const showSgiLink = Boolean(!loading && user && canManageUsers(user.role));
+  const showSgiLink = Boolean(!loading && user && canManageUsers(user));
   const inCorpBand = variant === "corp-end-band";
 
   const strip = (

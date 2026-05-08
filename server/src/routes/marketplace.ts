@@ -29,6 +29,7 @@ import {
 } from "../lib/whattomineYield.js";
 import { getAuthTokenFromRequest } from "../lib/authSessionCookie.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
+import { requireModuleGrant } from "../middleware/moduleGrant.js";
 import { marketplacePublicPostRateLimit } from "../middleware/authRateLimit.js";
 import { resolveSetupCompraHashrateUsd, resolveSetupEquipoCompletoUsd } from "../lib/marketplaceSetupHashratePrice.js";
 import { loadGarantiaQuoteRows } from "../lib/marketplaceGarantiaQuote.js";
@@ -38,8 +39,11 @@ import { sendMarketplaceAsicInquiryEmail, sendMarketplaceContactEmail } from "..
 
 export const marketplaceRouter = Router();
 
-const canManage = requireRole("admin_a", "admin_b", "operador");
-const adminAB = requireRole("admin_a", "admin_b");
+const canManage = [
+  requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("equipos_tienda"),
+];
+const adminAB = [requireRole("admin_a", "admin_b"), requireModuleGrant("marketplace_presencia")];
 const MARKETPLACE_PRESENCE_ONLINE_WINDOW_MS = 90_000;
 /** Evita duplicar filas cuando el cliente envía dos heartbeats seguidos (locale/IP) con el mismo estado. */
 const MARKETPLACE_PRESENCE_HISTORY_DEDUPE_MS = 15_000;
@@ -628,7 +632,7 @@ marketplaceRouter.post("/marketplace/asic-inquiry", marketplacePublicPostRateLim
 });
 
 /** Vista interna: cuántas personas están navegando el marketplace ahora mismo. */
-marketplaceRouter.get("/marketplace/presence-stats", requireAuth, adminAB, async (_req: Request, res: Response) => {
+marketplaceRouter.get("/marketplace/presence-stats", requireAuth, ...adminAB, async (_req: Request, res: Response) => {
   try {
     const cutoffIso = new Date(Date.now() - MARKETPLACE_PRESENCE_ONLINE_WINDOW_MS).toISOString();
     const rows = (await db
@@ -655,7 +659,7 @@ marketplaceRouter.get("/marketplace/presence-stats", requireAuth, adminAB, async
 });
 
 /** Vista interna detallada: sesiones activas del marketplace en tiempo real. */
-marketplaceRouter.get("/marketplace/presence-live", requireAuth, adminAB, async (req: Request, res: Response) => {
+marketplaceRouter.get("/marketplace/presence-live", requireAuth, ...adminAB, async (req: Request, res: Response) => {
   try {
     const cutoffIso = new Date(Date.now() - MARKETPLACE_PRESENCE_ONLINE_WINDOW_MS).toISOString();
     const rows = (await db
@@ -739,7 +743,7 @@ marketplaceRouter.get("/marketplace/presence-live", requireAuth, adminAB, async 
 });
 
 /** Historial de heartbeats del marketplace (staff / cliente / invitado), persistido en BD. */
-marketplaceRouter.get("/marketplace/presence-history", requireAuth, adminAB, async (req: Request, res: Response) => {
+marketplaceRouter.get("/marketplace/presence-history", requireAuth, ...adminAB, async (req: Request, res: Response) => {
   try {
     const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 200));
     const offset = Math.max(0, Number(req.query.offset) || 0);
@@ -1188,7 +1192,7 @@ marketplaceRouter.get("/marketplace/products", requireAuth, async (req, res: Res
 });
 
 /** POST /marketplace/products */
-marketplaceRouter.post("/marketplace/products", requireAuth, canManage, async (req, res: Response) => {
+marketplaceRouter.post("/marketplace/products", requireAuth, ...canManage, async (req, res: Response) => {
   const parsed = ProductCreateSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
@@ -1221,7 +1225,7 @@ marketplaceRouter.post("/marketplace/products", requireAuth, canManage, async (r
 });
 
 /** PUT /marketplace/products/:id */
-marketplaceRouter.put("/marketplace/products/:id", requireAuth, canManage, async (req, res: Response) => {
+marketplaceRouter.put("/marketplace/products/:id", requireAuth, ...canManage, async (req, res: Response) => {
   const idParam = (typeof req.params.id === "string" ? req.params.id : req.params.id?.[0] ?? "").trim();
   const id = parseInt(idParam, 10);
   if (!Number.isFinite(id)) return res.status(400).json({ error: { message: "ID inválido" } });
@@ -1269,7 +1273,7 @@ marketplaceRouter.put("/marketplace/products/:id", requireAuth, canManage, async
 });
 
 /** DELETE /marketplace/products/:id */
-marketplaceRouter.delete("/marketplace/products/:id", requireAuth, canManage, async (req, res: Response) => {
+marketplaceRouter.delete("/marketplace/products/:id", requireAuth, ...canManage, async (req, res: Response) => {
   const idParam = (typeof req.params.id === "string" ? req.params.id : req.params.id?.[0] ?? "").trim();
   const id = parseInt(idParam, 10);
   if (!Number.isFinite(id)) return res.status(400).json({ error: { message: "ID inválido" } });

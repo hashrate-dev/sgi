@@ -113,7 +113,7 @@ function MarketplacePageBody() {
   const handleAddToQuote = useCallback(
     (p: AsicProduct, opts?: AddQuoteLineOptions) => {
       if (loading) return;
-      if (!user || !canUseMarketplaceQuoteCart(user.role)) {
+      if (!user || !canUseMarketplaceQuoteCart(user)) {
         const next = new URLSearchParams(searchParams);
         next.set("login", "1");
         setSearchParams(next, { replace: false });
@@ -133,7 +133,7 @@ function MarketplacePageBody() {
     const st = location.state as { openQuoteDrawer?: boolean } | null;
     if (!st?.openQuoteDrawer) return;
     if (loading) return;
-    if (!user || !canUseMarketplaceQuoteCart(user.role)) {
+    if (!user || !canUseMarketplaceQuoteCart(user)) {
       navigate("/marketplace", { replace: true, state: {} });
       return;
     }

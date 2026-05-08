@@ -30,10 +30,21 @@ import {
 } from "../lib/marketplaceQuoteCartHistory.js";
 import { markClientsVentaMarketplaceAfterInstalado } from "../lib/marketplaceVentaCliente.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
+import { requireModuleGrant } from "../middleware/moduleGrant.js";
 
 export const marketplaceQuoteTicketsRouter = Router();
 
-const adminAB = requireRole("admin_a", "admin_b");
+/** Staff: bandeja y borrados masivos. Solo aplica lista blanca a AdministradorB. */
+const mpStaffPedidos = [requireRole("admin_a", "admin_b"), requireModuleGrant("marketplace_pedidos")];
+/** Carrito/sync: cliente tienda o admin; el permiso granular solo capa a AdministradorB sin módulo pedidos. */
+const quoteSyncAuth = [
+  requireRole("cliente", "admin_a", "admin_b"),
+  requireModuleGrant("marketplace_pedidos"),
+];
+const quoteOwnerAuth = [
+  requireRole("cliente", "admin_a", "admin_b"),
+  requireModuleGrant("marketplace_pedidos"),
+];
 
 /** Evita inundar la consola en debounce; solo diagnóstico en desarrollo. */
 let lastQuoteSyncPipelineMissLogMs = 0;
@@ -512,8 +523,7 @@ function shouldNotifySalesWhatsappOrderLista(
 }
 
 /** POST autenticado (cliente o admin A/B): guardar carrito / marcar consulta por mail o WhatsApp */
-const quoteSyncAuth = requireRole("cliente", "admin_a", "admin_b");
-marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, quoteSyncAuth, async (req: Request, res: Response) => {
+marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, ...quoteSyncAuth, async (req: Request, res: Response) => {
   try {
     const parsed = SyncSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -1276,8 +1286,11 @@ function rowToTicketDetail(row: Record<string, unknown>) {
 }
 
 /** Listado de tickets del usuario (marketplace): sin borradores; mismo dato que ve el staff en cotizaciones. */
-const quoteOwnerAuth = requireRole("cliente", "admin_a", "admin_b");
-marketplaceQuoteTicketsRouter.get("/marketplace/my-quote-tickets", requireAuth, quoteOwnerAuth, async (req: Request, res: Response) => {
+marketplaceQuoteTicketsRouter.get(
+  "/marketplace/my-quote-tickets",
+  requireAuth,
+  ...quoteOwnerAuth,
+  async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const sql = `SELECT ${TICKET_SELECT} FROM ${TICKET_FROM}
@@ -1294,7 +1307,7 @@ marketplaceQuoteTicketsRouter.get("/marketplace/my-quote-tickets", requireAuth, 
 marketplaceQuoteTicketsRouter.post(
   "/marketplace/my-quote-tickets/:id/cancel",
   requireAuth,
-  quoteOwnerAuth,
+  ...quoteOwnerAuth,
   async (req: Request, res: Response) => {
     try {
       const userId = req.user!.id;
@@ -1346,7 +1359,11 @@ marketplaceQuoteTicketsRouter.post(
   }
 );
 
-marketplaceQuoteTicketsRouter.get("/marketplace/my-quote-tickets/:id", requireAuth, quoteOwnerAuth, async (req: Request, res: Response) => {
+marketplaceQuoteTicketsRouter.get(
+  "/marketplace/my-quote-tickets/:id",
+  requireAuth,
+  ...quoteOwnerAuth,
+  async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ error: { message: "ID inválido" } });
@@ -1373,7 +1390,7 @@ marketplaceQuoteTicketsRouter.get("/marketplace/my-quote-tickets/:id", requireAu
 });
 
 /** Eliminar todas las órdenes/consultas del usuario (no borradores). Solo AdministradorA/B — los clientes tienda no pueden borrado masivo. */
-marketplaceQuoteTicketsRouter.delete("/marketplace/my-quote-tickets", requireAuth, adminAB, async (req: Request, res: Response) => {
+marketplaceQuoteTicketsRouter.delete("/marketplace/my-quote-tickets", requireAuth, ...mpStaffPedidos, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const r = await db
@@ -1387,7 +1404,11 @@ marketplaceQuoteTicketsRouter.delete("/marketplace/my-quote-tickets", requireAut
 });
 
 /** Eliminar una orden/consulta del usuario (no borrador). */
-marketplaceQuoteTicketsRouter.delete("/marketplace/my-quote-tickets/:id", requireAuth, quoteOwnerAuth, async (req: Request, res: Response) => {
+marketplaceQuoteTicketsRouter.delete(
+  "/marketplace/my-quote-tickets/:id",
+  requireAuth,
+  ...quoteOwnerAuth,
+  async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ error: { message: "ID inválido" } });
@@ -1420,7 +1441,7 @@ marketplaceQuoteTicketsRouter.delete("/marketplace/my-quote-tickets/:id", requir
 });
 
 /** Listado para panel admin */
-marketplaceQuoteTicketsRouter.get("/marketplace/quote-tickets", requireAuth, adminAB, async (req: Request, res: Response) => {
+marketplaceQuoteTicketsRouter.get("/marketplace/quote-tickets", requireAuth, ...mpStaffPedidos, async (req: Request, res: Response) => {
   try {
     const parsed = ListQuerySchema.safeParse(req.query);
     if (!parsed.success) {
@@ -1475,7 +1496,7 @@ marketplaceQuoteTicketsRouter.get("/marketplace/quote-tickets", requireAuth, adm
 });
 
 /** Detalle */
-marketplaceQuoteTicketsRouter.get("/marketplace/quote-tickets/:id", requireAuth, adminAB, async (req: Request, res: Response) => {
+marketplaceQuoteTicketsRouter.get("/marketplace/quote-tickets/:id", requireAuth, ...mpStaffPedidos, async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ error: { message: "ID inválido" } });
@@ -1488,7 +1509,7 @@ marketplaceQuoteTicketsRouter.get("/marketplace/quote-tickets/:id", requireAuth,
 });
 
 /** Eliminar ticket / orden del marketplace (solo AdministradorA/B). */
-marketplaceQuoteTicketsRouter.delete("/marketplace/quote-tickets/:id", requireAuth, adminAB, async (req: Request, res: Response) => {
+marketplaceQuoteTicketsRouter.delete("/marketplace/quote-tickets/:id", requireAuth, ...mpStaffPedidos, async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ error: { message: "ID inválido" } });
@@ -1507,7 +1528,7 @@ const PatchSchema = z.object({
   notesAdmin: z.string().max(4000).optional().nullable(),
 });
 
-marketplaceQuoteTicketsRouter.patch("/marketplace/quote-tickets/:id", requireAuth, adminAB, async (req: Request, res: Response) => {
+marketplaceQuoteTicketsRouter.patch("/marketplace/quote-tickets/:id", requireAuth, ...mpStaffPedidos, async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ error: { message: "ID inválido" } });
@@ -1571,7 +1592,7 @@ marketplaceQuoteTicketsRouter.patch("/marketplace/quote-tickets/:id", requireAut
 });
 
 /** KPIs rápidos para el tablero */
-marketplaceQuoteTicketsRouter.get("/marketplace/quote-tickets-stats", requireAuth, adminAB, async (_req: Request, res: Response) => {
+marketplaceQuoteTicketsRouter.get("/marketplace/quote-tickets-stats", requireAuth, ...mpStaffPedidos, async (_req: Request, res: Response) => {
   try {
     const rows = (await db
       .prepare("SELECT status, COUNT(*) as c FROM marketplace_quote_tickets GROUP BY status")

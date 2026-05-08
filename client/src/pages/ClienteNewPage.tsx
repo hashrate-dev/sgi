@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
-import { createClient, createClientsBulk, getClients } from "../lib/api";
+import { createClient, createClientsBulk, getClients, getNextClientCode } from "../lib/api";
 import { parseExcelFile } from "../lib/parseClientExcel";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
@@ -27,7 +27,28 @@ export function ClienteNewPage() {
   const [message, setMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [excelLoading, setExcelLoading] = useState(false);
-  if (user && !canEditClientes(user.role)) return <Navigate to="/clients/hosting" replace />;
+  const [nextCodeLoading, setNextCodeLoading] = useState(true);
+  if (user && !canEditClientes(user)) return <Navigate to="/clients/hosting" replace />;
+
+  useEffect(() => {
+    let alive = true;
+    setNextCodeLoading(true);
+    getNextClientCode()
+      .then((r) => {
+        if (!alive) return;
+        setForm((prev) => ({ ...prev, code: String(r?.code ?? "").trim() }));
+      })
+      .catch(() => {
+        if (!alive) return;
+        setForm((prev) => ({ ...prev, code: "" }));
+      })
+      .finally(() => {
+        if (alive) setNextCodeLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -45,15 +66,20 @@ export function ClienteNewPage() {
       city: form.city.trim() || undefined,
       city2: form.city2.trim() || undefined
     };
-    if (!payload.code || !payload.name) {
-      setMessage({ type: "err", text: "Código y nombre son obligatorios." });
+    if (!payload.name) {
+      setMessage({ type: "err", text: "El nombre es obligatorio." });
       return;
     }
 
     createClient(payload)
       .then(() => {
         setMessage({ type: "ok", text: "Cliente agregado correctamente." });
-        setForm(emptyForm);
+        setForm({ ...emptyForm, code: "" });
+        setNextCodeLoading(true);
+        void getNextClientCode()
+          .then((r) => setForm((prev) => ({ ...prev, code: String(r?.code ?? "").trim() })))
+          .catch(() => {})
+          .finally(() => setNextCodeLoading(false));
         setTimeout(() => {
           navigate("/clients/hosting");
         }, 1500);
@@ -170,8 +196,9 @@ export function ClienteNewPage() {
                       <input
                         className="fact-input"
                         value={form.code}
-                        onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-                        placeholder="Ej. C01"
+                        readOnly
+                        placeholder={nextCodeLoading ? "Generando..." : "Código automático"}
+                        title="Código automático según el último cliente registrado"
                       />
                     </div>
                     <div className="fact-field">

@@ -15,9 +15,9 @@ import "../styles/facturacion.css";
 export function ClientesPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const canDelete = user ? canDeleteClientes(user.role) : false;
-  const canEdit = user ? canEditClientes(user.role) : false;
-  const canExportData = user ? canExport(user.role) : false;
+  const canDelete = user ? canDeleteClientes(user) : false;
+  const canEdit = user ? canEditClientes(user) : false;
+  const canExportData = user ? canExport(user) : false;
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

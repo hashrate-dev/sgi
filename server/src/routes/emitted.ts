@@ -2,10 +2,14 @@ import { Router } from "express";
 import { z } from "zod";
 import { db } from "../db.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
+import { requireModuleGrant } from "../middleware/moduleGrant.js";
 
 export const emittedRouter = Router();
 
-const requireCanPostEmitted = requireRole("admin_a", "admin_b", "operador");
+const requireCanPostEmitted = [
+  requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("facturacion"),
+];
 
 const MS_24H = 24 * 60 * 60 * 1000;
 const MS_15_DAYS = 15 * 24 * 60 * 60 * 1000;
@@ -17,7 +21,12 @@ const AddEmittedSchema = z.object({
 });
 
 /** GET /emitted?source=hosting|asic — últimos 20 días en ambos */
-emittedRouter.get("/emitted", requireAuth, async (req, res) => {
+emittedRouter.get(
+  "/emitted",
+  requireAuth,
+  requireRole("admin_a", "admin_b", "operador", "lector"),
+  requireModuleGrant("facturacion"),
+  async (req, res) => {
   const q = z.object({ source: z.enum(["hosting", "asic"]) }).safeParse(req.query);
   if (!q.success) {
     return res.status(400).json({ error: { message: "source debe ser hosting o asic" } });
@@ -40,7 +49,7 @@ emittedRouter.get("/emitted", requireAuth, async (req, res) => {
 });
 
 /** POST /emitted — registrar documento emitido (en producción: admin/operador; en localhost: cualquier usuario logueado) */
-emittedRouter.post("/emitted", requireAuth, requireCanPostEmitted, async (req, res) => {
+emittedRouter.post("/emitted", requireAuth, ...requireCanPostEmitted, async (req, res) => {
   const parsed = AddEmittedSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: { message: "Body inválido", details: parsed.error.flatten() } });
@@ -62,7 +71,12 @@ emittedRouter.post("/emitted", requireAuth, requireCanPostEmitted, async (req, r
 });
 
 /** DELETE /emitted/:source/:invoiceNumber — borrar un documento emitido (para que no siga en "Documentos emitidos" al borrarlo del historial) */
-emittedRouter.delete("/emitted/:source/:invoiceNumber", requireAuth, requireRole("admin_a", "admin_b", "operador"), async (req, res) => {
+emittedRouter.delete(
+  "/emitted/:source/:invoiceNumber",
+  requireAuth,
+  requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("facturacion"),
+  async (req, res) => {
   const source = z.enum(["hosting", "asic"]).safeParse(req.params.source);
   const invoiceNumber = (typeof req.params.invoiceNumber === "string" ? req.params.invoiceNumber : "").trim();
   if (!source.success || !invoiceNumber) {

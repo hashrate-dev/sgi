@@ -175,7 +175,7 @@ export function MarketplaceCartOrdersPanel({ onBackToCart }: Props) {
   );
 
   /** En carrito marketplace: solo consultas en curso (no historial descartado/cerrado). */
-  const singleOrderAccount = enforceSingleMarketplaceOrderForRole(user?.role);
+  const singleOrderAccount = enforceSingleMarketplaceOrderForRole(user ?? null);
   const cartScopeTickets = useMemo(() => {
     if (!singleOrderAccount) return tickets;
     return tickets.filter((tk) => isMarketplacePipelineTicketStatus(tk.status));
@@ -355,7 +355,7 @@ export function MarketplaceCartOrdersPanel({ onBackToCart }: Props) {
     ? cartScopeTickets.length
     : tickets.filter((x) => isMarketplacePipelineTicketStatus(x.status)).length;
   const showLegacyMultiPipelineHint = Boolean(user && singleOrderAccount) && pendingCount > 1;
-  const showStaffOrderTools = canBulkManageMarketplaceMyOrders(user.role);
+  const showStaffOrderTools = canBulkManageMarketplaceMyOrders(user);
   /** Una sola orden en curso en el carrito: vista solo-detalle. */
   const soloUnTicketDetalle = Boolean(user && singleOrderAccount) && cartScopeTickets.length === 1;
 

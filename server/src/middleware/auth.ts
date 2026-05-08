@@ -1,9 +1,11 @@
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
-import { db } from "../db.js";
 import { getAuthTokenFromRequest } from "../lib/authSessionCookie.js";
 import { getTiendaPhonesForUserId } from "../lib/tiendaClientContact.js";
+import { parseAdminBGrantsJson } from "../lib/adminBPermissions.js";
+import { parseLectorGrantsJson } from "../lib/lectorPermissions.js";
+import { fetchUserRowForSessionById } from "../lib/dbUserColumnFallback.js";
 
 export type UserRole = "admin_a" | "admin_b" | "operador" | "lector" | "cliente";
 
@@ -13,6 +15,13 @@ export type AuthUser = {
   email: string;
   role: UserRole;
   usuario?: string;
+  /**
+   * Lista blanca de módulos para `admin_b`.
+   * `null`/`undefined`: sin restricción explícita (acceso completo heredado).
+   */
+  admin_b_grants?: string[] | null;
+  /** Lista blanca de módulos consultables para `lector`. `null`/`undefined`: acceso API amplio histórico. */
+  lector_grants?: string[] | null;
   /** Celular del registro tienda (`clients.phone`). */
   celular?: string;
   /** Teléfono fijo opcional del registro (`clients.phone2`). */
@@ -36,20 +45,34 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   (async () => {
     try {
       const payload = jwt.verify(token, env.JWT_SECRET) as { sub: string; userId: number };
-      const row = (await db.prepare("SELECT id, username, email, role, usuario FROM users WHERE id = ?").get(payload.userId)) as
-        | { id: number; username: string; email: string | null; role: string; usuario?: string | null }
+      const rowRaw = await fetchUserRowForSessionById(payload.userId);
+      const row = rowRaw as
+        | {
+            id: number;
+            username: string;
+            email: string | null;
+            role: string;
+            usuario?: string | null;
+            admin_b_grants_json?: string | null;
+            lector_grants_json?: string | null;
+          }
         | undefined;
       if (!row) {
         res.status(401).json({ error: { message: "Usuario no encontrado" } });
         return;
       }
       const { celular, telefono } = await getTiendaPhonesForUserId(row.id);
+      const role = row.role as UserRole;
+      const adminGrantsParsed = parseAdminBGrantsJson(row.admin_b_grants_json ?? null);
+      const lectorGrantsParsed = parseLectorGrantsJson(row.lector_grants_json ?? null);
       req.user = {
         id: row.id,
         username: row.username,
         email: row.email ?? row.username,
-        role: row.role as UserRole,
+        role,
         usuario: row.usuario ?? undefined,
+        ...(role === "admin_b" ? { admin_b_grants: adminGrantsParsed } : {}),
+        ...(role === "lector" ? { lector_grants: lectorGrantsParsed } : {}),
         celular,
         telefono,
       };

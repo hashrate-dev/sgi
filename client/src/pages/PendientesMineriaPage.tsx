@@ -48,7 +48,7 @@ export function PendientesMineriaPage() {
   const [qClient, setQClient] = useState("");
   const [qMonth, setQMonth] = useState("");
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null);
-  const canExportData = user ? canExport(user.role) : false;
+  const canExportData = user ? canExport(user) : false;
 
   // Recargar desde localStorage al montar (asegura ver datos de ASIC/mineria)
   useEffect(() => {

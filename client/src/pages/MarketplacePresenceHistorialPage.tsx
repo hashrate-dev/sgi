@@ -30,7 +30,7 @@ const EXPORT_BATCH_SIZE = 500;
 
 export function MarketplacePresenceHistorialPage() {
   const { user } = useAuth();
-  const canView = Boolean(user && canViewMarketplaceQuoteTickets(user.role));
+  const canView = Boolean(user && canViewMarketplaceQuoteTickets(user));
   const [rows, setRows] = useState<MarketplacePresenceHistoryRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);

@@ -893,7 +893,7 @@ export function CotizacionesMarketplacePage() {
     return { pendiente, compraConfirmada, cerrados };
   }, [tickets, laneFilter]);
 
-  if (!user || !canViewMarketplaceQuoteTickets(user.role)) {
+  if (!user || !canViewMarketplaceQuoteTickets(user)) {
     return <Navigate to="/" replace />;
   }
 

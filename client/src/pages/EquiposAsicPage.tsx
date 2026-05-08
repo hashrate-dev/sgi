@@ -34,7 +34,11 @@ import { PrecioHistorialFullModal } from "../components/equipos/PrecioHistorialF
 import { equipoASICToModalProduct } from "../lib/equipoAsicModalMapper";
 import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
-import { canDeleteClientes, canEditClientes, canEditEquipoMarketplacePrecioYTienda, canExport } from "../lib/auth";
+import {
+  canEditEquipoMarketplacePrecioYTienda,
+  canEditEquiposInventory,
+  canExport,
+} from "../lib/auth";
 import { codigoProductoVitrina as vitrinaCodigoFromSpecs } from "../lib/marketplaceProductCode";
 import { resolveMarketplaceListingKind } from "../lib/marketplaceAsicCatalog";
 import "../styles/facturacion.css";
@@ -468,10 +472,10 @@ function emptyEquipoForm(): EquipoFormState {
 
 export function EquiposAsicPage() {
   const { user } = useAuth();
-  const canDelete = user ? canDeleteClientes(user.role) : false;
-  const canEdit = user ? canEditClientes(user.role) : false;
-  const canEditTienda = user ? canEditEquipoMarketplacePrecioYTienda(user.role) : false;
-  const canExportData = user ? canExport(user.role) : false;
+  const canDelete = user ? canEditEquiposInventory(user) : false;
+  const canEdit = user ? canEditEquiposInventory(user) : false;
+  const canEditTienda = user ? canEditEquipoMarketplacePrecioYTienda(user) : false;
+  const canExportData = user ? canExport(user) : false;
   const [equipos, setEquipos] = useState<EquipoASIC[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);

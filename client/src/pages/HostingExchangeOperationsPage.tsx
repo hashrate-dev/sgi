@@ -2,7 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
-import { canEditFacturacion } from "../lib/auth";
+import {
+  canAccessHostingTipoCambio,
+  canDeleteHostingFxOperation,
+  canEditHostingTipoCambio,
+} from "../lib/auth";
 import {
   createHostingFxOperation,
   deleteHostingFxOperation,
@@ -95,7 +99,7 @@ export function HostingExchangeOperationsPage() {
 
   useEffect(() => {
     if (loading || !user) return;
-    if (!canEditFacturacion(user.role) && user.role !== "lector") return;
+    if (!canAccessHostingTipoCambio(user)) return;
     void loadData();
   }, [loading, user, loadData]);
 
@@ -118,8 +122,8 @@ export function HostingExchangeOperationsPage() {
     });
   }, [form.usdtSide]);
 
-  const canEdit = Boolean(user && canEditFacturacion(user.role));
-  const canDelete = user?.role === "admin_a" || user?.role === "admin_b";
+  const canEdit = Boolean(user && canEditHostingTipoCambio(user));
+  const canDelete = Boolean(user && canDeleteHostingFxOperation(user));
 
   const clientOptions = useMemo(
     () =>
@@ -206,7 +210,7 @@ export function HostingExchangeOperationsPage() {
   }, [ticketOperation]);
 
   if (!loading && !user) return <Navigate to="/login" replace />;
-  if (!loading && user && !canEditFacturacion(user.role) && user.role !== "lector") {
+  if (!loading && user && !canAccessHostingTipoCambio(user)) {
     return <Navigate to="/" replace />;
   }
 

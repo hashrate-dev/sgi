@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { db } from "../db.js";
 import { requireRole } from "../middleware/auth.js";
+import { requireModuleGrant } from "../middleware/moduleGrant.js";
 
 export const clientsRouter = Router();
 
@@ -42,7 +43,38 @@ const ClientUpdateSchema = z.object({
 const selectFields =
   "id, code, name, name2, phone, phone2, email, email2, address, address2, city, city2, usuario, documento_identidad, country";
 
-clientsRouter.post("/clients/bulk", requireRole("admin_a", "admin_b", "operador"), async (req, res) => {
+function buildNextCodeFromLast(lastCode: string | null | undefined): string {
+  const raw = String(lastCode ?? "").trim();
+  if (!raw) return "C01";
+  const match = raw.match(/^(.*?)(\d+)$/);
+  if (!match) return "C01";
+  const prefix = match[1] ?? "";
+  const numRaw = match[2] ?? "";
+  const next = Number.parseInt(numRaw, 10) + 1;
+  if (!Number.isFinite(next) || next <= 0) return "C01";
+  return `${prefix}${String(next).padStart(numRaw.length, "0")}`;
+}
+
+async function getLatestClientCode(): Promise<string | null> {
+  const row = await db.prepare("SELECT code FROM clients ORDER BY id DESC LIMIT 1").get() as { code?: string } | undefined;
+  return row?.code ?? null;
+}
+
+async function getNextClientCodeFromDb(): Promise<string> {
+  const last = await getLatestClientCode();
+  return buildNextCodeFromLast(last);
+}
+
+function isUniqueCodeError(err: unknown): boolean {
+  const e = err as { code?: string };
+  return Boolean(e?.code && (String(e.code).includes("SQLITE_CONSTRAINT") || e.code === "23505"));
+}
+
+clientsRouter.post(
+  "/clients/bulk",
+  requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("clientes"),
+  async (req, res) => {
   const body = req.body as { clients?: unknown[] };
   if (!Array.isArray(body?.clients) || body.clients.length === 0) {
     return res.status(400).json({ error: { message: "Se requiere un array 'clients' con al menos un cliente" } });
@@ -137,14 +169,33 @@ clientsRouter.post("/clients/bulk", requireRole("admin_a", "admin_b", "operador"
   });
 });
 
-clientsRouter.get("/clients", async (_req, res) => {
+clientsRouter.get(
+  "/clients",
+  requireRole("admin_a", "admin_b", "operador", "lector"),
+  requireModuleGrant("clientes"),
+  async (_req, res) => {
   const rows = await db.prepare(`SELECT ${selectFields} FROM clients ORDER BY code ASC`).all();
   res.json({ clients: rows });
 });
 
-clientsRouter.post("/clients", requireRole("admin_a", "admin_b", "operador"), async (req, res, next) => {
+clientsRouter.get(
+  "/clients/next-code",
+  requireRole("admin_a", "admin_b", "operador", "lector"),
+  requireModuleGrant("clientes"),
+  async (_req, res) => {
+  const code = await getNextClientCodeFromDb();
+  res.json({ code });
+});
+
+clientsRouter.post(
+  "/clients",
+  requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("clientes"),
+  async (req, res, next) => {
   try {
-    const parsed = ClientCreateSchema.safeParse(req.body);
+    const parsed = ClientCreateSchema.extend({
+      code: z.string().max(50).trim().optional()
+    }).safeParse(req.body);
     if (!parsed.success) {
       return res
         .status(400)
@@ -155,22 +206,39 @@ clientsRouter.post("/clients", requireRole("admin_a", "admin_b", "operador"), as
       "INSERT INTO clients (code, name, name2, phone, phone2, email, email2, address, address2, city, city2, usuario, documento_identidad, country) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
     try {
-      const info = await stmt.run(
-        d.code,
-        d.name,
-        d.name2 ?? null,
-        d.phone ?? null,
-        d.phone2 ?? null,
-        d.email ?? null,
-        d.email2 ?? null,
-        d.address ?? null,
-        d.address2 ?? null,
-        d.city ?? null,
-        d.city2 ?? null,
-        d.usuario ?? null,
-        d.documento_identidad ?? null,
-        d.country ?? null
-      );
+      let resolvedCode = (d.code ?? "").trim();
+      let info: { lastInsertRowid?: number | bigint | string | null } | null = null;
+      for (let attempt = 0; attempt < 6; attempt++) {
+        if (!resolvedCode) resolvedCode = await getNextClientCodeFromDb();
+        try {
+          info = await stmt.run(
+            resolvedCode,
+            d.name,
+            d.name2 ?? null,
+            d.phone ?? null,
+            d.phone2 ?? null,
+            d.email ?? null,
+            d.email2 ?? null,
+            d.address ?? null,
+            d.address2 ?? null,
+            d.city ?? null,
+            d.city2 ?? null,
+            d.usuario ?? null,
+            d.documento_identidad ?? null,
+            d.country ?? null
+          );
+          break;
+        } catch (e: unknown) {
+          if (isUniqueCodeError(e) && !(d.code ?? "").trim()) {
+            resolvedCode = "";
+            continue;
+          }
+          throw e;
+        }
+      }
+      if (!info) {
+        return res.status(409).json({ error: { message: "No se pudo generar un código de cliente único." } });
+      }
       const id = info?.lastInsertRowid;
       if (id == null || !Number.isFinite(Number(id))) {
         return res.status(500).json({ error: { message: "Error al crear cliente. No se obtuvo el ID." } });
@@ -190,7 +258,11 @@ clientsRouter.post("/clients", requireRole("admin_a", "admin_b", "operador"), as
   }
 });
 
-clientsRouter.put("/clients/:id", requireRole("admin_a", "admin_b", "operador"), async (req, res) => {
+clientsRouter.put(
+  "/clients/:id",
+  requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("clientes"),
+  async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) {
     return res.status(400).json({ error: { message: "Invalid id" } });
@@ -282,12 +354,20 @@ clientsRouter.put("/clients/:id", requireRole("admin_a", "admin_b", "operador"),
   }
 });
 
-clientsRouter.delete("/clients-all", requireRole("admin_a", "admin_b"), async (_req, res) => {
+clientsRouter.delete(
+  "/clients-all",
+  requireRole("admin_a", "admin_b"),
+  requireModuleGrant("clientes"),
+  async (_req, res) => {
   await db.prepare("DELETE FROM clients").run();
   res.status(204).send();
 });
 
-clientsRouter.delete("/clients/:id", requireRole("admin_a", "admin_b"), async (req, res) => {
+clientsRouter.delete(
+  "/clients/:id",
+  requireRole("admin_a", "admin_b"),
+  requireModuleGrant("clientes"),
+  async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) {
     return res.status(400).json({ error: { message: "Invalid id" } });

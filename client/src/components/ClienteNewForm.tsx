@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { createClient, createClientsBulk, getClients } from "../lib/api";
+import { useEffect, useState } from "react";
+import { createClient, createClientsBulk, getClients, getNextClientCode } from "../lib/api";
 import { parseExcelFile } from "../lib/parseClientExcel";
 import { showToast } from "./ToastNotification";
 import "../styles/facturacion.css";
@@ -31,6 +31,28 @@ type Props = {
 export function ClienteNewForm({ onSuccess, onCancel, variant = "card" }: Props) {
   const [form, setForm] = useState(emptyForm);
   const [excelLoading, setExcelLoading] = useState(false);
+  const [nextCodeLoading, setNextCodeLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    setNextCodeLoading(true);
+    getNextClientCode()
+      .then((r) => {
+        if (!alive) return;
+        const code = String(r?.code ?? "").trim();
+        setForm((prev) => ({ ...prev, code }));
+      })
+      .catch(() => {
+        if (!alive) return;
+        setForm((prev) => ({ ...prev, code: "" }));
+      })
+      .finally(() => {
+        if (alive) setNextCodeLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -48,14 +70,19 @@ export function ClienteNewForm({ onSuccess, onCancel, variant = "card" }: Props)
       city2: form.city2.trim() || undefined,
       usuario: form.usuario.trim() || undefined
     };
-    if (!payload.code || !payload.name) {
-      showToast("Código y nombre son obligatorios.", "error", TOAST_CONTEXT);
+    if (!payload.name) {
+      showToast("El nombre es obligatorio.", "error", TOAST_CONTEXT);
       return;
     }
 
     createClient(payload)
       .then(() => {
-        setForm(emptyForm);
+        setForm({ ...emptyForm, code: "" });
+        setNextCodeLoading(true);
+        void getNextClientCode()
+          .then((r) => setForm((prev) => ({ ...prev, code: String(r?.code ?? "").trim() })))
+          .catch(() => {})
+          .finally(() => setNextCodeLoading(false));
         onSuccess("Cliente agregado correctamente.");
       })
       .catch((err) => showToast(err instanceof Error ? err.message : "Error al crear", "error", TOAST_CONTEXT));
@@ -113,8 +140,9 @@ export function ClienteNewForm({ onSuccess, onCancel, variant = "card" }: Props)
             <input
               className="fact-input client-form-code-input"
               value={form.code}
-              onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-              placeholder="Ej. C01"
+              readOnly
+              placeholder={nextCodeLoading ? "Generando..." : "Código automático"}
+              title="Código automático según el último cliente registrado"
             />
           </div>
 

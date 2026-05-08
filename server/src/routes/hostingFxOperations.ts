@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { db } from "../db.js";
 import { requireRole } from "../middleware/auth.js";
+import { requireModuleGrant } from "../middleware/moduleGrant.js";
 import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
 
 export const hostingFxOperationsRouter = Router();
@@ -199,6 +200,7 @@ function mapFxRow(raw: Record<string, unknown>): Record<string, unknown> {
 hostingFxOperationsRouter.get(
   "/hosting/fx-operations",
   requireRole("admin_a", "admin_b", "operador", "lector"),
+  requireModuleGrant("hosting_tipo_cambio"),
   async (_req, res) => {
     await ensureHostingFxSchema();
     const rows = (await db
@@ -219,6 +221,7 @@ hostingFxOperationsRouter.get(
 hostingFxOperationsRouter.post(
   "/hosting/fx-operations",
   requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("hosting_tipo_cambio"),
   async (req, res) => {
     await ensureHostingFxSchema();
     const parsed = FxOperationCreateSchema.safeParse(req.body);
@@ -267,6 +270,7 @@ hostingFxOperationsRouter.post(
 hostingFxOperationsRouter.put(
   "/hosting/fx-operations/:id",
   requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("hosting_tipo_cambio"),
   async (req, res) => {
     await ensureHostingFxSchema();
     const id = Number.parseInt(String(req.params.id), 10);
@@ -325,6 +329,7 @@ hostingFxOperationsRouter.put(
 hostingFxOperationsRouter.delete(
   "/hosting/fx-operations/:id",
   requireRole("admin_a", "admin_b"),
+  requireModuleGrant("hosting_tipo_cambio"),
   async (req, res) => {
     await ensureHostingFxSchema();
     const id = Number.parseInt(String(req.params.id), 10);

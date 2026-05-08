@@ -17,7 +17,9 @@ import { getTiendaPhonesForUserId } from "../lib/tiendaClientContact.js";
 import { requireAuth } from "../middleware/auth.js";
 import { loginRateLimit, registerClienteRateLimit } from "../middleware/authRateLimit.js";
 import type { AuthUser } from "../middleware/auth.js";
-import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
+import { parseAdminBGrantsJson } from "../lib/adminBPermissions.js";
+import { parseLectorGrantsJson } from "../lib/lectorPermissions.js";
+import { fetchUserRowForLogin } from "../lib/dbUserColumnFallback.js";
 import { appendAuthCookie, appendClearAuthCookie } from "../lib/authSessionCookie.js";
 
 const authRouter = Router();
@@ -822,18 +824,24 @@ authRouter.post("/auth/login", loginRateLimit, async (req, res) => {
   }
   const { username, password } = parsed.data;
   const loginName = username.trim();
-  let row: { id: number; username: string; email?: string | null; password_hash: string; role: string; usuario?: string | null } | undefined;
+  let row:
+    | { id: number; username: string; email?: string | null; password_hash: string; role: string; usuario?: string | null }
+    | undefined;
   try {
-    const raw = (await db.prepare("SELECT id, username, email, password_hash, role, usuario FROM users WHERE username = ? OR email = ?").get(loginName, loginName)) as Record<string, unknown> | undefined;
-    row = raw ? (rowKeysToLowercase(raw) as typeof row) : undefined;
-  } catch (e) {
-    try {
-      const raw = (await db.prepare("SELECT id, username, password_hash, role, usuario FROM users WHERE username = ?").get(loginName)) as Record<string, unknown> | undefined;
-      row = raw ? (rowKeysToLowercase(raw) as typeof row) : undefined;
-    } catch (e2) {
-      console.error("login db error:", e2);
-      return res.status(500).json({ error: { message: "Error al consultar usuario. Revisá la base de datos." } });
-    }
+    const fetched = await fetchUserRowForLogin(loginName);
+    row = fetched
+      ? (fetched as {
+          id: number;
+          username: string;
+          email?: string | null;
+          password_hash: string;
+          role: string;
+          usuario?: string | null;
+        })
+      : undefined;
+  } catch (e2) {
+    console.error("login db error:", e2);
+    return res.status(500).json({ error: { message: "Error al consultar usuario. Revisá la base de datos." } });
   }
   if (!row) {
     return res.status(401).json({ error: { message: "Usuario o contraseña incorrectos" } });
@@ -860,12 +868,21 @@ authRouter.post("/auth/login", loginRateLimit, async (req, res) => {
       return res.status(500).json({ error: { message: "Id de usuario inválido en la base de datos." } });
     }
     const { celular, telefono } = await getTiendaPhonesForUserId(userId);
+    const role = row.role as AuthUser["role"];
+    const grantsRaw = (row as Record<string, unknown>).admin_b_grants_json;
+    const lectorRaw = (row as Record<string, unknown>).lector_grants_json;
+    const adminGrants =
+      role === "admin_b" ? parseAdminBGrantsJson(typeof grantsRaw === "string" ? grantsRaw : null) : undefined;
+    const lectorGrants =
+      role === "lector" ? parseLectorGrantsJson(typeof lectorRaw === "string" ? lectorRaw : null) : undefined;
     const user: AuthUser = {
       id: userId,
       username: row.username,
       email: row.email ?? row.username,
-      role: row.role as AuthUser["role"],
+      role,
       usuario: row.usuario ?? undefined,
+      ...(adminGrants !== undefined ? { admin_b_grants: adminGrants } : {}),
+      ...(lectorGrants !== undefined ? { lector_grants: lectorGrants } : {}),
       celular,
       telefono,
     };

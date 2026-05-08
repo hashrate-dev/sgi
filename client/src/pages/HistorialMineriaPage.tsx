@@ -202,8 +202,8 @@ export function HistorialMineriaPage() {
   const [clearing, setClearing] = useState(false);
   const [passwordAttempts, setPasswordAttempts] = useState(0);
   const MAX_PASSWORD_ATTEMPTS = 3;
-  const canDelete = user ? canDeleteHistorial(user.role) : false;
-  const canExportData = user ? canExport(user.role) : false;
+  const canDelete = user ? canDeleteHistorial(user) : false;
+  const canExportData = user ? canExport(user) : false;
 
   /** Cargar desde API cuando el backend está disponible (para Lector y todos: ver datos agregados por otros usuarios) */
   useEffect(() => {

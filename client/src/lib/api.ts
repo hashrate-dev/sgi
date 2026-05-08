@@ -391,7 +391,17 @@ export async function verifyPassword(password: string): Promise<{ valid: boolean
   return data as { valid: boolean };
 }
 
-export type UserListItem = { id: number; email: string; role: string; created_at: string; usuario?: string };
+export type UserListItem = {
+  id: number;
+  email: string;
+  role: string;
+  created_at: string;
+  usuario?: string;
+  /** Sólo `admin_b`; `null` = acceso histórico completo sin lista explícita. */
+  admin_b_grants?: string[] | null;
+  /** Sólo `lector`; `null`/omitido según servidor = legado amplio API / SPA solo Kryptex hasta que Admin A defina lista. */
+  lector_grants?: string[] | null;
+};
 export type UsersResponse = { users: UserListItem[] };
 export type UserResponse = { user: UserListItem };
 
@@ -432,6 +442,45 @@ export function updateMyPassword(password: string): Promise<UserResponse> {
 
 export function deleteUser(id: number): Promise<void> {
   return api<void>(`/api/users/${id}`, { method: "DELETE" });
+}
+
+export type AdminBPermissionCatalogEntry = {
+  key: string;
+  label: string;
+  description: string;
+  sectionOrder?: number;
+  sectionLabel?: string;
+};
+
+export function getAdminBPermissionsCatalog(): Promise<{ catalog: AdminBPermissionCatalogEntry[] }> {
+  return api<{ catalog: AdminBPermissionCatalogEntry[] }>("/api/users/admin-b-permissions-catalog");
+}
+
+/** `grants: null` restaura comportamiento histórico (columna NULL en servidor). Array = whitelist. */
+export function updateAdminBGrants(userId: number, grants: string[] | null): Promise<UserResponse> {
+  return api<UserResponse>(`/api/users/${userId}/admin-b-grants`, {
+    method: "PUT",
+    body: JSON.stringify({ grants }),
+  });
+}
+
+export type LectorPermissionCatalogEntry = {
+  key: string;
+  label?: string;
+  description?: string;
+  sectionOrder?: number;
+  sectionLabel?: string;
+};
+
+export function getLectorPermissionsCatalog(): Promise<{ catalog: LectorPermissionCatalogEntry[] }> {
+  return api<{ catalog: LectorPermissionCatalogEntry[] }>("/api/users/lector-permissions-catalog");
+}
+
+export function updateLectorGrants(userId: number, grants: string[] | null): Promise<UserResponse> {
+  return api<UserResponse>(`/api/users/${userId}/lector-grants`, {
+    method: "PUT",
+    body: JSON.stringify({ grants }),
+  });
 }
 
 export type ActivityItem = {
@@ -522,12 +571,18 @@ type ClientFields = {
 };
 export type ClientsResponse = { clients: Array<ClientFields> };
 export type ClientResponse = { client: ClientFields };
+export type NextClientCodeResponse = { code: string };
+export type CreateClientBody = Omit<ClientFields, "id" | "code"> & { code?: string };
 
 export function getClients(): Promise<ClientsResponse> {
   return api<ClientsResponse>("/api/clients");
 }
 
-export function createClient(body: Omit<ClientFields, "id">): Promise<ClientResponse> {
+export function getNextClientCode(): Promise<NextClientCodeResponse> {
+  return api<NextClientCodeResponse>("/api/clients/next-code");
+}
+
+export function createClient(body: CreateClientBody): Promise<ClientResponse> {
   return api<ClientResponse>("/api/clients", { method: "POST", body: JSON.stringify(body) });
 }
 

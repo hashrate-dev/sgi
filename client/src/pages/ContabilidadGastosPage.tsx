@@ -3,7 +3,7 @@ import { Link, Navigate } from "react-router-dom";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
-import { canEditFacturacion } from "../lib/auth";
+import { canAccessFinanzaContabilidadHub, canEditContabilidadGastos } from "../lib/auth";
 import { MedioPagoIcon, MedioPagoSelect } from "../components/MedioPagoSelect";
 import {
   createContabilidadGasto,
@@ -168,7 +168,7 @@ export function ContabilidadGastosPage() {
   const [gastosListPageSize, setGastosListPageSize] = useState(10);
   const [gastosListPage, setGastosListPage] = useState(1);
 
-  const canEdit = Boolean(user && canEditFacturacion(user.role));
+  const canEdit = Boolean(user && canEditContabilidadGastos(user));
 
   const loadProveedores = useCallback(async () => {
     try {
@@ -192,7 +192,7 @@ export function ContabilidadGastosPage() {
   }, []);
 
   useEffect(() => {
-    if (!loading && user && (canEditFacturacion(user.role) || user.role === "lector")) {
+    if (!loading && user && canAccessFinanzaContabilidadHub(user)) {
       void loadProveedores();
       void loadGastos();
     }
@@ -307,7 +307,7 @@ export function ContabilidadGastosPage() {
   }, [gastosListPresupuestoYm, presupuestoMesOpcionesLista]);
 
   if (!loading && !user) return <Navigate to="/login" replace />;
-  if (!loading && user && !canEditFacturacion(user.role) && user.role !== "lector") {
+  if (!loading && user && !canAccessFinanzaContabilidadHub(user)) {
     return <Navigate to="/" replace />;
   }
 

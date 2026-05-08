@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
-import { canEditFacturacion } from "../lib/auth";
+import { canAccessFinanzaContabilidadHub } from "../lib/auth";
 import {
   getContabilidadGastos,
   getHostingFxOperations,
@@ -173,7 +173,7 @@ export function MonitorFinancieroPage() {
   }, []);
 
   useEffect(() => {
-    if (!loading && user && (canEditFacturacion(user.role) || user.role === "lector")) {
+    if (!loading && user && canAccessFinanzaContabilidadHub(user)) {
       void load();
     }
   }, [loading, user, load]);
@@ -270,7 +270,7 @@ export function MonitorFinancieroPage() {
   }, [filteredItems]);
 
   if (!loading && !user) return <Navigate to="/login" replace />;
-  if (!loading && user && !canEditFacturacion(user.role) && user.role !== "lector") {
+  if (!loading && user && !canAccessFinanzaContabilidadHub(user)) {
     return <Navigate to="/" replace />;
   }
 

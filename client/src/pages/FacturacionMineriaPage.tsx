@@ -4,13 +4,13 @@ import { serviceCatalog } from "../lib/constants";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadInvoicesAsic, saveInvoicesAsic } from "../lib/storage";
 import type { Client, ComprobanteType, EquipoASIC, Invoice, LineItem, Setup } from "../lib/types";
-import { Link, useLocation } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { InvoicePreview } from "../components/InvoicePreview";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
-import { canEditFacturacion } from "../lib/auth";
+import { canEditFacturacion, lectorAllowsModule } from "../lib/auth";
 import { isClienteTiendaOnline } from "../lib/clientTienda";
 import { formatCurrencyNumber, formatUSD } from "../lib/formatCurrency";
 import "../styles/facturacion.css";
@@ -674,7 +674,10 @@ export function FacturacionMineriaPage() {
     setPreviewEmitted(null);
   }, [type, selectedClientId, items]);
 
-  if (user && !canEditFacturacion(user.role)) {
+  if (user && !canEditFacturacion(user)) {
+    if (user.role === "lector" && lectorAllowsModule(user, "facturacion")) {
+      return <Navigate to="/asic/history" replace />;
+    }
     return (
       <div className="fact-page">
         <div className="container py-5">

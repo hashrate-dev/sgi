@@ -4,6 +4,19 @@ import { z } from "zod";
 import { db } from "../db.js";
 import { env } from "../config/env.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
+import { requireModuleGrant } from "../middleware/moduleGrant.js";
+import {
+  AdminBGrantsBodySchema,
+  ADMIN_B_PERMISSION_CATALOG,
+  parseAdminBGrantsJson,
+  serializeAdminBGrants,
+} from "../lib/adminBPermissions.js";
+import {
+  LectorGrantsBodySchema,
+  LECTOR_PERMISSION_CATALOG,
+  parseLectorGrantsJson,
+  serializeLectorGrants,
+} from "../lib/lectorPermissions.js";
 import {
   ensureTiendaOnlineClientForUser,
   removeTiendaOnlineClientForUser,
@@ -79,21 +92,36 @@ const UpdateUserSchema = z.object({
 const UpdateMyPasswordSchema = z.object({ password: z.string().min(6).max(100) });
 
 /** Listar usuarios (solo admin) - devuelve id, email, role, created_at, usuario (sin password) */
-usersRouter.get("/users", requireAuth, requireRole("admin_a", "admin_b"), async (req, res) => {
-  const rows = (await db.prepare("SELECT id, username, email, role, created_at, usuario FROM users ORDER BY created_at DESC").all()) as Array<{
+usersRouter.get(
+  "/users",
+  requireAuth,
+  requireRole("admin_a", "admin_b"),
+  requireModuleGrant("usuarios"),
+  async (_req, res) => {
+  const rows = (await db
+    .prepare("SELECT id, username, email, role, created_at, usuario, admin_b_grants_json, lector_grants_json FROM users ORDER BY created_at DESC")
+    .all()) as Array<{
     id: number;
     username: string;
     email: string | null;
     role: string;
     created_at: string;
     usuario: string | null;
+    admin_b_grants_json?: string | null;
+    lector_grants_json?: string | null;
   }>;
   const users = rows.map((r) => ({
     id: r.id,
     email: r.email ?? r.username,
     role: r.role,
     created_at: r.created_at,
-    usuario: r.usuario ?? undefined
+    usuario: r.usuario ?? undefined,
+    ...(r.role === "admin_b"
+      ? { admin_b_grants: parseAdminBGrantsJson(r.admin_b_grants_json ?? null) }
+      : {}),
+    ...(r.role === "lector"
+      ? { lector_grants: parseLectorGrantsJson(r.lector_grants_json ?? null) }
+      : {}),
   }));
   res.json({ users });
 });
@@ -102,7 +130,12 @@ usersRouter.get("/users", requireAuth, requireRole("admin_a", "admin_b"), async 
  * Asegura una ficha en `clients` (código A9… / WEB-) por cada usuario con rol `cliente`.
  * Repara datos viejos (usuario cliente sin fila tienda) y alinea correo/usuario.
  */
-usersRouter.post("/users/sync-tienda-online-clients", requireAuth, requireRole("admin_a", "admin_b"), async (_req, res) => {
+usersRouter.post(
+  "/users/sync-tienda-online-clients",
+  requireAuth,
+  requireRole("admin_a", "admin_b"),
+  requireModuleGrant("usuarios"),
+  async (_req, res) => {
   try {
     const rows = (await db
       .prepare("SELECT id, email, username, usuario FROM users WHERE role = 'cliente'")
@@ -126,7 +159,7 @@ usersRouter.post("/users/sync-tienda-online-clients", requireAuth, requireRole("
 });
 
 /** Crear usuario (solo admin) */
-usersRouter.post("/users", requireAuth, requireRole("admin_a", "admin_b"), async (req, res) => {
+usersRouter.post("/users", requireAuth, requireRole("admin_a", "admin_b"), requireModuleGrant("usuarios"), async (req, res) => {
   const parsed = CreateUserSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
@@ -168,8 +201,136 @@ usersRouter.post("/users", requireAuth, requireRole("admin_a", "admin_b"), async
     }
     throw e;
   }
-  const row = (await db.prepare("SELECT id, email, role, created_at, usuario FROM users WHERE email = ?").get(emailNorm)) as { id: number; email: string; role: string; created_at: string; usuario: string | null };
-  res.status(201).json({ user: { id: row.id, email: row.email, role: row.role, created_at: row.created_at, usuario: row.usuario ?? undefined } });
+  const row = (await db
+    .prepare("SELECT id, email, role, created_at, usuario, admin_b_grants_json, lector_grants_json FROM users WHERE email = ?")
+    .get(emailNorm)) as {
+    id: number;
+    email: string;
+    role: string;
+    created_at: string;
+    usuario: string | null;
+    admin_b_grants_json?: string | null;
+    lector_grants_json?: string | null;
+  };
+  res.status(201).json({
+    user: {
+      id: row.id,
+      email: row.email,
+      role: row.role,
+      created_at: row.created_at,
+      usuario: row.usuario ?? undefined,
+      ...(row.role === "admin_b" ? { admin_b_grants: parseAdminBGrantsJson(row.admin_b_grants_json ?? null) } : {}),
+      ...(row.role === "lector" ? { lector_grants: parseLectorGrantsJson(row.lector_grants_json ?? null) } : {}),
+    },
+  });
+});
+
+/** Catálogo de permisos (solo AdministradorA): mismo orden que persiste la API de grants. */
+usersRouter.get("/users/admin-b-permissions-catalog", requireAuth, requireRole("admin_a"), (_req, res) => {
+  res.json({
+    catalog: ADMIN_B_PERMISSION_CATALOG.map((x) => ({
+      key: x.key,
+      label: x.label,
+      description: x.description,
+      sectionOrder: x.sectionOrder,
+      sectionLabel: x.sectionLabel,
+    })),
+  });
+});
+
+/** Catálogo permisos Lector (solo AdministradorA): consulta por módulos del SGI. */
+usersRouter.get("/users/lector-permissions-catalog", requireAuth, requireRole("admin_a"), (_req, res) => {
+  res.json({
+    catalog: LECTOR_PERMISSION_CATALOG.map((x) => ({
+      key: x.key,
+      label: x.label,
+      description: x.description,
+      sectionOrder: x.sectionOrder,
+      sectionLabel: x.sectionLabel,
+    })),
+  });
+});
+
+/** Lista blanca explícita de módulos para un AdministradorB (solo AdministradorA). */
+usersRouter.put("/users/:id/admin-b-grants", requireAuth, requireRole("admin_a"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) {
+    return res.status(400).json({ error: { message: "ID inválido" } });
+  }
+  const parsed = AdminBGrantsBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: { message: "Lista de permisos inválida", details: parsed.error.flatten() } });
+  }
+  const target = (await db.prepare("SELECT id, role FROM users WHERE id = ?").get(id)) as { id: number; role: string } | undefined;
+  if (!target || target.role !== "admin_b") {
+    return res.status(404).json({ error: { message: "Solo puede asignarse permiso granular a cuentas AdministradorB." } });
+  }
+  const g = parsed.data.grants;
+  const json = g == null ? null : serializeAdminBGrants(g);
+  await db.prepare("UPDATE users SET admin_b_grants_json = ? WHERE id = ?").run(json, id);
+  const row = (await db
+    .prepare("SELECT id, username, email, role, created_at, usuario, admin_b_grants_json, lector_grants_json FROM users WHERE id = ?")
+    .get(id)) as {
+    id: number;
+    username: string;
+    email: string | null;
+    role: string;
+    created_at: string;
+    usuario: string | null;
+    admin_b_grants_json?: string | null;
+    lector_grants_json?: string | null;
+  };
+  res.json({
+    user: {
+      id: row.id,
+      email: row.email ?? row.username,
+      role: row.role,
+      created_at: row.created_at,
+      usuario: row.usuario ?? undefined,
+      admin_b_grants: parseAdminBGrantsJson(row.admin_b_grants_json ?? null),
+    },
+  });
+});
+
+/** Lista blanca de módulos consultables para Lector (solo AdministradorA). */
+usersRouter.put("/users/:id/lector-grants", requireAuth, requireRole("admin_a"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) {
+    return res.status(400).json({ error: { message: "ID inválido" } });
+  }
+  const parsed = LectorGrantsBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: { message: "Lista de permisos inválida", details: parsed.error.flatten() } });
+  }
+  const target = (await db.prepare("SELECT id, role FROM users WHERE id = ?").get(id)) as { id: number; role: string } | undefined;
+  if (!target || target.role !== "lector") {
+    return res.status(404).json({ error: { message: "Solo puede asignarse permiso granular a cuentas Lector." } });
+  }
+  const g = parsed.data.grants;
+  const json = g == null ? null : serializeLectorGrants(g);
+  await db.prepare("UPDATE users SET lector_grants_json = ? WHERE id = ?").run(json, id);
+  const row = (await db
+    .prepare("SELECT id, username, email, role, created_at, usuario, admin_b_grants_json, lector_grants_json FROM users WHERE id = ?")
+    .get(id)) as {
+    id: number;
+    username: string;
+    email: string | null;
+    role: string;
+    created_at: string;
+    usuario: string | null;
+    admin_b_grants_json?: string | null;
+    lector_grants_json?: string | null;
+  };
+  res.json({
+    user: {
+      id: row.id,
+      email: row.email ?? row.username,
+      role: row.role,
+      created_at: row.created_at,
+      usuario: row.usuario ?? undefined,
+      lector_grants: parseLectorGrantsJson(row.lector_grants_json ?? null),
+    },
+  });
 });
 
 /** Cambiar mi propia contraseña (Operador, Lector o cualquier admin). Cualquier usuario autenticado puede usar esta ruta. */
@@ -180,12 +341,33 @@ usersRouter.put("/users/me", requireAuth, async (req, res) => {
   }
   const hash = bcrypt.hashSync(parsed.data.password, 10);
   await db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(hash, req.user!.id);
-  const row = (await db.prepare("SELECT id, username, email, role, created_at, usuario FROM users WHERE id = ?").get(req.user!.id)) as { id: number; username: string; email: string | null; role: string; created_at: string; usuario: string | null };
-  res.json({ user: { id: row.id, email: row.email ?? row.username, role: row.role, created_at: row.created_at, usuario: row.usuario ?? undefined } });
+  const row = (await db
+    .prepare("SELECT id, username, email, role, created_at, usuario, admin_b_grants_json, lector_grants_json FROM users WHERE id = ?")
+    .get(req.user!.id)) as {
+    id: number;
+    username: string;
+    email: string | null;
+    role: string;
+    created_at: string;
+    usuario: string | null;
+    admin_b_grants_json?: string | null;
+    lector_grants_json?: string | null;
+  };
+  res.json({
+    user: {
+      id: row.id,
+      email: row.email ?? row.username,
+      role: row.role,
+      created_at: row.created_at,
+      usuario: row.usuario ?? undefined,
+      ...(row.role === "admin_b" ? { admin_b_grants: parseAdminBGrantsJson(row.admin_b_grants_json ?? null) } : {}),
+      ...(row.role === "lector" ? { lector_grants: parseLectorGrantsJson(row.lector_grants_json ?? null) } : {}),
+    },
+  });
 });
 
 /** Actualizar usuario (solo admin). AdminA y AdminB pueden cambiar contraseña de cualquier usuario (Operador, Lector, o la propia). No puede quitarse su propio rol admin. */
-usersRouter.put("/users/:id", requireAuth, requireRole("admin_a", "admin_b"), async (req, res) => {
+usersRouter.put("/users/:id", requireAuth, requireRole("admin_a", "admin_b"), requireModuleGrant("usuarios"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) {
     return res.status(400).json({ error: { message: "ID inválido" } });
@@ -233,12 +415,44 @@ usersRouter.put("/users/:id", requireAuth, requireRole("admin_a", "admin_b"), as
     values.push(parsed.data.usuario.trim() || null);
   }
   if (updates.length === 0) {
-    const row = (await db.prepare("SELECT id, username, email, role, created_at, usuario FROM users WHERE id = ?").get(id)) as { id: number; username: string; email: string | null; role: string; created_at: string; usuario: string | null };
-    return res.json({ user: { id: row.id, email: row.email ?? row.username, role: row.role, created_at: row.created_at, usuario: row.usuario ?? undefined } });
+    const row = (await db
+      .prepare("SELECT id, username, email, role, created_at, usuario, admin_b_grants_json, lector_grants_json FROM users WHERE id = ?")
+      .get(id)) as {
+      id: number;
+      username: string;
+      email: string | null;
+      role: string;
+      created_at: string;
+      usuario: string | null;
+      admin_b_grants_json?: string | null;
+      lector_grants_json?: string | null;
+    };
+    return res.json({
+      user: {
+        id: row.id,
+        email: row.email ?? row.username,
+        role: row.role,
+        created_at: row.created_at,
+        usuario: row.usuario ?? undefined,
+        ...(row.role === "admin_b" ? { admin_b_grants: parseAdminBGrantsJson(row.admin_b_grants_json ?? null) } : {}),
+        ...(row.role === "lector" ? { lector_grants: parseLectorGrantsJson(row.lector_grants_json ?? null) } : {}),
+      },
+    });
   }
   values.push(id);
   await db.prepare(`UPDATE users SET ${updates.join(", ")} WHERE id = ?`).run(...values);
-  const row = (await db.prepare("SELECT id, username, email, role, created_at, usuario FROM users WHERE id = ?").get(id)) as { id: number; username: string; email: string | null; role: string; created_at: string; usuario: string | null };
+  const row = (await db
+    .prepare("SELECT id, username, email, role, created_at, usuario, admin_b_grants_json, lector_grants_json FROM users WHERE id = ?")
+    .get(id)) as {
+    id: number;
+    username: string;
+    email: string | null;
+    role: string;
+    created_at: string;
+    usuario: string | null;
+    admin_b_grants_json?: string | null;
+    lector_grants_json?: string | null;
+  };
 
   try {
     if (row.role === "cliente") {
@@ -257,11 +471,26 @@ usersRouter.put("/users/:id", requireAuth, requireRole("admin_a", "admin_b"), as
     console.error("[users] PUT /users/:id sync tienda client (usuario ya guardado)", id, e);
   }
 
-  res.json({ user: { id: row.id, email: row.email ?? row.username, role: row.role, created_at: row.created_at, usuario: row.usuario ?? undefined } });
+  res.json({
+    user: {
+      id: row.id,
+      email: row.email ?? row.username,
+      role: row.role,
+      created_at: row.created_at,
+      usuario: row.usuario ?? undefined,
+      ...(row.role === "admin_b" ? { admin_b_grants: parseAdminBGrantsJson(row.admin_b_grants_json ?? null) } : {}),
+      ...(row.role === "lector" ? { lector_grants: parseLectorGrantsJson(row.lector_grants_json ?? null) } : {}),
+    },
+  });
 });
 
 /** Listar actividad de usuarios (solo admin): entradas/salidas, horarios, tiempo conectado, IP */
-usersRouter.get("/users/activity", requireAuth, requireRole("admin_a", "admin_b"), async (req, res) => {
+usersRouter.get(
+  "/users/activity",
+  requireAuth,
+  requireRole("admin_a", "admin_b"),
+  requireModuleGrant("usuarios"),
+  async (req, res) => {
   const limit = Math.min(Math.max(1, Number(req.query.limit) || 100), 500);
   const rows = (await db
     .prepare(
@@ -300,7 +529,12 @@ usersRouter.get("/users/activity", requireAuth, requireRole("admin_a", "admin_b"
  * Auditoría de equipos ASIC / tienda online (solo admin): precios, publicación, imágenes, importaciones.
  * Quién (correo + usuario en BD) y qué se modificó.
  */
-usersRouter.get("/users/equipos-asic-audit", requireAuth, requireRole("admin_a", "admin_b"), async (req, res) => {
+usersRouter.get(
+  "/users/equipos-asic-audit",
+  requireAuth,
+  requireRole("admin_a", "admin_b"),
+  requireModuleGrant("usuarios"),
+  async (req, res) => {
   const limit = Math.min(Math.max(1, Number(req.query.limit) || 200), 500);
   try {
     const rows = (await db
@@ -346,7 +580,7 @@ usersRouter.get("/users/equipos-asic-audit", requireAuth, requireRole("admin_a",
 });
 
 /** Eliminar usuario (solo admin). Solo AdministradorA puede eliminar cuentas con rol AdministradorA o AdministradorB. */
-usersRouter.delete("/users/:id", requireAuth, requireRole("admin_a", "admin_b"), async (req, res) => {
+usersRouter.delete("/users/:id", requireAuth, requireRole("admin_a", "admin_b"), requireModuleGrant("usuarios"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) {
     return res.status(400).json({ error: { message: "ID inválido" } });

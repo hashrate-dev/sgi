@@ -233,6 +233,8 @@ CREATE INDEX IF NOT EXISTS idx_equipos_asic_audit_created ON equipos_asic_audit(
 -- Columnas extra que el app puede agregar si no existen (opcional)
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS usuario TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS usuario TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS admin_b_grants_json TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS lector_grants_json TEXT;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS related_invoice_id INTEGER;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'hosting';
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS related_invoice_number TEXT;

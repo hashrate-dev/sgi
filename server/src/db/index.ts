@@ -29,6 +29,8 @@ async function loadDb() {
             // eslint-disable-next-line no-console
             console.warn("[DB] runSupabaseSchema con advertencias (se sigue si la BD ya existe):", msg);
           }
+          /* Columnas nuevas (p.ej. lector_grants_json): garantizar aunque el split SQL del archivo fallara en algo previo */
+          await ensureSupabaseCriticalUserColumns(pool);
           await pool.query("SELECT 1");
         })(),
         new Promise((_, rej) =>
@@ -53,6 +55,17 @@ async function loadDb() {
   // eslint-disable-next-line no-console
   console.log("[DB] Usando SQLite local (data.db) - NO conectado a Supabase. Agregá SUPABASE_DATABASE_URL en server/.env");
   return createAsyncSqlite();
+}
+
+async function ensureSupabaseCriticalUserColumns(pool: Pool) {
+  try {
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS admin_b_grants_json TEXT`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS lector_grants_json TEXT`);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // eslint-disable-next-line no-console
+    console.warn("[DB] ensureSupabaseCriticalUserColumns:", msg);
+  }
 }
 
 async function runSupabaseSchema(pool: Pool) {

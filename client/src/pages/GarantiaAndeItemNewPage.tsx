@@ -29,7 +29,7 @@ function getNextCodigoGarantia(items: ItemGarantiaAnde[]): string {
 export function GarantiaAndeItemNewPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const canEdit = user ? canEditClientes(user.role) : false;
+  const canEdit = user ? canEditClientes(user) : false;
   const [items, setItems] = useState<ItemGarantiaAnde[]>([]);
   const [, setLoading] = useState(true);
   const [marketplaceEquipos, setMarketplaceEquipos] = useState<Array<{ id: string; label: string }>>([]);

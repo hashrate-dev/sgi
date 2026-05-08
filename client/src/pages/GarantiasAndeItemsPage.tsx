@@ -115,9 +115,9 @@ async function parseExcelGarantiasItems(file: File): Promise<Omit<ItemGarantiaAn
 
 export function GarantiasAndeItemsPage() {
   const { user } = useAuth();
-  const canDelete = user ? canDeleteClientes(user.role) : false;
-  const canEdit = user ? canEditClientes(user.role) : false;
-  const canExportData = user ? canExport(user.role) : false;
+  const canDelete = user ? canDeleteClientes(user) : false;
+  const canEdit = user ? canEditClientes(user) : false;
+  const canExportData = user ? canExport(user) : false;
   const [items, setItems] = useState<ItemGarantiaAnde[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);

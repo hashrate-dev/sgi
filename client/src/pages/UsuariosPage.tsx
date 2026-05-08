@@ -3,12 +3,28 @@ import { Link, Navigate, useLocation } from "react-router-dom";
 import {
   createUser,
   deleteUser,
+  getAdminBPermissionsCatalog,
+  getLectorPermissionsCatalog,
   getUsers,
   getUsersActivity,
+  updateAdminBGrants,
+  updateLectorGrants,
   updateUser,
   type ActivityItem,
-  type UserListItem
+  type UserListItem,
 } from "../lib/api";
+import {
+  ADMIN_B_PERMISSION_CATALOG,
+  mergeAdminBCatalogFromApi,
+  type AdminBPermissionCatalogItem,
+  type AdminBPermissionKey,
+} from "../lib/adminBPermissionsCatalog";
+import {
+  LECTOR_PERMISSION_CATALOG,
+  mergeLectorCatalogFromApi,
+  type LectorPermissionCatalogItem,
+  type LectorPermissionKey,
+} from "../lib/lectorPermissionsCatalog";
 import { canDeleteAdminUser, type UserRole } from "../lib/auth";
 import { PageHeader } from "../components/PageHeader";
 import { TiendaOnlineAuditSection } from "../components/TiendaOnlineAuditSection";
@@ -50,6 +66,47 @@ function usuariosRouteMode(pathname: string): "hub" | "cuentas" | "actividad" | 
   return "unknown";
 }
 
+const GRANTS_SECTION_ICONS: Record<number, string> = {
+  1: "bi-buildings",
+  2: "bi-bag-check",
+  3: "bi-cash-stack",
+  4: "bi-diagram-3",
+  5: "bi-bar-chart-line",
+};
+
+const GRANT_ITEM_ICONS: Record<AdminBPermissionKey, string> = {
+  facturacion: "bi-file-earmark-text",
+  clientes: "bi-people",
+  equipos: "bi-cpu",
+  equipos_tienda: "bi-shop-window",
+  garantias: "bi-shield-check",
+  setups: "bi-grid-3x3-gap-fill",
+  marketplace_pedidos: "bi-bag",
+  marketplace_presencia: "bi-activity",
+  finanzas_contabilidad: "bi-calculator",
+  finanzas_proveedores: "bi-building",
+  finanzas_asic_costos: "bi-graph-up-arrow",
+  hosting_tipo_cambio: "bi-currency-exchange",
+  usuarios: "bi-person-badge",
+  exportar: "bi-download",
+  reportes: "bi-pie-chart",
+};
+
+const LECTOR_GRANT_ITEM_ICONS: Record<LectorPermissionKey, string> = {
+  facturacion: "bi-file-earmark-text",
+  clientes: "bi-people",
+  equipos: "bi-cpu",
+  equipos_tienda: "bi-shop-window",
+  garantias: "bi-shield-check",
+  setups: "bi-grid-3x3-gap-fill",
+  finanzas_contabilidad: "bi-calculator",
+  finanzas_proveedores: "bi-building",
+  finanzas_asic_costos: "bi-graph-up-arrow",
+  hosting_tipo_cambio: "bi-currency-exchange",
+  reportes: "bi-pie-chart",
+  exportar: "bi-download",
+};
+
 const ROLES: { value: UserRole; label: string }[] = [
   { value: "admin_a", label: "AdministradorA" },
   { value: "admin_b", label: "AdministradorB" },
@@ -73,7 +130,7 @@ function getRoleBadgeClass(role: string, viewerRole: UserRole | undefined): stri
 export function UsuariosPage() {
   const { pathname } = useLocation();
   const routeMode = usuariosRouteMode(pathname);
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, refreshSession } = useAuth();
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,6 +154,17 @@ export function UsuariosPage() {
   const [pageSizeActivity, setPageSizeActivity] = useState<number>(20);
   const [goToPageUsers, setGoToPageUsers] = useState("");
   const [goToPageActivity, setGoToPageActivity] = useState("");
+  const [grantsCatalog, setGrantsCatalog] = useState<AdminBPermissionCatalogItem[]>(() => [...ADMIN_B_PERMISSION_CATALOG]);
+  const [grantsExplicit, setGrantsExplicit] = useState(false);
+  const [grantsSelected, setGrantsSelected] = useState<Record<string, boolean>>({});
+  const [grantsSaving, setGrantsSaving] = useState(false);
+  const [lectorGrantsCatalog, setLectorGrantsCatalog] = useState<LectorPermissionCatalogItem[]>(() => [...LECTOR_PERMISSION_CATALOG]);
+  const [lectorGrantsExplicit, setLectorGrantsExplicit] = useState(false);
+  const [lectorGrantsSelected, setLectorGrantsSelected] = useState<Record<string, boolean>>({});
+  const [lectorGrantsSaving, setLectorGrantsSaving] = useState(false);
+  /** Modales aparte: permisos Admin B / Lector (solo AdministradorA). */
+  const [grantsModalUser, setGrantsModalUser] = useState<UserListItem | null>(null);
+  const [lectorGrantsModalUser, setLectorGrantsModalUser] = useState<UserListItem | null>(null);
 
   function loadActivity() {
     setActivityLoading(true);
@@ -141,6 +209,36 @@ export function UsuariosPage() {
     setRoleDropdownOpen(false);
   }
 
+  function hydrateAdminBGrantsState(u: UserListItem) {
+    const raw = u.admin_b_grants;
+    const explicit = raw != null;
+    setGrantsExplicit(explicit);
+    const sel: Record<string, boolean> = {};
+    for (const c of ADMIN_B_PERMISSION_CATALOG) {
+      sel[c.key] = explicit && Array.isArray(raw) ? raw.includes(c.key) : true;
+    }
+    setGrantsSelected(sel);
+    setGrantsCatalog([...ADMIN_B_PERMISSION_CATALOG]);
+    void getAdminBPermissionsCatalog()
+      .then((r) => setGrantsCatalog(mergeAdminBCatalogFromApi(r.catalog)))
+      .catch(() => {});
+  }
+
+  function hydrateLectorGrantsState(u: UserListItem) {
+    const raw = u.lector_grants;
+    const explicit = raw != null;
+    setLectorGrantsExplicit(explicit);
+    const sel: Record<string, boolean> = {};
+    for (const c of LECTOR_PERMISSION_CATALOG) {
+      sel[c.key] = explicit && Array.isArray(raw) ? raw.includes(c.key) : true;
+    }
+    setLectorGrantsSelected(sel);
+    setLectorGrantsCatalog([...LECTOR_PERMISSION_CATALOG]);
+    void getLectorPermissionsCatalog()
+      .then((r) => setLectorGrantsCatalog(mergeLectorCatalogFromApi(r.catalog)))
+      .catch(() => {});
+  }
+
   function openEdit(u: UserListItem) {
     setModal(u);
     setFormEmail(u.email);
@@ -148,6 +246,122 @@ export function UsuariosPage() {
     setFormRole(u.role as UserRole);
     setFormUsuario(u.usuario ?? "");
     setRoleDropdownOpen(false);
+  }
+
+  function openAdminBGrants(u: UserListItem) {
+    const row = users.find((x) => x.id === u.id) ?? u;
+    hydrateAdminBGrantsState(row);
+    setGrantsModalUser(row);
+  }
+
+  function openLectorGrants(u: UserListItem) {
+    const row = users.find((x) => x.id === u.id) ?? u;
+    hydrateLectorGrantsState(row);
+    setLectorGrantsModalUser(row);
+  }
+
+  function closeAdminBGrantsModal() {
+    setGrantsModalUser(null);
+  }
+
+  function closeLectorGrantsModal() {
+    setLectorGrantsModalUser(null);
+  }
+
+  function toggleGrantKey(key: string) {
+    setGrantsSelected((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  function setSectionGrants(items: AdminBPermissionCatalogItem[], value: boolean) {
+    setGrantsSelected((prev) => {
+      const next = { ...prev };
+      for (const c of items) next[c.key] = value;
+      return next;
+    });
+  }
+
+  function toggleLectorGrantKey(key: string) {
+    setLectorGrantsSelected((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  function setSectionLectorGrants(items: LectorPermissionCatalogItem[], value: boolean) {
+    setLectorGrantsSelected((prev) => {
+      const next = { ...prev };
+      for (const c of items) next[c.key] = value;
+      return next;
+    });
+  }
+
+  async function handleSaveLectorGrantsFromModal() {
+    const target = lectorGrantsModalUser;
+    if (!target || target.role !== "lector") return;
+    if (lectorGrantsExplicit) {
+      const n = lectorGrantsCatalog.filter((c) => lectorGrantsSelected[c.key]).length;
+      if (n === 0) {
+        const ok = window.confirm(
+          "No hay ningún módulo marcado: esta cuenta Lector solo podrá acceder a Kryptex en la aplicación. ¿Guardar igualmente?"
+        );
+        if (!ok) return;
+      }
+    }
+    setLectorGrantsSaving(true);
+    try {
+      const grants = lectorGrantsExplicit
+        ? lectorGrantsCatalog.filter((c) => lectorGrantsSelected[c.key]).map((c) => c.key)
+        : null;
+      const r = await updateLectorGrants(target.id, grants);
+      showToast("Permisos de consulta guardados.", "success", toastContext);
+      setUsers((prev) =>
+        prev.map((row) =>
+          row.id === r.user.id ? { ...row, ...r.user, lector_grants: r.user.lector_grants ?? null } : row
+        )
+      );
+      setLectorGrantsModalUser({ ...target, ...r.user, lector_grants: r.user.lector_grants ?? null });
+      if (currentUser?.id === r.user.id) {
+        await refreshSession();
+      }
+    } catch (err) {
+      showToast(
+        `No se pudieron guardar los permisos: ${err instanceof Error ? err.message : "error"}`,
+        "error",
+        toastContext
+      );
+    } finally {
+      setLectorGrantsSaving(false);
+    }
+  }
+
+  async function handleSaveAdminBGrantsFromModal() {
+    const target = grantsModalUser;
+    if (!target || target.role !== "admin_b") return;
+    if (grantsExplicit) {
+      const n = grantsCatalog.filter((c) => grantsSelected[c.key]).length;
+      if (n === 0) {
+        const ok = window.confirm(
+          "No hay ningún módulo marcado: este AdministradorB quedará sin acceso a las secciones que dependen de permisos. ¿Guardar igualmente?"
+        );
+        if (!ok) return;
+      }
+    }
+    setGrantsSaving(true);
+    try {
+      const grants = grantsExplicit ? grantsCatalog.filter((c) => grantsSelected[c.key]).map((c) => c.key) : null;
+      const r = await updateAdminBGrants(target.id, grants);
+      showToast("Permisos guardados.", "success", toastContext);
+      setUsers((prev) =>
+        prev.map((row) =>
+          row.id === r.user.id ? { ...row, ...r.user, admin_b_grants: r.user.admin_b_grants ?? null } : row
+        )
+      );
+      setGrantsModalUser({ ...target, ...r.user, admin_b_grants: r.user.admin_b_grants ?? null });
+      if (currentUser?.id === r.user.id) {
+        await refreshSession();
+      }
+    } catch (err) {
+      showToast(`No se pudieron guardar los permisos: ${err instanceof Error ? err.message : "error"}`, "error", toastContext);
+    } finally {
+      setGrantsSaving(false);
+    }
   }
 
   /* Cerrar dropdown Rol al hacer clic fuera */
@@ -181,7 +395,7 @@ export function UsuariosPage() {
       createUser({ email: formEmail.trim(), password: formPassword, role: formRole, usuario: formUsuario.trim() || undefined })
         .then(() => {
           showToast("Usuario creado correctamente.", "success", toastContext);
-          setModal(null);
+          closeUsuarioModal();
           loadUsers();
           loadActivity();
           setAuditRefreshKey((k) => k + 1);
@@ -199,7 +413,7 @@ export function UsuariosPage() {
       updateUser((modal as UserListItem).id, body)
         .then(() => {
           showToast("Usuario actualizado correctamente.", "success", toastContext);
-          setModal(null);
+          closeUsuarioModal();
           loadUsers();
         })
         .catch((err) => showToast(`Error al actualizar usuario: ${err instanceof Error ? err.message : "Error desconocido"}`, "error", toastContext))
@@ -228,8 +442,46 @@ export function UsuariosPage() {
       .finally(() => setDeleting(false));
   }
 
+  function closeUsuarioModal() {
+    setModal(null);
+  }
+
   const isAdmin = currentUser?.role === "admin_a" || currentUser?.role === "admin_b";
   const toastContext = "Gestión de usuarios";
+
+  const grantsCatalogSections = useMemo(() => {
+    const sorted = [...grantsCatalog].sort((a, b) =>
+      a.sectionOrder !== b.sectionOrder ? a.sectionOrder - b.sectionOrder : String(a.key).localeCompare(String(b.key))
+    );
+    type SectionGroup = { sectionOrder: number; sectionLabel: string; items: AdminBPermissionCatalogItem[] };
+    const groups: SectionGroup[] = [];
+    for (const item of sorted) {
+      let g = groups.find((x) => x.sectionOrder === item.sectionOrder && x.sectionLabel === item.sectionLabel);
+      if (!g) {
+        g = { sectionOrder: item.sectionOrder, sectionLabel: item.sectionLabel, items: [] };
+        groups.push(g);
+      }
+      g.items.push(item);
+    }
+    return groups.sort((a, b) => a.sectionOrder - b.sectionOrder);
+  }, [grantsCatalog]);
+
+  const lectorGrantsCatalogSections = useMemo(() => {
+    const sorted = [...lectorGrantsCatalog].sort((a, b) =>
+      a.sectionOrder !== b.sectionOrder ? a.sectionOrder - b.sectionOrder : String(a.key).localeCompare(String(b.key))
+    );
+    type SectionGroup = { sectionOrder: number; sectionLabel: string; items: LectorPermissionCatalogItem[] };
+    const groups: SectionGroup[] = [];
+    for (const item of sorted) {
+      let g = groups.find((x) => x.sectionOrder === item.sectionOrder && x.sectionLabel === item.sectionLabel);
+      if (!g) {
+        g = { sectionOrder: item.sectionOrder, sectionLabel: item.sectionLabel, items: [] };
+        groups.push(g);
+      }
+      g.items.push(item);
+    }
+    return groups.sort((a, b) => a.sectionOrder - b.sectionOrder);
+  }, [lectorGrantsCatalog]);
 
   const totalPagesUsers = Math.max(1, Math.ceil(users.length / pageSizeUsers));
   const paginatedUsers = useMemo(() => {
@@ -378,10 +630,37 @@ export function UsuariosPage() {
                               <td><span className="user-date">{u.created_at ? new Date(u.created_at).toLocaleDateString("es-AR") : "—"}</span></td>
                               <td className="text-center">
                                 <div className="action-btns">
-                                  <button type="button" className="btn-action btn-action--edit" onClick={() => openEdit(u)} title="Editar">
+                                  <button
+                                    type="button"
+                                    className="btn-action btn-action--edit"
+                                    onClick={() => openEdit(u)}
+                                    title="Editar correo, usuario y contraseña"
+                                  >
                                     <i className="bi bi-pencil" />
                                     Editar
                                   </button>
+                                  {currentUser?.role === "admin_a" && u.role === "admin_b" && (
+                                    <button
+                                      type="button"
+                                      className="btn-action btn-action--grants"
+                                      onClick={() => openAdminBGrants(u)}
+                                      title="Permisos de módulos SGI"
+                                    >
+                                      <i className="bi bi-shield-lock" />
+                                      Permisos
+                                    </button>
+                                  )}
+                                  {currentUser?.role === "admin_a" && u.role === "lector" && (
+                                    <button
+                                      type="button"
+                                      className="btn-action btn-action--grants"
+                                      onClick={() => openLectorGrants(u)}
+                                      title="Permisos de consulta por módulo"
+                                    >
+                                      <i className="bi bi-shield-lock" />
+                                      Permisos
+                                    </button>
+                                  )}
                                   {currentUser && currentUser.id !== u.id && canDeleteAdminUser(currentUser.role, u.role) && (
                                     <button type="button" className="btn-action btn-action--danger" onClick={() => handleDeleteClick(u)} title="Eliminar">
                                       <i className="bi bi-trash" />
@@ -574,7 +853,13 @@ export function UsuariosPage() {
       </div>
 
       {isAdmin && modal && (
-        <div className="modal d-block professional-modal-overlay" tabIndex={-1}>
+        <div
+          className="modal d-block professional-modal-overlay"
+          tabIndex={-1}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="usuario-modal-title"
+        >
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content professional-modal professional-modal-form">
               <div className="modal-header professional-modal-header">
@@ -587,10 +872,10 @@ export function UsuariosPage() {
                     )}
                   </svg>
                 </div>
-                <h5 className="modal-title professional-modal-title">
+                <h5 id="usuario-modal-title" className="modal-title professional-modal-title">
                   {modal === "new" ? "Nuevo usuario" : "Editar usuario"}
                 </h5>
-                <button type="button" className="professional-modal-close" onClick={() => setModal(null)} aria-label="Cerrar">
+                <button type="button" className="professional-modal-close" onClick={closeUsuarioModal} aria-label="Cerrar">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                     <path d="M18 6L6 18M6 6L18 18" strokeLinecap="round"/>
                   </svg>
@@ -691,7 +976,7 @@ export function UsuariosPage() {
                   </div>
                 </div>
                 <div className="modal-footer professional-modal-footer">
-                  <button type="button" className="professional-btn professional-btn-secondary" onClick={() => setModal(null)}>
+                  <button type="button" className="professional-btn professional-btn-secondary" onClick={closeUsuarioModal}>
                     Cancelar
                   </button>
                   <button type="submit" className="professional-btn professional-btn-primary" disabled={saving}>
@@ -701,11 +986,385 @@ export function UsuariosPage() {
                         Guardando...
                       </>
                     ) : (
-                      modal === "new" ? "Crear" : "Guardar"
+                      modal === "new" ? "Crear" : "Guardar cambios"
                     )}
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isAdmin && grantsModalUser && (
+        <div
+          className="modal d-block professional-modal-overlay"
+          tabIndex={-1}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="admin-b-grants-modal-title"
+        >
+          <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable usuarios-admin-b-grants-modal-dialog">
+            <div className="modal-content professional-modal usuarios-admin-b-grants-modal-content">
+              <div className="modal-header usuarios-admin-b-grants-modal-header">
+                <div className="usuarios-admin-b-grants-modal-header-brand">
+                  <div className="usuarios-admin-b-grants-modal-header-icon professional-modal-icon-wrapper">
+                    <i className="bi bi-shield-lock-fill professional-modal-icon" aria-hidden />
+                  </div>
+                  <div className="usuarios-admin-b-grants-modal-header-titles">
+                    <span className="usuarios-admin-b-grants-modal-kicker">AdministradorB</span>
+                    <h5 className="usuarios-admin-b-grants-modal-title mb-0" id="admin-b-grants-modal-title">
+                      Permisos del SGI
+                    </h5>
+                    <span className="text-white-50 small text-truncate d-block" style={{ opacity: 0.85 }}>
+                      {grantsModalUser.email}
+                    </span>
+                  </div>
+                </div>
+                <button type="button" className="professional-modal-close" onClick={closeAdminBGrantsModal} aria-label="Cerrar">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M18 6L6 18M6 6L18 18" strokeLinecap="round"/>
+                  </svg>
+                </button>
+              </div>
+              <div className="modal-body professional-modal-body usuarios-admin-b-grants-modal-outer-body">
+                <div className="usuarios-admin-b-grants-user-strip">
+                  <div className="usuarios-admin-b-grants-user-avatar" aria-hidden>
+                    {(grantsModalUser.email || "?").slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="usuarios-admin-b-grants-user-meta">
+                    <span className="usuarios-admin-b-grants-user-label">AdministradorB</span>
+                    <span className="usuarios-admin-b-grants-user-email">{grantsModalUser.email}</span>
+                  </div>
+                  <span className="usuarios-admin-b-grants-role-pill">Permisos SGI</span>
+                </div>
+                <div className="usuarios-admin-b-grants-notice" role="status">
+                  <i className="bi bi-shield-lock-fill usuarios-admin-b-grants-notice-icon" aria-hidden />
+                  <p className="mb-0">
+                    Solo <strong>AdministradorA</strong> autoriza estos módulos. El usuario solo opera donde marques aquí.
+                  </p>
+                </div>
+                <div className={`usuarios-admin-b-grants-mode-card ${grantsExplicit ? "usuarios-admin-b-grants-mode-card--on" : ""}`}>
+                  <div className="usuarios-admin-b-grants-mode-card-row">
+                    <input
+                      className="form-check-input usuarios-admin-b-grants-mode-check"
+                      type="checkbox"
+                      id={`modal-ab-explicit-${grantsModalUser.id}`}
+                      checked={grantsExplicit}
+                      disabled={grantsSaving}
+                      onChange={(e) => {
+                        const on = e.target.checked;
+                        setGrantsExplicit(on);
+                        if (on) {
+                          setGrantsSelected((prev) => {
+                            const next = { ...prev };
+                            for (const c of grantsCatalog) {
+                              if (!(c.key in next)) next[c.key] = true;
+                            }
+                            return next;
+                          });
+                        }
+                      }}
+                    />
+                    <label className="usuarios-admin-b-grants-mode-label" htmlFor={`modal-ab-explicit-${grantsModalUser.id}`}>
+                      <span className="usuarios-admin-b-grants-mode-title">Lista explícita por módulo</span>
+                      <span className="usuarios-admin-b-grants-mode-hint">
+                        Sin marcar: acceso habitual completo de AdministradorB. Marcado: solo los módulos elegidos.
+                      </span>
+                    </label>
+                  </div>
+                </div>
+                {grantsExplicit ? (
+                  <div className="usuarios-admin-b-grants-modal-body">
+                    {grantsCatalogSections.map((sec) => (
+                      <section key={`modal-ab-${grantsModalUser.id}-${sec.sectionOrder}-${sec.sectionLabel}`} className="usuarios-admin-b-grants-section">
+                        <div className="usuarios-admin-b-grants-section-head">
+                          <div className="usuarios-admin-b-grants-section-title-row">
+                            <span className="usuarios-admin-b-grants-section-icon" aria-hidden>
+                              <i className={`bi ${GRANTS_SECTION_ICONS[sec.sectionOrder] ?? "bi-folder2-open"}`} />
+                            </span>
+                            <h4 className="usuarios-admin-b-grants-section-title">{sec.sectionLabel}</h4>
+                          </div>
+                          <div className="usuarios-admin-b-grants-section-actions">
+                            <button
+                              type="button"
+                              className="usuarios-admin-b-grants-pill-btn usuarios-admin-b-grants-pill-btn--on"
+                              disabled={grantsSaving}
+                              onClick={() => setSectionGrants(sec.items, true)}
+                            >
+                              <i className="bi bi-check2-all" aria-hidden />
+                              Marcar sección
+                            </button>
+                            <button
+                              type="button"
+                              className="usuarios-admin-b-grants-pill-btn"
+                              disabled={grantsSaving}
+                              onClick={() => setSectionGrants(sec.items, false)}
+                            >
+                              <i className="bi bi-slash-circle" aria-hidden />
+                              Desmarcar
+                            </button>
+                          </div>
+                        </div>
+                        <div className="usuarios-admin-b-grants-item-grid">
+                          {sec.items.map((c) => {
+                            const on = Boolean(grantsSelected[c.key]);
+                            const gid = `${grantsModalUser.id}-${c.key}`;
+                            return (
+                              <div
+                                key={`modal-ab-item-${gid}`}
+                                className={`usuarios-admin-b-grants-item ${on ? "usuarios-admin-b-grants-item--on" : ""}`}
+                              >
+                                <div className="usuarios-admin-b-grants-item-icon" aria-hidden>
+                                  <i className={`bi ${GRANT_ITEM_ICONS[c.key] ?? "bi-app"}`} />
+                                </div>
+                                <div className="usuarios-admin-b-grants-item-body">
+                                  <div className="usuarios-admin-b-grants-item-top">
+                                    <input
+                                      className="form-check-input usuarios-admin-b-grants-item-check"
+                                      type="checkbox"
+                                      id={`modal-ab-grant-${gid}`}
+                                      checked={on}
+                                      disabled={grantsSaving}
+                                      onChange={() => toggleGrantKey(c.key)}
+                                    />
+                                    <label className="usuarios-admin-b-grants-item-label" htmlFor={`modal-ab-grant-${gid}`}>
+                                      {c.label}
+                                    </label>
+                                  </div>
+                                  <p className="usuarios-admin-b-grants-item-desc">{c.description}</p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="usuarios-admin-b-grants-full-access-hint">
+                    <i className="bi bi-unlock-fill" aria-hidden />
+                    <p className="mb-0">
+                      <strong>Acceso amplio habitual.</strong> Activá la lista explícita arriba para restringir por módulo.
+                    </p>
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer professional-modal-footer usuarios-admin-b-grants-modal-footer">
+                <button
+                  type="button"
+                  className="professional-btn professional-btn-secondary"
+                  disabled={grantsSaving}
+                  onClick={closeAdminBGrantsModal}
+                >
+                  Cerrar
+                </button>
+                <button
+                  type="button"
+                  className="professional-btn professional-btn-primary usuarios-admin-b-grants-save-btn"
+                  disabled={grantsSaving}
+                  onClick={() => void handleSaveAdminBGrantsFromModal()}
+                >
+                  {grantsSaving ? (
+                    <>
+                      <span className="professional-btn-spinner" />
+                      Guardando…
+                    </>
+                  ) : (
+                    <>
+                      <i className="bi bi-check2-circle me-2" aria-hidden />
+                      Guardar permisos
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isAdmin && lectorGrantsModalUser && (
+        <div
+          className="modal d-block professional-modal-overlay"
+          tabIndex={-1}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="lector-grants-modal-title"
+        >
+          <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable usuarios-admin-b-grants-modal-dialog">
+            <div className="modal-content professional-modal usuarios-admin-b-grants-modal-content">
+              <div className="modal-header usuarios-admin-b-grants-modal-header">
+                <div className="usuarios-admin-b-grants-modal-header-brand">
+                  <div className="usuarios-admin-b-grants-modal-header-icon professional-modal-icon-wrapper">
+                    <i className="bi bi-eye-fill professional-modal-icon" aria-hidden />
+                  </div>
+                  <div className="usuarios-admin-b-grants-modal-header-titles">
+                    <span className="usuarios-admin-b-grants-modal-kicker">Lector</span>
+                    <h5 className="usuarios-admin-b-grants-modal-title mb-0" id="lector-grants-modal-title">
+                      Permisos de consulta
+                    </h5>
+                    <span className="text-white-50 small text-truncate d-block" style={{ opacity: 0.85 }}>
+                      {lectorGrantsModalUser.email}
+                    </span>
+                  </div>
+                </div>
+                <button type="button" className="professional-modal-close" onClick={closeLectorGrantsModal} aria-label="Cerrar">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M18 6L6 18M6 6L18 18" strokeLinecap="round"/>
+                  </svg>
+                </button>
+              </div>
+              <div className="modal-body professional-modal-body usuarios-admin-b-grants-modal-outer-body">
+                <div className="usuarios-admin-b-grants-user-strip">
+                  <div className="usuarios-admin-b-grants-user-avatar" aria-hidden>
+                    {(lectorGrantsModalUser.email || "?").slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="usuarios-admin-b-grants-user-meta">
+                    <span className="usuarios-admin-b-grants-user-label">Lector</span>
+                    <span className="usuarios-admin-b-grants-user-email">{lectorGrantsModalUser.email}</span>
+                  </div>
+                  <span className="usuarios-admin-b-grants-role-pill">Solo consulta</span>
+                </div>
+                <div className="usuarios-admin-b-grants-notice" role="status">
+                  <i className="bi bi-eye-fill usuarios-admin-b-grants-notice-icon" aria-hidden />
+                  <p className="mb-0">
+                    Módulos de <strong>solo lectura</strong>. Sin lista explícita la app queda como antes (solo Kryptex).
+                  </p>
+                </div>
+                <div className={`usuarios-admin-b-grants-mode-card ${lectorGrantsExplicit ? "usuarios-admin-b-grants-mode-card--on" : ""}`}>
+                  <div className="usuarios-admin-b-grants-mode-card-row">
+                    <input
+                      className="form-check-input usuarios-admin-b-grants-mode-check"
+                      type="checkbox"
+                      id={`modal-lector-explicit-${lectorGrantsModalUser.id}`}
+                      checked={lectorGrantsExplicit}
+                      disabled={lectorGrantsSaving}
+                      onChange={(e) => {
+                        const on = e.target.checked;
+                        setLectorGrantsExplicit(on);
+                        if (on) {
+                          setLectorGrantsSelected((prev) => {
+                            const next = { ...prev };
+                            for (const c of lectorGrantsCatalog) {
+                              if (!(c.key in next)) next[c.key] = true;
+                            }
+                            return next;
+                          });
+                        }
+                      }}
+                    />
+                    <label className="usuarios-admin-b-grants-mode-label" htmlFor={`modal-lector-explicit-${lectorGrantsModalUser.id}`}>
+                      <span className="usuarios-admin-b-grants-mode-title">Lista explícita (solo lectura)</span>
+                      <span className="usuarios-admin-b-grants-mode-hint">
+                        Marcado: el lector solo ve los módulos habilitados. Desmarcado: sin acotación en SPA salvo Kryptex.
+                      </span>
+                    </label>
+                  </div>
+                </div>
+                {lectorGrantsExplicit ? (
+                  <div className="usuarios-admin-b-grants-modal-body">
+                    {lectorGrantsCatalogSections.map((sec) => (
+                      <section key={`modal-lec-${lectorGrantsModalUser.id}-${sec.sectionOrder}-${sec.sectionLabel}`} className="usuarios-admin-b-grants-section">
+                        <div className="usuarios-admin-b-grants-section-head">
+                          <div className="usuarios-admin-b-grants-section-title-row">
+                            <span className="usuarios-admin-b-grants-section-icon" aria-hidden>
+                              <i className={`bi ${GRANTS_SECTION_ICONS[sec.sectionOrder] ?? "bi-folder2-open"}`} />
+                            </span>
+                            <h4 className="usuarios-admin-b-grants-section-title">{sec.sectionLabel}</h4>
+                          </div>
+                          <div className="usuarios-admin-b-grants-section-actions">
+                            <button
+                              type="button"
+                              className="usuarios-admin-b-grants-pill-btn usuarios-admin-b-grants-pill-btn--on"
+                              disabled={lectorGrantsSaving}
+                              onClick={() => setSectionLectorGrants(sec.items, true)}
+                            >
+                              <i className="bi bi-check2-all" aria-hidden />
+                              Marcar sección
+                            </button>
+                            <button
+                              type="button"
+                              className="usuarios-admin-b-grants-pill-btn"
+                              disabled={lectorGrantsSaving}
+                              onClick={() => setSectionLectorGrants(sec.items, false)}
+                            >
+                              <i className="bi bi-slash-circle" aria-hidden />
+                              Desmarcar
+                            </button>
+                          </div>
+                        </div>
+                        <div className="usuarios-admin-b-grants-item-grid">
+                          {sec.items.map((c) => {
+                            const on = Boolean(lectorGrantsSelected[c.key]);
+                            const gid = `${lectorGrantsModalUser.id}-${c.key}`;
+                            return (
+                              <div
+                                key={`modal-lec-item-${gid}`}
+                                className={`usuarios-admin-b-grants-item ${on ? "usuarios-admin-b-grants-item--on" : ""}`}
+                              >
+                                <div className="usuarios-admin-b-grants-item-icon" aria-hidden>
+                                  <i className={`bi ${LECTOR_GRANT_ITEM_ICONS[c.key] ?? "bi-app"}`} />
+                                </div>
+                                <div className="usuarios-admin-b-grants-item-body">
+                                  <div className="usuarios-admin-b-grants-item-top">
+                                    <input
+                                      className="form-check-input usuarios-admin-b-grants-item-check"
+                                      type="checkbox"
+                                      id={`modal-lector-grant-${gid}`}
+                                      checked={on}
+                                      disabled={lectorGrantsSaving}
+                                      onChange={() => toggleLectorGrantKey(c.key)}
+                                    />
+                                    <label className="usuarios-admin-b-grants-item-label" htmlFor={`modal-lector-grant-${gid}`}>
+                                      {c.label}
+                                    </label>
+                                  </div>
+                                  <p className="usuarios-admin-b-grants-item-desc">{c.description}</p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="usuarios-admin-b-grants-full-access-hint">
+                    <i className="bi bi-unlock-fill" aria-hidden />
+                    <p className="mb-0">
+                      Sin lista restrictiva para la app web: solo Kryptex. Activá arriba para habilitar módulos de consulta.
+                    </p>
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer professional-modal-footer usuarios-admin-b-grants-modal-footer">
+                <button
+                  type="button"
+                  className="professional-btn professional-btn-secondary"
+                  disabled={lectorGrantsSaving}
+                  onClick={closeLectorGrantsModal}
+                >
+                  Cerrar
+                </button>
+                <button
+                  type="button"
+                  className="professional-btn professional-btn-primary usuarios-admin-b-grants-save-btn"
+                  disabled={lectorGrantsSaving}
+                  onClick={() => void handleSaveLectorGrantsFromModal()}
+                >
+                  {lectorGrantsSaving ? (
+                    <>
+                      <span className="professional-btn-spinner" />
+                      Guardando…
+                    </>
+                  ) : (
+                    <>
+                      <i className="bi bi-check2-circle me-2" aria-hidden />
+                      Guardar permisos de consulta
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

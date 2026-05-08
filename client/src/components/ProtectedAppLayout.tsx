@@ -12,7 +12,7 @@ import "../styles/sgi-admin-footer.css";
 export function ProtectedAppLayout() {
   const { user } = useAuth();
   const location = useLocation();
-  const showAdminFooter = Boolean(user && canManageUsers(user.role));
+  const showAdminFooter = Boolean(user && canManageUsers(user));
   const isHomePage = location.pathname === "/";
 
   useEffect(() => {

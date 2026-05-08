@@ -12,6 +12,7 @@ import { z } from "zod";
 import { env } from "../config/env.js";
 import { db } from "../db.js";
 import { requireRole } from "../middleware/auth.js";
+import { requireModuleGrant } from "../middleware/moduleGrant.js";
 import { extractDraftFromFacturaText, type ProveedorLite } from "../lib/contabilidadFacturaPdfScan.js";
 import { ensureProveedoresHrsSchema } from "./proveedoresHrs.js";
 
@@ -333,6 +334,7 @@ function mapGasto(raw: GastoDbRow) {
 contabilidadGastosRouter.get(
   "/contabilidad/gastos",
   requireRole("admin_a", "admin_b", "operador", "lector"),
+  requireModuleGrant("finanzas_contabilidad"),
   async (_req, res) => {
     await ensureContabilidadGastosSchema();
     await ensureContabilidadFacturaObsCols();
@@ -352,6 +354,7 @@ contabilidadGastosRouter.get(
 contabilidadGastosRouter.post(
   "/contabilidad/gastos",
   requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("finanzas_contabilidad"),
   async (req, res) => {
     await ensureContabilidadGastosSchema();
     await ensureContabilidadFacturaObsCols();
@@ -439,6 +442,7 @@ contabilidadGastosRouter.post(
 contabilidadGastosRouter.put(
   "/contabilidad/gastos/:id",
   requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("finanzas_contabilidad"),
   async (req, res) => {
     await ensureContabilidadGastosSchema();
     await ensureContabilidadFacturaObsCols();
@@ -533,6 +537,7 @@ contabilidadGastosRouter.put(
 contabilidadGastosRouter.post(
   "/contabilidad/gastos/scan-factura-pdf",
   requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("finanzas_contabilidad"),
   (req, res, next) => {
     uploadFacturaPdf.single("pdf")(req, res, (err: unknown) => {
       if (err) {
@@ -589,6 +594,7 @@ contabilidadGastosRouter.post(
 contabilidadGastosRouter.get(
   "/contabilidad/gastos/:id/factura-pdf",
   requireRole("admin_a", "admin_b", "operador", "lector"),
+  requireModuleGrant("finanzas_contabilidad"),
   async (req, res) => {
     await ensureContabilidadGastosSchema();
     await ensureContabilidadFacturaPdfAdjuntoCol();
@@ -629,6 +635,7 @@ contabilidadGastosRouter.get(
 contabilidadGastosRouter.post(
   "/contabilidad/gastos/:id/factura-pdf",
   requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("finanzas_contabilidad"),
   (req, res, next) => {
     uploadFacturaPdf.single("pdf")(req, res, (err: unknown) => {
       if (err) {
@@ -684,6 +691,7 @@ contabilidadGastosRouter.post(
 contabilidadGastosRouter.delete(
   "/contabilidad/gastos/:id",
   requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("finanzas_contabilidad"),
   async (req, res) => {
     await ensureContabilidadGastosSchema();
     await ensureContabilidadFacturaObsCols();

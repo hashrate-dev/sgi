@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { isLectorPathAllowedInSpa } from "../lib/auth";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -18,10 +19,8 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (user.role === "cliente") {
     return <Navigate to="/marketplace" replace />;
   }
-  // LECTOR solo puede ver Kryptex
   const path = location.pathname;
-  const isKryptex = path === "/kryptex" || path.startsWith("/kryptex/");
-  if (user.role === "lector" && !isKryptex) {
+  if (user.role === "lector" && !isLectorPathAllowedInSpa(user, path)) {
     return <Navigate to="/kryptex" replace />;
   }
   return <>{children}</>;

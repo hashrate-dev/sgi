@@ -54,8 +54,8 @@ export function ClienteEditPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const canDelete = user ? canDeleteClientes(user.role) : false;
-  const canEdit = user ? canEditClientes(user.role) : false;
+  const canDelete = user ? canDeleteClientes(user) : false;
+  const canEdit = user ? canEditClientes(user) : false;
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

@@ -35,7 +35,7 @@ export function MarketplaceClienteLoginPage() {
     return () => clearTimeout(timeoutId);
   }, []);
 
-  if (!loading && user && canUseMarketplaceQuoteCart(user.role)) {
+  if (!loading && user && canUseMarketplaceQuoteCart(user)) {
     return (
       <Navigate
         to="/marketplace"
@@ -44,7 +44,7 @@ export function MarketplaceClienteLoginPage() {
       />
     );
   }
-  if (!loading && user && !canUseMarketplaceQuoteCart(user.role)) {
+  if (!loading && user && !canUseMarketplaceQuoteCart(user)) {
     /* Operador / lector: el carrito de cotización pide cuenta cliente o admin A/B */
     return (
       <div className="marketplace-asic-page">

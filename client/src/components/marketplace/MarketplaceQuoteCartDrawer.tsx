@@ -139,7 +139,7 @@ export function MarketplaceQuoteCartDrawer() {
   const showCartPolicyFooter =
     drawerSubView === "cart" &&
     (n > 0 || hasBlockingOrder) &&
-    Boolean(user && canUseQuoteCart && enforceSingleMarketplaceOrderForRole(user.role));
+    Boolean(user && canUseQuoteCart && enforceSingleMarketplaceOrderForRole(user ?? null));
 
   /** Priorizar altura útil de la lista: encabezado/pie más bajos cuando ya hay equipos */
   const compactCartChrome = drawerSubView === "cart" && n > 0;

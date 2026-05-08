@@ -72,7 +72,7 @@ export function MarketplacePresencePage() {
   const [countries, setCountries] = useState<PresenceCountry[]>([]);
   const [updatedAt, setUpdatedAt] = useState("");
 
-  const canView = Boolean(user && canViewMarketplaceQuoteTickets(user.role));
+  const canView = Boolean(user && canViewMarketplaceQuoteTickets(user));
 
   useEffect(() => {
     if (!canView) return;

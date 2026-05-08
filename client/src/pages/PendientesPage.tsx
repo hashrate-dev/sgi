@@ -56,7 +56,7 @@ export function PendientesPage() {
   const [qClient, setQClient] = useState("");
   const [qMonth, setQMonth] = useState("");
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null);
-  const canExportData = user ? canExport(user.role) : false;
+  const canExportData = user ? canExport(user) : false;
   const EPSILON = 0.0001;
 
   function fetchDocuments() {

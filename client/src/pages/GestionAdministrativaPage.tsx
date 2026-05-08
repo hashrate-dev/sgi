@@ -1,9 +1,26 @@
 import { Link, Navigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
+import {
+  canAccessAsicCostos,
+  canAccessFinanzaContabilidadHub,
+  canAccessHostingTipoCambio,
+  canAccessProveedoresHrs,
+  canSeeCuentaPorClienteShortcut,
+  canSeeReportesDashboard,
+  lectorAllowsModule,
+} from "../lib/auth.js";
 import "../styles/facturacion.css";
 
-const hubItems = [
+type HubItem = {
+  to: string;
+  icon: string;
+  label: string;
+  desc: string;
+  roles: readonly string[];
+};
+
+const hubItems: readonly HubItem[] = [
   {
     to: "/hosting",
     icon: "bi-hdd-network",
@@ -25,7 +42,7 @@ const hubItems = [
     desc: "Reportes, cuentas por cliente y operaciones de cambio (USDT/USD)",
     roles: ["admin_a", "admin_b", "operador"],
   },
-] as const;
+];
 
 function roleNorm(r: string | undefined) {
   return (r ?? "").toLowerCase().trim();
@@ -36,7 +53,35 @@ export function GestionAdministrativaPage() {
   const canSeeLeaf = (roles: readonly string[]) =>
     user != null && roles.some((r) => roleNorm(r) === roleNorm(user.role));
 
-  const visible = hubItems.filter((item) => canSeeLeaf(item.roles));
+  function lectorSeesHubItem(item: HubItem): boolean {
+    if (!user || user.role !== "lector") return false;
+    if (item.to === "/hosting") {
+      return lectorAllowsModule(user, "facturacion") || lectorAllowsModule(user, "hosting_tipo_cambio");
+    }
+    if (item.to === "/asic") {
+      return (
+        lectorAllowsModule(user, "facturacion") ||
+        lectorAllowsModule(user, "equipos") ||
+        lectorAllowsModule(user, "equipos_tienda") ||
+        lectorAllowsModule(user, "garantias") ||
+        lectorAllowsModule(user, "setups") ||
+        lectorAllowsModule(user, "finanzas_asic_costos")
+      );
+    }
+    if (item.to === "/gestion-financiera") {
+      return (
+        canAccessFinanzaContabilidadHub(user) ||
+        canAccessProveedoresHrs(user) ||
+        canAccessAsicCostos(user) ||
+        canAccessHostingTipoCambio(user) ||
+        canSeeReportesDashboard(user) ||
+        canSeeCuentaPorClienteShortcut(user)
+      );
+    }
+    return false;
+  }
+
+  const visible = hubItems.filter((item) => user?.role === "lector" ? lectorSeesHubItem(item) : canSeeLeaf(item.roles));
 
   /** Sin permiso sobre ningún módulo: no debe quedar página vacía ni acceso indebido */
   if (!user || visible.length === 0) {

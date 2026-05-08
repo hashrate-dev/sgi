@@ -4,6 +4,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { db, getDb } from "../db.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
+import { requireModuleGrant } from "../middleware/moduleGrant.js";
 import {
   marketplaceImageUploadUsesMemory,
   uploadMarketplaceImageMw,
@@ -38,8 +39,19 @@ import {
 
 export const equiposRouter = Router();
 
-const requireCanEdit = requireRole("admin_a", "admin_b", "operador");
-const requireAdminsEquipo = requireRole("admin_a", "admin_b");
+const requireEquiposEdit = [
+  requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("equipos"),
+];
+const requireEquiposTiendaAdmin = [requireRole("admin_a", "admin_b"), requireModuleGrant("equipos_tienda")];
+const requireEquiposRead = [
+  requireRole("admin_a", "admin_b", "operador", "lector"),
+  requireModuleGrant("equipos"),
+];
+const requireEquiposTiendaRead = [
+  requireRole("admin_a", "admin_b", "operador", "lector"),
+  requireModuleGrant("equipos_tienda"),
+];
 
 const CorpBestSellingBodySchema = z.object({
   ids: z.array(z.string().min(1).max(220)).max(4),
@@ -372,7 +384,7 @@ export const EQUIPOS_ASIC_SELECT = `SELECT id, numero_serie, fecha_ingreso, marc
 const EQUIPOS_SELECT = EQUIPOS_ASIC_SELECT;
 
 /** GET /equipos — listar todos */
-equiposRouter.get("/equipos", requireAuth, async (_req, res: Response) => {
+equiposRouter.get("/equipos", requireAuth, ...requireEquiposRead, async (_req, res: Response) => {
   try {
     const rows = (await db.prepare(`${EQUIPOS_SELECT} ORDER BY marca_equipo ASC, modelo ASC, numero_serie ASC`).all()) as EquipoRow[];
     res.json({ items: rows.map(rowToItem) });
@@ -383,7 +395,7 @@ equiposRouter.get("/equipos", requireAuth, async (_req, res: Response) => {
 });
 
 /** GET /equipos/marketplace-corp-best-selling — ids guardados para home corporativa (hasta 4). */
-equiposRouter.get("/equipos/marketplace-corp-best-selling", requireAuth, async (_req, res: Response) => {
+equiposRouter.get("/equipos/marketplace-corp-best-selling", requireAuth, ...requireEquiposTiendaRead, async (_req, res: Response) => {
   try {
     const ids = await readCorpBestSellingEquipoIds();
     res.json({ ids });
@@ -394,7 +406,11 @@ equiposRouter.get("/equipos/marketplace-corp-best-selling", requireAuth, async (
 });
 
 /** PUT /equipos/marketplace-corp-best-selling — guardar destacados home (solo admin A/B). */
-equiposRouter.put("/equipos/marketplace-corp-best-selling", requireAuth, requireAdminsEquipo, async (req, res: Response) => {
+equiposRouter.put(
+  "/equipos/marketplace-corp-best-selling",
+  requireAuth,
+  ...requireEquiposTiendaAdmin,
+  async (req, res: Response) => {
   const parsed = CorpBestSellingBodySchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
@@ -431,7 +447,7 @@ equiposRouter.put("/equipos/marketplace-corp-best-selling", requireAuth, require
 });
 
 /** GET /equipos/marketplace-corp-interesting — ids «Otros Productos Interesantes» (hasta 4). */
-equiposRouter.get("/equipos/marketplace-corp-interesting", requireAuth, async (_req, res: Response) => {
+equiposRouter.get("/equipos/marketplace-corp-interesting", requireAuth, ...requireEquiposTiendaRead, async (_req, res: Response) => {
   try {
     const ids = await readCorpInterestingEquipoIds();
     res.json({ ids });
@@ -442,7 +458,11 @@ equiposRouter.get("/equipos/marketplace-corp-interesting", requireAuth, async (_
 });
 
 /** GET /equipos/marketplace-hide-prices-for-guests — configuración global de visibilidad de precios sin login. */
-equiposRouter.get("/equipos/marketplace-hide-prices-for-guests", requireAuth, async (_req, res: Response) => {
+equiposRouter.get(
+  "/equipos/marketplace-hide-prices-for-guests",
+  requireAuth,
+  ...requireEquiposTiendaRead,
+  async (_req, res: Response) => {
   try {
     const enabled = await readMarketplaceHidePricesForGuests();
     res.json({ enabled });
@@ -453,7 +473,11 @@ equiposRouter.get("/equipos/marketplace-hide-prices-for-guests", requireAuth, as
 });
 
 /** PUT /equipos/marketplace-hide-prices-for-guests — actualizar visibilidad de precios sin login (solo admin A/B). */
-equiposRouter.put("/equipos/marketplace-hide-prices-for-guests", requireAuth, requireAdminsEquipo, async (req, res: Response) => {
+equiposRouter.put(
+  "/equipos/marketplace-hide-prices-for-guests",
+  requireAuth,
+  ...requireEquiposTiendaAdmin,
+  async (req, res: Response) => {
   const parsed = MarketplaceHidePricesBodySchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
@@ -468,7 +492,11 @@ equiposRouter.put("/equipos/marketplace-hide-prices-for-guests", requireAuth, re
 });
 
 /** PUT /equipos/marketplace-corp-interesting — guardar sección home (solo admin A/B). */
-equiposRouter.put("/equipos/marketplace-corp-interesting", requireAuth, requireAdminsEquipo, async (req, res: Response) => {
+equiposRouter.put(
+  "/equipos/marketplace-corp-interesting",
+  requireAuth,
+  ...requireEquiposTiendaAdmin,
+  async (req, res: Response) => {
   const parsed = CorpInterestingBodySchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
@@ -507,7 +535,7 @@ equiposRouter.put("/equipos/marketplace-corp-interesting", requireAuth, requireA
 /**
  * GET /equipos/:id/whattomine-yield — rendimiento estimado (WhatToMine, electricidad 0,078 USD/kWh).
  */
-equiposRouter.get("/equipos/:id/whattomine-yield", requireAuth, async (req, res: Response) => {
+equiposRouter.get("/equipos/:id/whattomine-yield", requireAuth, ...requireEquiposRead, async (req, res: Response) => {
   const id = (typeof req.params.id === "string" ? req.params.id : req.params.id?.[0] ?? "").trim();
   if (!id) return res.status(400).json({ error: { message: "ID requerido" } });
   try {
@@ -571,7 +599,7 @@ equiposRouter.get("/equipos/:id/whattomine-yield", requireAuth, async (req, res:
 });
 
 /** POST /equipos — crear */
-equiposRouter.post("/equipos", requireAuth, requireCanEdit, async (req, res: Response) => {
+equiposRouter.post("/equipos", requireAuth, ...requireEquiposEdit, async (req, res: Response) => {
   const parsed = EquipoBodySchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
@@ -660,7 +688,7 @@ equiposRouter.post("/equipos", requireAuth, requireCanEdit, async (req, res: Res
 equiposRouter.post(
   "/equipos/marketplace-image",
   requireAuth,
-  requireAdminsEquipo,
+  ...requireEquiposTiendaAdmin,
   (req: Request, res: Response, next) => {
     uploadMarketplaceImageMw(req, res, (err: unknown) => {
       if (err) {
@@ -743,7 +771,7 @@ equiposRouter.post(
 );
 
 /** PUT /equipos/:id — actualizar */
-equiposRouter.put("/equipos/:id", requireAuth, requireCanEdit, async (req, res: Response) => {
+equiposRouter.put("/equipos/:id", requireAuth, ...requireEquiposEdit, async (req, res: Response) => {
   const id = (typeof req.params.id === "string" ? req.params.id : req.params.id?.[0] ?? "").trim();
   if (!id) return res.status(400).json({ error: { message: "ID requerido" } });
   const parsed = EquipoBodySchema.safeParse(req.body);
@@ -876,7 +904,7 @@ equiposRouter.put("/equipos/:id", requireAuth, requireCanEdit, async (req, res: 
 });
 
 /** DELETE /equipos/:id — eliminar uno */
-equiposRouter.delete("/equipos/:id", requireAuth, requireCanEdit, async (req, res: Response) => {
+equiposRouter.delete("/equipos/:id", requireAuth, ...requireEquiposEdit, async (req, res: Response) => {
   const id = (typeof req.params.id === "string" ? req.params.id : req.params.id?.[0] ?? "").trim();
   if (!id) return res.status(400).json({ error: { message: "ID requerido" } });
   try {
@@ -910,7 +938,7 @@ const BulkRowSchema = z.object({
 });
 
 /** POST /equipos/bulk — importar varios equipos */
-equiposRouter.post("/equipos/bulk", requireAuth, requireAdminsEquipo, async (req, res: Response) => {
+equiposRouter.post("/equipos/bulk", requireAuth, ...requireEquiposTiendaAdmin, async (req, res: Response) => {
   const parsed = z.array(BulkRowSchema).safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
@@ -955,7 +983,12 @@ equiposRouter.post("/equipos/bulk", requireAuth, requireAdminsEquipo, async (req
 });
 
 /** DELETE /equipos — eliminar todos */
-equiposRouter.delete("/equipos", requireAuth, requireRole("admin_a", "admin_b"), async (req, res: Response) => {
+equiposRouter.delete(
+  "/equipos",
+  requireAuth,
+  requireRole("admin_a", "admin_b"),
+  requireModuleGrant("equipos"),
+  async (req, res: Response) => {
   try {
     await db.prepare("DELETE FROM equipos_asic").run();
     await logEquipoAsicAudit({

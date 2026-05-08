@@ -294,8 +294,8 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
   const [clearing, setClearing] = useState(false);
   const [passwordAttempts, setPasswordAttempts] = useState(0);
   const MAX_PASSWORD_ATTEMPTS = 3;
-  const canDelete = user ? canDeleteHistorial(user.role) : false;
-  const canExportData = user ? canExport(user.role) : false;
+  const canDelete = user ? canDeleteHistorial(user) : false;
+  const canExportData = user ? canExport(user) : false;
 
   /** Opciones de mes (MES) para el filtro: valores distintos de la columna month en los datos */
   const opcionesMes = useMemo(() => {

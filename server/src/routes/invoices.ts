@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db, getDb } from "../db.js";
 import { rebuildReciboSettlementByNumber } from "../lib/rebuildReciboSettlement.js";
 import { requireRole } from "../middleware/auth.js";
+import { requireModuleGrant } from "../middleware/moduleGrant.js";
 
 const isPg = () => (getDb() as { isPostgres?: boolean }).isPostgres === true;
 const clientNameCol = () => (isPg() ? '"clientName"' : "clientName");
@@ -77,7 +78,11 @@ async function getNextNumber(tx: { prepare: (s: string) => { get: (...p: unknown
 }
 
 /** GET /invoices/next-number?type=Factura|Recibo|Nota de Crédito&peek=1 — devuelve el siguiente número. Si peek=1 no incrementa la secuencia. */
-invoicesRouter.get("/invoices/next-number", requireRole("admin_a", "admin_b", "operador"), async (req, res) => {
+invoicesRouter.get(
+  "/invoices/next-number",
+  requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("facturacion"),
+  async (req, res) => {
   const q = z.object({
     type: z.enum(["Factura", "Recibo", "Nota de Crédito"]),
     peek: z.union([z.string(), z.undefined()]).optional()
@@ -99,7 +104,11 @@ invoicesRouter.get("/invoices/next-number", requireRole("admin_a", "admin_b", "o
 
 const sourceCol = () => (isPg() ? "COALESCE(source, 'hosting')" : "COALESCE(source, 'hosting')");
 
-invoicesRouter.get("/invoices", async (req, res) => {
+invoicesRouter.get(
+  "/invoices",
+  requireRole("admin_a", "admin_b", "operador", "lector"),
+  requireModuleGrant("facturacion"),
+  async (req, res) => {
   const q = z
     .object({
       client: z.string().optional(),
@@ -166,7 +175,11 @@ invoicesRouter.get("/invoices", async (req, res) => {
 });
 
 /** GET /invoices/:id — devuelve una factura con sus ítems (para cargar detalle en recibo/NC). */
-invoicesRouter.get("/invoices/:id", async (req, res) => {
+invoicesRouter.get(
+  "/invoices/:id",
+  requireRole("admin_a", "admin_b", "operador", "lector"),
+  requireModuleGrant("facturacion"),
+  async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) {
     return res.status(400).json({ error: { message: "Invalid id" } });
@@ -212,7 +225,11 @@ invoicesRouter.get("/invoices/:id", async (req, res) => {
   res.json({ invoice });
 });
 
-invoicesRouter.post("/invoices", requireRole("admin_a", "admin_b", "operador"), async (req, res) => {
+invoicesRouter.post(
+  "/invoices",
+  requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("facturacion"),
+  async (req, res) => {
   const parsed = InvoiceCreateSchema.safeParse(req.body);
   if (!parsed.success) {
     const details = parsed.error.flatten();
@@ -298,7 +315,11 @@ invoicesRouter.delete("/invoices/all", requireRole("admin_a"), async (req, res) 
   return res.json({ ok: true, deleted: info.changes ?? 0 });
 });
 
-invoicesRouter.delete("/invoices/:id", requireRole("admin_a", "admin_b"), async (req, res) => {
+invoicesRouter.delete(
+  "/invoices/:id",
+  requireRole("admin_a", "admin_b"),
+  requireModuleGrant("facturacion"),
+  async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) {
     return res.status(400).json({ error: { message: "Invalid id" } });
@@ -311,7 +332,11 @@ invoicesRouter.delete("/invoices/:id", requireRole("admin_a", "admin_b"), async 
 });
 
 /** POST /invoices/rebuild-recibo-settlement — reescribe ítems de un recibo al formato liquidación (admin). */
-invoicesRouter.post("/invoices/rebuild-recibo-settlement", requireRole("admin_a", "admin_b"), async (req, res) => {
+invoicesRouter.post(
+  "/invoices/rebuild-recibo-settlement",
+  requireRole("admin_a", "admin_b"),
+  requireModuleGrant("facturacion"),
+  async (req, res) => {
   const parsed = z
     .object({
       number: z.string().min(1).max(50),

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
-import { canEditFacturacion } from "../lib/auth";
+import { canAccessProveedoresHrs, canEditProveedoresHrs } from "../lib/auth";
 import {
   createProveedorHrs,
   deleteProveedorHrs,
@@ -44,7 +44,7 @@ export function ProveedoresHrsPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [rowBusy, setRowBusy] = useState<number | null>(null);
 
-  const canEdit = Boolean(user && canEditFacturacion(user.role));
+  const canMutateList = Boolean(user && canEditProveedoresHrs(user));
 
   const loadList = useCallback(async () => {
     setListLoading(true);
@@ -61,19 +61,19 @@ export function ProveedoresHrsPage() {
   }, []);
 
   useEffect(() => {
-    if (!loading && user && (canEditFacturacion(user.role) || user.role === "lector")) {
+    if (!loading && user && canAccessProveedoresHrs(user)) {
       void loadList();
     }
   }, [loading, user, loadList]);
 
   if (!loading && !user) return <Navigate to="/login" replace />;
-  if (!loading && user && !canEditFacturacion(user.role) && user.role !== "lector") {
+  if (!loading && user && !canAccessProveedoresHrs(user)) {
     return <Navigate to="/" replace />;
   }
 
   const onSubmit = async (ev: FormEvent) => {
     ev.preventDefault();
-    if (!canEdit) return;
+    if (!canMutateList) return;
     setErr("");
     setOk("");
     const supplierName = form.supplierName.trim();
@@ -144,7 +144,7 @@ export function ProveedoresHrsPage() {
   };
 
   const onDeleteRow = async (row: ProveedorHrs) => {
-    if (!canEdit) return;
+    if (!canMutateList) return;
     const okDel = window.confirm(
       `¿Eliminar el proveedor ${row.supplierNumber} — ${row.supplierName}? Esta acción no se puede deshacer.`
     );
@@ -180,7 +180,7 @@ export function ProveedoresHrsPage() {
                   guardados en la base <strong>Proveedores HRS</strong>.
                 </p>
 
-                {canEdit && editingId != null ? (
+                {canMutateList && editingId != null ? (
                   <div className="alert alert-light py-2 small mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2 border-0 shadow-sm">
                     <span className="text-dark">
                       Editando <strong>{items.find((i) => i.id === editingId)?.supplierNumber ?? "proveedor"}</strong> · el
@@ -192,7 +192,7 @@ export function ProveedoresHrsPage() {
                   </div>
                 ) : null}
 
-                {canEdit ? (
+                {canMutateList ? (
                   <form onSubmit={onSubmit} className="row g-3">
                     <div className="col-12 col-lg-5">
                       <label className="form-label">Nombre del proveedor</label>
@@ -302,7 +302,7 @@ export function ProveedoresHrsPage() {
                     <th className="proveedores-hrs-th proveedores-hrs-th-registro" scope="col">
                       Registro
                     </th>
-                    {canEdit ? (
+                    {canMutateList ? (
                       <th className="proveedores-hrs-th proveedores-hrs-th-acciones text-end text-nowrap" scope="col">
                         Acciones
                       </th>
@@ -325,7 +325,7 @@ export function ProveedoresHrsPage() {
                       <td className="proveedores-hrs-td proveedores-hrs-td-registro small text-muted text-nowrap">
                         {formatProveedorRegistro(row.createdAt)}
                       </td>
-                      {canEdit ? (
+                      {canMutateList ? (
                         <td className="proveedores-hrs-td proveedores-hrs-td-acciones text-end align-middle text-nowrap">
                           <button
                             type="button"

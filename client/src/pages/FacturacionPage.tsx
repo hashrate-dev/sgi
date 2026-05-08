@@ -14,13 +14,13 @@ import { serviceCatalog } from "../lib/constants";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadInvoices, saveInvoices } from "../lib/storage";
 import type { Client, ComprobanteType, Invoice, LineItem } from "../lib/types";
-import { Link, useLocation } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { InvoicePreview } from "../components/InvoicePreview";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
-import { canEditFacturacion } from "../lib/auth";
+import { canEditFacturacion, lectorAllowsModule } from "../lib/auth";
 import { formatCurrencyNumber, formatUSD } from "../lib/formatCurrency";
 import { isClienteTiendaOnline } from "../lib/clientTienda";
 import { isLinkedToInvoice } from "../lib/invoiceLinks";
@@ -1090,7 +1090,10 @@ export function FacturacionPage() {
     setPreviewEmitted(null);
   }, [type, selectedClientId, items, partialCreditItems, isPartialCreditNote]);
 
-  if (user && !canEditFacturacion(user.role)) {
+  if (user && !canEditFacturacion(user)) {
+    if (user.role === "lector" && lectorAllowsModule(user, "facturacion")) {
+      return <Navigate to="/hosting/history" replace />;
+    }
     return (
       <div className="fact-page">
         <div className="container py-5">

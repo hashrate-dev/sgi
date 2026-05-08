@@ -101,7 +101,7 @@ export function MarketplaceClienteRegistroPage() {
     }
   }, [countryId]);
 
-  if (!loading && user && canUseMarketplaceQuoteCart(user.role)) {
+  if (!loading && user && canUseMarketplaceQuoteCart(user)) {
     return (
       <Navigate
         to="/marketplace"
@@ -111,7 +111,7 @@ export function MarketplaceClienteRegistroPage() {
     );
   }
 
-  if (!loading && user && !canUseMarketplaceQuoteCart(user.role)) {
+  if (!loading && user && !canUseMarketplaceQuoteCart(user)) {
     return (
       <div className="marketplace-asic-page marketplace-registro-page">
         <div className="bg-mesh" aria-hidden />

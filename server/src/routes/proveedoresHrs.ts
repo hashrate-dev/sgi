@@ -3,6 +3,7 @@ import { z } from "zod";
 import { env } from "../config/env.js";
 import { db } from "../db.js";
 import { requireRole } from "../middleware/auth.js";
+import { requireModuleGrant } from "../middleware/moduleGrant.js";
 
 export const proveedoresHrsRouter = Router();
 
@@ -138,6 +139,7 @@ function mapProveedor(raw: ProveedorDbRow & { rubro?: string }) {
 proveedoresHrsRouter.get(
   "/proveedores-hrs",
   requireRole("admin_a", "admin_b", "operador", "lector"),
+  requireModuleGrant("finanzas_proveedores"),
   async (_req, res) => {
     await ensureProveedoresHrsSchema();
     const rows = (await db
@@ -153,6 +155,7 @@ proveedoresHrsRouter.get(
 proveedoresHrsRouter.post(
   "/proveedores-hrs",
   requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("finanzas_proveedores"),
   async (req, res) => {
     await ensureProveedoresHrsSchema();
     const parsed = CreateProveedorSchema.safeParse(req.body);
@@ -211,6 +214,7 @@ proveedoresHrsRouter.post(
 proveedoresHrsRouter.put(
   "/proveedores-hrs/:id",
   requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("finanzas_proveedores"),
   async (req, res) => {
     await ensureProveedoresHrsSchema();
     const id = Number(typeof req.params.id === "string" ? req.params.id : "");
@@ -253,6 +257,7 @@ proveedoresHrsRouter.put(
 proveedoresHrsRouter.delete(
   "/proveedores-hrs/:id",
   requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("finanzas_proveedores"),
   async (req, res) => {
     await ensureProveedoresHrsSchema();
     const id = Number(typeof req.params.id === "string" ? req.params.id : "");

@@ -61,8 +61,8 @@ export function ClientesTiendaOnlinePage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
-  const canView = user ? canEditClientes(user.role) : false;
-  const canExportData = user ? canExport(user.role) : false;
+  const canView = user ? canEditClientes(user) : false;
+  const canExportData = user ? canExport(user) : false;
 
   useEffect(() => {
     if (!canView) return;

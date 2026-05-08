@@ -20,7 +20,7 @@ export function MarketplaceSiteHeader() {
     onCorporateHome && hash === `#${id}` ? ("is-current" as const) : undefined;
   const { user, logout } = useAuth();
   const { lang, setLang, t, tf } = useMarketplaceLang();
-  const showLoggedAccount = Boolean(user && canUseMarketplaceQuoteCart(user.role));
+  const showLoggedAccount = Boolean(user && canUseMarketplaceQuoteCart(user));
   const quoteCart = useOptionalMarketplaceQuoteCart();
 
   const cartAria =
