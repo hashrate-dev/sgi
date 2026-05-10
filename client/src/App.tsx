@@ -28,6 +28,7 @@ import { ClienteEditPage } from "./pages/ClienteEditPage";
 import { EquiposAsicPage } from "./pages/EquiposAsicPage";
 import { TiendaOnlineBannersHomePage } from "./pages/TiendaOnlineBannersHomePage";
 import { SetupPage } from "./pages/SetupPage";
+import { ReparacionPage } from "./pages/ReparacionPage";
 import { ReportesPage } from "./pages/ReportesPage";
 import { UsuariosPage } from "./pages/UsuariosPage";
 import { ConfiguracionPage } from "./pages/ConfiguracionPage";
@@ -388,6 +389,7 @@ function App() {
             <Route path="/asic" element={<MineriaHubPage />} />
             <Route path="/asic/cotizador-china-py" element={<AsicCotizadorChinaPyPage />} />
             <Route path="/asic/setup" element={<SetupPage />} />
+            <Route path="/asic/reparacion" element={<ReparacionPage />} />
             <Route path="/asic/ande-warranty" element={<GarantiaAndePage />} />
             <Route path="/asic/warranty-items" element={<GarantiasAndeItemsPage />} />
             <Route path="/asic/warranty-items/new" element={<GarantiaAndeItemNewPage />} />

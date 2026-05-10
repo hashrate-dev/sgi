@@ -466,6 +466,8 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
     if (it.setupId && it.setupNombre) {
       // Setup
       desc = it.setupNombre;
+    } else if (it.reparacionTipoId && it.reparacionNombre) {
+      desc = it.reparacionNombre;
     } else if (it.marcaEquipo && it.modeloEquipo && it.procesadorEquipo) {
       // Equipo ASIC
       const equipoDesc = `${it.marcaEquipo} - ${it.modeloEquipo} - ${it.procesadorEquipo}`;
@@ -494,6 +496,8 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
       let descDescuento = "";
       if (it.setupId && it.setupNombre) {
         descDescuento = `Descuento ${it.setupNombre}`;
+      } else if (it.reparacionTipoId && it.reparacionNombre) {
+        descDescuento = `Descuento ${it.reparacionNombre}`;
       } else if (it.marcaEquipo && it.modeloEquipo) {
         descDescuento = `Descuento ${it.marcaEquipo} ${it.modeloEquipo}`;
       } else if (it.garantiaMarca && it.garantiaModelo) {

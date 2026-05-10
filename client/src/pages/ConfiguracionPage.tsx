@@ -13,6 +13,12 @@ const configMenuItems: Array<{ to: string; icon: string; label: string; desc: st
   },
   { to: "/asic/equipment", icon: "bi-gear", label: "Gestión de Equipos ASIC", desc: "Configuración de Equipos ASIC por marca y modelo" },
   { to: "/asic/setup", icon: "bi-tools", label: "Gestión de Setup", desc: "Configuración de tipos de Setup" },
+  {
+    to: "/asic/reparacion",
+    icon: "bi-wrench-adjustable-circle",
+    label: "Gestión de Reparación",
+    desc: "Configuración de tipos de Reparación",
+  },
   { to: "/asic/warranty-items", icon: "bi-list-ul", label: "Gestión de Garantías ANDE", desc: "Configuración de Garantías ANDE por tipo de equipo" },
 ];
 
@@ -69,7 +75,7 @@ export function ConfiguracionPage() {
           <Text color="gray.600" fontSize="sm" mb={3}>Opciones de configuración del sistema:</Text>
           <Grid templateColumns={{ base: "1fr", md: "repeat(2, minmax(0, 1fr))", xl: "repeat(3, minmax(0, 1fr))" }} gap={4}>
             {cards.map((item) => (
-              <Box key={item.to}>{ConfigMenuCard(item)}</Box>
+              <Box key={`${item.label}-${item.to}`}>{ConfigMenuCard(item)}</Box>
             ))}
           </Grid>
         </AppCard>

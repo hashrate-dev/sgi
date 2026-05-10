@@ -12,6 +12,7 @@ import { invoicesRouter } from "./routes/invoices.js";
 import { renderRouter } from "./routes/render.js";
 import { emittedRouter } from "./routes/emitted.js";
 import { garantiasRouter } from "./routes/garantias.js";
+import { reparacionTiposRouter } from "./routes/reparacionTipos.js";
 import { setupsRouter } from "./routes/setups.js";
 import { equiposRouter } from "./routes/equipos.js";
 import { marketplaceRouter } from "./routes/marketplace.js";
@@ -135,6 +136,7 @@ export function createApp() {
   app.use("/api", emittedRouter);
   app.use("/api", garantiasRouter);
   app.use("/api", requireAuth, setupsRouter);
+  app.use("/api", requireAuth, reparacionTiposRouter);
   app.use("/api", requireAuth, equiposRouter);
   app.use("/api", requireAuth, hostingFxOperationsRouter);
   app.use("/api", requireAuth, asicCostosRouter);

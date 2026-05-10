@@ -1200,6 +1200,25 @@ export function applyMarketplaceSetupGlobal(
   );
 }
 
+// ——— Reparación — tipos de servicio (misma idea que Setup) ———
+export type ReparacionTiposResponse = { items: import("./types.js").ReparacionTipo[] };
+
+export function getReparacionTipos(): Promise<ReparacionTiposResponse> {
+  return api<ReparacionTiposResponse>("/api/reparacion-tipos", { cache: "no-store" });
+}
+
+export function createReparacionTipo(data: { nombre: string; precioUSD: number }): Promise<{ ok: boolean; id: string }> {
+  return api<{ ok: boolean; id: string }>("/api/reparacion-tipos", { method: "POST", body: JSON.stringify(data) });
+}
+
+export function updateReparacionTipo(id: string, data: { nombre: string; precioUSD: number }): Promise<{ ok: boolean }> {
+  return api<{ ok: boolean }>(`/api/reparacion-tipos/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(data) });
+}
+
+export function deleteReparacionTipo(id: string): Promise<void> {
+  return api<void>(`/api/reparacion-tipos/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
 // ——— Equipos ASIC (backend) ———
 export type EquiposResponse = { items: import("./types.js").EquipoASIC[] };
 

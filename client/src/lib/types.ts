@@ -39,6 +39,9 @@ export type LineItem = {
   // Campos para Setup:
   setupId?: string; // ID del Setup
   setupNombre?: string; // Nombre del Setup
+  // Campos para Reparación (catálogo /asic/reparacion):
+  reparacionTipoId?: string;
+  reparacionNombre?: string;
   // Campos para Garantía ANDE:
   garantiaId?: string;
   garantiaCodigo?: string;
@@ -122,6 +125,14 @@ export type Setup = {
   codigo?: string; // Número de ítem: S01, S02, ... (auto)
   nombre: string; // Nombre del Setup
   precioUSD: number; // Precio en USD (p. ej. 0, 40 o 50 según gestión)
+};
+
+/** Tipos de servicio de reparación (misma estructura que Setup; códigos R01, R02, …). */
+export type ReparacionTipo = {
+  id: string;
+  codigo?: string;
+  nombre: string;
+  precioUSD: number;
 };
 
 export type ItemGarantiaAnde = {

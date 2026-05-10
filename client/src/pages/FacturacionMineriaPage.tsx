@@ -1,9 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
-import { addEmittedDocument, createInvoice, getEmittedDocuments, getClients, getEquipos, getNextInvoiceNumber, getSetups, wakeUpBackend, type InvoiceCreateBody } from "../lib/api";
+import {
+  addEmittedDocument,
+  createInvoice,
+  getEmittedDocuments,
+  getClients,
+  getEquipos,
+  getNextInvoiceNumber,
+  getReparacionTipos,
+  getSetups,
+  wakeUpBackend,
+  type InvoiceCreateBody,
+} from "../lib/api";
 import { serviceCatalog } from "../lib/constants";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadInvoicesAsic, saveInvoicesAsic } from "../lib/storage";
-import type { Client, ComprobanteType, EquipoASIC, Invoice, LineItem, Setup } from "../lib/types";
+import type { Client, ComprobanteType, EquipoASIC, Invoice, LineItem, ReparacionTipo, Setup } from "../lib/types";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { InvoicePreview } from "../components/InvoicePreview";
@@ -109,6 +120,7 @@ export function FacturacionMineriaPage() {
   const [nextNumFromApi, setNextNumFromApi] = useState<string | null>(null);
   const [equiposAsic, setEquiposAsic] = useState<EquipoASIC[]>([]);
   const [setups, setSetups] = useState<Setup[]>([]);
+  const [reparacionTipos, setReparacionTipos] = useState<ReparacionTipo[]>([]);
   /** Documentos emitidos en esta sesión: se muestran solo 24 h, luego se quitan de la tabla (siguen en Historial/Pendientes) */
   const [emittedInSession, setEmittedInSession] = useState<{ invoice: Invoice; emittedAt: string }[]>([]);
   const [showEmitPdfConfirm, setShowEmitPdfConfirm] = useState(false);
@@ -119,14 +131,16 @@ export function FacturacionMineriaPage() {
   useEffect(() => {
     setInvoices(loadInvoicesAsic());
     wakeUpBackend()
-      .then(() => Promise.all([getEquipos(), getSetups()]))
-      .then(([equiposRes, setupsRes]) => {
+      .then(() => Promise.all([getEquipos(), getSetups(), getReparacionTipos()]))
+      .then(([equiposRes, setupsRes, repRes]) => {
         setEquiposAsic(equiposRes.items ?? []);
         setSetups(setupsRes.items ?? []);
+        setReparacionTipos(repRes.items ?? []);
       })
       .catch(() => {
         setEquiposAsic([]);
         setSetups([]);
+        setReparacionTipos([]);
       });
   }, []);
 
@@ -300,6 +314,8 @@ export function FacturacionMineriaPage() {
             // Campos para Setup
             setupId: item.setupId,
             setupNombre: item.setupNombre,
+            reparacionTipoId: item.reparacionTipoId,
+            reparacionNombre: item.reparacionNombre,
             // Campos para servicios de Hosting (compatibilidad hacia atrás)
             serviceKey: item.serviceKey,
             serviceName: item.serviceName || (item.serviceKey ? serviceCatalog[item.serviceKey]?.name : undefined),
@@ -366,12 +382,25 @@ export function FacturacionMineriaPage() {
           setupNombre: setup.nombre,
           month: "",
           quantity: 1,
-          price: 50, // Precio fijo de 50 USD para Setup
+          price: setup.precioUSD,
+          discount: 0
+        }
+      ]);
+    } else if (reparacionTipos.length > 0) {
+      const r = reparacionTipos[0];
+      setItems((prev) => [
+        ...prev,
+        {
+          reparacionTipoId: r.id,
+          reparacionNombre: r.nombre,
+          month: "",
+          quantity: 1,
+          price: r.precioUSD,
           discount: 0
         }
       ]);
     } else {
-      // Si no hay equipos ni Setup, crear item vacío para que el usuario seleccione manualmente
+      // Si no hay equipos ni Setup ni Reparación, crear item vacío para que el usuario seleccione manualmente
       setItems((prev) => [
         ...prev,
         {
@@ -435,9 +464,10 @@ export function FacturacionMineriaPage() {
     if (items.some((it) => {
       const tieneEquipo = it.equipoId && it.marcaEquipo && it.modeloEquipo && it.procesadorEquipo;
       const tieneSetup = it.setupId && it.setupNombre;
-      return !tieneEquipo && !tieneSetup;
+      const tieneReparacion = it.reparacionTipoId && it.reparacionNombre;
+      return !tieneEquipo && !tieneSetup && !tieneReparacion;
     })) {
-      showToast("Todos los ítems deben tener un equipo ASIC o Setup seleccionado.", "error");
+      showToast("Todos los ítems deben tener un equipo ASIC, Setup o tipo de Reparación seleccionado.", "error");
       return;
     }
     setShowEmitPdfConfirm(true);
@@ -475,7 +505,7 @@ export function FacturacionMineriaPage() {
       discounts: finalDiscounts,
       total: finalTotal,
       items: items.map((it) => ({
-        service: String(it.serviceName || it.setupNombre || "Equipo / Servicio").slice(0, 200),
+        service: String(it.serviceName || it.setupNombre || it.reparacionNombre || "Equipo / Servicio").slice(0, 200),
         month: /^\d{4}-\d{2}$/.test(it.month) ? it.month : monthForApi,
         quantity: Math.max(1, Math.round(Number(it.quantity) || 1)),
         price: Number(it.price) || 0,
@@ -952,7 +982,7 @@ export function FacturacionMineriaPage() {
                         <table className="fact-detail-servicios-table">
                           <thead>
                             <tr>
-                              <th>Equipo ASIC / Setup</th>
+                              <th>Equipo ASIC / Setup / Reparación</th>
                               <th>Cantidad</th>
                               <th>Precio unit.</th>
                               <th>Total</th>
@@ -988,7 +1018,15 @@ export function FacturacionMineriaPage() {
                                     cursor: itemsLocked ? "not-allowed" : "pointer",
                                     opacity: itemsLocked ? 0.7 : 1
                                   }}
-                                  value={it.equipoId ? `equipo_${it.equipoId}` : it.setupId ? `setup_${it.setupId}` : ""}
+                                  value={
+                                    it.equipoId
+                                      ? `equipo_${it.equipoId}`
+                                      : it.setupId
+                                        ? `setup_${it.setupId}`
+                                        : it.reparacionTipoId
+                                          ? `reparacion_${it.reparacionTipoId}`
+                                          : ""
+                                  }
                                   onChange={(e) => {
                                     if (itemsLocked) return;
                                     const value = e.target.value;
@@ -1003,6 +1041,8 @@ export function FacturacionMineriaPage() {
                                           procesadorEquipo: equipo.procesador,
                                           setupId: undefined,
                                           setupNombre: undefined,
+                                          reparacionTipoId: undefined,
+                                          reparacionNombre: undefined,
                                           price: equipo.precioUSD
                                         });
                                       }
@@ -1017,7 +1057,25 @@ export function FacturacionMineriaPage() {
                                           marcaEquipo: undefined,
                                           modeloEquipo: undefined,
                                           procesadorEquipo: undefined,
-                                          price: 50 // Precio fijo de 50 USD para Setup
+                                          reparacionTipoId: undefined,
+                                          reparacionNombre: undefined,
+                                          price: setup.precioUSD
+                                        });
+                                      }
+                                    } else if (value.startsWith("reparacion_")) {
+                                      const rid = value.replace("reparacion_", "");
+                                      const rt = reparacionTipos.find((x) => x.id === rid);
+                                      if (rt) {
+                                        updateItem(idx, {
+                                          reparacionTipoId: rt.id,
+                                          reparacionNombre: rt.nombre,
+                                          equipoId: undefined,
+                                          marcaEquipo: undefined,
+                                          modeloEquipo: undefined,
+                                          procesadorEquipo: undefined,
+                                          setupId: undefined,
+                                          setupNombre: undefined,
+                                          price: rt.precioUSD
                                         });
                                       }
                                     } else {
@@ -1029,6 +1087,8 @@ export function FacturacionMineriaPage() {
                                         procesadorEquipo: undefined,
                                         setupId: undefined,
                                         setupNombre: undefined,
+                                        reparacionTipoId: undefined,
+                                        reparacionNombre: undefined,
                                         price: 0
                                       });
                                     }
@@ -1055,6 +1115,19 @@ export function FacturacionMineriaPage() {
                                     ) : (
                                       <option value="" disabled>
                                         No hay Setup disponibles. Agregue Setup desde Gestión de Setup.
+                                      </option>
+                                    )}
+                                  </optgroup>
+                                  <optgroup label="Reparación">
+                                    {reparacionTipos.length > 0 ? (
+                                      reparacionTipos.map((r) => (
+                                        <option key={r.id} value={`reparacion_${r.id}`}>
+                                          {r.nombre} - ${r.precioUSD} USD
+                                        </option>
+                                      ))
+                                    ) : (
+                                      <option value="" disabled>
+                                        No hay tipos de reparación. Configurarlos en Gestión de Reparación.
                                       </option>
                                     )}
                                   </optgroup>

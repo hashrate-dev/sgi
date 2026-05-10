@@ -158,7 +158,7 @@ export const LECTOR_GRANT_PATH_PREFIXES: Record<LectorPermissionKey, readonly st
   equipos: ["/asic/equipment", "/asic", "/equipos-asic", "/asic/cotizador-china-py"],
   equipos_tienda: ["/marketplace/home-banners", "/tienda-online-banners-home", "/asic/equipment"],
   garantias: ["/asic/ande-warranty", "/asic/warranty-items", "/asic/warranties-history", "/equipos-asic"],
-  setups: ["/asic/setup", "/equipos-asic/setup"],
+  setups: ["/asic/setup", "/equipos-asic/setup", "/asic/reparacion"],
   finanzas_contabilidad: ["/gestion-financiera/contabilidad", "/gestion-financiera/monitor-financiero"],
   finanzas_proveedores: ["/gestion-financiera/proveedores"],
   finanzas_asic_costos: ["/asic/cotizador-china-py"],
