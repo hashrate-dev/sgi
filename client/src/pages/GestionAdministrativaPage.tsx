@@ -81,9 +81,13 @@ export function GestionAdministrativaPage() {
     return false;
   }
 
-  const visible = hubItems.filter((item) => user?.role === "lector" ? lectorSeesHubItem(item) : canSeeLeaf(item.roles));
+  const visible = hubItems.filter((item) => {
+    if (!user) return false;
+    if (user.role === "lector") return lectorSeesHubItem(item);
+    if (!canSeeLeaf(item.roles)) return false;
+    return true;
+  });
 
-  /** Sin permiso sobre ningún módulo: no debe quedar página vacía ni acceso indebido */
   if (!user || visible.length === 0) {
     return <Navigate to="/" replace />;
   }

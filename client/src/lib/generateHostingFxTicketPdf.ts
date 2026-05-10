@@ -84,7 +84,11 @@ export async function downloadHostingFxTicketPdf(op: HostingFxOperation): Promis
 
   const cliente = `${op.clientCode || ""} ${op.clientName || ""} ${op.clientLastName || ""}`.trim();
   const tipo = op.operationType === "usdt_to_usd" ? "Cambio USDT a USD" : "Cambio USD a USDT";
-  const usdt = op.usdtSide === "buy_usdt" ? "Compra de USDT" : "Compra de USD";
+  const usdt = op.compraFlowHostingCommission
+    ? "4% Comisión por Hosting"
+    : op.usdtSide === "buy_usdt"
+      ? "Compra de USDT"
+      : "Compra de USD";
   const envio = op.deliveryMethod === "usd_to_bank" ? "Envio USD a Banco" : "USDT a Binance";
 
   const GAP = 8;

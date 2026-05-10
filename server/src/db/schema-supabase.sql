@@ -126,6 +126,7 @@ ALTER TABLE hosting_fx_operations ADD COLUMN IF NOT EXISTS bank_fee_amount DOUBL
 ALTER TABLE hosting_fx_operations ADD COLUMN IF NOT EXISTS delivery_method TEXT NOT NULL DEFAULT 'usd_to_bank';
 ALTER TABLE hosting_fx_operations ADD COLUMN IF NOT EXISTS account_holder_name TEXT NOT NULL DEFAULT '';
 ALTER TABLE hosting_fx_operations ADD COLUMN IF NOT EXISTS ticket_code TEXT;
+ALTER TABLE hosting_fx_operations ADD COLUMN IF NOT EXISTS compra_flow_hosting_commission INTEGER NOT NULL DEFAULT 0;
 CREATE TABLE IF NOT EXISTS hosting_fx_ticket_seq (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   next_num BIGINT NOT NULL

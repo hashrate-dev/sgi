@@ -634,6 +634,11 @@ export type HostingFxOperation = {
   clientCode?: string;
   clientName?: string;
   clientLastName?: string;
+  /** Suma de líneas «4% Gastos Operativos Transferencia» en factura hosting vinculada (si existe). */
+  invoiceHostingCambioCommissionUsd?: number;
+  invoiceHostingCambioNumber?: string;
+  /** Registrado con el flujo «4% Comisión por Hosting» en el formulario de operaciones. */
+  compraFlowHostingCommission?: boolean;
 };
 
 export type HostingFxOperationPayload = {
@@ -651,6 +656,7 @@ export type HostingFxOperationPayload = {
   accountHolderName: string;
   usdtSide: HostingFxUsdtSide;
   notes?: string;
+  compraFlowHostingCommission?: boolean;
 };
 
 export function getHostingFxOperations(): Promise<{ operations: HostingFxOperation[] }> {
@@ -673,6 +679,21 @@ export function updateHostingFxOperation(id: number, body: Partial<HostingFxOper
 
 export function deleteHostingFxOperation(id: number): Promise<{ ok: boolean }> {
   return api<{ ok: boolean }>(`/api/hosting/fx-operations/${id}`, { method: "DELETE" });
+}
+
+export type HostingInvoiceTransferCommissionRow = {
+  invoiceId: number;
+  number: string;
+  clientName: string;
+  date: string;
+  month: string;
+  invoiceTotalUsd: number;
+  commissionUsd: number;
+};
+
+/** Facturas hosting cuyo detalle incluye ítems «4% Gastos Operativos Transferencia» (comisión dentro del comprobante). */
+export function getHostingInvoicesTransferCommission(): Promise<{ invoices: HostingInvoiceTransferCommissionRow[] }> {
+  return api<{ invoices: HostingInvoiceTransferCommissionRow[] }>("/api/hosting/invoices-transfer-commission");
 }
 
 export type AsicCostoEquipoItem = {

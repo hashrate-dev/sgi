@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
-import { db } from "../db.js";
+import { db, getDb } from "../db.js";
+import { assignHostingInvoiceCommissionsToFxOps, type HostingCommissionInvoiceRow } from "../lib/hostingFxInvoiceCommissionMatch.js";
 import { requireRole } from "../middleware/auth.js";
 import { requireModuleGrant } from "../middleware/moduleGrant.js";
 import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
@@ -15,6 +16,9 @@ async function ensureHostingFxSchema(): Promise<void> {
   await db.prepare("ALTER TABLE hosting_fx_operations ADD COLUMN IF NOT EXISTS delivery_method TEXT NOT NULL DEFAULT 'usd_to_bank'").run();
   await db.prepare("ALTER TABLE hosting_fx_operations ADD COLUMN IF NOT EXISTS account_holder_name TEXT NOT NULL DEFAULT ''").run();
   await db.prepare("ALTER TABLE hosting_fx_operations ADD COLUMN IF NOT EXISTS ticket_code TEXT").run();
+  await db
+    .prepare("ALTER TABLE hosting_fx_operations ADD COLUMN IF NOT EXISTS compra_flow_hosting_commission INTEGER NOT NULL DEFAULT 0")
+    .run();
   await db.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_hosting_fx_ticket_code_unique ON hosting_fx_operations(ticket_code)").run();
   await db.prepare("CREATE TABLE IF NOT EXISTS hosting_fx_ticket_seq (id INTEGER PRIMARY KEY, next_num BIGINT NOT NULL)").run();
   await db.prepare("INSERT INTO hosting_fx_ticket_seq (id, next_num) VALUES (1, 100) ON CONFLICT (id) DO NOTHING").run();
@@ -100,6 +104,8 @@ const FxOperationCreateSchema = z
     accountHolderName: z.string().max(200).trim(),
     usdtSide: FxUsdtSideSchema,
     notes: z.string().max(1000).trim().optional(),
+    /** Alta desde el select «4% Comisión por Hosting» */
+    compraFlowHostingCommission: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.usdtSide === "buy_usdt" && data.deliveryMethod !== "usdt_to_hrs_binance") {
@@ -107,10 +113,8 @@ const FxOperationCreateSchema = z
     }
     if (data.deliveryMethod === "usd_to_bank") {
       if (!data.bankName.trim()) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["bankName"] });
-      if (!data.accountNumber.trim()) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["accountNumber"] });
       if (!data.currency.trim()) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["currency"] });
-      if (!data.bankBranch.trim()) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["bankBranch"] });
-      if (!data.accountHolderName.trim()) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["accountHolderName"] });
+      /* cuenta, sucursal y titular pueden ir vacíos */
     }
   });
 
@@ -130,6 +134,7 @@ const FxOperationUpdateSchema = z
     accountHolderName: z.string().max(200).trim().optional(),
     usdtSide: FxUsdtSideSchema.optional(),
     notes: z.string().max(1000).trim().optional(),
+    compraFlowHostingCommission: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.usdtSide === "buy_usdt" && data.deliveryMethod != null && data.deliveryMethod !== "usdt_to_hrs_binance") {
@@ -137,10 +142,7 @@ const FxOperationUpdateSchema = z
     }
     if (data.deliveryMethod === "usd_to_bank") {
       if (!data.bankName?.trim()) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["bankName"] });
-      if (!data.accountNumber?.trim()) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["accountNumber"] });
       if (!data.currency?.trim()) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["currency"] });
-      if (!data.bankBranch?.trim()) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["bankBranch"] });
-      if (!data.accountHolderName?.trim()) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["accountHolderName"] });
     }
   });
 
@@ -169,6 +171,80 @@ type FxRow = {
   client_name2?: string | null;
 };
 
+const isPgDb = (): boolean => (getDb() as { isPostgres?: boolean }).isPostgres === true;
+function invoicesClientNameQualifiedCol(): string {
+  return isPgDb() ? `i."clientName"` : "i.clientName";
+}
+function invoicesSourceExprSql(): string {
+  return isPgDb() ? "COALESCE(i.source, 'hosting')" : "COALESCE(i.source, 'hosting')";
+}
+
+type HostingInvoiceTransferCommissionAggRow = {
+  invoiceId: number;
+  invoiceNumber: string;
+  invoiceClientRaw: string;
+  invoiceDateRaw: string;
+  invoiceMonth: string;
+  invoiceTotalUsd: number;
+  commissionUsd: number;
+};
+
+/** Facturas hosting con al menos una línea «4% Gastos Operativos Transferencia» (sumado por factura). Solo si existe Recibo de pago vinculado con fecha de pago cargada. */
+async function fetchHostingInvoicesTransferCommissionAgg(): Promise<HostingInvoiceTransferCommissionAggRow[]> {
+  const cn = invoicesClientNameQualifiedCol();
+  const src = invoicesSourceExprSql();
+  const paidReciboExists =
+    `EXISTS (
+       SELECT 1 FROM invoices r
+       WHERE r.type = 'Recibo'
+         AND COALESCE(r.source, 'hosting') = 'hosting'
+         AND r.payment_date IS NOT NULL
+         AND TRIM(CAST(r.payment_date AS TEXT)) <> ''
+         AND (
+           r.related_invoice_id = i.id
+           OR (r.related_invoice_number IS NOT NULL AND TRIM(CAST(r.related_invoice_number AS TEXT)) <> ''
+               AND r.related_invoice_number = i.number)
+         )
+     )`;
+  const sql =
+    `SELECT i.id AS invoice_id, i.number AS invoice_number, ${cn} AS invoice_client_raw, i.date AS invoice_date_raw,
+            i.month AS invoice_month,
+            i.total AS invoice_total,
+            SUM(ii.quantity * (ii.price - ii.discount)) AS commission_usd
+     FROM invoices i INNER JOIN invoice_items ii ON ii.invoice_id = i.id
+     WHERE i.type = 'Factura'
+       AND ${src} = 'hosting'
+       AND ${paidReciboExists}
+       AND LOWER(ii.service) LIKE '%4%gastos operativos transferencia%'
+     GROUP BY i.id, i.number, i.date, ${cn}, i.month, i.total
+     HAVING ABS(SUM(ii.quantity * (ii.price - ii.discount))) > 0.0001
+     ORDER BY i.id DESC`;
+  const rows = (await db.prepare(sql).all()) as Array<Record<string, unknown>>;
+  return rows.map((raw) => {
+    const r = rowKeysToLowercase(raw as Record<string, unknown>);
+    return {
+      invoiceId: Number(r.invoice_id ?? 0),
+      invoiceNumber: String(r.invoice_number ?? ""),
+      invoiceClientRaw: String(r.invoice_client_raw ?? ""),
+      invoiceDateRaw: String(r.invoice_date_raw ?? ""),
+      invoiceMonth: String(r.invoice_month ?? ""),
+      invoiceTotalUsd: Number(r.invoice_total ?? 0),
+      commissionUsd: Number(r.commission_usd ?? 0),
+    };
+  });
+}
+
+async function fetchHostingCommissionInvoicesTotals(): Promise<HostingCommissionInvoiceRow[]> {
+  const rows = await fetchHostingInvoicesTransferCommissionAgg();
+  return rows.map((x) => ({
+    invoiceId: x.invoiceId,
+    invoiceNumber: x.invoiceNumber,
+    invoiceClientRaw: x.invoiceClientRaw,
+    invoiceDateRaw: x.invoiceDateRaw,
+    commissionUsd: x.commissionUsd,
+  }));
+}
+
 function mapFxRow(raw: Record<string, unknown>): Record<string, unknown> {
   const r = rowKeysToLowercase(raw);
   return {
@@ -194,6 +270,7 @@ function mapFxRow(raw: Record<string, unknown>): Record<string, unknown> {
     clientCode: r.client_code == null ? "" : String(r.client_code),
     clientName: r.client_name == null ? "" : String(r.client_name),
     clientLastName: r.client_name2 == null ? "" : String(r.client_name2),
+    compraFlowHostingCommission: Number(r.compra_flow_hosting_commission ?? 0) === 1,
   };
 }
 
@@ -208,13 +285,63 @@ hostingFxOperationsRouter.get(
         `SELECT o.id, o.ticket_code, o.client_id, o.operation_date, o.operation_type, o.hrs_commission_pct, o.bank_fee_amount, o.delivery_method, o.client_total_payment,
                 o.operation_amount,
                 o.bank_name, o.account_number, o.currency, o.bank_branch, o.account_holder_name, o.usdt_side, o.notes, o.created_at, o.updated_at,
+                COALESCE(o.compra_flow_hosting_commission, 0) AS compra_flow_hosting_commission,
                 c.code AS client_code, c.name AS client_name, c.name2 AS client_name2
          FROM hosting_fx_operations o
          JOIN clients c ON c.id = o.client_id
          ORDER BY o.operation_date DESC, o.id DESC`
       )
       .all()) as FxRow[];
-    res.json({ operations: rows.map((x) => mapFxRow(x as unknown as Record<string, unknown>)) });
+    let commissions: HostingCommissionInvoiceRow[] = [];
+    try {
+      commissions = await fetchHostingCommissionInvoicesTotals();
+    } catch {
+      commissions = [];
+    }
+    const base = rows.map((x) => mapFxRow(x as unknown as Record<string, unknown>)) as Array<Record<string, unknown>>;
+    const forAssign = base.map((op) => ({
+      id: Number(op.id ?? 0),
+      clientNameForInvoiceMatch: String(op.clientName ?? ""),
+      operationDateYmd: String(op.operationDate ?? ""),
+    }));
+    const assign = assignHostingInvoiceCommissionsToFxOps(forAssign, commissions);
+    const operations = base.map((op) => {
+      const id = Number(op.id ?? 0);
+      const hit = assign.get(id);
+      if (!hit) return op;
+      return {
+        ...op,
+        invoiceHostingCambioCommissionUsd: hit.commissionUsd,
+        invoiceHostingCambioNumber: hit.invoiceNumber,
+      };
+    });
+    res.json({ operations });
+  }
+);
+
+/** Listado vitrina: todas las facturas hosting que incluyen líneas de comisión 4% transferencia en el ítemizado. */
+hostingFxOperationsRouter.get(
+  "/hosting/invoices-transfer-commission",
+  requireRole("admin_a", "admin_b", "operador", "lector"),
+  requireModuleGrant("hosting_tipo_cambio"),
+  async (_req, res) => {
+    await ensureHostingFxSchema();
+    try {
+      const rows = await fetchHostingInvoicesTransferCommissionAgg();
+      res.json({
+        invoices: rows.map((x) => ({
+          invoiceId: x.invoiceId,
+          number: x.invoiceNumber,
+          clientName: x.invoiceClientRaw,
+          date: x.invoiceDateRaw,
+          month: x.invoiceMonth,
+          invoiceTotalUsd: x.invoiceTotalUsd,
+          commissionUsd: x.commissionUsd,
+        })),
+      });
+    } catch {
+      res.json({ invoices: [] });
+    }
   }
 );
 
@@ -229,6 +356,7 @@ hostingFxOperationsRouter.post(
       return res.status(400).json({ error: { message: "Datos inválidos para registrar la operación." } });
     }
     const d = parsed.data;
+    const hostingFlow = Boolean(d.compraFlowHostingCommission);
     const operationType: "usdt_to_usd" | "usd_to_usdt" = d.usdtSide === "buy_usdt" ? "usd_to_usdt" : "usdt_to_usd";
     const transferAmount = Math.max(0, d.operationAmount - (d.operationAmount * d.hrsCommissionPct) / 100);
     const client = (await db.prepare("SELECT id FROM clients WHERE id = ?").get(d.clientId)) as { id: number } | undefined;
@@ -240,8 +368,9 @@ hostingFxOperationsRouter.post(
       .prepare(
         `INSERT INTO hosting_fx_operations (
           client_id, operation_date, operation_amount, operation_type, hrs_commission_pct, bank_fee_amount, delivery_method, client_total_payment,
-          bank_name, account_number, currency, bank_branch, account_holder_name, usdt_side, notes, created_at, updated_at, ticket_code
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          bank_name, account_number, currency, bank_branch, account_holder_name, usdt_side, notes, created_at, updated_at, ticket_code,
+          compra_flow_hosting_commission
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         d.clientId,
@@ -261,7 +390,8 @@ hostingFxOperationsRouter.post(
         d.notes ?? null,
         now,
         now,
-        ticketCode
+        ticketCode,
+        hostingFlow ? 1 : 0
       );
     res.status(201).json({ ok: true });
   }
@@ -309,6 +439,7 @@ hostingFxOperationsRouter.put(
     if (d.usdtSide != null) push("usdt_side = ?", d.usdtSide);
     if (nextOperationType != null) push("operation_type = ?", nextOperationType);
     if (d.notes != null) push("notes = ?", d.notes);
+    if (d.compraFlowHostingCommission != null) push("compra_flow_hosting_commission = ?", d.compraFlowHostingCommission ? 1 : 0);
     if (d.operationAmount != null || d.hrsCommissionPct != null) {
       const current = (await db
         .prepare("SELECT operation_amount, hrs_commission_pct FROM hosting_fx_operations WHERE id = ?")

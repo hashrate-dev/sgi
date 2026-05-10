@@ -162,7 +162,7 @@ export const LECTOR_GRANT_PATH_PREFIXES: Record<LectorPermissionKey, readonly st
   finanzas_contabilidad: ["/gestion-financiera/contabilidad", "/gestion-financiera/monitor-financiero"],
   finanzas_proveedores: ["/gestion-financiera/proveedores"],
   finanzas_asic_costos: ["/asic/cotizador-china-py"],
-  hosting_tipo_cambio: ["/hosting/exchange-operations"],
+  hosting_tipo_cambio: ["/hosting/exchange-operations", "/hosting/tipo-cambio-historial"],
   reportes: ["/reports", "/reportes"],
   /** No amplía navegación SPA: la exportación aplica solo dentro de pantallas ya autorizadas por otro permiso. */
   exportar: [],
@@ -186,8 +186,11 @@ const LECTOR_KEYS_FOR_GESTION_FIN: readonly LectorPermissionKey[] = [
 
 export function lectorHubPathPrefixes(grants: readonly LectorPermissionKey[]): string[] {
   const out: string[] = [];
-  if (grants.some((k) => LECTOR_KEYS_FOR_GESTION_ADMIN.includes(k))) out.push("/gestion-administrativa");
-  if (grants.some((k) => LECTOR_KEYS_FOR_GESTION_FIN.includes(k))) out.push("/gestion-financiera");
+  const seesAdminModules = grants.some((k) => LECTOR_KEYS_FOR_GESTION_ADMIN.includes(k));
+  const seesFinModules = grants.some((k) => LECTOR_KEYS_FOR_GESTION_FIN.includes(k));
+  /** Gestión Financiera solo se entra desde el hub administrativo; quien tiene solo finanzas debe poder abrir ese hub */
+  if (seesAdminModules || seesFinModules) out.push("/gestion-administrativa");
+  if (seesFinModules) out.push("/gestion-financiera");
   return out;
 }
 
@@ -222,10 +225,8 @@ export function canLectorSeeHomeMenuTo(user: { role?: string; lector_grants?: st
   if (to === "/marketplace") return true;
   if (to === "/kryptex") return true;
   if (to === "/gestion-administrativa") {
-    return LECTOR_KEYS_FOR_GESTION_ADMIN.some((k) => g.includes(k));
-  }
-  if (to === "/gestion-financiera") {
     return (
+      LECTOR_KEYS_FOR_GESTION_ADMIN.some((k) => g.includes(k)) ||
       LECTOR_KEYS_FOR_GESTION_FIN.some((k) => g.includes(k)) ||
       g.includes("reportes") ||
       g.includes("facturacion") ||

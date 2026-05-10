@@ -9,12 +9,14 @@ import { FacturacionPage } from "./pages/FacturacionPage";
 import { FacturacionMineriaPage } from "./pages/FacturacionMineriaPage";
 import { HostingHubPage } from "./pages/HostingHubPage";
 import { GestionAdministrativaPage } from "./pages/GestionAdministrativaPage";
+import { PruebaPage } from "./pages/PruebaPage";
 import { GestionFinancieraHubPage } from "./pages/GestionFinancieraHubPage";
 import { ProveedoresHrsPage } from "./pages/ProveedoresHrsPage";
 import { ContabilidadGastosPage } from "./pages/ContabilidadGastosPage";
 import { MonitorFinancieroPage } from "./pages/MonitorFinancieroPage";
 import { FacturasMesHostingPage } from "./pages/FacturasMesHostingPage";
 import { HostingExchangeOperationsPage } from "./pages/HostingExchangeOperationsPage";
+import { HostingTipoCambioHistorialPage } from "./pages/HostingTipoCambioHistorialPage";
 import { MineriaHubPage } from "./pages/MineriaHubPage";
 import { AsicCotizadorChinaPyPage } from "./pages/AsicCotizadorChinaPyPage";
 import { HistorialPage } from "./pages/HistorialPage";
@@ -369,6 +371,7 @@ function App() {
             <Route path="/asic/equipment" element={<EquiposAsicPage />} />
             <Route path="/marketplace/home-banners" element={<TiendaOnlineBannersHomePage />} />
             <Route path="/gestion-administrativa" element={<GestionAdministrativaPage />} />
+            <Route path="/gestion-administrativa/prueba" element={<PruebaPage />} />
             <Route path="/gestion-financiera" element={<GestionFinancieraHubPage />} />
             <Route path="/gestion-financiera/proveedores" element={<ProveedoresHrsPage />} />
             <Route path="/gestion-financiera/contabilidad" element={<ContabilidadGastosPage />} />
@@ -376,6 +379,7 @@ function App() {
             <Route path="/hosting" element={<HostingHubPage />} />
             <Route path="/hosting/email-flow" element={<FacturasMesHostingPage />} />
             <Route path="/hosting/exchange-operations" element={<HostingExchangeOperationsPage />} />
+            <Route path="/hosting/tipo-cambio-historial" element={<HostingTipoCambioHistorialPage />} />
             <Route path="/hosting/billing" element={<FacturacionPage />} />
             <Route path="/history" element={<HistorialPage />} />
             <Route path="/hosting/history" element={<HistorialPage sourceFilter="hosting" />} />

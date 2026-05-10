@@ -2073,6 +2073,14 @@ a.fact-logo-container--link:focus-visible {
   align-items: stretch;
   overflow: visible;
 }
+/* Misma altura en cada fila: la zona de cifras queda abajo si la tarjeta es menos alta que la vecina */
+.hosting-fx-ops-indicators__grid > article.hosting-fx-ops-metric {
+  height: 100%;
+  align-self: stretch;
+}
+.hosting-fx-ops-indicators__grid > article.hosting-fx-ops-metric > :last-child {
+  margin-top: auto;
+}
 @media (min-width: 1200px) {
   .hosting-fx-ops-indicators__grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2081,6 +2089,51 @@ a.fact-logo-container--link:focus-visible {
 @media (max-width: 767.98px) {
   .hosting-fx-ops-indicators__grid {
     grid-template-columns: 1fr;
+  }
+}
+/* Historial tipo cambio: aviso bajo filtros (texto legible sobre fondo verde) */
+.historial-filtros-card .hosting-fx-historial-filtros-activo {
+  color: rgba(255, 255, 255, 0.88);
+  position: relative;
+  z-index: 1;
+}
+/* Historial — fila 2: Comisión | Volumen cambio | Total consolidado */
+.hosting-fx-ops-indicators__grid--with-transfer-kpi .hosting-fx-ops-row2-kpi-wrap {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.hosting-fx-ops-indicators__grid--with-transfer-kpi .hosting-fx-ops-transfer-invoices-kpi {
+  grid-column: 1 / 2;
+  grid-row: 2 / 3;
+}
+.hosting-fx-ops-indicators__grid--with-transfer-kpi .hosting-fx-ops-volume-change-kpi {
+  grid-column: 2 / 3;
+  grid-row: 2 / 3;
+}
+.hosting-fx-ops-indicators__grid--with-transfer-kpi .hosting-fx-ops-consolidated-kpi {
+  grid-column: 3 / 4;
+  grid-row: 2 / 3;
+}
+.hosting-fx-ops-indicators__grid--with-transfer-kpi .hosting-fx-ops-row2-kpi-wrap > .hosting-fx-ops-metric {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+}
+.hosting-fx-ops-indicators__grid--with-transfer-kpi .hosting-fx-ops-row2-kpi-wrap > .hosting-fx-ops-metric > :last-child {
+  margin-top: auto;
+}
+@media (max-width: 1199.98px) {
+  .hosting-fx-ops-indicators__grid--with-transfer-kpi .hosting-fx-ops-transfer-invoices-kpi,
+  .hosting-fx-ops-indicators__grid--with-transfer-kpi .hosting-fx-ops-volume-change-kpi,
+  .hosting-fx-ops-indicators__grid--with-transfer-kpi .hosting-fx-ops-consolidated-kpi {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    width: 100%;
   }
 }
 .hosting-fx-ops-metric {
@@ -2119,6 +2172,36 @@ a.fact-logo-container--link:focus-visible {
   background: linear-gradient(180deg, #f6fdf9 0%, #fff 32%);
   border-color: #d1e3d9;
   border-left: 3px solid #2D5D46;
+}
+/* Total consolidado (ganancias + comisiones hosting): KPI resaltado */
+.hosting-fx-ops-metric--grand-total {
+  background: linear-gradient(145deg, #ecfdf5 0%, #d1fae5 42%, #ffffff 100%);
+  border-color: #6ee7b7;
+  border-left: 5px solid #059669;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.06),
+    0 0 0 1px rgba(5, 150, 105, 0.14) inset,
+    0 8px 28px rgba(5, 150, 105, 0.14);
+}
+@media (hover: hover) and (pointer: fine) {
+  .hosting-fx-ops-metric--grand-total:hover {
+    border-color: #34d399;
+    box-shadow:
+      0 4px 22px rgba(5, 150, 105, 0.22),
+      0 0 0 1px rgba(5, 150, 105, 0.18) inset;
+  }
+}
+.hosting-fx-ops-metric--grand-total .hosting-fx-ops-metric__icon {
+  background: linear-gradient(145deg, #10b981 0%, #059669 100%);
+  color: #fff;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.22) inset;
+}
+.hosting-fx-ops-metric--grand-total .hosting-fx-ops-metric__eyebrow {
+  color: #047857;
+}
+.hosting-fx-ops-metric--grand-total .hosting-fx-ops-metric__figure {
+  color: #065f46;
+  font-weight: 700;
 }
 .hosting-fx-ops-metric__top {
   display: flex;
@@ -2675,8 +2758,10 @@ a.fact-logo-container--link:focus-visible {
 .hosting-fx-ops-table-wrap {
   border-radius: 12px;
   border: 1px solid #e2e8f0;
-  overflow: auto;
-  max-height: min(62vh, 520px);
+  /* Sin tope de alto: se ve la tabla completa; el desplazamiento vertical es el de la página, no un scroll interno */
+  overflow-x: auto;
+  overflow-y: visible;
+  max-height: none;
   background: #fff;
   width: 100%;
   -webkit-overflow-scrolling: touch;
@@ -2688,6 +2773,102 @@ a.fact-logo-container--link:focus-visible {
   border-spacing: 0;
   font-size: 0.875rem;
   table-layout: auto;
+}
+/* Historial operaciones: proporciones y lectura más limpia */
+.hosting-fx-ops-table--historial {
+  table-layout: fixed;
+  min-width: 1160px;
+}
+.hosting-fx-ops-table--historial col.hosting-fx-ops-w-mes {
+  width: 7%;
+}
+.hosting-fx-ops-table--historial col.hosting-fx-ops-w-fecha {
+  width: 7.5%;
+}
+.hosting-fx-ops-table--historial col.hosting-fx-ops-w-cliente {
+  width: 23%;
+}
+.hosting-fx-ops-table--historial col.hosting-fx-ops-w-tipo {
+  width: 9%;
+}
+.hosting-fx-ops-table--historial col.hosting-fx-ops-w-compra {
+  width: 13%;
+}
+.hosting-fx-ops-table--historial col.hosting-fx-ops-w-ganancia {
+  width: 11%;
+}
+.hosting-fx-ops-table--historial col.hosting-fx-ops-w-notas {
+  width: 16%;
+}
+.hosting-fx-ops-table--historial col.hosting-fx-ops-w-acciones {
+  width: 13.5%;
+}
+/* Cabeceras legibles: sin nowrap forzado (evita «GANANCIA OPER…» cortado) */
+.hosting-fx-ops-table--historial thead th {
+  padding: 0.78rem 0.65rem;
+  font-size: 0.71rem;
+  letter-spacing: 0.065em;
+  white-space: normal;
+  word-wrap: break-word;
+  line-height: 1.25;
+  vertical-align: middle;
+}
+.hosting-fx-ops-table--historial tbody td.hosting-fx-ops-td {
+  padding: 0.65rem 0.7rem;
+  vertical-align: middle;
+  border-bottom-color: #eef2f7;
+}
+.hosting-fx-ops-table--historial .hosting-fx-ops-td--fecha {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  color: #475569;
+}
+.hosting-fx-ops-table--historial .hosting-fx-ops-td--mes {
+  color: #475569;
+  font-weight: 500;
+}
+.hosting-fx-ops-table--historial .hosting-fx-ops-td--cliente {
+  word-break: break-word;
+  hyphens: auto;
+  line-height: 1.45;
+  font-weight: 500;
+  color: #1e293b;
+}
+.hosting-fx-ops-table--historial .hosting-fx-ops-td--tipo {
+  color: #475569;
+}
+.hosting-fx-ops-table--historial .hosting-fx-ops-td--compra {
+  color: #334155;
+  line-height: 1.4;
+}
+.hosting-fx-ops-table--historial .hosting-fx-ops-td--ganancia .hosting-fx-ops-num {
+  font-weight: 600;
+  color: #14532d;
+}
+.hosting-fx-ops-table--historial .hosting-fx-ops-notes-cell {
+  max-width: none;
+  vertical-align: middle;
+  line-height: 1.45;
+  font-size: 0.8125rem;
+  color: #475569;
+}
+.hosting-fx-ops-notes-empty {
+  color: #cbd5e1;
+  font-weight: 500;
+}
+.hosting-fx-ops-table--historial .hosting-fx-ops-icon-row {
+  gap: 0.55rem;
+  justify-content: center;
+}
+.hosting-fx-ops-table--historial .hosting-fx-ops-actions {
+  min-width: 12rem;
+  width: 100%;
+}
+.hosting-fx-ops-table--historial thead th.hosting-fx-ops-th--end {
+  text-align: right;
+}
+.hosting-fx-ops-table--historial thead th.hosting-fx-ops-th--center {
+  text-align: center;
 }
 .hosting-fx-ops-table thead th {
   position: sticky;
@@ -2712,6 +2893,22 @@ a.fact-logo-container--link:focus-visible {
 .hosting-fx-ops-table td.hosting-fx-ops-td--end {
   text-align: right;
 }
+.hosting-fx-ops-table thead th.hosting-fx-ops-th--narrow,
+.hosting-fx-ops-table td.hosting-fx-ops-td--narrow {
+  max-width: 5.85rem;
+}
+.hosting-fx-ops-num--muted {
+  color: #64748b;
+}
+.hosting-fx-ops-transfer-comm-foot td {
+  border-top: 2px solid #2d5d46;
+  padding-top: 0.65rem;
+  background: #f1f5f9;
+  color: #0f172a;
+}
+.hosting-fx-ops-transfer-comm-foot .hosting-fx-ops-transfer-comm-foot__label {
+  color: #475569;
+}
 .hosting-fx-ops-table thead th.hosting-fx-ops-th--center,
 .hosting-fx-ops-table td.hosting-fx-ops-td--center {
   text-align: center;
@@ -2732,6 +2929,13 @@ a.fact-logo-container--link:focus-visible {
 .hosting-fx-ops-table .hosting-fx-ops-num {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+.hosting-fx-ops-table .hosting-fx-ops-notes-cell {
+  max-width: 14rem;
+  word-break: break-word;
+  font-size: 0.875rem;
+  line-height: 1.35;
+  vertical-align: middle;
 }
 .hosting-fx-ops-table .hosting-fx-ops-actions {
   min-width: 11.5rem;

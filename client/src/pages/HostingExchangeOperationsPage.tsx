@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
+import { HostingFxOperationsIndicators } from "../components/HostingFxOperationsIndicators";
+import {
+  HostingFxOperationsHistoryCard,
+  HostingFxTicketModal,
+  HostingTransferCommissionInvoicesCard,
+} from "../components/HostingTipoCambioHistorialTables";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -12,12 +18,13 @@ import {
   deleteHostingFxOperation,
   getClients,
   getHostingFxOperations,
+  getHostingInvoicesTransferCommission,
   updateHostingFxOperation,
   type HostingFxOperation,
   type HostingFxOperationPayload,
+  type HostingInvoiceTransferCommissionRow,
 } from "../lib/api";
 import { downloadHostingFxTicketPdf } from "../lib/generateHostingFxTicketPdf";
-import { hostingFxOperationProfitUsd } from "../lib/hostingFxOperationProfit";
 import "../styles/facturacion.css";
 
 type FxFormState = HostingFxOperationPayload;
@@ -39,9 +46,11 @@ const INITIAL_FORM: FxFormState = {
 };
 
 const BANK_OPTIONS = ["Banco Santander", "BROU", "Banco Itau", "BBVA", "Prex", "Mi Dinero"] as const;
+const DEFAULT_BANK_HOSTING_COMMISSION = BANK_OPTIONS[0]!;
 const HRS_COMMISSION_PCT_OPTIONS = [1, 1.5, 2, 3, 4] as const;
-const HASHRATE_LOGO = "https://hashrate.space/wp-content/uploads/hashrate-LOGO.png";
 
+/** Valores del select «Cliente»: los dos primeros son operaciones FX; el tercero solo enlaza a la tabla de comisión 4% facturas. */
+type ClientCompraSelectValue = FxFormState["usdtSide"] | "hosting_commission";
 /** Al elegir «Compra de USDT»: envío fijo a Binance. Al elegir «Compra de USD»: envío por defecto a banco. */
 function deliveryWhenClientCompraSideChanges(usdtSide: FxFormState["usdtSide"]): FxFormState["deliveryMethod"] {
   return usdtSide === "buy_usdt" ? "usdt_to_hrs_binance" : "usd_to_bank";
@@ -55,6 +64,7 @@ function normalizeHrsCommissionPct(n: number): number {
 }
 
 export function HostingExchangeOperationsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, loading } = useAuth();
   const [clients, setClients] = useState<Array<{ id: number; code: string; name: string; name2?: string }>>([]);
   const [operations, setOperations] = useState<HostingFxOperation[]>([]);
@@ -66,6 +76,8 @@ export function HostingExchangeOperationsPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [ticketOperationId, setTicketOperationId] = useState<number | null>(null);
   const [pdfLoadingId, setPdfLoadingId] = useState<number | null>(null);
+  const [transferCommissionInvoices, setTransferCommissionInvoices] = useState<HostingInvoiceTransferCommissionRow[]>([]);
+  const [clientCompraSelect, setClientCompraSelect] = useState<ClientCompraSelectValue>("buy_usdt");
 
   const loadData = useCallback(async () => {
     setTableLoading(true);
@@ -83,12 +95,22 @@ export function HostingExchangeOperationsPage() {
       if (normalizedClients.length > 0 && form.clientId <= 0) {
         setForm((prev) => ({ ...prev, clientId: normalizedClients[0]!.id }));
       }
-      try {
-        const o = await getHostingFxOperations();
-        setOperations(o.operations || []);
-      } catch (e) {
+      const [rOps, rTi] = await Promise.allSettled([
+        getHostingFxOperations(),
+        getHostingInvoicesTransferCommission(),
+      ]);
+      if (rOps.status === "fulfilled") {
+        setOperations(rOps.value.operations || []);
+      } else {
         setOperations([]);
-        setErr(e instanceof Error ? e.message : "No se pudieron cargar las operaciones.");
+        setErr(
+          rOps.reason instanceof Error ? rOps.reason.message : "No se pudieron cargar las operaciones."
+        );
+      }
+      if (rTi.status === "fulfilled") {
+        setTransferCommissionInvoices(rTi.value.invoices || []);
+      } else {
+        setTransferCommissionInvoices([]);
       }
     } catch (e) {
       setErr(e instanceof Error ? e.message : "No se pudo cargar la información.");
@@ -148,35 +170,6 @@ export function HostingExchangeOperationsPage() {
       setPdfLoadingId(null);
     }
   }, []);
-  const exchangeOpsStats = useMemo(() => {
-    let totalGanancias = 0;
-    let montoVentaUsd = 0;
-    let montoCompraUsd = 0;
-    /** Suma de «Monto transferencia» (clientTotalPayment) con Cliente: Compra de USD (sell_usdt). */
-    let montoTransferenciaVentaUsdt = 0;
-    /** Suma de monto transferencia con Cliente: Compra de USDT (buy_usdt). */
-    let montoTransferenciaCompraDeUsdt = 0;
-    for (const op of operations) {
-      totalGanancias += hostingFxOperationProfitUsd(op);
-      const amt = Number.isFinite(op.operationAmount) ? op.operationAmount : 0;
-      const transfer = Number.isFinite(op.clientTotalPayment) ? op.clientTotalPayment : 0;
-      if (op.usdtSide === "sell_usdt") {
-        montoVentaUsd += amt;
-        montoTransferenciaVentaUsdt += transfer;
-      } else {
-        montoCompraUsd += amt;
-        montoTransferenciaCompraDeUsdt += transfer;
-      }
-    }
-    return {
-      totalGanancias,
-      count: operations.length,
-      montoVentaUsd,
-      montoCompraUsd,
-      montoTransferenciaVentaUsdt,
-      montoTransferenciaCompraDeUsdt,
-    };
-  }, [operations]);
   const transferAmount = useMemo(() => {
     const opAmount = Number.isFinite(form.operationAmount) ? form.operationAmount : 0;
     const comm = Number.isFinite(form.hrsCommissionPct) ? form.hrsCommissionPct : 0;
@@ -216,6 +209,7 @@ export function HostingExchangeOperationsPage() {
 
   const resetForm = () => {
     setEditingId(null);
+    setClientCompraSelect("buy_usdt");
     setForm((prev) => ({
       ...INITIAL_FORM,
       operationDate: new Date().toISOString().slice(0, 10),
@@ -226,6 +220,12 @@ export function HostingExchangeOperationsPage() {
   const refreshOperations = async () => {
     const data = await getHostingFxOperations();
     setOperations(data.operations || []);
+    try {
+      const inv = await getHostingInvoicesTransferCommission();
+      setTransferCommissionInvoices(inv.invoices || []);
+    } catch {
+      /* misma página: si falla, no ocultamos el listado anterior */
+    }
   };
 
   const validateForm = (): string | null => {
@@ -233,10 +233,8 @@ export function HostingExchangeOperationsPage() {
     if (!form.operationDate.trim()) return "Ingresá la fecha de la operación.";
     if (bankFieldsEnabled) {
       if (!form.bankName.trim()) return "Ingresá el banco.";
-      if (!form.accountNumber.trim()) return "Ingresá el número de cuenta.";
       if (!form.currency.trim()) return "Ingresá la moneda.";
-      if (!form.bankBranch.trim()) return "Ingresá la sucursal bancaria.";
-      if (!form.accountHolderName.trim()) return "Ingresá el nombre completo de cuenta.";
+      /* Número de cuenta, sucursal y titular son opcionales */
     }
     if (!Number.isFinite(form.hrsCommissionPct) || form.hrsCommissionPct < 0 || form.hrsCommissionPct > 100) {
       return "La comisión debe estar entre 0 y 100.";
@@ -272,6 +270,7 @@ export function HostingExchangeOperationsPage() {
         accountHolderName: bankOn ? form.accountHolderName.trim() : "",
         clientTotalPayment: transferAmount,
         notes: form.notes?.trim() || "",
+        compraFlowHostingCommission: clientCompraSelect === "hosting_commission",
       };
       if (editingId != null) {
         await updateHostingFxOperation(editingId, payload);
@@ -289,9 +288,12 @@ export function HostingExchangeOperationsPage() {
     }
   };
 
-  const startEdit = (op: HostingFxOperation) => {
+  const startEdit = useCallback((op: HostingFxOperation) => {
     if (!canEdit) return;
     setEditingId(op.id);
+    setClientCompraSelect(
+      op.compraFlowHostingCommission ? "hosting_commission" : op.usdtSide === "buy_usdt" ? "buy_usdt" : "sell_usdt"
+    );
     setForm({
       clientId: op.clientId,
       operationDate: op.operationDate,
@@ -312,7 +314,25 @@ export function HostingExchangeOperationsPage() {
     });
     setErr("");
     setOk("");
-  };
+  }, [canEdit]);
+
+  const editIdFromUrl = searchParams.get("edit");
+  useEffect(() => {
+    if (!editIdFromUrl || !canEdit) return;
+    const id = Number(editIdFromUrl);
+    if (!Number.isFinite(id) || id <= 0 || operations.length === 0) return;
+    const op = operations.find((o) => o.id === id);
+    if (!op) return;
+    startEdit(op);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("edit");
+        return next;
+      },
+      { replace: true }
+    );
+  }, [editIdFromUrl, operations, canEdit, startEdit, setSearchParams]);
 
   const removeOperation = async (id: number) => {
     if (!canDelete) return;
@@ -342,168 +362,7 @@ export function HostingExchangeOperationsPage() {
           backTo="/hosting"
           backText="Volver a Hosting"
         />
-        <section className="hosting-fx-ops-indicators mb-4 mt-3" aria-label="Indicadores de operaciones" aria-live="polite">
-          <div className="hosting-fx-ops-indicators__grid" role="presentation">
-            <article className="hosting-fx-ops-metric hosting-fx-ops-metric--profit" aria-label="Total de ganancias en USD">
-              <div className="hosting-fx-ops-metric__top">
-                <div className="hosting-fx-ops-metric__icon" aria-hidden>
-                  <i className="bi bi-currency-dollar" />
-                </div>
-                <div className="hosting-fx-ops-metric__intro">
-                  <span className="hosting-fx-ops-metric__eyebrow">Rendimiento</span>
-                  <h3 className="hosting-fx-ops-metric__title">Total de ganancias</h3>
-                </div>
-              </div>
-              <p className="hosting-fx-ops-metric__figure">
-                {tableLoading ? (
-                  <span className="hosting-fx-ops-metric__loading">Cargando…</span>
-                ) : (
-                  new Intl.NumberFormat("es-PY", { style: "currency", currency: "USD" }).format(
-                    exchangeOpsStats.totalGanancias
-                  )
-                )}
-              </p>
-            </article>
-            <article className="hosting-fx-ops-metric hosting-fx-ops-metric--count" aria-label="Cantidad de operaciones en el listado">
-              <div className="hosting-fx-ops-metric__top">
-                <div className="hosting-fx-ops-metric__icon" aria-hidden>
-                  <i className="bi bi-journal-text" />
-                </div>
-                <div className="hosting-fx-ops-metric__intro">
-                  <span className="hosting-fx-ops-metric__eyebrow">Volumen</span>
-                  <h3 className="hosting-fx-ops-metric__title">Operaciones en listado</h3>
-                </div>
-              </div>
-              <p className="hosting-fx-ops-metric__figure hosting-fx-ops-metric__figure--count">
-                {tableLoading ? <span className="hosting-fx-ops-metric__loading">—</span> : exchangeOpsStats.count}
-              </p>
-            </article>
-            <article
-              className="hosting-fx-ops-metric hosting-fx-ops-metric--sell"
-              aria-label="Monto operación, compra de USD, cliente paga con USDT"
-            >
-              <div className="hosting-fx-ops-metric__top">
-                <div className="hosting-fx-ops-metric__icon" aria-hidden>
-                  <i className="bi bi-arrow-up-right" />
-                </div>
-                <div className="hosting-fx-ops-metric__intro">
-                  <span className="hosting-fx-ops-metric__eyebrow">
-                    Compra de USD
-                    <br />
-                    (Cliente paga con USDT)
-                  </span>
-                  <div className="hosting-fx-ops-metric__title-with-info">
-                    <h3 className="hosting-fx-ops-metric__title" id="hosting-fx-metric-sell-title">
-                      Monto total movido
-                    </h3>
-                    <span className="hosting-fx-ops-metric__info-trig">
-                      <button
-                        type="button"
-                        className="hosting-fx-ops-metric__info-btn"
-                        aria-label="Más información sobre compra de USD (cliente paga con USDT) en este resumen"
-                        aria-describedby="hosting-fx-metric-sell-tip"
-                      >
-                        <i className="bi bi-info-circle" aria-hidden />
-                      </button>
-                      <span className="hosting-fx-ops-metric__info-bubble" id="hosting-fx-metric-sell-tip" role="tooltip">
-                        Suma de operaciones con movimiento hacia dólares (en USD).
-                      </span>
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="hosting-fx-ops-metric__figure-stack">
-                <p className="hosting-fx-ops-metric__figure hosting-fx-ops-metric__figure--usdt">
-                  {tableLoading ? (
-                    <span className="hosting-fx-ops-metric__loading">Cargando…</span>
-                  ) : (
-                    <>
-                      +
-                      {new Intl.NumberFormat("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-                        exchangeOpsStats.montoVentaUsd
-                      )}{" "}
-                      <span className="hosting-fx-ops-metric__unit">USDT</span>
-                    </>
-                  )}
-                </p>
-                {!tableLoading && (
-                  <p
-                    className="hosting-fx-ops-metric__figure-sub hosting-fx-ops-metric__figure-sub--transfer-usdt-neg"
-                    aria-label="Suma de monto transferencia en USD, operaciones con compra de USD (cliente)"
-                  >
-                    −
-                    {new Intl.NumberFormat("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-                      exchangeOpsStats.montoTransferenciaVentaUsdt
-                    )}{" "}
-                    <span className="hosting-fx-ops-metric__unit">USD</span>
-                  </p>
-                )}
-              </div>
-            </article>
-            <article
-              className="hosting-fx-ops-metric hosting-fx-ops-metric--buy"
-              aria-label="Monto operación, compra de USDT, cliente paga con USD"
-            >
-              <div className="hosting-fx-ops-metric__top">
-                <div className="hosting-fx-ops-metric__icon" aria-hidden>
-                  <i className="bi bi-arrow-down-left" />
-                </div>
-                <div className="hosting-fx-ops-metric__intro">
-                  <span className="hosting-fx-ops-metric__eyebrow">
-                    Compra de USDT
-                    <br />
-                    (Cliente paga con USD)
-                  </span>
-                  <div className="hosting-fx-ops-metric__title-with-info">
-                    <h3 className="hosting-fx-ops-metric__title" id="hosting-fx-metric-buy-title">
-                      Monto total movido
-                    </h3>
-                    <span className="hosting-fx-ops-metric__info-trig">
-                      <button
-                        type="button"
-                        className="hosting-fx-ops-metric__info-btn"
-                        aria-label="Más información sobre compra de USDT (cliente paga con USD) en este resumen"
-                        aria-describedby="hosting-fx-metric-buy-tip"
-                      >
-                        <i className="bi bi-info-circle" aria-hidden />
-                      </button>
-                      <span className="hosting-fx-ops-metric__info-bubble" id="hosting-fx-metric-buy-tip" role="tooltip">
-                        Suma de operaciones: compra de USDT, el cliente paga con USD.
-                      </span>
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="hosting-fx-ops-metric__figure-stack">
-                <p className="hosting-fx-ops-metric__figure hosting-fx-ops-metric__figure--usdt">
-                  {tableLoading ? (
-                    <span className="hosting-fx-ops-metric__loading">Cargando…</span>
-                  ) : (
-                    <>
-                      +
-                      {new Intl.NumberFormat("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-                        exchangeOpsStats.montoCompraUsd
-                      )}{" "}
-                      <span className="hosting-fx-ops-metric__unit">USD</span>
-                    </>
-                  )}
-                </p>
-                {!tableLoading && (
-                  <p
-                    className="hosting-fx-ops-metric__figure-sub hosting-fx-ops-metric__figure-sub--transfer-usdt-neg"
-                    aria-label="Suma de monto transferencia en USDT, operaciones con compra de USDT (cliente)"
-                  >
-                    −
-                    {new Intl.NumberFormat("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-                      exchangeOpsStats.montoTransferenciaCompraDeUsdt
-                    )}{" "}
-                    <span className="hosting-fx-ops-metric__unit">USDT</span>
-                  </p>
-                )}
-              </div>
-            </article>
-          </div>
-        </section>
+        <HostingFxOperationsIndicators operations={operations} tableLoading={tableLoading} />
 
         <div className="fact-card fact-panel-nuevo-documento mb-4">
           <div className="fact-panel-nuevo-documento-header">
@@ -608,22 +467,39 @@ export function HostingExchangeOperationsPage() {
                 />
               </div>
               <div className="col-12 col-md-6 col-lg-4">
-                <label className="fact-label">Cliente (Compra de USDT / Compra de USD)</label>
+                <label className="fact-label">Cliente (Compra de USDT / Compra de USD / 4% Hosting)</label>
                 <select
                   className="fact-select"
-                  value={form.usdtSide}
+                  value={clientCompraSelect}
                   onChange={(e) => {
-                    const usdtSide = e.target.value as FxFormState["usdtSide"];
+                    const v = e.target.value as ClientCompraSelectValue;
+                    setClientCompraSelect(v);
+                    if (v === "hosting_commission") {
+                      setForm((p) => ({
+                        ...p,
+                        usdtSide: "sell_usdt",
+                        deliveryMethod: "usd_to_bank",
+                        bankName: DEFAULT_BANK_HOSTING_COMMISSION,
+                      }));
+                      window.requestAnimationFrame(() => {
+                        document.getElementById("hosting-transfer-commission-section")?.scrollIntoView({
+                          behavior: "smooth",
+                          block: "start",
+                        });
+                      });
+                      return;
+                    }
                     setForm((p) => ({
                       ...p,
-                      usdtSide,
-                      deliveryMethod: deliveryWhenClientCompraSideChanges(usdtSide),
+                      usdtSide: v,
+                      deliveryMethod: deliveryWhenClientCompraSideChanges(v),
                     }));
                   }}
                   disabled={!canEdit || busy}
                 >
                   <option value="buy_usdt">Compra de USDT</option>
                   <option value="sell_usdt">Compra de USD</option>
+                  <option value="hosting_commission">4% Comisión por Hosting</option>
                 </select>
               </div>
               <div className="col-12 col-md-6 col-lg-4">
@@ -723,201 +599,24 @@ export function HostingExchangeOperationsPage() {
           </div>
         </div>
 
-        <div className="fact-card mb-4">
-          <div className="fact-card-header">
-            <div className="d-flex justify-content-between gap-2 flex-wrap">
-              <span>Historial de operaciones</span>
-            </div>
-          </div>
-          <div className="fact-card-body">
-          <div className="hosting-fx-ops-table-wrap">
-            <table className="hosting-fx-ops-table">
-              <thead className="hosting-fx-ops-thead">
-                <tr>
-                  <th scope="col">Fecha</th>
-                  <th scope="col">Cliente</th>
-                  <th scope="col">Tipo</th>
-                  <th scope="col">Compra de USDT / USD</th>
-                  <th scope="col" className="hosting-fx-ops-th--end">Ganancia operación</th>
-                  <th scope="col" className="hosting-fx-ops-th--center">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tableLoading ? (
-                  <tr>
-                    <td colSpan={6} className="text-center text-muted py-4">
-                      Cargando operaciones...
-                    </td>
-                  </tr>
-                ) : operations.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="text-center text-muted py-4">
-                      Sin operaciones registradas todavía.
-                    </td>
-                  </tr>
-                ) : (
-                  operations.map((op) => (
-                    <tr key={op.id}>
-                      <td>
-                        <span className="text-nowrap">{op.operationDate}</span>
-                      </td>
-                      <td>
-                        {`${op.clientCode || ""} ${op.clientName || ""} ${op.clientLastName || ""}`.trim()}
-                      </td>
-                      <td>
-                        {op.operationType === "usdt_to_usd" ? "USDT → USD" : "USD → USDT"}
-                      </td>
-                      <td>
-                        {op.usdtSide === "buy_usdt" ? "Compra USDT" : "Compra USD"}
-                      </td>
-                      <td className="hosting-fx-ops-td--end">
-                        <span className="hosting-fx-ops-num">
-                          {hostingFxOperationProfitUsd(op).toFixed(2)}
-                        </span>
-                      </td>
-                      <td className="text-center hosting-fx-ops-actions">
-                        <div className="d-flex justify-content-center align-items-center hosting-fx-ops-icon-row" role="group" aria-label="Acciones de la fila">
-                          {canEdit ? (
-                            <button
-                              type="button"
-                              className="hosting-fx-ops-icon-btn hosting-fx-ops-icon-btn--edit"
-                              onClick={() => startEdit(op)}
-                              title="Editar"
-                              aria-label="Editar"
-                            >
-                              <i className="bi bi-pencil-fill" aria-hidden />
-                            </button>
-                          ) : null}
-                          <button
-                            type="button"
-                            className="hosting-fx-ops-icon-btn hosting-fx-ops-icon-btn--info"
-                            onClick={() => setTicketOperationId(op.id)}
-                            title="Ver ticket"
-                            aria-label="Ver ticket"
-                          >
-                            <span className="hosting-fx-ops-ico-info" aria-hidden>
-                              i
-                            </span>
-                          </button>
-                          <button
-                            type="button"
-                            className="hosting-fx-ops-icon-btn hosting-fx-ops-icon-btn--pdf"
-                            onClick={() => void onDownloadRowPdf(op)}
-                            disabled={pdfLoadingId === op.id}
-                            title="Descargar PDF"
-                            aria-label="Descargar PDF"
-                          >
-                            {pdfLoadingId === op.id ? (
-                              <i className="bi bi-hourglass-split" aria-hidden />
-                            ) : (
-                              <i className="bi bi-file-earmark" aria-hidden />
-                            )}
-                          </button>
-                          {canDelete ? (
-                            <button
-                              type="button"
-                              className="hosting-fx-ops-icon-btn hosting-fx-ops-icon-btn--delete"
-                              onClick={() => void removeOperation(op.id)}
-                              title="Eliminar"
-                              aria-label="Eliminar"
-                            >
-                              <i className="bi bi-trash" aria-hidden />
-                            </button>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-          </div>
-        </div>
+        <HostingFxOperationsHistoryCard
+          operations={operations}
+          tableLoading={tableLoading}
+          canEdit={canEdit}
+          canDelete={canDelete}
+          pdfLoadingId={pdfLoadingId}
+          onEdit={startEdit}
+          onTicket={setTicketOperationId}
+          onPdf={onDownloadRowPdf}
+          onDelete={removeOperation}
+        />
 
-        {ticketOperation ? (
-          <div className="hosting-fx-ticket-modal-overlay" role="presentation" onClick={() => setTicketOperationId(null)}>
-            <div
-              className="hosting-fx-ticket-modal-dialog"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="hosting-fx-ticket-title"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="hosting-fx-ticket-modal-head">
-                <div>
-                  <p className="hosting-fx-ticket-modal-eyebrow mb-1">Comprobante interno</p>
-                  <h5 id="hosting-fx-ticket-title" className="mb-0">
-                    Ticket operación {ticketOperation.ticketCode || `#${ticketOperation.id}`}
-                  </h5>
-                </div>
-                <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setTicketOperationId(null)}>
-                  <i className="bi bi-x-lg me-1" aria-hidden />
-                  Cerrar
-                </button>
-              </div>
+        <HostingTransferCommissionInvoicesCard
+          transferCommissionInvoices={transferCommissionInvoices}
+          tableLoading={tableLoading}
+        />
 
-              <div className="hosting-fx-ticket-modal-body">
-                <div className="hosting-fx-ticket-card">
-                  <div className="hosting-fx-ticket-card-header">
-                    <div className="hosting-fx-ticket-brand">
-                      <img src={HASHRATE_LOGO} alt="Hashrate Space" className="hosting-fx-ticket-brand-logo" />
-                    </div>
-                    <div className="d-flex flex-wrap gap-3 gap-md-4 justify-content-end align-items-start">
-                      <div className="text-md-end">
-                        <div className="small text-muted">N° Ticket</div>
-                        <div className="fw-semibold">{ticketOperation.ticketCode || "—"}</div>
-                      </div>
-                      <div className="text-md-end">
-                        <div className="small text-muted">Fecha</div>
-                        <div className="fw-semibold">{ticketOperation.operationDate}</div>
-                      </div>
-                    </div>
-                  </div>
-                  <hr className="my-3" />
-                  <div className="row g-3">
-                    <div className="col-12 col-lg-5">
-                      <div className="hosting-fx-ticket-details-col">
-                        <div><strong>Cliente:</strong> {`${ticketOperation.clientCode || ""} ${ticketOperation.clientName || ""} ${ticketOperation.clientLastName || ""}`.trim()}</div>
-                        <div><strong>Tipo:</strong> {ticketOperation.operationType === "usdt_to_usd" ? "Cambio USDT a USD" : "Cambio USD a USDT"}</div>
-                        <div>
-                          <strong>Cliente (Compra de USDT / Compra de USD):</strong>{" "}
-                          {ticketOperation.usdtSide === "buy_usdt" ? "Compra de USDT" : "Compra de USD"}
-                        </div>
-                        <div><strong>Monto operación:</strong> {new Intl.NumberFormat("es-PY", { style: "currency", currency: "USD" }).format(ticketOperation.operationAmount)}</div>
-                        <div><strong>% comisión Hashrate:</strong> {ticketOperation.hrsCommissionPct.toFixed(2)}%</div>
-                        <div><strong>Comisión bancaria:</strong> {new Intl.NumberFormat("es-PY", { style: "currency", currency: "USD" }).format(ticketOperation.bankFeeAmount)}</div>
-                        <div>
-                          <strong>Monto transferencia:</strong>{" "}
-                          {ticketOperation.deliveryMethod === "usdt_to_hrs_binance"
-                            ? `${new Intl.NumberFormat("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(ticketOperation.clientTotalPayment)} USDT`
-                            : new Intl.NumberFormat("es-PY", { style: "currency", currency: "USD" }).format(ticketOperation.clientTotalPayment)}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="col-12 col-lg-7">
-                      <div className="hosting-fx-ticket-details-col">
-                        <div>
-                          <strong>Envío:</strong>{" "}
-                          {ticketOperation.deliveryMethod === "usd_to_bank" ? "Envio USD a Banco" : "USDT a Binance"}
-                        </div>
-                        {ticketOperation.deliveryMethod === "usd_to_bank" ? (
-                          <>
-                            <div><strong>Banco:</strong> {ticketOperation.bankName}</div>
-                            <div><strong>Sucursal:</strong> {ticketOperation.bankBranch}</div>
-                            <div><strong>Nombre completo de cuenta:</strong> {ticketOperation.accountHolderName}</div>
-                            <div><strong>Moneda:</strong> {ticketOperation.currency}</div>
-                            <div><strong>N° Cuenta:</strong> {ticketOperation.accountNumber}</div>
-                          </>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
+        <HostingFxTicketModal ticketOperation={ticketOperation} onClose={() => setTicketOperationId(null)} />
       </div>
     </div>
   );

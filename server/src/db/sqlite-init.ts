@@ -327,6 +327,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_hosting_fx_ticket_code_unique ON hosting_f
     const msg = e instanceof Error ? e.message : String(e);
     if (!msg.includes("duplicate column")) throw e;
   }
+  try {
+    db.exec("ALTER TABLE hosting_fx_operations ADD COLUMN compra_flow_hosting_commission INTEGER NOT NULL DEFAULT 0");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_hosting_fx_ticket_code_unique ON hosting_fx_operations(ticket_code)");
   db.exec(`CREATE TABLE IF NOT EXISTS hosting_fx_ticket_seq (
     id INTEGER PRIMARY KEY CHECK (id = 1),
