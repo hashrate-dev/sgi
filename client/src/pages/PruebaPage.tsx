@@ -32,13 +32,12 @@ export function PruebaPage() {
     <div className="fact-page">
       <div className="container">
         <PageHeader
-          title="PRUEBA — Cambio USDT/USD"
+          title="Cambio USDT/USD"
           showBackButton
           backTo="/gestion-financiera"
           backText="Volver a Gestión Financiera"
         />
         <div className="hrs-card p-4">
-          <p className="text-muted small mb-3">Elegí una opción:</p>
           <div className="reportes-grid">
             {cambioMenuItems.map((item) => (
               <Link key={item.to} to={item.to} className="reportes-card mineria-hub-card">

@@ -359,8 +359,8 @@ export function HostingExchangeOperationsPage() {
         <PageHeader
           title="Operaciones de Cambio (USDT/USD)"
           showBackButton
-          backTo="/hosting"
-          backText="Volver a Hosting"
+          backTo="/gestion-administrativa/exchange"
+          backText="Volver atrás"
         />
         <HostingFxOperationsIndicators operations={operations} tableLoading={tableLoading} />
 

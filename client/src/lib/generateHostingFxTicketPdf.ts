@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import type { HostingFxOperation } from "./api";
+import { hostingFxTipoDescripcionLarga } from "./hostingFxOperationClassification";
 import { loadImageAsBase64 } from "./generateFacturaPdf";
 
 const PAGE_W = 210;
@@ -83,7 +84,7 @@ export async function downloadHostingFxTicketPdf(op: HostingFxOperation): Promis
   doc.setFontSize(9);
 
   const cliente = `${op.clientCode || ""} ${op.clientName || ""} ${op.clientLastName || ""}`.trim();
-  const tipo = op.operationType === "usdt_to_usd" ? "Cambio USDT a USD" : "Cambio USD a USDT";
+  const tipo = hostingFxTipoDescripcionLarga(op);
   const usdt = op.compraFlowHostingCommission
     ? "4% Comisión por Hosting"
     : op.usdtSide === "buy_usdt"

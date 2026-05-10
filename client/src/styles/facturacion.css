@@ -688,6 +688,18 @@ a.fact-logo-container--link:focus-visible {
   align-items: center;
 }
 
+.fact-card-header .hosting-transfer-comm-info-btn {
+  cursor: help;
+  color: inherit !important;
+  opacity: 0.88;
+  line-height: 1;
+  vertical-align: middle;
+}
+.fact-card-header .hosting-transfer-comm-info-btn:hover,
+.fact-card-header .hosting-transfer-comm-info-btn:focus-visible {
+  opacity: 1;
+}
+
 .fact-card-body {
   padding: 1.25rem;
 }
@@ -2777,7 +2789,7 @@ a.fact-logo-container--link:focus-visible {
 /* Historial operaciones: proporciones y lectura más limpia */
 .hosting-fx-ops-table--historial {
   table-layout: fixed;
-  min-width: 1160px;
+  min-width: 1180px;
 }
 .hosting-fx-ops-table--historial col.hosting-fx-ops-w-mes {
   width: 7%;
@@ -2786,22 +2798,22 @@ a.fact-logo-container--link:focus-visible {
   width: 7.5%;
 }
 .hosting-fx-ops-table--historial col.hosting-fx-ops-w-cliente {
-  width: 23%;
+  width: 21%;
 }
 .hosting-fx-ops-table--historial col.hosting-fx-ops-w-tipo {
-  width: 9%;
+  width: 14%;
 }
 .hosting-fx-ops-table--historial col.hosting-fx-ops-w-compra {
-  width: 13%;
+  width: 12%;
 }
 .hosting-fx-ops-table--historial col.hosting-fx-ops-w-ganancia {
   width: 11%;
 }
 .hosting-fx-ops-table--historial col.hosting-fx-ops-w-notas {
-  width: 16%;
+  width: 15%;
 }
 .hosting-fx-ops-table--historial col.hosting-fx-ops-w-acciones {
-  width: 13.5%;
+  width: 12.5%;
 }
 /* Cabeceras legibles: sin nowrap forzado (evita «GANANCIA OPER…» cortado) */
 .hosting-fx-ops-table--historial thead th {
@@ -2836,10 +2848,17 @@ a.fact-logo-container--link:focus-visible {
 }
 .hosting-fx-ops-table--historial .hosting-fx-ops-td--tipo {
   color: #475569;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+  hyphens: auto;
 }
 .hosting-fx-ops-table--historial .hosting-fx-ops-td--compra {
   color: #334155;
   line-height: 1.4;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 .hosting-fx-ops-table--historial .hosting-fx-ops-td--ganancia .hosting-fx-ops-num {
   font-weight: 600;

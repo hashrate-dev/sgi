@@ -1,5 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { HostingFxOperation } from "../lib/api";
+import { hostingFxIsHostingCommissionUsdBank } from "../lib/hostingFxOperationClassification";
 import { hostingFxOperationProfitUsd } from "../lib/hostingFxOperationProfit";
 
 export type HostingFxOperationsIndicatorsProps = {
@@ -24,16 +25,22 @@ export function HostingFxOperationsIndicators({
     let montoCompraUsd = 0;
     let montoTransferenciaVentaUsdt = 0;
     let montoTransferenciaCompraDeUsdt = 0;
+    let montoTransferHostingBankUsdt = 0;
     for (const op of operations) {
       totalGanancias += hostingFxOperationProfitUsd(op);
       const amt = Number.isFinite(op.operationAmount) ? op.operationAmount : 0;
       const transfer = Number.isFinite(op.clientTotalPayment) ? op.clientTotalPayment : 0;
-      if (op.usdtSide === "sell_usdt") {
+      const hostingUsdBanco = hostingFxIsHostingCommissionUsdBank(op);
+      if (op.usdtSide === "sell_usdt" && !hostingUsdBanco) {
         montoVentaUsd += amt;
         montoTransferenciaVentaUsdt += transfer;
-      } else {
+      } else if (op.usdtSide === "buy_usdt" || hostingUsdBanco) {
         montoCompraUsd += amt;
-        montoTransferenciaCompraDeUsdt += transfer;
+        if (hostingUsdBanco) {
+          montoTransferHostingBankUsdt += transfer;
+        } else {
+          montoTransferenciaCompraDeUsdt += transfer;
+        }
       }
     }
     return {
@@ -43,6 +50,7 @@ export function HostingFxOperationsIndicators({
       montoCompraUsd,
       montoTransferenciaVentaUsdt,
       montoTransferenciaCompraDeUsdt,
+      montoTransferHostingBankUsdt,
     };
   }, [operations]);
 
@@ -129,7 +137,7 @@ export function HostingFxOperationsIndicators({
         </article>
         <article
           className="hosting-fx-ops-metric hosting-fx-ops-metric--sell"
-          aria-label="Monto operación, compra de USD, cliente paga con USDT"
+          aria-label="Monto operación: cliente pagó con USDT (excluye 4% Hosting USD banco)"
         >
           <div className="hosting-fx-ops-metric__top">
             <div className="hosting-fx-ops-metric__icon" aria-hidden>
@@ -155,7 +163,7 @@ export function HostingFxOperationsIndicators({
                     <i className="bi bi-info-circle" aria-hidden />
                   </button>
                   <span className="hosting-fx-ops-metric__info-bubble" id="hosting-fx-metric-sell-tip" role="tooltip">
-                    Suma de operaciones con movimiento hacia dólares (en USD).
+                    Operaciones donde el cliente pagó en USDT (Binance). No incluye 4% Hosting con pago USD vía banco.
                   </span>
                 </span>
               </div>
@@ -191,7 +199,7 @@ export function HostingFxOperationsIndicators({
         </article>
         <article
           className="hosting-fx-ops-metric hosting-fx-ops-metric--buy"
-          aria-label="Monto operación, compra de USDT, cliente paga con USD"
+          aria-label="Monto operación: cliente paga con USD (compra USDT o 4% Hosting vía banco)"
         >
           <div className="hosting-fx-ops-metric__top">
             <div className="hosting-fx-ops-metric__icon" aria-hidden>
@@ -217,7 +225,7 @@ export function HostingFxOperationsIndicators({
                     <i className="bi bi-info-circle" aria-hidden />
                   </button>
                   <span className="hosting-fx-ops-metric__info-bubble" id="hosting-fx-metric-buy-tip" role="tooltip">
-                    Suma de operaciones: compra de USDT, el cliente paga con USD.
+                    Incluye compra de USDT (cliente paga USD) y operaciones 4% Hosting con pago USD vía banco.
                   </span>
                 </span>
               </div>
@@ -237,7 +245,7 @@ export function HostingFxOperationsIndicators({
                 </>
               )}
             </p>
-            {!tableLoading && (
+            {!tableLoading && exchangeOpsStats.montoTransferenciaCompraDeUsdt > 0 ? (
               <p
                 className="hosting-fx-ops-metric__figure-sub hosting-fx-ops-metric__figure-sub--transfer-usdt-neg"
                 aria-label="Suma de monto transferencia en USDT, operaciones con compra de USDT (cliente)"
@@ -248,7 +256,19 @@ export function HostingFxOperationsIndicators({
                 )}{" "}
                 <span className="hosting-fx-ops-metric__unit">USDT</span>
               </p>
-            )}
+            ) : null}
+            {!tableLoading && exchangeOpsStats.montoTransferHostingBankUsdt > 0 ? (
+              <p
+                className="hosting-fx-ops-metric__figure-sub hosting-fx-ops-metric__figure-sub--transfer-usdt-neg"
+                aria-label="Suma de monto transferencia en USDT, operaciones 4% Hosting con pago vía banco"
+              >
+                −
+                {new Intl.NumberFormat("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
+                  exchangeOpsStats.montoTransferHostingBankUsdt
+                )}{" "}
+                <span className="hosting-fx-ops-metric__unit">USDT</span>
+              </p>
+            ) : null}
           </div>
         </article>
         {facturasTransferCommissionKpi != null ? (

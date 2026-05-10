@@ -7,10 +7,15 @@ import multer from "multer";
  * Importar el parser desde `lib/` evita `index.js` de pdf-parse, que en ESM/tsx ejecuta un bloque
  * de depuración (`readFileSync('./test/data/05-versions-space.pdf')`) y hace caer el API al arrancar.
  */
-import pdfParse from "pdf-parse/lib/pdf-parse.js";
 import { z } from "zod";
 import { env } from "../config/env.js";
 import { db } from "../db.js";
+import {
+  extractFacturaScanText,
+  facturaAttachmentExtFromUpload,
+  FACTURA_ADJUNTO_EXTS,
+  isAllowedFacturaScanMime,
+} from "../lib/contabilidadFacturaScanText.js";
 import { requireRole } from "../middleware/auth.js";
 import { requireModuleGrant } from "../middleware/moduleGrant.js";
 import { extractDraftFromFacturaText, type ProveedorLite } from "../lib/contabilidadFacturaPdfScan.js";
@@ -26,16 +31,23 @@ function ensureContabilidadGastosPdfDir(): void {
   fs.mkdirSync(CONTABILIDAD_GASTOS_PDF_DIR, { recursive: true });
 }
 
-function contabilidadGastoPdfAbsPath(id: number): string {
-  return path.join(CONTABILIDAD_GASTOS_PDF_DIR, `${id}.pdf`);
+function findContabilidadGastoFacturaPath(id: number): string | null {
+  ensureContabilidadGastosPdfDir();
+  for (const ext of FACTURA_ADJUNTO_EXTS) {
+    const p = path.join(CONTABILIDAD_GASTOS_PDF_DIR, `${id}${ext}`);
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
 }
 
-function unlinkContabilidadGastoPdf(id: number): void {
-  try {
-    const p = contabilidadGastoPdfAbsPath(id);
-    if (fs.existsSync(p)) fs.unlinkSync(p);
-  } catch {
-    /* ignore */
+function unlinkContabilidadGastoFacturaFiles(id: number): void {
+  for (const ext of FACTURA_ADJUNTO_EXTS) {
+    try {
+      const p = path.join(CONTABILIDAD_GASTOS_PDF_DIR, `${id}${ext}`);
+      if (fs.existsSync(p)) fs.unlinkSync(p);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -43,11 +55,9 @@ const uploadFacturaPdf = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 8 * 1024 * 1024 },
   fileFilter(_req, file, cb) {
-    const ok =
-      file.mimetype === "application/pdf" ||
-      (typeof file.originalname === "string" && file.originalname.toLowerCase().endsWith(".pdf"));
+    const ok = isAllowedFacturaScanMime(file.mimetype || "", file.originalname || "");
     if (ok) cb(null, true);
-    else cb(new Error("SOLO_PDF"));
+    else cb(new Error("TIPO_ARCHIVO_INVALIDO"));
   },
 });
 
@@ -543,19 +553,24 @@ contabilidadGastosRouter.post(
       if (err) {
         if (err instanceof multer.MulterError) {
           if (err.code === "LIMIT_FILE_SIZE") {
-            return res.status(400).json({ error: { message: "El PDF supera el límite de 8 MB." } });
+            return res.status(400).json({ error: { message: "El archivo supera el límite de 8 MB." } });
           }
           return res.status(400).json({ error: { message: "No se pudo recibir el archivo." } });
         }
         const msg = err instanceof Error ? err.message : String(err);
-        if (msg === "SOLO_PDF") {
-          return res.status(400).json({ error: { message: "Solo se aceptan archivos PDF." } });
+        if (msg === "TIPO_ARCHIVO_INVALIDO") {
+          return res.status(400).json({
+            error: {
+              message:
+                "Solo se aceptan PDF o imágenes (JPEG, JPG, PNG, WEBP o GIF).",
+            },
+          });
         }
         return next(err);
       }
       const f = req.file;
       if (!f?.buffer?.length) {
-        return res.status(400).json({ error: { message: "Enviá un PDF (campo de formulario «pdf»)." } });
+        return res.status(400).json({ error: { message: "Enviá un archivo en el campo «pdf»." } });
       }
       next();
     });
@@ -568,8 +583,9 @@ contabilidadGastosRouter.post(
       return res.status(400).json({ error: { message: "Archivo vacío." } });
     }
     try {
-      const parsed = await pdfParse(buf);
-      const text = String(parsed.text ?? "");
+      const mimetype = String(req.file?.mimetype ?? "");
+      const originalname = String(req.file?.originalname ?? "");
+      const text = await extractFacturaScanText(buf, mimetype, originalname);
       const provRows = (await db
         .prepare(`SELECT id, supplier_name, ruc FROM proveedores_hrs`)
         .all()) as Array<{ id?: unknown; supplier_name?: unknown; ruc?: unknown }>;
@@ -583,10 +599,20 @@ contabilidadGastosRouter.post(
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error("[contabilidad/gastos/scan-factura-pdf]", e);
-      if (env.NODE_ENV === "development") {
-        return res.status(422).json({ error: { message: `No se pudo leer el PDF: ${msg}` } });
+      if (msg === "UNSUPPORTED_TYPE") {
+        return res.status(400).json({
+          error: { message: "Formato no soportado. Usá PDF o imagen JPEG/PNG/WEBP/GIF." },
+        });
       }
-      return res.status(422).json({ error: { message: "No se pudo extraer texto del PDF. Probá otro archivo o cargá los datos a mano." } });
+      if (env.NODE_ENV === "development") {
+        return res.status(422).json({ error: { message: `No se pudo leer el archivo: ${msg}` } });
+      }
+      return res.status(422).json({
+        error: {
+          message:
+            "No se pudo extraer texto del archivo (PDF o imagen). Probá otra captura o cargá los datos a mano.",
+        },
+      });
     }
   }
 );
@@ -613,20 +639,34 @@ contabilidadGastosRouter.get(
       const has =
         adj === true || adj === 1 || adj === "1" || (typeof adj === "string" && adj.toLowerCase() === "true");
       if (!has) {
-        return res.status(404).json({ error: { message: "Este gasto no tiene PDF adjunto." } });
+        return res.status(404).json({ error: { message: "Este gasto no tiene comprobante adjunto." } });
       }
-      const fp = contabilidadGastoPdfAbsPath(id);
-      if (!fs.existsSync(fp)) {
-        return res.status(404).json({ error: { message: "Archivo PDF no encontrado en el servidor." } });
+      const fp = findContabilidadGastoFacturaPath(id);
+      if (!fp) {
+        return res.status(404).json({ error: { message: "Archivo adjunto no encontrado en el servidor." } });
       }
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `inline; filename="gasto-${id}.pdf"`);
+      const ext = path.extname(fp).toLowerCase();
+      const contentType =
+        ext === ".pdf"
+          ? "application/pdf"
+          : ext === ".jpg" || ext === ".jpeg"
+            ? "image/jpeg"
+            : ext === ".png"
+              ? "image/png"
+              : ext === ".webp"
+                ? "image/webp"
+                : ext === ".gif"
+                  ? "image/gif"
+                  : "application/octet-stream";
+      const safeExt = ext === ".jpeg" ? ".jpg" : ext || ".bin";
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Content-Disposition", `inline; filename="gasto-${id}${safeExt}"`);
       fs.createReadStream(fp).pipe(res);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error("[contabilidad/gastos/:id/factura-pdf] GET", e);
       res.status(500).json({
-        error: { message: env.NODE_ENV === "development" ? msg : "No se pudo leer el PDF." },
+        error: { message: env.NODE_ENV === "development" ? msg : "No se pudo leer el adjunto." },
       });
     }
   }
@@ -641,19 +681,24 @@ contabilidadGastosRouter.post(
       if (err) {
         if (err instanceof multer.MulterError) {
           if (err.code === "LIMIT_FILE_SIZE") {
-            return res.status(400).json({ error: { message: "El PDF supera el límite de 8 MB." } });
+            return res.status(400).json({ error: { message: "El archivo supera el límite de 8 MB." } });
           }
           return res.status(400).json({ error: { message: "No se pudo recibir el archivo." } });
         }
         const msg = err instanceof Error ? err.message : String(err);
-        if (msg === "SOLO_PDF") {
-          return res.status(400).json({ error: { message: "Solo se aceptan archivos PDF." } });
+        if (msg === "TIPO_ARCHIVO_INVALIDO") {
+          return res.status(400).json({
+            error: {
+              message:
+                "Solo se aceptan PDF o imágenes (JPEG, JPG, PNG, WEBP o GIF).",
+            },
+          });
         }
         return next(err);
       }
       const f = req.file;
       if (!f?.buffer?.length) {
-        return res.status(400).json({ error: { message: "Enviá un PDF (campo «pdf»)." } });
+        return res.status(400).json({ error: { message: "Enviá un archivo en el campo «pdf»." } });
       }
       next();
     });
@@ -675,14 +720,20 @@ contabilidadGastosRouter.post(
         return res.status(404).json({ error: { message: "Gasto no encontrado." } });
       }
       ensureContabilidadGastosPdfDir();
-      await fs.promises.writeFile(contabilidadGastoPdfAbsPath(id), buf);
+      const ext = facturaAttachmentExtFromUpload(String(req.file?.mimetype ?? ""), String(req.file?.originalname ?? ""));
+      if (!ext) {
+        return res.status(400).json({ error: { message: "Tipo de archivo no permitido para adjuntar." } });
+      }
+      unlinkContabilidadGastoFacturaFiles(id);
+      const dest = path.join(CONTABILIDAD_GASTOS_PDF_DIR, `${id}${ext}`);
+      await fs.promises.writeFile(dest, buf);
       await db.prepare(`UPDATE contabilidad_gastos SET factura_pdf_adjunto = 1 WHERE id = ?`).run(id);
       res.json({ ok: true as const });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error("[contabilidad/gastos/:id/factura-pdf] POST", e);
       res.status(500).json({
-        error: { message: env.NODE_ENV === "development" ? msg : "No se pudo guardar el PDF." },
+        error: { message: env.NODE_ENV === "development" ? msg : "No se pudo guardar el adjunto." },
       });
     }
   }
@@ -707,7 +758,7 @@ contabilidadGastosRouter.delete(
       if (result.changes === 0) {
         return res.status(404).json({ error: { message: "Gasto no encontrado." } });
       }
-      unlinkContabilidadGastoPdf(id);
+      unlinkContabilidadGastoFacturaFiles(id);
       res.json({ ok: true });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);

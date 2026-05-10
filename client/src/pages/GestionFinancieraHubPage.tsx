@@ -55,7 +55,7 @@ const hubItems: readonly FinHubItem[] = [
     roles: ["admin_a", "admin_b", "operador"],
   },
   {
-    to: "/gestion-administrativa/prueba",
+    to: "/gestion-administrativa/exchange",
     icon: "bi-currency-exchange",
     label: "Operaciones de Cambio",
     desc: "Menú de Operaciones de Cambio: Todo lo relacionado a cambio de USDT a USD y USD a USDT.",
@@ -84,7 +84,7 @@ export function GestionFinancieraHubPage() {
         return canSeeReportesDashboard(user);
       case "/clients/account":
         return canSeeCuentaPorClienteShortcut(user);
-      case "/gestion-administrativa/prueba":
+      case "/gestion-administrativa/exchange":
         return canAccessHostingTipoCambio(user);
       default:
         return false;

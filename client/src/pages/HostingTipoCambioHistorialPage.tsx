@@ -152,8 +152,8 @@ export function HostingTipoCambioHistorialPage() {
         <PageHeader
           title="Historial tipo de cambio (USDT/USD)"
           showBackButton
-          backTo="/hosting"
-          backText="Volver a Hosting"
+          backTo="/gestion-administrativa/exchange"
+          backText="Volver atrás"
           rightContent={
             <Link to="/hosting/exchange-operations" className="fact-back">
               Operaciones de cambio

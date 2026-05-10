@@ -371,7 +371,8 @@ function App() {
             <Route path="/asic/equipment" element={<EquiposAsicPage />} />
             <Route path="/marketplace/home-banners" element={<TiendaOnlineBannersHomePage />} />
             <Route path="/gestion-administrativa" element={<GestionAdministrativaPage />} />
-            <Route path="/gestion-administrativa/prueba" element={<PruebaPage />} />
+            <Route path="/gestion-administrativa/exchange" element={<PruebaPage />} />
+            <Route path="/gestion-administrativa/prueba" element={<Navigate to="/gestion-administrativa/exchange" replace />} />
             <Route path="/gestion-financiera" element={<GestionFinancieraHubPage />} />
             <Route path="/gestion-financiera/proveedores" element={<ProveedoresHrsPage />} />
             <Route path="/gestion-financiera/contabilidad" element={<ContabilidadGastosPage />} />

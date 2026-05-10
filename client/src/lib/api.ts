@@ -910,7 +910,7 @@ export async function fetchContabilidadGastoFacturaPdfBlob(id: number): Promise<
   return res.blob();
 }
 
-/** Borrador inferido desde texto del PDF (revisar siempre antes de guardar). */
+/** Borrador inferido desde texto del PDF o imagen escaneada/OCR (revisar siempre antes de guardar). */
 export type ContabilidadFacturaPdfScanDraft = {
   fecha: string | null;
   numeroFactura: string | null;

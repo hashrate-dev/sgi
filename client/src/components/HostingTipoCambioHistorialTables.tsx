@@ -1,5 +1,12 @@
+import { useEffect, useMemo, useState } from "react";
 import type { HostingFxOperation, HostingInvoiceTransferCommissionRow } from "../lib/api";
+import { hostingFxTipoDescripcionLarga, hostingFxTipoTableLabel } from "../lib/hostingFxOperationClassification";
 import { hostingFxOperationProfitUsd } from "../lib/hostingFxOperationProfit";
+
+const FX_HISTORIAL_PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
+
+const TRANSFER_COMMISSION_TABLE_HELP =
+  "Solo facturas hosting cuyo detalle incluye líneas «4% Gastos Operativos Transferencia» y además existe un Recibo de pago vinculado a esa factura, con fecha de pago registrada (pago efectuado). Las operaciones de cambio no condicionan este listado.";
 
 const HASHRATE_LOGO = "https://hashrate.space/wp-content/uploads/hashrate-LOGO.png";
 
@@ -38,6 +45,34 @@ export function HostingFxOperationsHistoryCard({
   onPdf,
   onDelete,
 }: HostingFxOperationsHistoryCardProps) {
+  const [pageSize, setPageSize] = useState(10);
+  const [page, setPage] = useState(1);
+  const [goToPage, setGoToPage] = useState("");
+
+  const total = operations.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const paginatedOperations = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return operations.slice(start, start + pageSize);
+  }, [operations, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [operations]);
+
+  function handlePageSizeChange(v: number) {
+    setPageSize(v);
+    setPage(1);
+  }
+
+  function handleGoTo() {
+    const n = parseInt(goToPage, 10);
+    if (Number.isFinite(n) && n >= 1 && n <= totalPages) {
+      setPage(n);
+      setGoToPage("");
+    }
+  }
+
   return (
     <div className="fact-card mb-4">
       <div className="fact-card-header">
@@ -88,7 +123,7 @@ export function HostingFxOperationsHistoryCard({
                   </td>
                 </tr>
               ) : (
-                operations.map((op) => (
+                paginatedOperations.map((op) => (
                   <tr key={op.id}>
                     <td className="hosting-fx-ops-td hosting-fx-ops-td--mes">
                       <span className="text-nowrap">{mesDesdeFechaOperacion(op.operationDate)}</span>
@@ -100,9 +135,7 @@ export function HostingFxOperationsHistoryCard({
                       {`${op.clientCode || ""} ${op.clientName || ""} ${op.clientLastName || ""}`.trim()}
                     </td>
                     <td className="hosting-fx-ops-td hosting-fx-ops-td--tipo">
-                      <span className="text-nowrap">
-                        {op.operationType === "usdt_to_usd" ? "USDT → USD" : "USD → USDT"}
-                      </span>
+                      {hostingFxTipoTableLabel(op)}
                     </td>
                     <td className="hosting-fx-ops-td hosting-fx-ops-td--compra">
                       {op.compraFlowHostingCommission
@@ -182,6 +215,74 @@ export function HostingFxOperationsHistoryCard({
             </tbody>
           </table>
         </div>
+        {!tableLoading && total > 0 ? (
+          <div className="usuarios-pagination d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3 px-1">
+            <div className="d-flex align-items-center gap-2">
+              <label className="text-muted small mb-0">Mostrar</label>
+              <select
+                className="form-select form-select-sm"
+                style={{ width: "auto" }}
+                value={pageSize}
+                onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                aria-label="Registros por página"
+              >
+                {FX_HISTORIAL_PAGE_SIZE_OPTIONS.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+              <span className="text-muted small">registros</span>
+            </div>
+            <div className="d-flex flex-wrap align-items-center gap-2">
+              <span className="text-muted small">
+                Mostrando {(page - 1) * pageSize + 1}-{Math.min(page * pageSize, total)} de {total}
+              </span>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-secondary"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                ‹ Anterior
+              </button>
+              <span className="px-2 small text-muted">
+                Página {page} de {totalPages}
+              </span>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-secondary"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Siguiente ›
+              </button>
+              <div className="d-flex align-items-center gap-1">
+                <span className="small text-muted">Ir a</span>
+                <input
+                  type="number"
+                  className="form-control form-control-sm"
+                  style={{ width: "4rem" }}
+                  min={1}
+                  max={totalPages}
+                  value={goToPage}
+                  onChange={(e) => setGoToPage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleGoTo();
+                    }
+                  }}
+                  placeholder={String(totalPages)}
+                  aria-label="Ir a página"
+                />
+                <button type="button" className="btn btn-sm btn-outline-secondary" onClick={handleGoTo}>
+                  Ir
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -196,27 +297,62 @@ export function HostingTransferCommissionInvoicesCard({
   transferCommissionInvoices,
   tableLoading,
 }: HostingTransferCommissionInvoicesCardProps) {
-  let sumCommission = 0;
-  let sumInvoiceTotal = 0;
-  const count = transferCommissionInvoices.length;
-  for (const row of transferCommissionInvoices) {
-    const c = Number(row.commissionUsd);
-    const t = Number(row.invoiceTotalUsd);
-    if (Number.isFinite(c) && c > 0) sumCommission += c;
-    if (Number.isFinite(t)) sumInvoiceTotal += t;
+  const [pageSize, setPageSize] = useState(10);
+  const [page, setPage] = useState(1);
+  const [goToPage, setGoToPage] = useState("");
+
+  const { sumCommission, sumInvoiceTotal, count } = useMemo(() => {
+    let sc = 0;
+    let st = 0;
+    const n = transferCommissionInvoices.length;
+    for (const row of transferCommissionInvoices) {
+      const c = Number(row.commissionUsd);
+      const t = Number(row.invoiceTotalUsd);
+      if (Number.isFinite(c) && c > 0) sc += c;
+      if (Number.isFinite(t)) st += t;
+    }
+    return { sumCommission: sc, sumInvoiceTotal: st, count: n };
+  }, [transferCommissionInvoices]);
+
+  const totalPages = Math.max(1, Math.ceil(count / pageSize));
+  const paginatedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return transferCommissionInvoices.slice(start, start + pageSize);
+  }, [transferCommissionInvoices, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [transferCommissionInvoices]);
+
+  function handlePageSizeChange(v: number) {
+    setPageSize(v);
+    setPage(1);
+  }
+
+  function handleGoTo() {
+    const n = parseInt(goToPage, 10);
+    if (Number.isFinite(n) && n >= 1 && n <= totalPages) {
+      setPage(n);
+      setGoToPage("");
+    }
   }
 
   return (
     <div className="fact-card mb-4" id="hosting-transfer-commission-section">
       <div className="fact-card-header">
-        <span>Facturas hosting con comisión 4% (Gastos operativos transferencia)</span>
+        <span className="d-inline-flex align-items-center gap-2 flex-wrap">
+          Facturas hosting con comisión 4% (Gastos operativos transferencia)
+          <button
+            type="button"
+            className="btn btn-link btn-sm p-0 text-decoration-none hosting-transfer-comm-info-btn"
+            title={TRANSFER_COMMISSION_TABLE_HELP}
+            aria-label="Información sobre el listado de facturas con comisión 4%"
+          >
+            <i className="bi bi-info-circle" aria-hidden />
+          </button>
+        </span>
       </div>
       <div className="fact-card-body">
-        <p className="small text-muted mb-3">
-          Solo facturas hosting cuyo detalle incluye líneas «4% Gastos Operativos Transferencia» y además existe un{" "}
-          <strong>Recibo</strong> de pago vinculado a esa factura, con <strong>fecha de pago</strong> registrada (pago
-          efectuado). Las operaciones de cambio no condicionan este listado.
-        </p>
         <div className="hosting-fx-ops-table-wrap">
           <table className="hosting-fx-ops-table">
             <thead className="hosting-fx-ops-thead">
@@ -247,7 +383,7 @@ export function HostingTransferCommissionInvoicesCard({
                   </td>
                 </tr>
               ) : (
-                transferCommissionInvoices.map((row) => (
+                paginatedRows.map((row) => (
                   <tr key={row.invoiceId}>
                     <td>
                       <span className="text-nowrap">{row.date}</span>
@@ -290,6 +426,74 @@ export function HostingTransferCommissionInvoicesCard({
             ) : null}
           </table>
         </div>
+        {!tableLoading && count > 0 ? (
+          <div className="usuarios-pagination d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3 px-1">
+            <div className="d-flex align-items-center gap-2">
+              <label className="text-muted small mb-0">Mostrar</label>
+              <select
+                className="form-select form-select-sm"
+                style={{ width: "auto" }}
+                value={pageSize}
+                onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                aria-label="Registros por página"
+              >
+                {FX_HISTORIAL_PAGE_SIZE_OPTIONS.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+              <span className="text-muted small">registros</span>
+            </div>
+            <div className="d-flex flex-wrap align-items-center gap-2">
+              <span className="text-muted small">
+                Mostrando {(page - 1) * pageSize + 1}-{Math.min(page * pageSize, count)} de {count}
+              </span>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-secondary"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                ‹ Anterior
+              </button>
+              <span className="px-2 small text-muted">
+                Página {page} de {totalPages}
+              </span>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-secondary"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Siguiente ›
+              </button>
+              <div className="d-flex align-items-center gap-1">
+                <span className="small text-muted">Ir a</span>
+                <input
+                  type="number"
+                  className="form-control form-control-sm"
+                  style={{ width: "4rem" }}
+                  min={1}
+                  max={totalPages}
+                  value={goToPage}
+                  onChange={(e) => setGoToPage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleGoTo();
+                    }
+                  }}
+                  placeholder={String(totalPages)}
+                  aria-label="Ir a página"
+                />
+                <button type="button" className="btn btn-sm btn-outline-secondary" onClick={handleGoTo}>
+                  Ir
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -351,7 +555,7 @@ export function HostingFxTicketModal({ ticketOperation, onClose }: HostingFxTick
                   </div>
                   <div>
                     <strong>Tipo:</strong>{" "}
-                    {ticketOperation.operationType === "usdt_to_usd" ? "Cambio USDT a USD" : "Cambio USD a USDT"}
+                    {hostingFxTipoDescripcionLarga(ticketOperation)}
                   </div>
                   <div>
                     <strong>Cliente (Compra de USDT / Compra de USD / 4% Hosting):</strong>{" "}

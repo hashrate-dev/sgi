@@ -422,11 +422,11 @@ export function ContabilidadGastosPage() {
       const hint =
         r.warnings.length > 0
           ? r.warnings.join(" ")
-          : "Campos sugeridos desde el PDF; revisá monto, moneda, tipo de cambio y medio de pago antes de guardar.";
+          : "Campos sugeridos desde el archivo; revisá monto, moneda, tipo de cambio y medio de pago antes de guardar.";
       setOk(hint);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "No se pudo leer el PDF.");
+      setErr(e instanceof Error ? e.message : "No se pudo leer el archivo.");
     } finally {
       setScanPdfBusy(false);
     }
@@ -573,7 +573,7 @@ export function ContabilidadGastosPage() {
                       ref={pdfFacturaInputRef}
                       type="file"
                       className="d-none"
-                      accept="application/pdf,.pdf"
+                      accept="application/pdf,.pdf,image/jpeg,.jpg,.jpeg,image/png,.png,image/webp,.webp,image/gif,.gif"
                       onChange={onPdfFacturaSelected}
                     />
                     <button
@@ -585,18 +585,18 @@ export function ContabilidadGastosPage() {
                       {scanPdfBusy ? (
                         <>
                           <span className="spinner-border spinner-border-sm text-light" role="status" aria-hidden />
-                          <span>Leyendo PDF…</span>
+                          <span>Leyendo archivo…</span>
                         </>
                       ) : (
                         <>
-                          <i className="bi bi-file-earmark-pdf contabilidad-gastos-scan-pdf-ico" aria-hidden />
-                          <span>Completar desde factura PDF</span>
+                          <i className="bi bi-file-earmark-arrow-up contabilidad-gastos-scan-pdf-ico" aria-hidden />
+                          <span>Completar desde PDF o imagen</span>
                         </>
                       )}
                     </button>
                     <span className="small text-white-50 mb-0">
-                      Lee el texto del PDF (e-factura o comprobante de transferencia BROU con «Importe a acreditar»). Los escaneos solo imagen no
-                      se interpretan aquí; revisá siempre antes de guardar.
+                      PDF con texto seleccionable, o foto/escaneo en JPEG, PNG, WEBP o GIF (se usa reconocimiento de texto OCR). Revisá siempre
+                      montos y datos antes de guardar.
                     </span>
                   </div>
                 ) : null}
