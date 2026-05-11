@@ -9942,3 +9942,990 @@ a.fact-logo-container--link:focus-visible {
   line-height: 1.35;
   white-space: nowrap;
 }
+
+/* Monitor Equipos ASIC — columna usuario + icono */
+.monitor-asic-usuario-input:focus-within .input-group-text {
+  border-color: var(--bs-success);
+  background-color: rgba(209, 250, 229, 0.95);
+}
+.monitor-asic-usuario-input .form-control:focus {
+  border-color: var(--bs-success);
+  box-shadow: 0 0 0 0.2rem rgba(25, 135, 84, 0.15);
+}
+
+/* Monitor Equipos ASIC — icono minero ASIC (SVG) en cabeceras de grupo */
+.monitor-asic-section-miner-icon {
+  color: #15803d;
+  filter: drop-shadow(0 1px 2px rgba(21, 128, 61, 0.25));
+}
+
+/* Columna modelo: icono ASIC sobre fondo claro (sin negro) */
+.monitor-asic-modelo-icon-slot {
+  background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%);
+  border-color: #fde68a !important;
+  color: #d97706;
+}
+.monitor-asic-miner-glyph {
+  display: block;
+  filter: drop-shadow(0 1px 1px rgba(217, 119, 6, 0.18));
+}
+.monitor-asic-modelo-input:focus-within .monitor-asic-modelo-icon-slot {
+  border-color: var(--bs-success) !important;
+  background: rgba(209, 250, 229, 0.95);
+  color: #ca8a04;
+}
+.monitor-asic-modelo-input:focus-within .monitor-asic-miner-glyph {
+  filter: drop-shadow(0 1px 2px rgba(202, 138, 4, 0.22));
+}
+.monitor-asic-modelo-input .form-control:focus {
+  border-color: var(--bs-success);
+  box-shadow: 0 0 0 0.2rem rgba(25, 135, 84, 0.15);
+}
+
+/* Monitor Equipos ASIC — columna potencia (CPU / cómputo) */
+.monitor-asic-potencia-icon-slot {
+  background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
+  border-color: #93c5fd !important;
+  color: #1d4ed8;
+}
+.monitor-asic-potencia-input:focus-within .monitor-asic-potencia-icon-slot {
+  border-color: var(--bs-success) !important;
+  background: rgba(209, 250, 229, 0.95);
+  color: #15803d;
+}
+.monitor-asic-potencia-input:focus-within .monitor-asic-potencia-unit-suffix {
+  border-color: var(--bs-success) !important;
+  background: rgba(209, 250, 229, 0.97) !important;
+  color: #15803d !important;
+}
+.monitor-asic-potencia-input .form-control:focus {
+  border-color: var(--bs-success);
+  box-shadow: 0 0 0 0.2rem rgba(25, 135, 84, 0.15);
+}
+
+/* Sufijo fijo MH/s (L7, L9) o TH/s (S21) — mismo tono que columna potencia */
+.monitor-asic-potencia-unit-suffix {
+  background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%) !important;
+  border-color: #93c5fd !important;
+  color: #1e40af !important;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* Monitor Equipos ASIC — serial / código de barras (identificación de equipo) */
+.monitor-asic-serial-icon-slot {
+  background: linear-gradient(165deg, #f8fafc 0%, #e2e8f0 55%, #cbd5e1 100%);
+  border-color: #94a3b8 !important;
+  color: #334155;
+}
+.monitor-asic-serial-icon-wrap {
+  min-width: 1.35rem;
+}
+.monitor-asic-serial-input:focus-within .monitor-asic-serial-icon-slot {
+  border-color: var(--bs-success) !important;
+  background: rgba(209, 250, 229, 0.97);
+  color: #15803d;
+}
+.monitor-asic-serial-input .form-control:focus {
+  border-color: var(--bs-success);
+  box-shadow: 0 0 0 0.2rem rgba(25, 135, 84, 0.15);
+}
+
+/* Monitor Equipos ASIC — fila bloqueada */
+.monitor-asic-lock-th {
+  vertical-align: middle;
+}
+.monitor-asic-lock-cell {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  box-shadow: 2px 0 0 rgba(15, 23, 42, 0.06);
+}
+.monitor-asic-lock-toggle:focus-visible {
+  outline: 2px solid var(--bs-success);
+  outline-offset: 2px;
+}
+.monitor-asic-row--locked .form-control:disabled,
+.monitor-asic-row--locked .form-select:disabled {
+  cursor: not-allowed;
+  background-color: #f1f5f9 !important;
+  opacity: 1;
+  color: #475569;
+}
+.monitor-asic-row--locked .input-group-text {
+  opacity: 0.78;
+}
+
+/* Monitor Equipos ASIC — dashboards circulares (anillos KPI) */
+.monitor-asic-dash-kicker {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #475569;
+}
+.monitor-asic-dash-head {
+  padding-bottom: 0.25rem;
+}
+.monitor-asic-dash-card {
+  position: relative;
+  height: 100%;
+  border-radius: 1.35rem;
+  padding: 1.15rem 1rem 1.35rem;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.97) 0%, rgba(248, 250, 252, 0.92) 48%, rgba(241, 245, 249, 0.88) 100%);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.05),
+    0 12px 28px -8px rgba(15, 23, 42, 0.1);
+  overflow: hidden;
+  animation: monitor-asic-dash-card-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.monitor-asic-dash-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0.55;
+  background: radial-gradient(120% 80% at 10% 0%, rgba(255, 255, 255, 0.55), transparent 52%);
+}
+.monitor-asic-dash-card--online::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 1.35rem 1.35rem 0 0;
+  background: linear-gradient(90deg, #4ade80, #22c55e, #15803d);
+  opacity: 0.92;
+}
+.monitor-asic-dash-card--offline::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 1.35rem 1.35rem 0 0;
+  background: linear-gradient(90deg, #fca5a5, #ef4444, #b91c1c);
+  opacity: 0.92;
+}
+.monitor-asic-dash-card__inner {
+  position: relative;
+  z-index: 1;
+}
+.monitor-asic-dash-ring-host {
+  position: relative;
+  width: 100%;
+  max-width: 220px;
+  margin-left: auto;
+  margin-right: auto;
+  aspect-ratio: 1;
+}
+.monitor-asic-dash-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 220px;
+  margin: 0 auto;
+  filter: drop-shadow(0 4px 14px rgba(15, 23, 42, 0.07));
+}
+.monitor-asic-dash-track {
+  transition: stroke 0.25s ease;
+}
+.monitor-asic-dash-arc {
+  transition: stroke-dasharray 0.85s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.monitor-asic-dash-core {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 18%;
+  pointer-events: none;
+}
+.monitor-asic-dash-core__icon {
+  font-size: clamp(1rem, 3.5vw, 1.35rem);
+  margin-bottom: 0.15rem;
+  opacity: 0.85;
+}
+.monitor-asic-dash-card--online .monitor-asic-dash-core__icon {
+  color: #15803d;
+}
+.monitor-asic-dash-card--offline .monitor-asic-dash-core__icon {
+  color: #b91c1c;
+}
+.monitor-asic-dash-core__n {
+  font-size: clamp(1.85rem, 8vw, 2.65rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: #0f172a;
+}
+.monitor-asic-dash-core__label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #64748b;
+  margin-top: 0.12rem;
+}
+.monitor-asic-dash-core__pct {
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #94a3b8;
+  margin-top: 0.2rem;
+}
+@keyframes monitor-asic-dash-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.monitor-asic-dash-head .row > .col-12:nth-child(2) .monitor-asic-dash-card {
+  animation-delay: 0.1s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .monitor-asic-dash-card {
+    animation: none;
+  }
+  .monitor-asic-dash-arc {
+    transition: none;
+  }
+  .monitor-asic-dash-head .row > .col-12:nth-child(2) .monitor-asic-dash-card {
+    animation-delay: 0s;
+  }
+}
+
+/* Monitor ASIC — feed global de notas (resumen tipo chat bajo el panel de estado) */
+.monitor-asic-global-feed {
+  background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+}
+.monitor-asic-global-feed__head {
+  background: linear-gradient(180deg, #ecfdf5 0%, #d1fae5 38%, #bbf7d0 100%);
+  border-bottom: 1px solid rgba(21, 128, 61, 0.15);
+}
+.monitor-asic-global-feed__title {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+.monitor-asic-global-feed__subtitle {
+  color: #3f6212;
+  max-width: 52rem;
+  line-height: 1.5;
+}
+.monitor-asic-global-feed__pill {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #166534;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(21, 128, 61, 0.22);
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+}
+.monitor-asic-global-feed__scroll {
+  max-height: min(46vh, 520px);
+  min-height: 120px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: linear-gradient(180deg, #e8edf3 0%, #e2e8f0 55%, #dce3ec 100%);
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 transparent;
+}
+.monitor-asic-global-feed__scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.monitor-asic-global-feed__scroll::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 99px;
+}
+.monitor-asic-global-feed__empty {
+  padding: 2rem 1.25rem;
+  text-align: center;
+}
+.monitor-asic-global-feed__entries {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding-top: 0.75rem;
+}
+.monitor-asic-global-feed__row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-width: 52rem;
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+}
+.monitor-asic-global-feed__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem 0.35rem;
+  font-size: 0.72rem;
+  color: #475569;
+  padding: 0 0.15rem;
+}
+.monitor-asic-global-feed__equipo-btn {
+  border: none;
+  background: rgba(255, 255, 255, 0.65);
+  color: #0f766e;
+  font-weight: 700;
+  font-size: 0.72rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  cursor: pointer;
+  max-width: 100%;
+  text-align: left;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.monitor-asic-global-feed__equipo-btn:hover {
+  background: #fff;
+  color: #115e59;
+}
+.monitor-asic-global-feed__meta-sep {
+  color: #94a3b8;
+  user-select: none;
+}
+.monitor-asic-global-feed__time {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #64748b;
+}
+.monitor-asic-global-feed__user {
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  font-size: 0.68rem;
+  color: #64748b;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.monitor-asic-global-feed__bubble.monitor-equipo-notas-modal__entry {
+  max-width: min(100%, 34rem);
+}
+.monitor-asic-global-feed__row .monitor-equipo-notas-modal__entry--mine {
+  margin-left: auto;
+  margin-right: 0;
+}
+.monitor-asic-global-feed__row .monitor-equipo-notas-modal__entry--other {
+  margin-right: auto;
+  margin-left: 0;
+}
+
+/* Monitor ASIC — panel tabla Luxor (solo lectura) */
+.monitor-asic-luxor-panel {
+  max-height: min(58vh, 720px);
+  overflow: auto;
+}
+.monitor-asic-luxor-table thead th {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+.monitor-asic-luxor-section {
+  margin-top: 0.25rem;
+}
+
+/* Monitor ASIC — tabla editable agrupada por modelo */
+.monitor-asic-equipos-group .table thead th {
+  font-size: 0.78rem;
+  color: #475569;
+  font-weight: 600;
+}
+.monitor-asic-equipos-group .table td {
+  vertical-align: middle;
+}
+.monitor-asic-equipos-group .form-control,
+.monitor-asic-equipos-group .form-select {
+  font-size: 0.8125rem;
+}
+.monitor-asic-potencia-input .form-select {
+  min-width: 4.5rem;
+}
+
+/* «Notas»: texto completo; pelotitas ancladas al borde derecho y saliendo un poco hacia afuera */
+.monitor-asic-equipos-group .monitor-asic-notas-btn {
+  box-sizing: border-box;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.monitor-asic-equipos-group .monitor-asic-notas-btn:hover {
+  box-shadow: 0 1px 5px rgba(13, 110, 253, 0.2);
+}
+
+.monitor-asic-equipos-group .monitor-asic-notas-btn:focus-visible {
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.28);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .monitor-asic-equipos-group .monitor-asic-notas-btn--badges .monitor-asic-notas-btn__icon {
+    display: inline-block;
+    transform-origin: 60% 70%;
+    animation: monitor-asic-notas-icon-wiggle 0.55s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  }
+}
+
+@keyframes monitor-asic-notas-icon-wiggle {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  25% {
+    transform: rotate(-14deg) scale(1.12);
+  }
+  50% {
+    transform: rotate(10deg) scale(1.08);
+  }
+  75% {
+    transform: rotate(-4deg) scale(1.02);
+  }
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+}
+
+.monitor-asic-equipos-group .monitor-asic-notas-btn-wrap {
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+  max-width: 100%;
+  /* Hueco para que la pelotita no choque con la columna siguiente al “salir” del botón */
+  padding-right: 0.55rem;
+}
+
+.monitor-asic-equipos-group .monitor-asic-notas-th,
+.monitor-asic-equipos-group .monitor-asic-notas-td {
+  width: 1%;
+  white-space: nowrap;
+  vertical-align: middle;
+  padding-right: 0.35rem;
+}
+
+/* Badges: mitad fuera del botón (right negativo) para no tapar “Notas” */
+.monitor-asic-notas-badge-stack {
+  position: absolute;
+  /* +0.2cm a `right` = 0.1cm a la derecha respecto al ajuste anterior; +0.2cm en `top` = baja respecto al centro */
+  right: calc(-0.38rem + 0.2cm);
+  top: calc(50% + 0.2cm);
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.12rem;
+  z-index: 2;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.monitor-asic-notas-badge-stack .monitor-asic-notas-badge {
+  position: relative;
+  min-width: 1rem;
+  height: 1rem;
+  padding: 0 0.22rem;
+  font-size: 0.55rem;
+  font-weight: 700;
+  line-height: 1rem;
+  border-radius: 999px;
+  color: #fff;
+  text-align: center;
+  letter-spacing: -0.02em;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.2), 0 0 0 1.5px rgba(255, 255, 255, 0.95);
+  animation: monitor-asic-notas-badge-pop 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .monitor-asic-notas-badge-stack .monitor-asic-notas-badge {
+    animation: none;
+  }
+}
+
+@keyframes monitor-asic-notas-badge-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.monitor-asic-notas-badge-stack .monitor-asic-notas-badge--new {
+  background: linear-gradient(160deg, #ef4444 0%, #dc2626 55%, #b91c1c 100%);
+}
+
+.monitor-asic-notas-badge-stack .monitor-asic-notas-badge--total {
+  background: linear-gradient(160deg, #3b82f6 0%, #2563eb 55%, #1d4ed8 100%);
+}
+
+/* ─── Modal «Notas» monitor equipos ASIC (timeline + composer) ─── */
+.monitor-equipo-notas-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  margin: -0.25rem 0 0;
+}
+
+@media (min-width: 992px) {
+  .monitor-equipo-notas-modal {
+    gap: 2rem;
+  }
+}
+
+.monitor-equipo-notas-modal__section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.monitor-equipo-notas-modal__section-title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.monitor-equipo-notas-modal__section-title .bi {
+  color: #15803d;
+  font-size: 1.1rem;
+}
+
+.monitor-equipo-notas-modal__count {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+  background: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%);
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+}
+
+.monitor-equipo-notas-modal__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  min-height: 200px;
+  color: #64748b;
+  font-size: 0.9375rem;
+  background: #f8fafc;
+  border-radius: 1rem;
+  border: 1px dashed #cbd5e1;
+}
+
+.monitor-equipo-notas-modal__loading .spinner-border {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-width: 0.2em;
+}
+
+.monitor-equipo-notas-modal__empty {
+  text-align: center;
+  padding: 2.5rem 1.5rem;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 1rem;
+  border: 1px solid #e2e8f0;
+}
+
+.monitor-equipo-notas-modal__empty-icon {
+  font-size: 2.5rem;
+  color: #94a3b8;
+  display: block;
+  margin-bottom: 0.75rem;
+}
+
+.monitor-equipo-notas-modal__empty-title {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: #334155;
+  margin: 0 0 0.35rem;
+}
+
+.monitor-equipo-notas-modal__empty-text {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #64748b;
+  max-width: 26rem;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.55;
+}
+
+.monitor-equipo-notas-modal__scroll {
+  max-height: min(60vh, 580px);
+  min-height: 280px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0.25rem 0.35rem 0.25rem 0;
+  margin: 0 -0.35rem 0 0;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.monitor-equipo-notas-modal__scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.monitor-equipo-notas-modal__scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 99px;
+}
+
+.monitor-equipo-notas-modal__entries {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  align-items: stretch;
+  padding: 0.15rem 0 0.25rem;
+}
+
+/* Burbujas tipo chat: propios a la derecha (celeste), otros usuarios a la izquierda (claro) */
+.monitor-equipo-notas-modal__entry {
+  position: relative;
+  width: fit-content;
+  max-width: min(92%, 34rem);
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.monitor-equipo-notas-modal__entry--mine {
+  margin-left: auto;
+  margin-right: 0;
+}
+
+.monitor-equipo-notas-modal__entry--other {
+  margin-right: auto;
+  margin-left: 0;
+}
+
+.monitor-equipo-notas-modal__entry-inner {
+  position: relative;
+  min-width: 0;
+  padding: 0.6rem 0.95rem 0.5rem 0.95rem;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.15s ease;
+}
+
+.monitor-equipo-notas-modal__entry--mine .monitor-equipo-notas-modal__entry-inner {
+  border-radius: 14px 14px 6px 14px;
+  background: linear-gradient(165deg, #e2f1fe 0%, #cbe7fb 48%, #b8daf6 100%);
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.65) inset,
+    0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.monitor-equipo-notas-modal__entry--other .monitor-equipo-notas-modal__entry-inner {
+  border-radius: 14px 14px 14px 6px;
+  background: linear-gradient(165deg, #ffffff 0%, #f1f5f9 52%, #e8eef4 100%);
+  border: 1px solid rgba(100, 116, 139, 0.2);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+.monitor-equipo-notas-modal__entry--mine:hover .monitor-equipo-notas-modal__entry-inner {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.6) inset,
+    0 3px 14px rgba(37, 99, 235, 0.14);
+  transform: translateY(-1px);
+}
+
+.monitor-equipo-notas-modal__entry--other:hover .monitor-equipo-notas-modal__entry-inner {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.85) inset,
+    0 3px 12px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+.monitor-equipo-notas-modal__entry-body {
+  font-size: 1.0625rem;
+  line-height: 1.52;
+  color: #0f172a;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding-bottom: 0.15rem;
+}
+
+/* ONLINE/OFFLINE: misma caja que una nota (anchura al texto, radios mine/other, tipografía de entry-body) */
+.monitor-equipo-notas-modal__entry--estado-online .monitor-equipo-notas-modal__entry-inner {
+  background: linear-gradient(165deg, #f0fdf4 0%, #dcfce7 50%, #bbf7d0 100%);
+  border-color: rgba(34, 197, 94, 0.32);
+}
+
+.monitor-equipo-notas-modal__entry--estado-offline .monitor-equipo-notas-modal__entry-inner {
+  background: linear-gradient(165deg, #fff5f5 0%, #fee2e2 52%, #fecaca 100%);
+  border-color: rgba(239, 68, 68, 0.28);
+}
+
+.monitor-equipo-notas-modal__entry-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  margin-top: 0.25rem;
+  padding-left: 0.15rem;
+}
+
+.monitor-equipo-notas-modal__entry--mine .monitor-equipo-notas-modal__entry-meta {
+  justify-content: flex-end;
+}
+
+.monitor-equipo-notas-modal__entry--other .monitor-equipo-notas-modal__entry-meta {
+  justify-content: flex-start;
+}
+
+.monitor-equipo-notas-modal__entry-time {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #64748b;
+  letter-spacing: 0.01em;
+}
+
+.monitor-equipo-notas-modal__entry-user {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    monospace;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.monitor-equipo-notas-modal__entry--mine .monitor-equipo-notas-modal__entry-user .bi {
+  color: #60a5fa;
+  font-size: 0.78rem;
+  opacity: 0.85;
+}
+
+.monitor-equipo-notas-modal__entry--other .monitor-equipo-notas-modal__entry-user .bi {
+  color: #94a3b8;
+  font-size: 0.78rem;
+  opacity: 0.95;
+}
+
+/* Compositor estilo WhatsApp Web (barra gris, pastilla blanca, envío circular) */
+.monitor-equipo-notas-modal__composer--wa {
+  margin-top: 0.35rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.monitor-equipo-notas-modal__wa-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.5rem 0.65rem 0.45rem 0.55rem;
+  background: #f0f2f5;
+  border-radius: 0;
+  border-top: 1px solid #e9edef;
+  /* Dialog.Body usa px={6} (1.5rem): barra al borde como WhatsApp Web */
+  margin: 0.75rem -1.5rem -1.5rem;
+  padding-left: max(0.65rem, env(safe-area-inset-left, 0px));
+  padding-right: max(0.65rem, env(safe-area-inset-right, 0px));
+}
+
+.monitor-equipo-notas-modal__wa-bar-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.monitor-equipo-notas-modal__wa-field {
+  flex: 1 1 0;
+  min-width: 0;
+  width: 100%;
+  position: relative;
+  display: block;
+  background: #fff;
+  border-radius: 1.5rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #e9edef;
+  box-shadow: 0 1px 1px rgba(11, 20, 26, 0.06);
+}
+
+.monitor-equipo-notas-modal__wa-field:focus-within {
+  border-color: #c4d6e3;
+  box-shadow: 0 1px 2px rgba(11, 20, 26, 0.1);
+}
+
+.monitor-equipo-notas-modal__wa-textarea {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 2.75rem;
+  max-height: 10.5rem;
+  resize: none;
+  overflow-y: auto;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0.55rem 3.35rem 0.55rem 0.65rem !important;
+  margin: 0 !important;
+  font-size: 0.9375rem !important;
+  line-height: 1.45 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #111b21;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.monitor-equipo-notas-modal__wa-textarea::placeholder {
+  color: #8696a0;
+}
+
+.monitor-equipo-notas-modal__wa-textarea:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.monitor-equipo-notas-modal__wa-counter {
+  position: absolute;
+  right: 0.65rem;
+  bottom: 0.4rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: #8696a0;
+  pointer-events: none;
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+
+.monitor-equipo-notas-modal__wa-send {
+  flex-shrink: 0;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: none;
+  border-radius: 50%;
+  background: #8696a0;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  cursor: not-allowed;
+  opacity: 0.85;
+  transition:
+    background 0.18s ease,
+    transform 0.12s ease,
+    opacity 0.18s ease;
+}
+
+.monitor-equipo-notas-modal__wa-send--active {
+  background: #00a884;
+  cursor: pointer;
+  opacity: 1;
+}
+
+.monitor-equipo-notas-modal__wa-send--active:hover {
+  background: #008f72;
+}
+
+.monitor-equipo-notas-modal__wa-send--active:active {
+  transform: scale(0.94);
+}
+
+.monitor-equipo-notas-modal__wa-send:disabled:not(.monitor-equipo-notas-modal__wa-send--active) {
+  cursor: not-allowed;
+}
+
+.monitor-equipo-notas-modal__wa-foot-hint {
+  margin: 0;
+  padding: 0 0.25rem 0.15rem;
+  font-size: 0.625rem;
+  color: #8696a0;
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+
+/* Footer: acciones principales del modal Notas */
+.monitor-equipo-notas-modal__footer {
+  padding-top: 0.15rem;
+}
+
+.monitor-equipo-notas-modal__footer-btn--close {
+  color: #334155 !important;
+  border-color: #cbd5e1 !important;
+  background: #fff !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.15s ease !important;
+}
+
+.monitor-equipo-notas-modal__footer-btn--close:hover:not(:disabled) {
+  background: #f8fafc !important;
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+.monitor-equipo-notas-modal__footer-btn--close:active:not(:disabled) {
+  transform: translateY(0);
+}

@@ -430,3 +430,15 @@ ALTER TABLE contabilidad_gastos ADD COLUMN IF NOT EXISTS factura_pdf_adjunto SMA
 
 CREATE INDEX IF NOT EXISTS idx_contabilidad_gastos_fecha ON contabilidad_gastos(fecha DESC);
 CREATE INDEX IF NOT EXISTS idx_contabilidad_gastos_prov ON contabilidad_gastos(proveedor_id);
+
+-- Historial de notas por equipo (monitor ASIC; equipo_id = UUID en el cliente)
+CREATE TABLE IF NOT EXISTS monitor_equipo_asic_historial (
+  id BIGSERIAL PRIMARY KEY,
+  equipo_id TEXT NOT NULL,
+  body TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_by_email TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_monitor_equipo_asic_historial_equipo ON monitor_equipo_asic_historial(equipo_id, created_at DESC);

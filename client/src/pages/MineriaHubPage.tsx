@@ -1,8 +1,17 @@
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
+import { useAuth } from "../contexts/AuthContext";
 import "../styles/facturacion.css";
 
-const asicMenuItems: Array<{ to: string; icon: string; label: string; desc: string }> = [
+const monitorMenuItem = {
+  to: "/asic/monitor-equipos",
+  icon: "bi-speedometer2",
+  label: "Monitor Equipos ASIC",
+  desc: "Tablero de control por equipo (usuario, modelo, pool, online)",
+} as const;
+
+const asicMenuItemsRest: Array<{ to: string; icon: string; label: string; desc: string }> = [
   {
     to: "/asic/cotizador-china-py",
     icon: "bi-calculator",
@@ -17,6 +26,12 @@ const asicMenuItems: Array<{ to: string; icon: string; label: string; desc: stri
 ];
 
 export function MineriaHubPage() {
+  const { user } = useAuth();
+  const asicMenuItems = useMemo(() => {
+    const isAdmin = user?.role === "admin_a" || user?.role === "admin_b";
+    return isAdmin ? [{ ...monitorMenuItem }, ...asicMenuItemsRest] : [...asicMenuItemsRest];
+  }, [user?.role]);
+
   return (
     <div className="fact-page mineria-page">
       <div className="container">

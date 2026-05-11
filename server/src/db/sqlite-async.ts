@@ -861,6 +861,20 @@ CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_visitor ON marketplace_presence_
     if (!msg.includes("duplicate column")) throw e;
   }
 
+  /** Notas de historial por equipo del monitor ASIC (clave = equipo_id UUID del cliente). */
+  native.exec(`CREATE TABLE IF NOT EXISTS monitor_equipo_asic_historial (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    equipo_id TEXT NOT NULL,
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    created_by_user_id INTEGER,
+    created_by_email TEXT NOT NULL DEFAULT '',
+    FOREIGN KEY (created_by_user_id) REFERENCES users(id)
+  )`);
+  native.exec(
+    `CREATE INDEX IF NOT EXISTS idx_monitor_equipo_asic_historial_equipo ON monitor_equipo_asic_historial(equipo_id, created_at DESC)`
+  );
+
   const txWrap = {
     prepare: (sql: string) => createStatement(native, sql),
   };

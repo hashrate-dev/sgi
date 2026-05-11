@@ -391,6 +391,258 @@ export async function verifyPassword(password: string): Promise<{ valid: boolean
   return data as { valid: boolean };
 }
 
+/** Respuesta de sincronización Luxor → monitor ASIC (filas con pool Luxor). */
+export type LuxorMonitorSyncResultItem = {
+  index: number;
+  skipped: boolean;
+  matched: boolean;
+  online: boolean | null;
+  luxorStatus?: string | null;
+  hashrate?: number | null;
+};
+
+export type LuxorSkippedSubaccount = {
+  subaccount: string;
+  reason: string;
+  /** Pool de la API en la que falló la subcuenta (p. ej. BTC vs LTC_DOGE). */
+  currencyType?: string;
+};
+
+/** Workers serializados desde Luxor (respuesta GET pool/workers). */
+export type LuxorWorkerPublic = {
+  subaccount_name: string;
+  name: string;
+  status: string;
+  hashrate: number | null;
+  efficiency: number | null;
+  last_share_time: string | null;
+  firmware: string | null;
+  id: string | null;
+  /** Endpoint Luxor usado para este worker (BTC, LTC_DOGE, …). */
+  currency_type?: string | null;
+};
+
+export type LuxorMonitorSyncResponse = {
+  ok: boolean;
+  luxorWorkerCount: number;
+  /** Lista completa devuelta por Luxor en la última sincronización. */
+  luxorWorkers?: LuxorWorkerPublic[];
+  /** Subcuentas que Luxor rechazó por permisos de la API key (se sigue con el resto). */
+  skippedSubaccounts?: LuxorSkippedSubaccount[];
+  results: LuxorMonitorSyncResultItem[];
+  /** Cómo se eligieron las subcuentas a consultar (ver GET /v2/pool/subaccounts en Luxor). */
+  luxorSubaccountSync?: "intersection" | "luxor_all" | "local_only";
+  luxorDirectorySubCount?: number;
+  luxorDirectorySample?: string[];
+  luxorDirectoryListingFailed?: boolean;
+};
+
+export type LuxorPingResponse = {
+  ok: boolean;
+  workersOnPage: number;
+  totalActive?: number;
+  totalInactive?: number;
+  /** Texto orientativo (p. ej. ping vía GET /workspace en vez de workers). */
+  message?: string;
+};
+
+/**
+ * Luxor puede tardar (varias páginas de workers); timeout extendido sin reintentos largos.
+ */
+export async function postLuxorMonitorSync(body: {
+  apiKey: string;
+  /** Compat: una pool */
+  currencyType?: string;
+  /** Varias pools en la misma sync (p. ej. BTC + LTC_DOGE). */
+  currencyTypes?: string[];
+  rows: Array<{ index: number; usuario: string; nombreNuevo: string; pool: string }>;
+}): Promise<LuxorMonitorSyncResponse> {
+  const token = getStoredToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let base = getApiBase();
+  const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
+  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") base = "";
+  const path = "/api/luxor/monitor-sync";
+  const url = base && base.trim() !== "" ? `${base.replace(/\/+$/, "")}${path}` : path;
+  const res = await fetchWithTimeout(
+    url,
+    { method: "POST", headers, credentials: "include", body: JSON.stringify(body) },
+    420000
+  );
+  const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    clearStoredAuth();
+    const cb = typeof window !== "undefined" ? (window as unknown as { __on401?: () => void }).__on401 : undefined;
+    if (typeof cb === "function") cb();
+    throw new Error((data as { error?: { message?: string } })?.error?.message ?? "Sesión expirada.");
+  }
+  if (!res.ok) {
+    const msg = extractJsonErrorMessage(data, res, "Error al sincronizar con Luxor");
+    throw makeApiError(msg, res.status);
+  }
+  return data as LuxorMonitorSyncResponse;
+}
+
+export async function postLuxorPing(body: { apiKey: string; currencyType?: string }): Promise<LuxorPingResponse> {
+  const token = getStoredToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let base = getApiBase();
+  const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
+  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") base = "";
+  const path = "/api/luxor/ping";
+  const url = base && base.trim() !== "" ? `${base.replace(/\/+$/, "")}${path}` : path;
+  const res = await fetchWithTimeout(
+    url,
+    { method: "POST", headers, credentials: "include", body: JSON.stringify(body) },
+    60000
+  );
+  const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    clearStoredAuth();
+    const cb = typeof window !== "undefined" ? (window as unknown as { __on401?: () => void }).__on401 : undefined;
+    if (typeof cb === "function") cb();
+    throw new Error((data as { error?: { message?: string } })?.error?.message ?? "Sesión expirada.");
+  }
+  if (!res.ok) {
+    const msg = extractJsonErrorMessage(data, res, "Error al probar Luxor");
+    throw makeApiError(msg, res.status);
+  }
+  return data as LuxorPingResponse;
+}
+
+export type MonitorEquipoAsicHistorialEntry = {
+  id: number;
+  body: string;
+  createdAt: string;
+  createdByEmail: string;
+};
+
+/** Entrada del feed global (incluye equipo). */
+export type MonitorEquipoAsicHistorialFeedEntry = MonitorEquipoAsicHistorialEntry & {
+  equipoId: string;
+};
+
+export async function getMonitorEquiposAsicHistorial(
+  equipoId: string
+): Promise<{ entries: MonitorEquipoAsicHistorialEntry[] }> {
+  const token = getStoredToken();
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let base = getApiBase();
+  const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
+  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") base = "";
+  const path = `/api/monitor-equipos-asic/historial/${encodeURIComponent(equipoId)}`;
+  const url = base && base.trim() !== "" ? `${base.replace(/\/+$/, "")}${path}` : path;
+  const res = await fetchWithTimeout(url, { method: "GET", headers, credentials: "include" }, 60000);
+  const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    clearStoredAuth();
+    const cb = typeof window !== "undefined" ? (window as unknown as { __on401?: () => void }).__on401 : undefined;
+    if (typeof cb === "function") cb();
+    throw new Error((data as { error?: { message?: string } })?.error?.message ?? "Sesión expirada.");
+  }
+  if (!res.ok) {
+    const msg = extractJsonErrorMessage(data, res, "Error al cargar historial");
+    throw makeApiError(msg, res.status);
+  }
+  return data as { entries: MonitorEquipoAsicHistorialEntry[] };
+}
+
+export async function postMonitorEquiposAsicHistorialSummary(payload: {
+  equipoIds: string[];
+  lastReadAtByEquipo?: Record<string, string | null>;
+}): Promise<{ summary: Record<string, { total: number; unread: number }> }> {
+  const token = getStoredToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let base = getApiBase();
+  const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
+  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") base = "";
+  const path = `/api/monitor-equipos-asic/historial-summary`;
+  const url = base && base.trim() !== "" ? `${base.replace(/\/+$/, "")}${path}` : path;
+  const res = await fetchWithTimeout(
+    url,
+    { method: "POST", headers, credentials: "include", body: JSON.stringify(payload) },
+    60000
+  );
+  const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    clearStoredAuth();
+    const cb = typeof window !== "undefined" ? (window as unknown as { __on401?: () => void }).__on401 : undefined;
+    if (typeof cb === "function") cb();
+    throw new Error((data as { error?: { message?: string } })?.error?.message ?? "Sesión expirada.");
+  }
+  if (!res.ok) {
+    const msg = extractJsonErrorMessage(data, res, "Error al cargar resumen de notas");
+    throw makeApiError(msg, res.status);
+  }
+  return data as { summary: Record<string, { total: number; unread: number }> };
+}
+
+export async function postMonitorEquiposAsicHistorialFeed(payload: {
+  equipoIds: string[];
+  limit?: number;
+}): Promise<{ entries: MonitorEquipoAsicHistorialFeedEntry[] }> {
+  const token = getStoredToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let base = getApiBase();
+  const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
+  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") base = "";
+  const path = `/api/monitor-equipos-asic/historial-feed`;
+  const url = base && base.trim() !== "" ? `${base.replace(/\/+$/, "")}${path}` : path;
+  const res = await fetchWithTimeout(
+    url,
+    { method: "POST", headers, credentials: "include", body: JSON.stringify(payload) },
+    60000
+  );
+  const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    clearStoredAuth();
+    const cb = typeof window !== "undefined" ? (window as unknown as { __on401?: () => void }).__on401 : undefined;
+    if (typeof cb === "function") cb();
+    throw new Error((data as { error?: { message?: string } })?.error?.message ?? "Sesión expirada.");
+  }
+  if (!res.ok) {
+    const msg = extractJsonErrorMessage(data, res, "Error al cargar el feed de notas");
+    throw makeApiError(msg, res.status);
+  }
+  return data as { entries: MonitorEquipoAsicHistorialFeedEntry[] };
+}
+
+export async function postMonitorEquiposAsicHistorialNote(
+  equipoId: string,
+  payload: { body: string }
+): Promise<{ entry: MonitorEquipoAsicHistorialEntry }> {
+  const token = getStoredToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let base = getApiBase();
+  const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
+  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") base = "";
+  const path = `/api/monitor-equipos-asic/historial/${encodeURIComponent(equipoId)}`;
+  const url = base && base.trim() !== "" ? `${base.replace(/\/+$/, "")}${path}` : path;
+  const res = await fetchWithTimeout(
+    url,
+    { method: "POST", headers, credentials: "include", body: JSON.stringify(payload) },
+    60000
+  );
+  const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    clearStoredAuth();
+    const cb = typeof window !== "undefined" ? (window as unknown as { __on401?: () => void }).__on401 : undefined;
+    if (typeof cb === "function") cb();
+    throw new Error((data as { error?: { message?: string } })?.error?.message ?? "Sesión expirada.");
+  }
+  if (!res.ok) {
+    const msg = extractJsonErrorMessage(data, res, "Error al guardar la nota");
+    throw makeApiError(msg, res.status);
+  }
+  return data as { entry: MonitorEquipoAsicHistorialEntry };
+}
+
 export type UserListItem = {
   id: number;
   email: string;

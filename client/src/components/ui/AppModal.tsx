@@ -9,6 +9,12 @@ type AppModalProps = {
   children: React.ReactNode;
   footer?: React.ReactNode;
   size?: "xs" | "sm" | "md" | "lg" | "xl" | "cover" | "full";
+  /** Ancho máximo del panel (por defecto `min(100%, 440px)` para diálogos compactos). */
+  contentMaxW?: string;
+  /** Tamaño del título en cabecera (`lg` por defecto). */
+  titleFontSize?: "lg" | "xl" | "2xl";
+  /** Texto bajo el título (por defecto `sm`). */
+  descriptionFontSize?: "sm" | "md";
   closeOnInteractOutside?: boolean;
 };
 
@@ -20,6 +26,9 @@ export function AppModal({
   children,
   footer,
   size = "md",
+  contentMaxW = "min(100%, 440px)",
+  titleFontSize = "lg",
+  descriptionFontSize = "sm",
   closeOnInteractOutside = true,
 }: AppModalProps) {
   return (
@@ -38,7 +47,8 @@ export function AppModal({
             boxShadow="xl"
             borderWidth="1px"
             borderColor="gray.200"
-            maxW="min(100%, 440px)"
+            maxW={contentMaxW}
+            w="100%"
             bg="white"
             display="flex"
             flexDirection="column"
@@ -54,12 +64,19 @@ export function AppModal({
               <Flex align="flex-start" gap={3}>
                 <Flex direction="column" gap={1.5} flex="1" minW={0} pr={2}>
                   <Dialog.Title>
-                    <Text as="span" fontSize="lg" fontWeight="semibold" color="gray.900" letterSpacing="-0.02em" lineHeight="short">
+                    <Text
+                      as="span"
+                      fontSize={titleFontSize}
+                      fontWeight="semibold"
+                      color="gray.900"
+                      letterSpacing="-0.02em"
+                      lineHeight="short"
+                    >
                       {title}
                     </Text>
                   </Dialog.Title>
                   {description ? (
-                    <Text fontSize="sm" color="gray.600" lineHeight="tall">
+                    <Text fontSize={descriptionFontSize} color="gray.600" lineHeight="tall">
                       {description}
                     </Text>
                   ) : null}
