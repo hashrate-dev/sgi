@@ -27,6 +27,7 @@ import {
   loadMonitorNotasSummaryCache,
   saveMonitorNotasSummaryCache,
 } from "../lib/monitorNotasSummaryCache";
+import { canAccessMonitorEquiposAsic } from "../lib/auth";
 import { loadMonitorEquiposAsicRows, saveMonitorEquiposAsicRows } from "../lib/monitorEquiposAsicStorage";
 import "../styles/facturacion.css";
 
@@ -1200,10 +1201,10 @@ function MonitorEquiposAsicPageContent() {
   );
 }
 
-/** Solo Administrador A y Administrador B (no operador ni lector). */
+/** Administrador A, o Administrador B con permiso inventario equipos ASIC (`equipos`), no solo tienda. */
 export function MonitorEquiposAsicPage() {
   const { user } = useAuth();
-  if (user?.role !== "admin_a" && user?.role !== "admin_b") {
+  if (!canAccessMonitorEquiposAsic(user)) {
     return <Navigate to="/asic" replace />;
   }
   return <MonitorEquiposAsicPageContent />;

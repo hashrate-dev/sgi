@@ -3,6 +3,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { db } from "../db.js";
 import { requireRole } from "../middleware/auth.js";
+import { requireAdminBGrant } from "../middleware/adminBGrant.js";
 
 export const monitorEquiposAsicHistorialRouter = Router();
 
@@ -48,6 +49,7 @@ const historialFeedBody = z.object({
 monitorEquiposAsicHistorialRouter.post(
   "/monitor-equipos-asic/historial-summary",
   requireRole("admin_a", "admin_b"),
+  requireAdminBGrant("equipos"),
   async (req: Request, res: Response) => {
     const parsed = historialSummaryBody.safeParse(req.body);
     if (!parsed.success) {
@@ -87,6 +89,7 @@ monitorEquiposAsicHistorialRouter.post(
 monitorEquiposAsicHistorialRouter.post(
   "/monitor-equipos-asic/historial-feed",
   requireRole("admin_a", "admin_b"),
+  requireAdminBGrant("equipos"),
   async (req: Request, res: Response) => {
     const parsed = historialFeedBody.safeParse(req.body);
     if (!parsed.success) {
@@ -121,6 +124,7 @@ monitorEquiposAsicHistorialRouter.post(
 monitorEquiposAsicHistorialRouter.get(
   "/monitor-equipos-asic/historial/:equipoId",
   requireRole("admin_a", "admin_b"),
+  requireAdminBGrant("equipos"),
   async (req: Request, res: Response) => {
     const parsed = equipoIdParam.safeParse(req.params.equipoId);
     if (!parsed.success) {
@@ -143,6 +147,7 @@ monitorEquiposAsicHistorialRouter.get(
 monitorEquiposAsicHistorialRouter.post(
   "/monitor-equipos-asic/historial/:equipoId",
   requireRole("admin_a", "admin_b"),
+  requireAdminBGrant("equipos"),
   async (req: Request, res: Response) => {
     const parsedId = equipoIdParam.safeParse(req.params.equipoId);
     if (!parsedId.success) {

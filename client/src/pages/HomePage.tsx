@@ -5,7 +5,11 @@ import { Navigate, Link as RouterLink } from "react-router-dom";
 import { Badge, Box, Flex, Grid, Heading, Image as ChakraImage, Stack, Text } from "@chakra-ui/react";
 import { useAuth } from "../contexts/AuthContext";
 import { getMarketplacePresenceStats, getMarketplaceQuoteTicketsStats, updateMyPassword } from "../lib/api";
-import { canViewMarketplaceQuoteTickets, lectorHasExplicitGrantList } from "../lib/auth.js";
+import {
+  canAccessMonitorEquiposAsic,
+  canViewMarketplaceQuoteTickets,
+  lectorHasExplicitGrantList,
+} from "../lib/auth.js";
 import { canLectorSeeHomeMenuTo } from "../lib/lectorPermissionsCatalog.js";
 import { playMarketplaceOrderNotificationSound } from "../lib/marketplaceCartSound";
 import { showToast } from "../components/ToastNotification";
@@ -251,6 +255,7 @@ export function HomePage() {
     if (user.role === "lector") {
       return canLectorSeeHomeMenuTo(user, item.to);
     }
+    if (item.to === "/asic/monitor-equipos" && !canAccessMonitorEquiposAsic(user)) return false;
     return !item.roles || item.roles.some((r) => roleNorm(r) === roleNorm(user.role));
   });
   const canSeeMarketplaceOrdersCard = Boolean(user && canViewMarketplaceQuoteTickets(user));

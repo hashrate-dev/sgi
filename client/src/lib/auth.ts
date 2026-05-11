@@ -69,6 +69,14 @@ export function adminBAllowsModule(user: PermUser, key: AdminBPermissionKey): bo
   return g.includes(key);
 }
 
+/** Monitor ASIC corporativo (no vitrina): Administrador A, o B con permiso `equipos` (lista nula = acceso completo legado). */
+export function canAccessMonitorEquiposAsic(user: PermUser): boolean {
+  if (!user) return false;
+  if (user.role === "admin_a") return true;
+  if (user.role === "admin_b") return adminBAllowsModule(user, "equipos");
+  return false;
+}
+
 const TOKEN_KEY = "hrs_facturacion_token";
 const USER_KEY = "hrs_facturacion_user";
 

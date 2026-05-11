@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
+import { canAccessMonitorEquiposAsic } from "../lib/auth";
 import "../styles/facturacion.css";
 
 const monitorMenuItem = {
@@ -28,9 +29,8 @@ const asicMenuItemsRest: Array<{ to: string; icon: string; label: string; desc: 
 export function MineriaHubPage() {
   const { user } = useAuth();
   const asicMenuItems = useMemo(() => {
-    const isAdmin = user?.role === "admin_a" || user?.role === "admin_b";
-    return isAdmin ? [{ ...monitorMenuItem }, ...asicMenuItemsRest] : [...asicMenuItemsRest];
-  }, [user?.role]);
+    return canAccessMonitorEquiposAsic(user) ? [{ ...monitorMenuItem }, ...asicMenuItemsRest] : [...asicMenuItemsRest];
+  }, [user]);
 
   return (
     <div className="fact-page mineria-page">

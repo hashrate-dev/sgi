@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { Router } from "express";
 import { z } from "zod";
 import { requireRole } from "../middleware/auth.js";
+import { requireAdminBGrant } from "../middleware/adminBGrant.js";
 
 export const luxorRouter = Router();
 
@@ -360,7 +361,11 @@ function buildWorkerMap(workers: LuxorWorker[]): Map<string, LuxorWorker> {
   return map;
 }
 
-luxorRouter.post("/luxor/ping", requireRole("admin_a", "admin_b"), async (req: Request, res: Response) => {
+luxorRouter.post(
+  "/luxor/ping",
+  requireRole("admin_a", "admin_b"),
+  requireAdminBGrant("equipos"),
+  async (req: Request, res: Response) => {
   const parsed = pingBody.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: { message: "Datos inválidos para probar Luxor." } });
@@ -380,7 +385,11 @@ luxorRouter.post("/luxor/ping", requireRole("admin_a", "admin_b"), async (req: R
   }
 });
 
-luxorRouter.post("/luxor/monitor-sync", requireRole("admin_a", "admin_b"), async (req: Request, res: Response) => {
+luxorRouter.post(
+  "/luxor/monitor-sync",
+  requireRole("admin_a", "admin_b"),
+  requireAdminBGrant("equipos"),
+  async (req: Request, res: Response) => {
   const parsed = syncBody.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: { message: "Datos inválidos para sincronizar con Luxor." } });
