@@ -11,7 +11,8 @@ type AuthContextValue = {
   applyLoginResponse: (r: LoginResponse) => void;
   /** Actualiza usuario desde `/api/me` (p. ej. tras cambiar permisos AdministradorB). */
   refreshSession: () => Promise<void>;
-  logout: () => void;
+  /** Cierra sesión en servidor (borra cookie httpOnly) y limpia estado local. Devolver Promise para poder await antes de navegar. */
+  logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -75,8 +76,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(u);
   }, []);
 
-  const logout = useCallback(() => {
-    logoutApi().catch(() => {});
+  const logout = useCallback(async () => {
+    try {
+      await logoutApi();
+    } catch {
+      /* red / 401: igual limpiamos cliente; si la cookie sigue, el usuario puede reintentar */
+    }
     clearStoredAuth();
     setUser(null);
   }, []);

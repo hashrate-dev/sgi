@@ -48,8 +48,8 @@ export function MarketplaceSiteHeader() {
             <button
               type="button"
               className="site-header__account-logout"
-              onClick={() => {
-                logout();
+              onClick={async () => {
+                await logout();
                 window.location.href = "/marketplace";
               }}
             >
