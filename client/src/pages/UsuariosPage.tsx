@@ -40,7 +40,7 @@ const USUARIOS_HUB_ITEMS: Array<{ to: string; icon: string; label: string; desc:
     to: "/usuarios/cuentas",
     icon: "bi-people",
     label: "Cuentas de usuario",
-    desc: "Alta, edición, roles y permisos. Identificados por correo.",
+    desc: "Alta, edición, roles y permisos (incluye rol Cliente de la tienda). Identificados por correo.",
   },
   {
     to: "/usuarios/actividad",
@@ -581,7 +581,16 @@ export function UsuariosPage() {
                     </span>
                     Usuarios
                   </h2>
-                  <p className="usuarios-page-subtitle">Identificados por correo. Roles: AdministradorA, AdministradorB, Operador o Lector.</p>
+                  <p className="usuarios-page-subtitle">
+                    Identificados por correo. Roles: AdministradorA, AdministradorB, Operador, Lector y{" "}
+                    <strong>Cliente (tienda)</strong> (cuenta creada al registrarse en la tienda online). Las fichas con
+                    código <code className="small sgi-tech-code">A9…</code> / <code className="small sgi-tech-code">WEB-…</code>, dirección y
+                    exportación están en{" "}
+                    <Link to="/clients/store" className="link-success text-decoration-underline">
+                      Clientes · Tienda online
+                    </Link>
+                    .
+                  </p>
                 </div>
                 <button type="button" className="usuarios-page-btn-new" onClick={openNew}>
                   <i className="bi bi-plus-lg" />
@@ -599,17 +608,28 @@ export function UsuariosPage() {
                     <div className="spinner-border" role="status" aria-label="Espere un momento" />
                   </div>
                 ) : (
-                  <div className="usuarios-listado-wrap">
-                    <table className="usuarios-listado-table table table-sm align-middle">
-                      <thead className="table-dark">
-                        <tr>
-                          <th className="text-start">Correo</th>
-                          <th className="text-start">Usuario</th>
-                          <th className="text-start">Rol</th>
-                          <th className="text-start">Fecha alta</th>
-                          <th className="text-center">Acciones</th>
-                        </tr>
-                      </thead>
+                  <div className="monitor-asic-equipos-group usuarios-table-registro rounded-3 border bg-white shadow-sm overflow-hidden">
+                    <div className="table-responsive">
+                      <table className="table table-sm table-hover align-middle mb-0 small">
+                        <thead className="table-light">
+                          <tr>
+                            <th scope="col" className="text-start">
+                              Correo
+                            </th>
+                            <th scope="col" className="text-start">
+                              Usuario
+                            </th>
+                            <th scope="col" className="text-start">
+                              Rol
+                            </th>
+                            <th scope="col" className="text-start">
+                              Fecha alta
+                            </th>
+                            <th scope="col" className="text-center">
+                              Acciones
+                            </th>
+                          </tr>
+                        </thead>
                       <tbody>
                         {users.length === 0 ? (
                           <tr>
@@ -620,7 +640,9 @@ export function UsuariosPage() {
                         ) : (
                           paginatedUsers.map((u) => (
                             <tr key={u.id}>
-                              <td><span className="user-email">{u.email}</span></td>
+                              <td>
+                                <span className="user-email sgi-tech-code">{u.email}</span>
+                              </td>
                               <td><span className="user-usuario">{u.usuario ?? "—"}</span></td>
                               <td>
                                 <span className={getRoleBadgeClass(u.role, currentUser?.role)}>
@@ -672,8 +694,9 @@ export function UsuariosPage() {
                             </tr>
                           ))
                         )}
-                      </tbody>
-                    </table>
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
                 {!loading && users.length > 0 && (
@@ -759,21 +782,34 @@ export function UsuariosPage() {
                     <p className="mb-0">Sin registros aún. La actividad se mostrará cuando los usuarios inicien o cierren sesión.</p>
                   </div>
                 ) : (
-                  <div className="usuarios-activity-listado-wrap">
-                    <table className="usuarios-activity-listado-table table table-sm align-middle">
-                      <thead className="table-dark">
-                        <tr>
-                          <th className="text-start">Usuario</th>
-                          <th className="text-start">Evento</th>
-                          <th className="text-start">Fecha y hora</th>
-                          <th className="text-start">Tiempo conectado</th>
-                          <th className="text-start">Ubicación (IP)</th>
-                        </tr>
-                      </thead>
+                  <div className="monitor-asic-equipos-group usuarios-table-registro rounded-3 border bg-white shadow-sm overflow-hidden">
+                    <div className="table-responsive">
+                      <table className="table table-sm table-hover align-middle mb-0 small">
+                        <thead className="table-light">
+                          <tr>
+                            <th scope="col" className="text-start">
+                              Usuario
+                            </th>
+                            <th scope="col" className="text-start">
+                              Evento
+                            </th>
+                            <th scope="col" className="text-start">
+                              Fecha y hora
+                            </th>
+                            <th scope="col" className="text-start">
+                              Tiempo conectado
+                            </th>
+                            <th scope="col" className="text-start">
+                              Ubicación (IP)
+                            </th>
+                          </tr>
+                        </thead>
                       <tbody>
                         {paginatedActivity.map((a) => (
                           <tr key={a.id}>
-                            <td><span className="user-email">{a.user_email}</span></td>
+                            <td>
+                              <span className="user-email sgi-tech-code">{a.user_email}</span>
+                            </td>
                             <td>
                               <span className={a.event === "login" ? "event-badge event-badge--login" : "event-badge event-badge--logout"}>
                                 {a.event === "login" ? <><i className="bi bi-box-arrow-in-right" /> Entrada</> : <><i className="bi bi-box-arrow-right" /> Salida</>}
@@ -785,11 +821,14 @@ export function UsuariosPage() {
                                 ? `${Math.floor(a.duration_seconds / 3600)}h ${Math.floor((a.duration_seconds % 3600) / 60)}min`
                                 : "—"}
                             </td>
-                            <td><span className="activity-ip">{a.ip_address || "—"}</span></td>
+                            <td>
+                              <span className="activity-ip sgi-tech-code">{a.ip_address || "—"}</span>
+                            </td>
                           </tr>
                         ))}
-                      </tbody>
-                    </table>
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
                 {!activityLoading && !activityError && activity.length > 0 && (

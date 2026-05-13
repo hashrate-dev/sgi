@@ -130,10 +130,10 @@ const menuItems: MenuItem[] = [
     iconHoverBorderColor: "#cbd5e1",
   },
   {
-    to: "/asic/monitor-equipos?watcher=1",
+    to: "/asic/monitor-equipos?watcher=total",
     icon: "bi-activity",
     label: "Watcher Equipos",
-    desc: "Monitor de equipos ASIC en NiceHash (watcher, lectura pública API2). W1…WN y vista TOTAL.",
+    desc: "NiceHash: vista TOTAL (todos los enlaces W1…WN) o un watcher suelto. El inicio abre TOTAL para ver todos los ASICs configurados.",
     roles: ["admin_a", "admin_b"],
     iconBg: "#ecf8f2",
     iconColor: "#2d5d46",

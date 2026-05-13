@@ -29,6 +29,20 @@ if (fs.existsSync(rootLocal)) dotenv.config({ path: rootLocal, override: true })
 const resendLocal = path.join(projectRoot, ".env.resend.local");
 if (fs.existsSync(resendLocal)) dotenv.config({ path: resendLocal, override: true });
 
+/** Supabase a veces exporta solo `DATABASE_URL`; alineamos con lo que usa el adaptador PG. */
+(() => {
+  if (process.env.SUPABASE_DATABASE_URL?.trim()) return;
+  const d = process.env.DATABASE_URL?.trim();
+  if (!d) return;
+  if (!/^postgres(ql)?:\/\//i.test(d)) return;
+  if (!/supabase\.co|pooler\.supabase\.com/i.test(d)) return;
+  process.env.SUPABASE_DATABASE_URL = d;
+  if (process.env.NODE_ENV !== "production") {
+    // eslint-disable-next-line no-console
+    console.log("[env] DATABASE_URL detectada como Postgres Supabase → se usa como SUPABASE_DATABASE_URL.");
+  }
+})();
+
 /** Evita 401 de Resend por `re_re_…` (doble prefijo) o comillas en .env. */
 (() => {
   const raw = process.env.RESEND_API_KEY;

@@ -6382,60 +6382,36 @@ button.fact-back {
   font-size: 1rem;
 }
 
-/* Listado usuarios: tabla con thead verde como Historial/Clientes */
-.usuarios-listado-wrap {
-  overflow-x: auto;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+/* Códigos / correos como identificadores — acento tipo tablas monitor (UUID) */
+.sgi-tech-code {
+  color: #d63384;
+  font-weight: 500;
 }
 
-.usuarios-listado-wrap .usuarios-listado-table {
-  border-collapse: separate;
-  border-spacing: 0;
-  margin-bottom: 0;
-  width: 100%;
-  font-size: 0.9375rem;
+/* Listado usuarios / auditoría: mismo patrón que Registro de Equipos ASIC (thead table-light, solo líneas horizontales) */
+.usuarios-table-registro.monitor-asic-equipos-group .table {
+  --bs-table-bg: transparent;
 }
 
-.usuarios-listado-wrap .usuarios-listado-table thead.table-dark,
-.usuarios-listado-wrap .usuarios-listado-table thead.table-dark th {
-  background-color: #2D5D46 !important;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
-  color: #fff;
-  font-weight: 600;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 1rem 1.25rem;
+.usuarios-table-registro.monitor-asic-equipos-group .table thead th {
+  border-bottom: 1px solid #dee2e6;
+  padding-top: 0.65rem;
+  padding-bottom: 0.65rem;
+  vertical-align: middle;
 }
 
-.usuarios-listado-wrap .usuarios-listado-table thead.table-dark tr th:first-child {
-  border-radius: 12px 0 0 0;
+.usuarios-table-registro.monitor-asic-equipos-group .table tbody td {
+  border-bottom: 1px solid #e9ecef;
+  padding: 0.65rem 0.75rem;
+  vertical-align: middle;
 }
 
-.usuarios-listado-wrap .usuarios-listado-table thead.table-dark tr th:last-child {
-  border-radius: 0 12px 0 0;
-}
-
-.usuarios-listado-wrap .usuarios-listado-table tbody td {
-  border-bottom: 1px solid #f1f5f9;
-  padding: 1rem 1.25rem;
-  background: #fff;
-}
-
-.usuarios-listado-wrap .usuarios-listado-table tbody tr:last-child td {
+.usuarios-table-registro.monitor-asic-equipos-group .table tbody tr:last-child td {
   border-bottom: none;
-}
-
-.usuarios-listado-wrap .usuarios-listado-table tbody tr:hover td {
-  background: #f8fafc;
 }
 
 .usuarios-page .user-email {
   font-weight: 500;
-  color: #0f172a;
 }
 
 .usuarios-page .user-date {
@@ -7011,59 +6987,9 @@ button.fact-back {
   align-items: center;
 }
 
-/* Actividad de usuarios: misma card con header verde y tabla verde */
+/* Actividad de usuarios: header de card verde SGI; tabla con estilo Registro ASIC (ver .usuarios-table-registro) */
 .usuarios-page-activity-card .usuarios-page-header--activity {
-  background: #2D5D46;
-}
-
-.usuarios-activity-listado-wrap {
-  overflow-x: auto;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-}
-
-.usuarios-activity-listado-wrap .usuarios-activity-listado-table {
-  border-collapse: separate;
-  border-spacing: 0;
-  margin-bottom: 0;
-  width: 100%;
-  font-size: 0.875rem;
-}
-
-.usuarios-activity-listado-wrap .usuarios-activity-listado-table thead.table-dark,
-.usuarios-activity-listado-wrap .usuarios-activity-listado-table thead.table-dark th {
-  background-color: #2D5D46 !important;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
-  color: #fff;
-  font-weight: 600;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 0.875rem 1.25rem;
-}
-
-.usuarios-activity-listado-wrap .usuarios-activity-listado-table thead.table-dark tr th:first-child {
-  border-radius: 12px 0 0 0;
-}
-
-.usuarios-activity-listado-wrap .usuarios-activity-listado-table thead.table-dark tr th:last-child {
-  border-radius: 0 12px 0 0;
-}
-
-.usuarios-activity-listado-wrap .usuarios-activity-listado-table tbody td {
-  border-bottom: 1px solid #f1f5f9;
-  padding: 0.875rem 1.25rem;
-  background: #fff;
-}
-
-.usuarios-activity-listado-wrap .usuarios-activity-listado-table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-.usuarios-activity-listado-wrap .usuarios-activity-listado-table tbody tr:hover td {
-  background: #f8fafc;
+  background: #2d5d46;
 }
 
 .usuarios-page .event-badge {

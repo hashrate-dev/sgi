@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   getNiceHashExternalRigs2,
   getNiceHashWatcherRigHashHistory,
@@ -672,10 +672,9 @@ function TotalWatcherSlotsOverview({
             return (
               <Link
                 key={idx}
-                to="/asic/monitor-equipos?watcher=1"
+                to={`/asic/monitor-equipos?watcher=1&slot=${idx + 1}`}
                 className="nh-watcher-slot-tab nh-watcher-slot-tab--aggregate text-decoration-none"
                 title={`Solo W${idx + 1}`}
-                onClick={() => saveActiveWatcherSlotIndex(idx)}
               >
                 {nick ? (
                   <span className="nh-watcher-slot-tab__label">
@@ -715,6 +714,16 @@ export function NiceHashWatcherDashboard({
 }: NiceHashWatcherDashboardProps) {
   const isTotal = viewMode === "allConfiguredSlots";
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const watcherSlot1FromUrl = useMemo(() => {
+    if (layout !== "fullscreen") return null;
+    const raw = searchParams.get("slot")?.trim();
+    if (!raw || !/^\d+$/.test(raw)) return null;
+    const n = parseInt(raw, 10);
+    if (!Number.isFinite(n) || n < 1 || n > NH_WATCHER_SLOT_COUNT) return null;
+    return n;
+  }, [layout, searchParams]);
+
   const [slotRows, setSlotRows] = useState(() => loadWatcherSlotRows());
   const [activeSlot, setActiveSlot] = useState(() => initialActiveSlotIndex(loadWatcherSlotRows()));
 
@@ -729,6 +738,15 @@ export function NiceHashWatcherDashboard({
   );
 
   const configuredSlotIndices = useMemo(() => listConfiguredWatcherSlotIndices(slotRows), [slotRows]);
+
+  useEffect(() => {
+    if (isTotal || watcherSlot1FromUrl == null) return;
+    const idx0 = watcherSlot1FromUrl - 1;
+    const configured = listConfiguredWatcherSlotIndices(slotRows);
+    if (!configured.includes(idx0)) return;
+    setActiveSlot(idx0);
+    saveActiveWatcherSlotIndex(idx0);
+  }, [isTotal, watcherSlot1FromUrl, slotRows]);
 
   const [configOpen, setConfigOpen] = useState(false);
   const [configDraft, setConfigDraft] = useState<NhWatcherSlotRow[]>(() => loadWatcherSlotRows().map((r) => ({ ...r })));
@@ -1791,6 +1809,7 @@ export function NiceHashWatcherDashboard({
                   onSelectSlot={(idx) => {
                     setActiveSlot(idx);
                     saveActiveWatcherSlotIndex(idx);
+                    setSearchParams({ watcher: "1", slot: String(idx + 1) }, { replace: true });
                   }}
                   onOpenConfig={openConfig}
                 />

@@ -21,10 +21,16 @@ export function getApiBase(): string {
    * El proxy de Vite limita el cuerpo (~10MB) y devuelve **413** al guardar equipos con imagen vitrina en JSON (data URL / galería grande).
    * Mismo `hostname` que la página (`localhost` vs `127.0.0.1`) para que CORS coincida con el `Origin` del navegador.
    * Para otra URL/puerto: `VITE_API_URL` o `VITE_API_PORT` en `client/.env`.
+   * Para mismos datos que producción: `VITE_USE_APP_HASHRATE_SPACE_API=1` o `VITE_API_URL=https://app.hashrate.space`.
    */
   if (h === "localhost" || h === "127.0.0.1") {
     const build = typeof RAW === "string" ? RAW.replace(/\/+$/, "").trim() : "";
     if (build) return build;
+    /** Misma API/BD que producción (usuarios, etc.); CORS en producción ya permite localhost:5173. */
+    const useProd = String(import.meta.env.VITE_USE_APP_HASHRATE_SPACE_API ?? "").trim();
+    if (useProd === "1" || /^true$/i.test(useProd)) {
+      return "https://app.hashrate.space";
+    }
     const rawPort = (import.meta.env.VITE_API_PORT ?? "").trim();
     const p = /^\d+$/.test(rawPort) ? rawPort : "8080";
     return `http://${h}:${p}`;

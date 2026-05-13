@@ -1438,6 +1438,7 @@ function MonitorEquiposAsicPageContent() {
   );
 }
 
+/** Activa el tablero NiceHash a pantalla completa (no es el índice de slot; el slot viene de `?slot=` o de localStorage). */
 function isWatcherOnlyRouteParam(raw: string | null): boolean {
   if (raw == null) return false;
   const v = raw.trim().toLowerCase();

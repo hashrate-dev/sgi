@@ -1,1 +1,1 @@
-export { db, initDb, getDb } from "./db/index.js";
+export { db, initDb, getDb, dbType } from "./db/index.js";

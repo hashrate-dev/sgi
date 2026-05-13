@@ -91,6 +91,13 @@ const UpdateUserSchema = z.object({
 
 const UpdateMyPasswordSchema = z.object({ password: z.string().min(6).max(100) });
 
+/** PostgreSQL puede devolver enum/text con casing distinto; el SPA compara con minúsculas. */
+function normalizeUserRoleForApi(role: string | null | undefined): string {
+  const u = String(role ?? "").trim().toLowerCase();
+  if (u === "admin_a" || u === "admin_b" || u === "operador" || u === "lector" || u === "cliente") return u;
+  return String(role ?? "").trim();
+}
+
 /** Listar usuarios (solo admin) - devuelve id, email, role, created_at, usuario (sin password) */
 usersRouter.get(
   "/users",
@@ -110,19 +117,22 @@ usersRouter.get(
     admin_b_grants_json?: string | null;
     lector_grants_json?: string | null;
   }>;
-  const users = rows.map((r) => ({
-    id: r.id,
-    email: r.email ?? r.username,
-    role: r.role,
-    created_at: r.created_at,
-    usuario: r.usuario ?? undefined,
-    ...(r.role === "admin_b"
-      ? { admin_b_grants: parseAdminBGrantsJson(r.admin_b_grants_json ?? null) }
-      : {}),
-    ...(r.role === "lector"
-      ? { lector_grants: parseLectorGrantsJson(r.lector_grants_json ?? null) }
-      : {}),
-  }));
+  const users = rows.map((r) => {
+    const roleNorm = normalizeUserRoleForApi(r.role);
+    return {
+      id: r.id,
+      email: r.email ?? r.username,
+      role: roleNorm,
+      created_at: r.created_at,
+      usuario: r.usuario ?? undefined,
+      ...(roleNorm === "admin_b"
+        ? { admin_b_grants: parseAdminBGrantsJson(r.admin_b_grants_json ?? null) }
+        : {}),
+      ...(roleNorm === "lector"
+        ? { lector_grants: parseLectorGrantsJson(r.lector_grants_json ?? null) }
+        : {}),
+    };
+  });
   res.json({ users });
 });
 

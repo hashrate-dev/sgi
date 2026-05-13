@@ -408,37 +408,56 @@ export function TiendaOnlineAuditSection({ refreshKey = 0 }: Props) {
             <p className="mb-0">Sin registros con los filtros actuales.</p>
           </div>
         ) : (
-          <div className="usuarios-listado-wrap">
-            <table className="table table-sm align-middle usuarios-listado-table">
-              <thead className="table-dark">
-                <tr>
-                  <th className="text-start">Fecha y hora</th>
-                  <th className="text-start">ID usuario</th>
-                  <th className="text-start">Correo</th>
-                  <th className="text-start">Usuario (BD)</th>
-                  <th className="text-start">Movimiento</th>
-                  <th className="text-start">Código</th>
-                  <th className="text-start">ID equipo</th>
-                  <th className="text-start">Resumen</th>
-                  <th className="text-start">Impacto contable / operativo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {entries.map((row) => (
-                  <tr key={row.id}>
-                    <td className="tienda-audit__mono text-nowrap">{new Date(row.created_at).toLocaleString("es-AR")}</td>
-                    <td className="tienda-audit__mono">{row.user_id}</td>
-                    <td>
-                      <span className="user-email">{row.user_email}</span>
-                    </td>
-                    <td className="small">{row.user_usuario?.trim() || "—"}</td>
-                    <td>
-                      <span className={badgeClass(row.action)}>{actionLabel(row.action)}</span>
-                    </td>
-                    <td className="tienda-audit__mono">{row.codigo_producto ?? "—"}</td>
-                    <td className="tienda-audit__mono small" title={row.equipo_id ?? undefined}>
-                      {row.equipo_id ? (row.equipo_id.length > 16 ? `${row.equipo_id.slice(0, 16)}…` : row.equipo_id) : "—"}
-                    </td>
+          <div className="monitor-asic-equipos-group usuarios-table-registro rounded-3 border bg-white shadow-sm overflow-hidden">
+            <div className="table-responsive">
+              <table className="table table-sm table-hover align-middle mb-0 small">
+                <thead className="table-light">
+                  <tr>
+                    <th scope="col" className="text-start">
+                      Fecha y hora
+                    </th>
+                    <th scope="col" className="text-start">
+                      ID usuario
+                    </th>
+                    <th scope="col" className="text-start">
+                      Correo
+                    </th>
+                    <th scope="col" className="text-start">
+                      Usuario (BD)
+                    </th>
+                    <th scope="col" className="text-start">
+                      Movimiento
+                    </th>
+                    <th scope="col" className="text-start">
+                      Código
+                    </th>
+                    <th scope="col" className="text-start">
+                      ID equipo
+                    </th>
+                    <th scope="col" className="text-start">
+                      Resumen
+                    </th>
+                    <th scope="col" className="text-start">
+                      Impacto contable / operativo
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {entries.map((row) => (
+                    <tr key={row.id}>
+                      <td className="tienda-audit__mono text-nowrap">{new Date(row.created_at).toLocaleString("es-AR")}</td>
+                      <td className="tienda-audit__mono sgi-tech-code">{row.user_id}</td>
+                      <td>
+                        <span className="user-email sgi-tech-code">{row.user_email}</span>
+                      </td>
+                      <td className="small">{row.user_usuario?.trim() || "—"}</td>
+                      <td>
+                        <span className={badgeClass(row.action)}>{actionLabel(row.action)}</span>
+                      </td>
+                      <td className="tienda-audit__mono sgi-tech-code">{row.codigo_producto ?? "—"}</td>
+                      <td className="tienda-audit__mono small sgi-tech-code" title={row.equipo_id ?? undefined}>
+                        {row.equipo_id ? (row.equipo_id.length > 16 ? `${row.equipo_id.slice(0, 16)}…` : row.equipo_id) : "—"}
+                      </td>
                     <td className="tienda-audit__summary small">{row.summary}</td>
                     <td>
                       {row.deltas && row.deltas.length > 0 ? (
@@ -477,8 +496,9 @@ export function TiendaOnlineAuditSection({ refreshKey = 0 }: Props) {
                     </td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 

@@ -66,7 +66,8 @@ export function MonitorEquiposAsicBajasPage() {
         <div className="hrs-card p-4 mb-3">
           <p className="text-muted small mb-3">
             Equipos retirados del monitor operativo (venta, baja del sistema). Se guarda una copia de la fila y la fecha;
-            el historial de notas en servidor sigue asociado al mismo <code className="small">equipoId</code> (UUID).
+            el historial de notas en servidor sigue asociado al mismo <code className="small sgi-tech-code">equipoId</code>{" "}
+            (UUID).
           </p>
           {loadErr ? <div className="alert alert-danger py-2">{loadErr}</div> : null}
           {tableLoading ? (
@@ -111,7 +112,7 @@ export function MonitorEquiposAsicBajasPage() {
                           {b.motivo?.trim() ? b.motivo : "—"}
                         </td>
                         <td>
-                          <code className="small text-break d-inline-block" style={{ maxWidth: "11rem" }}>
+                          <code className="small text-break d-inline-block sgi-tech-code" style={{ maxWidth: "11rem" }}>
                             {b.equipoId}
                           </code>
                         </td>
