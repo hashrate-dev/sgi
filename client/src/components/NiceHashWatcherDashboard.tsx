@@ -4,6 +4,7 @@ import {
   getNiceHashExternalRigs2,
   getNiceHashWatcherRigHashHistory,
   postNiceHashWatcherRigHashHistorySamples,
+  wakeUpBackend,
   type NiceHashExternalRigs2Payload,
 } from "../lib/api";
 import {
@@ -47,6 +48,9 @@ import {
   replaceNiceHashRigHashrateHistoryMap,
 } from "../lib/nicehashWatcherRigHashrateHistory";
 import "../styles/facturacion.css";
+
+/** Referencia estable para sparklines sin serie (evita re-renders por `?? []` nuevo cada vez). */
+const NH_SPARKLINE_VALUES_EMPTY: number[] = [];
 
 const NH_EMPTY_SLOT_ROW: NhWatcherSlotRow = { link: "", nickname: "", nhOrgId: "", nhApiKey: "", nhApiSecret: "" };
 
@@ -446,6 +450,54 @@ function formatUptimeFromConnected(timeConnectedMs?: number): string {
   return `${s}s`;
 }
 
+/** Cuenta atrás al próximo pago: intervalo local (no re-renderiza todo el tablero cada 1s). */
+function WatcherLiveCountdown({ iso }: { iso: string | null | undefined }) {
+  const [text, setText] = useState(() => formatCountdownToIso(iso, Date.now()));
+  useEffect(() => {
+    if (!iso) {
+      setText("—");
+      return;
+    }
+    const tick = () => setText(formatCountdownToIso(iso, Date.now()));
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [iso]);
+  return <>{text}</>;
+}
+
+/** “hace Xs” en última señal: solo este bloque se actualiza por segundo. */
+function WatcherLiveRelativeAge({ statusTimeMs }: { statusTimeMs?: number }) {
+  const [text, setText] = useState(() => formatNiceHashRelativeAge(statusTimeMs));
+  useEffect(() => {
+    if (typeof statusTimeMs !== "number" || !Number.isFinite(statusTimeMs)) {
+      setText(formatNiceHashRelativeAge(statusTimeMs));
+      return;
+    }
+    const tick = () => setText(formatNiceHashRelativeAge(statusTimeMs));
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [statusTimeMs]);
+  return <>{text}</>;
+}
+
+/** Duración de sesión desde timeConnected: avanza cada segundo sin tocar el resto del DOM. */
+function WatcherLiveUptime({ timeConnectedMs }: { timeConnectedMs?: number }) {
+  const [text, setText] = useState(() => formatUptimeFromConnected(timeConnectedMs));
+  useEffect(() => {
+    if (typeof timeConnectedMs !== "number" || !Number.isFinite(timeConnectedMs)) {
+      setText(formatUptimeFromConnected(timeConnectedMs));
+      return;
+    }
+    const tick = () => setText(formatUptimeFromConnected(timeConnectedMs));
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [timeConnectedMs]);
+  return <>{text}</>;
+}
+
 function WatcherSlotBar({
   variant,
   slotRows,
@@ -688,7 +740,6 @@ export function NiceHashWatcherDashboard({
   const [multiOk, setMultiOk] = useState<MultiOkRow[]>([]);
   const [multiFail, setMultiFail] = useState<Array<{ slotIndex: number; watcherId: string; error: string }>>([]);
   const [fetchedAt, setFetchedAt] = useState<number | null>(null);
-  const [, setTick] = useState(0);
   const [rigNicknames, setRigNicknames] = useState<Record<string, string>>({});
   const [rigHashSeriesMap, setRigHashSeriesMap] = useState<Record<string, number[]>>({});
   /** Historial local ~1 min: suma TH/s y MH/s del toolbar (un watcher o vista TOTAL). */
@@ -907,6 +958,7 @@ export function NiceHashWatcherDashboard({
 
   useEffect(() => {
     if (!active) return;
+    void wakeUpBackend();
     void refresh();
   }, [active, refresh]);
 
@@ -918,12 +970,6 @@ export function NiceHashWatcherDashboard({
     }, 60_000);
     return () => window.clearInterval(id);
   }, [active, refresh]);
-
-  useEffect(() => {
-    if (!active) return;
-    const id = window.setInterval(() => setTick((n) => n + 1), 1000);
-    return () => clearInterval(id);
-  }, [active]);
 
   useEffect(() => {
     if (!active || isTotal) return;
@@ -971,7 +1017,8 @@ export function NiceHashWatcherDashboard({
     if (!active || !isTotal) return;
     let cancelled = false;
     void (async () => {
-      for (const { watcherId } of multiOk) {
+      const fleetWid = NH_WATCHER_FLEET_TOOLBAR_WATCHER_ID.toLowerCase();
+      const slotTasks = multiOk.map(async ({ watcherId }) => {
         const wid = watcherId.trim().toLowerCase();
         try {
           const { series } = await getNiceHashWatcherRigHashHistory(wid);
@@ -982,17 +1029,19 @@ export function NiceHashWatcherDashboard({
         } catch {
           /* */
         }
-      }
-      try {
-        const fleetWid = NH_WATCHER_FLEET_TOOLBAR_WATCHER_ID.toLowerCase();
-        const { series: fleetSeries } = await getNiceHashWatcherRigHashHistory(fleetWid);
-        if (cancelled) return;
-        const localFleet = loadNiceHashRigHashratePointsMap(fleetWid);
-        const mergedFleet = mergeNiceHashRigHashratePointMaps(localFleet, fleetSeries);
-        replaceNiceHashRigHashrateHistoryMap(fleetWid, mergedFleet);
-      } catch {
-        /* */
-      }
+      });
+      const fleetTask = (async () => {
+        try {
+          const { series: fleetSeries } = await getNiceHashWatcherRigHashHistory(fleetWid);
+          if (cancelled) return;
+          const localFleet = loadNiceHashRigHashratePointsMap(fleetWid);
+          const mergedFleet = mergeNiceHashRigHashratePointMaps(localFleet, fleetSeries);
+          replaceNiceHashRigHashrateHistoryMap(fleetWid, mergedFleet);
+        } catch {
+          /* */
+        }
+      })();
+      await Promise.all([...slotTasks, fleetTask]);
       if (cancelled) return;
       const mergedSeries: Record<string, number[]> = {};
       for (const { watcherId } of multiOk) {
@@ -1265,7 +1314,7 @@ export function NiceHashWatcherDashboard({
             <div className="nh-watcher-kpi">
               <div className="nh-watcher-kpi__label">Próximo pago (estim.)</div>
               <div className="nh-watcher-kpi__value" style={{ fontSize: "1.15rem" }}>
-                {formatCountdownToIso(nhAgg.nextPayout, Date.now())}
+                <WatcherLiveCountdown iso={nhAgg.nextPayout} />
               </div>
               <div className="nh-watcher-kpi__sub">{nhAgg.nextPayout ? formatNiceHashIsoShort(nhAgg.nextPayout) : "—"}</div>
             </div>
@@ -1418,7 +1467,7 @@ export function NiceHashWatcherDashboard({
                       </div>
                       <div className="nh-watcher-rig-card__spark-wrap">
                         <NiceHashRigHashSparkline
-                          values={rigHashSeriesMap[seriesKey] ?? []}
+                          values={rigHashSeriesMap[seriesKey] ?? NH_SPARKLINE_VALUES_EMPTY}
                           title={`Tendencia hashrate (${label}): una muestra cada ~1 min, hasta ~7 días (navegador + servidor para tu usuario).`}
                           formatHashrate={formatNiceHashAcceptedSpeed}
                         />
@@ -1444,14 +1493,18 @@ export function NiceHashWatcherDashboard({
                       </div>
                       <div className="nh-watcher-rig-metric" title={formatNiceHashStatusTime(rig.statusTime)}>
                         Última señal
-                        <strong>{formatNiceHashRelativeAge(rig.statusTime)}</strong>
+                        <strong>
+                          <WatcherLiveRelativeAge statusTimeMs={rig.statusTime} />
+                        </strong>
                         <span className="nh-watcher-rig-metric__hint nh-watcher-rig-metric__hint--mono d-none d-md-block">
                           {formatNiceHashStatusTime(rig.statusTime)}
                         </span>
                       </div>
                       <div className="nh-watcher-rig-metric" title="Desde timeConnected de NiceHash">
                         Sesión
-                        <strong>{formatUptimeFromConnected(st0?.timeConnected)}</strong>
+                        <strong>
+                          <WatcherLiveUptime timeConnectedMs={st0?.timeConnected} />
+                        </strong>
                       </div>
                     </div>
                   </article>

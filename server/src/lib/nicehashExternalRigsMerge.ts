@@ -129,7 +129,7 @@ function parseBtcUsdFromNiceHashExchangeListJson(body: unknown): number | null {
 
 export async function fetchBtcUsdFromNiceHashExchangeList(): Promise<number | null> {
   const ac = new AbortController();
-  const tid = setTimeout(() => ac.abort(), 15000);
+  const tid = setTimeout(() => ac.abort(), 7000);
   try {
     const r = await fetch(NH_EXCHANGE_RATE_LIST, {
       method: "GET",
@@ -146,10 +146,10 @@ export async function fetchBtcUsdFromNiceHashExchangeList(): Promise<number | nu
   }
 }
 
-export async function proxyNiceHashRigs2WithExtras(
-  watcherId: string,
-  walletCreds?: NhWalletApiCreds | null
-): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; status: number; message: string }> {
+/** Solo rigs2 de NiceHash (sin extras). */
+async function fetchNiceHashExternalRigs2Only(
+  watcherId: string
+): Promise<{ ok: true; obj: Record<string, unknown> } | { ok: false; status: number; message: string }> {
   const url = `https://api2.nicehash.com/main/api/v2/mining/external/${encodeURIComponent(watcherId)}/rigs2`;
   const ac = new AbortController();
   const tid = setTimeout(() => ac.abort(), 18000);
@@ -178,9 +178,7 @@ export async function proxyNiceHashRigs2WithExtras(
     if (!body || typeof body !== "object" || Array.isArray(body)) {
       return { ok: false, status: 502, message: "NiceHash devolvió un JSON inesperado." };
     }
-    const obj = body as Record<string, unknown>;
-    const extras = await buildSgiExtrasForRigs2(obj, walletCreds ?? null);
-    return { ok: true, data: { ...obj, _sgi: extras } };
+    return { ok: true, obj: body as Record<string, unknown> };
   } catch (e) {
     clearTimeout(tid);
     const aborted = e instanceof Error && e.name === "AbortError";
@@ -192,9 +190,40 @@ export async function proxyNiceHashRigs2WithExtras(
   }
 }
 
+/**
+ * Proxy rigs2 + `_sgi`: dispara en paralelo NiceHash rigs2, tipo BTC (NiceHash+CoinGecko) y cartera opcional,
+ * para que el tiempo total sea ~max(cada rama) en lugar de rigs2 + suma secuencial.
+ */
+export async function proxyNiceHashRigs2WithExtras(
+  watcherId: string,
+  walletCreds?: NhWalletApiCreds | null
+): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; status: number; message: string }> {
+  const hasWallet =
+    Boolean(walletCreds?.orgId?.trim()) &&
+    Boolean(walletCreds?.apiKey?.trim()) &&
+    Boolean(walletCreds?.apiSecret?.trim());
+
+  const walletPromise = hasWallet && walletCreds
+    ? fetchNiceHashAccounts2TotalBtc(walletCreds)
+    : Promise.resolve({ btc: null as string | null, error: null as string | null });
+
+  const spotPromise = Promise.all([fetchBtcUsdFromNiceHashExchangeList(), fetchBtcSpotUsd()]);
+
+  const [rigsPart, [nhSpot, cgSpot], walletRes] = await Promise.all([
+    fetchNiceHashExternalRigs2Only(watcherId),
+    spotPromise,
+    walletPromise,
+  ]);
+
+  if (!rigsPart.ok) return rigsPart;
+
+  const extras = assembleSgiExtrasForRigs2Sync(rigsPart.obj, nhSpot, cgSpot, walletRes, hasWallet);
+  return { ok: true, data: { ...rigsPart.obj, _sgi: extras } };
+}
+
 export async function fetchBtcSpotUsd(): Promise<number | null> {
   const ac = new AbortController();
-  const tid = setTimeout(() => ac.abort(), 8000);
+  const tid = setTimeout(() => ac.abort(), 4500);
   try {
     const r = await fetch(COINGECKO_BTC_USD, {
       method: "GET",
@@ -214,7 +243,7 @@ export async function fetchBtcSpotUsd(): Promise<number | null> {
 
 export async function fetchNiceHashAccounts2TotalBtc(creds: NhWalletApiCreds): Promise<{ btc: string | null; error: string | null }> {
   const ac = new AbortController();
-  const tid = setTimeout(() => ac.abort(), 15000);
+  const tid = setTimeout(() => ac.abort(), 12000);
   try {
     const tr = await fetch(`${NH_HOST}/api/v2/time`, {
       method: "GET",
@@ -272,16 +301,14 @@ export async function fetchNiceHashAccounts2TotalBtc(creds: NhWalletApiCreds): P
   }
 }
 
-export async function buildSgiExtrasForRigs2(
+/** Ensambla `_sgi` cuando ya se obtuvieron spot y cartera (p. ej. en paralelo con rigs2). */
+export function assembleSgiExtrasForRigs2Sync(
   rigs2: Record<string, unknown>,
-  walletCreds?: NhWalletApiCreds | null
-): Promise<NiceHashSgiExtras> {
-  const [[nhSpot, cgSpot], walletRes] = await Promise.all([
-    Promise.all([fetchBtcUsdFromNiceHashExchangeList(), fetchBtcSpotUsd()]),
-    walletCreds?.orgId && walletCreds.apiKey && walletCreds.apiSecret
-      ? fetchNiceHashAccounts2TotalBtc(walletCreds)
-      : Promise.resolve({ btc: null as string | null, error: null as string | null }),
-  ]);
+  nhSpot: number | null,
+  cgSpot: number | null,
+  walletRes: { btc: string | null; error: string | null },
+  includeWalletError: boolean
+): NiceHashSgiExtras {
   const btcSpot = nhSpot ?? cgSpot;
 
   const unpaidN = parseAmountString(rigs2.unpaidAmount);
@@ -298,6 +325,24 @@ export async function buildSgiExtrasForRigs2(
     unpaidUsdSpotEstimate,
     walletTotalBtc,
     walletUsdApprox,
-    walletError: walletCreds?.orgId && walletCreds.apiKey && walletCreds.apiSecret ? walletRes.error : null,
+    walletError: includeWalletError ? walletRes.error : null,
   };
+}
+
+/** Uso secuencial (tests o callers que ya tienen rigs2 en mano). */
+export async function buildSgiExtrasForRigs2(
+  rigs2: Record<string, unknown>,
+  walletCreds?: NhWalletApiCreds | null
+): Promise<NiceHashSgiExtras> {
+  const hasWallet =
+    Boolean(walletCreds?.orgId?.trim()) &&
+    Boolean(walletCreds?.apiKey?.trim()) &&
+    Boolean(walletCreds?.apiSecret?.trim());
+  const [[nhSpot, cgSpot], walletRes] = await Promise.all([
+    Promise.all([fetchBtcUsdFromNiceHashExchangeList(), fetchBtcSpotUsd()]),
+    hasWallet && walletCreds
+      ? fetchNiceHashAccounts2TotalBtc(walletCreds)
+      : Promise.resolve({ btc: null as string | null, error: null as string | null }),
+  ]);
+  return assembleSgiExtrasForRigs2Sync(rigs2, nhSpot, cgSpot, walletRes, hasWallet);
 }

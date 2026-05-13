@@ -55,19 +55,27 @@ export function getApiBaseUrlForDisplay(): string {
   return getApiBase() || "(mismo origen o no configurado)";
 }
 
-/** En Vercel / app.hashrate.space: warmup (DB+app). En Render: health. Retorna Promise que resuelve cuando el backend está listo. */
+/**
+ * Despierta el backend lo antes posible (sin bloquear la UI): mismo origen `/api/warmup`,
+ * API explícita en Render (`sgi.hashrate.space`), o `/api/health` si el front es localhost y `VITE_API_URL` apunta al servidor.
+ */
 export function wakeUpBackend(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
   const h = window.location?.hostname ?? "";
+  const baseRaw = (getApiBase() ?? "").trim().replace(/\/+$/, "");
   if (h.endsWith(".vercel.app") || h === "app.hashrate.space") {
     return fetch("/api/warmup", { method: "GET", keepalive: true })
       .then(() => {})
       .catch(() => {});
   }
-  if (h !== "sgi.hashrate.space") return Promise.resolve();
-  const base = getApiBase();
-  if (!base) return Promise.resolve();
-  return fetch(`${base}/api/health`, { method: "GET", keepalive: true }).then(() => {}).catch(() => {});
+  if (h === "sgi.hashrate.space") {
+    if (!baseRaw) return Promise.resolve();
+    return fetch(`${baseRaw}/api/health`, { method: "GET", keepalive: true }).then(() => {}).catch(() => {});
+  }
+  if ((h === "localhost" || h === "127.0.0.1") && baseRaw) {
+    return fetch(`${baseRaw}/api/health`, { method: "GET", keepalive: true }).then(() => {}).catch(() => {});
+  }
+  return Promise.resolve();
 }
 
 function isLocalHost(): boolean {

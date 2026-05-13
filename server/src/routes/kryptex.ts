@@ -498,15 +498,15 @@ kryptexRouter.get("/kryptex/payouts", async (req, res) => {
     "Accept-Language": "en-US,en;q=0.9",
   };
   try {
-    const [htmlResp, statsResp, apiData] = await Promise.all([
+    const [htmlResp, statsResp, apiData, quaPrice] = await Promise.all([
       fetch(payoutsUrl, { headers: htmlHeaders }).then((r) => (r.ok ? r.text() : Promise.resolve(""))),
       fetch(statsUrl, { headers: htmlHeaders }).then((r) => (r.ok ? r.text() : Promise.resolve(""))),
       fetchPayoutsFromApi(pool, wallet).catch(() => ({ payouts: [] as KryptexPayoutsData["payouts"], totalPaid: 0 })),
+      fetchQuaiPriceUsd(),
     ]);
     const parsed = htmlResp ? parsePayoutsPage(htmlResp) : { unpaid: 0, paid: 0, reward7d: 0, reward30d: 0, unpaidUsd: null, paidUsd: null };
     let paidUsd = parsed.paidUsd;
     let unpaidUsd = parsed.unpaidUsd;
-    const quaPrice = await fetchQuaiPriceUsd();
     if (paidUsd == null) {
       const paidAmount = parsed.paid || apiData.totalPaid;
       if (quaPrice != null && paidAmount > 0) paidUsd = Math.round(paidAmount * quaPrice * 100) / 100;

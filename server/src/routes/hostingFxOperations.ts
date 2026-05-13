@@ -280,9 +280,10 @@ hostingFxOperationsRouter.get(
   requireModuleGrant("hosting_tipo_cambio"),
   async (_req, res) => {
     await ensureHostingFxSchema();
-    const rows = (await db
-      .prepare(
-        `SELECT o.id, o.ticket_code, o.client_id, o.operation_date, o.operation_type, o.hrs_commission_pct, o.bank_fee_amount, o.delivery_method, o.client_total_payment,
+    const [rowsRaw, commissions] = await Promise.all([
+      db
+        .prepare(
+          `SELECT o.id, o.ticket_code, o.client_id, o.operation_date, o.operation_type, o.hrs_commission_pct, o.bank_fee_amount, o.delivery_method, o.client_total_payment,
                 o.operation_amount,
                 o.bank_name, o.account_number, o.currency, o.bank_branch, o.account_holder_name, o.usdt_side, o.notes, o.created_at, o.updated_at,
                 COALESCE(o.compra_flow_hosting_commission, 0) AS compra_flow_hosting_commission,
@@ -290,14 +291,11 @@ hostingFxOperationsRouter.get(
          FROM hosting_fx_operations o
          JOIN clients c ON c.id = o.client_id
          ORDER BY o.operation_date DESC, o.id DESC`
-      )
-      .all()) as FxRow[];
-    let commissions: HostingCommissionInvoiceRow[] = [];
-    try {
-      commissions = await fetchHostingCommissionInvoicesTotals();
-    } catch {
-      commissions = [];
-    }
+        )
+        .all(),
+      fetchHostingCommissionInvoicesTotals().catch((): HostingCommissionInvoiceRow[] => []),
+    ]);
+    const rows = rowsRaw as FxRow[];
     const base = rows.map((x) => mapFxRow(x as unknown as Record<string, unknown>)) as Array<Record<string, unknown>>;
     const forAssign = base.map((op) => ({
       id: Number(op.id ?? 0),

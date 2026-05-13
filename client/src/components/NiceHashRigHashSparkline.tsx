@@ -1,4 +1,4 @@
-import { useId, useMemo } from "react";
+import { memo, useId, useMemo } from "react";
 
 const W = 112;
 const H = 32;
@@ -163,7 +163,7 @@ function guideLineClassName(kinds: LevelKind[]): string {
 }
 
 /** Sparkline estilo monitor: fondo oscuro, línea verde fina, guías punteadas opcionales. */
-export function NiceHashRigHashSparkline({ values, title, formatHashrate }: NiceHashRigHashSparklineProps) {
+function NiceHashRigHashSparklineInner({ values, title, formatHashrate }: NiceHashRigHashSparklineProps) {
   const gid = useId().replace(/:/g, "");
   const gradId = `nhRigSparkFill-${gid}`;
   const layout = useMemo(() => buildSparkLayout(values), [values]);
@@ -257,3 +257,7 @@ export function NiceHashRigHashSparkline({ values, title, formatHashrate }: Nice
     </div>
   );
 }
+
+export const NiceHashRigHashSparkline = memo(NiceHashRigHashSparklineInner, (prev, next) => {
+  return prev.values === next.values && prev.formatHashrate === next.formatHashrate;
+});

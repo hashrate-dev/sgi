@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { setStoredAuth, clearStoredAuth, getStoredToken } from "../lib/auth";
 import type { AuthUser } from "../lib/auth";
-import { getMe, login as apiLogin, logoutApi, type LoginResponse } from "../lib/api";
+import { getMe, login as apiLogin, logoutApi, wakeUpBackend, type LoginResponse } from "../lib/api";
 
 type AuthContextValue = {
   user: AuthUser | null;
@@ -23,6 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    void wakeUpBackend();
     const t = setTimeout(() => {
       if (!cancelled) {
         setLoading(false);

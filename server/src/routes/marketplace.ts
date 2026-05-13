@@ -1079,21 +1079,26 @@ marketplaceRouter.post("/marketplace/asic-yields", marketplacePublicPostRateLimi
     }
     const customItems = items.filter((it) => customById.has(String(it.id)));
     const nonCustomItemsBase = items.filter((it) => !customById.has(String(it.id)));
-    const snap = await fetchNetworkMiningSnapshot();
+    const [snap, customParallel] = await Promise.all([
+      fetchNetworkMiningSnapshot(),
+      Promise.all(
+        customItems.map(async (it) => {
+          const cfg = customById.get(String(it.id));
+          if (!cfg) return { kind: "fallback" as const, it };
+          const y = await estimateYieldFromCustomWhatToMine(cfg);
+          if (!y) return { kind: "fallback" as const, it };
+          return {
+            kind: "row" as const,
+            row: { id: String(it.id), line1: y.line1, line2: y.line2, note: y.note },
+          };
+        })
+      ),
+    ]);
     const fallbackFromCustom: AsicYieldItem[] = [];
     const customYieldRows: Array<{ id: string; line1: string; line2: string; note: string }> = [];
-    for (const it of customItems) {
-      const cfg = customById.get(String(it.id));
-      if (!cfg) {
-        fallbackFromCustom.push(it);
-        continue;
-      }
-      const y = await estimateYieldFromCustomWhatToMine(cfg);
-      if (!y) {
-        fallbackFromCustom.push(it);
-        continue;
-      }
-      customYieldRows.push({ id: String(it.id), line1: y.line1, line2: y.line2, note: y.note });
+    for (const r of customParallel) {
+      if (r.kind === "row") customYieldRows.push(r.row);
+      else fallbackFromCustom.push(r.it);
     }
     const nonCustomItems = [...nonCustomItemsBase, ...fallbackFromCustom];
     const zecItems = nonCustomItems.filter(detectZecEquihashYieldItem);
