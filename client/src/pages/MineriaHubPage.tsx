@@ -8,8 +8,15 @@ import "../styles/facturacion.css";
 const monitorMenuItem = {
   to: "/asic/monitor-equipos",
   icon: "bi-speedometer2",
-  label: "Monitor Equipos ASIC",
+  label: "Registro de Equipos ASIC",
   desc: "Tablero de control por equipo (usuario, modelo, pool, online)",
+} as const;
+
+const monitorBajasMenuItem = {
+  to: "/asic/equipos-dados-de-baja",
+  icon: "bi-archive",
+  label: "Equipos ASIC dados de baja",
+  desc: "Listado de equipos retirados del monitor (snapshot en servidor; venta o baja del sistema)",
 } as const;
 
 const asicMenuItemsRest: Array<{ to: string; icon: string; label: string; desc: string }> = [
@@ -29,7 +36,9 @@ const asicMenuItemsRest: Array<{ to: string; icon: string; label: string; desc: 
 export function MineriaHubPage() {
   const { user } = useAuth();
   const asicMenuItems = useMemo(() => {
-    return canAccessMonitorEquiposAsic(user) ? [{ ...monitorMenuItem }, ...asicMenuItemsRest] : [...asicMenuItemsRest];
+    return canAccessMonitorEquiposAsic(user)
+      ? [{ ...monitorMenuItem }, { ...monitorBajasMenuItem }, ...asicMenuItemsRest]
+      : [...asicMenuItemsRest];
   }, [user]);
 
   return (

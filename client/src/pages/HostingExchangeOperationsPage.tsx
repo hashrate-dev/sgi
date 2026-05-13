@@ -481,12 +481,6 @@ export function HostingExchangeOperationsPage() {
                         deliveryMethod: "usd_to_bank",
                         bankName: DEFAULT_BANK_HOSTING_COMMISSION,
                       }));
-                      window.requestAnimationFrame(() => {
-                        document.getElementById("hosting-transfer-commission-section")?.scrollIntoView({
-                          behavior: "smooth",
-                          block: "start",
-                        });
-                      });
                       return;
                     }
                     setForm((p) => ({
@@ -505,7 +499,6 @@ export function HostingExchangeOperationsPage() {
               <div className="col-12 col-md-6 col-lg-4">
                 <label className="fact-label">Envío</label>
                 <select
-                  key={form.usdtSide}
                   className="fact-select"
                   value={form.deliveryMethod}
                   onChange={(e) => setForm((p) => ({ ...p, deliveryMethod: e.target.value as FxFormState["deliveryMethod"] }))}

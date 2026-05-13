@@ -875,6 +875,38 @@ CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_visitor ON marketplace_presence_
     `CREATE INDEX IF NOT EXISTS idx_monitor_equipo_asic_historial_equipo ON monitor_equipo_asic_historial(equipo_id, created_at DESC)`
   );
 
+  native.exec(`CREATE TABLE IF NOT EXISTS monitor_equipo_asic_baja (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    equipo_id TEXT NOT NULL,
+    row_snapshot TEXT NOT NULL,
+    motivo TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    created_by_user_id INTEGER,
+    created_by_email TEXT NOT NULL DEFAULT '',
+    FOREIGN KEY (created_by_user_id) REFERENCES users(id)
+  )`);
+  native.exec(
+    `CREATE UNIQUE INDEX IF NOT EXISTS uq_monitor_equipo_asic_baja_equipo ON monitor_equipo_asic_baja(equipo_id)`
+  );
+  native.exec(
+    `CREATE INDEX IF NOT EXISTS idx_monitor_equipo_asic_baja_created ON monitor_equipo_asic_baja(created_at DESC)`
+  );
+
+  /** Sparkline watcher NiceHash: 1 muestra / min por rig (misma ventana que el cliente, ~7 días). */
+  native.exec(`CREATE TABLE IF NOT EXISTS nh_watcher_rig_hash_samples (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    watcher_id TEXT NOT NULL,
+    rig_key TEXT NOT NULL,
+    sample_t INTEGER NOT NULL,
+    value REAL NOT NULL,
+    UNIQUE (user_id, watcher_id, rig_key, sample_t),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`);
+  native.exec(
+    `CREATE INDEX IF NOT EXISTS idx_nh_watcher_rig_hash_user_watcher ON nh_watcher_rig_hash_samples(user_id, watcher_id, sample_t)`
+  );
+
   const txWrap = {
     prepare: (sql: string) => createStatement(native, sql),
   };

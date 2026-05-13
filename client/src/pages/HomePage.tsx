@@ -130,17 +130,17 @@ const menuItems: MenuItem[] = [
     iconHoverBorderColor: "#cbd5e1",
   },
   {
-    to: "/asic/monitor-equipos",
-    icon: "bi-speedometer2",
-    label: "Monitor Equipos ASIC",
-    desc: "Control por equipo: usuario, modelo, pool, nombres y estado online",
+    to: "/asic/monitor-equipos?watcher=1",
+    icon: "bi-broadcast-pin",
+    label: "Watcher Equipos",
+    desc: "Monitor de equipos ASIC en NiceHash (watcher, lectura pública API2). W1…WN y vista TOTAL.",
     roles: ["admin_a", "admin_b"],
-    iconBg: "#ecfdf5",
-    iconColor: "#047857",
-    iconBorderColor: "#a7f3d0",
-    iconHoverBg: "#d1fae5",
-    iconHoverColor: "#065f46",
-    iconHoverBorderColor: "#6ee7b7",
+    iconBg: "#e0f2fe",
+    iconColor: "#0369a1",
+    iconBorderColor: "#bae6fd",
+    iconHoverBg: "#bae6fd",
+    iconHoverColor: "#075985",
+    iconHoverBorderColor: "#7dd3fc",
   },
   {
     to: "/kryptex",
@@ -255,7 +255,7 @@ export function HomePage() {
     if (user.role === "lector") {
       return canLectorSeeHomeMenuTo(user, item.to);
     }
-    if (item.to === "/asic/monitor-equipos" && !canAccessMonitorEquiposAsic(user)) return false;
+    if (item.to.startsWith("/asic/monitor-equipos") && !canAccessMonitorEquiposAsic(user)) return false;
     return !item.roles || item.roles.some((r) => roleNorm(r) === roleNorm(user.role));
   });
   const canSeeMarketplaceOrdersCard = Boolean(user && canViewMarketplaceQuoteTickets(user));

@@ -30,6 +30,23 @@ export function MedioPagoIcon({ code }: { code: string }) {
           <path fill="#fff" d="M6.5 8.5h2.8v7H6.5zm4.35 0H18v1.85h-7.15v1.65H17v1.85h-7.8v3.65h-2.85V8.5z" opacity=".92" />
         </svg>
       );
+    /** BROU (Banco República Oriental del Uruguay): marca simplificada — azul institucional + sol (amarillo), cf. [brou.com.uy](https://www.brou.com.uy/). */
+    case "USD BANCO BROU UY":
+      return (
+        <svg viewBox={ICON_BOX} width={22} height={22} aria-hidden className="contabilidad-medio-pago-ico flex-shrink-0">
+          <rect x="2.25" y="2.25" width="19.5" height="19.5" rx="4" fill="#003d82" />
+          <circle cx="12" cy="11.35" r="6.15" fill="#ffd200" />
+          <circle cx="12" cy="11.35" r="2.85" fill="#003d82" />
+          {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => {
+            const r = (deg * Math.PI) / 180;
+            const x1 = 12 + Math.cos(r) * 3.15;
+            const y1 = 11.35 + Math.sin(r) * 3.15;
+            const x2 = 12 + Math.cos(r) * 5.55;
+            const y2 = 11.35 + Math.sin(r) * 5.55;
+            return <line key={deg} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#003d82" strokeWidth="0.95" strokeLinecap="round" />;
+          })}
+        </svg>
+      );
     case "USDT BINANCE":
       return (
         <svg viewBox={ICON_BOX} width={22} height={22} aria-hidden className="contabilidad-medio-pago-ico flex-shrink-0">

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { createPortal } from "react-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import { Flex } from "@chakra-ui/react";
+import NiceHashWatcherDashboard from "../components/NiceHashWatcherDashboard";
 import { PageHeader } from "../components/PageHeader";
 import { showToast } from "../components/ToastNotification";
 import { AppButton, AppModal } from "../components/ui";
@@ -14,6 +16,8 @@ import {
 } from "../data/monitorEquiposAsicData";
 import {
   getMonitorEquiposAsicHistorial,
+  isBenignFetchAbort,
+  postMonitorEquipoAsicBaja,
   postMonitorEquiposAsicHistorialFeed,
   postMonitorEquiposAsicHistorialNote,
   postMonitorEquiposAsicHistorialSummary,
@@ -21,7 +25,11 @@ import {
   type MonitorEquipoAsicHistorialEntry,
   type MonitorEquipoAsicHistorialFeedEntry,
 } from "../lib/api";
-import { loadHistorialLastReadMap, saveHistorialLastReadForEquipo } from "../lib/monitorEquiposAsicHistorialRead";
+import {
+  loadHistorialLastReadMap,
+  removeHistorialLastReadForEquipo,
+  saveHistorialLastReadForEquipo,
+} from "../lib/monitorEquiposAsicHistorialRead";
 import {
   filterSummaryCacheToRowIds,
   loadMonitorNotasSummaryCache,
@@ -236,6 +244,8 @@ function monitorRowNotasLabel(row: MonitorEquipoAsicRow): string {
 /** Prefijos guardados en el servidor para distinguir cambios ONLINE/OFFLINE en la línea de tiempo. */
 const MONITOR_HISTORIAL_ESTADO_PREFIX_ONLINE = "[[monitor-asic:estado:ONLINE]]";
 const MONITOR_HISTORIAL_ESTADO_PREFIX_OFFLINE = "[[monitor-asic:estado:OFFLINE]]";
+/** Registrado al dar de baja un equipo (ver POST /monitor-equipos-asic/baja). */
+const MONITOR_HISTORIAL_BAJA_PREFIX = "[[monitor-asic:baja]]";
 
 function defaultEstadoHistorialLine(variant: "online" | "offline"): string {
   return variant === "online"
@@ -243,9 +253,18 @@ function defaultEstadoHistorialLine(variant: "online" | "offline"): string {
     : "Marcado como OFFLINE (fuera de línea).";
 }
 
+function defaultBajaHistorialLine(): string {
+  return "Equipo dado de baja.";
+}
+
 function parseMonitorAsicHistorialEstado(body: string):
   | { kind: "estado"; variant: "online" | "offline"; userText: string }
+  | { kind: "baja"; userText: string }
   | { kind: "text" } {
+  if (body.startsWith(MONITOR_HISTORIAL_BAJA_PREFIX)) {
+    const rest = body.slice(MONITOR_HISTORIAL_BAJA_PREFIX.length).replace(/^\s*\n+/, "").trim();
+    return { kind: "baja", userText: rest };
+  }
   if (body.startsWith(MONITOR_HISTORIAL_ESTADO_PREFIX_ONLINE)) {
     return {
       kind: "estado",
@@ -263,6 +282,26 @@ function parseMonitorAsicHistorialEstado(body: string):
   return { kind: "text" };
 }
 
+/** Clases de globo (estado / baja) + texto a mostrar en feed global y modal de notas. */
+function formatMonitorHistorialBubble(body: string): { estadoExtra: string; bodyDisplay: string } {
+  const parsed = parseMonitorAsicHistorialEstado(body);
+  if (parsed.kind === "estado") {
+    return {
+      estadoExtra: ` monitor-equipo-notas-modal__entry--estado monitor-equipo-notas-modal__entry--estado-${parsed.variant}`,
+      bodyDisplay: parsed.userText || defaultEstadoHistorialLine(parsed.variant),
+    };
+  }
+  if (parsed.kind === "baja") {
+    const main = defaultBajaHistorialLine();
+    const bodyDisplay = parsed.userText.trim() ? `${main}\n${parsed.userText.trim()}` : main;
+    return {
+      estadoExtra: " monitor-equipo-notas-modal__entry--estado monitor-equipo-notas-modal__entry--estado-baja",
+      bodyDisplay,
+    };
+  }
+  return { estadoExtra: "", bodyDisplay: body };
+}
+
 function notasBadgeEquipoHaAbiertoModal(equipoId: string): boolean {
   return Boolean(loadHistorialLastReadMap()[equipoId]?.trim());
 }
@@ -276,6 +315,10 @@ function monitorNotasCirclesVisible(
   const opened = notasBadgeEquipoHaAbiertoModal(equipoId);
   return c.unread > 0 || (opened && c.unread === 0 && c.total > 0);
 }
+
+const MONITOR_ROW_MENU_MIN_W = 200;
+
+type MonitorAsicRowMenuOpen = { equipoId: string; top: number; left: number } | null;
 
 function MonitorAsicNotasBadges({
   counts,
@@ -333,6 +376,8 @@ function MonitorEquiposAsicPageContent() {
   const [globalFeedEntries, setGlobalFeedEntries] = useState<MonitorEquipoAsicHistorialFeedEntry[]>([]);
   const [globalFeedLoading, setGlobalFeedLoading] = useState(false);
   const [globalFeedError, setGlobalFeedError] = useState<string | null>(null);
+  const [rowMenu, setRowMenu] = useState<MonitorAsicRowMenuOpen>(null);
+
 
   /** Contadores por equipo para badges Notas (no leídas / total en ventana 20 días, servidor). Hidrata desde sessionStorage. */
   const [notasSummary, setNotasSummary] =
@@ -365,6 +410,34 @@ function MonitorEquiposAsicPageContent() {
     if (!wrap || globalFeedLoading || globalFeedEntries.length === 0) return;
     wrap.scrollTop = wrap.scrollHeight;
   }, [globalFeedEntries, globalFeedLoading]);
+
+  useEffect(() => {
+    if (!rowMenu) return;
+    const close = () => setRowMenu(null);
+    window.addEventListener("scroll", close, true);
+    return () => window.removeEventListener("scroll", close, true);
+  }, [rowMenu]);
+
+  useEffect(() => {
+    if (!rowMenu) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setRowMenu(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [rowMenu]);
+
+  useEffect(() => {
+    if (!rowMenu) return;
+    const onDown = (e: MouseEvent) => {
+      const t = e.target;
+      if (!(t instanceof Element)) return;
+      if (t.closest("[data-monitor-asic-row-menu-root]")) return;
+      setRowMenu(null);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [rowMenu]);
 
   const refreshNotasSummary = useCallback(async () => {
     const ids = [...new Set(rows.map((r) => r.equipoId))].filter((id) => MONITOR_EQUIPO_UUID_RE.test(id.trim()));
@@ -410,7 +483,11 @@ function MonitorEquiposAsicPageContent() {
       const { entries } = await postMonitorEquiposAsicHistorialFeed({ equipoIds: ids, limit: 280 });
       setGlobalFeedEntries(entries);
     } catch (e) {
-      setGlobalFeedError(e instanceof Error ? e.message : "No se pudo cargar el resumen de notas.");
+      if (!isBenignFetchAbort(e)) {
+        setGlobalFeedError(e instanceof Error ? e.message : "No se pudo cargar el resumen de notas.");
+      } else {
+        setGlobalFeedError(null);
+      }
       setGlobalFeedEntries([]);
     } finally {
       setGlobalFeedLoading(false);
@@ -486,8 +563,10 @@ function MonitorEquiposAsicPageContent() {
         void refreshNotasSummary();
         void refreshGlobalFeed();
       })
-      .catch((e: Error) => {
-        showToast(e.message ?? "Error al cargar historial", "error");
+      .catch((e: unknown) => {
+        if (!cancelled && !isBenignFetchAbort(e)) {
+          showToast(e instanceof Error ? e.message : "Error al cargar historial", "error");
+        }
         if (!cancelled) setHistorialEntries([]);
       })
       .finally(() => {
@@ -544,6 +623,71 @@ function MonitorEquiposAsicPageContent() {
     });
   }
 
+  function removeEquipoFromLocalState(equipoId: string) {
+    if (historialModal?.equipoId === equipoId) setHistorialModal(null);
+    removeHistorialLastReadForEquipo(equipoId);
+    setRows((prev) => {
+      const next = prev.filter((r) => r.equipoId !== equipoId);
+      if (next.length === prev.length) return prev;
+      saveMonitorEquiposAsicRows(next);
+      const summary = loadMonitorNotasSummaryCache();
+      saveMonitorNotasSummaryCache(filterSummaryCacheToRowIds(summary, next.map((r) => r.equipoId)));
+      return next;
+    });
+    setNotasSummary((prev) => {
+      const n = { ...prev };
+      delete n[equipoId];
+      return n;
+    });
+  }
+
+  function removeEquipoById(equipoId: string) {
+    if (
+      !window.confirm(
+        "¿Eliminar este equipo del listado local? Se quitan los datos guardados en este navegador para esta fila. Las notas en el servidor no se borran."
+      )
+    ) {
+      return;
+    }
+    setRowMenu(null);
+    removeEquipoFromLocalState(equipoId);
+    showToast("Equipo quitado del listado local.", "success");
+  }
+
+  async function darDeBajaEquipoFromMenu(equipoId: string) {
+    const row = rows.find((r) => r.equipoId === equipoId);
+    if (!row) {
+      showToast("No se encontró la fila del equipo.", "error");
+      setRowMenu(null);
+      return;
+    }
+    if (
+      !window.confirm(
+        "¿Dar de baja este equipo? Se quitará del listado del monitor en este navegador y quedará registrado en el servidor (retiro, venta, etc.). Las notas en el servidor no se eliminan."
+      )
+    ) {
+      return;
+    }
+    const motivoRaw = window.prompt("Motivo (opcional), ej. venta, retiro de cliente:", "");
+    if (motivoRaw === null) return;
+    const motivo = motivoRaw.trim();
+    setRowMenu(null);
+    const rowSnapshot: Record<string, unknown> = { ...row };
+    try {
+      await postMonitorEquipoAsicBaja({
+        equipoId: row.equipoId,
+        rowSnapshot,
+        ...(motivo ? { motivo } : {}),
+      });
+      removeEquipoFromLocalState(row.equipoId);
+      void refreshGlobalFeed();
+      void refreshNotasSummary();
+      showToast("Equipo dado de baja. Podés verlo en Equipos ASIC → Equipos ASIC dados de baja.", "success");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "No se pudo registrar la baja en el servidor.", "error");
+    }
+  }
+
   async function handleMonitorOnlineToggle(index: number, row: MonitorEquipoAsicRow) {
     if (row.rowLocked) return;
     const wasOnline = row.online;
@@ -561,7 +705,9 @@ function MonitorEquiposAsicPageContent() {
       }
     } catch (e) {
       patchEquipoRow(index, { online: wasOnline, luxorOnlineSync: row.luxorOnlineSync });
-      showToast(e instanceof Error ? e.message : "No se pudo registrar el cambio en el historial.", "error");
+      if (!isBenignFetchAbort(e)) {
+        showToast(e instanceof Error ? e.message : "No se pudo registrar el cambio en el historial.", "error");
+      }
     }
   }
 
@@ -592,6 +738,7 @@ function MonitorEquiposAsicPageContent() {
   }
 
   function openHistorialModal(row: MonitorEquipoAsicRow) {
+    setRowMenu(null);
     setHistorialModal({
       equipoId: row.equipoId,
       label: monitorRowNotasLabel(row),
@@ -621,7 +768,9 @@ function MonitorEquiposAsicPageContent() {
       setHistorialNoteDraft("");
       showToast("Nota registrada.", "success");
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "Error al guardar", "error");
+      if (!isBenignFetchAbort(e)) {
+        showToast(e instanceof Error ? e.message : "Error al guardar", "error");
+      }
     } finally {
       setHistorialSaving(false);
     }
@@ -630,7 +779,7 @@ function MonitorEquiposAsicPageContent() {
   return (
     <div className="fact-page mineria-page">
       <div className="container">
-        <PageHeader title="Monitor Equipos ASIC" />
+        <PageHeader title="Registro de Equipos ASIC" />
 
         <div className="hrs-card p-4 mb-3">
           <div className="monitor-asic-dash-head mb-3 mb-md-4">
@@ -655,12 +804,6 @@ function MonitorEquiposAsicPageContent() {
               </div>
             </div>
           </div>
-
-          <p className="text-muted small mb-0">
-            Los anillos se calculan desde las filas de <strong>Equipos registrados</strong>: cada equipo cuenta como{" "}
-            <strong>ONLINE</strong> u <strong>OFFLINE</strong> según el interruptor de la tabla de abajo. Si el listado
-            está vacío, los totales quedan en 0.
-          </p>
         </div>
 
         <div className="hrs-card mb-3 monitor-asic-global-feed border-0 shadow-sm overflow-hidden">
@@ -722,16 +865,11 @@ function MonitorEquiposAsicPageContent() {
               <div className="monitor-asic-global-feed__entries px-2 px-md-3 pb-3">
                 {globalFeedEntries.map((e) => {
                   const mine = isHistorialEntryFromCurrentUser(e.createdByEmail, user?.email);
-                  const estado = parseMonitorAsicHistorialEstado(e.body);
-                  const estadoExtra =
-                    estado.kind === "estado"
-                      ? ` monitor-equipo-notas-modal__entry--estado monitor-equipo-notas-modal__entry--estado-${estado.variant}`
-                      : "";
-                  const bodyDisplay =
-                    estado.kind === "estado"
-                      ? estado.userText || defaultEstadoHistorialLine(estado.variant)
-                      : e.body;
-                  const equipoLabel = labelByEquipoId.get(e.equipoId) ?? e.equipoId.slice(0, 8);
+                  const { estadoExtra, bodyDisplay } = formatMonitorHistorialBubble(e.body);
+                  const equipoLabel =
+                    labelByEquipoId.get(e.equipoId) ??
+                    (e.equipoLabelHint?.trim() ? e.equipoLabelHint.trim() : null) ??
+                    e.equipoId.slice(0, 8);
                   return (
                     <div key={`${e.equipoId}-${e.id}`} className="monitor-asic-global-feed__row">
                       <div className="monitor-asic-global-feed__meta">
@@ -844,12 +982,17 @@ function MonitorEquiposAsicPageContent() {
                   <div className="table-responsive">
                     <table
                       className="table table-sm table-hover align-middle mb-0 small"
-                      style={{ minWidth: "1080px" }}
+                      style={{ minWidth: "1120px" }}
                     >
                       <thead className="table-light">
                         <tr>
-                          <th scope="col" className="monitor-asic-lock-th text-center" style={{ width: "2.25rem" }}>
-                            <i className="bi bi-lock-fill text-secondary" aria-hidden title="Bloqueo" />
+                          <th
+                            scope="col"
+                            className="monitor-asic-edit-switch-th text-center text-nowrap small fw-semibold text-secondary"
+                            style={{ width: "3rem" }}
+                            title="Habilitá la edición por fila (usuario, potencia, nombres, serial, pool)"
+                          >
+                            Editar
                           </th>
                           <th scope="col">Usuario</th>
                           <th scope="col">Modelo</th>
@@ -866,6 +1009,13 @@ function MonitorEquiposAsicPageContent() {
                           <th scope="col" className="text-nowrap monitor-asic-notas-th" style={{ width: "1%" }}>
                             Notas
                           </th>
+                          <th
+                            scope="col"
+                            className="text-end text-nowrap monitor-asic-row-actions-th"
+                            style={{ width: "1%" }}
+                          >
+                            <span className="visually-hidden">Acciones</span>
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -880,15 +1030,27 @@ function MonitorEquiposAsicPageContent() {
                               key={`equipo-${row.equipoId}`}
                               className={locked ? "monitor-asic-row--locked" : undefined}
                             >
-                              <td className="monitor-asic-lock-cell align-middle bg-white text-center">
+                              <td className="monitor-asic-edit-switch-cell align-middle bg-white text-center">
                                 <button
                                   type="button"
-                                  className="btn btn-link btn-sm p-1 monitor-asic-lock-toggle text-secondary"
+                                  role="switch"
+                                  aria-checked={!locked}
+                                  className="monitor-asic-edit-switch"
                                   onClick={() => patchEquipoRow(index, { rowLocked: !locked })}
-                                  title={locked ? "Desbloquear fila" : "Bloquear fila"}
-                                  aria-label={locked ? "Desbloquear fila" : "Bloquear fila"}
+                                  title={
+                                    locked
+                                      ? "Activá para editar usuario, potencia, nombre ant., nombre nuevo, serial y pool"
+                                      : "Desactivá para evitar cambios accidentales en los datos"
+                                  }
+                                  aria-label={
+                                    locked
+                                      ? "Habilitar edición de datos del equipo"
+                                      : "Deshabilitar edición de datos del equipo"
+                                  }
                                 >
-                                  <i className={`bi ${locked ? "bi-lock-fill" : "bi-unlock-fill"}`} aria-hidden />
+                                  <span className="monitor-asic-edit-switch__track" aria-hidden>
+                                    <span className="monitor-asic-edit-switch__thumb" />
+                                  </span>
                                 </button>
                               </td>
                               <td style={{ minWidth: "7.5rem" }}>
@@ -963,9 +1125,14 @@ function MonitorEquiposAsicPageContent() {
                                 </div>
                               </td>
                               <td style={{ minWidth: "6.5rem" }}>
-                                <span className="font-monospace small text-secondary d-block text-break">
-                                  {row.nombreAnt || "—"}
-                                </span>
+                                <input
+                                  className="form-control form-control-sm font-monospace"
+                                  value={row.nombreAnt}
+                                  disabled={locked}
+                                  placeholder="—"
+                                  onChange={(e) => patchEquipoRow(index, { nombreAnt: e.target.value })}
+                                  aria-label="Nombre anterior"
+                                />
                               </td>
                               <td style={{ minWidth: "7.5rem" }}>
                                 <input
@@ -1035,6 +1202,37 @@ function MonitorEquiposAsicPageContent() {
                                   <MonitorAsicNotasBadges counts={notasCounts} equipoId={row.equipoId} />
                                 </span>
                               </td>
+                              <td className="align-middle text-end monitor-asic-row-actions-td">
+                                <span data-monitor-asic-row-menu-root>
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline-secondary btn-sm px-2 py-1 monitor-asic-row-menu-trigger"
+                                    title="Más acciones"
+                                    aria-label="Menú de acciones de la fila"
+                                    aria-haspopup="menu"
+                                    aria-expanded={rowMenu?.equipoId === row.equipoId}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                                      const left = Math.max(
+                                        8,
+                                        Math.min(rect.left, window.innerWidth - MONITOR_ROW_MENU_MIN_W - 8)
+                                      );
+                                      setRowMenu((cur) =>
+                                        cur?.equipoId === row.equipoId
+                                          ? null
+                                          : {
+                                              equipoId: row.equipoId,
+                                              top: rect.bottom + 4,
+                                              left,
+                                            }
+                                      );
+                                    }}
+                                  >
+                                    <i className="bi bi-list" aria-hidden />
+                                  </button>
+                                </span>
+                              </td>
                             </tr>
                           );
                         })}
@@ -1047,6 +1245,53 @@ function MonitorEquiposAsicPageContent() {
           )}
         </div>
       </div>
+
+      {typeof document !== "undefined" && rowMenu
+        ? createPortal(
+            <div
+              data-monitor-asic-row-menu-root
+              className="monitor-asic-row-menu-popover shadow border rounded-2 bg-white py-1"
+              style={{
+                position: "fixed",
+                zIndex: 1080,
+                top: rowMenu.top,
+                left: rowMenu.left,
+                minWidth: `${MONITOR_ROW_MENU_MIN_W}px`,
+              }}
+              role="presentation"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <ul className="list-unstyled mb-0" role="menu" aria-label="Acciones del equipo">
+                <li role="none">
+                  <button
+                    type="button"
+                    className="btn btn-link text-body text-decoration-none w-100 text-start rounded-0 py-2 px-3 d-flex align-items-center gap-2"
+                    role="menuitem"
+                    onClick={() => void darDeBajaEquipoFromMenu(rowMenu.equipoId)}
+                  >
+                    <i className="bi bi-box-arrow-down" aria-hidden />
+                    Dar de baja equipo
+                  </button>
+                </li>
+                <li role="none">
+                  <hr className="dropdown-divider my-0" />
+                </li>
+                <li role="none">
+                  <button
+                    type="button"
+                    className="btn btn-link text-danger text-decoration-none w-100 text-start rounded-0 py-2 px-3 d-flex align-items-center gap-2"
+                    role="menuitem"
+                    onClick={() => removeEquipoById(rowMenu.equipoId)}
+                  >
+                    <i className="bi bi-trash3" aria-hidden />
+                    Eliminar del listado local
+                  </button>
+                </li>
+              </ul>
+            </div>,
+            document.body
+          )
+        : null}
 
       <AppModal
         open={historialModal != null}
@@ -1110,15 +1355,7 @@ function MonitorEquiposAsicPageContent() {
                 <div className="monitor-equipo-notas-modal__entries">
                   {historialEntries.map((e) => {
                     const mine = isHistorialEntryFromCurrentUser(e.createdByEmail, user?.email);
-                    const estado = parseMonitorAsicHistorialEstado(e.body);
-                    const estadoExtra =
-                      estado.kind === "estado"
-                        ? ` monitor-equipo-notas-modal__entry--estado monitor-equipo-notas-modal__entry--estado-${estado.variant}`
-                        : "";
-                    const bodyDisplay =
-                      estado.kind === "estado"
-                        ? estado.userText || defaultEstadoHistorialLine(estado.variant)
-                        : e.body;
+                    const { estadoExtra, bodyDisplay } = formatMonitorHistorialBubble(e.body);
                     return (
                     <article
                       key={e.id}
@@ -1201,11 +1438,30 @@ function MonitorEquiposAsicPageContent() {
   );
 }
 
+function isWatcherOnlyRouteParam(raw: string | null): boolean {
+  if (raw == null) return false;
+  const v = raw.trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes";
+}
+
+function isWatcherTotalRouteParam(raw: string | null): boolean {
+  if (raw == null) return false;
+  const v = raw.trim().toLowerCase();
+  return v === "total" || v === "all";
+}
+
 /** Administrador A, o Administrador B con permiso inventario equipos ASIC (`equipos`), no solo tienda. */
 export function MonitorEquiposAsicPage() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   if (!canAccessMonitorEquiposAsic(user)) {
     return <Navigate to="/asic" replace />;
+  }
+  if (isWatcherTotalRouteParam(searchParams.get("watcher"))) {
+    return <NiceHashWatcherDashboard active layout="fullscreen" viewMode="allConfiguredSlots" />;
+  }
+  if (isWatcherOnlyRouteParam(searchParams.get("watcher"))) {
+    return <NiceHashWatcherDashboard active layout="fullscreen" />;
   }
   return <MonitorEquiposAsicPageContent />;
 }

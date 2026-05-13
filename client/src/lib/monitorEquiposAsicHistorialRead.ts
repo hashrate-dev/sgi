@@ -27,3 +27,16 @@ export function saveHistorialLastReadForEquipo(equipoId: string, lastReadIso: st
     /* ignore quota */
   }
 }
+
+/** Al quitar una fila del monitor local, evita que quede basura de «última lectura» para un UUID que ya no existe. */
+export function removeHistorialLastReadForEquipo(equipoId: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    const map = loadHistorialLastReadMap();
+    if (!(equipoId in map)) return;
+    delete map[equipoId];
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+  } catch {
+    /* ignore */
+  }
+}

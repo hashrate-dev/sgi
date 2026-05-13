@@ -83,12 +83,12 @@ export function PageHeader({
         </Heading>
       </Flex>
       <Flex className="fact-topbar-right" align="center" wrap="wrap">
-        {rightContent}
         {showBackButton ? (
           <Link to={backTo} className="fact-back">
             {backText}
           </Link>
         ) : null}
+        {rightContent}
       </Flex>
     </Box>
   );

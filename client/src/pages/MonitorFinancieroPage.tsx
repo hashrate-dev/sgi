@@ -29,6 +29,7 @@ import "../styles/reportes-dashboard.css";
 const MEDIOS_USD_FIAT = new Set([
   "USD BANCO SANTANDER UY",
   "USD BANCO INTERFISA",
+  "USD BANCO BROU UY",
   "USD CONTADO",
 ]);
 

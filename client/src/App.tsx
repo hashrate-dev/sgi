@@ -19,6 +19,7 @@ import { HostingExchangeOperationsPage } from "./pages/HostingExchangeOperations
 import { HostingTipoCambioHistorialPage } from "./pages/HostingTipoCambioHistorialPage";
 import { MineriaHubPage } from "./pages/MineriaHubPage";
 import { MonitorEquiposAsicPage } from "./pages/MonitorEquiposAsicPage";
+import { MonitorEquiposAsicBajasPage } from "./pages/MonitorEquiposAsicBajasPage";
 import { AsicCotizadorChinaPyPage } from "./pages/AsicCotizadorChinaPyPage";
 import { HistorialPage } from "./pages/HistorialPage";
 import { HistorialMineriaPage } from "./pages/HistorialMineriaPage";
@@ -388,6 +389,7 @@ function App() {
             <Route path="/hosting/history" element={<HistorialPage sourceFilter="hosting" />} />
             <Route path="/hosting/pending" element={<PendientesPage />} />
             <Route path="/asic/monitor-equipos" element={<MonitorEquiposAsicPage />} />
+            <Route path="/asic/equipos-dados-de-baja" element={<MonitorEquiposAsicBajasPage />} />
             <Route path="/asic" element={<MineriaHubPage />} />
             <Route path="/asic/cotizador-china-py" element={<AsicCotizadorChinaPyPage />} />
             <Route path="/asic/setup" element={<SetupPage />} />

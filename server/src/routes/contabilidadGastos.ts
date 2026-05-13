@@ -66,6 +66,7 @@ const MonedaGastoSchema = z.enum(["UYU", "USD", "PYG"]);
 const MedioPagoGastoSchema = z.enum([
   "USD BANCO SANTANDER UY",
   "USD BANCO INTERFISA",
+  "USD BANCO BROU UY",
   "USDT BINANCE",
   "USDC BINANCE",
   "USD CONTADO",

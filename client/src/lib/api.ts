@@ -113,8 +113,31 @@ function delay(ms: number): Promise<void> {
 
 function fetchWithTimeout(url: string, opts: RequestInit, timeoutMs: number): Promise<Response> {
   const ac = new AbortController();
-  const t = setTimeout(() => ac.abort(), timeoutMs);
+  const t = setTimeout(() => {
+    try {
+      ac.abort(new DOMException("Tiempo de espera agotado. Volvé a intentar.", "TimeoutError"));
+    } catch {
+      ac.abort();
+    }
+  }, timeoutMs);
   return fetch(url, { ...opts, signal: ac.signal }).finally(() => clearTimeout(t));
+}
+
+/** Petición cancelada (cierre de pestaña, recarga, HMR, o efecto React invalidado): no conviene mostrar toast con el mensaje crudo del motor. */
+export function isBenignFetchAbort(err: unknown): boolean {
+  if (err instanceof DOMException) {
+    if (err.name === "TimeoutError") return false;
+    if (err.name === "AbortError") {
+      const m = (err.message || "").toLowerCase();
+      return !m.includes("tiempo de espera");
+    }
+  }
+  if (err instanceof Error) {
+    const m = err.message.toLowerCase();
+    if (m.includes("tiempo de espera")) return false;
+    return m.includes("signal is aborted") || m.includes("the operation was aborted");
+  }
+  return false;
 }
 
 /** Error HTTP de la API (status y code opcional del JSON) para manejo en UI (ej. registro duplicado). */
@@ -522,6 +545,8 @@ export type MonitorEquipoAsicHistorialEntry = {
 /** Entrada del feed global (incluye equipo). */
 export type MonitorEquipoAsicHistorialFeedEntry = MonitorEquipoAsicHistorialEntry & {
   equipoId: string;
+  /** Fila sintética desde `monitor_equipo_asic_baja`: texto para la cabecera del equipo (usuario · nombre). */
+  equipoLabelHint?: string;
 };
 
 export async function getMonitorEquiposAsicHistorial(
@@ -641,6 +666,123 @@ export async function postMonitorEquiposAsicHistorialNote(
     throw makeApiError(msg, res.status);
   }
   return data as { entry: MonitorEquipoAsicHistorialEntry };
+}
+
+export type MonitorEquipoAsicBajaEntry = {
+  id: number;
+  equipoId: string;
+  rowSnapshot: Record<string, unknown>;
+  motivo: string;
+  createdAt: string;
+  createdByEmail: string;
+};
+
+export async function getMonitorEquiposAsicBajas(): Promise<{ bajas: MonitorEquipoAsicBajaEntry[] }> {
+  return api<{ bajas: MonitorEquipoAsicBajaEntry[] }>("/api/monitor-equipos-asic/bajas");
+}
+
+/** Extras del proxy SGI (spot CoinGecko + opcional cartera vía API NiceHash). */
+export type NiceHashExternalRigs2SgiExtras = {
+  btcSpotUsd?: number | null;
+  unpaidUsdSpotEstimate?: number | null;
+  walletTotalBtc?: string | null;
+  walletUsdApprox?: number | null;
+  walletError?: string | null;
+};
+
+/** Respuesta cruda de NiceHash `mining/external/{watcherId}/rigs2` (vía proxy SGI). */
+export type NiceHashExternalRigs2Payload = {
+  totalRigs?: number;
+  totalDevices?: number;
+  totalProfitability?: number;
+  minerStatuses?: Record<string, number>;
+  devicesStatuses?: Record<string, number>;
+  unpaidAmount?: string;
+  unpaidAmountUSDT?: string;
+  nextPayoutTimestamp?: string | null;
+  lastPayoutTimestamp?: string | null;
+  /** Metadatos añadidos por el backend (no vienen de NiceHash rigs2). */
+  _sgi?: NiceHashExternalRigs2SgiExtras;
+  miningRigs?: Array<{
+    rigId?: string;
+    name?: string;
+    type?: string;
+    minerStatus?: string;
+    statusTime?: number;
+    unpaidAmount?: string;
+    profitability?: number;
+    stats?: Array<{
+      market?: string;
+      speedAccepted?: number;
+      speedRejectedTotal?: number;
+      timeConnected?: number;
+      profitability?: number;
+      algorithm?: { enumName?: string; description?: string };
+    }>;
+  }>;
+};
+
+export type NiceHashWalletApiCreds = {
+  orgId: string;
+  apiKey: string;
+  apiSecret: string;
+};
+
+/**
+ * Watcher NiceHash: POST al proxy (siempre incluye `_sgi` con tipo BTC spot).
+ * Si pasás `nhWalletApi` (Org + key + secret con permiso de lectura de cartera), `_sgi.walletTotalBtc` refleja el total tipo «Total Assets» (`accounting/accounts2`).
+ */
+export async function getNiceHashExternalRigs2(
+  watcherId: string,
+  nhWalletApi?: NiceHashWalletApiCreds | null
+): Promise<NiceHashExternalRigs2Payload> {
+  const w =
+    nhWalletApi &&
+    nhWalletApi.orgId.trim() &&
+    nhWalletApi.apiKey.trim() &&
+    nhWalletApi.apiSecret.trim()
+      ? {
+          orgId: nhWalletApi.orgId.trim(),
+          apiKey: nhWalletApi.apiKey.trim(),
+          apiSecret: nhWalletApi.apiSecret.trim(),
+        }
+      : undefined;
+  return api<NiceHashExternalRigs2Payload>(`/api/monitor-equipos-asic/nicehash-external-rigs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ watcherId, nhWalletApi: w }),
+  });
+}
+
+export type NhWatcherRigHashSample = { rigKey: string; t: number; v: number };
+
+export type NhWatcherRigHashHistoryResponse = { series: Record<string, { t: number; v: number }[]> };
+
+export function getNiceHashWatcherRigHashHistory(watcherId: string): Promise<NhWatcherRigHashHistoryResponse> {
+  const id = encodeURIComponent(watcherId.trim());
+  return api<NhWatcherRigHashHistoryResponse>(`/api/monitor-equipos-asic/nicehash-watcher-rig-hash-history/${id}`);
+}
+
+export function postNiceHashWatcherRigHashHistorySamples(
+  watcherId: string,
+  samples: NhWatcherRigHashSample[]
+): Promise<{ ok: boolean; inserted: number }> {
+  return api<{ ok: boolean; inserted: number }>(`/api/monitor-equipos-asic/nicehash-watcher-rig-hash-history`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ watcherId: watcherId.trim(), samples }),
+  });
+}
+
+export async function postMonitorEquipoAsicBaja(payload: {
+  equipoId: string;
+  rowSnapshot: Record<string, unknown>;
+  motivo?: string;
+}): Promise<{ ok: boolean }> {
+  return api<{ ok: boolean }>("/api/monitor-equipos-asic/baja", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export type UserListItem = {
@@ -1048,6 +1190,7 @@ export type ContabilidadMoneda = "UYU" | "USD" | "PYG";
 export const CONTABILIDAD_MEDIOS_PAGO = [
   "USD BANCO SANTANDER UY",
   "USD BANCO INTERFISA",
+  "USD BANCO BROU UY",
   "USDT BINANCE",
   "USDC BINANCE",
   "USD CONTADO",

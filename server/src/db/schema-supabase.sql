@@ -442,3 +442,31 @@ CREATE TABLE IF NOT EXISTS monitor_equipo_asic_historial (
 );
 
 CREATE INDEX IF NOT EXISTS idx_monitor_equipo_asic_historial_equipo ON monitor_equipo_asic_historial(equipo_id, created_at DESC);
+
+-- Bajas del monitor ASIC (snapshot de fila al retirar equipo; historial de notas se conserva por equipo_id)
+CREATE TABLE IF NOT EXISTS monitor_equipo_asic_baja (
+  id BIGSERIAL PRIMARY KEY,
+  equipo_id TEXT NOT NULL,
+  row_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
+  motivo TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_by_email TEXT NOT NULL DEFAULT ''
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_monitor_equipo_asic_baja_equipo ON monitor_equipo_asic_baja(equipo_id);
+
+CREATE INDEX IF NOT EXISTS idx_monitor_equipo_asic_baja_created ON monitor_equipo_asic_baja(created_at DESC);
+
+-- Historial sparkline hashrate (watcher NiceHash): 1 fila ≈ 1 min por rig y usuario
+CREATE TABLE IF NOT EXISTS nh_watcher_rig_hash_samples (
+  id BIGSERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  watcher_id TEXT NOT NULL,
+  rig_key TEXT NOT NULL,
+  sample_t BIGINT NOT NULL,
+  value DOUBLE PRECISION NOT NULL,
+  UNIQUE (user_id, watcher_id, rig_key, sample_t)
+);
+
+CREATE INDEX IF NOT EXISTS idx_nh_watcher_rig_hash_user_watcher ON nh_watcher_rig_hash_samples(user_id, watcher_id, sample_t);
