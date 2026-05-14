@@ -1,9 +1,10 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { Box } from "@chakra-ui/react";
 import { useAuth } from "../contexts/AuthContext";
 import { canManageUsers } from "../lib/auth";
 import { SgiAdminFixedFooter } from "./SgiAdminFixedFooter";
+import { SgiProtectedTopBar } from "./SgiProtectedTopBar";
 import "../styles/sgi-admin-footer.css";
 
 /**
@@ -14,6 +15,10 @@ export function ProtectedAppLayout() {
   const location = useLocation();
   const showAdminFooter = Boolean(user && canManageUsers(user));
   const isHomePage = location.pathname === "/";
+  const [sgiTopBarH, setSgiTopBarH] = useState(80);
+  const onSgiTopBarHeight = useCallback((h: number) => {
+    setSgiTopBarH((prev) => (Math.abs(prev - h) < 1 ? prev : h));
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -39,14 +44,17 @@ export function ProtectedAppLayout() {
 
   return (
     <Box
-      className={`sgi-protected-root${showAdminFooter ? " sgi-protected-root--admin-footer" : ""}`}
+      className={`sgi-protected-root${showAdminFooter ? " sgi-protected-root--admin-footer" : ""}${isHomePage ? " sgi-protected-root--home" : ""}`}
       pb={showAdminFooter ? { base: "78px", md: "52px" } : 0}
       w="100%"
       maxW="100%"
       minH="100vh"
+      minW={0}
       bg={isHomePage ? "linear-gradient(135deg, #074025 0%, #2d8f3a 55%, #49f227 100%)" : "#f1f5f9"}
-      overflowX="hidden"
+      overflowX={isHomePage ? "visible" : "hidden"}
     >
+      {user ? <SgiProtectedTopBar onHeightChange={onSgiTopBarHeight} /> : null}
+      {user ? <Box aria-hidden h={`${sgiTopBarH}px`} flexShrink={0} /> : null}
       <Outlet />
       {showAdminFooter ? <SgiAdminFixedFooter /> : null}
     </Box>

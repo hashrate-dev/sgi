@@ -196,7 +196,7 @@ export function ClientesTiendaOnlinePage() {
   return (
     <div className="fact-page cti-page">
       <div className="container py-3 py-md-4">
-        <PageHeader title="Clientes — Tienda online" logoHref="/" />
+        <PageHeader title="Clientes — Tienda online" />
 
 
 

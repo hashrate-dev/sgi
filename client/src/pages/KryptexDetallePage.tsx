@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
-import { useAuth } from "../contexts/AuthContext";
 import {
   KryptexHashrateChart,
   sumWorkersTHs,
@@ -23,7 +22,6 @@ function formatNum(n: number): string {
 }
 
 export function KryptexDetallePage() {
-  const { user, logout } = useAuth();
   const [searchParams] = useSearchParams();
   const wallet = searchParams.get("wallet") ?? "";
   const pool = searchParams.get("pool") ?? "quai-scrypt";
@@ -96,12 +94,6 @@ export function KryptexDetallePage() {
           showBackButton
           backTo="/kryptex"
           backText="Volver a Kryptex"
-          rightContent={user?.role === "lector" ? (
-            <button type="button" className="fact-back" onClick={logout}>
-              <i className="bi bi-box-arrow-right me-1" />
-              Cerrar sesión
-            </button>
-          ) : undefined}
         />
 
         <div className="hrs-card p-4 mb-4 kryptex-detalle" style={{ background: "#fff", borderRadius: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>

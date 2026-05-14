@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from "react";
 import type { CSSProperties } from "react";
 import { keyframes } from "@emotion/react";
 import { Navigate, Link as RouterLink } from "react-router-dom";
-import { Badge, Box, Flex, Grid, Heading, Image as ChakraImage, Stack, Text } from "@chakra-ui/react";
+import { Box, Flex, Grid, Heading, Text } from "@chakra-ui/react";
 import { useAuth } from "../contexts/AuthContext";
-import { getMarketplacePresenceStats, getMarketplaceQuoteTicketsStats, updateMyPassword } from "../lib/api";
+import { getMarketplacePresenceStats, getMarketplaceQuoteTicketsStats } from "../lib/api";
 import {
   canAccessMonitorEquiposAsic,
   canViewMarketplaceQuoteTickets,
@@ -12,9 +12,9 @@ import {
 } from "../lib/auth.js";
 import { canLectorSeeHomeMenuTo } from "../lib/lectorPermissionsCatalog.js";
 import { playMarketplaceOrderNotificationSound } from "../lib/marketplaceCartSound";
-import { showToast } from "../components/ToastNotification";
+import { HOME_DASHBOARD_SHELL } from "../lib/sgiDashboardShell";
 import "../styles/marketplace-hashrate.css";
-import { AppButton, AppCard, AppInput, AppModal } from "../components/ui";
+import { AppCard } from "../components/ui";
 
 type MenuItem = {
   to: string;
@@ -237,12 +237,7 @@ function DashboardCardIconSlot({ item }: { item: MenuItem }) {
 }
 
 export function HomePage() {
-  const { user, logout } = useAuth();
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [logoSrc, setLogoSrc] = useState("/images/HRSLOGO.png");
+  const { user } = useAuth();
   const [marketplaceOpenCount, setMarketplaceOpenCount] = useState(0);
   const [marketplaceBadgePulse, setMarketplaceBadgePulse] = useState(false);
   const [marketplaceOnlineTotal, setMarketplaceOnlineTotal] = useState(0);
@@ -259,18 +254,6 @@ export function HomePage() {
     return !item.roles || item.roles.some((r) => roleNorm(r) === roleNorm(user.role));
   });
   const canSeeMarketplaceOrdersCard = Boolean(user && canViewMarketplaceQuoteTickets(user));
-
-  useEffect(() => {
-    const img = new Image();
-    img.onload = () => {
-      setLogoSrc("/images/HRSLOGO.png");
-    };
-    img.onerror = () => {
-      console.warn("HRSLOGO.png not found, using fallback");
-      setLogoSrc("/images/HASHRATELOGO2.png");
-    };
-    img.src = "/images/HRSLOGO.png";
-  }, []);
 
   useEffect(() => {
     if (!canSeeMarketplaceOrdersCard) return;
@@ -351,27 +334,6 @@ export function HomePage() {
     };
   }, [canSeeMarketplaceOrdersCard]);
 
-  function handleChangePassword() {
-    if (newPassword.length < 6) {
-      showToast("La contraseña debe tener al menos 6 caracteres.", "error");
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      showToast("Las contraseñas no coinciden.", "error");
-      return;
-    }
-    setSaving(true);
-    updateMyPassword(newPassword)
-      .then(() => {
-        showToast("✓ Tu contraseña ha sido cambiada exitosamente.", "success");
-        setShowPasswordModal(false);
-        setNewPassword("");
-        setConfirmPassword("");
-      })
-      .catch((err) => showToast(err instanceof Error ? err.message : "Error al actualizar la contraseña", "error"))
-      .finally(() => setSaving(false));
-  }
-
   const cardTitleProps = {
     as: "h2" as const,
     fontSize: { base: "1.55rem", md: "1.65rem" },
@@ -393,7 +355,10 @@ export function HomePage() {
     w: "100%",
     minH: "208px",
     h: "100%",
-    p: 4,
+    /* Más aire arriba: el slot de icono quedaba pegado al borde superior de la tarjeta */
+    pt: { base: 5, md: 6 },
+    px: 4,
+    pb: 4,
     display: "flex",
     flexDirection: "column" as const,
     transition: "box-shadow 0.2s ease, transform 0.2s ease",
@@ -412,97 +377,15 @@ export function HomePage() {
   return (
     <Box
       minH="100vh"
-      px={{ base: 4, md: 6 }}
-      pt={{ base: 2, md: 2 }}
+      w="100%"
+      maxW="100%"
+      minW={0}
+      px={0}
+      pt={0}
       pb={{ base: 3, md: 4 }}
       bgGradient="linear(135deg, #074025 0%, #2d8f3a 55%, #49f227 100%)"
     >
-      <Box maxW="1320px" mx="auto">
-        <AppCard mb={3} p={{ base: 3, md: 4 }} boxShadow="md" className="hrs-dashboard-glass-top">
-          <Flex
-            align="center"
-            justify="space-between"
-            gap={4}
-            flexWrap="wrap"
-            rowGap={4}
-          >
-            <Flex align="center" gap={4} minW={0} flex={{ base: "1 1 100%", lg: "0 1 auto" }}>
-              <ChakraImage
-                src={logoSrc}
-                alt="HRS Logo"
-                h={{ base: "56px", md: "72px" }}
-                w="auto"
-                maxW={{ base: "200px", md: "260px" }}
-                objectFit="contain"
-                flexShrink={0}
-                onError={() => {
-                  setLogoSrc("/images/HASHRATELOGO2.png");
-                }}
-              />
-              <Box minW={0}>
-                <Heading size="md" color="gray.800" lineHeight="short">
-                  HRS GROUP S.A
-                </Heading>
-                <Text fontSize="sm" color="gray.600" mt={0.5}>
-                  Sistema de gestión interna
-                </Text>
-              </Box>
-            </Flex>
-            {user ? (
-              <Flex
-                align="center"
-                justify={{ base: "flex-start", sm: "flex-end" }}
-                gap={2}
-                flexWrap="wrap"
-                flex={{ base: "1 1 100%", lg: "0 1 auto" }}
-                w={{ base: "100%", lg: "auto" }}
-              >
-                <Badge colorPalette="green" px={3} py={1.5} borderRadius="full" fontWeight="medium" maxW="100%">
-                  <Flex as="span" align="center" gap={2} minW={0}>
-                    <Box as="i" className="bi bi-person-circle" flexShrink={0} aria-hidden />
-                    <Text as="span" truncate fontSize="sm">
-                      {user.email || user.username} · {user.role}
-                    </Text>
-                  </Flex>
-                </Badge>
-                <AppButton
-                  variant="plain"
-                  size="xs"
-                  h="auto"
-                  minW="auto"
-                  px={1}
-                  py={0.5}
-                  color="gray.600"
-                  fontWeight="medium"
-                  borderRadius="sm"
-                  _hover={{ bg: "transparent", color: "green.700", textDecoration: "underline" }}
-                  _active={{ bg: "transparent" }}
-                  onClick={() => setShowPasswordModal(true)}
-                >
-                  <Flex align="center" gap={2}>
-                    <Box as="i" className="bi bi-key" fontSize="12px" aria-hidden />
-                    Cambiar contraseña
-                  </Flex>
-                </AppButton>
-                <AppButton
-                  variant="solid"
-                  size="xs"
-                  h="28px"
-                  px={3}
-                  borderRadius="full"
-                  fontWeight="semibold"
-                  onClick={logout}
-                >
-                  <Flex align="center" gap={2}>
-                    <Box as="i" className="bi bi-box-arrow-right" fontSize="12px" aria-hidden />
-                    Cerrar sesión
-                  </Flex>
-                </AppButton>
-              </Flex>
-            ) : null}
-          </Flex>
-        </AppCard>
-
+      <Box {...HOME_DASHBOARD_SHELL} pt={{ base: 3, md: 4 }}>
         <Grid
           templateColumns={{ base: "1fr", md: "repeat(2, minmax(0, 1fr))", xl: "repeat(3, minmax(0, 1fr))" }}
           gap={3}
@@ -706,59 +589,6 @@ export function HomePage() {
           ) : null}
         </Grid>
       </Box>
-
-      {/* Siempre montado con user: evita desmontar el Dialog al cerrar (dejaba backdrop/bloqueo de puntero) */}
-      {user ? (
-        <AppModal
-          open={showPasswordModal}
-          onOpenChange={setShowPasswordModal}
-          title="Cambiar mi contraseña"
-          description="Elegí una contraseña segura. Mínimo 6 caracteres; podés combinar letras y números."
-          size="md"
-          footer={
-            <>
-              <AppButton variant="outline" size="md" minH="42px" px={5} onClick={() => setShowPasswordModal(false)}>
-                Cancelar
-              </AppButton>
-              <AppButton size="md" minH="42px" px={5} onClick={handleChangePassword} loading={saving}>
-                Guardar contraseña
-              </AppButton>
-            </>
-          }
-        >
-          <Stack gap={5} align="stretch">
-            <AppInput
-              label="Usuario"
-              value={user.email || user.username}
-              readOnly
-              bg="gray.50"
-              color="gray.700"
-              cursor="default"
-              _readOnly={{ opacity: 1, cursor: "default" }}
-              helperText="Solo lectura. El usuario no se modifica desde aquí."
-            />
-            <AppInput
-              label="Nueva contraseña"
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              minLength={6}
-              autoComplete="new-password"
-              placeholder="Mínimo 6 caracteres"
-              helperText="No compartas esta contraseña con nadie."
-            />
-            <AppInput
-              label="Confirmar nueva contraseña"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              minLength={6}
-              autoComplete="new-password"
-              placeholder="Repetí la misma contraseña"
-            />
-          </Stack>
-        </AppModal>
-      ) : null}
     </Box>
   );
 }

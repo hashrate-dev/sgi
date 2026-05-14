@@ -165,7 +165,6 @@ export function MarketplacePresenceHistorialPage() {
       <div className="container">
         <PageHeader
           title="Historial detalle — Presencia marketplace"
-          logoHref="/"
           showBackButton
           backTo="/marketplace/presence"
           backText="Volver al monitor"

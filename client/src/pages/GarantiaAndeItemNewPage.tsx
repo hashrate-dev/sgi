@@ -103,7 +103,7 @@ export function GarantiaAndeItemNewPage() {
     return (
       <div className="fact-page fact-page--cte-tienda-edit">
         <div className="container cte-edit-tienda-page-inner">
-          <PageHeader title="Items Garantía ANDE" logoHref="/" />
+          <PageHeader title="Items Garantía ANDE" />
           <main className="cte-edit-market-main page-main page-main--market page-main--market--asic cliente-tienda-edit--admin">
             <section className="market-registro-section pt-0">
               <div className="py-2 cte-edit-tienda-container">
@@ -126,7 +126,7 @@ export function GarantiaAndeItemNewPage() {
   return (
     <div className="fact-page fact-page--cte-tienda-edit">
       <div className="container cte-edit-tienda-page-inner">
-        <PageHeader title="Nuevo ítem Garantía ANDE" logoHref="/" />
+        <PageHeader title="Nuevo ítem Garantía ANDE" />
         <main className="cte-edit-market-main page-main page-main--market page-main--market--asic cliente-tienda-edit--admin">
           <section className="market-registro-section pt-0">
             <div className="py-2 py-lg-2 cte-edit-tienda-container">

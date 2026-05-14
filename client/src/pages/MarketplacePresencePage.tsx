@@ -125,7 +125,6 @@ export function MarketplacePresencePage() {
       <div className="container">
         <PageHeader
           title="Marketplace en vivo"
-          logoHref="/"
           rightContent={
             <div className="d-flex flex-wrap gap-2 align-items-center">
               <Link to="/marketplace/presence/history" className="fact-back">

@@ -526,7 +526,7 @@ function WatcherSlotBar({
         ) : (
           configuredIndices.map((idx) => {
             const nick = (slotRows[idx]?.nickname ?? "").trim();
-            const tabTitle = nick ? `Watcher ${idx + 1} · ${nick}` : `Watcher ${idx + 1}`;
+            const tabTitle = nick ? `${nick} (enlace W${idx + 1})` : `Watcher ${idx + 1}`;
             return (
             <button
               key={idx}
@@ -536,15 +536,14 @@ function WatcherSlotBar({
               onClick={() => onSelectSlot(idx)}
             >
               {nick ? (
-                <span className="nh-watcher-slot-tab__label">
-                  <span className="nh-watcher-slot-tab__n">W{idx + 1}</span>
-                  <span className="nh-watcher-slot-tab__sep">·</span>
-                  <span className="nh-watcher-slot-tab__nick text-truncate d-inline-block align-bottom" style={{ maxWidth: "7.5rem" }}>
-                    {nick}
-                  </span>
+                <span
+                  className="nh-watcher-slot-tab__label nh-watcher-slot-tab__nick text-truncate d-inline-block align-bottom"
+                  style={{ maxWidth: "10rem" }}
+                >
+                  {nick}
                 </span>
               ) : (
-                `Watcher ${idx + 1}`
+                <span className="nh-watcher-slot-tab__n">W{idx + 1}</span>
               )}
             </button>
             );
@@ -560,17 +559,15 @@ function WatcherSlotBar({
           </Link>
         ) : null}
       </div>
-      {variant === "embedded" ? (
-        <button
-          type="button"
-          className="nh-watcher-config-btn nh-watcher-config-btn--embedded"
-          onClick={onOpenConfig}
-          aria-label="Configuración de watchers"
-          title="Configuración de watchers"
-        >
-          <i className="bi bi-gear-fill" aria-hidden />
-        </button>
-      ) : null}
+      <button
+        type="button"
+        className={`nh-watcher-config-btn ms-auto${variant === "embedded" ? " nh-watcher-config-btn--embedded" : ""}`}
+        onClick={onOpenConfig}
+        aria-label="Configuración de watchers"
+        title={variant === "page" ? "Configuración de watchers (hasta 16 enlaces)" : "Configuración de watchers"}
+      >
+        <i className="bi bi-gear-fill" aria-hidden />
+      </button>
     </div>
   );
 }
@@ -657,9 +654,11 @@ function WatcherActionBar({
 function TotalWatcherSlotsOverview({
   slotRows,
   configuredIndices,
+  onOpenConfig,
 }: {
   slotRows: NhWatcherSlotRow[];
   configuredIndices: number[];
+  onOpenConfig: () => void;
 }) {
   return (
     <div className="nh-watcher-slot-bar nh-watcher-slot-bar--page nh-watcher-slot-bar--total-overview">
@@ -669,26 +668,23 @@ function TotalWatcherSlotsOverview({
         ) : (
           configuredIndices.map((idx) => {
             const nick = (slotRows[idx]?.nickname ?? "").trim();
+            const linkTitle = nick ? `${nick} (enlace W${idx + 1})` : `Enlace W${idx + 1}`;
             return (
               <Link
                 key={idx}
                 to={`/asic/monitor-equipos?watcher=1&slot=${idx + 1}`}
                 className="nh-watcher-slot-tab nh-watcher-slot-tab--aggregate text-decoration-none"
-                title={`Solo W${idx + 1}`}
+                title={linkTitle}
               >
                 {nick ? (
-                  <span className="nh-watcher-slot-tab__label">
-                    <span className="nh-watcher-slot-tab__n">W{idx + 1}</span>
-                    <span className="nh-watcher-slot-tab__sep">·</span>
-                    <span
-                      className="nh-watcher-slot-tab__nick text-truncate d-inline-block align-bottom"
-                      style={{ maxWidth: "7.5rem" }}
-                    >
-                      {nick}
-                    </span>
+                  <span
+                    className="nh-watcher-slot-tab__label nh-watcher-slot-tab__nick text-truncate d-inline-block align-bottom"
+                    style={{ maxWidth: "10rem" }}
+                  >
+                    {nick}
                   </span>
                 ) : (
-                  <>W{idx + 1}</>
+                  <span className="nh-watcher-slot-tab__n">W{idx + 1}</span>
                 )}
               </Link>
             );
@@ -702,6 +698,15 @@ function TotalWatcherSlotsOverview({
           TOTAL
         </Link>
       </div>
+      <button
+        type="button"
+        className="nh-watcher-config-btn ms-auto"
+        onClick={onOpenConfig}
+        aria-label="Configuración de watchers"
+        title="Configuración de watchers (hasta 16 enlaces)"
+      >
+        <i className="bi bi-gear-fill" aria-hidden />
+      </button>
     </div>
   );
 }
@@ -1298,7 +1303,12 @@ export function NiceHashWatcherDashboard({
         <div className="nh-watcher-inner px-3 px-md-4 pt-3 pb-3">
           <div className="nh-watcher-kpi-grid mb-3">
             <div className="nh-watcher-kpi nh-watcher-kpi--accent">
-              <div className="nh-watcher-kpi__label">ASICs en marcha</div>
+              <div className="nh-watcher-kpi__head">
+                <span className="nh-watcher-kpi__icon-wrap nh-watcher-kpi__icon-wrap--accent" aria-hidden>
+                  <i className="bi bi-hdd-network nh-watcher-kpi__icon" />
+                </span>
+                <div className="nh-watcher-kpi__label">ASICs en marcha</div>
+              </div>
               <div className="nh-watcher-kpi__value">
                 {nhAgg.miningN} / {nhAgg.totalRigs || nhAgg.rigs.length}
               </div>
@@ -1313,7 +1323,12 @@ export function NiceHashWatcherDashboard({
               </div>
             </div>
             <div className="nh-watcher-kpi">
-              <div className="nh-watcher-kpi__label">Rentabilidad (24 h)</div>
+              <div className="nh-watcher-kpi__head">
+                <span className="nh-watcher-kpi__icon-wrap" aria-hidden>
+                  <i className="bi bi-graph-up-arrow nh-watcher-kpi__icon" />
+                </span>
+                <div className="nh-watcher-kpi__label">Rentabilidad (24 h)</div>
+              </div>
               <div className="nh-watcher-kpi__value nh-watcher-kpi__value--btc">
                 {nhAgg.btc24 != null ? `${formatNiceHashBtc8(nhAgg.btc24)} BTC` : "—"}
               </div>
@@ -1321,7 +1336,12 @@ export function NiceHashWatcherDashboard({
               <div className="nh-watcher-kpi__sub">{isTotal ? "Suma de todos los watchers" : "Suma API / ASICs"}</div>
             </div>
             <div className="nh-watcher-kpi">
-              <div className="nh-watcher-kpi__label">Saldo impago (minería)</div>
+              <div className="nh-watcher-kpi__head">
+                <span className="nh-watcher-kpi__icon-wrap" aria-hidden>
+                  <i className="bi bi-wallet2 nh-watcher-kpi__icon" />
+                </span>
+                <div className="nh-watcher-kpi__label">Saldo impago (minería)</div>
+              </div>
               <div className="nh-watcher-kpi__value nh-watcher-kpi__value--btc">
                 {nhAgg.unpaid ?? "—"}
                 {nhAgg.unpaid ? <span className="text-uppercase"> BTC</span> : null}
@@ -1330,7 +1350,12 @@ export function NiceHashWatcherDashboard({
               <div className="nh-watcher-kpi__sub">Balance acumulado sin liquidar</div>
             </div>
             <div className="nh-watcher-kpi">
-              <div className="nh-watcher-kpi__label">Próximo pago (estim.)</div>
+              <div className="nh-watcher-kpi__head">
+                <span className="nh-watcher-kpi__icon-wrap" aria-hidden>
+                  <i className="bi bi-hourglass-split nh-watcher-kpi__icon" />
+                </span>
+                <div className="nh-watcher-kpi__label">Próximo pago (estim.)</div>
+              </div>
               <div className="nh-watcher-kpi__value" style={{ fontSize: "1.15rem" }}>
                 <WatcherLiveCountdown iso={nhAgg.nextPayout} />
               </div>
@@ -1493,34 +1518,36 @@ export function NiceHashWatcherDashboard({
                       </div>
                       <div className={nhRigStatusClass(status)}>{status}</div>
                     </div>
-                    <div className="nh-watcher-rig-card__metrics">
+                    <div className="nh-watcher-rig-card__metrics" role="group" aria-label="Métricas del equipo">
                       <div className="nh-watcher-rig-metric nh-watcher-rig-metric--hash">
-                        Hashrate acept.
-                        <strong className="mono">{formatNiceHashAcceptedSpeed(spd)}</strong>
-                        <span className="nh-watcher-rig-metric__hint d-block mt-1">
+                        <span className="nh-watcher-rig-metric__kicker">Hashrate acept.</span>
+                        <strong className="nh-watcher-rig-metric__value mono">{formatNiceHashAcceptedSpeed(spd)}</strong>
+                        <span className="nh-watcher-rig-metric__meta">
                           Rechazo: {nhRejectPctLabel(st0)}
                         </span>
                       </div>
-                      <div className="nh-watcher-rig-metric">
-                        Rentab. ASIC (24 h)
-                        <strong className="mono">{rigBtc24 != null ? `${formatNiceHashBtc8(rigBtc24)} BTC` : "—"}</strong>
+                      <div className="nh-watcher-rig-metric nh-watcher-rig-metric--crypto">
+                        <span className="nh-watcher-rig-metric__kicker">Rentab. ASIC (24 h)</span>
+                        <strong className="nh-watcher-rig-metric__value mono nh-watcher-rig-metric__value--btc">
+                          {rigBtc24 != null ? `${formatNiceHashBtc8(rigBtc24)} BTC` : "—"}
+                        </strong>
                       </div>
-                      <div className="nh-watcher-rig-metric">
-                        Impago ASIC
-                        <strong className="mono">{unpaidRig}</strong>
+                      <div className="nh-watcher-rig-metric nh-watcher-rig-metric--crypto">
+                        <span className="nh-watcher-rig-metric__kicker">Impago ASIC</span>
+                        <strong className="nh-watcher-rig-metric__value mono nh-watcher-rig-metric__value--btc">{unpaidRig}</strong>
                       </div>
                       <div className="nh-watcher-rig-metric" title={formatNiceHashStatusTime(rig.statusTime)}>
-                        Última señal
-                        <strong>
+                        <span className="nh-watcher-rig-metric__kicker">Última señal</span>
+                        <strong className="nh-watcher-rig-metric__value">
                           <WatcherLiveRelativeAge statusTimeMs={rig.statusTime} />
                         </strong>
-                        <span className="nh-watcher-rig-metric__hint nh-watcher-rig-metric__hint--mono d-none d-md-block">
+                        <span className="nh-watcher-rig-metric__meta nh-watcher-rig-metric__meta--mono d-none d-md-block">
                           {formatNiceHashStatusTime(rig.statusTime)}
                         </span>
                       </div>
                       <div className="nh-watcher-rig-metric" title="Desde timeConnected de NiceHash">
-                        Sesión
-                        <strong>
+                        <span className="nh-watcher-rig-metric__kicker">Sesión</span>
+                        <strong className="nh-watcher-rig-metric__value mono">
                           <WatcherLiveUptime timeConnectedMs={st0?.timeConnected} />
                         </strong>
                       </div>
@@ -1776,29 +1803,16 @@ export function NiceHashWatcherDashboard({
       <>
         <div className="nh-watcher-fullpage">
           <div className="container">
-            <header className="nh-watcher-page-top">
+            <main className="nh-watcher-fullpage-main">
               <h1 className="visually-hidden">
                 {isTotal ? "NiceHash watcher · vista TOTAL" : "NiceHash watcher"}
               </h1>
-              <Link to="/" className="nh-watcher-page-back fact-back text-decoration-none">
-                <i className="bi bi-arrow-left me-1" aria-hidden />
-                Volver al inicio
-              </Link>
-              <div className="nh-watcher-page-top-cluster">
-                <button
-                  type="button"
-                  className="nh-watcher-config-btn"
-                  onClick={openConfig}
-                  aria-label="Configuración de watchers"
-                  title="Configuración de watchers (hasta 16 enlaces)"
-                >
-                  <i className="bi bi-gear-fill" aria-hidden />
-                </button>
-              </div>
-            </header>
-            <main className="nh-watcher-fullpage-main">
               {isTotal ? (
-                <TotalWatcherSlotsOverview slotRows={slotRows} configuredIndices={configuredSlotIndices} />
+                <TotalWatcherSlotsOverview
+                  slotRows={slotRows}
+                  configuredIndices={configuredSlotIndices}
+                  onOpenConfig={openConfig}
+                />
               ) : (
                 <WatcherSlotBar
                   variant="page"

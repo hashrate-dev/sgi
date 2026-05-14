@@ -335,7 +335,7 @@ export function ClienteEditPage() {
     <div className={`fact-page${tiendaOnline ? " fact-page--cte-tienda-edit" : ""}`}>
       {tiendaOnline ? (
         <div className="container cte-edit-tienda-page-inner">
-          <PageHeader title="Cliente · Tienda online" logoHref="/" />
+          <PageHeader title="Cliente · Tienda online" />
           <main className="cte-edit-market-main page-main page-main--market page-main--market--asic cliente-tienda-edit--admin">
             <section className="market-registro-section pt-0">
               <div className="py-2 py-lg-2 cte-edit-tienda-container">
@@ -645,7 +645,7 @@ export function ClienteEditPage() {
       ) : (
         <>
           <div className="container">
-            <PageHeader title="Editar Cliente" logoHref="/" />
+            <PageHeader title="Editar Cliente" />
           </div>
       <div className="container">
         <div className="fact-layout" style={{ gridTemplateColumns: "1fr", maxWidth: "100%" }}>

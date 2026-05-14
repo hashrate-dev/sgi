@@ -136,7 +136,7 @@ function WorkerTable({
 }
 
 export function KryptexPage() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [lectorRedirect, setLectorRedirect] = useState<{ wallet: string; pool: string } | null>(null);
   const [lectorError, setLectorError] = useState<string | null>(null);
   const [workers, setWorkers] = useState<KryptexWorkerData[]>([]);
@@ -202,7 +202,7 @@ export function KryptexPage() {
       return (
         <div className="hrs-home">
           <div className="hrs-home-container container" style={{ maxWidth: "1320px" }}>
-            <PageHeader title="Kryptex" rightContent={<button type="button" className="fact-back" onClick={logout}><i className="bi bi-box-arrow-right me-1" />Cerrar sesión</button>} />
+            <PageHeader title="Kryptex" />
             <div className="alert alert-danger">{lectorError}</div>
           </div>
         </div>
@@ -231,12 +231,6 @@ export function KryptexPage() {
           showBackButton={!isLector}
           backTo="/"
           backText="Volver al inicio"
-          rightContent={isLector ? (
-            <button type="button" className="fact-back" onClick={logout}>
-              <i className="bi bi-box-arrow-right me-1" />
-              Cerrar sesión
-            </button>
-          ) : undefined}
         />
 
         {/* Sección TH/s (S21) */}

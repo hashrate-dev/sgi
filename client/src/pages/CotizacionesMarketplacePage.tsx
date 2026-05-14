@@ -955,7 +955,6 @@ export function CotizacionesMarketplacePage() {
       <div className="container">
         <PageHeader
           title="Centro de Ordenes - Tienda Online"
-          logoHref="/"
           rightContent={
             <Link to="/marketplace/orders/history-detail" className="fact-back">
               <i className="bi bi-table me-1" aria-hidden />

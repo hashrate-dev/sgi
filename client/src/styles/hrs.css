@@ -58,6 +58,29 @@ body.hrs-protected-green-bg {
   overflow-x: hidden;
 }
 
+/* Home SGI: #root recortaba la cabecera (100vw / sticky) → franja a la derecha; fixed + viewport */
+html.hrs-home-bg #root {
+  overflow-x: visible;
+  background: transparent;
+}
+
+/* body también ocultaba overflow: la barra fixed quedaba recortada junto al scrollbar-gutter */
+html.hrs-home-bg body {
+  overflow-x: visible;
+}
+
+/* Cabecera SGI global (home + resto de vistas): fixed y ancho real del viewport */
+.sgi-protected-root > header.hrs-sgi-shell-header {
+  position: fixed !important;
+  inset: 0 0 auto 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  box-sizing: border-box !important;
+  z-index: 30 !important;
+}
+
 /* Todas las vistas SGI con .fact-page: fondo uniforme y altura estable (sin franjas) */
 .sgi-protected-root .fact-page {
   min-height: calc(100vh - 52px);

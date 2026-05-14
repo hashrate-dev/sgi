@@ -1,10 +1,10 @@
 import { memo, useId, useMemo } from "react";
 
-const W = 112;
-const H = 32;
-const PAD = 3;
+const W = 128;
+const H = 36;
+const PAD = 4;
 /** Etiquetas Mín/Máx dentro del gráfico (izquierda); Últ a la derecha. */
-const LABEL_INSET_X = 2.5;
+const LABEL_INSET_X = 3;
 
 type SparkScale = {
   yAt: (v: number) => number;
@@ -154,15 +154,7 @@ function kindPrefixShort(kinds: LevelKind[]): string {
   return parts.length ? `${parts.join("/")} ` : "";
 }
 
-/** Color guía punteada: máx naranja, mín amarillo, últ azul (si coinciden niveles, prioridad máx > mín > últ). */
-function guideLineClassName(kinds: LevelKind[]): string {
-  const base = "nh-watcher-rig-spark__guide";
-  if (kinds.includes("max")) return `${base} nh-watcher-rig-spark__guide--max`;
-  if (kinds.includes("min")) return `${base} nh-watcher-rig-spark__guide--min`;
-  return `${base} nh-watcher-rig-spark__guide--ult`;
-}
-
-/** Sparkline estilo monitor: fondo oscuro, línea verde fina, guías punteadas opcionales. */
+/** Sparkline: fondo oscuro suave, rejilla ligera, curva esmeralda, guías neutras y tipografía sans clara. */
 function NiceHashRigHashSparklineInner({ values, title, formatHashrate }: NiceHashRigHashSparklineProps) {
   const gid = useId().replace(/:/g, "");
   const gradId = `nhRigSparkFill-${gid}`;
@@ -184,7 +176,8 @@ function NiceHashRigHashSparklineInner({ values, title, formatHashrate }: NiceHa
     return (
       <div className="nh-watcher-rig-spark nh-watcher-rig-spark--empty" title={title ?? "Sin historial aún (~1 min entre muestras)"} aria-hidden>
         <svg viewBox={`0 0 ${W} ${H}`} className="nh-watcher-rig-spark__svg" preserveAspectRatio="none">
-          <rect x="0" y="0" width={W} height={H} rx="4" className="nh-watcher-rig-spark__bg" />
+          <rect x="0" y="0" width={W} height={H} rx="6" className="nh-watcher-rig-spark__bg" />
+          <rect x="0.5" y="0.5" width={W - 1} height={H - 1} rx="5.5" className="nh-watcher-rig-spark__frame" fill="none" />
         </svg>
       </div>
     );
@@ -194,13 +187,30 @@ function NiceHashRigHashSparklineInner({ values, title, formatHashrate }: NiceHa
     <svg viewBox={`0 0 ${W} ${H}`} className="nh-watcher-rig-spark__svg" preserveAspectRatio="none" aria-hidden>
       <defs>
         <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#3fb950" stopOpacity="0.22" />
-          <stop offset="100%" stopColor="#3fb950" stopOpacity="0" />
+          <stop offset="0%" stopColor="#34d399" stopOpacity="0.18" />
+          <stop offset="72%" stopColor="#34d399" stopOpacity="0.05" />
+          <stop offset="100%" stopColor="#34d399" stopOpacity="0" />
         </linearGradient>
       </defs>
-      <rect x="0" y="0" width={W} height={H} rx="4" className="nh-watcher-rig-spark__bg" />
+      <rect x="0" y="0" width={W} height={H} rx="6" className="nh-watcher-rig-spark__bg" />
+      <rect x="0.5" y="0.5" width={W - 1} height={H - 1} rx="5.5" className="nh-watcher-rig-spark__frame" fill="none" />
+      {[1, 2, 3].map((i) => {
+        const innerH = H - PAD * 2;
+        const y = PAD + (innerH * i) / 4;
+        return (
+          <line
+            key={`grid-${i}`}
+            x1={PAD}
+            y1={y}
+            x2={W - PAD}
+            y2={y}
+            className="nh-watcher-rig-spark__grid"
+            vectorEffect="non-scaling-stroke"
+          />
+        );
+      })}
       {guideRows && scale
-        ? guideRows.map(({ v, yLine, kinds }, idx) => {
+        ? guideRows.map(({ v, yLine }, idx) => {
             const x1 = PAD;
             const x2 = PAD + scale.plotW;
             return (
@@ -210,7 +220,7 @@ function NiceHashRigHashSparklineInner({ values, title, formatHashrate }: NiceHa
                 y1={yLine}
                 x2={x2}
                 y2={yLine}
-                className={guideLineClassName(kinds)}
+                className="nh-watcher-rig-spark__guide"
                 vectorEffect="non-scaling-stroke"
               />
             );
@@ -221,18 +231,19 @@ function NiceHashRigHashSparklineInner({ values, title, formatHashrate }: NiceHa
       {guideRows && formatHashrate
         ? guideRows.map(({ v, labelY, kinds }, idx) => {
             const ultDerecha = kinds.includes("last");
+            const pre = kindPrefixShort(kinds);
             return (
               <text
                 key={`t-${idx}-${v}`}
                 x={ultDerecha ? W - PAD - LABEL_INSET_X : PAD + LABEL_INSET_X}
                 y={labelY}
-                className="nh-watcher-rig-spark__guide-label mono"
+                className="nh-watcher-rig-spark__guide-label"
                 textAnchor={ultDerecha ? "end" : "start"}
                 dominantBaseline="middle"
               >
                 <title>{guideRowSvgTitle(kinds)}</title>
-                {kindPrefixShort(kinds)}
-                {formatHashrate(v)}
+                {pre ? <tspan className="nh-watcher-rig-spark__lbl-pre">{pre}</tspan> : null}
+                <tspan className="nh-watcher-rig-spark__lbl-val">{formatHashrate(v)}</tspan>
               </text>
             );
           })

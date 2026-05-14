@@ -99,10 +99,26 @@ body:has(.marketplace-asic-page)::after {
   -webkit-backdrop-filter: blur(14px) saturate(1.35);
 }
 
+/* Home SGI (/): estética de la barra (posición = fixed en HomePage, ancho viewport vía left/right:0) */
+.hrs-sgi-home-topbar {
+  border-radius: 0 !important;
+  border-width: 0 !important;
+  border-style: solid !important;
+  border-color: transparent !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.82) inset,
+    0 1px 0 rgba(15, 23, 42, 0.06),
+    0 10px 28px -12px rgba(2, 6, 23, 0.14) !important;
+  margin: 0 !important;
+  box-sizing: border-box;
+}
+
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .hrs-glass-topbar-surface,
   .sgi-unified-header:not(.sgi-unified-header--home),
   .hrs-dashboard-glass-top,
+  .hrs-sgi-home-topbar,
+  .hrs-sgi-shell-header,
   .sgi-unified-header--home .sgi-unified-header__inner {
     background: linear-gradient(180deg, #ffffff 0%, #f8fafc 52%, #eef2f7 100%) !important;
     backdrop-filter: none;
