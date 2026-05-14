@@ -78,6 +78,15 @@ function computeFleetMiningHeaderStats(rows: FleetHashRigRow[]): FleetMiningHead
   return { total: nTh + nMh, nTh, nMh, sumTh, sumMh };
 }
 
+/** Rigs con estado distinto de MINING (offline, detenido, etc.). */
+function countFleetRigsNotMining(rows: FleetHashRigRow[]): number {
+  let n = 0;
+  for (const row of rows) {
+    if (String(row.rig.minerStatus ?? "").trim().toUpperCase() !== "MINING") n += 1;
+  }
+  return n;
+}
+
 function fmtHashrateEs(n: number, maxFrac = 2): string {
   return n.toLocaleString("es-UY", { minimumFractionDigits: 0, maximumFractionDigits: maxFrac });
 }
@@ -236,6 +245,8 @@ type Props = {
 
 export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTotal }: Props) {
   const fleetHeaderStats = useMemo(() => computeFleetMiningHeaderStats(rows), [rows]);
+  const fleetOfflineCount = useMemo(() => countFleetRigsNotMining(rows), [rows]);
+  const fleetKpiHasAny = fleetHeaderStats.total > 0 || fleetOfflineCount > 0;
 
   const canvasThRef = useRef<HTMLCanvasElement>(null);
   const canvasMhRef = useRef<HTMLCanvasElement>(null);
@@ -417,23 +428,26 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
             </a>
             <div className="nh-fleet-hash-header__text">
               <div className="nh-fleet-hash-kpi-wrap" role="status" aria-live="polite">
-                {fleetHeaderStats.total === 0 ? (
-                  <div className="nh-fleet-hash-kpi-empty">Ningún ASIC en MINING para la selección actual.</div>
-                ) : (
+                {fleetKpiHasAny ? (
                   <div className="nh-fleet-hash-kpi-grid">
                     <div
                       className="nh-fleet-hash-kpi-group nh-fleet-hash-kpi-group--th"
-                      aria-label="Flota TH/s: rigs y hashrate agregado"
+                      aria-label="TOTAL ASIC SHA-256 y TH/s totales"
                     >
                       <div className="nh-fleet-hash-kpi-tile nh-fleet-hash-kpi-tile--th">
-                        <div className="nh-fleet-hash-kpi-tile__label">TOTAL ASICS SHA-256</div>
+                        <div className="nh-fleet-hash-kpi-tile__label nh-fleet-hash-kpi-tile__label--stack">
+                          <span className="nh-fleet-hash-kpi-tile__label-line">TOTAL ASICS</span>
+                          <span className="nh-fleet-hash-kpi-tile__label-sub">SHA-256</span>
+                        </div>
                         <div className="nh-fleet-hash-kpi-tile__figure">
                           <div className="nh-fleet-hash-kpi-tile__value tabular-nums">{fleetHeaderStats.nTh}</div>
-                          <span className="nh-fleet-hash-kpi-tile__unit">TH/s</span>
                         </div>
                       </div>
                       <div className="nh-fleet-hash-kpi-tile nh-fleet-hash-kpi-tile--th">
-                        <div className="nh-fleet-hash-kpi-tile__label">TH/s totales</div>
+                        <div className="nh-fleet-hash-kpi-tile__label nh-fleet-hash-kpi-tile__label--stack">
+                          <span className="nh-fleet-hash-kpi-tile__label-line">TOTAL HASHRATE</span>
+                          <span className="nh-fleet-hash-kpi-tile__label-sub">SHA-256</span>
+                        </div>
                         <div className="nh-fleet-hash-kpi-tile__figure">
                           <div className="nh-fleet-hash-kpi-tile__value tabular-nums">
                             {fmtHashrateEs(fleetHeaderStats.sumTh)}
@@ -444,17 +458,22 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
                     </div>
                     <div
                       className="nh-fleet-hash-kpi-group nh-fleet-hash-kpi-group--mh"
-                      aria-label="Flota MH/s: rigs y hashrate agregado"
+                      aria-label="TOTAL ASICS SCRYPT y MH/s totales"
                     >
                       <div className="nh-fleet-hash-kpi-tile nh-fleet-hash-kpi-tile--mh">
-                        <div className="nh-fleet-hash-kpi-tile__label">Rigs MH/s</div>
+                        <div className="nh-fleet-hash-kpi-tile__label nh-fleet-hash-kpi-tile__label--stack">
+                          <span className="nh-fleet-hash-kpi-tile__label-line">TOTAL ASICS</span>
+                          <span className="nh-fleet-hash-kpi-tile__label-sub">SCRYPT</span>
+                        </div>
                         <div className="nh-fleet-hash-kpi-tile__figure">
                           <div className="nh-fleet-hash-kpi-tile__value tabular-nums">{fleetHeaderStats.nMh}</div>
-                          <span className="nh-fleet-hash-kpi-tile__unit">MH</span>
                         </div>
                       </div>
                       <div className="nh-fleet-hash-kpi-tile nh-fleet-hash-kpi-tile--mh">
-                        <div className="nh-fleet-hash-kpi-tile__label">MH/s totales</div>
+                        <div className="nh-fleet-hash-kpi-tile__label nh-fleet-hash-kpi-tile__label--stack">
+                          <span className="nh-fleet-hash-kpi-tile__label-line">TOTAL HASHRATE</span>
+                          <span className="nh-fleet-hash-kpi-tile__label-sub">SCRYPT</span>
+                        </div>
                         <div className="nh-fleet-hash-kpi-tile__figure">
                           <div className="nh-fleet-hash-kpi-tile__value tabular-nums">
                             {fmtHashrateEs(fleetHeaderStats.sumMh)}
@@ -464,17 +483,32 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
                       </div>
                     </div>
                     <div
-                      className="nh-fleet-hash-kpi-group nh-fleet-hash-kpi-group--total"
-                      aria-label="ASICs activos en estado MINING"
+                      className="nh-fleet-hash-kpi-group nh-fleet-hash-kpi-group--status"
+                      aria-label="ASICs en MINING y fuera de MINING"
                     >
                       <div className="nh-fleet-hash-kpi-tile nh-fleet-hash-kpi-tile--total">
-                        <div className="nh-fleet-hash-kpi-tile__label">ASICs activos</div>
+                        <div className="nh-fleet-hash-kpi-tile__label nh-fleet-hash-kpi-tile__label--stack">
+                          <span className="nh-fleet-hash-kpi-tile__label-line">ASICS</span>
+                          <span className="nh-fleet-hash-kpi-tile__label-sub">ACTIVOS</span>
+                        </div>
                         <div className="nh-fleet-hash-kpi-tile__figure">
                           <div className="nh-fleet-hash-kpi-tile__value tabular-nums">{fleetHeaderStats.total}</div>
-                          <span className="nh-fleet-hash-kpi-tile__unit">MINING</span>
+                        </div>
+                      </div>
+                      <div className="nh-fleet-hash-kpi-tile nh-fleet-hash-kpi-tile--offline">
+                        <div className="nh-fleet-hash-kpi-tile__label nh-fleet-hash-kpi-tile__label--stack">
+                          <span className="nh-fleet-hash-kpi-tile__label-line">ASICS</span>
+                          <span className="nh-fleet-hash-kpi-tile__label-sub">OFFLINE</span>
+                        </div>
+                        <div className="nh-fleet-hash-kpi-tile__figure">
+                          <div className="nh-fleet-hash-kpi-tile__value tabular-nums">{fleetOfflineCount}</div>
                         </div>
                       </div>
                     </div>
+                  </div>
+                ) : (
+                  <div className="nh-fleet-hash-kpi-empty">
+                    Ningún ASIC en MINING ni fuera de MINING para la selección actual.
                   </div>
                 )}
               </div>
