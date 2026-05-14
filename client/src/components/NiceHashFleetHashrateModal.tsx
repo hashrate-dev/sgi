@@ -7,6 +7,7 @@ import {
   loadNiceHashRigHashratePointsMap,
   NH_WATCHER_CHART_RESOLUTION_OPTIONS,
   NH_WATCHER_HASH_SAMPLE_MS,
+  type NhRigHashPoint,
 } from "../lib/nicehashWatcherRigHashrateHistory";
 import { nhWatcherRigStorageKey } from "../lib/nicehashWatcherRigNicknames";
 import type { NhWatcherSlotRow } from "../lib/nicehashWatcherSlots";
