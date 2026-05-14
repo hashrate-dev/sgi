@@ -82,11 +82,6 @@ function fmtHashrateEs(n: number, maxFrac = 2): string {
   return n.toLocaleString("es-UY", { minimumFractionDigits: 0, maximumFractionDigits: maxFrac });
 }
 
-function equiposLabel(n: number): string {
-  if (n === 0) return "0 equipos";
-  return n === 1 ? "1 equipo" : `${n} equipos`;
-}
-
 function rigDisplayLabel(row: FleetHashRigRow, slotRows: NhWatcherSlotRow[], isTotal: boolean): string {
   const base = (row.rig.name ?? row.rig.rigId ?? "ASIC").trim() || "ASIC";
   if (!isTotal) return base;
@@ -421,32 +416,66 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
               </span>
             </a>
             <div className="nh-fleet-hash-header__text">
-              <div className="nh-fleet-hash-kpi-row" role="status" aria-live="polite">
+              <div className="nh-fleet-hash-kpi-wrap" role="status" aria-live="polite">
                 {fleetHeaderStats.total === 0 ? (
-                  <div className="nh-fleet-hash-kpi-empty">Sin ASICs en MINING en esta vista.</div>
+                  <div className="nh-fleet-hash-kpi-empty">Ningún ASIC en MINING para la selección actual.</div>
                 ) : (
-                  <>
-                    <div className="nh-fleet-hash-kpi-card">
-                      <div className="nh-fleet-hash-kpi-card__label">Suma TH/s</div>
-                      <div className="nh-fleet-hash-kpi-card__value tabular-nums">
-                        {fmtHashrateEs(fleetHeaderStats.sumTh)} <span className="nh-fleet-hash-kpi-card__unit">TH/s</span>
+                  <div className="nh-fleet-hash-kpi-grid">
+                    <div
+                      className="nh-fleet-hash-kpi-group nh-fleet-hash-kpi-group--th"
+                      aria-label="Flota TH/s: rigs y hashrate agregado"
+                    >
+                      <div className="nh-fleet-hash-kpi-tile nh-fleet-hash-kpi-tile--th">
+                        <div className="nh-fleet-hash-kpi-tile__label">TOTAL ASICS SHA-256</div>
+                        <div className="nh-fleet-hash-kpi-tile__figure">
+                          <div className="nh-fleet-hash-kpi-tile__value tabular-nums">{fleetHeaderStats.nTh}</div>
+                          <span className="nh-fleet-hash-kpi-tile__unit">TH/s</span>
+                        </div>
                       </div>
-                      <div className="nh-fleet-hash-kpi-card__meta">{equiposLabel(fleetHeaderStats.nTh)}</div>
-                    </div>
-                    <div className="nh-fleet-hash-kpi-card">
-                      <div className="nh-fleet-hash-kpi-card__label">Suma MH/s</div>
-                      <div className="nh-fleet-hash-kpi-card__value tabular-nums">
-                        {fmtHashrateEs(fleetHeaderStats.sumMh)}{" "}
-                        <span className="nh-fleet-hash-kpi-card__unit">MH/s</span>
+                      <div className="nh-fleet-hash-kpi-tile nh-fleet-hash-kpi-tile--th">
+                        <div className="nh-fleet-hash-kpi-tile__label">TH/s totales</div>
+                        <div className="nh-fleet-hash-kpi-tile__figure">
+                          <div className="nh-fleet-hash-kpi-tile__value tabular-nums">
+                            {fmtHashrateEs(fleetHeaderStats.sumTh)}
+                          </div>
+                          <span className="nh-fleet-hash-kpi-tile__unit">TH/s</span>
+                        </div>
                       </div>
-                      <div className="nh-fleet-hash-kpi-card__meta">{equiposLabel(fleetHeaderStats.nMh)}</div>
                     </div>
-                    <div className="nh-fleet-hash-kpi-card nh-fleet-hash-kpi-card--total">
-                      <div className="nh-fleet-hash-kpi-card__label">Total equipos</div>
-                      <div className="nh-fleet-hash-kpi-card__value tabular-nums">{fleetHeaderStats.total}</div>
-                      <div className="nh-fleet-hash-kpi-card__meta">ASICs en MINING</div>
+                    <div
+                      className="nh-fleet-hash-kpi-group nh-fleet-hash-kpi-group--mh"
+                      aria-label="Flota MH/s: rigs y hashrate agregado"
+                    >
+                      <div className="nh-fleet-hash-kpi-tile nh-fleet-hash-kpi-tile--mh">
+                        <div className="nh-fleet-hash-kpi-tile__label">Rigs MH/s</div>
+                        <div className="nh-fleet-hash-kpi-tile__figure">
+                          <div className="nh-fleet-hash-kpi-tile__value tabular-nums">{fleetHeaderStats.nMh}</div>
+                          <span className="nh-fleet-hash-kpi-tile__unit">MH</span>
+                        </div>
+                      </div>
+                      <div className="nh-fleet-hash-kpi-tile nh-fleet-hash-kpi-tile--mh">
+                        <div className="nh-fleet-hash-kpi-tile__label">MH/s totales</div>
+                        <div className="nh-fleet-hash-kpi-tile__figure">
+                          <div className="nh-fleet-hash-kpi-tile__value tabular-nums">
+                            {fmtHashrateEs(fleetHeaderStats.sumMh)}
+                          </div>
+                          <span className="nh-fleet-hash-kpi-tile__unit">MH/s</span>
+                        </div>
+                      </div>
                     </div>
-                  </>
+                    <div
+                      className="nh-fleet-hash-kpi-group nh-fleet-hash-kpi-group--total"
+                      aria-label="ASICs activos en estado MINING"
+                    >
+                      <div className="nh-fleet-hash-kpi-tile nh-fleet-hash-kpi-tile--total">
+                        <div className="nh-fleet-hash-kpi-tile__label">ASICs activos</div>
+                        <div className="nh-fleet-hash-kpi-tile__figure">
+                          <div className="nh-fleet-hash-kpi-tile__value tabular-nums">{fleetHeaderStats.total}</div>
+                          <span className="nh-fleet-hash-kpi-tile__unit">MINING</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
