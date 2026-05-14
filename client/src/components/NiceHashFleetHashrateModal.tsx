@@ -1,8 +1,13 @@
-import { useEffect, useId, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Chart from "chart.js/auto";
 import type { Chart as ChartJs, ChartConfiguration } from "chart.js";
-import type { NiceHashExternalRigs2Payload } from "../lib/api";
-import { loadNiceHashRigHashratePointsMap, type NhRigHashPoint } from "../lib/nicehashWatcherRigHashrateHistory";
+import { getNiceHashWatcherRigHashHistory, type NiceHashExternalRigs2Payload } from "../lib/api";
+import {
+  aggregateRigHashPointsByBucketMs,
+  loadNiceHashRigHashratePointsMap,
+  NH_WATCHER_CHART_RESOLUTION_OPTIONS,
+  NH_WATCHER_HASH_SAMPLE_MS,
+} from "../lib/nicehashWatcherRigHashrateHistory";
 import { nhWatcherRigStorageKey } from "../lib/nicehashWatcherRigNicknames";
 import type { NhWatcherSlotRow } from "../lib/nicehashWatcherSlots";
 import "./nicehashFleetHashrateModal.css";
@@ -15,6 +20,13 @@ export type FleetHashRigRow = {
 };
 
 const MAX_AXIS_POINTS = 4320;
+
+const HASHRATE_LOGO_LOCAL = "/images/LOGO-HASHRATE.png";
+const HASHRATE_LOGO_CDN = "https://hashrate.space/wp-content/uploads/hashrate-LOGO.png";
+const HASHRATE_LOGO_LOCAL_ALT = "/images/HASHRATELOGO2.png";
+
+/** CDN primero (suele ir con alpha); locales como respaldo (a veces vienen con fondo blanco). */
+const HASHRATE_LOGO_SOURCES: readonly string[] = [HASHRATE_LOGO_CDN, HASHRATE_LOGO_LOCAL, HASHRATE_LOGO_LOCAL_ALT];
 
 const CHART_COLORS = [
   "#34d399",
@@ -43,6 +55,37 @@ function speedLooksLikeTh(speed: number): boolean {
   return intDigits >= 3;
 }
 
+type FleetMiningHeaderStats = { total: number; nTh: number; nMh: number; sumTh: number; sumMh: number };
+
+function computeFleetMiningHeaderStats(rows: FleetHashRigRow[]): FleetMiningHeaderStats {
+  let nTh = 0;
+  let nMh = 0;
+  let sumTh = 0;
+  let sumMh = 0;
+  for (const row of rows) {
+    if (String(row.rig.minerStatus ?? "").trim().toUpperCase() !== "MINING") continue;
+    const sp = row.rig.stats?.[0]?.speedAccepted;
+    const v = typeof sp === "number" && Number.isFinite(sp) && sp >= 0 ? sp : 0;
+    if (speedLooksLikeTh(v)) {
+      nTh += 1;
+      sumTh += v;
+    } else {
+      nMh += 1;
+      sumMh += v;
+    }
+  }
+  return { total: nTh + nMh, nTh, nMh, sumTh, sumMh };
+}
+
+function fmtHashrateEs(n: number, maxFrac = 2): string {
+  return n.toLocaleString("es-UY", { minimumFractionDigits: 0, maximumFractionDigits: maxFrac });
+}
+
+function equiposLabel(n: number): string {
+  if (n === 0) return "0 equipos";
+  return n === 1 ? "1 equipo" : `${n} equipos`;
+}
+
 function rigDisplayLabel(row: FleetHashRigRow, slotRows: NhWatcherSlotRow[], isTotal: boolean): string {
   const base = (row.rig.name ?? row.rig.rigId ?? "ASIC").trim() || "ASIC";
   if (!isTotal) return base;
@@ -67,13 +110,19 @@ function formatAxisLabel(t: number): string {
 
 type SplitRow = FleetHashRigRow & { label: string; map: Map<number, number>; isTh: boolean };
 
-function buildSplitRows(rows: FleetHashRigRow[], slotRows: NhWatcherSlotRow[], isTotal: boolean): SplitRow[] {
+function buildSplitRows(
+  rows: FleetHashRigRow[],
+  slotRows: NhWatcherSlotRow[],
+  isTotal: boolean,
+  resolutionMs: number
+): SplitRow[] {
   const out: SplitRow[] = [];
   for (const row of rows) {
     if (String(row.rig.minerStatus ?? "").trim().toUpperCase() !== "MINING") continue;
     const wid = row.watcherId.trim().toLowerCase();
     const rk = nhWatcherRigStorageKey(row.rig, row.rigIndex);
-    const pts = loadNiceHashRigHashratePointsMap(wid)[rk] ?? [];
+    const rawPts = loadNiceHashRigHashratePointsMap(wid)[rk] ?? [];
+    const pts = aggregateRigHashPointsByBucketMs(rawPts, resolutionMs);
     const sp = row.rig.stats?.[0]?.speedAccepted;
     const isTh = speedLooksLikeTh(typeof sp === "number" && Number.isFinite(sp) ? sp : 0);
     out.push({
@@ -187,17 +236,38 @@ type Props = {
   rows: FleetHashRigRow[];
   slotRows: NhWatcherSlotRow[];
   isTotal: boolean;
-  miningCount: number;
 };
 
-export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTotal, miningCount }: Props) {
-  const titleId = useId();
+export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTotal }: Props) {
+  const fleetHeaderStats = useMemo(() => computeFleetMiningHeaderStats(rows), [rows]);
+
   const canvasThRef = useRef<HTMLCanvasElement>(null);
   const canvasMhRef = useRef<HTMLCanvasElement>(null);
   const chartThRef = useRef<ChartJs | null>(null);
   const chartMhRef = useRef<ChartJs | null>(null);
+  const [hashrateLogoIx, setHashrateLogoIx] = useState(0);
+  const hashrateLogoSrc = HASHRATE_LOGO_SOURCES[hashrateLogoIx] ?? HASHRATE_LOGO_SOURCES[0];
+  const hashrateLogoMatKnockout = hashrateLogoIx > 0;
+  const [chartResolutionMs, setChartResolutionMs] = useState(NH_WATCHER_HASH_SAMPLE_MS);
 
-  const splitRows = useMemo(() => (open ? buildSplitRows(rows, slotRows, isTotal) : []), [open, rows, slotRows, isTotal]);
+  const chartBucketLabel = useMemo(
+    () => NH_WATCHER_CHART_RESOLUTION_OPTIONS.find((o) => o.ms === chartResolutionMs)?.label ?? "1 min",
+    [chartResolutionMs]
+  );
+
+  const watcherIdsKey = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of rows) {
+      if (String(r.rig.minerStatus ?? "").trim().toUpperCase() !== "MINING") continue;
+      s.add(r.watcherId.trim().toLowerCase());
+    }
+    return [...s].sort().join(",");
+  }, [rows]);
+
+  const splitRows = useMemo(
+    () => (open ? buildSplitRows(rows, slotRows, isTotal, chartResolutionMs) : []),
+    [open, rows, slotRows, isTotal, chartResolutionMs]
+  );
 
   const axisTh = useMemo(() => unionAxisTs(splitRows, true), [splitRows]);
   const axisMh = useMemo(() => unionAxisTs(splitRows, false), [splitRows]);
@@ -223,6 +293,28 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
   }, [open, onClose]);
 
   useEffect(() => {
+    if (!open) setChartResolutionMs(NH_WATCHER_HASH_SAMPLE_MS);
+  }, [open]);
+
+  /** Materializa agregados en BD (15 / 30 / 60 min) a partir de las muestras 1 min del servidor. */
+  useEffect(() => {
+    if (!open || chartResolutionMs === NH_WATCHER_HASH_SAMPLE_MS) return;
+    const ids = watcherIdsKey.split(",").filter(Boolean);
+    if (ids.length === 0) return;
+    void (async () => {
+      await Promise.all(
+        ids.map(async (wid) => {
+          try {
+            await getNiceHashWatcherRigHashHistory(wid, { resolutionMs: chartResolutionMs });
+          } catch {
+            /* sin sesión o red */
+          }
+        })
+      );
+    })();
+  }, [open, chartResolutionMs, watcherIdsKey]);
+
+  useEffect(() => {
     if (!open) {
       chartThRef.current?.destroy();
       chartThRef.current = null;
@@ -240,7 +332,7 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
     chartThRef.current = new Chart(
       ctx,
       makeChartConfig(
-        "Hashrate aceptado · TH/s (una línea por ASIC en MINING)",
+        `Hashrate aceptado · TH/s (ASIC en MINING · intervalo ${chartBucketLabel})`,
         "TH/s",
         labelsTh,
         dsTh,
@@ -254,7 +346,7 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
       chartThRef.current?.destroy();
       chartThRef.current = null;
     };
-  }, [open, axisTh, labelsTh, dsTh]);
+  }, [open, axisTh, labelsTh, dsTh, chartBucketLabel]);
 
   useEffect(() => {
     if (!open) {
@@ -274,7 +366,7 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
     chartMhRef.current = new Chart(
       ctx,
       makeChartConfig(
-        "Hashrate aceptado · MH/s (una línea por ASIC en MINING)",
+        `Hashrate aceptado · MH/s (ASIC en MINING · intervalo ${chartBucketLabel})`,
         "MH/s",
         labelsMh,
         dsMh,
@@ -288,35 +380,111 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
       chartMhRef.current?.destroy();
       chartMhRef.current = null;
     };
-  }, [open, axisMh, labelsMh, dsMh]);
+  }, [open, axisMh, labelsMh, dsMh, chartBucketLabel]);
 
   if (!open) return null;
 
   return (
-    <div className="nh-fleet-hash-overlay" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+    <div
+      className="nh-fleet-hash-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Monitor de hashrate por equipo"
+    >
       <button type="button" className="nh-fleet-hash-backdrop" aria-label="Cerrar" onClick={onClose} />
       <div className="nh-fleet-hash-dialog">
         <header className="nh-fleet-hash-header">
-          <div className="nh-fleet-hash-header__text">
-            <h2 id={titleId} className="nh-fleet-hash-title">
-              Monitor de hashrate por equipo
-            </h2>
-            <p className="nh-fleet-hash-sub">
-              Resolución ~1 min entre puntos · {miningCount} ASICs en MINING en esta vista · historial en este navegador
-              (sincronizado con servidor cuando aplica)
-            </p>
+          <div className="nh-fleet-hash-header__brand">
+            <a
+              href="https://hashrate.space/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="nh-fleet-hash-brand-link"
+              aria-label="Hashrate Space (abre en nueva pestaña)"
+              title="hashrate.space"
+            >
+              <span
+                className={`nh-fleet-hash-brand-chip${hashrateLogoMatKnockout ? " nh-fleet-hash-brand-chip--mat" : ""}`}
+              >
+                <img
+                  src={hashrateLogoSrc}
+                  alt="HASHRATE"
+                  className="nh-fleet-hash-brand-logo"
+                  width={170}
+                  height={44}
+                  decoding="async"
+                  onError={() =>
+                    setHashrateLogoIx((i) => (i < HASHRATE_LOGO_SOURCES.length - 1 ? i + 1 : i))
+                  }
+                />
+              </span>
+            </a>
+            <div className="nh-fleet-hash-header__text">
+              <div className="nh-fleet-hash-kpi-row" role="status" aria-live="polite">
+                {fleetHeaderStats.total === 0 ? (
+                  <div className="nh-fleet-hash-kpi-empty">Sin ASICs en MINING en esta vista.</div>
+                ) : (
+                  <>
+                    <div className="nh-fleet-hash-kpi-card">
+                      <div className="nh-fleet-hash-kpi-card__label">Suma TH/s</div>
+                      <div className="nh-fleet-hash-kpi-card__value tabular-nums">
+                        {fmtHashrateEs(fleetHeaderStats.sumTh)} <span className="nh-fleet-hash-kpi-card__unit">TH/s</span>
+                      </div>
+                      <div className="nh-fleet-hash-kpi-card__meta">{equiposLabel(fleetHeaderStats.nTh)}</div>
+                    </div>
+                    <div className="nh-fleet-hash-kpi-card">
+                      <div className="nh-fleet-hash-kpi-card__label">Suma MH/s</div>
+                      <div className="nh-fleet-hash-kpi-card__value tabular-nums">
+                        {fmtHashrateEs(fleetHeaderStats.sumMh)}{" "}
+                        <span className="nh-fleet-hash-kpi-card__unit">MH/s</span>
+                      </div>
+                      <div className="nh-fleet-hash-kpi-card__meta">{equiposLabel(fleetHeaderStats.nMh)}</div>
+                    </div>
+                    <div className="nh-fleet-hash-kpi-card nh-fleet-hash-kpi-card--total">
+                      <div className="nh-fleet-hash-kpi-card__label">Total equipos</div>
+                      <div className="nh-fleet-hash-kpi-card__value tabular-nums">{fleetHeaderStats.total}</div>
+                      <div className="nh-fleet-hash-kpi-card__meta">ASICs en MINING</div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
-          <button type="button" className="nh-fleet-hash-close btn btn-outline-light btn-sm rounded-pill" onClick={onClose}>
-            <i className="bi bi-x-lg me-1" aria-hidden />
-            Cerrar
-          </button>
+          <div className="nh-fleet-hash-header__actions">
+            <div
+              className="nh-fleet-hash-resolution-bar nh-fleet-hash-resolution-bar--header"
+              role="toolbar"
+              aria-label="Temporalidad del gráfico"
+            >
+              <span className="nh-fleet-hash-resolution-bar__label">Temporalidad</span>
+              <div className="nh-fleet-hash-resolution-bar__btns">
+                {NH_WATCHER_CHART_RESOLUTION_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.ms}
+                    type="button"
+                    className={`nh-fleet-hash-resolution-btn${opt.ms === chartResolutionMs ? " nh-fleet-hash-resolution-btn--active" : ""}`}
+                    onClick={() => setChartResolutionMs(opt.ms)}
+                    aria-pressed={opt.ms === chartResolutionMs}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button type="button" className="nh-fleet-hash-close btn btn-outline-light btn-sm rounded-pill" onClick={onClose}>
+              <i className="bi bi-x-lg me-1" aria-hidden />
+              Cerrar
+            </button>
+          </div>
         </header>
 
         <div className="nh-fleet-hash-body">
           <section className="nh-fleet-hash-panel" aria-label="Gráfico TH por equipo">
             <div className="nh-fleet-hash-canvas-wrap">
               {axisTh.length === 0 || dsTh.length === 0 ? (
-                <div className="nh-fleet-hash-empty">No hay historial TH/s (~1 min) para ASICs en MINING aún.</div>
+                <div className="nh-fleet-hash-empty">
+                  No hay historial TH/s ({chartBucketLabel}) para ASICs en MINING aún.
+                </div>
               ) : (
                 <canvas ref={canvasThRef} />
               )}
@@ -325,7 +493,9 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
           <section className="nh-fleet-hash-panel" aria-label="Gráfico MH por equipo">
             <div className="nh-fleet-hash-canvas-wrap">
               {axisMh.length === 0 || dsMh.length === 0 ? (
-                <div className="nh-fleet-hash-empty">No hay historial MH/s (~1 min) para ASICs en MINING aún.</div>
+                <div className="nh-fleet-hash-empty">
+                  No hay historial MH/s ({chartBucketLabel}) para ASICs en MINING aún.
+                </div>
               ) : (
                 <canvas ref={canvasMhRef} />
               )}

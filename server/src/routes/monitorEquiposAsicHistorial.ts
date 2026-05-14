@@ -6,10 +6,16 @@ import { requireRole } from "../middleware/auth.js";
 import { requireAdminBGrant } from "../middleware/adminBGrant.js";
 import { proxyNiceHashRigs2WithExtras } from "../lib/nicehashExternalRigsMerge.js";
 import {
+  aggregate1MinDbRowsToAggSeries,
+  nhRigHashAggPruneOld,
+  nhRigHashAggTrimPerRig,
   nhRigHashPruneOld,
   nhRigHashTrimPerRig,
+  NH_WATCHER_HASH_SAMPLE_MS,
+  NH_WATCHER_RIG_HASH_AGG_RESOLUTION_MS_SET,
   NH_WATCHER_RIG_HASH_RETENTION_MS,
   persistNhWatcherRigHashSamplesFromPayload,
+  replaceNhWatcherRigHashAggSeries,
   sampleTimeBucketMs,
 } from "../lib/nhWatcherRigHashSamples.js";
 
@@ -145,6 +151,15 @@ function nhRigHashRowNorm(row: Record<string, unknown>): { rigKey: string; t: nu
   const v = Number(row.value ?? lower.value);
   if (!rigKey || !Number.isFinite(t) || !Number.isFinite(v)) return null;
   return { rigKey, t, v };
+}
+
+function parseRigHashHistoryResolutionMs(raw: unknown): number | null {
+  if (raw == null || raw === "") return NH_WATCHER_HASH_SAMPLE_MS;
+  const n = typeof raw === "string" ? Number(raw.trim()) : Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  if (n === NH_WATCHER_HASH_SAMPLE_MS) return n;
+  if (NH_WATCHER_RIG_HASH_AGG_RESOLUTION_MS_SET.has(n)) return n;
+  return null;
 }
 
 function normBajaListRow(row: Record<string, unknown>) {
@@ -467,6 +482,13 @@ monitorEquiposAsicHistorialRouter.get(
       res.status(400).json({ error: { message: "watcherId debe ser un UUID válido." } });
       return;
     }
+    const resolutionMs = parseRigHashHistoryResolutionMs(req.query.resolutionMs);
+    if (resolutionMs == null) {
+      res
+        .status(400)
+        .json({ error: { message: "resolutionMs inválido (60000, 900000, 1800000, 3600000)." } });
+      return;
+    }
     const user = req.user;
     if (!user) {
       res.status(401).json({ error: { message: "No autenticado." } });
@@ -483,11 +505,25 @@ monitorEquiposAsicHistorialRouter.get(
          ORDER BY rig_key ASC, sample_t ASC`
       )
       .all(user.id, wid, cutoff)) as Record<string, unknown>[];
+
+    if (resolutionMs === NH_WATCHER_HASH_SAMPLE_MS) {
+      const series: Record<string, { t: number; v: number }[]> = {};
+      for (const row of rows) {
+        const p = nhRigHashRowNorm(row);
+        if (!p) continue;
+        (series[p.rigKey] ??= []).push({ t: p.t, v: p.v });
+      }
+      res.json({ series });
+      return;
+    }
+
+    const aggSeries = aggregate1MinDbRowsToAggSeries(rows, resolutionMs);
+    await nhRigHashAggPruneOld(user.id, wid, resolutionMs);
+    await replaceNhWatcherRigHashAggSeries(user.id, wid, resolutionMs, aggSeries);
+    await nhRigHashAggTrimPerRig(user.id, wid, resolutionMs);
     const series: Record<string, { t: number; v: number }[]> = {};
-    for (const row of rows) {
-      const p = nhRigHashRowNorm(row);
-      if (!p) continue;
-      (series[p.rigKey] ??= []).push({ t: p.t, v: p.v });
+    for (const [rk, pts] of Object.entries(aggSeries)) {
+      series[rk] = pts.map(({ t, v }) => ({ t, v }));
     }
     res.json({ series });
   }

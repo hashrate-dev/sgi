@@ -907,6 +907,23 @@ CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_visitor ON marketplace_presence_
     `CREATE INDEX IF NOT EXISTS idx_nh_watcher_rig_hash_user_watcher ON nh_watcher_rig_hash_samples(user_id, watcher_id, sample_t)`
   );
 
+  /** Agregados 15 / 30 / 60 min derivados de muestras 1 min (misma ventana de retención). */
+  native.exec(`CREATE TABLE IF NOT EXISTS nh_watcher_rig_hash_agg_samples (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    watcher_id TEXT NOT NULL,
+    rig_key TEXT NOT NULL,
+    resolution_ms INTEGER NOT NULL,
+    bucket_t INTEGER NOT NULL,
+    value REAL NOT NULL,
+    sample_count INTEGER NOT NULL DEFAULT 1,
+    UNIQUE (user_id, watcher_id, rig_key, resolution_ms, bucket_t),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`);
+  native.exec(
+    `CREATE INDEX IF NOT EXISTS idx_nh_rig_hash_agg_user_wid_res ON nh_watcher_rig_hash_agg_samples(user_id, watcher_id, resolution_ms, bucket_t)`
+  );
+
   /** Snapshots de rentabilidad 24 h (BTC/día) para acumulado mensual por contexto (watcher o vista TOTAL). */
   native.exec(`CREATE TABLE IF NOT EXISTS nh_watcher_profit_snapshots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

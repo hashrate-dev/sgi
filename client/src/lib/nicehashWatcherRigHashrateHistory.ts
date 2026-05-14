@@ -222,3 +222,33 @@ export function loadNiceHashToolbarThSeries(watcherId: string): number[] {
 export function loadNiceHashToolbarMhSeries(watcherId: string): number[] {
   return loadNiceHashRigHashrateSeries(watcherId, NH_WATCHER_TOOLBAR_MH_KEY);
 }
+
+/** Opciones de temporalidad del monitor fullscreen (mismo `resolutionMs` que el GET del servidor). */
+export const NH_WATCHER_CHART_RESOLUTION_OPTIONS: ReadonlyArray<{ ms: number; label: string }> = [
+  { ms: NH_WATCHER_HASH_SAMPLE_MS, label: "1 min" },
+  { ms: 15 * 60 * 1000, label: "15 min" },
+  { ms: 30 * 60 * 1000, label: "30 min" },
+  { ms: 60 * 60 * 1000, label: "1 h" },
+];
+
+/**
+ * Promedia puntos ~1 min en buckets de `bucketMs` (p. ej. 15 min), alineado a epoch / bucketMs
+ * como en `aggregate1MinDbRowsToAggSeries` del servidor.
+ */
+export function aggregateRigHashPointsByBucketMs(points: NhRigHashPoint[], bucketMs: number): NhRigHashPoint[] {
+  const arr = points.filter((p) => Number.isFinite(p.t) && Number.isFinite(p.v));
+  if (!arr.length) return [];
+  if (!(Number.isFinite(bucketMs) && bucketMs >= NH_WATCHER_HASH_SAMPLE_MS)) return [...arr].sort((a, b) => a.t - b.t);
+  if (bucketMs <= NH_WATCHER_HASH_SAMPLE_MS) return [...arr].sort((a, b) => a.t - b.t);
+  const m = new Map<number, { sum: number; n: number }>();
+  for (const p of arr) {
+    const b = Math.floor(p.t / bucketMs) * bucketMs;
+    const o = m.get(b) ?? { sum: 0, n: 0 };
+    o.sum += p.v;
+    o.n += 1;
+    m.set(b, o);
+  }
+  return [...m.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([t, o]) => ({ t, v: o.n > 0 ? o.sum / o.n : 0 }));
+}

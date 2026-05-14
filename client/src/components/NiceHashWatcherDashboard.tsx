@@ -1396,7 +1396,6 @@ export function NiceHashWatcherDashboard({
         rows={fleetHashModalRows}
         slotRows={slotRows}
         isTotal={isTotal}
-        miningCount={nhAgg.miningN}
       />
     ) : null;
 

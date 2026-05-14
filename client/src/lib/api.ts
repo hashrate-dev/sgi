@@ -772,9 +772,17 @@ export type NhWatcherRigHashSample = { rigKey: string; t: number; v: number };
 
 export type NhWatcherRigHashHistoryResponse = { series: Record<string, { t: number; v: number }[]> };
 
-export function getNiceHashWatcherRigHashHistory(watcherId: string): Promise<NhWatcherRigHashHistoryResponse> {
+export function getNiceHashWatcherRigHashHistory(
+  watcherId: string,
+  opts?: { resolutionMs?: number }
+): Promise<NhWatcherRigHashHistoryResponse> {
   const id = encodeURIComponent(watcherId.trim());
-  return api<NhWatcherRigHashHistoryResponse>(`/api/monitor-equipos-asic/nicehash-watcher-rig-hash-history/${id}`);
+  const ms = opts?.resolutionMs;
+  const q =
+    typeof ms === "number" && Number.isFinite(ms) && ms > 0
+      ? `?resolutionMs=${encodeURIComponent(String(Math.floor(ms)))}`
+      : "";
+  return api<NhWatcherRigHashHistoryResponse>(`/api/monitor-equipos-asic/nicehash-watcher-rig-hash-history/${id}${q}`);
 }
 
 export function postNiceHashWatcherRigHashHistorySamples(

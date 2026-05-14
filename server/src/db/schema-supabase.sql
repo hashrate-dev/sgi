@@ -471,6 +471,21 @@ CREATE TABLE IF NOT EXISTS nh_watcher_rig_hash_samples (
 
 CREATE INDEX IF NOT EXISTS idx_nh_watcher_rig_hash_user_watcher ON nh_watcher_rig_hash_samples(user_id, watcher_id, sample_t);
 
+-- Agregados TH/MH por intervalo (15 / 30 / 60 min), materializados desde muestras 1 min
+CREATE TABLE IF NOT EXISTS nh_watcher_rig_hash_agg_samples (
+  id BIGSERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  watcher_id TEXT NOT NULL,
+  rig_key TEXT NOT NULL,
+  resolution_ms BIGINT NOT NULL,
+  bucket_t BIGINT NOT NULL,
+  value DOUBLE PRECISION NOT NULL,
+  sample_count INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (user_id, watcher_id, rig_key, resolution_ms, bucket_t)
+);
+
+CREATE INDEX IF NOT EXISTS idx_nh_rig_hash_agg_user_wid_res ON nh_watcher_rig_hash_agg_samples(user_id, watcher_id, resolution_ms, bucket_t);
+
 -- Snapshots rentabilidad 24 h (NiceHash watcher) para acumulado mensual
 CREATE TABLE IF NOT EXISTS nh_watcher_profit_snapshots (
   id BIGSERIAL PRIMARY KEY,
