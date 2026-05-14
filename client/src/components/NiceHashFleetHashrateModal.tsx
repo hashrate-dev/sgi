@@ -12,6 +12,7 @@ import {
 } from "../lib/nicehashWatcherRigHashrateHistory";
 import { nhWatcherRigStorageKey } from "../lib/nicehashWatcherRigNicknames";
 import type { NhWatcherSlotRow } from "../lib/nicehashWatcherSlots";
+import { nhAcceptedSpeedLooksLikeTh, nhRigSpeedAcceptedFromStats } from "../lib/nhSpeedAccepted";
 import "./nicehashFleetHashrateModal.css";
 
 export type FleetHashRigRow = {
@@ -55,14 +56,6 @@ const CHART_COLORS = [
   "#818cf8",
 ];
 
-function speedLooksLikeTh(speed: number): boolean {
-  if (!Number.isFinite(speed) || speed <= 0) return true;
-  if (speed < 1) return false;
-  const intPart = Math.floor(Math.abs(speed));
-  const intDigits = Math.floor(Math.log10(intPart)) + 1;
-  return intDigits >= 3;
-}
-
 type FleetMiningHeaderStats = { total: number; nTh: number; nMh: number; sumTh: number; sumMh: number };
 
 function computeFleetMiningHeaderStats(rows: FleetHashRigRow[]): FleetMiningHeaderStats {
@@ -72,9 +65,9 @@ function computeFleetMiningHeaderStats(rows: FleetHashRigRow[]): FleetMiningHead
   let sumMh = 0;
   for (const row of rows) {
     if (String(row.rig.minerStatus ?? "").trim().toUpperCase() !== "MINING") continue;
-    const sp = row.rig.stats?.[0]?.speedAccepted;
-    const v = typeof sp === "number" && Number.isFinite(sp) && sp >= 0 ? sp : 0;
-    if (speedLooksLikeTh(v)) {
+    const sp = nhRigSpeedAcceptedFromStats(row.rig.stats as unknown[]) ?? 0;
+    const v = Number.isFinite(sp) && sp >= 0 ? sp : 0;
+    if (nhAcceptedSpeedLooksLikeTh(v)) {
       nTh += 1;
       sumTh += v;
     } else {
@@ -166,8 +159,8 @@ function buildSplitRows(
     const rk = nhWatcherRigStorageKey(row.rig, row.rigIndex);
     const rawPts = loadNiceHashRigHashratePointsMap(wid)[rk] ?? [];
     const pts = aggregateRigHashPointsByBucketMs(rawPts, resolutionMs);
-    const sp = row.rig.stats?.[0]?.speedAccepted;
-    const isTh = speedLooksLikeTh(typeof sp === "number" && Number.isFinite(sp) ? sp : 0);
+    const sp = nhRigSpeedAcceptedFromStats(row.rig.stats as unknown[]);
+    const isTh = nhAcceptedSpeedLooksLikeTh(sp ?? 0);
     out.push({
       ...row,
       label: rigDisplayLabel(row, slotRows, isTotal),
@@ -202,8 +195,8 @@ function appendLiveSamples(
     if (String(row.rig.minerStatus ?? "").trim().toUpperCase() !== "MINING") continue;
     const rk = nhWatcherRigStorageKey(row.rig, row.rigIndex);
     const base = liveMap[rk] ?? [];
-    const sp = row.rig.stats?.[0]?.speedAccepted;
-    const v = typeof sp === "number" && Number.isFinite(sp) && sp >= 0 ? sp : 0;
+    const parsed = nhRigSpeedAcceptedFromStats(row.rig.stats as unknown[]);
+    const v = parsed != null && Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
     const arr = [...base, { t: nowMs, v }].filter((p) => p.t >= cutoff);
     next[rk] = arr.length > LIVE_MAX_POINTS_PER_RIG ? arr.slice(-LIVE_MAX_POINTS_PER_RIG) : arr;
   }
@@ -219,8 +212,8 @@ function collectLiveSamplesForDb(rows: FleetHashRigRow[], nowMs: number): Map<st
     const wid = row.watcherId.trim().toLowerCase();
     if (!wid) continue;
     const rk = nhWatcherRigStorageKey(row.rig, row.rigIndex);
-    const sp = row.rig.stats?.[0]?.speedAccepted;
-    const v = typeof sp === "number" && Number.isFinite(sp) && sp >= 0 ? sp : 0;
+    const parsed = nhRigSpeedAcceptedFromStats(row.rig.stats as unknown[]);
+    const v = parsed != null && Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
     const arr = byWid.get(wid) ?? [];
     arr.push({ rigKey: rk, t: Math.floor(nowMs), v });
     byWid.set(wid, arr);
@@ -252,8 +245,8 @@ function buildSplitRowsLive(
     if (String(row.rig.minerStatus ?? "").trim().toUpperCase() !== "MINING") continue;
     const rk = nhWatcherRigStorageKey(row.rig, row.rigIndex);
     const pts = liveByKey[rk] ?? [];
-    const sp = row.rig.stats?.[0]?.speedAccepted;
-    const isTh = speedLooksLikeTh(typeof sp === "number" && Number.isFinite(sp) ? sp : 0);
+    const sp = nhRigSpeedAcceptedFromStats(row.rig.stats as unknown[]);
+    const isTh = nhAcceptedSpeedLooksLikeTh(sp ?? 0);
     out.push({
       ...row,
       label: rigDisplayLabel(row, slotRows, isTotal),

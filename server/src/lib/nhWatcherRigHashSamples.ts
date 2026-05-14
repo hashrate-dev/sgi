@@ -1,4 +1,5 @@
 import { db } from "../db.js";
+import { nhAcceptedSpeedLooksLikeTh, nhRigSpeedAcceptedFromStats } from "./nhSpeedAccepted.js";
 
 /** Misma ventana que el cliente (~7 días × 1 muestra/min). */
 export const NH_WATCHER_RIG_HASH_MAX_POINTS = 60 * 24 * 7;
@@ -16,22 +17,13 @@ export function nhWatcherRigStorageKey(rig: { rigId?: string; name?: string }, l
   return `idx:${listIndex}`;
 }
 
-function nhAcceptedSpeedLooksLikeTh(speed: number): boolean {
-  if (!Number.isFinite(speed) || speed <= 0) return true;
-  if (speed < 1) return false;
-  const intPart = Math.floor(Math.abs(speed));
-  const intDigits = Math.floor(Math.log10(intPart)) + 1;
-  return intDigits >= 3;
-}
-
 function sumAcceptedThMhFromMiningRigs(rigs: unknown[]): { sumTh: number; sumMh: number } {
   let sumTh = 0;
   let sumMh = 0;
   for (const rig of rigs) {
     if (!rig || typeof rig !== "object") continue;
-    const st = (rig as { stats?: unknown[] }).stats?.[0] as { speedAccepted?: unknown } | undefined;
-    const sp = st?.speedAccepted;
-    if (typeof sp !== "number" || !Number.isFinite(sp)) continue;
+    const sp = nhRigSpeedAcceptedFromStats((rig as { stats?: unknown[] }).stats);
+    if (sp == null || !Number.isFinite(sp)) continue;
     if (nhAcceptedSpeedLooksLikeTh(sp)) sumTh += sp;
     else sumMh += sp;
   }
@@ -114,9 +106,8 @@ export async function persistNhWatcherRigHashSamplesFromPayload(
     const rig = rawRigs[i];
     if (!rig || typeof rig !== "object") continue;
     const rk = nhWatcherRigStorageKey(rig as { rigId?: string; name?: string }, i);
-    const st = (rig as { stats?: unknown[] }).stats?.[0] as { speedAccepted?: unknown } | undefined;
-    const sp = st?.speedAccepted;
-    if (typeof sp !== "number" || !Number.isFinite(sp) || sp < 0 || sp > 1e20) continue;
+    const sp = nhRigSpeedAcceptedFromStats((rig as { stats?: unknown[] }).stats);
+    if (sp == null || !Number.isFinite(sp) || sp < 0 || sp > 1e20) continue;
 
     const lb = lastBucketFor(rk);
     if (lb !== null && bucketNow <= lb) continue;

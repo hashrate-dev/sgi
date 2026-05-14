@@ -727,8 +727,8 @@ export type NiceHashExternalRigs2Payload = {
     profitability?: number;
     stats?: Array<{
       market?: string;
-      speedAccepted?: number;
-      speedRejectedTotal?: number;
+      speedAccepted?: number | string;
+      speedRejectedTotal?: number | string;
       timeConnected?: number;
       profitability?: number;
       algorithm?: { enumName?: string; description?: string };

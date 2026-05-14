@@ -32,6 +32,12 @@ import {
   saveWatcherSlotRows,
   watcherSlotNicknameTrimmed,
 } from "../lib/nicehashWatcherSlots";
+import {
+  nhAcceptedSpeedLooksLikeTh,
+  nhParseSpeedAccepted,
+  nhPickPrimaryMiningStat,
+  nhRigSpeedAcceptedFromStats,
+} from "../lib/nhSpeedAccepted";
 import { NICEHASH_WATCHER_ID, NH_WATCHER_FLEET_TOOLBAR_WATCHER_ID } from "../lib/nicehashWatcherConfig";
 import { NiceHashFleetHashrateModal } from "./NiceHashFleetHashrateModal";
 import { NiceHashRigAsicIcon } from "./NiceHashRigAsicIcon";
@@ -234,9 +240,13 @@ function formatCountdownToIso(iso: string | null | undefined, nowMs: number): st
 }
 
 function nhWatcherAlgoLine(rigs: NiceHashExternalRigs2Payload["miningRigs"]): string {
-  const st0 = rigs?.[0]?.stats?.[0];
-  const algo = st0?.algorithm?.description ?? st0?.algorithm?.enumName ?? "SHA256";
-  const mkt = st0?.market ? ` · ${st0.market}` : "";
+  const first = rigs?.[0];
+  const st0 = first ? nhPickPrimaryMiningStat(first.stats as unknown[]) : null;
+  const algoField = st0?.algorithm;
+  const algoObj =
+    algoField && typeof algoField === "object" ? (algoField as { description?: string; enumName?: string }) : null;
+  const algo = algoObj?.description ?? algoObj?.enumName ?? "SHA256";
+  const mkt = st0?.market ? ` · ${String(st0.market)}` : "";
   return `${algo}${mkt}`;
 }
 
@@ -247,27 +257,16 @@ function nhRigStatusClass(status: string): string {
   return "nh-watcher-rig-card__status nh-watcher-rig-card__status--other";
 }
 
-function nhRejectPctLabel(st: { speedAccepted?: number; speedRejectedTotal?: number } | undefined): string {
+function nhRejectPctLabel(stats: unknown[] | undefined): string {
+  const st = nhPickPrimaryMiningStat(stats as unknown[]);
   if (!st) return "—";
-  const acc = typeof st.speedAccepted === "number" && Number.isFinite(st.speedAccepted) ? st.speedAccepted : 0;
-  const rej = typeof st.speedRejectedTotal === "number" && Number.isFinite(st.speedRejectedTotal) ? st.speedRejectedTotal : 0;
+  const acc = nhParseSpeedAccepted(st.speedAccepted) ?? 0;
+  const rej = nhParseSpeedAccepted(st.speedRejectedTotal) ?? 0;
   const t = acc + rej;
   if (t <= 0) return "—";
   const pct = (rej / t) * 100;
   if (pct < 0.001) return "0,00%";
   return `${pct.toFixed(2).replace(".", ",")}%`;
-}
-
-/**
- * Heurística NiceHash watcher: Scrypt en ASICs BTC suele reportar valores con ≥3 cifras enteras (ej. 196 TH/s);
- * Scrypt LTC/DOGE suele quedar en 1–2 cifras enteras (ej. 10.5 MH/s). El API usa el mismo campo numérico.
- */
-function nhAcceptedSpeedLooksLikeTh(speed: number): boolean {
-  if (!Number.isFinite(speed) || speed <= 0) return true;
-  if (speed < 1) return false;
-  const intPart = Math.floor(Math.abs(speed));
-  const intDigits = Math.floor(Math.log10(intPart)) + 1;
-  return intDigits >= 3;
 }
 
 function formatNiceHashAcceptedSpeed(speed: number | null | undefined): string {
@@ -282,8 +281,8 @@ function sumAcceptedThMhFromMiningRigs(rigs: NiceHashExternalRigs2Payload["minin
   let sumTh = 0;
   let sumMh = 0;
   for (const rig of list) {
-    const sp = rig.stats?.[0]?.speedAccepted;
-    if (typeof sp !== "number" || !Number.isFinite(sp)) continue;
+    const sp = nhRigSpeedAcceptedFromStats(rig.stats as unknown[]);
+    if (sp == null || !Number.isFinite(sp)) continue;
     if (nhAcceptedSpeedLooksLikeTh(sp)) sumTh += sp;
     else sumMh += sp;
   }
@@ -354,8 +353,8 @@ function buildNhAggFromPayload(p: NiceHashExternalRigs2Payload): NhWatcherAgg {
   let sumMh = 0;
   let miningN = 0;
   for (const rig of rigs) {
-    const sp = rig.stats?.[0]?.speedAccepted;
-    if (typeof sp === "number" && Number.isFinite(sp)) {
+    const sp = nhRigSpeedAcceptedFromStats(rig.stats as unknown[]);
+    if (sp != null && Number.isFinite(sp)) {
       if (nhAcceptedSpeedLooksLikeTh(sp)) sumTh += sp;
       else sumMh += sp;
     }
@@ -1213,8 +1212,8 @@ export function NiceHashWatcherDashboard({
     for (let i = 0; i < payload.miningRigs.length; i++) {
       const rig = payload.miningRigs[i];
       const rk = nhWatcherRigStorageKey(rig, i);
-      const sp = rig.stats?.[0]?.speedAccepted;
-      const r = appendNiceHashRigHashrateSample(wid, rk, typeof sp === "number" ? sp : null, now);
+      const sp = nhRigSpeedAcceptedFromStats(rig.stats as unknown[]);
+      const r = appendNiceHashRigHashrateSample(wid, rk, sp, now);
       if (r.added && r.rigKey != null && r.t != null && r.v != null) {
         toPush.push({ rigKey: r.rigKey, t: r.t, v: r.v });
       }
@@ -1241,8 +1240,8 @@ export function NiceHashWatcherDashboard({
       for (let i = 0; i < rigs.length; i++) {
         const rig = rigs[i];
         const rk = nhWatcherRigStorageKey(rig, i);
-        const sp = rig.stats?.[0]?.speedAccepted;
-        const r = appendNiceHashRigHashrateSample(widNorm, rk, typeof sp === "number" ? sp : null, now);
+        const sp = nhRigSpeedAcceptedFromStats(rig.stats as unknown[]);
+        const r = appendNiceHashRigHashrateSample(widNorm, rk, sp, now);
         if (r.added && r.rigKey != null && r.t != null && r.v != null) {
           toPush.push({ rigKey: r.rigKey, t: r.t, v: r.v });
         }
@@ -1662,13 +1661,13 @@ export function NiceHashWatcherDashboard({
                 const compositeKey = nhCompositeRigKey(watcherId, rigKeyLocal);
                 const seriesKey = isTotal ? compositeKey : rigKeyLocal;
                 const status = (rig.minerStatus ?? "—").trim() || "—";
-                const st0 = rig.stats?.[0];
-                const spd = typeof st0?.speedAccepted === "number" ? st0.speedAccepted : null;
+                const stPrimary = nhPickPrimaryMiningStat(rig.stats as unknown[]);
+                const spd = nhRigSpeedAcceptedFromStats(rig.stats as unknown[]);
                 const rigBtc24 =
                   typeof rig.profitability === "number" && Number.isFinite(rig.profitability)
                     ? rig.profitability
-                    : typeof st0?.profitability === "number" && Number.isFinite(st0.profitability)
-                      ? st0.profitability
+                    : typeof stPrimary?.profitability === "number" && Number.isFinite(stPrimary.profitability as number)
+                      ? (stPrimary.profitability as number)
                       : null;
                 const unpaidRig = rig.unpaidAmount?.trim() || "—";
                 const nhTypeLabel = (rig.type ?? "UNMANAGED").toString().replace(/_/g, " ");
@@ -1713,7 +1712,7 @@ export function NiceHashWatcherDashboard({
                         <span className="nh-watcher-rig-metric__kicker">Hashrate acept.</span>
                         <strong className="nh-watcher-rig-metric__value mono">{formatNiceHashAcceptedSpeed(spd)}</strong>
                         <span className="nh-watcher-rig-metric__meta">
-                          Rechazo: {nhRejectPctLabel(st0)}
+                          Rechazo: {nhRejectPctLabel(rig.stats)}
                         </span>
                       </div>
                       <div className="nh-watcher-rig-metric nh-watcher-rig-metric--crypto">
@@ -1738,7 +1737,11 @@ export function NiceHashWatcherDashboard({
                       <div className="nh-watcher-rig-metric" title="Desde timeConnected de NiceHash">
                         <span className="nh-watcher-rig-metric__kicker">Sesión</span>
                         <strong className="nh-watcher-rig-metric__value mono">
-                          <WatcherLiveUptime timeConnectedMs={st0?.timeConnected} />
+                          <WatcherLiveUptime
+                            timeConnectedMs={
+                              typeof stPrimary?.timeConnected === "number" ? stPrimary.timeConnected : undefined
+                            }
+                          />
                         </strong>
                       </div>
                     </div>
