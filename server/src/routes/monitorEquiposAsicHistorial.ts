@@ -5,6 +5,13 @@ import { db } from "../db.js";
 import { requireRole } from "../middleware/auth.js";
 import { requireAdminBGrant } from "../middleware/adminBGrant.js";
 import { proxyNiceHashRigs2WithExtras } from "../lib/nicehashExternalRigsMerge.js";
+import {
+  nhRigHashPruneOld,
+  nhRigHashTrimPerRig,
+  NH_WATCHER_RIG_HASH_RETENTION_MS,
+  persistNhWatcherRigHashSamplesFromPayload,
+  sampleTimeBucketMs,
+} from "../lib/nhWatcherRigHashSamples.js";
 
 export const monitorEquiposAsicHistorialRouter = Router();
 
@@ -118,11 +125,6 @@ const postBajaBody = z.object({
     .transform((s) => (typeof s === "string" ? s.trim() : "")),
 });
 
-/** Misma ventana que el cliente (~7 días × 1 muestra/min). */
-const NH_WATCHER_RIG_HASH_MAX_POINTS = 60 * 24 * 7;
-/** No guardar filas más viejas que lo que la gráfica puede mostrar (+ margen). */
-const NH_WATCHER_RIG_HASH_RETENTION_MS = 8 * 24 * 60 * 60 * 1000;
-
 const postNhWatcherRigHashBody = z.object({
   watcherId: equipoIdParam,
   samples: z
@@ -143,30 +145,6 @@ function nhRigHashRowNorm(row: Record<string, unknown>): { rigKey: string; t: nu
   const v = Number(row.value ?? lower.value);
   if (!rigKey || !Number.isFinite(t) || !Number.isFinite(v)) return null;
   return { rigKey, t, v };
-}
-
-async function nhRigHashPruneOld(userId: number, watcherId: string) {
-  const cutoff = Date.now() - NH_WATCHER_RIG_HASH_RETENTION_MS;
-  await db
-    .prepare(`DELETE FROM nh_watcher_rig_hash_samples WHERE user_id = ? AND watcher_id = ? AND sample_t < ?`)
-    .run(userId, watcherId, cutoff);
-}
-
-/** Recorta a las últimas N muestras por rig (misma temporalidad que el sparkline). */
-async function nhRigHashTrimPerRig(userId: number, watcherId: string) {
-  await db
-    .prepare(
-      `DELETE FROM nh_watcher_rig_hash_samples
-       WHERE (user_id, watcher_id, rig_key, sample_t) IN (
-         SELECT user_id, watcher_id, rig_key, sample_t FROM (
-           SELECT user_id, watcher_id, rig_key, sample_t,
-             ROW_NUMBER() OVER (PARTITION BY rig_key ORDER BY sample_t DESC) AS rn
-           FROM nh_watcher_rig_hash_samples
-           WHERE user_id = ? AND watcher_id = ?
-         ) sub WHERE sub.rn > ?
-       )`
-    )
-    .run(userId, watcherId, NH_WATCHER_RIG_HASH_MAX_POINTS);
 }
 
 function normBajaListRow(row: Record<string, unknown>) {
@@ -439,6 +417,12 @@ monitorEquiposAsicHistorialRouter.get(
       res.status(r.status >= 400 && r.status < 600 ? r.status : 502).json({ error: { message: r.message } });
       return;
     }
+    const user = req.user;
+    if (user) {
+      void persistNhWatcherRigHashSamplesFromPayload(user.id, watcherId, r.data).catch((e) =>
+        console.error("nh_watcher_rig_hash persist (GET rigs):", e)
+      );
+    }
     res.json(r.data);
   }
 );
@@ -462,6 +446,12 @@ monitorEquiposAsicHistorialRouter.post(
     if (!r.ok) {
       res.status(r.status >= 400 && r.status < 600 ? r.status : 502).json({ error: { message: r.message } });
       return;
+    }
+    const user = req.user;
+    if (user) {
+      void persistNhWatcherRigHashSamplesFromPayload(user.id, watcherId, r.data).catch((e) =>
+        console.error("nh_watcher_rig_hash persist (POST rigs):", e)
+      );
     }
     res.json(r.data);
   }
@@ -529,11 +519,130 @@ monitorEquiposAsicHistorialRouter.post(
     let inserted = 0;
     for (const s of parsed.data.samples) {
       if (s.t > now + maxSkewMs || now - s.t > maxAgeMs) continue;
-      const r = await ins.run(user.id, wid, s.rigKey, s.t, s.v);
+      const bucketT = sampleTimeBucketMs(s.t);
+      const r = await ins.run(user.id, wid, s.rigKey, bucketT, s.v);
       if (r.changes > 0) inserted += 1;
     }
     await nhRigHashPruneOld(user.id, wid);
     await nhRigHashTrimPerRig(user.id, wid);
     res.json({ ok: true, inserted });
+  }
+);
+
+const yearMonthParam = z.string().regex(/^[0-9]{4}-(0[1-9]|1[0-2])$/);
+
+const postNhProfitSnapBody = z.object({
+  contextKey: z.string().trim().min(8).max(120),
+  profitBtc24h: z.number().finite().nonnegative().max(500),
+  capturedAtMs: z.number().int().optional(),
+});
+
+function normalizeNhProfitContextKey(raw: string): string | null {
+  const t = raw.trim().toLowerCase();
+  if (t === "fleet:total:v1") return t;
+  const m = /^watcher:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.exec(t);
+  return m ? `watcher:${m[1]}` : null;
+}
+
+function utcMonthRangeMs(ym: string): { start: number; end: number } {
+  const [ys, ms] = ym.split("-");
+  const y = Number(ys);
+  const mo = Number(ms);
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || mo < 1 || mo > 12) return { start: 0, end: 0 };
+  const start = Date.UTC(y, mo - 1, 1);
+  const end = mo === 12 ? Date.UTC(y + 1, 0, 1) : Date.UTC(y, mo, 1);
+  return { start, end };
+}
+
+const NH_PROFIT_SNAP_MIN_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+monitorEquiposAsicHistorialRouter.get(
+  "/monitor-equipos-asic/nicehash-watcher-profit-month",
+  requireRole("admin_a", "admin_b"),
+  requireAdminBGrant("equipos"),
+  async (req: Request, res: Response) => {
+    const rawKey = typeof req.query.contextKey === "string" ? req.query.contextKey : "";
+    const ck = normalizeNhProfitContextKey(rawKey);
+    if (!ck) {
+      res.status(400).json({ error: { message: "contextKey inválido (watcher:uuid o fleet:total:v1)." } });
+      return;
+    }
+    const ymParsed = yearMonthParam.safeParse(typeof req.query.yearMonth === "string" ? req.query.yearMonth : "");
+    if (!ymParsed.success) {
+      res.status(400).json({ error: { message: "yearMonth requerido (YYYY-MM)." } });
+      return;
+    }
+    const yearMonth = ymParsed.data;
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ error: { message: "No autenticado." } });
+      return;
+    }
+    const { start, end } = utcMonthRangeMs(yearMonth);
+    if (end <= start) {
+      res.status(400).json({ error: { message: "yearMonth inválido." } });
+      return;
+    }
+    const row = (await db
+      .prepare(
+        `SELECT COALESCE(SUM(profit_btc_24h), 0) AS total_btc, COUNT(*) AS n
+         FROM nh_watcher_profit_snapshots
+         WHERE user_id = ? AND context_key = ? AND snapshot_at >= ? AND snapshot_at < ?`
+      )
+      .get(user.id, ck, start, end)) as { total_btc?: unknown; n?: unknown } | undefined;
+    const totalBtc = Number(row?.total_btc ?? 0);
+    const n = Number(row?.n ?? 0);
+    res.json({
+      yearMonth,
+      contextKey: ck,
+      totalBtc: Number.isFinite(totalBtc) ? totalBtc : 0,
+      snapshotCount: Number.isFinite(n) ? n : 0,
+    });
+  }
+);
+
+monitorEquiposAsicHistorialRouter.post(
+  "/monitor-equipos-asic/nicehash-watcher-profit-snapshot",
+  requireRole("admin_a", "admin_b"),
+  requireAdminBGrant("equipos"),
+  async (req: Request, res: Response) => {
+    const parsed = postNhProfitSnapBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: { message: "Body inválido (contextKey, profitBtc24h)." } });
+      return;
+    }
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ error: { message: "No autenticado." } });
+      return;
+    }
+    const ck = normalizeNhProfitContextKey(parsed.data.contextKey);
+    if (!ck) {
+      res.status(400).json({ error: { message: "contextKey inválido." } });
+      return;
+    }
+    const now = Date.now();
+    const capMs = parsed.data.capturedAtMs;
+    const at = typeof capMs === "number" && Number.isFinite(capMs) ? capMs : now;
+    if (at > now + 120_000 || now - at > 48 * 3600000) {
+      res.status(400).json({ error: { message: "capturedAtMs fuera de rango." } });
+      return;
+    }
+    const lastRow = (await db
+      .prepare(
+        `SELECT MAX(snapshot_at) AS mx FROM nh_watcher_profit_snapshots WHERE user_id = ? AND context_key = ?`
+      )
+      .get(user.id, ck)) as { mx?: unknown } | undefined;
+    const lastMx = Number(lastRow?.mx);
+    if (Number.isFinite(lastMx) && now - lastMx < NH_PROFIT_SNAP_MIN_INTERVAL_MS) {
+      res.json({ ok: true, inserted: false, reason: "min_interval" });
+      return;
+    }
+    await db
+      .prepare(
+        `INSERT INTO nh_watcher_profit_snapshots (user_id, context_key, snapshot_at, profit_btc_24h) VALUES (?, ?, ?, ?)`
+      )
+      .run(user.id, ck, at, parsed.data.profitBtc24h);
+    res.json({ ok: true, inserted: true });
   }
 );

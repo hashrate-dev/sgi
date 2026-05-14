@@ -9332,7 +9332,7 @@ button.nh-watcher-btc-card__corner-btn:hover {
 }
 @media (min-width: 992px) {
   .nh-watcher-kpi-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr));
     gap: 1rem;
   }
 }
@@ -9453,6 +9453,14 @@ button.nh-watcher-btc-card__corner-btn:hover {
   box-shadow:
     0 0 0 1px rgba(63, 185, 80, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.055);
+}
+.nh-watcher-toolbar--fleet-hash-modal-trigger {
+  cursor: pointer;
+  user-select: none;
+}
+.nh-watcher-toolbar--fleet-hash-modal-trigger:focus-visible {
+  outline: 2px solid rgba(52, 211, 153, 0.75);
+  outline-offset: 2px;
 }
 .nh-watcher-toolbar__kicker {
   font-size: 0.78rem;

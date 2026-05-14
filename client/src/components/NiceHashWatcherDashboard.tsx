@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   getNiceHashExternalRigs2,
+  getNiceHashWatcherProfitMonth,
   getNiceHashWatcherRigHashHistory,
+  postNiceHashWatcherProfitSnapshot,
   postNiceHashWatcherRigHashHistorySamples,
   wakeUpBackend,
   type NiceHashExternalRigs2Payload,
@@ -31,6 +33,7 @@ import {
   watcherSlotNicknameTrimmed,
 } from "../lib/nicehashWatcherSlots";
 import { NICEHASH_WATCHER_ID, NH_WATCHER_FLEET_TOOLBAR_WATCHER_ID } from "../lib/nicehashWatcherConfig";
+import { NiceHashFleetHashrateModal } from "./NiceHashFleetHashrateModal";
 import { NiceHashRigAsicIcon } from "./NiceHashRigAsicIcon";
 import { NiceHashRigHashSparkline } from "./NiceHashRigHashSparkline";
 import { AppModal } from "./ui";
@@ -125,6 +128,30 @@ function formatNiceHashIsoShort(iso?: string | null): string {
 function formatNiceHashBtc8(n: number | undefined | null): string {
   if (n == null || !Number.isFinite(n)) return "—";
   return n.toFixed(8);
+}
+
+function utcYearMonthFromMs(ms: number): string {
+  const d = new Date(ms);
+  const y = d.getUTCFullYear();
+  const m = d.getUTCMonth() + 1;
+  return `${y}-${String(m).padStart(2, "0")}`;
+}
+
+function formatUtcYearMonthLongEs(ym: string): string {
+  const m = /^([0-9]{4})-(0[1-9]|1[0-2])$/.exec(ym);
+  if (!m) return ym;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  if (!Number.isFinite(y) || !Number.isFinite(mo)) return ym;
+  try {
+    return new Date(Date.UTC(y, mo - 1, 1)).toLocaleDateString("es-UY", {
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+  } catch {
+    return ym;
+  }
 }
 
 /** Parsea montos string del API NiceHash (coma o punto decimal). */
@@ -290,6 +317,37 @@ export function nhCompositeRigKey(watcherId: string, rigStorageKey: string): str
   return `${watcherId.trim().toLowerCase()}::${rigStorageKey}`;
 }
 
+function nhRigIsMining(rig: NhMiningRig): boolean {
+  return String(rig.minerStatus ?? "").trim().toUpperCase() === "MINING";
+}
+
+/** Suma rentabilidad 24 h (BTC/día) solo de rigs en MINING (misma idea que la lista de ASICs). */
+function miningRigsProfitabilitySumBtc24(rigs: NhMiningRig[] | undefined): number {
+  let s = 0;
+  for (const rig of rigs ?? []) {
+    if (!nhRigIsMining(rig)) continue;
+    const top = rig.profitability;
+    if (typeof top === "number" && Number.isFinite(top) && top > 0) {
+      s += top;
+      continue;
+    }
+    const st = rig.stats?.[0]?.profitability;
+    if (typeof st === "number" && Number.isFinite(st) && st > 0) s += st;
+  }
+  return s;
+}
+
+/** Suma impago en BTC solo de rigs en MINING. */
+function miningRigsUnpaidSumBtc(rigs: NhMiningRig[] | undefined): number {
+  let s = 0;
+  for (const rig of rigs ?? []) {
+    if (!nhRigIsMining(rig)) continue;
+    const n = parseNiceHashAmountString(rig.unpaidAmount);
+    if (n != null && n > 0) s += n;
+  }
+  return s;
+}
+
 function buildNhAggFromPayload(p: NiceHashExternalRigs2Payload): NhWatcherAgg {
   const rigs = p.miningRigs ?? [];
   let sumTh = 0;
@@ -353,24 +411,28 @@ function mergeTotalWatcherAggs(multiOk: Array<{ payload: NiceHashExternalRigs2Pa
   let unpaidAny = false;
   let nextPayout: string | null = null;
   const algoLines = new Set<string>();
-  for (const a of aggs) {
+  for (let i = 0; i < aggs.length; i++) {
+    const a = aggs[i];
+    const p = multiOk[i].payload;
+    const rigs = p.miningRigs ?? [];
     sumTh += a.sumTh;
     sumMh += a.sumMh;
     miningN += a.miningN;
     totalRigs += a.totalRigs;
     totalDev += a.totalDev;
-    if (a.btc24 != null && Number.isFinite(a.btc24)) {
-      btc24Sum += a.btc24;
+    const prMine = miningRigsProfitabilitySumBtc24(rigs);
+    if (prMine > 0) {
+      btc24Sum += prMine;
       btc24Any = true;
     }
-    const unp = parseNiceHashAmountString(a.unpaid ?? undefined);
-    if (unp != null && unp > 0) {
-      unpaidBtc += unp;
+    const upMine = miningRigsUnpaidSumBtc(rigs);
+    if (upMine > 0) {
+      unpaidBtc += upMine;
       unpaidAny = true;
     }
     if (a.algoLine.trim()) algoLines.add(a.algoLine.trim());
-    const iso = a.nextPayout;
-    if (iso) {
+    const iso = p.nextPayoutTimestamp ?? null;
+    if (iso && a.miningN > 0) {
       const t = Date.parse(iso);
       if (Number.isFinite(t)) {
         if (nextPayout == null || t < Date.parse(nextPayout)) nextPayout = iso;
@@ -396,23 +458,9 @@ function mergeTotalWatcherAggs(multiOk: Array<{ payload: NiceHashExternalRigs2Pa
 
 function buildSyntheticPayloadForTotal(multiOk: Array<{ payload: NiceHashExternalRigs2Payload }>): NiceHashExternalRigs2Payload | null {
   if (multiOk.length === 0) return null;
-  let unpaidBtc = 0;
-  let unpaidBtcAny = false;
-  let unpaidUsdt = 0;
-  let unpaidUsdtAny = false;
   let spot: number | null = null;
   const walletErrors: string[] = [];
   for (const { payload } of multiOk) {
-    const b = parseNiceHashAmountString(payload.unpaidAmount);
-    if (b != null && b > 0) {
-      unpaidBtc += b;
-      unpaidBtcAny = true;
-    }
-    const u = parseNiceHashAmountString(payload.unpaidAmountUSDT);
-    if (u != null && u > 0) {
-      unpaidUsdt += u;
-      unpaidUsdtAny = true;
-    }
     const s = payload._sgi?.btcSpotUsd;
     if (spot == null && typeof s === "number" && Number.isFinite(s) && s > 0) spot = s;
     const we = payload._sgi?.walletError;
@@ -420,8 +468,7 @@ function buildSyntheticPayloadForTotal(multiOk: Array<{ payload: NiceHashExterna
   }
   const agg = mergeTotalWatcherAggs(multiOk);
   return {
-    unpaidAmount: agg.unpaid ?? (unpaidBtcAny ? unpaidBtc.toFixed(8) : undefined),
-    unpaidAmountUSDT: unpaidUsdtAny ? String(unpaidUsdt) : undefined,
+    unpaidAmount: agg.unpaid ?? undefined,
     _sgi: {
       btcSpotUsd: spot ?? undefined,
       walletError: walletErrors.length ? walletErrors.join(" · ") : undefined,
@@ -754,6 +801,7 @@ export function NiceHashWatcherDashboard({
   }, [isTotal, watcherSlot1FromUrl, slotRows]);
 
   const [configOpen, setConfigOpen] = useState(false);
+  const [fleetHashDetailOpen, setFleetHashDetailOpen] = useState(false);
   const [configDraft, setConfigDraft] = useState<NhWatcherSlotRow[]>(() => loadWatcherSlotRows().map((r) => ({ ...r })));
 
   const [loading, setLoading] = useState(false);
@@ -806,6 +854,78 @@ export function NiceHashWatcherDashboard({
     if (typeof clientBtcSpotUsd === "number" && Number.isFinite(clientBtcSpotUsd) && clientBtcSpotUsd > 0) return clientBtcSpotUsd;
     return undefined;
   }, [displayPayload?._sgi?.btcSpotUsd, clientBtcSpotUsd]);
+
+  const nhProfitContextKey = useMemo(
+    () => (isTotal ? "fleet:total:v1" : `watcher:${effectiveWatcherId.trim().toLowerCase()}`),
+    [isTotal, effectiveWatcherId]
+  );
+
+  const [profitMonthClockMs, setProfitMonthClockMs] = useState(() => Date.now());
+  const utcYearMonthProfit = useMemo(() => utcYearMonthFromMs(profitMonthClockMs), [profitMonthClockMs]);
+
+  const [monthProfit, setMonthProfit] = useState<{
+    yearMonth: string;
+    totalBtc: number;
+    snapshotCount: number;
+  } | null>(null);
+  const [monthProfitLoading, setMonthProfitLoading] = useState(false);
+
+  useEffect(() => {
+    setMonthProfit(null);
+  }, [nhProfitContextKey]);
+
+  const reloadMonthProfit = useCallback(async () => {
+    const ym = utcYearMonthFromMs(Date.now());
+    try {
+      setMonthProfitLoading(true);
+      const r = await getNiceHashWatcherProfitMonth({ contextKey: nhProfitContextKey, yearMonth: ym });
+      setMonthProfit({
+        yearMonth: r.yearMonth,
+        totalBtc: r.totalBtc,
+        snapshotCount: r.snapshotCount,
+      });
+    } catch {
+      setMonthProfit(null);
+    } finally {
+      setMonthProfitLoading(false);
+    }
+  }, [nhProfitContextKey]);
+
+  useEffect(() => {
+    if (!active) return;
+    const id = window.setInterval(() => setProfitMonthClockMs(Date.now()), 60_000);
+    return () => window.clearInterval(id);
+  }, [active]);
+
+  useEffect(() => {
+    if (!active || !nhAgg) return;
+    void reloadMonthProfit();
+  }, [active, nhAgg, nhProfitContextKey, utcYearMonthProfit, reloadMonthProfit]);
+
+  useEffect(() => {
+    if (!active || !nhAgg || nhAgg.btc24 == null || !Number.isFinite(nhAgg.btc24) || nhAgg.btc24 < 0) return;
+    const ck = nhProfitContextKey;
+    const profit = nhAgg.btc24;
+    const lsKey = `nhWatcherProfitSnapAt:${ck}`;
+    let cancelled = false;
+    void (async () => {
+      try {
+        if (typeof window === "undefined") return;
+        const last = Number(window.localStorage.getItem(lsKey) || "0");
+        const now = Date.now();
+        if (Number.isFinite(last) && now - last < 23 * 60 * 60 * 1000) return;
+        const r = await postNiceHashWatcherProfitSnapshot({ contextKey: ck, profitBtc24h: profit });
+        if (cancelled || !r.ok) return;
+        window.localStorage.setItem(lsKey, String(now));
+        if (r.inserted) void reloadMonthProfit();
+      } catch {
+        /* sin sesión o red */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [active, nhAgg, nhProfitContextKey, fetchedAt, reloadMonthProfit]);
 
   const spotDependencyKey = useMemo(
     () => (isTotal ? multiOk.map((x) => x.watcherId).sort().join("|") : effectiveWatcherId),
@@ -1230,6 +1350,10 @@ export function NiceHashWatcherDashboard({
     setConfigOpen(true);
   }, []);
 
+  useEffect(() => {
+    if (fleetHashDetailOpen && !nhAgg) setFleetHashDetailOpen(false);
+  }, [fleetHashDetailOpen, nhAgg]);
+
   const mergedMinerStatuses = useMemo(() => {
     if (!isTotal || multiOk.length === 0) return null;
     return mergeMinerStatusesPayloads(multiOk.map((x) => x.payload));
@@ -1258,6 +1382,23 @@ export function NiceHashWatcherDashboard({
       payload,
     }));
   }, [nhAgg, isTotal, flatRigs, payload, activeSlot, effectiveWatcherId]);
+
+  const fleetHashModalRows = useMemo(
+    () => rigRowsForList.map(({ slotIndex, watcherId, rigIndex, rig }) => ({ slotIndex, watcherId, rigIndex, rig })),
+    [rigRowsForList]
+  );
+
+  const fleetHashModal =
+    fleetHashDetailOpen && nhAgg ? (
+      <NiceHashFleetHashrateModal
+        open
+        onClose={() => setFleetHashDetailOpen(false)}
+        rows={fleetHashModalRows}
+        slotRows={slotRows}
+        isTotal={isTotal}
+        miningCount={nhAgg.miningN}
+      />
+    ) : null;
 
   if (!active) return null;
 
@@ -1333,7 +1474,38 @@ export function NiceHashWatcherDashboard({
                 {nhAgg.btc24 != null ? `${formatNiceHashBtc8(nhAgg.btc24)} BTC` : "—"}
               </div>
               <div className="nh-watcher-kpi__fiat">{formatRent24hUsdApprox(displayPayload, nhAgg.btc24, effectiveBtcSpotUsd) ?? "—"}</div>
-              <div className="nh-watcher-kpi__sub">{isTotal ? "Suma de todos los watchers" : "Suma API / ASICs"}</div>
+              <div className="nh-watcher-kpi__sub">
+                {isTotal ? "Suma solo ASICs en MINING (todos los watchers)" : "Suma API / ASICs"}
+              </div>
+            </div>
+            <div className="nh-watcher-kpi">
+              <div className="nh-watcher-kpi__head">
+                <span className="nh-watcher-kpi__icon-wrap" aria-hidden>
+                  <i className="bi bi-calendar3 nh-watcher-kpi__icon" />
+                </span>
+                <div className="nh-watcher-kpi__label">Rentabilidad (mes acum.)</div>
+              </div>
+              <div className="nh-watcher-kpi__value nh-watcher-kpi__value--btc">
+                {monthProfitLoading && monthProfit == null
+                  ? "…"
+                  : monthProfit != null
+                    ? `${formatNiceHashBtc8(monthProfit.totalBtc)} BTC`
+                    : "—"}
+              </div>
+              <div className="nh-watcher-kpi__fiat">
+                {monthProfit != null
+                  ? formatRent24hUsdApprox(displayPayload, monthProfit.totalBtc, effectiveBtcSpotUsd) ?? "—"
+                  : "—"}
+              </div>
+              <div className="nh-watcher-kpi__sub">
+                Suma de snapshots 24 h en BD · {formatUtcYearMonthLongEs(utcYearMonthProfit)} UTC
+                {monthProfit != null ? (
+                  <>
+                    {" "}
+                    · <span className="nh-watcher-kpi__sub--accent">{monthProfit.snapshotCount}</span> reg.
+                  </>
+                ) : null}
+              </div>
             </div>
             <div className="nh-watcher-kpi">
               <div className="nh-watcher-kpi__head">
@@ -1347,7 +1519,9 @@ export function NiceHashWatcherDashboard({
                 {nhAgg.unpaid ? <span className="text-uppercase"> BTC</span> : null}
               </div>
               <div className="nh-watcher-kpi__fiat">{formatUnpaidMiningUsdApprox(displayPayload, nhAgg.unpaid, effectiveBtcSpotUsd) ?? "—"}</div>
-              <div className="nh-watcher-kpi__sub">Balance acumulado sin liquidar</div>
+              <div className="nh-watcher-kpi__sub">
+                {isTotal ? "Solo ASICs en MINING (impago por equipo)" : "Balance acumulado sin liquidar"}
+              </div>
             </div>
             <div className="nh-watcher-kpi">
               <div className="nh-watcher-kpi__head">
@@ -1359,7 +1533,12 @@ export function NiceHashWatcherDashboard({
               <div className="nh-watcher-kpi__value" style={{ fontSize: "1.15rem" }}>
                 <WatcherLiveCountdown iso={nhAgg.nextPayout} />
               </div>
-              <div className="nh-watcher-kpi__sub">{nhAgg.nextPayout ? formatNiceHashIsoShort(nhAgg.nextPayout) : "—"}</div>
+              <div className="nh-watcher-kpi__sub">
+                {nhAgg.nextPayout ? formatNiceHashIsoShort(nhAgg.nextPayout) : "—"}
+                {isTotal && nhAgg.nextPayout ? (
+                  <span className="d-block small text-secondary mt-1">Cuenta NiceHash con ASICs en MINING</span>
+                ) : null}
+              </div>
             </div>
           </div>
           {displayPayload?._sgi?.walletError ? (
@@ -1368,7 +1547,19 @@ export function NiceHashWatcherDashboard({
             </div>
           ) : null}
 
-          <div className="nh-watcher-toolbar mb-3">
+          <div
+            className="nh-watcher-toolbar mb-3 nh-watcher-toolbar--fleet-hash-modal-trigger"
+            role="button"
+            tabIndex={0}
+            aria-label="Abrir monitor de hashrate por equipo a pantalla completa"
+            onClick={() => setFleetHashDetailOpen(true)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setFleetHashDetailOpen(true);
+              }
+            }}
+          >
             <div className="nh-watcher-toolbar__left min-w-0">
               <div className="nh-watcher-toolbar__kicker">
                 <strong>Velocidad total (aceptada)</strong>
@@ -1833,6 +2024,7 @@ export function NiceHashWatcherDashboard({
           </div>
         </div>
         {configModal}
+        {fleetHashModal}
       </>
     );
   }
@@ -1841,6 +2033,7 @@ export function NiceHashWatcherDashboard({
     <>
       {shell}
       {configModal}
+      {fleetHashModal}
     </>
   );
 }

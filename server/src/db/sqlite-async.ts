@@ -907,6 +907,19 @@ CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_visitor ON marketplace_presence_
     `CREATE INDEX IF NOT EXISTS idx_nh_watcher_rig_hash_user_watcher ON nh_watcher_rig_hash_samples(user_id, watcher_id, sample_t)`
   );
 
+  /** Snapshots de rentabilidad 24 h (BTC/día) para acumulado mensual por contexto (watcher o vista TOTAL). */
+  native.exec(`CREATE TABLE IF NOT EXISTS nh_watcher_profit_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    context_key TEXT NOT NULL,
+    snapshot_at INTEGER NOT NULL,
+    profit_btc_24h REAL NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`);
+  native.exec(
+    `CREATE INDEX IF NOT EXISTS idx_nh_profit_snap_user_ctx_time ON nh_watcher_profit_snapshots(user_id, context_key, snapshot_at)`
+  );
+
   const txWrap = {
     prepare: (sql: string) => createStatement(native, sql),
   };

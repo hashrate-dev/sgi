@@ -470,3 +470,14 @@ CREATE TABLE IF NOT EXISTS nh_watcher_rig_hash_samples (
 );
 
 CREATE INDEX IF NOT EXISTS idx_nh_watcher_rig_hash_user_watcher ON nh_watcher_rig_hash_samples(user_id, watcher_id, sample_t);
+
+-- Snapshots rentabilidad 24 h (NiceHash watcher) para acumulado mensual
+CREATE TABLE IF NOT EXISTS nh_watcher_profit_snapshots (
+  id BIGSERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  context_key TEXT NOT NULL,
+  snapshot_at BIGINT NOT NULL,
+  profit_btc_24h DOUBLE PRECISION NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_nh_profit_snap_user_ctx_time ON nh_watcher_profit_snapshots(user_id, context_key, snapshot_at);

@@ -14,6 +14,14 @@ function storageKey(watcherId: string): string {
   return getNiceHashRigHashrateHistoryStorageKey(watcherId);
 }
 
+/**
+ * Marca temporal alineada al minuto (misma clave que en servidor) para deduplicar
+ * y coincidir con el intervalo ~1 min del sparkline.
+ */
+export function sampleTimeBucketMs(epochMs: number): number {
+  return Math.floor(epochMs / NH_WATCHER_HASH_SAMPLE_MS) * NH_WATCHER_HASH_SAMPLE_MS;
+}
+
 function parseStore(raw: string | null): Record<string, Point[]> {
   if (!raw) return {};
   try {
@@ -118,7 +126,8 @@ function saveAll(watcherId: string, data: Record<string, Point[]>): void {
 }
 
 /**
- * Registra un punto de hashrate si pasó ≥1 min desde el último (o es el primero).
+ * Registra un punto de hashrate a lo sumo una vez por minuto de reloj (bucket `t`),
+ * alineado con la BD y el sparkline ~1 min.
  * `value` = speedAccepted numérico del API (misma escala que en pantalla).
  */
 export function appendNiceHashRigHashrateSample(
@@ -133,16 +142,20 @@ export function appendNiceHashRigHashrateSample(
   const key = rigKey.trim();
   if (!wid || !key) return { added: false };
 
+  const bucketT = sampleTimeBucketMs(nowMs);
   const all = loadAll(wid);
   const arr = [...(all[key] ?? [])];
   const last = arr[arr.length - 1];
-  if (last && nowMs - last.t < NH_WATCHER_HASH_SAMPLE_MS) return { added: false };
+  if (last) {
+    const lastBucket = sampleTimeBucketMs(last.t);
+    if (bucketT <= lastBucket) return { added: false };
+  }
 
-  arr.push({ t: nowMs, v: value });
+  arr.push({ t: bucketT, v: value });
   while (arr.length > NH_WATCHER_HASH_MAX_POINTS) arr.shift();
   all[key] = arr;
   saveAll(wid, all);
-  return { added: true, rigKey: key, t: nowMs, v: value };
+  return { added: true, rigKey: key, t: bucketT, v: value };
 }
 
 /** Todas las series (solo `v`) por clave de ASIC, para hidratar estado al cargar / recargar. */

@@ -788,6 +788,39 @@ export function postNiceHashWatcherRigHashHistorySamples(
   });
 }
 
+export type NhWatcherProfitMonthResponse = {
+  yearMonth: string;
+  contextKey: string;
+  totalBtc: number;
+  snapshotCount: number;
+};
+
+export function getNiceHashWatcherProfitMonth(params: {
+  contextKey: string;
+  yearMonth: string;
+}): Promise<NhWatcherProfitMonthResponse> {
+  const q = new URLSearchParams({
+    contextKey: params.contextKey.trim(),
+    yearMonth: params.yearMonth.trim(),
+  });
+  return api<NhWatcherProfitMonthResponse>(`/api/monitor-equipos-asic/nicehash-watcher-profit-month?${q.toString()}`);
+}
+
+export function postNiceHashWatcherProfitSnapshot(payload: {
+  contextKey: string;
+  profitBtc24h: number;
+  capturedAtMs?: number;
+}): Promise<{ ok: boolean; inserted: boolean; reason?: string }> {
+  return api<{ ok: boolean; inserted: boolean; reason?: string }>(
+    `/api/monitor-equipos-asic/nicehash-watcher-profit-snapshot`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
 export async function postMonitorEquipoAsicBaja(payload: {
   equipoId: string;
   rowSnapshot: Record<string, unknown>;
