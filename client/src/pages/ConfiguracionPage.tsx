@@ -20,6 +20,12 @@ const configMenuItems: Array<{ to: string; icon: string; label: string; desc: st
     desc: "Configuración de tipos de Reparación",
   },
   { to: "/asic/warranty-items", icon: "bi-list-ul", label: "Gestión de Garantías ANDE", desc: "Configuración de Garantías ANDE por tipo de equipo" },
+  {
+    to: "/transporte-fletes",
+    icon: "bi-truck",
+    label: "Gestión de Transporte y Fletes",
+    desc: "Logística, envíos y costos de flete",
+  },
 ];
 
 type ConfigCardItem = { to: string; icon: string; label: string; desc: string };

@@ -7,6 +7,7 @@ import {
   getEquipos,
   getNextInvoiceNumber,
   getReparacionTipos,
+  getTransporteFleteTipos,
   getSetups,
   wakeUpBackend,
   type InvoiceCreateBody,
@@ -14,7 +15,16 @@ import {
 import { serviceCatalog } from "../lib/constants";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadInvoicesAsic, saveInvoicesAsic } from "../lib/storage";
-import type { Client, ComprobanteType, EquipoASIC, Invoice, LineItem, ReparacionTipo, Setup } from "../lib/types";
+import type {
+  Client,
+  ComprobanteType,
+  EquipoASIC,
+  Invoice,
+  LineItem,
+  ReparacionTipo,
+  Setup,
+  TransporteFleteTipo,
+} from "../lib/types";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { InvoicePreview } from "../components/InvoicePreview";
@@ -121,6 +131,7 @@ export function FacturacionMineriaPage() {
   const [equiposAsic, setEquiposAsic] = useState<EquipoASIC[]>([]);
   const [setups, setSetups] = useState<Setup[]>([]);
   const [reparacionTipos, setReparacionTipos] = useState<ReparacionTipo[]>([]);
+  const [transporteFleteTipos, setTransporteFleteTipos] = useState<TransporteFleteTipo[]>([]);
   /** Documentos emitidos en esta sesión: se muestran solo 24 h, luego se quitan de la tabla (siguen en Historial/Pendientes) */
   const [emittedInSession, setEmittedInSession] = useState<{ invoice: Invoice; emittedAt: string }[]>([]);
   const [showEmitPdfConfirm, setShowEmitPdfConfirm] = useState(false);
@@ -131,16 +142,18 @@ export function FacturacionMineriaPage() {
   useEffect(() => {
     setInvoices(loadInvoicesAsic());
     wakeUpBackend()
-      .then(() => Promise.all([getEquipos(), getSetups(), getReparacionTipos()]))
-      .then(([equiposRes, setupsRes, repRes]) => {
+      .then(() => Promise.all([getEquipos(), getSetups(), getReparacionTipos(), getTransporteFleteTipos()]))
+      .then(([equiposRes, setupsRes, repRes, fleteRes]) => {
         setEquiposAsic(equiposRes.items ?? []);
         setSetups(setupsRes.items ?? []);
         setReparacionTipos(repRes.items ?? []);
+        setTransporteFleteTipos(fleteRes.items ?? []);
       })
       .catch(() => {
         setEquiposAsic([]);
         setSetups([]);
         setReparacionTipos([]);
+        setTransporteFleteTipos([]);
       });
   }, []);
 
@@ -316,6 +329,8 @@ export function FacturacionMineriaPage() {
             setupNombre: item.setupNombre,
             reparacionTipoId: item.reparacionTipoId,
             reparacionNombre: item.reparacionNombre,
+            transporteFleteTipoId: item.transporteFleteTipoId,
+            transporteFleteNombre: item.transporteFleteNombre,
             // Campos para servicios de Hosting (compatibilidad hacia atrás)
             serviceKey: item.serviceKey,
             serviceName: item.serviceName || (item.serviceKey ? serviceCatalog[item.serviceKey]?.name : undefined),
@@ -399,8 +414,21 @@ export function FacturacionMineriaPage() {
           discount: 0
         }
       ]);
+    } else if (transporteFleteTipos.length > 0) {
+      const f = transporteFleteTipos[0];
+      setItems((prev) => [
+        ...prev,
+        {
+          transporteFleteTipoId: f.id,
+          transporteFleteNombre: f.nombre,
+          month: "",
+          quantity: 1,
+          price: f.precioUSD,
+          discount: 0
+        }
+      ]);
     } else {
-      // Si no hay equipos ni Setup ni Reparación, crear item vacío para que el usuario seleccione manualmente
+      // Si no hay equipos ni Setup ni Reparación ni transporte/flete, crear item vacío
       setItems((prev) => [
         ...prev,
         {
@@ -465,9 +493,13 @@ export function FacturacionMineriaPage() {
       const tieneEquipo = it.equipoId && it.marcaEquipo && it.modeloEquipo && it.procesadorEquipo;
       const tieneSetup = it.setupId && it.setupNombre;
       const tieneReparacion = it.reparacionTipoId && it.reparacionNombre;
-      return !tieneEquipo && !tieneSetup && !tieneReparacion;
+      const tieneTransporteFlete = it.transporteFleteTipoId && it.transporteFleteNombre;
+      return !tieneEquipo && !tieneSetup && !tieneReparacion && !tieneTransporteFlete;
     })) {
-      showToast("Todos los ítems deben tener un equipo ASIC, Setup o tipo de Reparación seleccionado.", "error");
+      showToast(
+        "Todos los ítems deben tener un equipo ASIC, Setup, tipo de Reparación o ítem de Transporte/Flete seleccionado.",
+        "error"
+      );
       return;
     }
     setShowEmitPdfConfirm(true);
@@ -505,7 +537,9 @@ export function FacturacionMineriaPage() {
       discounts: finalDiscounts,
       total: finalTotal,
       items: items.map((it) => ({
-        service: String(it.serviceName || it.setupNombre || it.reparacionNombre || "Equipo / Servicio").slice(0, 200),
+        service: String(
+          it.serviceName || it.setupNombre || it.reparacionNombre || it.transporteFleteNombre || "Equipo / Servicio"
+        ).slice(0, 200),
         month: /^\d{4}-\d{2}$/.test(it.month) ? it.month : monthForApi,
         quantity: Math.max(1, Math.round(Number(it.quantity) || 1)),
         price: Number(it.price) || 0,
@@ -982,7 +1016,7 @@ export function FacturacionMineriaPage() {
                         <table className="fact-detail-servicios-table">
                           <thead>
                             <tr>
-                              <th>Equipo ASIC / Setup / Reparación</th>
+                              <th>Equipo ASIC / Setup / Reparación / Transporte</th>
                               <th>Cantidad</th>
                               <th>Precio unit.</th>
                               <th>Total</th>
@@ -1025,13 +1059,15 @@ export function FacturacionMineriaPage() {
                                         ? `setup_${it.setupId}`
                                         : it.reparacionTipoId
                                           ? `reparacion_${it.reparacionTipoId}`
-                                          : ""
+                                          : it.transporteFleteTipoId
+                                            ? `flete_${it.transporteFleteTipoId}`
+                                            : ""
                                   }
                                   onChange={(e) => {
                                     if (itemsLocked) return;
                                     const value = e.target.value;
                                     if (value.startsWith("equipo_")) {
-                                      const equipoId = value.replace("equipo_", "");
+                                      const equipoId = value.slice("equipo_".length);
                                       const equipo = equiposAsic.find((eq) => eq.id === equipoId);
                                       if (equipo) {
                                         updateItem(idx, {
@@ -1043,11 +1079,13 @@ export function FacturacionMineriaPage() {
                                           setupNombre: undefined,
                                           reparacionTipoId: undefined,
                                           reparacionNombre: undefined,
+                                          transporteFleteTipoId: undefined,
+                                          transporteFleteNombre: undefined,
                                           price: equipo.precioUSD
                                         });
                                       }
                                     } else if (value.startsWith("setup_")) {
-                                      const setupId = value.replace("setup_", "");
+                                      const setupId = value.slice("setup_".length);
                                       const setup = setups.find((s) => s.id === setupId);
                                       if (setup) {
                                         updateItem(idx, {
@@ -1059,11 +1097,13 @@ export function FacturacionMineriaPage() {
                                           procesadorEquipo: undefined,
                                           reparacionTipoId: undefined,
                                           reparacionNombre: undefined,
+                                          transporteFleteTipoId: undefined,
+                                          transporteFleteNombre: undefined,
                                           price: setup.precioUSD
                                         });
                                       }
                                     } else if (value.startsWith("reparacion_")) {
-                                      const rid = value.replace("reparacion_", "");
+                                      const rid = value.slice("reparacion_".length);
                                       const rt = reparacionTipos.find((x) => x.id === rid);
                                       if (rt) {
                                         updateItem(idx, {
@@ -1075,7 +1115,27 @@ export function FacturacionMineriaPage() {
                                           procesadorEquipo: undefined,
                                           setupId: undefined,
                                           setupNombre: undefined,
+                                          transporteFleteTipoId: undefined,
+                                          transporteFleteNombre: undefined,
                                           price: rt.precioUSD
+                                        });
+                                      }
+                                    } else if (value.startsWith("flete_")) {
+                                      const fid = value.slice("flete_".length);
+                                      const ft = transporteFleteTipos.find((x) => x.id === fid);
+                                      if (ft) {
+                                        updateItem(idx, {
+                                          transporteFleteTipoId: ft.id,
+                                          transporteFleteNombre: ft.nombre,
+                                          equipoId: undefined,
+                                          marcaEquipo: undefined,
+                                          modeloEquipo: undefined,
+                                          procesadorEquipo: undefined,
+                                          setupId: undefined,
+                                          setupNombre: undefined,
+                                          reparacionTipoId: undefined,
+                                          reparacionNombre: undefined,
+                                          price: ft.precioUSD
                                         });
                                       }
                                     } else {
@@ -1089,6 +1149,8 @@ export function FacturacionMineriaPage() {
                                         setupNombre: undefined,
                                         reparacionTipoId: undefined,
                                         reparacionNombre: undefined,
+                                        transporteFleteTipoId: undefined,
+                                        transporteFleteNombre: undefined,
                                         price: 0
                                       });
                                     }
@@ -1128,6 +1190,19 @@ export function FacturacionMineriaPage() {
                                     ) : (
                                       <option value="" disabled>
                                         No hay tipos de reparación. Configurarlos en Gestión de Reparación.
+                                      </option>
+                                    )}
+                                  </optgroup>
+                                  <optgroup label="Transporte y fletes">
+                                    {transporteFleteTipos.length > 0 ? (
+                                      transporteFleteTipos.map((f) => (
+                                        <option key={f.id} value={`flete_${f.id}`}>
+                                          {f.nombre} - ${f.precioUSD} USD
+                                        </option>
+                                      ))
+                                    ) : (
+                                      <option value="" disabled>
+                                        No hay ítems. Configurarlos en Gestión de Transporte y Fletes.
                                       </option>
                                     )}
                                   </optgroup>

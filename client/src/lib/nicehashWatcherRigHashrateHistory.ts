@@ -223,8 +223,12 @@ export function loadNiceHashToolbarMhSeries(watcherId: string): number[] {
   return loadNiceHashRigHashrateSeries(watcherId, NH_WATCHER_TOOLBAR_MH_KEY);
 }
 
-/** Opciones de temporalidad del monitor fullscreen (mismo `resolutionMs` que el GET del servidor). */
+/** Sentinel: gráfico LIVE (muestreo en cliente con `speedAccepted` actual, sin agregado de servidor). */
+export const NH_WATCHER_CHART_LIVE_MS = -1;
+
+/** Opciones de temporalidad del monitor fullscreen (mismo `resolutionMs` que el GET del servidor, salvo LIVE). */
 export const NH_WATCHER_CHART_RESOLUTION_OPTIONS: ReadonlyArray<{ ms: number; label: string }> = [
+  { ms: NH_WATCHER_CHART_LIVE_MS, label: "LIVE" },
   { ms: NH_WATCHER_HASH_SAMPLE_MS, label: "1 min" },
   { ms: 15 * 60 * 1000, label: "15 min" },
   { ms: 30 * 60 * 1000, label: "30 min" },

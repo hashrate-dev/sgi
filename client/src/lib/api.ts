@@ -787,12 +787,17 @@ export function getNiceHashWatcherRigHashHistory(
 
 export function postNiceHashWatcherRigHashHistorySamples(
   watcherId: string,
-  samples: NhWatcherRigHashSample[]
+  samples: NhWatcherRigHashSample[],
+  opts?: { live?: boolean }
 ): Promise<{ ok: boolean; inserted: number }> {
   return api<{ ok: boolean; inserted: number }>(`/api/monitor-equipos-asic/nicehash-watcher-rig-hash-history`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ watcherId: watcherId.trim(), samples }),
+    body: JSON.stringify({
+      watcherId: watcherId.trim(),
+      samples,
+      ...(opts?.live ? { live: true } : {}),
+    }),
   });
 }
 
@@ -1667,6 +1672,25 @@ export function updateReparacionTipo(id: string, data: { nombre: string; precioU
 
 export function deleteReparacionTipo(id: string): Promise<void> {
   return api<void>(`/api/reparacion-tipos/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+// ——— Transporte y fletes — ítems para factura ASIC (misma idea que Reparación) ———
+export type TransporteFleteTiposResponse = { items: import("./types.js").TransporteFleteTipo[] };
+
+export function getTransporteFleteTipos(): Promise<TransporteFleteTiposResponse> {
+  return api<TransporteFleteTiposResponse>("/api/transporte-flete-tipos", { cache: "no-store" });
+}
+
+export function createTransporteFleteTipo(data: { nombre: string; precioUSD: number }): Promise<{ ok: boolean; id: string; codigo?: string }> {
+  return api<{ ok: boolean; id: string; codigo?: string }>("/api/transporte-flete-tipos", { method: "POST", body: JSON.stringify(data) });
+}
+
+export function updateTransporteFleteTipo(id: string, data: { nombre: string; precioUSD: number }): Promise<{ ok: boolean }> {
+  return api<{ ok: boolean }>(`/api/transporte-flete-tipos/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(data) });
+}
+
+export function deleteTransporteFleteTipo(id: string): Promise<void> {
+  return api<void>(`/api/transporte-flete-tipos/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 // ——— Equipos ASIC (backend) ———

@@ -468,6 +468,8 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
       desc = it.setupNombre;
     } else if (it.reparacionTipoId && it.reparacionNombre) {
       desc = it.reparacionNombre;
+    } else if (it.transporteFleteTipoId && it.transporteFleteNombre) {
+      desc = it.transporteFleteNombre;
     } else if (it.marcaEquipo && it.modeloEquipo && it.procesadorEquipo) {
       // Equipo ASIC
       const equipoDesc = `${it.marcaEquipo} - ${it.modeloEquipo} - ${it.procesadorEquipo}`;
@@ -498,6 +500,8 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
         descDescuento = `Descuento ${it.setupNombre}`;
       } else if (it.reparacionTipoId && it.reparacionNombre) {
         descDescuento = `Descuento ${it.reparacionNombre}`;
+      } else if (it.transporteFleteTipoId && it.transporteFleteNombre) {
+        descDescuento = `Descuento ${it.transporteFleteNombre}`;
       } else if (it.marcaEquipo && it.modeloEquipo) {
         descDescuento = `Descuento ${it.marcaEquipo} ${it.modeloEquipo}`;
       } else if (it.garantiaMarca && it.garantiaModelo) {

@@ -114,17 +114,17 @@
 
 .nh-fleet-hash-brand-logo {
   display: block;
-  height: 30px;
+  height: 44px;
   width: auto;
-  max-width: 9.75rem;
+  max-width: 13rem;
   object-fit: contain;
   filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.45));
 }
 
 @media (min-width: 768px) {
   .nh-fleet-hash-brand-logo {
-    height: 36px;
-    max-width: 11.25rem;
+    height: 54px;
+    max-width: 15.5rem;
   }
 }
 

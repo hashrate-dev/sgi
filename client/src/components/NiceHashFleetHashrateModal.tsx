@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Chart from "chart.js/auto";
-import type { Chart as ChartJs, ChartConfiguration } from "chart.js";
-import { getNiceHashWatcherRigHashHistory, type NiceHashExternalRigs2Payload } from "../lib/api";
+import type { Chart as ChartJs, ChartConfiguration, ChartDataset, ChartOptions, Plugin } from "chart.js";
+import { getNiceHashWatcherRigHashHistory, postNiceHashWatcherRigHashHistorySamples, type NiceHashExternalRigs2Payload, type NhWatcherRigHashSample } from "../lib/api";
 import {
   aggregateRigHashPointsByBucketMs,
   loadNiceHashRigHashratePointsMap,
+  NH_WATCHER_CHART_LIVE_MS,
   NH_WATCHER_CHART_RESOLUTION_OPTIONS,
   NH_WATCHER_HASH_SAMPLE_MS,
   type NhRigHashPoint,
@@ -21,6 +22,12 @@ export type FleetHashRigRow = {
 };
 
 const MAX_AXIS_POINTS = 4320;
+
+/** LIVE: refresco de curvas con `speedAccepted` del payload actual (no espera al bucket de 1 min). */
+const LIVE_POLL_MS = 5000;
+const LIVE_RETAIN_MS = 40 * 60 * 1000;
+const LIVE_SEED_BUCKETS = 90;
+const LIVE_MAX_POINTS_PER_RIG = 480;
 
 const HASHRATE_LOGO_LOCAL = "/images/LOGO-HASHRATE.png";
 const HASHRATE_LOGO_CDN = "https://hashrate.space/wp-content/uploads/hashrate-LOGO.png";
@@ -113,6 +120,37 @@ function formatAxisLabel(t: number): string {
   return d.toLocaleString("es-UY", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
+function formatAxisLabelForChart(t: number, resolutionMs: number): string {
+  const d = new Date(t);
+  if (Number.isNaN(d.getTime())) return "";
+  if (resolutionMs === NH_WATCHER_CHART_LIVE_MS) {
+    return d.toLocaleString("es-UY", {
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  }
+  return formatAxisLabel(t);
+}
+
+/** Título del gráfico (tono monitorización / operaciones). */
+function nhFleetHashChartTitle(axisUnit: "TH/s" | "MH/s", resolutionLabel: string): string {
+  const cadencia =
+    resolutionLabel === "LIVE"
+      ? "serie en vivo (LIVE)"
+      : resolutionLabel === "1 min"
+        ? "resolución 1 min"
+        : `agregado ${resolutionLabel}`;
+  return `Hashrate aceptado · ${axisUnit} · MINING · ${cadencia}`;
+}
+
+function nhFleetHashChartEmptyHint(axisUnit: "TH/s" | "MH/s", resolutionLabel: string): string {
+  const modo = resolutionLabel === "LIVE" ? "LIVE" : resolutionLabel;
+  return `Sin serie ${axisUnit} (${modo}) para la flota en MINING.`;
+}
+
 type SplitRow = FleetHashRigRow & { label: string; map: Map<number, number>; isTh: boolean };
 
 function buildSplitRows(
@@ -140,6 +178,92 @@ function buildSplitRows(
   return out;
 }
 
+function seedLiveSeriesFromHistory(rows: FleetHashRigRow[]): Record<string, NhRigHashPoint[]> {
+  const liveMap: Record<string, NhRigHashPoint[]> = {};
+  for (const row of rows) {
+    if (String(row.rig.minerStatus ?? "").trim().toUpperCase() !== "MINING") continue;
+    const wid = row.watcherId.trim().toLowerCase();
+    const rk = nhWatcherRigStorageKey(row.rig, row.rigIndex);
+    const rawPts = loadNiceHashRigHashratePointsMap(wid)[rk] ?? [];
+    const oneMin = aggregateRigHashPointsByBucketMs(rawPts, NH_WATCHER_HASH_SAMPLE_MS);
+    liveMap[rk] = oneMin.slice(-LIVE_SEED_BUCKETS);
+  }
+  return liveMap;
+}
+
+function appendLiveSamples(
+  liveMap: Record<string, NhRigHashPoint[]>,
+  rows: FleetHashRigRow[],
+  nowMs: number
+): Record<string, NhRigHashPoint[]> {
+  const cutoff = nowMs - LIVE_RETAIN_MS;
+  const next: Record<string, NhRigHashPoint[]> = {};
+  for (const row of rows) {
+    if (String(row.rig.minerStatus ?? "").trim().toUpperCase() !== "MINING") continue;
+    const rk = nhWatcherRigStorageKey(row.rig, row.rigIndex);
+    const base = liveMap[rk] ?? [];
+    const sp = row.rig.stats?.[0]?.speedAccepted;
+    const v = typeof sp === "number" && Number.isFinite(sp) && sp >= 0 ? sp : 0;
+    const arr = [...base, { t: nowMs, v }].filter((p) => p.t >= cutoff);
+    next[rk] = arr.length > LIVE_MAX_POINTS_PER_RIG ? arr.slice(-LIVE_MAX_POINTS_PER_RIG) : arr;
+  }
+  return next;
+}
+
+const LIVE_POST_CHUNK = 380;
+
+function collectLiveSamplesForDb(rows: FleetHashRigRow[], nowMs: number): Map<string, NhWatcherRigHashSample[]> {
+  const byWid = new Map<string, NhWatcherRigHashSample[]>();
+  for (const row of rows) {
+    if (String(row.rig.minerStatus ?? "").trim().toUpperCase() !== "MINING") continue;
+    const wid = row.watcherId.trim().toLowerCase();
+    if (!wid) continue;
+    const rk = nhWatcherRigStorageKey(row.rig, row.rigIndex);
+    const sp = row.rig.stats?.[0]?.speedAccepted;
+    const v = typeof sp === "number" && Number.isFinite(sp) && sp >= 0 ? sp : 0;
+    const arr = byWid.get(wid) ?? [];
+    arr.push({ rigKey: rk, t: Math.floor(nowMs), v });
+    byWid.set(wid, arr);
+  }
+  return byWid;
+}
+
+/** Persiste en BD el hashrate actual (modo `live`: UPSERT del bucket de 1 min por rig). */
+function postLiveSamplesToServer(rows: FleetHashRigRow[], nowMs: number): void {
+  const byWid = collectLiveSamplesForDb(rows, nowMs);
+  for (const [wid, samples] of byWid) {
+    if (samples.length === 0) continue;
+    for (let i = 0; i < samples.length; i += LIVE_POST_CHUNK) {
+      void postNiceHashWatcherRigHashHistorySamples(wid, samples.slice(i, i + LIVE_POST_CHUNK), { live: true }).catch(
+        () => {}
+      );
+    }
+  }
+}
+
+function buildSplitRowsLive(
+  rows: FleetHashRigRow[],
+  slotRows: NhWatcherSlotRow[],
+  isTotal: boolean,
+  liveByKey: Record<string, NhRigHashPoint[]>
+): SplitRow[] {
+  const out: SplitRow[] = [];
+  for (const row of rows) {
+    if (String(row.rig.minerStatus ?? "").trim().toUpperCase() !== "MINING") continue;
+    const rk = nhWatcherRigStorageKey(row.rig, row.rigIndex);
+    const pts = liveByKey[rk] ?? [];
+    const sp = row.rig.stats?.[0]?.speedAccepted;
+    const isTh = speedLooksLikeTh(typeof sp === "number" && Number.isFinite(sp) ? sp : 0);
+    out.push({
+      ...row,
+      label: rigDisplayLabel(row, slotRows, isTotal),
+      map: pointsToMap(pts),
+      isTh,
+    });
+  }
+  return out;
+}
+
 function unionAxisTs(rows: SplitRow[], filterTh: boolean): number[] {
   const s = new Set<number>();
   for (const row of rows) {
@@ -149,7 +273,7 @@ function unionAxisTs(rows: SplitRow[], filterTh: boolean): number[] {
   return [...s].sort((a, b) => a - b).slice(-MAX_AXIS_POINTS);
 }
 
-function buildDatasets(rows: SplitRow[], filterTh: boolean, axis: number[]): ChartConfiguration["data"]["datasets"] {
+function buildDatasets(rows: SplitRow[], filterTh: boolean, axis: number[]): ChartDataset<"line">[] {
   const slice = rows.filter((r) => r.isTh === filterTh && r.map.size > 0);
   return slice.map((row, idx) => {
     const color = CHART_COLORS[idx % CHART_COLORS.length];
@@ -171,52 +295,114 @@ function buildDatasets(rows: SplitRow[], filterTh: boolean, axis: number[]): Cha
   });
 }
 
+/** Círculo parpadeante en el último punto visible de cada serie (solo modo LIVE). */
+const nhFleetHashLiveLastPointPlugin: Plugin<"line"> = {
+  id: "nhFleetHashLiveLastPoint",
+  afterDatasetsDraw(chart) {
+    const opts = chart.options.plugins as Record<string, { enabled?: boolean } | undefined> | undefined;
+    const cfg = opts?.nhFleetHashLiveLastPoint;
+    if (!cfg?.enabled) return;
+
+    const ctx = chart.ctx;
+    const pulse = 0.38 + 0.62 * (0.5 + 0.5 * Math.sin((Date.now() / 420) * Math.PI * 2));
+
+    for (let di = 0; di < chart.data.datasets.length; di++) {
+      const meta = chart.getDatasetMeta(di);
+      if (!meta || meta.hidden || meta.type !== "line") continue;
+      const ds = chart.data.datasets[di];
+      const br = ds.borderColor;
+      const border =
+        typeof br === "string"
+          ? br
+          : Array.isArray(br) && typeof br[0] === "string"
+            ? br[0]
+            : "#34d399";
+
+      const pts = meta.data;
+      if (!pts?.length) continue;
+
+      for (let i = pts.length - 1; i >= 0; i--) {
+        const el = pts[i] as { x?: number; y?: number; skip?: boolean } | undefined;
+        if (!el || el.skip || typeof el.x !== "number" || typeof el.y !== "number") continue;
+        const raw = ds.data[i];
+        if (raw == null || !Number.isFinite(Number(raw))) continue;
+
+        const { x, y } = el;
+        ctx.save();
+        ctx.globalAlpha = pulse;
+        ctx.beginPath();
+        ctx.arc(x, y, 6.5, 0, Math.PI * 2);
+        ctx.fillStyle = border;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.beginPath();
+        ctx.arc(x, y, 6.5, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(248, 250, 252, 0.9)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+        break;
+      }
+    }
+  },
+};
+
 function makeChartConfig(
   title: string,
   yUnit: string,
   labels: string[],
-  datasets: ChartConfiguration["data"]["datasets"],
-  yFormat: (n: number) => string
-): ChartConfiguration {
+  datasets: ChartDataset<"line">[],
+  yFormat: (n: number) => string,
+  opts?: { live?: boolean }
+): ChartConfiguration<"line"> {
+  const live = Boolean(opts?.live);
+  const plugins: ChartOptions<"line">["plugins"] = {
+    title: { display: true, text: title, color: "#f0f6fc", font: { size: 14, weight: 600 } },
+    legend: {
+      display: true,
+      position: "bottom",
+      labels: {
+        color: "#c9d1d9",
+        boxWidth: 12,
+        padding: 10,
+        font: { size: 10 },
+        usePointStyle: true,
+      },
+    },
+    tooltip: {
+      backgroundColor: "#161b22",
+      titleColor: "#f0f6fc",
+      bodyColor: "#c9d1d9",
+      borderColor: "rgba(52, 211, 153, 0.35)",
+      borderWidth: 1,
+      callbacks: {
+        label(ctx) {
+          const raw = ctx.parsed.y;
+          if (raw == null || !Number.isFinite(raw)) return `${ctx.dataset.label}: —`;
+          return `${ctx.dataset.label}: ${yFormat(raw)}`;
+        },
+      },
+    },
+    nhFleetHashLiveLastPoint: live ? { enabled: true } : { enabled: false },
+  } as ChartOptions<"line">["plugins"];
+
   return {
     type: "line",
+    plugins: live ? [nhFleetHashLiveLastPointPlugin] : [],
     data: { labels, datasets },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      animation: { duration: 280 },
+      animation: live ? { duration: 0 } : { duration: 280 },
       interaction: { mode: "index", intersect: false },
-      plugins: {
-        title: { display: true, text: title, color: "#f0f6fc", font: { size: 14, weight: 600 } },
-        legend: {
-          display: true,
-          position: "bottom",
-          labels: {
-            color: "#c9d1d9",
-            boxWidth: 12,
-            padding: 10,
-            font: { size: 10 },
-            usePointStyle: true,
-          },
-        },
-        tooltip: {
-          backgroundColor: "#161b22",
-          titleColor: "#f0f6fc",
-          bodyColor: "#c9d1d9",
-          borderColor: "rgba(52, 211, 153, 0.35)",
-          borderWidth: 1,
-          callbacks: {
-            label(ctx) {
-              const raw = ctx.parsed.y;
-              if (raw == null || !Number.isFinite(raw)) return `${ctx.dataset.label}: —`;
-              return `${ctx.dataset.label}: ${yFormat(raw)}`;
-            },
-          },
-        },
-      },
+      plugins,
       scales: {
         x: {
-          ticks: { color: "#8b949e", maxTicksLimit: 14, maxRotation: 45 },
+          ticks: {
+            color: "#8b949e",
+            maxTicksLimit: live ? 20 : 14,
+            maxRotation: 45,
+          },
           grid: { color: "rgba(148, 163, 184, 0.1)" },
         },
         y: {
@@ -256,6 +442,10 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
   const hashrateLogoSrc = HASHRATE_LOGO_SOURCES[hashrateLogoIx] ?? HASHRATE_LOGO_SOURCES[0];
   const hashrateLogoMatKnockout = hashrateLogoIx > 0;
   const [chartResolutionMs, setChartResolutionMs] = useState(NH_WATCHER_HASH_SAMPLE_MS);
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+  const liveSeriesRef = useRef<Record<string, NhRigHashPoint[]>>({});
+  const [liveTick, setLiveTick] = useState(0);
 
   const chartBucketLabel = useMemo(
     () => NH_WATCHER_CHART_RESOLUTION_OPTIONS.find((o) => o.ms === chartResolutionMs)?.label ?? "1 min",
@@ -271,16 +461,25 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
     return [...s].sort().join(",");
   }, [rows]);
 
-  const splitRows = useMemo(
-    () => (open ? buildSplitRows(rows, slotRows, isTotal, chartResolutionMs) : []),
-    [open, rows, slotRows, isTotal, chartResolutionMs]
-  );
+  const splitRows = useMemo(() => {
+    if (!open) return [];
+    if (chartResolutionMs === NH_WATCHER_CHART_LIVE_MS) {
+      return buildSplitRowsLive(rows, slotRows, isTotal, liveSeriesRef.current);
+    }
+    return buildSplitRows(rows, slotRows, isTotal, chartResolutionMs);
+  }, [open, rows, slotRows, isTotal, chartResolutionMs, liveTick]);
 
   const axisTh = useMemo(() => unionAxisTs(splitRows, true), [splitRows]);
   const axisMh = useMemo(() => unionAxisTs(splitRows, false), [splitRows]);
 
-  const labelsTh = useMemo(() => axisTh.map(formatAxisLabel), [axisTh]);
-  const labelsMh = useMemo(() => axisMh.map(formatAxisLabel), [axisMh]);
+  const labelsTh = useMemo(
+    () => axisTh.map((t) => formatAxisLabelForChart(t, chartResolutionMs)),
+    [axisTh, chartResolutionMs]
+  );
+  const labelsMh = useMemo(
+    () => axisMh.map((t) => formatAxisLabelForChart(t, chartResolutionMs)),
+    [axisMh, chartResolutionMs]
+  );
 
   const dsTh = useMemo(() => buildDatasets(splitRows, true, axisTh), [splitRows, axisTh]);
   const dsMh = useMemo(() => buildDatasets(splitRows, false, axisMh), [splitRows, axisMh]);
@@ -303,9 +502,10 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
     if (!open) setChartResolutionMs(NH_WATCHER_HASH_SAMPLE_MS);
   }, [open]);
 
-  /** Materializa agregados en BD (15 / 30 / 60 min) a partir de las muestras 1 min del servidor. */
+  /** Materializa agregados en BD (15 / 30 / 60 min) a partir de las muestras 1 min del servidor. LIVE no usa este GET. */
   useEffect(() => {
-    if (!open || chartResolutionMs === NH_WATCHER_HASH_SAMPLE_MS) return;
+    if (!open || chartResolutionMs === NH_WATCHER_HASH_SAMPLE_MS || chartResolutionMs === NH_WATCHER_CHART_LIVE_MS)
+      return;
     const ids = watcherIdsKey.split(",").filter(Boolean);
     if (ids.length === 0) return;
     void (async () => {
@@ -320,6 +520,22 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
       );
     })();
   }, [open, chartResolutionMs, watcherIdsKey]);
+
+  /** LIVE: semilla desde historial 1 min + muestra `speedAccepted` cada LIVE_POLL_MS. */
+  useEffect(() => {
+    if (!open || chartResolutionMs !== NH_WATCHER_CHART_LIVE_MS) return;
+    liveSeriesRef.current = seedLiveSeriesFromHistory(rowsRef.current);
+    liveSeriesRef.current = appendLiveSamples(liveSeriesRef.current, rowsRef.current, Date.now());
+    postLiveSamplesToServer(rowsRef.current, Date.now());
+    setLiveTick((x) => x + 1);
+    const id = window.setInterval(() => {
+      const t = Date.now();
+      liveSeriesRef.current = appendLiveSamples(liveSeriesRef.current, rowsRef.current, t);
+      postLiveSamplesToServer(rowsRef.current, t);
+      setLiveTick((x) => x + 1);
+    }, LIVE_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [open, chartResolutionMs]);
 
   useEffect(() => {
     if (!open) {
@@ -336,14 +552,16 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
     chartThRef.current?.destroy();
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    const live = chartResolutionMs === NH_WATCHER_CHART_LIVE_MS;
     chartThRef.current = new Chart(
       ctx,
       makeChartConfig(
-        `Hashrate aceptado · TH/s (ASIC en MINING · intervalo ${chartBucketLabel})`,
+        nhFleetHashChartTitle("TH/s", chartBucketLabel),
         "TH/s",
         labelsTh,
         dsTh,
-        (n) => `${n.toFixed(2)} TH/s`
+        (n) => `${n.toFixed(2)} TH/s`,
+        { live }
       )
     );
     const ro = new ResizeObserver(() => chartThRef.current?.resize());
@@ -353,7 +571,7 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
       chartThRef.current?.destroy();
       chartThRef.current = null;
     };
-  }, [open, axisTh, labelsTh, dsTh, chartBucketLabel]);
+  }, [open, axisTh, labelsTh, dsTh, chartBucketLabel, chartResolutionMs]);
 
   useEffect(() => {
     if (!open) {
@@ -370,14 +588,16 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
     chartMhRef.current?.destroy();
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    const live = chartResolutionMs === NH_WATCHER_CHART_LIVE_MS;
     chartMhRef.current = new Chart(
       ctx,
       makeChartConfig(
-        `Hashrate aceptado · MH/s (ASIC en MINING · intervalo ${chartBucketLabel})`,
+        nhFleetHashChartTitle("MH/s", chartBucketLabel),
         "MH/s",
         labelsMh,
         dsMh,
-        (n) => `${n.toFixed(2)} MH/s`
+        (n) => `${n.toFixed(2)} MH/s`,
+        { live }
       )
     );
     const ro = new ResizeObserver(() => chartMhRef.current?.resize());
@@ -387,7 +607,17 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
       chartMhRef.current?.destroy();
       chartMhRef.current = null;
     };
-  }, [open, axisMh, labelsMh, dsMh, chartBucketLabel]);
+  }, [open, axisMh, labelsMh, dsMh, chartBucketLabel, chartResolutionMs]);
+
+  /** LIVE: redibuja para que el plugin del último punto parpadee sin reconstruir el chart. */
+  useEffect(() => {
+    if (!open || chartResolutionMs !== NH_WATCHER_CHART_LIVE_MS) return;
+    const id = window.setInterval(() => {
+      chartThRef.current?.draw();
+      chartMhRef.current?.draw();
+    }, 450);
+    return () => window.clearInterval(id);
+  }, [open, chartResolutionMs]);
 
   if (!open) return null;
 
@@ -417,8 +647,8 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
                   src={hashrateLogoSrc}
                   alt="HASHRATE"
                   className="nh-fleet-hash-brand-logo"
-                  width={170}
-                  height={44}
+                  width={240}
+                  height={62}
                   decoding="async"
                   onError={() =>
                     setHashrateLogoIx((i) => (i < HASHRATE_LOGO_SOURCES.length - 1 ? i + 1 : i))
@@ -520,7 +750,7 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
               role="toolbar"
               aria-label="Temporalidad del gráfico"
             >
-              <span className="nh-fleet-hash-resolution-bar__label">Temporalidad</span>
+
               <div className="nh-fleet-hash-resolution-bar__btns">
                 {NH_WATCHER_CHART_RESOLUTION_OPTIONS.map((opt) => (
                   <button
@@ -547,7 +777,7 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
             <div className="nh-fleet-hash-canvas-wrap">
               {axisTh.length === 0 || dsTh.length === 0 ? (
                 <div className="nh-fleet-hash-empty">
-                  No hay historial TH/s ({chartBucketLabel}) para ASICs en MINING aún.
+                  {nhFleetHashChartEmptyHint("TH/s", chartBucketLabel)}
                 </div>
               ) : (
                 <canvas ref={canvasThRef} />
@@ -558,7 +788,7 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
             <div className="nh-fleet-hash-canvas-wrap">
               {axisMh.length === 0 || dsMh.length === 0 ? (
                 <div className="nh-fleet-hash-empty">
-                  No hay historial MH/s ({chartBucketLabel}) para ASICs en MINING aún.
+                  {nhFleetHashChartEmptyHint("MH/s", chartBucketLabel)}
                 </div>
               ) : (
                 <canvas ref={canvasMhRef} />

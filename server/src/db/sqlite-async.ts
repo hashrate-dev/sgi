@@ -177,6 +177,13 @@ CREATE TABLE IF NOT EXISTS reparacion_tipos (
   precio_usd INTEGER NOT NULL DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS transporte_flete_tipos (
+  id TEXT PRIMARY KEY,
+  codigo TEXT UNIQUE,
+  nombre TEXT NOT NULL,
+  precio_usd INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS equipos_asic (
   id TEXT PRIMARY KEY,
   numero_serie TEXT,

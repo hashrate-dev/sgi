@@ -133,6 +133,8 @@ const postBajaBody = z.object({
 
 const postNhWatcherRigHashBody = z.object({
   watcherId: equipoIdParam,
+  /** Si true: misma fila por minuto/rig se actualiza con el último valor (muestreo LIVE). */
+  live: z.boolean().optional(),
   samples: z
     .array(
       z.object({
@@ -545,13 +547,15 @@ monitorEquiposAsicHistorialRouter.post(
       return;
     }
     const wid = parsed.data.watcherId.trim().toLowerCase();
+    const live = Boolean(parsed.data.live);
     const now = Date.now();
     const maxSkewMs = 120_000;
     const maxAgeMs = 10 * 24 * 60 * 60 * 1000;
-    const ins = db.prepare(
-      `INSERT INTO nh_watcher_rig_hash_samples (user_id, watcher_id, rig_key, sample_t, value) VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT (user_id, watcher_id, rig_key, sample_t) DO NOTHING`
-    );
+    const sqlLive = `INSERT INTO nh_watcher_rig_hash_samples (user_id, watcher_id, rig_key, sample_t, value) VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT (user_id, watcher_id, rig_key, sample_t) DO UPDATE SET value = excluded.value`;
+    const sqlNorm = `INSERT INTO nh_watcher_rig_hash_samples (user_id, watcher_id, rig_key, sample_t, value) VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT (user_id, watcher_id, rig_key, sample_t) DO NOTHING`;
+    const ins = db.prepare(live ? sqlLive : sqlNorm);
     let inserted = 0;
     for (const s of parsed.data.samples) {
       if (s.t > now + maxSkewMs || now - s.t > maxAgeMs) continue;

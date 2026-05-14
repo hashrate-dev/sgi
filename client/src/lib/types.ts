@@ -42,6 +42,9 @@ export type LineItem = {
   // Campos para Reparación (catálogo /asic/reparacion):
   reparacionTipoId?: string;
   reparacionNombre?: string;
+  // Campos para Transporte / fletes (catálogo /transporte-fletes):
+  transporteFleteTipoId?: string;
+  transporteFleteNombre?: string;
   // Campos para Garantía ANDE:
   garantiaId?: string;
   garantiaCodigo?: string;
@@ -129,6 +132,14 @@ export type Setup = {
 
 /** Tipos de servicio de reparación (misma estructura que Setup; códigos R01, R02, …). */
 export type ReparacionTipo = {
+  id: string;
+  codigo?: string;
+  nombre: string;
+  precioUSD: number;
+};
+
+/** Ítems de transporte y flete para facturación ASIC (códigos F01, F02, …). */
+export type TransporteFleteTipo = {
   id: string;
   codigo?: string;
   nombre: string;

@@ -34,6 +34,7 @@ import { ReparacionPage } from "./pages/ReparacionPage";
 import { ReportesPage } from "./pages/ReportesPage";
 import { UsuariosPage } from "./pages/UsuariosPage";
 import { ConfiguracionPage } from "./pages/ConfiguracionPage";
+import { TransporteFletesPage } from "./pages/TransporteFletesPage";
 import { ClientesTiendaOnlinePage } from "./pages/ClientesTiendaOnlinePage";
 import { ClientesHubPage } from "./pages/ClientesHubPage";
 import { CotizacionesMarketplacePage } from "./pages/CotizacionesMarketplacePage";
@@ -409,6 +410,7 @@ function App() {
             <Route path="/clients/hosting/:id/edit" element={<ClienteEditPage />} />
             <Route path="/reports" element={<ReportesPage />} />
             <Route path="/settings" element={<ConfiguracionPage />} />
+            <Route path="/transporte-fletes" element={<TransporteFletesPage />} />
             <Route path="/clients/store" element={<ClientesTiendaOnlinePage />} />
             <Route path="/marketplace/orders/history-detail" element={<CotizacionesMarketplaceHistorialDetallePage />} />
             <Route path="/marketplace/orders" element={<CotizacionesMarketplacePage />} />

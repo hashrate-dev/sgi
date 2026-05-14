@@ -275,6 +275,8 @@ export function InvoicePreview({
                     desc = item.setupNombre;
                   } else if (item.reparacionTipoId && item.reparacionNombre) {
                     desc = item.reparacionNombre;
+                  } else if (item.transporteFleteTipoId && item.transporteFleteNombre) {
+                    desc = item.transporteFleteNombre;
                   } else if (item.marcaEquipo && item.modeloEquipo && item.procesadorEquipo) {
                     // Equipo ASIC
                     const equipoDesc = `${item.marcaEquipo} - ${item.modeloEquipo} - ${item.procesadorEquipo}`;
@@ -304,6 +306,8 @@ export function InvoicePreview({
                               ? `Descuento ${item.setupNombre}`
                               : item.reparacionTipoId && item.reparacionNombre
                                 ? `Descuento ${item.reparacionNombre}`
+                                : item.transporteFleteTipoId && item.transporteFleteNombre
+                                  ? `Descuento ${item.transporteFleteNombre}`
                               : item.marcaEquipo && item.modeloEquipo 
                                 ? `Descuento ${item.marcaEquipo} ${item.modeloEquipo}`
                                 : item.garantiaMarca && item.garantiaModelo
