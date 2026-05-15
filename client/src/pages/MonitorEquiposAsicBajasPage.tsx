@@ -135,7 +135,7 @@ export function MonitorEquiposAsicBajasPage() {
         <p className="small text-muted mb-0">
           Para dar de baja un equipo desde el monitor: menú <i className="bi bi-list" aria-hidden /> en la fila →{" "}
           <strong>Dar de baja equipo</strong>.{" "}
-          <Link to="/asic/monitor-equipos" className="link-success">
+          <Link to="/asic/monitor-equipos?registro=1" className="link-success">
             Ir al monitor
           </Link>
         </p>

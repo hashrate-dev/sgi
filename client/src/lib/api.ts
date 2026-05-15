@@ -1,5 +1,6 @@
 import { getStoredToken, clearStoredAuth } from "./auth.js";
 import type { AuthUser } from "./auth.js";
+import { NH_WATCHER_HASH_SAMPLE_MS } from "./nicehashWatcherRigHashrateHistory.js";
 
 // Plan A: localStorage, VITE_API_URL, default. Si falla, Plan B: probar URLs de fallback y guardar la que responda (Chrome/Opera sin localStorage).
 const STORAGE_KEY = "hrs_api_url";
@@ -777,11 +778,10 @@ export function getNiceHashWatcherRigHashHistory(
   opts?: { resolutionMs?: number }
 ): Promise<NhWatcherRigHashHistoryResponse> {
   const id = encodeURIComponent(watcherId.trim());
-  const ms = opts?.resolutionMs;
-  const q =
-    typeof ms === "number" && Number.isFinite(ms) && ms > 0
-      ? `?resolutionMs=${encodeURIComponent(String(Math.floor(ms)))}`
-      : "";
+  const raw = opts?.resolutionMs;
+  const ms =
+    typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : NH_WATCHER_HASH_SAMPLE_MS;
+  const q = `?resolutionMs=${encodeURIComponent(String(ms))}`;
   return api<NhWatcherRigHashHistoryResponse>(`/api/monitor-equipos-asic/nicehash-watcher-rig-hash-history/${id}${q}`);
 }
 

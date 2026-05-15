@@ -52,6 +52,7 @@ import {
   loadNiceHashToolbarMhSeries,
   loadNiceHashToolbarThSeries,
   mergeNiceHashRigHashratePointMaps,
+  NH_WATCHER_HASH_SAMPLE_MS,
   NH_WATCHER_TOOLBAR_MH_KEY,
   NH_WATCHER_TOOLBAR_TH_KEY,
   replaceNiceHashRigHashrateHistoryMap,
@@ -682,7 +683,7 @@ function WatcherActionBar({
           </button>
         ) : (
           <Link
-            to="/asic/monitor-equipos"
+            to="/asic/monitor-equipos?registro=1"
             className={
               sgi
                 ? "nh-watcher-footer-pill nh-watcher-footer-pill--primary fw-semibold"
@@ -945,6 +946,44 @@ export function NiceHashWatcherDashboard({
     }
   }, [isTotal, effectiveWatcherId]);
 
+  const mergeNhWatcherRigHashHistoryFromServer = useCallback(async (watcherIdRaw: string): Promise<void> => {
+    const wid = watcherIdRaw.trim().toLowerCase();
+    try {
+      const { series } = await getNiceHashWatcherRigHashHistory(wid, { resolutionMs: NH_WATCHER_HASH_SAMPLE_MS });
+      const local = loadNiceHashRigHashratePointsMap(wid);
+      const merged = mergeNiceHashRigHashratePointMaps(local, series);
+      replaceNiceHashRigHashrateHistoryMap(wid, merged);
+    } catch {
+      /* sin sesión o red */
+    }
+  }, []);
+
+  const applySingleSlotRigHashSeriesFromStorage = useCallback(
+    (watcherIdRaw: string) => {
+      const wid = watcherIdRaw.trim().toLowerCase();
+      setRigHashSeriesMap(loadNiceHashRigHashrateSeriesMap(wid));
+      reloadToolbarSparkSeries();
+    },
+    [reloadToolbarSparkSeries]
+  );
+
+  const rebuildTotalRigHashSeriesMapFromStorage = useCallback(
+    (ok: MultiOkRow[]) => {
+      const mergedSeries: Record<string, number[]> = {};
+      for (const { watcherId } of ok) {
+        const widNorm = watcherId.trim().toLowerCase();
+        const m = loadNiceHashRigHashrateSeriesMap(widNorm);
+        for (const [k, arr] of Object.entries(m)) {
+          if (k === NH_WATCHER_TOOLBAR_TH_KEY || k === NH_WATCHER_TOOLBAR_MH_KEY) continue;
+          mergedSeries[nhCompositeRigKey(widNorm, k)] = arr;
+        }
+      }
+      setRigHashSeriesMap(mergedSeries);
+      reloadToolbarSparkSeries();
+    },
+    [reloadToolbarSparkSeries]
+  );
+
   useEffect(() => {
     if (!active) return;
     reloadToolbarSparkSeries();
@@ -1024,6 +1063,11 @@ export function NiceHashWatcherDashboard({
           setPayload(data);
           setFetchedAt(Date.now());
           setError(null);
+          void (async () => {
+            await mergeNhWatcherRigHashHistoryFromServer(wid);
+            if (payloadWatcherMatchRef.current !== wid) return;
+            applySingleSlotRigHashSeriesFromStorage(wid);
+          })();
         } catch (e) {
           setError(e instanceof Error ? e.message : String(e));
           setPayload((prev) => (prev == null ? null : prev));
@@ -1082,10 +1126,19 @@ export function NiceHashWatcherDashboard({
           payloadWatcherMatchRef.current = null;
         } else {
           setError(null);
-          payloadWatcherMatchRef.current = `TOTAL:${ok
+          const totalRef = `TOTAL:${ok
             .map((x) => x.watcherId.trim().toLowerCase())
             .sort()
             .join("|")}`;
+          payloadWatcherMatchRef.current = totalRef;
+          void (async () => {
+            await Promise.all([
+              ...ok.map(({ watcherId }) => mergeNhWatcherRigHashHistoryFromServer(watcherId)),
+              mergeNhWatcherRigHashHistoryFromServer(NH_WATCHER_FLEET_TOOLBAR_WATCHER_ID),
+            ]);
+            if (payloadWatcherMatchRef.current !== totalRef) return;
+            rebuildTotalRigHashSeriesMapFromStorage(ok);
+          })();
         }
         setFetchedAt(Date.now());
       } catch (e) {
@@ -1095,7 +1148,15 @@ export function NiceHashWatcherDashboard({
         if (!silent) setLoading(false);
       }
     },
-    [isTotal, effectiveWatcherId, slotRows, activeSlot]
+    [
+      isTotal,
+      effectiveWatcherId,
+      slotRows,
+      activeSlot,
+      mergeNhWatcherRigHashHistoryFromServer,
+      applySingleSlotRigHashSeriesFromStorage,
+      rebuildTotalRigHashSeriesMapFromStorage,
+    ]
   );
 
   useEffect(() => {
@@ -1138,69 +1199,37 @@ export function NiceHashWatcherDashboard({
     setRigHashSeriesMap(loadNiceHashRigHashrateSeriesMap(wid));
     let cancelled = false;
     void (async () => {
-      try {
-        const { series } = await getNiceHashWatcherRigHashHistory(wid);
-        if (cancelled) return;
-        const local = loadNiceHashRigHashratePointsMap(wid);
-        const merged = mergeNiceHashRigHashratePointMaps(local, series);
-        replaceNiceHashRigHashrateHistoryMap(wid, merged);
-        setRigHashSeriesMap(loadNiceHashRigHashrateSeriesMap(wid));
-        reloadToolbarSparkSeries();
-      } catch {
-        /* sin sesión o red */
-      }
+      await mergeNhWatcherRigHashHistoryFromServer(wid);
+      if (cancelled) return;
+      applySingleSlotRigHashSeriesFromStorage(wid);
     })();
     return () => {
       cancelled = true;
     };
-  }, [active, isTotal, effectiveWatcherId, reloadToolbarSparkSeries]);
+  }, [
+    active,
+    isTotal,
+    effectiveWatcherId,
+    mergeNhWatcherRigHashHistoryFromServer,
+    applySingleSlotRigHashSeriesFromStorage,
+  ]);
 
   useEffect(() => {
-    if (!active || !isTotal) return;
+    if (!active || !isTotal || multiOk.length === 0) return;
     let cancelled = false;
     void (async () => {
       const fleetWid = NH_WATCHER_FLEET_TOOLBAR_WATCHER_ID.toLowerCase();
-      const slotTasks = multiOk.map(async ({ watcherId }) => {
-        const wid = watcherId.trim().toLowerCase();
-        try {
-          const { series } = await getNiceHashWatcherRigHashHistory(wid);
-          if (cancelled) return;
-          const local = loadNiceHashRigHashratePointsMap(wid);
-          const mergedPts = mergeNiceHashRigHashratePointMaps(local, series);
-          replaceNiceHashRigHashrateHistoryMap(wid, mergedPts);
-        } catch {
-          /* */
-        }
-      });
-      const fleetTask = (async () => {
-        try {
-          const { series: fleetSeries } = await getNiceHashWatcherRigHashHistory(fleetWid);
-          if (cancelled) return;
-          const localFleet = loadNiceHashRigHashratePointsMap(fleetWid);
-          const mergedFleet = mergeNiceHashRigHashratePointMaps(localFleet, fleetSeries);
-          replaceNiceHashRigHashrateHistoryMap(fleetWid, mergedFleet);
-        } catch {
-          /* */
-        }
-      })();
-      await Promise.all([...slotTasks, fleetTask]);
+      await Promise.all([
+        ...multiOk.map(({ watcherId }) => mergeNhWatcherRigHashHistoryFromServer(watcherId)),
+        mergeNhWatcherRigHashHistoryFromServer(fleetWid),
+      ]);
       if (cancelled) return;
-      const mergedSeries: Record<string, number[]> = {};
-      for (const { watcherId } of multiOk) {
-        const wid = watcherId.trim().toLowerCase();
-        const m = loadNiceHashRigHashrateSeriesMap(wid);
-        for (const [k, arr] of Object.entries(m)) {
-          if (k === NH_WATCHER_TOOLBAR_TH_KEY || k === NH_WATCHER_TOOLBAR_MH_KEY) continue;
-          mergedSeries[nhCompositeRigKey(wid, k)] = arr;
-        }
-      }
-      setRigHashSeriesMap(mergedSeries);
-      reloadToolbarSparkSeries();
+      rebuildTotalRigHashSeriesMapFromStorage(multiOk);
     })();
     return () => {
       cancelled = true;
     };
-  }, [active, isTotal, multiOk, reloadToolbarSparkSeries]);
+  }, [active, isTotal, multiOk, mergeNhWatcherRigHashHistoryFromServer, rebuildTotalRigHashSeriesMapFromStorage]);
 
   useEffect(() => {
     if (!active || isTotal || !payload?.miningRigs?.length) return;

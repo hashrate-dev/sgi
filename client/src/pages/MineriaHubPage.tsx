@@ -8,8 +8,8 @@ import "../styles/facturacion.css";
 const monitorMenuItem = {
   to: "/asic/monitor-equipos",
   icon: "bi-speedometer2",
-  label: "Registro de Equipos ASIC",
-  desc: "Tablero de control por equipo (usuario, modelo, pool, online)",
+  label: "Monitor equipos ASIC (NiceHash)",
+  desc: "En vivo desde tus enlaces watcher W1…WN (NiceHash por cuenta). El listado local con notas: ?registro=1 o el botón «Registro» en el tablero.",
 } as const;
 
 const monitorBajasMenuItem = {

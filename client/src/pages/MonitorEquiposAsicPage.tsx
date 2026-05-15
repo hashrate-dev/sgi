@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Navigate, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { Flex } from "@chakra-ui/react";
 import NiceHashWatcherDashboard from "../components/NiceHashWatcherDashboard";
 import { PageHeader } from "../components/PageHeader";
@@ -781,6 +781,17 @@ function MonitorEquiposAsicPageContent() {
       <div className="container">
         <PageHeader title="Registro de Equipos ASIC" />
 
+        <div className="alert alert-success border-0 shadow-sm mb-3 py-2 px-3 small d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <span className="me-2">
+            <i className="bi bi-activity me-2" aria-hidden />
+            Tablero en vivo NiceHash: misma vista que «TOTAL»; cada equipo se alimenta del enlace watcher (W1…WN) que
+            configurás.
+          </span>
+          <Link to="/asic/monitor-equipos" className="btn btn-sm btn-success rounded-pill text-decoration-none flex-shrink-0">
+            Ir al tablero NiceHash
+          </Link>
+        </div>
+
         <div className="hrs-card p-4 mb-3">
           <div className="monitor-asic-dash-head mb-3 mb-md-4">
             <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
@@ -1438,6 +1449,13 @@ function MonitorEquiposAsicPageContent() {
   );
 }
 
+/** Listado local de equipos + notas (no es el tablero NiceHash por enlaces watcher). */
+function isRegistroLegacyRouteParam(raw: string | null): boolean {
+  if (raw == null) return false;
+  const v = raw.trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "legacy";
+}
+
 /** Activa el tablero NiceHash a pantalla completa (no es el índice de slot; el slot viene de `?slot=` o de localStorage). */
 function isWatcherOnlyRouteParam(raw: string | null): boolean {
   if (raw == null) return false;
@@ -1458,11 +1476,15 @@ export function MonitorEquiposAsicPage() {
   if (!canAccessMonitorEquiposAsic(user)) {
     return <Navigate to="/asic" replace />;
   }
+  if (isRegistroLegacyRouteParam(searchParams.get("registro"))) {
+    return <MonitorEquiposAsicPageContent />;
+  }
   if (isWatcherTotalRouteParam(searchParams.get("watcher"))) {
     return <NiceHashWatcherDashboard active layout="fullscreen" viewMode="allConfiguredSlots" />;
   }
   if (isWatcherOnlyRouteParam(searchParams.get("watcher"))) {
     return <NiceHashWatcherDashboard active layout="fullscreen" />;
   }
-  return <MonitorEquiposAsicPageContent />;
+  /** Por defecto: mismo tablero que `?watcher=total` (todos los enlaces W1…WN → NiceHash `rigs2` por cuenta). */
+  return <NiceHashWatcherDashboard active layout="fullscreen" viewMode="allConfiguredSlots" />;
 }
