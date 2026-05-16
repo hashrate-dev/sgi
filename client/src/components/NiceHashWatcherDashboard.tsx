@@ -144,23 +144,6 @@ function utcYearMonthFromMs(ms: number): string {
   return `${y}-${String(m).padStart(2, "0")}`;
 }
 
-function formatUtcYearMonthLongEs(ym: string): string {
-  const m = /^([0-9]{4})-(0[1-9]|1[0-2])$/.exec(ym);
-  if (!m) return ym;
-  const y = Number(m[1]);
-  const mo = Number(m[2]);
-  if (!Number.isFinite(y) || !Number.isFinite(mo)) return ym;
-  try {
-    return new Date(Date.UTC(y, mo - 1, 1)).toLocaleDateString("es-UY", {
-      month: "long",
-      year: "numeric",
-      timeZone: "UTC",
-    });
-  } catch {
-    return ym;
-  }
-}
-
 /** Parsea montos string del API NiceHash (coma o punto decimal). */
 function parseNiceHashAmountString(s: string | null | undefined): number | null {
   if (s == null) return null;
@@ -274,6 +257,13 @@ function formatNiceHashAcceptedSpeed(speed: number | null | undefined): string {
   if (speed == null || !Number.isFinite(speed)) return "—";
   const th = nhAcceptedSpeedLooksLikeTh(speed);
   return `${speed.toFixed(2)} ${th ? "TH/s" : "MH/s"}`;
+}
+
+function nhSplitSpeedLabel(formatted: string): { num: string; unit: string } | null {
+  if (formatted === "—") return null;
+  const i = formatted.lastIndexOf(" ");
+  if (i <= 0) return { num: formatted, unit: "" };
+  return { num: formatted.slice(0, i), unit: formatted.slice(i + 1) };
 }
 
 /** Suma velocidad aceptada por heurística TH vs MH (misma lógica que KPI del toolbar). */
@@ -1469,104 +1459,107 @@ export function NiceHashWatcherDashboard({
       ) : null}
       {nhAgg ? (
         <div className="nh-watcher-inner px-3 px-md-4 pt-3 pb-3">
-          <div className="nh-watcher-kpi-grid mb-3">
-            <div className="nh-watcher-kpi nh-watcher-kpi--accent">
-              <div className="nh-watcher-kpi__head">
-                <span className="nh-watcher-kpi__icon-wrap nh-watcher-kpi__icon-wrap--accent" aria-hidden>
+          <div className="nh-watcher-kpi-grid nh-watcher-kpi-grid--pro mb-3" role="list">
+            <article className="nh-watcher-kpi nh-watcher-kpi--pro nh-watcher-kpi--pro-hero" role="listitem">
+              <header className="nh-watcher-kpi__head">
+                <span className="nh-watcher-kpi__icon-wrap" aria-hidden>
                   <i className="bi bi-hdd-network nh-watcher-kpi__icon" />
                 </span>
-                <div className="nh-watcher-kpi__label">ASICs en marcha</div>
+                <h3 className="nh-watcher-kpi__label">ASICs en marcha</h3>
+              </header>
+              <div className="nh-watcher-kpi__body">
+                <p className="nh-watcher-kpi__value nh-watcher-kpi__value--hero">
+                  <span className="nh-watcher-kpi__value-main">{nhAgg.miningN}</span>
+                  <span className="nh-watcher-kpi__value-sep">/</span>
+                  <span className="nh-watcher-kpi__value-dim">{nhAgg.totalRigs || nhAgg.rigs.length}</span>
+                </p>
               </div>
-              <div className="nh-watcher-kpi__value">
-                {nhAgg.miningN} / {nhAgg.totalRigs || nhAgg.rigs.length}
-              </div>
-              <div className="nh-watcher-kpi__sub">
-                <span className="nh-watcher-kpi__sub--accent">{nhAgg.totalDev} dispositivos</span> reportados
-                {isTotal && multiOk.length > 0 ? (
-                  <>
-                    {" "}
-                    · <span className="nh-watcher-kpi__sub--accent">{multiOk.length} watchers</span>
-                  </>
-                ) : null}
-              </div>
-            </div>
-            <div className="nh-watcher-kpi">
-              <div className="nh-watcher-kpi__head">
+            </article>
+            <article className="nh-watcher-kpi nh-watcher-kpi--pro nh-watcher-kpi--pro-profit" role="listitem">
+              <header className="nh-watcher-kpi__head">
                 <span className="nh-watcher-kpi__icon-wrap" aria-hidden>
                   <i className="bi bi-graph-up-arrow nh-watcher-kpi__icon" />
                 </span>
-                <div className="nh-watcher-kpi__label">Rentabilidad (24 h)</div>
+                <h3 className="nh-watcher-kpi__label">Rentabilidad (24 h)</h3>
+              </header>
+              <div className="nh-watcher-kpi__body">
+                <p className="nh-watcher-kpi__value nh-watcher-kpi__value--btc">
+                  {nhAgg.btc24 != null ? (
+                    <>
+                      <span className="nh-watcher-kpi__value-main">{formatNiceHashBtc8(nhAgg.btc24)}</span>
+                      <span className="nh-watcher-kpi__unit">BTC</span>
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </p>
+                <p className="nh-watcher-kpi__fiat">{formatRent24hUsdApprox(displayPayload, nhAgg.btc24, effectiveBtcSpotUsd) ?? "—"}</p>
               </div>
-              <div className="nh-watcher-kpi__value nh-watcher-kpi__value--btc">
-                {nhAgg.btc24 != null ? `${formatNiceHashBtc8(nhAgg.btc24)} BTC` : "—"}
-              </div>
-              <div className="nh-watcher-kpi__fiat">{formatRent24hUsdApprox(displayPayload, nhAgg.btc24, effectiveBtcSpotUsd) ?? "—"}</div>
-              <div className="nh-watcher-kpi__sub">
-                {isTotal ? "Suma solo ASICs en MINING (todos los watchers)" : "Suma API / ASICs"}
-              </div>
-            </div>
-            <div className="nh-watcher-kpi">
-              <div className="nh-watcher-kpi__head">
+            </article>
+            <article className="nh-watcher-kpi nh-watcher-kpi--pro nh-watcher-kpi--pro-profit" role="listitem">
+              <header className="nh-watcher-kpi__head">
                 <span className="nh-watcher-kpi__icon-wrap" aria-hidden>
                   <i className="bi bi-calendar3 nh-watcher-kpi__icon" />
                 </span>
-                <div className="nh-watcher-kpi__label">Rentabilidad (mes acum.)</div>
-              </div>
-              <div className="nh-watcher-kpi__value nh-watcher-kpi__value--btc">
-                {monthProfitLoading && monthProfit == null
-                  ? "…"
-                  : monthProfit != null
-                    ? `${formatNiceHashBtc8(monthProfit.totalBtc)} BTC`
+                <h3 className="nh-watcher-kpi__label">Rentabilidad (mes acum.)</h3>
+              </header>
+              <div className="nh-watcher-kpi__body">
+                <p className="nh-watcher-kpi__value nh-watcher-kpi__value--btc">
+                  {monthProfitLoading && monthProfit == null ? (
+                    <span className="nh-watcher-kpi__value-pulse">…</span>
+                  ) : monthProfit != null ? (
+                    <>
+                      <span className="nh-watcher-kpi__value-main">{formatNiceHashBtc8(monthProfit.totalBtc)}</span>
+                      <span className="nh-watcher-kpi__unit">BTC</span>
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </p>
+                <p className="nh-watcher-kpi__fiat">
+                  {monthProfit != null
+                    ? formatRent24hUsdApprox(displayPayload, monthProfit.totalBtc, effectiveBtcSpotUsd) ?? "—"
                     : "—"}
+                </p>
               </div>
-              <div className="nh-watcher-kpi__fiat">
-                {monthProfit != null
-                  ? formatRent24hUsdApprox(displayPayload, monthProfit.totalBtc, effectiveBtcSpotUsd) ?? "—"
-                  : "—"}
-              </div>
-              <div className="nh-watcher-kpi__sub">
-                Suma de snapshots 24 h en BD · {formatUtcYearMonthLongEs(utcYearMonthProfit)} UTC
-                {monthProfit != null ? (
-                  <>
-                    {" "}
-                    · <span className="nh-watcher-kpi__sub--accent">{monthProfit.snapshotCount}</span> reg.
-                  </>
-                ) : null}
-              </div>
-            </div>
-            <div className="nh-watcher-kpi">
-              <div className="nh-watcher-kpi__head">
+            </article>
+            <article className="nh-watcher-kpi nh-watcher-kpi--pro nh-watcher-kpi--pro-wallet" role="listitem">
+              <header className="nh-watcher-kpi__head">
                 <span className="nh-watcher-kpi__icon-wrap" aria-hidden>
                   <i className="bi bi-wallet2 nh-watcher-kpi__icon" />
                 </span>
-                <div className="nh-watcher-kpi__label">Saldo impago (minería)</div>
+                <h3 className="nh-watcher-kpi__label">Saldo impago (minería)</h3>
+              </header>
+              <div className="nh-watcher-kpi__body">
+                <p className="nh-watcher-kpi__value nh-watcher-kpi__value--btc">
+                  {nhAgg.unpaid ? (
+                    <>
+                      <span className="nh-watcher-kpi__value-main">{nhAgg.unpaid}</span>
+                      <span className="nh-watcher-kpi__unit">BTC</span>
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </p>
+                <p className="nh-watcher-kpi__fiat">{formatUnpaidMiningUsdApprox(displayPayload, nhAgg.unpaid, effectiveBtcSpotUsd) ?? "—"}</p>
               </div>
-              <div className="nh-watcher-kpi__value nh-watcher-kpi__value--btc">
-                {nhAgg.unpaid ?? "—"}
-                {nhAgg.unpaid ? <span className="text-uppercase"> BTC</span> : null}
-              </div>
-              <div className="nh-watcher-kpi__fiat">{formatUnpaidMiningUsdApprox(displayPayload, nhAgg.unpaid, effectiveBtcSpotUsd) ?? "—"}</div>
-              <div className="nh-watcher-kpi__sub">
-                {isTotal ? "Solo ASICs en MINING (impago por equipo)" : "Balance acumulado sin liquidar"}
-              </div>
-            </div>
-            <div className="nh-watcher-kpi">
-              <div className="nh-watcher-kpi__head">
+            </article>
+            <article className="nh-watcher-kpi nh-watcher-kpi--pro nh-watcher-kpi--pro-time" role="listitem">
+              <header className="nh-watcher-kpi__head">
                 <span className="nh-watcher-kpi__icon-wrap" aria-hidden>
                   <i className="bi bi-hourglass-split nh-watcher-kpi__icon" />
                 </span>
-                <div className="nh-watcher-kpi__label">Próximo pago (estim.)</div>
+                <h3 className="nh-watcher-kpi__label">Próximo pago (estim.)</h3>
+              </header>
+              <div className="nh-watcher-kpi__body">
+                <p className="nh-watcher-kpi__value nh-watcher-kpi__value--countdown">
+                  <WatcherLiveCountdown iso={nhAgg.nextPayout} />
+                </p>
+                <p className="nh-watcher-kpi__fiat nh-watcher-kpi__fiat--muted">
+                  {nhAgg.nextPayout ? formatNiceHashIsoShort(nhAgg.nextPayout) : "—"}
+                </p>
               </div>
-              <div className="nh-watcher-kpi__value" style={{ fontSize: "1.15rem" }}>
-                <WatcherLiveCountdown iso={nhAgg.nextPayout} />
-              </div>
-              <div className="nh-watcher-kpi__sub">
-                {nhAgg.nextPayout ? formatNiceHashIsoShort(nhAgg.nextPayout) : "—"}
-                {isTotal && nhAgg.nextPayout ? (
-                  <span className="d-block small text-secondary mt-1">Cuenta NiceHash con ASICs en MINING</span>
-                ) : null}
-              </div>
-            </div>
+            </article>
           </div>
           {displayPayload?._sgi?.walletError ? (
             <div className="alert alert-warning py-2 px-3 mb-3 border-0 small" role="status">
@@ -1575,7 +1568,7 @@ export function NiceHashWatcherDashboard({
           ) : null}
 
           <div
-            className="nh-watcher-toolbar mb-3 nh-watcher-toolbar--fleet-hash-modal-trigger"
+            className="nh-watcher-toolbar nh-watcher-toolbar--pro mb-3 nh-watcher-toolbar--fleet-hash-modal-trigger"
             role="button"
             tabIndex={0}
             aria-label="Abrir monitor de hashrate por equipo a pantalla completa"
@@ -1596,7 +1589,7 @@ export function NiceHashWatcherDashboard({
               <div className="nh-watcher-toolbar-speeds" role="list" aria-label="Velocidad por tipo de equipo">
                 {nhAgg.sumTh > 0 ? (
                   <div
-                    className="nh-watcher-toolbar-speed-tile nh-watcher-toolbar-speed-tile--primary nh-watcher-toolbar-speed-tile--with-spark"
+                    className="nh-watcher-toolbar-speed-tile nh-watcher-toolbar-speed-tile--pro nh-watcher-toolbar-speed-tile--primary nh-watcher-toolbar-speed-tile--with-spark"
                     role="listitem"
                   >
                     <div className="nh-watcher-toolbar-speed-tile__main">
@@ -1617,7 +1610,7 @@ export function NiceHashWatcherDashboard({
                   </div>
                 ) : null}
                 {nhAgg.sumMh > 0 ? (
-                  <div className="nh-watcher-toolbar-speed-tile nh-watcher-toolbar-speed-tile--with-spark" role="listitem">
+                  <div className="nh-watcher-toolbar-speed-tile nh-watcher-toolbar-speed-tile--pro nh-watcher-toolbar-speed-tile--with-spark" role="listitem">
                     <div className="nh-watcher-toolbar-speed-tile__main">
                       <span className="nh-watcher-toolbar-speed-tile__label">Scrypt · LTC / DOGE</span>
                       <span className="nh-watcher-toolbar-speed-tile__hint">Velocidad aceptada (MH/s)</span>
@@ -1678,7 +1671,9 @@ export function NiceHashWatcherDashboard({
             </div>
           </div>
 
-          <h3 className="nh-watcher-section-title">{isTotal ? "Todos los ASICs · TOTAL" : "Mis ASICs"}</h3>
+          <h3 className="nh-watcher-section-title nh-watcher-section-title--pro">
+            {isTotal ? "Todos los ASICs · TOTAL" : "Mis ASICs"}
+          </h3>
           <div className="nh-watcher-rig-list">
             {rigRowsForList.length === 0 ? (
               <div className="text-center text-secondary py-4">No hay ASICs en la respuesta.</div>
@@ -1699,6 +1694,7 @@ export function NiceHashWatcherDashboard({
                       ? (stPrimary.profitability as number)
                       : null;
                 const unpaidRig = rig.unpaidAmount?.trim() || "—";
+                const spdLabel = nhSplitSpeedLabel(formatNiceHashAcceptedSpeed(spd));
                 const nhTypeLabel = (rig.type ?? "UNMANAGED").toString().replace(/_/g, " ");
                 const slotNick = watcherSlotNicknameTrimmed(slotRows, slotIndex);
                 const resolvedNick = rigNicknames[seriesKey] ?? (slotNick || NH_WATCHER_DEFAULT_RIG_NICKNAME);
@@ -1708,7 +1704,7 @@ export function NiceHashWatcherDashboard({
                     ? `Apodo del watcher · NiceHash: ${nhTypeLabel}`
                     : `Apodo por defecto · NiceHash: ${nhTypeLabel}`;
                 return (
-                  <article key={seriesKey} className="nh-watcher-rig-card">
+                  <article key={seriesKey} className="nh-watcher-rig-card nh-watcher-rig-card--pro">
                     <div className="nh-watcher-rig-card__head">
                       <div className="nh-watcher-rig-card__grow">
                         <div className="nh-watcher-rig-card__name">
@@ -1739,20 +1735,45 @@ export function NiceHashWatcherDashboard({
                     <div className="nh-watcher-rig-card__metrics" role="group" aria-label="Métricas del equipo">
                       <div className="nh-watcher-rig-metric nh-watcher-rig-metric--hash">
                         <span className="nh-watcher-rig-metric__kicker">Hashrate acept.</span>
-                        <strong className="nh-watcher-rig-metric__value mono">{formatNiceHashAcceptedSpeed(spd)}</strong>
+                        <strong className="nh-watcher-rig-metric__value nh-watcher-rig-metric__value--split mono">
+                          {spdLabel ? (
+                            <>
+                              <span className="nh-watcher-rig-metric__value-main">{spdLabel.num}</span>
+                              {spdLabel.unit ? <span className="nh-watcher-rig-metric__unit">{spdLabel.unit}</span> : null}
+                            </>
+                          ) : (
+                            "—"
+                          )}
+                        </strong>
                         <span className="nh-watcher-rig-metric__meta">
                           Rechazo: {nhRejectPctLabel(rig.stats)}
                         </span>
                       </div>
                       <div className="nh-watcher-rig-metric nh-watcher-rig-metric--crypto">
                         <span className="nh-watcher-rig-metric__kicker">Rentab. ASIC (24 h)</span>
-                        <strong className="nh-watcher-rig-metric__value mono nh-watcher-rig-metric__value--btc">
-                          {rigBtc24 != null ? `${formatNiceHashBtc8(rigBtc24)} BTC` : "—"}
+                        <strong className="nh-watcher-rig-metric__value nh-watcher-rig-metric__value--split mono nh-watcher-rig-metric__value--btc">
+                          {rigBtc24 != null ? (
+                            <>
+                              <span className="nh-watcher-rig-metric__value-main">{formatNiceHashBtc8(rigBtc24)}</span>
+                              <span className="nh-watcher-rig-metric__unit">BTC</span>
+                            </>
+                          ) : (
+                            "—"
+                          )}
                         </strong>
                       </div>
                       <div className="nh-watcher-rig-metric nh-watcher-rig-metric--crypto">
                         <span className="nh-watcher-rig-metric__kicker">Impago ASIC</span>
-                        <strong className="nh-watcher-rig-metric__value mono nh-watcher-rig-metric__value--btc">{unpaidRig}</strong>
+                        <strong className="nh-watcher-rig-metric__value nh-watcher-rig-metric__value--split mono nh-watcher-rig-metric__value--btc">
+                          {unpaidRig !== "—" ? (
+                            <>
+                              <span className="nh-watcher-rig-metric__value-main">{unpaidRig}</span>
+                              <span className="nh-watcher-rig-metric__unit">BTC</span>
+                            </>
+                          ) : (
+                            "—"
+                          )}
+                        </strong>
                       </div>
                       <div className="nh-watcher-rig-metric" title={formatNiceHashStatusTime(rig.statusTime)}>
                         <span className="nh-watcher-rig-metric__kicker">Última señal</span>
