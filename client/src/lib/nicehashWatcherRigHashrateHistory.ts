@@ -74,6 +74,25 @@ function capSeries(pts: Point[]): Point[] {
   return pts.slice(-NH_WATCHER_HASH_MAX_POINTS);
 }
 
+/**
+ * Quita ceros al inicio cuando hay valores reales después (evita el “piso” en 0 TH/s al abrir la web).
+ * Conserva ceros en medio/final (p. ej. rig offline).
+ */
+export function sanitizeRigHashSparklineValues(values: readonly number[]): number[] {
+  if (values.length === 0) return [];
+  let start = 0;
+  while (start < values.length - 1 && values[start] === 0) start += 1;
+  return values.slice(start);
+}
+
+/** Misma lógica sobre puntos con marca temporal (para limpiar almacén local/BD). */
+export function sanitizeRigHashSparklinePoints(points: readonly NhRigHashPoint[]): NhRigHashPoint[] {
+  if (points.length === 0) return [];
+  let start = 0;
+  while (start < points.length - 1 && points[start]!.v === 0) start += 1;
+  return points.slice(start);
+}
+
 /** Une local + servidor por `t` (misma `t` → gana el servidor), ordena y recorta al máximo de la gráfica. */
 export function mergeNiceHashRigHashratePointMaps(
   local: Record<string, NhRigHashPoint[]>,
@@ -91,10 +110,13 @@ export function mergeNiceHashRigHashratePointMaps(
     for (const p of b) {
       if (Number.isFinite(p.t) && Number.isFinite(p.v)) byT.set(p.t, p.v);
     }
-    const merged = [...byT.entries()]
-      .sort((x, y) => x[0] - y[0])
-      .map(([t, v]) => ({ t, v }));
-    out[k] = capSeries(merged);
+    const merged = sanitizeRigHashSparklinePoints(
+      [...byT.entries()]
+        .sort((x, y) => x[0] - y[0])
+        .map(([t, v]) => ({ t, v }))
+        .filter((p) => p.v > 0)
+    );
+    if (merged.length) out[k] = capSeries(merged);
   }
   return out;
 }
@@ -107,11 +129,13 @@ export function replaceNiceHashRigHashrateHistoryMap(watcherId: string, data: Re
   for (const [k, pts] of Object.entries(data)) {
     const key = k.trim();
     if (!key || !pts?.length) continue;
-    const arr = pts
-      .filter((p) => Number.isFinite(p.t) && Number.isFinite(p.v))
-      .map((p) => ({ t: p.t, v: p.v }))
-      .sort((a, b) => a.t - b.t);
-    trimmed[key] = capSeries(arr);
+    const arr = sanitizeRigHashSparklinePoints(
+      pts
+        .filter((p) => Number.isFinite(p.t) && Number.isFinite(p.v) && p.v > 0)
+        .map((p) => ({ t: p.t, v: p.v }))
+        .sort((a, b) => a.t - b.t)
+    );
+    if (arr.length) trimmed[key] = capSeries(arr);
   }
   saveAll(wid, trimmed);
 }
@@ -137,7 +161,7 @@ export function appendNiceHashRigHashrateSample(
   nowMs: number
 ): { added: boolean; rigKey?: string; t?: number; v?: number } {
   if (typeof window === "undefined") return { added: false };
-  if (value == null || !Number.isFinite(value) || value < 0) return { added: false };
+  if (value == null || !Number.isFinite(value) || value <= 0) return { added: false };
   const wid = watcherId.trim().toLowerCase();
   const key = rigKey.trim();
   if (!wid || !key) return { added: false };

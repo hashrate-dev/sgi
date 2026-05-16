@@ -18,6 +18,7 @@ import {
   replaceNhWatcherRigHashAggSeries,
   sampleTimeBucketMs,
 } from "../lib/nhWatcherRigHashSamples.js";
+import { normalizeNhWatcherStorageId } from "../lib/nhWatcherConfig.js";
 
 export const monitorEquiposAsicHistorialRouter = Router();
 
@@ -131,8 +132,16 @@ const postBajaBody = z.object({
     .transform((s) => (typeof s === "string" ? s.trim() : "")),
 });
 
+const nhWatcherStorageIdField = z
+  .string()
+  .trim()
+  .refine((s) => normalizeNhWatcherStorageId(s) != null, {
+    message: "watcherId debe ser un UUID válido o el id de toolbar de flota.",
+  })
+  .transform((s) => normalizeNhWatcherStorageId(s)!);
+
 const postNhWatcherRigHashBody = z.object({
-  watcherId: equipoIdParam,
+  watcherId: nhWatcherStorageIdField,
   /** Si true: misma fila por minuto/rig se actualiza con el último valor (muestreo LIVE). */
   live: z.boolean().optional(),
   samples: z
@@ -479,9 +488,10 @@ monitorEquiposAsicHistorialRouter.get(
   requireRole("admin_a", "admin_b"),
   requireAdminBGrant("equipos"),
   async (req: Request, res: Response) => {
-    const parsed = equipoIdParam.safeParse(req.params.watcherId);
-    if (!parsed.success) {
-      res.status(400).json({ error: { message: "watcherId debe ser un UUID válido." } });
+    const widParam = typeof req.params.watcherId === "string" ? req.params.watcherId : "";
+    const wid = normalizeNhWatcherStorageId(widParam);
+    if (!wid) {
+      res.status(400).json({ error: { message: "watcherId debe ser un UUID válido o el id de toolbar de flota." } });
       return;
     }
     const resolutionMs = parseRigHashHistoryResolutionMs(req.query.resolutionMs);
@@ -496,7 +506,6 @@ monitorEquiposAsicHistorialRouter.get(
       res.status(401).json({ error: { message: "No autenticado." } });
       return;
     }
-    const wid = parsed.data.trim().toLowerCase();
     await nhRigHashPruneOld(user.id, wid);
     await nhRigHashTrimPerRig(user.id, wid);
     const cutoff = Date.now() - NH_WATCHER_RIG_HASH_RETENTION_MS;
@@ -512,7 +521,7 @@ monitorEquiposAsicHistorialRouter.get(
       const series: Record<string, { t: number; v: number }[]> = {};
       for (const row of rows) {
         const p = nhRigHashRowNorm(row);
-        if (!p) continue;
+        if (!p || p.v <= 0) continue;
         (series[p.rigKey] ??= []).push({ t: p.t, v: p.v });
       }
       res.json({ series });
@@ -559,6 +568,7 @@ monitorEquiposAsicHistorialRouter.post(
     let inserted = 0;
     for (const s of parsed.data.samples) {
       if (s.t > now + maxSkewMs || now - s.t > maxAgeMs) continue;
+      if (!(s.v > 0)) continue;
       const bucketT = sampleTimeBucketMs(s.t);
       const r = await ins.run(user.id, wid, s.rigKey, bucketT, s.v);
       if (r.changes > 0) inserted += 1;

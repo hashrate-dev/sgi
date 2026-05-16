@@ -1,4 +1,5 @@
 import { memo, useId, useMemo } from "react";
+import { sanitizeRigHashSparklineValues } from "../lib/nicehashWatcherRigHashrateHistory";
 
 const W = 128;
 const H = 36;
@@ -42,6 +43,10 @@ function computeSparkScale(values: number[]): SparkScale | null {
   if (n === 0) return null;
   let vmin = Math.min(...values);
   let vmax = Math.max(...values);
+  if (vmax > 0 && vmin === 0) {
+    const positive = values.filter((v) => v > 0);
+    if (positive.length >= 1) vmin = Math.min(...positive);
+  }
   if (!Number.isFinite(vmin) || !Number.isFinite(vmax)) return null;
   if (vmin === vmax) {
     vmin -= Math.abs(vmin) * 0.06 + 0.01;
@@ -158,9 +163,10 @@ function kindPrefixShort(kinds: LevelKind[]): string {
 function NiceHashRigHashSparklineInner({ values, title, formatHashrate }: NiceHashRigHashSparklineProps) {
   const gid = useId().replace(/:/g, "");
   const gradId = `nhRigSparkFill-${gid}`;
-  const layout = useMemo(() => buildSparkLayout(values), [values]);
+  const plotValues = useMemo(() => sanitizeRigHashSparklineValues(values), [values]);
+  const layout = useMemo(() => buildSparkLayout(plotValues), [plotValues]);
   const { d, hasArea, scale } = layout;
-  const stats = useMemo(() => sparkStatsFromValues(values), [values]);
+  const stats = useMemo(() => sparkStatsFromValues(plotValues), [plotValues]);
   const statsTitle =
     stats && formatHashrate
       ? `Último registro: ${formatHashrate(stats.last)} · Mín. en gráfica: ${formatHashrate(stats.min)} · Máx.: ${formatHashrate(stats.max)}`
@@ -172,7 +178,7 @@ function NiceHashRigHashSparklineInner({ values, title, formatHashrate }: NiceHa
     return mergeLevelRows(stats, scale);
   }, [formatHashrate, stats, scale]);
 
-  if (values.length === 0) {
+  if (plotValues.length === 0) {
     return (
       <div className="nh-watcher-rig-spark nh-watcher-rig-spark--empty" title={title ?? "Sin historial aún (~1 min entre muestras)"} aria-hidden>
         <svg viewBox={`0 0 ${W} ${H}`} className="nh-watcher-rig-spark__svg" preserveAspectRatio="none">

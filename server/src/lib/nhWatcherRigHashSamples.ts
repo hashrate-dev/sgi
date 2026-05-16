@@ -107,7 +107,7 @@ export async function persistNhWatcherRigHashSamplesFromPayload(
     if (!rig || typeof rig !== "object") continue;
     const rk = nhWatcherRigStorageKey(rig as { rigId?: string; name?: string }, i);
     const sp = nhRigSpeedAcceptedFromStats((rig as { stats?: unknown[] }).stats);
-    if (sp == null || !Number.isFinite(sp) || sp < 0 || sp > 1e20) continue;
+    if (sp == null || !Number.isFinite(sp) || sp <= 0 || sp > 1e20) continue;
 
     const lb = lastBucketFor(rk);
     if (lb !== null && bucketNow <= lb) continue;
