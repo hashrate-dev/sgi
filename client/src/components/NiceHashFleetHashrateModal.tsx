@@ -20,7 +20,11 @@ import {
   type NhRigHashPoint,
 } from "../lib/nicehashWatcherRigHashrateHistory";
 import { nhWatcherRigStorageKey } from "../lib/nicehashWatcherRigNicknames";
-import type { NhWatcherSlotRow } from "../lib/nicehashWatcherSlots";
+import {
+  loadWatcherSlotRows,
+  watcherAccountLabelForSlot,
+  type NhWatcherSlotRow,
+} from "../lib/nicehashWatcherSlots";
 import { nhAcceptedSpeedLooksLikeTh, nhRigSpeedAcceptedFromStats } from "../lib/nhSpeedAccepted";
 import "./nicehashFleetHashrateModal.css";
 
@@ -29,6 +33,8 @@ export type FleetHashRigRow = {
   watcherId: string;
   rigIndex: number;
   rig: NonNullable<NiceHashExternalRigs2Payload["miningRigs"]>[number];
+  /** Nickname de cuenta (MARIRI, VALKYRIA…); el modal puede recalcularlo si falta. */
+  accountLabel?: string;
 };
 
 const MAX_AXIS_POINTS = 4320;
@@ -100,12 +106,11 @@ function fmtHashrateEs(n: number, maxFrac = 2): string {
   return n.toLocaleString("es-UY", { minimumFractionDigits: 0, maximumFractionDigits: maxFrac });
 }
 
-function rigDisplayLabel(row: FleetHashRigRow, slotRows: NhWatcherSlotRow[], isTotal: boolean): string {
+function rigDisplayLabel(row: FleetHashRigRow, slotRows: NhWatcherSlotRow[]): string {
   const base = (row.rig.name ?? row.rig.rigId ?? "ASIC").trim() || "ASIC";
-  if (!isTotal) return base;
-  const nick = (slotRows[row.slotIndex]?.nickname ?? "").trim();
-  const w = `W${row.slotIndex + 1}`;
-  return nick ? `${w} ${nick} · ${base}` : `${w} · ${base}`;
+  const account =
+    (row.accountLabel ?? "").trim() || watcherAccountLabelForSlot(slotRows, row.slotIndex, row.watcherId);
+  return account ? `${account} - ${base}` : base;
 }
 
 function pointsToMap(pts: NhRigHashPoint[]): Map<number, number> {
@@ -155,12 +160,7 @@ function nhFleetHashChartEmptyHint(axisUnit: "TH/s" | "MH/s", resolutionLabel: s
 
 type SplitRow = FleetHashRigRow & { label: string; map: Map<number, number>; isTh: boolean };
 
-function buildSplitRows(
-  rows: FleetHashRigRow[],
-  slotRows: NhWatcherSlotRow[],
-  isTotal: boolean,
-  resolutionMs: number
-): SplitRow[] {
+function buildSplitRows(rows: FleetHashRigRow[], slotRows: NhWatcherSlotRow[], resolutionMs: number): SplitRow[] {
   const out: SplitRow[] = [];
   for (const row of rows) {
     if (String(row.rig.minerStatus ?? "").trim().toUpperCase() !== "MINING") continue;
@@ -172,7 +172,7 @@ function buildSplitRows(
     const isTh = nhAcceptedSpeedLooksLikeTh(sp ?? 0);
     out.push({
       ...row,
-      label: rigDisplayLabel(row, slotRows, isTotal),
+      label: rigDisplayLabel(row, slotRows),
       map: pointsToMap(pts),
       isTh,
     });
@@ -246,7 +246,6 @@ function postLiveSamplesToServer(rows: FleetHashRigRow[], nowMs: number): void {
 function buildSplitRowsLive(
   rows: FleetHashRigRow[],
   slotRows: NhWatcherSlotRow[],
-  isTotal: boolean,
   liveByKey: Record<string, NhRigHashPoint[]>
 ): SplitRow[] {
   const out: SplitRow[] = [];
@@ -258,7 +257,7 @@ function buildSplitRowsLive(
     const isTh = nhAcceptedSpeedLooksLikeTh(sp ?? 0);
     out.push({
       ...row,
-      label: rigDisplayLabel(row, slotRows, isTotal),
+      label: rigDisplayLabel(row, slotRows),
       map: pointsToMap(pts),
       isTh,
     });
@@ -460,10 +459,9 @@ type Props = {
   onClose: () => void;
   rows: FleetHashRigRow[];
   slotRows: NhWatcherSlotRow[];
-  isTotal: boolean;
 };
 
-export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTotal }: Props) {
+export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows }: Props) {
   const fleetHeaderStats = useMemo(() => computeFleetMiningHeaderStats(rows), [rows]);
   const fleetOfflineCount = useMemo(() => countFleetRigsNotMining(rows), [rows]);
   const fleetKpiHasAny = fleetHeaderStats.total > 0 || fleetOfflineCount > 0;
@@ -495,13 +493,19 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
     return [...s].sort().join(",");
   }, [rows]);
 
+  /** Nicknames de cuenta al abrir el modal (localStorage fresco). */
+  const slotRowsForLabels = useMemo(() => {
+    if (!open) return slotRows;
+    return loadWatcherSlotRows();
+  }, [open, slotRows]);
+
   const splitRows = useMemo(() => {
     if (!open) return [];
     if (chartResolutionMs === NH_WATCHER_CHART_LIVE_MS) {
-      return buildSplitRowsLive(rows, slotRows, isTotal, liveSeriesRef.current);
+      return buildSplitRowsLive(rows, slotRowsForLabels, liveSeriesRef.current);
     }
-    return buildSplitRows(rows, slotRows, isTotal, chartResolutionMs);
-  }, [open, rows, slotRows, isTotal, chartResolutionMs, liveTick]);
+    return buildSplitRows(rows, slotRowsForLabels, chartResolutionMs);
+  }, [open, rows, slotRowsForLabels, chartResolutionMs, liveTick]);
 
   const axisTh = useMemo(() => unionAxisTs(splitRows, true), [splitRows]);
   const axisMh = useMemo(() => unionAxisTs(splitRows, false), [splitRows]);

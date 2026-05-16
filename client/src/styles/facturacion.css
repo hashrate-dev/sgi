@@ -10874,17 +10874,26 @@ button.nh-watcher-btc-card__corner-btn:hover {
   color: #8b949e;
 }
 
-/* NiceHash watcher — vista página completa (?watcher=1); mismo fondo que .mineria-page.fact-page */
-.nh-watcher-fullpage {
+/* NiceHash watcher — vista página (?watcher=total|1): mismo ancho SGI que .fact-page + .container (1320px) */
+.fact-page.mineria-page.nh-watcher-fullpage {
   min-height: calc(100vh - 52px);
-  background: #f1f5f9;
-  padding: 0.7rem 0 2rem;
   overflow-x: hidden;
 }
 @media (max-width: 768px) {
-  .nh-watcher-fullpage {
+  .fact-page.mineria-page.nh-watcher-fullpage {
     min-height: calc(100vh - 78px);
   }
+}
+.sgi-protected-root .nh-watcher-fullpage__container {
+  max-width: 1320px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+.nh-watcher-fullpage-main {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 /* Cabecera página watcher: misma barra verde SGI que .fact-topbar; ancho = .container (como Historial). */
 .nh-watcher-page-top {
@@ -11453,9 +11462,6 @@ button.nh-watcher-btc-card__corner-btn:hover {
   color: #8b949e;
   margin-top: 0.25rem;
   word-break: break-all;
-}
-.nh-watcher-fullpage-main {
-  width: 100%;
 }
 .nh-watcher-actions--embedded,
 .nh-watcher-actions--page {

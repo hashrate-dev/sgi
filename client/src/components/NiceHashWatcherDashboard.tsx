@@ -30,6 +30,7 @@ import {
   resolveWatcherIdAtSlot,
   saveActiveWatcherSlotIndex,
   saveWatcherSlotRows,
+  watcherAccountLabelForSlot,
   watcherSlotNicknameTrimmed,
 } from "../lib/nicehashWatcherSlots";
 import {
@@ -1402,8 +1403,15 @@ export function NiceHashWatcherDashboard({
   }, [nhAgg, isTotal, flatRigs, payload, activeSlot, effectiveWatcherId]);
 
   const fleetHashModalRows = useMemo(
-    () => rigRowsForList.map(({ slotIndex, watcherId, rigIndex, rig }) => ({ slotIndex, watcherId, rigIndex, rig })),
-    [rigRowsForList]
+    () =>
+      rigRowsForList.map(({ slotIndex, watcherId, rigIndex, rig }) => ({
+        slotIndex,
+        watcherId,
+        rigIndex,
+        rig,
+        accountLabel: watcherAccountLabelForSlot(slotRows, slotIndex, watcherId),
+      })),
+    [rigRowsForList, slotRows]
   );
 
   const fleetHashModal =
@@ -1413,7 +1421,6 @@ export function NiceHashWatcherDashboard({
         onClose={() => setFleetHashDetailOpen(false)}
         rows={fleetHashModalRows}
         slotRows={slotRows}
-        isTotal={isTotal}
       />
     ) : null;
 
@@ -2044,8 +2051,8 @@ export function NiceHashWatcherDashboard({
   if (layout === "fullscreen") {
     return (
       <>
-        <div className="nh-watcher-fullpage">
-          <div className="container">
+        <div className="fact-page mineria-page nh-watcher-fullpage">
+          <div className="container nh-watcher-fullpage__container">
             <main className="nh-watcher-fullpage-main">
               <h1 className="visually-hidden">
                 {isTotal ? "NiceHash watcher · vista TOTAL" : "NiceHash watcher"}

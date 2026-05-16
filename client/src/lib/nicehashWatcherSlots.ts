@@ -109,6 +109,23 @@ export function watcherSlotNicknameTrimmed(rows: NhWatcherSlotRow[], slotIndex: 
   return n.slice(0, NH_WATCHER_SLOT_NICKNAME_MAX);
 }
 
+/** Slot cuyo enlace watcher coincide con `watcherId` (si no hay match, devuelve `hint`). */
+export function watcherSlotIndexForWatcherId(rows: NhWatcherSlotRow[], watcherId: string, hint = 0): number {
+  const w = watcherId.trim().toLowerCase();
+  if (!w) return hint;
+  for (let i = 0; i < rows.length; i++) {
+    const id = parseNiceHashWatcherUuid(rows[i]?.link ?? "");
+    if (id && id.toLowerCase() === w) return i;
+  }
+  return hint;
+}
+
+/** Nickname de cuenta (slot) para un rig, resolviendo el slot por UUID del watcher si hace falta. */
+export function watcherAccountLabelForSlot(rows: NhWatcherSlotRow[], slotIndex: number, watcherId?: string): string {
+  const idx = watcherId != null ? watcherSlotIndexForWatcherId(rows, watcherId, slotIndex) : slotIndex;
+  return watcherSlotNicknameTrimmed(rows, idx);
+}
+
 export function loadWatcherSlotRows(): NhWatcherSlotRow[] {
   if (typeof window === "undefined") return defaultRows();
   try {
