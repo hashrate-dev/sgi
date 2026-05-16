@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Chart from "chart.js/auto";
-import type { Chart as ChartJs, ChartConfiguration, ChartDataset, ChartOptions, Plugin } from "chart.js";
+import type {
+  Chart as ChartJs,
+  ChartConfiguration,
+  ChartDataset,
+  ChartEvent,
+  ChartOptions,
+  LegendElement,
+  LegendItem,
+  Plugin,
+} from "chart.js";
 import { getNiceHashWatcherRigHashHistory, postNiceHashWatcherRigHashHistorySamples, type NiceHashExternalRigs2Payload, type NhWatcherRigHashSample } from "../lib/api";
 import {
   aggregateRigHashPointsByBucketMs,
@@ -340,6 +349,30 @@ const nhFleetHashLiveLastPointPlugin: Plugin<"line"> = {
   },
 };
 
+/** Clic en leyenda: solo esa serie; segundo clic en la misma → todas visibles. */
+function nhFleetHashLegendSoloFocusHandler(_evt: ChartEvent, legendItem: LegendItem, legend: LegendElement<"line">): void {
+  const chart = legend.chart;
+  const idx = legendItem.datasetIndex;
+  if (idx == null || idx < 0 || !chart.data.datasets.length) return;
+
+  const onlyThisVisible = chart.data.datasets.every((_, i) => {
+    const hidden = chart.getDatasetMeta(i).hidden;
+    return i === idx ? !hidden : Boolean(hidden);
+  });
+
+  for (let i = 0; i < chart.data.datasets.length; i++) {
+    chart.getDatasetMeta(i).hidden = onlyThisVisible ? false : i !== idx;
+  }
+  chart.update();
+}
+
+function nhFleetHashLegendPointerHover(evt: ChartEvent, item: LegendItem | null): void {
+  const target = evt.native?.target;
+  if (target instanceof HTMLElement) {
+    target.style.cursor = item ? "pointer" : "default";
+  }
+}
+
 function makeChartConfig(
   title: string,
   yUnit: string,
@@ -360,6 +393,8 @@ function makeChartConfig(
     legend: {
       display: true,
       position: "bottom",
+      onClick: nhFleetHashLegendSoloFocusHandler,
+      onHover: nhFleetHashLegendPointerHover,
       labels: {
         color: "#c9d1d9",
         boxWidth: 12,
@@ -764,7 +799,6 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
               role="toolbar"
               aria-label="Temporalidad del gráfico"
             >
-              <span className="nh-fleet-hash-resolution-bar__label">Temporalidad</span>
               <div className="nh-fleet-hash-resolution-bar__btns">
                 {NH_WATCHER_CHART_RESOLUTION_OPTIONS.map((opt) => (
                   <button
