@@ -350,7 +350,13 @@ function makeChartConfig(
 ): ChartConfiguration<"line"> {
   const live = Boolean(opts?.live);
   const plugins: ChartOptions<"line">["plugins"] = {
-    title: { display: true, text: title, color: "#f0f6fc", font: { size: 14, weight: 600 } },
+    title: {
+      display: true,
+      text: title,
+      color: "#f8fafc",
+      font: { size: 13, weight: "bold" as const },
+      padding: { top: 8, bottom: 12 },
+    },
     legend: {
       display: true,
       position: "bottom",
@@ -622,8 +628,8 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
       aria-label="Monitor de hashrate por equipo"
     >
       <button type="button" className="nh-fleet-hash-backdrop" aria-label="Cerrar" onClick={onClose} />
-      <div className="nh-fleet-hash-dialog">
-        <header className="nh-fleet-hash-header">
+      <div className="nh-fleet-hash-dialog nh-fleet-hash-dialog--pro">
+        <header className="nh-fleet-hash-header nh-fleet-hash-header--pro">
           <div className="nh-fleet-hash-header__brand">
             <a
               href="https://hashrate.space/"
@@ -652,82 +658,97 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
             <div className="nh-fleet-hash-header__text">
               <div className="nh-fleet-hash-kpi-wrap" role="status" aria-live="polite">
                 {fleetKpiHasAny ? (
-                  <div className="nh-fleet-hash-kpi-grid">
-                    <div
-                      className="nh-fleet-hash-kpi-group nh-fleet-hash-kpi-group--th"
-                      aria-label="TOTAL ASIC SHA-256 y TH/s totales"
-                    >
-                      <div className="nh-fleet-hash-kpi-tile nh-fleet-hash-kpi-tile--th">
-                        <div className="nh-fleet-hash-kpi-tile__label nh-fleet-hash-kpi-tile__label--stack">
-                          <span className="nh-fleet-hash-kpi-tile__label-line">TOTAL ASICS</span>
+                  <div className="nh-fleet-hash-kpi-grid nh-fleet-hash-kpi-grid--pro" role="list">
+                    <article className="nh-fleet-hash-kpi-tile nh-fleet-hash-kpi-tile--pro nh-fleet-hash-kpi-tile--th" role="listitem">
+                      <header className="nh-fleet-hash-kpi-tile__head">
+                        <span className="nh-fleet-hash-kpi-tile__icon-wrap" aria-hidden>
+                          <i className="bi bi-hdd-network nh-fleet-hash-kpi-tile__icon" />
+                        </span>
+                        <div className="nh-fleet-hash-kpi-tile__label-wrap">
+                          <span className="nh-fleet-hash-kpi-tile__label-line">Total ASICs</span>
                           <span className="nh-fleet-hash-kpi-tile__label-sub">SHA-256</span>
                         </div>
-                        <div className="nh-fleet-hash-kpi-tile__figure">
-                          <div className="nh-fleet-hash-kpi-tile__value tabular-nums">{fleetHeaderStats.nTh}</div>
-                        </div>
+                      </header>
+                      <div className="nh-fleet-hash-kpi-tile__body">
+                        <p className="nh-fleet-hash-kpi-tile__value tabular-nums">{fleetHeaderStats.nTh}</p>
                       </div>
-                      <div className="nh-fleet-hash-kpi-tile nh-fleet-hash-kpi-tile--th">
-                        <div className="nh-fleet-hash-kpi-tile__label nh-fleet-hash-kpi-tile__label--stack">
-                          <span className="nh-fleet-hash-kpi-tile__label-line">TOTAL HASHRATE</span>
+                    </article>
+                    <article className="nh-fleet-hash-kpi-tile nh-fleet-hash-kpi-tile--pro nh-fleet-hash-kpi-tile--th-rate" role="listitem">
+                      <header className="nh-fleet-hash-kpi-tile__head">
+                        <span className="nh-fleet-hash-kpi-tile__icon-wrap" aria-hidden>
+                          <i className="bi bi-speedometer2 nh-fleet-hash-kpi-tile__icon" />
+                        </span>
+                        <div className="nh-fleet-hash-kpi-tile__label-wrap">
+                          <span className="nh-fleet-hash-kpi-tile__label-line">Hashrate total</span>
                           <span className="nh-fleet-hash-kpi-tile__label-sub">SHA-256</span>
                         </div>
-                        <div className="nh-fleet-hash-kpi-tile__figure">
-                          <div className="nh-fleet-hash-kpi-tile__value tabular-nums">
-                            {fmtHashrateEs(fleetHeaderStats.sumTh)}
-                          </div>
+                      </header>
+                      <div className="nh-fleet-hash-kpi-tile__body">
+                        <p className="nh-fleet-hash-kpi-tile__value nh-fleet-hash-kpi-tile__value--split tabular-nums">
+                          <span className="nh-fleet-hash-kpi-tile__value-main">{fmtHashrateEs(fleetHeaderStats.sumTh)}</span>
                           <span className="nh-fleet-hash-kpi-tile__unit">TH/s</span>
-                        </div>
+                        </p>
                       </div>
-                    </div>
-                    <div
-                      className="nh-fleet-hash-kpi-group nh-fleet-hash-kpi-group--mh"
-                      aria-label="TOTAL ASICS SCRYPT y MH/s totales"
-                    >
-                      <div className="nh-fleet-hash-kpi-tile nh-fleet-hash-kpi-tile--mh">
-                        <div className="nh-fleet-hash-kpi-tile__label nh-fleet-hash-kpi-tile__label--stack">
-                          <span className="nh-fleet-hash-kpi-tile__label-line">TOTAL ASICS</span>
-                          <span className="nh-fleet-hash-kpi-tile__label-sub">SCRYPT</span>
+                    </article>
+                    <article className="nh-fleet-hash-kpi-tile nh-fleet-hash-kpi-tile--pro nh-fleet-hash-kpi-tile--mh" role="listitem">
+                      <header className="nh-fleet-hash-kpi-tile__head">
+                        <span className="nh-fleet-hash-kpi-tile__icon-wrap" aria-hidden>
+                          <i className="bi bi-lightning-charge nh-fleet-hash-kpi-tile__icon" />
+                        </span>
+                        <div className="nh-fleet-hash-kpi-tile__label-wrap">
+                          <span className="nh-fleet-hash-kpi-tile__label-line">Total ASICs</span>
+                          <span className="nh-fleet-hash-kpi-tile__label-sub">Scrypt</span>
                         </div>
-                        <div className="nh-fleet-hash-kpi-tile__figure">
-                          <div className="nh-fleet-hash-kpi-tile__value tabular-nums">{fleetHeaderStats.nMh}</div>
-                        </div>
+                      </header>
+                      <div className="nh-fleet-hash-kpi-tile__body">
+                        <p className="nh-fleet-hash-kpi-tile__value tabular-nums">{fleetHeaderStats.nMh}</p>
                       </div>
-                      <div className="nh-fleet-hash-kpi-tile nh-fleet-hash-kpi-tile--mh">
-                        <div className="nh-fleet-hash-kpi-tile__label nh-fleet-hash-kpi-tile__label--stack">
-                          <span className="nh-fleet-hash-kpi-tile__label-line">TOTAL HASHRATE</span>
-                          <span className="nh-fleet-hash-kpi-tile__label-sub">SCRYPT</span>
+                    </article>
+                    <article className="nh-fleet-hash-kpi-tile nh-fleet-hash-kpi-tile--pro nh-fleet-hash-kpi-tile--mh-rate" role="listitem">
+                      <header className="nh-fleet-hash-kpi-tile__head">
+                        <span className="nh-fleet-hash-kpi-tile__icon-wrap" aria-hidden>
+                          <i className="bi bi-graph-up nh-fleet-hash-kpi-tile__icon" />
+                        </span>
+                        <div className="nh-fleet-hash-kpi-tile__label-wrap">
+                          <span className="nh-fleet-hash-kpi-tile__label-line">Hashrate total</span>
+                          <span className="nh-fleet-hash-kpi-tile__label-sub">Scrypt</span>
                         </div>
-                        <div className="nh-fleet-hash-kpi-tile__figure">
-                          <div className="nh-fleet-hash-kpi-tile__value tabular-nums">
-                            {fmtHashrateEs(fleetHeaderStats.sumMh)}
-                          </div>
+                      </header>
+                      <div className="nh-fleet-hash-kpi-tile__body">
+                        <p className="nh-fleet-hash-kpi-tile__value nh-fleet-hash-kpi-tile__value--split tabular-nums">
+                          <span className="nh-fleet-hash-kpi-tile__value-main">{fmtHashrateEs(fleetHeaderStats.sumMh)}</span>
                           <span className="nh-fleet-hash-kpi-tile__unit">MH/s</span>
-                        </div>
+                        </p>
                       </div>
-                    </div>
-                    <div
-                      className="nh-fleet-hash-kpi-group nh-fleet-hash-kpi-group--status"
-                      aria-label="ASICs en MINING y fuera de MINING"
-                    >
-                      <div className="nh-fleet-hash-kpi-tile nh-fleet-hash-kpi-tile--total">
-                        <div className="nh-fleet-hash-kpi-tile__label nh-fleet-hash-kpi-tile__label--stack">
-                          <span className="nh-fleet-hash-kpi-tile__label-line">ASICS</span>
-                          <span className="nh-fleet-hash-kpi-tile__label-sub">ACTIVOS</span>
+                    </article>
+                    <article className="nh-fleet-hash-kpi-tile nh-fleet-hash-kpi-tile--pro nh-fleet-hash-kpi-tile--active" role="listitem">
+                      <header className="nh-fleet-hash-kpi-tile__head">
+                        <span className="nh-fleet-hash-kpi-tile__icon-wrap" aria-hidden>
+                          <i className="bi bi-check-circle nh-fleet-hash-kpi-tile__icon" />
+                        </span>
+                        <div className="nh-fleet-hash-kpi-tile__label-wrap">
+                          <span className="nh-fleet-hash-kpi-tile__label-line">ASICs</span>
+                          <span className="nh-fleet-hash-kpi-tile__label-sub">Activos</span>
                         </div>
-                        <div className="nh-fleet-hash-kpi-tile__figure">
-                          <div className="nh-fleet-hash-kpi-tile__value tabular-nums">{fleetHeaderStats.total}</div>
-                        </div>
+                      </header>
+                      <div className="nh-fleet-hash-kpi-tile__body">
+                        <p className="nh-fleet-hash-kpi-tile__value tabular-nums">{fleetHeaderStats.total}</p>
                       </div>
-                      <div className="nh-fleet-hash-kpi-tile nh-fleet-hash-kpi-tile--offline">
-                        <div className="nh-fleet-hash-kpi-tile__label nh-fleet-hash-kpi-tile__label--stack">
-                          <span className="nh-fleet-hash-kpi-tile__label-line">ASICS</span>
-                          <span className="nh-fleet-hash-kpi-tile__label-sub">OFFLINE</span>
+                    </article>
+                    <article className="nh-fleet-hash-kpi-tile nh-fleet-hash-kpi-tile--pro nh-fleet-hash-kpi-tile--offline" role="listitem">
+                      <header className="nh-fleet-hash-kpi-tile__head">
+                        <span className="nh-fleet-hash-kpi-tile__icon-wrap" aria-hidden>
+                          <i className="bi bi-exclamation-circle nh-fleet-hash-kpi-tile__icon" />
+                        </span>
+                        <div className="nh-fleet-hash-kpi-tile__label-wrap">
+                          <span className="nh-fleet-hash-kpi-tile__label-line">ASICs</span>
+                          <span className="nh-fleet-hash-kpi-tile__label-sub">Offline</span>
                         </div>
-                        <div className="nh-fleet-hash-kpi-tile__figure">
-                          <div className="nh-fleet-hash-kpi-tile__value tabular-nums">{fleetOfflineCount}</div>
-                        </div>
+                      </header>
+                      <div className="nh-fleet-hash-kpi-tile__body">
+                        <p className="nh-fleet-hash-kpi-tile__value tabular-nums">{fleetOfflineCount}</p>
                       </div>
-                    </div>
+                    </article>
                   </div>
                 ) : (
                   <div className="nh-fleet-hash-kpi-empty">
@@ -739,11 +760,11 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
           </div>
           <div className="nh-fleet-hash-header__actions">
             <div
-              className="nh-fleet-hash-resolution-bar nh-fleet-hash-resolution-bar--header"
+              className="nh-fleet-hash-resolution-bar nh-fleet-hash-resolution-bar--header nh-fleet-hash-resolution-bar--pro"
               role="toolbar"
               aria-label="Temporalidad del gráfico"
             >
-
+              <span className="nh-fleet-hash-resolution-bar__label">Temporalidad</span>
               <div className="nh-fleet-hash-resolution-bar__btns">
                 {NH_WATCHER_CHART_RESOLUTION_OPTIONS.map((opt) => (
                   <button
@@ -758,15 +779,15 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
                 ))}
               </div>
             </div>
-            <button type="button" className="nh-fleet-hash-close btn btn-outline-light btn-sm rounded-pill" onClick={onClose}>
+            <button type="button" className="nh-fleet-hash-close nh-fleet-hash-close--pro" onClick={onClose}>
               <i className="bi bi-x-lg me-1" aria-hidden />
               Cerrar
             </button>
           </div>
         </header>
 
-        <div className="nh-fleet-hash-body">
-          <section className="nh-fleet-hash-panel" aria-label="Gráfico TH por equipo">
+        <div className="nh-fleet-hash-body nh-fleet-hash-body--pro">
+          <section className="nh-fleet-hash-panel nh-fleet-hash-panel--pro nh-fleet-hash-panel--th" aria-label="Gráfico TH por equipo">
             <div className="nh-fleet-hash-canvas-wrap">
               {axisTh.length === 0 || dsTh.length === 0 ? (
                 <div className="nh-fleet-hash-empty">
@@ -777,7 +798,7 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows, isTo
               )}
             </div>
           </section>
-          <section className="nh-fleet-hash-panel" aria-label="Gráfico MH por equipo">
+          <section className="nh-fleet-hash-panel nh-fleet-hash-panel--pro nh-fleet-hash-panel--mh" aria-label="Gráfico MH por equipo">
             <div className="nh-fleet-hash-canvas-wrap">
               {axisMh.length === 0 || dsMh.length === 0 ? (
                 <div className="nh-fleet-hash-empty">
