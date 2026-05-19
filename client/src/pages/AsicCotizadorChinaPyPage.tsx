@@ -3,9 +3,9 @@ import { PageHeader } from "../components/PageHeader";
 import { createAsicCostoEquipo, deleteAsicCostoEquipo, getAsicCostosEquipos, type AsicCostoEquipoItem } from "../lib/api";
 import "../styles/facturacion.css";
 
-/** Valores por defecto de la fórmula: ((PRECIO ORIGEN + 220 USD) × 1,17) + 300 */
+/** Valores por defecto de la fórmula: ((PRECIO ORIGEN + 220 USD) × 1,23) + 300 */
 const DEFAULT_BLOQUE_USD = 220;
-const DEFAULT_MULT = 1.17;
+const DEFAULT_MULT = 1.23;
 const DEFAULT_PROVEEDOR_USD = 300;
 const HASHRATE_LOGO = "https://hashrate.space/wp-content/uploads/hashrate-LOGO.png";
 
@@ -435,7 +435,7 @@ export function AsicCotizadorChinaPyPage() {
                 </div>
                 <div className="col asic-cotizador-field-wrap asic-cotizador-field-wrap--costo">
                   <label className="fact-label" htmlFor="cot-mult">
-                    Coeficiente (ej. 1,17)
+                    Coeficiente (ej. 1,23)
                   </label>
                   <input
                     id="cot-mult"
