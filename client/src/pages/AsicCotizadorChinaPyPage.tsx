@@ -53,17 +53,21 @@ function removeMinus(raw: string): string {
   return raw.replace(/-/g, "");
 }
 
-function formatFechaRegistro(iso: string): string {
-  return new Date(iso).toLocaleString("es-PY", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+function calendarDayKey(iso: string): string {
+  const f = new Date(iso);
+  const y = f.getFullYear();
+  const m = String(f.getMonth() + 1).padStart(2, "0");
+  const d = String(f.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
-const USD_FMT = new Intl.NumberFormat("es-PY", { style: "currency", currency: "USD" });
+function prioridadModeloCotizacion(modeloRaw: string): number {
+  const modeloNorm = modeloRaw.trim().toUpperCase();
+  if (modeloNorm === "S21") return 0;
+  if (modeloNorm === "L9") return 1;
+  return 2;
+}
+
 const USD_FMT_CEIL = new Intl.NumberFormat("es-PY", {
   style: "currency",
   currency: "USD",
@@ -151,29 +155,33 @@ export function AsicCotizadorChinaPyPage() {
     const y = hoy.getFullYear();
     const m = hoy.getMonth();
     const d = hoy.getDate();
-    const prioridadModelo = (modeloRaw: string): number => {
-      const modeloNorm = modeloRaw.trim().toUpperCase();
-      if (modeloNorm === "S21") return 0;
-      if (modeloNorm === "L9") return 1;
-      return 2;
-    };
-
     return registros
       .filter((r) => {
         const f = new Date(r.createdAt);
         return f.getFullYear() === y && f.getMonth() === m && f.getDate() === d;
       })
-      .sort((a, b) => prioridadModelo(a.modelo) - prioridadModelo(b.modelo));
+      .sort((a, b) => prioridadModeloCotizacion(a.modelo) - prioridadModeloCotizacion(b.modelo));
   }, [registros]);
 
-  /** Todos los registros, más recientes primero (misma orden que devuelve la API). */
-  const registrosUltimos = useMemo(
-    () =>
-      [...registros].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() || b.id - a.id
-      ),
-    [registros]
-  );
+  /** Solo equipos del día de registro más reciente (último lote de cotizaciones). */
+  const ultimoLotePrecios = useMemo(() => {
+    if (registros.length === 0) {
+      return { fechaLabel: null as string | null, items: [] as AsicCostoEquipoItem[] };
+    }
+    const sorted = [...registros].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() || b.id - a.id
+    );
+    const diaReciente = calendarDayKey(sorted[0]!.createdAt);
+    const items = sorted
+      .filter((r) => calendarDayKey(r.createdAt) === diaReciente)
+      .sort((a, b) => prioridadModeloCotizacion(a.modelo) - prioridadModeloCotizacion(b.modelo));
+    const fechaLabel = new Intl.DateTimeFormat("es-PY", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date(sorted[0]!.createdAt));
+    return { fechaLabel, items };
+  }, [registros]);
 
   const fechaActualizacionHoy = useMemo(
     () =>
@@ -631,7 +639,7 @@ export function AsicCotizadorChinaPyPage() {
         {showUltimosModal ? (
           <>
             <div className="modal fade show d-block" tabIndex={-1} role="dialog" aria-modal="true">
-              <div className="modal-dialog modal-xl modal-dialog-scrollable" role="document">
+              <div className="modal-dialog modal-lg modal-dialog-scrollable" role="document">
                 <div className="modal-content asic-cotizador-hoy-modal__content">
                   <div className="modal-header asic-cotizador-hoy-modal__header">
                     <h5 className="modal-title asic-cotizador-hoy-modal__title">
@@ -643,7 +651,7 @@ export function AsicCotizadorChinaPyPage() {
                         decoding="async"
                       />
                       <span className="asic-cotizador-hoy-modal__title-text">
-                        Últimos precios registrados ({registrosUltimos.length})
+                        Últimos precios registrados ({ultimoLotePrecios.items.length})
                       </span>
                     </h5>
                     <button
@@ -656,44 +664,40 @@ export function AsicCotizadorChinaPyPage() {
                   <div className="modal-body">
                     {registrosLoading ? (
                       <div className="text-muted small">Cargando registros…</div>
-                    ) : registrosUltimos.length === 0 ? (
+                    ) : ultimoLotePrecios.items.length === 0 ? (
                       <div className="text-muted small">Todavía no hay cotizaciones registradas.</div>
                     ) : (
                       <div>
                         <p className="text-muted small mb-2">
-                          Ordenados por fecha de registro (más recientes primero).
+                          Equipos del último día de registro
+                          {ultimoLotePrecios.fechaLabel ? (
+                            <>
+                              : <strong>{ultimoLotePrecios.fechaLabel}</strong>
+                            </>
+                          ) : null}
+                          .
                         </p>
                         <div className="table-responsive asic-cotizador-registros-wrap asic-cotizador-hoy-modal__table-wrap">
-                          <table className="table table-sm align-middle mb-0 asic-cotizador-registros-table asic-cotizador-ultimos-modal__table">
+                          <table className="table table-sm align-middle mb-0 asic-cotizador-registros-table asic-cotizador-hoy-modal__table">
                             <thead>
                               <tr>
                                 <th>Fecha</th>
                                 <th>Marca</th>
                                 <th>Modelo</th>
                                 <th>Procesador</th>
-                                <th className="text-end">Origen</th>
-                                <th className="text-end">Nacionalizado</th>
-                                <th className="text-end">Margen</th>
-                                <th className="text-end">% Margen</th>
                                 <th className="text-end">Precio venta</th>
                               </tr>
                             </thead>
                             <tbody>
-                              {registrosUltimos.map((r) => (
+                              {ultimoLotePrecios.items.map((r) => (
                                 <tr key={`ult-${r.id}`}>
-                                  <td className="asic-cotizador-ultimos-modal__fecha-cell">{formatFechaRegistro(r.createdAt)}</td>
+                                  <td className="asic-cotizador-hoy-modal__date-cell">
+                                    {ultimoLotePrecios.fechaLabel ?? "—"}
+                                  </td>
                                   <td>{r.marca || "—"}</td>
                                   <td>{r.modelo || "—"}</td>
                                   <td>{r.procesador || "—"}</td>
-                                  <td className="text-end">{USD_FMT.format(r.precioOrigen)}</td>
-                                  <td className="text-end">{USD_FMT.format(r.totalNacionalizado)}</td>
-                                  <td className="text-end text-success fw-semibold">
-                                    +{new Intl.NumberFormat("es-PY", { maximumFractionDigits: 2 }).format(r.margenUsd)}
-                                  </td>
-                                  <td className="text-end">
-                                    {new Intl.NumberFormat("es-PY", { maximumFractionDigits: 2 }).format(r.pctMargen)}%
-                                  </td>
-                                  <td className="text-end fw-bold asic-cotizador-hoy-modal__price-cell">
+                                  <td className="text-end fw-semibold asic-cotizador-hoy-modal__price-cell">
                                     {USD_FMT_CEIL.format(Math.ceil(r.precioVenta))}
                                   </td>
                                 </tr>
