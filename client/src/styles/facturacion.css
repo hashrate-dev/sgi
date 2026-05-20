@@ -2705,6 +2705,31 @@ button.fact-back {
   transition: all 0.18s ease;
 }
 
+.fact-panel-nuevo-documento .asic-cotizador-ultimos-btn {
+  border-color: rgba(255, 255, 255, 0.65);
+  color: #f8fafc;
+  font-weight: 600;
+}
+
+.fact-panel-nuevo-documento .asic-cotizador-ultimos-btn:hover:not(:disabled),
+.fact-panel-nuevo-documento .asic-cotizador-ultimos-btn:focus:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: #fff;
+  color: #fff;
+}
+
+.asic-cotizador-ultimos-modal__table {
+  min-width: 960px;
+  font-size: 0.88rem;
+}
+
+.asic-cotizador-ultimos-modal__fecha-cell {
+  white-space: nowrap;
+  font-weight: 600;
+  color: #475569;
+  font-size: 0.82rem;
+}
+
 .asic-cotizador-hoy-btn:hover,
 .asic-cotizador-hoy-btn:focus {
   color: #ffffff;
