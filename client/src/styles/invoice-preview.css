@@ -248,7 +248,8 @@
 }
 
 .invoice-preview-table tbody tr {
-  height: 9mm; /* ROW_H */
+  height: auto;
+  min-height: 9mm; /* ROW_H mínimo (una línea) */
   border-bottom: 0.5px solid rgb(226, 232, 240); /* TABLE_BORDER */
 }
 
@@ -261,11 +262,12 @@
   font-weight: normal;
   color: #000000;
   padding: 0;
-  height: 9mm; /* ROW_H */
+  height: auto;
+  min-height: 9mm;
   vertical-align: middle;
   border: none;
   border-right: 0.5px solid rgb(226, 232, 240); /* línea entre columnas */
-  line-height: 1;
+  line-height: 1.25;
 }
 .invoice-preview-table td:last-child {
   border-right: none;
@@ -274,17 +276,23 @@
 .invoice-preview-td-desc {
   width: 95mm; /* COL_DESC */
   text-align: left;
-  padding-left: 3mm; /* tableLeft + 3 */
+  padding: 2mm 2mm 2mm 3mm; /* tableLeft + 3 */
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  vertical-align: top;
 }
 
 .invoice-preview-td-precio {
   width: 32mm; /* COL_PRECIO */
   text-align: center;
+  vertical-align: middle;
 }
 
 .invoice-preview-td-cant {
   width: 22mm; /* COL_CANT */
   text-align: center;
+  vertical-align: middle;
 }
 
 .invoice-preview-td-total {

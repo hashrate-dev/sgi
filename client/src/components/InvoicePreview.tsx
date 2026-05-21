@@ -8,6 +8,7 @@ import {
 } from "../lib/receiptSettlementLine";
 import { recibimosMontoEnDosLineas } from "../lib/numberToWords";
 import { effectiveInvoiceClientName2, hasSecondaryClientColumn } from "../lib/clientInvoiceDisplay";
+import { getLineItemDescription, getLineItemDiscountDescription } from "../lib/invoiceLineItemDescription";
 import "../styles/invoice-preview.css";
 
 const EMISOR = {
@@ -37,12 +38,6 @@ function formatDDMMYY(d: Date): string {
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const year = String(d.getFullYear()).slice(-2);
   return `${day}/${month}/${year}`;
-}
-
-function ymToMonthYear(ym: string): string {
-  if (!/^\d{4}-\d{2}$/.test(ym)) return ym;
-  const [y, m] = ym.split("-");
-  return `${m}-${y}`;
 }
 
 interface InvoicePreviewProps {
@@ -226,98 +221,31 @@ export function InvoicePreview({
                 {displayItems.map((item, idx) => {
                   const settlementKind = getReceiptSettlementRowKind(item);
                   const lineTotalServicio = item.price * item.quantity;
+                  const desc = getLineItemDescription(item);
 
-                  if (settlementKind === "payment_line") {
-                    const desc = String(item.serviceName ?? "").trim() || "Pago";
-                    return (
-                      <React.Fragment key={idx}>
-                        <tr>
-                          <td className="invoice-preview-td-desc">{desc.substring(0, 80)}</td>
-                          <td className="invoice-preview-td-precio">{formatUSD(item.price)}</td>
-                          <td className="invoice-preview-td-cant">{item.quantity}</td>
-                          <td className="invoice-preview-td-total">{formatUSD(lineTotalServicio)}</td>
-                        </tr>
-                      </React.Fragment>
-                    );
-                  }
-                  if (settlementKind === "invoice_ref") {
-                    const desc = item.month ? `${item.serviceName ?? "Factura"} - ${ymToMonthYear(item.month)}` : (item.serviceName ?? "Factura");
-                    return (
-                      <React.Fragment key={idx}>
-                        <tr>
-                          <td className="invoice-preview-td-desc">{desc.substring(0, 80)}</td>
-                          <td className="invoice-preview-td-precio">{formatUSD(item.price)}</td>
-                          <td className="invoice-preview-td-cant">{item.quantity}</td>
-                          <td className="invoice-preview-td-total">{formatUSD(lineTotalServicio)}</td>
-                        </tr>
-                      </React.Fragment>
-                    );
-                  }
                   if (settlementKind === "credit_note" || settlementKind === "prior_receipt") {
                     const amt = item.discount * item.quantity;
-                    const desc = item.month ? `${item.serviceName ?? ""} - ${ymToMonthYear(item.month)}` : (item.serviceName ?? "");
                     return (
-                      <React.Fragment key={idx}>
-                        <tr>
-                          <td className="invoice-preview-td-desc">{desc.substring(0, 80)}</td>
-                          <td className="invoice-preview-td-precio">—</td>
-                          <td className="invoice-preview-td-cant">{item.quantity}</td>
-                          <td className="invoice-preview-td-total">- {formatUSD(amt)}</td>
-                        </tr>
-                      </React.Fragment>
+                      <tr key={idx}>
+                        <td className="invoice-preview-td-desc">{desc}</td>
+                        <td className="invoice-preview-td-precio">—</td>
+                        <td className="invoice-preview-td-cant">{item.quantity}</td>
+                        <td className="invoice-preview-td-total">- {formatUSD(amt)}</td>
+                      </tr>
                     );
                   }
 
-                  // Determinar la descripción: Setup, equipos ASIC, Garantía ANDE, servicios de Hosting
-                  let desc = "";
-                  if (item.setupId && item.setupNombre) {
-                    // Setup
-                    desc = item.setupNombre;
-                  } else if (item.reparacionTipoId && item.reparacionNombre) {
-                    desc = item.reparacionNombre;
-                  } else if (item.transporteFleteTipoId && item.transporteFleteNombre) {
-                    desc = item.transporteFleteNombre;
-                  } else if (item.marcaEquipo && item.modeloEquipo && item.procesadorEquipo) {
-                    // Equipo ASIC
-                    const equipoDesc = `${item.marcaEquipo} - ${item.modeloEquipo} - ${item.procesadorEquipo}`;
-                    desc = item.month ? `${equipoDesc} - ${ymToMonthYear(item.month)}` : equipoDesc;
-                  } else if (item.garantiaCodigo || item.garantiaMarca || item.garantiaModelo) {
-                    // Ítem de Garantía ANDE (tabla Detalles -> Garantías): código - Garantías - marca - modelo
-                    desc = [item.garantiaCodigo, "Garantías", item.garantiaMarca, item.garantiaModelo].filter(Boolean).join(" - ") || "Garantía";
-                  } else if (item.serviceName) {
-                    // Servicio de Hosting (compatibilidad hacia atrás)
-                    desc = item.month ? `${item.serviceName} - ${ymToMonthYear(item.month)}` : item.serviceName;
-                  } else {
-                    // Fallback
-                    desc = item.month ? `Item - ${ymToMonthYear(item.month)}` : "Item";
-                  }
                   return (
                     <React.Fragment key={idx}>
                       <tr>
-                        <td className="invoice-preview-td-desc">{desc.substring(0, 52)}</td>
+                        <td className="invoice-preview-td-desc">{desc}</td>
                         <td className="invoice-preview-td-precio">{formatUSD(item.price)}</td>
                         <td className="invoice-preview-td-cant">{item.quantity}</td>
                         <td className="invoice-preview-td-total">{formatUSD(lineTotalServicio)}</td>
                       </tr>
-                      {item.discount > 0 && getReceiptSettlementRowKind(item) == null && (
+                      {item.discount > 0 && settlementKind == null && (
                         <tr>
-                          <td className="invoice-preview-td-desc">
-                            {item.setupId && item.setupNombre
-                              ? `Descuento ${item.setupNombre}`
-                              : item.reparacionTipoId && item.reparacionNombre
-                                ? `Descuento ${item.reparacionNombre}`
-                                : item.transporteFleteTipoId && item.transporteFleteNombre
-                                  ? `Descuento ${item.transporteFleteNombre}`
-                              : item.marcaEquipo && item.modeloEquipo 
-                                ? `Descuento ${item.marcaEquipo} ${item.modeloEquipo}`
-                                : item.garantiaMarca && item.garantiaModelo
-                                  ? `Descuento ${item.garantiaMarca} ${item.garantiaModelo}`
-                                  : item.serviceKey === "A" 
-                                    ? "Descuento HASHRATE L7" 
-                                    : item.serviceKey === "B" 
-                                      ? "Descuento HASHRATE L9" 
-                                      : "Descuento HASHRATE S21"}
-                          </td>
+                          <td className="invoice-preview-td-desc">{getLineItemDiscountDescription(item)}</td>
                           <td className="invoice-preview-td-precio">- {formatUSD(item.discount)}</td>
                           <td className="invoice-preview-td-cant">{item.quantity}</td>
                           <td className="invoice-preview-td-total">- {formatUSD(item.discount * item.quantity)}</td>

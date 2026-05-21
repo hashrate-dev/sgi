@@ -3,9 +3,9 @@ import type { ComprobanteType, LineItem } from "./types";
 import { effectiveInvoiceClientName2 } from "./clientInvoiceDisplay";
 import { formatUSD } from "./formatCurrency";
 import { recibimosMontoEnDosLineas } from "./numberToWords";
+import { getLineItemDescription, getLineItemDiscountDescription } from "./invoiceLineItemDescription";
 import {
   collapseLegacyReciboSettlementItemsForPdf,
-  countItemTableRows,
   getReceiptSettlementRowKind,
   reciboIsPaymentLineSettledTable,
 } from "./receiptSettlementLine";
@@ -30,13 +30,6 @@ function formatFechaTexto(d: Date): string {
   const dia = d.getDate();
   const anio = d.getFullYear();
   return `${mes} ${dia}, ${anio}`;
-}
-
-/** Convierte YYYY-MM a MM-YYYY para mostrar en descripción */
-function ymToMonthYear(ym: string): string {
-  if (!/^\d{4}-\d{2}$/.test(ym)) return ym;
-  const [y, m] = ym.split("-");
-  return `${m}-${y}`;
 }
 
 export type FacturaPdfData = {
@@ -103,6 +96,60 @@ const TABLE_RADIUS = 2;
 /** Logo hashrate: arriba a la izquierda; manteniendo proporción original */
 const LOGO_WIDTH_MM = 50; // Ancho ajustado para mejor proporción
 const LOGO_HEIGHT_MM = 14; // Altura ajustada para mantener proporción (relación ~3.57:1)
+
+const DESC_TEXT_W = COL_DESC - 6;
+const PDF_DESC_LINE_H = 4.2;
+
+type FacturaPdfTableRow = {
+  desc: string;
+  precio: string;
+  cant: string;
+  total: string;
+  rowH: number;
+};
+
+function pdfRowHeightForDesc(doc: jsPDF, desc: string): number {
+  const lines = doc.splitTextToSize((desc || "—").trim(), DESC_TEXT_W) as string[];
+  const textH = lines.length * PDF_DESC_LINE_H;
+  return Math.max(ROW_H, 4 + textH + 2.5);
+}
+
+function buildFacturaPdfTableRows(doc: jsPDF, items: LineItem[]): FacturaPdfTableRow[] {
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  const rows: FacturaPdfTableRow[] = [];
+  for (const it of items) {
+    const settlementKind = getReceiptSettlementRowKind(it);
+    const lineTotalServicio = it.price * it.quantity;
+    const desc = getLineItemDescription(it);
+    let precio = formatUSD(it.price);
+    let total = formatUSD(lineTotalServicio);
+    if (settlementKind === "credit_note" || settlementKind === "prior_receipt") {
+      const amt = it.discount * it.quantity;
+      precio = "—";
+      total = "- " + formatUSD(amt);
+    }
+    rows.push({
+      desc,
+      precio,
+      cant: String(it.quantity),
+      total,
+      rowH: pdfRowHeightForDesc(doc, desc),
+    });
+    if (it.discount > 0 && settlementKind == null) {
+      const discountAmount = it.discount * it.quantity;
+      const descDesc = getLineItemDiscountDescription(it);
+      rows.push({
+        desc: descDesc,
+        precio: "- " + formatUSD(it.discount),
+        cant: String(it.quantity),
+        total: "- " + formatUSD(discountAmount),
+        rowH: pdfRowHeightForDesc(doc, descDesc),
+      });
+    }
+  }
+  return rows;
+}
 
 /**
  * Genera el PDF de la factura con diseño HRS a color:
@@ -366,8 +413,10 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   const centerPrecio = tableLeft + COL_DESC + COL_PRECIO / 2;
   const centerCant = tableLeft + COL_DESC + COL_PRECIO + COL_CANT / 2;
   const centerTotal = tableLeft + COL_DESC + COL_PRECIO + COL_CANT + COL_TOTAL / 2;
-  const numDataRows = pdfItems.reduce((s, it) => s + countItemTableRows(it), 0);
-  const tableTotalH = HEADER_ROW_H + numDataRows * ROW_H;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  const tableRows = buildFacturaPdfTableRows(doc, pdfItems);
+  const tableTotalH = HEADER_ROW_H + tableRows.reduce((s, r) => s + r.rowH, 0);
   const R = TABLE_RADIUS;
   const k = 0.5522847498; // Bezier para arco 90°
 
@@ -416,111 +465,20 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   doc.setTextColor(0, 0, 0);
 
   y = tableTop + HEADER_ROW_H;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(11); /* igual que vista previa: tbody td 11pt */
 
-  for (const it of pdfItems) {
-    const settlementKind = getReceiptSettlementRowKind(it);
-    const lineTotalServicio = it.price * it.quantity;
-
-    if (settlementKind === "payment_line") {
-      const desc = String(it.serviceName ?? "").trim() || "Pago";
-      doc.text(desc.substring(0, 72), tableLeft + 3, y + 5.5);
-      doc.text(formatUSD(it.price), centerPrecio, y + 5.5, { align: "center" });
-      doc.text(String(it.quantity), centerCant, y + 5.5, { align: "center" });
-      doc.text(formatUSD(lineTotalServicio), centerTotal, y + 5.5, { align: "center" });
-      if (y + ROW_H < tableTop + tableTotalH) {
-        doc.line(tableLeft, y + ROW_H, tableLeft + TABLE_W, y + ROW_H);
-      }
-      y += ROW_H;
-      continue;
+  for (const row of tableRows) {
+    const descLines = doc.splitTextToSize(row.desc.trim() || "—", DESC_TEXT_W) as string[];
+    const textBlockH = descLines.length * PDF_DESC_LINE_H;
+    const textY = y + Math.max(4, (row.rowH - textBlockH) / 2 + 2);
+    doc.text(descLines, tableLeft + 3, textY);
+    const midY = y + row.rowH / 2 + 1.5;
+    doc.text(row.precio, centerPrecio, midY, { align: "center" });
+    doc.text(row.cant, centerCant, midY, { align: "center" });
+    doc.text(row.total, centerTotal, midY, { align: "center" });
+    if (y + row.rowH < tableTop + tableTotalH) {
+      doc.line(tableLeft, y + row.rowH, tableLeft + TABLE_W, y + row.rowH);
     }
-    if (settlementKind === "invoice_ref") {
-      const desc = it.month ? `${it.serviceName ?? "Factura"} - ${ymToMonthYear(it.month)}` : (it.serviceName ?? "Factura");
-      doc.text(desc.substring(0, 60), tableLeft + 3, y + 5.5);
-      doc.text(formatUSD(it.price), centerPrecio, y + 5.5, { align: "center" });
-      doc.text(String(it.quantity), centerCant, y + 5.5, { align: "center" });
-      doc.text(formatUSD(lineTotalServicio), centerTotal, y + 5.5, { align: "center" });
-      if (y + ROW_H < tableTop + tableTotalH) {
-        doc.line(tableLeft, y + ROW_H, tableLeft + TABLE_W, y + ROW_H);
-      }
-      y += ROW_H;
-      continue;
-    }
-    if (settlementKind === "credit_note" || settlementKind === "prior_receipt") {
-      const amt = it.discount * it.quantity;
-      const desc = it.month ? `${it.serviceName ?? ""} - ${ymToMonthYear(it.month)}` : (it.serviceName ?? "");
-      doc.text(desc.substring(0, 60), tableLeft + 3, y + 5.5);
-      doc.text("—", centerPrecio, y + 5.5, { align: "center" });
-      doc.text(String(it.quantity), centerCant, y + 5.5, { align: "center" });
-      doc.text("- " + formatUSD(amt), centerTotal, y + 5.5, { align: "center" });
-      if (y + ROW_H < tableTop + tableTotalH) {
-        doc.line(tableLeft, y + ROW_H, tableLeft + TABLE_W, y + ROW_H);
-      }
-      y += ROW_H;
-      continue;
-    }
-
-    // Determinar la descripción: Setup, equipos ASIC, Garantía ANDE, servicios de Hosting
-    let desc = "";
-    if (it.setupId && it.setupNombre) {
-      // Setup
-      desc = it.setupNombre;
-    } else if (it.reparacionTipoId && it.reparacionNombre) {
-      desc = it.reparacionNombre;
-    } else if (it.transporteFleteTipoId && it.transporteFleteNombre) {
-      desc = it.transporteFleteNombre;
-    } else if (it.marcaEquipo && it.modeloEquipo && it.procesadorEquipo) {
-      // Equipo ASIC
-      const equipoDesc = `${it.marcaEquipo} - ${it.modeloEquipo} - ${it.procesadorEquipo}`;
-      desc = it.month ? `${equipoDesc} - ${ymToMonthYear(it.month)}` : equipoDesc;
-    } else if (it.garantiaCodigo || it.garantiaMarca || it.garantiaModelo) {
-      // Ítem de Garantía ANDE (tabla Detalles -> Garantías): código - Garantías - marca - modelo
-      desc = [it.garantiaCodigo, "Garantías", it.garantiaMarca, it.garantiaModelo].filter(Boolean).join(" - ") || "Garantía";
-    } else if (it.serviceName) {
-      // Servicio de Hosting (compatibilidad hacia atrás)
-      desc = it.month ? `${it.serviceName} - ${ymToMonthYear(it.month)}` : it.serviceName;
-    } else {
-      // Fallback
-      desc = it.month ? `Item - ${ymToMonthYear(it.month)}` : "Item";
-    }
-    doc.text(desc.substring(0, 52), tableLeft + 3, y + 5.5);
-    doc.text(formatUSD(it.price), centerPrecio, y + 5.5, { align: "center" });
-    doc.text(String(it.quantity), centerCant, y + 5.5, { align: "center" });
-    doc.text(formatUSD(lineTotalServicio), centerTotal, y + 5.5, { align: "center" });
-    if (y + ROW_H < tableTop + tableTotalH) {
-      doc.line(tableLeft, y + ROW_H, tableLeft + TABLE_W, y + ROW_H);
-    }
-    y += ROW_H;
-
-    if (it.discount > 0 && getReceiptSettlementRowKind(it) == null) {
-      const discountAmount = it.discount * it.quantity;
-      let descDescuento = "";
-      if (it.setupId && it.setupNombre) {
-        descDescuento = `Descuento ${it.setupNombre}`;
-      } else if (it.reparacionTipoId && it.reparacionNombre) {
-        descDescuento = `Descuento ${it.reparacionNombre}`;
-      } else if (it.transporteFleteTipoId && it.transporteFleteNombre) {
-        descDescuento = `Descuento ${it.transporteFleteNombre}`;
-      } else if (it.marcaEquipo && it.modeloEquipo) {
-        descDescuento = `Descuento ${it.marcaEquipo} ${it.modeloEquipo}`;
-      } else if (it.garantiaMarca && it.garantiaModelo) {
-        descDescuento = `Descuento ${it.garantiaMarca} ${it.garantiaModelo}`;
-      } else if (it.serviceKey) {
-        const serviceLabel = it.serviceKey === "A" ? "L7" : it.serviceKey === "B" ? "L9" : "S21";
-        descDescuento = `Descuento HASHRATE ${serviceLabel}`;
-      } else {
-        descDescuento = "Descuento";
-      }
-      doc.text(descDescuento, tableLeft + 3, y + 5.5);
-      doc.text("- " + formatUSD(it.discount), centerPrecio, y + 5.5, { align: "center" });
-      doc.text(String(it.quantity), centerCant, y + 5.5, { align: "center" });
-      doc.text("- " + formatUSD(discountAmount), centerTotal, y + 5.5, { align: "center" });
-      if (y + ROW_H < tableTop + tableTotalH) {
-        doc.line(tableLeft, y + ROW_H, tableLeft + TABLE_W, y + ROW_H);
-      }
-      y += ROW_H;
-    }
+    y += row.rowH;
   }
 
   y += 6;
