@@ -29,6 +29,7 @@ import {
   type QuoteLineHistorySnap,
 } from "../lib/marketplaceQuoteCartHistory.js";
 import { markClientsVentaMarketplaceAfterInstalado } from "../lib/marketplaceVentaCliente.js";
+import { requireMarketplaceQuoteCartAccess } from "../lib/marketplaceQuoteAccess.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { requireModuleGrant } from "../middleware/moduleGrant.js";
 
@@ -36,15 +37,9 @@ export const marketplaceQuoteTicketsRouter = Router();
 
 /** Staff: bandeja y borrados masivos. Solo aplica lista blanca a AdministradorB. */
 const mpStaffPedidos = [requireRole("admin_a", "admin_b"), requireModuleGrant("marketplace_pedidos")];
-/** Carrito/sync: cliente tienda o admin; el permiso granular solo capa a AdministradorB sin módulo pedidos. */
-const quoteSyncAuth = [
-  requireRole("cliente", "admin_a", "admin_b"),
-  requireModuleGrant("marketplace_pedidos"),
-];
-const quoteOwnerAuth = [
-  requireRole("cliente", "admin_a", "admin_b"),
-  requireModuleGrant("marketplace_pedidos"),
-];
+/** Carrito/sync y «mis órdenes»: cliente, operador (siempre) o admin B con pedidos marketplace. */
+const quoteSyncAuth = [requireMarketplaceQuoteCartAccess];
+const quoteOwnerAuth = [requireMarketplaceQuoteCartAccess];
 
 /** Evita inundar la consola en debounce; solo diagnóstico en desarrollo. */
 let lastQuoteSyncPipelineMissLogMs = 0;

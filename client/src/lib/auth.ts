@@ -1,9 +1,15 @@
 import type { AdminBPermissionKey } from "./adminBPermissionsCatalog.js";
 import type { LectorPermissionKey } from "./lectorPermissionsCatalog.js";
 import {
-  collectLectorAllowedPathPrefixes,
+  canLectorSeeHomeMenuTo,
   pathMatchesAnyLectorPrefix,
 } from "./lectorPermissionsCatalog.js";
+import {
+  collectPathPrefixesFromScreenGrants,
+  grantsIncludeLegacyModule,
+  grantsIncludeScreen,
+} from "./sgiScreenGrants.js";
+import { canUserAccessScreen, canUserSeeGestionAdministrativaNav } from "./sgiNavigation.js";
 
 export type UserRole = "admin_a" | "admin_b" | "operador" | "lector" | "cliente";
 
@@ -21,25 +27,71 @@ export type AuthUser = {
    * Lista blanca para `lector` (solo gestiona AdministradorA). `null`/`undefined`: comportamiento SPA histórico (solo Kryptex; API puede seguir amplia según servidor).
    */
   lector_grants?: string[] | null;
+  /** Lector: el servidor encontró un pool Kryptex para usuario/correo. */
+  kryptex_asignado?: boolean;
   /** Celular indicado al registrar la cuenta tienda. */
   celular?: string;
   /** Teléfono fijo opcional del registro. */
   telefono?: string;
 };
 
-export type PermUser = Pick<AuthUser, "role" | "admin_b_grants" | "lector_grants"> | null | undefined;
+export type PermUser = Pick<AuthUser, "role" | "admin_b_grants" | "lector_grants" | "kryptex_asignado"> | null | undefined;
+
+/** Lector con pool Kryptex vinculado en el servidor. */
+export function lectorHasKryptexPool(user: Pick<AuthUser, "role" | "kryptex_asignado"> | null | undefined): boolean {
+  return user?.role === "lector" && user.kryptex_asignado === true;
+}
+
+/** Lector con permisos de módulos SGI en el inicio (además de Kryptex). */
+export function lectorHasHomeDashboardModules(
+  user: Pick<AuthUser, "role" | "lector_grants" | "kryptex_asignado"> | null | undefined
+): boolean {
+  if (!user || user.role !== "lector") return false;
+  const g = user.lector_grants;
+  if (!Array.isArray(g) || g.length === 0) return false;
+  const paths = [
+    "/gestion-administrativa",
+    "/clients/account",
+    "/history",
+    "/clients",
+    "/reports",
+    "/marketplace",
+  ];
+  return paths.some((to) => canLectorSeeHomeMenuTo(user, to));
+}
+
+/** Ruta tras login o cuando no puede entrar a la pantalla pedida. */
+export function lectorDefaultLandingPath(user: AuthUser): string {
+  if (user.role !== "lector") return "/";
+  if (lectorHasHomeDashboardModules(user)) return "/";
+  if (lectorHasKryptexPool(user)) return "/kryptex";
+  return "/";
+}
 
 /** Lista explícita de módulos de consulta (`null`: legado amplio según servidor / solo Kryptex en SPA). */
 export function lectorAllowsModule(user: PermUser, key: LectorPermissionKey): boolean {
   if (!user || user.role !== "lector") return true;
-  const g = user.lector_grants;
-  if (g == null) return true;
-  return g.includes(key);
+  return grantsIncludeLegacyModule(user.lector_grants ?? null, key);
 }
 
 /** Lector con lista guardada en servidor (puede ser `[]`: sin módulos). */
 export function lectorHasExplicitGrantList(user: PermUser): boolean {
   return user?.role === "lector" && user.lector_grants != null;
+}
+
+/** Rutas internas permitidas para Operador / Admin B con lista explícita. */
+export function isStaffPathAllowedInSpa(
+  user: Pick<AuthUser, "role" | "admin_b_grants">,
+  pathname: string
+): boolean {
+  if (user.role !== "admin_b" && user.role !== "operador") return true;
+  const g = user.admin_b_grants;
+  if (g == null) return true;
+  const pathRaw = (pathname.split("?")[0] ?? pathname).replace(/\/+$/, "") || "/";
+  if (g.length === 0) return pathRaw === "/" || pathRaw === "";
+  if (pathRaw === "/" || pathRaw === "") return true;
+  const prefixes = collectPathPrefixesFromScreenGrants(g);
+  return pathMatchesAnyLectorPrefix(pathRaw, prefixes);
 }
 
 /** Rutas internas permitidas para lector: Kryptex siempre; resto según grants o bloqueo explícito. */
@@ -52,7 +104,7 @@ export function isLectorPathAllowedInSpa(user: Pick<AuthUser, "role" | "lector_g
   if (g.length === 0) return isKryptex;
   if (pathRaw === "/" || pathRaw === "") return true;
   if (isKryptex) return true;
-  const prefixes = collectLectorAllowedPathPrefixes(g as LectorPermissionKey[]);
+  const prefixes = collectPathPrefixesFromScreenGrants(g);
   return pathMatchesAnyLectorPrefix(pathRaw, prefixes);
 }
 
@@ -61,19 +113,29 @@ export function canConfigureLectorGrants(user: PermUser): boolean {
   return user?.role === "admin_a";
 }
 
-/** `admin_a`/`operador`/`lector`/otros ignoran lista; sólo evalúa `admin_b`. */
+/** `admin_a`/`lector`/otros ignoran lista; `admin_b` y `operador` según `admin_b_grants`. */
 export function adminBAllowsModule(user: PermUser, key: AdminBPermissionKey): boolean {
-  if (!user || user.role !== "admin_b") return true;
-  const g = user.admin_b_grants;
-  if (g == null) return true;
-  return g.includes(key);
+  if (!user || (user.role !== "admin_b" && user.role !== "operador")) return true;
+  return grantsIncludeLegacyModule(user.admin_b_grants ?? null, key);
 }
 
-/** Monitor ASIC corporativo (no vitrina): Administrador A, o B con permiso `equipos` (lista nula = acceso completo legado). */
+function staffGrants(user: PermUser): string[] | null | undefined {
+  if (!user || (user.role !== "admin_b" && user.role !== "operador")) return null;
+  return user.admin_b_grants;
+}
+
+function lectorGrantsList(user: PermUser): string[] | null | undefined {
+  if (!user || user.role !== "lector") return null;
+  return user.lector_grants;
+}
+
+/** Monitor ASIC corporativo (no vitrina): Administrador A, o B/Operador con permiso `equipos`. */
 export function canAccessMonitorEquiposAsic(user: PermUser): boolean {
   if (!user) return false;
   if (user.role === "admin_a") return true;
-  if (user.role === "admin_b") return adminBAllowsModule(user, "equipos");
+  if (user.role === "operador" || user.role === "admin_b" || user.role === "lector") {
+    return canUserAccessScreen(user, "asic-monitor");
+  }
   return false;
 }
 
@@ -119,18 +181,16 @@ export function getStoredUser(): AuthUser | null {
 export function canEditFacturacion(user: PermUser): boolean {
   if (!user) return false;
   if (user.role === "lector") return false;
-  if (user.role === "operador") return true;
   if (user.role === "admin_a") return true;
-  if (user.role === "admin_b") return adminBAllowsModule(user, "facturacion");
+  if (user.role === "operador" || user.role === "admin_b") return adminBAllowsModule(user, "facturacion");
   return false;
 }
 
 export function canEditClientes(user: PermUser): boolean {
   if (!user) return false;
   if (user.role === "lector") return false;
-  if (user.role === "operador") return true;
   if (user.role === "admin_a") return true;
-  if (user.role === "admin_b") return adminBAllowsModule(user, "clientes");
+  if (user.role === "operador" || user.role === "admin_b") return adminBAllowsModule(user, "clientes");
   return false;
 }
 
@@ -138,8 +198,8 @@ export function canEditClientes(user: PermUser): boolean {
 export function canAccessFinanzaContabilidadHub(user: PermUser): boolean {
   if (!user) return false;
   if (user.role === "lector") return lectorAllowsModule(user, "finanzas_contabilidad");
-  if (user.role === "operador" || user.role === "admin_a") return true;
-  if (user.role === "admin_b") return adminBAllowsModule(user, "finanzas_contabilidad");
+  if (user.role === "admin_a") return true;
+  if (user.role === "operador" || user.role === "admin_b") return adminBAllowsModule(user, "finanzas_contabilidad");
   return false;
 }
 
@@ -147,16 +207,16 @@ export function canAccessFinanzaContabilidadHub(user: PermUser): boolean {
 export function canAccessHostingTipoCambio(user: PermUser): boolean {
   if (!user) return false;
   if (user.role === "lector") return lectorAllowsModule(user, "hosting_tipo_cambio");
-  if (user.role === "operador" || user.role === "admin_a") return true;
-  if (user.role === "admin_b") return adminBAllowsModule(user, "hosting_tipo_cambio");
+  if (user.role === "admin_a") return true;
+  if (user.role === "operador" || user.role === "admin_b") return adminBAllowsModule(user, "hosting_tipo_cambio");
   return false;
 }
 
 /** Alta/edición/eliminación FX (POST/PUT/DELETE) — sin lector. */
 export function canEditHostingTipoCambio(user: PermUser): boolean {
   if (!user || user.role === "lector") return false;
-  if (user.role === "operador" || user.role === "admin_a") return true;
-  if (user.role === "admin_b") return adminBAllowsModule(user, "hosting_tipo_cambio");
+  if (user.role === "admin_a") return true;
+  if (user.role === "operador" || user.role === "admin_b") return adminBAllowsModule(user, "hosting_tipo_cambio");
   return false;
 }
 
@@ -171,8 +231,8 @@ export function canDeleteHostingFxOperation(user: PermUser): boolean {
 export function canSeeReportesDashboard(user: PermUser): boolean {
   if (!user) return false;
   if (user.role === "lector") return lectorAllowsModule(user, "reportes");
-  if (user.role === "operador" || user.role === "admin_a") return true;
-  if (user.role === "admin_b") return adminBAllowsModule(user, "reportes");
+  if (user.role === "admin_a") return true;
+  if (user.role === "operador" || user.role === "admin_b") return adminBAllowsModule(user, "reportes");
   return false;
 }
 
@@ -189,29 +249,31 @@ export function canSeeCuentaPorClienteShortcut(user: PermUser): boolean {
   );
 }
 
-/** Al menos una tarjeta de Gestión Administrativa visible para AdministradorB. */
-export function canSeeGestionAdministrativaHub(user: PermUser): boolean {
+/** Formulario Nuevos Leads (sin acceso automático a Leads Base). */
+export function canAccessNuevosLeads(user: PermUser): boolean {
   if (!user) return false;
-  if (user.role === "lector") {
-    return (
-      lectorAllowsModule(user, "facturacion") ||
-      lectorAllowsModule(user, "clientes") ||
-      lectorAllowsModule(user, "equipos") ||
-      lectorAllowsModule(user, "equipos_tienda") ||
-      lectorAllowsModule(user, "garantias") ||
-      lectorAllowsModule(user, "setups")
-    );
+  if (user.role === "admin_a") return true;
+  if (user.role === "lector") return grantsIncludeScreen(lectorGrantsList(user), "ga-nuevos-leads");
+  if (user.role === "operador" || user.role === "admin_b") {
+    return grantsIncludeScreen(staffGrants(user), "ga-nuevos-leads");
   }
-  if (user.role !== "admin_b") {
-    return user.role === "admin_a" || user.role === "operador";
+  return false;
+}
+
+/** Tabla Leads Base (POTENCIALES CLIENTES). */
+export function canAccessLeadsBase(user: PermUser): boolean {
+  if (!user) return false;
+  if (user.role === "admin_a") return true;
+  if (user.role === "lector") return grantsIncludeScreen(lectorGrantsList(user), "ga-leads-base");
+  if (user.role === "operador" || user.role === "admin_b") {
+    return grantsIncludeScreen(staffGrants(user), "ga-leads-base");
   }
-  return (
-    adminBAllowsModule(user, "facturacion") ||
-    adminBAllowsModule(user, "equipos") ||
-    adminBAllowsModule(user, "equipos_tienda") ||
-    adminBAllowsModule(user, "garantias") ||
-    adminBAllowsModule(user, "setups")
-  );
+  return false;
+}
+
+/** Al menos una tarjeta de Gestión Administrativa visible. */
+export function canSeeGestionAdministrativaHub(user: PermUser): boolean {
+  return canUserSeeGestionAdministrativaNav(user);
 }
 
 export function canDeleteHistorial(user: PermUser): boolean {
@@ -236,6 +298,17 @@ export function canManageUsers(user: PermUser): boolean {
   return false;
 }
 
+/** Enlace «SGI» en footer del marketplace: personal interno; oculto para clientes de tienda. */
+export function canAccessSgiFromMarketplaceFooter(user: PermUser): boolean {
+  if (!user) return false;
+  return (
+    user.role === "admin_a" ||
+    user.role === "admin_b" ||
+    user.role === "operador" ||
+    user.role === "lector"
+  );
+}
+
 /** Asignar permisos granular a otros AdministradorB — sólo AdministradorA (sin API en cliente). */
 export function canConfigureAdminBGrants(user: PermUser): boolean {
   return user?.role === "admin_a";
@@ -245,23 +318,20 @@ export function canConfigureAdminBGrants(user: PermUser): boolean {
 export function canEditEquipoMarketplacePrecioYTienda(user: PermUser): boolean {
   if (!user) return false;
   if (user.role === "admin_a") return true;
-  if (user.role === "admin_b") return adminBAllowsModule(user, "equipos_tienda");
+  if (user.role === "operador" || user.role === "admin_b") return adminBAllowsModule(user, "equipos_tienda");
   return false;
 }
 
 /** Monitoreo de cotizaciones / tickets del marketplace (carrito cliente). */
 export function canViewMarketplaceQuoteTickets(user: PermUser): boolean {
-  if (!user) return false;
-  if (user.role === "admin_a") return true;
-  if (user.role === "admin_b") return adminBAllowsModule(user, "marketplace_pedidos");
-  return false;
+  return canUserAccessScreen(user, "marketplace-orders");
 }
 
 /** Presencia marketplace / embudo. */
 export function canViewMarketplacePresence(user: PermUser): boolean {
   if (!user) return false;
   if (user.role === "admin_a") return true;
-  if (user.role === "admin_b") return adminBAllowsModule(user, "marketplace_presencia");
+  if (user.role === "operador" || user.role === "admin_b") return adminBAllowsModule(user, "marketplace_presencia");
   return false;
 }
 
@@ -269,26 +339,24 @@ export function canViewMarketplacePresence(user: PermUser): boolean {
 export function canAccessSetupsModule(user: PermUser): boolean {
   if (!user) return false;
   if (user.role === "lector") return lectorAllowsModule(user, "setups");
-  if (user.role === "operador") return true;
   if (user.role === "admin_a") return true;
-  if (user.role === "admin_b") return adminBAllowsModule(user, "setups");
+  if (user.role === "operador" || user.role === "admin_b") return adminBAllowsModule(user, "setups");
   return false;
 }
 
 export function canEditEquiposInventory(user: PermUser): boolean {
   if (!user) return false;
   if (user.role === "lector") return false;
-  if (user.role === "operador") return true;
   if (user.role === "admin_a") return true;
-  if (user.role === "admin_b") return adminBAllowsModule(user, "equipos");
+  if (user.role === "operador" || user.role === "admin_b") return adminBAllowsModule(user, "equipos");
   return false;
 }
 
 export function canAccessProveedoresHrs(user: PermUser): boolean {
   if (!user) return false;
   if (user.role === "lector") return lectorAllowsModule(user, "finanzas_proveedores");
-  if (user.role === "operador" || user.role === "admin_a") return true;
-  if (user.role === "admin_b") return adminBAllowsModule(user, "finanzas_proveedores");
+  if (user.role === "admin_a") return true;
+  if (user.role === "operador" || user.role === "admin_b") return adminBAllowsModule(user, "finanzas_proveedores");
   return false;
 }
 
@@ -299,16 +367,16 @@ export function canEditProveedoresHrs(user: PermUser): boolean {
 
 export function canEditContabilidadGastos(user: PermUser): boolean {
   if (!user || user.role === "lector") return false;
-  if (user.role === "operador" || user.role === "admin_a") return true;
-  if (user.role === "admin_b") return adminBAllowsModule(user, "finanzas_contabilidad");
+  if (user.role === "admin_a") return true;
+  if (user.role === "operador" || user.role === "admin_b") return adminBAllowsModule(user, "finanzas_contabilidad");
   return false;
 }
 
 export function canAccessAsicCostos(user: PermUser): boolean {
   if (!user) return false;
   if (user.role === "lector") return lectorAllowsModule(user, "finanzas_asic_costos");
-  if (user.role === "operador" || user.role === "admin_a") return true;
-  if (user.role === "admin_b") return adminBAllowsModule(user, "finanzas_asic_costos");
+  if (user.role === "admin_a") return true;
+  if (user.role === "operador" || user.role === "admin_b") return adminBAllowsModule(user, "finanzas_asic_costos");
   return false;
 }
 
@@ -325,18 +393,22 @@ export function canAccessEquiposAsicStaff(user: PermUser): boolean {
       lectorAllowsModule(user, "facturacion")
     );
   }
-  if (user.role === "operador" || user.role === "admin_a") return true;
-  if (user.role === "admin_b")
+  if (user.role === "admin_a") return true;
+  if (user.role === "operador" || user.role === "admin_b")
     return adminBAllowsModule(user, "equipos") || adminBAllowsModule(user, "equipos_tienda");
   return false;
 }
 
-/** Carrito de cotización en /marketplace: cuenta cliente o administradores con módulo pedidos. */
+/** Carrito de cotización en /marketplace: cualquier usuario autenticado (todos los roles). */
 export function canUseMarketplaceQuoteCart(user: PermUser): boolean {
   if (!user) return false;
-  if (user.role === "cliente" || user.role === "admin_a") return true;
-  if (user.role === "admin_b") return adminBAllowsModule(user, "marketplace_pedidos");
-  return false;
+  return (
+    user.role === "cliente" ||
+    user.role === "admin_a" ||
+    user.role === "admin_b" ||
+    user.role === "operador" ||
+    user.role === "lector"
+  );
 }
 
 /**
@@ -364,9 +436,8 @@ export function canDeleteAdminUser(currentUserRole: UserRole, targetUserRole: st
 export function canExport(user: PermUser): boolean {
   if (!user) return false;
   if (user.role === "lector") return lectorAllowsModule(user, "exportar");
-  if (user.role === "operador") return true;
   if (user.role === "admin_a") return true;
-  if (user.role === "admin_b") return adminBAllowsModule(user, "exportar");
+  if (user.role === "operador" || user.role === "admin_b") return adminBAllowsModule(user, "exportar");
   return false;
 }
 
@@ -374,8 +445,8 @@ export function canExport(user: PermUser): boolean {
 export function canAccessGarantiasModule(user: PermUser): boolean {
   if (!user) return false;
   if (user.role === "lector") return lectorAllowsModule(user, "garantias");
-  if (user.role === "operador" || user.role === "admin_a") return true;
-  if (user.role === "admin_b") return adminBAllowsModule(user, "garantias");
+  if (user.role === "admin_a") return true;
+  if (user.role === "operador" || user.role === "admin_b") return adminBAllowsModule(user, "garantias");
   return false;
 }
 

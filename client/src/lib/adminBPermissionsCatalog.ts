@@ -8,6 +8,7 @@ export type AdminBPermissionKey =
   | "equipos_tienda"
   | "garantias"
   | "setups"
+  | "leads"
   | "marketplace_pedidos"
   | "marketplace_presencia"
   | "finanzas_contabilidad"
@@ -72,6 +73,14 @@ export const ADMIN_B_PERMISSION_CATALOG: readonly AdminBPermissionCatalogItem[] 
     key: "setups",
     label: "Combos / setups de minería",
     description: "Armado y mantenimiento de combos (setups) ofrecidos en el flujo operativo corporativo.",
+  },
+  {
+    sectionOrder: 1,
+    sectionLabel: "Gestión Administrativa — operación Hosting, ASIC y tienda corporativa",
+    key: "leads",
+    label: "Leads (Nuevos Leads + Leads Base)",
+    description:
+      "Formulario de registro de prospectos y tabla POTENCIALES CLIENTES en Gestión Administrativa.",
   },
   {
     sectionOrder: 2,

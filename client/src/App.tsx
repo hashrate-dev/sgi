@@ -9,6 +9,8 @@ import { FacturacionPage } from "./pages/FacturacionPage";
 import { FacturacionMineriaPage } from "./pages/FacturacionMineriaPage";
 import { HostingHubPage } from "./pages/HostingHubPage";
 import { GestionAdministrativaPage } from "./pages/GestionAdministrativaPage";
+import { LeadsBasePage } from "./pages/LeadsBasePage";
+import { NuevosLeadsPage } from "./pages/NuevosLeadsPage";
 import { PruebaPage } from "./pages/PruebaPage";
 import { GestionFinancieraHubPage } from "./pages/GestionFinancieraHubPage";
 import { ProveedoresHrsPage } from "./pages/ProveedoresHrsPage";
@@ -375,6 +377,8 @@ function App() {
             <Route path="/asic/equipment" element={<EquiposAsicPage />} />
             <Route path="/marketplace/home-banners" element={<TiendaOnlineBannersHomePage />} />
             <Route path="/gestion-administrativa" element={<GestionAdministrativaPage />} />
+            <Route path="/gestion-administrativa/nuevos-leads" element={<NuevosLeadsPage />} />
+            <Route path="/gestion-administrativa/leads-base" element={<LeadsBasePage />} />
             <Route path="/gestion-administrativa/exchange" element={<PruebaPage />} />
             <Route path="/gestion-administrativa/prueba" element={<Navigate to="/gestion-administrativa/exchange" replace />} />
             <Route path="/gestion-financiera" element={<GestionFinancieraHubPage />} />

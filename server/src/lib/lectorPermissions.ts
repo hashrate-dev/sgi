@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { AdminBPermissionKey } from "./adminBPermissions.js";
+import { grantsIncludeLegacyModule, isSgiScreenGrantId } from "./sgiScreenGrants.js";
 
 /**
  * Permisos de consulta (`lector`) gestionados solo por AdministradorA.
@@ -47,6 +48,13 @@ export const LECTOR_PERMISSION_CATALOG = [
     key: "setups",
     label: "Combos / setups",
     description: "Ver armados y configuraciones publicadas.",
+  },
+  {
+    sectionOrder: 1,
+    sectionLabel: "Operación Hosting, ASIC y clientes — solo lectura",
+    key: "leads",
+    label: "Leads (Nuevos Leads + Leads Base)",
+    description: "Registrar prospectos y consultar la base POTENCIALES CLIENTES.",
   },
   {
     sectionOrder: 2,
@@ -106,7 +114,7 @@ export const LECTOR_PERMISSION_KEYS = LECTOR_PERMISSION_CATALOG.map((x) => x.key
 ];
 
 export function isValidLectorGrantKey(k: string): k is LectorPermissionKey {
-  return (LECTOR_PERMISSION_KEYS as readonly string[]).includes(k);
+  return (LECTOR_PERMISSION_KEYS as readonly string[]).includes(k) || isSgiScreenGrantId(k);
 }
 
 export const LectorGrantsBodySchema = z.object({
@@ -139,8 +147,9 @@ export function parseLectorGrantsJson(raw: string | null | undefined): string[] 
 /** Evalúa acceso API para rol lector ante una clave de módulo (típicamente mismo enum que administración). */
 export function lectorHasGrant(grants: string[] | null | undefined, key: AdminBPermissionKey): boolean {
   if (grants == null) return true;
-  if (!isValidLectorGrantKey(key)) return false;
-  return grants.includes(key);
+  const lectorModule = (LECTOR_PERMISSION_KEYS as readonly string[]).includes(key);
+  if (!lectorModule && !isSgiScreenGrantId(key)) return false;
+  return grantsIncludeLegacyModule(grants, key);
 }
 
 export function serializeLectorGrants(grants: string[]): string {

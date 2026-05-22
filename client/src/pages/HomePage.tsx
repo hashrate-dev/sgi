@@ -6,11 +6,11 @@ import { Box, Flex, Grid, Heading, Text } from "@chakra-ui/react";
 import { useAuth } from "../contexts/AuthContext";
 import { getMarketplacePresenceStats, getMarketplaceQuoteTicketsStats } from "../lib/api";
 import {
-  canAccessMonitorEquiposAsic,
-  canViewMarketplaceQuoteTickets,
   lectorHasExplicitGrantList,
+  lectorHasKryptexPool,
+  canViewMarketplaceQuoteTickets,
 } from "../lib/auth.js";
-import { canLectorSeeHomeMenuTo } from "../lib/lectorPermissionsCatalog.js";
+import { canUserAccessNavPath, canUserAccessScreen } from "../lib/sgiNavigation.js";
 import { playMarketplaceOrderNotificationSound } from "../lib/marketplaceCartSound";
 import { HOME_DASHBOARD_SHELL } from "../lib/sgiDashboardShell";
 import "../styles/marketplace-hashrate.css";
@@ -247,13 +247,11 @@ export function HomePage() {
   const roleNorm = (r: string | undefined) => (r ?? "").toLowerCase().trim();
   const visibleMenuItems = menuItems.filter((item) => {
     if (!user) return false;
-    if (user.role === "lector") {
-      return canLectorSeeHomeMenuTo(user, item.to);
-    }
-    if (item.to.startsWith("/asic/monitor-equipos") && !canAccessMonitorEquiposAsic(user)) return false;
-    return !item.roles || item.roles.some((r) => roleNorm(r) === roleNorm(user.role));
+    return canUserAccessNavPath(user, item.to);
   });
   const canSeeMarketplaceOrdersCard = Boolean(user && canViewMarketplaceQuoteTickets(user));
+  const canSeeMarketplacePresenceCard = Boolean(user && canUserAccessScreen(user, "marketplace-presence"));
+  const canSeeMarketplaceBannersCard = Boolean(user && canUserAccessNavPath(user, "/marketplace/home-banners"));
 
   useEffect(() => {
     if (!canSeeMarketplaceOrdersCard) return;
@@ -301,7 +299,7 @@ export function HomePage() {
   }, [canSeeMarketplaceOrdersCard]);
 
   useEffect(() => {
-    if (!canSeeMarketplaceOrdersCard) return;
+    if (!canSeeMarketplacePresenceCard) return;
     let cancelled = false;
     const refreshPresence = async () => {
       try {
@@ -332,7 +330,7 @@ export function HomePage() {
       window.clearInterval(int);
       window.removeEventListener("focus", onFocus);
     };
-  }, [canSeeMarketplaceOrdersCard]);
+  }, [canSeeMarketplacePresenceCard]);
 
   const cardTitleProps = {
     as: "h2" as const,
@@ -366,7 +364,9 @@ export function HomePage() {
   };
 
   if (user?.role === "lector") {
-    if (!lectorHasExplicitGrantList(user) || (user.lector_grants?.length ?? 0) === 0) {
+    const soloKryptexLegacy =
+      !lectorHasExplicitGrantList(user) || (user.lector_grants?.length ?? 0) === 0;
+    if (soloKryptexLegacy && lectorHasKryptexPool(user)) {
       return <Navigate to="/kryptex" replace />;
     }
   }
@@ -489,7 +489,7 @@ export function HomePage() {
             </RouterLink>
           ) : null}
 
-          {canSeeMarketplaceOrdersCard ? (
+          {canSeeMarketplacePresenceCard ? (
             <RouterLink to="/marketplace/presence" role="status" aria-live="polite" style={DASHBOARD_CARD_LINK_STYLE}>
               <AppCard
                 {...dashboardCardProps}
@@ -530,7 +530,7 @@ export function HomePage() {
             </RouterLink>
           ) : null}
 
-          {user && (roleNorm(user.role) === "admin_a" || roleNorm(user.role) === "admin_b") ? (
+          {canSeeMarketplaceBannersCard ? (
             <RouterLink to="/marketplace/home-banners" style={DASHBOARD_CARD_LINK_STYLE}>
               <AppCard
                 {...dashboardCardProps}

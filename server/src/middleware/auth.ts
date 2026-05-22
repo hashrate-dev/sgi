@@ -5,6 +5,7 @@ import { getAuthTokenFromRequest } from "../lib/authSessionCookie.js";
 import { getTiendaPhonesForUserId } from "../lib/tiendaClientContact.js";
 import { parseAdminBGrantsJson } from "../lib/adminBPermissions.js";
 import { parseLectorGrantsJson } from "../lib/lectorPermissions.js";
+import { lectorHasKryptexPoolAssigned } from "../lib/kryptexLectorPool.js";
 import { fetchUserRowForSessionById } from "../lib/dbUserColumnFallback.js";
 
 export type UserRole = "admin_a" | "admin_b" | "operador" | "lector" | "cliente";
@@ -22,6 +23,8 @@ export type AuthUser = {
   admin_b_grants?: string[] | null;
   /** Lista blanca de módulos consultables para `lector`. `null`/`undefined`: acceso API amplio histórico. */
   lector_grants?: string[] | null;
+  /** `lector`: hay pool Kryptex que coincide con usuario/correo. */
+  kryptex_asignado?: boolean;
   /** Celular del registro tienda (`clients.phone`). */
   celular?: string;
   /** Teléfono fijo opcional del registro (`clients.phone2`). */
@@ -65,14 +68,24 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
       const role = row.role as UserRole;
       const adminGrantsParsed = parseAdminBGrantsJson(row.admin_b_grants_json ?? null);
       const lectorGrantsParsed = parseLectorGrantsJson(row.lector_grants_json ?? null);
+      const kryptexAsignado =
+        role === "lector"
+          ? lectorHasKryptexPoolAssigned({
+              usuario: row.usuario,
+              username: row.username,
+              email: row.email ?? row.username,
+            })
+          : undefined;
       req.user = {
         id: row.id,
         username: row.username,
         email: row.email ?? row.username,
         role,
         usuario: row.usuario ?? undefined,
-        ...(role === "admin_b" ? { admin_b_grants: adminGrantsParsed } : {}),
-        ...(role === "lector" ? { lector_grants: lectorGrantsParsed } : {}),
+        ...(role === "admin_b" || role === "operador" ? { admin_b_grants: adminGrantsParsed } : {}),
+        ...(role === "lector"
+          ? { lector_grants: lectorGrantsParsed, kryptex_asignado: kryptexAsignado }
+          : {}),
         celular,
         telefono,
       };

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { loadKryptexPoolConfigs } from "../config/kryptexPoolsFromEnv.js";
+import { resolveKryptexWalletForUser } from "../lib/kryptexLectorPool.js";
 import { requireAuth } from "../middleware/auth.js";
 
 const FETCH_TIMEOUT_MS = 10000;
@@ -77,38 +78,23 @@ function parseWorkerBlock(html: string, workerName: string): Omit<KryptexWorkerD
 
 export const kryptexRouter = Router();
 
-/** Normaliza usuario para comparación: quita @ y normaliza mayúsculas/minúsculas */
-function normalizeUsuario(u: string): string {
-  return (u ?? "").replace(/^@/, "").trim().toLowerCase();
-}
-
-/** Obtiene wallet y pool para un usuario LECTOR según POOL_CONFIGS. Si hay varias configs (ej. Mariri SHA256+SCRYPT), devuelve la primera. */
-function getWalletForUsuario(usuario: string): { wallet: string; pool: string } | null {
-  if (!usuario?.trim()) return null;
-  const norm = normalizeUsuario(usuario);
-  const config = POOL_CONFIGS.find((c) => normalizeUsuario(c.usuario) === norm);
-  if (!config) return null;
-  const m = config.url.match(/\/miner\/stats\/(0x[a-fA-F0-9]+)/);
-  const wallet = m?.[1];
-  const poolMatch = config.url.match(/pool\.kryptex\.com\/([^/]+)\//);
-  const pool = poolMatch?.[1] ?? "quai-scrypt";
-  if (!wallet) return null;
-  return { wallet, pool };
-}
-
-/** GET /api/kryptex/lector-wallet — Para LECTOR: devuelve wallet y pool según users.usuario → POOL_CONFIGS.usuario */
+/** GET /api/kryptex/lector-wallet — Para LECTOR: devuelve wallet y pool según users.usuario / email → POOL_CONFIGS.usuario */
 kryptexRouter.get("/kryptex/lector-wallet", requireAuth, (req, res) => {
   if (req.user!.role !== "lector") {
     return res.status(403).json({ error: { message: "Solo usuarios LECTOR pueden usar este endpoint" } });
   }
-  const usuario = req.user!.usuario;
-  const result = getWalletForUsuario(usuario ?? "");
+  const u = req.user!;
+  const result = resolveKryptexWalletForUser({
+    usuario: u.usuario,
+    username: u.username,
+    email: u.email,
+  });
   if (!result) {
+    const label = (u.usuario ?? u.username ?? u.email ?? "").trim() || "tu cuenta";
     return res.status(404).json({
       error: {
-        message: usuario
-          ? `No hay cuenta Kryptex asignada para el usuario "${usuario}". Contactá al administrador.`
-          : "No tenés un usuario Kryptex asignado. Contactá al administrador.",
+        message: `No hay cuenta Kryptex asignada para ${label}. Pedí al administrador que configure el campo «Usuario Kryptex» (ej. Mariri, Jlsoler) en Usuarios → Editar.`,
+        code: "KRYPTEX_POOL_NOT_ASSIGNED",
       },
     });
   }

@@ -19,6 +19,7 @@ import { loginRateLimit, registerClienteRateLimit } from "../middleware/authRate
 import type { AuthUser } from "../middleware/auth.js";
 import { parseAdminBGrantsJson } from "../lib/adminBPermissions.js";
 import { parseLectorGrantsJson } from "../lib/lectorPermissions.js";
+import { lectorHasKryptexPoolAssigned } from "../lib/kryptexLectorPool.js";
 import { fetchUserRowForLogin } from "../lib/dbUserColumnFallback.js";
 import { appendAuthCookie, appendClearAuthCookie } from "../lib/authSessionCookie.js";
 
@@ -872,9 +873,19 @@ authRouter.post("/auth/login", loginRateLimit, async (req, res) => {
     const grantsRaw = (row as Record<string, unknown>).admin_b_grants_json;
     const lectorRaw = (row as Record<string, unknown>).lector_grants_json;
     const adminGrants =
-      role === "admin_b" ? parseAdminBGrantsJson(typeof grantsRaw === "string" ? grantsRaw : null) : undefined;
+      role === "admin_b" || role === "operador"
+        ? parseAdminBGrantsJson(typeof grantsRaw === "string" ? grantsRaw : null)
+        : undefined;
     const lectorGrants =
       role === "lector" ? parseLectorGrantsJson(typeof lectorRaw === "string" ? lectorRaw : null) : undefined;
+    const kryptexAsignado =
+      role === "lector"
+        ? lectorHasKryptexPoolAssigned({
+            usuario: row.usuario,
+            username: row.username,
+            email: row.email ?? row.username,
+          })
+        : undefined;
     const user: AuthUser = {
       id: userId,
       username: row.username,
@@ -882,7 +893,9 @@ authRouter.post("/auth/login", loginRateLimit, async (req, res) => {
       role,
       usuario: row.usuario ?? undefined,
       ...(adminGrants !== undefined ? { admin_b_grants: adminGrants } : {}),
-      ...(lectorGrants !== undefined ? { lector_grants: lectorGrants } : {}),
+      ...(lectorGrants !== undefined
+        ? { lector_grants: lectorGrants, kryptex_asignado: kryptexAsignado }
+        : {}),
       celular,
       telefono,
     };

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
-import { canUseMarketplaceQuoteCart } from "../lib/auth.js";
 import { useAuth } from "../contexts/AuthContext";
 import { requestPasswordReset, wakeUpBackend } from "../lib/api";
 import { MarketplaceSiteHeader } from "../components/marketplace/MarketplaceSiteHeader";
@@ -13,8 +12,8 @@ import "../styles/facturacion.css";
 const HASHRATE_LOGO = "https://hashrate.space/wp-content/uploads/hashrate-LOGO.png";
 
 export function MarketplaceClienteLoginPage() {
-  const { t, tf, lang } = useMarketplaceLang();
-  const { user, loading, login, logout } = useAuth();
+  const { t, lang } = useMarketplaceLang();
+  const { user, loading, login } = useAuth();
   const location = useLocation();
   const fromQuote = (location.state as { from?: string } | null)?.from === "quote";
   const [email, setEmail] = useState("");
@@ -35,63 +34,13 @@ export function MarketplaceClienteLoginPage() {
     return () => clearTimeout(timeoutId);
   }, []);
 
-  if (!loading && user && canUseMarketplaceQuoteCart(user)) {
+  if (!loading && user) {
     return (
       <Navigate
         to="/marketplace"
         replace
         state={fromQuote ? { openQuoteDrawer: true } : undefined}
       />
-    );
-  }
-  if (!loading && user && !canUseMarketplaceQuoteCart(user)) {
-    /* Operador / lector: el carrito de cotización pide cuenta cliente o admin A/B */
-    return (
-      <div className="marketplace-asic-page">
-        <div className="bg-mesh" aria-hidden />
-        <div className="bg-grid" aria-hidden />
-        <div id="app" data-page="marketplace-login-internal">
-          <MarketplaceSiteHeader />
-          <main id="page-main" className="page-main page-main--market page-main--market--asic">
-            <section className="section section--market-shelf market-auth-section" style={{ maxWidth: 520, margin: "0 auto", padding: "2rem 1rem" }}>
-              <p className="market-intro__desc mb-3">
-                <Link to="/marketplace" className="text-decoration-underline">
-                  {t("login.back_catalog")}
-                </Link>
-              </p>
-              <h1 className="market-intro__kicker" style={{ marginBottom: "0.5rem" }}>
-                {t("login.quote_title")}
-              </h1>
-              <p className="market-intro__desc mb-3">
-                {tf("login.quote_blocked", {
-                  email: user.email ?? user.username ?? "—",
-                  role: String(user.role),
-                  client: t("drawer.client"),
-                  admin: t("drawer.admin"),
-                })}
-              </p>
-              {fromQuote ? (
-                <p className="market-intro__desc small mb-4" role="status">
-                  {t("login.quote_hint_from")}
-                </p>
-              ) : (
-                <p className="market-intro__desc small text-muted mb-4">
-                  {t("login.quote_hint_other")}
-                </p>
-              )}
-              <div className="hrs-card p-4 d-flex flex-column gap-2" style={{ borderRadius: 16, background: "rgba(255,255,255,0.92)" }}>
-                <button type="button" className="btn btn-success w-100" onClick={() => logout()}>
-                  {t("login.logout_switch")}
-                </button>
-                <Link to="/" className="btn btn-outline-secondary w-100">
-                  {t("login.hrs_home")}
-                </Link>
-              </div>
-            </section>
-          </main>
-          <MarketplaceSiteFooter />
-        </div>
-      </div>
     );
   }
 

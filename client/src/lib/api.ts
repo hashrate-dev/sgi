@@ -851,7 +851,7 @@ export type UserListItem = {
   role: string;
   created_at: string;
   usuario?: string;
-  /** Sólo `admin_b`; `null` = acceso histórico completo sin lista explícita. */
+  /** `admin_b` y `operador`; `null` = acceso histórico completo sin lista explícita. */
   admin_b_grants?: string[] | null;
   /** Sólo `lector`; `null`/omitido según servidor = legado amplio API / SPA solo Kryptex hasta que Admin A defina lista. */
   lector_grants?: string[] | null;
@@ -1197,6 +1197,86 @@ export function deleteAsicCostoEquipo(id: number): Promise<void> {
   return api<void>(`/api/asic/costos-equipos/${encodeURIComponent(String(id))}`, {
     method: "DELETE",
   });
+}
+
+/** Lead en tabla POTENCIALES CLIENTES (compradores potenciales de mineros). */
+export type PotencialClienteLead = {
+  id: number;
+  createdAt: string;
+  nombre: string;
+  apellidos: string;
+  email: string;
+  celular: string;
+  observaciones: string;
+};
+
+export type PotencialClienteLeadPayload = {
+  nombre: string;
+  apellidos?: string;
+  email?: string;
+  celular?: string;
+  observaciones?: string;
+};
+
+export function getPotencialesClientesLeads(): Promise<{ items: PotencialClienteLead[] }> {
+  return api<{ items: PotencialClienteLead[] }>("/api/potenciales-clientes");
+}
+
+export function createPotencialClienteLead(
+  body: PotencialClienteLeadPayload
+): Promise<{ ok: boolean; item: PotencialClienteLead | null }> {
+  return api<{ ok: boolean; item: PotencialClienteLead | null }>("/api/potenciales-clientes", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function updatePotencialClienteLead(
+  id: number,
+  body: PotencialClienteLeadPayload
+): Promise<{ ok: boolean; item: PotencialClienteLead | null }> {
+  return api<{ ok: boolean; item: PotencialClienteLead | null }>(`/api/potenciales-clientes/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+export function deletePotencialClienteLead(id: number): Promise<{ ok: boolean }> {
+  return api<{ ok: boolean }>(`/api/potenciales-clientes/${id}`, {
+    method: "DELETE",
+  });
+}
+
+/** Descarga CSV desde el servidor (UTF-8 con BOM). */
+export async function downloadPotencialesClientesCsv(): Promise<Blob> {
+  const token = getStoredToken();
+  const headers: Record<string, string> = { Accept: "text/csv" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const base = getApiBase();
+  const h = typeof window !== "undefined" ? (window.location?.hostname ?? "") : "";
+  if ((!base || base.trim() === "") && h !== "localhost" && h !== "127.0.0.1" && !h.endsWith(".vercel.app") && h !== "app.hashrate.space") {
+    throw new Error(getNoApiMessage());
+  }
+  const path = "/api/potenciales-clientes/export.csv";
+  const url = base && base.trim() !== "" ? `${base}${path}` : path;
+  const res = await fetch(url, { method: "GET", headers, credentials: "include" });
+  if (res.status === 401) {
+    clearStoredAuth();
+    const cb = typeof window !== "undefined" ? (window as unknown as { __on401?: () => void }).__on401 : undefined;
+    if (typeof cb === "function") cb();
+    throw new Error("Sesión expirada.");
+  }
+  if (!res.ok) {
+    let msg = res.statusText;
+    try {
+      const j = (await res.json()) as { error?: { message?: string } };
+      if (j?.error?.message) msg = j.error.message;
+    } catch {
+      /* body no JSON */
+    }
+    throw new Error(msg || `Error ${res.status}`);
+  }
+  return res.blob();
 }
 
 export type ProveedorHrs = {

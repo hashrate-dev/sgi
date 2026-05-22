@@ -3,8 +3,6 @@ import { Link, Navigate, useLocation } from "react-router-dom";
 import {
   createUser,
   deleteUser,
-  getAdminBPermissionsCatalog,
-  getLectorPermissionsCatalog,
   getUsers,
   getUsersActivity,
   updateAdminBGrants,
@@ -13,20 +11,15 @@ import {
   type ActivityItem,
   type UserListItem,
 } from "../lib/api";
-import {
-  ADMIN_B_PERMISSION_CATALOG,
-  mergeAdminBCatalogFromApi,
-  type AdminBPermissionCatalogItem,
-  type AdminBPermissionKey,
-} from "../lib/adminBPermissionsCatalog";
-import {
-  LECTOR_PERMISSION_CATALOG,
-  mergeLectorCatalogFromApi,
-  type LectorPermissionCatalogItem,
-  type LectorPermissionKey,
-} from "../lib/lectorPermissionsCatalog";
 import { canDeleteAdminUser, type UserRole } from "../lib/auth";
+import { canUserAccessNavPath } from "../lib/sgiNavigation";
 import { PageHeader } from "../components/PageHeader";
+import { SgiPermissionsMapPanel } from "../components/SgiPermissionsMapPanel";
+import {
+  countSelectedScreens,
+  hydrateScreenSelection,
+  screenIdsFromSelection,
+} from "../lib/sgiScreenGrants";
 import { TiendaOnlineAuditSection } from "../components/TiendaOnlineAuditSection";
 import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
@@ -65,47 +58,6 @@ function usuariosRouteMode(pathname: string): "hub" | "cuentas" | "actividad" | 
   if (p.startsWith("/usuarios/")) return "unknown";
   return "unknown";
 }
-
-const GRANTS_SECTION_ICONS: Record<number, string> = {
-  1: "bi-buildings",
-  2: "bi-bag-check",
-  3: "bi-cash-stack",
-  4: "bi-diagram-3",
-  5: "bi-bar-chart-line",
-};
-
-const GRANT_ITEM_ICONS: Record<AdminBPermissionKey, string> = {
-  facturacion: "bi-file-earmark-text",
-  clientes: "bi-people",
-  equipos: "bi-cpu",
-  equipos_tienda: "bi-shop-window",
-  garantias: "bi-shield-check",
-  setups: "bi-grid-3x3-gap-fill",
-  marketplace_pedidos: "bi-bag",
-  marketplace_presencia: "bi-activity",
-  finanzas_contabilidad: "bi-calculator",
-  finanzas_proveedores: "bi-building",
-  finanzas_asic_costos: "bi-graph-up-arrow",
-  hosting_tipo_cambio: "bi-currency-exchange",
-  usuarios: "bi-person-badge",
-  exportar: "bi-download",
-  reportes: "bi-pie-chart",
-};
-
-const LECTOR_GRANT_ITEM_ICONS: Record<LectorPermissionKey, string> = {
-  facturacion: "bi-file-earmark-text",
-  clientes: "bi-people",
-  equipos: "bi-cpu",
-  equipos_tienda: "bi-shop-window",
-  garantias: "bi-shield-check",
-  setups: "bi-grid-3x3-gap-fill",
-  finanzas_contabilidad: "bi-calculator",
-  finanzas_proveedores: "bi-building",
-  finanzas_asic_costos: "bi-graph-up-arrow",
-  hosting_tipo_cambio: "bi-currency-exchange",
-  reportes: "bi-pie-chart",
-  exportar: "bi-download",
-};
 
 const ROLES: { value: UserRole; label: string }[] = [
   { value: "admin_a", label: "AdministradorA" },
@@ -154,11 +106,9 @@ export function UsuariosPage() {
   const [pageSizeActivity, setPageSizeActivity] = useState<number>(20);
   const [goToPageUsers, setGoToPageUsers] = useState("");
   const [goToPageActivity, setGoToPageActivity] = useState("");
-  const [grantsCatalog, setGrantsCatalog] = useState<AdminBPermissionCatalogItem[]>(() => [...ADMIN_B_PERMISSION_CATALOG]);
   const [grantsExplicit, setGrantsExplicit] = useState(false);
   const [grantsSelected, setGrantsSelected] = useState<Record<string, boolean>>({});
   const [grantsSaving, setGrantsSaving] = useState(false);
-  const [lectorGrantsCatalog, setLectorGrantsCatalog] = useState<LectorPermissionCatalogItem[]>(() => [...LECTOR_PERMISSION_CATALOG]);
   const [lectorGrantsExplicit, setLectorGrantsExplicit] = useState(false);
   const [lectorGrantsSelected, setLectorGrantsSelected] = useState<Record<string, boolean>>({});
   const [lectorGrantsSaving, setLectorGrantsSaving] = useState(false);
@@ -213,30 +163,14 @@ export function UsuariosPage() {
     const raw = u.admin_b_grants;
     const explicit = raw != null;
     setGrantsExplicit(explicit);
-    const sel: Record<string, boolean> = {};
-    for (const c of ADMIN_B_PERMISSION_CATALOG) {
-      sel[c.key] = explicit && Array.isArray(raw) ? raw.includes(c.key) : true;
-    }
-    setGrantsSelected(sel);
-    setGrantsCatalog([...ADMIN_B_PERMISSION_CATALOG]);
-    void getAdminBPermissionsCatalog()
-      .then((r) => setGrantsCatalog(mergeAdminBCatalogFromApi(r.catalog)))
-      .catch(() => {});
+    setGrantsSelected(hydrateScreenSelection("staff", Array.isArray(raw) ? raw : null, explicit));
   }
 
   function hydrateLectorGrantsState(u: UserListItem) {
     const raw = u.lector_grants;
     const explicit = raw != null;
     setLectorGrantsExplicit(explicit);
-    const sel: Record<string, boolean> = {};
-    for (const c of LECTOR_PERMISSION_CATALOG) {
-      sel[c.key] = explicit && Array.isArray(raw) ? raw.includes(c.key) : true;
-    }
-    setLectorGrantsSelected(sel);
-    setLectorGrantsCatalog([...LECTOR_PERMISSION_CATALOG]);
-    void getLectorPermissionsCatalog()
-      .then((r) => setLectorGrantsCatalog(mergeLectorCatalogFromApi(r.catalog)))
-      .catch(() => {});
+    setLectorGrantsSelected(hydrateScreenSelection("lector", Array.isArray(raw) ? raw : null, explicit));
   }
 
   function openEdit(u: UserListItem) {
@@ -268,26 +202,26 @@ export function UsuariosPage() {
     setLectorGrantsModalUser(null);
   }
 
-  function toggleGrantKey(key: string) {
-    setGrantsSelected((prev) => ({ ...prev, [key]: !prev[key] }));
+  function toggleGrantScreenId(screenId: string) {
+    setGrantsSelected((prev) => ({ ...prev, [screenId]: !prev[screenId] }));
   }
 
-  function setSectionGrants(items: AdminBPermissionCatalogItem[], value: boolean) {
+  function toggleLectorScreenId(screenId: string) {
+    setLectorGrantsSelected((prev) => ({ ...prev, [screenId]: !prev[screenId] }));
+  }
+
+  function setZoneStaffScreenIds(screenIds: string[], value: boolean) {
     setGrantsSelected((prev) => {
       const next = { ...prev };
-      for (const c of items) next[c.key] = value;
+      for (const id of screenIds) next[id] = value;
       return next;
     });
   }
 
-  function toggleLectorGrantKey(key: string) {
-    setLectorGrantsSelected((prev) => ({ ...prev, [key]: !prev[key] }));
-  }
-
-  function setSectionLectorGrants(items: LectorPermissionCatalogItem[], value: boolean) {
+  function setZoneLectorScreenIds(screenIds: string[], value: boolean) {
     setLectorGrantsSelected((prev) => {
       const next = { ...prev };
-      for (const c of items) next[c.key] = value;
+      for (const id of screenIds) next[id] = value;
       return next;
     });
   }
@@ -296,7 +230,7 @@ export function UsuariosPage() {
     const target = lectorGrantsModalUser;
     if (!target || target.role !== "lector") return;
     if (lectorGrantsExplicit) {
-      const n = lectorGrantsCatalog.filter((c) => lectorGrantsSelected[c.key]).length;
+      const n = countSelectedScreens("lector", lectorGrantsSelected);
       if (n === 0) {
         const ok = window.confirm(
           "No hay ningún módulo marcado: esta cuenta Lector solo podrá acceder a Kryptex en la aplicación. ¿Guardar igualmente?"
@@ -306,9 +240,7 @@ export function UsuariosPage() {
     }
     setLectorGrantsSaving(true);
     try {
-      const grants = lectorGrantsExplicit
-        ? lectorGrantsCatalog.filter((c) => lectorGrantsSelected[c.key]).map((c) => c.key)
-        : null;
+      const grants = lectorGrantsExplicit ? screenIdsFromSelection("lector", lectorGrantsSelected) : null;
       const r = await updateLectorGrants(target.id, grants);
       showToast("Permisos de consulta guardados.", "success", toastContext);
       setUsers((prev) =>
@@ -333,19 +265,20 @@ export function UsuariosPage() {
 
   async function handleSaveAdminBGrantsFromModal() {
     const target = grantsModalUser;
-    if (!target || target.role !== "admin_b") return;
+    if (!target || (target.role !== "admin_b" && target.role !== "operador")) return;
+    const grantsRoleLabel = target.role === "operador" ? "Operador" : "AdministradorB";
     if (grantsExplicit) {
-      const n = grantsCatalog.filter((c) => grantsSelected[c.key]).length;
+      const n = countSelectedScreens("staff", grantsSelected);
       if (n === 0) {
         const ok = window.confirm(
-          "No hay ningún módulo marcado: este AdministradorB quedará sin acceso a las secciones que dependen de permisos. ¿Guardar igualmente?"
+          `No hay ningún módulo marcado: este ${grantsRoleLabel} quedará sin acceso a las secciones que dependen de permisos. ¿Guardar igualmente?`
         );
         if (!ok) return;
       }
     }
     setGrantsSaving(true);
     try {
-      const grants = grantsExplicit ? grantsCatalog.filter((c) => grantsSelected[c.key]).map((c) => c.key) : null;
+      const grants = grantsExplicit ? screenIdsFromSelection("staff", grantsSelected) : null;
       const r = await updateAdminBGrants(target.id, grants);
       showToast("Permisos guardados.", "success", toastContext);
       setUsers((prev) =>
@@ -449,40 +382,6 @@ export function UsuariosPage() {
   const isAdmin = currentUser?.role === "admin_a" || currentUser?.role === "admin_b";
   const toastContext = "Gestión de usuarios";
 
-  const grantsCatalogSections = useMemo(() => {
-    const sorted = [...grantsCatalog].sort((a, b) =>
-      a.sectionOrder !== b.sectionOrder ? a.sectionOrder - b.sectionOrder : String(a.key).localeCompare(String(b.key))
-    );
-    type SectionGroup = { sectionOrder: number; sectionLabel: string; items: AdminBPermissionCatalogItem[] };
-    const groups: SectionGroup[] = [];
-    for (const item of sorted) {
-      let g = groups.find((x) => x.sectionOrder === item.sectionOrder && x.sectionLabel === item.sectionLabel);
-      if (!g) {
-        g = { sectionOrder: item.sectionOrder, sectionLabel: item.sectionLabel, items: [] };
-        groups.push(g);
-      }
-      g.items.push(item);
-    }
-    return groups.sort((a, b) => a.sectionOrder - b.sectionOrder);
-  }, [grantsCatalog]);
-
-  const lectorGrantsCatalogSections = useMemo(() => {
-    const sorted = [...lectorGrantsCatalog].sort((a, b) =>
-      a.sectionOrder !== b.sectionOrder ? a.sectionOrder - b.sectionOrder : String(a.key).localeCompare(String(b.key))
-    );
-    type SectionGroup = { sectionOrder: number; sectionLabel: string; items: LectorPermissionCatalogItem[] };
-    const groups: SectionGroup[] = [];
-    for (const item of sorted) {
-      let g = groups.find((x) => x.sectionOrder === item.sectionOrder && x.sectionLabel === item.sectionLabel);
-      if (!g) {
-        g = { sectionOrder: item.sectionOrder, sectionLabel: item.sectionLabel, items: [] };
-        groups.push(g);
-      }
-      g.items.push(item);
-    }
-    return groups.sort((a, b) => a.sectionOrder - b.sectionOrder);
-  }, [lectorGrantsCatalog]);
-
   const totalPagesUsers = Math.max(1, Math.ceil(users.length / pageSizeUsers));
   const paginatedUsers = useMemo(() => {
     const start = (pageUsers - 1) * pageSizeUsers;
@@ -558,7 +457,7 @@ export function UsuariosPage() {
                   estilo de accesos que <strong>Servicios de Hosting</strong>).
                 </p>
                 <div className="reportes-grid">
-                  {USUARIOS_HUB_ITEMS.map((item) => (
+                  {USUARIOS_HUB_ITEMS.filter((item) => canUserAccessNavPath(currentUser, item.to)).map((item) => (
                     <Link key={item.to} to={item.to} className="reportes-card mineria-hub-card">
                       <div className="reportes-card-icon">
                         <i className={`bi ${item.icon}`} />
@@ -661,12 +560,16 @@ export function UsuariosPage() {
                                     <i className="bi bi-pencil" />
                                     Editar
                                   </button>
-                                  {currentUser?.role === "admin_a" && u.role === "admin_b" && (
+                                  {currentUser?.role === "admin_a" && (u.role === "admin_b" || u.role === "operador") && (
                                     <button
                                       type="button"
                                       className="btn-action btn-action--grants"
                                       onClick={() => openAdminBGrants(u)}
-                                      title="Permisos de módulos SGI"
+                                      title={
+                                        u.role === "operador"
+                                          ? "Permisos de módulos SGI (Operador)"
+                                          : "Permisos de módulos SGI"
+                                      }
                                     >
                                       <i className="bi bi-shield-lock" />
                                       Permisos
@@ -929,8 +832,18 @@ export function UsuariosPage() {
                       className="form-control"
                       value={formUsuario}
                       onChange={(e) => setFormUsuario(e.target.value)}
-                      placeholder="Nombre de usuario"
+                      placeholder={
+                        formRole === "lector"
+                          ? "Nombre pool Kryptex (ej. Mariri, Jlsoler)"
+                          : "Nombre de usuario"
+                      }
                     />
+                    {formRole === "lector" ? (
+                      <p className="form-text text-muted mb-0">
+                        Debe coincidir con un usuario de pool configurado en el servidor (Kryptex). Si solo
+                        usás permisos SGI, dejalo vacío y asigná módulos en Permisos.
+                      </p>
+                    ) : null}
                   </div>
                   <div className="mb-3">
                     <label className="form-label">Correo</label>
@@ -1051,9 +964,11 @@ export function UsuariosPage() {
                     <i className="bi bi-shield-lock-fill professional-modal-icon" aria-hidden />
                   </div>
                   <div className="usuarios-admin-b-grants-modal-header-titles">
-                    <span className="usuarios-admin-b-grants-modal-kicker">AdministradorB</span>
+                    <span className="usuarios-admin-b-grants-modal-kicker">
+                      {grantsModalUser.role === "operador" ? "Operador" : "AdministradorB"}
+                    </span>
                     <h5 className="usuarios-admin-b-grants-modal-title mb-0" id="admin-b-grants-modal-title">
-                      Permisos del SGI
+                      Mapa de acceso al SGI
                     </h5>
                     <span className="text-white-50 small text-truncate d-block" style={{ opacity: 0.85 }}>
                       {grantsModalUser.email}
@@ -1072,15 +987,20 @@ export function UsuariosPage() {
                     {(grantsModalUser.email || "?").slice(0, 1).toUpperCase()}
                   </div>
                   <div className="usuarios-admin-b-grants-user-meta">
-                    <span className="usuarios-admin-b-grants-user-label">AdministradorB</span>
+                    <span className="usuarios-admin-b-grants-user-label">
+                      {grantsModalUser.role === "operador" ? "Operador" : "AdministradorB"}
+                    </span>
                     <span className="usuarios-admin-b-grants-user-email">{grantsModalUser.email}</span>
                   </div>
-                  <span className="usuarios-admin-b-grants-role-pill">Permisos SGI</span>
+                  <span className="usuarios-admin-b-grants-role-pill">
+                    {grantsModalUser.role === "operador" ? "Operador · Permisos SGI" : "Permisos SGI"}
+                  </span>
                 </div>
                 <div className="usuarios-admin-b-grants-notice" role="status">
                   <i className="bi bi-shield-lock-fill usuarios-admin-b-grants-notice-icon" aria-hidden />
                   <p className="mb-0">
-                    Solo <strong>AdministradorA</strong> autoriza estos módulos. El usuario solo opera donde marques aquí.
+                    Solo <strong>AdministradorA</strong> autoriza el acceso. Activá la lista explícita y marcá cada{" "}
+                    <strong>pantalla</strong> (con su ruta) que el usuario podrá abrir.
                   </p>
                 </div>
                 <div className={`usuarios-admin-b-grants-mode-card ${grantsExplicit ? "usuarios-admin-b-grants-mode-card--on" : ""}`}>
@@ -1095,90 +1015,28 @@ export function UsuariosPage() {
                         const on = e.target.checked;
                         setGrantsExplicit(on);
                         if (on) {
-                          setGrantsSelected((prev) => {
-                            const next = { ...prev };
-                            for (const c of grantsCatalog) {
-                              if (!(c.key in next)) next[c.key] = true;
-                            }
-                            return next;
-                          });
+                          setGrantsSelected(hydrateScreenSelection("staff", null, true));
                         }
                       }}
                     />
                     <label className="usuarios-admin-b-grants-mode-label" htmlFor={`modal-ab-explicit-${grantsModalUser.id}`}>
-                      <span className="usuarios-admin-b-grants-mode-title">Lista explícita por módulo</span>
+                      <span className="usuarios-admin-b-grants-mode-title">Lista explícita (recomendado)</span>
                       <span className="usuarios-admin-b-grants-mode-hint">
-                        Sin marcar: acceso habitual completo de AdministradorB. Marcado: solo los módulos elegidos.
+                        Sin marcar: acceso amplio habitual. Marcado: solo las pantallas que elijas en el mapa de abajo.
                       </span>
                     </label>
                   </div>
                 </div>
                 {grantsExplicit ? (
                   <div className="usuarios-admin-b-grants-modal-body">
-                    {grantsCatalogSections.map((sec) => (
-                      <section key={`modal-ab-${grantsModalUser.id}-${sec.sectionOrder}-${sec.sectionLabel}`} className="usuarios-admin-b-grants-section">
-                        <div className="usuarios-admin-b-grants-section-head">
-                          <div className="usuarios-admin-b-grants-section-title-row">
-                            <span className="usuarios-admin-b-grants-section-icon" aria-hidden>
-                              <i className={`bi ${GRANTS_SECTION_ICONS[sec.sectionOrder] ?? "bi-folder2-open"}`} />
-                            </span>
-                            <h4 className="usuarios-admin-b-grants-section-title">{sec.sectionLabel}</h4>
-                          </div>
-                          <div className="usuarios-admin-b-grants-section-actions">
-                            <button
-                              type="button"
-                              className="usuarios-admin-b-grants-pill-btn usuarios-admin-b-grants-pill-btn--on"
-                              disabled={grantsSaving}
-                              onClick={() => setSectionGrants(sec.items, true)}
-                            >
-                              <i className="bi bi-check2-all" aria-hidden />
-                              Marcar sección
-                            </button>
-                            <button
-                              type="button"
-                              className="usuarios-admin-b-grants-pill-btn"
-                              disabled={grantsSaving}
-                              onClick={() => setSectionGrants(sec.items, false)}
-                            >
-                              <i className="bi bi-slash-circle" aria-hidden />
-                              Desmarcar
-                            </button>
-                          </div>
-                        </div>
-                        <div className="usuarios-admin-b-grants-item-grid">
-                          {sec.items.map((c) => {
-                            const on = Boolean(grantsSelected[c.key]);
-                            const gid = `${grantsModalUser.id}-${c.key}`;
-                            return (
-                              <div
-                                key={`modal-ab-item-${gid}`}
-                                className={`usuarios-admin-b-grants-item ${on ? "usuarios-admin-b-grants-item--on" : ""}`}
-                              >
-                                <div className="usuarios-admin-b-grants-item-icon" aria-hidden>
-                                  <i className={`bi ${GRANT_ITEM_ICONS[c.key] ?? "bi-app"}`} />
-                                </div>
-                                <div className="usuarios-admin-b-grants-item-body">
-                                  <div className="usuarios-admin-b-grants-item-top">
-                                    <input
-                                      className="form-check-input usuarios-admin-b-grants-item-check"
-                                      type="checkbox"
-                                      id={`modal-ab-grant-${gid}`}
-                                      checked={on}
-                                      disabled={grantsSaving}
-                                      onChange={() => toggleGrantKey(c.key)}
-                                    />
-                                    <label className="usuarios-admin-b-grants-item-label" htmlFor={`modal-ab-grant-${gid}`}>
-                                      {c.label}
-                                    </label>
-                                  </div>
-                                  <p className="usuarios-admin-b-grants-item-desc">{c.description}</p>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </section>
-                    ))}
+                    <SgiPermissionsMapPanel
+                      audience="staff"
+                      userId={grantsModalUser.id}
+                      selected={grantsSelected}
+                      disabled={grantsSaving}
+                      onToggleScreenId={toggleGrantScreenId}
+                      onSetZoneScreenIds={setZoneStaffScreenIds}
+                    />
                   </div>
                 ) : (
                   <div className="usuarios-admin-b-grants-full-access-hint">
@@ -1240,7 +1098,7 @@ export function UsuariosPage() {
                   <div className="usuarios-admin-b-grants-modal-header-titles">
                     <span className="usuarios-admin-b-grants-modal-kicker">Lector</span>
                     <h5 className="usuarios-admin-b-grants-modal-title mb-0" id="lector-grants-modal-title">
-                      Permisos de consulta
+                      Mapa de consulta al SGI
                     </h5>
                     <span className="text-white-50 small text-truncate d-block" style={{ opacity: 0.85 }}>
                       {lectorGrantsModalUser.email}
@@ -1282,13 +1140,7 @@ export function UsuariosPage() {
                         const on = e.target.checked;
                         setLectorGrantsExplicit(on);
                         if (on) {
-                          setLectorGrantsSelected((prev) => {
-                            const next = { ...prev };
-                            for (const c of lectorGrantsCatalog) {
-                              if (!(c.key in next)) next[c.key] = true;
-                            }
-                            return next;
-                          });
+                          setLectorGrantsSelected(hydrateScreenSelection("lector", null, true));
                         }
                       }}
                     />
@@ -1302,70 +1154,14 @@ export function UsuariosPage() {
                 </div>
                 {lectorGrantsExplicit ? (
                   <div className="usuarios-admin-b-grants-modal-body">
-                    {lectorGrantsCatalogSections.map((sec) => (
-                      <section key={`modal-lec-${lectorGrantsModalUser.id}-${sec.sectionOrder}-${sec.sectionLabel}`} className="usuarios-admin-b-grants-section">
-                        <div className="usuarios-admin-b-grants-section-head">
-                          <div className="usuarios-admin-b-grants-section-title-row">
-                            <span className="usuarios-admin-b-grants-section-icon" aria-hidden>
-                              <i className={`bi ${GRANTS_SECTION_ICONS[sec.sectionOrder] ?? "bi-folder2-open"}`} />
-                            </span>
-                            <h4 className="usuarios-admin-b-grants-section-title">{sec.sectionLabel}</h4>
-                          </div>
-                          <div className="usuarios-admin-b-grants-section-actions">
-                            <button
-                              type="button"
-                              className="usuarios-admin-b-grants-pill-btn usuarios-admin-b-grants-pill-btn--on"
-                              disabled={lectorGrantsSaving}
-                              onClick={() => setSectionLectorGrants(sec.items, true)}
-                            >
-                              <i className="bi bi-check2-all" aria-hidden />
-                              Marcar sección
-                            </button>
-                            <button
-                              type="button"
-                              className="usuarios-admin-b-grants-pill-btn"
-                              disabled={lectorGrantsSaving}
-                              onClick={() => setSectionLectorGrants(sec.items, false)}
-                            >
-                              <i className="bi bi-slash-circle" aria-hidden />
-                              Desmarcar
-                            </button>
-                          </div>
-                        </div>
-                        <div className="usuarios-admin-b-grants-item-grid">
-                          {sec.items.map((c) => {
-                            const on = Boolean(lectorGrantsSelected[c.key]);
-                            const gid = `${lectorGrantsModalUser.id}-${c.key}`;
-                            return (
-                              <div
-                                key={`modal-lec-item-${gid}`}
-                                className={`usuarios-admin-b-grants-item ${on ? "usuarios-admin-b-grants-item--on" : ""}`}
-                              >
-                                <div className="usuarios-admin-b-grants-item-icon" aria-hidden>
-                                  <i className={`bi ${LECTOR_GRANT_ITEM_ICONS[c.key] ?? "bi-app"}`} />
-                                </div>
-                                <div className="usuarios-admin-b-grants-item-body">
-                                  <div className="usuarios-admin-b-grants-item-top">
-                                    <input
-                                      className="form-check-input usuarios-admin-b-grants-item-check"
-                                      type="checkbox"
-                                      id={`modal-lector-grant-${gid}`}
-                                      checked={on}
-                                      disabled={lectorGrantsSaving}
-                                      onChange={() => toggleLectorGrantKey(c.key)}
-                                    />
-                                    <label className="usuarios-admin-b-grants-item-label" htmlFor={`modal-lector-grant-${gid}`}>
-                                      {c.label}
-                                    </label>
-                                  </div>
-                                  <p className="usuarios-admin-b-grants-item-desc">{c.description}</p>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </section>
-                    ))}
+                    <SgiPermissionsMapPanel
+                      audience="lector"
+                      userId={lectorGrantsModalUser.id}
+                      selected={lectorGrantsSelected}
+                      disabled={lectorGrantsSaving}
+                      onToggleScreenId={toggleLectorScreenId}
+                      onSetZoneScreenIds={setZoneLectorScreenIds}
+                    />
                   </div>
                 ) : (
                   <div className="usuarios-admin-b-grants-full-access-hint">

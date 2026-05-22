@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
-import { canManageUsers } from "../../lib/auth.js";
+import { canAccessSgiFromMarketplaceFooter } from "../../lib/auth.js";
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
 
 const UP = "https://hashrate.space/wp-content/uploads";
@@ -17,7 +17,7 @@ export function MarketplaceSiteFooter({ variant = "default" }: Props) {
   const year = new Date().getFullYear();
   const { user, loading } = useAuth();
   const { t, tf } = useMarketplaceLang();
-  const showSgiLink = Boolean(!loading && user && canManageUsers(user));
+  const showSgiLink = Boolean(!loading && user && canAccessSgiFromMarketplaceFooter(user));
   const inCorpBand = variant === "corp-end-band";
 
   const strip = (

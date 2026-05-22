@@ -1,25 +1,23 @@
 import { useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
-import { canAccessMonitorEquiposAsic } from "../lib/auth";
+import { canUserAccessNavPath } from "../lib/sgiNavigation";
 import "../styles/facturacion.css";
 
-const monitorMenuItem = {
-  to: "/asic/monitor-equipos",
-  icon: "bi-speedometer2",
-  label: "Monitor equipos ASIC (NiceHash)",
-  desc: "En vivo desde tus enlaces watcher W1…WN (NiceHash por cuenta). El listado local con notas: ?registro=1 o el botón «Registro» en el tablero.",
-} as const;
-
-const monitorBajasMenuItem = {
-  to: "/asic/equipos-dados-de-baja",
-  icon: "bi-archive",
-  label: "Equipos ASIC dados de baja",
-  desc: "Listado de equipos retirados del monitor (snapshot en servidor; venta o baja del sistema)",
-} as const;
-
-const asicMenuItemsRest: Array<{ to: string; icon: string; label: string; desc: string }> = [
+const asicMenuItems: Array<{ to: string; icon: string; label: string; desc: string }> = [
+  {
+    to: "/asic/monitor-equipos",
+    icon: "bi-speedometer2",
+    label: "Monitor equipos ASIC (NiceHash)",
+    desc: "En vivo desde tus enlaces watcher W1…WN (NiceHash por cuenta). El listado local con notas: ?registro=1 o el botón «Registro» en el tablero.",
+  },
+  {
+    to: "/asic/equipos-dados-de-baja",
+    icon: "bi-archive",
+    label: "Equipos ASIC dados de baja",
+    desc: "Listado de equipos retirados del monitor (snapshot en servidor; venta o baja del sistema)",
+  },
   {
     to: "/asic/cotizador-china-py",
     icon: "bi-calculator",
@@ -35,11 +33,14 @@ const asicMenuItemsRest: Array<{ to: string; icon: string; label: string; desc: 
 
 export function MineriaHubPage() {
   const { user } = useAuth();
-  const asicMenuItems = useMemo(() => {
-    return canAccessMonitorEquiposAsic(user)
-      ? [{ ...monitorMenuItem }, { ...monitorBajasMenuItem }, ...asicMenuItemsRest]
-      : [...asicMenuItemsRest];
-  }, [user]);
+  const visible = useMemo(
+    () => asicMenuItems.filter((item) => canUserAccessNavPath(user, item.to)),
+    [user]
+  );
+
+  if (!user || visible.length === 0) {
+    return <Navigate to="/gestion-administrativa" replace />;
+  }
 
   return (
     <div className="fact-page mineria-page">
@@ -49,7 +50,7 @@ export function MineriaHubPage() {
         <div className="hrs-card p-4">
           <p className="text-muted small mb-3">Espacio para gestionar todo lo relacionado a la venta de Equipos ASIC:</p>
           <div className="reportes-grid">
-            {asicMenuItems.map((item) => (
+            {visible.map((item) => (
               <Link key={item.to} to={item.to} className="reportes-card mineria-hub-card">
                 <div className="reportes-card-icon">
                   <i className={`bi ${item.icon}`} />

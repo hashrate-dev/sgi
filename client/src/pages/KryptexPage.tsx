@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
+import { lectorHasHomeDashboardModules } from "../lib/auth";
 import {
   KryptexHashrateChart,
   sumWorkersTHs,
@@ -199,11 +200,20 @@ export function KryptexPage() {
       return <Navigate to={`/kryptex/detalle?wallet=${encodeURIComponent(lectorRedirect.wallet)}&pool=${encodeURIComponent(lectorRedirect.pool)}`} replace />;
     }
     if (lectorError) {
+      if (user && lectorHasHomeDashboardModules(user)) {
+        return <Navigate to="/" replace />;
+      }
       return (
         <div className="hrs-home">
           <div className="hrs-home-container container" style={{ maxWidth: "1320px" }}>
             <PageHeader title="Kryptex" />
-            <div className="alert alert-danger">{lectorError}</div>
+            <div className="alert alert-danger">
+              <p className="mb-2">{lectorError}</p>
+              <p className="mb-0 small text-muted">
+                El administrador debe asignar en <strong>Usuarios → Editar</strong> el campo{" "}
+                <strong>Usuario</strong> con un nombre de pool existente (ej. Mariri, Jlsoler, Hashrate).
+              </p>
+            </div>
           </div>
         </div>
       );

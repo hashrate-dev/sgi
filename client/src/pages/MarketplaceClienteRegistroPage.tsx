@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
-import { canUseMarketplaceQuoteCart } from "../lib/auth.js";
 import { useAuth } from "../contexts/AuthContext";
 import { isEmailAlreadyRegisteredError, registerMarketplaceCliente, wakeUpBackend } from "../lib/api";
 import { MarketplacePasswordField } from "../components/marketplace/MarketplacePasswordField";
@@ -26,8 +25,8 @@ const DEFAULT_PHONE_DIAL_COUNTRY_ID = "PY";
 
 /** Registro tienda: layout amplio + branding HASHRATE SPACE (alineado con `/marketplace/login`). */
 export function MarketplaceClienteRegistroPage() {
-  const { lang, t, tf } = useMarketplaceLang();
-  const { user, loading, applyLoginResponse, logout } = useAuth();
+  const { lang, t } = useMarketplaceLang();
+  const { user, loading, applyLoginResponse } = useAuth();
   const location = useLocation();
   const fromQuote = (location.state as { from?: string } | null)?.from === "quote";
   const [email, setEmail] = useState("");
@@ -101,61 +100,13 @@ export function MarketplaceClienteRegistroPage() {
     }
   }, [countryId]);
 
-  if (!loading && user && canUseMarketplaceQuoteCart(user)) {
+  if (!loading && user) {
     return (
       <Navigate
         to="/marketplace"
         replace
         state={fromQuote ? { openQuoteDrawer: true } : undefined}
       />
-    );
-  }
-
-  if (!loading && user && !canUseMarketplaceQuoteCart(user)) {
-    return (
-      <div className="marketplace-asic-page marketplace-registro-page">
-        <div className="bg-mesh" aria-hidden />
-        <div className="bg-grid" aria-hidden />
-        <div id="app" data-page="marketplace-registro-blocked">
-          <MarketplaceSiteHeader />
-          <main className="page-main page-main--market page-main--market--asic">
-            <section className="market-registro-section">
-              <div className="container py-5" style={{ maxWidth: 640 }}>
-                <div className="market-registro-card">
-                  <p className="small text-center mb-3">
-                    <Link to="/marketplace" className="text-decoration-none fw-semibold" style={{ color: "#0d9488" }}>
-                      ← {t("reg.blocked_back")}
-                    </Link>
-                  </p>
-                  <h2 className="market-registro-card__title text-center">{t("reg.blocked_title_alt")}</h2>
-                  <p className="text-muted small mb-3">
-                    {tf("reg.blocked_detail", {
-                      email: user.email ?? user.username ?? "—",
-                      role: String(user.role),
-                    })}
-                  </p>
-                  {fromQuote ? (
-                    <p className="small mb-4" role="status">
-                      {t("reg.blocked_from_quote")}
-                    </p>
-                  ) : (
-                    <p className="small text-muted mb-4">{t("reg.blocked_else")}</p>
-                  )}
-                  <div className="d-flex flex-column gap-2">
-                    <button type="button" className="btn btn-success market-registro-submit w-100" onClick={() => logout()}>
-                      {t("reg.logout_continue")}
-                    </button>
-                    <Link to="/" className="btn btn-outline-secondary w-100">
-                      {t("reg.hrs_home_short")}
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </section>
-          </main>
-          <MarketplaceSiteFooter />
-        </div>
-      </div>
     );
   }
 

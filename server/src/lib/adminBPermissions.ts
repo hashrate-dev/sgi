@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { grantsIncludeLegacyModule, isSgiScreenGrantId } from "./sgiScreenGrants.js";
 
 /** Permisos que AdministradorA puede asignar a cada AdministradorB (lista cerrada). */
 export const ADMIN_B_PERMISSION_CATALOG = [
@@ -46,6 +47,14 @@ export const ADMIN_B_PERMISSION_CATALOG = [
     key: "setups",
     label: "Combos / setups de minería",
     description: "Armado y mantenimiento de combos (setups) ofrecidos en el flujo operativo corporativo.",
+  },
+  {
+    sectionOrder: 1,
+    sectionLabel: "Gestión Administrativa — operación Hosting, ASIC y tienda corporativa",
+    key: "leads",
+    label: "Leads (Nuevos Leads + Leads Base)",
+    description:
+      "Formulario de registro de prospectos y tabla POTENCIALES CLIENTES en Gestión Administrativa.",
   },
   /** --- Marketplace (cotizaciones, pedidos y presencia digital) --- */
   {
@@ -132,13 +141,15 @@ export const ADMIN_B_PERMISSION_KEYS = ADMIN_B_PERMISSION_CATALOG.map((x) => x.k
 ];
 
 export function isValidAdminBGrantKey(k: string): k is AdminBPermissionKey {
-  return (ADMIN_B_PERMISSION_KEYS as readonly string[]).includes(k);
+  return (ADMIN_B_PERMISSION_KEYS as readonly string[]).includes(k) || isSgiScreenGrantId(k);
 }
 
 export const AdminBGrantsBodySchema = z.object({
   /** `null`: sin lista en DB (AdministradorB con acceso completo, comportamiento histórico). Array: whitelist. */
   grants: z.union([z.null(), z.array(z.string())]).transform((a) =>
-    a == null ? null : [...new Set(a)].filter((k): k is AdminBPermissionKey => isValidAdminBGrantKey(k))
+    a == null
+      ? null
+      : [...new Set(a)].filter((k): k is string => isValidAdminBGrantKey(k) || isSgiScreenGrantId(k))
   ),
 });
 
@@ -155,7 +166,7 @@ export function parseAdminBGrantsJson(raw: string | null | undefined): string[] 
     if (!Array.isArray(j)) return null;
     const out: string[] = [];
     for (const x of j) {
-      if (typeof x === "string" && isValidAdminBGrantKey(x) && !out.includes(x)) out.push(x);
+      if (typeof x === "string" && (isValidAdminBGrantKey(x) || isSgiScreenGrantId(x)) && !out.includes(x)) out.push(x);
     }
     return out;
   } catch {
@@ -163,12 +174,22 @@ export function parseAdminBGrantsJson(raw: string | null | undefined): string[] 
   }
 }
 
+const LEGACY_LEADS_GRANT_ALIASES: readonly AdminBPermissionKey[] = [
+  "facturacion",
+  "equipos",
+  "equipos_tienda",
+  "garantias",
+  "setups",
+];
+
 export function adminBHasGrant(grants: string[] | null | undefined, key: AdminBPermissionKey): boolean {
   if (grants == null) return true;
-  return grants.includes(key);
+  if (grants.includes(key)) return true;
+  if (key === "leads" && LEGACY_LEADS_GRANT_ALIASES.some((k) => grants.includes(k))) return true;
+  return false;
 }
 
 export function serializeAdminBGrants(grants: string[]): string {
-  const uniq = [...new Set(grants.filter((k) => isValidAdminBGrantKey(k)))];
+  const uniq = [...new Set(grants.filter((k) => isValidAdminBGrantKey(k) || isSgiScreenGrantId(k)))];
   return JSON.stringify(uniq);
 }

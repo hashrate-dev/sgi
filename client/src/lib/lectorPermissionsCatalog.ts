@@ -1,6 +1,9 @@
 /**
  * Catálogo consulta Lector (alineado con `server/src/lib/lectorPermissions.ts`).
  */
+import { collectPathPrefixesFromScreenGrants } from "./sgiScreenGrants";
+import { canUserAccessNavPath } from "./sgiNavigation";
+
 export type LectorPermissionKey =
   | "facturacion"
   | "clientes"
@@ -8,6 +11,7 @@ export type LectorPermissionKey =
   | "equipos_tienda"
   | "garantias"
   | "setups"
+  | "leads"
   | "finanzas_contabilidad"
   | "finanzas_proveedores"
   | "finanzas_asic_costos"
@@ -65,6 +69,13 @@ export const LECTOR_PERMISSION_CATALOG: readonly LectorPermissionCatalogItem[] =
     key: "setups",
     label: "Combos / setups",
     description: "Ver armados y configuraciones publicadas.",
+  },
+  {
+    sectionOrder: 1,
+    sectionLabel: "Operación Hosting, ASIC y clientes — solo lectura",
+    key: "leads",
+    label: "Leads (Nuevos Leads + Leads Base)",
+    description: "Registrar prospectos y consultar la base POTENCIALES CLIENTES.",
   },
   {
     sectionOrder: 2,
@@ -133,7 +144,7 @@ export function mergeLectorCatalogFromApi(rows: LectorPermissionCatalogApiRow[] 
   });
 }
 
-/** Prefijos de ruta SPA habilitados por cada permiso (lectura). */
+/** Prefijos de ruta SPA habilitados por cada permiso legacy (lectura). */
 export const LECTOR_GRANT_PATH_PREFIXES: Record<LectorPermissionKey, readonly string[]> = {
   facturacion: [
     "/hosting",
@@ -159,6 +170,7 @@ export const LECTOR_GRANT_PATH_PREFIXES: Record<LectorPermissionKey, readonly st
   equipos_tienda: ["/marketplace/home-banners", "/tienda-online-banners-home", "/asic/equipment"],
   garantias: ["/asic/ande-warranty", "/asic/warranty-items", "/asic/warranties-history", "/equipos-asic"],
   setups: ["/asic/setup", "/equipos-asic/setup", "/asic/reparacion"],
+  leads: [],
   finanzas_contabilidad: ["/gestion-financiera/contabilidad", "/gestion-financiera/monitor-financiero"],
   finanzas_proveedores: ["/gestion-financiera/proveedores"],
   finanzas_asic_costos: ["/asic/cotizador-china-py"],
@@ -175,6 +187,7 @@ const LECTOR_KEYS_FOR_GESTION_ADMIN: readonly LectorPermissionKey[] = [
   "equipos_tienda",
   "garantias",
   "setups",
+  "leads",
 ];
 
 const LECTOR_KEYS_FOR_GESTION_FIN: readonly LectorPermissionKey[] = [
@@ -194,13 +207,15 @@ export function lectorHubPathPrefixes(grants: readonly LectorPermissionKey[]): s
   return out;
 }
 
-/** Prefijos de ruta permitidos para un lector con lista explícita (incluye hubs derivados). */
-export function collectLectorAllowedPathPrefixes(grants: readonly LectorPermissionKey[]): string[] {
-  const set = new Set<string>();
+/** Prefijos de ruta permitidos para un lector con lista explícita (pantallas + legacy). */
+export function collectLectorAllowedPathPrefixes(grants: readonly string[]): string[] {
+  const fromScreens = collectPathPrefixesFromScreenGrants(grants);
+  const set = new Set<string>(fromScreens);
   for (const k of grants) {
-    for (const p of LECTOR_GRANT_PATH_PREFIXES[k]) set.add(p);
+    if (!(k in LECTOR_GRANT_PATH_PREFIXES)) continue;
+    for (const p of LECTOR_GRANT_PATH_PREFIXES[k as LectorPermissionKey]) set.add(p);
   }
-  for (const h of lectorHubPathPrefixes(grants)) set.add(h);
+  for (const h of lectorHubPathPrefixes(grants as LectorPermissionKey[])) set.add(h);
   return [...set];
 }
 
@@ -217,27 +232,11 @@ export function pathMatchesAnyLectorPrefix(pathname: string, prefixes: readonly 
   return false;
 }
 
-/** Ítems del menú principal (`/`) visibles por lector con permisos explícitos. */
-export function canLectorSeeHomeMenuTo(user: { role?: string; lector_grants?: string[] | null }, to: string): boolean {
+/** Ítems del menú principal (`/`) visibles por lector (delegado al mapa de pantallas). */
+export function canLectorSeeHomeMenuTo(
+  user: { role?: string; lector_grants?: string[] | null; kryptex_asignado?: boolean },
+  to: string
+): boolean {
   if (user.role !== "lector") return false;
-  const g = user.lector_grants;
-  if (!Array.isArray(g) || g.length === 0) return false;
-  if (to === "/marketplace") return true;
-  if (to === "/kryptex") return true;
-  if (to === "/gestion-administrativa") {
-    return (
-      LECTOR_KEYS_FOR_GESTION_ADMIN.some((k) => g.includes(k)) ||
-      LECTOR_KEYS_FOR_GESTION_FIN.some((k) => g.includes(k)) ||
-      g.includes("reportes") ||
-      g.includes("facturacion") ||
-      g.includes("clientes")
-    );
-  }
-  if (to === "/clients/account") {
-    return g.includes("facturacion") || g.includes("clientes");
-  }
-  if (to === "/history") return g.includes("facturacion");
-  if (to === "/clients") return g.includes("clientes");
-  if (to === "/reports") return g.includes("reportes");
-  return false;
+  return canUserAccessNavPath(user, to);
 }

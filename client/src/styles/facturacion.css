@@ -2705,31 +2705,6 @@ button.fact-back {
   transition: all 0.18s ease;
 }
 
-.fact-panel-nuevo-documento .asic-cotizador-ultimos-btn {
-  border-color: rgba(255, 255, 255, 0.65);
-  color: #f8fafc;
-  font-weight: 600;
-}
-
-.fact-panel-nuevo-documento .asic-cotizador-ultimos-btn:hover:not(:disabled),
-.fact-panel-nuevo-documento .asic-cotizador-ultimos-btn:focus:not(:disabled) {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: #fff;
-  color: #fff;
-}
-
-.asic-cotizador-ultimos-modal__table {
-  min-width: 960px;
-  font-size: 0.88rem;
-}
-
-.asic-cotizador-ultimos-modal__fecha-cell {
-  white-space: nowrap;
-  font-weight: 600;
-  color: #475569;
-  font-size: 0.82rem;
-}
-
 .asic-cotizador-hoy-btn:hover,
 .asic-cotizador-hoy-btn:focus {
   color: #ffffff;
@@ -5446,6 +5421,64 @@ button.fact-back {
   100% { background-position: -200% 0; }
 }
 
+/* Leads Base — tabla listado SGI */
+.leads-base-listado-wrap {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  overflow: auto;
+  max-height: min(72vh, 760px);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+.leads-base-listado-wrap .clientes-listado-table {
+  min-width: 1080px;
+}
+.leads-base-listado-wrap .clientes-listado-table tbody td.leads-base-cell-id {
+  font-variant-numeric: tabular-nums;
+  color: #64748b;
+  font-weight: 600;
+  width: 3.5rem;
+}
+.leads-base-listado-wrap .clientes-listado-table tbody td.leads-base-cell-fecha {
+  font-size: 0.8125rem;
+  color: #475569;
+  white-space: nowrap;
+}
+.leads-base-listado-wrap .clientes-listado-table tbody td.leads-base-cell-nombre {
+  font-weight: 600;
+  color: #0f172a;
+}
+.leads-base-listado-wrap .clientes-listado-table tbody td.leads-base-cell-obs {
+  white-space: pre-wrap;
+  max-width: 300px;
+  min-width: 140px;
+  font-size: 0.8125rem;
+  color: #475569;
+  line-height: 1.45;
+}
+.leads-base-listado-wrap .clientes-listado-table th.leads-base-th-actions,
+.leads-base-listado-wrap .clientes-listado-table td.leads-base-cell-actions {
+  width: 11rem;
+  min-width: 11rem;
+  text-align: center !important;
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  box-shadow: -4px 0 8px rgba(15, 23, 42, 0.04);
+}
+.leads-base-listado-wrap .clientes-listado-table thead th.leads-base-th-actions {
+  z-index: 3;
+  background-color: #2d5d46 !important;
+}
+.leads-base-listado-wrap .clientes-listado-table tbody td.leads-base-cell-actions {
+  background: #fff;
+}
+.leads-base-listado-wrap .clientes-listado-table tbody tr:nth-child(even) td.leads-base-cell-actions {
+  background: #fafbfc;
+}
+.leads-base-listado-wrap .clientes-listado-table tbody tr:hover td.leads-base-cell-actions {
+  background: #f0fdf4;
+}
+
 /* ========== Página Reportes: menú tipo índice + tabla facturación por cliente ========== */
 .reportes-grid {
   display: grid;
@@ -7010,6 +7043,165 @@ button.fact-back {
 .usuarios-page .usuarios-admin-b-grants-save-btn {
   display: inline-flex;
   align-items: center;
+}
+
+/* Mapa pantalla → permiso (modal Permisos en /usuarios/cuentas) */
+.usuarios-page .sgi-perm-map-summary {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+  padding: 0.95rem 1.05rem;
+  margin-bottom: 1.25rem;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f0fdf4 100%);
+  border: 1px solid rgba(45, 93, 70, 0.22);
+}
+
+.usuarios-page .sgi-perm-map-summary-icon {
+  font-size: 1.35rem;
+  color: #2d5d46;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.usuarios-page .sgi-perm-map-summary p {
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: #475569;
+}
+
+.usuarios-page .sgi-perm-map-summary-count {
+  margin-top: 0.45rem !important;
+  font-size: 0.8rem;
+  color: #334155;
+}
+
+.usuarios-page .sgi-perm-map-summary-sep {
+  margin: 0 0.35rem;
+  color: #94a3b8;
+}
+
+.usuarios-page .sgi-perm-map-table-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  background: #fff;
+}
+
+.usuarios-page .sgi-perm-map-table {
+  width: 100%;
+  margin: 0;
+  font-size: 0.8125rem;
+  border-collapse: collapse;
+}
+
+.usuarios-page .sgi-perm-map-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f8fafc;
+  font-weight: 700;
+  color: #334155;
+  padding: 0.55rem 0.65rem;
+  border-bottom: 2px solid rgba(45, 93, 70, 0.15);
+  white-space: nowrap;
+}
+
+.usuarios-page .sgi-perm-map-th-check {
+  width: 2.5rem;
+  text-align: center;
+}
+
+.usuarios-page .sgi-perm-map-table tbody td {
+  padding: 0.6rem 0.65rem;
+  vertical-align: top;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+}
+
+.usuarios-page .sgi-perm-map-row--on {
+  background: linear-gradient(90deg, rgba(240, 253, 244, 0.9) 0%, #fff 100%);
+}
+
+.usuarios-page .sgi-perm-map-row--info {
+  background: #fafbfc;
+}
+
+.usuarios-page .sgi-perm-map-td-check {
+  text-align: center;
+  width: 2.5rem;
+}
+
+.usuarios-page .sgi-perm-map-check {
+  margin: 0;
+  cursor: pointer;
+}
+
+.usuarios-page .sgi-perm-map-td-title label {
+  font-weight: 700;
+  color: #0f172a;
+  cursor: pointer;
+  margin: 0;
+}
+
+.usuarios-page .sgi-perm-map-info-tag {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 4px;
+  background: #e2e8f0;
+  color: #64748b;
+  vertical-align: middle;
+}
+
+.usuarios-page .sgi-perm-map-td-note {
+  color: #64748b;
+  line-height: 1.45;
+  max-width: 16rem;
+}
+
+.usuarios-page .sgi-perm-map-routes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.usuarios-page .sgi-perm-map-routes li {
+  margin-bottom: 0.2rem;
+}
+
+.usuarios-page .sgi-perm-map-routes code {
+  font-size: 0.72rem;
+  color: #1e4638;
+  background: #f1f5f9;
+  padding: 0.12rem 0.35rem;
+  border-radius: 4px;
+  word-break: break-all;
+}
+
+.usuarios-page .sgi-perm-map-key-badge {
+  display: inline-block;
+  max-width: 11rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.35;
+  padding: 0.2rem 0.45rem;
+  border-radius: 6px;
+  background: rgba(45, 93, 70, 0.12);
+  color: #1e4638;
+}
+
+.usuarios-page .sgi-perm-map-key-badge--muted {
+  background: #f1f5f9;
+  color: #94a3b8;
+}
+
+.usuarios-page .sgi-perm-map-zone {
+  margin-bottom: 1.5rem;
 }
 
 /* Actividad de usuarios: header de card verde SGI; tabla con estilo Registro ASIC (ver .usuarios-table-registro) */
@@ -13220,4 +13412,132 @@ button.nh-watcher-btc-card__corner-btn:hover {
 
 .monitor-equipo-notas-modal__footer-btn--close:active:not(:disabled) {
   transform: translateY(0);
+}
+
+/* ========== Responsive móvil / tablet — pulido por módulo ========== */
+@media (max-width: 991.98px) {
+  .asic-cotizador-registros-wrap,
+  .hosting-fx-ops-table-scroll,
+  .proveedores-hrs-scroll,
+  .reportes-listado-wrap,
+  .facturas-mes-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+
+  .asic-cotizador-form-grid .row {
+    --bs-gutter-y: 0.75rem;
+  }
+
+  .nh-watcher-dashboard__toolbar,
+  .nh-watcher-dashboard__filters,
+  .nh-watcher-actions {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .nh-watcher-slot-bar {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .fact-panel-nuevo-documento .row {
+    --bs-gutter-y: 0.65rem;
+  }
+
+  .fact-emitted-filters .row > [class*="col-"] {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+
+  .monitor-equipo-filters .row > [class*="col-lg-"],
+  .monitor-equipo-filters .row > [class*="col-md-"] {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+
+  .usuarios-page .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .invoice-preview-wrap {
+    overflow-x: auto;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .reportes-card-icon {
+    width: 56px;
+    height: 56px;
+    font-size: 1.5rem;
+  }
+
+  .reportes-card-title {
+    font-size: 1.25rem;
+  }
+
+  .fact-back,
+  .fact-toolbar .btn {
+    font-size: 0.875rem;
+  }
+
+  .clientes-listado-table,
+  .proveedores-hrs-tabla,
+  .fact-emitted-table {
+    font-size: 0.8rem;
+  }
+
+  .fact-panel {
+    padding: 1rem 1.1rem;
+    border-radius: 12px;
+  }
+
+  .nh-watcher-toolbar-speed-tile {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+
+  .nh-watcher-rig-card__metrics {
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .usuarios-page-btn-new {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .asic-cotizador-registros-table {
+    min-width: 720px;
+  }
+
+  .hosting-fx-ops-table {
+    min-width: 900px;
+  }
+
+  .hosting-fx-ops-table--historial {
+    min-width: 880px;
+  }
+
+  .clientes-listado-table.leads-base-listado-table,
+  .leads-base-listado-wrap .clientes-listado-table {
+    min-width: 640px;
+  }
+
+  .proveedores-hrs-tabla {
+    min-width: 720px;
+  }
+
+  .fact-emitted-table {
+    min-width: 680px;
+  }
+
+  .usuarios-page .users-table {
+    min-width: 600px;
+  }
 }

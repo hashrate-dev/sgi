@@ -504,7 +504,7 @@ monitorEquiposAsicHistorialRouter.get(
     const user = req.user;
     if (!user) {
       res.status(401).json({ error: { message: "No autenticado." } });
-      return;
+        return;
     }
     await nhRigHashPruneOld(user.id, wid);
     await nhRigHashTrimPerRig(user.id, wid);
@@ -631,8 +631,8 @@ monitorEquiposAsicHistorialRouter.get(
     const { start, end } = utcMonthRangeMs(yearMonth);
     if (end <= start) {
       res.status(400).json({ error: { message: "yearMonth inválido." } });
-      return;
-    }
+        return;
+      }
     const row = (await db
       .prepare(
         `SELECT COALESCE(SUM(profit_btc_24h), 0) AS total_btc, COUNT(*) AS n

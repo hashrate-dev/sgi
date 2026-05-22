@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import { MarketplacePasswordField } from "../components/marketplace/MarketplacePasswordField";
 import { useAuth } from "../contexts/AuthContext";
+import { lectorDefaultLandingPath } from "../lib/auth";
 import { requestPasswordReset, setApiBaseUrl, wakeUpBackend } from "../lib/api";
 import "../styles/facturacion.css";
 
@@ -49,8 +50,7 @@ export function LoginPage() {
     let to = "/";
     if (user.role === "cliente") to = "/marketplace";
     else if (user.role === "lector") {
-      const g = user.lector_grants;
-      to = Array.isArray(g) && g.length > 0 ? "/" : "/kryptex";
+      to = lectorDefaultLandingPath(user);
     }
     return <Navigate to={to} replace />;
   }

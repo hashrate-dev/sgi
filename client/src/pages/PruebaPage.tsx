@@ -1,7 +1,7 @@
 import { Link, Navigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
-import { canAccessHostingTipoCambio } from "../lib/auth.js";
+import { canUserAccessNavPath } from "../lib/sgiNavigation";
 import "../styles/facturacion.css";
 
 const cambioMenuItems = [
@@ -24,7 +24,8 @@ export function PruebaPage() {
 
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
-  if (!canAccessHostingTipoCambio(user)) {
+  const visible = cambioMenuItems.filter((item) => canUserAccessNavPath(user, item.to));
+  if (visible.length === 0) {
     return <Navigate to="/gestion-financiera" replace />;
   }
 
@@ -39,7 +40,7 @@ export function PruebaPage() {
         />
         <div className="hrs-card p-4">
           <div className="reportes-grid">
-            {cambioMenuItems.map((item) => (
+            {visible.map((item) => (
               <Link key={item.to} to={item.to} className="reportes-card mineria-hub-card">
                 <div className="reportes-card-icon">
                   <i className={`bi ${item.icon}`} aria-hidden />

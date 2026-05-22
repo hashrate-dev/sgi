@@ -125,7 +125,7 @@ usersRouter.get(
       role: roleNorm,
       created_at: r.created_at,
       usuario: r.usuario ?? undefined,
-      ...(roleNorm === "admin_b"
+      ...(roleNorm === "admin_b" || roleNorm === "operador"
         ? { admin_b_grants: parseAdminBGrantsJson(r.admin_b_grants_json ?? null) }
         : {}),
       ...(roleNorm === "lector"
@@ -229,7 +229,9 @@ usersRouter.post("/users", requireAuth, requireRole("admin_a", "admin_b"), requi
       role: row.role,
       created_at: row.created_at,
       usuario: row.usuario ?? undefined,
-      ...(row.role === "admin_b" ? { admin_b_grants: parseAdminBGrantsJson(row.admin_b_grants_json ?? null) } : {}),
+      ...(row.role === "admin_b" || row.role === "operador"
+        ? { admin_b_grants: parseAdminBGrantsJson(row.admin_b_grants_json ?? null) }
+        : {}),
       ...(row.role === "lector" ? { lector_grants: parseLectorGrantsJson(row.lector_grants_json ?? null) } : {}),
     },
   });
@@ -272,8 +274,11 @@ usersRouter.put("/users/:id/admin-b-grants", requireAuth, requireRole("admin_a")
     return res.status(400).json({ error: { message: "Lista de permisos inválida", details: parsed.error.flatten() } });
   }
   const target = (await db.prepare("SELECT id, role FROM users WHERE id = ?").get(id)) as { id: number; role: string } | undefined;
-  if (!target || target.role !== "admin_b") {
-    return res.status(404).json({ error: { message: "Solo puede asignarse permiso granular a cuentas AdministradorB." } });
+  const targetRole = normalizeUserRoleForApi(target?.role ?? "");
+  if (!target || (targetRole !== "admin_b" && targetRole !== "operador")) {
+    return res.status(404).json({
+      error: { message: "Solo puede asignarse permiso granular a cuentas Operador o AdministradorB." },
+    });
   }
   const g = parsed.data.grants;
   const json = g == null ? null : serializeAdminBGrants(g);
@@ -370,7 +375,9 @@ usersRouter.put("/users/me", requireAuth, async (req, res) => {
       role: row.role,
       created_at: row.created_at,
       usuario: row.usuario ?? undefined,
-      ...(row.role === "admin_b" ? { admin_b_grants: parseAdminBGrantsJson(row.admin_b_grants_json ?? null) } : {}),
+      ...(row.role === "admin_b" || row.role === "operador"
+        ? { admin_b_grants: parseAdminBGrantsJson(row.admin_b_grants_json ?? null) }
+        : {}),
       ...(row.role === "lector" ? { lector_grants: parseLectorGrantsJson(row.lector_grants_json ?? null) } : {}),
     },
   });
@@ -444,7 +451,9 @@ usersRouter.put("/users/:id", requireAuth, requireRole("admin_a", "admin_b"), re
         role: row.role,
         created_at: row.created_at,
         usuario: row.usuario ?? undefined,
-        ...(row.role === "admin_b" ? { admin_b_grants: parseAdminBGrantsJson(row.admin_b_grants_json ?? null) } : {}),
+        ...(row.role === "admin_b" || row.role === "operador"
+        ? { admin_b_grants: parseAdminBGrantsJson(row.admin_b_grants_json ?? null) }
+        : {}),
         ...(row.role === "lector" ? { lector_grants: parseLectorGrantsJson(row.lector_grants_json ?? null) } : {}),
       },
     });
@@ -488,7 +497,9 @@ usersRouter.put("/users/:id", requireAuth, requireRole("admin_a", "admin_b"), re
       role: row.role,
       created_at: row.created_at,
       usuario: row.usuario ?? undefined,
-      ...(row.role === "admin_b" ? { admin_b_grants: parseAdminBGrantsJson(row.admin_b_grants_json ?? null) } : {}),
+      ...(row.role === "admin_b" || row.role === "operador"
+        ? { admin_b_grants: parseAdminBGrantsJson(row.admin_b_grants_json ?? null) }
+        : {}),
       ...(row.role === "lector" ? { lector_grants: parseLectorGrantsJson(row.lector_grants_json ?? null) } : {}),
     },
   });

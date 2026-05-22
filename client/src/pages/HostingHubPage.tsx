@@ -1,5 +1,7 @@
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
+import { useAuth } from "../contexts/AuthContext";
+import { canUserAccessNavPath } from "../lib/sgiNavigation";
 import "../styles/facturacion.css";
 
 const hostingMenuItems: Array<{ to: string; icon: string; label: string; desc: string }> = [
@@ -11,6 +13,13 @@ const hostingMenuItems: Array<{ to: string; icon: string; label: string; desc: s
 ];
 
 export function HostingHubPage() {
+  const { user } = useAuth();
+  const visible = hostingMenuItems.filter((item) => canUserAccessNavPath(user, item.to));
+
+  if (!user || visible.length === 0) {
+    return <Navigate to="/" replace />;
+  }
+
   return (
     <div className="fact-page">
       <div className="container">
@@ -19,7 +28,7 @@ export function HostingHubPage() {
         <div className="hrs-card p-4">
           <p className="text-muted small mb-3">Espacio para gestionar todo lo relacionado a la venta de Servicios de Hosting de Minería:</p>
           <div className="reportes-grid">
-            {hostingMenuItems.map((item) => (
+            {visible.map((item) => (
               <Link key={item.to} to={item.to} className="reportes-card mineria-hub-card">
                 <div className="reportes-card-icon">
                   <i className={`bi ${item.icon}`} />

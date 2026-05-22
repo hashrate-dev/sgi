@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { isLectorPathAllowedInSpa } from "../lib/auth";
+import { isLectorPathAllowedInSpa, isStaffPathAllowedInSpa, lectorDefaultLandingPath } from "../lib/auth";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -21,7 +21,10 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
   const path = location.pathname;
   if (user.role === "lector" && !isLectorPathAllowedInSpa(user, path)) {
-    return <Navigate to="/kryptex" replace />;
+    return <Navigate to={lectorDefaultLandingPath(user)} replace />;
+  }
+  if ((user.role === "admin_b" || user.role === "operador") && !isStaffPathAllowedInSpa(user, path)) {
+    return <Navigate to="/" replace />;
   }
   return <>{children}</>;
 }

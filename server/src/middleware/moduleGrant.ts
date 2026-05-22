@@ -4,7 +4,7 @@ import { lectorHasGrant } from "../lib/lectorPermissions.js";
 
 /**
  * Lista blanca de módulos para `admin_b` y `lector` sobre rutas compartidas.
- * `admin_a` y `operador` pasan siempre (tras `requireRole`).
+ * `admin_a` pasa siempre; `admin_b` y `operador` según lista en `admin_b_grants_json`.
  */
 export function requireModuleGrant(permission: AdminBPermissionKey) {
   return (req: Request, res: Response, next: NextFunction): void => {
@@ -13,15 +13,15 @@ export function requireModuleGrant(permission: AdminBPermissionKey) {
       res.status(401).json({ error: { message: "No autenticado" } });
       return;
     }
-    if (u.role === "admin_b") {
+    if (u.role === "admin_b" || u.role === "operador") {
       if (adminBHasGrant(u.admin_b_grants ?? null, permission)) {
         next();
         return;
       }
+      const rolLabel = u.role === "operador" ? "Operador" : "AdministradorB";
       res.status(403).json({
         error: {
-          message:
-            "Tu cuenta de AdministradorB no tiene este permiso. Pedilo a AdministradorA (Usuarios → Permisos).",
+          message: `Tu cuenta de ${rolLabel} no tiene este permiso. Pedilo a AdministradorA (Usuarios → Permisos).`,
         },
       });
       return;

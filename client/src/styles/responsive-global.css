@@ -1,0 +1,525 @@
+/**
+ * Capa responsive global — SGI + marketplace + auth.
+ * Cargar después de Bootstrap y hrs.css; complementa facturacion.css / marketplace-hashrate.css.
+ * Breakpoints alineados con Bootstrap 5: sm 576, md 768, lg 992, xl 1200, xxl 1400.
+ */
+
+:root {
+  --hrs-bp-sm: 576px;
+  --hrs-bp-md: 768px;
+  --hrs-bp-lg: 992px;
+  --hrs-bp-xl: 1200px;
+  --hrs-bp-xxl: 1400px;
+  --hrs-page-pad-x: clamp(0.75rem, 3vw, 1.5rem);
+  --hrs-touch-min: 44px;
+  --hrs-safe-left: env(safe-area-inset-left, 0px);
+  --hrs-safe-right: env(safe-area-inset-right, 0px);
+  --hrs-safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Evita zoom involuntario en inputs iOS (<16px) */
+@supports (-webkit-touch-callout: none) {
+  input,
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Padding lateral seguro; el max-width lo define Bootstrap + hrs.css (1320px) */
+.sgi-protected-root .container {
+  padding-left: max(var(--hrs-page-pad-x), var(--hrs-safe-left));
+  padding-right: max(var(--hrs-page-pad-x), var(--hrs-safe-right));
+}
+
+@media (max-width: 575.98px) {
+  .sgi-protected-root .container {
+    --bs-gutter-x: 1rem;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .fact-page {
+    padding-top: 0.5rem;
+    padding-bottom: 1.25rem;
+  }
+
+  .fact-page h1,
+  .fact-page .fact-page-title,
+  .hrs-title {
+    font-size: clamp(1.35rem, 5vw, 2rem) !important;
+    line-height: 1.2;
+    word-break: break-word;
+  }
+}
+
+/* Hubs / menús: en móvil una columna (escritorio = estilos originales en facturacion.css) */
+@media (max-width: 575.98px) {
+  .reportes-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.reportes-card {
+  min-width: 0;
+}
+
+/* Flex / filas de acciones: apilar en pantallas estrechas */
+@media (max-width: 767.98px) {
+  .sgi-protected-root .d-flex.flex-wrap.gap-2,
+  .sgi-protected-root .d-flex.flex-wrap.gap-3,
+  .fact-toolbar,
+  .fact-actions-row {
+    flex-wrap: wrap !important;
+    gap: 0.5rem !important;
+  }
+
+  .sgi-protected-root .btn-group {
+    flex-wrap: wrap;
+  }
+}
+
+/* Tablas anchas: scroll táctil sin romper el layout */
+.table-responsive,
+.pendientes-listado-wrap,
+.historial-listado-wrap,
+.leads-base-listado-wrap,
+.asic-cotizador-registros-wrap,
+.hosting-fx-ops-table-wrap,
+.proveedores-hrs-tabla-wrap,
+.fact-emitted-table-wrap,
+[class*="listado-wrap"],
+[class*="-table-scroll"],
+[class*="table-wrap"] {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+.table-responsive > table,
+.pendientes-listado-wrap table,
+.historial-listado-wrap table,
+.leads-base-listado-wrap table {
+  margin-bottom: 0;
+}
+
+/* Quitar desplazamientos físicos (cm) que rompen móvil */
+@media (max-width: 991.98px) {
+  .fact-emitted-table th,
+  .fact-emitted-table td,
+  .fact-hosting-servicios-table th,
+  .fact-hosting-servicios-table td {
+    transform: none !important;
+  }
+
+  .fact-emitted-table .table,
+  .clientes-listado-table {
+    font-size: 0.8125rem;
+  }
+}
+
+/* Filas de KPI / indicadores */
+@media (max-width: 767.98px) {
+  .hosting-fx-ops-indicators__grid,
+  .hosting-fx-ops-indicators__grid--with-transfer-kpi {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Modales Bootstrap + Chakra: casi ancho completo en móvil */
+@media (max-width: 575.98px) {
+  .modal-dialog {
+    margin: 0.5rem;
+    max-width: calc(100% - 1rem);
+  }
+
+  .modal-dialog.modal-lg,
+  .modal-dialog.modal-xl {
+    max-width: calc(100% - 1rem);
+  }
+
+  .modal-body {
+    padding: 0.75rem 1rem;
+  }
+}
+
+/* Drawers / paneles marketplace: ancho seguro (sin 100vw puro) */
+.market-quote-drawer__panel,
+.market-quote-drawer-root,
+[class*="drawer__panel"] {
+  max-width: min(100%, 100vw - var(--hrs-safe-left) - var(--hrs-safe-right));
+}
+
+@media (max-width: 899.98px) {
+  .site-header--marketplace .site-header__inner {
+    padding-left: max(0.75rem, var(--hrs-safe-left));
+    padding-right: max(0.75rem, var(--hrs-safe-right));
+  }
+
+  .site-header--marketplace .site-logo-img {
+    max-width: min(200px, 52vw);
+    height: auto;
+  }
+
+  .site-header__account-email {
+    max-width: min(140px, 38vw);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* Marketplace corp footer: una columna en móvil */
+@media (max-width: 767.98px) {
+  .market-corp-strip__inner--footer,
+  .market-corp-strip__inner.market-corp-strip__inner--footer {
+    grid-template-columns: 1fr !important;
+    gap: 1.5rem;
+    text-align: center;
+  }
+
+  .market-corp-strip__brand--footer {
+    align-items: center;
+  }
+
+  .market-corp-strip__links--footer {
+    align-items: center;
+  }
+}
+
+/* Catálogo vitrina */
+@media (max-width: 575.98px) {
+  .market-shelf-grid--catalog-v2,
+  .market-shelf-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 160px), 1fr)) !important;
+    gap: 0.75rem !important;
+  }
+}
+
+/* Login / auth */
+.hrs-login-page > .container {
+  padding-left: max(1rem, var(--hrs-safe-left));
+  padding-right: max(1rem, var(--hrs-safe-right));
+}
+
+.hrs-auth-card {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Botones táctiles (mínimo recomendado ~44px) */
+@media (hover: none) and (pointer: coarse) {
+  .btn,
+  .btn-menu,
+  .market-quote-cart-trigger,
+  .site-header__account-logout,
+  .nav-toggle,
+  .reportes-card {
+    min-height: var(--hrs-touch-min);
+  }
+}
+
+/* Kanban cotizaciones marketplace */
+@media (max-width: 767.98px) {
+  .hrs-mqt-lane-scroll {
+    padding-bottom: 0.5rem;
+  }
+
+  .hrs-mqt-lane-card {
+    min-width: min(320px, 85vw) !important;
+  }
+}
+
+/* NiceHash watcher: contenido no desborda */
+.nh-watcher-fullpage .container,
+.fact-page.mineria-page .container {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+/* Utilidad: hijos flex/grid pueden encoger */
+.min-w-0 {
+  min-width: 0;
+}
+
+.sgi-protected-root .row > [class*="col-"] {
+  min-width: 0;
+}
+
+/* Evita overflow por cadenas flex en layout principal */
+.sgi-protected-root > * {
+  min-width: 0;
+}
+
+/* iframe / embeds */
+iframe,
+embed,
+object {
+  max-width: 100%;
+}
+
+/* ========== Pulido responsive — todas las vistas SGI + marketplace ========== */
+
+/* Paneles y tarjetas: ancho completo del contenedor (hubs, formularios, listados) */
+.sgi-protected-root .fact-page .hrs-card,
+.sgi-protected-root .fact-page .usuarios-page-card,
+.sgi-protected-root .fact-page .fact-panel,
+.hrs-mqt-page .hrs-mqt-panel {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* Tablet: hubs y menús en 2 columnas */
+@media (min-width: 576px) and (max-width: 991.98px) {
+  .reportes-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Móvil: formularios Bootstrap a una columna */
+@media (max-width: 767.98px) {
+  .sgi-protected-root .fact-page .row > [class*="col-md-"],
+  .sgi-protected-root .fact-page .row > [class*="col-lg-"],
+  .sgi-protected-root .fact-page .row > [class*="col-xl-"] {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+
+  .fact-topbar,
+  .fact-page-header-row,
+  .nh-watcher-page-top {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .fact-topbar .d-flex,
+  .fact-toolbar {
+    width: 100%;
+    justify-content: flex-start !important;
+  }
+
+  .hrs-card.p-4,
+  .hrs-card.p-3 {
+    padding: 1rem !important;
+  }
+
+  .usuarios-page-header,
+  .usuarios-page-header-inner {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 0.75rem;
+  }
+
+  .usuarios-admin-b-grants-section-head {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 0.65rem;
+  }
+
+  .usuarios-admin-b-grants-section-actions {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+}
+
+/* Permisos SGI: tabla con scroll en pantallas chicas */
+.sgi-perm-map-table-wrap {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 991.98px) {
+  .sgi-perm-map-table {
+    min-width: 560px;
+  }
+
+  .sgi-perm-map-td-title,
+  .sgi-perm-map-td-routes {
+    max-width: 220px;
+    word-break: break-word;
+  }
+}
+
+/* Tablas genéricas dentro del SGI */
+.sgi-protected-root .fact-page .table-responsive {
+  margin-bottom: 0.75rem;
+}
+
+.sgi-protected-root .fact-page table {
+  max-width: none;
+}
+
+/* Gráficos / canvas */
+canvas,
+.chart-wrap,
+.reportes-chart-wrap,
+.nh-watcher-rig-spark__svg,
+.nh-fleet-hash-canvas-wrap {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Cotizador ASIC: bloques apilados */
+@media (max-width: 991.98px) {
+  .asic-cotizador-hoy-modal__content {
+    max-width: calc(100vw - 1.5rem);
+    margin: 0.75rem;
+  }
+
+  .asic-cotizador-hoy-modal__title {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+}
+
+/* Cotizaciones marketplace: panel y tablero */
+@media (max-width: 991.98px) {
+  .hrs-mqt-page .container {
+    padding-left: max(0.75rem, var(--hrs-safe-left));
+    padding-right: max(0.75rem, var(--hrs-safe-right));
+  }
+
+  .hrs-mqt-panel {
+    padding: 1rem 1rem 1.1rem;
+    border-radius: 12px;
+  }
+
+  .hrs-mqt-lane-scroll {
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 0.75rem;
+    padding-bottom: 0.35rem;
+  }
+
+  .hrs-mqt-lane {
+    flex: 0 0 min(300px, 88vw);
+    max-width: 88vw;
+  }
+}
+
+/* Marketplace (rutas públicas sin .sgi-protected-root) */
+.marketplace-asic-page,
+#app[data-page] {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  min-width: 0;
+}
+
+.marketplace-asic-page .container,
+.page-main--market .container {
+  width: 100%;
+  max-width: 1200px;
+  padding-left: max(var(--hrs-page-pad-x), var(--hrs-safe-left));
+  padding-right: max(var(--hrs-page-pad-x), var(--hrs-safe-right));
+}
+
+/* Product modal full bleed mobile */
+@media (max-width: 767.98px) {
+  .product-modal__overlay,
+  .product-modal__dialog {
+    padding: 0.5rem !important;
+  }
+
+  .product-modal__panel {
+    max-height: calc(100dvh - 1rem);
+    overflow-y: auto;
+  }
+}
+
+/* Monitor / equipos grids */
+@media (max-width: 991.98px) {
+  .monitor-equipos-grid,
+  .equipos-asic-grid,
+  .asic-equipment-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)) !important;
+  }
+}
+
+/* Kryptex / home corporativa */
+@media (max-width: 767.98px) {
+  .kryptex-page .container,
+  .hrshome-page .container {
+    padding-left: max(0.75rem, var(--hrs-safe-left));
+    padding-right: max(0.75rem, var(--hrs-safe-right));
+  }
+}
+
+/* Cabecera SGI fija: email largo */
+@media (max-width: 991.98px) {
+  .hrs-sgi-shell-header .chakra-text,
+  .sgi-protected-root header [class*="email"] {
+    max-width: min(200px, 42vw);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* Landscape móvil: altura útil */
+@media (max-height: 500px) and (orientation: landscape) {
+  .modal-dialog {
+    max-height: calc(100dvh - 1rem);
+    overflow-y: auto;
+  }
+
+  .market-quote-drawer__panel {
+    max-height: 100dvh;
+  }
+}
+
+/* iPad / tablet apaisada */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .reportes-grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
+
+  .site-header--marketplace .site-header__inner {
+    max-width: 100%;
+  }
+}
+
+/* Texto largo / URLs */
+.sgi-protected-root td,
+.sgi-protected-root .text-break-url,
+.fact-page .small {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+pre,
+code {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Impresión: sin recortes raros */
+@media print {
+  .sgi-protected-root > header,
+  .site-header--marketplace,
+  .sgi-admin-fixed-footer {
+    display: none !important;
+  }
+
+  .fact-page,
+  .sgi-protected-root .fact-page {
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+}

@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { ChakraProvider } from "@chakra-ui/react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./styles/hrs.css";
+import "./styles/responsive-global.css";
 import App from "./App.tsx";
 import { AppErrorBoundary } from "./components/AppErrorBoundary.tsx";
 import { chakraSystem } from "./theme/chakraTheme";

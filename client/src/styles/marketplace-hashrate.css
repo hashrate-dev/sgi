@@ -9882,3 +9882,34 @@ button.product-modal__btn--quote-cart:active {
   background: #f0fdf4;
   color: #047857;
 }
+
+/* ========== Responsive global marketplace (complementa responsive-global.css) ========== */
+@media (max-width: 899.98px) {
+  .product-modal__dialog,
+  .product-modal__panel {
+    width: calc(100% - 1.5rem) !important;
+    max-width: calc(100% - 1.5rem) !important;
+    margin: 0.75rem auto !important;
+  }
+
+  .market-corp-hero__title {
+    font-size: clamp(1.5rem, 6vw, 2.5rem) !important;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .page-main--market .container {
+    padding-left: max(0.75rem, env(safe-area-inset-left));
+    padding-right: max(0.75rem, env(safe-area-inset-right));
+  }
+
+  .market-quote-drawer__panel {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 12px 12px 0 0;
+  }
+
+  .shelf-product__body {
+    padding: 0.65rem 0.75rem;
+  }
+}
