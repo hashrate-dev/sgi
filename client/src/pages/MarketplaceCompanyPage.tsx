@@ -6,7 +6,7 @@ import "../styles/marketplace-hashrate.css";
 
 const UP = "https://hashrate.space/wp-content/uploads";
 
-type TeamKey = "fab" | "jv" | "af" | "dg" | "rg" | "ab";
+type TeamKey = "fab" | "jv" | "af" | "dg" | "rg" | "ab" | "dv";
 
 const TEAM: readonly {
   key: TeamKey;
@@ -16,9 +16,10 @@ const TEAM: readonly {
   { key: "fab", img: `${UP}/FB-Team-1-1024x991.png`, linkedin: "https://www.linkedin.com/in/fabrianchi/" },
   { key: "jv", img: `${UP}/JV-Team-1024x991.png`, linkedin: "https://www.linkedin.com/in/jlvilasoler/" },
   { key: "af", img: `${UP}/AF-Team-1024x991.png`, linkedin: "https://www.linkedin.com/in/figueroaanthony/" },
-  { key: "dg", img: `${UP}/DG-Team-HRS-1024x991.png` },
   { key: "rg", img: `${UP}/RG-1024x991.png` },
+  { key: "dv", img: "/images/marketplace-uploads/DV-Team.png" },
   { key: "ab", img: `${UP}/AB-Team-1024x991.png` },
+  { key: "dg", img: `${UP}/DG-Team-HRS-1024x991.png` },
 ] as const;
 
 function LinkedInIcon() {

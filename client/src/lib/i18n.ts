@@ -295,6 +295,12 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
       "Profesional orientado al desarrollo estratégico de negocios, con experiencia en la identificación de oportunidades comerciales, generación de alianzas estratégicas y expansión de mercados. Se destaca por su visión analítica, capacidad de negociación y enfoque en resultados medibles.",
     "company.m.ab.b2":
       "A lo largo de su trayectoria, ha participado activamente en la estructuración y ejecución de estrategias de crecimiento, gestionando relaciones con socios clave, inversores y clientes corporativos. Su perfil combina pensamiento estratégico con ejecución práctica, permitiéndole transformar oportunidades en proyectos concretos y rentables.",
+    "company.m.dv.role": "Desarrollo de Negocios - LATAM",
+    "company.m.dv.name": "Daniel Vinarsci",
+    "company.m.dv.b1":
+      "Lidera el área de Alianzas Estratégicas de Negocio en Hashrate, donde es responsable de identificar, estructurar y consolidar alianzas estratégicas que impulsan el crecimiento sostenible de la compañía. Con una sólida visión de negocio y mentalidad orientada a resultados, conecta oportunidades en energía, tecnología y finanzas para apoyar la expansión de la infraestructura y operaciones de minería de alto rendimiento.",
+    "company.m.dv.b2":
+      "Su capacidad para generar relaciones de largo plazo con inversores, proveedores y socios estratégicos ha sido clave en el posicionamiento de Hashrate como un actor relevante en el ecosistema de minería de Bitcoin en la región. Daniel combina pensamiento estratégico, ejecución disciplinada y una fuerte orientación a la creación de valor para stakeholders.",
 
     // Filtros
     "filter.label": "Filtrar",
@@ -1052,6 +1058,12 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
       "Professional focused on strategic business development, with experience in identifying commercial opportunities, building strategic partnerships, and expanding markets. He stands out for his analytical vision, negotiation skills, and strong results-oriented approach.",
     "company.m.ab.b2":
       "Throughout his career, he has actively participated in structuring and executing growth strategies, managing relationships with key partners, investors, and corporate clients. His profile combines strategic thinking with practical execution, enabling him to transform opportunities into concrete and profitable projects.",
+    "company.m.dv.role": "Business Developer LATAM",
+    "company.m.dv.name": "Daniel Vinarsci",
+    "company.m.dv.b1":
+      "Leads the Strategic Business Partnerships area at Hashrate, where he is responsible for identifying, structuring, and consolidating strategic alliances that drive the company's sustainable growth. With a strong business vision and a results-oriented mindset, he connects opportunities across the energy, technology, and financial sectors to support the expansion of high-performance mining infrastructure and operations.",
+    "company.m.dv.b2":
+      "His ability to build long-term relationships with investors, suppliers, and strategic partners has been instrumental in positioning Hashrate as a key player in the Bitcoin mining ecosystem in the region. Daniel combines strategic thinking, disciplined execution, and a strong focus on delivering value to stakeholders.",
 
     "filter.label": "Filter",
     "filter.all": "All",

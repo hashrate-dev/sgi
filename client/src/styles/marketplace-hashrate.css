@@ -147,9 +147,22 @@ body:has(.marketplace-asic-page)::after {
   margin: 0 auto;
 }
 
+/* Header marketplace: menos margen izquierdo → más espacio para el menú */
+.site-header--marketplace .container.site-header__inner {
+  padding-top: 0.65rem;
+  padding-bottom: 0.65rem;
+  padding-left: max(0.4rem, var(--hrs-safe-left, 0px));
+  padding-right: max(0.75rem, var(--hrs-safe-right, 0px));
+}
+
 .logo-link--main {
   flex: 1;
   min-width: 120px;
+}
+
+/* Solo el logo: desplazamiento visual hacia la izquierda (menú y resto sin mover) */
+.site-header--marketplace .logo-link--main {
+  margin-left: -2cm;
 }
 
 .site-logo-img {
@@ -158,6 +171,12 @@ body:has(.marketplace-asic-page)::after {
   width: auto;
   max-width: 248px;
   display: block;
+}
+
+/* Logo marketplace: altura acorde a la barra superior */
+.site-header--marketplace .site-logo-img {
+  max-height: 54px;
+  max-width: 220px;
 }
 
 .site-header__trailing {
@@ -280,12 +299,16 @@ body:has(.marketplace-asic-page)::after {
    * Antes: minmax(max-content, 1fr) en la 3ª columna competía en fr con el menú y lo achicaba
    * (en PT: EQUIPAMENTOS + CONTATO + CADASTRO se solapaban / cortaban).
    */
-  .site-header--marketplace .site-header__inner {
+  .site-header--marketplace .site-header__inner,
+  .site-header--marketplace .container.site-header__inner {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) max-content;
     align-items: center;
+    max-width: min(1320px, 100%);
+    padding-left: max(0.2rem, var(--hrs-safe-left, 0px));
+    padding-right: max(0.65rem, var(--hrs-safe-right, 0px));
     /* Más aire entre menú y bloque derecho (todos los idiomas / textos largos) */
-    column-gap: clamp(0.85rem, 2.5vw, 1.5rem);
+    column-gap: clamp(0.55rem, 1.8vw, 1.15rem);
     row-gap: 0.5rem;
   }
 
@@ -294,6 +317,12 @@ body:has(.marketplace-asic-page)::after {
     grid-row: 1;
     flex: unset;
     min-width: 0;
+    justify-self: start;
+  }
+
+  .site-header--marketplace .site-logo-img {
+    max-width: 248px;
+    max-height: 60px;
   }
 
   .site-header--marketplace .nav-main {
@@ -563,6 +592,7 @@ body:has(.marketplace-asic-page)::after {
 }
 
 .nav-main {
+  --nav-link-font-size: 1.05rem;
   width: 100%;
   flex-basis: 100%;
   max-height: 0;
@@ -591,6 +621,7 @@ body:has(.marketplace-asic-page)::after {
    * en ES/EN/PT cuando el ancho útil es justo (antes: nowrap + centrado recortaba por ambos lados).
    */
   .site-header--marketplace .nav-main {
+    --nav-link-font-size: 1rem;
     justify-content: flex-start;
     overflow-x: auto;
     overflow-y: visible;
@@ -610,9 +641,8 @@ body:has(.marketplace-asic-page)::after {
 
   .site-header--marketplace .nav-main a {
     white-space: nowrap;
-    padding: 0.36rem 0.48rem;
+    padding: 0.45rem 0.58rem;
     letter-spacing: 0.04em;
-    font-size: 0.68rem;
   }
 }
 
@@ -638,10 +668,10 @@ body:has(.marketplace-asic-page)::after {
 
 .nav-main a {
   display: block;
-  padding: 0.45rem 0.85rem;
+  padding: 0.55rem 0.95rem;
   color: #4b5563;
   text-decoration: none;
-  font-size: 0.72rem;
+  font-size: var(--nav-link-font-size);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;

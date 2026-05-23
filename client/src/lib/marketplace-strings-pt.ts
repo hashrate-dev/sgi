@@ -276,6 +276,12 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
     "Profissional focado em desenvolvimento estratégico de negócios, com experiência em oportunidades comerciais, parcerias e expansão de mercados. Destaca-se pela visão analítica, negociação e foco em resultados.",
   "company.m.ab.b2":
     "Participou ativamente da estruturação e execução de estratégias de crescimento, gerindo relações com parceiros, investidores e clientes corporativos — unindo pensamento estratégico à execução prática para transformar oportunidades em projetos rentáveis.",
+  "company.m.dv.role": "Desenvolvimento de negócios — LATAM",
+  "company.m.dv.name": "Daniel Vinarsci",
+  "company.m.dv.b1":
+    "Lidera a área de Parcerias Estratégicas de Negócios na Hashrate, identificando, estruturando e consolidando alianças que impulsionam o crescimento sustentável. Conecta oportunidades em energia, tecnologia e finanças para expandir infraestrutura e operações de mineração de alto desempenho.",
+  "company.m.dv.b2":
+    "Sua capacidade de construir relações de longo prazo com investidores, fornecedores e parceiros foi decisiva para posicionar a Hashrate no ecossistema de mineração de Bitcoin na região. Daniel combina pensamento estratégico, execução disciplinada e foco em valor para stakeholders.",
 
   "filter.label": "Filtrar",
   "filter.all": "Todos",
