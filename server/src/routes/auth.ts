@@ -7,10 +7,9 @@ import { z, type ZodError } from "zod";
 import { db } from "../db.js";
 import { env } from "../config/env.js";
 import {
-  effectiveResendFromEmail,
   normalizeResendApiKey,
-  normalizeResendFromEmailForVerifiedDomain,
   resendApiKeyLooksInvalid,
+  resendFromCandidates,
 } from "../config/resendFrom.js";
 import { allocateNextTiendaOnlineClientCode, type TiendaSeqTx } from "../lib/tiendaOnlineClientCode.js";
 import { getTiendaPhonesForUserId } from "../lib/tiendaClientContact.js";
@@ -246,14 +245,10 @@ function passwordResetEmailCopy(lang: PasswordResetLang): {
 
 /** Remitente solo para reset (no pisa avisos marketplace). Si no hay override, usa RESEND_FROM_EMAIL. */
 function passwordResetFromAddress(): string {
-  const explicitRaw = String(process.env.PASSWORD_RESET_FROM_EMAIL || "").trim();
-  const explicit = explicitRaw ? normalizeResendFromEmailForVerifiedDomain(explicitRaw) : "";
+  const explicit = String(process.env.PASSWORD_RESET_FROM_EMAIL || "").trim();
   if (explicit) return explicit;
-  const resendFrom = effectiveResendFromEmail();
-  if (resendFrom) return resendFrom;
-  // Fallback seguro para producción/local si olvidaron publicar RESEND_FROM_EMAIL.
-  // Debe coincidir con dominio verificado en Resend (hashrate.space).
-  return "Hashrate Space <noreply@hashrate.space>";
+  const candidates = resendFromCandidates();
+  return candidates[0] ?? "";
 }
 
 function passwordResetSmtpConfigured(): boolean {
@@ -358,10 +353,7 @@ async function sendPasswordResetEmail(
     });
   }
 
-  const resendFromGlobal = String(process.env.RESEND_FROM_EMAIL || "").trim();
-  const fromCandidates = [fromInitial, resendFromGlobal, "Hashrate Space <noreply@hashrate.space>"]
-    .map((x) => x.trim())
-    .filter((x, i, arr) => x.length > 0 && arr.findIndex((y) => y.toLowerCase() === x.toLowerCase()) === i);
+  const fromCandidates = resendFromCandidates();
 
   let sendFrom = fromInitial;
   let res!: Response;

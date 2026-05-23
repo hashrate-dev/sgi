@@ -51,19 +51,19 @@ function formatResendFromHeader(display: string, address: string): string {
   return a;
 }
 
-/** Remitente por defecto (dominio apex verificado en Resend). */
+/** Remitente apex (si está verificado en Resend). */
 export const DEFAULT_RESEND_FROM = "Hashrate Space <noreply@hashrate.space>";
 
-/**
- * Normaliza remitentes Resend al dominio apex verificado (`hashrate.space`).
- * Migra el subdominio legacy `mail.hashrate.space` → `hashrate.space`.
- */
-export function normalizeResendFromEmailForVerifiedDomain(raw: string): string {
-  const t = raw.trim();
+/** Subdominio mail (suele ser el verificado en cuentas Resend antiguas). */
+export const LEGACY_RESEND_FROM_MAIL = "Hashrate Space <noreply@mail.hashrate.space>";
+
+/** Variante alternativa apex ↔ mail para reintentos automáticos. */
+function resendFromAlternateDomain(header: string): string {
+  const t = header.trim();
   if (!t) return "";
   const { display, address } = parseResendFromHeader(t);
   const at = address.lastIndexOf("@");
-  if (at < 1 || at >= address.length - 1) return t;
+  if (at < 1) return "";
   let local = address.slice(0, at).trim();
   const host = address.slice(at + 1).trim().toLowerCase();
   if (local.toLowerCase() === "no-reply") local = "noreply";
@@ -71,23 +71,56 @@ export function normalizeResendFromEmailForVerifiedDomain(raw: string): string {
     return formatResendFromHeader(display, `${local}@hashrate.space`);
   }
   if (host === "hashrate.space") {
-    return formatResendFromHeader(display, `${local}@hashrate.space`);
+    return formatResendFromHeader(display, `${local}@mail.hashrate.space`);
   }
-  return t;
+  return "";
 }
 
-/** Valor efectivo de `RESEND_FROM_EMAIL` (normalizado a dominio verificado si aplica). */
-export function effectiveResendFromEmail(): string {
+/**
+ * Lista de remitentes a probar (en orden). No fuerza un solo dominio:
+ * si el apex falla en Resend, se reintenta con mail.hashrate.space.
+ */
+export function resendFromCandidates(): string[] {
+  const out: string[] = [];
+  const add = (v: string) => {
+    const t = v.trim();
+    if (!t || out.some((x) => x.toLowerCase() === t.toLowerCase())) return;
+    out.push(t);
+  };
+
   const explicit = process.env.RESEND_FROM_EMAIL?.trim();
-  return normalizeResendFromEmailForVerifiedDomain(explicit || "");
+  if (explicit) {
+    add(explicit);
+    add(resendFromAlternateDomain(explicit));
+  }
+
+  // mail.hashrate.space primero: en muchas cuentas es el único dominio verificado en Resend.
+  add(LEGACY_RESEND_FROM_MAIL);
+  add(DEFAULT_RESEND_FROM);
+
+  return out;
 }
 
-/** Igual que `effectiveResendFromEmail`, con fallback al remitente verificado en Resend si hay API key. */
+/** Valor preferido para logs / health (primer candidato). */
+export function effectiveResendFromEmail(): string {
+  const c = resendFromCandidates();
+  return c[0] ?? "";
+}
+
+/** Igual que `effectiveResendFromEmail`, con fallback si no hay env. */
 export function effectiveResendFromEmailOrDefault(): string {
   const from = effectiveResendFromEmail();
   if (from) return from;
   if (normalizeResendApiKey(process.env.RESEND_API_KEY)) {
-    return DEFAULT_RESEND_FROM;
+    return LEGACY_RESEND_FROM_MAIL;
   }
   return "";
+}
+
+/** @deprecated Usar `resendFromCandidates`; se mantiene por compatibilidad con imports viejos. */
+export function normalizeResendFromEmailForVerifiedDomain(raw: string): string {
+  const t = raw.trim();
+  if (!t) return "";
+  const alt = resendFromAlternateDomain(t);
+  return alt || t;
 }
