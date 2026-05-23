@@ -147,9 +147,10 @@ export async function deliverResendEmailWithFromFallback(args: {
       );
     }
     if (resend403UnverifiedFromDomain(resendErrorDetail(lastBody))) {
+      const detail = resendErrorDetail(lastBody);
       throw new Error(
         `Resend rechazó el remitente. Probados: ${tried.join(" | ")}. ` +
-          `Verificá en Resend el dominio hashrate.space o mail.hashrate.space y actualizá RESEND_FROM_EMAIL en Vercel.`
+          `Detalle: ${detail}. Verificá hashrate.space o mail.hashrate.space en Resend y poné RESEND_FROM_EMAIL=noreply@mail.hashrate.space en Vercel.`
       );
     }
   }

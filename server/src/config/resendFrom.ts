@@ -57,16 +57,27 @@ export const DEFAULT_RESEND_FROM = "Hashrate Space <noreply@hashrate.space>";
 /** Subdominio mail (suele ser el verificado en cuentas Resend antiguas). */
 export const LEGACY_RESEND_FROM_MAIL = "Hashrate Space <noreply@mail.hashrate.space>";
 
-/** Variante alternativa apex ↔ mail para reintentos automáticos. */
-function resendFromAlternateDomain(header: string): string {
+function normalizeResendLocalPart(header: string): string {
   const t = header.trim();
   if (!t) return "";
   const { display, address } = parseResendFromHeader(t);
   const at = address.lastIndexOf("@");
-  if (at < 1) return "";
+  if (at < 1) return t;
   let local = address.slice(0, at).trim();
   const host = address.slice(at + 1).trim().toLowerCase();
   if (local.toLowerCase() === "no-reply") local = "noreply";
+  return formatResendFromHeader(display, `${local}@${host}`);
+}
+
+/** Variante alternativa apex ↔ mail para reintentos automáticos. */
+function resendFromAlternateDomain(header: string): string {
+  const t = normalizeResendLocalPart(header);
+  if (!t) return "";
+  const { display, address } = parseResendFromHeader(t);
+  const at = address.lastIndexOf("@");
+  if (at < 1) return "";
+  const local = address.slice(0, at).trim();
+  const host = address.slice(at + 1).trim().toLowerCase();
   if (host === "mail.hashrate.space") {
     return formatResendFromHeader(display, `${local}@hashrate.space`);
   }
@@ -88,14 +99,15 @@ export function resendFromCandidates(): string[] {
     out.push(t);
   };
 
+  // mail.hashrate.space primero: suele ser el dominio verificado en Resend.
+  add(LEGACY_RESEND_FROM_MAIL);
+
   const explicit = process.env.RESEND_FROM_EMAIL?.trim();
   if (explicit) {
-    add(explicit);
+    add(normalizeResendLocalPart(explicit));
     add(resendFromAlternateDomain(explicit));
   }
 
-  // mail.hashrate.space primero: en muchas cuentas es el único dominio verificado en Resend.
-  add(LEGACY_RESEND_FROM_MAIL);
   add(DEFAULT_RESEND_FROM);
 
   return out;
