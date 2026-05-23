@@ -159,6 +159,17 @@ export function resolveMarketplaceListingKind(p: AsicListingTitleFields): Market
   return inferMinerListingFromTitles(p.brand, p.model) ? "miner" : "infrastructure";
 }
 
+/**
+ * Modal vitrina: recorta duplicados erróneos al final de la galería en BD.
+ * - 3 fotos → quita la última (1 duplicado).
+ * - 4+ fotos → quitan las 2 últimas (p. ej. S21 Hydro con 5 → quedan 3).
+ */
+export function capProductGalleryUrls(urls: string[]): string[] {
+  if (urls.length <= 2) return urls;
+  if (urls.length >= 4) return urls.slice(0, urls.length - 2);
+  return urls.slice(0, 2);
+}
+
 /** Rendimiento estimado + bloque hosting del modal solo para fichas tipo minero. */
 export function asicProductShowsMinerEconomyContent(p: AsicListingTitleFields): boolean {
   return resolveMarketplaceListingKind(p) === "miner";
@@ -320,21 +331,55 @@ export function normalizeMarketplaceImageSrc(src: string): string {
   return publicImageUrl(raw);
 }
 
+/** Clave por nombre de archivo (sin sufijos WordPress tipo `-300x300`). */
+export function galleryFileKey(url: string): string {
+  const path = String(url ?? "").replace(/\?.*$/, "");
+  const file = path.split("/").pop() ?? path;
+  return file
+    .replace(/-\d+x\d+(?=\.[a-z0-9]+$)/i, "")
+    .replace(/-e\d+(?=\.[a-z0-9]+$)/i, "")
+    .replace(/-scaled(?=\.[a-z0-9]+$)/i, "")
+    .toLowerCase();
+}
+
+/** Quita duplicados y variantes de tamaño de la misma foto en la galería. */
+export function dedupeGalleryUrls(urls: string[]): string[] {
+  const out: string[] = [];
+  const seenUrl = new Set<string>();
+  const seenFile = new Set<string>();
+  for (const raw of urls) {
+    const u = raw.trim();
+    if (!u || seenUrl.has(u)) continue;
+    const fk = galleryFileKey(u);
+    if (seenFile.has(fk)) continue;
+    seenUrl.add(u);
+    seenFile.add(fk);
+    out.push(u);
+  }
+  return out;
+}
+
 export function normalizeAsicProductImages(product: AsicProduct): AsicProduct {
   const imageSrc = normalizeMarketplaceImageSrc(product.imageSrc ?? "");
-  const gallerySrcs = product.gallerySrcs
-    ?.map((g) => normalizeMarketplaceImageSrc(g))
-    .filter(Boolean);
-  const seen = new Set<string>();
-  const uniqueGallery = gallerySrcs?.filter((u) => {
-    if (seen.has(u)) return false;
-    seen.add(u);
-    return true;
-  });
+  const shelfFb = normalizeMarketplaceImageSrc(
+    defaultAsicShelfImageSrc(product.brand, product.model)
+  );
+  let gallerySrcs = dedupeGalleryUrls(
+    (product.gallerySrcs ?? []).map((g) => normalizeMarketplaceImageSrc(g)).filter(Boolean)
+  );
+  if (gallerySrcs.length > 1 && shelfFb) {
+    gallerySrcs = gallerySrcs.filter((u) => u !== shelfFb);
+  }
+  if (gallerySrcs.length > 1 && imageSrc) {
+    const mainKey = galleryFileKey(imageSrc);
+    const withoutMainDup = gallerySrcs.filter((u) => galleryFileKey(u) !== mainKey);
+    if (withoutMainDup.length > 0) gallerySrcs = withoutMainDup;
+  }
+  gallerySrcs = capProductGalleryUrls(gallerySrcs);
   return {
     ...product,
     imageSrc,
-    ...(uniqueGallery?.length ? { gallerySrcs: uniqueGallery } : {}),
+    ...(gallerySrcs.length ? { gallerySrcs } : {}),
   };
 }
 

@@ -3,7 +3,12 @@
  */
 
 import { isBitmainAntminerRandomXMinerBlob } from "./miningYieldEstimate.js";
-import { normalizeMarketplaceImageSrc } from "./marketplaceImageSrc.js";
+import {
+  capProductGalleryUrls,
+  dedupeGalleryUrls,
+  galleryFileKey,
+  normalizeMarketplaceImageSrc,
+} from "./marketplaceImageSrc.js";
 import { resolveMarketplaceAlgoForPersist } from "./whattomineYield.js";
 
 export type AsicAlgo = "sha256" | "scrypt" | "randomx";
@@ -154,14 +159,9 @@ export function mapEquipoRowToVitrina(row: EquipoAsicVitrinaRow): VitrinaAsicPro
     try {
       const g = JSON.parse(row.mp_gallery_json) as unknown;
       if (Array.isArray(g) && g.every((x) => typeof x === "string" && x.trim())) {
-        const seen = new Set<string>();
-        gallerySrcs = (g as string[])
-          .map((x) => normalizeMarketplaceImageSrc(x.trim()))
-          .filter((u) => {
-            if (!u || seen.has(u)) return false;
-            seen.add(u);
-            return true;
-          });
+        gallerySrcs = dedupeGalleryUrls(
+          (g as string[]).map((x) => normalizeMarketplaceImageSrc(x.trim())).filter(Boolean)
+        );
       }
     } catch {
       /* usar solo imagen principal */
@@ -200,6 +200,14 @@ export function mapEquipoRowToVitrina(row: EquipoAsicVitrinaRow): VitrinaAsicPro
 
   /** Sin imagen principal en BD → cadena vacía (la tienda no muestra foto genérica). */
   const imageSrc = normalizeMarketplaceImageSrc(row.mp_image_src);
+  if (gallerySrcs && gallerySrcs.length > 1 && imageSrc) {
+    const mainKey = galleryFileKey(imageSrc);
+    const withoutMainDup = gallerySrcs.filter((u) => galleryFileKey(u) !== mainKey);
+    if (withoutMainDup.length > 0) gallerySrcs = withoutMainDup;
+  }
+  if (gallerySrcs && gallerySrcs.length > 2) {
+    gallerySrcs = capProductGalleryUrls(gallerySrcs);
+  }
   const priceUsd = Math.max(0, Math.round(Number(row.precio_usd) || 0));
   const labelRaw = (row.mp_price_label ?? "").trim();
   const labelNorm = labelRaw ? normalizeConsultPriceLabelForDisplay(labelRaw) : "";

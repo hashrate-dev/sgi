@@ -16,3 +16,35 @@ export function normalizeMarketplaceImageSrc(src: string | null | undefined): st
 
   return raw.startsWith("/") ? raw : `/${raw}`;
 }
+
+export function galleryFileKey(url: string): string {
+  const path = String(url ?? "").replace(/\?.*$/, "");
+  const file = path.split("/").pop() ?? path;
+  return file
+    .replace(/-\d+x\d+(?=\.[a-z0-9]+$)/i, "")
+    .replace(/-e\d+(?=\.[a-z0-9]+$)/i, "")
+    .replace(/-scaled(?=\.[a-z0-9]+$)/i, "")
+    .toLowerCase();
+}
+
+export function capProductGalleryUrls(urls: string[]): string[] {
+  if (urls.length <= 2) return urls;
+  if (urls.length >= 4) return urls.slice(0, urls.length - 2);
+  return urls.slice(0, 2);
+}
+
+export function dedupeGalleryUrls(urls: string[]): string[] {
+  const out: string[] = [];
+  const seenUrl = new Set<string>();
+  const seenFile = new Set<string>();
+  for (const raw of urls) {
+    const u = raw.trim();
+    if (!u || seenUrl.has(u)) continue;
+    const fk = galleryFileKey(u);
+    if (seenFile.has(fk)) continue;
+    seenUrl.add(u);
+    seenFile.add(fk);
+    out.push(u);
+  }
+  return out;
+}

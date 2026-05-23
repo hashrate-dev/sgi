@@ -2,7 +2,10 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AsicProduct } from "../../lib/marketplaceAsicCatalog.js";
 import {
   asicProductShowsMinerEconomyContent,
+  capProductGalleryUrls,
+  dedupeGalleryUrls,
   defaultAsicShelfImageSrc,
+  galleryFileKey,
   normalizeMarketplaceImageSrc,
   formatAsicPriceUsd,
   isBitmainAntminerRandomXCatalogBlob,
@@ -38,21 +41,25 @@ function renderYieldLineParts(text: string): ReactNode {
   );
 }
 
-/** URLs únicas para miniaturas + hero; catálogo local si la API no trae `imageSrc`. */
+/** URLs únicas para miniaturas + hero; sin duplicar la principal ni el fallback de catálogo. */
 function gallerySources(product: AsicProduct): string[] {
   const fb = defaultAsicShelfImageSrc(product.brand, product.model);
   const fbUrl = fb ? normalizeMarketplaceImageSrc(fb) : "";
   const main = normalizeMarketplaceImageSrc(product.imageSrc ?? "");
-  const g =
-    product.gallerySrcs
-      ?.map((x) => normalizeMarketplaceImageSrc(String(x)))
-      .filter(Boolean) ?? [];
-  const dedupe = (urls: string[]) => {
-    const seen = new Set<string>();
-    return urls.filter((u) => (seen.has(u) ? false : (seen.add(u), true)));
-  };
-  const urls = dedupe([...g, ...(main ? [main] : []), ...(fbUrl ? [fbUrl] : [])]);
-  return urls;
+  let g = dedupeGalleryUrls(
+    (product.gallerySrcs ?? []).map((x) => normalizeMarketplaceImageSrc(String(x))).filter(Boolean)
+  );
+  if (fbUrl && g.length > 0) g = g.filter((u) => u !== fbUrl);
+  if (g.length > 0) {
+    if (main) {
+      const mainKey = galleryFileKey(main);
+      const withoutMainDup = g.filter((u) => galleryFileKey(u) !== mainKey);
+      if (withoutMainDup.length > 0) g = withoutMainDup;
+    }
+    return capProductGalleryUrls(g);
+  }
+  if (main) return capProductGalleryUrls(main === fbUrl || !fbUrl ? [main] : [main, fbUrl]);
+  return capProductGalleryUrls(fbUrl ? [fbUrl] : []);
 }
 
 export function AsicProductModal({
@@ -128,22 +135,37 @@ export function AsicProductModal({
     return `https://wa.me/595993358387?text=${waText}`;
   }, [mailText.body]);
 
-  const thumbs = useMemo(() => gallerySources(product), [product]);
+  const thumbs = useMemo(
+    () => capProductGalleryUrls(gallerySources(product)),
+    [product]
+  );
   const shelfFallbackSrc = useMemo(
     () => normalizeMarketplaceImageSrc(defaultAsicShelfImageSrc(product.brand, product.model)),
     [product.brand, product.model]
   );
-  const hasAnyPhoto = thumbs.length > 0;
+  const [brokenThumbUrls, setBrokenThumbUrls] = useState<Set<string>>(() => new Set());
+  const visibleThumbs = useMemo(
+    () => thumbs.filter((u) => !brokenThumbUrls.has(u)),
+    [thumbs, brokenThumbUrls]
+  );
+  const hasAnyPhoto = visibleThumbs.length > 0;
   const [activeThumb, setActiveThumb] = useState(0);
   const [mainBroken, setMainBroken] = useState(false);
   const [emailInquiryOpen, setEmailInquiryOpen] = useState(false);
 
   useEffect(() => {
+    setBrokenThumbUrls(new Set());
     setActiveThumb(0);
     setMainBroken(false);
     setHashrateShareView(false);
     setShareViewPct(shareParts[0]?.sharePct ?? 75);
   }, [product, shareParts]);
+
+  useEffect(() => {
+    if (activeThumb >= visibleThumbs.length && visibleThumbs.length > 0) {
+      setActiveThumb(visibleThumbs.length - 1);
+    }
+  }, [activeThumb, visibleThumbs.length]);
 
   useEffect(() => {
     setMainBroken(false);
@@ -195,7 +217,8 @@ export function AsicProductModal({
         ? t("modal.yield_foot_loading")
         : t("modal.yield_foot_ref");
 
-  const activeSrc = thumbs[Math.min(activeThumb, Math.max(thumbs.length - 1, 0))] ?? shelfFallbackSrc;
+  const activeSrc =
+    visibleThumbs[Math.min(activeThumb, Math.max(visibleThumbs.length - 1, 0))] ?? shelfFallbackSrc;
   const [heroSrc, setHeroSrc] = useState(activeSrc);
 
   useEffect(() => {
@@ -252,9 +275,9 @@ export function AsicProductModal({
             className={`product-modal__gallery${!hasAnyPhoto ? " product-modal__gallery--no-media" : ""}`}
             aria-label={hasAnyPhoto ? t("modal.gallery") : t("modal.no_photos")}
           >
-            {thumbs.length > 0 ? (
+            {visibleThumbs.length > 0 ? (
               <div className="product-modal__thumbs" role="tablist" aria-label={t("modal.thumbs")}>
-                {thumbs.map((src, i) => (
+                {visibleThumbs.map((src, i) => (
                   <button
                     key={`${src}-${i}`}
                     type="button"
@@ -268,10 +291,8 @@ export function AsicProductModal({
                       alt=""
                       loading="lazy"
                       decoding="async"
-                      onError={(e) => {
-                        if (shelfFallbackSrc && e.currentTarget.src !== shelfFallbackSrc) {
-                          e.currentTarget.src = shelfFallbackSrc;
-                        }
+                      onError={() => {
+                        setBrokenThumbUrls((prev) => new Set(prev).add(src));
                       }}
                     />
                   </button>
@@ -295,7 +316,7 @@ export function AsicProductModal({
                           setHeroSrc(shelfFallbackSrc);
                           return;
                         }
-                        if (thumbs.length > 1 && activeThumb < thumbs.length - 1) {
+                        if (visibleThumbs.length > 1 && activeThumb < visibleThumbs.length - 1) {
                           setActiveThumb((i) => i + 1);
                           return;
                         }
