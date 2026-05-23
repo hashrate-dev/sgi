@@ -7,7 +7,7 @@
     {
       "source": "/:path*",
       "has": [{ "type": "host", "value": "app.hashrate.space" }],
-      "destination": "https://www.hashrate.space/:path*",
+      "destination": "https://hashrate.space/:path*",
       "permanent": true
     },
     { "source": "/marketplace/home", "destination": "/", "permanent": true },

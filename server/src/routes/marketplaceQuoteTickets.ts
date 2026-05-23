@@ -8,6 +8,7 @@ import { z } from "zod";
 import { db, getDb } from "../db.js";
 import { notifyMarketplaceOrderWhatsApp } from "../lib/whatsappCloud.js";
 import { notifyMarketplaceOrderEmail, notifyMarketplaceOrderGeneradaEmail } from "../lib/marketplaceOrderEmail.js";
+import { resolveMarketplaceOrdersPanelUrl } from "../lib/publicAppOrigin.js";
 import { resolveSetupCompraHashrateUsd, resolveSetupEquipoCompletoUsd } from "../lib/marketplaceSetupHashratePrice.js";
 import {
   loadGarantiaQuoteRows,
@@ -537,6 +538,7 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, ...qu
     const ip = clientIp(req);
     const ua = (typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : "").slice(0, 500);
     const nowIso = new Date().toISOString();
+    const ordersPanelUrl = resolveMarketplaceOrdersPanelUrl(req);
 
     /**
      * Carrito vacío en cliente pero «Generar orden»: usar ítems ya guardados en la orden en pipeline
@@ -736,6 +738,7 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, ...qu
             ticketCode: blocking.ticket_code,
             contactEmail: contactEmail ?? "",
             subtotalUsd: mergedSub,
+            panelUrl: ordersPanelUrl,
           }).catch((e) => console.error("[email] marketplace order notify (merge submit):", e));
         }
         if (shouldNotifyResendOrderGenerada(mergePrevNorm, mergeNextNorm, isSubmitTicketMerge, confirmGenerarOrden)) {
@@ -744,6 +747,7 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, ...qu
             ticketCode: blocking.ticket_code,
             contactEmail: contactEmail ?? "",
             subtotalUsd: mergedSub,
+            panelUrl: ordersPanelUrl,
           }).catch((e) => console.error("[email] marketplace ORDEN GENERADA (merge submit):", e));
         }
         if (shouldNotifySalesWhatsappOrderLista(mergePrevNorm, mergeNextNorm, isSubmitTicketMerge, confirmGenerarOrden)) {
@@ -930,6 +934,7 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, ...qu
           ticketCode: existing.ticket_code,
           contactEmail: contactEmail ?? "",
           subtotalUsd: subtotal,
+          panelUrl: ordersPanelUrl,
         }).catch((e) => console.error("[email] marketplace order notify:", e));
       }
       if (shouldNotifyResendOrderGenerada(prevNorm, nextNorm, isSubmitTicket, confirmGenerarOrden)) {
@@ -938,6 +943,7 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, ...qu
           ticketCode: existing.ticket_code,
           contactEmail: contactEmail ?? "",
           subtotalUsd: subtotal,
+          panelUrl: ordersPanelUrl,
         }).catch((e) => console.error("[email] marketplace ORDEN GENERADA:", e));
       }
       if (shouldNotifySalesWhatsappOrderLista(prevNorm, nextNorm, isSubmitTicket, confirmGenerarOrden)) {
@@ -1037,6 +1043,7 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, ...qu
               ticketCode: latestCancelled.ticket_code,
               contactEmail: contactEmail ?? "",
               subtotalUsd: subtotal,
+              panelUrl: ordersPanelUrl,
             }).catch((e) => console.error("[email] marketplace order notify (reactivate submit):", e));
             void notifyMarketplaceOrderWhatsApp({
               orderNumber: ordNum,
@@ -1132,6 +1139,7 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, ...qu
             ticketCode: code,
             contactEmail: contactEmail ?? "",
             subtotalUsd: subtotal,
+            panelUrl: ordersPanelUrl,
           }).catch((e) => console.error("[email] marketplace order notify:", e));
           void notifyMarketplaceOrderWhatsApp({
             orderNumber: created.orderNumber,

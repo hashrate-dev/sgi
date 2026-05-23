@@ -73,3 +73,13 @@ export function effectiveResendFromEmail(): string {
   const explicit = process.env.RESEND_FROM_EMAIL?.trim();
   return normalizeResendFromEmailForVerifiedDomain(explicit || "");
 }
+
+/** Igual que `effectiveResendFromEmail`, con fallback al remitente verificado en Resend si hay API key. */
+export function effectiveResendFromEmailOrDefault(): string {
+  const from = effectiveResendFromEmail();
+  if (from) return from;
+  if (normalizeResendApiKey(process.env.RESEND_API_KEY)) {
+    return "Hashrate Space <noreply@mail.hashrate.space>";
+  }
+  return "";
+}

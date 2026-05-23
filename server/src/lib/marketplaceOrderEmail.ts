@@ -1,8 +1,13 @@
 import {
-  effectiveResendFromEmail,
+  effectiveResendFromEmailOrDefault,
   normalizeResendApiKey,
   resendApiKeyLooksInvalid,
 } from "../config/resendFrom.js";
+import {
+  DEFAULT_MARKETPLACE_ORDERS_PANEL_URL,
+  normalizeLegacyHashratePublicUrl,
+  resolveMarketplaceOrdersPanelUrl,
+} from "./publicAppOrigin.js";
 
 /**
  * Avisos por email (Resend) al pasar a `orden_lista`:
@@ -15,7 +20,7 @@ import {
 const RESEND_API_URL = "https://api.resend.com/emails";
 const DEFAULT_TO = "sales@hashrate.space";
 const DEFAULT_SUBJECT_PREFIX = "[Marketplace]";
-const DEFAULT_PANEL_URL = "https://hashrate.space/marketplace/orders";
+const DEFAULT_PANEL_URL = DEFAULT_MARKETPLACE_ORDERS_PANEL_URL;
 
 let warnedMissingEnv = false;
 let loggedResendDeliveryHint = false;
@@ -25,6 +30,8 @@ export type MarketplaceOrderEmailPayload = {
   ticketCode: string;
   contactEmail: string;
   subtotalUsd: number;
+  /** Si no se pasa, se usa `MARKETPLACE_QUOTES_PANEL_URL` o el origen del request (sin `app.hashrate.space`). */
+  panelUrl?: string;
 };
 
 function clip(s: string, max: number): string {
@@ -54,6 +61,25 @@ function resend403UnverifiedFromDomain(detail: string): boolean {
     d.includes("domain is not verified") ||
     d.includes("unauthorized domain")
   );
+}
+
+function isResendTestingRecipientRestriction(status: number, bodyText: string): boolean {
+  if (status !== 403 && status !== 422) return false;
+  const t = bodyText.toLowerCase();
+  return (
+    t.includes("only send testing") ||
+    t.includes("testing emails") ||
+    t.includes("send emails to other recipients") ||
+    (t.includes("recipient") && t.includes("testing"))
+  );
+}
+
+function resolvePanelLink(p: MarketplaceOrderEmailPayload): string {
+  const explicit = normalizeLegacyHashratePublicUrl(p.panelUrl || "");
+  if (explicit) return explicit;
+  const fromEnv = normalizeLegacyHashratePublicUrl(process.env.MARKETPLACE_QUOTES_PANEL_URL || "");
+  if (fromEnv) return fromEnv;
+  return resolveMarketplaceOrdersPanelUrl();
 }
 
 async function resendPostEmail(opts: {
@@ -96,16 +122,15 @@ export async function notifyMarketplaceOrderEmail(p: MarketplaceOrderEmailPayloa
   // eslint-disable-next-line no-console
   console.log(`[email] aviso marketplace (handler) orden=${String(p.orderNumber || "?").slice(0, 24)} ticket=${String(p.ticketCode || "?").slice(0, 16)}`);
   const apiKey = normalizeResendApiKey(process.env.RESEND_API_KEY);
-  const from = effectiveResendFromEmail();
+  const from = effectiveResendFromEmailOrDefault();
   const to = (process.env.MARKETPLACE_NOTIFY_EMAIL_TO || DEFAULT_TO).trim();
   const subjectPrefix = (process.env.MARKETPLACE_NOTIFY_SUBJECT_PREFIX || DEFAULT_SUBJECT_PREFIX).trim();
-  const panelUrl = (process.env.MARKETPLACE_QUOTES_PANEL_URL || DEFAULT_PANEL_URL).trim();
 
   const order = clip(p.orderNumber || "—", 64);
   const ticket = clip(p.ticketCode || "—", 64);
   const contact = clip(p.contactEmail || "—", 200);
   const subtotal = clip(moneyUsd(p.subtotalUsd), 64);
-  const panelLink = panelUrl || DEFAULT_PANEL_URL;
+  const panelLink = resolvePanelLink(p) || DEFAULT_PANEL_URL;
   const subject = `${subjectPrefix || DEFAULT_SUBJECT_PREFIX} Nueva orden ${order}`.trim();
 
   const text = [
@@ -189,6 +214,11 @@ export async function notifyMarketplaceOrderEmail(p: MarketplaceOrderEmailPayloa
 
   if (!res.ok) {
     const detail = resendErrorDetail(bodyText);
+    if (isResendTestingRecipientRestriction(res.status, bodyText)) {
+      throw new Error(
+        `Resend API ${res.status}: modo prueba — solo permite enviar al buzón de la cuenta Resend. Verificá dominio mail.hashrate.space y usá producción, o definí MARKETPLACE_NOTIFY_EMAIL_TO al inbox permitido. Detalle: ${detail}`
+      );
+    }
     throw new Error(`Resend API ${res.status}: ${detail}`);
   }
 
@@ -216,16 +246,15 @@ export async function notifyMarketplaceOrderGeneradaEmail(p: MarketplaceOrderEma
     `[email] ORDEN GENERADA (Resend) orden=${String(p.orderNumber || "?").slice(0, 24)} ticket=${String(p.ticketCode || "?").slice(0, 16)}`
   );
   const apiKey = normalizeResendApiKey(process.env.RESEND_API_KEY);
-  const from = effectiveResendFromEmail();
+  const from = effectiveResendFromEmailOrDefault();
   const to = (process.env.MARKETPLACE_NOTIFY_EMAIL_TO || DEFAULT_TO).trim();
   const subjectPrefix = (process.env.MARKETPLACE_NOTIFY_SUBJECT_PREFIX || DEFAULT_SUBJECT_PREFIX).trim();
-  const panelUrl = (process.env.MARKETPLACE_QUOTES_PANEL_URL || DEFAULT_PANEL_URL).trim();
 
   const order = clip(p.orderNumber || "—", 64);
   const ticket = clip(p.ticketCode || "—", 64);
   const contact = clip(p.contactEmail || "—", 200);
   const subtotal = clip(moneyUsd(p.subtotalUsd), 64);
-  const panelLink = panelUrl || DEFAULT_PANEL_URL;
+  const panelLink = resolvePanelLink(p) || DEFAULT_PANEL_URL;
   const subject = `${subjectPrefix || DEFAULT_SUBJECT_PREFIX} ORDEN GENERADA ${order}`.trim();
 
   const text = [
@@ -309,6 +338,11 @@ export async function notifyMarketplaceOrderGeneradaEmail(p: MarketplaceOrderEma
 
   if (!res.ok) {
     const detail = resendErrorDetail(bodyText);
+    if (isResendTestingRecipientRestriction(res.status, bodyText)) {
+      throw new Error(
+        `Resend API ${res.status}: modo prueba — solo permite enviar al buzón de la cuenta Resend. Verificá dominio mail.hashrate.space y usá producción, o definí MARKETPLACE_NOTIFY_EMAIL_TO al inbox permitido. Detalle: ${detail}`
+      );
+    }
     throw new Error(`Resend API ${res.status}: ${detail}`);
   }
 

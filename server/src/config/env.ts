@@ -5,9 +5,11 @@ import { z } from "zod";
 import dotenv from "dotenv";
 import {
   effectiveResendFromEmail,
+  effectiveResendFromEmailOrDefault,
   normalizeResendApiKey,
   resendApiKeyLooksInvalid,
 } from "./resendFrom.js";
+import { applyLegacyHashratePublicUrlEnv } from "../lib/publicAppOrigin.js";
 
 // Cargar .env desde múltiples ubicaciones (localhost puede ejecutarse desde raíz o server/)
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -28,6 +30,8 @@ if (fs.existsSync(rootLocal)) dotenv.config({ path: rootLocal, override: true })
 // 5) Resend solo (gitignored); evita mezclar con el .env principal
 const resendLocal = path.join(projectRoot, ".env.resend.local");
 if (fs.existsSync(resendLocal)) dotenv.config({ path: resendLocal, override: true });
+
+applyLegacyHashratePublicUrlEnv();
 
 /** Supabase a veces exporta solo `DATABASE_URL`; alineamos con lo que usa el adaptador PG. */
 (() => {
@@ -129,7 +133,7 @@ export const env: Env = EnvSchema.parse(process.env);
 
 (() => {
   const apiKey = normalizeResendApiKey(process.env.RESEND_API_KEY);
-  const from = effectiveResendFromEmail();
+  const from = effectiveResendFromEmailOrDefault();
   const to = (process.env.MARKETPLACE_NOTIFY_EMAIL_TO || "sales@hashrate.space").trim();
   const devConsole =
     process.env.NODE_ENV !== "production" && process.env.MARKETPLACE_EMAIL_DEV_CONSOLE !== "0";
@@ -143,6 +147,11 @@ export const env: Env = EnvSchema.parse(process.env);
   if (apiKey && from && !badResendKey) {
     // eslint-disable-next-line no-console
     console.log(`[email] Avisos marketplace por email: activos (destino: ${to}, desde: ${from}).`);
+  } else if (process.env.VERCEL && !apiKey) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[email] Vercel: RESEND_API_KEY no está definida — los avisos de «Generar orden» no se enviarán. Configurala en Vercel → Settings → Environment Variables (y RESEND_FROM_EMAIL con @mail.hashrate.space verificado)."
+    );
   } else if (devConsole) {
     // eslint-disable-next-line no-console
     console.log(

@@ -165,7 +165,7 @@ export function MarketplaceCompanyPage() {
                 <div className="market-corp-company-team__cards">
                   <div className="market-corp-company-team__cards-grid">
                     {TEAM.map((m) => (
-                      <article key={m.key} className="market-corp-team-card">
+                      <article key={m.key} className="market-corp-team-card" data-member={m.key}>
                         <button
                           type="button"
                           className="market-corp-team-card__btn"
@@ -219,6 +219,7 @@ export function MarketplaceCompanyPage() {
             <div className="market-corp-team-modal__head">
               <img
                 className="market-corp-team-modal__photo"
+                data-member={openMember}
                 src={openMemberData.img}
                 alt=""
                 width={160}

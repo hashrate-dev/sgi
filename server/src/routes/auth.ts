@@ -22,6 +22,7 @@ import { parseLectorGrantsJson } from "../lib/lectorPermissions.js";
 import { lectorHasKryptexPoolAssigned } from "../lib/kryptexLectorPool.js";
 import { fetchUserRowForLogin } from "../lib/dbUserColumnFallback.js";
 import { appendAuthCookie, appendClearAuthCookie } from "../lib/authSessionCookie.js";
+import { resolvePublicAppOrigin } from "../lib/publicAppOrigin.js";
 
 const authRouter = Router();
 const JWT_SECRET = env.JWT_SECRET;
@@ -111,16 +112,6 @@ function formatRegisterValidationMessage(zerr: ZodError): string {
   if (!msg) return `Revisá el campo ${label}.`;
   if (msg.toLowerCase().includes("required")) return `Completá el campo ${label}.`;
   return `Revisá ${label}: ${msg}.`;
-}
-
-function resolvePublicAppOrigin(req: Request): string {
-  const fromEnv = (process.env.APP_PUBLIC_URL || process.env.FRONTEND_ORIGIN || "").trim();
-  if (fromEnv) return fromEnv.replace(/\/+$/, "");
-  const origin = String(req.headers.origin || "").trim();
-  if (/^https?:\/\//i.test(origin)) return origin.replace(/\/+$/, "");
-  const host = String(req.headers.host || "").trim();
-  if (/localhost|127\.0\.0\.1/i.test(host)) return "http://localhost:5173";
-  return "https://hashrate.space";
 }
 
 /** Resend en API key de prueba a veces solo permite entregar a un buzón (lo suele indicar en el JSON del 403). */

@@ -301,7 +301,12 @@ export function AsicProductModal({
             ) : null}
             <div className="product-modal__gallery-col">
               <div className="product-modal__hero-wrap">
-                <div className="product-modal__hero-gradient">
+                <div
+                  className={
+                    "product-modal__hero-gradient" +
+                    (product.algo === "scrypt" ? " product-modal__hero-gradient--scrypt" : "")
+                  }
+                >
                   {!hasAnyPhoto || mainBroken ? (
                     <div className="product-modal__hero-fallback" aria-hidden />
                   ) : (
