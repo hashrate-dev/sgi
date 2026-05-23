@@ -26,7 +26,7 @@ const VIDEO_URL = CORP_INSTITUTIONAL_VIDEO_URL;
 /** Promo Z15 — reemplazá `public/images/bitmain-z15-pro.png` por el render oficial si querés otro asset */
 const CORP_Z15_PROMO_IMG = `${import.meta.env.BASE_URL}images/bitmain-z15-pro.png`;
 const CORP_ZCASH_LOGO_IMG = `${import.meta.env.BASE_URL}images/zcash-logo.png`;
-const CORP_NICEHASH_LOGO_IMG = publicImageUrl("/images/nicehash-logo.jpg");
+const CORP_NICEHASH_LOGO_IMG = publicImageUrl("/images/nicehash-logo-cropped.jpg");
 /** Fondo faja “Servicio todo incluido” (mineros / hosting) */
 const CORP_HOSTING_BAND_IMG = `${import.meta.env.BASE_URL}images/hosting-mining-farm-04.png`;
 
@@ -618,11 +618,11 @@ export function MarketplaceCorporateHomePage() {
                   aria-label={t("corp.partners.nicehash_aria")}
                 >
                   <img
-                    className="market-corp-luxor__img market-corp-luxor__img--nicehash"
+                    className="market-corp-luxor__img"
                     src={CORP_NICEHASH_LOGO_IMG}
                     alt=""
-                    width={320}
-                    height={80}
+                    width={744}
+                    height={148}
                     loading="lazy"
                     decoding="async"
                     draggable={false}

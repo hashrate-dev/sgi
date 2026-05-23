@@ -8630,6 +8630,7 @@ button.product-modal__btn--quote-cart:active {
   justify-content: center;
   gap: clamp(1.75rem, 5vw, 3.5rem);
   padding: 0.5rem 0 0.15rem;
+  --corp-partner-logo-h: clamp(28px, 3.5vw, 34px);
 }
 
 /* Fondo del PNG (blanco) → mismo gris que la página (#f3f4f6): multiply + base explícita */
@@ -8637,6 +8638,9 @@ button.product-modal__btn--quote-cart:active {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
+  height: var(--corp-partner-logo-h);
+  width: auto;
   line-height: 0;
   text-decoration: none;
   border: none;
@@ -8660,10 +8664,9 @@ button.product-modal__btn--quote-cart:active {
 
 .market-corp-luxor__img {
   display: block;
+  height: 100%;
   width: auto;
-  height: auto;
-  max-width: min(200px, 55vw);
-  max-height: 44px;
+  max-height: 100%;
   object-fit: contain;
   object-position: center;
   filter: grayscale(1) brightness(1.02);
@@ -8671,20 +8674,9 @@ button.product-modal__btn--quote-cart:active {
   opacity: 1;
 }
 
-.market-corp-luxor__img--nicehash {
-  max-width: min(240px, 62vw);
-  max-height: 48px;
-}
-
 @media (min-width: 900px) {
-  .market-corp-luxor__img {
-    max-height: 40px;
-    max-width: min(180px, 22vw);
-  }
-
-  .market-corp-luxor__img--nicehash {
-    max-height: 44px;
-    max-width: min(220px, 24vw);
+  .market-corp-luxor__row {
+    --corp-partner-logo-h: 32px;
   }
 }
 
