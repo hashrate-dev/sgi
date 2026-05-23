@@ -13,7 +13,7 @@ import {
 import { canUserAccessNavPath, canUserAccessScreen } from "../lib/sgiNavigation.js";
 import { playMarketplaceOrderNotificationSound } from "../lib/marketplaceCartSound";
 import { HOME_DASHBOARD_SHELL } from "../lib/sgiDashboardShell";
-import { getBrowserHostname, isPrimaryPublicHost } from "../lib/hashrateHosts";
+import { MARKETPLACE } from "../lib/marketplacePaths";
 import "../styles/marketplace-hashrate.css";
 import { AppCard } from "../components/ui";
 
@@ -106,7 +106,7 @@ const marketplaceOrdersIconFlash = keyframes`
 
 const menuItems: MenuItem[] = [
   {
-    to: "/marketplace",
+    to: MARKETPLACE.catalog,
     icon: "bi-bag",
     label: "Tienda online",
     desc: "Catálogo público de equipos ASIC — vista cliente (sin administración)",
@@ -167,7 +167,7 @@ const menuItems: MenuItem[] = [
 ];
 
 function DashboardCardIconSlot({ item }: { item: MenuItem }) {
-  if (item.to === "/marketplace") {
+  if (item.to === MARKETPLACE.catalog) {
     return (
       <Flex
         {...ICON_SLOT_PROPS}
@@ -238,9 +238,6 @@ function DashboardCardIconSlot({ item }: { item: MenuItem }) {
 }
 
 export function HomePage() {
-  if (isPrimaryPublicHost(getBrowserHostname())) {
-    return <Navigate to="/marketplace/home" replace />;
-  }
   const { user } = useAuth();
   const [marketplaceOpenCount, setMarketplaceOpenCount] = useState(0);
   const [marketplaceBadgePulse, setMarketplaceBadgePulse] = useState(false);
@@ -375,7 +372,7 @@ export function HomePage() {
     }
   }
   if (user?.role === "cliente") {
-    return <Navigate to="/marketplace" replace />;
+    return <Navigate to={MARKETPLACE.catalog} replace />;
   }
 
   return (
@@ -406,7 +403,7 @@ export function HomePage() {
                     color: item.iconHoverColor ?? "green.800",
                     borderColor: item.iconHoverBorderColor ?? "green.300",
                   },
-                  ...(item.to === "/marketplace"
+                  ...(item.to === MARKETPLACE.catalog
                     ? {
                         "& .dashboard-card-icon-slot--marketplace": {
                           bg: "#d97706",

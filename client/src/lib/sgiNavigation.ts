@@ -133,7 +133,7 @@ export function canUserAccessNavPath(user: SgiNavUser | null | undefined, to: st
 
   const path = normalizeNavPath(to);
 
-  if (path === "/marketplace" || path.startsWith("/marketplace/home")) {
+  if (path === "/equipment" || path === "/marketplace" || path === "/home" || path.startsWith("/marketplace/home")) {
     return true;
   }
 

@@ -3,7 +3,6 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from "rea
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ProtectedAppLayout } from "./components/ProtectedAppLayout";
-import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
 import { FacturacionPage } from "./pages/FacturacionPage";
 import { FacturacionMineriaPage } from "./pages/FacturacionMineriaPage";
@@ -67,9 +66,11 @@ import { MarketplaceLanguageProvider } from "./contexts/MarketplaceLanguageConte
 import { MarketplaceQuoteCartProvider, useMarketplaceQuoteCart } from "./contexts/MarketplaceQuoteCartContext";
 import { MarketplaceQuoteCartDrawer } from "./components/marketplace/MarketplaceQuoteCartDrawer";
 import { LegacyWpLangRedirect } from "./components/marketplace/LegacyWpLangRedirect";
+import { RootIndex } from "./components/RootIndex";
 import { getStoredUser } from "./lib/auth";
 import { postMarketplacePresenceHeartbeat, type MarketplacePresenceViewerType } from "./lib/api";
 import { getBrowserHostname, isPrimaryPublicHost } from "./lib/hashrateHosts";
+import { isMarketplacePublicPath, MARKETPLACE, mpHome } from "./lib/marketplacePaths";
 
 const MARKETPLACE_PRESENCE_VISITOR_KEY = "hrs_marketplace_presence_visitor_id";
 const MARKETPLACE_PRESENCE_COUNTRY_CACHE_KEY = "hrs_marketplace_presence_country_v1";
@@ -256,7 +257,7 @@ async function getPublicIpAddress(): Promise<string> {
 function MarketplacePresenceBeacon() {
   const location = useLocation();
   useEffect(() => {
-    if (!location.pathname.startsWith("/marketplace")) return;
+    if (!isMarketplacePublicPath(location.pathname)) return;
     const visitorId = getMarketplacePresenceVisitorId();
     const currentPath = `${location.pathname}${location.search ?? ""}`.slice(0, 200);
     const viewerType = resolveMarketplaceViewerType();
@@ -325,7 +326,7 @@ function MarketplaceCloseCartOnAuthRoute() {
   const { closeDrawer } = useMarketplaceQuoteCart();
   useEffect(() => {
     const p = pathname.replace(/\/+$/, "") || "/";
-    if (p === "/marketplace/login" || p === "/marketplace/signup") {
+    if (p === MARKETPLACE.clientLogin || p === MARKETPLACE.clientSignup) {
       closeDrawer();
     }
   }, [pathname, closeDrawer]);
@@ -348,7 +349,7 @@ function MarketplaceLayout() {
 
 function AppNotFoundRedirect() {
   if (isPrimaryPublicHost(getBrowserHostname())) {
-    return <Navigate to="/marketplace/home" replace />;
+    return <Navigate to={mpHome()} replace />;
   }
   return <Navigate to="/" replace />;
 }
@@ -367,27 +368,44 @@ function App() {
           <Route path="/es" element={<LegacyWpLangRedirect lang="es" />} />
           <Route path="/pt/*" element={<LegacyWpLangRedirect lang="pt" />} />
           <Route path="/pt" element={<LegacyWpLangRedirect lang="pt" />} />
-          {/* Tienda primero: catálogo público + login/signup cliente (anidado para matching estable en RR7) */}
-          <Route path="/marketplace" element={<MarketplaceLayout />}>
-            <Route index element={<MarketplacePage />} />
-            <Route path="home" element={<MarketplaceCorporateHomePage />} />
-            <Route path="services" element={<MarketplaceServicesPage />} />
-            <Route path="company" element={<MarketplaceCompanyPage />} />
-            <Route path="faq" element={<MarketplaceFaqPage />} />
-            <Route path="contact" element={<MarketplaceContactPage />} />
-            <Route path="consultar-correo" element={<MarketplaceAsicEmailInquiryPage />} />
-            <Route path="consultar-correo-carrito" element={<MarketplaceAsicEmailInquiryPage />} />
-            <Route path="login" element={<MarketplaceClienteLoginPage />} />
-            <Route path="signup" element={<MarketplaceClienteRegistroPage />} />
-            <Route path="registro" element={<Navigate to="/marketplace/signup" replace />} />
-            <Route path="mis-ordenes" element={<Navigate to="/marketplace" replace />} />
+          <Route path="/" element={<RootIndex />} />
+          {/* Sitio público (sin /marketplace en la URL) */}
+          <Route element={<MarketplaceLayout />}>
+            <Route path="/home" element={<MarketplaceCorporateHomePage />} />
+            <Route path={MARKETPLACE.services} element={<MarketplaceServicesPage />} />
+            <Route path={MARKETPLACE.company} element={<MarketplaceCompanyPage />} />
+            <Route path={MARKETPLACE.faq} element={<MarketplaceFaqPage />} />
+            <Route path={MARKETPLACE.contact} element={<MarketplaceContactPage />} />
+            <Route path={MARKETPLACE.catalog} element={<MarketplacePage />} />
+            <Route path={MARKETPLACE.emailInquiry} element={<MarketplaceAsicEmailInquiryPage />} />
+            <Route path={MARKETPLACE.emailInquiryCart} element={<MarketplaceAsicEmailInquiryPage />} />
+            <Route path={MARKETPLACE.clientLogin} element={<MarketplaceClienteLoginPage />} />
+            <Route path={MARKETPLACE.clientSignup} element={<MarketplaceClienteRegistroPage />} />
           </Route>
-          <Route path="/marketplace/" element={<Navigate to="/marketplace" replace />} />
+          {/* Redirects legacy /marketplace/* */}
+          <Route path="/marketplace" element={<Navigate to={MARKETPLACE.catalog} replace />} />
+          <Route path="/marketplace/" element={<Navigate to={MARKETPLACE.catalog} replace />} />
+          <Route path="/marketplace/home" element={<Navigate to={mpHome()} replace />} />
+          <Route path="/marketplace/home/" element={<Navigate to={mpHome()} replace />} />
+          <Route path="/marketplace/services" element={<Navigate to={MARKETPLACE.services} replace />} />
+          <Route path="/marketplace/services/" element={<Navigate to={MARKETPLACE.services} replace />} />
+          <Route path="/marketplace/company" element={<Navigate to={MARKETPLACE.company} replace />} />
+          <Route path="/marketplace/company/" element={<Navigate to={MARKETPLACE.company} replace />} />
+          <Route path="/marketplace/faq" element={<Navigate to={MARKETPLACE.faq} replace />} />
+          <Route path="/marketplace/faq/" element={<Navigate to={MARKETPLACE.faq} replace />} />
+          <Route path="/marketplace/contact" element={<Navigate to={MARKETPLACE.contact} replace />} />
+          <Route path="/marketplace/contact/" element={<Navigate to={MARKETPLACE.contact} replace />} />
+          <Route path="/marketplace/login" element={<Navigate to={MARKETPLACE.clientLogin} replace />} />
+          <Route path="/marketplace/login/" element={<Navigate to={MARKETPLACE.clientLogin} replace />} />
+          <Route path="/marketplace/signup" element={<Navigate to={MARKETPLACE.clientSignup} replace />} />
+          <Route path="/marketplace/signup/" element={<Navigate to={MARKETPLACE.clientSignup} replace />} />
+          <Route path="/marketplace/registro" element={<Navigate to={MARKETPLACE.clientSignup} replace />} />
+          <Route path="/marketplace/consultar-correo" element={<Navigate to={MARKETPLACE.emailInquiry} replace />} />
+          <Route path="/marketplace/consultar-correo-carrito" element={<Navigate to={MARKETPLACE.emailInquiryCart} replace />} />
+          <Route path="/marketplace/mis-ordenes" element={<Navigate to={MARKETPLACE.catalog} replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/reset-password" element={<PasswordResetPage />} />
           <Route element={<ProtectedRoute><ProtectedAppLayout /></ProtectedRoute>}>
-            {/* `index`: en layout sin path, `path="/"` como hijo puede no matchear `/` y el * devuelve bucle infinito */}
-            <Route index element={<HomePage />} />
             <Route path="/kryptex" element={<KryptexPage />} />
             <Route path="/kryptex/detalle" element={<KryptexDetallePage />} />
             <Route path="/asic/equipment" element={<EquiposAsicPage />} />

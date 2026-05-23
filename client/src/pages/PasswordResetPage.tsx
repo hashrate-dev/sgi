@@ -127,7 +127,7 @@ export function PasswordResetPage() {
   useEffect(() => {
     if (!hasToken || !resetDone) return;
     const t = window.setTimeout(() => {
-      const target = resetSource === "marketplace" ? "/marketplace/login" : "/login";
+      const target = resetSource === "marketplace" ? "/acceso" : "/login";
       navigate(target, { replace: true });
     }, 1200);
     return () => window.clearTimeout(t);
@@ -255,7 +255,7 @@ export function PasswordResetPage() {
                   ) : null}
                   {showSgiLoginLink && showMarketplaceLoginLink ? <span className="mx-2">·</span> : null}
                   {showMarketplaceLoginLink ? (
-                    <Link to="/marketplace/login" className="text-decoration-none">
+                    <Link to="/acceso" className="text-decoration-none">
                       {copy.backMarketplace}
                     </Link>
                   ) : null}

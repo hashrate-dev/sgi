@@ -5,17 +5,25 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useOptionalMarketplaceQuoteCart } from "../../contexts/MarketplaceQuoteCartContext.js";
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
 import type { MarketplaceLang } from "../../lib/i18n.js";
+import { MARKETPLACE, mpHome } from "../../lib/marketplacePaths.js";
+
+function pathIs(pathname: string, target: string): boolean {
+  const p = pathname.replace(/\/+$/, "") || "/";
+  const t = target.replace(/\/+$/, "") || "/";
+  return p === t;
+}
 
 export function MarketplaceSiteHeader() {
   const [navOpen, setNavOpen] = useState(false);
   const { pathname, hash } = useLocation();
-  const onCatalog = pathname === "/marketplace" || pathname === "/marketplace/";
-  const onCorporateHome = pathname === "/marketplace/home" || pathname === "/marketplace/home/";
-  const onServicesPage = pathname === "/marketplace/services" || pathname === "/marketplace/services/";
-  const onCompanyPage = pathname === "/marketplace/company" || pathname === "/marketplace/company/";
-  const onFaqPage = pathname === "/marketplace/faq" || pathname === "/marketplace/faq/";
-  const onContactPage = pathname === "/marketplace/contact" || pathname === "/marketplace/contact/";
-  const onClienteLoginPage = pathname === "/marketplace/login" || pathname === "/marketplace/login/";
+  const homePath = mpHome();
+  const onCatalog = pathIs(pathname, MARKETPLACE.catalog) || pathIs(pathname, "/marketplace");
+  const onCorporateHome = pathIs(pathname, homePath) || pathIs(pathname, MARKETPLACE.homeDev);
+  const onServicesPage = pathIs(pathname, MARKETPLACE.services);
+  const onCompanyPage = pathIs(pathname, MARKETPLACE.company);
+  const onFaqPage = pathIs(pathname, MARKETPLACE.faq);
+  const onContactPage = pathIs(pathname, MARKETPLACE.contact);
+  const onClienteLoginPage = pathIs(pathname, MARKETPLACE.clientLogin);
   const corpHashCurrent = (id: string) =>
     onCorporateHome && hash === `#${id}` ? ("is-current" as const) : undefined;
   const { user, logout } = useAuth();
@@ -50,7 +58,7 @@ export function MarketplaceSiteHeader() {
               className="site-header__account-logout"
               onClick={async () => {
                 await logout();
-                window.location.href = "/marketplace";
+                window.location.href = MARKETPLACE.catalog;
               }}
             >
               {t("header.logout")}
@@ -59,7 +67,7 @@ export function MarketplaceSiteHeader() {
         ) : (
           <div className="site-header__auth-actions">
             {!onClienteLoginPage ? (
-              <Link to="/marketplace/signup" className="site-header__auth-link site-header__auth-link--primary">
+              <Link to={MARKETPLACE.clientSignup} className="site-header__auth-link site-header__auth-link--primary">
                 {t("header.register")}
               </Link>
             ) : null}
@@ -72,7 +80,7 @@ export function MarketplaceSiteHeader() {
   return (
     <header className="site-header site-header--marketplace hrs-glass-topbar-surface">
       <div className="container site-header__inner">
-        <Link className="logo-link logo-link--main" to="/marketplace/home" aria-label={t("header.logo_aria")}>
+        <Link className="logo-link logo-link--main" to={homePath} aria-label={t("header.logo_aria")}>
           <img
             className="site-logo-img"
             src="https://hashrate.space/wp-content/uploads/hashrate-LOGO.png"
@@ -155,7 +163,7 @@ export function MarketplaceSiteHeader() {
           <ul>
             <li>
               <Link
-                to="/marketplace/home"
+                to={homePath}
                 className={onCorporateHome ? "is-current" : undefined}
                 {...(onCorporateHome ? { "aria-current": "page" as const } : {})}
               >
@@ -164,7 +172,7 @@ export function MarketplaceSiteHeader() {
             </li>
             <li>
               <Link
-                to="/marketplace/services"
+                to={MARKETPLACE.services}
                 className={onServicesPage || corpHashCurrent("servicios") ? "is-current" : undefined}
                 {...(onServicesPage ? { "aria-current": "page" as const } : {})}
               >
@@ -173,7 +181,7 @@ export function MarketplaceSiteHeader() {
             </li>
             <li>
               <Link
-                to="/marketplace"
+                to={MARKETPLACE.catalog}
                 className={onCatalog ? "is-current" : undefined}
                 {...(onCatalog ? { "aria-current": "page" as const } : {})}
               >
@@ -182,7 +190,7 @@ export function MarketplaceSiteHeader() {
             </li>
             <li>
               <Link
-                to="/marketplace/faq"
+                to={MARKETPLACE.faq}
                 className={onFaqPage ? "is-current" : undefined}
                 {...(onFaqPage ? { "aria-current": "page" as const } : {})}
               >
@@ -191,7 +199,7 @@ export function MarketplaceSiteHeader() {
             </li>
             <li>
               <Link
-                to="/marketplace/company"
+                to={MARKETPLACE.company}
                 className={onCompanyPage ? "is-current" : undefined}
                 {...(onCompanyPage ? { "aria-current": "page" as const } : {})}
               >
@@ -200,7 +208,7 @@ export function MarketplaceSiteHeader() {
             </li>
             <li>
               <Link
-                to="/marketplace/contact"
+                to={MARKETPLACE.contact}
                 className={onContactPage ? "is-current" : undefined}
                 {...(onContactPage ? { "aria-current": "page" as const } : {})}
               >

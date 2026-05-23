@@ -133,12 +133,12 @@ function MarketplacePageBody() {
     if (!st?.openQuoteDrawer) return;
     if (loading) return;
     if (!user) {
-      navigate("/marketplace", { replace: true, state: {} });
+      navigate("/equipment", { replace: true, state: {} });
       return;
     }
     const t = window.setTimeout(() => {
       openDrawer();
-      navigate("/marketplace", { replace: true, state: {} });
+      navigate("/equipment", { replace: true, state: {} });
     }, 0);
     return () => window.clearTimeout(t);
   }, [location.state, loading, user, openDrawer, navigate]);

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { canAccessSgiFromMarketplaceFooter } from "../../lib/auth.js";
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
+import { MARKETPLACE, mpHome } from "../../lib/marketplacePaths.js";
 
 const UP = "https://hashrate.space/wp-content/uploads";
 const CORP_VIDEO_URL = "https://hashrate.space/video/Hashrate-Farm-Py.mp4";
@@ -42,22 +43,22 @@ export function MarketplaceSiteFooter({ variant = "default" }: Props) {
           <h3 className="market-corp-strip__h3 market-corp-strip__h3--footer">{t("footer.col_company")}</h3>
           <ul className="market-corp-strip__links market-corp-strip__links--footer">
             <li>
-              <Link to="/marketplace/home">{t("nav.home")}</Link>
+              <Link to={mpHome()}>{t("nav.home")}</Link>
             </li>
             <li>
-              <Link to="/marketplace/services">{t("nav.services")}</Link>
+              <Link to={MARKETPLACE.services}>{t("nav.services")}</Link>
             </li>
             <li>
-              <Link to="/marketplace">{t("nav.equipment")}</Link>
+              <Link to={MARKETPLACE.catalog}>{t("nav.equipment")}</Link>
             </li>
             <li>
-              <Link to="/marketplace/faq">{t("nav.faq")}</Link>
+              <Link to={MARKETPLACE.faq}>{t("nav.faq")}</Link>
             </li>
             <li>
-              <Link to="/marketplace/company">{t("nav.company")}</Link>
+              <Link to={MARKETPLACE.company}>{t("nav.company")}</Link>
             </li>
             <li>
-              <Link to="/marketplace/contact">{t("nav.contact")}</Link>
+              <Link to={MARKETPLACE.contact}>{t("nav.contact")}</Link>
             </li>
             {showSgiLink ? (
               <li>

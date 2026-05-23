@@ -10,12 +10,15 @@
       "destination": "https://www.hashrate.space/:path*",
       "permanent": true
     },
-    {
-      "source": "/:path*",
-      "has": [{ "type": "host", "value": "hashrate.space" }],
-      "destination": "https://www.hashrate.space/:path*",
-      "permanent": false
-    }
+    { "source": "/marketplace/home", "destination": "/", "permanent": true },
+    { "source": "/marketplace", "destination": "/equipment", "permanent": true },
+    { "source": "/marketplace/services", "destination": "/services", "permanent": true },
+    { "source": "/marketplace/company", "destination": "/company", "permanent": true },
+    { "source": "/marketplace/faq", "destination": "/faq", "permanent": true },
+    { "source": "/marketplace/contact", "destination": "/contact", "permanent": true },
+    { "source": "/marketplace/login", "destination": "/acceso", "permanent": true },
+    { "source": "/marketplace/signup", "destination": "/registro", "permanent": true },
+    { "source": "/marketplace/registro", "destination": "/registro", "permanent": true }
   ],
   "rewrites": [{"source": "/((?!api/).*)", "destination": "/index.html"}],
   "framework": null,

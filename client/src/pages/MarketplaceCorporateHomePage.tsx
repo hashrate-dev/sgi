@@ -14,6 +14,7 @@ import {
 import type { AsicProduct } from "../lib/marketplaceAsicCatalog.js";
 import { getMarketplaceCorpBestSelling, getMarketplaceCorpInteresting, wakeUpBackend } from "../lib/api.js";
 import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
+import { isCorpHomePath, MARKETPLACE } from "../lib/marketplacePaths.js";
 import { useAuth } from "../contexts/AuthContext";
 import "../styles/marketplace-hashrate.css";
 
@@ -188,7 +189,7 @@ export function MarketplaceCorporateHomePage() {
   }, []);
 
   useEffect(() => {
-    if (pathname !== "/marketplace/home" && pathname !== "/marketplace/home/") return;
+    if (!isCorpHomePath(pathname)) return;
     const id = hash?.replace(/^#/, "") ?? "";
     if (!id || !(CORP_ANCHOR_IDS as readonly string[]).includes(id)) return;
     const el = document.getElementById(id);
@@ -245,10 +246,10 @@ export function MarketplaceCorporateHomePage() {
                       {t("corp.hero.title")}
                     </h1>
                     <div className="market-corp-hero__actions">
-                      <Link to="/marketplace" className="market-corp-btn market-corp-btn--ghost">
+                      <Link to="/equipment" className="market-corp-btn market-corp-btn--ghost">
                         {t("corp.hero.cta_shop")}
                       </Link>
-                      <Link to="/marketplace/contact" className="market-corp-btn market-corp-btn--see-through">
+                      <Link to={MARKETPLACE.contact} className="market-corp-btn market-corp-btn--see-through">
                         {t("corp.hero.cta_contact")}
                       </Link>
                     </div>
@@ -314,7 +315,7 @@ export function MarketplaceCorporateHomePage() {
                   </li>
                 </ul>
                 <p className="market-corp-spotlight__body">{t("corp.spotlight.body")}</p>
-                <Link to="/marketplace" className="market-corp-spotlight__cta">
+                <Link to="/equipment" className="market-corp-spotlight__cta">
                   {t("corp.spotlight.cta")}
                 </Link>
               </div>
@@ -546,7 +547,7 @@ export function MarketplaceCorporateHomePage() {
                 onContactClick={() => goCorpHash("contacto")}
               />
               <div className="market-corp-faq-home-more">
-                <Link to="/marketplace/faq" className="market-corp-faq-home-more__link">
+                <Link to={MARKETPLACE.faq} className="market-corp-faq-home-more__link">
                   {t("corp.faq.view_all")}
                 </Link>
               </div>

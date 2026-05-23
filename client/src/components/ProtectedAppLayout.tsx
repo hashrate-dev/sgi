@@ -1,19 +1,19 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { Box } from "@chakra-ui/react";
 import { useAuth } from "../contexts/AuthContext";
-import { canManageUsers } from "../lib/auth";
+import { canAccessSgiFromMarketplaceFooter } from "../lib/auth";
 import { SgiAdminFixedFooter } from "./SgiAdminFixedFooter";
 import { SgiProtectedTopBar } from "./SgiProtectedTopBar";
 import "../styles/sgi-admin-footer.css";
 
 /**
- * Layout de rutas internas (post-login): administradores A/B ven footer fijo Hashrate + enlace SGI.
+ * Layout de rutas internas (post-login): personal interno ve footer fijo Hashrate + enlace SGI.
  */
-export function ProtectedAppLayout() {
+export function ProtectedAppLayout({ children }: { children?: ReactNode }) {
   const { user } = useAuth();
   const location = useLocation();
-  const showAdminFooter = Boolean(user && canManageUsers(user));
+  const showAdminFooter = Boolean(user && canAccessSgiFromMarketplaceFooter(user));
   const isHomePage = location.pathname === "/";
   const [sgiTopBarH, setSgiTopBarH] = useState(80);
   const onSgiTopBarHeight = useCallback((h: number) => {
@@ -55,7 +55,7 @@ export function ProtectedAppLayout() {
     >
       {user ? <SgiProtectedTopBar onHeightChange={onSgiTopBarHeight} /> : null}
       {user ? <Box aria-hidden h={`${sgiTopBarH}px`} flexShrink={0} /> : null}
-      <Outlet />
+      {children ?? <Outlet />}
       {showAdminFooter ? <SgiAdminFixedFooter /> : null}
     </Box>
   );

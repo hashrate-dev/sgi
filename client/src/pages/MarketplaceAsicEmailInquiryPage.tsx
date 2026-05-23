@@ -94,7 +94,7 @@ export function MarketplaceAsicEmailInquiryPage() {
   );
 
   if (!isCartInquiry && (!brand.length || !model.length)) {
-    return <Navigate to="/marketplace" replace />;
+    return <Navigate to="/equipment" replace />;
   }
 
   return (

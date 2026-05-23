@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 
-/** Pie fijo estilo vitrina Hashrate: solo se monta para administradores en `ProtectedAppLayout`. */
+/** Pie fijo estilo vitrina Hashrate: personal interno (admin, operador, lector) en `ProtectedAppLayout`. */
 export function SgiAdminFixedFooter() {
   const year = new Date().getFullYear();
   return (

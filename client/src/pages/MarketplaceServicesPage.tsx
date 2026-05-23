@@ -63,7 +63,7 @@ export function MarketplaceServicesPage() {
             <div className="market-services-band__inner">
               <h2>{t("services.hero.title")}</h2>
               <p className="market-services-band__body">{t("services.hero.body")}</p>
-              <Link to="/marketplace/contact" className="market-services-band__cta">
+              <Link to="/contact" className="market-services-band__cta">
                 {t("corp.green.cta")}
               </Link>
             </div>
@@ -151,7 +151,7 @@ export function MarketplaceServicesPage() {
                   </li>
                 </ul>
                 <p className="market-corp-spotlight__body">{t("corp.spotlight.body")}</p>
-                <Link to="/marketplace" className="market-corp-spotlight__cta">
+                <Link to="/equipment" className="market-corp-spotlight__cta">
                   {t("corp.spotlight.cta")}
                 </Link>
               </div>

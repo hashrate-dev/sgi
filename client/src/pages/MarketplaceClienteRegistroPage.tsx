@@ -103,7 +103,7 @@ export function MarketplaceClienteRegistroPage() {
   if (!loading && user) {
     return (
       <Navigate
-        to="/marketplace"
+        to="/equipment"
         replace
         state={fromQuote ? { openQuoteDrawer: true } : undefined}
       />
@@ -518,7 +518,7 @@ export function MarketplaceClienteRegistroPage() {
                                 <p className="mt-1 mb-2 small text-body-secondary">{duplicateDetailMessage}</p>
                                 <p className="mb-0 small">
                                   <Link
-                                    to="/marketplace/login"
+                                    to="/acceso"
                                     className="fw-semibold text-decoration-none"
                                     state={fromQuote ? { from: "quote" } : undefined}
                                   >
@@ -543,13 +543,13 @@ export function MarketplaceClienteRegistroPage() {
                       <div className="row align-items-center market-registro-submit-row g-2 g-md-3">
                         <div className="col-12 col-md-6">
                           <div className="market-registro-foot market-registro-foot--beside-submit small text-muted">
-                            <Link to="/marketplace" className="text-decoration-none">
+                            <Link to="/equipment" className="text-decoration-none">
                               <i className="bi bi-arrow-left-short me-1" aria-hidden />
                               {t("login.back_shop")}
                             </Link>
                             <span className="mx-2">·</span>
                             <Link
-                              to="/marketplace/login"
+                              to="/acceso"
                               className="text-decoration-none"
                               state={fromQuote ? { from: "quote" } : undefined}
                             >

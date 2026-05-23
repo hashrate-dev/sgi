@@ -55,7 +55,7 @@ export function MarketplaceCorpFaqSpotlight({
             </h2>
             <p className="market-corp-faq-spotlight__lede">{t("corp.faq.spot.specs")}</p>
             <div className="market-corp-faq-spotlight__lead-actions">
-              <Link to="/marketplace" className="market-corp-faq-spotlight__btn market-corp-faq-spotlight__btn--primary">
+              <Link to="/equipment" className="market-corp-faq-spotlight__btn market-corp-faq-spotlight__btn--primary">
                 {t("corp.faq.shop_cta")}
               </Link>
               {onContactClick ? (
@@ -68,7 +68,7 @@ export function MarketplaceCorpFaqSpotlight({
                 </button>
               ) : (
                 <Link
-                  to="/marketplace/contact"
+                  to="/contact"
                   className="market-corp-faq-spotlight__btn market-corp-faq-spotlight__btn--ghost"
                 >
                   {t("corp.faq.contact_cta")}

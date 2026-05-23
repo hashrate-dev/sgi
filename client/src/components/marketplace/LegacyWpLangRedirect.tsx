@@ -5,20 +5,25 @@ import type { MarketplaceLang } from "../../lib/i18n.js";
 const STORAGE_KEY = "marketplace-lang";
 
 /** Rutas del WordPress antiguo (slug sin prefijo de idioma) → app React. */
-const SLUG_TO_PATH: Record<string, string> = {
-  "": "/marketplace/home",
-  home: "/marketplace/home",
-  services: "/marketplace/services",
-  servicios: "/marketplace/services",
-  company: "/marketplace/company",
-  empresa: "/marketplace/company",
-  faq: "/marketplace/faq",
-  contact: "/marketplace/contact",
-  contacto: "/marketplace/contact",
-  equipment: "/marketplace",
-  equipos: "/marketplace",
-  marketplace: "/marketplace",
-};
+import { MARKETPLACE, mpHome } from "../../lib/marketplacePaths.js";
+
+function slugToPath(slug: string): string {
+  const map: Record<string, string> = {
+    "": mpHome(),
+    home: mpHome(),
+    services: MARKETPLACE.services,
+    servicios: MARKETPLACE.services,
+    company: MARKETPLACE.company,
+    empresa: MARKETPLACE.company,
+    faq: MARKETPLACE.faq,
+    contact: MARKETPLACE.contact,
+    contacto: MARKETPLACE.contact,
+    equipment: MARKETPLACE.catalog,
+    equipos: MARKETPLACE.catalog,
+    marketplace: MARKETPLACE.catalog,
+  };
+  return map[slug] ?? mpHome();
+}
 
 function normalizeSlug(tail: string): string {
   return tail.replace(/^\/+|\/+$/g, "").toLowerCase().split("/")[0] ?? "";
@@ -41,6 +46,6 @@ export function LegacyWpLangRedirect({ lang }: Props) {
 
   const tail = pathname.replace(new RegExp(`^/${lang}/?`, "i"), "");
   const slug = normalizeSlug(tail);
-  const dest = SLUG_TO_PATH[slug] ?? "/marketplace/home";
+  const dest = slugToPath(slug);
   return <Navigate to={dest} replace />;
 }

@@ -55,7 +55,7 @@ export function lectorHasHomeDashboardModules(
     "/history",
     "/clients",
     "/reports",
-    "/marketplace",
+    "/equipment",
   ];
   return paths.some((to) => canLectorSeeHomeMenuTo(user, to));
 }

@@ -115,11 +115,11 @@ export function MarketplaceInlineLoginModal({ open, onClose }: Props) {
           </button>
         </form>
         <p className="market-login-inline__links">
-          <Link to="/marketplace/signup" onClick={onClose}>
+          <Link to="/registro" onClick={onClose}>
             {t("login.register")}
           </Link>
           <span aria-hidden>·</span>
-          <Link to="/marketplace/login" onClick={onClose}>
+          <Link to="/acceso" onClick={onClose}>
             Login completo
           </Link>
         </p>

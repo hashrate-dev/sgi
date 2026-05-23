@@ -1,7 +1,7 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isLectorPathAllowedInSpa, isStaffPathAllowedInSpa, lectorDefaultLandingPath } from "../lib/auth";
-import { getBrowserHostname, isPrimaryPublicHost } from "../lib/hashrateHosts";
+import { MARKETPLACE } from "../lib/marketplacePaths";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -15,13 +15,10 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
   if (!user) {
-    if (isPrimaryPublicHost(getBrowserHostname()) && (location.pathname === "/" || location.pathname === "")) {
-      return <Navigate to="/marketplace/home" replace />;
-    }
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
   if (user.role === "cliente") {
-    return <Navigate to="/marketplace" replace />;
+    return <Navigate to={MARKETPLACE.catalog} replace />;
   }
   const path = location.pathname;
   if (user.role === "lector" && !isLectorPathAllowedInSpa(user, path)) {

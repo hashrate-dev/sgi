@@ -38,7 +38,7 @@ export function MarketplaceClienteLoginPage() {
   if (!loading && user) {
     return (
       <Navigate
-        to="/marketplace"
+        to="/equipment"
         replace
         state={fromQuote ? { openQuoteDrawer: true } : undefined}
       />
@@ -188,14 +188,14 @@ export function MarketplaceClienteLoginPage() {
                       ) : null}
                     </form>
                     <p className="text-center small text-muted mt-3 mb-0">
-                      <Link to="/marketplace" className="text-decoration-none">
+                      <Link to="/equipment" className="text-decoration-none">
                         <i className="bi bi-bag-heart me-1" aria-hidden />
                         {t("login.back_shop")}
                       </Link>
                     </p>
                     <p className="text-center small text-muted mt-2 mb-0">
                       {t("login.no_account")}{" "}
-                      <Link to="/marketplace/signup" state={fromQuote ? { from: "quote" } : undefined}>
+                      <Link to="/registro" state={fromQuote ? { from: "quote" } : undefined}>
                         {t("login.register")}
                       </Link>
                     </p>

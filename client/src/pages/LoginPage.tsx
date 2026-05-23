@@ -4,6 +4,7 @@ import { MarketplacePasswordField } from "../components/marketplace/MarketplaceP
 import { useAuth } from "../contexts/AuthContext";
 import { lectorDefaultLandingPath } from "../lib/auth";
 import { requestPasswordReset, setApiBaseUrl, wakeUpBackend } from "../lib/api";
+import { MARKETPLACE } from "../lib/marketplacePaths";
 import { isVercelOrPrimaryPublicHost } from "../lib/hashrateHosts";
 import "../styles/facturacion.css";
 
@@ -49,7 +50,7 @@ export function LoginPage() {
 
   if (user) {
     let to = "/";
-    if (user.role === "cliente") to = "/marketplace";
+    if (user.role === "cliente") to = MARKETPLACE.catalog;
     else if (user.role === "lector") {
       to = lectorDefaultLandingPath(user);
     }
@@ -149,7 +150,7 @@ export function LoginPage() {
               </button>
             </form>
             <p className="text-center small text-muted mt-3 mb-0">
-              <Link to="/marketplace" className="text-decoration-none">
+              <Link to={MARKETPLACE.catalog} className="text-decoration-none">
                 <i className="bi bi-bag-heart me-1" aria-hidden />
                 Tienda online
               </Link>
