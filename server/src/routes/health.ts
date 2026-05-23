@@ -23,17 +23,8 @@ healthRouter.get("/email-config", (_req, res) => {
     resendApiKey: apiKey ? (resendApiKeyLooksInvalid(apiKey) ? "invalid" : "set") : "missing",
     resendFrom: from || "missing",
     notifyTo: to,
-    contactTo: (
-      process.env.MARKETPLACE_CONTACT_EMAIL_TO ||
-      process.env.MARKETPLACE_NOTIFY_EMAIL_TO ||
-      "sales@hashrate.space"
-    ).trim(),
-    inquiryTo: (
-      process.env.MARKETPLACE_ASIC_INQUIRY_EMAIL_TO ||
-      process.env.MARKETPLACE_CONTACT_EMAIL_TO ||
-      process.env.MARKETPLACE_NOTIFY_EMAIL_TO ||
-      "sales@hashrate.space"
-    ).trim(),
+    contactTo: "sales@hashrate.space",
+    inquiryTo: "sales@hashrate.space",
     ordersPanelUrl: resolveMarketplaceOrdersPanelUrl(),
     appPublicUrl: (process.env.APP_PUBLIC_URL || process.env.FRONTEND_ORIGIN || "").trim() || null,
   });

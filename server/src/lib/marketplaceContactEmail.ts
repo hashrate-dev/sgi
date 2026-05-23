@@ -7,8 +7,13 @@ import {
 import { CANONICAL_PUBLIC_ORIGIN } from "./publicAppOrigin.js";
 
 const RESEND_API_URL = "https://api.resend.com/emails";
-const DEFAULT_CONTACT_TO = "sales@hashrate.space";
+/** Buzón fijo de ventas/operaciones: todas las consultas del marketplace van acá. */
+const MARKETPLACE_SALES_INBOX = "sales@hashrate.space";
 const DEFAULT_SUBJECT_PREFIX = "[Hashrate Space]";
+
+function marketplaceSalesInbox(): string {
+  return MARKETPLACE_SALES_INBOX;
+}
 
 let warnedMissingEnv = false;
 
@@ -235,59 +240,11 @@ async function deliverMarketplaceResendEmail(args: {
   return resendDeliverWithFromFallback({ apiKey, to, replyTo, subject, text, html, devLogTag });
 }
 
-async function sendInquiryReceiptToVisitor(visitorEmail: string, siteOrigin: string): Promise<void> {
-  const to = visitorEmail.trim().toLowerCase();
-  if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return;
-
-  const origin = siteOrigin.trim() || CANONICAL_PUBLIC_ORIGIN;
-  const subject = "Recibimos tu consulta — Hashrate Space";
-  const text = [
-    "Hola,",
-    "",
-    `Recibimos tu mensaje enviado desde ${origin}.`,
-    "Nuestro equipo de ventas te responderá a la brevedad a este mismo correo.",
-    "",
-    "Si no enviaste esta consulta, podés ignorar este mensaje.",
-    "",
-    "Saludos,",
-    "Hashrate Space",
-    "sales@hashrate.space",
-  ].join("\n");
-
-  const html = `
-    <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111">
-      <p>Hola,</p>
-      <p>Recibimos tu mensaje enviado desde <a href="${escapeHtml(origin)}">${escapeHtml(origin)}</a>.</p>
-      <p>Nuestro equipo de ventas te responderá a la brevedad a este mismo correo.</p>
-      <p style="color:#6b7280;font-size:0.9rem">Si no enviaste esta consulta, podés ignorar este mensaje.</p>
-      <p>Saludos,<br><strong>Hashrate Space</strong><br><a href="mailto:sales@hashrate.space">sales@hashrate.space</a></p>
-    </div>
-  `.trim();
-
-  try {
-    await deliverMarketplaceResendEmail({
-      to,
-      replyTo: DEFAULT_CONTACT_TO,
-      subject,
-      text,
-      html,
-      devLogTag: "acuse consulta visitante",
-    });
-  } catch (e) {
-    // eslint-disable-next-line no-console
-    console.warn("[email] No se pudo enviar acuse al visitante (la consulta sí llegó a ventas):", e);
-  }
-}
-
 /**
  * Envía el formulario «Contacto» del marketplace por Resend (servidor).
  */
 export async function sendMarketplaceContactEmail(p: MarketplaceContactEmailPayload): Promise<{ simulated: boolean }> {
-  const to = (
-    process.env.MARKETPLACE_CONTACT_EMAIL_TO ||
-    process.env.MARKETPLACE_NOTIFY_EMAIL_TO ||
-    DEFAULT_CONTACT_TO
-  ).trim();
+  const to = marketplaceSalesInbox();
   const subjectPrefix = (process.env.MARKETPLACE_CONTACT_SUBJECT_PREFIX || DEFAULT_SUBJECT_PREFIX).trim();
   const siteOrigin = (p.siteOrigin || CANONICAL_PUBLIC_ORIGIN).trim();
 
@@ -328,7 +285,7 @@ export async function sendMarketplaceContactEmail(p: MarketplaceContactEmailPayl
     </div>
   `.trim();
 
-  const result = await deliverMarketplaceResendEmail({
+  return deliverMarketplaceResendEmail({
     to,
     replyTo: email,
     subject,
@@ -336,12 +293,6 @@ export async function sendMarketplaceContactEmail(p: MarketplaceContactEmailPayl
     html,
     devLogTag: "contacto marketplace",
   });
-
-  if (!result.simulated) {
-    await sendInquiryReceiptToVisitor(email, siteOrigin);
-  }
-
-  return result;
 }
 
 /**
@@ -350,12 +301,7 @@ export async function sendMarketplaceContactEmail(p: MarketplaceContactEmailPayl
 export async function sendMarketplaceAsicInquiryEmail(p: MarketplaceAsicInquiryEmailPayload): Promise<{
   simulated: boolean;
 }> {
-  const to = (
-    process.env.MARKETPLACE_ASIC_INQUIRY_EMAIL_TO ||
-    process.env.MARKETPLACE_CONTACT_EMAIL_TO ||
-    process.env.MARKETPLACE_NOTIFY_EMAIL_TO ||
-    DEFAULT_CONTACT_TO
-  ).trim();
+  const to = marketplaceSalesInbox();
   const subjectPrefix = (process.env.MARKETPLACE_INQUIRY_SUBJECT_PREFIX || DEFAULT_SUBJECT_PREFIX).trim();
   const siteOrigin = (p.siteOrigin || CANONICAL_PUBLIC_ORIGIN).trim();
 
@@ -395,7 +341,7 @@ export async function sendMarketplaceAsicInquiryEmail(p: MarketplaceAsicInquiryE
     </div>
   `.trim();
 
-  const result = await deliverMarketplaceResendEmail({
+  return deliverMarketplaceResendEmail({
     to,
     replyTo: email,
     subject,
@@ -403,10 +349,4 @@ export async function sendMarketplaceAsicInquiryEmail(p: MarketplaceAsicInquiryE
     html,
     devLogTag: fromCart ? "consulta carrito marketplace" : "consulta ASIC marketplace",
   });
-
-  if (!result.simulated && email.includes("@")) {
-    await sendInquiryReceiptToVisitor(email, siteOrigin);
-  }
-
-  return result;
 }
