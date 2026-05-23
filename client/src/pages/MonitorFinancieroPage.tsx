@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
+import { sgiHome } from "../lib/marketplacePaths.js";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
 import { canAccessFinanzaContabilidadHub } from "../lib/auth";
@@ -272,7 +273,7 @@ export function MonitorFinancieroPage() {
 
   if (!loading && !user) return <Navigate to="/login" replace />;
   if (!loading && user && !canAccessFinanzaContabilidadHub(user)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={sgiHome()} replace />;
   }
 
   return (

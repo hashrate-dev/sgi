@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "reac
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { Navigate } from "react-router-dom";
+import { sgiHome } from "../lib/marketplacePaths.js";
 import { getMarketplacePresenceHistory, type MarketplacePresenceHistoryRow } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { canViewMarketplaceQuoteTickets } from "../lib/auth";
@@ -158,7 +159,7 @@ export function MarketplacePresenceHistorialPage() {
     }
   }, [exportingExcel, qDebounced, viewerTypeFilter]);
 
-  if (!canView) return <Navigate to="/" replace />;
+  if (!canView) return <Navigate to={sgiHome()} replace />;
 
   return (
     <div className="fact-page hrs-mplive-page">

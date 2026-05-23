@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
+import { sgiHome } from "../lib/marketplacePaths.js";
 import { Badge, Box, Flex, Grid, Heading, Text } from "@chakra-ui/react";
 import {
   getEquipos,
@@ -225,7 +226,7 @@ export function TiendaOnlineBannersHomePage() {
   }, [canEditTienda, hidePricesForGuests]);
 
   if (!user || !canEditTienda) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={sgiHome()} replace />;
   }
 
   return (

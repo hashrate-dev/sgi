@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { Link, Navigate } from "react-router-dom";
+import { sgiHome } from "../lib/marketplacePaths.js";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
@@ -321,7 +322,7 @@ export function ContabilidadGastosPage() {
 
   if (!loading && !user) return <Navigate to="/login" replace />;
   if (!loading && user && !canAccessFinanzaContabilidadHub(user)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={sgiHome()} replace />;
   }
 
   const resetFormToNew = () => {

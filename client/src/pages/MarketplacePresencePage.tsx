@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
+import { sgiHome } from "../lib/marketplacePaths.js";
 import { CircleMarker, MapContainer, TileLayer, Tooltip } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { getMarketplacePresenceLive, getMarketplacePresenceStats } from "../lib/api";
@@ -118,7 +119,7 @@ export function MarketplacePresencePage() {
     [countries]
   );
 
-  if (!canView) return <Navigate to="/" replace />;
+  if (!canView) return <Navigate to={sgiHome()} replace />;
 
   return (
     <div className="fact-page hrs-mplive-page">

@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { canAccessSgiFromMarketplaceFooter } from "../../lib/auth.js";
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
-import { MARKETPLACE, mpHome } from "../../lib/marketplacePaths.js";
+import { MARKETPLACE, mpHome, sgiHome } from "../../lib/marketplacePaths.js";
 import { HASHRATE_SPACE_LOGO_WHITE } from "../../lib/marketplaceWpAssets.js";
 const CORP_VIDEO_URL = "https://hashrate.space/video/Hashrate-Farm-Py.mp4";
 
@@ -62,7 +62,7 @@ export function MarketplaceSiteFooter({ variant = "default" }: Props) {
             </li>
             {showSgiLink ? (
               <li>
-                <Link to="/">{t("footer.sgi")}</Link>
+                <Link to={sgiHome()}>{t("footer.sgi")}</Link>
               </li>
             ) : null}
           </ul>

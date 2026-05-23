@@ -224,7 +224,7 @@ export function pathMatchesAnyLectorPrefix(pathname: string, prefixes: readonly 
   for (const raw of prefixes) {
     const base = (raw.replace(/\/+$/, "") || "/") as string;
     if (base === "/") {
-      if (path === "/") return true;
+      if (path === "/" || path === "/sgi") return true;
       continue;
     }
     if (path === base || path.startsWith(`${base}/`)) return true;

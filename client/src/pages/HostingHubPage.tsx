@@ -1,4 +1,5 @@
 import { Link, Navigate } from "react-router-dom";
+import { sgiHome } from "../lib/marketplacePaths.js";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
 import { canUserAccessNavPath } from "../lib/sgiNavigation";
@@ -17,7 +18,7 @@ export function HostingHubPage() {
   const visible = hostingMenuItems.filter((item) => canUserAccessNavPath(user, item.to));
 
   if (!user || visible.length === 0) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={sgiHome()} replace />;
   }
 
   return (

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Link, Navigate } from "react-router-dom";
+import { sgiHome } from "../lib/marketplacePaths.js";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
 import { lectorHasHomeDashboardModules } from "../lib/auth";
@@ -201,7 +202,7 @@ export function KryptexPage() {
     }
     if (lectorError) {
       if (user && lectorHasHomeDashboardModules(user)) {
-        return <Navigate to="/" replace />;
+        return <Navigate to={sgiHome()} replace />;
       }
       return (
         <div className="hrs-home">

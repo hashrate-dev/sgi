@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
+import { sgiHome } from "../lib/marketplacePaths.js";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { getStoreClients, syncTiendaOnlineClientsFromUsers } from "../lib/api.js";
@@ -190,7 +191,7 @@ export function ClientesTiendaOnlinePage() {
   }
 
   if (!user || !canView) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={sgiHome()} replace />;
   }
 
   return (

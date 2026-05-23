@@ -4,7 +4,7 @@ import { MarketplacePasswordField } from "../components/marketplace/MarketplaceP
 import { useAuth } from "../contexts/AuthContext";
 import { lectorDefaultLandingPath } from "../lib/auth";
 import { requestPasswordReset, setApiBaseUrl, wakeUpBackend } from "../lib/api";
-import { MARKETPLACE } from "../lib/marketplacePaths";
+import { MARKETPLACE, sgiHome } from "../lib/marketplacePaths";
 import { isVercelOrPrimaryPublicHost } from "../lib/hashrateHosts";
 import "../styles/facturacion.css";
 
@@ -50,7 +50,7 @@ export function LoginPage() {
   }, [location.search, location.pathname, location.hash]);
 
   if (user) {
-    let to = "/";
+    let to = sgiHome();
     if (user.role === "cliente") to = MARKETPLACE.catalog;
     else if (user.role === "lector") {
       to = lectorDefaultLandingPath(user);

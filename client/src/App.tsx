@@ -70,7 +70,8 @@ import { RootIndex } from "./components/RootIndex";
 import { getStoredUser } from "./lib/auth";
 import { postMarketplacePresenceHeartbeat, type MarketplacePresenceViewerType } from "./lib/api";
 import { getBrowserHostname, isPrimaryPublicHost } from "./lib/hashrateHosts";
-import { isMarketplacePublicPath, MARKETPLACE, mpHome } from "./lib/marketplacePaths";
+import { isMarketplacePublicPath, MARKETPLACE, mpHome, SGI_DASHBOARD_PATH, sgiHome } from "./lib/marketplacePaths";
+import { HomePage } from "./pages/HomePage";
 
 const MARKETPLACE_PRESENCE_VISITOR_KEY = "hrs_marketplace_presence_visitor_id";
 const MARKETPLACE_PRESENCE_COUNTRY_CACHE_KEY = "hrs_marketplace_presence_country_v1";
@@ -351,7 +352,7 @@ function AppNotFoundRedirect() {
   if (isPrimaryPublicHost(getBrowserHostname())) {
     return <Navigate to={mpHome()} replace />;
   }
-  return <Navigate to="/" replace />;
+  return <Navigate to={sgiHome()} replace />;
 }
 
 function App() {
@@ -406,6 +407,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/reset-password" element={<PasswordResetPage />} />
           <Route element={<ProtectedRoute><ProtectedAppLayout /></ProtectedRoute>}>
+            <Route path={SGI_DASHBOARD_PATH} element={<HomePage />} />
             <Route path="/kryptex" element={<KryptexPage />} />
             <Route path="/kryptex/detalle" element={<KryptexDetallePage />} />
             <Route path="/asic/equipment" element={<EquiposAsicPage />} />

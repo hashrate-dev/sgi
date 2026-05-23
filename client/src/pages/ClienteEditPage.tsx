@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
+import { sgiHome } from "../lib/marketplacePaths.js";
 import { deleteClient, getClients, updateClient, wakeUpBackend } from "../lib/api";
 import type { Client } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
@@ -318,7 +319,7 @@ export function ClienteEditPage() {
               <div className="mb-3 p-3 rounded" style={{ background: "#fef2f2", color: "#b91c1c" }}>
                 {error || "Cliente no encontrado"}
               </div>
-              <Link to="/" className="fact-btn fact-btn-primary">
+              <Link to={sgiHome()} className="fact-btn fact-btn-primary">
                 Volver al inicio
               </Link>
             </div>

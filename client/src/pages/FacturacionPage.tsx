@@ -15,6 +15,7 @@ import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf
 import { loadInvoices, saveInvoices } from "../lib/storage";
 import type { Client, ComprobanteType, Invoice, LineItem } from "../lib/types";
 import { Link, Navigate, useLocation } from "react-router-dom";
+import { sgiHome } from "../lib/marketplacePaths.js";
 import { PageHeader } from "../components/PageHeader";
 import { InvoicePreview } from "../components/InvoicePreview";
 import { ConfirmModal } from "../components/ConfirmModal";
@@ -1103,7 +1104,7 @@ export function FacturacionPage() {
             <div>
               <h5 className="alert-heading mb-1">Sin permiso</h5>
               <p className="mb-0">Su rol (Lector) solo permite consultar. No puede emitir facturas, recibos ni notas de crédito.</p>
-              <Link to="/" className="alert-link mt-2 d-inline-block">Volver al inicio</Link>
+              <Link to={sgiHome()} className="alert-link mt-2 d-inline-block">Volver al inicio</Link>
             </div>
           </div>
         </div>

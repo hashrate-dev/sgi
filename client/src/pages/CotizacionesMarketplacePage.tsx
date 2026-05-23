@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
+import { sgiHome } from "../lib/marketplacePaths.js";
 import {
   deleteMarketplaceQuoteTicketAdmin,
   getMarketplaceGarantiaQuotePrices,
@@ -894,7 +895,7 @@ export function CotizacionesMarketplacePage() {
   }, [tickets, laneFilter]);
 
   if (!user || !canViewMarketplaceQuoteTickets(user)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={sgiHome()} replace />;
   }
 
   const saveDetail = async () => {

@@ -28,7 +28,7 @@ export const SGI_PERMISSION_SCREEN_MAP: readonly SgiPermissionScreenRow[] = [
     zone: "Inicio del SGI",
     legacyModule: "reportes",
     title: "Panel principal (tarjetas de acceso)",
-    routes: ["/"],
+    routes: ["/", "/sgi"],
     accessNote: "Visible al iniciar sesión. Las tarjetas dependen de los permisos marcados abajo.",
     audience: ["staff", "lector"],
     infoOnly: true,

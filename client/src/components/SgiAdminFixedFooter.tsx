@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { sgiHome } from "../lib/marketplacePaths.js";
 
 /** Pie fijo estilo vitrina Hashrate: personal interno (admin, operador, lector) en `ProtectedAppLayout`. */
 export function SgiAdminFixedFooter() {
@@ -12,7 +13,7 @@ export function SgiAdminFixedFooter() {
             hashrate.space
           </a>
         </p>
-        <Link to="/" className="sgi-admin-fixed-footer__sgi">
+        <Link to={sgiHome()} className="sgi-admin-fixed-footer__sgi">
           Sistema de Gestión Interna (SGI)
         </Link>
       </div>

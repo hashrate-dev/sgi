@@ -1,4 +1,7 @@
-import { getBrowserHostname } from "./hashrateHosts.js";
+import { getBrowserHostname, isSgiAdminHost } from "./hashrateHosts.js";
+
+/** Panel SGI en hashrate.space (en localhost/sgi sigue siendo `/`). */
+export const SGI_DASHBOARD_PATH = "/sgi";
 
 /** Rutas públicas del sitio (sin prefijo `/marketplace`). */
 export const MARKETPLACE = {
@@ -21,6 +24,19 @@ export function mpHome(): string {
   const h = getBrowserHostname();
   if (h === "localhost" || h === "127.0.0.1") return MARKETPLACE.homeDev;
   return "/";
+}
+
+/** Inicio del panel SGI: `/sgi` en hashrate.space; `/` en localhost y sgi.hashrate.space. */
+export function sgiHome(): string {
+  if (typeof window === "undefined") return SGI_DASHBOARD_PATH;
+  const h = getBrowserHostname();
+  if (h === "localhost" || h === "127.0.0.1" || isSgiAdminHost(h)) return "/";
+  return SGI_DASHBOARD_PATH;
+}
+
+export function isSgiDashboardPath(pathname: string): boolean {
+  const p = (pathname ?? "").replace(/\/+$/, "") || "/";
+  return p === "/" || p === SGI_DASHBOARD_PATH;
 }
 
 export function isCorpHomePath(pathname: string): boolean {

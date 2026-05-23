@@ -1,7 +1,7 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isLectorPathAllowedInSpa, isStaffPathAllowedInSpa, lectorDefaultLandingPath } from "../lib/auth";
-import { MARKETPLACE } from "../lib/marketplacePaths";
+import { MARKETPLACE, sgiHome } from "../lib/marketplacePaths";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -25,7 +25,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to={lectorDefaultLandingPath(user)} replace />;
   }
   if ((user.role === "admin_b" || user.role === "operador") && !isStaffPathAllowedInSpa(user, path)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={sgiHome()} replace />;
   }
   return <>{children}</>;
 }

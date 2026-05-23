@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
+import { sgiHome } from "../lib/marketplacePaths.js";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
 import { canAccessProveedoresHrs, canEditProveedoresHrs } from "../lib/auth";
@@ -68,7 +69,7 @@ export function ProveedoresHrsPage() {
 
   if (!loading && !user) return <Navigate to="/login" replace />;
   if (!loading && user && !canAccessProveedoresHrs(user)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={sgiHome()} replace />;
   }
 
   const onSubmit = async (ev: FormEvent) => {

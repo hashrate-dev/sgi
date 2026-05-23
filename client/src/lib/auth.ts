@@ -1,5 +1,6 @@
 import type { AdminBPermissionKey } from "./adminBPermissionsCatalog.js";
 import type { LectorPermissionKey } from "./lectorPermissionsCatalog.js";
+import { isSgiDashboardPath, sgiHome } from "./marketplacePaths.js";
 import {
   canLectorSeeHomeMenuTo,
   pathMatchesAnyLectorPrefix,
@@ -62,10 +63,11 @@ export function lectorHasHomeDashboardModules(
 
 /** Ruta tras login o cuando no puede entrar a la pantalla pedida. */
 export function lectorDefaultLandingPath(user: AuthUser): string {
-  if (user.role !== "lector") return "/";
-  if (lectorHasHomeDashboardModules(user)) return "/";
+  const home = sgiHome();
+  if (user.role !== "lector") return home;
+  if (lectorHasHomeDashboardModules(user)) return home;
   if (lectorHasKryptexPool(user)) return "/kryptex";
-  return "/";
+  return home;
 }
 
 /** Lista explícita de módulos de consulta (`null`: legado amplio según servidor / solo Kryptex en SPA). */
@@ -88,8 +90,8 @@ export function isStaffPathAllowedInSpa(
   const g = user.admin_b_grants;
   if (g == null) return true;
   const pathRaw = (pathname.split("?")[0] ?? pathname).replace(/\/+$/, "") || "/";
-  if (g.length === 0) return pathRaw === "/" || pathRaw === "";
-  if (pathRaw === "/" || pathRaw === "") return true;
+  if (g.length === 0) return isSgiDashboardPath(pathRaw);
+  if (isSgiDashboardPath(pathRaw)) return true;
   const prefixes = collectPathPrefixesFromScreenGrants(g);
   return pathMatchesAnyLectorPrefix(pathRaw, prefixes);
 }
@@ -102,7 +104,7 @@ export function isLectorPathAllowedInSpa(user: Pick<AuthUser, "role" | "lector_g
   const g = user.lector_grants;
   if (g == null) return isKryptex;
   if (g.length === 0) return isKryptex;
-  if (pathRaw === "/" || pathRaw === "") return true;
+  if (isSgiDashboardPath(pathRaw)) return true;
   if (isKryptex) return true;
   const prefixes = collectPathPrefixesFromScreenGrants(g);
   return pathMatchesAnyLectorPrefix(pathRaw, prefixes);

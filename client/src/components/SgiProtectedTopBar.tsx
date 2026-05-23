@@ -4,6 +4,7 @@ import { Badge, Box, Flex, Heading, Image as ChakraImage, Stack, Text } from "@c
 import { useAuth } from "../contexts/AuthContext";
 import { updateMyPassword } from "../lib/api";
 import { HOME_DASHBOARD_SHELL } from "../lib/sgiDashboardShell";
+import { isSgiDashboardPath, sgiHome } from "../lib/marketplacePaths.js";
 import { showToast } from "./ToastNotification";
 import { AppButton, AppInput, AppModal } from "./ui";
 import "../styles/marketplace-hashrate.css";
@@ -12,16 +13,12 @@ type SgiProtectedTopBarProps = {
   onHeightChange: (heightPx: number) => void;
 };
 
-function normalizePath(pathname: string) {
-  const p = pathname.replace(/\/+$/, "") || "/";
-  return p;
-}
-
 export function SgiProtectedTopBar({ onHeightChange }: SgiProtectedTopBarProps) {
   const { user, logout } = useAuth();
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const isHome = normalizePath(pathname) === "/";
+  const homePath = sgiHome();
+  const isHome = isSgiDashboardPath(pathname);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -88,7 +85,7 @@ export function SgiProtectedTopBar({ onHeightChange }: SgiProtectedTopBarProps) 
         <Box w="100%" {...HOME_DASHBOARD_SHELL} py={{ base: 3, md: 3.5 }}>
           <Flex align="center" justify="space-between" gap={4} flexWrap="wrap" rowGap={4} w="100%">
             <RouterLink
-              to="/"
+              to={homePath}
               aria-label="Ir al inicio SGI"
               title="Ir al inicio SGI"
               style={{ textDecoration: "none", color: "inherit", minWidth: 0, flexShrink: 0 }}
@@ -137,7 +134,7 @@ export function SgiProtectedTopBar({ onHeightChange }: SgiProtectedTopBarProps) 
                   borderRadius="sm"
                   _hover={{ bg: "transparent", color: "green.700", textDecoration: "underline" }}
                   _active={{ bg: "transparent" }}
-                  onClick={() => navigate("/")}
+                  onClick={() => navigate(homePath)}
                   flexShrink={0}
                 >
                   <Flex align="center" gap={2}>

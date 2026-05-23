@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { Navigate, useNavigate } from "react-router-dom";
+import { sgiHome } from "../lib/marketplacePaths.js";
 import { getMarketplaceQuoteTickets } from "../lib/api.js";
 import type { MarketplaceQuoteTicket } from "../lib/api.js";
 import { canExport, canViewMarketplaceQuoteTickets } from "../lib/auth.js";
@@ -258,7 +259,7 @@ export function CotizacionesMarketplaceHistorialDetallePage() {
   }, [filtered]);
 
   if (!user || !canViewMarketplaceQuoteTickets(user)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={sgiHome()} replace />;
   }
 
   return (

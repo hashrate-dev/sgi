@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, useSearchParams } from "react-router-dom";
+import { sgiHome } from "../lib/marketplacePaths.js";
 import { HostingFxOperationsIndicators } from "../components/HostingFxOperationsIndicators";
 import {
   HostingFxOperationsHistoryCard,
@@ -204,7 +205,7 @@ export function HostingExchangeOperationsPage() {
 
   if (!loading && !user) return <Navigate to="/login" replace />;
   if (!loading && user && !canAccessHostingTipoCambio(user)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={sgiHome()} replace />;
   }
 
   const resetForm = () => {
