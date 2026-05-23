@@ -3,13 +3,13 @@ import type { AsicProduct } from "../../lib/marketplaceAsicCatalog.js";
 import {
   asicProductShowsMinerEconomyContent,
   defaultAsicShelfImageSrc,
+  normalizeMarketplaceImageSrc,
   formatAsicPriceUsd,
   isBitmainAntminerRandomXCatalogBlob,
   normalizeConsultPriceLabelForDisplay,
   productHashrateShareParts,
   proratedEquipmentPriceUsd,
   productSupportsHashrateShare,
-  publicImageUrl,
   scaleDetailRowTextForShare,
   scaleHashrateDisplay,
   scaleYieldDisplayLine,
@@ -40,19 +40,19 @@ function renderYieldLineParts(text: string): ReactNode {
 
 /** URLs únicas para miniaturas + hero; catálogo local si la API no trae `imageSrc`. */
 function gallerySources(product: AsicProduct): string[] {
-  const toU = (s: string) => publicImageUrl(s);
-  const main = (product.imageSrc ?? "").trim();
   const fb = defaultAsicShelfImageSrc(product.brand, product.model);
-  const g = product.gallerySrcs?.map((x) => String(x).trim()).filter(Boolean) ?? [];
+  const fbUrl = fb ? normalizeMarketplaceImageSrc(fb) : "";
+  const main = normalizeMarketplaceImageSrc(product.imageSrc ?? "");
+  const g =
+    product.gallerySrcs
+      ?.map((x) => normalizeMarketplaceImageSrc(String(x)))
+      .filter(Boolean) ?? [];
   const dedupe = (urls: string[]) => {
     const seen = new Set<string>();
     return urls.filter((u) => (seen.has(u) ? false : (seen.add(u), true)));
   };
-  if (g.length > 0) return dedupe(g.map(toU));
-  if (main && fb && publicImageUrl(main) !== publicImageUrl(fb)) return dedupe([toU(main), toU(fb)]);
-  if (main) return [toU(main)];
-  if (fb) return [toU(fb)];
-  return [];
+  const urls = dedupe([...g, ...(main ? [main] : []), ...(fbUrl ? [fbUrl] : [])]);
+  return urls;
 }
 
 export function AsicProductModal({
@@ -129,6 +129,10 @@ export function AsicProductModal({
   }, [mailText.body]);
 
   const thumbs = useMemo(() => gallerySources(product), [product]);
+  const shelfFallbackSrc = useMemo(
+    () => normalizeMarketplaceImageSrc(defaultAsicShelfImageSrc(product.brand, product.model)),
+    [product.brand, product.model]
+  );
   const hasAnyPhoto = thumbs.length > 0;
   const [activeThumb, setActiveThumb] = useState(0);
   const [mainBroken, setMainBroken] = useState(false);
@@ -191,7 +195,13 @@ export function AsicProductModal({
         ? t("modal.yield_foot_loading")
         : t("modal.yield_foot_ref");
 
-  const mainSrc = thumbs[Math.min(activeThumb, thumbs.length - 1)] ?? product.imageSrc;
+  const activeSrc = thumbs[Math.min(activeThumb, Math.max(thumbs.length - 1, 0))] ?? shelfFallbackSrc;
+  const [heroSrc, setHeroSrc] = useState(activeSrc);
+
+  useEffect(() => {
+    setHeroSrc(activeSrc);
+    setMainBroken(false);
+  }, [activeSrc]);
 
   const chipRow = product.detailRows.find((r) => r.icon === "chip");
   const isZecProductUi = useMemo(() => {
@@ -253,7 +263,17 @@ export function AsicProductModal({
                     className={`product-modal__thumb${activeThumb === i ? " product-modal__thumb--active" : ""}`}
                     onClick={() => setActiveThumb(i)}
                   >
-                    <img src={src} alt="" loading="lazy" decoding="async" />
+                    <img
+                      src={src}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      onError={(e) => {
+                        if (shelfFallbackSrc && e.currentTarget.src !== shelfFallbackSrc) {
+                          e.currentTarget.src = shelfFallbackSrc;
+                        }
+                      }}
+                    />
                   </button>
                 ))}
               </div>
@@ -265,12 +285,16 @@ export function AsicProductModal({
                     <div className="product-modal__hero-fallback" aria-hidden />
                   ) : (
                     <img
-                      src={mainSrc}
+                      src={heroSrc}
                       alt=""
                       className="product-modal__hero-img"
                       loading="eager"
                       decoding="async"
                       onError={() => {
+                        if (shelfFallbackSrc && heroSrc !== shelfFallbackSrc) {
+                          setHeroSrc(shelfFallbackSrc);
+                          return;
+                        }
                         if (thumbs.length > 1 && activeThumb < thumbs.length - 1) {
                           setActiveThumb((i) => i + 1);
                           return;

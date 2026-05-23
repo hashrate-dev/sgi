@@ -8599,8 +8599,10 @@ button.product-modal__btn--quote-cart:active {
 
 .market-corp-luxor__row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
+  gap: clamp(1.75rem, 5vw, 3.5rem);
   padding: 0.5rem 0 0.15rem;
 }
 
@@ -8643,10 +8645,20 @@ button.product-modal__btn--quote-cart:active {
   opacity: 1;
 }
 
+.market-corp-luxor__img--nicehash {
+  max-width: min(240px, 62vw);
+  max-height: 48px;
+}
+
 @media (min-width: 900px) {
   .market-corp-luxor__img {
     max-height: 40px;
     max-width: min(180px, 22vw);
+  }
+
+  .market-corp-luxor__img--nicehash {
+    max-height: 44px;
+    max-width: min(220px, 24vw);
   }
 }
 

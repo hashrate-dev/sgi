@@ -6,6 +6,7 @@ import {
   compareMarketplaceShelfProducts,
   inferMarketplaceCatalogFilter,
   mergeAsicCatalogWithCorpGridExtras,
+  normalizeAsicProductImages,
 } from "../lib/marketplaceAsicCatalog.js";
 import type { AsicProduct, MarketplaceCatalogFilter } from "../lib/marketplaceAsicCatalog.js";
 import type { AddQuoteLineOptions } from "../lib/marketplaceQuoteCart.js";
@@ -218,7 +219,7 @@ function MarketplacePageBody() {
         setHidePricesForGuests(res.hidePricesForGuests !== false);
         const list = res.products ?? [];
         if (list.length > 0) {
-          setProducts(mergeAsicCatalogWithCorpGridExtras(list));
+          setProducts(mergeAsicCatalogWithCorpGridExtras(list.map(normalizeAsicProductImages)));
           setCatalogFromApi(true);
         } else {
           applyLocalFallback();

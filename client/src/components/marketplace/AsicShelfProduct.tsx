@@ -4,8 +4,8 @@ import {
   defaultAsicShelfImageSrc,
   formatAsicProductPriceDisplay,
   normalizeConsultPriceLabelForDisplay,
+  normalizeMarketplaceImageSrc,
   pickMarketplaceShelfSpecRows,
-  publicImageUrl,
 } from "../../lib/marketplaceAsicCatalog.js";
 import { Link } from "react-router-dom";
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
@@ -35,19 +35,21 @@ export function AsicShelfProduct({
 }) {
   const { lang, t, tf } = useMarketplaceLang();
   const quoteLabel = addToQuoteLabel ?? t("catalog.add_short");
-  const explicit = (product.imageSrc ?? "").trim();
-  const fallbackPath = defaultAsicShelfImageSrc(product.brand, product.model);
-  const [imgSrc, setImgSrc] = useState(() => publicImageUrl(explicit || fallbackPath));
+  const explicit = normalizeMarketplaceImageSrc(product.imageSrc ?? "");
+  const fallbackSrc = normalizeMarketplaceImageSrc(
+    defaultAsicShelfImageSrc(product.brand, product.model)
+  );
+  const [imgSrc, setImgSrc] = useState(() => explicit || fallbackSrc);
   const [imgBroken, setImgBroken] = useState(false);
 
   useEffect(() => {
-    const ex = (product.imageSrc ?? "").trim();
-    const fb = defaultAsicShelfImageSrc(product.brand, product.model);
-    setImgSrc(publicImageUrl(ex || fb));
+    const ex = normalizeMarketplaceImageSrc(product.imageSrc ?? "");
+    const fb = normalizeMarketplaceImageSrc(defaultAsicShelfImageSrc(product.brand, product.model));
+    setImgSrc(ex || fb);
     setImgBroken(false);
   }, [product.id, product.imageSrc, product.brand, product.model]);
 
-  const hasPhoto = Boolean((explicit || fallbackPath).trim()) && !imgBroken;
+  const hasPhoto = Boolean((explicit || fallbackSrc).trim()) && !imgBroken;
   const ariaLabel = tf("shelf.seemore_aria", { model: product.model, hash: product.hashrate });
   const consultLabel = product.priceDisplayLabel?.trim()
     ? normalizeConsultPriceLabelForDisplay(product.priceDisplayLabel.trim())
@@ -90,8 +92,8 @@ export function AsicShelfProduct({
                 {...(eagerImg ? { fetchPriority: productIndex === 0 ? ("high" as const) : ("auto" as const) } : {})}
                 className="shelf-product__photo"
                 onError={() => {
-                  if (explicit && fallbackPath && imgSrc === publicImageUrl(explicit)) {
-                    setImgSrc(publicImageUrl(fallbackPath));
+                  if (explicit && fallbackSrc && imgSrc === explicit) {
+                    setImgSrc(fallbackSrc);
                     return;
                   }
                   setImgBroken(true);

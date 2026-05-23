@@ -10,20 +10,23 @@ import {
   ASIC_MARKETPLACE_PRODUCTS,
   CORP_HOME_GRID_PRODUCT_IDS,
   formatAsicProductPriceDisplay,
+  normalizeAsicProductImages,
 } from "../lib/marketplaceAsicCatalog.js";
 import type { AsicProduct } from "../lib/marketplaceAsicCatalog.js";
 import { getMarketplaceCorpBestSelling, getMarketplaceCorpInteresting, wakeUpBackend } from "../lib/api.js";
 import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
 import { isCorpHomePath, MARKETPLACE } from "../lib/marketplacePaths.js";
-import { wpUpload } from "../lib/marketplaceWpAssets.js";
+import { publicImageUrl } from "../lib/marketplaceAsicCatalog.js";
+import { CORP_INSTITUTIONAL_VIDEO_URL, wpUpload } from "../lib/marketplaceWpAssets.js";
 import { useAuth } from "../contexts/AuthContext";
 import "../styles/marketplace-hashrate.css";
 
 const DOC_TITLE = "Hashrate – Space";
-const VIDEO_URL = "https://hashrate.space/video/Hashrate-Farm-Py.mp4";
+const VIDEO_URL = CORP_INSTITUTIONAL_VIDEO_URL;
 /** Promo Z15 — reemplazá `public/images/bitmain-z15-pro.png` por el render oficial si querés otro asset */
 const CORP_Z15_PROMO_IMG = `${import.meta.env.BASE_URL}images/bitmain-z15-pro.png`;
 const CORP_ZCASH_LOGO_IMG = `${import.meta.env.BASE_URL}images/zcash-logo.png`;
+const CORP_NICEHASH_LOGO_IMG = publicImageUrl("/images/nicehash-logo.jpg");
 /** Fondo faja “Servicio todo incluido” (mineros / hosting) */
 const CORP_HOSTING_BAND_IMG = `${import.meta.env.BASE_URL}images/hosting-mining-farm-04.png`;
 
@@ -136,7 +139,7 @@ export function MarketplaceCorporateHomePage() {
         if (cancelled) return;
         setHidePricesForGuests(res.hidePricesForGuests !== false);
         const list = res.products ?? [];
-        if (list.length > 0) setInterestingVitrina(list);
+        if (list.length > 0) setInterestingVitrina(list.map(normalizeAsicProductImages));
       })
       .catch(() => {
         if (cancelled) return;
@@ -146,7 +149,7 @@ export function MarketplaceCorporateHomePage() {
         if (cancelled) return;
         setHidePricesForGuests(res.hidePricesForGuests !== false);
         const list = res.products ?? [];
-        if (list.length > 0) setCorpBestSellingProducts(list);
+        if (list.length > 0) setCorpBestSellingProducts(list.map(normalizeAsicProductImages));
       })
       .catch(() => {
         if (cancelled) return;
@@ -607,6 +610,24 @@ export function MarketplaceCorporateHomePage() {
                 {t("corp.partners.title")}
               </h2>
               <div className="market-corp-luxor__row">
+                <a
+                  className="market-corp-luxor__link"
+                  href="https://www.nicehash.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={t("corp.partners.nicehash_aria")}
+                >
+                  <img
+                    className="market-corp-luxor__img market-corp-luxor__img--nicehash"
+                    src={CORP_NICEHASH_LOGO_IMG}
+                    alt=""
+                    width={320}
+                    height={80}
+                    loading="lazy"
+                    decoding="async"
+                    draggable={false}
+                  />
+                </a>
                 <a
                   className="market-corp-luxor__link"
                   href="https://www.luxor.tech/"

@@ -149,6 +149,7 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
     "Dados de contato, e-mails e formulário para suporte, vendas e investidores — Hashrate Space.",
   "corp.partners.title": "Parceiros oficiais",
   "corp.partners.lede": "Alianças com fabricantes e fornecedores do ecossistema de mineração.",
+  "corp.partners.nicehash_aria": "NiceHash — site externo (abre em nova aba)",
   "corp.partners.luxor_aria": "Luxor — site externo (abre em nova aba)",
   "corp.faq.title": "Perguntas frequentes",
   "corp.faq.lede": "Políticas, envios e operação: a equipe responde pelos canais de contato.",

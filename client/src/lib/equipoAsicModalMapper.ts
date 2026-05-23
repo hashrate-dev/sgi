@@ -6,6 +6,7 @@ import {
   type AsicAlgo,
   type AsicProduct,
   defaultAsicShelfImageSrc,
+  normalizeAsicProductImages,
   normalizeConsultPriceLabelForDisplay,
   resolveMarketplaceListingKind,
 } from "./marketplaceAsicCatalog.js";
@@ -66,7 +67,7 @@ export function equipoASICToModalProduct(e: EquipoASIC): AsicProduct {
     model: e.modelo,
     listingKind: listingKindRaw,
   });
-  return {
+  return normalizeAsicProductImages({
     id: e.id,
     algo,
     brand: e.marcaEquipo,
@@ -91,5 +92,5 @@ export function equipoASICToModalProduct(e: EquipoASIC): AsicProduct {
             setupUsd: Math.round(Number(x.setupUsd) || 0),
           }))
         : undefined,
-  };
+  });
 }

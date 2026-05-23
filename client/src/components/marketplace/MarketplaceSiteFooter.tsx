@@ -3,8 +3,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { canAccessSgiFromMarketplaceFooter } from "../../lib/auth.js";
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
 import { MARKETPLACE, mpHome, sgiHome } from "../../lib/marketplacePaths.js";
-import { HASHRATE_SPACE_LOGO_WHITE } from "../../lib/marketplaceWpAssets.js";
-const CORP_VIDEO_URL = "https://hashrate.space/video/Hashrate-Farm-Py.mp4";
+import { CORP_INSTITUTIONAL_VIDEO_URL, HASHRATE_SPACE_LOGO_WHITE } from "../../lib/marketplaceWpAssets.js";
 
 export type MarketplaceSiteFooterVariant = "default" | "corp-end-band";
 
@@ -76,7 +75,7 @@ export function MarketplaceSiteFooter({ variant = "default" }: Props) {
               </a>
             </li>
             <li>
-              <a href={CORP_VIDEO_URL} target="_blank" rel="noopener noreferrer">
+              <a href={CORP_INSTITUTIONAL_VIDEO_URL} target="_blank" rel="noopener noreferrer">
                 {t("footer.media.video")}
               </a>
             </li>

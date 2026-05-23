@@ -300,6 +300,44 @@ export function publicImageUrl(path: string): string {
   return normBase ? `${normBase}${pathPart}` : pathPart;
 }
 
+/** Convierte URLs legacy de WordPress y rutas relativas al formato servido por Vite (`/images/...`). */
+export function normalizeMarketplaceImageSrc(src: string): string {
+  const raw = (src ?? "").trim();
+  if (!raw) return "";
+  if (/^data:/i.test(raw)) return raw;
+
+  const wpMatch = raw.match(/wp-content\/uploads\/(?:\d{4}\/\d{2}\/)?([^?#\s]+)/i);
+  if (wpMatch?.[1]) {
+    return publicImageUrl(`/images/wp-uploads/${decodeURIComponent(wpMatch[1])}`);
+  }
+
+  if (/^https?:\/\//i.test(raw)) return raw;
+
+  if (raw.startsWith("/images/") || raw.startsWith("images/")) {
+    return publicImageUrl(raw);
+  }
+
+  return publicImageUrl(raw);
+}
+
+export function normalizeAsicProductImages(product: AsicProduct): AsicProduct {
+  const imageSrc = normalizeMarketplaceImageSrc(product.imageSrc ?? "");
+  const gallerySrcs = product.gallerySrcs
+    ?.map((g) => normalizeMarketplaceImageSrc(g))
+    .filter(Boolean);
+  const seen = new Set<string>();
+  const uniqueGallery = gallerySrcs?.filter((u) => {
+    if (seen.has(u)) return false;
+    seen.add(u);
+    return true;
+  });
+  return {
+    ...product,
+    imageSrc,
+    ...(uniqueGallery?.length ? { gallerySrcs: uniqueGallery } : {}),
+  };
+}
+
 const MAX_IMAGE_QUERY_PARAM_LEN = 1200;
 
 /**
