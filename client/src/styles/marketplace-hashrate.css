@@ -127,14 +127,19 @@ body:has(.marketplace-asic-page)::after {
 
 }
 
-/* ——— Header claro (layout) ——— */
+/* ——— Header claro (layout): fijo al scroll (altura en --marketplace-header-h vía JS) ——— */
 .site-header--marketplace {
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 100;
-  align-self: flex-start;
+  left: 0;
+  right: 0;
+  z-index: 200;
   width: 100%;
   box-sizing: border-box;
+}
+
+.marketplace-asic-page > #app > #page-main {
+  padding-top: var(--marketplace-header-h, 5.25rem);
 }
 
 .site-header__inner {

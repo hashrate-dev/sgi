@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { canUseMarketplaceQuoteCart } from "../../lib/auth.js";
 import { useAuth } from "../../contexts/AuthContext";
@@ -15,7 +15,26 @@ function pathIs(pathname: string, target: string): boolean {
 }
 
 export function MarketplaceSiteHeader() {
+  const headerRef = useRef<HTMLElement>(null);
   const [navOpen, setNavOpen] = useState(false);
+
+  useLayoutEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const root = document.documentElement;
+    const sync = () => {
+      root.style.setProperty("--marketplace-header-h", `${el.offsetHeight}px`);
+    };
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    window.addEventListener("resize", sync);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", sync);
+      root.style.removeProperty("--marketplace-header-h");
+    };
+  }, [navOpen]);
   const { pathname, hash } = useLocation();
   const homePath = mpHome();
   const onCatalog = pathIs(pathname, MARKETPLACE.catalog) || pathIs(pathname, "/marketplace");
@@ -79,7 +98,7 @@ export function MarketplaceSiteHeader() {
   }
 
   return (
-    <header className="site-header site-header--marketplace hrs-glass-topbar-surface">
+    <header ref={headerRef} className="site-header site-header--marketplace hrs-glass-topbar-surface">
       <div className="container site-header__inner">
         <Link className="logo-link logo-link--main" to={homePath} aria-label={t("header.logo_aria")}>
           <img
