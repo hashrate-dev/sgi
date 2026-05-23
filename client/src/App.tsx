@@ -66,6 +66,7 @@ import { ScrollToTop } from "./components/ScrollToTop";
 import { MarketplaceLanguageProvider } from "./contexts/MarketplaceLanguageContext";
 import { MarketplaceQuoteCartProvider, useMarketplaceQuoteCart } from "./contexts/MarketplaceQuoteCartContext";
 import { MarketplaceQuoteCartDrawer } from "./components/marketplace/MarketplaceQuoteCartDrawer";
+import { LegacyWpLangRedirect } from "./components/marketplace/LegacyWpLangRedirect";
 import { getStoredUser } from "./lib/auth";
 import { postMarketplacePresenceHeartbeat, type MarketplacePresenceViewerType } from "./lib/api";
 import { getBrowserHostname, isPrimaryPublicHost } from "./lib/hashrateHosts";
@@ -359,6 +360,13 @@ function App() {
         <ScrollToTop />
         <ToastContainer />
         <Routes>
+          {/* URLs legacy WordPress: /en/, /es/, /pt/ */}
+          <Route path="/en/*" element={<LegacyWpLangRedirect lang="en" />} />
+          <Route path="/en" element={<LegacyWpLangRedirect lang="en" />} />
+          <Route path="/es/*" element={<LegacyWpLangRedirect lang="es" />} />
+          <Route path="/es" element={<LegacyWpLangRedirect lang="es" />} />
+          <Route path="/pt/*" element={<LegacyWpLangRedirect lang="pt" />} />
+          <Route path="/pt" element={<LegacyWpLangRedirect lang="pt" />} />
           {/* Tienda primero: catálogo público + login/signup cliente (anidado para matching estable en RR7) */}
           <Route path="/marketplace" element={<MarketplaceLayout />}>
             <Route index element={<MarketplacePage />} />
