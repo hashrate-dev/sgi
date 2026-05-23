@@ -166,8 +166,7 @@ html {
   }
 
   .site-header--marketplace .site-logo-img {
-    max-width: min(220px, 56vw);
-    max-height: 50px;
+    max-width: min(200px, 52vw);
     height: auto;
   }
 
