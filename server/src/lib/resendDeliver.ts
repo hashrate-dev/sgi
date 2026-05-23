@@ -116,23 +116,20 @@ export async function deliverResendEmailWithFromFallback(args: {
   let lastRes!: Response;
   let lastBody = "";
   let sendFrom = fromCandidates[0]!;
-  const tried: string[] = [];
+  const attemptErrors: string[] = [];
 
   for (let i = 0; i < fromCandidates.length; i++) {
     sendFrom = fromCandidates[i]!;
-    tried.push(sendFrom);
     const attempt = await resendPostEmail({ apiKey, from: sendFrom, to, replyTo, subject, text, html });
     lastRes = attempt.res;
     lastBody = attempt.bodyText;
     if (lastRes.ok) break;
+    attemptErrors.push(`${sendFrom} → ${lastRes.status}: ${resendErrorDetail(lastBody)}`);
     if (lastRes.status === 401) break;
     if (i < fromCandidates.length - 1) {
       if (isResendTestingRecipientRestriction(lastRes.status, lastBody)) break;
       // eslint-disable-next-line no-console
-      console.warn(
-        `[email] ${devLogTag}: remitente rechazado (${sendFrom}), probando siguiente…`,
-        resendErrorDetail(lastBody)
-      );
+      console.warn(`[email] ${devLogTag}: remitente rechazado (${sendFrom}), probando siguiente…`);
       continue;
     }
     break;
@@ -147,10 +144,9 @@ export async function deliverResendEmailWithFromFallback(args: {
       );
     }
     if (resend403UnverifiedFromDomain(resendErrorDetail(lastBody))) {
-      const detail = resendErrorDetail(lastBody);
       throw new Error(
-        `Resend rechazó el remitente. Probados: ${tried.join(" | ")}. ` +
-          `Detalle: ${detail}. Verificá hashrate.space o mail.hashrate.space en Resend y poné RESEND_FROM_EMAIL=noreply@mail.hashrate.space en Vercel.`
+        `Resend rechazó el remitente. ${attemptErrors.join(" | ")}. ` +
+          `Verificá el dominio en https://resend.com/domains y en Vercel usá RESEND_FROM_EMAIL=Hashrate Space <noreply@mail.hashrate.space> (o el que figure Verified).`
       );
     }
   }
