@@ -219,7 +219,7 @@ function isAntminerL9(p: AsicProduct): boolean {
 }
 
 /**
- * Grupo para ordenar la grilla `/marketplace` (app.hashrate.space):
+ * Grupo para ordenar la grilla `/marketplace` (hashrate.space):
  * 0 = minero de aire Bitcoin (SHA-256, sin Z15/Zcash),
  * 1 = Zcash / Z15 / Equihash,
  * 2 = Monero RandomX (Antminer X*),

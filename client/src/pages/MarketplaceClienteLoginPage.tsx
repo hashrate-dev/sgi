@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { requestPasswordReset, wakeUpBackend } from "../lib/api";
+import { isVercelOrPrimaryPublicHost } from "../lib/hashrateHosts";
 import { MarketplaceSiteHeader } from "../components/marketplace/MarketplaceSiteHeader";
 import { MarketplaceSiteFooter } from "../components/marketplace/MarketplaceSiteFooter";
 import { MarketplacePasswordField } from "../components/marketplace/MarketplacePasswordField";
@@ -49,7 +50,7 @@ export function MarketplaceClienteLoginPage() {
     setError("");
     setSubmitting(true);
     try {
-      if (typeof window !== "undefined" && window.location.hostname.endsWith(".vercel.app")) {
+      if (typeof window !== "undefined" && isVercelOrPrimaryPublicHost(window.location.hostname)) {
         await wakeUpBackend();
       }
       await login(email.trim(), password);

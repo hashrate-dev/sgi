@@ -68,6 +68,7 @@ import { MarketplaceQuoteCartProvider, useMarketplaceQuoteCart } from "./context
 import { MarketplaceQuoteCartDrawer } from "./components/marketplace/MarketplaceQuoteCartDrawer";
 import { getStoredUser } from "./lib/auth";
 import { postMarketplacePresenceHeartbeat, type MarketplacePresenceViewerType } from "./lib/api";
+import { getBrowserHostname, isPrimaryPublicHost } from "./lib/hashrateHosts";
 
 const MARKETPLACE_PRESENCE_VISITOR_KEY = "hrs_marketplace_presence_visitor_id";
 const MARKETPLACE_PRESENCE_COUNTRY_CACHE_KEY = "hrs_marketplace_presence_country_v1";
@@ -344,6 +345,13 @@ function MarketplaceLayout() {
   );
 }
 
+function AppNotFoundRedirect() {
+  if (isPrimaryPublicHost(getBrowserHostname())) {
+    return <Navigate to="/marketplace/home" replace />;
+  }
+  return <Navigate to="/" replace />;
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -461,7 +469,7 @@ function App() {
             <Route path="/marketplace-presencia" element={<Navigate to="/marketplace/presence" replace />} />
             <Route path="/usuarios/*" element={<UsuariosPage />} />
           </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<AppNotFoundRedirect />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

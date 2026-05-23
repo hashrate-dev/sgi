@@ -62,6 +62,8 @@ export function createApp() {
     "http://localhost:5174",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5174",
+    "https://hashrate.space",
+    "https://www.hashrate.space",
     "https://app.hashrate.space",
     "https://sgi.hashrate.space",
   ]);

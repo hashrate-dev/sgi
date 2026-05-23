@@ -120,7 +120,7 @@ function resolvePublicAppOrigin(req: Request): string {
   if (/^https?:\/\//i.test(origin)) return origin.replace(/\/+$/, "");
   const host = String(req.headers.host || "").trim();
   if (/localhost|127\.0\.0\.1/i.test(host)) return "http://localhost:5173";
-  return "https://app.hashrate.space";
+  return "https://hashrate.space";
 }
 
 /** Resend en API key de prueba a veces solo permite entregar a un buzón (lo suele indicar en el JSON del 403). */

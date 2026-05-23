@@ -47,7 +47,7 @@ En **Project Settings → Environment Variables** configurá:
 |----------|-------------|
 | `SUPABASE_DATABASE_URL` | Connection string de Supabase (URI). Obtener en: Supabase Dashboard → Project Settings → Database → Connection string (URI) |
 | `JWT_SECRET` | Secreto largo para JWT (ej. 32+ caracteres aleatorios) |
-| `CORS_ORIGIN` | `https://app.hashrate.space` o tu dominio |
+| `CORS_ORIGIN` | `https://hashrate.space` o tu dominio |
 
 ---
 

@@ -25,7 +25,7 @@ En **Settings → Environment Variables** agregá las mismas claves para **Produ
 | `RESEND_FROM_EMAIL` | Remitente marketplace, ej. `Hashrate Space <noreply@mail.hashrate.space>` (el dominio exacto que figura **Verified** en Resend) | Recomendado |
 | `PASSWORD_RESET_FROM_EMAIL` | Remitente del reset; mismo dominio verificado, ej. `Hashrate Space <noreply@mail.hashrate.space>`. Si no está, se usa `RESEND_FROM_EMAIL` | Recomendado |
 | `MARKETPLACE_NOTIFY_EMAIL_TO` | Destino de avisos de órdenes marketplace (default en código: `sales@hashrate.space`) | Opcional |
-| `APP_PUBLIC_URL` | URL pública del front para links en mails (ej. `https://app.hashrate.space`). Si falta, el servidor intenta deducirla del request | Opcional |
+| `APP_PUBLIC_URL` | URL pública del front para links en mails (ej. `https://hashrate.space`). Si falta, el servidor intenta deducirla del request | Opcional |
 | `FRONTEND_ORIGIN` | Alternativa a `APP_PUBLIC_URL` (misma idea: base del enlace de reset) | Opcional |
 
 **Reset de contraseña y Resend:** en [Resend → Domains](https://resend.com/domains) el dominio debe estar **Verified** (p. ej. `mail.hashrate.space`). Las variables `RESEND_FROM_EMAIL` / `PASSWORD_RESET_FROM_EMAIL` tienen que usar **esa** zona (p. ej. `noreply@mail.hashrate.space`), no otra variante sin verificar.

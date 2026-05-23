@@ -13,6 +13,7 @@ import {
 import { canUserAccessNavPath, canUserAccessScreen } from "../lib/sgiNavigation.js";
 import { playMarketplaceOrderNotificationSound } from "../lib/marketplaceCartSound";
 import { HOME_DASHBOARD_SHELL } from "../lib/sgiDashboardShell";
+import { getBrowserHostname, isPrimaryPublicHost } from "../lib/hashrateHosts";
 import "../styles/marketplace-hashrate.css";
 import { AppCard } from "../components/ui";
 
@@ -237,6 +238,9 @@ function DashboardCardIconSlot({ item }: { item: MenuItem }) {
 }
 
 export function HomePage() {
+  if (isPrimaryPublicHost(getBrowserHostname())) {
+    return <Navigate to="/marketplace/home" replace />;
+  }
   const { user } = useAuth();
   const [marketplaceOpenCount, setMarketplaceOpenCount] = useState(0);
   const [marketplaceBadgePulse, setMarketplaceBadgePulse] = useState(false);

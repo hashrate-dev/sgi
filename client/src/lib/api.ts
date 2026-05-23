@@ -1,5 +1,11 @@
 import { getStoredToken, clearStoredAuth } from "./auth.js";
 import type { AuthUser } from "./auth.js";
+import {
+  isPrimaryPublicHost,
+  isSgiAdminHost,
+  isVercelOrPrimaryPublicHost,
+  PRODUCTION_SITE_ORIGIN,
+} from "./hashrateHosts.js";
 import { NH_WATCHER_HASH_SAMPLE_MS } from "./nicehashWatcherRigHashrateHistory.js";
 
 // Plan A: localStorage, VITE_API_URL, default. Si falla, Plan B: probar URLs de fallback y guardar la que responda (Chrome/Opera sin localStorage).
@@ -22,31 +28,32 @@ export function getApiBase(): string {
    * El proxy de Vite limita el cuerpo (~10MB) y devuelve **413** al guardar equipos con imagen vitrina en JSON (data URL / galería grande).
    * Mismo `hostname` que la página (`localhost` vs `127.0.0.1`) para que CORS coincida con el `Origin` del navegador.
    * Para otra URL/puerto: `VITE_API_URL` o `VITE_API_PORT` en `client/.env`.
-   * Para mismos datos que producción: `VITE_USE_APP_HASHRATE_SPACE_API=1` o `VITE_API_URL=https://app.hashrate.space`.
+   * Para mismos datos que producción: `VITE_USE_HASHRATE_SPACE_API=1` (o legacy `VITE_USE_APP_HASHRATE_SPACE_API`) o `VITE_API_URL=https://hashrate.space`.
    */
   if (h === "localhost" || h === "127.0.0.1") {
     const build = typeof RAW === "string" ? RAW.replace(/\/+$/, "").trim() : "";
     if (build) return build;
     /** Misma API/BD que producción (usuarios, etc.); CORS en producción ya permite localhost:5173. */
-    const useProd = String(import.meta.env.VITE_USE_APP_HASHRATE_SPACE_API ?? "").trim();
+    const useProd = String(
+      import.meta.env.VITE_USE_HASHRATE_SPACE_API ?? import.meta.env.VITE_USE_APP_HASHRATE_SPACE_API ?? ""
+    ).trim();
     if (useProd === "1" || /^true$/i.test(useProd)) {
-      return "https://app.hashrate.space";
+      return PRODUCTION_SITE_ORIGIN;
     }
     const rawPort = (import.meta.env.VITE_API_PORT ?? "").trim();
     const p = /^\d+$/.test(rawPort) ? rawPort : "8080";
     return `http://${h}:${p}`;
   }
-  // *.vercel.app y app.hashrate.space: API en mismo origen (Vercel serverless + Supabase). Sin CORS.
-  if (h.endsWith(".vercel.app")) return "";
-  if (h === "app.hashrate.space") return "";
+  // *.vercel.app y hashrate.space (apex): API en mismo origen (Vercel serverless + Supabase). Sin CORS.
+  if (isVercelOrPrimaryPublicHost(h)) return "";
   // sgi.hashrate.space: backend en Render (dominio custom distinto)
-  if (h === "sgi.hashrate.space") return SGI_RENDER_API;
+  if (isSgiAdminHost(h)) return SGI_RENDER_API;
   const stored = window.localStorage.getItem(STORAGE_KEY);
   const s = typeof stored === "string" ? stored.replace(/\/+$/, "").trim() : "";
   if (s) return s;
   const build = typeof RAW === "string" ? RAW.replace(/\/+$/, "").trim() : "";
   if (build) return build;
-  if (h.endsWith(".hashrate.space")) return SGI_RENDER_API;
+  if (h.endsWith(".hashrate.space") && !isPrimaryPublicHost(h)) return SGI_RENDER_API;
   return "";
 }
 
@@ -70,7 +77,7 @@ export function wakeUpBackend(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
   const h = window.location?.hostname ?? "";
   const baseRaw = (getApiBase() ?? "").trim().replace(/\/+$/, "");
-  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") {
+  if (isVercelOrPrimaryPublicHost(h)) {
     return fetch("/api/warmup", { method: "GET", keepalive: true })
       .then(() => {})
       .catch(() => {});
@@ -96,7 +103,7 @@ function getNoApiMessage(): string {
     return "No se pudo conectar con el servidor. ¿Tenés el backend levantado? Ejecutá en la raíz del proyecto: npm run dev";
   }
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") {
+  if (isVercelOrPrimaryPublicHost(h)) {
     return "No se pudo conectar con la API. Esperá unos segundos (cold start) y volvé a intentar.";
   }
   if (h === "sgi.hashrate.space") {
@@ -110,7 +117,7 @@ function get502Message(): string {
     return "No se pudo conectar con el servidor. ¿Tenés el backend levantado? Ejecutá: npm run dev";
   }
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") {
+  if (isVercelOrPrimaryPublicHost(h)) {
     return "La API está iniciando (cold start). Esperá 30-60 segundos y volvé a intentar.";
   }
   if (h === "sgi.hashrate.space") {
@@ -232,7 +239,7 @@ async function apiNoRetry<T>(path: string, timeoutMs = 10000): Promise<T> {
   if (token) headers.Authorization = `Bearer ${token}`;
   let base = getApiBase();
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") base = "";
+  if (isVercelOrPrimaryPublicHost(h)) base = "";
   const url = base && base.trim() !== "" ? `${base}${path}` : path;
   const res = await fetchWithTimeout(url, { method: "GET", headers, credentials: "include" }, timeoutMs);
   const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
@@ -256,13 +263,13 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   if (token) headers.Authorization = `Bearer ${token}`;
   let base = getApiBase();
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  // *.vercel.app y app.hashrate.space: mismo origen (API serverless en Vercel). Sin CORS.
-  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") {
+  // *.vercel.app y hashrate.space: mismo origen (API serverless en Vercel). Sin CORS.
+  if (isVercelOrPrimaryPublicHost(h)) {
     base = "";
   }
   // base vacío = mismo origen (ej. Vercel: front + API en mismo dominio)
   const url = base && base.trim() !== "" ? `${base}${path}` : path;
-  if ((!base || base.trim() === "") && h !== "localhost" && h !== "127.0.0.1" && !h.endsWith(".vercel.app") && h !== "app.hashrate.space") {
+  if ((!base || base.trim() === "") && h !== "localhost" && h !== "127.0.0.1" && !isVercelOrPrimaryPublicHost(h)) {
     throw new Error(getNoApiMessage());
   }
   // Debug: log la URL que estamos usando
@@ -320,7 +327,7 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const msg = lastError?.message || "";
   const isConnectionError = msg === "Failed to fetch" || msg === "Load failed" || msg.includes("NetworkError") || msg === "The operation was aborted." || msg === get502Message() || msg === getNoApiMessage();
   const host = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  // Solo intentar fallbacks en sgi.hashrate.space (Render). app.hashrate.space usa API en mismo origen, no hay fallback.
+  // Solo intentar fallbacks en sgi.hashrate.space (Render). hashrate.space usa API en mismo origen, no hay fallback.
   if (isConnectionError && host === "sgi.hashrate.space") {
     const currentBase = getApiBase();
     for (const fallback of FALLBACK_API_URLS) {
@@ -409,7 +416,7 @@ export async function verifyPassword(password: string): Promise<{ valid: boolean
   if (token) headers.Authorization = `Bearer ${token}`;
   let base = getApiBase();
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") base = "";
+  if (isVercelOrPrimaryPublicHost(h)) base = "";
   const urlNorm = base && base.trim() !== "" ? `${base.replace(/\/+$/, "")}/api/auth/verify-password` : "/api/auth/verify-password";
   const res = await fetch(urlNorm, {
     method: "POST",
@@ -500,7 +507,7 @@ export async function postLuxorMonitorSync(body: {
   if (token) headers.Authorization = `Bearer ${token}`;
   let base = getApiBase();
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") base = "";
+  if (isVercelOrPrimaryPublicHost(h)) base = "";
   const path = "/api/luxor/monitor-sync";
   const url = base && base.trim() !== "" ? `${base.replace(/\/+$/, "")}${path}` : path;
   const res = await fetchWithTimeout(
@@ -528,7 +535,7 @@ export async function postLuxorPing(body: { apiKey: string; currencyType?: strin
   if (token) headers.Authorization = `Bearer ${token}`;
   let base = getApiBase();
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") base = "";
+  if (isVercelOrPrimaryPublicHost(h)) base = "";
   const path = "/api/luxor/ping";
   const url = base && base.trim() !== "" ? `${base.replace(/\/+$/, "")}${path}` : path;
   const res = await fetchWithTimeout(
@@ -572,7 +579,7 @@ export async function getMonitorEquiposAsicHistorial(
   if (token) headers.Authorization = `Bearer ${token}`;
   let base = getApiBase();
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") base = "";
+  if (isVercelOrPrimaryPublicHost(h)) base = "";
   const path = `/api/monitor-equipos-asic/historial/${encodeURIComponent(equipoId)}`;
   const url = base && base.trim() !== "" ? `${base.replace(/\/+$/, "")}${path}` : path;
   const res = await fetchWithTimeout(url, { method: "GET", headers, credentials: "include" }, 60000);
@@ -599,7 +606,7 @@ export async function postMonitorEquiposAsicHistorialSummary(payload: {
   if (token) headers.Authorization = `Bearer ${token}`;
   let base = getApiBase();
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") base = "";
+  if (isVercelOrPrimaryPublicHost(h)) base = "";
   const path = `/api/monitor-equipos-asic/historial-summary`;
   const url = base && base.trim() !== "" ? `${base.replace(/\/+$/, "")}${path}` : path;
   const res = await fetchWithTimeout(
@@ -630,7 +637,7 @@ export async function postMonitorEquiposAsicHistorialFeed(payload: {
   if (token) headers.Authorization = `Bearer ${token}`;
   let base = getApiBase();
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") base = "";
+  if (isVercelOrPrimaryPublicHost(h)) base = "";
   const path = `/api/monitor-equipos-asic/historial-feed`;
   const url = base && base.trim() !== "" ? `${base.replace(/\/+$/, "")}${path}` : path;
   const res = await fetchWithTimeout(
@@ -661,7 +668,7 @@ export async function postMonitorEquiposAsicHistorialNote(
   if (token) headers.Authorization = `Bearer ${token}`;
   let base = getApiBase();
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") base = "";
+  if (isVercelOrPrimaryPublicHost(h)) base = "";
   const path = `/api/monitor-equipos-asic/historial/${encodeURIComponent(equipoId)}`;
   const url = base && base.trim() !== "" ? `${base.replace(/\/+$/, "")}${path}` : path;
   const res = await fetchWithTimeout(
@@ -1254,7 +1261,7 @@ export async function downloadPotencialesClientesCsv(): Promise<Blob> {
   if (token) headers.Authorization = `Bearer ${token}`;
   const base = getApiBase();
   const h = typeof window !== "undefined" ? (window.location?.hostname ?? "") : "";
-  if ((!base || base.trim() === "") && h !== "localhost" && h !== "127.0.0.1" && !h.endsWith(".vercel.app") && h !== "app.hashrate.space") {
+  if ((!base || base.trim() === "") && h !== "localhost" && h !== "127.0.0.1" && !isVercelOrPrimaryPublicHost(h)) {
     throw new Error(getNoApiMessage());
   }
   const path = "/api/potenciales-clientes/export.csv";
@@ -1420,7 +1427,7 @@ export async function fetchContabilidadGastoFacturaPdfBlob(id: number): Promise<
   if (token) headers.Authorization = `Bearer ${token}`;
   const base = getApiBase();
   const h = typeof window !== "undefined" ? (window.location?.hostname ?? "") : "";
-  if ((!base || base.trim() === "") && h !== "localhost" && h !== "127.0.0.1" && !h.endsWith(".vercel.app") && h !== "app.hashrate.space") {
+  if ((!base || base.trim() === "") && h !== "localhost" && h !== "127.0.0.1" && !isVercelOrPrimaryPublicHost(h)) {
     throw new Error(getNoApiMessage());
   }
   const path = `/api/contabilidad/gastos/${encodeURIComponent(String(id))}/factura-pdf`;
@@ -1793,7 +1800,7 @@ export async function uploadMarketplaceAsicImage(file: File): Promise<{ url: str
 
   let base = getApiBase();
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") base = "";
+  if (isVercelOrPrimaryPublicHost(h)) base = "";
   const pathUrl = "/api/equipos/marketplace-image";
   const url = base && base.trim() !== "" ? `${base}${pathUrl}` : pathUrl;
 
@@ -2337,16 +2344,10 @@ export async function postMarketplacePresenceHeartbeat(payload: {
   if (token) headers.Authorization = `Bearer ${token}`;
   let base = getApiBase();
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") base = "";
+  if (isVercelOrPrimaryPublicHost(h)) base = "";
   const path = "/api/marketplace/presence/heartbeat";
   const url = base && base.trim() !== "" ? `${base}${path}` : path;
-  if (
-    (!base || base.trim() === "") &&
-    h !== "localhost" &&
-    h !== "127.0.0.1" &&
-    !h.endsWith(".vercel.app") &&
-    h !== "app.hashrate.space"
-  ) {
+  if ((!base || base.trim() === "") && h !== "localhost" && h !== "127.0.0.1" && !isVercelOrPrimaryPublicHost(h)) {
     return;
   }
   try {
@@ -2385,10 +2386,10 @@ export async function postMarketplaceContactPublic(
   if (token) headers.Authorization = `Bearer ${token}`;
   let base = getApiBase();
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") base = "";
+  if (isVercelOrPrimaryPublicHost(h)) base = "";
   const path = "/api/marketplace/contact";
   const url = base && base.trim() !== "" ? `${base}${path}` : path;
-  if ((!base || base.trim() === "") && h !== "localhost" && h !== "127.0.0.1" && !h.endsWith(".vercel.app") && h !== "app.hashrate.space") {
+  if ((!base || base.trim() === "") && h !== "localhost" && h !== "127.0.0.1" && !isVercelOrPrimaryPublicHost(h)) {
     throw new Error(getNoApiMessage());
   }
   const res = await fetchWithTimeout(
@@ -2429,10 +2430,10 @@ export async function postMarketplaceAsicInquiryPublic(
   if (token) headers.Authorization = `Bearer ${token}`;
   let base = getApiBase();
   const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
-  if (h.endsWith(".vercel.app") || h === "app.hashrate.space") base = "";
+  if (isVercelOrPrimaryPublicHost(h)) base = "";
   const path = "/api/marketplace/asic-inquiry";
   const url = base && base.trim() !== "" ? `${base}${path}` : path;
-  if ((!base || base.trim() === "") && h !== "localhost" && h !== "127.0.0.1" && !h.endsWith(".vercel.app") && h !== "app.hashrate.space") {
+  if ((!base || base.trim() === "") && h !== "localhost" && h !== "127.0.0.1" && !isVercelOrPrimaryPublicHost(h)) {
     throw new Error(getNoApiMessage());
   }
   const res = await fetchWithTimeout(

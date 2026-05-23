@@ -4,6 +4,7 @@ import { MarketplacePasswordField } from "../components/marketplace/MarketplaceP
 import { useAuth } from "../contexts/AuthContext";
 import { lectorDefaultLandingPath } from "../lib/auth";
 import { requestPasswordReset, setApiBaseUrl, wakeUpBackend } from "../lib/api";
+import { isVercelOrPrimaryPublicHost } from "../lib/hashrateHosts";
 import "../styles/facturacion.css";
 
 const HASHRATE_LOGO = "https://hashrate.space/wp-content/uploads/hashrate-LOGO.png";
@@ -60,7 +61,7 @@ export function LoginPage() {
     setError("");
     setSubmitting(true);
     try {
-      if (window.location.hostname.endsWith(".vercel.app")) {
+      if (isVercelOrPrimaryPublicHost(window.location.hostname)) {
         await wakeUpBackend();
       }
       await login(username.trim(), password);

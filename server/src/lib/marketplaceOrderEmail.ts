@@ -15,7 +15,7 @@ import {
 const RESEND_API_URL = "https://api.resend.com/emails";
 const DEFAULT_TO = "sales@hashrate.space";
 const DEFAULT_SUBJECT_PREFIX = "[Marketplace]";
-const DEFAULT_PANEL_URL = "https://app.hashrate.space/cotizaciones-marketplace";
+const DEFAULT_PANEL_URL = "https://hashrate.space/marketplace/orders";
 
 let warnedMissingEnv = false;
 let loggedResendDeliveryHint = false;
@@ -90,7 +90,7 @@ async function resendPostEmail(opts: {
  * Opcionales:
  * - MARKETPLACE_NOTIFY_EMAIL_TO (default sales@hashrate.space)
  * - MARKETPLACE_NOTIFY_SUBJECT_PREFIX (default [Marketplace])
- * - MARKETPLACE_QUOTES_PANEL_URL (default https://app.hashrate.space/cotizaciones-marketplace)
+ * - MARKETPLACE_QUOTES_PANEL_URL (default https://hashrate.space/marketplace/orders)
  */
 export async function notifyMarketplaceOrderEmail(p: MarketplaceOrderEmailPayload): Promise<void> {
   // eslint-disable-next-line no-console
