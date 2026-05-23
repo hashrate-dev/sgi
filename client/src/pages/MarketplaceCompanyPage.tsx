@@ -17,7 +17,7 @@ const TEAM: readonly {
   { key: "jv", img: wpUpload("JV-Team-1024x991.png"), linkedin: "https://www.linkedin.com/in/jlvilasoler/" },
   { key: "af", img: wpUpload("AF-Team-1024x991.png"), linkedin: "https://www.linkedin.com/in/figueroaanthony/" },
   { key: "rg", img: wpUpload("RG-1024x991.png") },
-  { key: "dv", img: "/images/marketplace-uploads/DV-Team.png" },
+  { key: "dv", img: wpUpload("DV-Team.png") },
   { key: "ab", img: wpUpload("AB-Team-1024x991.png") },
   { key: "dg", img: wpUpload("DG-Team-HRS-1024x991.png") },
 ] as const;
