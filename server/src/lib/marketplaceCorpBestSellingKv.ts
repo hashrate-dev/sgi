@@ -96,14 +96,24 @@ function parseKvBoolean(raw: string | null | undefined, fallback: boolean): bool
   return fallback;
 }
 
+let hidePricesForGuestsCache: { value: boolean; at: number } | null = null;
+const HIDE_PRICES_CACHE_MS = 60_000;
+
 export async function readMarketplaceHidePricesForGuests(): Promise<boolean> {
+  const now = Date.now();
+  if (hidePricesForGuestsCache && now - hidePricesForGuestsCache.at < HIDE_PRICES_CACHE_MS) {
+    return hidePricesForGuestsCache.value;
+  }
   const row = (await db.prepare("SELECT value FROM marketplace_site_kv WHERE key = ?").get(MARKETPLACE_HIDE_PRICES_FOR_GUESTS_KV_KEY)) as
     | { value?: string | null }
     | undefined;
-  return parseKvBoolean(row?.value, true);
+  const value = parseKvBoolean(row?.value, true);
+  hidePricesForGuestsCache = { value, at: now };
+  return value;
 }
 
 export async function writeMarketplaceHidePricesForGuests(enabled: boolean): Promise<void> {
+  hidePricesForGuestsCache = null;
   const value = enabled ? "1" : "0";
   if (isPg()) {
     await db

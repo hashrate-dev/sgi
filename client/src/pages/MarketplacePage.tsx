@@ -10,7 +10,12 @@ import {
 } from "../lib/marketplaceAsicCatalog.js";
 import type { AsicProduct, MarketplaceCatalogFilter } from "../lib/marketplaceAsicCatalog.js";
 import type { AddQuoteLineOptions } from "../lib/marketplaceQuoteCart.js";
-import { getMarketplaceAsicVitrina, postMarketplaceAsicYields, wakeUpBackend, type MarketplaceAsicLiveYield } from "../lib/api.js";
+import {
+  getMarketplaceAsicVitrina,
+  peekMarketplaceVitrinaCache,
+  postMarketplaceAsicYields,
+  type MarketplaceAsicLiveYield,
+} from "../lib/api.js";
 import { useAuth } from "../contexts/AuthContext";
 import { useMarketplaceQuoteCart } from "../contexts/MarketplaceQuoteCartContext.js";
 import { MarketplaceSiteHeader } from "../components/marketplace/MarketplaceSiteHeader.js";
@@ -98,10 +103,16 @@ function MarketplacePageBody() {
   const canViewMarketplacePrices = Boolean(!loading && (user || !hidePricesForGuests));
   const [filterAlgo, setFilterAlgo] = useState<MarketplaceCatalogFilter | null>(null);
   const [modalIndex, setModalIndex] = useState<number | null>(null);
-  /** Vacío hasta la vitrina: evita pintar catálogo placeholder y reemplazarlo por el de la API (doble trabajo y “ola” visual). */
-  const [products, setProducts] = useState<AsicProduct[]>(() => []);
-  /** null = primer fetch en curso; true = vitrina API; false = fallback local tras vacío o error */
-  const [catalogFromApi, setCatalogFromApi] = useState<boolean | null>(null);
+  /** Catálogo visible al instante (caché de sesión o bundle local); la API actualiza en segundo plano. */
+  const [products, setProducts] = useState<AsicProduct[]>(() => {
+    const cached = peekMarketplaceVitrinaCache();
+    if (cached?.products?.length) {
+      return mergeAsicCatalogWithCorpGridExtras(cached.products.map(normalizeAsicProductImages));
+    }
+    return mergeAsicCatalogWithCorpGridExtras(ASIC_MARKETPLACE_PRODUCTS);
+  });
+  const [catalogRevalidating, setCatalogRevalidating] = useState(false);
+  const [catalogSyncFailed, setCatalogSyncFailed] = useState(false);
   const [liveYieldsById, setLiveYieldsById] = useState<Record<string, MarketplaceAsicLiveYield>>({});
   const [yieldsLoading, setYieldsLoading] = useState(false);
   const loginModalOpen = searchParams.get("login") === "1";
@@ -185,60 +196,38 @@ function MarketplacePageBody() {
   }, []);
 
   useEffect(() => {
-    /** Si el primer fetch corre antes de que `getMe()` termine, puede salir sin Bearer y quedar “anon” en el servidor. */
-    if (loading) return;
-
     let cancelled = false;
-    let fallbackApplied = false;
-    const localFallbackProducts = mergeAsicCatalogWithCorpGridExtras(ASIC_MARKETPLACE_PRODUCTS);
+    setCatalogRevalidating(true);
+    setCatalogSyncFailed(false);
 
-    const applyLocalFallback = () => {
-      if (cancelled) return;
-      fallbackApplied = true;
-      setProducts(localFallbackProducts);
-      setCatalogFromApi(false);
-    };
-
-    /**
-     * En localhost, si el backend está apagado/lento, `api()` puede tardar varios reintentos.
-     * Evita que la vitrina quede en skeleton por minutos.
-     */
-    const fallbackTimer = window.setTimeout(() => {
-      if (fallbackApplied) return;
-      applyLocalFallback();
-    }, 12000);
-
-    setCatalogFromApi(null);
-
-    /** No encadenar: el GET a la vitrina ya despierta el backend; evita espera extra en cold start. */
-    void wakeUpBackend();
     getMarketplaceAsicVitrina()
       .then((res) => {
         if (cancelled) return;
-        window.clearTimeout(fallbackTimer);
         setHidePricesForGuests(res.hidePricesForGuests !== false);
         const list = res.products ?? [];
         if (list.length > 0) {
           setProducts(mergeAsicCatalogWithCorpGridExtras(list.map(normalizeAsicProductImages)));
-          setCatalogFromApi(true);
+          setCatalogSyncFailed(false);
         } else {
-          applyLocalFallback();
+          setCatalogSyncFailed(true);
         }
       })
       .catch(() => {
         if (cancelled) return;
-        window.clearTimeout(fallbackTimer);
-        applyLocalFallback();
+        setCatalogSyncFailed(true);
+      })
+      .finally(() => {
+        if (!cancelled) setCatalogRevalidating(false);
       });
+
     return () => {
       cancelled = true;
-      window.clearTimeout(fallbackTimer);
     };
-  }, [loading, user?.id]);
+  }, [user?.id]);
 
   useEffect(() => {
     /** Evita POST de yields hasta tener catálogo definitivo y dar tiempo al primer paint de la grilla. */
-    if (catalogFromApi === null || products.length === 0) return;
+    if (products.length === 0) return;
     let cancelled = false;
     const idleId = scheduleIdle(() => {
       if (cancelled) return;
@@ -271,12 +260,12 @@ function MarketplacePageBody() {
         .finally(() => {
           if (!cancelled) setYieldsLoading(false);
         });
-    }, 1800);
+    }, 600);
     return () => {
       cancelled = true;
       cancelIdle(idleId);
     };
-  }, [products, catalogFromApi]);
+  }, [products]);
 
   /**
    * Sin filtro: mineros de aire (Bitcoin → Zcash → L9 → otro scrypt), luego hydro/líquido, al final infra.
@@ -312,7 +301,6 @@ function MarketplacePageBody() {
 
   /** Deep link desde home corporativa: `/marketplace?asic=<id>` abre el modal de esa ficha. */
   useEffect(() => {
-    if (catalogFromApi === null) return;
     const id = searchParams.get("asic")?.trim();
     if (!id) return;
     const idx = shelfProducts.findIndex((p) => p.id === id);
@@ -324,7 +312,7 @@ function MarketplacePageBody() {
     }
     setModalIndex(idx);
     setSearchParams(next, { replace: true });
-  }, [searchParams, shelfProducts, setSearchParams, catalogFromApi]);
+  }, [searchParams, shelfProducts, setSearchParams]);
 
   const modalProduct = modalIndex != null ? shelfProducts[modalIndex] ?? null : null;
   const modalLiveYield = modalProduct ? liveYieldsById[modalProduct.id] : undefined;
@@ -341,7 +329,7 @@ function MarketplacePageBody() {
               <header className="market-intro">
                 <p className="market-intro__kicker">{t("catalog.kicker")}</p>
                 <p className="market-intro__desc">{t("catalog.intro")}</p>
-                {catalogFromApi === false ? (
+                {catalogSyncFailed && !catalogRevalidating ? (
                   <p className="market-intro__desc market-intro__desc--note mt-2 mb-0">{t("catalog.fallback_note")}</p>
                 ) : null}
               </header>
@@ -352,13 +340,13 @@ function MarketplacePageBody() {
                 onChange={setFilterAlgo}
                 availableFilters={availableFilters}
               />
-              {catalogFromApi === null ? (
+              {catalogRevalidating ? (
                 <p className="text-muted small mb-3 market-catalog-sync-hint" aria-live="polite">
                   {t("catalog.syncing")}
                 </p>
               ) : null}
               <div className="shelf-grid market-shelf-grid--catalog-v2">
-                {catalogFromApi === null ? (
+                {products.length === 0 && catalogRevalidating ? (
                   <ShelfSkeletonGrid />
                 ) : (
                   shelfProducts.map((p, i) => (

@@ -935,8 +935,10 @@ marketplaceRouter.get("/marketplace/corp-interesting", async (req: Request, res:
 /** GET /marketplace/asic-vitrina — catálogo ASIC para /marketplace (sin token). Origen: equipos_asic con mp_visible. */
 marketplaceRouter.get("/marketplace/asic-vitrina", async (req: Request, res: Response) => {
   try {
-    const auth = await resolveAuthSnapshot(req);
-    const hidePricesForGuests = await readMarketplaceHidePricesForGuests();
+    const [auth, hidePricesForGuests] = await Promise.all([
+      resolveAuthSnapshot(req),
+      readMarketplaceHidePricesForGuests(),
+    ]);
     const canViewPrices = auth.viewerType !== "anon" || !hidePricesForGuests;
     // No bloquear la respuesta del catálogo por telemetría/presencia.
     void touchMarketplacePresence(req, "/marketplace/asic-vitrina").catch((err) => {

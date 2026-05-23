@@ -6,6 +6,7 @@ import {
   isVercelOrPrimaryPublicHost,
   PRODUCTION_SITE_ORIGIN,
 } from "./hashrateHosts.js";
+import { writeMarketplaceVitrinaCache } from "./marketplaceVitrinaCache.js";
 import { NH_WATCHER_HASH_SAMPLE_MS } from "./nicehashWatcherRigHashrateHistory.js";
 
 // Plan A: localStorage, VITE_API_URL, default. Si falla, Plan B: probar URLs de fallback y guardar la que responda (Chrome/Opera sin localStorage).
@@ -1837,16 +1838,64 @@ export async function uploadMarketplaceAsicImage(file: File): Promise<{ url: str
   return data as { url: string };
 }
 
-/** Catálogo ASIC para /marketplace (público, sin auth). */
-export function getMarketplaceAsicVitrina(): Promise<{
+/** Catálogo ASIC: timeout corto y un solo reintento (la vitrina no debe bloquear la UI minutos). */
+async function fetchMarketplaceAsicVitrinaNetwork(): Promise<{
   products: import("./marketplaceAsicCatalog.js").AsicProduct[];
   hidePricesForGuests: boolean;
 }> {
-  return api<{
-    products: import("./marketplaceAsicCatalog.js").AsicProduct[];
-    hidePricesForGuests: boolean;
-  }>("/api/marketplace/asic-vitrina", { cache: "no-store" });
+  const token = getStoredToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let base = getApiBase();
+  const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
+  if (isVercelOrPrimaryPublicHost(h)) base = "";
+  const path = "/api/marketplace/asic-vitrina";
+  const url = base && base.trim() !== "" ? `${base}${path}` : path;
+  const attempts = [0, 1200];
+  const timeoutMs = 14_000;
+  let lastErr: Error | null = null;
+  for (let i = 0; i < attempts.length; i++) {
+    if (attempts[i]! > 0) await delay(attempts[i]!);
+    try {
+      const res = await fetchWithTimeout(
+        url,
+        { method: "GET", headers, credentials: "include", cache: "default" },
+        timeoutMs
+      );
+      const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        clearStoredAuth();
+        const cb = typeof window !== "undefined" ? (window as unknown as { __on401?: () => void }).__on401 : undefined;
+        if (typeof cb === "function") cb();
+        throw new Error((data as { error?: { message?: string } })?.error?.message ?? "Sesión expirada.");
+      }
+      if (!res.ok) {
+        lastErr = new Error((data as { error?: { message?: string } })?.error?.message ?? res.statusText);
+        if (res.status === 502 || res.status === 503) continue;
+        throw lastErr;
+      }
+      return data as {
+        products: import("./marketplaceAsicCatalog.js").AsicProduct[];
+        hidePricesForGuests: boolean;
+      };
+    } catch (e) {
+      lastErr = e instanceof Error ? e : new Error(String(e));
+    }
+  }
+  throw lastErr ?? new Error(getNoApiMessage());
 }
+
+/** Catálogo ASIC para /equipment (público). Usa caché de sesión + fetch rápido al servidor. */
+export async function getMarketplaceAsicVitrina(): Promise<{
+  products: import("./marketplaceAsicCatalog.js").AsicProduct[];
+  hidePricesForGuests: boolean;
+}> {
+  const data = await fetchMarketplaceAsicVitrinaNetwork();
+  writeMarketplaceVitrinaCache(data);
+  return data;
+}
+
+export { peekMarketplaceVitrinaCache } from "./marketplaceVitrinaCache.js";
 
 /** Destacados “Equipos más vendidos” en /marketplace/home (público). */
 export function getMarketplaceCorpBestSelling(): Promise<{
