@@ -1,4 +1,5 @@
 import {
+  DEFAULT_RESEND_FROM,
   effectiveResendFromEmail,
   effectiveResendFromEmailOrDefault,
   normalizeResendApiKey,
@@ -102,7 +103,7 @@ function resendFromCandidates(): string[] {
     out.push(t);
   };
   add(effectiveResendFromEmail());
-  add("Hashrate Space <noreply@mail.hashrate.space>");
+  add(DEFAULT_RESEND_FROM);
   if (out.length === 0) add(effectiveResendFromEmailOrDefault());
   return out;
 }
@@ -148,7 +149,7 @@ async function resendDeliverWithFromFallback(args: {
   const { apiKey, to, replyTo, subject, text, html, devLogTag } = args;
   const fromCandidates = resendFromCandidates();
   if (fromCandidates.length === 0) {
-    throw new Error("Definí RESEND_FROM_EMAIL con un remitente verificado (ej. noreply@mail.hashrate.space).");
+    throw new Error("Definí RESEND_FROM_EMAIL con un remitente verificado (ej. noreply@hashrate.space).");
   }
 
   let lastRes!: Response;
@@ -175,12 +176,12 @@ async function resendDeliverWithFromFallback(args: {
       const sandboxInbox = parseResendSandboxInboxFrom403(lastBody);
       throw new Error(
         `Resend está en modo prueba: solo permite enviar a ${sandboxInbox ?? "el buzón de la cuenta Resend"}. ` +
-          `Verificá el dominio mail.hashrate.space en Resend o usá una API key de producción.`
+          `Verificá el dominio hashrate.space en Resend o usá una API key de producción.`
       );
     }
     if (resend403UnverifiedFromDomain(detail403)) {
       throw new Error(
-        `Resend rechazó el remitente (${sendFrom}). Usá RESEND_FROM_EMAIL con @mail.hashrate.space verificado.`
+        `Resend rechazó el remitente (${sendFrom}). Usá RESEND_FROM_EMAIL con @hashrate.space verificado.`
       );
     }
   }

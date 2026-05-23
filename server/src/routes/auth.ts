@@ -252,8 +252,8 @@ function passwordResetFromAddress(): string {
   const resendFrom = effectiveResendFromEmail();
   if (resendFrom) return resendFrom;
   // Fallback seguro para producción/local si olvidaron publicar RESEND_FROM_EMAIL.
-  // Debe coincidir con dominio verificado en Resend (mail.hashrate.space).
-  return "Hashrate Space <noreply@mail.hashrate.space>";
+  // Debe coincidir con dominio verificado en Resend (hashrate.space).
+  return "Hashrate Space <noreply@hashrate.space>";
 }
 
 function passwordResetSmtpConfigured(): boolean {
@@ -359,7 +359,7 @@ async function sendPasswordResetEmail(
   }
 
   const resendFromGlobal = String(process.env.RESEND_FROM_EMAIL || "").trim();
-  const fromCandidates = [fromInitial, resendFromGlobal, "Hashrate Space <noreply@mail.hashrate.space>"]
+  const fromCandidates = [fromInitial, resendFromGlobal, "Hashrate Space <noreply@hashrate.space>"]
     .map((x) => x.trim())
     .filter((x, i, arr) => x.length > 0 && arr.findIndex((y) => y.toLowerCase() === x.toLowerCase()) === i);
 
@@ -425,7 +425,7 @@ async function sendPasswordResetEmail(
           } else if (testingRecipientBlock) {
             // eslint-disable-next-line no-console
             console.warn(
-              `[auth] password-reset: envío directo a ${to} rechazado por Resend; enlace enviado por relay a ${relay}. Revisá clave API y dominio verificado (From @mail.hashrate.space).`
+              `[auth] password-reset: envío directo a ${to} rechazado por Resend; enlace enviado por relay a ${relay}. Revisá clave API y dominio verificado (From @hashrate.space).`
             );
           }
           return;
@@ -740,7 +740,7 @@ authRouter.post("/auth/password-reset-request", loginRateLimit, async (req, res)
       return res.status(422).json({
         error: {
           code: "EMAIL_SEND_FAILED",
-          message: `No se pudo enviar el correo a ${emailNorm}. Usá clave Resend de producción y From @mail.hashrate.space, o definí PASSWORD_RESET_SMTP_* para enviar al usuario desde tu servidor de correo. Relay opcional a sales: PASSWORD_RESET_RELAY_ON_FAILURE=1.`,
+          message: `No se pudo enviar el correo a ${emailNorm}. Usá clave Resend de producción y From @hashrate.space, o definí PASSWORD_RESET_SMTP_* para enviar al usuario desde tu servidor de correo. Relay opcional a sales: PASSWORD_RESET_RELAY_ON_FAILURE=1.`,
         },
       });
     }

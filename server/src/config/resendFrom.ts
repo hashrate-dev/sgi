@@ -51,9 +51,12 @@ function formatResendFromHeader(display: string, address: string): string {
   return a;
 }
 
+/** Remitente por defecto (dominio apex verificado en Resend). */
+export const DEFAULT_RESEND_FROM = "Hashrate Space <noreply@hashrate.space>";
+
 /**
- * En Resend suele estar verificado solo el subdominio `mail.hashrate.space`.
- * Remitentes en el apex `@hashrate.space` devuelven 403; muchos `.env` de ejemplo usaban `no-reply@hashrate.space`.
+ * Normaliza remitentes Resend al dominio apex verificado (`hashrate.space`).
+ * Migra el subdominio legacy `mail.hashrate.space` → `hashrate.space`.
  */
 export function normalizeResendFromEmailForVerifiedDomain(raw: string): string {
   const t = raw.trim();
@@ -63,9 +66,14 @@ export function normalizeResendFromEmailForVerifiedDomain(raw: string): string {
   if (at < 1 || at >= address.length - 1) return t;
   let local = address.slice(0, at).trim();
   const host = address.slice(at + 1).trim().toLowerCase();
-  if (host !== "hashrate.space") return t;
   if (local.toLowerCase() === "no-reply") local = "noreply";
-  return formatResendFromHeader(display, `${local}@mail.hashrate.space`);
+  if (host === "mail.hashrate.space") {
+    return formatResendFromHeader(display, `${local}@hashrate.space`);
+  }
+  if (host === "hashrate.space") {
+    return formatResendFromHeader(display, `${local}@hashrate.space`);
+  }
+  return t;
 }
 
 /** Valor efectivo de `RESEND_FROM_EMAIL` (normalizado a dominio verificado si aplica). */
@@ -79,7 +87,7 @@ export function effectiveResendFromEmailOrDefault(): string {
   const from = effectiveResendFromEmail();
   if (from) return from;
   if (normalizeResendApiKey(process.env.RESEND_API_KEY)) {
-    return "Hashrate Space <noreply@mail.hashrate.space>";
+    return DEFAULT_RESEND_FROM;
   }
   return "";
 }

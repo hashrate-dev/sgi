@@ -112,7 +112,7 @@ async function resendPostEmail(opts: {
  * Envía un email transaccional por Resend.
  * Requiere:
  * - RESEND_API_KEY
- * - RESEND_FROM_EMAIL (debe estar definido y verificado, ej. noreply@mail.hashrate.space)
+ * - RESEND_FROM_EMAIL (debe estar definido y verificado, ej. noreply@hashrate.space)
  * Opcionales:
  * - MARKETPLACE_NOTIFY_EMAIL_TO (default sales@hashrate.space)
  * - MARKETPLACE_NOTIFY_SUBJECT_PREFIX (default [Marketplace])
@@ -187,7 +187,7 @@ export async function notifyMarketplaceOrderEmail(p: MarketplaceOrderEmailPayloa
   }
 
   if (!from) {
-    throw new Error("Definí RESEND_FROM_EMAIL con un remitente verificado (ej. noreply@mail.hashrate.space).");
+    throw new Error("Definí RESEND_FROM_EMAIL con un remitente verificado (ej. noreply@hashrate.space).");
   }
 
   // eslint-disable-next-line no-console
@@ -207,7 +207,7 @@ export async function notifyMarketplaceOrderEmail(p: MarketplaceOrderEmailPayloa
     const detail403 = resendErrorDetail(bodyText);
     if (resend403UnverifiedFromDomain(detail403)) {
       throw new Error(
-        `Resend rechazó el remitente (${sendFrom}): dominio no verificado. Usá RESEND_FROM_EMAIL con @mail.hashrate.space.`
+        `Resend rechazó el remitente (${sendFrom}): dominio no verificado. Usá RESEND_FROM_EMAIL con @hashrate.space.`
       );
     }
   }
@@ -216,7 +216,7 @@ export async function notifyMarketplaceOrderEmail(p: MarketplaceOrderEmailPayloa
     const detail = resendErrorDetail(bodyText);
     if (isResendTestingRecipientRestriction(res.status, bodyText)) {
       throw new Error(
-        `Resend API ${res.status}: modo prueba — solo permite enviar al buzón de la cuenta Resend. Verificá dominio mail.hashrate.space y usá producción, o definí MARKETPLACE_NOTIFY_EMAIL_TO al inbox permitido. Detalle: ${detail}`
+        `Resend API ${res.status}: modo prueba — solo permite enviar al buzón de la cuenta Resend. Verificá dominio hashrate.space y usá producción, o definí MARKETPLACE_NOTIFY_EMAIL_TO al inbox permitido. Detalle: ${detail}`
       );
     }
     throw new Error(`Resend API ${res.status}: ${detail}`);
@@ -311,7 +311,7 @@ export async function notifyMarketplaceOrderGeneradaEmail(p: MarketplaceOrderEma
   }
 
   if (!from) {
-    throw new Error("Definí RESEND_FROM_EMAIL con un remitente verificado (ej. noreply@mail.hashrate.space).");
+    throw new Error("Definí RESEND_FROM_EMAIL con un remitente verificado (ej. noreply@hashrate.space).");
   }
 
   // eslint-disable-next-line no-console
@@ -331,7 +331,7 @@ export async function notifyMarketplaceOrderGeneradaEmail(p: MarketplaceOrderEma
     const detail403 = resendErrorDetail(bodyText);
     if (resend403UnverifiedFromDomain(detail403)) {
       throw new Error(
-        `Resend rechazó el remitente (${sendFrom}): dominio no verificado. Usá RESEND_FROM_EMAIL con @mail.hashrate.space.`
+        `Resend rechazó el remitente (${sendFrom}): dominio no verificado. Usá RESEND_FROM_EMAIL con @hashrate.space.`
       );
     }
   }
@@ -340,7 +340,7 @@ export async function notifyMarketplaceOrderGeneradaEmail(p: MarketplaceOrderEma
     const detail = resendErrorDetail(bodyText);
     if (isResendTestingRecipientRestriction(res.status, bodyText)) {
       throw new Error(
-        `Resend API ${res.status}: modo prueba — solo permite enviar al buzón de la cuenta Resend. Verificá dominio mail.hashrate.space y usá producción, o definí MARKETPLACE_NOTIFY_EMAIL_TO al inbox permitido. Detalle: ${detail}`
+        `Resend API ${res.status}: modo prueba — solo permite enviar al buzón de la cuenta Resend. Verificá dominio hashrate.space y usá producción, o definí MARKETPLACE_NOTIFY_EMAIL_TO al inbox permitido. Detalle: ${detail}`
       );
     }
     throw new Error(`Resend API ${res.status}: ${detail}`);

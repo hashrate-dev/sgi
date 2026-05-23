@@ -150,7 +150,7 @@ export const env: Env = EnvSchema.parse(process.env);
   } else if (process.env.VERCEL && !apiKey) {
     // eslint-disable-next-line no-console
     console.warn(
-      "[email] Vercel: RESEND_API_KEY no está definida — los avisos de «Generar orden» no se enviarán. Configurala en Vercel → Settings → Environment Variables (y RESEND_FROM_EMAIL con @mail.hashrate.space verificado)."
+      "[email] Vercel: RESEND_API_KEY no está definida — los avisos de «Generar orden» no se enviarán. Configurala en Vercel → Settings → Environment Variables (y RESEND_FROM_EMAIL con @hashrate.space verificado)."
     );
   } else if (devConsole) {
     // eslint-disable-next-line no-console
