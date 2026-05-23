@@ -3,8 +3,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { canAccessSgiFromMarketplaceFooter } from "../../lib/auth.js";
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
 import { MARKETPLACE, mpHome } from "../../lib/marketplacePaths.js";
-
-const UP = "https://hashrate.space/wp-content/uploads";
+import { HASHRATE_SPACE_LOGO_WHITE } from "../../lib/marketplaceWpAssets.js";
 const CORP_VIDEO_URL = "https://hashrate.space/video/Hashrate-Farm-Py.mp4";
 
 export type MarketplaceSiteFooterVariant = "default" | "corp-end-band";
@@ -30,7 +29,8 @@ export function MarketplaceSiteFooter({ variant = "default" }: Props) {
       <div className="market-corp-strip__inner market-corp-strip__inner--footer">
         <div className="market-corp-strip__brand market-corp-strip__brand--footer">
           <img
-            src={`${UP}/hashrate-white-300x46.png`}
+            src={HASHRATE_SPACE_LOGO_WHITE}
+            className="market-corp-strip__logo-img"
             alt="Hashrate Space"
             width={300}
             height={46}

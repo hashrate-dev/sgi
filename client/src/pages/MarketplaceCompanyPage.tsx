@@ -4,7 +4,7 @@ import { MarketplaceSiteFooter } from "../components/marketplace/MarketplaceSite
 import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
 import "../styles/marketplace-hashrate.css";
 
-const UP = "https://hashrate.space/wp-content/uploads";
+import { wpUpload } from "../lib/marketplaceWpAssets.js";
 
 type TeamKey = "fab" | "jv" | "af" | "dg" | "rg" | "ab" | "dv";
 
@@ -13,13 +13,13 @@ const TEAM: readonly {
   img: string;
   linkedin?: string;
 }[] = [
-  { key: "fab", img: `${UP}/FB-Team-1-1024x991.png`, linkedin: "https://www.linkedin.com/in/fabrianchi/" },
-  { key: "jv", img: `${UP}/JV-Team-1024x991.png`, linkedin: "https://www.linkedin.com/in/jlvilasoler/" },
-  { key: "af", img: `${UP}/AF-Team-1024x991.png`, linkedin: "https://www.linkedin.com/in/figueroaanthony/" },
-  { key: "rg", img: `${UP}/RG-1024x991.png` },
+  { key: "fab", img: wpUpload("FB-Team-1-1024x991.png"), linkedin: "https://www.linkedin.com/in/fabrianchi/" },
+  { key: "jv", img: wpUpload("JV-Team-1024x991.png"), linkedin: "https://www.linkedin.com/in/jlvilasoler/" },
+  { key: "af", img: wpUpload("AF-Team-1024x991.png"), linkedin: "https://www.linkedin.com/in/figueroaanthony/" },
+  { key: "rg", img: wpUpload("RG-1024x991.png") },
   { key: "dv", img: "/images/marketplace-uploads/DV-Team.png" },
-  { key: "ab", img: `${UP}/AB-Team-1024x991.png` },
-  { key: "dg", img: `${UP}/DG-Team-HRS-1024x991.png` },
+  { key: "ab", img: wpUpload("AB-Team-1024x991.png") },
+  { key: "dg", img: wpUpload("DG-Team-HRS-1024x991.png") },
 ] as const;
 
 function LinkedInIcon() {
@@ -140,7 +140,7 @@ export function MarketplaceCompanyPage() {
                 <div className="market-corp-company-intro__visual">
                   <div className="market-corp-company-intro__img-wrap">
                     <img
-                      src={`${UP}/HRS-ASICS-HOT.png`}
+                      src={wpUpload("HRS-ASICS-HOT.png")}
                       alt={t("company.intro.img_alt")}
                       width={772}
                       height={1376}

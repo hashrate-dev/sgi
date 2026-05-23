@@ -26,6 +26,7 @@ import {
   type NhWatcherSlotRow,
 } from "../lib/nicehashWatcherSlots";
 import { nhAcceptedSpeedLooksLikeTh, nhRigSpeedAcceptedFromStats } from "../lib/nhSpeedAccepted";
+import { HASHRATE_SPACE_LOGO } from "../lib/marketplaceWpAssets.js";
 import "./nicehashFleetHashrateModal.css";
 
 export type FleetHashRigRow = {
@@ -46,7 +47,7 @@ const LIVE_SEED_BUCKETS = 90;
 const LIVE_MAX_POINTS_PER_RIG = 480;
 
 const HASHRATE_LOGO_LOCAL = "/images/LOGO-HASHRATE.png";
-const HASHRATE_LOGO_CDN = "https://hashrate.space/wp-content/uploads/hashrate-LOGO.png";
+const HASHRATE_LOGO_CDN = HASHRATE_SPACE_LOGO;
 const HASHRATE_LOGO_LOCAL_ALT = "/images/HASHRATELOGO2.png";
 
 /** CDN primero (suele ir con alpha); locales como respaldo (a veces vienen con fondo blanco). */

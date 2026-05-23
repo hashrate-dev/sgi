@@ -6626,7 +6626,7 @@ button.product-modal__btn--quote-cart:active {
 .market-corp-hero-full__bg {
   position: absolute;
   inset: 0;
-  background-image: url("https://hashrate.space/wp-content/uploads/HRS-ASICS-HOT.png");
+  background-image: url("/images/wp-uploads/HRS-ASICS-HOT.png");
   background-size: cover;
   background-position: center center;
   background-color: #fff;
@@ -7437,7 +7437,7 @@ button.product-modal__btn--quote-cart:active {
   position: absolute;
   inset: 0;
   background-color: #454156;
-  background-image: url("https://hashrate.space/wp-content/uploads/itaipu-py.webp");
+  background-image: url("/images/wp-uploads/itaipu-py.webp");
   background-position: center -3cm;
   background-repeat: no-repeat;
   background-size: cover;
@@ -7623,7 +7623,7 @@ button.product-modal__btn--quote-cart:active {
       rgba(92, 200, 102, 0.38) 52%,
       rgba(1, 30, 45, 0.85) 100%
     ),
-    url("https://hashrate.space/wp-content/uploads/hydro-ss21.jpeg");
+    url("/images/wp-uploads/hydro-ss21.jpeg");
   background-size: cover;
   background-position: center 22%;
   background-repeat: no-repeat;
@@ -8664,7 +8664,7 @@ button.product-modal__btn--quote-cart:active {
 .market-corp-strip__bg {
   position: absolute;
   inset: 0;
-  background-image: url("https://hashrate.space/wp-content/uploads/background.png");
+  background-image: url("/images/wp-uploads/background.png");
   background-size: cover;
   background-position: left top;
 }
@@ -8698,6 +8698,13 @@ button.product-modal__btn--quote-cart:active {
 .site-footer--marketplace__strip .market-corp-strip__brand--footer {
   margin-left: 0;
   max-width: 100%;
+}
+
+.site-footer--marketplace__strip .market-corp-strip__logo-img {
+  display: block;
+  max-height: 46px;
+  width: auto;
+  filter: brightness(0) invert(1);
 }
 
 .site-footer--marketplace__strip .market-corp-strip__tagline--footer {
@@ -9537,7 +9544,7 @@ button.product-modal__btn--quote-cart:active {
 .market-services-hero__bg {
   position: absolute;
   inset: 0;
-  background: url("https://hashrate.space/wp-content/uploads/Fabrizio-Hash.png") left top / contain no-repeat;
+  background: url("/images/wp-uploads/Fabrizio-Hash.png") left top / contain no-repeat;
   opacity: 0.18;
   pointer-events: none;
 }
@@ -9659,7 +9666,7 @@ button.product-modal__btn--quote-cart:active {
   position: relative;
   background:
     linear-gradient(45deg, rgba(0, 105, 255, 0.86) 0%, rgba(92, 200, 102, 0.86) 100%),
-    url("https://hashrate.space/wp-content/uploads/Equipos-Hashrate.png") center / cover no-repeat;
+    url("/images/wp-uploads/Equipos-Hashrate.png") center / cover no-repeat;
   padding: clamp(2.5rem, 7vw, 5rem) 1.25rem;
 }
 

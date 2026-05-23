@@ -42,7 +42,7 @@ export async function downloadHostingFxTicketPdf(op: HostingFxOperation): Promis
     logo = await loadImageAsBase64(`${base}images/LOGO-HASHRATE.png`);
   } catch {
     try {
-      logo = await loadImageAsBase64("https://hashrate.space/wp-content/uploads/hashrate-LOGO.png");
+      logo = await loadImageAsBase64(`${base}images/wp-uploads/hashrate-LOGO.png`);
     } catch {
       /* sin logo */
     }

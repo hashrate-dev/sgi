@@ -5,7 +5,7 @@ import { MarketplaceSiteFooter } from "../components/marketplace/MarketplaceSite
 import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
 import "../styles/marketplace-hashrate.css";
 
-const UP = "https://hashrate.space/wp-content/uploads";
+import { wpUpload } from "../lib/marketplaceWpAssets.js";
 
 /** Mismo destacado Z15 que en HOME corporativa (`MarketplaceCorporateHomePage`) */
 const CORP_Z15_PROMO_IMG = `${import.meta.env.BASE_URL}images/bitmain-z15-pro.png`;
@@ -75,7 +75,7 @@ export function MarketplaceServicesPage() {
                 <article key={item.key} className="market-services-card">
                   <div
                     className="market-services-card__bg"
-                    style={{ backgroundImage: `url(${UP}/background.png)` }}
+                    style={{ backgroundImage: `url(${wpUpload("background.png")})` }}
                     aria-hidden
                   />
                   <span className="market-services-card__icon" aria-hidden>

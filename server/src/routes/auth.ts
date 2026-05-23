@@ -308,7 +308,7 @@ async function sendPasswordResetEmail(
     <div style="margin:0;padding:24px;background:#ffffff;font-family:Inter,Segoe UI,Arial,sans-serif;color:#000000">
       <div style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #d1d5db;border-radius:16px;overflow:hidden">
         <div style="padding:24px 28px 14px;background:#ffffff">
-          <img src="https://hashrate.space/wp-content/uploads/hashrate-LOGO.png" alt="Hashrate Space" style="height:44px;width:auto;display:block" />
+          <img src="https://hashrate.space/images/wp-uploads/hashrate-LOGO.png" alt="Hashrate Space" style="height:44px;width:auto;display:block" />
         </div>
         <div style="padding:8px 28px 26px">
           <h1 style="margin:0 0 12px;font-size:30px;line-height:1.15;color:#000000">${escapeHtml(copy.headline)}</h1>

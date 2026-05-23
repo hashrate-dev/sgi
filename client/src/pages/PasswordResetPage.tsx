@@ -4,7 +4,8 @@ import { confirmPasswordReset, requestPasswordReset } from "../lib/api";
 import { MarketplacePasswordField } from "../components/marketplace/MarketplacePasswordField";
 import "../styles/facturacion.css";
 
-const HASHRATE_LOGO = "https://hashrate.space/wp-content/uploads/hashrate-LOGO.png";
+import { HASHRATE_SPACE_LOGO } from "../lib/marketplaceWpAssets.js";
+const HASHRATE_LOGO = HASHRATE_SPACE_LOGO;
 type UiLang = "es" | "en" | "pt";
 
 function normalizeUiLang(raw?: string | null): UiLang | null {

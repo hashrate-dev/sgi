@@ -2,13 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import type { HostingFxOperation, HostingInvoiceTransferCommissionRow } from "../lib/api";
 import { hostingFxTipoDescripcionLarga, hostingFxTipoTableLabel } from "../lib/hostingFxOperationClassification";
 import { hostingFxOperationProfitUsd } from "../lib/hostingFxOperationProfit";
+import { HASHRATE_SPACE_LOGO } from "../lib/marketplaceWpAssets.js";
 
 const FX_HISTORIAL_PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
 
 const TRANSFER_COMMISSION_TABLE_HELP =
   "Solo facturas hosting cuyo detalle incluye líneas «4% Gastos Operativos Transferencia» y además existe un Recibo de pago vinculado a esa factura, con fecha de pago registrada (pago efectuado). Las operaciones de cambio no condicionan este listado.";
 
-const HASHRATE_LOGO = "https://hashrate.space/wp-content/uploads/hashrate-LOGO.png";
+const HASHRATE_LOGO = HASHRATE_SPACE_LOGO;
 
 /** Mes/año legible a partir de la fecha de operación (YYYY-MM-DD u otro prefijo ISO). */
 function mesDesdeFechaOperacion(operationDate: string | undefined): string {

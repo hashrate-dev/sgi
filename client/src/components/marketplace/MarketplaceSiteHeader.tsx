@@ -5,6 +5,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useOptionalMarketplaceQuoteCart } from "../../contexts/MarketplaceQuoteCartContext.js";
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
 import type { MarketplaceLang } from "../../lib/i18n.js";
+import { HASHRATE_SPACE_LOGO } from "../../lib/marketplaceWpAssets.js";
 import { MARKETPLACE, mpHome } from "../../lib/marketplacePaths.js";
 
 function pathIs(pathname: string, target: string): boolean {
@@ -83,7 +84,7 @@ export function MarketplaceSiteHeader() {
         <Link className="logo-link logo-link--main" to={homePath} aria-label={t("header.logo_aria")}>
           <img
             className="site-logo-img"
-            src="https://hashrate.space/wp-content/uploads/hashrate-LOGO.png"
+            src={HASHRATE_SPACE_LOGO}
             alt="Hashrate Space"
             width={248}
             height={60}

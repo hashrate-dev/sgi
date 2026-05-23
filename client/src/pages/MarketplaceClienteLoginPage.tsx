@@ -10,7 +10,8 @@ import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
 import "../styles/marketplace-hashrate.css";
 import "../styles/facturacion.css";
 
-const HASHRATE_LOGO = "https://hashrate.space/wp-content/uploads/hashrate-LOGO.png";
+import { HASHRATE_SPACE_LOGO } from "../lib/marketplaceWpAssets.js";
+const HASHRATE_LOGO = HASHRATE_SPACE_LOGO;
 
 export function MarketplaceClienteLoginPage() {
   const { t, lang } = useMarketplaceLang();

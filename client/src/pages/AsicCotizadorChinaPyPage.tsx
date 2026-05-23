@@ -7,7 +7,8 @@ import "../styles/facturacion.css";
 const DEFAULT_BLOQUE_USD = 220;
 const DEFAULT_MULT = 1.23;
 const DEFAULT_PROVEEDOR_USD = 300;
-const HASHRATE_LOGO = "https://hashrate.space/wp-content/uploads/hashrate-LOGO.png";
+import { HASHRATE_SPACE_LOGO } from "../lib/marketplaceWpAssets.js";
+const HASHRATE_LOGO = HASHRATE_SPACE_LOGO;
 
 const ASIC_MODELOS = ["S21", "L7", "L9", "Z15", "X9"] as const;
 

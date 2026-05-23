@@ -15,11 +15,11 @@ import type { AsicProduct } from "../lib/marketplaceAsicCatalog.js";
 import { getMarketplaceCorpBestSelling, getMarketplaceCorpInteresting, wakeUpBackend } from "../lib/api.js";
 import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
 import { isCorpHomePath, MARKETPLACE } from "../lib/marketplacePaths.js";
+import { wpUpload } from "../lib/marketplaceWpAssets.js";
 import { useAuth } from "../contexts/AuthContext";
 import "../styles/marketplace-hashrate.css";
 
 const DOC_TITLE = "Hashrate – Space";
-const UP = "https://hashrate.space/wp-content/uploads";
 const VIDEO_URL = "https://hashrate.space/video/Hashrate-Farm-Py.mp4";
 /** Promo Z15 — reemplazá `public/images/bitmain-z15-pro.png` por el render oficial si querés otro asset */
 const CORP_Z15_PROMO_IMG = `${import.meta.env.BASE_URL}images/bitmain-z15-pro.png`;
@@ -38,10 +38,10 @@ const CORP_FAQ_ROWS = [
 const CORP_ANCHOR_IDS = ["servicios", "faq", "contacto"] as const;
 
 const STAT_ICONS = {
-  security: `${UP}/Security-150x150.png`,
-  dc: `${UP}/Data_Center-150x150.png`,
-  watt: `${UP}/Watt-150x150.png`,
-  miner: `${UP}/HRS-asic-1-e1745411075254.png`,
+  security: wpUpload("Security-150x150.png"),
+  dc: wpUpload("Data_Center-150x150.png"),
+  watt: wpUpload("Watt-150x150.png"),
+  miner: wpUpload("HRS-asic-1-e1745411075254.png"),
 } as const;
 
 /** Tarjeta 1: minero ASIC — `public/images/corp-how-miner-card1.png` (asset usuario, fondo verde degradé). */
@@ -66,12 +66,12 @@ const CORP_HOW_STEPS = [
 ] as const;
 
 const BRAND_LOGOS = [
-  { src: `${UP}/bitmain.png`, alt: "Bitmain", w: 512, h: 180, slug: "bitmain" as const },
-  { src: `${UP}/canaan-logo.png`, alt: "Canaan", w: 616, h: 188, slug: "canaan" as const },
-  { src: `${UP}/microbt-logo.png`, alt: "MicroBT", w: 400, h: 126, slug: "microbt" as const },
-  { src: `${UP}/logo-inosili.png`, alt: "Innosilicon", w: 400, h: 50, slug: "innosilicon" as const },
-  { src: `${UP}/iceriver-logo.webp`, alt: "IceRiver", w: 290, h: 31, slug: "iceriver" as const },
-  { src: `${UP}/elphapex-logo.png`, alt: "Elphapex", w: 712, h: 148, slug: "elphapex" as const },
+  { src: wpUpload("bitmain.png"), alt: "Bitmain", w: 512, h: 180, slug: "bitmain" as const },
+  { src: wpUpload("canaan-logo.png"), alt: "Canaan", w: 616, h: 188, slug: "canaan" as const },
+  { src: wpUpload("microbt-logo.png"), alt: "MicroBT", w: 400, h: 126, slug: "microbt" as const },
+  { src: wpUpload("logo-inosili.png"), alt: "Innosilicon", w: 400, h: 50, slug: "innosilicon" as const },
+  { src: wpUpload("iceriver-logo.webp"), alt: "IceRiver", w: 290, h: 31, slug: "iceriver" as const },
+  { src: wpUpload("elphapex-logo.png"), alt: "Elphapex", w: 712, h: 148, slug: "elphapex" as const },
 ] as const;
 
 /**
@@ -616,7 +616,7 @@ export function MarketplaceCorporateHomePage() {
                 >
                   <img
                     className="market-corp-luxor__img"
-                    src={`${UP}/Luxor-logo.png`}
+                    src={wpUpload("Luxor-logo.png")}
                     alt=""
                     width={855}
                     height={294}

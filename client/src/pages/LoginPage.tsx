@@ -8,7 +8,8 @@ import { MARKETPLACE } from "../lib/marketplacePaths";
 import { isVercelOrPrimaryPublicHost } from "../lib/hashrateHosts";
 import "../styles/facturacion.css";
 
-const HASHRATE_LOGO = "https://hashrate.space/wp-content/uploads/hashrate-LOGO.png";
+import { HASHRATE_SPACE_LOGO } from "../lib/marketplaceWpAssets.js";
+const HASHRATE_LOGO = HASHRATE_SPACE_LOGO;
 
 export function LoginPage() {
   const { user, login } = useAuth();
