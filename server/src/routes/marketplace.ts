@@ -36,6 +36,7 @@ import { loadGarantiaQuoteRows } from "../lib/marketplaceGarantiaQuote.js";
 import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
 import { mpVisibleFromDbValue } from "../lib/mpVisible.js";
 import { sendMarketplaceAsicInquiryEmail, sendMarketplaceContactEmail } from "../lib/marketplaceContactEmail.js";
+import { resolvePublicAppOrigin } from "../lib/publicAppOrigin.js";
 
 export const marketplaceRouter = Router();
 
@@ -595,6 +596,7 @@ marketplaceRouter.post("/marketplace/contact", marketplacePublicPostRateLimit, a
     return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
   }
   try {
+    const siteOrigin = resolvePublicAppOrigin(req);
     const { simulated } = await sendMarketplaceContactEmail({
       firstName: parsed.data.name,
       lastName: parsed.data.lastName,
@@ -602,6 +604,7 @@ marketplaceRouter.post("/marketplace/contact", marketplacePublicPostRateLimit, a
       subject: parsed.data.subject,
       phone: parsed.data.phone,
       message: parsed.data.message,
+      siteOrigin,
     });
     res.json({ ok: true as const, simulated });
   } catch (e) {
@@ -617,12 +620,14 @@ marketplaceRouter.post("/marketplace/asic-inquiry", marketplacePublicPostRateLim
     return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
   }
   try {
+    const siteOrigin = resolvePublicAppOrigin(req);
     const { simulated } = await sendMarketplaceAsicInquiryEmail({
       visitorEmail: parsed.data.email,
       visitorName: parsed.data.name,
       subject: parsed.data.subject,
       message: parsed.data.message,
       source: parsed.data.source,
+      siteOrigin,
     });
     res.json({ ok: true as const, simulated });
   } catch (e) {
