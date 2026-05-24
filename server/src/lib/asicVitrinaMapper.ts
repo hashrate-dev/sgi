@@ -7,6 +7,7 @@ import {
   capProductGalleryUrls,
   dedupeGalleryUrls,
   galleryFileKey,
+  MARKETPLACE_PRODUCT_GALLERY_MAX,
   normalizeMarketplaceImageSrc,
 } from "./marketplaceImageSrc.js";
 import { resolveMarketplaceAlgoForPersist } from "./whattomineYield.js";
@@ -205,7 +206,7 @@ export function mapEquipoRowToVitrina(row: EquipoAsicVitrinaRow): VitrinaAsicPro
     const withoutMainDup = gallerySrcs.filter((u) => galleryFileKey(u) !== mainKey);
     if (withoutMainDup.length > 0) gallerySrcs = withoutMainDup;
   }
-  if (gallerySrcs && gallerySrcs.length > 2) {
+  if (gallerySrcs && gallerySrcs.length > MARKETPLACE_PRODUCT_GALLERY_MAX) {
     gallerySrcs = capProductGalleryUrls(gallerySrcs);
   }
   const priceUsd = Math.max(0, Math.round(Number(row.precio_usd) || 0));

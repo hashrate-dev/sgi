@@ -27,10 +27,10 @@ export function galleryFileKey(url: string): string {
     .toLowerCase();
 }
 
+export const MARKETPLACE_PRODUCT_GALLERY_MAX = 3;
+
 export function capProductGalleryUrls(urls: string[]): string[] {
-  if (urls.length <= 2) return urls;
-  if (urls.length >= 4) return urls.slice(0, urls.length - 2);
-  return urls.slice(0, 2);
+  return urls.slice(0, MARKETPLACE_PRODUCT_GALLERY_MAX);
 }
 
 export function dedupeGalleryUrls(urls: string[]): string[] {

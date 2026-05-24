@@ -159,15 +159,12 @@ export function resolveMarketplaceListingKind(p: AsicListingTitleFields): Market
   return inferMinerListingFromTitles(p.brand, p.model) ? "miner" : "infrastructure";
 }
 
-/**
- * Modal vitrina: recorta duplicados erróneos al final de la galería en BD.
- * - 3 fotos → quita la última (1 duplicado).
- * - 4+ fotos → quitan las 2 últimas (p. ej. S21 Hydro con 5 → quedan 3).
- */
+/** Máximo de miniaturas en el modal de producto (vitrina). */
+export const MARKETPLACE_PRODUCT_GALLERY_MAX = 3;
+
+/** Recorta la galería al máximo visible en el modal. */
 export function capProductGalleryUrls(urls: string[]): string[] {
-  if (urls.length <= 2) return urls;
-  if (urls.length >= 4) return urls.slice(0, urls.length - 2);
-  return urls.slice(0, 2);
+  return urls.slice(0, MARKETPLACE_PRODUCT_GALLERY_MAX);
 }
 
 /** Rendimiento estimado + bloque hosting del modal solo para fichas tipo minero. */

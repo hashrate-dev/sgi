@@ -2054,6 +2054,10 @@ body:has(.asic-email-window) {
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
+  max-height: min(152px, 100%);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
 }
 
 .product-modal__thumb {

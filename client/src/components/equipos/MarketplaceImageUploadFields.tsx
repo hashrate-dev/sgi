@@ -1,5 +1,6 @@
 import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { uploadMarketplaceAsicImage } from "../../lib/api";
+import { MARKETPLACE_PRODUCT_GALLERY_MAX } from "../../lib/marketplaceAsicCatalog.js";
 import { showToast } from "../ToastNotification";
 import "./MarketplaceImageUploadFields.css";
 
@@ -293,10 +294,27 @@ export function GalleryImagesUploadField({
       showToast("No hay imágenes válidas.", "error", "Equipos ASIC");
       return;
     }
+    const slotsLeft = Math.max(0, MARKETPLACE_PRODUCT_GALLERY_MAX - urls.length);
+    if (slotsLeft <= 0) {
+      showToast(
+        `La galería del modal admite hasta ${MARKETPLACE_PRODUCT_GALLERY_MAX} fotos. Quitá una para agregar otra.`,
+        "warning",
+        "Equipos ASIC"
+      );
+      return;
+    }
+    const toUpload = list.slice(0, slotsLeft);
+    if (toUpload.length < list.length) {
+      showToast(
+        `Solo se agregaron ${toUpload.length} foto(s): máximo ${MARKETPLACE_PRODUCT_GALLERY_MAX} en el modal.`,
+        "warning",
+        "Equipos ASIC"
+      );
+    }
     setUploading(true);
     try {
       const newUrls: string[] = [];
-      for (const file of list) {
+      for (const file of toUpload) {
         const optimized = await optimizeMarketplaceImage(file);
         const { url } = await uploadMarketplaceAsicImage(optimized);
         newUrls.push(url);
@@ -321,7 +339,7 @@ export function GalleryImagesUploadField({
   function onDragOver(e: DragEvent) {
     e.preventDefault();
     e.stopPropagation();
-    if (!disabled && !uploading) setDragActive(true);
+    if (!disabled && !uploading && urls.length < MARKETPLACE_PRODUCT_GALLERY_MAX) setDragActive(true);
   }
 
   function onDragLeave(e: DragEvent) {
@@ -334,18 +352,20 @@ export function GalleryImagesUploadField({
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    if (disabled || uploading) return;
+    if (disabled || uploading || urls.length >= MARKETPLACE_PRODUCT_GALLERY_MAX) return;
     if (e.dataTransfer.files?.length) void processFiles(e.dataTransfer.files);
   }
 
   function openPicker() {
-    if (!disabled && !uploading) inputRef.current?.click();
+    if (!disabled && !uploading && urls.length < MARKETPLACE_PRODUCT_GALLERY_MAX) inputRef.current?.click();
   }
 
   const zoneClass = [
     "hrs-upload-dropzone",
     "hrs-upload-gallery-drop",
-    disabled || uploading ? "hrs-upload-dropzone--disabled" : "",
+    disabled || uploading || urls.length >= MARKETPLACE_PRODUCT_GALLERY_MAX
+      ? "hrs-upload-dropzone--disabled"
+      : "",
     dragActive ? "hrs-upload-dropzone--active" : "",
   ]
     .filter(Boolean)
@@ -353,7 +373,9 @@ export function GalleryImagesUploadField({
 
   return (
     <div className="fact-field hrs-upload-field">
-      <span className="hrs-upload-label">Galería modal (fotos del detalle)</span>
+      <span className="hrs-upload-label">
+        Galería modal (fotos del detalle, máx. {MARKETPLACE_PRODUCT_GALLERY_MAX})
+      </span>
 
       {urls.length > 0 ? (
         <div className="hrs-upload-gallery-grid">
@@ -382,7 +404,7 @@ export function GalleryImagesUploadField({
         className={zoneClass}
         role="button"
         aria-label="Agregar fotos a la galería"
-        tabIndex={disabled || uploading ? -1 : 0}
+        tabIndex={disabled || uploading || urls.length >= MARKETPLACE_PRODUCT_GALLERY_MAX ? -1 : 0}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
@@ -403,7 +425,7 @@ export function GalleryImagesUploadField({
           aria-hidden
           tabIndex={-1}
           onChange={onFiles}
-          disabled={disabled || uploading}
+          disabled={disabled || uploading || urls.length >= MARKETPLACE_PRODUCT_GALLERY_MAX}
         />
         <div className="hrs-upload-dropzone-inner">
           <div className="hrs-upload-dropzone-icon" aria-hidden>
@@ -412,7 +434,9 @@ export function GalleryImagesUploadField({
           <p className="hrs-upload-dropzone-title">
             {uploading ? "Subiendo…" : "Arrastrá fotos aquí o hacé clic para agregar las que quieras"}
           </p>
-          <p className="hrs-upload-dropzone-hint">Podés elegir varias a la vez · JPG, PNG, WebP, GIF</p>
+          <p className="hrs-upload-dropzone-hint">
+            Hasta {MARKETPLACE_PRODUCT_GALLERY_MAX} fotos en el modal · JPG, PNG, WebP, GIF
+          </p>
         </div>
       </div>
     </div>
