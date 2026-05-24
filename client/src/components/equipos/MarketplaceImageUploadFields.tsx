@@ -1,6 +1,11 @@
 import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { uploadMarketplaceAsicImage } from "../../lib/api";
 import { MARKETPLACE_PRODUCT_GALLERY_MAX } from "../../lib/marketplaceAsicCatalog.js";
+import {
+  isAcceptableMarketplaceImageFile,
+  marketplaceUploadUsesInlineImages,
+  optimizeMarketplaceImage,
+} from "../../lib/marketplaceImageOptimize.js";
 import { showToast } from "../ToastNotification";
 import "./MarketplaceImageUploadFields.css";
 
@@ -21,86 +26,6 @@ function fileLabelFromPath(path: string): string {
     return seg ? decodeURIComponent(seg) : t;
   } catch {
     return t.slice(-40);
-  }
-}
-
-const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp)$/i;
-
-/** PNG/JPEG/GIF/WebP por firma (archivos sin extensión suelen venir con `type` vacío al elegir desde carpeta). */
-async function sniffImageMagic(file: File): Promise<boolean> {
-  if (file.size < 12) return false;
-  try {
-    const buf = await file.slice(0, 16).arrayBuffer();
-    const u = new Uint8Array(buf);
-    if (u.length >= 3 && u[0] === 0xff && u[1] === 0xd8 && u[2] === 0xff) return true;
-    if (u.length >= 8 && u[0] === 0x89 && u[1] === 0x50 && u[2] === 0x4e && u[3] === 0x47) return true;
-    if (u.length >= 6 && u[0] === 0x47 && u[1] === 0x49 && u[2] === 0x46 && u[3] === 0x38) return true;
-    if (u.length >= 12 && u[0] === 0x52 && u[1] === 0x49 && u[2] === 0x46 && u[3] === 0x46) {
-      const tag = String.fromCharCode(u[8]!, u[9]!, u[10]!, u[11]!);
-      return tag === "WEBP";
-    }
-  } catch {
-    return false;
-  }
-  return false;
-}
-
-async function isAcceptableMarketplaceImageFile(file: File): Promise<boolean> {
-  if (file.type.startsWith("image/")) return true;
-  if (IMAGE_EXT_RE.test(file.name)) return true;
-  if (!file.type || file.type === "application/octet-stream") return sniffImageMagic(file);
-  return false;
-}
-
-async function loadImageElement(file: File): Promise<HTMLImageElement> {
-  const objectUrl = URL.createObjectURL(file);
-  try {
-    const img = new Image();
-    img.decoding = "async";
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error("No se pudo leer la imagen."));
-      img.src = objectUrl;
-    });
-    return img;
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
-}
-
-/**
- * Reduce tamaño antes de subir (clave para evitar 413 al guardar equipos con galería inline).
- * - Mantiene GIF sin tocar (animación).
- * - Resto: redimensiona (máx. 1600px) y exporta JPEG/WebP con calidad media.
- */
-async function optimizeMarketplaceImage(file: File): Promise<File> {
-  if (!file.type.startsWith("image/")) return file;
-  if (file.type === "image/gif") return file;
-  if (file.size <= 450_000) return file;
-  try {
-    const img = await loadImageElement(file);
-    const maxDim = 1600;
-    const ratio = Math.min(1, maxDim / Math.max(img.width, img.height));
-    const width = Math.max(1, Math.round(img.width * ratio));
-    const height = Math.max(1, Math.round(img.height * ratio));
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return file;
-    ctx.drawImage(img, 0, 0, width, height);
-    const outType = file.type === "image/png" ? "image/png" : "image/jpeg";
-    const quality = outType === "image/png" ? undefined : 0.82;
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, outType, quality)
-    );
-    if (!blob || blob.size <= 0) return file;
-    if (blob.size >= file.size * 0.98) return file;
-    const ext = outType === "image/png" ? "png" : "jpg";
-    const base = file.name.replace(/\.[^.]+$/, "");
-    return new File([blob], `${base}.${ext}`, { type: outType });
-  } catch {
-    return file;
   }
 }
 
@@ -220,7 +145,12 @@ export function CardImageUploadField({
             <p className="hrs-upload-dropzone-title">
               {uploading ? "Subiendo…" : "Arrastrá una imagen aquí o hacé clic para elegir"}
             </p>
-            <p className="hrs-upload-dropzone-hint">JPG, PNG, WebP o GIF · hasta 8 MB en local · hasta ~4 MB en app alojada</p>
+            <p className="hrs-upload-dropzone-hint">
+              JPG, PNG, WebP o GIF
+              {marketplaceUploadUsesInlineImages()
+                ? " · en hashrate.space se comprimen al subir (máx. ~300 KB c/u)"
+                : " · hasta 8 MB en local"}
+            </p>
           </div>
         ) : (
           <div className="hrs-upload-preview-row">

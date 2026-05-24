@@ -314,6 +314,12 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
         lastError = new Error(get502Message());
         continue;
       }
+      if (res.status === 413) {
+        throw makeApiError(
+          "El envío es demasiado grande (suele ser por varias fotos en la vitrina). Reemplazá las imágenes por archivos más chicos o guardá con menos fotos en la galería.",
+          413
+        );
+      }
       if (res.status === 404) {
         const payload = data as { error?: { message?: string; code?: string } };
         const msg = payload?.error?.message ?? "Recurso no encontrado";

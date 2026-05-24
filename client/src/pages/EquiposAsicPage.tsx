@@ -33,6 +33,12 @@ import { AsicProductModal } from "../components/marketplace/AsicProductModal";
 import { PrecioHistorialFullModal } from "../components/equipos/PrecioHistorialFullModal";
 import { equipoASICToModalProduct } from "../lib/equipoAsicModalMapper";
 import { showToast } from "../components/ToastNotification";
+import {
+  estimateJsonPayloadBytes,
+  HOSTED_EQUIPO_SAVE_MAX_BYTES,
+  marketplaceUploadUsesInlineImages,
+  shrinkEquipoMarketplaceImagesForSave,
+} from "../lib/marketplaceImageOptimize.js";
 import { useAuth } from "../contexts/AuthContext";
 import {
   canEditEquipoMarketplacePrecioYTienda,
@@ -638,7 +644,19 @@ export function EquiposAsicPage() {
       }
     }
     const mp = buildMarketplacePayload(formData);
-    const basePayload = buildEquipoSavePayload(formData);
+    let basePayload = buildEquipoSavePayload(formData);
+    basePayload = await shrinkEquipoMarketplaceImagesForSave(basePayload);
+    if (marketplaceUploadUsesInlineImages()) {
+      const bytes = estimateJsonPayloadBytes(basePayload);
+      if (bytes > HOSTED_EQUIPO_SAVE_MAX_BYTES) {
+        showToast(
+          "Las fotos del equipo siguen siendo demasiado grandes. Reemplazá las imágenes de tarjeta y galería por archivos más chicos (JPG) o guardá con menos fotos.",
+          "error",
+          "Equipos ASIC"
+        );
+        return;
+      }
+    }
 
     try {
       if (editingEquipo) {
@@ -820,9 +838,10 @@ export function EquiposAsicPage() {
     try {
       setPrecioModalSaving(true);
       if (editingEquipo) {
-        await updateEquipo(editingEquipo.id, {
-          ...buildEquipoSavePayload({ ...formData, precioUSD: newP }),
-        });
+        const precioPayload = await shrinkEquipoMarketplaceImagesForSave(
+          buildEquipoSavePayload({ ...formData, precioUSD: newP })
+        );
+        await updateEquipo(editingEquipo.id, precioPayload);
         const refreshed = await getEquipos();
         const items = refreshed.items ?? [];
         setEquipos(items);

@@ -25,6 +25,7 @@ import {
 } from "../lib/precioHistorialAsic.js";
 import { codigoProductoVitrina } from "../lib/marketplaceProductCode.js";
 import { isAdminABRole, logEquipoAsicAudit } from "../lib/equipoAsicAudit.js";
+import { compressMarketplaceImageBuffer } from "../lib/compressMarketplaceImage.js";
 import { mimeForSniffedFormat, sniffImageFormat } from "../lib/marketplaceImageSniff.js";
 import { resolveVitrinaListingKind } from "../lib/asicVitrinaMapper.js";
 import { mpVisibleFromDbValue } from "../lib/mpVisible.js";
@@ -704,7 +705,7 @@ equiposRouter.post(
       next();
     });
   },
-  (req: Request, res: Response) => {
+  async (req: Request, res: Response) => {
     const file = req.file;
     if (!file) {
       return res.status(400).json({ error: { message: "Archivo requerido (campo file)" } });
@@ -741,16 +742,16 @@ equiposRouter.post(
       }
       return res.status(400).json({ error: { message: "Solo imágenes (JPEG, PNG, WebP, GIF)." } });
     }
-    const verifiedMime = mimeForSniffedFormat(fmt);
     if (marketplaceImageUploadUsesMemory()) {
-      const url = `data:${verifiedMime};base64,${buf.toString("base64")}`;
+      const compressed = await compressMarketplaceImageBuffer(buf, fmt);
+      const url = `data:${compressed.mime};base64,${compressed.buf.toString("base64")}`;
       void logEquipoAsicAudit({
         user: req.user!,
         equipoId: null,
         codigoProducto: null,
         action: "marketplace_image",
         summary: "Imagen cargada para tienda online (inline, serverless)",
-        details: { urlPrefix: url.slice(0, 48), bytes: buf.length },
+        details: { urlPrefix: url.slice(0, 48), bytes: compressed.buf.length },
       });
       return res.status(201).json({ url });
     }
