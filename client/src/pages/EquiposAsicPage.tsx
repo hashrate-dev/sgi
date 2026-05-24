@@ -84,7 +84,7 @@ type FamiliaProcesadorPreset = "l9" | "l7" | "s21" | "z15";
 /** Presets de hashrate según modelo (texto guardado en BD = valor del `option`). L9/L7 en MH/s, S21 en TH/s. */
 const PROCESADOR_PRESETS_L9 = ["15.000 MH/s", "16.000 MH/s", "16.500 MH/s", "17.000 MH/s"] as const;
 const PROCESADOR_PRESETS_L7 = ["8.800 MH/s", "9.050 MH/s", "9.500 MH/s"] as const;
-const PROCESADOR_PRESETS_Z15 = ["420 kSol/s", "840 kSol/s"] as const;
+const PROCESADOR_PRESETS_Z15 = ["420 kSol/s", "840 kSol/s", "860 kSol/s"] as const;
 const PROCESADOR_PRESETS_S21 = [
   "200 TH/s",
   "234 TH/s",
