@@ -82,28 +82,6 @@ const marketplaceLiveIconFlash = keyframes`
   }
 `;
 
-const marketplaceOrdersAlertPulse = keyframes`
-  0%, 100% {
-    background: #f0fdf4;
-    border-color: #dcfce7;
-    box-shadow: 0 0 0 rgba(239, 68, 68, 0);
-  }
-  50% {
-    background: #fee2e2;
-    border-color: #f87171;
-    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.22);
-  }
-`;
-
-const marketplaceOrdersIconFlash = keyframes`
-  0%, 100% {
-    color: #15803d;
-  }
-  50% {
-    color: #dc2626;
-  }
-`;
-
 const menuItems: MenuItem[] = [
   {
     to: MARKETPLACE.catalog,
@@ -428,12 +406,8 @@ export function HomePage() {
             <RouterLink to="/marketplace/orders" style={DASHBOARD_CARD_LINK_STYLE}>
               <AppCard
                 {...dashboardCardProps}
-                borderLeftWidth="4px"
-                borderLeftColor="green.500"
                 _hover={{
-                  transform: "translateY(-2px)",
-                  boxShadow: "md",
-                  borderColor: "gray.200",
+                  ...dashboardCardProps._hover,
                   "& .dashboard-card-icon-slot": {
                     bg: "green.200",
                     color: "green.800",
@@ -446,7 +420,7 @@ export function HomePage() {
                   className="dashboard-card-icon-slot"
                   mb={3}
                   position="relative"
-                  animation={marketplaceOpenCount > 0 ? `${marketplaceOrdersAlertPulse} 1.12s ease-in-out infinite` : undefined}
+                  animation={marketplaceOpenCount > 0 ? `${marketplaceLiveAlertPulse} 1.12s ease-in-out infinite` : undefined}
                 >
                   <Box
                     as="i"
@@ -455,7 +429,7 @@ export function HomePage() {
                     lineHeight={1}
                     aria-hidden
                     style={{
-                      animation: marketplaceOpenCount > 0 ? `${marketplaceOrdersIconFlash} 1.12s ease-in-out infinite` : undefined,
+                      animation: marketplaceOpenCount > 0 ? `${marketplaceLiveIconFlash} 1.12s ease-in-out infinite` : undefined,
                     }}
                   />
                   {marketplaceOpenCount > 0 ? (

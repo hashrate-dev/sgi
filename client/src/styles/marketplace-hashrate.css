@@ -3641,7 +3641,8 @@ button.product-modal__btn--quote-cart:active {
 }
 
 .market-quote-drawer__body-scroll--has-lines {
-  padding: 0.5rem 0.4rem 0.65rem;
+  flex: 1 1 0%;
+  padding: 0.5rem 0.75rem 0.65rem;
 }
 
 .market-quote-drawer__cart-sticky-summary {
@@ -3649,7 +3650,7 @@ button.product-modal__btn--quote-cart:active {
   display: flex;
   flex-direction: column;
   gap: 0.28rem;
-  margin-top: 0.5cm;
+  margin-top: 0;
   padding: 0.38rem 1rem 0.52rem;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, #f8fafc 100%);
   border-top: 1px solid rgba(15, 23, 42, 0.08);
@@ -10006,7 +10007,117 @@ button.product-modal__btn--quote-cart:active {
   .market-quote-drawer__panel {
     width: 100% !important;
     max-width: 100% !important;
+    height: 100dvh;
+    max-height: 100dvh;
     border-radius: 12px 12px 0 0;
+  }
+
+  /* Carrito móvil: scroll del cuerpo completo (ítems + total) para evitar colapso flex en iOS */
+  .market-quote-drawer__body--cart-layout {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  .market-quote-drawer__body-scroll--has-lines {
+    flex: 0 0 auto;
+    overflow: visible;
+    min-height: unset;
+    padding: 0.65rem max(0.85rem, env(safe-area-inset-left, 0px)) 0.45rem
+      max(0.85rem, env(safe-area-inset-right, 0px));
+  }
+
+  .market-quote-drawer__panel--has-lines .market-quote-drawer__section-label {
+    margin-bottom: 0.45rem;
+    padding-left: 0.1rem;
+    padding-right: 0.1rem;
+  }
+
+  .market-quote-drawer__panel--has-lines .market-quote-drawer__list {
+    gap: 0.65rem;
+  }
+
+  .market-quote-drawer__panel--has-lines .market-quote-drawer__line {
+    padding: 0.72rem 0.82rem 0.68rem;
+  }
+
+  .market-quote-drawer__line-name-spec {
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .market-quote-drawer__line-top {
+    gap: 0.35rem;
+    align-items: flex-start;
+  }
+
+  .market-quote-drawer__line-mid {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.45rem;
+  }
+
+  .market-quote-drawer__cart-sticky-summary {
+    margin-top: 0;
+    padding: 0.35rem max(0.85rem, env(safe-area-inset-left, 0px)) 0.55rem
+      max(0.85rem, env(safe-area-inset-right, 0px));
+    box-shadow: none;
+    border-top: 1px solid rgba(15, 23, 42, 0.1);
+    background: transparent;
+  }
+
+  .market-quote-drawer__cart-sticky-summary .market-quote-drawer__ticket-ref {
+    padding: 0.42rem 0.6rem;
+  }
+
+  .market-quote-drawer__cart-sticky-summary .market-quote-drawer__total,
+  .market-quote-drawer__panel--has-lines .market-quote-drawer__cart-sticky-summary .market-quote-drawer__total {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.55rem;
+    padding: 0.72rem 0.9rem;
+  }
+
+  .market-quote-drawer__total-copy {
+    min-width: 0;
+  }
+
+  .market-quote-drawer__total-note {
+    font-size: 0.82rem;
+    line-height: 1.4;
+  }
+
+  .market-quote-drawer__total-amt,
+  .market-quote-drawer__panel--has-lines .market-quote-drawer__cart-sticky-summary .market-quote-drawer__total-amt {
+    align-self: flex-end;
+    font-size: clamp(1.35rem, 6vw, 1.72rem);
+    white-space: normal;
+    text-align: right;
+    line-height: 1.15;
+  }
+
+  .market-quote-drawer__foot--compact {
+    padding: 0.5rem max(0.85rem, env(safe-area-inset-left, 0px))
+      calc(0.55rem + env(safe-area-inset-bottom, 0px)) max(0.85rem, env(safe-area-inset-right, 0px));
+  }
+
+  .market-quote-drawer__foot--compact .market-quote-drawer__cart-policy {
+    margin-top: 0.35rem;
+    padding: 0.45rem 0.55rem;
+    gap: 0.5rem;
+  }
+
+  .market-quote-drawer__foot--compact .market-quote-drawer__cart-policy-text {
+    font-size: 0.72rem;
+    line-height: 1.38;
+  }
+
+  .market-quote-drawer__foot--compact .market-quote-drawer__cta-pair .market-quote-drawer__btn {
+    min-height: 2rem;
+    font-size: 0.68rem;
   }
 
   .shelf-product__body {
