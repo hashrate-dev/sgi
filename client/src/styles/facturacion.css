@@ -5422,61 +5422,183 @@ button.fact-back {
 }
 
 /* Leads Base — tabla listado SGI */
+.leads-base-page .clientes-listado-wrap {
+  margin-left: 0;
+  margin-right: 0;
+  padding: 0;
+  border-top: none;
+  box-shadow: none;
+  background: transparent;
+  overflow: visible;
+}
+
 .leads-base-listado-wrap {
   border-radius: 12px;
   border: 1px solid #e2e8f0;
   overflow: auto;
   max-height: min(72vh, 760px);
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  -webkit-overflow-scrolling: touch;
 }
-.leads-base-listado-wrap .clientes-listado-table {
-  min-width: 1080px;
+
+.leads-base-listado-wrap .leads-base-listado-table {
+  width: 100%;
+  min-width: 1180px;
+  table-layout: auto;
+  margin-bottom: 0;
 }
-.leads-base-listado-wrap .clientes-listado-table tbody td.leads-base-cell-id {
+
+.leads-base-listado-wrap .leads-base-listado-table thead th,
+.leads-base-listado-wrap .leads-base-listado-table tbody td {
+  padding: 0.65rem 0.85rem;
+  vertical-align: middle;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+.leads-base-listado-wrap .leads-base-listado-table thead.table-dark th {
+  white-space: nowrap;
+  font-size: 0.72rem;
+  padding: 0.75rem 0.85rem;
+}
+
+.leads-base-listado-wrap .leads-base-listado-table tbody td.leads-base-cell-id {
   font-variant-numeric: tabular-nums;
   color: #64748b;
   font-weight: 600;
-  width: 3.5rem;
+  width: 3rem;
+  white-space: nowrap;
 }
-.leads-base-listado-wrap .clientes-listado-table tbody td.leads-base-cell-fecha {
+
+.leads-base-listado-wrap .leads-base-listado-table tbody td.leads-base-cell-fecha {
   font-size: 0.8125rem;
   color: #475569;
   white-space: nowrap;
+  min-width: 9.5rem;
 }
-.leads-base-listado-wrap .clientes-listado-table tbody td.leads-base-cell-nombre {
+
+.leads-base-listado-wrap .leads-base-listado-table tbody td.leads-base-cell-nombre,
+.leads-base-listado-wrap .leads-base-listado-table tbody td.leads-base-cell-apellidos {
   font-weight: 600;
   color: #0f172a;
+  white-space: nowrap;
+  min-width: 5.5rem;
 }
-.leads-base-listado-wrap .clientes-listado-table tbody td.leads-base-cell-obs {
-  white-space: pre-wrap;
-  max-width: 300px;
-  min-width: 140px;
+
+.leads-base-listado-wrap .leads-base-listado-table tbody td.leads-base-cell-apellidos {
+  font-weight: 500;
+  color: #334155;
+}
+
+.leads-base-listado-wrap .leads-base-listado-table tbody td.leads-base-cell-email,
+.leads-base-listado-wrap .leads-base-listado-table tbody td.leads-base-cell-celular,
+.leads-base-listado-wrap .leads-base-listado-table tbody td.leads-base-cell-registrado {
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  color: #475569;
+}
+
+.leads-base-listado-wrap .leads-base-listado-table tbody td.leads-base-cell-email {
+  min-width: 10.5rem;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.leads-base-listado-wrap .leads-base-listado-table tbody td.leads-base-cell-celular {
+  min-width: 6.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.leads-base-listado-wrap .leads-base-listado-table tbody td.leads-base-cell-registrado {
+  min-width: 9rem;
+  max-width: 13rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.leads-base-listado-wrap .leads-base-listado-table tbody td.leads-base-cell-obs {
+  white-space: normal;
+  min-width: 8rem;
+  max-width: 16rem;
   font-size: 0.8125rem;
   color: #475569;
   line-height: 1.45;
 }
-.leads-base-listado-wrap .clientes-listado-table th.leads-base-th-actions,
-.leads-base-listado-wrap .clientes-listado-table td.leads-base-cell-actions {
-  width: 11rem;
-  min-width: 11rem;
+
+.leads-base-listado-wrap .leads-base-listado-table th.leads-base-th-actions,
+.leads-base-listado-wrap .leads-base-listado-table td.leads-base-cell-actions {
+  width: 9.5rem;
+  min-width: 9.5rem;
+  max-width: 9.5rem;
   text-align: center !important;
   position: sticky;
   right: 0;
   z-index: 1;
   box-shadow: -4px 0 8px rgba(15, 23, 42, 0.04);
+  white-space: nowrap;
 }
-.leads-base-listado-wrap .clientes-listado-table thead th.leads-base-th-actions {
+
+.leads-base-listado-wrap .leads-base-listado-table thead th.leads-base-th-actions {
   z-index: 3;
   background-color: #2d5d46 !important;
 }
-.leads-base-listado-wrap .clientes-listado-table tbody td.leads-base-cell-actions {
+
+.leads-base-listado-wrap .leads-base-listado-table tbody td.leads-base-cell-actions {
   background: #fff;
 }
-.leads-base-listado-wrap .clientes-listado-table tbody tr:nth-child(even) td.leads-base-cell-actions {
+
+.leads-base-listado-wrap .leads-base-listado-table tbody tr:nth-child(even) td.leads-base-cell-actions {
   background: #fafbfc;
 }
-.leads-base-listado-wrap .clientes-listado-table tbody tr:hover td.leads-base-cell-actions {
+
+.leads-base-listado-wrap .leads-base-listado-table tbody tr:hover td.leads-base-cell-actions {
   background: #f0fdf4;
+}
+
+.leads-base-listado-wrap .leads-base-listado-table thead.table-dark,
+.leads-base-listado-wrap .leads-base-listado-table thead.table-dark th {
+  background-color: #2d5d46 !important;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.leads-base-listado-wrap .leads-base-listado-table tbody td {
+  border-bottom: 1px solid #f1f5f9;
+  background: #fff;
+}
+
+.leads-base-listado-wrap .leads-base-listado-table tbody tr:nth-child(even) td:not(.leads-base-cell-actions) {
+  background: #fafbfc;
+}
+
+.leads-base-listado-wrap .leads-base-listado-table tbody tr:hover td:not(.leads-base-cell-actions) {
+  background: #f8fafc;
+}
+
+.leads-base-listado-wrap .leads-base-listado-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.leads-base-listado-wrap .leads-base-cell-actions .d-flex {
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 0.35rem !important;
+}
+
+.leads-base-listado-wrap .leads-base-cell-actions .btn,
+.leads-base-listado-wrap .leads-base-cell-actions .fact-btn {
+  padding: 0.3rem 0.55rem !important;
+  font-size: 0.75rem !important;
+  white-space: nowrap;
+}
+
+/* Compat: reglas anteriores con .clientes-listado-table */
+.leads-base-listado-wrap .clientes-listado-table {
+  min-width: 1180px;
 }
 
 /* ========== Página Reportes: menú tipo índice + tabla facturación por cliente ========== */
@@ -13525,8 +13647,9 @@ button.nh-watcher-btc-card__corner-btn:hover {
   }
 
   .clientes-listado-table.leads-base-listado-table,
-  .leads-base-listado-wrap .clientes-listado-table {
-    min-width: 640px;
+  .leads-base-listado-wrap .clientes-listado-table,
+  .leads-base-listado-wrap .leads-base-listado-table {
+    min-width: 1180px;
   }
 
   .proveedores-hrs-tabla {

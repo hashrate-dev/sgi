@@ -1216,6 +1216,8 @@ export type PotencialClienteLead = {
   email: string;
   celular: string;
   observaciones: string;
+  /** Email del usuario SGI que registró el lead. */
+  registeredByEmail: string;
 };
 
 export type PotencialClienteLeadPayload = {

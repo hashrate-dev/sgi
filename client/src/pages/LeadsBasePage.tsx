@@ -62,6 +62,7 @@ function leadMatchesQuery(lead: PotencialClienteLead, q: string): boolean {
     lead.email,
     lead.celular,
     lead.observaciones,
+    lead.registeredByEmail,
     String(lead.id),
     formatFechaRegistro(lead.createdAt),
   ]
@@ -216,6 +217,7 @@ export function LeadsBasePage() {
         { header: "Email", key: "email", width: 32 },
         { header: "Celular", key: "celular", width: 18 },
         { header: "Observaciones", key: "observaciones", width: 48 },
+        { header: "Registrado por (SGI)", key: "registeredByEmail", width: 32 },
       ];
       for (const r of rows) {
         ws.addRow({
@@ -226,6 +228,7 @@ export function LeadsBasePage() {
           email: r.email,
           celular: r.celular,
           observaciones: r.observaciones,
+          registeredByEmail: r.registeredByEmail || "—",
         });
       }
       const headerRow = ws.getRow(1);
@@ -305,7 +308,7 @@ export function LeadsBasePage() {
                 id="leads-base-search"
                 className="fact-input"
                 type="search"
-                placeholder="Nombre, email, celular, observaciones…"
+                placeholder="Nombre, email, celular, observaciones, registrado por…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 autoComplete="off"
@@ -316,7 +319,7 @@ export function LeadsBasePage() {
 
             {loading ? (
               <div className="clientes-listado-wrap leads-base-listado-wrap">
-                <table className="table table-sm align-middle clientes-listado-table mb-0">
+                <table className="table table-sm align-middle clientes-listado-table leads-base-listado-table mb-0">
                   <thead className="table-dark">
                     <tr>
                       <th>ID</th>
@@ -326,6 +329,7 @@ export function LeadsBasePage() {
                       <th>Email</th>
                       <th>Celular</th>
                       <th>Observaciones</th>
+                      <th>Registrado por</th>
                       <th className="leads-base-th-actions">Acciones</th>
                     </tr>
                   </thead>
@@ -338,6 +342,7 @@ export function LeadsBasePage() {
                         <td><span className="clientes-skeleton" style={{ width: "7em" }} /></td>
                         <td><span className="clientes-skeleton" style={{ width: "12em" }} /></td>
                         <td><span className="clientes-skeleton" style={{ width: "6em" }} /></td>
+                        <td><span className="clientes-skeleton" style={{ width: "10em" }} /></td>
                         <td><span className="clientes-skeleton" style={{ width: "10em" }} /></td>
                         <td className="leads-base-cell-actions">
                           <span className="clientes-skeleton" style={{ width: "7em" }} />
@@ -358,7 +363,7 @@ export function LeadsBasePage() {
               </div>
             ) : (
               <div className="clientes-listado-wrap leads-base-listado-wrap">
-                <table className="table table-sm align-middle clientes-listado-table mb-0">
+                <table className="table table-sm align-middle clientes-listado-table leads-base-listado-table mb-0">
                   <thead className="table-dark">
                     <tr>
                       <th className="text-start">ID</th>
@@ -368,6 +373,7 @@ export function LeadsBasePage() {
                       <th className="text-start">Email</th>
                       <th className="text-start">Celular</th>
                       <th className="text-start">Observaciones</th>
+                      <th className="text-start">Registrado por</th>
                       <th className="text-start leads-base-th-actions">Acciones</th>
                     </tr>
                   </thead>
@@ -377,24 +383,27 @@ export function LeadsBasePage() {
                         <td className="leads-base-cell-id">{r.id}</td>
                         <td className="leads-base-cell-fecha">{formatFechaRegistro(r.createdAt)}</td>
                         <td className="leads-base-cell-nombre">{r.nombre}</td>
-                        <td>{r.apellidos || "—"}</td>
-                        <td>{r.email || "—"}</td>
-                        <td>{r.celular || "—"}</td>
+                        <td className="leads-base-cell-apellidos">{r.apellidos || "—"}</td>
+                        <td className="leads-base-cell-email" title={r.email || undefined}>
+                          {r.email || "—"}
+                        </td>
+                        <td className="leads-base-cell-celular">{r.celular || "—"}</td>
                         <td className="leads-base-cell-obs">{r.observaciones || "—"}</td>
+                        <td className="leads-base-cell-registrado" title={r.registeredByEmail || undefined}>
+                          {r.registeredByEmail || "—"}
+                        </td>
                         <td className="leads-base-cell-actions">
-                          <div className="d-flex gap-1 flex-wrap justify-content-center">
+                          <div className="d-flex gap-1 justify-content-center leads-base-actions-row">
                             <button
                               type="button"
-                              className="fact-btn fact-btn-secondary btn-sm"
-                              style={{ padding: "0.35rem 0.75rem", fontSize: "0.8125rem" }}
+                              className="fact-btn fact-btn-secondary btn-sm leads-base-action-btn"
                               onClick={() => openEdit(r)}
                             >
                               Editar
                             </button>
                             <button
                               type="button"
-                              className="btn btn-outline-danger btn-sm"
-                              style={{ padding: "0.35rem 0.75rem", fontSize: "0.8125rem" }}
+                              className="btn btn-outline-danger btn-sm leads-base-action-btn"
                               onClick={() => setDeleteTarget(r)}
                             >
                               Eliminar
@@ -503,6 +512,12 @@ export function LeadsBasePage() {
                     <div className="col-12">
                       <p className="text-muted small mb-0">
                         Registrado: {formatFechaRegistro(editing.createdAt)}
+                        {editing.registeredByEmail ? (
+                          <>
+                            {" · "}
+                            Por: {editing.registeredByEmail}
+                          </>
+                        ) : null}
                       </p>
                     </div>
                   </div>

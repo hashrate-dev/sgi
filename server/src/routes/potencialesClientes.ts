@@ -21,7 +21,8 @@ async function ensurePotencialesClientesSchema(): Promise<void> {
           apellidos TEXT NOT NULL DEFAULT '',
           email TEXT NOT NULL DEFAULT '',
           celular TEXT NOT NULL DEFAULT '',
-          observaciones TEXT NOT NULL DEFAULT ''
+          observaciones TEXT NOT NULL DEFAULT '',
+          registered_by_email TEXT NOT NULL DEFAULT ''
         )`
       )
       .run();
@@ -40,7 +41,8 @@ async function ensurePotencialesClientesSchema(): Promise<void> {
           apellidos TEXT NOT NULL DEFAULT '',
           email TEXT NOT NULL DEFAULT '',
           celular TEXT NOT NULL DEFAULT '',
-          observaciones TEXT NOT NULL DEFAULT ''
+          observaciones TEXT NOT NULL DEFAULT '',
+          registered_by_email TEXT NOT NULL DEFAULT ''
         )`
       )
       .run();
@@ -50,6 +52,12 @@ async function ensurePotencialesClientesSchema(): Promise<void> {
       )
       .run();
   }
+
+  await db
+    .prepare(
+      "ALTER TABLE potenciales_clientes ADD COLUMN IF NOT EXISTS registered_by_email TEXT NOT NULL DEFAULT ''"
+    )
+    .run();
 
   schemaEnsured = true;
 }
@@ -75,6 +83,7 @@ type LeadRow = {
   email: string;
   celular: string;
   observaciones: string;
+  registered_by_email: string;
 };
 
 function mapLeadRow(raw: Record<string, unknown>) {
@@ -87,6 +96,7 @@ function mapLeadRow(raw: Record<string, unknown>) {
     email: String(r.email ?? ""),
     celular: String(r.celular ?? ""),
     observaciones: String(r.observaciones ?? ""),
+    registeredByEmail: String(r.registered_by_email ?? ""),
   };
 }
 
@@ -124,7 +134,7 @@ async function leadWithEmailExists(email: string, excludeId?: number): Promise<b
 async function getLeadById(id: number): Promise<LeadRow | undefined> {
   return (await db
     .prepare(
-      `SELECT id, created_at, nombre, apellidos, email, celular, observaciones
+      `SELECT id, created_at, nombre, apellidos, email, celular, observaciones, registered_by_email
        FROM potenciales_clientes WHERE id = ?`
     )
     .get(id)) as LeadRow | undefined;
@@ -137,7 +147,7 @@ potencialesClientesRouter.get(
     await ensurePotencialesClientesSchema();
     const rows = (await db
       .prepare(
-        `SELECT id, created_at, nombre, apellidos, email, celular, observaciones
+        `SELECT id, created_at, nombre, apellidos, email, celular, observaciones, registered_by_email
          FROM potenciales_clientes
          ORDER BY created_at DESC, id DESC`
       )
@@ -168,11 +178,14 @@ potencialesClientesRouter.post(
     }
 
     const createdAt = new Date().toISOString();
+    const registeredByEmail = String(req.user?.email ?? req.user?.username ?? "")
+      .trim()
+      .slice(0, 254);
 
     const result = await db
       .prepare(
-        `INSERT INTO potenciales_clientes (created_at, nombre, apellidos, email, celular, observaciones)
-         VALUES (?, ?, ?, ?, ?, ?)`
+        `INSERT INTO potenciales_clientes (created_at, nombre, apellidos, email, celular, observaciones, registered_by_email)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         createdAt,
@@ -180,13 +193,14 @@ potencialesClientesRouter.post(
         d.apellidos?.trim() || "",
         d.email?.trim() || "",
         d.celular?.trim() || "",
-        d.observaciones?.trim() || ""
+        d.observaciones?.trim() || "",
+        registeredByEmail
       );
 
     const insertedId = Number(result.lastInsertRowid ?? 0);
     const inserted = (await db
       .prepare(
-        `SELECT id, created_at, nombre, apellidos, email, celular, observaciones
+        `SELECT id, created_at, nombre, apellidos, email, celular, observaciones, registered_by_email
          FROM potenciales_clientes WHERE id = ?`
       )
       .get(insertedId)) as LeadRow | undefined;
@@ -279,13 +293,22 @@ potencialesClientesRouter.get(
     await ensurePotencialesClientesSchema();
     const rows = (await db
       .prepare(
-        `SELECT id, created_at, nombre, apellidos, email, celular, observaciones
+        `SELECT id, created_at, nombre, apellidos, email, celular, observaciones, registered_by_email
          FROM potenciales_clientes
          ORDER BY created_at DESC, id DESC`
       )
       .all()) as LeadRow[];
 
-    const header = ["ID", "Fecha registro", "Nombre", "Apellidos", "Email", "Celular", "Observaciones"];
+    const header = [
+      "ID",
+      "Fecha registro",
+      "Nombre",
+      "Apellidos",
+      "Email",
+      "Celular",
+      "Observaciones",
+      "Registrado por (SGI)",
+    ];
     const lines = [
       header.join(";"),
       ...rows.map((r) => {
@@ -307,6 +330,7 @@ potencialesClientesRouter.get(
           csvEscapeCell(item.email),
           csvEscapeCell(item.celular),
           csvEscapeCell(item.observaciones),
+          csvEscapeCell(item.registeredByEmail),
         ].join(";");
       }),
     ];
