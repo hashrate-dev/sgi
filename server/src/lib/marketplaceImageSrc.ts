@@ -27,7 +27,7 @@ export function galleryFileKey(url: string): string {
     .toLowerCase();
 }
 
-export const MARKETPLACE_PRODUCT_GALLERY_MAX = 3;
+export const MARKETPLACE_PRODUCT_GALLERY_MAX = 4;
 
 export function capProductGalleryUrls(urls: string[]): string[] {
   return urls.slice(0, MARKETPLACE_PRODUCT_GALLERY_MAX);

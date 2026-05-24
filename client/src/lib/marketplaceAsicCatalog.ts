@@ -160,7 +160,7 @@ export function resolveMarketplaceListingKind(p: AsicListingTitleFields): Market
 }
 
 /** Máximo de miniaturas en el modal de producto (vitrina). */
-export const MARKETPLACE_PRODUCT_GALLERY_MAX = 3;
+export const MARKETPLACE_PRODUCT_GALLERY_MAX = 4;
 
 /** Recorta la galería al máximo visible en el modal. */
 export function capProductGalleryUrls(urls: string[]): string[] {
