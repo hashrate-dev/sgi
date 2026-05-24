@@ -1445,16 +1445,17 @@ button.market-link-hrs {
 
 .market-shelf-grid--catalog-v2 .shelf-product__media {
   padding: 0;
-  background: #fff;
+  background: transparent;
   border-radius: 12px 12px 0 0;
   border: none;
 }
 
 .market-shelf-grid--catalog-v2 .shelf-product__media-inner {
   position: relative;
-  background: #fff;
+  background: transparent;
   border-radius: 12px 12px 0 0;
   border-bottom: 1px solid #eef0f3;
+  overflow: hidden;
 }
 
 .market-shelf-grid--catalog-v2 .shelf-product__media-gradient {
@@ -1463,13 +1464,14 @@ button.market-link-hrs {
 
 .market-shelf-grid--catalog-v2 .shelf-product__imglink {
   aspect-ratio: 1;
-  background: #fff;
+  background: linear-gradient(135deg, #004e75 0%, #0d6b58 42%, #42cc66 100%);
+  overflow: hidden;
 }
 
 .market-shelf-grid--catalog-v2 .shelf-product__photo {
-  object-fit: contain;
+  object-fit: cover;
   object-position: center;
-  padding: 0.75rem;
+  padding: 0;
   filter: none;
 }
 
@@ -2074,11 +2076,11 @@ body:has(.asic-email-window) {
 }
 
 /*
- * Imágenes L9/Scrypt legacy (WordPress): logos LTC/DOGE en la esquina inferior derecha.
- * Recorte con object-position (sin parche blanco encima). Las monedas ya figuran en los chips.
+ * Scrypt (L9, etc.): recorte para esquina con logos legacy en el PNG.
+ * Mismo gradiente y cover que el resto del catálogo; solo cambia object-position.
  */
 .product-modal__hero-gradient--scrypt {
-  background: linear-gradient(135deg, #2aae56 0%, #1bab7a 40%, #0e9ab5 100%);
+  background: linear-gradient(135deg, #004e75 0%, #0d6b58 42%, #42cc66 100%);
 }
 
 .product-modal__hero-gradient--scrypt .product-modal__hero-img,
@@ -2087,16 +2089,8 @@ body:has(.asic-email-window) {
   object-position: 34% 38%;
 }
 
-.market-shelf-grid--catalog-v2 .shelf-product[data-algo="scrypt"] .shelf-product__imglink {
-  overflow: hidden;
-  background: linear-gradient(135deg, #2aae56 0%, #1bab7a 40%, #0e9ab5 100%);
-}
-
 .market-shelf-grid--catalog-v2 .shelf-product[data-algo="scrypt"] .shelf-product__photo {
-  object-fit: cover;
   object-position: 34% 38%;
-  padding: 0;
-  filter: none;
 }
 
 /* Alineado con `.market-shelf-grid--catalog-v2 .shelf-product__photo`: contain + centro */
