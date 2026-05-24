@@ -1,14 +1,51 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
 import { postMarketplaceAsicInquiryPublic } from "../../lib/api.js";
+import {
+  buildQuoteMessage,
+  type GarantiaQuotePriceItem,
+  type QuoteCartLine,
+} from "../../lib/marketplaceQuoteCart.js";
+import type { QuoteTicketRef } from "../../contexts/MarketplaceQuoteCartContext.js";
 import { MailCtaIcon } from "./MarketplaceCtaIcons.js";
 
 type Props = {
   open: boolean;
   onClose: () => void;
+  defaultEmail?: string;
+  cartLines?: QuoteCartLine[];
+  ticketRef?: QuoteTicketRef | null;
+  setupEquipoCompletoUsd?: number;
+  setupCompraHashrateUsd?: number;
+  garantiaQuoteItems?: GarantiaQuotePriceItem[];
 };
 
-export function MarketplaceCartEmailInquiryModal({ open, onClose }: Props) {
+function buildCartInquiryMessage(
+  intro: string,
+  lines: QuoteCartLine[] | undefined,
+  ticketRef: QuoteTicketRef | null | undefined,
+  pricing: { setupEquipoCompletoUsd: number; setupCompraHashrateUsd: number; garantiaQuoteItems: GarantiaQuotePriceItem[] }
+): string {
+  if (!lines?.length) return intro;
+  const cartBlock = buildQuoteMessage(lines, ticketRef ?? undefined, {
+    setupEquipoCompletoUsd: pricing.setupEquipoCompletoUsd,
+    setupCompraHashrateUsd: pricing.setupCompraHashrateUsd,
+    garantiaItems: pricing.garantiaQuoteItems,
+  });
+  const combined = `${intro.trim()}\n\n--- Ítems en el carrito ---\n${cartBlock}`;
+  return combined.length <= 4000 ? combined : combined.slice(0, 3997) + "…";
+}
+
+export function MarketplaceCartEmailInquiryModal({
+  open,
+  onClose,
+  defaultEmail = "",
+  cartLines,
+  ticketRef,
+  setupEquipoCompletoUsd = 50,
+  setupCompraHashrateUsd = 50,
+  garantiaQuoteItems = [],
+}: Props) {
   const { t } = useMarketplaceLang();
   const mailText = useMemo(
     () => ({ subject: t("drawer.email_inquiry_subject"), body: t("drawer.email_inquiry_default_body") }),
@@ -21,17 +58,30 @@ export function MarketplaceCartEmailInquiryModal({ open, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [simulated, setSimulated] = useState(false);
-  const messageSeeded = useRef(false);
 
   useEffect(() => {
     if (!open) return;
     setError(null);
     setSuccess(false);
     setSimulated(false);
-    if (messageSeeded.current) return;
-    setMessage(mailText.body);
-    messageSeeded.current = true;
-  }, [open, mailText.body]);
+    setEmail(defaultEmail.trim());
+    setMessage(
+      buildCartInquiryMessage(mailText.body, cartLines, ticketRef, {
+        setupEquipoCompletoUsd,
+        setupCompraHashrateUsd,
+        garantiaQuoteItems,
+      })
+    );
+  }, [
+    open,
+    mailText.body,
+    defaultEmail,
+    cartLines,
+    ticketRef,
+    setupEquipoCompletoUsd,
+    setupCompraHashrateUsd,
+    garantiaQuoteItems,
+  ]);
 
   useEffect(() => {
     if (!open) return;
@@ -54,6 +104,8 @@ export function MarketplaceCartEmailInquiryModal({ open, onClose }: Props) {
           subject: mailText.subject.trim(),
           message: message.trim(),
           source: "cart",
+          orderNumber: ticketRef?.orderNumber,
+          ticketCode: ticketRef?.ticketCode,
         });
         if (r.ok) {
           setSuccess(true);
@@ -65,7 +117,7 @@ export function MarketplaceCartEmailInquiryModal({ open, onClose }: Props) {
         setSending(false);
       }
     },
-    [email, message, name, mailText.subject]
+    [email, message, name, mailText.subject, ticketRef]
   );
 
   if (!open) return null;

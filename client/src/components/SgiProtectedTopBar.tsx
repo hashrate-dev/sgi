@@ -82,30 +82,31 @@ export function SgiProtectedTopBar({ onHeightChange }: SgiProtectedTopBarProps) 
         aria-label="Cabecera SGI"
         className="hrs-dashboard-glass-top hrs-sgi-home-topbar hrs-sgi-shell-header"
       >
-        <Box w="100%" {...HOME_DASHBOARD_SHELL} py={{ base: 3, md: 3.5 }}>
-          <Flex align="center" justify="space-between" gap={4} flexWrap="wrap" rowGap={4} w="100%">
+        <Box w="100%" {...HOME_DASHBOARD_SHELL} py={{ base: 3, md: 3 }} className="hrs-sgi-shell-header__inner">
+          <Flex align="center" justify="space-between" gap={{ base: 3, lg: 4 }} flexWrap={{ base: "wrap", lg: "nowrap" }} w="100%">
             <RouterLink
               to={homePath}
               aria-label="Ir al inicio SGI"
               title="Ir al inicio SGI"
               style={{ textDecoration: "none", color: "inherit", minWidth: 0, flexShrink: 0 }}
             >
-              <Flex align="center" gap={4} minW={0} flex={{ base: "1 1 100%", lg: "0 1 auto" }}>
+              <Flex align="center" gap={3} minW={0} flex={{ base: "1 1 100%", lg: "0 1 auto" }}>
                 <ChakraImage
                   src={logoSrc}
                   alt="HRS Logo"
-                  h={{ base: "56px", md: "72px" }}
+                  className="hrs-sgi-shell-header__logo"
+                  h={{ base: "44px", md: "52px" }}
                   w="auto"
-                  maxW={{ base: "200px", md: "260px" }}
+                  maxW={{ base: "168px", md: "210px" }}
                   objectFit="contain"
                   flexShrink={0}
                   onError={() => setLogoSrc("/images/HASHRATELOGO2.png")}
                 />
-                <Box minW={0}>
-                  <Heading size="md" color="gray.800" lineHeight="short">
+                <Box minW={0} lineHeight="1.15">
+                  <Heading fontSize={{ base: "0.95rem", md: "1.05rem" }} fontWeight="700" color="gray.800" lineHeight="1.15">
                     HRS GROUP S.A
                   </Heading>
-                  <Text fontSize="sm" color="gray.600" mt={0.5}>
+                  <Text fontSize="xs" color="gray.600" mt={0.5} lineHeight="1.2">
                     Sistema de gestión interna
                   </Text>
                 </Box>
@@ -114,9 +115,9 @@ export function SgiProtectedTopBar({ onHeightChange }: SgiProtectedTopBarProps) 
             <Flex
               flex={{ base: "1 1 100%", lg: "0 1 auto" }}
               minW={0}
-              align="flex-start"
+              align="center"
               justify={{ base: "flex-start", lg: "flex-end" }}
-              gap={3}
+              gap={2}
               flexWrap="wrap"
               w={{ base: "100%", lg: "auto" }}
               ml={{ base: 0, lg: "auto" }}
@@ -143,66 +144,61 @@ export function SgiProtectedTopBar({ onHeightChange }: SgiProtectedTopBarProps) 
                   </Flex>
                 </AppButton>
               ) : null}
-              <Flex direction="column" alignItems="flex-end" gap={1.5} minW={0}>
-                <Flex align="center" gap={2} flexWrap="wrap" justify="flex-end">
-                  {isHome ? (
-                    <AppButton
-                      variant="plain"
-                      size="xs"
-                      h="auto"
-                      minW="auto"
-                      px={1}
-                      py={0.5}
-                      color="gray.600"
-                      fontWeight="medium"
-                      borderRadius="sm"
-                      _hover={{ bg: "transparent", color: "green.700", textDecoration: "underline" }}
-                      _active={{ bg: "transparent" }}
-                      onClick={() => setShowPasswordModal(true)}
-                      flexShrink={0}
-                    >
-                      <Flex align="center" gap={2}>
-                        <Box as="i" className="bi bi-key" fontSize="12px" aria-hidden />
-                        Cambiar contraseña
-                      </Flex>
-                    </AppButton>
-                  ) : null}
-                  <Badge
-                    colorPalette="green"
-                    px={3}
-                    py={1.5}
-                    borderRadius="full"
-                    fontWeight="medium"
-                    maxW={{ base: "min(100%, 22rem)", md: "min(100%, 24rem)" }}
-                    flexShrink={0}
-                  >
-                    <Flex as="span" align="center" gap={2} minW={0}>
-                      <Box as="i" className="bi bi-person-circle" flexShrink={0} aria-hidden />
-                      <Text as="span" truncate fontSize="sm">
-                        {user.email || user.username} · {user.role}
-                      </Text>
-                    </Flex>
-                  </Badge>
-                </Flex>
+              {isHome ? (
                 <AppButton
-                  variant="solid"
+                  variant="plain"
                   size="xs"
-                  h="24px"
-                  minH="24px"
-                  px={2.5}
-                  fontSize="xs"
-                  borderRadius="full"
-                  fontWeight="semibold"
-                  onClick={logout}
+                  h="auto"
+                  minW="auto"
+                  px={1}
+                  py={0.5}
+                  color="gray.600"
+                  fontWeight="medium"
+                  borderRadius="sm"
+                  _hover={{ bg: "transparent", color: "green.700", textDecoration: "underline" }}
+                  _active={{ bg: "transparent" }}
+                  onClick={() => setShowPasswordModal(true)}
                   flexShrink={0}
-                  alignSelf="flex-end"
                 >
-                  <Flex align="center" gap={1.5}>
-                    <Box as="i" className="bi bi-box-arrow-right" fontSize="11px" aria-hidden />
-                    Cerrar sesión
+                  <Flex align="center" gap={2}>
+                    <Box as="i" className="bi bi-key" fontSize="12px" aria-hidden />
+                    Cambiar contraseña
                   </Flex>
                 </AppButton>
-              </Flex>
+              ) : null}
+              <Badge
+                colorPalette="green"
+                px={2.5}
+                py={1}
+                borderRadius="full"
+                fontWeight="medium"
+                maxW={{ base: "min(100%, 22rem)", md: "min(100%, 24rem)" }}
+                flexShrink={0}
+              >
+                <Flex as="span" align="center" gap={1.5} minW={0}>
+                  <Box as="i" className="bi bi-person-circle" flexShrink={0} aria-hidden />
+                  <Text as="span" truncate fontSize="xs">
+                    {user.email || user.username} · {user.role}
+                  </Text>
+                </Flex>
+              </Badge>
+              <AppButton
+                variant="solid"
+                size="xs"
+                h="24px"
+                minH="24px"
+                px={2.5}
+                fontSize="xs"
+                borderRadius="full"
+                fontWeight="semibold"
+                onClick={logout}
+                flexShrink={0}
+              >
+                <Flex align="center" gap={1.5}>
+                  <Box as="i" className="bi bi-box-arrow-right" fontSize="11px" aria-hidden />
+                  Cerrar sesión
+                </Flex>
+              </AppButton>
             </Flex>
           </Flex>
         </Box>

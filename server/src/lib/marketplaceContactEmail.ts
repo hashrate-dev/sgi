@@ -1,13 +1,8 @@
 import { CANONICAL_PUBLIC_ORIGIN } from "./publicAppOrigin.js";
-import { deliverResendEmailWithFromFallback } from "./resendDeliver.js";
+import { deliverMarketplaceSalesEmail } from "./marketplaceSalesEmailDeliver.js";
+import { resolveMarketplaceSalesInbox } from "./marketplaceSalesInbox.js";
 
-/** Buzón fijo de ventas/operaciones: todas las consultas del marketplace van acá. */
-const MARKETPLACE_SALES_INBOX = "sales@hashrate.space";
 const DEFAULT_SUBJECT_PREFIX = "[Hashrate Space]";
-
-function marketplaceSalesInbox(): string {
-  return MARKETPLACE_SALES_INBOX;
-}
 
 export type MarketplaceContactEmailPayload = {
   firstName: string;
@@ -27,6 +22,8 @@ export type MarketplaceAsicInquiryEmailPayload = {
   /** `cart`: consulta desde el carrito de cotización (texto genérico al cliente). */
   source?: "asic" | "cart";
   siteOrigin?: string;
+  orderNumber?: string;
+  ticketCode?: string;
 };
 
 function clip(s: string, max: number): string {
@@ -47,7 +44,7 @@ function escapeHtml(s: string): string {
  * Envía el formulario «Contacto» del marketplace por Resend (servidor).
  */
 export async function sendMarketplaceContactEmail(p: MarketplaceContactEmailPayload): Promise<{ simulated: boolean }> {
-  const to = marketplaceSalesInbox();
+  const to = resolveMarketplaceSalesInbox();
   const subjectPrefix = (process.env.MARKETPLACE_CONTACT_SUBJECT_PREFIX || DEFAULT_SUBJECT_PREFIX).trim();
   const siteOrigin = (p.siteOrigin || CANONICAL_PUBLIC_ORIGIN).trim();
 
@@ -88,7 +85,7 @@ export async function sendMarketplaceContactEmail(p: MarketplaceContactEmailPayl
     </div>
   `.trim();
 
-  return deliverResendEmailWithFromFallback({
+  const r = await deliverMarketplaceSalesEmail({
     to,
     replyTo: email,
     subject,
@@ -96,6 +93,7 @@ export async function sendMarketplaceContactEmail(p: MarketplaceContactEmailPayl
     html,
     devLogTag: "contacto marketplace",
   });
+  return { simulated: r.simulated };
 }
 
 /**
@@ -103,8 +101,9 @@ export async function sendMarketplaceContactEmail(p: MarketplaceContactEmailPayl
  */
 export async function sendMarketplaceAsicInquiryEmail(p: MarketplaceAsicInquiryEmailPayload): Promise<{
   simulated: boolean;
+  via: ("smtp" | "resend")[];
 }> {
-  const to = marketplaceSalesInbox();
+  const to = resolveMarketplaceSalesInbox();
   const subjectPrefix = (process.env.MARKETPLACE_INQUIRY_SUBJECT_PREFIX || DEFAULT_SUBJECT_PREFIX).trim();
   const siteOrigin = (p.siteOrigin || CANONICAL_PUBLIC_ORIGIN).trim();
 
@@ -113,6 +112,12 @@ export async function sendMarketplaceAsicInquiryEmail(p: MarketplaceAsicInquiryE
   const subjectLine = clip(p.subject || "—", 250);
   const message = clip(p.message || "—", 4000);
   const fromCart = p.source === "cart";
+  const orderNumber = clip(p.orderNumber || "", 40);
+  const ticketCode = clip(p.ticketCode || "", 40);
+  const ticketRef =
+    orderNumber && ticketCode
+      ? `${orderNumber} · ${ticketCode}`
+      : orderNumber || ticketCode || "";
 
   const subject = `${subjectPrefix} ${fromCart ? "Consulta carrito" : "Consulta ASIC"}: ${subjectLine}`.trim();
 
@@ -121,6 +126,7 @@ export async function sendMarketplaceAsicInquiryEmail(p: MarketplaceAsicInquiryE
       ? "Consulta por correo desde el carrito de cotización (marketplace)."
       : "Consulta por correo desde la ficha de producto ASIC (marketplace).",
     `Sitio: ${siteOrigin}`,
+    ...(ticketRef ? [`Orden / ticket: ${ticketRef}`] : []),
     "",
     `Correo del visitante: ${email}`,
     `Nombre (opcional): ${name}`,
@@ -135,6 +141,7 @@ export async function sendMarketplaceAsicInquiryEmail(p: MarketplaceAsicInquiryE
       <h2 style="margin:0 0 12px">${escapeHtml(heading)}</h2>
       <p style="margin:0 0 12px"><strong>Sitio:</strong> <a href="${escapeHtml(siteOrigin)}">${escapeHtml(siteOrigin)}</a></p>
       <ul style="margin:0 0 14px 18px;padding:0">
+        ${ticketRef ? `<li><strong>Orden / ticket:</strong> ${escapeHtml(ticketRef)}</li>` : ""}
         <li><strong>Correo:</strong> ${escapeHtml(email)}</li>
         <li><strong>Nombre:</strong> ${escapeHtml(name)}</li>
         <li><strong>Asunto:</strong> ${escapeHtml(subjectLine)}</li>
@@ -144,7 +151,7 @@ export async function sendMarketplaceAsicInquiryEmail(p: MarketplaceAsicInquiryE
     </div>
   `.trim();
 
-  return deliverResendEmailWithFromFallback({
+  const r = await deliverMarketplaceSalesEmail({
     to,
     replyTo: email,
     subject,
@@ -152,4 +159,5 @@ export async function sendMarketplaceAsicInquiryEmail(p: MarketplaceAsicInquiryE
     html,
     devLogTag: fromCart ? "consulta carrito marketplace" : "consulta ASIC marketplace",
   });
+  return { simulated: r.simulated, via: r.via };
 }

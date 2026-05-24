@@ -79,6 +79,8 @@ const MarketplaceAsicInquiryPublicSchema = z.object({
   subject: z.string().min(1).max(250).trim(),
   message: z.string().min(1).max(4000).trim(),
   source: z.enum(["asic", "cart"]).optional(),
+  orderNumber: z.string().max(40).trim().optional(),
+  ticketCode: z.string().max(40).trim().optional(),
 });
 
 const ProductCreateSchema = z.object({
@@ -621,15 +623,17 @@ marketplaceRouter.post("/marketplace/asic-inquiry", marketplacePublicPostRateLim
   }
   try {
     const siteOrigin = resolvePublicAppOrigin(req);
-    const { simulated } = await sendMarketplaceAsicInquiryEmail({
+    const { simulated, via } = await sendMarketplaceAsicInquiryEmail({
       visitorEmail: parsed.data.email,
       visitorName: parsed.data.name,
       subject: parsed.data.subject,
       message: parsed.data.message,
       source: parsed.data.source,
       siteOrigin,
+      orderNumber: parsed.data.orderNumber,
+      ticketCode: parsed.data.ticketCode,
     });
-    res.json({ ok: true as const, simulated });
+    res.json({ ok: true as const, simulated, delivered: !simulated, via });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     res.status(502).json({ error: { message: msg } });

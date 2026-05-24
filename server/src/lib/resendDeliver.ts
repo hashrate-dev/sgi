@@ -55,7 +55,7 @@ function parseResendSandboxInboxFrom403(bodyText: string): string | null {
 async function resendPostEmail(opts: {
   apiKey: string;
   from: string;
-  to: string;
+  to: string[];
   replyTo?: string;
   subject: string;
   text: string;
@@ -63,7 +63,7 @@ async function resendPostEmail(opts: {
 }): Promise<{ res: Response; bodyText: string }> {
   const payload: Record<string, unknown> = {
     from: opts.from,
-    to: [opts.to],
+    to: opts.to,
     subject: opts.subject,
     text: opts.text,
     html: opts.html,
@@ -85,7 +85,7 @@ async function resendPostEmail(opts: {
  * Envía por Resend probando varios remitentes (`@hashrate.space` y `@mail.hashrate.space`).
  */
 export async function deliverResendEmailWithFromFallback(args: {
-  to: string;
+  to: string | string[];
   replyTo?: string;
   subject: string;
   text: string;
@@ -93,7 +93,9 @@ export async function deliverResendEmailWithFromFallback(args: {
   devLogTag: string;
 }): Promise<{ simulated: boolean; resendId?: string; fromUsed?: string }> {
   const apiKey = normalizeResendApiKey(process.env.RESEND_API_KEY);
-  const { to, replyTo, subject, text, html, devLogTag } = args;
+  const recipients = normalizeResendRecipients(args.to);
+  const { replyTo, subject, text, html, devLogTag } = args;
+  const toLabel = recipients.join(", ");
 
   const devConsole =
     process.env.NODE_ENV !== "production" && process.env.MARKETPLACE_EMAIL_DEV_CONSOLE !== "0";
@@ -101,11 +103,15 @@ export async function deliverResendEmailWithFromFallback(args: {
     if (devConsole) {
       // eslint-disable-next-line no-console
       console.log(
-        `[email] (dev, sin envío Resend) ${devLogTag} → destino sería ${to}\nreply_to: ${replyTo ?? "—"}\n${subject}\n${text}`
+        `[email] (dev, sin envío Resend) ${devLogTag} → destino sería ${toLabel}\nreply_to: ${replyTo ?? "—"}\n${subject}\n${text}`
       );
       return { simulated: true };
     }
     throw new Error("El envío de correo no está configurado en el servidor (RESEND_API_KEY).");
+  }
+
+  if (recipients.length === 0) {
+    throw new Error("Destinatario Resend inválido.");
   }
 
   const fromCandidates = resendFromCandidates();
@@ -120,7 +126,7 @@ export async function deliverResendEmailWithFromFallback(args: {
 
   for (let i = 0; i < fromCandidates.length; i++) {
     sendFrom = fromCandidates[i]!;
-    const attempt = await resendPostEmail({ apiKey, from: sendFrom, to, replyTo, subject, text, html });
+    const attempt = await resendPostEmail({ apiKey, from: sendFrom, to: recipients, replyTo, subject, text, html });
     lastRes = attempt.res;
     lastBody = attempt.bodyText;
     if (lastRes.ok) break;
@@ -163,6 +169,17 @@ export async function deliverResendEmailWithFromFallback(args: {
     /* ignore */
   }
   // eslint-disable-next-line no-console
-  console.log(`[email] ${devLogTag} enviado a ${to}${resendId ? ` (id: ${resendId})` : ""} desde ${sendFrom}`);
+  console.log(`[email] ${devLogTag} enviado a ${toLabel}${resendId ? ` (id: ${resendId})` : ""} desde ${sendFrom}`);
   return { simulated: false, resendId, fromUsed: sendFrom };
+}
+
+function normalizeResendRecipients(to: string | string[]): string[] {
+  const arr = Array.isArray(to) ? to : [to];
+  const out: string[] = [];
+  for (const raw of arr) {
+    const t = String(raw ?? "").trim();
+    if (!t || !t.includes("@")) continue;
+    if (!out.some((x) => x.toLowerCase() === t.toLowerCase())) out.push(t);
+  }
+  return out;
 }

@@ -530,12 +530,7 @@ export function MarketplaceQuoteCartDrawer() {
                   onClick={() => {
                     setSubmitErr("");
                     setContactBusy("email");
-                    void openQuoteEmail()
-                      .catch((e) => {
-                        if (isOneActiveOrderError(e)) void refreshActiveOrderGate();
-                        setSubmitErr(isOneActiveOrderError(e) ? t("drawer.one_active_err") : t("drawer.err_ticket"));
-                      })
-                      .finally(() => setContactBusy(null));
+                    void openQuoteEmail().finally(() => setContactBusy(null));
                   }}
                 >
                   <span className="market-quote-drawer__btn-icon" aria-hidden>
@@ -598,7 +593,21 @@ export function MarketplaceQuoteCartDrawer() {
     {ticketSummary ? (
       <MarketplaceTicketSummaryModal summary={ticketSummary} onClose={() => setTicketSummary(null)} />
     ) : null}
-    <MarketplaceCartEmailInquiryModal open={emailInquiryOpen} onClose={closeEmailInquiry} />
+    <MarketplaceCartEmailInquiryModal
+      open={emailInquiryOpen}
+      onClose={closeEmailInquiry}
+      defaultEmail={user?.email ?? ""}
+      cartLines={lines}
+      ticketRef={
+        ticketRef ??
+        (blockingPipelineOrder
+          ? { orderNumber: blockingPipelineOrder.orderNumber, ticketCode: blockingPipelineOrder.ticketCode }
+          : null)
+      }
+      setupEquipoCompletoUsd={setupEquipoCompletoUsd}
+      setupCompraHashrateUsd={setupCompraHashrateUsd}
+      garantiaQuoteItems={garantiaQuoteItems}
+    />
     </>
   );
 }

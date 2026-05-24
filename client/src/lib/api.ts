@@ -2468,12 +2468,14 @@ export type MarketplaceAsicInquiryPublicPayload = {
   subject: string;
   message: string;
   source?: "asic" | "cart";
+  orderNumber?: string;
+  ticketCode?: string;
 };
 
 /** Consulta por correo desde ficha ASIC: un solo POST (sin reintentos 502/503 de `api()`). */
 export async function postMarketplaceAsicInquiryPublic(
   payload: MarketplaceAsicInquiryPublicPayload
-): Promise<{ ok: boolean; simulated?: boolean }> {
+): Promise<{ ok: boolean; simulated?: boolean; delivered?: boolean; via?: ("smtp" | "resend")[] }> {
   const token = getStoredToken();
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -2490,7 +2492,13 @@ export async function postMarketplaceAsicInquiryPublic(
     { method: "POST", headers, credentials: "include", body: JSON.stringify(payload) },
     MARKETPLACE_ASIC_INQUIRY_POST_TIMEOUT_MS
   );
-  const data = (await res.json().catch(() => ({}))) as { ok?: boolean; simulated?: boolean; error?: { message?: string } };
+  const data = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    simulated?: boolean;
+    delivered?: boolean;
+    via?: ("smtp" | "resend")[];
+    error?: { message?: string };
+  };
   if (res.status === 401) {
     clearStoredAuth();
     const cb = typeof window !== "undefined" ? (window as unknown as { __on401?: () => void }).__on401 : undefined;
@@ -2501,7 +2509,15 @@ export async function postMarketplaceAsicInquiryPublic(
     const msg = data?.error?.message ?? res.statusText ?? "No se pudo enviar el mensaje.";
     throw new Error(msg.trim() || "No se pudo enviar el mensaje.");
   }
-  return { ok: Boolean(data.ok), simulated: Boolean(data.simulated) };
+  if (data.delivered === false && data.simulated) {
+    throw new Error("El servidor no pudo entregar el correo a ventas. Reintentá más tarde.");
+  }
+  return {
+    ok: Boolean(data.ok),
+    simulated: Boolean(data.simulated),
+    delivered: data.delivered,
+    via: data.via,
+  };
 }
 
 export function getMarketplacePresenceStats(): Promise<{

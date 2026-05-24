@@ -51,6 +51,13 @@ function formatResendFromHeader(display: string, address: string): string {
   return a;
 }
 
+function isValidResendFromHeader(header: string): boolean {
+  const t = header.trim();
+  if (!t) return false;
+  const { address } = parseResendFromHeader(t);
+  return address.includes("@") && address.indexOf("@") > 0;
+}
+
 /** Remitente apex (si está verificado en Resend). */
 export const DEFAULT_RESEND_FROM = "Hashrate Space <noreply@hashrate.space>";
 
@@ -95,8 +102,8 @@ export function resendFromCandidates(): string[] {
   const out: string[] = [];
   const add = (v: string) => {
     const t = v.trim();
-    if (!t || out.some((x) => x.toLowerCase() === t.toLowerCase())) return;
-    out.push(t);
+    if (!t || !isValidResendFromHeader(t)) return;
+    if (!out.some((x) => x.toLowerCase() === t.toLowerCase())) out.push(t);
   };
 
   // mail.hashrate.space primero: suele ser el dominio verificado en Resend.

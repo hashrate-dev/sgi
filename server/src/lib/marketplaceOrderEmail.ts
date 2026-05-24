@@ -1,13 +1,10 @@
 import {
-  normalizeResendApiKey,
-  resendApiKeyLooksInvalid,
-} from "../config/resendFrom.js";
-import {
   DEFAULT_MARKETPLACE_ORDERS_PANEL_URL,
   normalizeLegacyHashratePublicUrl,
   resolveMarketplaceOrdersPanelUrl,
 } from "./publicAppOrigin.js";
-import { deliverResendEmailWithFromFallback } from "./resendDeliver.js";
+import { deliverMarketplaceSalesEmail } from "./marketplaceSalesEmailDeliver.js";
+import { resolveMarketplaceSalesInbox } from "./marketplaceSalesInbox.js";
 
 /**
  * Avisos por email (Resend) al pasar a `orden_lista`:
@@ -21,7 +18,6 @@ const DEFAULT_TO = "sales@hashrate.space";
 const DEFAULT_SUBJECT_PREFIX = "[Marketplace]";
 const DEFAULT_PANEL_URL = DEFAULT_MARKETPLACE_ORDERS_PANEL_URL;
 
-let warnedMissingEnv = false;
 let loggedResendDeliveryHint = false;
 
 export type MarketplaceOrderEmailPayload = {
@@ -68,34 +64,7 @@ async function sendMarketplaceOrderResend(args: {
   html: string;
   replyTo?: string;
 }): Promise<void> {
-  const apiKey = normalizeResendApiKey(process.env.RESEND_API_KEY);
-  if (!apiKey || resendApiKeyLooksInvalid(apiKey)) {
-    const devConsole =
-      process.env.NODE_ENV !== "production" && process.env.MARKETPLACE_EMAIL_DEV_CONSOLE !== "0";
-    if (devConsole) {
-      // eslint-disable-next-line no-console
-      console.log(
-        `[email] (dev, sin envío Resend) ${args.devLogTag} → destino sería ${args.to}\n${args.subject}\n${args.text}${
-          apiKey && resendApiKeyLooksInvalid(apiKey)
-            ? "\n\nMotivo: RESEND_API_KEY no es válida (ej. re_vcp_…). Usá solo la clave re_… de https://resend.com/api-keys"
-            : ""
-        }`
-      );
-      return;
-    }
-    if (!warnedMissingEnv) {
-      warnedMissingEnv = true;
-      // eslint-disable-next-line no-console
-      console.warn(
-        apiKey && resendApiKeyLooksInvalid(apiKey)
-          ? `[email] ${args.devLogTag} omitido: RESEND_API_KEY inválida.`
-          : `[email] ${args.devLogTag} omitido: falta RESEND_API_KEY.`
-      );
-    }
-    return;
-  }
-
-  await deliverResendEmailWithFromFallback({
+  await deliverMarketplaceSalesEmail({
     to: args.to,
     replyTo: args.replyTo,
     subject: args.subject,
@@ -112,7 +81,7 @@ async function sendMarketplaceOrderResend(args: {
 export async function notifyMarketplaceOrderEmail(p: MarketplaceOrderEmailPayload): Promise<void> {
   // eslint-disable-next-line no-console
   console.log(`[email] aviso marketplace (handler) orden=${String(p.orderNumber || "?").slice(0, 24)} ticket=${String(p.ticketCode || "?").slice(0, 16)}`);
-  const to = (process.env.MARKETPLACE_NOTIFY_EMAIL_TO || DEFAULT_TO).trim();
+  const to = resolveMarketplaceSalesInbox();
   const subjectPrefix = (process.env.MARKETPLACE_NOTIFY_SUBJECT_PREFIX || DEFAULT_SUBJECT_PREFIX).trim();
 
   const order = clip(p.orderNumber || "—", 64);
@@ -165,7 +134,7 @@ export async function notifyMarketplaceOrderGeneradaEmail(p: MarketplaceOrderEma
   console.log(
     `[email] ORDEN GENERADA (Resend) orden=${String(p.orderNumber || "?").slice(0, 24)} ticket=${String(p.ticketCode || "?").slice(0, 16)}`
   );
-  const to = (process.env.MARKETPLACE_NOTIFY_EMAIL_TO || DEFAULT_TO).trim();
+  const to = resolveMarketplaceSalesInbox();
   const subjectPrefix = (process.env.MARKETPLACE_NOTIFY_SUBJECT_PREFIX || DEFAULT_SUBJECT_PREFIX).trim();
 
   const order = clip(p.orderNumber || "—", 64);

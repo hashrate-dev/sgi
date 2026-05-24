@@ -636,15 +636,11 @@ export function MarketplaceQuoteCartProvider({ children }: { children: ReactNode
           }
         }
       }
-    } catch (e) {
-      if (isOneActiveOrderError(e)) {
-        void refreshActiveOrderGate();
-        throw e;
-      }
-      /* sin sync remoto: abrimos el formulario igual */
+    } catch {
+      /* quote-sync opcional: el correo a ventas va por asic-inquiry aunque falle el sync */
     }
     setEmailInquiryOpen(true);
-  }, [lines, canUseQuoteCart, setupEquipoCompletoUsd, setupCompraHashrateUsd, garantiaQuoteItems, refreshActiveOrderGate]);
+  }, [lines, canUseQuoteCart, refreshActiveOrderGate]);
 
   const closeEmailInquiry = useCallback(() => {
     setEmailInquiryOpen(false);

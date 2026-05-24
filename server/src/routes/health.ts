@@ -6,6 +6,8 @@ import {
   resendApiKeyLooksInvalid,
 } from "../config/resendFrom.js";
 import { resolveMarketplaceOrdersPanelUrl } from "../lib/publicAppOrigin.js";
+import { resolveMarketplaceSalesInbox } from "../lib/marketplaceSalesInbox.js";
+import { isSmtpDeliverConfigured } from "../lib/smtpDeliver.js";
 
 export const healthRouter = Router();
 
@@ -17,14 +19,15 @@ healthRouter.get("/health", (_req, res) => {
 healthRouter.get("/email-config", (_req, res) => {
   const apiKey = normalizeResendApiKey(process.env.RESEND_API_KEY);
   const from = effectiveResendFromEmailOrDefault();
-  const to = (process.env.MARKETPLACE_NOTIFY_EMAIL_TO || "sales@hashrate.space").trim();
+  const to = resolveMarketplaceSalesInbox();
   res.json({
-    ok: Boolean(apiKey && from && !resendApiKeyLooksInvalid(apiKey)),
+    ok: Boolean((apiKey && !resendApiKeyLooksInvalid(apiKey)) || isSmtpDeliverConfigured()),
     resendApiKey: apiKey ? (resendApiKeyLooksInvalid(apiKey) ? "invalid" : "set") : "missing",
     resendFrom: from || "missing",
+    smtp: isSmtpDeliverConfigured() ? "set" : "missing",
     notifyTo: to,
-    contactTo: "sales@hashrate.space",
-    inquiryTo: "sales@hashrate.space",
+    contactTo: to,
+    inquiryTo: to,
     ordersPanelUrl: resolveMarketplaceOrdersPanelUrl(),
     appPublicUrl: (process.env.APP_PUBLIC_URL || process.env.FRONTEND_ORIGIN || "").trim() || null,
   });

@@ -114,8 +114,7 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
   "corp.form.phone": "Telefone",
   "corp.form.message": "Mensagem",
   "corp.form.submit": "Enviar",
-  "corp.form.hint":
-    "Seu cliente de e-mail será aberto com a mensagem. Você também pode nos escrever diretamente em sales@hashrate.space.",
+  "corp.form.hint": "Sua mensagem é enviada pelo site.",
   "corp.contact.social": "Redes sociais",
   "corp.contact.headquarter": "Sede",
   "corp.strip.tagline": "Plataforma de infraestrutura de alto desempenho e operação ponta a ponta",

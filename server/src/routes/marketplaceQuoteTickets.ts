@@ -857,9 +857,12 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, ...qu
         }
       }
       const nextNormFor409 = normalizeTicketStatusDb(String(nextStatus));
+      /** Consulta por mail/WhatsApp no bloquea por «otra orden activa»: el aviso a ventas va por `asic-inquiry`. */
+      const contactOnlyEvent = event === "contact_email" || event === "contact_whatsapp";
       if (
         singleMarketplaceOrderPolicy &&
         contactChannel &&
+        !contactOnlyEvent &&
         !terminal &&
         (nextNormFor409 === "enviado_consulta" ||
           nextNormFor409 === "orden_lista" ||
@@ -1071,7 +1074,8 @@ marketplaceQuoteTicketsRouter.post("/marketplace/quote-sync", requireAuth, ...qu
 
     const ticketCode = genTicketCode();
     const initialStatus = "pendiente";
-    if (singleMarketplaceOrderPolicy && (await countPipelineTicketsForUser(userId, null)) > 0) {
+    const contactOnlyInsert = event === "contact_email" || event === "contact_whatsapp";
+    if (singleMarketplaceOrderPolicy && !contactOnlyInsert && (await countPipelineTicketsForUser(userId, null)) > 0) {
       const blocking = (await db
         .prepare(
           `SELECT order_number, ticket_code FROM marketplace_quote_tickets
