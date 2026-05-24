@@ -27,6 +27,8 @@ const VIDEO_URL = CORP_INSTITUTIONAL_VIDEO_URL;
 const CORP_Z15_PROMO_IMG = `${import.meta.env.BASE_URL}images/bitmain-z15-pro.png`;
 const CORP_ZCASH_LOGO_IMG = `${import.meta.env.BASE_URL}images/zcash-logo.png`;
 const CORP_NICEHASH_LOGO_IMG = publicImageUrl("/images/nicehash-logo-cropped.jpg");
+const CORP_VIABTC_LOGO_IMG = publicImageUrl("/images/via-btc-logo-cropped.png");
+const CORP_OCEAN_POOL_LOGO_IMG = publicImageUrl("/images/ocean-pool-logo-bw.jpg");
 /** Fondo faja “Servicio todo incluido” (mineros / hosting) */
 const CORP_HOSTING_BAND_IMG = `${import.meta.env.BASE_URL}images/hosting-mining-farm-04.png`;
 
@@ -623,6 +625,42 @@ export function MarketplaceCorporateHomePage() {
                     alt=""
                     width={744}
                     height={148}
+                    loading="lazy"
+                    decoding="async"
+                    draggable={false}
+                  />
+                </a>
+                <a
+                  className="market-corp-luxor__link"
+                  href="https://www.viabtc.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={t("corp.partners.viabtc_aria")}
+                >
+                  <img
+                    className="market-corp-luxor__img"
+                    src={CORP_VIABTC_LOGO_IMG}
+                    alt=""
+                    width={512}
+                    height={160}
+                    loading="lazy"
+                    decoding="async"
+                    draggable={false}
+                  />
+                </a>
+                <a
+                  className="market-corp-luxor__link"
+                  href="https://ocean.xyz/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={t("corp.partners.ocean_aria")}
+                >
+                  <img
+                    className="market-corp-luxor__img"
+                    src={CORP_OCEAN_POOL_LOGO_IMG}
+                    alt=""
+                    width={1772}
+                    height={470}
                     loading="lazy"
                     decoding="async"
                     draggable={false}
