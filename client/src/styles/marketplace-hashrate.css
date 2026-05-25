@@ -1423,33 +1423,13 @@ button.market-link-hrs {
   transform: translateY(1px);
 }
 
-/* Home corporativa: tarjetas distintas del catálogo /equipment (marca aparte, caja precio, specs azules) */
-.market-corp-mp-shortcuts .shelf-product--corp-home {
-  contain-intrinsic-size: auto 520px;
+/* Home corporativa: misma grilla de tarjetas que /equipment */
+.market-corp-home-catalog-grid {
+  margin-bottom: 2rem;
 }
 
-.market-corp-mp-shortcuts .shelf-product--corp-home .shelf-product__imglink {
-  text-decoration: none;
-}
-
-.market-corp-mp-shortcuts .shelf-product--corp-home .shelf-product__cta,
-.market-corp-mp-shortcuts .shelf-product--corp-home .shelf-product__quote-btn {
-  text-decoration: none;
-}
-
-.market-corp-mp-shortcuts .shelf-product--corp-home .shelf-product__identity {
-  display: block;
-}
-
-.market-corp-mp-shortcuts .shelf-product--corp-home .shelf-product__price-box,
-.market-corp-mp-shortcuts .shelf-product--corp-home .shelf-product__specs-box {
-  display: block;
-}
-
-/* Si alguna regla global afecta enlaces, no aplicar subrayado en botones de la home */
-.market-corp-mp-shortcuts .shelf-product--corp-home a.shelf-product__cta,
-.market-corp-mp-shortcuts .shelf-product--corp-home a.shelf-product__quote-btn {
-  text-decoration: none;
+.market-corp-interesting-slot .market-corp-home-catalog-grid.market-corp-interesting-slot__shortcuts {
+  margin-bottom: 0;
 }
 
 /* ——— Catálogo /marketplace: tarjetas estilo retail (fondo claro, badge, favoritos, foto en blanco) ——— */

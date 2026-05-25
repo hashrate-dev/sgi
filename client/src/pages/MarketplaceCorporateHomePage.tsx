@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useId, useMemo, useState, memo } from "react";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { MarketplaceSiteHeader } from "../components/marketplace/MarketplaceSiteHeader";
 import { MarketplaceSiteFooter } from "../components/marketplace/MarketplaceSiteFooter";
 import { MarketplaceCorpFaqSpotlight } from "../components/marketplace/MarketplaceCorpFaqSpotlight";
 import { MarketplaceCorpContactCard } from "../components/marketplace/MarketplaceCorpContactCard";
-import { MarketplaceCorpHomeProductCard } from "../components/marketplace/MarketplaceCorpHomeProductCard.js";
+import { AsicShelfProduct } from "../components/marketplace/AsicShelfProduct.js";
+import { useMarketplaceQuoteCart } from "../contexts/MarketplaceQuoteCartContext.js";
 import {
   ASIC_MARKETPLACE_PRODUCTS,
   CORP_HOME_GRID_PRODUCT_IDS,
@@ -17,10 +18,23 @@ import { isCorpHomePath, MARKETPLACE } from "../lib/marketplacePaths.js";
 import { publicImageUrl } from "../lib/marketplaceAsicCatalog.js";
 import { CORP_INSTITUTIONAL_VIDEO_URL, wpUpload } from "../lib/marketplaceWpAssets.js";
 import { useAuth } from "../contexts/AuthContext";
+import "../styles/marketplace-hashrate.css";
 
 /** Fondo sección “Nuestros datacenters” / Itaipú (antes en WordPress). */
 const CORP_ITAIPU_BG = wpUpload("itaipu-py.webp");
-import "../styles/marketplace-hashrate.css";
+
+const MemoAsicShelfProduct = memo(AsicShelfProduct, (prev, next) => {
+  return (
+    prev.product === next.product &&
+    prev.productIndex === next.productIndex &&
+    prev.filteredHidden === next.filteredHidden &&
+    prev.showPrice === next.showPrice &&
+    prev.addToQuoteLabel === next.addToQuoteLabel &&
+    prev.onAddToQuote === next.onAddToQuote &&
+    prev.onOpenModal === next.onOpenModal
+  );
+});
+MemoAsicShelfProduct.displayName = "AsicShelfProduct";
 
 const DOC_TITLE = "Hashrate – Space";
 const VIDEO_URL = CORP_INSTITUTIONAL_VIDEO_URL;
@@ -89,16 +103,13 @@ export function MarketplaceCorporateHomePage() {
   const { user, loading } = useAuth();
   const { pathname, hash } = useLocation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { addProduct, openDrawer } = useMarketplaceQuoteCart();
   const cachedHome = peekMarketplaceCorpHomeCache();
   const [hidePricesForGuests, setHidePricesForGuests] = useState(
     () => cachedHome?.hidePricesForGuests !== false
   );
   const canViewMarketplacePrices = Boolean(!loading && (user || !hidePricesForGuests));
-  const hiddenPriceLabel = lang === "en"
-    ? "Login to view price"
-    : lang === "pt"
-      ? "Faca login para ver o preco"
-      : "Registrate para ver precio";
 
   const localHomeProductsPool = useMemo(
     () => ASIC_MARKETPLACE_PRODUCTS.filter((p) => Boolean(p.imageSrc)).slice(0, 12),
@@ -134,6 +145,30 @@ export function MarketplaceCorporateHomePage() {
     cachedHome?.interesting?.length
       ? normalizeAsicCatalogProducts(cachedHome.interesting)
       : interestingFallback
+  );
+
+  const addToQuoteLabel = t("catalog.add_short");
+
+  const goEquipmentAsic = useCallback(
+    (productId: string) => {
+      void navigate(`${MARKETPLACE.catalog}?asic=${encodeURIComponent(productId)}`);
+    },
+    [navigate]
+  );
+
+  const handleAddToQuote = useCallback(
+    (p: AsicProduct) => {
+      if (loading) return;
+      if (!user) {
+        const next = new URLSearchParams(searchParams);
+        next.set("login", "1");
+        void navigate({ pathname: MARKETPLACE.catalog, search: `?${next.toString()}` });
+        return;
+      }
+      addProduct(p, 1);
+      openDrawer();
+    },
+    [addProduct, openDrawer, user, loading, searchParams, navigate]
   );
 
   const goCorpHash = useCallback((id: (typeof CORP_ANCHOR_IDS)[number]) => {
@@ -360,14 +395,20 @@ export function MarketplaceCorporateHomePage() {
           {corpBestSellingProducts.length > 0 ? (
             <div className="market-corp-inner market-corp-inner--flush-top">
               <h2 className="market-corp-products-title">{t("corp.best_selling.title")}</h2>
-              <div className="market-corp-mp-shortcuts" aria-label={t("corp.market_shortcuts_aria")}>
+              <div
+                className="shelf-grid market-shelf-grid--catalog-v2 market-corp-home-catalog-grid"
+                aria-label={t("corp.market_shortcuts_aria")}
+              >
                 {corpBestSellingProducts.map((p, idx) => (
-                  <MarketplaceCorpHomeProductCard
+                  <MemoAsicShelfProduct
                     key={p.id}
                     product={p}
                     productIndex={idx}
+                    filteredHidden={false}
                     showPrice={canViewMarketplacePrices}
-                    hiddenPriceLabel={hiddenPriceLabel}
+                    onOpenModal={() => goEquipmentAsic(p.id)}
+                    onAddToQuote={handleAddToQuote}
+                    addToQuoteLabel={addToQuoteLabel}
                   />
                 ))}
               </div>
@@ -411,16 +452,19 @@ export function MarketplaceCorporateHomePage() {
                   {t("corp.interesting_products.title")}
                 </h2>
                 <div
-                  className="market-corp-mp-shortcuts market-corp-interesting-slot__shortcuts"
+                  className="shelf-grid market-shelf-grid--catalog-v2 market-corp-home-catalog-grid market-corp-interesting-slot__shortcuts"
                   aria-label={t("corp.interesting_products.grid_aria")}
                 >
                   {interestingVitrina.map((p, idx) => (
-                    <MarketplaceCorpHomeProductCard
+                    <MemoAsicShelfProduct
                       key={p.id}
                       product={p}
                       productIndex={idx}
+                      filteredHidden={false}
                       showPrice={canViewMarketplacePrices}
-                      hiddenPriceLabel={hiddenPriceLabel}
+                      onOpenModal={() => goEquipmentAsic(p.id)}
+                      onAddToQuote={handleAddToQuote}
+                      addToQuoteLabel={addToQuoteLabel}
                     />
                   ))}
                 </div>
@@ -434,14 +478,20 @@ export function MarketplaceCorporateHomePage() {
                 <h2 id="corp-home-row2-title" className="market-corp-products-title market-corp-products-title--row2">
                   {t("corp.home_row2.title")}
                 </h2>
-                <div className="market-corp-mp-shortcuts" aria-label={t("corp.home_row2.grid_aria")}>
+                <div
+                  className="shelf-grid market-shelf-grid--catalog-v2 market-corp-home-catalog-grid"
+                  aria-label={t("corp.home_row2.grid_aria")}
+                >
                   {corpMarketplaceAfterHostingProducts.map((p, idx) => (
-                    <MarketplaceCorpHomeProductCard
+                    <MemoAsicShelfProduct
                       key={p.id}
                       product={p}
                       productIndex={idx}
+                      filteredHidden={false}
                       showPrice={canViewMarketplacePrices}
-                      hiddenPriceLabel={hiddenPriceLabel}
+                      onOpenModal={() => goEquipmentAsic(p.id)}
+                      onAddToQuote={handleAddToQuote}
+                      addToQuoteLabel={addToQuoteLabel}
                     />
                   ))}
                 </div>
