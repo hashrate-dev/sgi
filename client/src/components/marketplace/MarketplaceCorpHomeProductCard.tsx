@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import type { AsicProduct } from "../../lib/marketplaceAsicCatalog.js";
 import {
   defaultAsicShelfImageSrc,
   formatAsicProductPriceDisplay,
   marketplaceShelfImageApiUrl,
   normalizeMarketplaceImageSrc,
+  pickMarketplaceShelfSpecRows,
   resolveShelfDisplayImageSrc,
 } from "../../lib/marketplaceAsicCatalog.js";
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
@@ -25,8 +26,14 @@ export function MarketplaceCorpHomeProductCard({
   hiddenPriceLabel: string;
 }) {
   const { lang, t } = useMarketplaceLang();
+  const navigate = useNavigate();
   const to = `${MARKETPLACE.catalog}?asic=${encodeURIComponent(product.id)}`;
   const aria = `${product.brand} ${product.model} ${product.hashrate} — ${t("corp.mp_card_link_aria")}`;
+  const specRows = useMemo(() => pickMarketplaceShelfSpecRows(product.detailRows), [product.detailRows]);
+  const consultLabel = product.priceDisplayLabel?.trim();
+  const goAsic = () => {
+    void navigate(to);
+  };
 
   const { primarySrc, fallbackSrc, apiSrc } = useMemo(() => {
     const fb = normalizeMarketplaceImageSrc(defaultAsicShelfImageSrc(product.brand, product.model));
@@ -47,7 +54,7 @@ export function MarketplaceCorpHomeProductCard({
   const eager = productIndex < 2;
 
   return (
-    <article className="shelf-product" data-algo={product.algo}>
+    <article className="shelf-product shelf-product--corp-home" data-algo={product.algo}>
       <div className="shelf-product__media">
         <div className="shelf-product__media-gradient">
           <Link to={to} className="shelf-product__imglink" aria-label={aria}>
@@ -86,13 +93,17 @@ export function MarketplaceCorpHomeProductCard({
           <p className="shelf-product__hashrate">{product.hashrate}</p>
         </div>
         <div className="shelf-product__price-box">
-          <span className="shelf-product__price-value">
+          <span
+            className={
+              "shelf-product__price-value" + (consultLabel && showPrice ? " shelf-product__price-value--consult" : "")
+            }
+          >
             {showPrice ? formatAsicProductPriceDisplay(product, lang) : hiddenPriceLabel}
           </span>
         </div>
         <div className="shelf-product__specs-box" role="group" aria-label={t("shelf.techspecs")}>
           <ul className="shelf-detail-strip">
-            {product.detailRows.map((row, i) => (
+            {specRows.map((row, i) => (
               <li key={i} className="shelf-detail-strip__row">
                 <AsicDetailSvg kind={row.icon} />
                 <span className="shelf-detail-strip__txt">{row.text}</span>
@@ -101,12 +112,12 @@ export function MarketplaceCorpHomeProductCard({
           </ul>
         </div>
         <div className="shelf-product__cta-row">
-          <Link to={to} className="shelf-product__cta">
+          <button type="button" className="shelf-product__cta" onClick={goAsic}>
             {t("shelf.seemore")}
-          </Link>
-          <Link to={to} className="shelf-product__quote-btn" title={t("shelf.add_title")}>
+          </button>
+          <button type="button" className="shelf-product__quote-btn" onClick={goAsic} title={t("shelf.add_title")}>
             {t("catalog.add_short")}
-          </Link>
+          </button>
         </div>
       </div>
     </article>
