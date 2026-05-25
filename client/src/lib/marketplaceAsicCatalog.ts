@@ -356,6 +356,15 @@ export function dedupeGalleryUrls(urls: string[]): string[] {
   return out;
 }
 
+/** Normaliza listado vitrina en un solo paso (sin galería suele ser muy rápido). */
+export function normalizeAsicCatalogProducts(products: AsicProduct[]): AsicProduct[] {
+  const out: AsicProduct[] = [];
+  for (let i = 0; i < products.length; i++) {
+    out.push(normalizeAsicProductImages(products[i]!));
+  }
+  return out;
+}
+
 export function normalizeAsicProductImages(product: AsicProduct): AsicProduct {
   const imageSrc = normalizeMarketplaceImageSrc(product.imageSrc ?? "");
   const shelfFb = normalizeMarketplaceImageSrc(

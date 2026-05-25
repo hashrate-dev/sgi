@@ -106,15 +106,13 @@ export function resendFromCandidates(): string[] {
     if (!out.some((x) => x.toLowerCase() === t.toLowerCase())) out.push(t);
   };
 
-  // mail.hashrate.space primero: suele ser el dominio verificado en Resend.
-  add(LEGACY_RESEND_FROM_MAIL);
-
   const explicit = process.env.RESEND_FROM_EMAIL?.trim();
   if (explicit) {
     add(normalizeResendLocalPart(explicit));
     add(resendFromAlternateDomain(explicit));
   }
 
+  add(LEGACY_RESEND_FROM_MAIL);
   add(DEFAULT_RESEND_FROM);
 
   return out;

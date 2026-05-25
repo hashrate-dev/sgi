@@ -6,12 +6,14 @@ import {
   compareMarketplaceShelfProducts,
   inferMarketplaceCatalogFilter,
   mergeAsicCatalogWithCorpGridExtras,
+  normalizeAsicCatalogProducts,
   normalizeAsicProductImages,
 } from "../lib/marketplaceAsicCatalog.js";
 import type { AsicProduct, MarketplaceCatalogFilter } from "../lib/marketplaceAsicCatalog.js";
 import type { AddQuoteLineOptions } from "../lib/marketplaceQuoteCart.js";
 import {
   getMarketplaceAsicVitrina,
+  getMarketplaceAsicVitrinaItem,
   peekMarketplaceVitrinaCache,
   postMarketplaceAsicYields,
   type MarketplaceAsicLiveYield,
@@ -103,11 +105,15 @@ function MarketplacePageBody() {
   const canViewMarketplacePrices = Boolean(!loading && (user || !hidePricesForGuests));
   const [filterAlgo, setFilterAlgo] = useState<MarketplaceCatalogFilter | null>(null);
   const [modalIndex, setModalIndex] = useState<number | null>(null);
+  const [modalProduct, setModalProduct] = useState<AsicProduct | null>(null);
+  const openProductModal = useCallback((index: number) => {
+    setModalIndex(index);
+  }, []);
   /** Catálogo visible al instante (caché de sesión o bundle local); la API actualiza en segundo plano. */
   const [products, setProducts] = useState<AsicProduct[]>(() => {
     const cached = peekMarketplaceVitrinaCache();
     if (cached?.products?.length) {
-      return mergeAsicCatalogWithCorpGridExtras(cached.products.map(normalizeAsicProductImages));
+      return mergeAsicCatalogWithCorpGridExtras(normalizeAsicCatalogProducts(cached.products));
     }
     return mergeAsicCatalogWithCorpGridExtras(ASIC_MARKETPLACE_PRODUCTS);
   });
@@ -177,18 +183,6 @@ function MarketplacePageBody() {
       );
       document.head.appendChild(linkGoogle);
     }
-    let linkInter = document.querySelector('link[data-hrs-font="inter-catalog"]');
-    if (!linkInter) {
-      linkInter = document.createElement("link");
-      linkInter.setAttribute("rel", "stylesheet");
-      linkInter.setAttribute(
-        "href",
-        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-      );
-      linkInter.setAttribute("data-hrs-font", "inter-catalog");
-      document.head.appendChild(linkInter);
-    }
-
     return () => {
       document.title = prevTitle;
       meta?.setAttribute("content", prevContent);
@@ -197,7 +191,8 @@ function MarketplacePageBody() {
 
   useEffect(() => {
     let cancelled = false;
-    setCatalogRevalidating(true);
+    const hadCache = Boolean(peekMarketplaceVitrinaCache()?.products?.length);
+    if (!hadCache) setCatalogRevalidating(true);
     setCatalogSyncFailed(false);
 
     getMarketplaceAsicVitrina()
@@ -206,15 +201,15 @@ function MarketplacePageBody() {
         setHidePricesForGuests(res.hidePricesForGuests !== false);
         const list = res.products ?? [];
         if (list.length > 0) {
-          setProducts(mergeAsicCatalogWithCorpGridExtras(list.map(normalizeAsicProductImages)));
+          setProducts(mergeAsicCatalogWithCorpGridExtras(normalizeAsicCatalogProducts(list)));
           setCatalogSyncFailed(false);
-        } else {
+        } else if (!hadCache) {
           setCatalogSyncFailed(true);
         }
       })
       .catch(() => {
         if (cancelled) return;
-        setCatalogSyncFailed(true);
+        if (!hadCache) setCatalogSyncFailed(true);
       })
       .finally(() => {
         if (!cancelled) setCatalogRevalidating(false);
@@ -286,6 +281,19 @@ function MarketplacePageBody() {
     return list;
   }, [products, filterAlgo, sortLoc]);
 
+  /** Solo tarjetas visibles: no montar DOM oculto por filtro (mejora scroll y paint). */
+  const visibleShelfEntries = useMemo(() => {
+    if (filterAlgo == null) {
+      return shelfProducts.map((p, i) => ({ product: p, index: i }));
+    }
+    const out: { product: AsicProduct; index: number }[] = [];
+    for (let i = 0; i < shelfProducts.length; i++) {
+      const p = shelfProducts[i]!;
+      if (matchesCatalogFilter(p, filterAlgo)) out.push({ product: p, index: i });
+    }
+    return out;
+  }, [shelfProducts, filterAlgo]);
+
   const availableFilters = useMemo<MarketplaceCatalogFilter[]>(() => {
     const seen = new Set<MarketplaceCatalogFilter>();
     for (const p of shelfProducts) seen.add(inferMarketplaceCatalogFilter(p));
@@ -314,7 +322,28 @@ function MarketplacePageBody() {
     setSearchParams(next, { replace: true });
   }, [searchParams, shelfProducts, setSearchParams]);
 
-  const modalProduct = modalIndex != null ? shelfProducts[modalIndex] ?? null : null;
+  const shelfProductAtModal = modalIndex != null ? shelfProducts[modalIndex] ?? null : null;
+
+  useEffect(() => {
+    if (modalIndex == null || !shelfProductAtModal) {
+      setModalProduct(null);
+      return;
+    }
+    setModalProduct(shelfProductAtModal);
+    let cancelled = false;
+    void getMarketplaceAsicVitrinaItem(shelfProductAtModal.id)
+      .then((full) => {
+        if (cancelled) return;
+        setModalProduct(normalizeAsicProductImages(full));
+      })
+      .catch(() => {
+        /* grilla sigue visible con datos livianos */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [modalIndex, shelfProductAtModal?.id]);
+
   const modalLiveYield = modalProduct ? liveYieldsById[modalProduct.id] : undefined;
 
   return (
@@ -349,14 +378,14 @@ function MarketplacePageBody() {
                 {products.length === 0 && catalogRevalidating ? (
                   <ShelfSkeletonGrid />
                 ) : (
-                  shelfProducts.map((p, i) => (
+                  visibleShelfEntries.map(({ product: p, index: i }) => (
                     <MemoAsicShelfProduct
                       key={p.id}
                       product={p}
                       productIndex={i}
-                      filteredHidden={filterAlgo != null && !matchesCatalogFilter(p, filterAlgo)}
+                      filteredHidden={false}
                       showPrice={canViewMarketplacePrices}
-                      onOpenModal={setModalIndex}
+                      onOpenModal={openProductModal}
                       onAddToQuote={handleAddToQuote}
                       addToQuoteLabel={addToQuoteLabel}
                     />

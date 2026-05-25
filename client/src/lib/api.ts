@@ -1903,6 +1903,30 @@ export async function getMarketplaceAsicVitrina(): Promise<{
   return data;
 }
 
+/** Ficha completa (galería, fracciones hashrate) al abrir modal — no va en el listado liviano. */
+export async function getMarketplaceAsicVitrinaItem(
+  id: string
+): Promise<import("./marketplaceAsicCatalog.js").AsicProduct> {
+  const token = getStoredToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let base = getApiBase();
+  const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
+  if (isVercelOrPrimaryPublicHost(h)) base = "";
+  const path = `/api/marketplace/asic-vitrina/${encodeURIComponent(id)}`;
+  const url = base && base.trim() !== "" ? `${base}${path}` : path;
+  const res = await fetchWithTimeout(url, { method: "GET", headers, credentials: "include" }, 12_000);
+  const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      extractJsonErrorMessage(data, res, "No se pudo cargar el detalle del producto")
+    );
+  }
+  const product = (data as { product?: import("./marketplaceAsicCatalog.js").AsicProduct }).product;
+  if (!product?.id) throw new Error("Producto no encontrado");
+  return product;
+}
+
 export { peekMarketplaceVitrinaCache } from "./marketplaceVitrinaCache.js";
 
 /** Destacados “Equipos más vendidos” en /marketplace/home (público). */

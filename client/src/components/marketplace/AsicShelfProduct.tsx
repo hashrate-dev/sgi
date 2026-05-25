@@ -35,19 +35,18 @@ export function AsicShelfProduct({
 }) {
   const { lang, t, tf } = useMarketplaceLang();
   const quoteLabel = addToQuoteLabel ?? t("catalog.add_short");
-  const explicit = normalizeMarketplaceImageSrc(product.imageSrc ?? "");
-  const fallbackSrc = normalizeMarketplaceImageSrc(
-    defaultAsicShelfImageSrc(product.brand, product.model)
-  );
+  const { explicit, fallbackSrc } = useMemo(() => {
+    const ex = normalizeMarketplaceImageSrc(product.imageSrc ?? "");
+    const fb = normalizeMarketplaceImageSrc(defaultAsicShelfImageSrc(product.brand, product.model));
+    return { explicit: ex, fallbackSrc: fb };
+  }, [product.id, product.imageSrc, product.brand, product.model]);
   const [imgSrc, setImgSrc] = useState(() => explicit || fallbackSrc);
   const [imgBroken, setImgBroken] = useState(false);
 
   useEffect(() => {
-    const ex = normalizeMarketplaceImageSrc(product.imageSrc ?? "");
-    const fb = normalizeMarketplaceImageSrc(defaultAsicShelfImageSrc(product.brand, product.model));
-    setImgSrc(ex || fb);
+    setImgSrc(explicit || fallbackSrc);
     setImgBroken(false);
-  }, [product.id, product.imageSrc, product.brand, product.model]);
+  }, [explicit, fallbackSrc]);
 
   const hasPhoto = Boolean((explicit || fallbackSrc).trim()) && !imgBroken;
   const ariaLabel = tf("shelf.seemore_aria", { model: product.model, hash: product.hashrate });

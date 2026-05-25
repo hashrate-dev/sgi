@@ -88,11 +88,24 @@ export async function deliverMarketplaceSalesEmail(args: {
   }
 
   if (via.length === 0) {
+    const resendUnverified = errors.some(
+      (e) => e.includes("not verified") || e.includes("rechazó el remitente") || e.includes("Resend rechazó")
+    );
+    const smtpHint = isSmtpDeliverConfigured()
+      ? ""
+      : " Configurá SMTP de Google Workspace en Vercel (PASSWORD_RESET_SMTP_*) o verificá mail.hashrate.space en https://resend.com/domains — ver docs/MARKETPLACE_EMAIL_VERCEL.md.";
     if (process.env.NODE_ENV === "production") {
+      if (resendUnverified && !isSmtpDeliverConfigured()) {
+        throw new Error(
+          "No se pudo enviar el correo a sales@hashrate.space: el dominio de envío no está verificado en Resend." +
+            " Verificá mail.hashrate.space en https://resend.com/domains y actualizá RESEND_FROM_EMAIL en Vercel, o activá SMTP (Workspace)." +
+            smtpHint
+        );
+      }
       throw new Error(
         errors.length > 0
-          ? `No se pudo enviar el correo a ventas. ${errors.join(" | ")}`
-          : "No se pudo enviar el correo a ventas (Resend/SMTP no configurados)."
+          ? `No se pudo enviar el correo a ventas. ${errors.join(" | ")}${smtpHint}`
+          : `No se pudo enviar el correo a ventas (Resend/SMTP no configurados).${smtpHint}`
       );
     }
     throw new Error(errors.length > 0 ? errors.join(" | ") : "El envío de correo no está configurado.");

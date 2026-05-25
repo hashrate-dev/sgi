@@ -1,13 +1,7 @@
 #!/usr/bin/env node
 /**
- * Sube RESEND_* (y opcional MARKETPLACE_NOTIFY_EMAIL_TO) desde .env y .env.resend.local
- * al proyecto de Vercel vía API, para Production + Preview.
- *
- * Requisitos:
- *   - Token: https://vercel.com/account/tokens → export VERCEL_TOKEN=...
- *   - Mismo team/proyecto que deploy:vercel (o definí VERCEL_TEAM_ID y VERCEL_PROJECT_ID).
- *
- * Uso: npm run vercel:env:resend
+ * Sube variables de email marketplace (Resend + SMTP opcional) a Vercel.
+ * Uso: npm run vercel:env:marketplace-email
  */
 const fs = require("fs");
 const path = require("path");
@@ -16,10 +10,23 @@ const https = require("https");
 const ROOT = path.resolve(__dirname, "..");
 const ENV_PATH = path.join(ROOT, ".env");
 const RESEND_LOCAL_PATH = path.join(ROOT, ".env.resend.local");
-
-/** Defaults alineados con scripts/deploy-vercel.cjs */
 const DEFAULT_TEAM_ID = "team_ZrFs7KNf947ZEMU0YbE1Ri05";
 const DEFAULT_PROJECT_ID = "prj_mzDDYrMiQPXnQcHlWVpGUXoIfQ77";
+
+const SMTP_KEYS = [
+  "PASSWORD_RESET_SMTP_HOST",
+  "PASSWORD_RESET_SMTP_PORT",
+  "PASSWORD_RESET_SMTP_SECURE",
+  "PASSWORD_RESET_SMTP_USER",
+  "PASSWORD_RESET_SMTP_PASS",
+  "PASSWORD_RESET_SMTP_FROM",
+  "MARKETPLACE_SMTP_HOST",
+  "MARKETPLACE_SMTP_PORT",
+  "MARKETPLACE_SMTP_SECURE",
+  "MARKETPLACE_SMTP_USER",
+  "MARKETPLACE_SMTP_PASS",
+  "MARKETPLACE_SMTP_FROM",
+];
 
 function parseDotEnv(filePath) {
   if (!fs.existsSync(filePath)) return {};
@@ -81,15 +88,12 @@ async function upsertEnv({ token, teamId, projectId, key, value, type, target })
     value,
     type,
     target,
-    comment: "Marketplace avisos por email (Resend)",
+    comment: "Marketplace email (Resend/SMTP)",
   });
   return httpsJson(
     "POST",
     url,
-    {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
+    { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     payload
   );
 }
@@ -100,56 +104,39 @@ async function main() {
   const projectId = (process.env.VERCEL_PROJECT_ID || DEFAULT_PROJECT_ID).trim();
 
   if (!token) {
-    console.error(
-      "Falta VERCEL_TOKEN. Creá un token en https://vercel.com/account/tokens y ejecutá:\n" +
-        "  set VERCEL_TOKEN=tu_token   (PowerShell: $env:VERCEL_TOKEN=\"...\")\n" +
-        "  npm run vercel:env:resend"
-    );
+    console.error("Falta VERCEL_TOKEN. Ver docs/MARKETPLACE_EMAIL_VERCEL.md");
     process.exit(1);
   }
 
-  const rootEnv = parseDotEnv(ENV_PATH);
-  const resendLocal = parseDotEnv(RESEND_LOCAL_PATH);
-  const merged = { ...rootEnv, ...resendLocal };
-  const apiKey = (merged.RESEND_API_KEY || process.env.RESEND_API_KEY || "").trim();
-  let from = (merged.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || "").trim();
-  const resetFrom = (
-    merged.PASSWORD_RESET_FROM_EMAIL ||
-    process.env.PASSWORD_RESET_FROM_EMAIL ||
-    from
-  ).trim();
-  const notifyTo = (
-    merged.MARKETPLACE_NOTIFY_EMAIL_TO ||
-    process.env.MARKETPLACE_NOTIFY_EMAIL_TO ||
-    ""
-  ).trim();
-
-  if (!apiKey) {
-    console.error(
-      "Falta RESEND_API_KEY en .env o .env.resend.local (raíz del repo) o en el entorno actual."
-    );
-    process.exit(1);
-  }
-  if (!from) {
-    console.error(
-      "Falta RESEND_FROM_EMAIL en .env o .env.resend.local. Debe ser un remitente verificado (ej. noreply@mail.hashrate.space)."
-    );
-    process.exit(1);
-  }
-
+  const merged = { ...parseDotEnv(ENV_PATH), ...parseDotEnv(RESEND_LOCAL_PATH) };
   const target = ["production", "preview"];
-  const pairs = [
-    { key: "RESEND_API_KEY", value: apiKey, type: "sensitive" },
-    { key: "RESEND_FROM_EMAIL", value: from, type: "encrypted" },
-    { key: "PASSWORD_RESET_FROM_EMAIL", value: resetFrom, type: "encrypted" },
-  ];
-  const contactTo = (merged.MARKETPLACE_CONTACT_EMAIL_TO || notifyTo || "sales@hashrate.space").trim();
+  const pairs = [];
+
+  const apiKey = (merged.RESEND_API_KEY || "").trim();
+  const from = (merged.RESEND_FROM_EMAIL || "").trim();
+  if (apiKey) pairs.push({ key: "RESEND_API_KEY", value: apiKey, type: "sensitive" });
+  if (from) pairs.push({ key: "RESEND_FROM_EMAIL", value: from, type: "encrypted" });
+
+  const contactTo = (merged.MARKETPLACE_CONTACT_EMAIL_TO || merged.MARKETPLACE_NOTIFY_EMAIL_TO || "sales@hashrate.space").trim();
   pairs.push({ key: "MARKETPLACE_CONTACT_EMAIL_TO", value: contactTo, type: "encrypted" });
-  if (notifyTo) pairs.push({ key: "MARKETPLACE_NOTIFY_EMAIL_TO", value: notifyTo, type: "encrypted" });
-  else pairs.push({ key: "MARKETPLACE_NOTIFY_EMAIL_TO", value: contactTo, type: "encrypted" });
+  pairs.push({ key: "MARKETPLACE_NOTIFY_EMAIL_TO", value: contactTo, type: "encrypted" });
 
-  console.log(`Sincronizando ${pairs.length} variable(s) a Vercel (project ${projectId})…`);
+  for (const key of SMTP_KEYS) {
+    const v = (merged[key] || "").trim();
+    if (v) pairs.push({ key, value: v, type: key.includes("PASS") ? "sensitive" : "encrypted" });
+  }
 
+  const hasSmtp = SMTP_KEYS.some((k) => (merged[k] || "").trim());
+  if (hasSmtp) {
+    pairs.push({ key: "MARKETPLACE_SALES_SMTP_FIRST", value: "1", type: "encrypted" });
+  }
+
+  if (!apiKey && !hasSmtp) {
+    console.error("Definí RESEND_API_KEY o PASSWORD_RESET_SMTP_* en .env / .env.resend.local");
+    process.exit(1);
+  }
+
+  console.log(`Subiendo ${pairs.length} variable(s) a Vercel…`);
   for (const p of pairs) {
     const res = await upsertEnv({ token, teamId, projectId, ...p, target });
     if (res.status < 200 || res.status >= 300) {
@@ -160,9 +147,10 @@ async function main() {
     console.log(`  OK ${p.key}`);
   }
 
-  console.log(
-    "\nListo. En Vercel → Deployments hacé Redeploy del último (o un push) para que los lambdas/serverless lean las nuevas variables."
-  );
+  console.log("\nListo. Redeploy en Vercel.");
+  if (!hasSmtp) {
+    console.warn("\nSin SMTP en .env: verificá mail.hashrate.space en https://resend.com/domains o agregá SMTP (docs/MARKETPLACE_EMAIL_VERCEL.md).");
+  }
 }
 
 main().catch((e) => {

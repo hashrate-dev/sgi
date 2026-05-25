@@ -9,6 +9,7 @@ import {
   mapEquipoRowToVitrinaWithAlgoFallback,
   type EquipoAsicVitrinaRow,
 } from "../lib/asicVitrinaMapper.js";
+import { mapEquipoRowToVitrinaList } from "../lib/vitrinaCatalogSlim.js";
 import {
   readCorpBestSellingEquipoIds,
   readCorpInterestingEquipoIds,
@@ -954,21 +955,10 @@ marketplaceRouter.get("/marketplace/asic-vitrina", async (req: Request, res: Res
       console.warn("[marketplace] asic-vitrina presence:", err);
     });
     const clause = sqlMarketplaceVisible();
-    const sql = `SELECT id, marca_equipo, modelo, procesador, precio_usd, mp_visible, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_hashrate_sell_enabled, mp_hashrate_parts_json, mp_price_label, mp_listing_kind
+    /** Sin galería/yield/parts en listado: menos I/O y JSON mucho más chico (sin data URLs en galería). */
+    const sql = `SELECT id, marca_equipo, modelo, procesador, precio_usd, mp_visible, mp_algo, mp_image_src, mp_detail_rows_json, mp_price_label, mp_listing_kind
       FROM equipos_asic WHERE ${clause} ORDER BY marca_equipo ASC, modelo ASC, procesador ASC`;
-    let raw: Record<string, unknown>[];
-    try {
-      raw = (await db.prepare(sql).all()) as Record<string, unknown>[];
-    } catch (e) {
-      const m = e instanceof Error ? e.message : String(e);
-      if (m.toLowerCase().includes("mp_hashrate_sell_enabled") || m.toLowerCase().includes("mp_hashrate_parts_json")) {
-        const legacySql = `SELECT id, marca_equipo, modelo, procesador, precio_usd, mp_visible, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_price_label, mp_listing_kind
-          FROM equipos_asic WHERE ${clause} ORDER BY marca_equipo ASC, modelo ASC, procesador ASC`;
-        raw = (await db.prepare(legacySql).all()) as Record<string, unknown>[];
-      } else {
-        throw e;
-      }
-    }
+    const raw = (await db.prepare(sql).all()) as Record<string, unknown>[];
     const rows = raw
       .map((r) => rowKeysToLowercase(r) as Record<string, unknown>)
       .filter((r) => mpVisibleFromDbValue(r.mp_visible))
@@ -976,13 +966,13 @@ marketplaceRouter.get("/marketplace/asic-vitrina", async (req: Request, res: Res
         const { mp_visible: _drop, ...rest } = r;
         return rest as EquipoAsicVitrinaRow;
       });
-    const products = rows.map(mapEquipoRowToVitrina).filter((p): p is NonNullable<typeof p> => p != null);
+    const products = rows.map(mapEquipoRowToVitrinaList).filter((p): p is NonNullable<typeof p> => p != null);
     const visibleProducts = withMarketplacePriceVisibility(products, canViewPrices);
     const cacheControl = hidePricesForGuests
       ? auth.viewerType === "anon"
-        ? "public, max-age=45, stale-while-revalidate=120"
+        ? "public, max-age=60, stale-while-revalidate=300"
         : "private, no-store"
-      : "public, max-age=45, stale-while-revalidate=120";
+      : "public, max-age=60, stale-while-revalidate=300";
     res.set("Cache-Control", cacheControl);
     res.json({ products: visibleProducts, hidePricesForGuests });
   } catch (e) {
@@ -990,6 +980,39 @@ marketplaceRouter.get("/marketplace/asic-vitrina", async (req: Request, res: Res
     /* Evitar 500 en el cliente: catálogo vacío hasta corregir BD/migraciones. */
     res.set("Cache-Control", "no-store");
     res.status(200).json({ products: [], hidePricesForGuests: true });
+  }
+});
+
+/** GET /marketplace/asic-vitrina/:id — ficha completa (galería, hashrate share) al abrir «Ver más». */
+marketplaceRouter.get("/marketplace/asic-vitrina/:id", async (req: Request, res: Response) => {
+  const id = (typeof req.params.id === "string" ? req.params.id : req.params.id?.[0] ?? "").trim();
+  if (!id) return res.status(400).json({ error: { message: "ID requerido" } });
+  try {
+    const [auth, hidePricesForGuests] = await Promise.all([
+      resolveAuthSnapshot(req),
+      readMarketplaceHidePricesForGuests(),
+    ]);
+    const canViewPrices = auth.viewerType !== "anon" || !hidePricesForGuests;
+    const clause = sqlMarketplaceVisible();
+    const sql = `SELECT id, marca_equipo, modelo, procesador, precio_usd, mp_visible, mp_algo, mp_hashrate_display, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_yield_json, mp_hashrate_sell_enabled, mp_hashrate_parts_json, mp_price_label, mp_listing_kind
+      FROM equipos_asic WHERE id = ? AND ${clause}`;
+    let raw = (await db.prepare(sql).get(id)) as Record<string, unknown> | undefined;
+    if (!raw) {
+      return res.status(404).json({ error: { message: "Producto no encontrado" } });
+    }
+    raw = rowKeysToLowercase(raw) as Record<string, unknown>;
+    if (!mpVisibleFromDbValue(raw.mp_visible)) {
+      return res.status(404).json({ error: { message: "Producto no visible en tienda" } });
+    }
+    const { mp_visible: _drop, ...rest } = raw;
+    const product = mapEquipoRowToVitrina(rest as EquipoAsicVitrinaRow);
+    if (!product) return res.status(404).json({ error: { message: "Producto no encontrado" } });
+    const [visible] = withMarketplacePriceVisibility([product], canViewPrices);
+    res.set("Cache-Control", "private, max-age=30");
+    res.json({ product: visible });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: { message: msg } });
   }
 });
 

@@ -31,6 +31,7 @@
     "start": "npm run start -w server",
     "deploy:vercel": "node scripts/deploy-vercel.cjs",
     "vercel:env:resend": "node scripts/push-resend-env-vercel.cjs",
+    "vercel:env:marketplace-email": "node scripts/push-marketplace-email-env-vercel.cjs",
     "resend:init": "node scripts/init-resend-env-local.cjs",
     "resend:test": "node scripts/test-resend-marketplace.cjs",
     "supabase:set": "node scripts/set-supabase-url.cjs",
