@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useState, memo } from "react";
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { MarketplaceSiteHeader } from "../components/marketplace/MarketplaceSiteHeader";
 import { MarketplaceSiteFooter } from "../components/marketplace/MarketplaceSiteFooter";
 import { MarketplaceCorpFaqSpotlight } from "../components/marketplace/MarketplaceCorpFaqSpotlight";
@@ -99,11 +99,10 @@ const BRAND_LOGOS = [
  * sin WordPress: mismas secciones, imágenes CDN y navegación interna.
  */
 export function MarketplaceCorporateHomePage() {
-  const { t, lang } = useMarketplaceLang();
+  const { t } = useMarketplaceLang();
   const { user, loading } = useAuth();
   const { pathname, hash } = useLocation();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   const { addProduct, openDrawer } = useMarketplaceQuoteCart();
   const cachedHome = peekMarketplaceCorpHomeCache();
   const [hidePricesForGuests, setHidePricesForGuests] = useState(
@@ -160,15 +159,13 @@ export function MarketplaceCorporateHomePage() {
     (p: AsicProduct) => {
       if (loading) return;
       if (!user) {
-        const next = new URLSearchParams(searchParams);
-        next.set("login", "1");
-        void navigate({ pathname: MARKETPLACE.catalog, search: `?${next.toString()}` });
+        void navigate(`${MARKETPLACE.catalog}?login=1`);
         return;
       }
       addProduct(p, 1);
       openDrawer();
     },
-    [addProduct, openDrawer, user, loading, searchParams, navigate]
+    [addProduct, openDrawer, user, loading, navigate]
   );
 
   const goCorpHash = useCallback((id: (typeof CORP_ANCHOR_IDS)[number]) => {
