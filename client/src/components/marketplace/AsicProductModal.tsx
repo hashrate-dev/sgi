@@ -65,6 +65,7 @@ function gallerySources(product: AsicProduct): string[] {
 export function AsicProductModal({
   product,
   onClose,
+  galleryLoading = false,
   liveYield,
   liveYieldLoading,
   inventoryAside,
@@ -76,6 +77,8 @@ export function AsicProductModal({
 }: {
   product: AsicProduct;
   onClose: () => void;
+  /** Mientras se trae la ficha completa: no mostrar foto genérica de catálogo. */
+  galleryLoading?: boolean;
   liveYield?: MarketplaceAsicLiveYield;
   liveYieldLoading?: boolean;
   /** Reemplaza CTA + tarjeta hosting (p. ej. ficha de inventario en Gestión ASIC). */
@@ -136,8 +139,8 @@ export function AsicProductModal({
   }, [mailText.body]);
 
   const thumbs = useMemo(
-    () => capProductGalleryUrls(gallerySources(product)),
-    [product]
+    () => (galleryLoading ? [] : capProductGalleryUrls(gallerySources(product))),
+    [product, galleryLoading]
   );
   const shelfFallbackSrc = useMemo(
     () => normalizeMarketplaceImageSrc(defaultAsicShelfImageSrc(product.brand, product.model)),
@@ -272,10 +275,27 @@ export function AsicProductModal({
           </button>
 
           <div
-            className={`product-modal__gallery${!hasAnyPhoto ? " product-modal__gallery--no-media" : ""}`}
-            aria-label={hasAnyPhoto ? t("modal.gallery") : t("modal.no_photos")}
+            className={`product-modal__gallery${
+              galleryLoading
+                ? " product-modal__gallery--loading"
+                : !hasAnyPhoto
+                  ? " product-modal__gallery--no-media"
+                  : ""
+            }`}
+            aria-label={
+              galleryLoading ? t("modal.gallery_loading") : hasAnyPhoto ? t("modal.gallery") : t("modal.no_photos")
+            }
+            aria-busy={galleryLoading}
           >
-            {visibleThumbs.length > 0 ? (
+            {galleryLoading ? (
+              <div className="product-modal__gallery-col product-modal__gallery-col--loading">
+                <div className="product-modal__gallery-loading" role="status">
+                  <div className="product-modal__gallery-spinner" aria-hidden />
+                  <p className="product-modal__gallery-loading-txt">{t("modal.gallery_loading")}</p>
+                </div>
+              </div>
+            ) : null}
+            {!galleryLoading && visibleThumbs.length > 0 ? (
               <div className="product-modal__thumbs" role="tablist" aria-label={t("modal.thumbs")}>
                 {visibleThumbs.map((src, i) => (
                   <button
@@ -299,6 +319,7 @@ export function AsicProductModal({
                 ))}
               </div>
             ) : null}
+            {!galleryLoading ? (
             <div className="product-modal__gallery-col">
               <div className="product-modal__hero-wrap">
                 <div
@@ -354,6 +375,7 @@ export function AsicProductModal({
                 </aside>
               ) : null}
             </div>
+            ) : null}
           </div>
 
           <div className="product-modal__center">

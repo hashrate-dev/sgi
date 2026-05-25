@@ -302,6 +302,7 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
   "modal.close_win": "Fechar janela",
   "modal.detail_aria": "Detalhe do produto e solicitação",
   "modal.gallery": "Galeria do produto",
+  "modal.gallery_loading": "Carregando imagens…",
   "modal.no_photos": "Produto sem fotos",
   "modal.thumbs": "Vistas do produto",
   "modal.store_official": "Loja oficial",

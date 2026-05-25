@@ -106,6 +106,7 @@ function MarketplacePageBody() {
   const [filterAlgo, setFilterAlgo] = useState<MarketplaceCatalogFilter | null>(null);
   const [modalIndex, setModalIndex] = useState<number | null>(null);
   const [modalProduct, setModalProduct] = useState<AsicProduct | null>(null);
+  const [modalGalleryLoading, setModalGalleryLoading] = useState(false);
   const openProductModal = useCallback((index: number) => {
     setModalIndex(index);
   }, []);
@@ -327,17 +328,20 @@ function MarketplacePageBody() {
   useEffect(() => {
     if (modalIndex == null || !shelfProductAtModal) {
       setModalProduct(null);
+      setModalGalleryLoading(false);
       return;
     }
     setModalProduct(shelfProductAtModal);
+    setModalGalleryLoading(true);
     let cancelled = false;
     void getMarketplaceAsicVitrinaItem(shelfProductAtModal.id)
       .then((full) => {
         if (cancelled) return;
         setModalProduct(normalizeAsicProductImages(full));
+        setModalGalleryLoading(false);
       })
       .catch(() => {
-        /* grilla sigue visible con datos livianos */
+        if (!cancelled) setModalGalleryLoading(false);
       });
     return () => {
       cancelled = true;
@@ -401,6 +405,7 @@ function MarketplacePageBody() {
         <AsicProductModal
           product={modalProduct}
           onClose={() => setModalIndex(null)}
+          galleryLoading={modalGalleryLoading}
           liveYield={modalLiveYield}
           liveYieldLoading={yieldsLoading && !modalLiveYield}
           showPrice={canViewMarketplacePrices}
