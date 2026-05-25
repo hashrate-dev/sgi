@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Badge, Box, Flex, Grid, Heading, Image, Text } from "@chakra-ui/react";
+import { Badge, Box, Flex, Grid, Heading, Text } from "@chakra-ui/react";
+import { CorpLogoHomePreview } from "./CorpLogoHomePreview.js";
 import {
   getEquiposMarketplaceCorpPartners,
   putEquiposMarketplaceCorpPartners,
@@ -186,7 +187,7 @@ export function TiendaOnlineCorpPartnersSection({ isEditionLocked }: Props) {
             🤝 Partners oficiales
           </Heading>
           <Text color="gray.700" fontSize="sm" mt={1}>
-            Logos al pie de <code>/marketplace/home</code> (sección «Partners oficiales»). Usá <strong>PNG con fondo transparente</strong> para que no se vea caja gris alrededor del logo.
+            Logos al pie de <code>/marketplace/home</code>. Se muestran siempre en <strong>gris corporativo</strong> (como ahora en la home); podés subir el logo a color o con fondo blanco (PNG recomendado).
           </Text>
         </Box>
         <Badge colorPalette="green" variant="subtle" borderRadius="full" px={3} py={1}>
@@ -217,20 +218,15 @@ export function TiendaOnlineCorpPartnersSection({ isEditionLocked }: Props) {
                     display="flex"
                     alignItems="center"
                     justifyContent="center"
-                    bg="gray.50"
+                    bg="#f3f4f6"
                     borderRadius="md"
                     borderWidth="1px"
                     borderColor="gray.200"
                     overflow="hidden"
+                    className="corp-logo-home-style"
                   >
                     {p.imageUrl ? (
-                      <Image
-                        src={resolveCorpPartnerImageSrc(p.imageUrl)}
-                        alt=""
-                        maxW="100%"
-                        maxH="100%"
-                        objectFit="contain"
-                      />
+                      <CorpLogoHomePreview src={resolveCorpPartnerImageSrc(p.imageUrl)} alt={p.name} />
                     ) : (
                       <Text fontSize="xs" color="gray.400">
                         Sin imagen

@@ -1,4 +1,5 @@
 /* Marketplace ASIC — estilo claro (mockup: fondo gris, tarjetas blancas, precio rojo, verde acción) */
+@import "./corp-logo-home.css";
 
 /*
  * Toda la tienda pública (`/marketplace`, home corp., etc.): mismo tratamiento de ancho que la home corp.
@@ -8825,48 +8826,24 @@ a.market-corp-clients__item {
 }
 
 /*
- * Home: partners + fabricantes — fondo de cada logo = gris claro de la página (#f3f4f6).
- * multiply funde blanco/gris del PNG con ese mismo color (sin cajas oscuras).
+ * Home: partners + fabricantes — estilo fijo en corp-logo-home.css (gris #f3f4f6 + B/N).
  */
 .market-corp-page .market-corp-logo-strip--bw,
 .market-corp-page .market-corp-logo-strip--bw .market-corp-clients,
 .market-corp-page .market-corp-logo-strip--bw .market-corp-luxor__row,
 .market-corp-page .market-corp-logo-strip--bw .market-corp-clients__item,
 .market-corp-page .market-corp-logo-strip--bw .market-corp-luxor__link,
-.market-corp-page .market-corp-logo-strip--bw .market-corp-logo-cell {
-  background-color: var(--marketplace-page-bg, #f3f4f6);
+.market-corp-page .market-corp-logo-strip--bw .corp-logo-home-style__frame {
+  background-color: var(--corp-logo-home-bg, #f3f4f6);
 }
 
-.market-corp-page .market-corp-logo-strip--bw .market-corp-logo-cell {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 0;
-  isolation: isolate;
-}
-
-.market-corp-page .market-corp-logo-strip--bw .market-corp-clients__item .market-corp-logo-cell {
+.market-corp-page .market-corp-logo-strip--bw .market-corp-clients__item .corp-logo-home-style__frame {
   max-height: 44px;
 }
 
-.market-corp-page .market-corp-logo-strip--bw .market-corp-luxor__link .market-corp-logo-cell {
+.market-corp-page .market-corp-logo-strip--bw .market-corp-luxor__link .corp-logo-home-style__frame {
   height: 100%;
   max-height: var(--corp-partner-logo-h);
-}
-
-.market-corp-page .market-corp-logo-strip--bw .market-corp-logo-cell__img,
-.market-corp-page .market-corp-logo-strip--bw .market-corp-luxor__img {
-  display: block;
-  max-width: 100%;
-  width: auto;
-  height: auto;
-  max-height: 44px;
-  object-fit: contain;
-  object-position: center;
-  background-color: var(--marketplace-page-bg, #f3f4f6);
-  mix-blend-mode: multiply;
-  /* Mismo B/N y gris de marca que NiceHash (fondo blanco del PNG → gris página) */
-  filter: grayscale(100%) saturate(0) contrast(1.12) brightness(1.04);
 }
 
 .market-corp-page .market-corp-logo-strip--bw .market-corp-luxor__img {

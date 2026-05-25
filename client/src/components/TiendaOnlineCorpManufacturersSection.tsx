@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Badge, Box, Flex, Grid, Heading, Image, Text } from "@chakra-ui/react";
+import { Badge, Box, Flex, Grid, Heading, Text } from "@chakra-ui/react";
+import { CorpLogoHomePreview } from "./CorpLogoHomePreview.js";
 import {
   getEquiposMarketplaceCorpManufacturers,
   putEquiposMarketplaceCorpManufacturers,
@@ -204,7 +205,7 @@ export function TiendaOnlineCorpManufacturersSection({ isEditionLocked }: Props)
             🏭 Confiamos en los mejores fabricantes de la industria
           </Heading>
           <Text color="gray.700" fontSize="sm" mt={1}>
-            Logos en <code>/marketplace/home</code> (sección de fabricantes, arriba del FAQ). Subí <strong>PNG con fondo transparente</strong> para evitar recuadros grises.
+            Logos en <code>/marketplace/home</code> (arriba del FAQ). Siempre en <strong>gris corporativo</strong> como en la home; subí logo a color o fondo blanco (PNG recomendado).
           </Text>
         </Box>
         <Badge colorPalette="green" variant="subtle" borderRadius="full" px={3} py={1}>
@@ -235,20 +236,15 @@ export function TiendaOnlineCorpManufacturersSection({ isEditionLocked }: Props)
                     display="flex"
                     alignItems="center"
                     justifyContent="center"
-                    bg="gray.50"
+                    bg="#f3f4f6"
                     borderRadius="md"
                     borderWidth="1px"
                     borderColor="gray.200"
                     overflow="hidden"
+                    className="corp-logo-home-style"
                   >
                     {m.imageUrl ? (
-                      <Image
-                        src={resolveCorpManufacturerImageSrc(m.imageUrl)}
-                        alt=""
-                        maxW="100%"
-                        maxH="100%"
-                        objectFit="contain"
-                      />
+                      <CorpLogoHomePreview src={resolveCorpManufacturerImageSrc(m.imageUrl)} alt={m.name} />
                     ) : (
                       <Text fontSize="xs" color="gray.400">
                         Sin imagen

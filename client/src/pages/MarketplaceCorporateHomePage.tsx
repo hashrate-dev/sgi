@@ -527,7 +527,7 @@ export function MarketplaceCorporateHomePage() {
 
             <div className="market-corp-inner">
             {industryManufacturers.length > 0 ? (
-              <section className="market-corp-brands-block market-corp-logo-strip--bw" aria-labelledby="corp-brands-title">
+              <section className="market-corp-brands-block market-corp-logo-strip--bw corp-logo-home-style" aria-labelledby="corp-brands-title">
                 <h2 id="corp-brands-title" className="market-corp-brands-block__title">
                   {t("corp.brands.title")}
                 </h2>
@@ -542,9 +542,9 @@ export function MarketplaceCorporateHomePage() {
                     const alt = m.name.trim() || "Fabricante";
                     const href = m.href.trim();
                     const img = (
-                      <span className="market-corp-logo-cell">
+                      <span className="corp-logo-home-style__frame">
                         <img
-                          className="market-corp-logo-cell__img"
+                          className="corp-logo-home-style__img"
                           src={src}
                           alt={alt}
                           loading="lazy"
@@ -643,7 +643,7 @@ export function MarketplaceCorporateHomePage() {
             <MarketplaceCorpContactCard titleId="corp-contact-title" anchorId="contacto" />
 
             {officialPartners.length > 0 ? (
-              <section className="market-corp-luxor market-corp-logo-strip--bw" aria-labelledby="corp-luxor-title">
+              <section className="market-corp-luxor market-corp-logo-strip--bw corp-logo-home-style" aria-labelledby="corp-luxor-title">
                 <h2 id="corp-luxor-title" className="market-corp-brands-block__title market-corp-luxor__heading">
                   {t("corp.partners.title")}
                 </h2>
@@ -654,9 +654,9 @@ export function MarketplaceCorporateHomePage() {
                     const href = p.href.trim();
                     const aria = p.name.trim() || "Partner";
                     const img = (
-                      <span className="market-corp-logo-cell">
+                      <span className="corp-logo-home-style__frame">
                         <img
-                          className="market-corp-logo-cell__img market-corp-luxor__img"
+                          className="corp-logo-home-style__img market-corp-luxor__img"
                           src={src}
                           alt=""
                           loading="lazy"
