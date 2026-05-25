@@ -10,15 +10,18 @@ const DEFAULT_PROVEEDOR_USD = 300;
 import { HASHRATE_SPACE_LOGO } from "../lib/marketplaceWpAssets.js";
 const HASHRATE_LOGO = HASHRATE_SPACE_LOGO;
 
-const ASIC_MODELOS = ["S21", "L7", "L9", "Z15", "X9"] as const;
+const ASIC_MODELOS = ["S21", "S23", "L7", "L9", "L11", "Z15", "X9", "U3S21exPH"] as const;
 
 /** Hashrate / variante de procesador según modelo */
 const PROCESADOR_POR_MODELO: Record<(typeof ASIC_MODELOS)[number], readonly string[]> = {
   S21: ["200 ths", "234 ths", "235 ths", "245 ths", "270 ths", "473 ths hydro"],
+  S23: ["305 ths"],
   L7: ["8800 mhs", "9050 mhs", "9500 mhs"],
   L9: ["15.000 mhs", "16.000 mhs", "16.500 mhs", "17.000 mhs"],
+  L11: ["20.000 ghs", "21.000 ghs", "32.000 ghs hydro"],
   Z15: ["840 kSol/s", "860 kSol/s"],
   X9: ["1.000K"],
+  U3S21exPH: ["860 ths hydro", "H 860 ths"],
 };
 
 function parseMoney(raw: string): number {
@@ -57,8 +60,10 @@ function removeMinus(raw: string): string {
 function prioridadModeloCotizacion(modeloRaw: string): number {
   const modeloNorm = modeloRaw.trim().toUpperCase();
   if (modeloNorm === "S21") return 0;
-  if (modeloNorm === "L9") return 1;
-  return 2;
+  if (modeloNorm === "S23") return 1;
+  if (modeloNorm === "L9") return 2;
+  if (modeloNorm === "L11") return 3;
+  return 4;
 }
 
 export function AsicCotizadorChinaPyPage() {
