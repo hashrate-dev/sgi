@@ -18,11 +18,37 @@ export function vitrinaListImageSrc(raw: string | null | undefined): string {
   return n;
 }
 
+function parseGalleryRawUrls(json: string | null | undefined): string[] {
+  if (!json?.trim()) return [];
+  try {
+    const g = JSON.parse(json) as unknown;
+    if (!Array.isArray(g)) return [];
+    return g
+      .filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+      .map((x) => x.trim());
+  } catch {
+    return [];
+  }
+}
+
+/** Imagen de grilla: principal o primera URL de galería que no sea data: (base64 va por `/shelf-image/:id`). */
+export function pickVitrinaListImageSrc(
+  row: Pick<EquipoAsicVitrinaRow, "mp_image_src" | "mp_gallery_json">
+): string {
+  const main = vitrinaListImageSrc(row.mp_image_src);
+  if (main) return main;
+  for (const raw of parseGalleryRawUrls(row.mp_gallery_json)) {
+    const u = vitrinaListImageSrc(raw);
+    if (u) return u;
+  }
+  return "";
+}
+
 /** Catálogo grilla: sin galería, sin partes hashrate, imagen solo por URL. */
 export function mapEquipoRowToVitrinaList(row: EquipoAsicVitrinaRow): VitrinaAsicProduct | null {
   const full = mapEquipoRowToVitrina(row);
   if (!full) return null;
-  const imageSrc = vitrinaListImageSrc(row.mp_image_src);
+  const imageSrc = pickVitrinaListImageSrc(row);
   return {
     id: full.id,
     algo: full.algo,

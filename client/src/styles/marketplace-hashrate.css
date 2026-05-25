@@ -7341,11 +7341,6 @@ button.product-modal__btn--quote-cart:active {
   }
 }
 
-/* Home corp.: tarjetas ASIC con misma grilla que `/marketplace` (`.market-shelf-grid--catalog-v2`) */
-.market-corp-home-shelf-grid {
-  margin-bottom: 2rem;
-}
-
 .market-corp-product-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

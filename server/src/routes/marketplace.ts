@@ -10,8 +10,12 @@ import {
   type EquipoAsicVitrinaRow,
 } from "../lib/asicVitrinaMapper.js";
 import { mapEquipoRowToVitrinaList } from "../lib/vitrinaCatalogSlim.js";
+import {
+  pickMarketplaceShelfImageRaw,
+  sendMarketplaceShelfImageResponse,
+} from "../lib/marketplaceShelfImage.js";
 
-const CORP_HOME_LIST_SQL = `id, marca_equipo, modelo, procesador, precio_usd, mp_algo, mp_image_src, mp_detail_rows_json, mp_price_label, mp_listing_kind`;
+const CORP_HOME_LIST_SQL = `id, marca_equipo, modelo, procesador, precio_usd, mp_algo, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_price_label, mp_listing_kind`;
 import {
   readCorpBestSellingEquipoIds,
   readCorpInterestingEquipoIds,
@@ -502,7 +506,7 @@ function equipoDbRowToVitrinaListInput(raw: Record<string, unknown>): EquipoAsic
     mp_algo: typeof r.mp_algo === "string" && r.mp_algo.trim() ? r.mp_algo.trim() : null,
     mp_hashrate_display: null,
     mp_image_src: typeof r.mp_image_src === "string" ? r.mp_image_src : null,
-    mp_gallery_json: null,
+    mp_gallery_json: typeof r.mp_gallery_json === "string" ? r.mp_gallery_json : null,
     mp_detail_rows_json: typeof r.mp_detail_rows_json === "string" ? r.mp_detail_rows_json : null,
     mp_yield_json: null,
     mp_hashrate_sell_enabled: null,
@@ -930,6 +934,31 @@ function sqlMarketplaceVisible(): string {
 }
 
 /**
+ * GET /marketplace/shelf-image/:id — foto de tarjeta (redirect a URL o bytes desde data: en BD).
+ * Evita meter base64 en JSON de listados; el navegador cachea cada imagen por separado.
+ */
+marketplaceRouter.get("/marketplace/shelf-image/:id", async (req: Request, res: Response) => {
+  const id = (typeof req.params.id === "string" ? req.params.id : req.params.id?.[0] ?? "").trim();
+  if (!id) return res.status(400).end();
+  try {
+    const clause = sqlMarketplaceVisible();
+    const sql = `SELECT mp_image_src, mp_gallery_json, mp_visible FROM equipos_asic WHERE id = ? AND ${clause}`;
+    const raw = (await db.prepare(sql).get(id)) as Record<string, unknown> | undefined;
+    if (!raw) return res.status(404).end();
+    const row = rowKeysToLowercase(raw);
+    if (!mpVisibleFromDbValue(row.mp_visible)) return res.status(404).end();
+    const src = pickMarketplaceShelfImageRaw(
+      typeof row.mp_image_src === "string" ? row.mp_image_src : null,
+      typeof row.mp_gallery_json === "string" ? row.mp_gallery_json : null
+    );
+    sendMarketplaceShelfImageResponse(res, src);
+  } catch (e) {
+    console.error("[marketplace] shelf-image:", e);
+    res.status(404).end();
+  }
+});
+
+/**
  * GET /marketplace/corp-home-sections — ambas filas de equipos de la home en un solo request.
  */
 marketplaceRouter.get("/marketplace/corp-home-sections", async (req: Request, res: Response) => {
@@ -1036,7 +1065,7 @@ marketplaceRouter.get("/marketplace/asic-vitrina", async (req: Request, res: Res
     });
     const clause = sqlMarketplaceVisible();
     /** Sin galería/yield/parts en listado: menos I/O y JSON mucho más chico (sin data URLs en galería). */
-    const sql = `SELECT id, marca_equipo, modelo, procesador, precio_usd, mp_visible, mp_algo, mp_image_src, mp_detail_rows_json, mp_price_label, mp_listing_kind
+    const sql = `SELECT id, marca_equipo, modelo, procesador, precio_usd, mp_visible, mp_algo, mp_image_src, mp_gallery_json, mp_detail_rows_json, mp_price_label, mp_listing_kind
       FROM equipos_asic WHERE ${clause} ORDER BY marca_equipo ASC, modelo ASC, procesador ASC`;
     const raw = (await db.prepare(sql).all()) as Record<string, unknown>[];
     const rows = raw

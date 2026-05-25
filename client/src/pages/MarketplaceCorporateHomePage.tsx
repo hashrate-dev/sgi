@@ -1,15 +1,13 @@
-import { useCallback, useEffect, useId, useMemo, useState, memo } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { MarketplaceSiteHeader } from "../components/marketplace/MarketplaceSiteHeader";
 import { MarketplaceSiteFooter } from "../components/marketplace/MarketplaceSiteFooter";
 import { MarketplaceCorpFaqSpotlight } from "../components/marketplace/MarketplaceCorpFaqSpotlight";
 import { MarketplaceCorpContactCard } from "../components/marketplace/MarketplaceCorpContactCard";
-import { AsicShelfProduct } from "../components/marketplace/AsicShelfProduct.js";
-import { AsicDetailSvg } from "../components/marketplace/AsicDetailIcon.js";
+import { MarketplaceCorpHomeProductCard } from "../components/marketplace/MarketplaceCorpHomeProductCard.js";
 import {
   ASIC_MARKETPLACE_PRODUCTS,
   CORP_HOME_GRID_PRODUCT_IDS,
-  formatAsicProductPriceDisplay,
   normalizeAsicCatalogProducts,
 } from "../lib/marketplaceAsicCatalog.js";
 import type { AsicProduct } from "../lib/marketplaceAsicCatalog.js";
@@ -18,10 +16,10 @@ import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
 import { isCorpHomePath, MARKETPLACE } from "../lib/marketplacePaths.js";
 import { publicImageUrl } from "../lib/marketplaceAsicCatalog.js";
 import { CORP_INSTITUTIONAL_VIDEO_URL, wpUpload } from "../lib/marketplaceWpAssets.js";
+import { useAuth } from "../contexts/AuthContext";
 
 /** Fondo sección “Nuestros datacenters” / Itaipú (antes en WordPress). */
 const CORP_ITAIPU_BG = wpUpload("itaipu-py.webp");
-import { useAuth } from "../contexts/AuthContext";
 import "../styles/marketplace-hashrate.css";
 
 const DOC_TITLE = "Hashrate – Space";
@@ -72,18 +70,6 @@ const CORP_HOW_STEPS = [
   { titleKey: "corp.how.step3_title" as const, bodyKey: "corp.how.step3_body" as const, imgAltKey: "corp.how.step3_img_alt" as const },
   { titleKey: "corp.how.step2_title" as const, bodyKey: "corp.how.step2_body" as const, imgAltKey: "corp.how.step2_img_alt" as const },
 ] as const;
-
-const MemoAsicShelfProduct = memo(AsicShelfProduct, (prev, next) => {
-  return (
-    prev.product === next.product &&
-    prev.productIndex === next.productIndex &&
-    prev.filteredHidden === next.filteredHidden &&
-    prev.showPrice === next.showPrice &&
-    prev.onAddToQuote === next.onAddToQuote &&
-    prev.onOpenModal === next.onOpenModal
-  );
-});
-MemoAsicShelfProduct.displayName = "AsicShelfProduct";
 
 const BRAND_LOGOS = [
   { src: wpUpload("bitmain.png"), alt: "Bitmain", w: 512, h: 180, slug: "bitmain" as const },
@@ -148,36 +134,6 @@ export function MarketplaceCorporateHomePage() {
     cachedHome?.interesting?.length
       ? normalizeAsicCatalogProducts(cachedHome.interesting)
       : interestingFallback
-  );
-
-  const goEquipmentAsic = useCallback(
-    (productId: string) => {
-      void navigate(`${MARKETPLACE.catalog}?asic=${encodeURIComponent(productId)}`);
-    },
-    [navigate]
-  );
-
-  const handleAddToQuote = useCallback(
-    (prod: AsicProduct) => {
-      goEquipmentAsic(prod.id);
-    },
-    [goEquipmentAsic]
-  );
-
-  const openBestSellingModal = useCallback(
-    (idx: number) => {
-      const x = corpBestSellingProducts[idx];
-      if (x) goEquipmentAsic(x.id);
-    },
-    [corpBestSellingProducts, goEquipmentAsic]
-  );
-
-  const openInterestingModal = useCallback(
-    (idx: number) => {
-      const x = interestingVitrina[idx];
-      if (x) goEquipmentAsic(x.id);
-    },
-    [interestingVitrina, goEquipmentAsic]
   );
 
   const goCorpHash = useCallback((id: (typeof CORP_ANCHOR_IDS)[number]) => {
@@ -404,16 +360,14 @@ export function MarketplaceCorporateHomePage() {
           {corpBestSellingProducts.length > 0 ? (
             <div className="market-corp-inner market-corp-inner--flush-top">
               <h2 className="market-corp-products-title">{t("corp.best_selling.title")}</h2>
-              <div className="shelf-grid market-shelf-grid--catalog-v2 market-corp-home-shelf-grid" aria-label={t("corp.market_shortcuts_aria")}>
+              <div className="market-corp-mp-shortcuts" aria-label={t("corp.market_shortcuts_aria")}>
                 {corpBestSellingProducts.map((p, idx) => (
-                  <MemoAsicShelfProduct
+                  <MarketplaceCorpHomeProductCard
                     key={p.id}
                     product={p}
                     productIndex={idx}
-                    filteredHidden={false}
                     showPrice={canViewMarketplacePrices}
-                    onOpenModal={openBestSellingModal}
-                    onAddToQuote={handleAddToQuote}
+                    hiddenPriceLabel={hiddenPriceLabel}
                   />
                 ))}
               </div>
@@ -457,18 +411,16 @@ export function MarketplaceCorporateHomePage() {
                   {t("corp.interesting_products.title")}
                 </h2>
                 <div
-                  className="shelf-grid market-shelf-grid--catalog-v2 market-corp-home-shelf-grid market-corp-interesting-slot__shortcuts"
+                  className="market-corp-mp-shortcuts market-corp-interesting-slot__shortcuts"
                   aria-label={t("corp.interesting_products.grid_aria")}
                 >
                   {interestingVitrina.map((p, idx) => (
-                    <MemoAsicShelfProduct
+                    <MarketplaceCorpHomeProductCard
                       key={p.id}
                       product={p}
                       productIndex={idx}
-                      filteredHidden={false}
                       showPrice={canViewMarketplacePrices}
-                      onOpenModal={openInterestingModal}
-                      onAddToQuote={handleAddToQuote}
+                      hiddenPriceLabel={hiddenPriceLabel}
                     />
                   ))}
                 </div>
@@ -483,67 +435,15 @@ export function MarketplaceCorporateHomePage() {
                   {t("corp.home_row2.title")}
                 </h2>
                 <div className="market-corp-mp-shortcuts" aria-label={t("corp.home_row2.grid_aria")}>
-                  {corpMarketplaceAfterHostingProducts.map((p, idx) => {
-                    const to = `${MARKETPLACE.catalog}?asic=${encodeURIComponent(p.id)}`;
-                    const aria = `${p.brand} ${p.model} ${p.hashrate} — ${t("corp.mp_card_link_aria")}`;
-                    const goAsic = () => {
-                      void navigate(to);
-                    };
-                    return (
-                      <article key={p.id} className="shelf-product">
-                        <div className="shelf-product__media">
-                          <div className="shelf-product__media-gradient">
-                            <Link to={to} className="shelf-product__imglink" aria-label={aria}>
-                              {p.imageSrc ? (
-                                <img
-                                  src={p.imageSrc}
-                                  alt=""
-                                  width={400}
-                                  height={400}
-                                  loading={idx < 2 ? "eager" : "lazy"}
-                                  fetchPriority={idx < 2 ? "high" : "auto"}
-                                  decoding="async"
-                                  className="shelf-product__photo"
-                                />
-                              ) : (
-                                <div className="shelf-product__photo shelf-product__photo--fallback" aria-hidden />
-                              )}
-                            </Link>
-                          </div>
-                        </div>
-                        <div className="shelf-product__body">
-                          <div className="shelf-product__identity">
-                            <p className="shelf-product__brand">{p.brand}</p>
-                            <h3 className="shelf-product__title">{p.model}</h3>
-                            <p className="shelf-product__hashrate">{p.hashrate}</p>
-                          </div>
-                          <div className="shelf-product__price-box">
-                            <span className="shelf-product__price-value">
-                              {canViewMarketplacePrices ? formatAsicProductPriceDisplay(p, lang) : hiddenPriceLabel}
-                            </span>
-                          </div>
-                          <div className="shelf-product__specs-box" role="group" aria-label={t("shelf.techspecs")}>
-                            <ul className="shelf-detail-strip">
-                              {p.detailRows.map((row, i) => (
-                                <li key={i} className="shelf-detail-strip__row">
-                                  <AsicDetailSvg kind={row.icon} />
-                                  <span className="shelf-detail-strip__txt">{row.text}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                          <div className="shelf-product__cta-row">
-                            <button type="button" className="shelf-product__cta" onClick={goAsic}>
-                              {t("shelf.seemore")}
-                            </button>
-                            <button type="button" className="shelf-product__quote-btn" onClick={goAsic} title={t("shelf.add_title")}>
-                              {t("catalog.add_short")}
-                            </button>
-                          </div>
-                        </div>
-                      </article>
-                    );
-                  })}
+                  {corpMarketplaceAfterHostingProducts.map((p, idx) => (
+                    <MarketplaceCorpHomeProductCard
+                      key={p.id}
+                      product={p}
+                      productIndex={idx}
+                      showPrice={canViewMarketplacePrices}
+                      hiddenPriceLabel={hiddenPriceLabel}
+                    />
+                  ))}
                 </div>
               </section>
               </div>

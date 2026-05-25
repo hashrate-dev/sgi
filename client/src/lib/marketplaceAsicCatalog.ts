@@ -413,8 +413,30 @@ export function defaultAsicShelfImageSrc(brand: string, model: string): string {
   if (/\b(?:antminer\s+)?l9\b/.test(t)) file = "L9-catalog.png";
   else if (/\b(?:antminer\s+)?s21\b/.test(t)) file = "S21-catalog.png";
   else if (/\bz15\b/.test(t)) file = "bitmain-z15-pro.png";
+  else if (/\bantspace\b|\bhw5\b|\bhd5\b|\bantrack\b|\bhydro\b/.test(t)) file = "wp-uploads/hydro-ss21.jpeg";
   if (!file) return "";
-  return `/images/${encodeURIComponent(file)}`;
+  return file.startsWith("wp-uploads/") ? `/images/${file}` : `/images/${encodeURIComponent(file)}`;
+}
+
+/** URL de imagen de tarjeta cuando el listado no trae `imageSrc` (foto en BD como data: o solo en galería). */
+export function marketplaceShelfImageApiUrl(productId: string): string {
+  const id = String(productId ?? "").trim();
+  if (!id) return "";
+  return `/api/marketplace/shelf-image/${encodeURIComponent(id)}`;
+}
+
+/** Orden: URL del listado → API shelf-image (foto en BD) → fallback local por modelo. */
+export function resolveShelfDisplayImageSrc(product: {
+  id: string;
+  imageSrc?: string;
+  brand: string;
+  model: string;
+}): string {
+  const explicit = normalizeMarketplaceImageSrc(product.imageSrc ?? "");
+  if (explicit && !/^data:/i.test(explicit)) return explicit;
+  const api = marketplaceShelfImageApiUrl(product.id);
+  if (api) return api;
+  return normalizeMarketplaceImageSrc(defaultAsicShelfImageSrc(product.brand, product.model));
 }
 
 /** Fallback local si la API no responde (vacío: vitrina solo desde BD). */

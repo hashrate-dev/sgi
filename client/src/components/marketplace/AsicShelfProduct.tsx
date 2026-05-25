@@ -3,9 +3,11 @@ import type { AsicProduct } from "../../lib/marketplaceAsicCatalog.js";
 import {
   defaultAsicShelfImageSrc,
   formatAsicProductPriceDisplay,
+  marketplaceShelfImageApiUrl,
   normalizeConsultPriceLabelForDisplay,
   normalizeMarketplaceImageSrc,
   pickMarketplaceShelfSpecRows,
+  resolveShelfDisplayImageSrc,
 } from "../../lib/marketplaceAsicCatalog.js";
 import { Link } from "react-router-dom";
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
@@ -35,20 +37,21 @@ export function AsicShelfProduct({
 }) {
   const { lang, t, tf } = useMarketplaceLang();
   const quoteLabel = addToQuoteLabel ?? t("catalog.add_short");
-  const { explicit, fallbackSrc } = useMemo(() => {
-    const ex = normalizeMarketplaceImageSrc(product.imageSrc ?? "");
+  const { primarySrc, fallbackSrc, apiSrc } = useMemo(() => {
     const fb = normalizeMarketplaceImageSrc(defaultAsicShelfImageSrc(product.brand, product.model));
-    return { explicit: ex, fallbackSrc: fb };
+    const api = marketplaceShelfImageApiUrl(product.id);
+    const primary = resolveShelfDisplayImageSrc(product);
+    return { primarySrc: primary, fallbackSrc: fb, apiSrc: api };
   }, [product.id, product.imageSrc, product.brand, product.model]);
-  const [imgSrc, setImgSrc] = useState(() => explicit || fallbackSrc);
+  const [imgSrc, setImgSrc] = useState(() => primarySrc);
   const [imgBroken, setImgBroken] = useState(false);
 
   useEffect(() => {
-    setImgSrc(explicit || fallbackSrc);
+    setImgSrc(primarySrc);
     setImgBroken(false);
-  }, [explicit, fallbackSrc]);
+  }, [primarySrc]);
 
-  const hasPhoto = Boolean((explicit || fallbackSrc).trim()) && !imgBroken;
+  const hasPhoto = Boolean(primarySrc.trim()) && !imgBroken;
   const ariaLabel = tf("shelf.seemore_aria", { model: product.model, hash: product.hashrate });
   const consultLabel = product.priceDisplayLabel?.trim()
     ? normalizeConsultPriceLabelForDisplay(product.priceDisplayLabel.trim())
@@ -91,7 +94,11 @@ export function AsicShelfProduct({
                 {...(eagerImg ? { fetchPriority: productIndex === 0 ? ("high" as const) : ("auto" as const) } : {})}
                 className="shelf-product__photo"
                 onError={() => {
-                  if (explicit && fallbackSrc && imgSrc === explicit) {
+                  if (imgSrc !== apiSrc && apiSrc) {
+                    setImgSrc(apiSrc);
+                    return;
+                  }
+                  if (fallbackSrc && imgSrc !== fallbackSrc) {
                     setImgSrc(fallbackSrc);
                     return;
                   }
