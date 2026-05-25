@@ -63,7 +63,7 @@ async function parseExcelSetups(file: File): Promise<{ nombre: string; precioUSD
     const nombre = idx.nombre >= 0 ? get(row, idx.nombre) : get(row, 1);
     if (!nombre) continue;
     let precioUSD = idx.precioUSD >= 0 ? getNum(row, idx.precioUSD) : getNum(row, 2);
-    if (![0, 40, 50].includes(precioUSD)) precioUSD = 0;
+    if (![0, 25, 40, 50].includes(precioUSD)) precioUSD = 0;
     result.push({ nombre, precioUSD });
   }
   return result;
@@ -100,11 +100,12 @@ export function SetupPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  /** Precios permitidos en el formulario: 0, 40 o 50 USD. */
-  function normalizeSetupPrecioUsd(v: unknown): 0 | 40 | 50 {
+  /** Precios permitidos en el formulario: 0, 25, 40 o 50 USD. */
+  function normalizeSetupPrecioUsd(v: unknown): 0 | 25 | 40 | 50 {
     const n = Number(v);
     if (n === 50) return 50;
     if (n === 40) return 40;
+    if (n === 25) return 25;
     return 0;
   }
 
@@ -573,16 +574,16 @@ export function SetupPage() {
                     <select
                       id="setup-modal-precio-usd"
                       className="fact-select"
-                      value={
-                        formData.precioUSD === 50 ? "50" : formData.precioUSD === 40 ? "40" : "0"
-                      }
+                      value={String(normalizeSetupPrecioUsd(formData.precioUSD))}
                       onChange={(e) => {
-                        const raw = e.target.value;
-                        const v = raw === "50" ? 50 : raw === "40" ? 40 : 0;
-                        setFormData({ ...formData, precioUSD: v });
+                        setFormData({
+                          ...formData,
+                          precioUSD: normalizeSetupPrecioUsd(e.target.value),
+                        });
                       }}
                     >
                       <option value="0">0 USD</option>
+                      <option value="25">25 USD</option>
                       <option value="40">40 USD</option>
                       <option value="50">50 USD</option>
                     </select>
