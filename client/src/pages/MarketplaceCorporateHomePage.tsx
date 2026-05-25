@@ -527,14 +527,11 @@ export function MarketplaceCorporateHomePage() {
 
             <div className="market-corp-inner">
             {industryManufacturers.length > 0 ? (
-              <section className="market-corp-brands-block market-corp-logo-strip--bw corp-logo-home-style" aria-labelledby="corp-brands-title">
-                <h2 id="corp-brands-title" className="market-corp-brands-block__title">
+              <section className="market-corp-luxor market-corp-logo-strip--bw corp-logo-home-style" aria-labelledby="corp-brands-title">
+                <h2 id="corp-brands-title" className="market-corp-brands-block__title market-corp-luxor__heading">
                   {t("corp.brands.title")}
                 </h2>
-                <div
-                  className={`market-corp-clients fade-in-animation${industryManufacturers.length >= 6 ? " market-corp-clients--six-cols" : ""}`}
-                  role="list"
-                >
+                <div className="market-corp-luxor__row" role="list">
                   {industryManufacturers.map((m) => {
                     const src = resolveCorpManufacturerImageSrc(m.imageUrl);
                     if (!src) return null;
@@ -544,7 +541,7 @@ export function MarketplaceCorporateHomePage() {
                     const img = (
                       <span className="corp-logo-home-style__frame">
                         <img
-                          className="corp-logo-home-style__img"
+                          className="corp-logo-home-style__img market-corp-luxor__img"
                           src={src}
                           alt={alt}
                           loading="lazy"
@@ -553,25 +550,26 @@ export function MarketplaceCorporateHomePage() {
                         />
                       </span>
                     );
-                    const itemClass = `market-corp-clients__item market-corp-clients__item--${slug}`;
+                    const linkClass = `market-corp-luxor__link market-corp-luxor__link--${slug.replace(/[^a-z0-9_-]+/gi, "-")}`;
                     if (href) {
                       return (
                         <a
                           key={m.id}
-                          className={itemClass}
+                          className={linkClass}
                           href={href}
                           target="_blank"
                           rel="noopener noreferrer"
                           role="listitem"
+                          aria-label={alt}
                         >
                           {img}
                         </a>
                       );
                     }
                     return (
-                      <div key={m.id} className={itemClass} role="listitem">
+                      <span key={m.id} className={linkClass} role="listitem" aria-label={alt}>
                         {img}
-                      </div>
+                      </span>
                     );
                   })}
                 </div>

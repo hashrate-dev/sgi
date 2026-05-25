@@ -32,3 +32,11 @@
   mix-blend-mode: multiply;
   filter: grayscale(100%) saturate(0) contrast(1.12) brightness(1.04);
 }
+
+/* Gana sobre .market-corp-clients__item img legacy si queda algún uso en la franja */
+.market-corp-logo-strip--bw .corp-logo-home-style__img,
+.market-corp-logo-strip--bw .market-corp-clients__item .corp-logo-home-style__img {
+  mix-blend-mode: multiply;
+  filter: grayscale(100%) saturate(0) contrast(1.12) brightness(1.04);
+  background-color: var(--corp-logo-home-bg);
+}
