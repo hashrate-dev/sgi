@@ -67,6 +67,7 @@ const MARCAS_EQUIPO_OPCIONES = ["Bitmain"] as const;
 /** Modelos del desplegable; en edición, si en BD hay otro texto se ofrece como opción extra. */
 const MODELOS_EQUIPO_OPCIONES = [
   "Antminer S21",
+  "Antminer S23",
   "Antminer X9",
   "Antminer L7",
   "Antminer L9",
@@ -85,9 +86,9 @@ function opcionesModeloConActual(actual: string): string[] {
   return base;
 }
 
-type FamiliaProcesadorPreset = "l9" | "l7" | "s21" | "z15";
+type FamiliaProcesadorPreset = "l9" | "l7" | "s21" | "s23" | "z15";
 
-/** Presets de hashrate según modelo (texto guardado en BD = valor del `option`). L9/L7 en MH/s, S21 en TH/s. */
+/** Presets de hashrate según modelo (texto guardado en BD = valor del `option`). L9/L7 en MH/s, S21/S23 en TH/s. */
 const PROCESADOR_PRESETS_L9 = ["15.000 MH/s", "16.000 MH/s", "16.500 MH/s", "17.000 MH/s"] as const;
 const PROCESADOR_PRESETS_L7 = ["8.800 MH/s", "9.050 MH/s", "9.500 MH/s"] as const;
 const PROCESADOR_PRESETS_Z15 = ["420 kSol/s", "840 kSol/s", "860 kSol/s"] as const;
@@ -99,13 +100,14 @@ const PROCESADOR_PRESETS_S21 = [
   "270 TH/s",
   "473 TH/s Hydro",
 ] as const;
+const PROCESADOR_PRESETS_S23 = ["305 TH/s"] as const;
 
 /** S21 → TH/s; L7 / L9 (y variantes en texto libre) → MH/s — solo para modelo sin preset de lista. */
 function unidadProcesadorDesdeModelo(modelo: string): "th" | "mh" | null {
   const m = (modelo ?? "").trim().toLowerCase();
   if (!m) return null;
   if (/\bl7\b/.test(m) || /\bl9\b/.test(m)) return "mh";
-  if (/\bs21\b/.test(m)) return "th";
+  if (/\bs23\b/.test(m) || /\bs21\b/.test(m)) return "th";
   return null;
 }
 
@@ -115,6 +117,7 @@ function familiaProcesadorPreset(modelo: string): FamiliaProcesadorPreset | null
   if (/\bl9\b/.test(m)) return "l9";
   if (/\bl7\b/.test(m)) return "l7";
   if (/\bz15\b/.test(m)) return "z15";
+  if (/\bs23\b/.test(m)) return "s23";
   if (/\bs21\b/.test(m)) return "s21";
   return null;
 }
@@ -129,6 +132,8 @@ function presetsProcesadorFamilia(f: FamiliaProcesadorPreset): readonly string[]
       return PROCESADOR_PRESETS_Z15;
     case "s21":
       return PROCESADOR_PRESETS_S21;
+    case "s23":
+      return PROCESADOR_PRESETS_S23;
   }
 }
 

@@ -45,7 +45,23 @@ function formatDisplayNumber(raw: string): string {
   if (!raw.trim()) return "";
   const n = Number(raw);
   if (!Number.isFinite(n)) return raw;
-  return n.toLocaleString("es-PY", { maximumFractionDigits: 6 });
+  return Math.round(n).toLocaleString("es-PY", { maximumFractionDigits: 0 });
+}
+
+function formatUsd(value: number): string {
+  return new Intl.NumberFormat("es-PY", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+  }).format(Math.round(value));
+}
+
+function formatWhole(value: number): string {
+  return new Intl.NumberFormat("es-PY", {
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+  }).format(Math.round(value));
 }
 
 function displayAsPositive(raw: string): string {
@@ -128,10 +144,13 @@ export function AsicCotizadorChinaPyPage() {
     const mult = Math.max(0, parseMoney(multiplicador));
     const prov = Math.max(0, parseMoney(proveedorPy));
     const totalSinMargen = (p + montoUsd) * mult + prov;
-    return { precioNum: p, totalNacionalizado: totalSinMargen };
+    return { precioNum: p, totalNacionalizado: Math.round(totalSinMargen) };
   }, [precioOrigen, bloqueUsd, multiplicador, proveedorPy]);
 
-  const precioVenta = useMemo(() => totalNacionalizado + parseMoney(margen), [margen, totalNacionalizado]);
+  const precioVenta = useMemo(
+    () => Math.round(totalNacionalizado + parseMoney(margen)),
+    [margen, totalNacionalizado]
+  );
 
   /** % del margen sobre el precio de venta: margen USD / PVP × 100 */
   const pctMargenSobrePvp = useMemo(() => {
@@ -177,7 +196,7 @@ export function AsicCotizadorChinaPyPage() {
         margenUsd: parseMoney(margen),
         totalNacionalizado,
         precioVenta,
-        pctMargen: pctMargenSobrePvp,
+        pctMargen: Math.round(pctMargenSobrePvp),
       });
       if (resp.item) setRegistros((prev) => [resp.item!, ...prev]);
     } catch (e) {
@@ -247,7 +266,7 @@ export function AsicCotizadorChinaPyPage() {
                 </div>
               </div>
               <p className="hosting-fx-ops-metric__figure">
-                {new Intl.NumberFormat("es-PY", { style: "currency", currency: "USD" }).format(precioNum)}
+                {formatUsd(precioNum)}
               </p>
             </article>
 
@@ -264,7 +283,7 @@ export function AsicCotizadorChinaPyPage() {
                 </div>
               </div>
               <p className="hosting-fx-ops-metric__figure">
-                {new Intl.NumberFormat("es-PY", { style: "currency", currency: "USD" }).format(totalNacionalizado)}
+                {formatUsd(totalNacionalizado)}
               </p>
             </article>
 
@@ -316,9 +335,7 @@ export function AsicCotizadorChinaPyPage() {
                 </div>
               </div>
               <p className="hosting-fx-ops-metric__figure hosting-fx-ops-metric__figure--pct">
-                {new Intl.NumberFormat("es-PY", { maximumFractionDigits: 2, minimumFractionDigits: 0 }).format(
-                  pctMargenSobrePvp
-                )}
+                {formatWhole(pctMargenSobrePvp)}
                 <span className="hosting-fx-ops-metric__unit hosting-fx-ops-metric__unit--suffix-pct">%</span>
               </p>
 
@@ -337,8 +354,8 @@ export function AsicCotizadorChinaPyPage() {
                   <h3 className="hosting-fx-ops-metric__title">Precio de venta</h3>
                 </div>
               </div>
-              <p className="hosting-fx-ops-metric__figure">
-                {new Intl.NumberFormat("es-PY", { style: "currency", currency: "USD" }).format(precioVenta)}
+              <p className="hosting-fx-ops-metric__figure hosting-fx-ops-metric__figure--usd-whole">
+                {formatUsd(precioVenta)}
               </p>
             </article>
           </div>
@@ -557,24 +574,24 @@ export function AsicCotizadorChinaPyPage() {
                         <td>{r.modelo}</td>
                         <td>{r.procesador}</td>
                         <td className="text-end">
-                          {new Intl.NumberFormat("es-PY", { style: "currency", currency: "USD" }).format(r.precioOrigen)}
+                          {formatUsd(r.precioOrigen)}
                         </td>
                         <td className="text-end">
-                          {new Intl.NumberFormat("es-PY", { style: "currency", currency: "USD" }).format(r.montoUsd)}
+                          {formatUsd(r.montoUsd)}
                         </td>
                         <td className="text-end">{new Intl.NumberFormat("es-PY", { maximumFractionDigits: 6 }).format(r.coeficiente)}</td>
                         <td className="text-end">
-                          {new Intl.NumberFormat("es-PY", { style: "currency", currency: "USD" }).format(r.proveedorPy)}
+                          {formatUsd(r.proveedorPy)}
                         </td>
                         <td className="text-end fw-semibold">
-                          {new Intl.NumberFormat("es-PY", { style: "currency", currency: "USD" }).format(r.totalNacionalizado)}
+                          {formatUsd(r.totalNacionalizado)}
                         </td>
                         <td className="text-end text-success fw-semibold">
-                          +{new Intl.NumberFormat("es-PY", { maximumFractionDigits: 6 }).format(r.margenUsd)}
+                          +{formatWhole(r.margenUsd)}
                         </td>
-                        <td className="text-end">{new Intl.NumberFormat("es-PY", { maximumFractionDigits: 2 }).format(r.pctMargen)}%</td>
+                        <td className="text-end">{formatWhole(r.pctMargen)}%</td>
                         <td className="text-end fw-bold">
-                          {new Intl.NumberFormat("es-PY", { style: "currency", currency: "USD" }).format(r.precioVenta)}
+                          {formatUsd(r.precioVenta)}
                         </td>
                         <td className="text-end">
                           <button
@@ -646,12 +663,7 @@ export function AsicCotizadorChinaPyPage() {
                                   <td>{r.procesador || "-"}</td>
                                   <td className="asic-cotizador-hoy-modal__date-cell">{fechaActualizacionHoy}</td>
                                   <td className="text-end fw-semibold asic-cotizador-hoy-modal__price-cell">
-                                    {new Intl.NumberFormat("es-PY", {
-                                      style: "currency",
-                                      currency: "USD",
-                                      minimumFractionDigits: 0,
-                                      maximumFractionDigits: 0,
-                                    }).format(Math.ceil(r.precioVenta))}
+                                    {formatUsd(r.precioVenta)}
                                   </td>
                                 </tr>
                               ))}

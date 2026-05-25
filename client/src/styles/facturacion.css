@@ -2427,6 +2427,9 @@ button.fact-back {
 .hosting-fx-ops-metric--profit .hosting-fx-ops-metric__figure {
   color: #14532d;
 }
+.hosting-fx-ops-indicators--asic-quoter .hosting-fx-ops-metric--profit .hosting-fx-ops-metric__figure--usd-whole {
+  white-space: nowrap;
+}
 .hosting-fx-ops-metric__figure--count {
   color: #0f172a;
   font-size: clamp(1.5rem, 2.4vw, 1.85rem);
