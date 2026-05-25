@@ -882,6 +882,30 @@ export function syncTiendaOnlineClientsFromUsers(): Promise<{ ok: boolean; synce
   return api<{ ok: boolean; synced: number }>("/api/users/sync-tienda-online-clients", { method: "POST" });
 }
 
+/** Datos del registro público de clientes tienda (usuarios rol `cliente` + ficha clients). */
+export type ClienteCuentaTiendaRow = {
+  user_id: number;
+  cuenta_email: string;
+  cuenta_creada: string;
+  client_id?: number;
+  code?: string;
+  nombre?: string;
+  apellidos?: string;
+  celular?: string;
+  telefono?: string;
+  email?: string;
+  ciudad?: string;
+  pais?: string;
+  usuario?: string;
+  documento_identidad?: string;
+};
+
+export type ClientesCuentasTiendaResponse = { clientes: ClienteCuentaTiendaRow[] };
+
+export function getUsuariosClientesCuentasTienda(): Promise<ClientesCuentasTiendaResponse> {
+  return api<ClientesCuentasTiendaResponse>("/api/users/clientes-cuentas-tienda");
+}
+
 export function createUser(body: {
   email: string;
   password: string;

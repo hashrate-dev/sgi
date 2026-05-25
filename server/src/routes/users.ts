@@ -505,6 +505,75 @@ usersRouter.put("/users/:id", requireAuth, requireRole("admin_a", "admin_b"), re
   });
 });
 
+/**
+ * Cuentas de clientes registradas en la tienda (rol `cliente` + ficha `clients`).
+ * Mismos datos que el formulario público de registro (nombre, apellidos, país, ciudad, celular, teléfono, correo).
+ */
+usersRouter.get(
+  "/users/clientes-cuentas-tienda",
+  requireAuth,
+  requireRole("admin_a", "admin_b"),
+  requireModuleGrant("usuarios"),
+  async (_req, res) => {
+    const rows = (await db
+      .prepare(
+        `SELECT
+           u.id AS user_id,
+           COALESCE(u.email, u.username) AS cuenta_email,
+           u.created_at AS cuenta_creada,
+           c.id AS client_id,
+           c.code,
+           c.name,
+           c.name2,
+           c.phone,
+           c.phone2,
+           c.email AS registro_email,
+           c.city,
+           c.country,
+           c.usuario,
+           c.documento_identidad
+         FROM users u
+         LEFT JOIN clients c ON c.user_id = u.id
+         WHERE LOWER(TRIM(COALESCE(u.role, ''))) = 'cliente'
+         ORDER BY u.created_at DESC`
+      )
+      .all()) as Array<{
+      user_id: number;
+      cuenta_email: string | null;
+      cuenta_creada: string;
+      client_id: number | null;
+      code: string | null;
+      name: string | null;
+      name2: string | null;
+      phone: string | null;
+      phone2: string | null;
+      registro_email: string | null;
+      city: string | null;
+      country: string | null;
+      usuario: string | null;
+      documento_identidad: string | null;
+    }>;
+    res.json({
+      clientes: rows.map((r) => ({
+        user_id: r.user_id,
+        cuenta_email: r.cuenta_email ?? "",
+        cuenta_creada: r.cuenta_creada,
+        client_id: r.client_id ?? undefined,
+        code: r.code?.trim() || undefined,
+        nombre: r.name?.trim() || undefined,
+        apellidos: r.name2?.trim() || undefined,
+        celular: r.phone?.trim() || undefined,
+        telefono: r.phone2?.trim() || undefined,
+        email: (r.registro_email ?? r.cuenta_email ?? "").trim() || undefined,
+        ciudad: r.city?.trim() || undefined,
+        pais: r.country?.trim() || undefined,
+        usuario: r.usuario?.trim() || undefined,
+        documento_identidad: r.documento_identidad?.trim() || undefined,
+      })),
+    });
+  }
+);
+
 /** Listar actividad de usuarios (solo admin): entradas/salidas, horarios, tiempo conectado, IP */
 usersRouter.get(
   "/users/activity",

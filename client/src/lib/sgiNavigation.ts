@@ -21,7 +21,12 @@ const FIN_HUB_SCREENS = [
 
 const CLIENTS_HUB_SCREENS = ["clients-hosting", "clients-store"] as const;
 
-const USUARIOS_HUB_SCREENS = ["sgi-usuarios-cuentas", "sgi-usuarios-actividad", "sgi-usuarios-auditoria"] as const;
+const USUARIOS_HUB_SCREENS = [
+  "sgi-usuarios-cuentas",
+  "sgi-usuarios-clientes-cuentas",
+  "sgi-usuarios-actividad",
+  "sgi-usuarios-auditoria",
+] as const;
 
 const GA_HUB_SECTION_SCREENS = [
   ...HOSTING_HUB_SCREENS,

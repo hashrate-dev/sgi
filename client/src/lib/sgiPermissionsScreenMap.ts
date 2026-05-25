@@ -465,6 +465,16 @@ export const SGI_PERMISSION_SCREEN_MAP: readonly SgiPermissionScreenRow[] = [
     audience: ["staff"],
   },
   {
+    id: "sgi-usuarios-clientes-cuentas",
+    zoneOrder: 70,
+    zone: "Administración del SGI",
+    legacyModule: "usuarios",
+    title: "Cuentas clientes tienda online",
+    routes: ["/usuarios/clientes-cuentas"],
+    accessNote: "Resumen y tabla con los datos del registro público de la tienda (correo, nombre, país, celular, etc.).",
+    audience: ["staff"],
+  },
+  {
     id: "sgi-usuarios-actividad",
     zoneOrder: 70,
     zone: "Administración del SGI",

@@ -21,6 +21,7 @@ import {
   screenIdsFromSelection,
 } from "../lib/sgiScreenGrants";
 import { TiendaOnlineAuditSection } from "../components/TiendaOnlineAuditSection";
+import { UsuariosClientesCuentasPanel } from "../components/UsuariosClientesCuentasPanel";
 import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import "../styles/facturacion.css";
@@ -42,6 +43,12 @@ const USUARIOS_HUB_ITEMS: Array<{ to: string; icon: string; label: string; desc:
     desc: "Entradas y salidas al sistema, horarios, tiempo conectado e IP.",
   },
   {
+    to: "/usuarios/clientes-cuentas",
+    icon: "bi-shop",
+    label: "Cuentas clientes tienda",
+    desc: "Resumen y tabla con los datos del registro público (nombre, país, ciudad, celular, correo).",
+  },
+  {
     to: "/usuarios/auditoria",
     icon: "bi-journal-text",
     label: "Auditoría tienda e inventario",
@@ -49,10 +56,13 @@ const USUARIOS_HUB_ITEMS: Array<{ to: string; icon: string; label: string; desc:
   },
 ];
 
-function usuariosRouteMode(pathname: string): "hub" | "cuentas" | "actividad" | "auditoria" | "unknown" {
+function usuariosRouteMode(
+  pathname: string
+): "hub" | "cuentas" | "clientes-cuentas" | "actividad" | "auditoria" | "unknown" {
   const p = (pathname || "/").replace(/\/+$/, "") || "/";
   if (p === "/usuarios") return "hub";
   if (p === "/usuarios/cuentas") return "cuentas";
+  if (p === "/usuarios/clientes-cuentas") return "clientes-cuentas";
   if (p === "/usuarios/actividad") return "actividad";
   if (p === "/usuarios/auditoria") return "auditoria";
   if (p.startsWith("/usuarios/")) return "unknown";
@@ -420,9 +430,11 @@ export function UsuariosPage() {
   const subPageHeader =
     routeMode === "cuentas"
       ? { title: "Cuentas de usuario", backText: "Volver a usuarios" }
-      : routeMode === "actividad"
-        ? { title: "Actividad de sesiones", backText: "Volver a usuarios" }
-        : { title: "Auditoría tienda e inventario", backText: "Volver a usuarios" };
+      : routeMode === "clientes-cuentas"
+        ? { title: "Cuentas clientes tienda", backText: "Volver a usuarios" }
+        : routeMode === "actividad"
+          ? { title: "Actividad de sesiones", backText: "Volver a usuarios" }
+          : { title: "Auditoría tienda e inventario", backText: "Volver a usuarios" };
 
   return (
     <div className="fact-page usuarios-page">
@@ -784,6 +796,8 @@ export function UsuariosPage() {
               </div>
             </div>
             ) : null}
+
+            {routeMode === "clientes-cuentas" ? <UsuariosClientesCuentasPanel /> : null}
 
             {routeMode === "auditoria" ? (
             <div className="usuarios-section usuarios-section--auditoria">
