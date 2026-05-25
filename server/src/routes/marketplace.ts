@@ -10,6 +10,8 @@ import {
   type EquipoAsicVitrinaRow,
 } from "../lib/asicVitrinaMapper.js";
 import { mapEquipoRowToVitrinaList } from "../lib/vitrinaCatalogSlim.js";
+
+const CORP_HOME_LIST_SQL = `id, marca_equipo, modelo, procesador, precio_usd, mp_algo, mp_image_src, mp_detail_rows_json, mp_price_label, mp_listing_kind`;
 import {
   readCorpBestSellingEquipoIds,
   readCorpInterestingEquipoIds,
@@ -485,19 +487,58 @@ function equipoDbRowToVitrinaInput(raw: Record<string, unknown>): EquipoAsicVitr
   };
 }
 
-type CorpHomeVitrinaProduct = NonNullable<ReturnType<typeof mapEquipoRowToVitrinaWithAlgoFallback>>;
+type CorpHomeVitrinaProduct = NonNullable<ReturnType<typeof mapEquipoRowToVitrinaList>>;
+
+function equipoDbRowToVitrinaListInput(raw: Record<string, unknown>): EquipoAsicVitrinaRow | null {
+  const r = rowKeysToLowercase(raw);
+  const id = String(r.id ?? "").trim();
+  if (!id) return null;
+  return {
+    id,
+    marca_equipo: String(r.marca_equipo ?? ""),
+    modelo: String(r.modelo ?? ""),
+    procesador: String(r.procesador ?? ""),
+    precio_usd: Math.max(0, Math.round(Number(r.precio_usd) || 0)),
+    mp_algo: typeof r.mp_algo === "string" && r.mp_algo.trim() ? r.mp_algo.trim() : null,
+    mp_hashrate_display: null,
+    mp_image_src: typeof r.mp_image_src === "string" ? r.mp_image_src : null,
+    mp_gallery_json: null,
+    mp_detail_rows_json: typeof r.mp_detail_rows_json === "string" ? r.mp_detail_rows_json : null,
+    mp_yield_json: null,
+    mp_hashrate_sell_enabled: null,
+    mp_hashrate_parts_json: null,
+    mp_price_label: typeof r.mp_price_label === "string" ? r.mp_price_label : null,
+    mp_listing_kind: typeof r.mp_listing_kind === "string" ? r.mp_listing_kind : null,
+  };
+}
+
+/** Home corporativa: una sola query IN + JSON liviano (sin galería ni data URLs). */
+async function corpHomeVitrinaProductsMapByIds(ids: string[]): Promise<Map<string, CorpHomeVitrinaProduct>> {
+  const uniq = [...new Set(ids.map((x) => String(x ?? "").trim()).filter(Boolean))].slice(0, 8);
+  const byId = new Map<string, CorpHomeVitrinaProduct>();
+  if (uniq.length === 0) return byId;
+  const ph = uniq.map(() => "?").join(",");
+  const clause = sqlMarketplaceVisible();
+  const sql = `SELECT ${CORP_HOME_LIST_SQL} FROM equipos_asic WHERE id IN (${ph}) AND ${clause}`;
+  const rawRows = (await db.prepare(sql).all(...uniq)) as Record<string, unknown>[];
+  for (const raw of rawRows) {
+    const row = equipoDbRowToVitrinaListInput(raw);
+    if (!row) continue;
+    const p = mapEquipoRowToVitrinaList(row);
+    if (p) byId.set(p.id, p);
+  }
+  return byId;
+}
 
 async function corpHomeVitrinaProductsByEquipoIds(ids: string[]): Promise<CorpHomeVitrinaProduct[]> {
-  const products: CorpHomeVitrinaProduct[] = [];
-  for (const id of ids) {
-    const raw = (await db.prepare(`${EQUIPOS_ASIC_SELECT} WHERE id = ?`).get(id)) as Record<string, unknown> | undefined;
-    if (!raw) continue;
-    const row = equipoDbRowToVitrinaInput(raw);
-    if (!row) continue;
-    const p = mapEquipoRowToVitrinaWithAlgoFallback(row);
-    if (p) products.push(p);
+  const uniq = [...new Set(ids.map((x) => String(x ?? "").trim()).filter(Boolean))].slice(0, 4);
+  const byId = await corpHomeVitrinaProductsMapByIds(uniq);
+  const out: CorpHomeVitrinaProduct[] = [];
+  for (const id of uniq) {
+    const p = byId.get(id);
+    if (p) out.push(p);
   }
-  return products;
+  return out;
 }
 
 function rowToProduct(r: Row) {
@@ -889,12 +930,51 @@ function sqlMarketplaceVisible(): string {
 }
 
 /**
+ * GET /marketplace/corp-home-sections — ambas filas de equipos de la home en un solo request.
+ */
+marketplaceRouter.get("/marketplace/corp-home-sections", async (req: Request, res: Response) => {
+  try {
+    void touchMarketplacePresence(req, "/marketplace/corp-home-sections").catch(() => {});
+    const [auth, hidePricesForGuests, bestIds, interestingIds] = await Promise.all([
+      resolveAuthSnapshot(req),
+      readMarketplaceHidePricesForGuests(),
+      readCorpBestSellingEquipoIds(),
+      readCorpInterestingEquipoIds(),
+    ]);
+    const canViewPrices = auth.viewerType !== "anon" || !hidePricesForGuests;
+    const allIds = [...new Set([...bestIds, ...interestingIds])];
+    const byId = await corpHomeVitrinaProductsMapByIds(allIds);
+    const bestSelling = bestIds.map((id) => byId.get(id)).filter((p): p is CorpHomeVitrinaProduct => Boolean(p));
+    const interesting = interestingIds
+      .map((id) => byId.get(id))
+      .filter((p): p is CorpHomeVitrinaProduct => Boolean(p));
+    const visibleBest = withMarketplacePriceVisibility(bestSelling, canViewPrices);
+    const visibleInteresting = withMarketplacePriceVisibility(interesting, canViewPrices);
+    const cacheControl = hidePricesForGuests
+      ? auth.viewerType === "anon"
+        ? "public, max-age=60, stale-while-revalidate=300"
+        : "private, no-store"
+      : "public, max-age=60, stale-while-revalidate=300";
+    res.set("Cache-Control", cacheControl);
+    res.json({
+      bestSelling: visibleBest,
+      interesting: visibleInteresting,
+      hidePricesForGuests,
+    });
+  } catch (e) {
+    console.error("[marketplace] corp-home-sections:", e);
+    res.set("Cache-Control", "no-store");
+    res.status(200).json({ bestSelling: [], interesting: [], hidePricesForGuests: true });
+  }
+});
+
+/**
  * GET /marketplace/corp-best-selling — hasta 4 equipos elegidos en /marketplacedashboard para la home corporativa.
  * Público (sin token). Orden = orden guardado en `marketplace_site_kv`.
  */
 marketplaceRouter.get("/marketplace/corp-best-selling", async (req: Request, res: Response) => {
   try {
-    await touchMarketplacePresence(req, "/marketplace/corp-best-selling");
+    void touchMarketplacePresence(req, "/marketplace/corp-best-selling").catch(() => {});
     const auth = await resolveAuthSnapshot(req);
     const hidePricesForGuests = await readMarketplaceHidePricesForGuests();
     const canViewPrices = auth.viewerType !== "anon" || !hidePricesForGuests;
@@ -903,9 +983,9 @@ marketplaceRouter.get("/marketplace/corp-best-selling", async (req: Request, res
     const visibleProducts = withMarketplacePriceVisibility(products, canViewPrices);
     const cacheControl = hidePricesForGuests
       ? auth.viewerType === "anon"
-        ? "public, max-age=30, stale-while-revalidate=60"
+        ? "public, max-age=60, stale-while-revalidate=300"
         : "private, no-store"
-      : "public, max-age=30, stale-while-revalidate=60";
+      : "public, max-age=60, stale-while-revalidate=300";
     res.set("Cache-Control", cacheControl);
     res.json({ products: visibleProducts, hidePricesForGuests });
   } catch (e) {
@@ -921,7 +1001,7 @@ marketplaceRouter.get("/marketplace/corp-best-selling", async (req: Request, res
  */
 marketplaceRouter.get("/marketplace/corp-interesting", async (req: Request, res: Response) => {
   try {
-    await touchMarketplacePresence(req, "/marketplace/corp-interesting");
+    void touchMarketplacePresence(req, "/marketplace/corp-interesting").catch(() => {});
     const auth = await resolveAuthSnapshot(req);
     const hidePricesForGuests = await readMarketplaceHidePricesForGuests();
     const canViewPrices = auth.viewerType !== "anon" || !hidePricesForGuests;
@@ -930,9 +1010,9 @@ marketplaceRouter.get("/marketplace/corp-interesting", async (req: Request, res:
     const visibleProducts = withMarketplacePriceVisibility(products, canViewPrices);
     const cacheControl = hidePricesForGuests
       ? auth.viewerType === "anon"
-        ? "public, max-age=30, stale-while-revalidate=60"
+        ? "public, max-age=60, stale-while-revalidate=300"
         : "private, no-store"
-      : "public, max-age=30, stale-while-revalidate=60";
+      : "public, max-age=60, stale-while-revalidate=300";
     res.set("Cache-Control", cacheControl);
     res.json({ products: visibleProducts, hidePricesForGuests });
   } catch (e) {

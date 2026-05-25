@@ -1929,6 +1929,56 @@ export async function getMarketplaceAsicVitrinaItem(
 
 export { peekMarketplaceVitrinaCache } from "./marketplaceVitrinaCache.js";
 
+/** Ambas secciones de equipos de la home en un solo request (más rápido que 2 llamadas). */
+async function fetchMarketplaceCorpHomeSectionsNetwork(): Promise<{
+  bestSelling: import("./marketplaceAsicCatalog.js").AsicProduct[];
+  interesting: import("./marketplaceAsicCatalog.js").AsicProduct[];
+  hidePricesForGuests: boolean;
+}> {
+  const token = getStoredToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let base = getApiBase();
+  const h = typeof window !== "undefined" ? window.location?.hostname ?? "" : "";
+  if (isVercelOrPrimaryPublicHost(h)) base = "";
+  const path = "/api/marketplace/corp-home-sections";
+  const url = base && base.trim() !== "" ? `${base}${path}` : path;
+  const res = await fetchWithTimeout(
+    url,
+    { method: "GET", headers, credentials: "include", cache: "default" },
+    12_000
+  );
+  const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      extractJsonErrorMessage(data, res, "No se pudieron cargar los equipos de la home")
+    );
+  }
+  const d = data as {
+    bestSelling?: import("./marketplaceAsicCatalog.js").AsicProduct[];
+    interesting?: import("./marketplaceAsicCatalog.js").AsicProduct[];
+    hidePricesForGuests?: boolean;
+  };
+  return {
+    bestSelling: d.bestSelling ?? [],
+    interesting: d.interesting ?? [],
+    hidePricesForGuests: d.hidePricesForGuests !== false,
+  };
+}
+
+export async function getMarketplaceCorpHomeSections(): Promise<{
+  bestSelling: import("./marketplaceAsicCatalog.js").AsicProduct[];
+  interesting: import("./marketplaceAsicCatalog.js").AsicProduct[];
+  hidePricesForGuests: boolean;
+}> {
+  const data = await fetchMarketplaceCorpHomeSectionsNetwork();
+  const { writeMarketplaceCorpHomeCache } = await import("./marketplaceCorpHomeCache.js");
+  writeMarketplaceCorpHomeCache(data);
+  return data;
+}
+
+export { peekMarketplaceCorpHomeCache } from "./marketplaceCorpHomeCache.js";
+
 /** Destacados “Equipos más vendidos” en /marketplace/home (público). */
 export function getMarketplaceCorpBestSelling(): Promise<{
   products: import("./marketplaceAsicCatalog.js").AsicProduct[];
@@ -1938,7 +1988,7 @@ export function getMarketplaceCorpBestSelling(): Promise<{
     products: import("./marketplaceAsicCatalog.js").AsicProduct[];
     hidePricesForGuests: boolean;
   }>("/api/marketplace/corp-best-selling", {
-    cache: "no-store",
+    cache: "default",
   });
 }
 
@@ -1977,7 +2027,7 @@ export function getMarketplaceCorpInteresting(): Promise<{
     products: import("./marketplaceAsicCatalog.js").AsicProduct[];
     hidePricesForGuests: boolean;
   }>("/api/marketplace/corp-interesting", {
-    cache: "no-store",
+    cache: "default",
   });
 }
 

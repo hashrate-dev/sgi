@@ -73,7 +73,7 @@ import { postMarketplacePresenceHeartbeat, type MarketplacePresenceViewerType } 
 import { getBrowserHostname, isPrimaryPublicHost } from "./lib/hashrateHosts";
 import { isMarketplacePublicPath, MARKETPLACE, mpHome, SGI_DASHBOARD_PATH, sgiHome } from "./lib/marketplacePaths";
 import { HomePage } from "./pages/HomePage";
-import { getMarketplaceAsicVitrina } from "./lib/api";
+import { getMarketplaceAsicVitrina, getMarketplaceCorpHomeSections } from "./lib/api";
 
 const MARKETPLACE_PRESENCE_VISITOR_KEY = "hrs_marketplace_presence_visitor_id";
 const MARKETPLACE_PRESENCE_COUNTRY_CACHE_KEY = "hrs_marketplace_presence_country_v1";
@@ -340,6 +340,7 @@ function MarketplaceCloseCartOnAuthRoute() {
 function MarketplaceLayout() {
   useEffect(() => {
     void getMarketplaceAsicVitrina().catch(() => {});
+    void getMarketplaceCorpHomeSections().catch(() => {});
   }, []);
   return (
     <MarketplaceLanguageProvider>
