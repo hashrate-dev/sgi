@@ -7733,6 +7733,18 @@ button.product-modal__btn--quote-cart:active {
   box-shadow: none;
   cursor: default;
   user-select: none;
+  opacity: var(--corp-clients-logo-opacity, 0.56);
+  transition: opacity 0.2s ease;
+}
+
+a.market-corp-clients__item {
+  text-decoration: none;
+  color: inherit;
+}
+
+.market-corp-clients__item:hover,
+.market-corp-clients__item:focus-visible {
+  opacity: 0.68;
 }
 
 .market-corp-clients__item img {
@@ -7743,8 +7755,8 @@ button.product-modal__btn--quote-cart:active {
   max-height: 44px;
   object-fit: contain;
   object-position: center;
-  filter: grayscale(1) brightness(1.02);
-  opacity: var(--corp-clients-logo-opacity);
+  filter: grayscale(100%) saturate(0) contrast(1.1) brightness(0.72);
+  opacity: 1;
 }
 
 /*
@@ -7763,8 +7775,7 @@ button.product-modal__btn--quote-cart:active {
 .market-corp-clients__item--elphapex img {
   mix-blend-mode: multiply;
   opacity: 1;
-  /* Un poco más de brillo/contraste para acercarlos a logos con alpha (Canaan, MicroBT, IceRiver) */
-  filter: grayscale(1) brightness(1.22) contrast(1.2);
+  filter: grayscale(100%) saturate(0) contrast(1.2) brightness(0.78);
 }
 
 @media (min-width: 900px) {
@@ -8830,9 +8841,32 @@ button.product-modal__btn--quote-cart:active {
   max-height: 100%;
   object-fit: contain;
   object-position: center;
-  filter: grayscale(1) brightness(1.02);
+  filter: grayscale(100%) saturate(0) contrast(1.1) brightness(0.72);
   mix-blend-mode: multiply;
   opacity: 1;
+}
+
+/* Home corporativa: partners y fabricantes siempre monocromo (gris oscuro) */
+.market-corp-page .market-corp-logo-strip--bw .market-corp-clients__item img,
+.market-corp-page .market-corp-logo-strip--bw .market-corp-luxor__img {
+  filter: grayscale(100%) saturate(0) contrast(1.12) brightness(0.68);
+}
+
+.market-corp-page .market-corp-logo-strip--bw .market-corp-clients__item--bitmain img,
+.market-corp-page .market-corp-logo-strip--bw .market-corp-clients__item--innosilicon img,
+.market-corp-page .market-corp-logo-strip--bw .market-corp-clients__item--elphapex img,
+.market-corp-page .market-corp-logo-strip--bw .market-corp-luxor__img {
+  mix-blend-mode: multiply;
+  filter: grayscale(100%) saturate(0) contrast(1.18) brightness(0.74);
+}
+
+.market-corp-page .market-corp-logo-strip--bw .market-corp-clients__item:not(
+    .market-corp-clients__item--bitmain,
+    .market-corp-clients__item--innosilicon,
+    .market-corp-clients__item--elphapex
+  )
+  img {
+  mix-blend-mode: normal;
 }
 
 @media (min-width: 900px) {

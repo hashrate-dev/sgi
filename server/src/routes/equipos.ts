@@ -37,6 +37,16 @@ import {
   writeCorpBestSellingEquipoIds,
   writeCorpInterestingEquipoIds,
 } from "../lib/marketplaceCorpBestSellingKv.js";
+import {
+  readCorpOfficialPartnersAdmin,
+  writeCorpOfficialPartners,
+  type CorpOfficialPartnerRecord,
+} from "../lib/marketplaceCorpPartnersKv.js";
+import {
+  readCorpIndustryManufacturersAdmin,
+  writeCorpIndustryManufacturers,
+  type CorpIndustryManufacturerRecord,
+} from "../lib/marketplaceCorpManufacturersKv.js";
 
 export const equiposRouter = Router();
 
@@ -491,6 +501,100 @@ equiposRouter.put(
     res.status(500).json({ error: { message: msg } });
   }
 });
+
+const CorpOfficialPartnersBodySchema = z.object({
+  partners: z.array(
+    z.object({
+      id: z.string().min(1).max(80),
+      name: z.string().min(1).max(120),
+      href: z.string().max(500).optional().default(""),
+      imageUrl: z.string().min(1).max(2_800_000),
+      enabled: z.boolean().optional().default(true),
+    })
+  ),
+});
+
+/** GET /equipos/marketplace-corp-partners — logos «Partners oficiales» (admin). */
+equiposRouter.get("/equipos/marketplace-corp-partners", requireAuth, ...requireEquiposTiendaRead, async (_req, res: Response) => {
+  try {
+    const partners = await readCorpOfficialPartnersAdmin();
+    res.json({ partners });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: { message: msg } });
+  }
+});
+
+/** PUT /equipos/marketplace-corp-partners — guardar logos partners home (solo admin A/B). */
+equiposRouter.put(
+  "/equipos/marketplace-corp-partners",
+  requireAuth,
+  ...requireEquiposTiendaAdmin,
+  async (req, res: Response) => {
+    const parsed = CorpOfficialPartnersBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
+    }
+    try {
+      const partners = await writeCorpOfficialPartners(parsed.data.partners as CorpOfficialPartnerRecord[]);
+      res.json({ ok: true, partners });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      res.status(500).json({ error: { message: msg } });
+    }
+  }
+);
+
+const CorpIndustryManufacturersBodySchema = z.object({
+  manufacturers: z.array(
+    z.object({
+      id: z.string().min(1).max(80),
+      name: z.string().min(1).max(120),
+      href: z.string().max(500).optional().default(""),
+      imageUrl: z.string().min(1).max(2_800_000),
+      enabled: z.boolean().optional().default(true),
+      slug: z.string().max(40).optional().default(""),
+    })
+  ),
+});
+
+/** GET /equipos/marketplace-corp-manufacturers — logos fabricantes industria (admin). */
+equiposRouter.get(
+  "/equipos/marketplace-corp-manufacturers",
+  requireAuth,
+  ...requireEquiposTiendaRead,
+  async (_req, res: Response) => {
+    try {
+      const manufacturers = await readCorpIndustryManufacturersAdmin();
+      res.json({ manufacturers });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      res.status(500).json({ error: { message: msg } });
+    }
+  }
+);
+
+/** PUT /equipos/marketplace-corp-manufacturers — guardar logos fabricantes home (solo admin A/B). */
+equiposRouter.put(
+  "/equipos/marketplace-corp-manufacturers",
+  requireAuth,
+  ...requireEquiposTiendaAdmin,
+  async (req, res: Response) => {
+    const parsed = CorpIndustryManufacturersBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
+    }
+    try {
+      const manufacturers = await writeCorpIndustryManufacturers(
+        parsed.data.manufacturers as CorpIndustryManufacturerRecord[]
+      );
+      res.json({ ok: true, manufacturers });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      res.status(500).json({ error: { message: msg } });
+    }
+  }
+);
 
 /** PUT /equipos/marketplace-corp-interesting — guardar sección home (solo admin A/B). */
 equiposRouter.put(

@@ -2066,6 +2066,70 @@ export function putEquiposMarketplaceCorpInteresting(body: { ids: string[] }): P
   });
 }
 
+export type CorpOfficialPartnerDto = {
+  id: string;
+  name: string;
+  href: string;
+  imageUrl: string;
+  enabled: boolean;
+};
+
+/** Partners oficiales en /marketplace/home (público). */
+export function getMarketplaceCorpOfficialPartners(): Promise<{ partners: CorpOfficialPartnerDto[] }> {
+  return api<{ partners: CorpOfficialPartnerDto[] }>("/api/marketplace/corp-official-partners", {
+    cache: "default",
+  });
+}
+
+export function getEquiposMarketplaceCorpPartners(): Promise<{ partners: CorpOfficialPartnerDto[] }> {
+  return api<{ partners: CorpOfficialPartnerDto[] }>("/api/equipos/marketplace-corp-partners", {
+    cache: "no-store",
+  });
+}
+
+export function putEquiposMarketplaceCorpPartners(body: {
+  partners: CorpOfficialPartnerDto[];
+}): Promise<{ ok: boolean; partners: CorpOfficialPartnerDto[] }> {
+  return api<{ ok: boolean; partners: CorpOfficialPartnerDto[] }>("/api/equipos/marketplace-corp-partners", {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+export type CorpIndustryManufacturerDto = {
+  id: string;
+  name: string;
+  href: string;
+  imageUrl: string;
+  enabled: boolean;
+  slug: string;
+};
+
+/** Fabricantes de la industria en /marketplace/home (público). */
+export function getMarketplaceCorpIndustryManufacturers(): Promise<{ manufacturers: CorpIndustryManufacturerDto[] }> {
+  return api<{ manufacturers: CorpIndustryManufacturerDto[] }>("/api/marketplace/corp-industry-manufacturers", {
+    cache: "default",
+  });
+}
+
+export function getEquiposMarketplaceCorpManufacturers(): Promise<{ manufacturers: CorpIndustryManufacturerDto[] }> {
+  return api<{ manufacturers: CorpIndustryManufacturerDto[] }>("/api/equipos/marketplace-corp-manufacturers", {
+    cache: "no-store",
+  });
+}
+
+export function putEquiposMarketplaceCorpManufacturers(body: {
+  manufacturers: CorpIndustryManufacturerDto[];
+}): Promise<{ ok: boolean; manufacturers: CorpIndustryManufacturerDto[] }> {
+  return api<{ ok: boolean; manufacturers: CorpIndustryManufacturerDto[] }>(
+    "/api/equipos/marketplace-corp-manufacturers",
+    {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }
+  );
+}
+
 /**
  * Precios setup cotización: S02 (equipo completo) + S03 (fracción hashrate).
  * Público — mismo origen que la vitrina.

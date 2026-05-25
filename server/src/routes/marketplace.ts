@@ -21,6 +21,8 @@ import {
   readCorpInterestingEquipoIds,
   readMarketplaceHidePricesForGuests,
 } from "../lib/marketplaceCorpBestSellingKv.js";
+import { readCorpOfficialPartnersPublic } from "../lib/marketplaceCorpPartnersKv.js";
+import { readCorpIndustryManufacturersPublic } from "../lib/marketplaceCorpManufacturersKv.js";
 import { EQUIPOS_ASIC_SELECT } from "./equipos.js";
 import {
   detectRandomXMoneroYieldItem,
@@ -1021,6 +1023,39 @@ marketplaceRouter.get("/marketplace/corp-best-selling", async (req: Request, res
     console.error("[marketplace] corp-best-selling:", e);
     res.set("Cache-Control", "no-store");
     res.status(200).json({ products: [], hidePricesForGuests: true });
+  }
+});
+
+/**
+ * GET /marketplace/corp-official-partners — logos «Partners oficiales» en /marketplace/home.
+ * Público. Solo partners con `enabled: true`.
+ */
+marketplaceRouter.get("/marketplace/corp-official-partners", async (req: Request, res: Response) => {
+  try {
+    void touchMarketplacePresence(req, "/marketplace/corp-official-partners").catch(() => {});
+    const partners = await readCorpOfficialPartnersPublic();
+    res.set("Cache-Control", "public, max-age=120, stale-while-revalidate=600");
+    res.json({ partners });
+  } catch (e) {
+    console.error("[marketplace] corp-official-partners:", e);
+    res.set("Cache-Control", "no-store");
+    res.status(200).json({ partners: [] });
+  }
+});
+
+/**
+ * GET /marketplace/corp-industry-manufacturers — logos «Confiamos en los mejores fabricantes…» en /marketplace/home.
+ */
+marketplaceRouter.get("/marketplace/corp-industry-manufacturers", async (req: Request, res: Response) => {
+  try {
+    void touchMarketplacePresence(req, "/marketplace/corp-industry-manufacturers").catch(() => {});
+    const manufacturers = await readCorpIndustryManufacturersPublic();
+    res.set("Cache-Control", "public, max-age=120, stale-while-revalidate=600");
+    res.json({ manufacturers });
+  } catch (e) {
+    console.error("[marketplace] corp-industry-manufacturers:", e);
+    res.set("Cache-Control", "no-store");
+    res.status(200).json({ manufacturers: [] });
   }
 });
 

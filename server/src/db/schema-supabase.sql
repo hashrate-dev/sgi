@@ -377,6 +377,12 @@ ON CONFLICT (key) DO NOTHING;
 INSERT INTO marketplace_site_kv (key, value) VALUES ('corp_interesting_asic_ids', '[]')
 ON CONFLICT (key) DO NOTHING;
 
+INSERT INTO marketplace_site_kv (key, value) VALUES ('corp_official_partners_json', '[]')
+ON CONFLICT (key) DO NOTHING;
+
+INSERT INTO marketplace_site_kv (key, value) VALUES ('corp_industry_manufacturers_json', '[]')
+ON CONFLICT (key) DO NOTHING;
+
 -- Marketplace tickets: embudo operativo (idempotente en despliegues sucesivos)
 ALTER TABLE marketplace_quote_tickets DROP CONSTRAINT IF EXISTS marketplace_quote_tickets_status_check;
 UPDATE marketplace_quote_tickets SET status = 'en_contacto_equipo' WHERE status = 'respondido';

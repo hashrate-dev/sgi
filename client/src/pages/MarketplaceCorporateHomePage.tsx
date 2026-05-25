@@ -12,10 +12,19 @@ import {
   normalizeAsicCatalogProducts,
 } from "../lib/marketplaceAsicCatalog.js";
 import type { AsicProduct } from "../lib/marketplaceAsicCatalog.js";
-import { getMarketplaceCorpHomeSections, peekMarketplaceCorpHomeCache, wakeUpBackend } from "../lib/api.js";
+import {
+  getMarketplaceCorpHomeSections,
+  getMarketplaceCorpIndustryManufacturers,
+  getMarketplaceCorpOfficialPartners,
+  peekMarketplaceCorpHomeCache,
+  wakeUpBackend,
+  type CorpIndustryManufacturerDto,
+  type CorpOfficialPartnerDto,
+} from "../lib/api.js";
+import { resolveCorpManufacturerImageSrc } from "../lib/marketplaceCorpManufacturers.js";
+import { resolveCorpPartnerImageSrc } from "../lib/marketplaceCorpPartners.js";
 import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
 import { isCorpHomePath, MARKETPLACE } from "../lib/marketplacePaths.js";
-import { publicImageUrl } from "../lib/marketplaceAsicCatalog.js";
 import { CORP_INSTITUTIONAL_VIDEO_URL, wpUpload } from "../lib/marketplaceWpAssets.js";
 import { useAuth } from "../contexts/AuthContext";
 import "../styles/marketplace-hashrate.css";
@@ -41,9 +50,6 @@ const VIDEO_URL = CORP_INSTITUTIONAL_VIDEO_URL;
 /** Promo Z15 — reemplazá `public/images/bitmain-z15-pro.png` por el render oficial si querés otro asset */
 const CORP_Z15_PROMO_IMG = `${import.meta.env.BASE_URL}images/bitmain-z15-pro.png`;
 const CORP_ZCASH_LOGO_IMG = `${import.meta.env.BASE_URL}images/zcash-logo.png`;
-const CORP_NICEHASH_LOGO_IMG = publicImageUrl("/images/nicehash-logo-cropped.jpg");
-const CORP_VIABTC_LOGO_IMG = publicImageUrl("/images/via-btc-logo-cropped.png");
-const CORP_OCEAN_POOL_LOGO_IMG = publicImageUrl("/images/ocean-pool-logo-bw.jpg");
 /** Fondo faja “Servicio todo incluido” (mineros / hosting) */
 const CORP_HOSTING_BAND_IMG = `${import.meta.env.BASE_URL}images/hosting-mining-farm-04.png`;
 
@@ -83,15 +89,6 @@ const CORP_HOW_STEPS = [
   { titleKey: "corp.how.step1_title" as const, bodyKey: "corp.how.step1_body" as const, imgAltKey: "corp.how.step1_img_alt" as const },
   { titleKey: "corp.how.step3_title" as const, bodyKey: "corp.how.step3_body" as const, imgAltKey: "corp.how.step3_img_alt" as const },
   { titleKey: "corp.how.step2_title" as const, bodyKey: "corp.how.step2_body" as const, imgAltKey: "corp.how.step2_img_alt" as const },
-] as const;
-
-const BRAND_LOGOS = [
-  { src: wpUpload("bitmain.png"), alt: "Bitmain", w: 512, h: 180, slug: "bitmain" as const },
-  { src: wpUpload("canaan-logo.png"), alt: "Canaan", w: 616, h: 188, slug: "canaan" as const },
-  { src: wpUpload("microbt-logo.png"), alt: "MicroBT", w: 400, h: 126, slug: "microbt" as const },
-  { src: wpUpload("logo-inosili.png"), alt: "Innosilicon", w: 400, h: 50, slug: "innosilicon" as const },
-  { src: wpUpload("iceriver-logo.webp"), alt: "IceRiver", w: 290, h: 31, slug: "iceriver" as const },
-  { src: wpUpload("elphapex-logo.png"), alt: "Elphapex", w: 712, h: 148, slug: "elphapex" as const },
 ] as const;
 
 /**
@@ -176,6 +173,8 @@ export function MarketplaceCorporateHomePage() {
   }, [navigate, pathname]);
   const videoTitleId = useId();
   const [videoOpen, setVideoOpen] = useState(false);
+  const [officialPartners, setOfficialPartners] = useState<CorpOfficialPartnerDto[]>([]);
+  const [industryManufacturers, setIndustryManufacturers] = useState<CorpIndustryManufacturerDto[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -194,6 +193,16 @@ export function MarketplaceCorporateHomePage() {
       .catch(() => {
         /* mantener caché / fallback */
       });
+    void getMarketplaceCorpOfficialPartners()
+      .then((res) => {
+        if (!cancelled && Array.isArray(res.partners)) setOfficialPartners(res.partners);
+      })
+      .catch(() => {});
+    void getMarketplaceCorpIndustryManufacturers()
+      .then((res) => {
+        if (!cancelled && Array.isArray(res.manufacturers)) setIndustryManufacturers(res.manufacturers);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -517,22 +526,48 @@ export function MarketplaceCorporateHomePage() {
             </section>
 
             <div className="market-corp-inner">
-            <section className="market-corp-brands-block" aria-labelledby="corp-brands-title">
-              <h2 id="corp-brands-title" className="market-corp-brands-block__title">
-                {t("corp.brands.title")}
-              </h2>
-              <div className="market-corp-clients market-corp-clients--six-cols fade-in-animation" role="list">
-                {BRAND_LOGOS.map((b) => (
-                  <div
-                    key={b.src}
-                    className={`market-corp-clients__item market-corp-clients__item--${b.slug}`}
-                    role="listitem"
-                  >
-                    <img src={b.src} alt={b.alt} width={b.w} height={b.h} loading="lazy" decoding="async" draggable={false} />
-                  </div>
-                ))}
-              </div>
-            </section>
+            {industryManufacturers.length > 0 ? (
+              <section className="market-corp-brands-block market-corp-logo-strip--bw" aria-labelledby="corp-brands-title">
+                <h2 id="corp-brands-title" className="market-corp-brands-block__title">
+                  {t("corp.brands.title")}
+                </h2>
+                <div
+                  className={`market-corp-clients fade-in-animation${industryManufacturers.length >= 6 ? " market-corp-clients--six-cols" : ""}`}
+                  role="list"
+                >
+                  {industryManufacturers.map((m) => {
+                    const src = resolveCorpManufacturerImageSrc(m.imageUrl);
+                    if (!src) return null;
+                    const slug = (m.slug || m.id).trim() || "marca";
+                    const alt = m.name.trim() || "Fabricante";
+                    const href = m.href.trim();
+                    const img = (
+                      <img src={src} alt={alt} loading="lazy" decoding="async" draggable={false} />
+                    );
+                    const itemClass = `market-corp-clients__item market-corp-clients__item--${slug}`;
+                    if (href) {
+                      return (
+                        <a
+                          key={m.id}
+                          className={itemClass}
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          role="listitem"
+                        >
+                          {img}
+                        </a>
+                      );
+                    }
+                    return (
+                      <div key={m.id} className={itemClass} role="listitem">
+                        {img}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            ) : null}
 
             <section id="faq" className="market-corp-section market-corp-anchor" aria-labelledby="corp-faq-title">
               <MarketplaceCorpFaqSpotlight
@@ -598,85 +633,47 @@ export function MarketplaceCorporateHomePage() {
             <div className="market-corp-inner">
             <MarketplaceCorpContactCard titleId="corp-contact-title" anchorId="contacto" />
 
-            <section className="market-corp-luxor" aria-labelledby="corp-luxor-title">
-              <h2 id="corp-luxor-title" className="market-corp-brands-block__title market-corp-luxor__heading">
-                {t("corp.partners.title")}
-              </h2>
-              <div className="market-corp-luxor__row">
-                <a
-                  className="market-corp-luxor__link"
-                  href="https://www.nicehash.com/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={t("corp.partners.nicehash_aria")}
-                >
-                  <img
-                    className="market-corp-luxor__img"
-                    src={CORP_NICEHASH_LOGO_IMG}
-                    alt=""
-                    width={744}
-                    height={148}
-                    loading="lazy"
-                    decoding="async"
-                    draggable={false}
-                  />
-                </a>
-                <a
-                  className="market-corp-luxor__link"
-                  href="https://www.viabtc.com/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={t("corp.partners.viabtc_aria")}
-                >
-                  <img
-                    className="market-corp-luxor__img"
-                    src={CORP_VIABTC_LOGO_IMG}
-                    alt=""
-                    width={512}
-                    height={160}
-                    loading="lazy"
-                    decoding="async"
-                    draggable={false}
-                  />
-                </a>
-                <a
-                  className="market-corp-luxor__link"
-                  href="https://ocean.xyz/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={t("corp.partners.ocean_aria")}
-                >
-                  <img
-                    className="market-corp-luxor__img"
-                    src={CORP_OCEAN_POOL_LOGO_IMG}
-                    alt=""
-                    width={1772}
-                    height={470}
-                    loading="lazy"
-                    decoding="async"
-                    draggable={false}
-                  />
-                </a>
-                <a
-                  className="market-corp-luxor__link"
-                  href="https://www.luxor.tech/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={t("corp.partners.luxor_aria")}
-                >
-                  <img
-                    className="market-corp-luxor__img"
-                    src={wpUpload("Luxor-logo.png")}
-                    alt=""
-                    width={855}
-                    height={294}
-                    loading="lazy"
-                    decoding="async"
-                    draggable={false}
-                  />
-                </a>
-              </div>
-            </section>
+            {officialPartners.length > 0 ? (
+              <section className="market-corp-luxor market-corp-logo-strip--bw" aria-labelledby="corp-luxor-title">
+                <h2 id="corp-luxor-title" className="market-corp-brands-block__title market-corp-luxor__heading">
+                  {t("corp.partners.title")}
+                </h2>
+                <div className="market-corp-luxor__row">
+                  {officialPartners.map((p) => {
+                    const src = resolveCorpPartnerImageSrc(p.imageUrl);
+                    if (!src) return null;
+                    const href = p.href.trim();
+                    const aria = p.name.trim() || "Partner";
+                    const img = (
+                      <img
+                        className="market-corp-luxor__img"
+                        src={src}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        draggable={false}
+                      />
+                    );
+                    return href ? (
+                      <a
+                        key={p.id}
+                        className="market-corp-luxor__link"
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={aria}
+                      >
+                        {img}
+                      </a>
+                    ) : (
+                      <span key={p.id} className="market-corp-luxor__link" aria-label={aria}>
+                        {img}
+                      </span>
+                    );
+                  })}
+                </div>
+              </section>
+            ) : null}
             </div>
 
           {/* Un solo degradado (como bloque Contacto) para franja empresa + pie — sin línea entre ambos */}

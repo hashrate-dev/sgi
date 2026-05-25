@@ -7,17 +7,50 @@ import {
   getEquiposMarketplaceCorpBestSellingIds,
   getEquiposMarketplaceCorpInterestingIds,
   getEquiposMarketplaceHidePricesForGuests,
+  getMarketplaceAsicVitrina,
   putEquiposMarketplaceCorpBestSelling,
   putEquiposMarketplaceCorpInteresting,
   putEquiposMarketplaceHidePricesForGuests,
   wakeUpBackend,
 } from "../lib/api";
+import type { AsicProduct } from "../lib/marketplaceAsicCatalog.js";
 import type { EquipoASIC } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
 import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import { canEditEquipoMarketplacePrecioYTienda } from "../lib/auth";
 import { AppButton, AppCard, AppSelect } from "../components/ui";
+import { TiendaOnlineCorpPartnersSection } from "../components/TiendaOnlineCorpPartnersSection";
+import { TiendaOnlineCorpManufacturersSection } from "../components/TiendaOnlineCorpManufacturersSection";
+
+type MarketplaceSelectOption = { id: string; label: string };
+
+function formatVitrinaProductLabel(p: AsicProduct): string {
+  return `${p.id.slice(0, 48)} · ${p.brand} ${p.model} · ${p.hashrate}`;
+}
+
+function formatEquipoSelectLabel(e: EquipoASIC): string {
+  return `${(e.numeroSerie?.trim() || e.id).slice(0, 48)} · ${e.marcaEquipo} ${e.modelo} · ${e.procesador}`;
+}
+
+function buildMarketplaceSelectOptions(
+  vitrina: AsicProduct[],
+  equipos: EquipoASIC[],
+  ensureIds: string[]
+): MarketplaceSelectOption[] {
+  const byId = new Map<string, MarketplaceSelectOption>();
+  for (const p of vitrina) {
+    byId.set(p.id, { id: p.id, label: formatVitrinaProductLabel(p) });
+  }
+  const equipoById = new Map(equipos.map((e) => [e.id, e]));
+  for (const rawId of ensureIds) {
+    const id = rawId.trim();
+    if (!id || byId.has(id)) continue;
+    const e = equipoById.get(id);
+    byId.set(id, e ? { id, label: formatEquipoSelectLabel(e) } : { id, label: id });
+  }
+  return [...byId.values()].sort((a, b) => a.label.localeCompare(b.label, "es"));
+}
 
 /**
  * Banners / destacados de `/marketplace/home` (más vendidos + otros interesantes).
@@ -28,6 +61,7 @@ export function TiendaOnlineBannersHomePage() {
   const canEditTienda = user ? canEditEquipoMarketplacePrecioYTienda(user) : false;
 
   const [equipos, setEquipos] = useState<EquipoASIC[]>([]);
+  const [vitrinaProducts, setVitrinaProducts] = useState<AsicProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -61,13 +95,19 @@ export function TiendaOnlineBannersHomePage() {
     setLoading(true);
     setLoadError(null);
     wakeUpBackend()
-      .then(() => getEquipos())
-      .then((res) => {
-        if (!cancelled) setEquipos(res.items ?? []);
+      .then(() =>
+        Promise.all([getMarketplaceAsicVitrina(), getEquipos().catch(() => ({ items: [] as EquipoASIC[] }))])
+      )
+      .then(([vitrinaRes, equiposRes]) => {
+        if (!cancelled) {
+          setVitrinaProducts(vitrinaRes.products ?? []);
+          setEquipos(equiposRes.items ?? []);
+        }
       })
       .catch((err) => {
         if (!cancelled) {
-          setLoadError(err instanceof Error ? err.message : "Error al cargar equipos");
+          setLoadError(err instanceof Error ? err.message : "Error al cargar el catálogo del marketplace");
+          setVitrinaProducts([]);
           setEquipos([]);
         }
       })
@@ -118,28 +158,27 @@ export function TiendaOnlineBannersHomePage() {
     };
   }, [canEditTienda]);
 
-  const equiposBestSellingSelectList = useMemo(() => {
-    return [...equipos]
-      .filter((e) => Boolean(e.marketplaceVisible))
-      .sort((a, b) => {
-      const la = `${a.numeroSerie ?? a.id} ${a.marcaEquipo} ${a.modelo}`.toLowerCase();
-      const lb = `${b.numeroSerie ?? b.id} ${b.marcaEquipo} ${b.modelo}`.toLowerCase();
-      return la.localeCompare(lb, "es");
-      });
-  }, [equipos]);
+  const marketplaceSelectOptions = useMemo(
+    () =>
+      buildMarketplaceSelectOptions(vitrinaProducts, equipos, [
+        ...bestSellingSlotIds,
+        ...interestingSlotIds,
+      ]),
+    [vitrinaProducts, equipos, bestSellingSlotIds, interestingSlotIds]
+  );
 
-  const equiposOptionsForBestSellingSlot = useCallback(
+  const optionsForBestSellingSlot = useCallback(
     (slotIndex: number) => {
       const selectedElsewhere = new Set(
         bestSellingSlotIds
           .map((id, j) => (j !== slotIndex && id.trim() ? id.trim() : null))
           .filter((x): x is string => Boolean(x))
       );
-      return equiposBestSellingSelectList.filter(
-        (e) => !selectedElsewhere.has(e.id) || bestSellingSlotIds[slotIndex] === e.id
+      return marketplaceSelectOptions.filter(
+        (o) => !selectedElsewhere.has(o.id) || bestSellingSlotIds[slotIndex] === o.id
       );
     },
-    [bestSellingSlotIds, equiposBestSellingSelectList]
+    [bestSellingSlotIds, marketplaceSelectOptions]
   );
 
   function setBestSellingSlot(slot: number, value: string) {
@@ -168,18 +207,18 @@ export function TiendaOnlineBannersHomePage() {
     }
   }, [bestSellingSlotIds, canEditTienda]);
 
-  const equiposOptionsForInterestingSlot = useCallback(
+  const optionsForInterestingSlot = useCallback(
     (slotIndex: number) => {
       const selectedElsewhere = new Set(
         interestingSlotIds
           .map((id, j) => (j !== slotIndex && id.trim() ? id.trim() : null))
           .filter((x): x is string => Boolean(x))
       );
-      return equiposBestSellingSelectList.filter(
-        (e) => !selectedElsewhere.has(e.id) || interestingSlotIds[slotIndex] === e.id
+      return marketplaceSelectOptions.filter(
+        (o) => !selectedElsewhere.has(o.id) || interestingSlotIds[slotIndex] === o.id
       );
     },
-    [interestingSlotIds, equiposBestSellingSelectList]
+    [interestingSlotIds, marketplaceSelectOptions]
   );
 
   function setInterestingSlot(slot: number, value: string) {
@@ -340,12 +379,18 @@ export function TiendaOnlineBannersHomePage() {
                   ⭐ Equipos más vendidos
                 </Heading>
                 <Text color="gray.700" fontSize="sm" mt={1}>
-                  Se muestran en la primera grilla de <code>/marketplace/home</code> (orden: posición 1 → 4).
+                  Se muestran en la primera grilla de <code>/marketplace/home</code> (orden: posición 1 → 4). Opciones =
+                  catálogo publicado en <code>/marketplace</code>.
                 </Text>
               </Box>
-              <Badge colorPalette="green" variant="subtle" borderRadius="full" px={3} py={1}>
-                Seleccionados: {selectedBestSellingCount}/4
-              </Badge>
+              <Flex direction="column" align="flex-end" gap={1}>
+                <Badge colorPalette="green" variant="subtle" borderRadius="full" px={3} py={1}>
+                  Seleccionados: {selectedBestSellingCount}/4
+                </Badge>
+                <Badge colorPalette="gray" variant="subtle" borderRadius="full" px={3} py={0.5} fontSize="xs">
+                  {loading ? "Cargando catálogo…" : `${marketplaceSelectOptions.length} en marketplace`}
+                </Badge>
+              </Flex>
             </Flex>
             <Box>
               {bestSellingLoadError ? (
@@ -363,13 +408,13 @@ export function TiendaOnlineBannersHomePage() {
                     rootProps={{ mb: 0 }}
                     placeholder="— Sin equipo —"
                     onChange={(ev) => setBestSellingSlot(slot, ev.target.value)}
-                    disabled={loading || equipos.length === 0 || isEditionLocked}
+                    disabled={loading || marketplaceSelectOptions.length === 0 || isEditionLocked}
                     value={bestSellingSlotIds[slot] ?? ""}
                   >
                     <option value="">— Sin equipo —</option>
-                    {equiposOptionsForBestSellingSlot(slot).map((e) => (
-                      <option key={e.id} value={e.id}>
-                        {(e.numeroSerie?.trim() || e.id).slice(0, 48)} · {e.marcaEquipo} {e.modelo} · {e.procesador}
+                    {optionsForBestSellingSlot(slot).map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.label}
                       </option>
                     ))}
                   </AppSelect>
@@ -401,12 +446,18 @@ export function TiendaOnlineBannersHomePage() {
                   🛒 Otros Productos Interesantes
                 </Heading>
                 <Text color="gray.700" fontSize="sm" mt={1}>
-                  Se muestran en la segunda grilla de <code>/marketplace/home</code> (orden: posición 1 → 4).
+                  Se muestran en la segunda grilla de <code>/marketplace/home</code> (orden: posición 1 → 4). Mismo
+                  catálogo que <code>/marketplace</code>.
                 </Text>
               </Box>
-              <Badge colorPalette="green" variant="subtle" borderRadius="full" px={3} py={1}>
-                Seleccionados: {selectedInterestingCount}/4
-              </Badge>
+              <Flex direction="column" align="flex-end" gap={1}>
+                <Badge colorPalette="green" variant="subtle" borderRadius="full" px={3} py={1}>
+                  Seleccionados: {selectedInterestingCount}/4
+                </Badge>
+                <Badge colorPalette="gray" variant="subtle" borderRadius="full" px={3} py={0.5} fontSize="xs">
+                  {loading ? "Cargando catálogo…" : `${marketplaceSelectOptions.length} en marketplace`}
+                </Badge>
+              </Flex>
             </Flex>
             <Box>
               {interestingLoadError ? (
@@ -424,13 +475,13 @@ export function TiendaOnlineBannersHomePage() {
                     rootProps={{ mb: 0 }}
                     placeholder="— Sin equipo —"
                     onChange={(ev) => setInterestingSlot(slot, ev.target.value)}
-                    disabled={loading || equipos.length === 0 || isEditionLocked}
+                    disabled={loading || marketplaceSelectOptions.length === 0 || isEditionLocked}
                     value={interestingSlotIds[slot] ?? ""}
                   >
                     <option value="">— Sin equipo —</option>
-                    {equiposOptionsForInterestingSlot(slot).map((e) => (
-                      <option key={e.id} value={e.id}>
-                        {(e.numeroSerie?.trim() || e.id).slice(0, 48)} · {e.marcaEquipo} {e.modelo} · {e.procesador}
+                    {optionsForInterestingSlot(slot).map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.label}
                       </option>
                     ))}
                   </AppSelect>
@@ -454,6 +505,9 @@ export function TiendaOnlineBannersHomePage() {
               </Flex>
             </Box>
           </AppCard>
+
+          <TiendaOnlineCorpPartnersSection isEditionLocked={isEditionLocked} />
+          <TiendaOnlineCorpManufacturersSection isEditionLocked={isEditionLocked} />
         </AppCard>
       </Box>
     </Box>
