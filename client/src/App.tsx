@@ -62,6 +62,7 @@ import { CuentaClientePage } from "./pages/CuentaClientePage";
 import { CuentaClienteDetallePage } from "./pages/CuentaClienteDetallePage";
 import { ToastContainer } from "./components/ToastNotification";
 import { ScrollToTop } from "./components/ScrollToTop";
+import { GoogleAnalytics } from "./components/GoogleAnalytics";
 import { MarketplaceLanguageProvider } from "./contexts/MarketplaceLanguageContext";
 import { MarketplaceQuoteCartProvider, useMarketplaceQuoteCart } from "./contexts/MarketplaceQuoteCartContext";
 import { MarketplaceQuoteCartDrawer } from "./components/marketplace/MarketplaceQuoteCartDrawer";
@@ -360,6 +361,7 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <ScrollToTop />
+        <GoogleAnalytics />
         <ToastContainer />
         <Routes>
           {/* URLs legacy WordPress: /en/, /es/, /pt/ */}
