@@ -531,7 +531,7 @@ export function MarketplaceCorporateHomePage() {
                 <h2 id="corp-brands-title" className="market-corp-brands-block__title market-corp-luxor__heading">
                   {t("corp.brands.title")}
                 </h2>
-                <div className="market-corp-luxor__row" role="list">
+                <div className="market-corp-luxor__row market-corp-luxor__row--brands" role="list">
                   {industryManufacturers.map((m) => {
                     const src = resolveCorpManufacturerImageSrc(m.imageUrl);
                     if (!src) return null;
