@@ -18,6 +18,9 @@ import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
 import { isCorpHomePath, MARKETPLACE } from "../lib/marketplacePaths.js";
 import { publicImageUrl } from "../lib/marketplaceAsicCatalog.js";
 import { CORP_INSTITUTIONAL_VIDEO_URL, wpUpload } from "../lib/marketplaceWpAssets.js";
+
+/** Fondo sección “Nuestros datacenters” / Itaipú (antes en WordPress). */
+const CORP_ITAIPU_BG = wpUpload("itaipu-py.webp");
 import { useAuth } from "../contexts/AuthContext";
 import "../styles/marketplace-hashrate.css";
 
@@ -547,7 +550,11 @@ export function MarketplaceCorporateHomePage() {
             ) : null}
 
             <section className="market-corp-itaipu" aria-labelledby="corp-itaipu-title">
-              <div className="market-corp-itaipu__bg" aria-hidden />
+              <div
+                className="market-corp-itaipu__bg"
+                style={{ backgroundImage: `url(${CORP_ITAIPU_BG})` }}
+                aria-hidden
+              />
               <div className="market-corp-itaipu__overlay" aria-hidden />
               <div className="market-corp-itaipu__content">
                 <h2 id="corp-itaipu-title" className="market-corp-itaipu__title">

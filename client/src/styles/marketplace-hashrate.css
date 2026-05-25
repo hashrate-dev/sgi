@@ -7580,7 +7580,7 @@ button.product-modal__btn--quote-cart:active {
   position: absolute;
   inset: 0;
   background-color: #454156;
-  background-image: url("/images/wp-uploads/itaipu-py.webp");
+  /* background-image se define en JSX (wpUpload) para respetar BASE_URL y evitar assets rotos */
   background-position: center -3cm;
   background-repeat: no-repeat;
   background-size: cover;

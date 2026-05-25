@@ -13,6 +13,7 @@ const LEGACY_HOST = "hashrate.space";
 const LEGACY_IP = "179.27.153.62";
 
 const files = [
+  "itaipu-py.webp",
   "FB-Team-1-1024x991.png",
   "JV-Team-1024x991.png",
   "AF-Team-1024x991.png",
@@ -40,7 +41,8 @@ function download(file) {
         res.on("data", (c) => chunks.push(c));
         res.on("end", () => {
           const buf = Buffer.concat(chunks);
-          if (buf.length < 50_000) reject(new Error(`too small (${buf.length})`));
+          const minBytes = file.endsWith(".webp") && file.includes("itaipu") ? 100_000 : 50_000;
+          if (buf.length < minBytes) reject(new Error(`too small (${buf.length})`));
           else {
             fs.writeFileSync(out, buf);
             resolve(buf.length);
@@ -57,7 +59,8 @@ fs.mkdirSync(dest, { recursive: true });
 
 for (const file of files) {
   const out = path.join(dest, file);
-  if (fs.existsSync(out) && fs.statSync(out).size > 50_000) {
+  const minBytes = file.endsWith(".webp") && file.includes("itaipu") ? 100_000 : 50_000;
+  if (fs.existsSync(out) && fs.statSync(out).size > minBytes) {
     console.log(`skip ${file}`);
     continue;
   }

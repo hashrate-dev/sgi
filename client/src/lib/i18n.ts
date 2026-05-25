@@ -191,7 +191,7 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "corp.faq.q4": "¿Cómo pido una cotización?",
     "corp.faq.a4": "En la tienda podés armar la lista de equipos o escribirnos desde la sección de contacto.",
     "corp.sales_banner.body":
-      "Ya tengas experiencia en minería o recién empieces, nuestro equipo puede orientarte sobre operación, equipos y hosting en la región.",
+      "Tanto si ya tenés experiencia en minería como si estás dando tus primeros pasos, nuestro equipo está preparado para acompañarte en cada etapa, brindándote asesoramiento personalizado sobre todos nuestros servicios.",
     "corp.how.title": "¿Cómo funciona?",
     "corp.how.lede": "Hashrate Space te acerca a la minería de Bitcoin con equipo validado y soporte humano, sin vueltas.",
     "corp.how.step1_title": "Elegí tu minero",
