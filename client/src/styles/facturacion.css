@@ -4958,29 +4958,29 @@ button.fact-back {
   width: 100%;
   min-width: min-content;
 }
-/* Encabezado: más alto, todos alineados a la izquierda (Estado y Acciones se centran después) */
+/* Encabezado: compacto, sin romper etiquetas de columna */
 .historial-listado-wrap .historial-listado-table thead.table-dark th {
   background-color: #2D5D46 !important;
   border-bottom: 2px solid rgba(255, 255, 255, 0.2);
   color: #fff;
   font-weight: 600;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  padding: 1.15rem 0.75rem;
+  padding: 0.75rem 0.55rem;
   white-space: nowrap;
   vertical-align: middle;
   text-align: left;
 }
-/* Celdas cuerpo: filas más altas para mejor lectura */
+/* Celdas cuerpo */
 .historial-listado-wrap .historial-listado-table tbody td {
   border-bottom: 1px solid #eef2f6;
-  padding: 1.15rem 0.75rem;
+  padding: 0.65rem 0.55rem;
   background: #fff;
   vertical-align: middle;
-  font-size: 0.875rem;
-  line-height: 1.4;
-  min-height: 4rem;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  min-height: 0;
 }
 /* Columna Origen: solo "HOSTING" o "ASIC" */
 .historial-listado-wrap .historial-listado-table th.historial-col-origen,
@@ -5010,21 +5010,31 @@ button.fact-back {
   background: #f8fafc;
 }
 
-/* ---- Anchos por columna: achicados para tabla más compacta ---- */
+/* ---- Anchos por columna (legibles; N° nunca en una letra por fila) ---- */
 .historial-listado-wrap .historial-listado-table th.historial-col-num,
 .historial-listado-wrap .historial-listado-table td.historial-col-num {
-  min-width: 2.25rem;
-  width: 2.25rem;
+  min-width: 5.75rem;
+  width: 5.75rem;
+  max-width: 7rem;
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.historial-listado-wrap .historial-listado-table td.historial-col-num {
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 .historial-listado-wrap .historial-listado-table th.historial-col-tipo,
 .historial-listado-wrap .historial-listado-table td.historial-col-tipo {
-  min-width: 3.5rem;
+  min-width: 4.25rem;
+  white-space: nowrap;
 }
 .historial-listado-wrap .historial-listado-table th.historial-col-cliente,
 .historial-listado-wrap .historial-listado-table td.historial-col-cliente {
-  min-width: 6rem;
-  max-width: 12rem;
-  width: 8rem;
+  min-width: 7.5rem;
+  max-width: 14rem;
+  width: auto;
   white-space: normal;
   word-break: break-word;
   vertical-align: middle;
@@ -5039,14 +5049,14 @@ button.fact-back {
 }
 .historial-listado-wrap .historial-listado-table th.historial-col-fecha-emision,
 .historial-listado-wrap .historial-listado-table td.historial-col-fecha-emision {
-  min-width: 4.5rem;
+  min-width: 5.25rem;
   text-align: left;
-  padding-left: calc(0.45rem - 0.1cm);
-  padding-right: 0.45rem;
+  padding-left: 0.45rem;
+  padding-right: 0.4rem;
 }
 .historial-listado-wrap .historial-listado-table th.historial-col-fecha-emision {
   white-space: normal;
-  line-height: 1.2;
+  line-height: 1.15;
   text-align: left;
 }
 .historial-listado-wrap .historial-listado-table td.historial-col-fecha-emision {
@@ -5054,38 +5064,38 @@ button.fact-back {
 }
 .historial-listado-wrap .historial-listado-table th.historial-col-hora,
 .historial-listado-wrap .historial-listado-table td.historial-col-hora {
-  min-width: 3rem;
-  padding-left: calc(0.35rem - 0.1cm);
-  padding-right: 0.35rem;
+  min-width: 4.25rem;
+  padding-left: 0.4rem;
+  padding-right: 0.4rem;
 }
 .historial-listado-wrap .historial-listado-table th.historial-col-hora {
   white-space: normal;
-  line-height: 1.2;
+  line-height: 1.15;
 }
 .historial-listado-wrap .historial-listado-table td.historial-col-hora {
   white-space: nowrap;
 }
 .historial-listado-wrap .historial-listado-table th.historial-col-fecha-venc,
 .historial-listado-wrap .historial-listado-table td.historial-col-fecha-venc {
-  min-width: 4.75rem;
+  min-width: 5.25rem;
   text-align: left;
-  padding-left: 0.5rem;
-  padding-right: 0.35rem;
+  padding-left: 0.45rem;
+  padding-right: 0.4rem;
 }
 .historial-listado-wrap .historial-listado-table th.historial-col-fecha-venc {
   white-space: normal;
-  line-height: 1.2;
+  line-height: 1.15;
 }
 .historial-listado-wrap .historial-listado-table th.historial-col-fecha-pago,
 .historial-listado-wrap .historial-listado-table td.historial-col-fecha-pago {
-  min-width: 5rem;
+  min-width: 5.5rem;
   text-align: left;
-  padding-left: 0.5rem;
-  padding-right: 0.35rem;
+  padding-left: 0.45rem;
+  padding-right: 0.4rem;
 }
 .historial-listado-wrap .historial-listado-table th.historial-col-fecha-pago {
   white-space: normal;
-  line-height: 1.2;
+  line-height: 1.15;
 }
 .historial-listado-wrap .historial-listado-table th.historial-col-mes,
 .historial-listado-wrap .historial-listado-table td.historial-col-mes {
@@ -5119,21 +5129,21 @@ button.fact-back {
 }
 .historial-listado-wrap .historial-listado-table th.historial-col-total,
 .historial-listado-wrap .historial-listado-table td.historial-col-total {
-  min-width: 5.5rem;
+  min-width: 6.25rem;
   text-align: left;
-  padding-left: 0.3rem;
-  padding-right: 0.25rem;
+  padding-left: 0.35rem;
+  padding-right: 0.3rem;
 }
 .historial-listado-wrap .historial-listado-table thead.table-dark th.historial-col-total {
   text-align: left !important;
-  padding-left: calc(0.3rem - 0.1cm);
+  padding-left: 0.35rem;
 }
 .historial-listado-wrap .historial-listado-table th.historial-col-total-stc,
 .historial-listado-wrap .historial-listado-table td.historial-col-total-stc {
-  min-width: 5.5rem;
+  min-width: 6.25rem;
   text-align: left;
-  padding-left: calc(0.3rem - 0.1cm);
-  padding-right: 0.25rem;
+  padding-left: 0.35rem;
+  padding-right: 0.3rem;
 }
 .historial-listado-wrap .historial-listado-table th.historial-col-total-stc {
   white-space: normal;
@@ -5142,13 +5152,13 @@ button.fact-back {
 /* TC: ancho para "X.XXX,XX USD" en una fila */
 .historial-listado-wrap .historial-listado-table th.historial-col-cambio-header,
 .historial-listado-wrap .historial-listado-table td.historial-col-cambio {
-  min-width: 4.5rem;
+  min-width: 5rem;
   text-align: left;
   padding-left: 0.35rem;
   padding-right: 0.35rem;
 }
 .historial-listado-wrap .historial-listado-table thead.table-dark th.historial-col-cambio-header {
-  padding-left: calc(0.35rem - 0.1cm);
+  padding-left: 0.35rem;
 }
 /* Estado: ancho para encabezado "Estado" e ícono */
 .historial-listado-wrap .historial-listado-table th.historial-col-estado,

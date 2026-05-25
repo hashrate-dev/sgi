@@ -1,0 +1,184 @@
+/* Cuentas clientes tienda — filtros + listado compacto sin scroll horizontal */
+
+.ucc-filtros-outer {
+  margin-left: 0;
+  margin-right: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.historial-filtros-card .ucc-filtros-row {
+  flex-wrap: wrap !important;
+}
+
+.ucc-filtros-meta {
+  color: rgba(255, 255, 255, 0.9);
+  position: relative;
+  z-index: 1;
+}
+
+.usuarios-page-body .ucc-listado-wrap.historial-listado-wrap {
+  margin-left: 0;
+  margin-right: 0;
+  margin-top: 1.5rem;
+  padding: 1.15rem 1.25rem 1.25rem;
+}
+
+/* Contenedor tabla: sin barra horizontal */
+.ucc-listado-wrap .ucc-table-viewport {
+  width: 100%;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.05);
+}
+
+.ucc-listado-table {
+  table-layout: fixed;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.8125rem;
+}
+
+.ucc-listado-table thead th {
+  background: linear-gradient(180deg, #356b52 0%, #2d5d46 100%);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.7rem 0.55rem;
+  border: none;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.ucc-listado-table thead th:first-child {
+  border-radius: 11px 0 0 0;
+  padding-left: 0.85rem;
+}
+
+.ucc-listado-table thead th:last-child {
+  border-radius: 0 11px 0 0;
+  padding-right: 0.85rem;
+}
+
+.ucc-listado-table tbody td {
+  padding: 0.62rem 0.55rem;
+  border-bottom: 1px solid #eef2f6;
+  color: #334155;
+  vertical-align: middle;
+  line-height: 1.35;
+  overflow: hidden;
+}
+
+.ucc-listado-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.ucc-listado-table tbody tr:nth-child(even) td {
+  background: #f8fafb;
+}
+
+.ucc-listado-table tbody tr:hover td {
+  background: #ecf5f1;
+}
+
+/* Anchos fijos (%): entra en el panel sin scroll */
+.ucc-col-code {
+  width: 9%;
+}
+.ucc-col-alta {
+  width: 11%;
+}
+.ucc-col-cliente {
+  width: 19%;
+}
+.ucc-col-ubic {
+  width: 14%;
+}
+.ucc-col-contacto {
+  width: 15%;
+}
+.ucc-col-email {
+  width: 24%;
+}
+.ucc-col-doc {
+  width: 8%;
+}
+
+.ucc-code-pill {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  background: #e8f3ed;
+  color: #1e4034;
+  font-family: ui-monospace, monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ucc-cell-main {
+  display: block;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.ucc-cell-sub {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 0.72rem;
+  color: #64748b;
+  line-height: 1.2;
+}
+
+.ucc-cell-empty {
+  color: #94a3b8;
+}
+
+.ucc-ellipsis {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.ucc-email-link {
+  color: #1d4ed8;
+  font-weight: 500;
+}
+
+.ucc-listado-table tbody tr:hover .ucc-email-link {
+  color: #1e40af;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (max-width: 992px) {
+  .ucc-listado-wrap.historial-listado-wrap {
+    padding: 1rem;
+  }
+
+  .ucc-listado-table {
+    font-size: 0.78rem;
+  }
+
+  .ucc-listado-table thead th,
+  .ucc-listado-table tbody td {
+    padding: 0.5rem 0.4rem;
+  }
+
+  .ucc-col-doc {
+    width: 10%;
+  }
+  .ucc-col-email {
+    width: 22%;
+  }
+}
