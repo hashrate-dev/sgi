@@ -542,7 +542,16 @@ export function MarketplaceCorporateHomePage() {
                     const alt = m.name.trim() || "Fabricante";
                     const href = m.href.trim();
                     const img = (
-                      <img src={src} alt={alt} loading="lazy" decoding="async" draggable={false} />
+                      <span className="market-corp-logo-cell">
+                        <img
+                          className="market-corp-logo-cell__img"
+                          src={src}
+                          alt={alt}
+                          loading="lazy"
+                          decoding="async"
+                          draggable={false}
+                        />
+                      </span>
                     );
                     const itemClass = `market-corp-clients__item market-corp-clients__item--${slug}`;
                     if (href) {
@@ -645,19 +654,22 @@ export function MarketplaceCorporateHomePage() {
                     const href = p.href.trim();
                     const aria = p.name.trim() || "Partner";
                     const img = (
-                      <img
-                        className="market-corp-luxor__img"
-                        src={src}
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                        draggable={false}
-                      />
+                      <span className="market-corp-logo-cell">
+                        <img
+                          className="market-corp-logo-cell__img market-corp-luxor__img"
+                          src={src}
+                          alt=""
+                          loading="lazy"
+                          decoding="async"
+                          draggable={false}
+                        />
+                      </span>
                     );
+                    const partnerLinkClass = `market-corp-luxor__link market-corp-luxor__link--${p.id.replace(/[^a-z0-9_-]+/gi, "-")}`;
                     return href ? (
                       <a
                         key={p.id}
-                        className="market-corp-luxor__link"
+                        className={partnerLinkClass}
                         href={href}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -666,7 +678,7 @@ export function MarketplaceCorporateHomePage() {
                         {img}
                       </a>
                     ) : (
-                      <span key={p.id} className="market-corp-luxor__link" aria-label={aria}>
+                      <span key={p.id} className={partnerLinkClass} aria-label={aria}>
                         {img}
                       </span>
                     );

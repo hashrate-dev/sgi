@@ -7759,25 +7759,6 @@ a.market-corp-clients__item {
   opacity: 1;
 }
 
-/*
- * Bitmain / Innosilicon / Elphapex: PNG con caja blanca (mismo truco que Luxor).
- * Opacidad en el ítem; multiply en la img para fundir blanco con --marketplace-page-bg.
- */
-.market-corp-clients__item--bitmain,
-.market-corp-clients__item--innosilicon,
-.market-corp-clients__item--elphapex {
-  background-color: var(--marketplace-page-bg, #f3f4f6);
-  opacity: var(--corp-clients-logo-opacity, 0.56);
-}
-
-.market-corp-clients__item--bitmain img,
-.market-corp-clients__item--innosilicon img,
-.market-corp-clients__item--elphapex img {
-  mix-blend-mode: multiply;
-  opacity: 1;
-  filter: grayscale(100%) saturate(0) contrast(1.2) brightness(0.78);
-}
-
 @media (min-width: 900px) {
   .market-corp-clients__item img {
     max-height: 40px;
@@ -8805,7 +8786,6 @@ a.market-corp-clients__item {
   --corp-partner-logo-h: clamp(28px, 3.5vw, 34px);
 }
 
-/* Fondo del PNG (blanco) → mismo gris que la página (#f3f4f6): multiply + base explícita */
 .market-corp-luxor__link {
   display: inline-flex;
   align-items: center;
@@ -8816,7 +8796,7 @@ a.market-corp-clients__item {
   line-height: 0;
   text-decoration: none;
   border: none;
-  background-color: var(--marketplace-page-bg, #f3f4f6);
+  background-color: transparent;
   box-shadow: none;
   cursor: pointer;
   opacity: var(--corp-clients-logo-opacity, 0.56);
@@ -8841,32 +8821,56 @@ a.market-corp-clients__item {
   max-height: 100%;
   object-fit: contain;
   object-position: center;
-  filter: grayscale(100%) saturate(0) contrast(1.1) brightness(0.72);
-  mix-blend-mode: multiply;
   opacity: 1;
 }
 
-/* Home corporativa: partners y fabricantes siempre monocromo (gris oscuro) */
-.market-corp-page .market-corp-logo-strip--bw .market-corp-clients__item img,
-.market-corp-page .market-corp-logo-strip--bw .market-corp-luxor__img {
-  filter: grayscale(100%) saturate(0) contrast(1.12) brightness(0.68);
+/*
+ * Home: partners + fabricantes — fondo de cada logo = gris claro de la página (#f3f4f6).
+ * multiply funde blanco/gris del PNG con ese mismo color (sin cajas oscuras).
+ */
+.market-corp-page .market-corp-logo-strip--bw,
+.market-corp-page .market-corp-logo-strip--bw .market-corp-clients,
+.market-corp-page .market-corp-logo-strip--bw .market-corp-luxor__row,
+.market-corp-page .market-corp-logo-strip--bw .market-corp-clients__item,
+.market-corp-page .market-corp-logo-strip--bw .market-corp-luxor__link,
+.market-corp-page .market-corp-logo-strip--bw .market-corp-logo-cell {
+  background-color: var(--marketplace-page-bg, #f3f4f6);
 }
 
-.market-corp-page .market-corp-logo-strip--bw .market-corp-clients__item--bitmain img,
-.market-corp-page .market-corp-logo-strip--bw .market-corp-clients__item--innosilicon img,
-.market-corp-page .market-corp-logo-strip--bw .market-corp-clients__item--elphapex img,
+.market-corp-page .market-corp-logo-strip--bw .market-corp-logo-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  isolation: isolate;
+}
+
+.market-corp-page .market-corp-logo-strip--bw .market-corp-clients__item .market-corp-logo-cell {
+  max-height: 44px;
+}
+
+.market-corp-page .market-corp-logo-strip--bw .market-corp-luxor__link .market-corp-logo-cell {
+  height: 100%;
+  max-height: var(--corp-partner-logo-h);
+}
+
+.market-corp-page .market-corp-logo-strip--bw .market-corp-logo-cell__img,
 .market-corp-page .market-corp-logo-strip--bw .market-corp-luxor__img {
+  display: block;
+  max-width: 100%;
+  width: auto;
+  height: auto;
+  max-height: 44px;
+  object-fit: contain;
+  object-position: center;
+  background-color: var(--marketplace-page-bg, #f3f4f6);
   mix-blend-mode: multiply;
-  filter: grayscale(100%) saturate(0) contrast(1.18) brightness(0.74);
+  /* Mismo B/N y gris de marca que NiceHash (fondo blanco del PNG → gris página) */
+  filter: grayscale(100%) saturate(0) contrast(1.12) brightness(1.04);
 }
 
-.market-corp-page .market-corp-logo-strip--bw .market-corp-clients__item:not(
-    .market-corp-clients__item--bitmain,
-    .market-corp-clients__item--innosilicon,
-    .market-corp-clients__item--elphapex
-  )
-  img {
-  mix-blend-mode: normal;
+.market-corp-page .market-corp-logo-strip--bw .market-corp-luxor__img {
+  max-height: 100%;
 }
 
 @media (min-width: 900px) {

@@ -186,7 +186,7 @@ export function TiendaOnlineCorpPartnersSection({ isEditionLocked }: Props) {
             🤝 Partners oficiales
           </Heading>
           <Text color="gray.700" fontSize="sm" mt={1}>
-            Logos al pie de <code>/marketplace/home</code> (sección «Partners oficiales»). Subí PNG/WebP con fondo transparente si es posible.
+            Logos al pie de <code>/marketplace/home</code> (sección «Partners oficiales»). Usá <strong>PNG con fondo transparente</strong> para que no se vea caja gris alrededor del logo.
           </Text>
         </Box>
         <Badge colorPalette="green" variant="subtle" borderRadius="full" px={3} py={1}>

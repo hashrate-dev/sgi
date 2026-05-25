@@ -204,7 +204,7 @@ export function TiendaOnlineCorpManufacturersSection({ isEditionLocked }: Props)
             🏭 Confiamos en los mejores fabricantes de la industria
           </Heading>
           <Text color="gray.700" fontSize="sm" mt={1}>
-            Logos en <code>/marketplace/home</code> (sección de fabricantes, arriba del FAQ). Orden de izquierda a derecha.
+            Logos en <code>/marketplace/home</code> (sección de fabricantes, arriba del FAQ). Subí <strong>PNG con fondo transparente</strong> para evitar recuadros grises.
           </Text>
         </Box>
         <Badge colorPalette="green" variant="subtle" borderRadius="full" px={3} py={1}>
