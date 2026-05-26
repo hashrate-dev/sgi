@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import Chart from "chart.js/auto";
@@ -235,6 +236,15 @@ export function PrecioHistorialFullModal({
   const deltaAbs = latest && first ? latest.precioUsd - first.precioUsd : null;
   const deltaPct = latest && first && first.precioUsd > 0 ? ((latest.precioUsd - first.precioUsd) / first.precioUsd) * 100 : null;
 
+  useEffect(() => {
+    if (!open || typeof document === "undefined") return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   if (!open) return null;
 
   async function handleDownloadReport() {
@@ -281,7 +291,7 @@ export function PrecioHistorialFullModal({
     saveAs(new Blob([buf]), `${baseName}.xlsx`);
   }
 
-  return (
+  const modalTree = (
     <div
       className="modal d-block professional-modal-overlay hrs-precio-historial-full-overlay"
       tabIndex={-1}
@@ -290,6 +300,13 @@ export function PrecioHistorialFullModal({
       aria-labelledby="hrs-precio-historial-full-title"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          e.stopPropagation();
+          onClose();
+        }
       }}
     >
       <div className="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable hrs-precio-historial-full-dialog">
@@ -414,4 +431,7 @@ export function PrecioHistorialFullModal({
       </div>
     </div>
   );
+
+  if (typeof document === "undefined") return modalTree;
+  return createPortal(modalTree, document.body);
 }

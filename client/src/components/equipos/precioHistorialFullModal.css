@@ -4,8 +4,10 @@
 .hrs-precio-historial-full-overlay {
   position: fixed;
   inset: 0;
-  z-index: 23000 !important;
+  /* Por encima de Chakra Dialog (editar equipo ~14xx) y toasts (~20050) */
+  z-index: 25000 !important;
   pointer-events: auto;
+  isolation: isolate;
 }
 
 .hrs-precio-historial-full-dialog {
