@@ -237,3 +237,145 @@
   margin: 0.75rem auto;
 }
 
+/* Garantías ANDE — listado de ítems (tabla legible, sin cortar palabras) */
+.garantias-ande-items-listado.clientes-listado-wrap {
+  margin-left: 0;
+  margin-right: 0;
+  padding: 1.25rem 1.5rem;
+}
+
+.garantias-ande-items-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.garantias-ande-items-table {
+  width: 100%;
+  min-width: 1060px;
+  table-layout: fixed;
+  font-size: 0.875rem;
+}
+
+.garantias-ande-items-table .garantias-ande-items-table__th {
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: normal;
+  hyphens: manual;
+  line-height: 1.3;
+  vertical-align: middle;
+  padding: 0.75rem 0.65rem;
+}
+
+.garantias-ande-items-table .garantias-ande-items-table__th--codigo {
+  width: 5.5rem;
+}
+.garantias-ande-items-table .garantias-ande-items-table__th--marca {
+  width: 6.5rem;
+}
+.garantias-ande-items-table .garantias-ande-items-table__th--modelo {
+  width: 11rem;
+}
+.garantias-ande-items-table .garantias-ande-items-table__th--marketplace {
+  width: auto;
+  min-width: 14rem;
+}
+.garantias-ande-items-table .garantias-ande-items-table__th--fecha {
+  width: 7.5rem;
+}
+.garantias-ande-items-table .garantias-ande-items-table__th--precio {
+  width: 7.5rem;
+}
+.garantias-ande-items-table .garantias-ande-items-table__th--obs {
+  width: 9rem;
+}
+.garantias-ande-items-table .garantias-ande-items-table__th--acciones {
+  width: 8.75rem;
+}
+
+.garantias-ande-items-table tbody td {
+  padding: 0.7rem 0.65rem;
+  vertical-align: middle;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+.garantias-ande-items-table__codigo,
+.garantias-ande-items-table__marca,
+.garantias-ande-items-table__fecha,
+.garantias-ande-items-table__precio {
+  white-space: nowrap;
+}
+
+.garantias-ande-items-table__modelo {
+  white-space: normal;
+  line-height: 1.35;
+}
+
+.garantias-ande-items-table__marketplace,
+.garantias-ande-items-table__obs {
+  max-width: 0;
+  overflow: hidden;
+}
+
+.garantias-ande-items-table__marketplace-text,
+.garantias-ande-items-table__obs-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #64748b;
+  font-size: 0.8125rem;
+}
+
+.garantias-ande-items-table__modelo {
+  color: #0f172a;
+  font-weight: 500;
+}
+
+.garantias-ande-items-table__acciones {
+  white-space: nowrap;
+  width: 8.75rem;
+}
+
+.garantias-ande-items-table__acciones-inner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  flex-wrap: nowrap;
+}
+
+.garantias-ande-items-table__btn-edit,
+.garantias-ande-items-table__btn-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+}
+
+.garantias-ande-items-table__btn-delete {
+  width: 2.1rem;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.garantias-ande-items-table__btn-edit .bi {
+  font-size: 0.9em;
+}
+
+@media (max-width: 991.98px) {
+  .garantias-ande-items-listado.clientes-listado-wrap {
+    padding: 1rem;
+  }
+
+  .garantias-ande-items-table {
+    min-width: 980px;
+    font-size: 0.8125rem;
+  }
+}
+

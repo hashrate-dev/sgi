@@ -494,6 +494,39 @@ export function GarantiasAndeItemsPage() {
   });
   const marketplaceById = new Map(marketplaceEquipos.map((x) => [x.id, x.label] as const));
 
+  const garantiasItemsTableHead = (
+    <thead className="table-dark">
+      <tr>
+        <th scope="col" className="garantias-ande-items-table__th garantias-ande-items-table__th--codigo">
+          Código
+        </th>
+        <th scope="col" className="garantias-ande-items-table__th garantias-ande-items-table__th--marca">
+          Marca
+        </th>
+        <th scope="col" className="garantias-ande-items-table__th garantias-ande-items-table__th--modelo">
+          Modelo
+        </th>
+        <th scope="col" className="garantias-ande-items-table__th garantias-ande-items-table__th--marketplace">
+          Equipo marketplace
+        </th>
+        <th scope="col" className="garantias-ande-items-table__th garantias-ande-items-table__th--fecha">
+          Fecha ingreso
+        </th>
+        <th scope="col" className="garantias-ande-items-table__th garantias-ande-items-table__th--precio text-end">
+          Precio garantía
+        </th>
+        <th scope="col" className="garantias-ande-items-table__th garantias-ande-items-table__th--obs">
+          Observaciones
+        </th>
+        {canEdit ? (
+          <th scope="col" className="garantias-ande-items-table__th garantias-ande-items-table__th--acciones text-center">
+            Acciones
+          </th>
+        ) : null}
+      </tr>
+    </thead>
+  );
+
   return (
     <div className="fact-page fact-page--cte-tienda-edit">
       <div className="container cte-edit-tienda-page-inner">
@@ -583,7 +616,7 @@ export function GarantiasAndeItemsPage() {
                   </div>
                 </div>
 
-                <div className="clientes-listado-wrap">
+                <div className="clientes-listado-wrap garantias-ande-items-listado">
                   <div className="d-flex justify-content-between align-items-center mb-2">
                     <h6 className="fw-bold m-0">
                       📋 Listado de ítems ({loading ? "…" : filteredItems.length})
@@ -609,24 +642,9 @@ export function GarantiasAndeItemsPage() {
                   </div>
 
                   {loading ? (
-                    <div className="table-responsive" style={{ minHeight: 200 }}>
-                      <table className="table table-sm align-middle clientes-listado-table" style={{ fontSize: "0.85rem" }}>
-                        <thead className="table-dark">
-                          <tr>
-                            <th className="text-start">Código</th>
-                            <th className="text-start">Marca</th>
-                            <th className="text-start">Modelo</th>
-                            <th className="text-start">Equipo marketplace vinculado</th>
-                            <th className="text-start">Fecha ingreso</th>
-                            <th className="text-end">Precio garantía</th>
-                            <th className="text-start">Observaciones</th>
-                            {canEdit && (
-                              <th className="text-start" style={{ width: "120px" }}>
-                                Acciones
-                              </th>
-                            )}
-                          </tr>
-                        </thead>
+                    <div className="table-responsive garantias-ande-items-table-scroll" style={{ minHeight: 200 }}>
+                      <table className="table table-sm align-middle clientes-listado-table garantias-ande-items-table">
+                        {garantiasItemsTableHead}
                         <tbody>
                           {[1, 2, 3, 4, 5].map((row) => (
                             <tr key={row}>
@@ -634,13 +652,13 @@ export function GarantiasAndeItemsPage() {
                                 <span className="clientes-skeleton" style={{ width: "3em" }} />
                               </td>
                               <td>
-                                <span className="clientes-skeleton" style={{ width: "6em" }} />
+                                <span className="clientes-skeleton" style={{ width: "5em" }} />
                               </td>
                               <td>
-                                <span className="clientes-skeleton" style={{ width: "8em" }} />
+                                <span className="clientes-skeleton" style={{ width: "9em" }} />
                               </td>
                               <td>
-                                <span className="clientes-skeleton" style={{ width: "12em" }} />
+                                <span className="clientes-skeleton" style={{ width: "14em" }} />
                               </td>
                               <td>
                                 <span className="clientes-skeleton" style={{ width: "5em" }} />
@@ -649,13 +667,13 @@ export function GarantiasAndeItemsPage() {
                                 <span className="clientes-skeleton" style={{ width: "4em" }} />
                               </td>
                               <td>
-                                <span className="clientes-skeleton" style={{ width: "10em" }} />
+                                <span className="clientes-skeleton" style={{ width: "8em" }} />
                               </td>
-                              {canEdit && (
+                              {canEdit ? (
                                 <td>
-                                  <span className="clientes-skeleton" style={{ width: "5em" }} />
+                                  <span className="clientes-skeleton" style={{ width: "6em" }} />
                                 </td>
-                              )}
+                              ) : null}
                             </tr>
                           ))}
                         </tbody>
@@ -681,74 +699,61 @@ export function GarantiasAndeItemsPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="table-responsive">
-                      <table
-                        className="table table-sm align-middle clientes-listado-table"
-                        style={{ fontSize: "0.85rem" }}
-                      >
-                        <thead className="table-dark">
-                          <tr>
-                            <th className="text-start">Código</th>
-                            <th className="text-start">Marca</th>
-                            <th className="text-start">Modelo</th>
-                            <th className="text-start">Equipo marketplace vinculado</th>
-                            <th className="text-start">Fecha ingreso</th>
-                            <th className="text-end">Precio garantía</th>
-                            <th className="text-start">Observaciones</th>
-                            {canEdit && (
-                              <th className="text-start" style={{ width: "120px" }}>
-                                Acciones
-                              </th>
-                            )}
-                          </tr>
-                        </thead>
+                    <div className="table-responsive garantias-ande-items-table-scroll">
+                      <table className="table table-sm align-middle clientes-listado-table garantias-ande-items-table">
+                        {garantiasItemsTableHead}
                         <tbody>
-                          {filteredItems.map((i) => (
-                            <tr key={i.id}>
-                              <td className="text-start fw-bold">{i.codigo}</td>
-                              <td className="text-start">{i.marca ?? "—"}</td>
-                              <td className="text-start">{i.modelo ?? "—"}</td>
-                              <td className="text-start text-muted small">
-                                {i.marketplaceEquipoId
-                                  ? (marketplaceById.get(i.marketplaceEquipoId) ?? i.marketplaceEquipoId)
-                                  : "—"}
-                              </td>
-                              <td className="text-start">
-                                {i.fechaIngreso
-                                  ? new Date(i.fechaIngreso + "T12:00:00").toLocaleDateString("es-AR")
-                                  : "—"}
-                              </td>
-                              <td className="text-end text-muted small">
-                                {i.precioGarantia != null && Number.isFinite(Number(i.precioGarantia))
-                                  ? Number(i.precioGarantia).toLocaleString("es-AR", { maximumFractionDigits: 2 })
-                                  : "—"}
-                              </td>
-                              <td className="text-start text-muted small">{i.observaciones ?? "—"}</td>
-                              {canEdit && (
-                                <td className="text-start">
-                                  <div className="d-flex gap-1">
-                                    <button
-                                      type="button"
-                                      className="fact-btn fact-btn-secondary btn-sm"
-                                      style={{ padding: "0.35rem 0.75rem", fontSize: "0.8125rem" }}
-                                      onClick={() => handleEdit(i)}
-                                    >
-                                      Editar
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="btn btn-danger btn-sm"
-                                      style={{ padding: "0.35rem 0.75rem", fontSize: "0.8125rem" }}
-                                      onClick={() => setDeleteConfirmItem(i)}
-                                      title="Eliminar"
-                                    >
-                                      <i className="bi bi-trash" />
-                                    </button>
-                                  </div>
+                          {filteredItems.map((i) => {
+                            const marketplaceLabel = i.marketplaceEquipoId
+                              ? (marketplaceById.get(i.marketplaceEquipoId) ?? i.marketplaceEquipoId)
+                              : "—";
+                            return (
+                              <tr key={i.id}>
+                                <td className="garantias-ande-items-table__codigo fw-semibold">{i.codigo}</td>
+                                <td className="garantias-ande-items-table__marca">{i.marca ?? "—"}</td>
+                                <td className="garantias-ande-items-table__modelo">{i.modelo ?? "—"}</td>
+                                <td className="garantias-ande-items-table__marketplace" title={marketplaceLabel}>
+                                  <span className="garantias-ande-items-table__marketplace-text">{marketplaceLabel}</span>
                                 </td>
-                              )}
-                            </tr>
-                          ))}
+                                <td className="garantias-ande-items-table__fecha">
+                                  {i.fechaIngreso
+                                    ? new Date(i.fechaIngreso + "T12:00:00").toLocaleDateString("es-AR")
+                                    : "—"}
+                                </td>
+                                <td className="garantias-ande-items-table__precio text-end tabular-nums">
+                                  {i.precioGarantia != null && Number.isFinite(Number(i.precioGarantia))
+                                    ? Number(i.precioGarantia).toLocaleString("es-AR", { maximumFractionDigits: 0 })
+                                    : "—"}
+                                </td>
+                                <td className="garantias-ande-items-table__obs" title={i.observaciones ?? undefined}>
+                                  <span className="garantias-ande-items-table__obs-text">{i.observaciones ?? "—"}</span>
+                                </td>
+                                {canEdit ? (
+                                  <td className="garantias-ande-items-table__acciones">
+                                    <div className="garantias-ande-items-table__acciones-inner">
+                                      <button
+                                        type="button"
+                                        className="btn btn-outline-secondary btn-sm garantias-ande-items-table__btn-edit"
+                                        onClick={() => handleEdit(i)}
+                                      >
+                                        <i className="bi bi-pencil" aria-hidden />
+                                        <span>Editar</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-outline-danger btn-sm garantias-ande-items-table__btn-delete"
+                                        onClick={() => setDeleteConfirmItem(i)}
+                                        title="Eliminar"
+                                        aria-label={`Eliminar ${i.codigo}`}
+                                      >
+                                        <i className="bi bi-trash" aria-hidden />
+                                      </button>
+                                    </div>
+                                  </td>
+                                ) : null}
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

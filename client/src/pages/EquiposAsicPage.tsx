@@ -78,12 +78,35 @@ const MODELOS_EQUIPO_OPCIONES = [
   "AntSpace Hydro MD5",
 ] as const;
 
+const MODELO_CANONICO_S21E_XP = "Antminer S21e XP";
+const PROCESADOR_CANONICO_S21E_XP = "U3 Hydro 860 TH/s";
+
+/** Renombra modelos legacy (p. ej. U3S21eXP H) al nombre actual del desplegable. */
+function normalizeModeloEquipo(modelo: string): string {
+  const t = (modelo ?? "").trim();
+  if (!t) return "";
+  if (t === "Antminer U3S21eXP H") return MODELO_CANONICO_S21E_XP;
+  if (/^antminer\s+u3s21e?xp/i.test(t)) return MODELO_CANONICO_S21E_XP;
+  return t;
+}
+
+/** Alinea hashrates legacy del S21e XP al preset actual. */
+function normalizeProcesadorEquipo(modelo: string, procesador: string): string {
+  const mod = normalizeModeloEquipo(modelo);
+  if (familiaProcesadorPreset(mod) !== "s21exp") return (procesador ?? "").trim();
+  const p = (procesador ?? "").trim();
+  if (!p || /^860\s*th\/s\s*hydro$/i.test(p) || /^h\s*860\s*th\/s$/i.test(p)) {
+    return PROCESADOR_CANONICO_S21E_XP;
+  }
+  return p;
+}
+
 /** Texto por defecto en vitrina cuando el producto no tiene precio fijo (editable). */
 const DEFAULT_MARKETPLACE_PRICE_LABEL = "SOLICITA PRECIO";
 
 function opcionesModeloConActual(actual: string): string[] {
   const base = [...MODELOS_EQUIPO_OPCIONES];
-  const a = (actual ?? "").trim();
+  const a = normalizeModeloEquipo(actual);
   if (a && !base.some((x) => x === a)) return [a, ...base];
   return base;
 }
@@ -458,11 +481,12 @@ function formatFechaIngresoDisplay(raw: string): string {
 
 function buildEquipoSavePayload(form: EquipoFormState) {
   const mp = buildMarketplacePayload(form);
+  const modelo = normalizeModeloEquipo(form.modelo);
   return {
     fechaIngreso: form.fechaIngreso || "",
     marcaEquipo: form.marcaEquipo,
-    modelo: form.modelo,
-    procesador: form.procesador,
+    modelo,
+    procesador: normalizeProcesadorEquipo(modelo, form.procesador),
     precioUSD: form.precioUSD,
     observaciones: form.observaciones || undefined,
     ...mp,
@@ -765,8 +789,8 @@ export function EquiposAsicPage() {
     setFormData({
       fechaIngreso: e.fechaIngreso,
       marcaEquipo: e.marcaEquipo,
-      modelo: e.modelo,
-      procesador: e.procesador,
+      modelo: normalizeModeloEquipo(e.modelo),
+      procesador: normalizeProcesadorEquipo(e.modelo, e.procesador),
       precioUSD: e.precioUSD,
       precioHistorialLocal: sortPrecioHistorialAsc(e.precioHistorial ?? []),
       observaciones: e.observaciones ?? "",
@@ -1743,8 +1767,9 @@ export function EquiposAsicPage() {
                                   "fact-input" + (specsFieldsLocked ? " hrs-equipo-asic-modal-form__spec-input--locked" : "")
                                 }
                                 value={(() => {
+                                  const modeloNorm = normalizeModeloEquipo(formData.modelo);
                                   const opts = opcionesModeloConActual(formData.modelo);
-                                  return opts.includes(formData.modelo) ? formData.modelo : "";
+                                  return opts.includes(modeloNorm) ? modeloNorm : "";
                                 })()}
                                 onChange={(e) => {
                                   const v = e.target.value;
