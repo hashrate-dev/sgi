@@ -18,7 +18,7 @@ const PROCESADOR_POR_MODELO: Record<(typeof ASIC_MODELOS)[number], readonly stri
   S23: ["305 ths"],
   L7: ["8800 mhs", "9050 mhs", "9500 mhs"],
   L9: ["15.000 mhs", "16.000 mhs", "16.500 mhs", "17.000 mhs"],
-  L11: ["20.000 ghs", "21.000 ghs", "32.000 ghs hydro"],
+  L11: ["20.000 mhs", "21.000 mhs", "32.000 mhs hydro"],
   Z15: ["840 kSol/s", "860 kSol/s"],
   X9: ["1.000K"],
   U3S21exPH: ["860 ths hydro", "H 860 ths"],

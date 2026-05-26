@@ -113,10 +113,10 @@ function opcionesModeloConActual(actual: string): string[] {
 
 type FamiliaProcesadorPreset = "l9" | "l7" | "l11" | "s21" | "s23" | "s21exp" | "z15";
 
-/** Presets de hashrate según modelo (texto guardado en BD = valor del `option`). L7/L9 en MH/s, L11 en GH/s, S21/S23/U3 en TH/s. */
+/** Presets de hashrate según modelo (texto guardado en BD = valor del `option`). L7/L9/L11 en MH/s, S21/S23/U3 en TH/s. */
 const PROCESADOR_PRESETS_L9 = ["15.000 MH/s", "16.000 MH/s", "16.500 MH/s", "17.000 MH/s"] as const;
 const PROCESADOR_PRESETS_L7 = ["8.800 MH/s", "9.050 MH/s", "9.500 MH/s"] as const;
-const PROCESADOR_PRESETS_L11 = ["20.000 GH/s", "21.000 GH/s", "32.000 GH/s Hydro"] as const;
+const PROCESADOR_PRESETS_L11 = ["20.000 MH/s", "21.000 MH/s", "32.000 MH/s Hydro"] as const;
 const PROCESADOR_PRESETS_Z15 = ["420 kSol/s", "840 kSol/s", "860 kSol/s"] as const;
 const PROCESADOR_PRESETS_S21 = [
   "200 TH/s",
