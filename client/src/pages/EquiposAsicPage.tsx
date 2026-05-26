@@ -68,7 +68,7 @@ const MARCAS_EQUIPO_OPCIONES = ["Bitmain"] as const;
 const MODELOS_EQUIPO_OPCIONES = [
   "Antminer S21",
   "Antminer S23",
-  "Antminer U3S21eXP H",
+  "Antminer S21e XP",
   "Antminer X9",
   "Antminer L7",
   "Antminer L9",
@@ -88,7 +88,7 @@ function opcionesModeloConActual(actual: string): string[] {
   return base;
 }
 
-type FamiliaProcesadorPreset = "l9" | "l7" | "l11" | "s21" | "s23" | "u3s21" | "z15";
+type FamiliaProcesadorPreset = "l9" | "l7" | "l11" | "s21" | "s23" | "s21exp" | "z15";
 
 /** Presets de hashrate según modelo (texto guardado en BD = valor del `option`). L7/L9 en MH/s, L11 en GH/s, S21/S23/U3 en TH/s. */
 const PROCESADOR_PRESETS_L9 = ["15.000 MH/s", "16.000 MH/s", "16.500 MH/s", "17.000 MH/s"] as const;
@@ -104,7 +104,7 @@ const PROCESADOR_PRESETS_S21 = [
   "473 TH/s Hydro",
 ] as const;
 const PROCESADOR_PRESETS_S23 = ["305 TH/s"] as const;
-const PROCESADOR_PRESETS_U3S21 = ["860 TH/s Hydro", "H 860 TH/s"] as const;
+const PROCESADOR_PRESETS_S21E_XP = ["U3 Hydro 860 TH/s"] as const;
 
 /** S21 → TH/s; L7 / L9 (y variantes en texto libre) → MH/s — solo para modelo sin preset de lista. */
 function unidadProcesadorDesdeModelo(modelo: string): "th" | "mh" | null {
@@ -112,7 +112,7 @@ function unidadProcesadorDesdeModelo(modelo: string): "th" | "mh" | null {
   if (!m) return null;
   if (/\bl7\b/.test(m) || /\bl9\b/.test(m)) return "mh";
   if (/\bl11\b/.test(m)) return "mh";
-  if (/\bu3s21\b/.test(m) || /\bs23\b/.test(m) || /\bs21\b/.test(m)) return "th";
+  if (/\bs21e\s*xp\b/.test(m) || /\bu3s21\b/.test(m) || /\bs23\b/.test(m) || /\bs21\b/.test(m)) return "th";
   return null;
 }
 
@@ -123,7 +123,7 @@ function familiaProcesadorPreset(modelo: string): FamiliaProcesadorPreset | null
   if (/\bl11\b/.test(m)) return "l11";
   if (/\bl7\b/.test(m)) return "l7";
   if (/\bz15\b/.test(m)) return "z15";
-  if (/\bu3s21\b/.test(m)) return "u3s21";
+  if (/\bs21e\s*xp\b/.test(m) || /\bu3s21\b/.test(m)) return "s21exp";
   if (/\bs23\b/.test(m)) return "s23";
   if (/\bs21\b/.test(m)) return "s21";
   return null;
@@ -143,8 +143,8 @@ function presetsProcesadorFamilia(f: FamiliaProcesadorPreset): readonly string[]
       return PROCESADOR_PRESETS_S21;
     case "s23":
       return PROCESADOR_PRESETS_S23;
-    case "u3s21":
-      return PROCESADOR_PRESETS_U3S21;
+    case "s21exp":
+      return PROCESADOR_PRESETS_S21E_XP;
   }
 }
 
