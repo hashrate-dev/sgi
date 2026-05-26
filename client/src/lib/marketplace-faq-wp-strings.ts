@@ -68,7 +68,7 @@ export const MARKETPLACE_FAQ_WP_EN: Record<string, string> = {
     "The hosting service can be paid via bank transfer in U.S. dollars, with digital dollars (USDT / USDC), or with cryptocurrencies such as Bitcoin (BTC) and Ethereum (ETH).",
   "corp.faq.wp.6.q": "What is the associated energy cost?",
   "corp.faq.wp.6.a":
-    "We charge as low as USD 0.07–0.078/kWh all in.\n\nFor example, an S21 Pro 234 costs about USD 200 per month.",
+    "We charge from approx. USD 0.07–0.078 / kWh all in.\n\nFor example, an S21 at 270 TH/s may cost around USD 200 per month in energy.",
   "corp.faq.wp.7.q": "How long is the contract?",
   "corp.faq.wp.7.a":
     "The contract has an initial duration of 12 months and will automatically renew for additional 12-month periods unless otherwise notified in advance.",
@@ -111,7 +111,7 @@ export const MARKETPLACE_FAQ_WP_PT: Record<string, string> = {
     "A hospedagem pode ser paga por transferência bancária em dólares americanos, com dólares digitais (USDT / USDC) ou com criptomoedas como Bitcoin (BTC) e Ethereum (ETH).",
   "corp.faq.wp.6.q": "Qual é o custo de energia associado?",
   "corp.faq.wp.6.a":
-    "Cobramos a partir de aprox. USD 0,07–0,078/kWh tudo incluído.\n\nPor exemplo, um S21 Pro 234 pode custar cerca de USD 200 por mês em energia.",
+    "Cobramos a partir de aprox. USD 0,07–0,078 / kWh tudo incluído.\n\nPor exemplo, um S21 de 270 TH/s pode custar cerca de USD 200 por mês em energia.",
   "corp.faq.wp.7.q": "Qual é a duração do contrato?",
   "corp.faq.wp.7.a":
     "O contrato tem duração inicial de 12 meses e renova automaticamente por períodos adicionais de 12 meses, salvo aviso prévio em contrário.",
