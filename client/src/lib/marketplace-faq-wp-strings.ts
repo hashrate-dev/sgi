@@ -25,7 +25,7 @@ export const MARKETPLACE_FAQ_WP_ES: Record<string, string> = {
     "El hosting puede pagarse mediante transferencia bancaria en dólares estadounidenses, dólares digitales (USDT / USDC) o con criptomonedas como Bitcoin (BTC) y Ethereum (ETH).",
   "corp.faq.wp.6.q": "¿Cuál es el costo energético asociado?",
   "corp.faq.wp.6.a":
-    "Cobramos desde aprox. USD 0,07–0,078 / kWh todo incluido.\n\nPor ejemplo, un S21 Pro 234 puede costar alrededor de USD 200 por mes en energía.",
+    "Cobramos desde aprox. USD 0,07–0,078 / kWh todo incluido.\n\nPor ejemplo, un S21 de 270 TH/s puede costar alrededor de USD 200 por mes en energía.",
   "corp.faq.wp.7.q": "¿Cuánto dura el contrato?",
   "corp.faq.wp.7.a":
     "El contrato tiene una duración inicial de 12 meses y se renueva automáticamente por períodos adicionales de 12 meses salvo notificación previa en contrario.",
