@@ -41,6 +41,22 @@ function sanitizeNumberInput(raw: string): string {
   return s;
 }
 
+/** Coeficiente multiplicador: admite decimales (coma o punto), sin redondear a entero. */
+function sanitizeDecimalInput(raw: string): string {
+  let s = raw.trim().replace(/\s/g, "").replace(/-/g, "").replace(/\+/g, "").replace(/,/g, ".");
+  s = s.replace(/[^0-9.]/g, "");
+  const firstDot = s.indexOf(".");
+  if (firstDot >= 0) {
+    s = s.slice(0, firstDot + 1) + s.slice(firstDot + 1).replace(/\./g, "");
+  }
+  return s;
+}
+
+function displayDecimalInput(canonical: string): string {
+  if (!canonical.trim()) return "";
+  return canonical.replace(".", ",");
+}
+
 function formatDisplayNumber(raw: string): string {
   if (!raw.trim()) return "";
   const n = Number(raw);
@@ -466,9 +482,9 @@ export function AsicCotizadorChinaPyPage() {
                     type="text"
                     inputMode="decimal"
                     autoComplete="off"
-                    placeholder={String(DEFAULT_MULT)}
-                    value={displayAsPositive(multiplicador)}
-                    onChange={(e) => setMultiplicador(sanitizeNumberInput(removeMinus(e.target.value)))}
+                    placeholder="1,23"
+                    value={displayDecimalInput(multiplicador)}
+                    onChange={(e) => setMultiplicador(sanitizeDecimalInput(e.target.value))}
                   />
                 </div>
                 <div className="col asic-cotizador-field-wrap asic-cotizador-field-wrap--costo">
