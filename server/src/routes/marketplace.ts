@@ -1068,7 +1068,7 @@ marketplaceRouter.get("/marketplace/corp-company-team", async (req: Request, res
   try {
     void touchMarketplacePresence(req, "/marketplace/corp-company-team").catch(() => {});
     const members = await readCorpCompanyTeamPublic();
-    res.set("Cache-Control", "public, max-age=120, stale-while-revalidate=600");
+    res.set("Cache-Control", "no-store");
     res.json({ members });
   } catch (e) {
     console.error("[marketplace] corp-company-team:", e);

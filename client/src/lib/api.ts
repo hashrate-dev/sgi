@@ -2147,7 +2147,7 @@ export type CorpCompanyTeamMemberDto = {
 /** Equipo de la empresa en sección de compañía (público). */
 export function getMarketplaceCorpCompanyTeam(): Promise<{ members: CorpCompanyTeamMemberDto[] }> {
   return api<{ members: CorpCompanyTeamMemberDto[] }>("/api/marketplace/corp-company-team", {
-    cache: "default",
+    cache: "no-store",
   });
 }
 

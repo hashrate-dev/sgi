@@ -86,6 +86,7 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
   const fallbackMembersRef = useRef(fallbackMembers);
   fallbackMembersRef.current = fallbackMembers;
   const hasLoadedOnceRef = useRef(false);
+  const savedSnapshotRef = useRef<string>("");
   const [hydratedFromApi, setHydratedFromApi] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -103,8 +104,9 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
     void getEquiposMarketplaceCorpCompanyTeam()
       .then((r) => {
         const incoming = Array.isArray(r.members) ? r.members : [];
-        if (incoming.length > 0) setMembers(incoming);
-        else setMembers(fallbackMembersRef.current);
+        const next = incoming.length > 0 ? incoming : fallbackMembersRef.current;
+        setMembers(next);
+        savedSnapshotRef.current = JSON.stringify(next);
         hasLoadedOnceRef.current = true;
       })
       .catch(() => setLoadError("No se pudieron cargar los datos del equipo."))
@@ -123,7 +125,9 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
       setSaving(true);
       try {
         const r = await putEquiposMarketplaceCorpCompanyTeam({ members: next });
-        setMembers(r.members ?? next);
+        const saved = r.members ?? next;
+        setMembers(saved);
+        savedSnapshotRef.current = JSON.stringify(saved);
         if (toastMsg) showToast(toastMsg, "success", "Equipo de la empresa");
       } catch (e) {
         showToast(e instanceof Error ? e.message : "Error al guardar", "error", "Equipo de la empresa");
@@ -213,6 +217,8 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
   }
 
   const enabledCount = members.filter((m) => m.enabled).length;
+  const membersJson = JSON.stringify(members);
+  const hasUnsavedChanges = hydratedFromApi && membersJson !== savedSnapshotRef.current;
 
   return (
     <AppCard borderColor="green.200" mt={4} aria-labelledby="hrs-corp-team-h" p={{ base: 4, md: 5 }}>
@@ -248,6 +254,11 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
           <Text color="gray.700" fontSize="sm" mt={1}>
             Fotos y textos que se muestran en la sección de equipo (tarjetas + modal biografía).
           </Text>
+          {hasUnsavedChanges ? (
+            <Text color="orange.700" fontSize="sm" mt={1} fontWeight="semibold">
+              Tenés cambios sin guardar — usá «Guardar cambios» para publicarlos en la web.
+            </Text>
+          ) : null}
         </Box>
         <Badge colorPalette="green" variant="subtle" borderRadius="full" px={3} py={1}>
           Integrantes: {enabledCount}/{members.length}

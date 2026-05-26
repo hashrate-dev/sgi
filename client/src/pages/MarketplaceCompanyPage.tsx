@@ -123,28 +123,38 @@ export function MarketplaceCompanyPage() {
 
   useEffect(() => {
     let cancelled = false;
-    void getMarketplaceCorpCompanyTeam()
-      .then((res) => {
-        const incoming = Array.isArray(res.members) ? res.members : [];
-        if (cancelled) return;
-        if (incoming.length === 0) return;
-        setTeamMembers(
-          incoming.map((m) => ({
-            id: m.id,
-            imageUrl: m.imageUrl,
-            linkedin: m.linkedin,
-            role: m.role,
-            name: m.name,
-            bio: Array.isArray(m.bio) ? m.bio : [],
-            enabled: m.enabled,
-          }))
-        );
-      })
-      .catch(() => {
-        // mantener fallback
-      });
+
+    const loadTeamFromApi = () => {
+      void getMarketplaceCorpCompanyTeam()
+        .then((res) => {
+          const incoming = (Array.isArray(res.members) ? res.members : []).filter((m) => m.enabled !== false);
+          if (cancelled) return;
+          if (incoming.length === 0) return;
+          setTeamMembers(
+            incoming.map((m) => ({
+              id: m.id,
+              imageUrl: m.imageUrl,
+              linkedin: m.linkedin,
+              role: m.role,
+              name: m.name,
+              bio: Array.isArray(m.bio) ? m.bio : [],
+              enabled: m.enabled,
+            }))
+          );
+        })
+        .catch(() => {
+          /* mantener fallback i18n */
+        });
+    };
+
+    loadTeamFromApi();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") loadTeamFromApi();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
 
