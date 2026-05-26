@@ -1891,7 +1891,7 @@ async function fetchMarketplaceAsicVitrinaNetwork(): Promise<{
     try {
       const res = await fetchWithTimeout(
         url,
-        { method: "GET", headers, credentials: "include", cache: "default" },
+        { method: "GET", headers, credentials: "include", cache: "no-store" },
         timeoutMs
       );
       const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
@@ -1939,7 +1939,11 @@ export async function getMarketplaceAsicVitrinaItem(
   if (isVercelOrPrimaryPublicHost(h)) base = "";
   const path = `/api/marketplace/asic-vitrina/${encodeURIComponent(id)}`;
   const url = base && base.trim() !== "" ? `${base}${path}` : path;
-  const res = await fetchWithTimeout(url, { method: "GET", headers, credentials: "include" }, 12_000);
+  const res = await fetchWithTimeout(
+    url,
+    { method: "GET", headers, credentials: "include", cache: "no-store" },
+    12_000
+  );
   const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(
@@ -1969,7 +1973,7 @@ async function fetchMarketplaceCorpHomeSectionsNetwork(): Promise<{
   const url = base && base.trim() !== "" ? `${base}${path}` : path;
   const res = await fetchWithTimeout(
     url,
-    { method: "GET", headers, credentials: "include", cache: "default" },
+    { method: "GET", headers, credentials: "include", cache: "no-store" },
     12_000
   );
   const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
@@ -2128,6 +2132,39 @@ export function putEquiposMarketplaceCorpManufacturers(body: {
       body: JSON.stringify(body),
     }
   );
+}
+
+export type CorpCompanyTeamMemberDto = {
+  id: string;
+  role: string;
+  name: string;
+  imageUrl: string;
+  linkedin?: string;
+  bio: string[];
+  enabled: boolean;
+};
+
+/** Equipo de la empresa en sección de compañía (público). */
+export function getMarketplaceCorpCompanyTeam(): Promise<{ members: CorpCompanyTeamMemberDto[] }> {
+  return api<{ members: CorpCompanyTeamMemberDto[] }>("/api/marketplace/corp-company-team", {
+    cache: "default",
+  });
+}
+
+/** Equipo de la empresa (admin). */
+export function getEquiposMarketplaceCorpCompanyTeam(): Promise<{ members: CorpCompanyTeamMemberDto[] }> {
+  return api<{ members: CorpCompanyTeamMemberDto[] }>("/api/equipos/marketplace-corp-company-team", {
+    cache: "no-store",
+  });
+}
+
+export function putEquiposMarketplaceCorpCompanyTeam(body: {
+  members: CorpCompanyTeamMemberDto[];
+}): Promise<{ ok: boolean; members: CorpCompanyTeamMemberDto[] }> {
+  return api<{ ok: boolean; members: CorpCompanyTeamMemberDto[] }>("/api/equipos/marketplace-corp-company-team", {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
 }
 
 /**

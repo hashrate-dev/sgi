@@ -713,12 +713,19 @@ export function normalizeConsultPriceLabelForDisplay(label: string): string {
   return s;
 }
 
+/** Etiquetas que el servidor usa al ocultar precios a visitantes (no deben mostrarse si hay precio USD real). */
+export function isMarketplaceGuestHiddenPriceLabel(label: string): boolean {
+  const n = normalizeConsultPriceLabelForDisplay(label.trim());
+  if (!n) return false;
+  return /^(solicit|consult)/iu.test(n);
+}
+
 /** Precio en tarjeta/modal: texto comercial o USD formateado. */
 export function formatAsicProductPriceDisplay(product: AsicProduct, langOrLocale?: string): string {
   const lb = product.priceDisplayLabel?.trim();
   if (lb) {
     const n = normalizeConsultPriceLabelForDisplay(lb);
-    if (n) return n;
+    if (n && !(product.priceUsd > 0 && isMarketplaceGuestHiddenPriceLabel(lb))) return n;
   }
   return formatAsicPriceUsd(product.priceUsd, langOrLocale);
 }

@@ -1,25 +1,36 @@
-import { useCallback, useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { MarketplaceSiteHeader } from "../components/marketplace/MarketplaceSiteHeader";
 import { MarketplaceSiteFooter } from "../components/marketplace/MarketplaceSiteFooter";
 import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
 import "../styles/marketplace-hashrate.css";
 
 import { wpUpload } from "../lib/marketplaceWpAssets.js";
+import { getMarketplaceCorpCompanyTeam } from "../lib/api.js";
 
-type TeamKey = "fab" | "jv" | "af" | "dg" | "rg" | "ab" | "dv";
+type DefaultTeamMemberId = "fab" | "jv" | "af" | "dg" | "rg" | "ab" | "dv";
 
-const TEAM: readonly {
-  key: TeamKey;
-  img: string;
+type TeamMemberDto = {
+  id: string;
+  imageUrl: string;
+  linkedin?: string;
+  role: string;
+  name: string;
+  bio: string[];
+  enabled?: boolean;
+};
+
+const DEFAULT_TEAM: readonly {
+  id: DefaultTeamMemberId;
+  imageUrl: string;
   linkedin?: string;
 }[] = [
-  { key: "fab", img: wpUpload("FB-Team-1-1024x991.png"), linkedin: "https://www.linkedin.com/in/fabrianchi/" },
-  { key: "jv", img: wpUpload("JV-Team-1024x991.png"), linkedin: "https://www.linkedin.com/in/jlvilasoler/" },
-  { key: "af", img: wpUpload("AF-Team-1024x991.png"), linkedin: "https://www.linkedin.com/in/figueroaanthony/" },
-  { key: "rg", img: wpUpload("RG-1024x991.png") },
-  { key: "dv", img: wpUpload("DV-Team.png") },
-  { key: "ab", img: wpUpload("AB-Team-1024x991.png") },
-  { key: "dg", img: wpUpload("DG-Team-HRS-1024x991.png") },
+  { id: "fab", imageUrl: wpUpload("FB-Team-1-1024x991.png"), linkedin: "https://www.linkedin.com/in/fabrianchi/" },
+  { id: "jv", imageUrl: wpUpload("JV-Team-1024x991.png"), linkedin: "https://www.linkedin.com/in/jlvilasoler/" },
+  { id: "af", imageUrl: wpUpload("AF-Team-1024x991.png"), linkedin: "https://www.linkedin.com/in/figueroaanthony/" },
+  { id: "rg", imageUrl: wpUpload("RG-1024x991.png") },
+  { id: "dv", imageUrl: wpUpload("DV-Team.png") },
+  { id: "ab", imageUrl: wpUpload("AB-Team-1024x991.png") },
+  { id: "dg", imageUrl: wpUpload("DG-Team-HRS-1024x991.png") },
 ] as const;
 
 function LinkedInIcon() {
@@ -36,7 +47,36 @@ function LinkedInIcon() {
 export function MarketplaceCompanyPage() {
   const { t } = useMarketplaceLang();
   const dialogTitleId = useId();
-  const [openMember, setOpenMember] = useState<TeamKey | null>(null);
+  const fallbackMembers = useMemo<TeamMemberDto[]>(() => {
+    const getBio = (key: DefaultTeamMemberId): string[] => {
+      if (key === "jv") {
+        const b1 = t("company.m.jv.b1");
+        const b2 = t("company.m.jv.b2");
+        const b3a = t("company.m.jv.b3a");
+        const brand = t("company.m.jv.brand");
+        const b3b = t("company.m.jv.b3b");
+        const b4 = t("company.m.jv.b4");
+        const b3 = `${b3a}${brand}${b3b}`.trim();
+        return [b1, b2, b3, b4].map((x) => String(x ?? "").trim()).filter(Boolean);
+      }
+      const b1 = t(`company.m.${key}.b1`);
+      const b2 = t(`company.m.${key}.b2`);
+      return [b1, b2].map((x) => String(x ?? "").trim()).filter(Boolean);
+    };
+
+    return DEFAULT_TEAM.map((m) => ({
+      id: m.id,
+      imageUrl: m.imageUrl,
+      linkedin: m.linkedin,
+      role: t(`company.m.${m.id}.role`),
+      name: t(`company.m.${m.id}.name`),
+      bio: getBio(m.id),
+      enabled: true,
+    }));
+  }, [t]);
+
+  const [teamMembers, setTeamMembers] = useState<TeamMemberDto[]>(() => fallbackMembers);
+  const [openMemberId, setOpenMemberId] = useState<string | null>(null);
 
   useEffect(() => {
     const prevTitle = document.title;
@@ -68,9 +108,9 @@ export function MarketplaceCompanyPage() {
   }, [t]);
 
   useEffect(() => {
-    if (!openMember) return;
+    if (!openMemberId) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpenMember(null);
+      if (e.key === "Escape") setOpenMemberId(null);
     };
     document.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
@@ -79,36 +119,36 @@ export function MarketplaceCompanyPage() {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [openMember]);
+  }, [openMemberId]);
 
-  const renderMemberBio = useCallback(
-    (key: TeamKey) => {
-      const paras: React.ReactNode[] = [];
-      if (key === "jv") {
-        paras.push(<p key="1">{t("company.m.jv.b1")}</p>);
-        paras.push(<p key="2">{t("company.m.jv.b2")}</p>);
-        paras.push(
-          <p key="3">
-            {t("company.m.jv.b3a")}
-            <strong>{t("company.m.jv.brand")}</strong>
-            {t("company.m.jv.b3b")}
-          </p>
+  useEffect(() => {
+    let cancelled = false;
+    void getMarketplaceCorpCompanyTeam()
+      .then((res) => {
+        const incoming = Array.isArray(res.members) ? res.members : [];
+        if (cancelled) return;
+        if (incoming.length === 0) return;
+        setTeamMembers(
+          incoming.map((m) => ({
+            id: m.id,
+            imageUrl: m.imageUrl,
+            linkedin: m.linkedin,
+            role: m.role,
+            name: m.name,
+            bio: Array.isArray(m.bio) ? m.bio : [],
+            enabled: m.enabled,
+          }))
         );
-        paras.push(<p key="4">{t("company.m.jv.b4")}</p>);
-        return paras;
-      }
-      const bKeys = [`company.m.${key}.b1`, `company.m.${key}.b2`, `company.m.${key}.b3`] as const;
-      for (const bk of bKeys) {
-        const text = t(bk);
-        if (!text || text === bk) break;
-        paras.push(<p key={bk}>{text}</p>);
-      }
-      return paras;
-    },
-    [t]
-  );
+      })
+      .catch(() => {
+        // mantener fallback
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  const openMemberData = openMember ? TEAM.find((m) => m.key === openMember) : null;
+  const openMemberData = openMemberId ? teamMembers.find((m) => m.id === openMemberId) ?? null : null;
 
   return (
     <div className="marketplace-asic-page market-corp-page">
@@ -164,22 +204,22 @@ export function MarketplaceCompanyPage() {
                 </div>
                 <div className="market-corp-company-team__cards">
                   <div className="market-corp-company-team__cards-grid">
-                    {TEAM.map((m) => (
-                      <article key={m.key} className="market-corp-team-card" data-member={m.key}>
+                    {teamMembers.map((m) => (
+                      <article key={m.id} className="market-corp-team-card" data-member={m.id}>
                         <button
                           type="button"
                           className="market-corp-team-card__btn"
-                          onClick={() => setOpenMember(m.key)}
+                          onClick={() => setOpenMemberId(m.id)}
                           aria-haspopup="dialog"
-                          aria-expanded={openMember === m.key}
-                          aria-controls={openMember === m.key ? dialogTitleId : undefined}
+                          aria-expanded={openMemberId === m.id}
+                          aria-controls={openMemberId === m.id ? dialogTitleId : undefined}
                         >
                           <span className="market-corp-team-card__media">
-                            <img src={m.img} alt="" width={500} height={500} loading="lazy" decoding="async" />
+                            <img src={m.imageUrl} alt="" width={500} height={500} loading="lazy" decoding="async" />
                           </span>
                           <span className="market-corp-team-card__meta">
-                            <span className="market-corp-team-card__role">{t(`company.m.${m.key}.role`)}</span>
-                            <span className="market-corp-team-card__name">{t(`company.m.${m.key}.name`)}</span>
+                            <span className="market-corp-team-card__role">{m.role}</span>
+                            <span className="market-corp-team-card__name">{m.name}</span>
                             <span className="market-corp-team-card__hint">{t("company.team.read_bio")}</span>
                           </span>
                         </button>
@@ -198,12 +238,12 @@ export function MarketplaceCompanyPage() {
         </main>
       </div>
 
-      {openMember && openMemberData ? (
+      {openMemberId && openMemberData ? (
         <div
           className="market-corp-team-modal"
           role="presentation"
-          onClick={() => setOpenMember(null)}
-          onKeyDown={(e) => e.key === "Escape" && setOpenMember(null)}
+          onClick={() => setOpenMemberId(null)}
+          onKeyDown={(e) => e.key === "Escape" && setOpenMemberId(null)}
         >
           <div
             id={dialogTitleId}
@@ -213,26 +253,30 @@ export function MarketplaceCompanyPage() {
             aria-labelledby="team-modal-name"
             onClick={(e) => e.stopPropagation()}
           >
-            <button type="button" className="market-corp-team-modal__close" onClick={() => setOpenMember(null)}>
+            <button type="button" className="market-corp-team-modal__close" onClick={() => setOpenMemberId(null)}>
               {t("company.team.dlg_close")}
             </button>
             <div className="market-corp-team-modal__head">
               <img
                 className="market-corp-team-modal__photo"
-                data-member={openMember}
-                src={openMemberData.img}
+                data-member={openMemberId}
+                src={openMemberData.imageUrl}
                 alt=""
                 width={160}
                 height={160}
               />
               <div>
-                <p className="market-corp-team-modal__role">{t(`company.m.${openMember}.role`)}</p>
+                <p className="market-corp-team-modal__role">{openMemberData.role}</p>
                 <h3 id="team-modal-name" className="market-corp-team-modal__name">
-                  {t(`company.m.${openMember}.name`)}
+                  {openMemberData.name}
                 </h3>
               </div>
             </div>
-            <div className="market-corp-team-modal__bio">{renderMemberBio(openMember)}</div>
+            <div className="market-corp-team-modal__bio">
+              {(openMemberData.bio ?? []).map((p, idx) => (
+                <p key={idx}>{p}</p>
+              ))}
+            </div>
             {openMemberData.linkedin ? (
               <a
                 className="market-corp-team-modal__linkedin"

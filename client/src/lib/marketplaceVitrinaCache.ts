@@ -42,6 +42,23 @@ function peekLocalVitrinaCache(): MarketplaceVitrinaPayload | null {
   }
 }
 
+export function clearMarketplaceVitrinaCache(): void {
+  if (typeof sessionStorage !== "undefined") {
+    try {
+      sessionStorage.removeItem(SESSION_KEY);
+    } catch {
+      /* ignore */
+    }
+  }
+  if (typeof localStorage !== "undefined") {
+    try {
+      localStorage.removeItem(LOCAL_KEY);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 export function writeMarketplaceVitrinaCache(data: MarketplaceVitrinaPayload): void {
   const blob = JSON.stringify({ at: Date.now(), data });
   if (typeof sessionStorage !== "undefined") {

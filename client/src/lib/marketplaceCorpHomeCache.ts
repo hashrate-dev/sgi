@@ -23,6 +23,15 @@ export function peekMarketplaceCorpHomeCache(): MarketplaceCorpHomePayload | nul
   }
 }
 
+export function clearMarketplaceCorpHomeCache(): void {
+  if (typeof sessionStorage === "undefined") return;
+  try {
+    sessionStorage.removeItem(SESSION_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 export function writeMarketplaceCorpHomeCache(data: MarketplaceCorpHomePayload): void {
   if (typeof sessionStorage === "undefined") return;
   try {

@@ -1,5 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { setStoredAuth, clearStoredAuth, getStoredToken } from "../lib/auth";
+import { clearMarketplaceCorpHomeCache } from "../lib/marketplaceCorpHomeCache.js";
+import { clearMarketplaceVitrinaCache } from "../lib/marketplaceVitrinaCache.js";
+
+function clearMarketplaceCatalogCaches(): void {
+  clearMarketplaceVitrinaCache();
+  clearMarketplaceCorpHomeCache();
+}
 import type { AuthUser } from "../lib/auth";
 import { getMe, login as apiLogin, logoutApi, wakeUpBackend, type LoginResponse } from "../lib/api";
 
@@ -33,7 +40,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, 8000);
     getMe()
       .then(({ user: u }) => {
-        if (!cancelled) setUser(u);
+        if (!cancelled) {
+          if (u) clearMarketplaceCatalogCaches();
+          setUser(u);
+        }
       })
       .catch(() => {
         if (!cancelled) {
@@ -62,11 +72,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (username: string, password: string) => {
     const r = await apiLogin(username, password);
+    clearMarketplaceCatalogCaches();
     setStoredAuth(r.token ?? null, r.user);
     setUser(r.user);
   }, []);
 
   const applyLoginResponse = useCallback((r: LoginResponse) => {
+    clearMarketplaceCatalogCaches();
     setStoredAuth(r.token ?? null, r.user);
     setUser(r.user);
   }, []);
@@ -84,6 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       /* red / 401: igual limpiamos cliente; si la cookie sigue, el usuario puede reintentar */
     }
     clearStoredAuth();
+    clearMarketplaceCatalogCaches();
     setUser(null);
   }, []);
 

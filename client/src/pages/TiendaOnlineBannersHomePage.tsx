@@ -22,6 +22,7 @@ import { canEditEquipoMarketplacePrecioYTienda } from "../lib/auth";
 import { AppButton, AppCard, AppSelect } from "../components/ui";
 import { TiendaOnlineCorpPartnersSection } from "../components/TiendaOnlineCorpPartnersSection";
 import { TiendaOnlineCorpManufacturersSection } from "../components/TiendaOnlineCorpManufacturersSection";
+import { TiendaOnlineCorpCompanyTeamSection } from "../components/TiendaOnlineCorpCompanyTeamSection";
 
 type MarketplaceSelectOption = { id: string; label: string };
 
@@ -508,6 +509,7 @@ export function TiendaOnlineBannersHomePage() {
 
           <TiendaOnlineCorpPartnersSection isEditionLocked={isEditionLocked} />
           <TiendaOnlineCorpManufacturersSection isEditionLocked={isEditionLocked} />
+          <TiendaOnlineCorpCompanyTeamSection isEditionLocked={isEditionLocked} />
         </AppCard>
       </Box>
     </Box>

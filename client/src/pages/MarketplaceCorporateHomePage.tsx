@@ -26,6 +26,8 @@ import { resolveCorpPartnerImageSrc } from "../lib/marketplaceCorpPartners.js";
 import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
 import { isCorpHomePath, MARKETPLACE } from "../lib/marketplacePaths.js";
 import { CORP_INSTITUTIONAL_VIDEO_URL, wpUpload } from "../lib/marketplaceWpAssets.js";
+import { getStoredUser } from "../lib/auth.js";
+import { clearMarketplaceCorpHomeCache } from "../lib/marketplaceCorpHomeCache.js";
 import { useAuth } from "../contexts/AuthContext";
 import "../styles/marketplace-hashrate.css";
 
@@ -101,11 +103,11 @@ export function MarketplaceCorporateHomePage() {
   const { pathname, hash } = useLocation();
   const navigate = useNavigate();
   const { addProduct, openDrawer } = useMarketplaceQuoteCart();
-  const cachedHome = peekMarketplaceCorpHomeCache();
+  const cachedHome = getStoredUser() ? null : peekMarketplaceCorpHomeCache();
   const [hidePricesForGuests, setHidePricesForGuests] = useState(
     () => cachedHome?.hidePricesForGuests !== false
   );
-  const canViewMarketplacePrices = Boolean(!loading && (user || !hidePricesForGuests));
+  const canViewMarketplacePrices = Boolean(!loading && (Boolean(user) || !hidePricesForGuests));
 
   const localHomeProductsPool = useMemo(
     () => ASIC_MARKETPLACE_PRODUCTS.filter((p) => Boolean(p.imageSrc)).slice(0, 12),
@@ -177,7 +179,9 @@ export function MarketplaceCorporateHomePage() {
   const [industryManufacturers, setIndustryManufacturers] = useState<CorpIndustryManufacturerDto[]>([]);
 
   useEffect(() => {
+    if (loading) return;
     let cancelled = false;
+    if (user) clearMarketplaceCorpHomeCache();
     void wakeUpBackend();
     void getMarketplaceCorpHomeSections()
       .then((res) => {
@@ -206,7 +210,7 @@ export function MarketplaceCorporateHomePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loading, user?.id]);
 
   useEffect(() => {
     const prevTitle = document.title;

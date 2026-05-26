@@ -18,6 +18,8 @@ import {
   postMarketplaceAsicYields,
   type MarketplaceAsicLiveYield,
 } from "../lib/api.js";
+import { getStoredUser } from "../lib/auth.js";
+import { clearMarketplaceVitrinaCache } from "../lib/marketplaceVitrinaCache.js";
 import { useAuth } from "../contexts/AuthContext";
 import { useMarketplaceQuoteCart } from "../contexts/MarketplaceQuoteCartContext.js";
 import { MarketplaceSiteHeader } from "../components/marketplace/MarketplaceSiteHeader.js";
@@ -102,7 +104,8 @@ function MarketplacePageBody() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { addProduct, openDrawer } = useMarketplaceQuoteCart();
   const [hidePricesForGuests, setHidePricesForGuests] = useState(true);
-  const canViewMarketplacePrices = Boolean(!loading && (user || !hidePricesForGuests));
+  /** Usuario logueado siempre ve precios; visitantes solo si el admin no oculta precios. */
+  const canViewMarketplacePrices = Boolean(!loading && (Boolean(user) || !hidePricesForGuests));
   const [filterAlgo, setFilterAlgo] = useState<MarketplaceCatalogFilter | null>(null);
   const [modalIndex, setModalIndex] = useState<number | null>(null);
   const [modalProduct, setModalProduct] = useState<AsicProduct | null>(null);
@@ -112,6 +115,9 @@ function MarketplacePageBody() {
   }, []);
   /** Catálogo visible al instante (caché de sesión o bundle local); la API actualiza en segundo plano. */
   const [products, setProducts] = useState<AsicProduct[]>(() => {
+    if (getStoredUser()) {
+      return mergeAsicCatalogWithCorpGridExtras(ASIC_MARKETPLACE_PRODUCTS);
+    }
     const cached = peekMarketplaceVitrinaCache();
     if (cached?.products?.length) {
       return mergeAsicCatalogWithCorpGridExtras(normalizeAsicCatalogProducts(cached.products));
@@ -191,7 +197,9 @@ function MarketplacePageBody() {
   }, []);
 
   useEffect(() => {
+    if (loading) return;
     let cancelled = false;
+    if (user) clearMarketplaceVitrinaCache();
     const hadCache = Boolean(peekMarketplaceVitrinaCache()?.products?.length);
     if (!hadCache) setCatalogRevalidating(true);
     setCatalogSyncFailed(false);
@@ -219,7 +227,7 @@ function MarketplacePageBody() {
     return () => {
       cancelled = true;
     };
-  }, [user?.id]);
+  }, [loading, user?.id]);
 
   useEffect(() => {
     /** Evita POST de yields hasta tener catálogo definitivo y dar tiempo al primer paint de la grilla. */

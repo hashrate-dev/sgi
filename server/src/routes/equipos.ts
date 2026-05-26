@@ -47,6 +47,11 @@ import {
   writeCorpIndustryManufacturers,
   type CorpIndustryManufacturerRecord,
 } from "../lib/marketplaceCorpManufacturersKv.js";
+import {
+  readCorpCompanyTeamAdmin,
+  writeCorpCompanyTeamAdmin,
+  type CorpCompanyTeamMemberRecord,
+} from "../lib/marketplaceCorpCompanyTeamKv.js";
 
 export const equiposRouter = Router();
 
@@ -589,6 +594,56 @@ equiposRouter.put(
         parsed.data.manufacturers as CorpIndustryManufacturerRecord[]
       );
       res.json({ ok: true, manufacturers });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      res.status(500).json({ error: { message: msg } });
+    }
+  }
+);
+
+const CorpCompanyTeamMemberBodySchema = z.object({
+  id: z.string().min(1).max(80),
+  role: z.string().min(1).max(120),
+  name: z.string().min(1).max(140),
+  imageUrl: z.string().min(1).max(2_800_000),
+  linkedin: z.string().max(500).optional().default(""),
+  bio: z.array(z.string().max(2000)).max(8).optional().default([]),
+  enabled: z.boolean().optional().default(true),
+});
+
+const CorpCompanyTeamBodySchema = z.object({
+  members: z.array(CorpCompanyTeamMemberBodySchema).max(24),
+});
+
+/** GET /equipos/marketplace-corp-company-team — equipo de la empresa (admin). */
+equiposRouter.get(
+  "/equipos/marketplace-corp-company-team",
+  requireAuth,
+  ...requireEquiposTiendaRead,
+  async (_req, res: Response) => {
+    try {
+      const members = await readCorpCompanyTeamAdmin();
+      res.json({ members });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      res.status(500).json({ error: { message: msg } });
+    }
+  }
+);
+
+/** PUT /equipos/marketplace-corp-company-team — guardar fotos + textos del equipo (solo admin A/B). */
+equiposRouter.put(
+  "/equipos/marketplace-corp-company-team",
+  requireAuth,
+  ...requireEquiposTiendaAdmin,
+  async (req, res: Response) => {
+    const parsed = CorpCompanyTeamBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: { message: "Datos inválidos", details: parsed.error.flatten() } });
+    }
+    try {
+      const members = await writeCorpCompanyTeamAdmin(parsed.data.members as CorpCompanyTeamMemberRecord[]);
+      res.json({ ok: true, members });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       res.status(500).json({ error: { message: msg } });

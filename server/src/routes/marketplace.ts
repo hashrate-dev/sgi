@@ -23,6 +23,7 @@ import {
 } from "../lib/marketplaceCorpBestSellingKv.js";
 import { readCorpOfficialPartnersPublic } from "../lib/marketplaceCorpPartnersKv.js";
 import { readCorpIndustryManufacturersPublic } from "../lib/marketplaceCorpManufacturersKv.js";
+import { readCorpCompanyTeamPublic } from "../lib/marketplaceCorpCompanyTeamKv.js";
 import { EQUIPOS_ASIC_SELECT } from "./equipos.js";
 import {
   detectRandomXMoneroYieldItem,
@@ -213,6 +214,16 @@ function withMarketplacePriceVisibility<T extends { priceUsd: number; priceDispl
 ): T[] {
   if (canViewPrices) return products;
   return products.map((p) => ({ ...p, priceUsd: 0, priceDisplayLabel: "SOLICITAR PRECIO" }));
+}
+
+/** Respuestas con/sin precios según sesión: no cachear en CDN compartido entre anónimo y logueado. */
+function setMarketplaceCatalogCacheHeaders(res: Response, hidePricesForGuests: boolean): void {
+  if (hidePricesForGuests) {
+    res.set("Cache-Control", "private, no-store");
+    res.set("Vary", "Cookie");
+    return;
+  }
+  res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
 }
 
 function normalizeCountryCode(raw: unknown): string {
@@ -981,12 +992,7 @@ marketplaceRouter.get("/marketplace/corp-home-sections", async (req: Request, re
       .filter((p): p is CorpHomeVitrinaProduct => Boolean(p));
     const visibleBest = withMarketplacePriceVisibility(bestSelling, canViewPrices);
     const visibleInteresting = withMarketplacePriceVisibility(interesting, canViewPrices);
-    const cacheControl = hidePricesForGuests
-      ? auth.viewerType === "anon"
-        ? "public, max-age=60, stale-while-revalidate=300"
-        : "private, no-store"
-      : "public, max-age=60, stale-while-revalidate=300";
-    res.set("Cache-Control", cacheControl);
+    setMarketplaceCatalogCacheHeaders(res, hidePricesForGuests);
     res.json({
       bestSelling: visibleBest,
       interesting: visibleInteresting,
@@ -1012,12 +1018,7 @@ marketplaceRouter.get("/marketplace/corp-best-selling", async (req: Request, res
     const ids = await readCorpBestSellingEquipoIds();
     const products = await corpHomeVitrinaProductsByEquipoIds(ids);
     const visibleProducts = withMarketplacePriceVisibility(products, canViewPrices);
-    const cacheControl = hidePricesForGuests
-      ? auth.viewerType === "anon"
-        ? "public, max-age=60, stale-while-revalidate=300"
-        : "private, no-store"
-      : "public, max-age=60, stale-while-revalidate=300";
-    res.set("Cache-Control", cacheControl);
+    setMarketplaceCatalogCacheHeaders(res, hidePricesForGuests);
     res.json({ products: visibleProducts, hidePricesForGuests });
   } catch (e) {
     console.error("[marketplace] corp-best-selling:", e);
@@ -1060,6 +1061,23 @@ marketplaceRouter.get("/marketplace/corp-industry-manufacturers", async (req: Re
 });
 
 /**
+ * GET /marketplace/corp-company-team — equipo de la empresa (fotos + textos) en sección de compañía.
+ * Público. Si no hay datos en KV, devuelve [] y el front usa fallback.
+ */
+marketplaceRouter.get("/marketplace/corp-company-team", async (req: Request, res: Response) => {
+  try {
+    void touchMarketplacePresence(req, "/marketplace/corp-company-team").catch(() => {});
+    const members = await readCorpCompanyTeamPublic();
+    res.set("Cache-Control", "public, max-age=120, stale-while-revalidate=600");
+    res.json({ members });
+  } catch (e) {
+    console.error("[marketplace] corp-company-team:", e);
+    res.set("Cache-Control", "no-store");
+    res.status(200).json({ members: [] });
+  }
+});
+
+/**
  * GET /marketplace/corp-interesting — hasta 4 equipos para «Otros Productos Interesantes» en /marketplace/home.
  * Público. Orden = orden guardado en `marketplace_site_kv`.
  */
@@ -1072,12 +1090,7 @@ marketplaceRouter.get("/marketplace/corp-interesting", async (req: Request, res:
     const ids = await readCorpInterestingEquipoIds();
     const products = await corpHomeVitrinaProductsByEquipoIds(ids);
     const visibleProducts = withMarketplacePriceVisibility(products, canViewPrices);
-    const cacheControl = hidePricesForGuests
-      ? auth.viewerType === "anon"
-        ? "public, max-age=60, stale-while-revalidate=300"
-        : "private, no-store"
-      : "public, max-age=60, stale-while-revalidate=300";
-    res.set("Cache-Control", cacheControl);
+    setMarketplaceCatalogCacheHeaders(res, hidePricesForGuests);
     res.json({ products: visibleProducts, hidePricesForGuests });
   } catch (e) {
     console.error("[marketplace] corp-interesting:", e);
@@ -1112,12 +1125,7 @@ marketplaceRouter.get("/marketplace/asic-vitrina", async (req: Request, res: Res
       });
     const products = rows.map(mapEquipoRowToVitrinaList).filter((p): p is NonNullable<typeof p> => p != null);
     const visibleProducts = withMarketplacePriceVisibility(products, canViewPrices);
-    const cacheControl = hidePricesForGuests
-      ? auth.viewerType === "anon"
-        ? "public, max-age=60, stale-while-revalidate=300"
-        : "private, no-store"
-      : "public, max-age=60, stale-while-revalidate=300";
-    res.set("Cache-Control", cacheControl);
+    setMarketplaceCatalogCacheHeaders(res, hidePricesForGuests);
     res.json({ products: visibleProducts, hidePricesForGuests });
   } catch (e) {
     console.error("[marketplace] asic-vitrina:", e);
@@ -1152,7 +1160,7 @@ marketplaceRouter.get("/marketplace/asic-vitrina/:id", async (req: Request, res:
     const product = mapEquipoRowToVitrina(rest as EquipoAsicVitrinaRow);
     if (!product) return res.status(404).json({ error: { message: "Producto no encontrado" } });
     const [visible] = withMarketplacePriceVisibility([product], canViewPrices);
-    res.set("Cache-Control", "private, max-age=30");
+    setMarketplaceCatalogCacheHeaders(res, hidePricesForGuests);
     res.json({ product: visible });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
-import { AuthProvider } from "./contexts/AuthContext";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ProtectedAppLayout } from "./components/ProtectedAppLayout";
 import { LoginPage } from "./pages/LoginPage";
@@ -74,6 +74,8 @@ import { getBrowserHostname, isPrimaryPublicHost } from "./lib/hashrateHosts";
 import { isMarketplacePublicPath, MARKETPLACE, mpHome, SGI_DASHBOARD_PATH, sgiHome } from "./lib/marketplacePaths";
 import { HomePage } from "./pages/HomePage";
 import { getMarketplaceAsicVitrina, getMarketplaceCorpHomeSections } from "./lib/api";
+import { clearMarketplaceCorpHomeCache } from "./lib/marketplaceCorpHomeCache";
+import { clearMarketplaceVitrinaCache } from "./lib/marketplaceVitrinaCache";
 
 const MARKETPLACE_PRESENCE_VISITOR_KEY = "hrs_marketplace_presence_visitor_id";
 const MARKETPLACE_PRESENCE_COUNTRY_CACHE_KEY = "hrs_marketplace_presence_country_v1";
@@ -338,10 +340,16 @@ function MarketplaceCloseCartOnAuthRoute() {
 
 /** Outlet para anidar /marketplace, /marketplace/login, /marketplace/signup (matching estable en RR7). */
 function MarketplaceLayout() {
+  const { user, loading } = useAuth();
   useEffect(() => {
+    if (loading) return;
+    if (user) {
+      clearMarketplaceVitrinaCache();
+      clearMarketplaceCorpHomeCache();
+    }
     void getMarketplaceAsicVitrina().catch(() => {});
     void getMarketplaceCorpHomeSections().catch(() => {});
-  }, []);
+  }, [loading, user?.id]);
   return (
     <MarketplaceLanguageProvider>
       <MarketplaceQuoteCartProvider>
