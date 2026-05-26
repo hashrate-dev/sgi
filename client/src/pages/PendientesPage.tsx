@@ -371,23 +371,23 @@ export function PendientesPage() {
             <h6 className="fw-bold m-0">📄 Facturas Pendientes{user && !canExportData ? " (solo consulta)" : ""}</h6>
           </div>
 
-          <div className="table-responsive">
-            <table className="table table-sm align-middle" style={{ fontSize: "0.85rem" }}>
+          <div className="table-responsive pendientes-facturas-table-scroll">
+            <table className="table table-sm align-middle pendientes-facturas-table">
               <thead className="table-dark">
                 <tr>
-                  <th className="text-start">N°</th>
-                  <th className="text-start">Cliente</th>
-                  <th className="text-start">Fecha Emisión</th>
-                  <th className="text-start">Hora Emisión</th>
-                  <th className="text-start">Fecha<br />Vencimiento</th>
-                  <th className="text-start">Total (S/Desc)</th>
-                  <th className="text-start">Descuento</th>
-                  <th className="text-start">Total Factura</th>
-                  <th className="text-start">NC Aplicada</th>
-                  <th className="text-start">Cobros</th>
-                  <th className="text-start">Saldo Pendiente</th>
-                  <th className="text-start">Estado</th>
-                  <th className="text-start">Acciones</th>
+                  <th className="text-start pendientes-col-num">N°</th>
+                  <th className="text-start pendientes-col-cliente">Cliente</th>
+                  <th className="text-start pendientes-col-fecha-emision">Fecha<br />Emisión</th>
+                  <th className="text-start pendientes-col-hora">Hora<br />Emisión</th>
+                  <th className="text-start pendientes-col-fecha-venc">Fecha<br />Venc.</th>
+                  <th className="text-start pendientes-col-monto">Total<br />(S/Desc)</th>
+                  <th className="text-start pendientes-col-monto">Descuento</th>
+                  <th className="text-start pendientes-col-monto">Total<br />Factura</th>
+                  <th className="text-start pendientes-col-monto">NC<br />Aplicada</th>
+                  <th className="text-start pendientes-col-monto">Cobros</th>
+                  <th className="text-start pendientes-col-monto pendientes-col-saldo">Saldo<br />Pendiente</th>
+                  <th className="text-center pendientes-col-estado">Estado</th>
+                  <th className="text-center pendientes-col-acciones">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -408,38 +408,49 @@ export function PendientesPage() {
                     const dueDate = inv.invoice.dueDate || calculateDueDate(inv.invoice.date);
                     return (
                       <tr key={inv.invoice.id}>
-                        <td className="fw-bold text-start">{inv.invoice.number}</td>
-                        <td className="text-start">{inv.invoice.clientName}</td>
-                        <td className="text-start">{inv.invoice.date}</td>
-                        <td className="text-start">{inv.invoice.emissionTime || "-"}</td>
-                        <td className="text-start">{dueDate}</td>
-                        <td className="text-start">{formatCurrency(inv.invoice.subtotal)}</td>
-                        <td className="text-start">{formatCurrency(inv.invoice.discounts)}</td>
-                        <td className="text-start">{formatCurrency(inv.originalTotal)}</td>
-                        <td className="text-start text-info">- {formatCurrency(inv.creditApplied)}</td>
-                        <td className="text-start text-primary">- {formatCurrency(inv.paidApplied)}</td>
-                        <td className="text-start fw-bold text-danger">{formatCurrency(inv.pendingAmount)}</td>
-                        <td className="text-center">
-                          <span className="d-inline-flex" style={{ fontSize: "0.95rem", padding: "0.1rem 0.2rem", borderRadius: "50%", width: "1.05rem", height: "1.05rem", alignItems: "center", justifyContent: "center", backgroundColor: "transparent", color: "#ffc107" }} title="Factura pendiente de pago">
+                        <td className="fw-bold text-start pendientes-col-num">{inv.invoice.number}</td>
+                        <td className="text-start pendientes-col-cliente" title={inv.invoice.clientName}>
+                          <span className="pendientes-cliente-nombre">{inv.invoice.clientName}</span>
+                        </td>
+                        <td className="text-start pendientes-col-fecha-emision">{inv.invoice.date}</td>
+                        <td className="text-start pendientes-col-hora">{inv.invoice.emissionTime || "—"}</td>
+                        <td className="text-start pendientes-col-fecha-venc">{dueDate}</td>
+                        <td className="text-start pendientes-col-monto pendientes-monto-cell">{formatCurrency(inv.invoice.subtotal)}</td>
+                        <td className="text-start pendientes-col-monto pendientes-monto-cell">{formatCurrency(inv.invoice.discounts)}</td>
+                        <td className="text-start pendientes-col-monto pendientes-monto-cell">{formatCurrency(inv.originalTotal)}</td>
+                        <td className="text-start pendientes-col-monto pendientes-monto-cell text-info">
+                          − {formatCurrency(inv.creditApplied)}
+                        </td>
+                        <td className="text-start pendientes-col-monto pendientes-monto-cell text-primary">
+                          − {formatCurrency(inv.paidApplied)}
+                        </td>
+                        <td className="text-start pendientes-col-monto pendientes-col-saldo pendientes-monto-cell fw-bold text-danger">
+                          {formatCurrency(inv.pendingAmount)}
+                        </td>
+                        <td className="text-center pendientes-col-estado">
+                          <span
+                            className="pendientes-estado-icon"
+                            title="Factura pendiente de pago"
+                            aria-label="Pendiente de pago"
+                          >
                             ⚠️
                           </span>
                         </td>
-                        <td className="text-center">
-                          <div className="d-flex gap-1 justify-content-center flex-wrap">
+                        <td className="text-center pendientes-col-acciones">
+                          <div className="d-flex gap-1 justify-content-center align-items-center flex-nowrap historial-acciones-btns">
                             <button
                               type="button"
-                              className="btn btn-sm border"
+                              className="btn btn-sm border historial-accion-btn"
                               onClick={() => setDetailInvoice(inv.invoice)}
                               title="Ver detalles"
-                              style={{ width: "1.3rem", height: "1.3rem", padding: 0, fontSize: "1rem", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, backgroundColor: "#fff9c4", color: "#5d4037", borderColor: "#d4c44a" }}
                             >
                               ℹ️
                             </button>
-                            <button 
-                              className="fact-btn fact-btn-primary btn-sm" 
+                            <button
+                              type="button"
+                              className="fact-btn fact-btn-primary btn-sm historial-accion-btn"
                               onClick={() => generatePdfFromHistory(inv.invoice)}
                               title="PDF"
-                              style={{ width: "1.3rem", height: "1.3rem", padding: 0, fontSize: "0.75rem", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}
                             >
                               📄
                             </button>
