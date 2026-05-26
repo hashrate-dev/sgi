@@ -5,7 +5,8 @@ import "../styles/facturacion.css";
 
 /** Valores por defecto de la fórmula: ((PRECIO ORIGEN + 220 USD) × 1,23) + 300 */
 const DEFAULT_BLOQUE_USD = 220;
-const DEFAULT_MULT = 1.23;
+/** Coeficiente fijo de nacionalización (no editable). */
+const COEFICIENTE_FIJO = 1.23;
 const DEFAULT_PROVEEDOR_USD = 300;
 import { HASHRATE_SPACE_LOGO } from "../lib/marketplaceWpAssets.js";
 const HASHRATE_LOGO = HASHRATE_SPACE_LOGO;
@@ -39,22 +40,6 @@ function sanitizeNumberInput(raw: string): string {
     s = s.slice(0, firstDot + 1) + s.slice(firstDot + 1).replace(/\./g, "");
   }
   return s;
-}
-
-/** Coeficiente multiplicador: admite decimales (coma o punto), sin redondear a entero. */
-function sanitizeDecimalInput(raw: string): string {
-  let s = raw.trim().replace(/\s/g, "").replace(/-/g, "").replace(/\+/g, "").replace(/,/g, ".");
-  s = s.replace(/[^0-9.]/g, "");
-  const firstDot = s.indexOf(".");
-  if (firstDot >= 0) {
-    s = s.slice(0, firstDot + 1) + s.slice(firstDot + 1).replace(/\./g, "");
-  }
-  return s;
-}
-
-function displayDecimalInput(canonical: string): string {
-  if (!canonical.trim()) return "";
-  return canonical.replace(".", ",");
 }
 
 function formatDisplayNumber(raw: string): string {
@@ -101,7 +86,6 @@ function prioridadModeloCotizacion(modeloRaw: string): number {
 export function AsicCotizadorChinaPyPage() {
   const [precioOrigen, setPrecioOrigen] = useState("");
   const [bloqueUsd, setBloqueUsd] = useState(String(DEFAULT_BLOQUE_USD));
-  const [multiplicador, setMultiplicador] = useState(String(DEFAULT_MULT));
   const [proveedorPy, setProveedorPy] = useState(String(DEFAULT_PROVEEDOR_USD));
   const [margen, setMargen] = useState("");
   const [marca, setMarca] = useState("");
@@ -157,11 +141,10 @@ export function AsicCotizadorChinaPyPage() {
   const { precioNum, totalNacionalizado } = useMemo(() => {
     const p = parseMoney(precioOrigen);
     const montoUsd = Math.max(0, parseMoney(bloqueUsd));
-    const mult = Math.max(0, parseMoney(multiplicador));
     const prov = Math.max(0, parseMoney(proveedorPy));
-    const totalSinMargen = (p + montoUsd) * mult + prov;
+    const totalSinMargen = (p + montoUsd) * COEFICIENTE_FIJO + prov;
     return { precioNum: p, totalNacionalizado: Math.round(totalSinMargen) };
-  }, [precioOrigen, bloqueUsd, multiplicador, proveedorPy]);
+  }, [precioOrigen, bloqueUsd, proveedorPy]);
 
   const precioVenta = useMemo(
     () => Math.round(totalNacionalizado + parseMoney(margen)),
@@ -207,7 +190,7 @@ export function AsicCotizadorChinaPyPage() {
         procesador: procesador.trim(),
         precioOrigen: parseMoney(precioOrigen),
         montoUsd: parseMoney(bloqueUsd),
-        coeficiente: parseMoney(multiplicador),
+        coeficiente: COEFICIENTE_FIJO,
         proveedorPy: parseMoney(proveedorPy),
         margenUsd: parseMoney(margen),
         totalNacionalizado,
@@ -474,17 +457,16 @@ export function AsicCotizadorChinaPyPage() {
                 </div>
                 <div className="col asic-cotizador-field-wrap asic-cotizador-field-wrap--costo">
                   <label className="fact-label" htmlFor="cot-mult">
-                    Coeficiente (ej. 1,23)
+                    Coeficiente <span className="text-muted">(fijo)</span>
                   </label>
                   <input
                     id="cot-mult"
                     className="fact-input"
                     type="text"
-                    inputMode="decimal"
-                    autoComplete="off"
-                    placeholder="1,23"
-                    value={displayDecimalInput(multiplicador)}
-                    onChange={(e) => setMultiplicador(sanitizeDecimalInput(e.target.value))}
+                    readOnly
+                    tabIndex={-1}
+                    aria-readonly="true"
+                    value="1,23"
                   />
                 </div>
                 <div className="col asic-cotizador-field-wrap asic-cotizador-field-wrap--costo">
