@@ -3,7 +3,7 @@ import type { ComprobanteType, LineItem } from "./types";
 import { effectiveInvoiceClientName2 } from "./clientInvoiceDisplay";
 import { formatUSD } from "./formatCurrency";
 import { recibimosMontoEnDosLineas } from "./numberToWords";
-import { getLineItemDescription, getLineItemDiscountDescription } from "./invoiceLineItemDescription";
+import { getLineItemDescription } from "./invoiceLineItemDescription";
 import {
   collapseLegacyReciboSettlementItemsForPdf,
   getReceiptSettlementRowKind,

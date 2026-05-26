@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Client, ComprobanteType, LineItem } from "../lib/types";
 import { formatUSD } from "../lib/formatCurrency";
 import {
@@ -8,7 +8,7 @@ import {
 } from "../lib/receiptSettlementLine";
 import { recibimosMontoEnDosLineas } from "../lib/numberToWords";
 import { effectiveInvoiceClientName2, hasSecondaryClientColumn } from "../lib/clientInvoiceDisplay";
-import { getLineItemDescription, getLineItemDiscountDescription } from "../lib/invoiceLineItemDescription";
+import { getLineItemDescription } from "../lib/invoiceLineItemDescription";
 import "../styles/invoice-preview.css";
 
 const EMISOR = {
