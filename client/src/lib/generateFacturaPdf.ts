@@ -120,10 +120,14 @@ function buildFacturaPdfTableRows(doc: jsPDF, items: LineItem[]): FacturaPdfTabl
   const rows: FacturaPdfTableRow[] = [];
   for (const it of items) {
     const settlementKind = getReceiptSettlementRowKind(it);
-    const lineTotalServicio = it.price * it.quantity;
     const desc = getLineItemDescription(it);
-    let precio = formatUSD(it.price);
-    let total = formatUSD(lineTotalServicio);
+    // Si es ítem normal: precio neto = price - discount (para NO renderizar una segunda fila).
+    // Si es línea de liquidación (payment_line / invoice_ref / credit_note / prior_receipt):
+    // mantenemos la lógica existente.
+    const netUnitPrice = settlementKind == null ? Math.max(0, it.price - it.discount) : it.price;
+    const netLineTotal = netUnitPrice * it.quantity;
+    let precio = formatUSD(netUnitPrice);
+    let total = formatUSD(netLineTotal);
     if (settlementKind === "credit_note" || settlementKind === "prior_receipt") {
       const amt = it.discount * it.quantity;
       precio = "—";
@@ -136,17 +140,6 @@ function buildFacturaPdfTableRows(doc: jsPDF, items: LineItem[]): FacturaPdfTabl
       total,
       rowH: pdfRowHeightForDesc(doc, desc),
     });
-    if (it.discount > 0 && settlementKind == null) {
-      const discountAmount = it.discount * it.quantity;
-      const descDesc = getLineItemDiscountDescription(it);
-      rows.push({
-        desc: descDesc,
-        precio: "- " + formatUSD(it.discount),
-        cant: String(it.quantity),
-        total: "- " + formatUSD(discountAmount),
-        rowH: pdfRowHeightForDesc(doc, descDesc),
-      });
-    }
   }
   return rows;
 }

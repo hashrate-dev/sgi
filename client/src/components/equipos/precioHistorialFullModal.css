@@ -1,8 +1,11 @@
-/* Modal de historial completo de precios (encima del modal de equipo y del detalle tipo vitrina z-index 2000) */
+/* Modal de historial completo de precios.
+ * Debe quedar SIEMPRE por encima del modal de “Editar Equipo ASIC” (Chakra/Radix) y otros overlays.
+ */
 .hrs-precio-historial-full-overlay {
   position: fixed;
   inset: 0;
-  z-index: 2100;
+  z-index: 23000 !important;
+  pointer-events: auto;
 }
 
 .hrs-precio-historial-full-dialog {

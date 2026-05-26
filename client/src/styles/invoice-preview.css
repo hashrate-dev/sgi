@@ -280,7 +280,7 @@
   white-space: normal;
   word-wrap: break-word;
   overflow-wrap: anywhere;
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 .invoice-preview-td-precio {

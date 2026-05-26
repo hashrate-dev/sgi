@@ -220,7 +220,6 @@ export function InvoicePreview({
               <tbody>
                 {displayItems.map((item, idx) => {
                   const settlementKind = getReceiptSettlementRowKind(item);
-                  const lineTotalServicio = item.price * item.quantity;
                   const desc = getLineItemDescription(item);
 
                   if (settlementKind === "credit_note" || settlementKind === "prior_receipt") {
@@ -235,23 +234,20 @@ export function InvoicePreview({
                     );
                   }
 
+                  // Para mantener una MUY buena calidad visual: cada servicio debe renderearse en una
+                  // sola fila (sin duplicar “DESCRIPCION”). Si existe discount en ítems normales,
+                  // lo reflejamos como precio neto para que no aparezca un segundo <tr>.
+                  const netUnitPrice =
+                    settlementKind == null ? Math.max(0, item.price - item.discount) : item.price;
+                  const lineTotalServicio = netUnitPrice * item.quantity;
+
                   return (
-                    <React.Fragment key={idx}>
-                      <tr>
-                        <td className="invoice-preview-td-desc">{desc}</td>
-                        <td className="invoice-preview-td-precio">{formatUSD(item.price)}</td>
-                        <td className="invoice-preview-td-cant">{item.quantity}</td>
-                        <td className="invoice-preview-td-total">{formatUSD(lineTotalServicio)}</td>
-                      </tr>
-                      {item.discount > 0 && settlementKind == null && (
-                        <tr>
-                          <td className="invoice-preview-td-desc">{getLineItemDiscountDescription(item)}</td>
-                          <td className="invoice-preview-td-precio">- {formatUSD(item.discount)}</td>
-                          <td className="invoice-preview-td-cant">{item.quantity}</td>
-                          <td className="invoice-preview-td-total">- {formatUSD(item.discount * item.quantity)}</td>
-                        </tr>
-                      )}
-                    </React.Fragment>
+                    <tr key={idx}>
+                      <td className="invoice-preview-td-desc">{desc}</td>
+                      <td className="invoice-preview-td-precio">{formatUSD(netUnitPrice)}</td>
+                      <td className="invoice-preview-td-cant">{item.quantity}</td>
+                      <td className="invoice-preview-td-total">{formatUSD(lineTotalServicio)}</td>
+                    </tr>
                   );
                 })}
               </tbody>
