@@ -83,6 +83,11 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
   const [saving, setSaving] = useState(false);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
 
+  const fallbackMembersRef = useRef(fallbackMembers);
+  fallbackMembersRef.current = fallbackMembers;
+  const hasLoadedOnceRef = useRef(false);
+  const [hydratedFromApi, setHydratedFromApi] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addAvatarFileRef = useRef<HTMLInputElement>(null);
 
@@ -91,18 +96,23 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
   const [pendingAddLinkedin, setPendingAddLinkedin] = useState("");
   const [pendingAddBioText, setPendingAddBioText] = useState("");
 
-  const load = useCallback(() => {
-    setLoading(true);
+  const load = useCallback((opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true && hasLoadedOnceRef.current;
+    if (!silent) setLoading(true);
     setLoadError(null);
     void getEquiposMarketplaceCorpCompanyTeam()
       .then((r) => {
         const incoming = Array.isArray(r.members) ? r.members : [];
         if (incoming.length > 0) setMembers(incoming);
-        else setMembers(fallbackMembers);
+        else setMembers(fallbackMembersRef.current);
+        hasLoadedOnceRef.current = true;
       })
       .catch(() => setLoadError("No se pudieron cargar los datos del equipo."))
-      .finally(() => setLoading(false));
-  }, [fallbackMembers]);
+      .finally(() => {
+        setLoading(false);
+        setHydratedFromApi(true);
+      });
+  }, []);
 
   useEffect(() => {
     load();
@@ -250,12 +260,19 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
         </AppCard>
       ) : null}
 
-      {loading ? (
-        <Text color="gray.600" fontSize="sm">
-          Cargando equipo…
-        </Text>
+      {loading && !hydratedFromApi ? (
+        <Box minH="280px" display="flex" alignItems="center" justifyContent="center">
+          <Text color="gray.600" fontSize="sm">
+            Cargando equipo…
+          </Text>
+        </Box>
       ) : (
         <>
+          {loading ? (
+            <Text color="gray.500" fontSize="xs" mb={2}>
+              Actualizando…
+            </Text>
+          ) : null}
           <Grid templateColumns={{ base: "1fr", lg: "repeat(2, minmax(0, 1fr))" }} gap={3} mb={4}>
             {members.map((m) => (
               <AppCard key={m.id} borderColor="gray.200" bg="white" p={3}>
@@ -414,7 +431,7 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
           </AppCard>
 
           <Flex justify="flex-end" gap={2}>
-            <AppButton variant="outline" size="md" onClick={() => load()} disabled={loading || saving}>
+            <AppButton variant="outline" size="md" onClick={() => load({ silent: true })} disabled={loading || saving}>
               Recargar
             </AppButton>
             <AppButton

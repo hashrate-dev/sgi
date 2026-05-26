@@ -61,11 +61,13 @@ export function MarketplaceLanguageProvider({ children }: { children: ReactNode 
   );
 }
 
+const noopSetLang = () => {};
+
 /** Dentro de `/marketplace/*`. Fuera del provider: español por defecto. */
 export function useMarketplaceLang(): Ctx {
   const ctx = useContext(MarketplaceLanguageContext);
   const lang = ctx?.lang ?? "es";
-  const setLang = ctx?.setLang ?? (() => {});
+  const setLang = ctx?.setLang ?? noopSetLang;
   return useMemo(
     () => ({
       lang,
