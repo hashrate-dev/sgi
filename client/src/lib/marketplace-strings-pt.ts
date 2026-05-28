@@ -753,6 +753,7 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
   "reg.verify_step1": "Verifique sua caixa de entrada (e também spam ou promoções).",
   "reg.verify_step2": "Abra o e-mail «Ative sua conta» e clique no link de ativação.",
   "reg.verify_step3": "Depois de ativar, você receberá o e-mail de boas-vindas e poderá entrar.",
+  "reg.verify_steps_aria": "Passos para ativar sua conta",
   "reg.verify_resend_btn": "Reenviar e-mail de ativação",
   "reg.verify_resend_busy": "Reenviando…",
   "reg.verify_resend_ok": "Reenviamos o e-mail de ativação. Verifique sua caixa de entrada.",

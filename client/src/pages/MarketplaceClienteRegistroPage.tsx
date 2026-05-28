@@ -284,7 +284,18 @@ export function MarketplaceClienteRegistroPage() {
 
                 <div className="col-12 col-lg-9 col-xl-9">
                   {pendingVerificationEmail ? (
-                    <div className="market-registro-card market-registro-success-card" role="status">
+                    <>
+                      <div className="market-registro-hero-compact">
+                        <span className="market-registro-aside__badge">
+                          <i className="bi bi-shop" aria-hidden />
+                          {t("reg.badge")}
+                        </span>
+                        <h1 className="market-registro-aside__title">{t("reg.hero_title")}</h1>
+                        <p className="market-registro-aside__lead mb-0">{t("reg.hero_lead")}</p>
+                      </div>
+
+                      <div className="market-registro-card market-registro-success-card" role="status">
+                        <div className="market-registro-success-card__body">
                       <div className="market-registro-success-card__icon" aria-hidden>
                         <i className="bi bi-envelope-check-fill" />
                       </div>
@@ -297,10 +308,20 @@ export function MarketplaceClienteRegistroPage() {
                       {pendingVerificationMessage ? (
                         <p className="market-registro-success-card__server-msg">{pendingVerificationMessage}</p>
                       ) : null}
-                      <ol className="market-registro-success-card__steps">
-                        <li>{t("reg.verify_step1")}</li>
-                        <li>{t("reg.verify_step2")}</li>
-                        <li>{t("reg.verify_step3")}</li>
+                      <ol className="market-registro-success-card__steps" aria-label={t("reg.verify_steps_aria")}>
+                        {[
+                          { icon: "bi-inbox-fill", text: t("reg.verify_step1") },
+                          { icon: "bi-envelope-open-fill", text: t("reg.verify_step2") },
+                          { icon: "bi-patch-check-fill", text: t("reg.verify_step3") },
+                        ].map((step, index) => (
+                          <li key={index} className="market-registro-success-card__step">
+                            <div className="market-registro-success-card__step-marker" aria-hidden>
+                              <span className="market-registro-success-card__step-num">{index + 1}</span>
+                              <i className={`bi ${step.icon} market-registro-success-card__step-icon`} />
+                            </div>
+                            <p className="market-registro-success-card__step-text">{step.text}</p>
+                          </li>
+                        ))}
                       </ol>
                       <p className="market-registro-success-card__hint">{t("reg.verify_pending_hint")}</p>
                       {resendActivationMsg ? (
@@ -324,7 +345,9 @@ export function MarketplaceClienteRegistroPage() {
                           {t("reg.back_shop")}
                         </Link>
                       </div>
+                        </div>
                     </div>
+                    </>
                   ) : (
                     <>
                   <div className="market-registro-hero-compact">

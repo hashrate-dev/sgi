@@ -296,9 +296,29 @@ body:has(.marketplace-asic-page)::after {
 
   .site-header__account-wrap--desktop {
     display: block;
-    max-width: min(14.5rem, 22vw);
+    max-width: min(10.5rem, 15vw);
     flex-shrink: 1;
     min-width: 0;
+  }
+
+  .site-header__account-wrap--desktop .site-header__account {
+    flex-wrap: nowrap;
+    min-width: 0;
+    max-width: 100%;
+    justify-content: flex-end;
+  }
+
+  .site-header__account-wrap--desktop .site-header__account-email {
+    max-width: 7.25rem;
+    flex: 0 1 auto;
+    min-width: 0;
+    display: inline-block;
+    vertical-align: bottom;
+  }
+
+  .site-header__account-wrap--desktop .site-header__account-logout {
+    flex-shrink: 0;
+    white-space: nowrap;
   }
 
   .site-header__account-wrap--mobile {
@@ -354,6 +374,8 @@ body:has(.marketplace-asic-page)::after {
   align-items: center;
   gap: 0.35rem 0.5rem;
   font-size: 0.85rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .site-header__account-email {
@@ -362,12 +384,7 @@ body:has(.marketplace-asic-page)::after {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: #6b7280;
-}
-
-@media (min-width: 900px) {
-  .site-header__account-wrap--desktop .site-header__account-email {
-    max-width: 100%;
-  }
+  min-width: 0;
 }
 
 .site-header__account-logout {
@@ -6355,9 +6372,15 @@ button.product-modal__btn--quote-cart:active {
 
 .market-registro-success-card {
   text-align: center;
-  padding: clamp(2rem, 5vw, 3.25rem) clamp(1.25rem, 4vw, 2.5rem);
-  max-width: 720px;
-  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.marketplace-registro-page .market-registro-success-card {
+  min-height: clamp(560px, 72vh, 820px);
 }
 
 .market-registro-success-card__icon {
@@ -6385,7 +6408,7 @@ button.product-modal__btn--quote-cart:active {
   font-size: 1rem;
   line-height: 1.6;
   color: #475569;
-  max-width: 36rem;
+  max-width: 42rem;
   margin: 0 auto 1.25rem;
 }
 
@@ -6394,11 +6417,14 @@ button.product-modal__btn--quote-cart:active {
   flex-direction: column;
   gap: 0.25rem;
   align-items: center;
-  margin-bottom: 1.5rem;
+  margin: 0 auto 1.5rem;
   padding: 0.85rem 1.1rem;
   border-radius: 12px;
   background: rgba(236, 253, 245, 0.65);
   border: 1px solid rgba(45, 212, 191, 0.35);
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
 }
 
 .market-registro-success-card__email strong {
@@ -6415,24 +6441,92 @@ button.product-modal__btn--quote-cart:active {
 }
 
 .market-registro-success-card__steps {
+  list-style: none;
   text-align: left;
-  max-width: 34rem;
+  width: 100%;
+  max-width: none;
   margin: 0 auto 1.25rem;
-  padding-left: 1.25rem;
+  padding: 0;
   color: #334155;
+}
+
+.market-registro-success-card__step {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  position: relative;
+  padding-bottom: 1.1rem;
+}
+
+.market-registro-success-card__step:last-child {
+  padding-bottom: 0;
+}
+
+.market-registro-success-card__step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 1.35rem;
+  top: 3.15rem;
+  bottom: 0.15rem;
+  width: 2px;
+  background: linear-gradient(180deg, rgba(45, 212, 191, 0.55) 0%, rgba(45, 212, 191, 0.15) 100%);
+  border-radius: 2px;
+}
+
+.market-registro-success-card__step-marker {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  width: 2.7rem;
+}
+
+.market-registro-success-card__step-num {
+  width: 2.7rem;
+  height: 2.7rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(145deg, #14b8a6 0%, #059669 100%);
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.28);
+  line-height: 1;
+}
+
+.market-registro-success-card__step-icon {
+  font-size: 1.15rem;
+  color: #0d9488;
+  line-height: 1;
+}
+
+.market-registro-success-card__step-text {
+  margin: 0.35rem 0 0;
   font-size: 0.95rem;
   line-height: 1.55;
+  color: #334155;
+  flex: 1;
 }
 
 .market-registro-success-card__steps li + li {
-  margin-top: 0.55rem;
+  margin-top: 0;
 }
 
 .market-registro-success-card__hint {
   font-size: 0.85rem;
   color: #64748b;
-  max-width: 34rem;
+  width: 100%;
+  max-width: none;
   margin: 0 auto 1.5rem;
+}
+
+.market-registro-success-card__body {
+  width: 100%;
+  max-width: 42rem;
+  margin: 0 auto;
 }
 
 .market-registro-success-card__actions {
