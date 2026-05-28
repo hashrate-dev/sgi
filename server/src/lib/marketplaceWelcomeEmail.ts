@@ -1,11 +1,59 @@
 import type { Request } from "express";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   DEFAULT_RESEND_FROM,
   LEGACY_RESEND_FROM_MAIL,
   resendFromCandidates,
 } from "../config/resendFrom.js";
 import { deliverResendEmailWithFromFallback } from "./resendDeliver.js";
-import { hashrateEmailLogoImgHtml } from "./emailHashrateLogo.js";
+
+/** Mismo logo que el mail de recuperación de contraseña (adjunto inline; Gmail no muestra data: URI). */
+const WELCOME_EMAIL_LOGO_CID = "hrs-welcome-logo";
+const WELCOME_EMAIL_LIB_DIR = path.dirname(fileURLToPath(import.meta.url));
+
+function welcomeEmailLogoPngBuffer(): Buffer | null {
+  const serverRoot = path.resolve(WELCOME_EMAIL_LIB_DIR, "../..");
+  const repoRoot = path.resolve(serverRoot, "..");
+  const candidates = [
+    path.join(serverRoot, "assets", "password-reset-logo.png"),
+    path.join(process.cwd(), "server", "assets", "password-reset-logo.png"),
+    path.join(repoRoot, "public", "images", "LOGO-HRS-PNG.png"),
+  ];
+  for (const filePath of candidates) {
+    try {
+      if (!fs.existsSync(filePath)) continue;
+      const buf = fs.readFileSync(filePath);
+      if (buf.length >= 32) return buf;
+    } catch {
+      /* siguiente */
+    }
+  }
+  return null;
+}
+
+function welcomeEmailLogoImgHtml(): string {
+  if (welcomeEmailLogoPngBuffer()) {
+    return `<img src="cid:${WELCOME_EMAIL_LOGO_CID}" alt="Hashrate Space" width="200" height="44" style="display:block;height:44px;width:auto;max-width:200px;border:0" />`;
+  }
+  return `<img src="https://hashrate.space/images/wp-uploads/hashrate-LOGO.png" alt="Hashrate Space" style="height:44px;width:auto;display:block" />`;
+}
+
+function welcomeEmailLogoResendAttachments():
+  | { filename: string; content: string; content_id: string; content_type: string }[]
+  | undefined {
+  const buf = welcomeEmailLogoPngBuffer();
+  if (!buf) return undefined;
+  return [
+    {
+      filename: "hashrate-logo.png",
+      content: buf.toString("base64"),
+      content_id: WELCOME_EMAIL_LOGO_CID,
+      content_type: "image/png",
+    },
+  ];
+}
 
 export type MarketplaceWelcomeLang = "es" | "en" | "pt";
 
@@ -118,14 +166,13 @@ function buildWelcomeEmailHtml(args: {
   shopUrl: string;
   loginUrl: string;
   email: string;
-  siteOrigin: string;
 }): string {
-  const { copy, shopUrl, loginUrl, email, siteOrigin } = args;
+  const { copy, shopUrl, loginUrl, email } = args;
   return `
     <div style="margin:0;padding:24px;background:#ffffff;font-family:Inter,Segoe UI,Arial,sans-serif;color:#000000">
       <div style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #d1d5db;border-radius:16px;overflow:hidden">
         <div style="padding:24px 28px 14px;background:#ffffff">
-          ${hashrateEmailLogoImgHtml({ siteOrigin })}
+          ${welcomeEmailLogoImgHtml()}
         </div>
         <div style="padding:8px 28px 26px">
           <h1 style="margin:0 0 12px;font-size:30px;line-height:1.15;color:#000000">${escapeHtml(copy.headline)}</h1>
@@ -175,7 +222,6 @@ export async function sendMarketplaceWelcomeEmail(args: {
     shopUrl,
     loginUrl,
     email: args.email.trim(),
-    siteOrigin: origin,
   });
 
   const result = await deliverResendEmailWithFromFallback({
@@ -185,6 +231,7 @@ export async function sendMarketplaceWelcomeEmail(args: {
     html,
     devLogTag: "marketplace-welcome",
     fromCandidates: marketplaceWelcomeFromCandidates(),
+    attachments: welcomeEmailLogoResendAttachments(),
   });
 
   return { simulated: result.simulated, fromUsed: result.fromUsed };
