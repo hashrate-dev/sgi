@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { MARKETPLACE } from "../../lib/marketplacePaths.js";
 import { useAuth } from "../../contexts/AuthContext";
 import { canUseMarketplaceQuoteCart } from "../../lib/auth.js";
 import { wakeUpBackend } from "../../lib/api";
@@ -115,11 +116,11 @@ export function MarketplaceInlineLoginModal({ open, onClose }: Props) {
           </button>
         </form>
         <p className="market-login-inline__links">
-          <Link to="/registro" onClick={onClose}>
+          <Link to={MARKETPLACE.clientSignup} onClick={onClose}>
             {t("login.register")}
           </Link>
           <span aria-hidden>·</span>
-          <Link to="/acceso" onClick={onClose}>
+          <Link to={MARKETPLACE.clientLogin} onClick={onClose}>
             Login completo
           </Link>
         </p>

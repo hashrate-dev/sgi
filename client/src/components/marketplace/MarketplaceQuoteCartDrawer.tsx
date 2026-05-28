@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { MARKETPLACE } from "../../lib/marketplacePaths.js";
 import { useMarketplaceQuoteCart } from "../../contexts/MarketplaceQuoteCartContext.js";
 import { MarketplaceCartOrdersPanel } from "./MarketplaceCartOrdersPanel.js";
 import { isOneActiveOrderError } from "../../lib/api.js";
@@ -199,11 +200,11 @@ export function MarketplaceQuoteCartDrawer() {
                 <p className="market-quote-drawer__lede">{t("drawer.lede")}</p>
                 <p className="market-quote-drawer__login-hint" role="note">
                   {t("drawer.hint.p1")}{" "}
-                  <Link to="/acceso" onClick={closeDrawer}>
+                  <Link to={MARKETPLACE.clientLogin} onClick={closeDrawer}>
                     {t("drawer.login_link")}
                   </Link>
                   {t("drawer.hint.p2")}
-                  <Link to="/registro" onClick={closeDrawer}>
+                  <Link to={MARKETPLACE.clientSignup} onClick={closeDrawer}>
                     {t("drawer.register_link")}
                   </Link>
                   {t("drawer.hint.p5")}
@@ -562,7 +563,7 @@ export function MarketplaceQuoteCartDrawer() {
               </div>
             ) : (
               <Link
-                to="/acceso"
+                to={MARKETPLACE.clientLogin}
                 className="market-quote-drawer__btn market-quote-drawer__btn--solid text-center text-decoration-none"
                 onClick={closeDrawer}
               >

@@ -10,6 +10,7 @@ import {
   resolveShelfDisplayImageSrc,
 } from "../../lib/marketplaceAsicCatalog.js";
 import { Link } from "react-router-dom";
+import { MARKETPLACE } from "../../lib/marketplacePaths.js";
 import { useMarketplaceLang } from "../../contexts/MarketplaceLanguageContext.js";
 import { AsicDetailSvg } from "./AsicDetailIcon.js";
 
@@ -130,7 +131,7 @@ export function AsicShelfProduct({
               <span className="shelf-product__price-locked-main">{lockedPriceLabel}</span>
               <span className="shelf-product__price-locked-hint">{lockedPriceHint}</span>
               <Link
-                to="/acceso"
+                to={MARKETPLACE.clientLogin}
                 className="shelf-product__price-locked-cta"
                 aria-label={lockedPriceCta}
               >

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { confirmPasswordReset, requestPasswordReset } from "../lib/api";
+import { MARKETPLACE } from "../lib/marketplacePaths.js";
 import { MarketplacePasswordField } from "../components/marketplace/MarketplacePasswordField";
 import "../styles/facturacion.css";
 
@@ -128,7 +129,7 @@ export function PasswordResetPage() {
   useEffect(() => {
     if (!hasToken || !resetDone) return;
     const t = window.setTimeout(() => {
-      const target = resetSource === "marketplace" ? "/acceso" : "/login";
+      const target = resetSource === "marketplace" ? MARKETPLACE.clientLogin : "/login";
       navigate(target, { replace: true });
     }, 1200);
     return () => window.clearTimeout(t);
@@ -256,7 +257,7 @@ export function PasswordResetPage() {
                   ) : null}
                   {showSgiLoginLink && showMarketplaceLoginLink ? <span className="mx-2">·</span> : null}
                   {showMarketplaceLoginLink ? (
-                    <Link to="/acceso" className="text-decoration-none">
+                    <Link to={MARKETPLACE.clientLogin} className="text-decoration-none">
                       {copy.backMarketplace}
                     </Link>
                   ) : null}

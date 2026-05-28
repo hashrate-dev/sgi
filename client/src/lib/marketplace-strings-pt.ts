@@ -486,6 +486,7 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
   "login.no_account": "Ainda não tem conta?",
   "login.register": "Cadastre-se",
   "login.forgot_password": "Esqueci minha senha",
+  "login.forgot_title": "Recuperar senha",
   "login.forgot_lead": "Enviaremos um link para criar uma nova senha.",
   "login.forgot_email_required": "Informe seu e-mail para receber o link de recuperação.",
   "login.forgot_success":
@@ -499,6 +500,14 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
   "login.forgot_sending": "Enviando…",
   "login.forgot_send_link": "Enviar link",
   "login.forgot_back": "Voltar ao login",
+  "login.aside_aria": "Sua conta na loja",
+  "login.aside_title_prefix": "Entre na sua conta e escolha seu",
+  "login.aside_title_accent": "equipamento de mineração.",
+  "login.aside_lead":
+    "Seu espaço de cliente para orçar, acompanhar pedidos e comprar no catálogo ASIC da Hashrate Space.",
+  "login.aside_b1": "Retome listas de orçamento e novidades do catálogo ASIC.",
+  "login.aside_b2": "Seus dados de envio e contato prontos para agilizar a próxima compra.",
+  "login.aside_b3": "Acesso seguro com o e-mail e a senha da sua conta.",
 
   "orders.loading": "",
   "orders.back": "← Voltar ao catálogo",
@@ -679,6 +688,8 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
   "reg.aside_aria": "Benefícios",
   "reg.badge": "Loja HASHRATE SPACE",
   "reg.aside_title": "Crie sua conta e escolha seu equipamento de mineração com confiança",
+  "reg.aside_title_prefix": "Crie sua conta e escolha seu",
+  "reg.aside_title_accent": "equipamento de mineração.",
   "reg.aside_lead":
     "Um único cadastro para montar seu pedido e acompanhar seus pedidos em um ambiente pensado para clientes de mineração Bitcoin.",
   "reg.aside_b1": "Listas de orçamento e atualizações do catálogo ASIC.",
@@ -686,12 +697,19 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
   "reg.aside_b3": "Acesso seguro com seu e-mail e senha.",
   "reg.hero_title": "Criar conta cliente",
   "reg.hero_lead": "Preencha o formulário para orçar equipamentos de mineração e gerenciar seus dados de contato.",
+  "reg.form_title": "Crie sua conta",
+  "reg.form_subtitle": "Comece grátis. Não é necessário cartão de crédito.",
+  "reg.toggle_signin": "Entrar",
+  "reg.toggle_signup": "Criar conta",
+  "reg.auth_toggle_aria": "Entrar ou cadastrar",
+  "reg.terms_note":
+    "Ao se cadastrar, você concorda com os Termos de serviço e a Política de privacidade da Hashrate Space.",
   "reg.card_kicker_lower": "Cadastro de nova conta",
   "reg.card_desc_long":
     "Preencha os campos com seus dados pessoais. Com sua conta você acessa o mundo da mineração de bitcoin e criptomoedas.",
   "reg.legend_account": "Sua conta",
   "reg.email_label": "E-mail",
-  "reg.email_ph": "nome@gmail.com",
+  "reg.email_ph": "nome@mail.com",
   "reg.pw_min": "Senha (mín. 6)",
   "reg.pw_confirm": "Confirmar senha",
   "reg.legend_personal": "Dados pessoais",

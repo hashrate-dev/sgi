@@ -10,10 +10,11 @@ export const MARKETPLACE = {
   faq: "/faq",
   contact: "/contact",
   catalog: "/equipment",
-  clientLogin: "/acceso",
-  clientSignup: "/registro",
-  emailInquiry: "/consultar-correo",
-  emailInquiryCart: "/consultar-correo-carrito",
+  clientLogin: "/sign-in",
+  clientSignup: "/signup",
+  emailInquiry: "/email-inquiry",
+  emailInquiryCart: "/email-inquiry-cart",
+  activateAccount: "/activate-account",
   /** Home en localhost cuando `/` es el panel SGI. */
   homeDev: "/home",
 } as const;

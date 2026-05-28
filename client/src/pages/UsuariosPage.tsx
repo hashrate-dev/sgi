@@ -867,7 +867,7 @@ export function UsuariosPage() {
                       value={formEmail}
                       onChange={(e) => setFormEmail(e.target.value)}
                       required
-                      placeholder="usuario@ejemplo.com"
+                      placeholder="usuario@mail.com"
                     />
                   </div>
                   <div className="mb-3">

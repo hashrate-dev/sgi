@@ -18,6 +18,8 @@ type RegistroCountrySelectProps = {
   allowEmpty?: boolean;
   required?: boolean;
   className?: string;
+  /** En el botón cerrado muestra solo prefijo (ej. +595) para dejar más espacio al número. */
+  compactDisplay?: boolean;
   "aria-label": string;
 };
 
@@ -31,6 +33,7 @@ export function RegistroCountrySelect({
   allowEmpty = true,
   required,
   className = "",
+  compactDisplay = false,
   "aria-label": ariaLabel,
 }: RegistroCountrySelectProps) {
   const { t } = useMarketplaceLang();
@@ -127,7 +130,9 @@ export function RegistroCountrySelect({
               decoding="async"
             />
             <span className="market-registro-country-select__text">
-              {formatRegistroCountryDialLabel(selected, { withEmoji: false })}
+              {compactDisplay
+                ? selected.dial
+                : formatRegistroCountryDialLabel(selected, { withEmoji: false })}
             </span>
           </span>
         ) : allowEmpty ? (

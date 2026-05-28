@@ -749,7 +749,7 @@ export function ClienteEditPage() {
                         type="email"
                         value={form.email}
                         onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                        placeholder="correo@ejemplo.com"
+                        placeholder="correo@mail.com"
                       />
                     </div>
                     <div className="fact-field">
@@ -759,7 +759,7 @@ export function ClienteEditPage() {
                         type="email"
                         value={form.email2}
                         onChange={(e) => setForm((f) => ({ ...f, email2: e.target.value }))}
-                        placeholder="correo@ejemplo.com"
+                        placeholder="correo@mail.com"
                       />
                     </div>
                   </div>

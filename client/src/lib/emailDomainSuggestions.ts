@@ -1,24 +1,12 @@
-/** Dominios habituales para autocompletar correos en formularios (tienda / registro). */
+/** Dominios genéricos / ISP para autocompletar correos (sin marcas de webmail). */
 export const COMMON_EMAIL_DOMAINS = [
-  "gmail.com",
-  "hotmail.com",
-  "outlook.com",
-  "yahoo.com",
-  "live.com",
-  "icloud.com",
-  "proton.me",
-  "protonmail.com",
-  "msn.com",
-  "gmx.com",
-  "yahoo.com.ar",
-  "hotmail.com.ar",
-  "outlook.com.ar",
+  "mail.com",
+  "email.com",
   "fibertel.com.ar",
   "speedy.com.ar",
   "uanicordenons.com.py",
   "tigo.com.py",
   "personal.com.py",
-  "outlook.com.py",
 ] as const;
 
 export function splitEmailLocalAndDomain(value: string): { local: string; domainFragment: string } {

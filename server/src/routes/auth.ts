@@ -747,7 +747,7 @@ authRouter.post("/auth/register-cliente", registerClienteRateLimit, async (req, 
     });
     const origin = resolvePublicAppOrigin(req);
     const qp = new URLSearchParams({ token: rawToken, lang: welcomeLang });
-    activationUrlForDev = `${origin}/activar-cuenta?${qp.toString()}`;
+    activationUrlForDev = `${origin}/activate-account?${qp.toString()}`;
     await sendMarketplaceAccountActivationEmail({
       to: emailNorm,
       displayName,
@@ -1019,7 +1019,7 @@ authRouter.post("/auth/resend-verification-email", loginRateLimit, async (req, r
       req,
     });
     const origin = resolvePublicAppOrigin(req);
-    const activationUrl = `${origin}/activar-cuenta?${new URLSearchParams({ token: rawToken, lang }).toString()}`;
+    const activationUrl = `${origin}/activate-account?${new URLSearchParams({ token: rawToken, lang }).toString()}`;
     await sendMarketplaceAccountActivationEmail({
       to: emailNorm,
       displayName: row.display_name,

@@ -39,6 +39,7 @@ export function MarketplacePasswordField({
         {label}
       </label>
       <div className="market-password-field">
+        <i className="bi bi-lock-fill market-password-field__lock" aria-hidden />
         <input
           id={fieldId}
           type={visible ? "text" : "password"}

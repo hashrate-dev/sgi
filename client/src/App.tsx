@@ -417,6 +417,7 @@ function App() {
           <Route path="/marketplace/contact/" element={<Navigate to={MARKETPLACE.contact} replace />} />
           <Route path="/marketplace/login" element={<Navigate to={MARKETPLACE.clientLogin} replace />} />
           <Route path="/marketplace/login/" element={<Navigate to={MARKETPLACE.clientLogin} replace />} />
+          <Route path="/marketplace/acceso" element={<Navigate to={MARKETPLACE.clientLogin} replace />} />
           <Route path="/marketplace/signup" element={<Navigate to={MARKETPLACE.clientSignup} replace />} />
           <Route path="/marketplace/signup/" element={<Navigate to={MARKETPLACE.clientSignup} replace />} />
           <Route path="/marketplace/registro" element={<Navigate to={MARKETPLACE.clientSignup} replace />} />
@@ -425,7 +426,13 @@ function App() {
           <Route path="/marketplace/mis-ordenes" element={<Navigate to={MARKETPLACE.catalog} replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/reset-password" element={<PasswordResetPage />} />
-          <Route path="/activar-cuenta" element={<AccountActivatePage />} />
+          <Route path={MARKETPLACE.activateAccount} element={<AccountActivatePage />} />
+          {/* Legacy ES → EN (URLs públicas tienda) */}
+          <Route path="/activar-cuenta" element={<Navigate to={MARKETPLACE.activateAccount} replace />} />
+          <Route path="/acceso" element={<Navigate to={MARKETPLACE.clientLogin} replace />} />
+          <Route path="/registro" element={<Navigate to={MARKETPLACE.clientSignup} replace />} />
+          <Route path="/consultar-correo" element={<Navigate to={MARKETPLACE.emailInquiry} replace />} />
+          <Route path="/consultar-correo-carrito" element={<Navigate to={MARKETPLACE.emailInquiryCart} replace />} />
           <Route element={<ProtectedRoute><ProtectedAppLayout /></ProtectedRoute>}>
             <Route path={SGI_DASHBOARD_PATH} element={<HomePage />} />
             <Route path="/kryptex" element={<KryptexPage />} />

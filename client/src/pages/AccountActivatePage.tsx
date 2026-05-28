@@ -4,6 +4,7 @@ import { resendMarketplaceVerificationEmail, verifyMarketplaceEmail } from "../l
 import { useAuth } from "../contexts/AuthContext";
 import { MarketplaceSiteHeader } from "../components/marketplace/MarketplaceSiteHeader";
 import { MarketplaceSiteFooter } from "../components/marketplace/MarketplaceSiteFooter";
+import { MARKETPLACE } from "../lib/marketplacePaths.js";
 import { HASHRATE_SPACE_LOGO } from "../lib/marketplaceWpAssets.js";
 import "../styles/marketplace-hashrate.css";
 import "../styles/facturacion.css";
@@ -39,7 +40,7 @@ export function AccountActivatePage() {
         success: "Account activated. Redirecting…",
         fail: "Could not activate your account.",
         resendLabel: "Resend activation email",
-        resendEmailPh: "your@email.com",
+        resendEmailPh: "your@mail.com",
         resendBusy: "Sending…",
         resendOk: "If your account is pending, we sent a new link.",
         login: "Sign in",
@@ -54,7 +55,7 @@ export function AccountActivatePage() {
         success: "Conta ativada. Redirecionando…",
         fail: "Não foi possível ativar sua conta.",
         resendLabel: "Reenviar e-mail de ativação",
-        resendEmailPh: "seu@email.com",
+        resendEmailPh: "seu@mail.com",
         resendBusy: "Enviando…",
         resendOk: "Se sua conta estiver pendente, enviamos um novo link.",
         login: "Entrar",
@@ -68,7 +69,7 @@ export function AccountActivatePage() {
       success: "Cuenta activada. Redirigiendo…",
       fail: "No se pudo activar tu cuenta.",
       resendLabel: "Reenviar correo de activación",
-      resendEmailPh: "tu@correo.com",
+      resendEmailPh: "tu@mail.com",
       resendBusy: "Enviando…",
       resendOk: "Si tu cuenta está pendiente, te enviamos un nuevo enlace.",
       login: "Iniciar sesión",
@@ -170,7 +171,7 @@ export function AccountActivatePage() {
                       </form>
                     ) : null}
                     <p className="small text-muted mt-4 mb-0">
-                      <Link to="/acceso">{copy.login}</Link>
+                      <Link to={MARKETPLACE.clientLogin}>{copy.login}</Link>
                       <span className="mx-2">·</span>
                       <Link to="/equipment">{copy.shop}</Link>
                     </p>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { Navigate, useLocation, useSearchParams } from "react-router-dom";
 import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
 import { postMarketplaceAsicInquiryPublic } from "../lib/api.js";
+import { MARKETPLACE } from "../lib/marketplacePaths.js";
 import { MailCtaIcon } from "../components/marketplace/MarketplaceCtaIcons.js";
 import "../styles/marketplace-hashrate.css";
 
@@ -19,7 +20,9 @@ export function MarketplaceAsicEmailInquiryPage() {
   const price = (search.get("p") ?? "").trim();
 
   const { t, tf } = useMarketplaceLang();
-  const isCartInquiry = location.pathname.endsWith("/consultar-correo-carrito");
+  const isCartInquiry =
+    location.pathname.replace(/\/+$/, "") === MARKETPLACE.emailInquiryCart ||
+    location.pathname.replace(/\/+$/, "") === "/marketplace/consultar-correo-carrito";
 
   const mailText = useMemo(() => {
     if (isCartInquiry) {
@@ -118,6 +121,7 @@ export function MarketplaceAsicEmailInquiryPage() {
               name="inquiry-email"
               required
               autoComplete="email"
+              placeholder={t("reg.email_ph")}
               value={email}
               onChange={(ev) => setEmail(ev.target.value)}
               disabled={sending || success}

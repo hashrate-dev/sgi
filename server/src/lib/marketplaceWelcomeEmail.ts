@@ -213,7 +213,7 @@ export async function sendMarketplaceWelcomeEmail(args: {
 
   const origin = args.siteOrigin.replace(/\/+$/, "") || "https://hashrate.space";
   const shopUrl = `${origin}/equipment`;
-  const loginUrl = `${origin}/acceso`;
+  const loginUrl = `${origin}/sign-in`;
 
   const copy = welcomeEmailCopy(args.lang, args.displayName);
   const text = `${copy.plainText}${copy.detail}\n\nCuenta: ${args.email}\nTienda: ${shopUrl}\nIniciar sesión: ${loginUrl}\n\n${copy.security}`;

@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
+import { MARKETPLACE } from "../lib/marketplacePaths.js";
 import { useAuth } from "../contexts/AuthContext";
 import { isEmailAlreadyRegisteredError, isRegisterPendingVerification, registerMarketplaceCliente, resendMarketplaceVerificationEmail, wakeUpBackend } from "../lib/api";
 import { MarketplacePasswordField } from "../components/marketplace/MarketplacePasswordField";
+import { RegistroAuthShell } from "../components/marketplace/RegistroAuthShell";
+import { RegistroBrandPanel } from "../components/marketplace/RegistroBrandPanel";
 import { RegistroCountrySelect } from "../components/marketplace/RegistroCountrySelect";
-import { MarketplaceSiteHeader } from "../components/marketplace/MarketplaceSiteHeader";
 import { MarketplaceSiteFooter } from "../components/marketplace/MarketplaceSiteFooter";
 import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
 import "../styles/marketplace-hashrate.css";
@@ -88,6 +90,8 @@ export function MarketplaceClienteRegistroPage() {
   const duplicateHeading = duplicateReason === "email" ? t("reg.dup_heading") : "No se pudo crear la cuenta";
   const duplicateDetailMessage =
     duplicateReason === "email" ? "Este email ya se está utilizando en el sistema." : error;
+
+  const loginLinkState = fromQuote ? { from: "quote" as const } : undefined;
 
   function applyEmailDomain(domain: string) {
     const base = emailLocal.trim();
@@ -269,50 +273,28 @@ export function MarketplaceClienteRegistroPage() {
   }
 
   return (
-    <div className="marketplace-asic-page marketplace-registro-page">
-      <div className="bg-mesh" aria-hidden />
-      <div className="bg-grid" aria-hidden />
+    <div className="marketplace-asic-page marketplace-registro-page marketplace-login-page--standalone">
+      <div className="market-registro-page-bg" aria-hidden />
       <div id="app" data-page="marketplace-registro">
-        <MarketplaceSiteHeader />
         <main id="page-main" className="page-main page-main--market page-main--market--asic">
           <section className="market-registro-section">
             <div className="container-fluid market-registro-shell px-3 px-sm-4 px-xl-5">
-              <div className="row g-3 g-lg-4 align-items-start market-registro-layout-row">
-                <aside className="col-lg-3 col-xl-3 d-none d-lg-block market-registro-aside" aria-label={t("reg.aside_aria")}>
-                  <span className="market-registro-aside__badge">
-                    <i className="bi bi-shop" aria-hidden />
-                    {t("reg.badge")}
-                  </span>
-                  <h1 className="market-registro-aside__title">{t("reg.aside_title")}</h1>
-                  <p className="market-registro-aside__lead">{t("reg.aside_lead")}</p>
-                  <ul className="market-registro-aside__list">
-                    <li>
-                      <i className="bi bi-check-circle-fill" aria-hidden />
-                      <span>{t("reg.aside_b1")}</span>
-                    </li>
-                    <li>
-                      <i className="bi bi-check-circle-fill" aria-hidden />
-                      <span>{t("reg.aside_b2")}</span>
-                    </li>
-                    <li>
-                      <i className="bi bi-check-circle-fill" aria-hidden />
-                      <span>{t("reg.aside_b3")}</span>
-                    </li>
-                  </ul>
+              <div className="row g-3 g-lg-4 align-items-stretch market-registro-layout-row market-registro-layout-row--split">
+                <aside
+                  className="col-lg-5 col-xl-4 d-none d-lg-flex market-registro-aside"
+                  aria-label={t("reg.aside_aria")}
+                >
+                  <RegistroBrandPanel />
                 </aside>
 
-                <div className="col-12 col-lg-9 col-xl-9">
+                <div className="col-12 col-lg-7 col-xl-8 market-registro-form-col">
                   {pendingVerificationEmail ? (
                     <>
-                      <div className="market-registro-hero-compact">
-                        <span className="market-registro-aside__badge">
-                          <i className="bi bi-shop" aria-hidden />
-                          {t("reg.badge")}
-                        </span>
-                        <h1 className="market-registro-aside__title">{t("reg.hero_title")}</h1>
-                        <p className="market-registro-aside__lead mb-0">{t("reg.hero_lead")}</p>
+                      <div className="market-registro-hero-compact d-lg-none">
+                        <RegistroBrandPanel compact />
                       </div>
 
+                      <RegistroAuthShell mode="signup" loginLinkState={loginLinkState}>
                       <div className="market-registro-card market-registro-success-card" role="status">
                         <div className="market-registro-success-card__body">
                       <div className="market-registro-success-card__icon" aria-hidden>
@@ -357,7 +339,7 @@ export function MarketplaceClienteRegistroPage() {
                         >
                           {resendActivationBusy ? t("reg.verify_resend_busy") : t("reg.verify_resend_btn")}
                         </button>
-                        <Link to="/acceso" className="btn btn-outline-secondary">
+                        <Link to={MARKETPLACE.clientLogin} className="btn btn-outline-secondary">
                           {t("reg.login_link")}
                         </Link>
                         <Link to="/equipment" className="btn btn-link text-decoration-none">
@@ -366,26 +348,21 @@ export function MarketplaceClienteRegistroPage() {
                       </div>
                         </div>
                     </div>
+                      </RegistroAuthShell>
                     </>
                   ) : (
                     <>
-                  <div className="market-registro-hero-compact">
-                    <span className="market-registro-aside__badge">
-                      <i className="bi bi-shop" aria-hidden />
-                      {t("reg.badge")}
-                    </span>
-                    <h1 className="market-registro-aside__title">{t("reg.hero_title")}</h1>
-                    <p className="market-registro-aside__lead mb-0">{t("reg.hero_lead")}</p>
+                  <div className="market-registro-hero-compact d-lg-none">
+                    <RegistroBrandPanel compact />
                   </div>
 
-                  <div className="market-registro-card">
-                    <header className="market-registro-card__head">
-                      <p className="market-registro-card__kicker">{t("reg.card_kicker_lower")}</p>
-                      <h2 className="market-registro-card__title">{t("reg.title")}</h2>
-                      <p className="market-registro-card__desc">{t("reg.card_desc_long")}</p>
+                  <RegistroAuthShell mode="signup" loginLinkState={loginLinkState}>
+                  <div className="market-registro-card market-registro-card--auth">
+                    <header className="market-registro-card__head market-registro-card__head--auth">
+                      <h2 className="market-registro-card__title">{t("reg.form_title")}</h2>
                     </header>
 
-                    <form onSubmit={(e) => void handleSubmit(e)} noValidate>
+                    <form className="market-registro-form" onSubmit={(e) => void handleSubmit(e)} noValidate>
                       <div
                         className="market-registro-fieldset market-registro-fieldset--panel market-registro-fieldset--panel--wide"
                         role="group"
@@ -467,7 +444,7 @@ export function MarketplaceClienteRegistroPage() {
                       </div>
 
                       <div className="row g-3 market-registro-split-xl align-items-stretch">
-                        <div className="col-12 col-lg-6 d-flex">
+                        <div className="col-12 col-xl-6 d-flex">
                           <div
                             className="market-registro-fieldset market-registro-fieldset--panel market-registro-fieldset--panel--wide mb-0 flex-grow-1 w-100"
                             role="group"
@@ -477,8 +454,8 @@ export function MarketplaceClienteRegistroPage() {
                               <i className="bi bi-person-vcard" aria-hidden />
                               {t("reg.legend_personal")}
                             </div>
-                            <div className="row g-3 market-registro-panel-fields">
-                              <div className="col-sm-6">
+                            <div className="market-registro-personal-fields">
+                              <div className="market-registro-field market-registro-field--field-icon market-registro-field--icon-name">
                                 <label className="form-label market-registro-label" htmlFor="reg-nombre">
                                   {t("reg.label_nombre")}
                                 </label>
@@ -493,7 +470,7 @@ export function MarketplaceClienteRegistroPage() {
                                   required
                                 />
                               </div>
-                              <div className="col-sm-6">
+                              <div className="market-registro-field market-registro-field--field-icon market-registro-field--icon-surname">
                                 <label className="form-label market-registro-label" htmlFor="reg-apellidos">
                                   {t("reg.label_apellidos")}
                                 </label>
@@ -508,45 +485,46 @@ export function MarketplaceClienteRegistroPage() {
                                   required
                                 />
                               </div>
-                            </div>
-                            <div className="market-registro-phone-grid market-registro-phone-grid--in-personal">
-                              <label
-                                className="form-label market-registro-label market-registro-phone-grid__label-dial"
-                                htmlFor="reg-cel-dial"
-                              >
-                                {t("reg.label_dial_short")}
-                              </label>
-                              <label
-                                className="form-label market-registro-label market-registro-phone-grid__label-num"
-                                htmlFor="reg-cel-num"
-                              >
-                                {t("reg.label_mobile")}
-                              </label>
-                              <RegistroCountrySelect
-                                id="reg-cel-dial"
-                                className="market-registro-phone-grid__input-dial"
-                                value={celularDialId}
-                                onChange={handleCelularDialChange}
-                                countries={countriesSorted}
-                                allowEmpty={false}
-                                aria-label={t("reg.dial_aria")}
-                                required
-                              />
-                              <input
-                                id="reg-cel-num"
-                                type="tel"
-                                className="form-control market-registro-phone-grid__input-num"
-                                value={celularLocal}
-                                onChange={(e) => setCelularLocal(e.target.value)}
-                                autoComplete="tel-national"
-                                placeholder={t("reg.phone_ph")}
-                                inputMode="numeric"
-                                required
-                              />
+                              <div className="market-registro-field market-registro-field--phone-row">
+                                <div className="market-registro-phone-row">
+                                  <div className="market-registro-phone-row__dial">
+                                    <label className="form-label market-registro-label" htmlFor="reg-cel-dial">
+                                      {t("reg.label_dial_short")}
+                                    </label>
+                                    <RegistroCountrySelect
+                                      id="reg-cel-dial"
+                                      className="w-100"
+                                      value={celularDialId}
+                                      onChange={handleCelularDialChange}
+                                      countries={countriesSorted}
+                                      allowEmpty={false}
+                                      compactDisplay
+                                      aria-label={t("reg.dial_aria")}
+                                      required
+                                    />
+                                  </div>
+                                  <div className="market-registro-phone-row__num market-registro-field--field-icon market-registro-field--icon-phone">
+                                    <label className="form-label market-registro-label" htmlFor="reg-cel-num">
+                                      {t("reg.label_mobile")}
+                                    </label>
+                                    <input
+                                      id="reg-cel-num"
+                                      type="tel"
+                                      className="form-control"
+                                      value={celularLocal}
+                                      onChange={(e) => setCelularLocal(e.target.value)}
+                                      autoComplete="tel-national"
+                                      placeholder={t("reg.phone_ph")}
+                                      inputMode="numeric"
+                                      required
+                                    />
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         </div>
-                        <div className="col-12 col-lg-6 d-flex">
+                        <div className="col-12 col-xl-6 d-flex">
                           <div
                             className="market-registro-fieldset market-registro-fieldset--panel market-registro-fieldset--panel--wide mb-0 flex-grow-1 w-100"
                             role="group"
@@ -557,7 +535,7 @@ export function MarketplaceClienteRegistroPage() {
                               {t("reg.legend_ship")}
                             </div>
                             <div className="market-registro-pais-fields">
-                              <div className="market-registro-field">
+                              <div className="market-registro-field market-registro-field--field-icon market-registro-field--icon-globe">
                                 <label className="form-label market-registro-label" htmlFor="reg-pais">
                                   {t("reg.label_country")}
                                 </label>
@@ -572,7 +550,7 @@ export function MarketplaceClienteRegistroPage() {
                                   required
                                 />
                               </div>
-                              <div className="market-registro-field">
+                              <div className="market-registro-field market-registro-field--field-icon market-registro-field--icon-city">
                                 <label className="form-label market-registro-label" htmlFor="reg-ciudad">
                                   {t("reg.label_city")}
                                 </label>
@@ -599,18 +577,24 @@ export function MarketplaceClienteRegistroPage() {
                                   ) : null}
                                 </select>
                                 {paisSeleccionado && city === CITY_OTHER_VALUE ? (
-                                  <input
-                                    type="text"
-                                    className="form-control mt-2"
-                                    value={cityOther}
-                                    onChange={(e) => setCityOther(e.target.value)}
-                                    placeholder={t("reg.ph_city_other")}
-                                    autoComplete="address-level2"
-                                    aria-label={t("reg.ph_city_other")}
-                                    required
-                                  />
+                                  <div className="market-registro-field--field-icon market-registro-field--icon-city-other mt-2">
+                                    <input
+                                      type="text"
+                                      className="form-control"
+                                      value={cityOther}
+                                      onChange={(e) => setCityOther(e.target.value)}
+                                      placeholder={t("reg.ph_city_other")}
+                                      autoComplete="address-level2"
+                                      aria-label={t("reg.ph_city_other")}
+                                      required
+                                    />
+                                  </div>
                                 ) : null}
                               </div>
+                              <div
+                                className="market-registro-field market-registro-field--grid-spacer"
+                                aria-hidden="true"
+                              />
                             </div>
                           </div>
                         </div>
@@ -634,14 +618,14 @@ export function MarketplaceClienteRegistroPage() {
                                 <p className="mt-1 mb-2 small text-body-secondary">{duplicateDetailMessage}</p>
                                 <p className="mb-0 small">
                                   <Link
-                                    to="/acceso"
+                                    to={MARKETPLACE.clientLogin}
                                     className="fw-semibold text-decoration-none"
                                     state={fromQuote ? { from: "quote" } : undefined}
                                   >
                                     {t("reg.dup_login")}
                                   </Link>
                                   <span className="text-muted"> · </span>
-                                  <Link to="/login" className="fw-semibold text-decoration-none">
+                                  <Link to={MARKETPLACE.clientLogin} className="fw-semibold text-decoration-none">
                                     {t("reg.dup_sgi")}
                                   </Link>
                                 </p>
@@ -656,33 +640,35 @@ export function MarketplaceClienteRegistroPage() {
                         </div>
                       ) : null}
 
-                      <div className="market-registro-submit-row">
-                        <div className="market-registro-foot market-registro-foot--beside-submit small text-muted">
-                          <Link to="/equipment" className="text-decoration-none">
+                      <div className="market-registro-submit-row market-registro-submit-row--auth">
+                        <div className="market-registro-submit-row__cta">
+                          <button
+                            type="submit"
+                            className="btn btn-success market-registro-submit"
+                            disabled={submitting || !ready}
+                          >
+                            {!ready ? t("login.preparing") : submitting ? t("reg.submit_busy") : t("reg.submit")}
+                          </button>
+                        </div>
+                        <div className="market-registro-auth-footer-links">
+                          <Link
+                            to="/equipment"
+                            className="market-registro-auth-footer-links__back text-decoration-none"
+                          >
                             <i className="bi bi-arrow-left-short me-1" aria-hidden />
                             {t("login.back_shop")}
                           </Link>
-                          <span className="market-registro-foot__sep" aria-hidden>
-                            ·
+                          <span className="market-registro-auth-footer-links__login">
+                            {t("reg.have_account")}{" "}
+                            <Link to={MARKETPLACE.clientLogin} state={loginLinkState}>
+                              {t("reg.login_link")}
+                            </Link>
                           </span>
-                          <Link
-                            to="/acceso"
-                            className="text-decoration-none"
-                            state={fromQuote ? { from: "quote" } : undefined}
-                          >
-                            {t("reg.footer_have_login")}
-                          </Link>
                         </div>
-                        <button
-                          type="submit"
-                          className="btn btn-success market-registro-submit"
-                          disabled={submitting || !ready}
-                        >
-                          {!ready ? t("login.preparing") : submitting ? t("reg.submit_busy") : t("reg.submit")}
-                        </button>
                       </div>
                     </form>
                   </div>
+                  </RegistroAuthShell>
                     </>
                   )}
                 </div>

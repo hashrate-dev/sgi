@@ -144,6 +144,7 @@ export function MarketplaceCartEmailInquiryModal({
               name="inquiry-email"
               required
               autoComplete="email"
+              placeholder={t("reg.email_ph")}
               value={email}
               onChange={(ev) => setEmail(ev.target.value)}
               disabled={sending || success}
