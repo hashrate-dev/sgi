@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { isEmailAlreadyRegisteredError, isRegisterPendingVerification, registerMarketplaceCliente, wakeUpBackend } from "../lib/api";
+import { isEmailAlreadyRegisteredError, isRegisterPendingVerification, registerMarketplaceCliente, resendMarketplaceVerificationEmail, wakeUpBackend } from "../lib/api";
 import { MarketplacePasswordField } from "../components/marketplace/MarketplacePasswordField";
 import { RegistroCountrySelect } from "../components/marketplace/RegistroCountrySelect";
 import { MarketplaceSiteHeader } from "../components/marketplace/MarketplaceSiteHeader";
@@ -51,6 +51,8 @@ export function MarketplaceClienteRegistroPage() {
   const [emailSuggestFocus, setEmailSuggestFocus] = useState(false);
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
   const [pendingVerificationMessage, setPendingVerificationMessage] = useState("");
+  const [resendActivationBusy, setResendActivationBusy] = useState(false);
+  const [resendActivationMsg, setResendActivationMsg] = useState("");
 
   useEffect(() => {
     const t = setTimeout(() => setReady(true), 25000);
@@ -114,6 +116,31 @@ export function MarketplaceClienteRegistroPage() {
         state={fromQuote ? { openQuoteDrawer: true } : undefined}
       />
     );
+  }
+
+  function showRegistrationPendingVerification(emailAddr: string, message?: string) {
+    setPendingVerificationEmail(emailAddr.trim().toLowerCase());
+    setPendingVerificationMessage(message?.trim() || "");
+    setResendActivationMsg("");
+    setError("");
+    setSubmitting(false);
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }
+
+  async function handleResendActivationEmail() {
+    if (!pendingVerificationEmail) return;
+    setResendActivationBusy(true);
+    setResendActivationMsg("");
+    try {
+      const r = await resendMarketplaceVerificationEmail(pendingVerificationEmail, lang);
+      setResendActivationMsg(r.message || t("reg.verify_resend_ok"));
+    } catch (err) {
+      setResendActivationMsg(err instanceof Error ? err.message : t("reg.verify_resend_fail"));
+    } finally {
+      setResendActivationBusy(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -200,12 +227,12 @@ export function MarketplaceClienteRegistroPage() {
         lang,
       });
       if (isRegisterPendingVerification(res)) {
-        setPendingVerificationEmail(res.email);
-        setPendingVerificationMessage(res.message);
-        setError("");
+        showRegistrationPendingVerification(res.email, res.message);
         return;
       }
-      applyLoginResponse(res);
+      if ("user" in res && res.user) {
+        applyLoginResponse(res);
+      }
     } catch (err) {
       const isDupEmail = isEmailAlreadyRegisteredError(err);
       if (isDupEmail) {
@@ -256,6 +283,50 @@ export function MarketplaceClienteRegistroPage() {
                 </aside>
 
                 <div className="col-12 col-lg-9 col-xl-9">
+                  {pendingVerificationEmail ? (
+                    <div className="market-registro-card market-registro-success-card" role="status">
+                      <div className="market-registro-success-card__icon" aria-hidden>
+                        <i className="bi bi-envelope-check-fill" />
+                      </div>
+                      <h1 className="market-registro-success-card__title">{t("reg.verify_success_title")}</h1>
+                      <p className="market-registro-success-card__lead">{t("reg.verify_success_lead")}</p>
+                      <p className="market-registro-success-card__email">
+                        <span className="text-muted">{t("reg.verify_success_sent_to")}</span>
+                        <strong>{pendingVerificationEmail}</strong>
+                      </p>
+                      {pendingVerificationMessage ? (
+                        <p className="market-registro-success-card__server-msg">{pendingVerificationMessage}</p>
+                      ) : null}
+                      <ol className="market-registro-success-card__steps">
+                        <li>{t("reg.verify_step1")}</li>
+                        <li>{t("reg.verify_step2")}</li>
+                        <li>{t("reg.verify_step3")}</li>
+                      </ol>
+                      <p className="market-registro-success-card__hint">{t("reg.verify_pending_hint")}</p>
+                      {resendActivationMsg ? (
+                        <div className="alert alert-success py-2 small mb-3" role="status">
+                          {resendActivationMsg}
+                        </div>
+                      ) : null}
+                      <div className="market-registro-success-card__actions">
+                        <button
+                          type="button"
+                          className="btn btn-success"
+                          disabled={resendActivationBusy}
+                          onClick={() => void handleResendActivationEmail()}
+                        >
+                          {resendActivationBusy ? t("reg.verify_resend_busy") : t("reg.verify_resend_btn")}
+                        </button>
+                        <Link to="/acceso" className="btn btn-outline-secondary">
+                          {t("reg.login_link")}
+                        </Link>
+                        <Link to="/equipment" className="btn btn-link text-decoration-none">
+                          {t("reg.back_shop")}
+                        </Link>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
                   <div className="market-registro-hero-compact">
                     <span className="market-registro-aside__badge">
                       <i className="bi bi-shop" aria-hidden />
@@ -266,25 +337,6 @@ export function MarketplaceClienteRegistroPage() {
                   </div>
 
                   <div className="market-registro-card">
-                    {pendingVerificationEmail ? (
-                      <div className="p-4 p-md-5 text-center">
-                        <div className="alert alert-success mb-4" role="status">
-                          <h2 className="h4 mb-2">{t("reg.verify_pending_title")}</h2>
-                          <p className="mb-2">{pendingVerificationMessage || t("reg.verify_pending_body")}</p>
-                          <p className="mb-0">
-                            <strong>{pendingVerificationEmail}</strong>
-                          </p>
-                        </div>
-                        <p className="text-muted small mb-4">{t("reg.verify_pending_hint")}</p>
-                        <Link to="/activar-cuenta" className="btn btn-success me-2 mb-2">
-                          {t("reg.verify_pending_cta")}
-                        </Link>
-                        <Link to="/acceso" className="btn btn-outline-secondary mb-2">
-                          {t("reg.login_link")}
-                        </Link>
-                      </div>
-                    ) : (
-                      <>
                     <header className="market-registro-card__head">
                       <p className="market-registro-card__kicker">{t("reg.card_kicker_lower")}</p>
                       <h2 className="market-registro-card__title">{t("reg.title")}</h2>
@@ -588,9 +640,9 @@ export function MarketplaceClienteRegistroPage() {
                         </button>
                       </div>
                     </form>
-                      </>
-                    )}
                   </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

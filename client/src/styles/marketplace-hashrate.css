@@ -6353,6 +6353,96 @@ button.product-modal__btn--quote-cart:active {
   max-width: none;
 }
 
+.market-registro-success-card {
+  text-align: center;
+  padding: clamp(2rem, 5vw, 3.25rem) clamp(1.25rem, 4vw, 2.5rem);
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.market-registro-success-card__icon {
+  width: 4.5rem;
+  height: 4.5rem;
+  margin: 0 auto 1.25rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(145deg, rgba(45, 212, 191, 0.22) 0%, rgba(16, 185, 129, 0.12) 100%);
+  color: #059669;
+  font-size: 2rem;
+}
+
+.market-registro-success-card__title {
+  font-size: clamp(1.45rem, 2.8vw, 2rem);
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 0.75rem;
+  line-height: 1.25;
+}
+
+.market-registro-success-card__lead {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #475569;
+  max-width: 36rem;
+  margin: 0 auto 1.25rem;
+}
+
+.market-registro-success-card__email {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding: 0.85rem 1.1rem;
+  border-radius: 12px;
+  background: rgba(236, 253, 245, 0.65);
+  border: 1px solid rgba(45, 212, 191, 0.35);
+}
+
+.market-registro-success-card__email strong {
+  font-size: 1.05rem;
+  color: #0f766e;
+  word-break: break-all;
+}
+
+.market-registro-success-card__server-msg {
+  font-size: 0.92rem;
+  color: #64748b;
+  margin: -0.5rem auto 1.25rem;
+  max-width: 34rem;
+}
+
+.market-registro-success-card__steps {
+  text-align: left;
+  max-width: 34rem;
+  margin: 0 auto 1.25rem;
+  padding-left: 1.25rem;
+  color: #334155;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.market-registro-success-card__steps li + li {
+  margin-top: 0.55rem;
+}
+
+.market-registro-success-card__hint {
+  font-size: 0.85rem;
+  color: #64748b;
+  max-width: 34rem;
+  margin: 0 auto 1.5rem;
+}
+
+.market-registro-success-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  justify-content: center;
+  align-items: center;
+}
+
 .market-registro-fieldset {
   margin: 0 0 1.65rem;
   padding: 0;

@@ -388,7 +388,10 @@ export type RegisterClienteResponse =
 export function isRegisterPendingVerification(
   res: RegisterClienteResponse
 ): res is Extract<RegisterClienteResponse, { requiresEmailVerification: true }> {
-  return "requiresEmailVerification" in res && res.requiresEmailVerification === true;
+  if ("requiresEmailVerification" in res && res.requiresEmailVerification === true) return true;
+  if ("user" in res && res.user) return false;
+  const r = res as { ok?: boolean; email?: string };
+  return r.ok === true && typeof r.email === "string" && r.email.includes("@");
 }
 export type MeResponse = { user: AuthUser };
 
