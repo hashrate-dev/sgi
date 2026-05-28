@@ -26,6 +26,7 @@ import { contabilidadGastosRouter } from "./routes/contabilidadGastos.js";
 import { luxorRouter } from "./routes/luxor.js";
 import { monitorEquiposAsicHistorialRouter } from "./routes/monitorEquiposAsicHistorial.js";
 import { potencialesClientesRouter } from "./routes/potencialesClientes.js";
+import { reunionesRouter } from "./routes/reuniones.js";
 import { requireAuth } from "./middleware/auth.js";
 import { notFound } from "./middleware/notFound.js";
 import { errorHandler } from "./middleware/errorHandler.js";
@@ -152,6 +153,7 @@ export function createApp() {
   app.use("/api", requireAuth, luxorRouter);
   app.use("/api", requireAuth, monitorEquiposAsicHistorialRouter);
   app.use("/api", requireAuth, potencialesClientesRouter);
+  app.use("/api", reunionesRouter);
 
   app.use(notFound);
   app.use(errorHandler);

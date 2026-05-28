@@ -44,6 +44,7 @@ export function MarketplaceLanguageProvider({ children }: { children: ReactNode 
 
   useEffect(() => {
     document.documentElement.lang = lang === "en" ? "en" : lang === "pt" ? "pt" : "es";
+    window.dispatchEvent(new CustomEvent("marketplace-lang-change", { detail: { lang } }));
   }, [lang]);
 
   const value = useMemo<Ctx>(

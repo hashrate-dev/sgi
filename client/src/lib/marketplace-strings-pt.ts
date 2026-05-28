@@ -709,7 +709,7 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
     "Preencha os campos com seus dados pessoais. Com sua conta você acessa o mundo da mineração de bitcoin e criptomoedas.",
   "reg.legend_account": "Sua conta",
   "reg.email_label": "E-mail",
-  "reg.email_ph": "nome@mail.com",
+  "reg.email_ph": "hal@finney.bitcoin",
   "reg.pw_min": "Senha (mín. 6)",
   "reg.pw_confirm": "Confirmar senha",
   "reg.legend_personal": "Dados pessoais",

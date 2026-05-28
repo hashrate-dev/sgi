@@ -91,6 +91,8 @@ const EnvSchema = z
      * Ej.: [{"email":"admin@local.test","password":"...","role":"admin_a"}]
      */
     DEV_SEED_USERS_JSON: z.string().optional(),
+    /** Token personal de Calendly (Integrations → API & Webhooks) para agenda de reuniones en SGI. */
+    CALENDLY_API_TOKEN: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV !== "production") return;
@@ -163,6 +165,19 @@ export const env: Env = EnvSchema.parse(process.env);
     // eslint-disable-next-line no-console
     console.log(
       "[email] Avisos marketplace por email: no configurados. Definí RESEND_API_KEY (y opcional RESEND_FROM_EMAIL) en .env.resend.local o en el .env de la raíz / server/.env; reiniciá el proceso después de guardar."
+    );
+  }
+})();
+
+(() => {
+  const token = process.env.CALENDLY_API_TOKEN?.trim();
+  if (token) {
+    // eslint-disable-next-line no-console
+    console.log("[calendly] Agenda de reuniones SGI: activa (API token configurado).");
+  } else {
+    // eslint-disable-next-line no-console
+    console.log(
+      "[calendly] Agenda de reuniones SGI: inactiva. Definí CALENDLY_API_TOKEN en .env (token personal en Calendly → Integrations → API & Webhooks)."
     );
   }
 })();

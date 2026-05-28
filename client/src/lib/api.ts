@@ -2899,3 +2899,33 @@ export function patchMarketplaceQuoteTicket(
 export function deleteMarketplaceQuoteTicketAdmin(id: number): Promise<{ ok: boolean }> {
   return api(`/api/marketplace/quote-tickets/${id}`, { method: "DELETE" });
 }
+
+export type ReunionAgendaItem = {
+  id: string;
+  name: string;
+  status: string;
+  startTime: string;
+  endTime: string;
+  timezone: string | null;
+  locationType: string;
+  locationLabel: string | null;
+  joinUrl: string | null;
+  cancelUrl: string | null;
+  rescheduleUrl: string | null;
+  invitees: Array<{ name: string; email: string; status: string }>;
+};
+
+export type ReunionesAgendaResponse = {
+  configured?: boolean;
+  message?: string;
+  range: "upcoming" | "past";
+  ownerName: string | null;
+  ownerTimezone: string | null;
+  events: ReunionAgendaItem[];
+  fetchedAt: string;
+};
+
+export function getReunionesAgenda(range: "upcoming" | "past" = "upcoming"): Promise<ReunionesAgendaResponse> {
+  const qs = new URLSearchParams({ range });
+  return api(`/api/reuniones/agenda?${qs.toString()}`);
+}

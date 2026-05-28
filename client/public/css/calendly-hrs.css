@@ -1,0 +1,95 @@
+/* Popup Calendly: modal centrado sobre la página actual (tienda / sitio) */
+body.calendly-overlay-open {
+  overflow: hidden;
+}
+
+.calendly-overlay {
+  background-color: rgba(15, 39, 66, 0.52) !important;
+  backdrop-filter: blur(2px);
+  z-index: 99990 !important;
+}
+
+.calendly-overlay .calendly-close-overlay {
+  color: #fff !important;
+  font-size: 2rem !important;
+  top: 18px !important;
+  right: 22px !important;
+  opacity: 0.92;
+}
+
+.calendly-popup {
+  box-sizing: border-box;
+  padding: 24px 16px !important;
+  max-height: 100vh !important;
+}
+
+.calendly-popup-content {
+  box-sizing: border-box;
+  width: min(1040px, calc(100vw - 32px)) !important;
+  max-width: 1040px !important;
+  height: min(720px, calc(100vh - 48px)) !important;
+  max-height: calc(100vh - 48px) !important;
+  margin: 0 auto !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  box-shadow: 0 24px 64px rgba(15, 39, 66, 0.35) !important;
+}
+
+.calendly-popup-content iframe {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 620px;
+}
+
+#hrs-calendly-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 99980;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 14px 20px;
+  border: none;
+  border-radius: 999px;
+  background: #36a08e;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.2px;
+  line-height: 1.2;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(15, 39, 66, 0.28);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+#hrs-calendly-fab:hover {
+  background: #2d8a7a;
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px rgba(15, 39, 66, 0.32);
+}
+
+#hrs-calendly-fab:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(54, 160, 142, 0.45), 0 10px 24px rgba(15, 39, 66, 0.28);
+}
+
+@media (max-width: 575.98px) {
+  .calendly-popup {
+    padding: 12px 8px !important;
+  }
+
+  .calendly-popup-content {
+    width: calc(100vw - 16px) !important;
+    height: calc(100vh - 24px) !important;
+    max-height: calc(100vh - 24px) !important;
+    border-radius: 10px !important;
+  }
+
+  #hrs-calendly-fab {
+    right: 14px;
+    bottom: 14px;
+    padding: 12px 16px;
+    font-size: 0.88rem;
+  }
+}

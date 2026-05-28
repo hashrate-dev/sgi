@@ -1,0 +1,193 @@
+.sgi-reuniones-page {
+  background: #f8fafc;
+  min-height: calc(100vh - 3.5rem);
+}
+
+.sgi-reuniones-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.sgi-reuniones-title {
+  margin: 0;
+  font-size: clamp(1.55rem, 2.4vw, 1.95rem);
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.sgi-reuniones-subtitle {
+  margin: 0.35rem 0 0;
+  color: #64748b;
+  font-size: 0.92rem;
+  max-width: 42rem;
+}
+
+.sgi-reuniones-head__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.sgi-reuniones-tabs {
+  display: inline-flex;
+  gap: 0.35rem;
+  padding: 0.25rem;
+  margin-bottom: 1rem;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+}
+
+.sgi-reuniones-tabs__btn {
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 0.88rem;
+  padding: 0.45rem 0.95rem;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.sgi-reuniones-tabs__btn.is-active {
+  background: #ecfdf5;
+  color: #047857;
+  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.25);
+}
+
+.sgi-reuniones-alert {
+  border-radius: 12px;
+}
+
+.sgi-reuniones-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 2rem 0;
+  color: #64748b;
+}
+
+.sgi-reuniones-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #64748b;
+  background: #fff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 16px;
+}
+
+.sgi-reuniones-empty .bi {
+  font-size: 2rem;
+  color: #94a3b8;
+  display: block;
+  margin-bottom: 0.75rem;
+}
+
+.sgi-reuniones-day + .sgi-reuniones-day {
+  margin-top: 1.35rem;
+}
+
+.sgi-reuniones-day__title {
+  margin: 0 0 0.65rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: capitalize;
+  color: #334155;
+}
+
+.sgi-reuniones-day__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.sgi-reuniones-card {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, 9rem) minmax(0, 1fr) auto;
+  gap: 0.85rem 1rem;
+  align-items: center;
+  padding: 0.95rem 1rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.sgi-reuniones-card__time {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.sgi-reuniones-card__clock {
+  font-weight: 700;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.92rem;
+}
+
+.sgi-reuniones-card__duration {
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.sgi-reuniones-card__name {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.sgi-reuniones-card__invitee,
+.sgi-reuniones-card__meta {
+  margin: 0;
+  font-size: 0.86rem;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.sgi-reuniones-card__meta {
+  margin-top: 0.25rem;
+  color: #64748b;
+}
+
+.sgi-reuniones-card__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: stretch;
+}
+
+.sgi-reuniones-footnote {
+  margin: 1.25rem 0 0;
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.sgi-reuniones-page .bi.spin {
+  animation: sgi-reuniones-spin 0.8s linear infinite;
+}
+
+@keyframes sgi-reuniones-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 767.98px) {
+  .sgi-reuniones-card {
+    grid-template-columns: 1fr;
+  }
+
+  .sgi-reuniones-card__actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}

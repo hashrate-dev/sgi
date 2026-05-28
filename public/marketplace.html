@@ -18,68 +18,10 @@
   <div class="bg-grid" aria-hidden="true"></div>
   <div id="app" data-page="marketplace"></div>
   <script type="module" src="js/app.js"></script>
-  <!-- Principio del widget de globo de Calendly -->
-  <link href="https://assets.calendly.com/assets/external/widget.css" rel="stylesheet">
+  <!-- Calendly: botón flotante + popup modal (la página actual queda visible detrás) -->
+  <link href="https://assets.calendly.com/assets/external/widget.css" rel="stylesheet" />
+  <link href="/css/calendly-hrs.css" rel="stylesheet" />
   <script src="https://assets.calendly.com/assets/external/widget.js" type="text/javascript" async></script>
-  <script type="text/javascript">
-    window.addEventListener("load", function() {
-      var labels = {
-        es: "📅 Reserva una reunión",
-        en: "📅 Book a meeting",
-        pt: "📅 Agende uma reunião"
-      };
-      function resolveLang() {
-        var stored = "";
-        try { stored = (localStorage.getItem("marketplace-lang") || "").toLowerCase(); } catch (e) {}
-        if (stored === "es" || stored === "en" || stored === "pt") return stored;
-        var htmlLang = (document.documentElement.lang || "").toLowerCase().slice(0, 2);
-        if (htmlLang === "es" || htmlLang === "en" || htmlLang === "pt") return htmlLang;
-        return "en";
-      }
-      function getLabel() {
-        return labels[resolveLang()] || labels.en;
-      }
-      function getCalendlyUrl() {
-        var lang = resolveLang();
-        var locale = lang === "pt" ? "pt-BR" : lang;
-        var base = "https://calendly.com/hashrate-space/30min";
-        var params = [
-          "hide_event_type_details=0",
-          "hide_gdpr_banner=1",
-          "background_color=ffffff",
-          "text_color=14324a",
-          "primary_color=36a08e",
-          "locale=" + encodeURIComponent(locale)
-        ];
-        return base + "?" + params.join("&");
-      }
-      Calendly.initBadgeWidget({
-        url: getCalendlyUrl(),
-        text: getLabel(),
-        color: "#36a08e",
-        textColor: "#ffffff",
-        branding: false
-      });
-      function applyLabel() {
-        var badge = document.querySelector(".calendly-badge-widget");
-        var el = document.querySelector(".calendly-badge-content");
-        if (badge) {
-          badge.style.right = "20px";
-          badge.style.bottom = "20px";
-        }
-        if (el) el.textContent = getLabel();
-        if (el) {
-          el.style.padding = "14px 20px";
-          el.style.borderRadius = "999px";
-          el.style.fontWeight = "700";
-          el.style.letterSpacing = "0.2px";
-          el.style.boxShadow = "0 10px 24px rgba(15,39,66,0.28)";
-        }
-      }
-      applyLabel();
-      setInterval(applyLabel, 1000);
-    });
-  </script>
-  <!-- Final del widget de globo de Calendly -->
+  <script src="/js/calendly-hrs.js" defer></script>
 </body>
 </html>

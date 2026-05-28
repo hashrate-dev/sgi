@@ -9,6 +9,7 @@ import {
   lectorHasExplicitGrantList,
   lectorHasKryptexPool,
   canViewMarketplaceQuoteTickets,
+  canViewSiteMeetings,
 } from "../lib/auth.js";
 import { canUserAccessNavPath, canUserAccessScreen } from "../lib/sgiNavigation.js";
 import { playMarketplaceOrderNotificationSound } from "../lib/marketplaceCartSound";
@@ -231,6 +232,7 @@ export function HomePage() {
   const canSeeMarketplaceOrdersCard = Boolean(user && canViewMarketplaceQuoteTickets(user));
   const canSeeMarketplacePresenceCard = Boolean(user && canUserAccessScreen(user, "marketplace-presence"));
   const canSeeMarketplaceBannersCard = Boolean(user && canUserAccessNavPath(user, "/marketplace/home-banners"));
+  const canSeeMeetingsCard = Boolean(user && canViewSiteMeetings(user));
 
   useEffect(() => {
     if (!canSeeMarketplaceOrdersCard) return;
@@ -523,6 +525,35 @@ export function HomePage() {
                 </Flex>
                 <Heading {...cardTitleProps}>Tienda online — banners home</Heading>
                 <Text {...cardDescProps}>Destacados de la home pública: más vendidos y otros productos</Text>
+              </AppCard>
+            </RouterLink>
+          ) : null}
+
+          {canSeeMeetingsCard ? (
+            <RouterLink to="/reuniones" style={DASHBOARD_CARD_LINK_STYLE}>
+              <AppCard
+                {...dashboardCardProps}
+                _hover={{
+                  ...dashboardCardProps._hover,
+                  "& .dashboard-card-icon-slot": {
+                    bg: "#dbeafe",
+                    color: "#1d4ed8",
+                    borderColor: "#bfdbfe",
+                  },
+                }}
+              >
+                <Flex
+                  {...ICON_SLOT_PROPS}
+                  className="dashboard-card-icon-slot"
+                  mb={3}
+                  bg="#eff6ff"
+                  color="#1d4ed8"
+                  borderColor="#bfdbfe"
+                >
+                  <Box as="i" className="bi bi-calendar-event" fontSize={DASHBOARD_BI_ICON_SIZE_LG} lineHeight={1} aria-hidden />
+                </Flex>
+                <Heading {...cardTitleProps}>Reuniones</Heading>
+                <Text {...cardDescProps}>Agenda de reservas Calendly — solo administradores del sitio</Text>
               </AppCard>
             </RouterLink>
           ) : null}

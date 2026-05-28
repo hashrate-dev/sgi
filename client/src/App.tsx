@@ -59,6 +59,7 @@ import { MarketplaceAsicEmailInquiryPage } from "./pages/MarketplaceAsicEmailInq
 import { MarketplaceClienteLoginPage } from "./pages/MarketplaceClienteLoginPage";
 import { MarketplaceClienteRegistroPage } from "./pages/MarketplaceClienteRegistroPage";
 import { MarketplacePresencePage } from "./pages/MarketplacePresencePage";
+import { SgiReunionesPage } from "./pages/SgiReunionesPage";
 import { MarketplacePresenceHistorialPage } from "./pages/MarketplacePresenceHistorialPage";
 import { PasswordResetPage } from "./pages/PasswordResetPage";
 import { AccountActivatePage } from "./pages/AccountActivatePage";
@@ -489,6 +490,7 @@ function App() {
             <Route path="/marketplace/orders" element={<CotizacionesMarketplacePage />} />
             <Route path="/marketplace/presence/history" element={<MarketplacePresenceHistorialPage />} />
             <Route path="/marketplace/presence" element={<MarketplacePresencePage />} />
+            <Route path="/reuniones" element={<SgiReunionesPage />} />
 
             {/* Compatibilidad legacy ES -> EN */}
             <Route path="/marketplacedashboard" element={<Navigate to="/asic/equipment" replace />} />

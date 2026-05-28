@@ -86,10 +86,13 @@ export function isStaffPathAllowedInSpa(
   user: Pick<AuthUser, "role" | "admin_b_grants">,
   pathname: string
 ): boolean {
+  const pathRaw = (pathname.split("?")[0] ?? pathname).replace(/\/+$/, "") || "/";
+  if (pathRaw === "/reuniones" || pathRaw.startsWith("/reuniones/")) {
+    return user.role === "admin_a" || user.role === "admin_b";
+  }
   if (user.role !== "admin_b" && user.role !== "operador") return true;
   const g = user.admin_b_grants;
   if (g == null) return true;
-  const pathRaw = (pathname.split("?")[0] ?? pathname).replace(/\/+$/, "") || "/";
   if (g.length === 0) return isSgiDashboardPath(pathRaw);
   if (isSgiDashboardPath(pathRaw)) return true;
   const prefixes = collectPathPrefixesFromScreenGrants(g);
@@ -335,6 +338,12 @@ export function canViewMarketplacePresence(user: PermUser): boolean {
   if (user.role === "admin_a") return true;
   if (user.role === "operador" || user.role === "admin_b") return adminBAllowsModule(user, "marketplace_presencia");
   return false;
+}
+
+/** Agenda de reuniones Calendly — solo administradores del sitio (A y B). */
+export function canViewSiteMeetings(user: PermUser): boolean {
+  if (!user) return false;
+  return user.role === "admin_a" || user.role === "admin_b";
 }
 
 /** Setup / combos minería. */
