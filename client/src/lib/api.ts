@@ -1070,6 +1070,16 @@ export function getClients(): Promise<ClientsResponse> {
   return api<ClientsResponse>("/api/clients");
 }
 
+/** Clientes solo cambio USDT (código FX…). */
+export function getFxExchangeClients(): Promise<ClientsResponse> {
+  return api<ClientsResponse>("/api/clients/fx");
+}
+
+/** Hosting + clientes FX para el formulario Operaciones de Cambio. */
+export function getClientsForFxOperations(): Promise<ClientsResponse> {
+  return api<ClientsResponse>("/api/clients/for-fx-operations");
+}
+
 export function getStoreClients(): Promise<ClientsResponse> {
   return api<ClientsResponse>("/api/clients/store");
 }
@@ -1078,8 +1088,27 @@ export function getNextClientCode(): Promise<NextClientCodeResponse> {
   return api<NextClientCodeResponse>("/api/clients/next-code");
 }
 
+export function getNextFxClientCode(): Promise<NextClientCodeResponse> {
+  return api<NextClientCodeResponse>("/api/clients/next-fx-code");
+}
+
 export function createClient(body: CreateClientBody): Promise<ClientResponse> {
   return api<ClientResponse>("/api/clients", { method: "POST", body: JSON.stringify(body) });
+}
+
+export function createFxExchangeClient(body: CreateClientBody): Promise<ClientResponse> {
+  return api<ClientResponse>("/api/clients/fx", { method: "POST", body: JSON.stringify(body) });
+}
+
+export function updateFxExchangeClient(
+  id: number | string,
+  body: Omit<Partial<ClientFields>, "id" | "code">
+): Promise<ClientResponse> {
+  return api<ClientResponse>(`/api/clients/fx/${id}`, { method: "PUT", body: JSON.stringify(body) });
+}
+
+export function deleteFxExchangeClient(id: number | string): Promise<void> {
+  return api<void>(`/api/clients/fx/${id}`, { method: "DELETE" });
 }
 
 export type ClientsBulkResponse = { inserted: number; skipped: number; errors: number; insertedClients: Array<{ code: string; name: string }>; skippedCodes: string[]; errorMessages: string[] };

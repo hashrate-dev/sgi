@@ -53,7 +53,11 @@ const storeIdentityWhereSql = `
       AND LOWER(TRIM(COALESCE(u.role, ''))) = 'cliente'
   )
 )`;
-const hostingOnlyWhereSql = "NOT (UPPER(TRIM(COALESCE(code, ''))) LIKE 'A9%' OR UPPER(TRIM(COALESCE(code, ''))) LIKE 'WEB-%')";
+const hostingOnlyWhereSql =
+  "NOT (UPPER(TRIM(COALESCE(code, ''))) LIKE 'A9%' OR UPPER(TRIM(COALESCE(code, ''))) LIKE 'WEB-%' OR UPPER(TRIM(COALESCE(code, ''))) LIKE 'FX%')";
+const fxOnlyWhereSql = "UPPER(TRIM(COALESCE(code, ''))) LIKE 'FX%'";
+/** Clientes elegibles en Operaciones de Cambio: hosting (C…) + solo cambio (FX…). */
+const fxOperationsClientsWhereSql = `(${hostingOnlyWhereSql}) OR (${fxOnlyWhereSql})`;
 const storeOnlyWhereSql = storeIdentityWhereSql;
 
 function buildNextHostingCode(codes: string[]): string {
@@ -76,6 +80,72 @@ function buildNextHostingCode(codes: string[]): string {
 async function getNextClientCodeFromDb(): Promise<string> {
   const rows = await db.prepare(`SELECT code FROM clients WHERE ${hostingOnlyWhereSql}`).all() as Array<{ code?: string }>;
   return buildNextHostingCode(rows.map((r) => String(r.code ?? "")));
+}
+
+function buildNextFxCode(codes: string[]): string {
+  let max = 0;
+  let width = 3;
+  for (const codeRaw of codes) {
+    const code = String(codeRaw ?? "").trim().toUpperCase();
+    const m = code.match(/^FX(\d+)$/);
+    if (!m) continue;
+    const numRaw = m[1] ?? "";
+    const num = Number.parseInt(numRaw, 10);
+    if (!Number.isFinite(num) || num <= 0) continue;
+    if (num > max) max = num;
+    if (numRaw.length > width) width = numRaw.length;
+  }
+  const next = max + 1;
+  return `FX${String(next).padStart(width, "0")}`;
+}
+
+async function getNextFxClientCodeFromDb(): Promise<string> {
+  const rows = await db.prepare(`SELECT code FROM clients WHERE ${fxOnlyWhereSql}`).all() as Array<{ code?: string }>;
+  return buildNextFxCode(rows.map((r) => String(r.code ?? "")));
+}
+
+async function insertClientRow(d: z.infer<typeof ClientCreateSchema> & { code: string }): Promise<{ id: number; client: unknown }> {
+  const stmt = db.prepare(
+    "INSERT INTO clients (code, name, name2, phone, phone2, email, email2, address, address2, city, city2, usuario, documento_identidad, country) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  );
+  let resolvedCode = d.code.trim();
+  let info: { lastInsertRowid?: number | bigint | string | null } | null = null;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    try {
+      info = await stmt.run(
+        resolvedCode,
+        d.name,
+        d.name2 ?? null,
+        d.phone ?? null,
+        d.phone2 ?? null,
+        d.email ?? null,
+        d.email2 ?? null,
+        d.address ?? null,
+        d.address2 ?? null,
+        d.city ?? null,
+        d.city2 ?? null,
+        d.usuario ?? null,
+        d.documento_identidad ?? null,
+        d.country ?? null
+      );
+      break;
+    } catch (e: unknown) {
+      if (isUniqueCodeError(e) && !d.code.trim()) {
+        resolvedCode = "";
+        continue;
+      }
+      throw e;
+    }
+  }
+  if (!info) {
+    throw Object.assign(new Error("No se pudo generar un código de cliente único."), { statusCode: 409 });
+  }
+  const id = info?.lastInsertRowid;
+  if (id == null || !Number.isFinite(Number(id))) {
+    throw Object.assign(new Error("Error al crear cliente. No se obtuvo el ID."), { statusCode: 500 });
+  }
+  const client = await db.prepare(`SELECT ${selectFields} FROM clients WHERE id = ?`).get(Number(id));
+  return { id: Number(id), client: client ?? { ...d, id: Number(id) } };
 }
 
 function isUniqueCodeError(err: unknown): boolean {
@@ -236,6 +306,79 @@ clientsRouter.get(
   res.json({ code });
 });
 
+clientsRouter.get(
+  "/clients/fx",
+  requireRole("admin_a", "admin_b", "operador", "lector"),
+  requireModuleGrant("hosting_tipo_cambio"),
+  async (_req, res) => {
+  const rows = await db
+    .prepare(`SELECT ${selectFields} FROM clients WHERE ${fxOnlyWhereSql} ORDER BY code ASC`)
+    .all();
+  res.json({ clients: rows });
+});
+
+clientsRouter.get(
+  "/clients/for-fx-operations",
+  requireRole("admin_a", "admin_b", "operador", "lector"),
+  requireModuleGrant("hosting_tipo_cambio"),
+  async (_req, res) => {
+  const rows = await db
+    .prepare(`SELECT ${selectFields} FROM clients WHERE ${fxOperationsClientsWhereSql} ORDER BY code ASC`)
+    .all();
+  res.json({ clients: rows });
+});
+
+clientsRouter.get(
+  "/clients/next-fx-code",
+  requireRole("admin_a", "admin_b", "operador", "lector"),
+  requireModuleGrant("hosting_tipo_cambio"),
+  async (_req, res) => {
+  const code = await getNextFxClientCodeFromDb();
+  res.json({ code });
+});
+
+clientsRouter.post(
+  "/clients/fx",
+  requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("hosting_tipo_cambio"),
+  async (req, res, next) => {
+  try {
+    const parsed = ClientCreateSchema.extend({
+      code: z.string().max(50).trim().optional(),
+    }).safeParse(req.body);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ error: { message: "Invalid body", details: parsed.error.flatten() } });
+    }
+    const d = parsed.data;
+    let resolvedCode = (d.code ?? "").trim().toUpperCase();
+    if (resolvedCode && !resolvedCode.startsWith("FX")) {
+      return res.status(400).json({ error: { message: "El código de cliente de cambio debe comenzar con FX." } });
+    }
+    if (!resolvedCode) resolvedCode = await getNextFxClientCodeFromDb();
+    try {
+      const { client } = await insertClientRow({ ...d, code: resolvedCode });
+      return res.status(201).json({ client });
+    } catch (e: unknown) {
+      if (isUniqueCodeError(e)) {
+        return res.status(409).json({ error: { message: "Ya existe un cliente con ese código" } });
+      }
+      if (isUniqueEmailError(e)) {
+        return res.status(409).json({ error: { message: "Ya existe un cliente con ese email" } });
+      }
+      const statusCode = (e as { statusCode?: number }).statusCode;
+      if (statusCode === 409 || statusCode === 500) {
+        return res.status(statusCode).json({ error: { message: (e as Error).message } });
+      }
+      console.error("POST /clients/fx error:", e);
+      return res.status(500).json({ error: { message: "Error al crear cliente de cambio." } });
+    }
+  } catch (e) {
+    next(e);
+  }
+});
+
 clientsRouter.post(
   "/clients",
   requireRole("admin_a", "admin_b", "operador"),
@@ -309,26 +452,7 @@ clientsRouter.post(
   }
 });
 
-clientsRouter.put(
-  "/clients/:id",
-  requireRole("admin_a", "admin_b", "operador"),
-  requireModuleGrant("clientes"),
-  async (req, res) => {
-  const id = Number(req.params.id);
-  if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: { message: "Invalid id" } });
-  }
-  const parsed = ClientUpdateSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res
-      .status(400)
-      .json({ error: { message: "Invalid body", details: parsed.error.flatten() } });
-  }
-  const existing = await db.prepare("SELECT id FROM clients WHERE id = ?").get(id);
-  if (!existing) {
-    return res.status(404).json({ error: { message: "Cliente no encontrado" } });
-  }
-  const d = parsed.data;
+async function updateClientById(id: number, d: z.infer<typeof ClientUpdateSchema>): Promise<unknown> {
   const updates: string[] = [];
   const values: unknown[] = [];
   if (d.code !== undefined) {
@@ -388,13 +512,93 @@ clientsRouter.put(
     values.push(d.country);
   }
   if (updates.length === 0) {
-    const client = await db.prepare(`SELECT ${selectFields} FROM clients WHERE id = ?`).get(id);
-    return res.json({ client });
+    return db.prepare(`SELECT ${selectFields} FROM clients WHERE id = ?`).get(id);
   }
   values.push(id);
+  await db.prepare(`UPDATE clients SET ${updates.join(", ")} WHERE id = ?`).run(...values);
+  return db.prepare(`SELECT ${selectFields} FROM clients WHERE id = ?`).get(id);
+}
+
+clientsRouter.put(
+  "/clients/fx/:id",
+  requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("hosting_tipo_cambio"),
+  async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) {
+    return res.status(400).json({ error: { message: "Invalid id" } });
+  }
+  const parsed = ClientUpdateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ error: { message: "Invalid body", details: parsed.error.flatten() } });
+  }
+  const existing = await db
+    .prepare(`SELECT id FROM clients WHERE id = ? AND ${fxOnlyWhereSql}`)
+    .get(id);
+  if (!existing) {
+    return res.status(404).json({ error: { message: "Cliente de cambio no encontrado" } });
+  }
+  if (parsed.data.code !== undefined) {
+    const code = parsed.data.code.trim().toUpperCase();
+    if (!code.startsWith("FX")) {
+      return res.status(400).json({ error: { message: "El código debe comenzar con FX." } });
+    }
+  }
   try {
-    await db.prepare(`UPDATE clients SET ${updates.join(", ")} WHERE id = ?`).run(...values);
-    const client = await db.prepare(`SELECT ${selectFields} FROM clients WHERE id = ?`).get(id);
+    const client = await updateClientById(id, parsed.data);
+    res.json({ client });
+  } catch (e: unknown) {
+    const err = e as { code?: string };
+    if (err?.code && String(err.code).includes("SQLITE_CONSTRAINT")) {
+      return res.status(409).json({ error: { message: "Ya existe un cliente con ese código" } });
+    }
+    throw e;
+  }
+});
+
+clientsRouter.delete(
+  "/clients/fx/:id",
+  requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("hosting_tipo_cambio"),
+  async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) {
+    return res.status(400).json({ error: { message: "Invalid id" } });
+  }
+  const existing = await db
+    .prepare(`SELECT id FROM clients WHERE id = ? AND ${fxOnlyWhereSql}`)
+    .get(id);
+  if (!existing) {
+    return res.status(404).json({ error: { message: "Cliente de cambio no encontrado" } });
+  }
+  await db.prepare("DELETE FROM clients WHERE id = ?").run(id);
+  res.status(204).send();
+});
+
+clientsRouter.put(
+  "/clients/:id",
+  requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("clientes"),
+  async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) {
+    return res.status(400).json({ error: { message: "Invalid id" } });
+  }
+  const parsed = ClientUpdateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ error: { message: "Invalid body", details: parsed.error.flatten() } });
+  }
+  const existing = await db.prepare("SELECT id FROM clients WHERE id = ?").get(id);
+  if (!existing) {
+    return res.status(404).json({ error: { message: "Cliente no encontrado" } });
+  }
+  const d = parsed.data;
+  try {
+    const client = await updateClientById(id, d);
     res.json({ client });
   } catch (e: unknown) {
     const err = e as { code?: string };

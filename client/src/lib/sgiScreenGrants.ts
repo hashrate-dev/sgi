@@ -163,7 +163,10 @@ export function collectPathPrefixesFromScreenGrants(grants: readonly string[]): 
     set.add("/clients");
   }
   const seesGa =
-    grantsIncludeScreen(g, "ga-nuevos-leads") || grantsIncludeScreen(g, "ga-leads-base");
+    grantsIncludeScreen(g, "ga-nuevos-leads") ||
+    grantsIncludeScreen(g, "ga-leads-base") ||
+    grantsIncludeScreen(g, "ga-cambio-usdt-hub") ||
+    grantsIncludeScreen(g, "ga-cambio-usdt-clientes");
   const seesFin =
     grantsIncludeScreen(g, "fin-proveedores") ||
     grantsIncludeScreen(g, "fin-contabilidad") ||

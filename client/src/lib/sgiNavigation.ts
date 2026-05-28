@@ -34,11 +34,16 @@ const GA_HUB_SECTION_SCREENS = [
   ...FIN_HUB_SCREENS,
   "ga-nuevos-leads",
   "ga-leads-base",
+  "ga-cambio-usdt-hub",
+  "ga-cambio-usdt-clientes",
 ] as const;
+
+const CAMBIO_USDT_HUB_SCREENS = ["ga-cambio-usdt-hub", "ga-cambio-usdt-clientes", "fin-exchange-hub"] as const;
 
 /** Ruta de hub/menú → basta con tener acceso a una pantalla de la lista. */
 const HUB_PATH_SCREENS: Record<string, readonly string[]> = {
   "/gestion-administrativa": GA_HUB_SECTION_SCREENS,
+  "/gestion-administrativa/cambio-usdt": CAMBIO_USDT_HUB_SCREENS,
   "/hosting": HOSTING_HUB_SCREENS,
   "/asic": ASIC_HUB_SCREENS,
   "/gestion-financiera": FIN_HUB_SCREENS,

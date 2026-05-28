@@ -32,6 +32,12 @@ const hubItems: readonly HubItem[] = [
     desc: "Reportes, cuentas por cliente y operaciones de cambio (USDT/USD)",
   },
   {
+    to: "/gestion-administrativa/cambio-usdt",
+    icon: "bi-currency-bitcoin",
+    label: "Servicios de Cambio USDT",
+    desc: "Clientes exclusivos de cambio USDT/USD y acceso a operaciones de cambio",
+  },
+  {
     to: "/gestion-administrativa/nuevos-leads",
     icon: "bi-person-plus-fill",
     label: "Nuevos Leads",

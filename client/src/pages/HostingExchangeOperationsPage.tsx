@@ -17,7 +17,7 @@ import {
 import {
   createHostingFxOperation,
   deleteHostingFxOperation,
-  getClients,
+  getClientsForFxOperations,
   getHostingFxOperations,
   getHostingInvoicesTransferCommission,
   updateHostingFxOperation,
@@ -83,7 +83,7 @@ export function HostingExchangeOperationsPage() {
   const loadData = useCallback(async () => {
     setTableLoading(true);
     try {
-      const c = await getClients();
+      const c = await getClientsForFxOperations();
       const normalizedClients = (c.clients || [])
         .map((x) => ({
           id: Number(x.id ?? 0),

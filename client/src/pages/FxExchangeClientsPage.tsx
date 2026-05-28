@@ -1,0 +1,380 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link, Navigate, useNavigate } from "react-router-dom";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
+import { FxClienteNewForm } from "../components/FxClienteNewForm";
+import { PageHeader } from "../components/PageHeader";
+import { showToast } from "../components/ToastNotification";
+import { useAuth } from "../contexts/AuthContext";
+import { canAccessHostingTipoCambio, canEditHostingTipoCambio, canExport } from "../lib/auth";
+import { getFxExchangeClients } from "../lib/api";
+import type { Client } from "../lib/types";
+import "../styles/facturacion.css";
+
+export function FxExchangeClientsPage() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const canAccess = user ? canAccessHostingTipoCambio(user) : false;
+  const canEdit = user ? canEditHostingTipoCambio(user) : false;
+  const canExportData = user ? canExport(user) : false;
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showNewForm, setShowNewForm] = useState(false);
+
+  function loadClients() {
+    setLoading(true);
+    setError(null);
+    getFxExchangeClients()
+      .then((r) => setClients((r.clients || []) as Client[]))
+      .catch((e) => setError(e instanceof Error ? e.message : "Error al cargar clientes"))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    if (canAccess) loadClients();
+  }, [canAccess]);
+
+  function handleEdit(c: Client) {
+    if (!c.code && c.id == null) return;
+    navigate(
+      `/gestion-administrativa/cambio-usdt/clientes/${encodeURIComponent(c.code || String(c.id))}/edit`
+    );
+  }
+
+  function handleNewClient() {
+    setShowNewForm(true);
+  }
+
+  function exportExcel() {
+    if (filteredClients.length === 0) {
+      showToast("No hay clientes de cambio para exportar.", "warning");
+      return;
+    }
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Clientes Cambio USDT");
+
+    ws.columns = [
+      { header: "Código", key: "code", width: 15 },
+      { header: "Nombre", key: "name", width: 35 },
+      { header: "Nombre adicional", key: "name2", width: 35 },
+      { header: "Teléfono 1", key: "phone", width: 20 },
+      { header: "Teléfono 2", key: "phone2", width: 20 },
+      { header: "Email 1", key: "email", width: 30 },
+      { header: "Email 2", key: "email2", width: 30 },
+      { header: "Dirección 1", key: "address", width: 40 },
+      { header: "Dirección 2", key: "address2", width: 40 },
+      { header: "Ciudad / País 1", key: "city", width: 30 },
+      { header: "Ciudad / País 2", key: "city2", width: 30 },
+    ];
+
+    filteredClients.forEach((client) => {
+      ws.addRow({
+        code: client.code || "",
+        name: client.name || "",
+        name2: client.name2 || "",
+        phone: client.phone || "",
+        phone2: client.phone2 || "",
+        email: client.email || "",
+        email2: client.email2 || "",
+        address: client.address || "",
+        address2: client.address2 || "",
+        city: client.city || "",
+        city2: client.city2 || "",
+      });
+    });
+
+    const headerRow = ws.getRow(1);
+    headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    headerRow.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF00A652" },
+    };
+    headerRow.alignment = { vertical: "middle", horizontal: "center" };
+    headerRow.height = 25;
+
+    ws.eachRow((row, rowNumber) => {
+      row.eachCell((cell) => {
+        cell.border = {
+          top: { style: "thin", color: { argb: "FFE2E8F0" } },
+          left: { style: "thin", color: { argb: "FFE2E8F0" } },
+          bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
+          right: { style: "thin", color: { argb: "FFE2E8F0" } },
+        };
+        if (rowNumber > 1) {
+          cell.alignment = { vertical: "middle", horizontal: "left" };
+        }
+      });
+    });
+
+    wb.xlsx.writeBuffer().then((buf) => {
+      const fecha = new Date().toISOString().split("T")[0];
+      saveAs(new Blob([buf]), `Clientes_Cambio_USDT_${fecha}.xlsx`);
+    });
+  }
+
+  const filteredClients = useMemo(() => {
+    const searchLower = searchTerm.toLowerCase().trim();
+    if (!searchLower) return clients;
+    return clients.filter(
+      (c) =>
+        c.code?.toLowerCase().includes(searchLower) ||
+        c.name?.toLowerCase().includes(searchLower) ||
+        c.name2?.toLowerCase().includes(searchLower) ||
+        c.phone?.toLowerCase().includes(searchLower) ||
+        c.email?.toLowerCase().includes(searchLower) ||
+        c.address?.toLowerCase().includes(searchLower) ||
+        c.city?.toLowerCase().includes(searchLower)
+    );
+  }, [clients, searchTerm]);
+
+  if (!user || !canAccess) {
+    return <Navigate to="/gestion-administrativa" replace />;
+  }
+
+  return (
+    <div className="fact-page clientes-page">
+      <div className="container">
+        <PageHeader title="Clientes · Cambio USDT" />
+
+        {canEdit && showNewForm && (
+          <div className="modal d-block professional-modal-overlay" tabIndex={-1}>
+            <div className="modal-dialog modal-dialog-centered clientes-new-modal-dialog">
+              <div className="modal-content professional-modal professional-modal-form clientes-new-modal-content">
+                <div className="modal-header professional-modal-header">
+                  <div className="professional-modal-icon-wrapper">
+                    <svg className="professional-modal-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path
+                        d="M16 21V19C16 17.9391 15.5786 16.9217 14.8284 16.1716C14.0783 15.4214 13.0609 15 12 15H5C3.93913 15 2.92172 15.4214 2.17157 16.1716C1.42143 16.9217 1 17.9391 1 19V21M23 21V19C22.9993 18.1137 22.7044 17.2528 22.1614 16.5523C21.6184 15.8519 20.8581 15.3516 20 15.13M16 3.13C16.8604 3.35031 17.623 3.85071 18.1676 4.55232C18.7122 5.25392 19.0078 6.11683 19.0078 7.005C19.0078 7.89318 18.7122 8.75608 18.1676 9.45769C17.623 10.1593 16.8604 10.6597 16 10.88M13 7C13 9.20914 11.2091 11 9 11C6.79086 11 5 9.20914 5 7C5 4.79086 6.79086 3 9 3C11.2091 3 13 4.79086 13 7Z"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
+                  <h5 className="modal-title professional-modal-title">Agregar nuevo cliente</h5>
+                  <button
+                    type="button"
+                    className="professional-modal-close"
+                    onClick={() => setShowNewForm(false)}
+                    aria-label="Cerrar"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M18 6L6 18M6 6L18 18" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                </div>
+                <FxClienteNewForm
+                  variant="modal"
+                  onSuccess={(message) => {
+                    loadClients();
+                    setShowNewForm(false);
+                    showToast(message ?? "Listo.", "success", "Clientes Cambio USDT");
+                  }}
+                  onCancel={() => setShowNewForm(false)}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="hrs-card hrs-card--rect p-4">
+          <div className="clientes-filtros-outer">
+            <div className="clientes-filtros-container">
+              <div className="card clientes-filtros-card">
+                <h6 className="fw-bold border-bottom pb-2">🔍 Filtros</h6>
+                <div className="row g-2 align-items-end">
+                  <div className="col-md-4">
+                    <label className="form-label small fw-bold">Buscar</label>
+                    <input
+                      type="text"
+                      className="form-control form-control-sm"
+                      placeholder="Buscar por código, nombre, teléfono o email..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  <div className="col-md-2 d-flex align-items-end filtros-limpiar-col">
+                    <button
+                      className="btn btn-outline-secondary btn-sm filtros-limpiar-btn"
+                      type="button"
+                      onClick={() => setSearchTerm("")}
+                    >
+                      Limpiar
+                    </button>
+                  </div>
+                  <div className="col-md-auto d-flex align-items-end gap-2 ms-auto">
+                    {canExportData && (
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary btn-sm clientes-export-excel-btn"
+                        style={{ backgroundColor: "rgba(13, 110, 253, 0.12)" }}
+                        onClick={exportExcel}
+                        disabled={filteredClients.length === 0}
+                      >
+                        📊 Exportar Excel
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="clientes-listado-wrap">
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <h6 className="fw-bold m-0">
+                👥 Listado de clientes · Cambio USDT ({loading ? "…" : filteredClients.length})
+                {!canEdit && <span className="text-muted small ms-2">(solo consulta)</span>}
+              </h6>
+              {canEdit && (
+                <button
+                  type="button"
+                  className="fact-btn fact-btn-primary btn-sm"
+                  onClick={handleNewClient}
+                  style={{ fontSize: "0.8125rem", padding: "0.5rem 1rem" }}
+                >
+                  ➕ Nuevo Cliente
+                </button>
+              )}
+            </div>
+
+            <p className="text-muted small mb-3">
+              Clientes con código <strong>FX</strong> (solo cambio USDT/USD). Aparecen en{" "}
+              <Link to="/hosting/exchange-operations">Operaciones de Cambio</Link> junto con la cartera de hosting.
+            </p>
+
+            {error && (
+              <div className="mb-3 p-3 rounded" style={{ background: "#fef2f2", color: "#b91c1c" }}>
+                {error}
+                {typeof window !== "undefined" &&
+                  (window.location?.hostname === "localhost" || window.location?.hostname === "127.0.0.1") &&
+                  " Asegurate de tener el servidor levantado (npm run dev en la raíz)."}
+              </div>
+            )}
+
+            {loading ? (
+              <div className="table-responsive" style={{ minHeight: 200 }}>
+                <table className="table table-sm align-middle clientes-listado-table" style={{ fontSize: "0.85rem" }}>
+                  <thead className="table-dark">
+                    <tr>
+                      <th className="text-start">Código</th>
+                      <th className="text-start">Nombre</th>
+                      <th className="text-start">Contacto</th>
+                      <th className="text-start">Ubicación</th>
+                      {canEdit && <th className="text-start" style={{ width: "100px" }}>Acciones</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <tr key={i}>
+                        <td>
+                          <span className="clientes-skeleton" style={{ width: "4em" }} />
+                        </td>
+                        <td>
+                          <span className="clientes-skeleton" style={{ width: "12em" }} />
+                        </td>
+                        <td>
+                          <span className="clientes-skeleton" style={{ width: "10em" }} />
+                        </td>
+                        <td>
+                          <span className="clientes-skeleton" style={{ width: "8em" }} />
+                        </td>
+                        {canEdit && (
+                          <td>
+                            <span className="clientes-skeleton" style={{ width: "5em" }} />
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : filteredClients.length === 0 ? (
+              <div className="fact-empty">
+                <div className="fact-empty-icon">👥</div>
+                <div className="fact-empty-text">
+                  {searchTerm
+                    ? "No se encontraron clientes de cambio con ese criterio."
+                    : "No hay clientes de cambio cargados. Agregá uno con «Nuevo Cliente»."}
+                </div>
+              </div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-sm align-middle clientes-listado-table" style={{ fontSize: "0.85rem" }}>
+                  <thead className="table-dark">
+                    <tr>
+                      <th className="text-start">Código</th>
+                      <th className="text-start">Nombre</th>
+                      <th className="text-start">Contacto</th>
+                      <th className="text-start">Ubicación</th>
+                      {canEdit && <th className="text-start" style={{ width: "100px" }}>Acciones</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredClients.map((c) => (
+                      <tr key={c.id ?? c.code}>
+                        <td className="text-start client-code">{c.code}</td>
+                        <td className="text-start client-name">
+                          <div className="client-name-primary">👤 {c.name}</div>
+                          {c.name2 && (
+                            <div className="client-name-secondary">
+                              <span>👤 {c.name2}</span>
+                            </div>
+                          )}
+                        </td>
+                        <td className="text-start client-contact">
+                          {c.phone && <div>📞 {c.phone}</div>}
+                          {c.phone2 && <div className="text-muted small">📞 {c.phone2}</div>}
+                          {c.email && <div>✉️ {c.email}</div>}
+                          {c.email2 && <div className="text-muted small">✉️ {c.email2}</div>}
+                        </td>
+                        <td className="text-start client-location">
+                          {c.address || c.city ? (
+                            <>
+                              {c.address && (
+                                <div>
+                                  📍 {c.address}
+                                </div>
+                              )}
+                              {c.city && !c.address && (
+                                <div>
+                                  📍 {c.city}
+                                </div>
+                              )}
+                              {c.city && c.address && (
+                                <div className="text-muted small">📍 {c.city}</div>
+                              )}
+                            </>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        {canEdit && (
+                          <td className="text-start">
+                            <button
+                              type="button"
+                              className="fact-btn fact-btn-secondary btn-sm"
+                              style={{ padding: "0.35rem 0.75rem", fontSize: "0.8125rem" }}
+                              onClick={() => handleEdit(c)}
+                            >
+                              Editar
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

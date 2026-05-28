@@ -174,7 +174,12 @@ export const LECTOR_GRANT_PATH_PREFIXES: Record<LectorPermissionKey, readonly st
   finanzas_contabilidad: ["/gestion-financiera/contabilidad", "/gestion-financiera/monitor-financiero"],
   finanzas_proveedores: ["/gestion-financiera/proveedores"],
   finanzas_asic_costos: ["/asic/cotizador-china-py"],
-  hosting_tipo_cambio: ["/hosting/exchange-operations", "/hosting/tipo-cambio-historial"],
+  hosting_tipo_cambio: [
+    "/hosting/exchange-operations",
+    "/hosting/tipo-cambio-historial",
+    "/gestion-administrativa/cambio-usdt",
+    "/gestion-administrativa/exchange",
+  ],
   reportes: ["/reports", "/reportes"],
   /** No amplía navegación SPA: la exportación aplica solo dentro de pantallas ya autorizadas por otro permiso. */
   exportar: [],

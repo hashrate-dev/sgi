@@ -11,6 +11,9 @@ import { GestionAdministrativaPage } from "./pages/GestionAdministrativaPage";
 import { LeadsBasePage } from "./pages/LeadsBasePage";
 import { NuevosLeadsPage } from "./pages/NuevosLeadsPage";
 import { PruebaPage } from "./pages/PruebaPage";
+import { CambioUsdtHubPage } from "./pages/CambioUsdtHubPage";
+import { FxExchangeClientsPage } from "./pages/FxExchangeClientsPage";
+import { FxExchangeClienteEditPage } from "./pages/FxExchangeClienteEditPage";
 import { GestionFinancieraHubPage } from "./pages/GestionFinancieraHubPage";
 import { ProveedoresHrsPage } from "./pages/ProveedoresHrsPage";
 import { ContabilidadGastosPage } from "./pages/ContabilidadGastosPage";
@@ -430,6 +433,12 @@ function App() {
             <Route path="/gestion-administrativa" element={<GestionAdministrativaPage />} />
             <Route path="/gestion-administrativa/nuevos-leads" element={<NuevosLeadsPage />} />
             <Route path="/gestion-administrativa/leads-base" element={<LeadsBasePage />} />
+            <Route path="/gestion-administrativa/cambio-usdt" element={<CambioUsdtHubPage />} />
+            <Route path="/gestion-administrativa/cambio-usdt/clientes" element={<FxExchangeClientsPage />} />
+            <Route
+              path="/gestion-administrativa/cambio-usdt/clientes/:id/edit"
+              element={<FxExchangeClienteEditPage />}
+            />
             <Route path="/gestion-administrativa/exchange" element={<PruebaPage />} />
             <Route path="/gestion-administrativa/prueba" element={<Navigate to="/gestion-administrativa/exchange" replace />} />
             <Route path="/gestion-financiera" element={<GestionFinancieraHubPage />} />
