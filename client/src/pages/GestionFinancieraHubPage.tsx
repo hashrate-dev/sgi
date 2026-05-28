@@ -42,12 +42,6 @@ const hubItems: readonly FinHubItem[] = [
     label: "Cuenta por cliente",
     desc: "Movimientos históricos por cliente (hosting y ASIC)",
   },
-  {
-    to: "/gestion-administrativa/exchange",
-    icon: "bi-currency-exchange",
-    label: "Operaciones de Cambio",
-    desc: "Menú de Operaciones de Cambio: Todo lo relacionado a cambio de USDT a USD y USD a USDT.",
-  },
 ];
 
 export function GestionFinancieraHubPage() {
