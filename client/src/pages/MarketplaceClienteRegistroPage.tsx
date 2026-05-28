@@ -8,6 +8,7 @@ import { MarketplaceSiteFooter } from "../components/marketplace/MarketplaceSite
 import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
 import "../styles/marketplace-hashrate.css";
 import {
+  CITY_OTHER_VALUE,
   COUNTRIES_REGISTRO,
   countryById,
   normalizeLocalPhoneInput,
@@ -36,6 +37,7 @@ export function MarketplaceClienteRegistroPage() {
   const [apellidos, setApellidos] = useState("");
   const [countryId, setCountryId] = useState("");
   const [city, setCity] = useState("");
+  const [cityOther, setCityOther] = useState("");
   /** País asociado al prefijo E.164 (independiente del país de dirección; se sincroniza con él al cambiar). */
   const [celularDialId, setCelularDialId] = useState(DEFAULT_PHONE_DIAL_COUNTRY_ID);
   const [celularLocal, setCelularLocal] = useState("");
@@ -94,10 +96,14 @@ export function MarketplaceClienteRegistroPage() {
 
 
   useEffect(() => {
-    setCity("");
-    if (countryId) {
-      setCelularDialId(countryId);
+    setCityOther("");
+    if (!countryId) {
+      setCity("");
+      return;
     }
+    setCelularDialId(countryId);
+    const pais = countryById(countryId);
+    setCity(pais && pais.cities.length === 0 ? CITY_OTHER_VALUE : "");
   }, [countryId]);
 
   if (!loading && user) {
@@ -148,15 +154,15 @@ export function MarketplaceClienteRegistroPage() {
       setError(t("reg.err.country_bad"));
       return;
     }
-    const cityFinal = city.trim();
-    if (!cityFinal) {
+    if (!city) {
       setErrorKind("client");
       setError(t("reg.err.city"));
       return;
     }
-    if (cityFinal.length < 2) {
+    const cityFinal = city === CITY_OTHER_VALUE ? cityOther.trim() : city.trim();
+    if (!cityFinal || cityFinal.length < 2) {
       setErrorKind("client");
-      setError(t("reg.err.city_other"));
+      setError(city === CITY_OTHER_VALUE ? t("reg.err.city_other") : t("reg.err.city"));
       return;
     }
     if (!celularDialId) {
@@ -191,6 +197,7 @@ export function MarketplaceClienteRegistroPage() {
         country: pais.name,
         city: cityFinal,
         celular: celularFull,
+        lang,
       });
       applyLoginResponse(res);
     } catch (err) {
@@ -215,10 +222,10 @@ export function MarketplaceClienteRegistroPage() {
       <div className="bg-grid" aria-hidden />
       <div id="app" data-page="marketplace-registro">
         <MarketplaceSiteHeader />
-        <main className="page-main page-main--market page-main--market--asic">
+        <main id="page-main" className="page-main page-main--market page-main--market--asic">
           <section className="market-registro-section">
-            <div className="container-fluid market-registro-shell px-3 px-sm-4 px-xl-5 py-4 py-lg-5">
-              <div className="row g-4 g-xl-4 align-items-start">
+            <div className="container-fluid market-registro-shell px-3 px-sm-4 px-xl-5">
+              <div className="row g-3 g-lg-4 align-items-start market-registro-layout-row">
                 <aside className="col-lg-3 col-xl-3 d-none d-lg-block market-registro-aside" aria-label={t("reg.aside_aria")}>
                   <span className="market-registro-aside__badge">
                     <i className="bi bi-shop" aria-hidden />
@@ -314,34 +321,36 @@ export function MarketplaceClienteRegistroPage() {
                             ) : null}
                           </div>
                         </div>
-                        <div className="row g-3 mb-0">
-                          <div className="col-md-6">
+                        <div className="row g-3 market-registro-password-row">
+                          <div className="col-sm-6">
                             <MarketplacePasswordField
                               label={t("reg.pw_min")}
                               value={password}
                               onChange={(e) => setPassword(e.target.value)}
                               autoComplete="new-password"
                               labelClassName="form-label market-registro-label"
+                              wrapperClassName="mb-0"
                               required
                             />
                           </div>
-                          <div className="col-md-6">
+                          <div className="col-sm-6">
                             <MarketplacePasswordField
                               label={t("reg.pw_confirm")}
                               value={password2}
                               onChange={(e) => setPassword2(e.target.value)}
                               autoComplete="new-password"
                               labelClassName="form-label market-registro-label"
+                              wrapperClassName="mb-0"
                               required
                             />
                           </div>
                         </div>
                       </div>
 
-                      <div className="row g-4 market-registro-split-xl mb-2">
-                        <div className="col-xl-6">
+                      <div className="row g-3 market-registro-split-xl align-items-stretch">
+                        <div className="col-12 col-lg-6 d-flex">
                           <div
-                            className="market-registro-fieldset market-registro-fieldset--panel market-registro-fieldset--panel--wide mb-0 h-100"
+                            className="market-registro-fieldset market-registro-fieldset--panel market-registro-fieldset--panel--wide mb-0 flex-grow-1 w-100"
                             role="group"
                             aria-labelledby="reg-legend-personal"
                           >
@@ -349,8 +358,8 @@ export function MarketplaceClienteRegistroPage() {
                               <i className="bi bi-person-vcard" aria-hidden />
                               {t("reg.legend_personal")}
                             </div>
-                            <div className="row g-3 mb-1">
-                              <div className="col-md-6">
+                            <div className="row g-3 market-registro-panel-fields">
+                              <div className="col-sm-6">
                                 <label className="form-label market-registro-label" htmlFor="reg-nombre">
                                   {t("reg.label_nombre")}
                                 </label>
@@ -365,7 +374,7 @@ export function MarketplaceClienteRegistroPage() {
                                   required
                                 />
                               </div>
-                              <div className="col-md-6">
+                              <div className="col-sm-6">
                                 <label className="form-label market-registro-label" htmlFor="reg-apellidos">
                                   {t("reg.label_apellidos")}
                                 </label>
@@ -381,11 +390,50 @@ export function MarketplaceClienteRegistroPage() {
                                 />
                               </div>
                             </div>
+                            <div className="market-registro-phone-grid market-registro-phone-grid--in-personal">
+                              <label
+                                className="form-label market-registro-label market-registro-phone-grid__label-dial"
+                                htmlFor="reg-cel-dial"
+                              >
+                                {t("reg.label_dial_short")}
+                              </label>
+                              <label
+                                className="form-label market-registro-label market-registro-phone-grid__label-num"
+                                htmlFor="reg-cel-num"
+                              >
+                                {t("reg.label_mobile")}
+                              </label>
+                              <select
+                                id="reg-cel-dial"
+                                className="form-select market-registro-phone-dial market-registro-phone-grid__input-dial"
+                                value={celularDialId}
+                                onChange={(e) => setCelularDialId(e.target.value)}
+                                aria-label={t("reg.dial_aria")}
+                                required
+                              >
+                                {countriesForPhoneSelect.map((c) => (
+                                  <option key={c.id} value={c.id} title={c.name}>
+                                    {c.dial}
+                                  </option>
+                                ))}
+                              </select>
+                              <input
+                                id="reg-cel-num"
+                                type="tel"
+                                className="form-control market-registro-phone-grid__input-num"
+                                value={celularLocal}
+                                onChange={(e) => setCelularLocal(e.target.value)}
+                                autoComplete="tel-national"
+                                placeholder={t("reg.phone_ph")}
+                                inputMode="numeric"
+                                required
+                              />
+                            </div>
                           </div>
                         </div>
-                        <div className="col-xl-6">
+                        <div className="col-12 col-lg-6 d-flex">
                           <div
-                            className="market-registro-fieldset market-registro-fieldset--panel market-registro-fieldset--panel--wide mb-0 h-100"
+                            className="market-registro-fieldset market-registro-fieldset--panel market-registro-fieldset--panel--wide mb-0 flex-grow-1 w-100"
                             role="group"
                             aria-labelledby="reg-legend-ubicacion"
                           >
@@ -393,8 +441,8 @@ export function MarketplaceClienteRegistroPage() {
                               <i className="bi bi-geo-alt" aria-hidden />
                               {t("reg.legend_ship")}
                             </div>
-                            <div className="row g-3 mb-1">
-                              <div className="col-md-6">
+                            <div className="market-registro-pais-fields">
+                              <div className="market-registro-field">
                                 <label className="form-label market-registro-label" htmlFor="reg-pais">
                                   {t("reg.label_country")}
                                 </label>
@@ -415,86 +463,45 @@ export function MarketplaceClienteRegistroPage() {
                                   ))}
                                 </select>
                               </div>
-                              <div className="col-md-6">
+                              <div className="market-registro-field">
                                 <label className="form-label market-registro-label" htmlFor="reg-ciudad">
                                   {t("reg.label_city")}
                                 </label>
-                                <input
+                                <select
                                   id="reg-ciudad"
-                                  type="text"
-                                  className="form-control"
+                                  className="form-select"
                                   value={city}
                                   onChange={(e) => setCity(e.target.value)}
                                   autoComplete="address-level2"
                                   aria-label={t("reg.label_city")}
-                                  placeholder={paisSeleccionado ? t("reg.city_pick") : t("reg.city_need_country")}
-                                  list={paisSeleccionado?.cities.length ? "reg-city-suggestions" : undefined}
                                   disabled={!paisSeleccionado}
                                   required
-                                />
-                                {paisSeleccionado?.cities.length ? (
-                                  <datalist id="reg-city-suggestions">
-                                    {paisSeleccionado.cities.map((c) => (
-                                      <option key={c} value={c} />
-                                    ))}
-                                  </datalist>
-                                ) : null}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="row g-4 market-registro-doc-contact-row align-items-stretch mb-2">
-                        <div className="col-md-12">
-                          <div
-                            className="market-registro-fieldset market-registro-fieldset--panel market-registro-fieldset--panel--wide mb-0 h-100"
-                            role="group"
-                            aria-labelledby="reg-legend-celular"
-                          >
-                            <div id="reg-legend-celular" className="market-registro-fieldset__legend">
-                              <i className="bi bi-phone" aria-hidden />
-                              {t("reg.legend_contact_block")}
-                            </div>
-                            <div className="mb-0 market-registro-phone-block">
-                              <div className="row g-3">
-                                <div className="col-6">
-                                  <label className="form-label market-registro-label" htmlFor="reg-cel-dial">
-                                    {t("reg.dial_aria")}
-                                  </label>
-                                  <select
-                                    id="reg-cel-dial"
-                                    className="form-select market-registro-phone-dial"
-                                    value={celularDialId}
-                                    onChange={(e) => setCelularDialId(e.target.value)}
-                                    aria-label={t("reg.dial_aria")}
-                                    required
-                                  >
-                                    {countriesForPhoneSelect.map((c) => (
-                                      <option key={c.id} value={c.id}>
-                                        {c.dial} · {c.name}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-                                <div className="col-6">
-                                  <label className="form-label market-registro-label" htmlFor="reg-cel-num">
-                                    {t("reg.label_mobile")}
-                                  </label>
+                                >
+                                  <option value="">
+                                    {paisSeleccionado ? t("reg.city_pick") : t("reg.city_need_country")}
+                                  </option>
+                                  {paisSeleccionado?.cities.map((c) => (
+                                    <option key={c} value={c}>
+                                      {c}
+                                    </option>
+                                  ))}
+                                  {paisSeleccionado ? (
+                                    <option value={CITY_OTHER_VALUE}>{t("reg.city_other")}</option>
+                                  ) : null}
+                                </select>
+                                {paisSeleccionado && city === CITY_OTHER_VALUE ? (
                                   <input
-                                    id="reg-cel-num"
-                                    type="tel"
-                                    className="form-control"
-                                    value={celularLocal}
-                                    onChange={(e) => setCelularLocal(e.target.value)}
-                                    autoComplete="tel-national"
-                                    placeholder={t("reg.phone_ph")}
-                                    inputMode="numeric"
+                                    type="text"
+                                    className="form-control mt-2"
+                                    value={cityOther}
+                                    onChange={(e) => setCityOther(e.target.value)}
+                                    placeholder={t("reg.ph_city_other")}
+                                    autoComplete="address-level2"
+                                    aria-label={t("reg.ph_city_other")}
                                     required
                                   />
-                                </div>
+                                ) : null}
                               </div>
-
                             </div>
                           </div>
                         </div>
@@ -540,32 +547,30 @@ export function MarketplaceClienteRegistroPage() {
                         </div>
                       ) : null}
 
-                      <div className="row align-items-center market-registro-submit-row g-2 g-md-3">
-                        <div className="col-12 col-md-6">
-                          <div className="market-registro-foot market-registro-foot--beside-submit small text-muted">
-                            <Link to="/equipment" className="text-decoration-none">
-                              <i className="bi bi-arrow-left-short me-1" aria-hidden />
-                              {t("login.back_shop")}
-                            </Link>
-                            <span className="mx-2">·</span>
-                            <Link
-                              to="/acceso"
-                              className="text-decoration-none"
-                              state={fromQuote ? { from: "quote" } : undefined}
-                            >
-                              {t("reg.footer_have_login")}
-                            </Link>
-                          </div>
-                        </div>
-                        <div className="col-12 col-md-6">
-                          <button
-                            type="submit"
-                            className="btn btn-success w-100 market-registro-submit"
-                            disabled={submitting || !ready}
+                      <div className="market-registro-submit-row">
+                        <div className="market-registro-foot market-registro-foot--beside-submit small text-muted">
+                          <Link to="/equipment" className="text-decoration-none">
+                            <i className="bi bi-arrow-left-short me-1" aria-hidden />
+                            {t("login.back_shop")}
+                          </Link>
+                          <span className="market-registro-foot__sep" aria-hidden>
+                            ·
+                          </span>
+                          <Link
+                            to="/acceso"
+                            className="text-decoration-none"
+                            state={fromQuote ? { from: "quote" } : undefined}
                           >
-                            {!ready ? t("login.preparing") : submitting ? t("reg.submit_busy") : t("reg.submit")}
-                          </button>
+                            {t("reg.footer_have_login")}
+                          </Link>
                         </div>
+                        <button
+                          type="submit"
+                          className="btn btn-success market-registro-submit"
+                          disabled={submitting || !ready}
+                        >
+                          {!ready ? t("login.preparing") : submitting ? t("reg.submit_busy") : t("reg.submit")}
+                        </button>
                       </div>
                     </form>
                   </div>

@@ -405,6 +405,7 @@ export function registerMarketplaceCliente(body: {
   city: string;
   celular: string;
   telefono?: string;
+  lang?: "es" | "en" | "pt";
 }): Promise<LoginResponse> {
   return api<LoginResponse>("/api/auth/register-cliente", {
     method: "POST",

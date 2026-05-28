@@ -22,6 +22,11 @@ import { lectorHasKryptexPoolAssigned } from "../lib/kryptexLectorPool.js";
 import { fetchUserRowForLogin } from "../lib/dbUserColumnFallback.js";
 import { appendAuthCookie, appendClearAuthCookie } from "../lib/authSessionCookie.js";
 import { resolvePublicAppOrigin } from "../lib/publicAppOrigin.js";
+import {
+  parseMarketplaceWelcomeLang,
+  sendMarketplaceWelcomeEmail,
+} from "../lib/marketplaceWelcomeEmail.js";
+import { hashrateEmailLogoImgHtml } from "../lib/emailHashrateLogo.js";
 
 const authRouter = Router();
 const JWT_SECRET = env.JWT_SECRET;
@@ -39,6 +44,7 @@ const RegisterClienteSchema = z.object({
   city: z.string().min(1).max(100).trim(),
   celular: z.string().min(6).max(40).trim(),
   telefono: z.string().max(40).trim().optional(),
+  lang: z.enum(["es", "en", "pt"]).optional(),
 });
 
 const DevSeedUserSchema = z.object({
@@ -294,7 +300,7 @@ async function sendPasswordResetEmail(
     <div style="margin:0;padding:24px;background:#ffffff;font-family:Inter,Segoe UI,Arial,sans-serif;color:#000000">
       <div style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #d1d5db;border-radius:16px;overflow:hidden">
         <div style="padding:24px 28px 14px;background:#ffffff">
-          <img src="https://hashrate.space/images/wp-uploads/hashrate-LOGO.png" alt="Hashrate Space" style="height:44px;width:auto;display:block" />
+          ${hashrateEmailLogoImgHtml({ siteOrigin: resolvePublicAppOrigin() })}
         </div>
         <div style="padding:8px 28px 26px">
           <h1 style="margin:0 0 12px;font-size:30px;line-height:1.15;color:#000000">${escapeHtml(copy.headline)}</h1>
@@ -653,6 +659,24 @@ authRouter.post("/auth/register-cliente", registerClienteRateLimit, async (req, 
   };
   const token = jwt.sign({ sub: row.username, userId: row.id }, JWT_SECRET, { expiresIn: "7d" });
   appendAuthCookie(res, token);
+
+  try {
+    const welcomeLang = parseMarketplaceWelcomeLang(req, body.lang);
+    const welcomeResult = await sendMarketplaceWelcomeEmail({
+      to: emailNorm,
+      email: emailNorm,
+      displayName: `${body.nombre.trim()} ${body.apellidos.trim()}`.trim(),
+      lang: welcomeLang,
+      siteOrigin: resolvePublicAppOrigin(req),
+    });
+    if (welcomeResult.simulated && env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.log(`[auth] register-cliente: bienvenida simulada (sin RESEND) → ${emailNorm}`);
+    }
+  } catch (welcomeErr) {
+    console.error("[auth] register-cliente: no se pudo enviar correo de bienvenida:", welcomeErr);
+  }
+
   if (env.NODE_ENV === "production") {
     return res.status(201).json({ user });
   }

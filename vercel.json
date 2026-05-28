@@ -22,7 +22,12 @@
   ],
   "rewrites": [{"source": "/((?!api/).*)", "destination": "/index.html"}],
   "framework": null,
-  "functions": {"api/[[...path]].js": {"maxDuration": 60}},
+  "functions": {
+    "api/[[...path]].js": {
+      "maxDuration": 60,
+      "includeFiles": "server/dist/assets/**"
+    }
+  },
   "headers": [
     {
       "source": "/(.*)",

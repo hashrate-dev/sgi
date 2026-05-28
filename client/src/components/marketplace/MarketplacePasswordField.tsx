@@ -12,6 +12,8 @@ type Props = {
   inputClassName?: string;
   /** Clases del label */
   labelClassName?: string;
+  /** Clases del contenedor externo (por defecto `mb-3`) */
+  wrapperClassName?: string;
 };
 
 /** Campo contraseña con toggle mostrar/ocultar (iconos Bootstrap Icons). */
@@ -24,6 +26,7 @@ export function MarketplacePasswordField({
   required = false,
   inputClassName = "form-control",
   labelClassName = "form-label",
+  wrapperClassName = "mb-3",
 }: Props) {
   const { t } = useMarketplaceLang();
   const uid = useId().replace(/:/g, "");
@@ -31,7 +34,7 @@ export function MarketplacePasswordField({
   const [visible, setVisible] = useState(false);
 
   return (
-    <div className="mb-3">
+    <div className={wrapperClassName}>
       <label htmlFor={fieldId} className={labelClassName}>
         {label}
       </label>

@@ -91,6 +91,8 @@ export async function deliverResendEmailWithFromFallback(args: {
   text: string;
   html: string;
   devLogTag: string;
+  /** Si se define, se usa en lugar de `resendFromCandidates()` (p. ej. bienvenida desde mail.hashrate.space). */
+  fromCandidates?: string[];
 }): Promise<{ simulated: boolean; resendId?: string; fromUsed?: string }> {
   const apiKey = normalizeResendApiKey(process.env.RESEND_API_KEY);
   const recipients = normalizeResendRecipients(args.to);
@@ -114,7 +116,8 @@ export async function deliverResendEmailWithFromFallback(args: {
     throw new Error("Destinatario Resend inválido.");
   }
 
-  const fromCandidates = resendFromCandidates();
+  const fromCandidates =
+    args.fromCandidates && args.fromCandidates.length > 0 ? args.fromCandidates : resendFromCandidates();
   if (fromCandidates.length === 0) {
     throw new Error("Definí RESEND_FROM_EMAIL con un remitente verificado en Resend.");
   }

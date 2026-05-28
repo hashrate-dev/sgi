@@ -9,6 +9,8 @@ build/
 .idea/
 server/data.db
 server/src/data.db
+# Logo base64 para emails (generar: npm run build -w server)
+server/src/generated/hashrateEmailLogoDataUri.embedded.ts
 client/server/
 
 # Fotos subidas desde el panel (no versionar binarios); mantener la carpeta con .gitkeep

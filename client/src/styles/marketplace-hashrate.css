@@ -162,7 +162,8 @@ body:has(.marketplace-asic-page)::after {
   box-sizing: border-box;
 }
 
-.marketplace-asic-page > #app > #page-main {
+.marketplace-asic-page > #app > #page-main,
+.marketplace-asic-page > #app > main.page-main {
   padding-top: var(--marketplace-header-h, 5.25rem);
 }
 
@@ -6044,15 +6045,167 @@ button.product-modal__btn--quote-cart:active {
   margin-right: auto;
 }
 
-@media (min-width: 1200px) {
-  .market-registro-split-xl > .col-xl-6:first-child {
-    border-right: 1px solid rgba(15, 23, 42, 0.07);
-    padding-right: calc(var(--bs-gutter-x) * 1.1);
-  }
+/* Registro: menos aire arriba, más abajo (botón + Calendly / barra del SO) */
+.marketplace-registro-page > #app > #page-main,
+.marketplace-registro-page > #app > main.page-main {
+  padding-top: calc(var(--marketplace-header-h, 5.25rem) + 0.15rem);
+}
 
-  .market-registro-split-xl > .col-xl-6:last-child {
-    padding-left: calc(var(--bs-gutter-x) * 1.1);
+.marketplace-registro-page .market-registro-section {
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+.marketplace-registro-page .market-registro-shell {
+  padding-top: 0.65rem;
+  padding-bottom: 0.85rem;
+}
+
+@media (min-width: 992px) {
+  .marketplace-registro-page .market-registro-shell {
+    padding-top: 0.85rem;
+    padding-bottom: 1rem;
   }
+}
+
+.marketplace-registro-page .market-registro-layout-row {
+  --bs-gutter-y: 0.85rem;
+}
+
+.marketplace-registro-page .market-registro-card {
+  padding: 1.05rem 1.2rem 1.15rem;
+}
+
+.marketplace-registro-page .market-registro-card__head {
+  margin-bottom: 0.85rem;
+  padding-bottom: 0.75rem;
+}
+
+.marketplace-registro-page .market-registro-card__title {
+  font-size: clamp(1.2rem, 2vw, 1.55rem);
+  margin-bottom: 0.35rem;
+}
+
+.marketplace-registro-page .market-registro-card__desc {
+  font-size: 0.86rem;
+  line-height: 1.42;
+}
+
+.marketplace-registro-page .market-registro-fieldset.market-registro-fieldset--panel {
+  padding: 0.7rem 0.85rem 0.8rem;
+}
+
+.marketplace-registro-page .market-registro-fieldset__legend {
+  margin-bottom: 0.6rem;
+  font-size: 0.74rem;
+}
+
+.marketplace-registro-page .market-registro-label {
+  margin-bottom: 0.28rem;
+  font-size: 0.8rem;
+}
+
+.marketplace-registro-page .market-registro-card .form-control,
+.marketplace-registro-page .market-registro-card .form-select {
+  padding: 0.48rem 0.75rem;
+  font-size: 0.9rem;
+  min-height: 2.35rem;
+}
+
+
+.marketplace-registro-page .market-registro-card form > .market-registro-fieldset--panel,
+.marketplace-registro-page .market-registro-card form > .market-registro-split-xl,
+.marketplace-registro-page .market-registro-card form > .market-registro-contact-panel {
+  margin-bottom: 0.7rem;
+}
+
+.marketplace-registro-page .market-registro-pais-fields {
+  gap: 0.65rem;
+}
+
+.marketplace-registro-page .market-registro-split-xl .market-registro-fieldset--panel {
+  min-height: 0;
+}
+
+.marketplace-registro-page .market-registro-email-wrap {
+  margin-bottom: 0.75rem !important;
+}
+
+.marketplace-registro-page .market-registro-submit-row {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+}
+
+.marketplace-registro-page .market-registro-aside__badge {
+  margin-bottom: 0.65rem;
+}
+
+.marketplace-registro-page .market-registro-aside__title {
+  font-size: clamp(1.2rem, 1.8vw, 1.55rem);
+  margin-bottom: 0.5rem;
+}
+
+.marketplace-registro-page .market-registro-aside__lead {
+  margin-bottom: 0.85rem;
+  font-size: 0.88rem;
+}
+
+.marketplace-registro-page .market-registro-aside__list {
+  gap: 0.55rem;
+}
+
+.marketplace-registro-page .site-footer--marketplace {
+  margin-top: 0;
+}
+
+.marketplace-registro-page .market-registro-phone-grid .form-control,
+.marketplace-registro-page .market-registro-phone-grid .form-select {
+  min-height: 2.5rem;
+  height: 2.5rem;
+}
+
+/* Paneles Datos personales / País: misma altura y ancho */
+.market-registro-split-xl > [class*="col-"] {
+  min-width: 0;
+}
+
+.market-registro-split-xl .market-registro-fieldset--panel {
+  min-height: 100%;
+}
+
+.market-registro-panel-fields {
+  margin-bottom: 0;
+}
+
+.market-registro-pais-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.market-registro-pais-fields .market-registro-field:last-child {
+  margin-bottom: 0;
+}
+
+.market-registro-field {
+  min-width: 0;
+}
+
+.market-registro-contact-panel {
+  margin-bottom: 0;
+}
+
+.market-registro-password-row {
+  margin-bottom: 0;
+}
+
+.marketplace-registro-page .market-registro-card form > .market-registro-fieldset--panel,
+.marketplace-registro-page .market-registro-card form > .market-registro-split-xl,
+.marketplace-registro-page .market-registro-card form > .market-registro-contact-panel {
+  margin-bottom: 1rem;
+}
+
+.marketplace-registro-page .market-registro-card form > .market-registro-submit-row {
+  margin-bottom: 0;
 }
 
 .market-registro-aside {
@@ -6323,16 +6476,75 @@ button.product-modal__btn--quote-cart:active {
   box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.22);
 }
 
-/* Contacto: distribución en dos columnas, estilo similar a "Ubicación de envío" */
-.market-registro-phone-block {
+/* Contacto: grilla 2×2 (etiquetas fila 1, campos fila 2) — alineación uniforme */
+.market-registro-phone-grid {
+  display: grid;
+  grid-template-columns: minmax(6.25rem, 7.5rem) minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 0.85rem;
+  row-gap: 0.35rem;
+  align-items: end;
   width: 100%;
-  max-width: 100%;
+}
+
+.market-registro-phone-grid__label-dial {
+  grid-column: 1;
+  grid-row: 1;
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+
+.market-registro-phone-grid__label-num {
+  grid-column: 2;
+  grid-row: 1;
+  margin-bottom: 0;
+}
+
+.market-registro-phone-grid__input-dial {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.market-registro-phone-grid__input-num {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.market-registro-phone-grid .form-control,
+.market-registro-phone-grid .form-select {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.5rem;
+  height: 2.5rem;
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+  line-height: 1.25;
+}
+
+.market-registro-phone-grid--in-personal {
+  margin-top: 0.85rem;
+  width: 100%;
+  grid-template-columns: minmax(6.25rem, 7.5rem) minmax(0, 1fr);
 }
 
 .market-registro-phone-dial {
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  padding-left: 0.45rem;
+  padding-right: 1.65rem;
+  background-position: right 0.45rem center;
+}
+
+@media (max-width: 479.98px) {
+  .market-registro-phone-grid {
+    grid-template-columns: minmax(5.5rem, 6.75rem) minmax(0, 1fr);
+    column-gap: 0.65rem;
+  }
+}
+
+.market-registro-phone-block {
   width: 100%;
-  min-width: 0;
-  max-width: none;
+  max-width: 100%;
 }
 
 .market-registro-card .input-group .form-select.hrs-reg-phone-dial {
@@ -6356,9 +6568,49 @@ button.product-modal__btn--quote-cart:active {
 }
 
 .market-registro-submit-row {
-  margin-top: 1rem;
-  padding-top: 1.1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 1.25rem;
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
   border-top: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.market-registro-foot--beside-submit {
+  flex: 1 1 12rem;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.market-registro-foot__sep {
+  margin: 0 0.35rem;
+  color: #94a3b8;
+}
+
+.market-registro-submit-row .market-registro-submit {
+  flex: 1 1 14rem;
+  max-width: 100%;
+  width: auto;
+  min-width: min(100%, 16rem);
+  margin-left: auto;
+}
+
+@media (max-width: 575.98px) {
+  .market-registro-submit-row {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .market-registro-submit-row .market-registro-submit {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .market-registro-foot--beside-submit {
+    text-align: center;
+  }
 }
 
 .market-registro-submit {
