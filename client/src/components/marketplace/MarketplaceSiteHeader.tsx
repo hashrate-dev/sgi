@@ -65,7 +65,7 @@ export function MarketplaceSiteHeader() {
       <div
         className={
           "site-header__account" +
-          (!showLoggedAccount ? " site-header__account--guest" : "")
+          (!showLoggedAccount ? " site-header__account--guest" : " site-header__account--logged")
         }
       >
         {showLoggedAccount ? (
@@ -112,7 +112,6 @@ export function MarketplaceSiteHeader() {
           />
         </Link>
         <div className="site-header__trailing">
-          <div className="site-header__account-wrap site-header__account-wrap--desktop">{renderAccountBlock()}</div>
           {quoteCart ? (
             <button
               type="button"
@@ -169,6 +168,7 @@ export function MarketplaceSiteHeader() {
               </button>
             ))}
           </div>
+          <div className="site-header__account-wrap site-header__account-wrap--desktop">{renderAccountBlock()}</div>
           <button
             type="button"
             className="nav-toggle"

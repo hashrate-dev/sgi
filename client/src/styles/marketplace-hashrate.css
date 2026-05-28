@@ -224,6 +224,12 @@ body:has(.marketplace-asic-page)::after {
   align-items: flex-start;
 }
 
+.site-header__account-wrap--mobile .site-header__account--logged .site-header__account-email {
+  max-width: none;
+  white-space: normal;
+  word-break: break-word;
+}
+
 .site-header__cart-slot {
   flex: 0 0 auto;
   box-sizing: border-box;
@@ -250,9 +256,9 @@ body:has(.marketplace-asic-page)::after {
     0 6px 16px -6px rgba(15, 23, 42, 0.1);
 }
 
-/* Marketplace: idiomas pegados al extremo derecho de la barra (cuenta + carrito a la izquierda del bloque) */
+/* Marketplace: bloque derecho (carrito + idiomas + cuenta) */
 .site-header--marketplace .site-header__lang-switch {
-  margin-left: auto;
+  margin-left: 0;
 }
 
 .market-lang-switch .market-lang-switch__btn {
@@ -296,29 +302,32 @@ body:has(.marketplace-asic-page)::after {
 
   .site-header__account-wrap--desktop {
     display: block;
-    max-width: min(10.5rem, 15vw);
-    flex-shrink: 1;
-    min-width: 0;
+    flex-shrink: 0;
+    max-width: none;
   }
 
-  .site-header__account-wrap--desktop .site-header__account {
+  .site-header__account-wrap--desktop .site-header__account--logged {
+    flex-direction: column;
+    align-items: flex-end;
     flex-wrap: nowrap;
-    min-width: 0;
-    max-width: 100%;
-    justify-content: flex-end;
+    gap: 0.12rem;
+    line-height: 1.25;
+    max-width: none;
   }
 
-  .site-header__account-wrap--desktop .site-header__account-email {
-    max-width: 7.25rem;
-    flex: 0 1 auto;
-    min-width: 0;
-    display: inline-block;
-    vertical-align: bottom;
+  .site-header__account-wrap--desktop .site-header__account--logged .site-header__account-email {
+    max-width: none;
+    overflow: visible;
+    text-overflow: unset;
+    white-space: nowrap;
+    font-size: 0.78rem;
   }
 
-  .site-header__account-wrap--desktop .site-header__account-logout {
+  .site-header__account-wrap--desktop .site-header__account--logged .site-header__account-logout {
     flex-shrink: 0;
     white-space: nowrap;
+    font-size: 0.78rem;
+    line-height: 1.2;
   }
 
   .site-header__account-wrap--mobile {
@@ -379,12 +388,15 @@ body:has(.marketplace-asic-page)::after {
 }
 
 .site-header__account-email {
-  max-width: 12rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   color: #6b7280;
   min-width: 0;
+}
+
+.site-header__account--logged .site-header__account-email {
+  overflow: visible;
+  text-overflow: unset;
+  white-space: nowrap;
+  max-width: none;
 }
 
 .site-header__account-logout {

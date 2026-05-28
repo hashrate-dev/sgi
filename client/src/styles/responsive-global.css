@@ -176,6 +176,15 @@ html {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  .site-header__account-wrap--mobile .site-header__account-email,
+  .site-header__account--logged .site-header__account-email {
+    max-width: none;
+    overflow: visible;
+    text-overflow: unset;
+    white-space: normal;
+    word-break: break-word;
+  }
 }
 
 /* Marketplace corp footer: una columna en móvil */
