@@ -1,5 +1,8 @@
 import { Router, type Request } from "express";
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
@@ -26,9 +29,54 @@ import {
   parseMarketplaceWelcomeLang,
   sendMarketplaceWelcomeEmail,
 } from "../lib/marketplaceWelcomeEmail.js";
-import { hashrateEmailLogoImgHtml } from "../lib/emailHashrateLogo.js";
-
 const authRouter = Router();
+
+/** Logo solo para el mail de recuperación de contraseña (adjunto inline; Gmail no muestra data: URI). */
+const PASSWORD_RESET_LOGO_CID = "hrs-password-reset-logo";
+const AUTH_ROUTES_DIR = path.dirname(fileURLToPath(import.meta.url));
+
+function passwordResetLogoPngBuffer(): Buffer | null {
+  const serverRoot = path.resolve(AUTH_ROUTES_DIR, "../..");
+  const repoRoot = path.resolve(serverRoot, "..");
+  const candidates = [
+    path.join(serverRoot, "assets", "password-reset-logo.png"),
+    path.join(process.cwd(), "server", "assets", "password-reset-logo.png"),
+    path.join(repoRoot, "public", "images", "LOGO-HRS-PNG.png"),
+  ];
+  for (const filePath of candidates) {
+    try {
+      if (!fs.existsSync(filePath)) continue;
+      const buf = fs.readFileSync(filePath);
+      if (buf.length >= 32) return buf;
+    } catch {
+      /* siguiente */
+    }
+  }
+  return null;
+}
+
+function passwordResetLogoImgHtml(): string {
+  const buf = passwordResetLogoPngBuffer();
+  if (buf) {
+    return `<img src="cid:${PASSWORD_RESET_LOGO_CID}" alt="Hashrate Space" width="200" height="44" style="display:block;height:44px;width:auto;max-width:200px;border:0" />`;
+  }
+  return `<img src="https://hashrate.space/images/wp-uploads/hashrate-LOGO.png" alt="Hashrate Space" style="height:44px;width:auto;display:block" />`;
+}
+
+function passwordResetLogoResendAttachments():
+  | { filename: string; content: string; content_id: string; content_type: string }[]
+  | undefined {
+  const buf = passwordResetLogoPngBuffer();
+  if (!buf) return undefined;
+  return [
+    {
+      filename: "hashrate-logo.png",
+      content: buf.toString("base64"),
+      content_id: PASSWORD_RESET_LOGO_CID,
+      content_type: "image/png",
+    },
+  ];
+}
 const JWT_SECRET = env.JWT_SECRET;
 const PASSWORD_RESET_TTL_MINUTES = 30;
 const RESEND_API_URL = "https://api.resend.com/emails";
@@ -281,7 +329,18 @@ async function tryPasswordResetSmtpFallback(to: string, subject: string, text: s
   const from =
     String(process.env.PASSWORD_RESET_SMTP_FROM || process.env.PASSWORD_RESET_FROM_EMAIL || "").trim() || user;
   const transporter = nodemailer.createTransport({ host, port, secure, auth: { user, pass } });
-  await transporter.sendMail({ from, to, subject, text, html });
+  const logoBuf = passwordResetLogoPngBuffer();
+  const smtpAttachments = logoBuf
+    ? [
+        {
+          filename: "hashrate-logo.png",
+          content: logoBuf,
+          cid: PASSWORD_RESET_LOGO_CID,
+          contentType: "image/png",
+        },
+      ]
+    : undefined;
+  await transporter.sendMail({ from, to, subject, text, html, attachments: smtpAttachments });
   return true;
 }
 
@@ -300,7 +359,7 @@ async function sendPasswordResetEmail(
     <div style="margin:0;padding:24px;background:#ffffff;font-family:Inter,Segoe UI,Arial,sans-serif;color:#000000">
       <div style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #d1d5db;border-radius:16px;overflow:hidden">
         <div style="padding:24px 28px 14px;background:#ffffff">
-          ${hashrateEmailLogoImgHtml({ siteOrigin: resolvePublicAppOrigin() })}
+          ${passwordResetLogoImgHtml()}
         </div>
         <div style="padding:8px 28px 26px">
           <h1 style="margin:0 0 12px;font-size:30px;line-height:1.15;color:#000000">${escapeHtml(copy.headline)}</h1>
@@ -343,6 +402,8 @@ async function sendPasswordResetEmail(
     throw new Error("Email provider no configurado.");
   }
 
+  const resetLogoAttachments = passwordResetLogoResendAttachments();
+
   async function resendPost(from: string, recipient: string, subj: string, txt: string, htm: string, replyTo?: string) {
     const payload: Record<string, unknown> = {
       from,
@@ -352,6 +413,7 @@ async function sendPasswordResetEmail(
       html: htm,
     };
     if (replyTo?.trim()) payload.reply_to = replyTo.trim();
+    if (resetLogoAttachments?.length) payload.attachments = resetLogoAttachments;
     return fetch(RESEND_API_URL, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
