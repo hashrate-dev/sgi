@@ -61,6 +61,7 @@ import { MarketplaceClienteRegistroPage } from "./pages/MarketplaceClienteRegist
 import { MarketplacePresencePage } from "./pages/MarketplacePresencePage";
 import { MarketplacePresenceHistorialPage } from "./pages/MarketplacePresenceHistorialPage";
 import { PasswordResetPage } from "./pages/PasswordResetPage";
+import { AccountActivatePage } from "./pages/AccountActivatePage";
 import { CuentaClientePage } from "./pages/CuentaClientePage";
 import { CuentaClienteDetallePage } from "./pages/CuentaClienteDetallePage";
 import { ToastContainer } from "./components/ToastNotification";
@@ -424,6 +425,7 @@ function App() {
           <Route path="/marketplace/mis-ordenes" element={<Navigate to={MARKETPLACE.catalog} replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/reset-password" element={<PasswordResetPage />} />
+          <Route path="/activar-cuenta" element={<AccountActivatePage />} />
           <Route element={<ProtectedRoute><ProtectedAppLayout /></ProtectedRoute>}>
             <Route path={SGI_DASHBOARD_PATH} element={<HomePage />} />
             <Route path="/kryptex" element={<KryptexPage />} />

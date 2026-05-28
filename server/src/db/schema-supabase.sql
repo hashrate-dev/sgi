@@ -53,6 +53,22 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 CREATE INDEX IF NOT EXISTS idx_pwd_reset_user_created ON password_reset_tokens(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_pwd_reset_email_created ON password_reset_tokens(email, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS email_verification_tokens (
+  id BIGSERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  display_name TEXT NOT NULL DEFAULT '',
+  lang TEXT NOT NULL DEFAULT 'es',
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  used_at TIMESTAMPTZ,
+  requested_ip TEXT,
+  requested_user_agent TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_email_verify_user_created ON email_verification_tokens(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_email_verify_email_created ON email_verification_tokens(email, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS invoice_sequences (
   type TEXT PRIMARY KEY CHECK (type IN ('Factura', 'Recibo', 'Nota de Crédito')),
   last_number INTEGER NOT NULL DEFAULT 1000
@@ -250,6 +266,7 @@ ALTER TABLE clients ADD COLUMN IF NOT EXISTS usuario TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS usuario TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS admin_b_grants_json TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS lector_grants_json TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS related_invoice_id INTEGER;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'hosting';
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS related_invoice_number TEXT;

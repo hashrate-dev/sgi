@@ -29,6 +29,19 @@ import {
   parseMarketplaceWelcomeLang,
   sendMarketplaceWelcomeEmail,
 } from "../lib/marketplaceWelcomeEmail.js";
+import {
+  sendMarketplaceAccountActivationEmail,
+} from "../lib/marketplaceAccountActivationEmail.js";
+import {
+  createEmailVerificationToken,
+  EMAIL_VERIFICATION_TTL_HOURS,
+  ensureEmailVerificationStorage,
+  findEmailVerificationToken,
+  findUnverifiedClienteByEmail,
+  hashEmailVerificationToken,
+  isMarketplaceClienteEmailVerified,
+  markUserEmailVerified,
+} from "../lib/marketplaceAccountVerification.js";
 const authRouter = Router();
 
 /** Logo solo para el mail de recuperación de contraseña (adjunto inline; Gmail no muestra data: URI). */
@@ -605,9 +618,19 @@ authRouter.post("/auth/register-cliente", registerClienteRateLimit, async (req, 
       reusableClientId = Number.isFinite(cid) && cid > 0 ? cid : null;
     }
     await db.transaction(async (tx) => {
-      const insUser = await tx
-        .prepare("INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, 'cliente')")
-        .run(emailNorm, emailNorm, hash);
+      await ensureEmailVerificationStorage();
+      let insUser;
+      try {
+        insUser = await tx
+          .prepare(
+            "INSERT INTO users (username, email, password_hash, role, email_verified_at) VALUES (?, ?, ?, 'cliente', NULL)"
+          )
+          .run(emailNorm, emailNorm, hash);
+      } catch {
+        insUser = await tx
+          .prepare("INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, 'cliente')")
+          .run(emailNorm, emailNorm, hash);
+      }
       let uid = insUser.lastInsertRowid;
       if (uid == null || !Number.isFinite(Number(uid))) {
         const row = (await tx.prepare("SELECT id FROM users WHERE username = ?").get(emailNorm)) as { id: number } | undefined;
@@ -708,41 +731,55 @@ authRouter.post("/auth/register-cliente", registerClienteRateLimit, async (req, 
     row = (await db.prepare("SELECT id, username, password_hash, role FROM users WHERE username = ?").get(emailNorm)) as typeof row;
   }
   if (!row) {
-    return res.status(500).json({ error: { message: "Cuenta creada pero no se pudo iniciar sesión." } });
+    return res.status(500).json({ error: { message: "Cuenta creada pero no se pudo completar el registro." } });
   }
-  const user: AuthUser = {
-    id: row.id,
-    username: row.username,
-    email: row.email ?? row.username,
-    role: row.role as AuthUser["role"],
-    usuario: row.usuario ?? undefined,
-    celular: body.celular.trim(),
-    telefono: telefonoFijo ?? undefined,
-  };
-  const token = jwt.sign({ sub: row.username, userId: row.id }, JWT_SECRET, { expiresIn: "7d" });
-  appendAuthCookie(res, token);
 
+  const displayName = `${body.nombre.trim()} ${body.apellidos.trim()}`.trim();
+  const welcomeLang = parseMarketplaceWelcomeLang(req, body.lang);
+  let activationUrlForDev = "";
   try {
-    const welcomeLang = parseMarketplaceWelcomeLang(req, body.lang);
-    const welcomeResult = await sendMarketplaceWelcomeEmail({
-      to: emailNorm,
+    const { rawToken } = await createEmailVerificationToken({
+      userId: row.id,
       email: emailNorm,
-      displayName: `${body.nombre.trim()} ${body.apellidos.trim()}`.trim(),
+      displayName,
       lang: welcomeLang,
-      siteOrigin: resolvePublicAppOrigin(req),
+      req,
     });
-    if (welcomeResult.simulated && env.NODE_ENV !== "production") {
-      // eslint-disable-next-line no-console
-      console.log(`[auth] register-cliente: bienvenida simulada (sin RESEND) → ${emailNorm}`);
+    const origin = resolvePublicAppOrigin(req);
+    const qp = new URLSearchParams({ token: rawToken, lang: welcomeLang });
+    activationUrlForDev = `${origin}/activar-cuenta?${qp.toString()}`;
+    await sendMarketplaceAccountActivationEmail({
+      to: emailNorm,
+      displayName,
+      activationUrl: activationUrlForDev,
+      lang: welcomeLang,
+      ttlHours: EMAIL_VERIFICATION_TTL_HOURS,
+      req,
+    });
+  } catch (activationErr) {
+    console.error("[auth] register-cliente: no se pudo enviar correo de activación:", activationErr);
+    if (env.NODE_ENV === "production") {
+      return res.status(422).json({
+        error: {
+          code: "ACTIVATION_EMAIL_FAILED",
+          message:
+            "Tu cuenta fue creada, pero no pudimos enviar el correo de activación. Intentá nuevamente en unos minutos o contactá a sales@hashrate.space.",
+        },
+      });
     }
-  } catch (welcomeErr) {
-    console.error("[auth] register-cliente: no se pudo enviar correo de bienvenida:", welcomeErr);
   }
 
-  if (env.NODE_ENV === "production") {
-    return res.status(201).json({ user });
-  }
-  return res.status(201).json({ token, user });
+  const devNote =
+    env.NODE_ENV !== "production" && activationUrlForDev
+      ? ` En desarrollo podés activar con este enlace: ${activationUrlForDev}`
+      : "";
+
+  return res.status(201).json({
+    ok: true,
+    requiresEmailVerification: true,
+    email: emailNorm,
+    message: `Te enviamos un correo para activar tu cuenta. Revisá tu bandeja (incluido spam) y hacé clic en el enlace.${devNote}`,
+  });
 });
 
 const PasswordResetRequestSchema = z.object({
@@ -879,6 +916,129 @@ authRouter.post("/auth/password-reset-confirm", loginRateLimit, async (req, res)
   }
 });
 
+const EmailVerificationConfirmSchema = z.object({
+  token: z.string().min(20).max(300),
+});
+
+const EmailVerificationResendSchema = z.object({
+  email: z.string().email().max(200),
+  lang: z.enum(["es", "en", "pt"]).optional(),
+});
+
+/** Activa cuenta marketplace con token del correo; luego envía bienvenida e inicia sesión. */
+authRouter.post("/auth/verify-email", loginRateLimit, async (req, res) => {
+  const parsed = EmailVerificationConfirmSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: { message: "Enlace de activación inválido." } });
+  }
+  const tokenHash = hashEmailVerificationToken(parsed.data.token.trim());
+  const nowIso = new Date().toISOString();
+  try {
+    await ensureEmailVerificationStorage();
+    const tok = await findEmailVerificationToken(tokenHash);
+    if (!tok || tok.used_at) {
+      return res.status(400).json({ error: { message: "El enlace es inválido o ya fue utilizado." } });
+    }
+    if (String(tok.expires_at || "") <= nowIso) {
+      return res.status(400).json({ error: { message: "El enlace expiró. Solicitá uno nuevo desde acceso." } });
+    }
+    const userRow = (await db
+      .prepare("SELECT id, username, email, password_hash, role, usuario FROM users WHERE id = ?")
+      .get(tok.user_id)) as
+      | { id: number; username: string; email?: string | null; password_hash: string; role: string; usuario?: string | null }
+      | undefined;
+    if (!userRow || userRow.role !== "cliente") {
+      return res.status(400).json({ error: { message: "Cuenta no encontrada para activar." } });
+    }
+    const alreadyVerified = await isMarketplaceClienteEmailVerified(userRow.id, userRow.role);
+    if (!alreadyVerified) {
+      await markUserEmailVerified(userRow.id, tok.token_hash);
+    }
+    const lang = tok.lang === "en" || tok.lang === "pt" ? tok.lang : "es";
+    try {
+      await sendMarketplaceWelcomeEmail({
+        to: tok.email,
+        email: tok.email,
+        displayName: tok.display_name,
+        lang,
+        siteOrigin: resolvePublicAppOrigin(req),
+      });
+    } catch (welcomeErr) {
+      console.error("[auth] verify-email: bienvenida no enviada:", welcomeErr);
+    }
+    const userId = userRow.id;
+    const { celular, telefono } = await getTiendaPhonesForUserId(userId);
+    const user: AuthUser = {
+      id: userId,
+      username: userRow.username,
+      email: userRow.email ?? userRow.username,
+      role: "cliente",
+      usuario: userRow.usuario ?? undefined,
+      celular,
+      telefono,
+    };
+    const token = jwt.sign({ sub: userRow.username, userId }, JWT_SECRET, { expiresIn: "7d" });
+    appendAuthCookie(res, token);
+    return res.status(200).json({
+      ok: true,
+      alreadyVerified: alreadyVerified,
+      message: alreadyVerified
+        ? "Tu cuenta ya estaba activada. Podés iniciar sesión."
+        : "Cuenta activada correctamente. Te enviamos un correo de bienvenida.",
+      user,
+      ...(env.NODE_ENV !== "production" ? { token } : {}),
+    });
+  } catch (e) {
+    console.error("verify-email:", e);
+    return res.status(500).json({ error: { message: "No se pudo activar la cuenta." } });
+  }
+});
+
+/** Reenvía correo de activación si la cuenta cliente sigue sin verificar. */
+authRouter.post("/auth/resend-verification-email", loginRateLimit, async (req, res) => {
+  const parsed = EmailVerificationResendSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: { message: "Ingresá un correo electrónico válido." } });
+  }
+  const emailNorm = parsed.data.email.trim().toLowerCase();
+  const lang = parseMarketplaceWelcomeLang(req, parsed.data.lang);
+  try {
+    const row = await findUnverifiedClienteByEmail(emailNorm);
+    if (!row) {
+      return res.status(200).json({
+        ok: true,
+        message:
+          "Si existe una cuenta pendiente de activación con ese correo, te enviamos un nuevo enlace. Revisá tu bandeja.",
+      });
+    }
+    const { rawToken } = await createEmailVerificationToken({
+      userId: row.id,
+      email: emailNorm,
+      displayName: row.display_name,
+      lang,
+      req,
+    });
+    const origin = resolvePublicAppOrigin(req);
+    const activationUrl = `${origin}/activar-cuenta?${new URLSearchParams({ token: rawToken, lang }).toString()}`;
+    await sendMarketplaceAccountActivationEmail({
+      to: emailNorm,
+      displayName: row.display_name,
+      activationUrl,
+      lang,
+      ttlHours: EMAIL_VERIFICATION_TTL_HOURS,
+      req,
+    });
+    const devNote = env.NODE_ENV !== "production" ? ` Enlace dev: ${activationUrl}` : "";
+    return res.status(200).json({
+      ok: true,
+      message: `Te enviamos un nuevo enlace de activación a ${emailNorm}. Revisá tu correo.${devNote}`,
+    });
+  } catch (e) {
+    console.error("resend-verification-email:", e);
+    return res.status(500).json({ error: { message: "No se pudo reenviar el correo de activación." } });
+  }
+});
+
 authRouter.post("/auth/login", loginRateLimit, async (req, res) => {
   /* Solo desarrollo: evita sembrar credenciales por defecto en producción. */
   if (env.NODE_ENV !== "production") {
@@ -931,6 +1091,23 @@ authRouter.post("/auth/login", loginRateLimit, async (req, res) => {
   }
   if (!passwordOk) {
     return res.status(401).json({ error: { message: "Usuario o contraseña incorrectos" } });
+  }
+  const roleEarly = row.role as AuthUser["role"];
+  if (roleEarly === "cliente") {
+    const verifiedAt = (row as Record<string, unknown>).email_verified_at;
+    const verified =
+      verifiedAt != null && String(verifiedAt).trim() !== ""
+        ? true
+        : await isMarketplaceClienteEmailVerified(Number(row.id), roleEarly);
+    if (!verified) {
+      return res.status(403).json({
+        error: {
+          code: "EMAIL_NOT_VERIFIED",
+          message:
+            "Tu cuenta aún no está activada. Revisá tu correo y hacé clic en el enlace de activación, o solicitá uno nuevo desde la página de acceso.",
+        },
+      });
+    }
   }
   try {
     const userId = typeof row.id === "number" ? row.id : Number(String(row.id).trim());

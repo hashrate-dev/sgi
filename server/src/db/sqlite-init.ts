@@ -146,6 +146,12 @@ INSERT OR IGNORE INTO invoice_sequences (type, last_number) VALUES ('Factura', 1
     const msg = e instanceof Error ? e.message : String(e);
     if (!msg.includes("duplicate column")) throw e;
   }
+  try {
+    db.exec("ALTER TABLE users ADD COLUMN email_verified_at TEXT");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
 
   try {
     db.exec("ALTER TABLE invoices ADD COLUMN related_invoice_id INTEGER");

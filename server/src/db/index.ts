@@ -62,6 +62,7 @@ async function ensureSupabaseCriticalUserColumns(pool: Pool) {
   try {
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS admin_b_grants_json TEXT`);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS lector_grants_json TEXT`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ`);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     // eslint-disable-next-line no-console

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { isEmailAlreadyRegisteredError, registerMarketplaceCliente, wakeUpBackend } from "../lib/api";
+import { isEmailAlreadyRegisteredError, isRegisterPendingVerification, registerMarketplaceCliente, wakeUpBackend } from "../lib/api";
 import { MarketplacePasswordField } from "../components/marketplace/MarketplacePasswordField";
 import { RegistroCountrySelect } from "../components/marketplace/RegistroCountrySelect";
 import { MarketplaceSiteHeader } from "../components/marketplace/MarketplaceSiteHeader";
@@ -49,6 +49,8 @@ export function MarketplaceClienteRegistroPage() {
   const [submitting, setSubmitting] = useState(false);
   const [ready, setReady] = useState(false);
   const [emailSuggestFocus, setEmailSuggestFocus] = useState(false);
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
+  const [pendingVerificationMessage, setPendingVerificationMessage] = useState("");
 
   useEffect(() => {
     const t = setTimeout(() => setReady(true), 25000);
@@ -197,6 +199,12 @@ export function MarketplaceClienteRegistroPage() {
         celular: celularFull,
         lang,
       });
+      if (isRegisterPendingVerification(res)) {
+        setPendingVerificationEmail(res.email);
+        setPendingVerificationMessage(res.message);
+        setError("");
+        return;
+      }
       applyLoginResponse(res);
     } catch (err) {
       const isDupEmail = isEmailAlreadyRegisteredError(err);
@@ -258,6 +266,25 @@ export function MarketplaceClienteRegistroPage() {
                   </div>
 
                   <div className="market-registro-card">
+                    {pendingVerificationEmail ? (
+                      <div className="p-4 p-md-5 text-center">
+                        <div className="alert alert-success mb-4" role="status">
+                          <h2 className="h4 mb-2">{t("reg.verify_pending_title")}</h2>
+                          <p className="mb-2">{pendingVerificationMessage || t("reg.verify_pending_body")}</p>
+                          <p className="mb-0">
+                            <strong>{pendingVerificationEmail}</strong>
+                          </p>
+                        </div>
+                        <p className="text-muted small mb-4">{t("reg.verify_pending_hint")}</p>
+                        <Link to="/activar-cuenta" className="btn btn-success me-2 mb-2">
+                          {t("reg.verify_pending_cta")}
+                        </Link>
+                        <Link to="/acceso" className="btn btn-outline-secondary mb-2">
+                          {t("reg.login_link")}
+                        </Link>
+                      </div>
+                    ) : (
+                      <>
                     <header className="market-registro-card__head">
                       <p className="market-registro-card__kicker">{t("reg.card_kicker_lower")}</p>
                       <h2 className="market-registro-card__title">{t("reg.title")}</h2>
@@ -561,6 +588,8 @@ export function MarketplaceClienteRegistroPage() {
                         </button>
                       </div>
                     </form>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

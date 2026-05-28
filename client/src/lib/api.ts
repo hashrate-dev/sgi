@@ -167,6 +167,7 @@ export function isBenignFetchAbort(err: unknown): boolean {
 export type ApiHttpError = Error & { status?: number; code?: string };
 
 export const API_ERROR_EMAIL_ALREADY_REGISTERED = "EMAIL_ALREADY_REGISTERED";
+export const API_ERROR_EMAIL_NOT_VERIFIED = "EMAIL_NOT_VERIFIED";
 /** Reset de contraseña: correo no registrado en `users`. */
 export const API_ERROR_INVALID_EMAIL = "INVALID_EMAIL";
 export const API_ERROR_DOCUMENT_ALREADY_REGISTERED = "DOCUMENT_ALREADY_REGISTERED";
@@ -209,6 +210,11 @@ export function isEmailAlreadyRegisteredError(err: unknown): boolean {
   if (e.code === API_ERROR_EMAIL_ALREADY_REGISTERED) return true;
   const msg = String(e?.message ?? "").toLowerCase();
   return msg.includes("correo electrónico") && msg.includes("asociado a una cuenta");
+}
+
+export function isEmailNotVerifiedError(err: unknown): boolean {
+  const e = err as ApiHttpError;
+  return e?.status === 403 && e.code === API_ERROR_EMAIL_NOT_VERIFIED;
 }
 
 export function isDocumentAlreadyRegisteredError(err: unknown): boolean {
@@ -369,6 +375,21 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export type LoginResponse = { user: AuthUser; token?: string };
+
+export type RegisterClienteResponse =
+  | LoginResponse
+  | {
+      ok: true;
+      requiresEmailVerification: true;
+      email: string;
+      message: string;
+    };
+
+export function isRegisterPendingVerification(
+  res: RegisterClienteResponse
+): res is Extract<RegisterClienteResponse, { requiresEmailVerification: true }> {
+  return "requiresEmailVerification" in res && res.requiresEmailVerification === true;
+}
 export type MeResponse = { user: AuthUser };
 
 export function login(username: string, password: string): Promise<LoginResponse> {
@@ -406,10 +427,29 @@ export function registerMarketplaceCliente(body: {
   celular: string;
   telefono?: string;
   lang?: "es" | "en" | "pt";
-}): Promise<LoginResponse> {
-  return api<LoginResponse>("/api/auth/register-cliente", {
+}): Promise<RegisterClienteResponse> {
+  return api<RegisterClienteResponse>("/api/auth/register-cliente", {
     method: "POST",
     body: JSON.stringify(body),
+  });
+}
+
+/** Activa cuenta marketplace con token del correo (envía bienvenida e inicia sesión). */
+export function verifyMarketplaceEmail(token: string): Promise<LoginResponse & { ok: boolean; message: string }> {
+  return api<LoginResponse & { ok: boolean; message: string }>("/api/auth/verify-email", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+}
+
+/** Reenvía correo de activación para cuenta cliente pendiente. */
+export function resendMarketplaceVerificationEmail(
+  email: string,
+  lang?: "es" | "en" | "pt"
+): Promise<{ ok: boolean; message: string }> {
+  return api<{ ok: boolean; message: string }>("/api/auth/resend-verification-email", {
+    method: "POST",
+    body: JSON.stringify({ email, lang }),
   });
 }
 

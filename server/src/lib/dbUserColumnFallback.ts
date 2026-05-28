@@ -11,6 +11,7 @@ export function isRecoverableMissingUserColumnDbErr(e: unknown): boolean {
 /** Login: mismas columnas que el flujo principal, con degradación si falta `lector_grants_json` u otras JSON. */
 export async function fetchUserRowForLogin(loginName: string): Promise<Record<string, unknown> | undefined> {
   const bundlesOrEmail = [
+    "SELECT id, username, email, password_hash, role, usuario, admin_b_grants_json, lector_grants_json, email_verified_at FROM users WHERE username = ? OR email = ?",
     "SELECT id, username, email, password_hash, role, usuario, admin_b_grants_json, lector_grants_json FROM users WHERE username = ? OR email = ?",
     "SELECT id, username, email, password_hash, role, usuario, admin_b_grants_json FROM users WHERE username = ? OR email = ?",
     "SELECT id, username, email, password_hash, role, usuario FROM users WHERE username = ? OR email = ?",

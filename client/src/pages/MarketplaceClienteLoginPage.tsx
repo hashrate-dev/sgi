@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { requestPasswordReset, wakeUpBackend } from "../lib/api";
+import { requestPasswordReset, resendMarketplaceVerificationEmail, wakeUpBackend, isEmailNotVerifiedError } from "../lib/api";
 import { isVercelOrPrimaryPublicHost } from "../lib/hashrateHosts";
 import { MarketplaceSiteHeader } from "../components/marketplace/MarketplaceSiteHeader";
 import { MarketplaceSiteFooter } from "../components/marketplace/MarketplaceSiteFooter";
@@ -26,6 +26,8 @@ export function MarketplaceClienteLoginPage() {
   const [resetBusy, setResetBusy] = useState(false);
   const [resetMsg, setResetMsg] = useState("");
   const [forgotMode, setForgotMode] = useState(false);
+  const [showUnverifiedResend, setShowUnverifiedResend] = useState(false);
+  const [unverifiedResendBusy, setUnverifiedResendBusy] = useState(false);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => setReady(true), 25000);
@@ -49,6 +51,7 @@ export function MarketplaceClienteLoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    setShowUnverifiedResend(false);
     setSubmitting(true);
     try {
       if (typeof window !== "undefined" && isVercelOrPrimaryPublicHost(window.location.hostname)) {
@@ -56,9 +59,30 @@ export function MarketplaceClienteLoginPage() {
       }
       await login(email.trim(), password);
     } catch (err) {
+      if (isEmailNotVerifiedError(err)) {
+        setShowUnverifiedResend(true);
+      }
       setError(err instanceof Error ? err.message : t("login.err_generic"));
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleResendActivation() {
+    if (!email.trim()) {
+      setError(t("login.forgot_email_required"));
+      return;
+    }
+    setUnverifiedResendBusy(true);
+    setResetMsg("");
+    try {
+      const r = await resendMarketplaceVerificationEmail(email.trim(), lang);
+      setResetMsg(r.message || t("login.unverified_resend_ok"));
+      setError("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("login.forgot_err_send"));
+    } finally {
+      setUnverifiedResendBusy(false);
     }
   }
 
@@ -153,6 +177,16 @@ export function MarketplaceClienteLoginPage() {
                         <div className="alert alert-danger py-2 small" role="alert">
                           {error}
                         </div>
+                      ) : null}
+                      {showUnverifiedResend && !forgotMode ? (
+                        <button
+                          type="button"
+                          className="btn btn-outline-success w-100 mb-2"
+                          disabled={unverifiedResendBusy}
+                          onClick={() => void handleResendActivation()}
+                        >
+                          {unverifiedResendBusy ? t("login.unverified_resend_busy") : t("login.unverified_resend")}
+                        </button>
                       ) : null}
                       {resetMsg ? (
                         <div className="alert alert-success py-2 small" role="status">
