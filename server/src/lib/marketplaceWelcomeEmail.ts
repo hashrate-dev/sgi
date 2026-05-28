@@ -5,7 +5,10 @@ import {
   resendFromCandidates,
 } from "../config/resendFrom.js";
 import { deliverResendEmailWithFromFallback } from "./resendDeliver.js";
-import { hashrateEmailLogoImgHtml } from "./emailHashrateLogo.js";
+import {
+  getHashrateEmailLogoResendAttachments,
+  hashrateEmailLogoImgHtml,
+} from "./emailHashrateLogo.js";
 
 export type MarketplaceWelcomeLang = "es" | "en" | "pt";
 
@@ -185,6 +188,7 @@ export async function sendMarketplaceWelcomeEmail(args: {
     html,
     devLogTag: "marketplace-welcome",
     fromCandidates: marketplaceWelcomeFromCandidates(),
+    attachments: getHashrateEmailLogoResendAttachments(),
   });
 
   return { simulated: result.simulated, fromUsed: result.fromUsed };

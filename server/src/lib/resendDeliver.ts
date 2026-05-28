@@ -3,6 +3,7 @@ import {
   resendApiKeyLooksInvalid,
   resendFromCandidates,
 } from "../config/resendFrom.js";
+import type { ResendInlineLogoAttachment } from "./emailHashrateLogo.js";
 
 const RESEND_API_URL = "https://api.resend.com/emails";
 
@@ -60,6 +61,7 @@ async function resendPostEmail(opts: {
   subject: string;
   text: string;
   html: string;
+  attachments?: ResendInlineLogoAttachment[];
 }): Promise<{ res: Response; bodyText: string }> {
   const payload: Record<string, unknown> = {
     from: opts.from,
@@ -69,6 +71,7 @@ async function resendPostEmail(opts: {
     html: opts.html,
   };
   if (opts.replyTo?.trim()) payload.reply_to = opts.replyTo.trim();
+  if (opts.attachments?.length) payload.attachments = opts.attachments;
   const res = await fetch(RESEND_API_URL, {
     method: "POST",
     headers: {
@@ -93,6 +96,8 @@ export async function deliverResendEmailWithFromFallback(args: {
   devLogTag: string;
   /** Si se define, se usa en lugar de `resendFromCandidates()` (p. ej. bienvenida desde mail.hashrate.space). */
   fromCandidates?: string[];
+  /** Logo u otros inline (`content_id` + `cid:` en HTML). */
+  attachments?: ResendInlineLogoAttachment[];
 }): Promise<{ simulated: boolean; resendId?: string; fromUsed?: string }> {
   const apiKey = normalizeResendApiKey(process.env.RESEND_API_KEY);
   const recipients = normalizeResendRecipients(args.to);
@@ -129,7 +134,16 @@ export async function deliverResendEmailWithFromFallback(args: {
 
   for (let i = 0; i < fromCandidates.length; i++) {
     sendFrom = fromCandidates[i]!;
-    const attempt = await resendPostEmail({ apiKey, from: sendFrom, to: recipients, replyTo, subject, text, html });
+    const attempt = await resendPostEmail({
+      apiKey,
+      from: sendFrom,
+      to: recipients,
+      replyTo,
+      subject,
+      text,
+      html,
+      attachments: args.attachments,
+    });
     lastRes = attempt.res;
     lastBody = attempt.bodyText;
     if (lastRes.ok) break;

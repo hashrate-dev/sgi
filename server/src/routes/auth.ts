@@ -26,7 +26,10 @@ import {
   parseMarketplaceWelcomeLang,
   sendMarketplaceWelcomeEmail,
 } from "../lib/marketplaceWelcomeEmail.js";
-import { hashrateEmailLogoImgHtml } from "../lib/emailHashrateLogo.js";
+import {
+  getHashrateEmailLogoResendAttachments,
+  hashrateEmailLogoImgHtml,
+} from "../lib/emailHashrateLogo.js";
 
 const authRouter = Router();
 const JWT_SECRET = env.JWT_SECRET;
@@ -281,7 +284,21 @@ async function tryPasswordResetSmtpFallback(to: string, subject: string, text: s
   const from =
     String(process.env.PASSWORD_RESET_SMTP_FROM || process.env.PASSWORD_RESET_FROM_EMAIL || "").trim() || user;
   const transporter = nodemailer.createTransport({ host, port, secure, auth: { user, pass } });
-  await transporter.sendMail({ from, to, subject, text, html });
+  const logoAttachments = getHashrateEmailLogoResendAttachments();
+  const smtpAttachments = logoAttachments?.map((a) => ({
+    filename: a.filename,
+    content: Buffer.from(a.content, "base64"),
+    cid: a.content_id,
+    contentType: a.content_type,
+  }));
+  await transporter.sendMail({
+    from,
+    to,
+    subject,
+    text,
+    html,
+    attachments: smtpAttachments,
+  });
   return true;
 }
 
@@ -343,6 +360,8 @@ async function sendPasswordResetEmail(
     throw new Error("Email provider no configurado.");
   }
 
+  const logoAttachments = getHashrateEmailLogoResendAttachments();
+
   async function resendPost(from: string, recipient: string, subj: string, txt: string, htm: string, replyTo?: string) {
     const payload: Record<string, unknown> = {
       from,
@@ -352,6 +371,7 @@ async function sendPasswordResetEmail(
       html: htm,
     };
     if (replyTo?.trim()) payload.reply_to = replyTo.trim();
+    if (logoAttachments?.length) payload.attachments = logoAttachments;
     return fetch(RESEND_API_URL, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },

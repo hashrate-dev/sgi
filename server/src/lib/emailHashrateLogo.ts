@@ -6,7 +6,16 @@ import { HASHRATE_EMAIL_LOGO_DATA_URI } from "../generated/hashrateEmailLogoData
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 
-/** Rutas de respaldo en dev si el módulo generado no existe aún. */
+/** ID para `<img src="cid:…">` y adjunto inline en Resend / Nodemailer. */
+export const HASHRATE_EMAIL_LOGO_CID = "hashrate-logo";
+
+export type ResendInlineLogoAttachment = {
+  filename: string;
+  content: string;
+  content_id: string;
+  content_type: string;
+};
+
 function logoFileCandidates(): string[] {
   const cwd = process.cwd();
   const serverRoot = path.resolve(MODULE_DIR, "../..");
@@ -21,45 +30,63 @@ function logoFileCandidates(): string[] {
   ];
 }
 
-let cachedFileDataUri: string | null | undefined;
+let cachedPng: Buffer | null | undefined;
 
-function readLogoFromDisk(): string | null {
-  if (cachedFileDataUri !== undefined) return cachedFileDataUri;
+function pngFromEmbeddedDataUri(): Buffer | null {
+  if (!HASHRATE_EMAIL_LOGO_DATA_URI?.startsWith("data:image/png;base64,")) return null;
+  try {
+    return Buffer.from(HASHRATE_EMAIL_LOGO_DATA_URI.slice("data:image/png;base64,".length), "base64");
+  } catch {
+    return null;
+  }
+}
+
+/** Bytes del PNG para adjuntos inline (Resend / SMTP). */
+export function getHashrateEmailLogoPngBuffer(): Buffer | null {
+  if (cachedPng !== undefined) return cachedPng;
   for (const filePath of logoFileCandidates()) {
     try {
       if (!fs.existsSync(filePath)) continue;
       const buf = fs.readFileSync(filePath);
-      if (buf.length < 32) continue;
-      cachedFileDataUri = `data:image/png;base64,${buf.toString("base64")}`;
-      return cachedFileDataUri;
+      if (buf.length >= 32) {
+        cachedPng = buf;
+        return cachedPng;
+      }
     } catch {
-      /* siguiente candidato */
+      /* siguiente */
     }
   }
-  cachedFileDataUri = null;
-  return null;
+  cachedPng = pngFromEmbeddedDataUri();
+  return cachedPng;
 }
 
-/** Logo embebido (fiable en Gmail/Outlook); no depende de URL externa ni del SPA. */
-export function getHashrateEmailLogoDataUri(): string | null {
-  if (HASHRATE_EMAIL_LOGO_DATA_URI?.startsWith("data:image/png;base64,")) {
-    return HASHRATE_EMAIL_LOGO_DATA_URI;
-  }
-  return readLogoFromDisk();
+/** Adjunto inline para Resend (`content_id` + `cid:` en HTML). Gmail no muestra data: URI. */
+export function getHashrateEmailLogoResendAttachments(): ResendInlineLogoAttachment[] | undefined {
+  const buf = getHashrateEmailLogoPngBuffer();
+  if (!buf) return undefined;
+  return [
+    {
+      filename: "hashrate-logo.png",
+      content: buf.toString("base64"),
+      content_id: HASHRATE_EMAIL_LOGO_CID,
+      content_type: "image/png",
+    },
+  ];
 }
 
-/** URL pública (último recurso). */
+/** URL pública si no hay adjunto (p. ej. vista previa sin Resend). */
 export function getHashrateEmailLogoPublicUrl(siteOrigin?: string): string {
   const base = (siteOrigin || CANONICAL_PUBLIC_ORIGIN).replace(/\/+$/, "");
   return `${base}/images/wp-uploads/hashrate-LOGO.png`;
 }
 
 /**
- * `<img>` para plantillas Resend: prioriza data URI embebido en el bundle del servidor.
+ * `<img>` para plantillas: `cid:` cuando hay PNG; si no, URL pública.
  */
 export function hashrateEmailLogoImgHtml(opts?: { siteOrigin?: string; heightPx?: number }): string {
   const height = opts?.heightPx ?? 44;
   const width = Math.round(height * (248 / 60));
-  const src = getHashrateEmailLogoDataUri() || getHashrateEmailLogoPublicUrl(opts?.siteOrigin);
+  const hasInline = !!getHashrateEmailLogoPngBuffer();
+  const src = hasInline ? `cid:${HASHRATE_EMAIL_LOGO_CID}` : getHashrateEmailLogoPublicUrl(opts?.siteOrigin);
   return `<img src="${src}" alt="Hashrate Space" width="${width}" height="${height}" style="display:block;height:${height}px;width:auto;max-width:${width}px;border:0;outline:none;text-decoration:none" />`;
 }
