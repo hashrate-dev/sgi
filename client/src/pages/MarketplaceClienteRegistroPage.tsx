@@ -96,17 +96,36 @@ export function MarketplaceClienteRegistroPage() {
     setEmailSuggestFocus(false);
   }
 
-
-  useEffect(() => {
+  /** Ciudad según país de ubicación (al cambiar país o al sincronizar desde prefijo). */
+  function applyCityForCountry(id: string) {
     setCityOther("");
-    if (!countryId) {
+    if (!id) {
       setCity("");
       return;
     }
-    setCelularDialId(countryId);
-    const pais = countryById(countryId);
+    const pais = countryById(id);
     setCity(pais && pais.cities.length === 0 ? CITY_OTHER_VALUE : "");
-  }, [countryId]);
+  }
+
+  /** País de ubicación → actualiza prefijo; el usuario puede cambiar el prefijo después. */
+  function handleCountryChange(id: string) {
+    setCountryId(id);
+    if (id) {
+      setCelularDialId(id);
+    }
+    applyCityForCountry(id);
+  }
+
+  /**
+   * Prefijo → país solo si aún no eligió país (p. ej. prefijo primero).
+   * Si ya hay país distinto, no se pisa (celular de otro país).
+   */
+  function handleCelularDialChange(id: string) {
+    setCelularDialId(id);
+    if (!id || countryId) return;
+    setCountryId(id);
+    applyCityForCountry(id);
+  }
 
   if (!loading && user) {
     return (
@@ -507,7 +526,7 @@ export function MarketplaceClienteRegistroPage() {
                                 id="reg-cel-dial"
                                 className="market-registro-phone-grid__input-dial"
                                 value={celularDialId}
-                                onChange={setCelularDialId}
+                                onChange={handleCelularDialChange}
                                 countries={countriesSorted}
                                 allowEmpty={false}
                                 aria-label={t("reg.dial_aria")}
@@ -546,7 +565,7 @@ export function MarketplaceClienteRegistroPage() {
                                   id="reg-pais"
                                   className="w-100"
                                   value={countryId}
-                                  onChange={setCountryId}
+                                  onChange={handleCountryChange}
                                   countries={countriesSorted}
                                   placeholder={t("reg.country_placeholder")}
                                   aria-label={t("reg.label_country")}

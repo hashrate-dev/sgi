@@ -258,6 +258,32 @@ export function sortCountriesRegistroByName(
   return [...countries].sort((a, b) => a.name.localeCompare(b.name, locale));
 }
 
+function normalizeCountrySearchText(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .trim();
+}
+
+/** Filtra por nombre, código ISO o prefijo (ej. "urug", "598", "+595"). */
+export function filterCountriesRegistro(
+  countries: readonly CountryRegistro[],
+  query: string
+): CountryRegistro[] {
+  const q = normalizeCountrySearchText(query);
+  if (!q) return [...countries];
+  const qDigits = digitsOnly(query);
+  return countries.filter((c) => {
+    const name = normalizeCountrySearchText(c.name);
+    const dial = c.dial.toLowerCase();
+    const id = c.id.toLowerCase();
+    if (name.includes(q) || dial.includes(q) || id.includes(q)) return true;
+    if (qDigits && digitsOnly(c.dial).includes(qDigits)) return true;
+    return false;
+  });
+}
+
 /** Solo dígitos para armar número internacional */
 export function digitsOnly(s: string): string {
   return s.replace(/\D/g, "");
