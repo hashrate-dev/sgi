@@ -256,9 +256,9 @@ body:has(.marketplace-asic-page)::after {
     0 6px 16px -6px rgba(15, 23, 42, 0.1);
 }
 
-/* Marketplace: bloque derecho (carrito + idiomas + cuenta) */
+/* Marketplace: idiomas pegados al extremo derecho (cuenta + carrito a la izquierda del bloque) */
 .site-header--marketplace .site-header__lang-switch {
-  margin-left: 0;
+  margin-left: auto;
 }
 
 .market-lang-switch .market-lang-switch__btn {
