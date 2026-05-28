@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isEmailAlreadyRegisteredError, registerMarketplaceCliente, wakeUpBackend } from "../lib/api";
 import { MarketplacePasswordField } from "../components/marketplace/MarketplacePasswordField";
+import { RegistroCountrySelect } from "../components/marketplace/RegistroCountrySelect";
 import { MarketplaceSiteHeader } from "../components/marketplace/MarketplaceSiteHeader";
 import { MarketplaceSiteFooter } from "../components/marketplace/MarketplaceSiteFooter";
 import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
@@ -12,6 +13,7 @@ import {
   COUNTRIES_REGISTRO,
   countryById,
   normalizeLocalPhoneInput,
+  sortCountriesRegistroByName,
 } from "../lib/marketplaceRegistroGeo";
 import {
   COMMON_EMAIL_DOMAINS,
@@ -59,14 +61,10 @@ export function MarketplaceClienteRegistroPage() {
 
   const paisSeleccionado = countryById(countryId);
 
-  const countriesForPhoneSelect = useMemo(() => {
-    const loc = marketplaceLocale(lang);
-    return [...COUNTRIES_REGISTRO].sort((a, b) => {
-      if (a.id === DEFAULT_PHONE_DIAL_COUNTRY_ID) return -1;
-      if (b.id === DEFAULT_PHONE_DIAL_COUNTRY_ID) return 1;
-      return a.name.localeCompare(b.name, loc);
-    });
-  }, [lang]);
+  const countriesSorted = useMemo(
+    () => sortCountriesRegistroByName(COUNTRIES_REGISTRO, marketplaceLocale(lang)),
+    [lang]
+  );
 
   const { local: emailLocal, domainFragment: emailDomainFrag } = splitEmailLocalAndDomain(email);
   const emailDomainSuggestions = useMemo(
@@ -403,20 +401,16 @@ export function MarketplaceClienteRegistroPage() {
                               >
                                 {t("reg.label_mobile")}
                               </label>
-                              <select
+                              <RegistroCountrySelect
                                 id="reg-cel-dial"
-                                className="form-select market-registro-phone-dial market-registro-phone-grid__input-dial"
+                                className="market-registro-phone-grid__input-dial"
                                 value={celularDialId}
-                                onChange={(e) => setCelularDialId(e.target.value)}
+                                onChange={setCelularDialId}
+                                countries={countriesSorted}
+                                allowEmpty={false}
                                 aria-label={t("reg.dial_aria")}
                                 required
-                              >
-                                {countriesForPhoneSelect.map((c) => (
-                                  <option key={c.id} value={c.id} title={c.name}>
-                                    {c.dial}
-                                  </option>
-                                ))}
-                              </select>
+                              />
                               <input
                                 id="reg-cel-num"
                                 type="tel"
@@ -446,22 +440,16 @@ export function MarketplaceClienteRegistroPage() {
                                 <label className="form-label market-registro-label" htmlFor="reg-pais">
                                   {t("reg.label_country")}
                                 </label>
-                                <select
+                                <RegistroCountrySelect
                                   id="reg-pais"
-                                  className="form-select"
+                                  className="w-100"
                                   value={countryId}
-                                  onChange={(e) => setCountryId(e.target.value)}
-                                  autoComplete="country"
+                                  onChange={setCountryId}
+                                  countries={countriesSorted}
+                                  placeholder={t("reg.country_placeholder")}
                                   aria-label={t("reg.label_country")}
                                   required
-                                >
-                                  <option value="">{t("reg.country_placeholder")}</option>
-                                  {COUNTRIES_REGISTRO.map((c) => (
-                                    <option key={c.id} value={c.id}>
-                                      {c.name} ({c.dial})
-                                    </option>
-                                  ))}
-                                </select>
+                                />
                               </div>
                               <div className="market-registro-field">
                                 <label className="form-label market-registro-label" htmlFor="reg-ciudad">

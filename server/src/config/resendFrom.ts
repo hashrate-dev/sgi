@@ -96,7 +96,7 @@ function resendFromAlternateDomain(header: string): string {
 
 /**
  * Lista de remitentes a probar (en orden). No fuerza un solo dominio:
- * si el apex falla en Resend, se reintenta con mail.hashrate.space.
+ * si el apex (@hashrate.space) falla en Resend, se reintenta con mail.hashrate.space.
  */
 export function resendFromCandidates(): string[] {
   const out: string[] = [];
@@ -112,8 +112,8 @@ export function resendFromCandidates(): string[] {
     add(resendFromAlternateDomain(explicit));
   }
 
-  add(LEGACY_RESEND_FROM_MAIL);
   add(DEFAULT_RESEND_FROM);
+  add(LEGACY_RESEND_FROM_MAIL);
 
   return out;
 }
@@ -129,7 +129,7 @@ export function effectiveResendFromEmailOrDefault(): string {
   const from = effectiveResendFromEmail();
   if (from) return from;
   if (normalizeResendApiKey(process.env.RESEND_API_KEY)) {
-    return LEGACY_RESEND_FROM_MAIL;
+    return DEFAULT_RESEND_FROM;
   }
   return "";
 }

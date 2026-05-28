@@ -65,9 +65,9 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-/** Remitente preferido para bienvenida de registro (subdominio mail verificado en Resend). */
+/** Remitente preferido para bienvenida de registro (apex @hashrate.space; fallback mail.*). */
 export function marketplaceWelcomeFromCandidates(): string[] {
-  const preferred = (process.env.MARKETPLACE_WELCOME_FROM_EMAIL || LEGACY_RESEND_FROM_MAIL).trim();
+  const preferred = (process.env.MARKETPLACE_WELCOME_FROM_EMAIL || DEFAULT_RESEND_FROM).trim();
   const out: string[] = [];
   const add = (v: string) => {
     const t = v.trim();

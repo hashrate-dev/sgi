@@ -225,6 +225,39 @@ export const COUNTRIES_REGISTRO: CountryRegistro[] = [
 
 export const CITY_OTHER_VALUE = "__otra__";
 
+/** URL de bandera PNG (visible en Windows; los emoji de bandera suelen no renderizar en `<select>`). */
+export function countryFlagImgUrl(iso2: string, width = 40): string {
+  const code = iso2.trim().toLowerCase();
+  if (!/^[a-z]{2}$/.test(code)) return "";
+  return `https://flagcdn.com/w${width}/${code}.png`;
+}
+
+/** Bandera emoji (ISO 3166-1 alpha-2, ej. PY → 🇵🇾). */
+export function countryFlagEmoji(iso2: string): string {
+  const code = iso2.trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(code)) return "";
+  const base = 0x1f1e6;
+  return String.fromCodePoint(...([...code].map((ch) => base + ch.charCodeAt(0) - 65)));
+}
+
+/** Etiqueta para selects: nombre + prefijo; con `withEmoji` antepone bandera emoji (prefijo telefónico nativo). */
+export function formatRegistroCountryDialLabel(
+  country: CountryRegistro,
+  opts?: { withEmoji?: boolean }
+): string {
+  const base = `${country.name} (${country.dial})`;
+  if (opts?.withEmoji === false) return base;
+  const flag = countryFlagEmoji(country.id);
+  return flag ? `${flag} ${base}` : base;
+}
+
+export function sortCountriesRegistroByName(
+  countries: readonly CountryRegistro[],
+  locale = "es"
+): CountryRegistro[] {
+  return [...countries].sort((a, b) => a.name.localeCompare(b.name, locale));
+}
+
 /** Solo dígitos para armar número internacional */
 export function digitsOnly(s: string): string {
   return s.replace(/\D/g, "");
