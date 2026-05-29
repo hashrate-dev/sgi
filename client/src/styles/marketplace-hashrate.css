@@ -7303,7 +7303,7 @@ button.product-modal__btn--quote-cart:active {
   }
 
   .marketplace-registro-page.marketplace-login-page--standalone .market-registro-form-col .market-registro-auth-shell {
-    transform: scale(1.035);
+    transform: scale(var(--auth-shell-scale, 1.035));
     transform-origin: top center;
   }
 

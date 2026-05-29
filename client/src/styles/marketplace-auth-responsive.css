@@ -8,11 +8,30 @@
   --auth-shell-scale: 1;
   --auth-layout-min-h: auto;
   --auth-shell-min-h: auto;
+  --auth-panel-top: clamp(0.75rem, 2vh, 1.25rem);
   overflow-x: clip;
 }
 
 .marketplace-registro-page.marketplace-login-page--standalone > #app {
   overflow-x: clip;
+  flex: 0 0 auto;
+  min-height: auto;
+}
+
+/* Footer fuera del viewport inicial: main ocupa al menos 1 pantalla */
+.marketplace-registro-page.marketplace-login-page--standalone > #app > #page-main,
+.marketplace-registro-page.marketplace-login-page--standalone > #app > main.page-main {
+  flex: 0 0 auto;
+  min-height: 100dvh;
+}
+
+.marketplace-registro-page.marketplace-login-page--standalone .site-footer--marketplace {
+  margin-top: 0;
+  flex-shrink: 0;
+}
+
+.marketplace-registro-page.marketplace-login-page--standalone .market-registro-section {
+  padding-bottom: clamp(1.25rem, 2.5vh, 2rem);
 }
 
 .marketplace-registro-page.marketplace-login-page--standalone .market-registro-layout-row--split {
@@ -63,6 +82,10 @@
     padding-bottom: 0.25rem;
   }
 
+  .marketplace-registro-page.marketplace-login-page--standalone .market-registro-form-col {
+    padding-top: 2cm;
+  }
+
   .marketplace-registro-page.marketplace-login-page--standalone .market-registro-brand-panel--compact {
     padding: 0.35rem 0 0.75rem;
   }
@@ -79,7 +102,7 @@
   }
 
   .marketplace-registro-page.marketplace-login-page--standalone .market-registro-section {
-    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+    padding-bottom: clamp(1rem, 2vh, 1.5rem);
   }
 
   .marketplace-registro-page.marketplace-login-page--standalone .market-registro-country-select__panel {
@@ -185,8 +208,8 @@
   .marketplace-registro-page.marketplace-login-page--standalone {
     --auth-aside-shift: clamp(-1.5rem, -2.8vw, -2.75rem);
     --auth-shell-scale: 1;
-    --auth-layout-min-h: min(48rem, calc(100vh - 5rem));
-    --auth-shell-min-h: min(42rem, calc(100vh - 7rem));
+    --auth-layout-min-h: auto;
+    --auth-shell-min-h: auto;
   }
 
   .marketplace-registro-page.marketplace-login-page--standalone .market-registro-aside-inner {
@@ -209,7 +232,6 @@
   }
 
   .marketplace-registro-page.marketplace-login-page--standalone .market-registro-form-col {
-    padding-top: clamp(0.5rem, 1.5vh, 1rem);
     overflow-x: clip;
   }
 
@@ -227,8 +249,8 @@
   .marketplace-registro-page.marketplace-login-page--standalone {
     --auth-aside-shift: clamp(-2.5rem, -4vw, -5cm);
     --auth-shell-scale: 1.02;
-    --auth-layout-min-h: clamp(36rem, calc(100vh - 6rem), 52rem);
-    --auth-shell-min-h: clamp(36rem, calc(100vh - 6rem), 52rem);
+    --auth-layout-min-h: auto;
+    --auth-shell-min-h: auto;
   }
 
   .marketplace-registro-page.marketplace-login-page--standalone .market-registro-aside-inner {
@@ -247,14 +269,106 @@
   }
 }
 
-/* ─── Signup: two columns from lg ─── */
+/* ─── Signup: two columns from lg + toggle anclado arriba (misma posición en /signup y /sign-in) ─── */
 @media (min-width: 992px) {
+  .marketplace-registro-page.marketplace-login-page--standalone {
+    --auth-panel-top: calc(clamp(0.75rem, 2vh, 1.25rem) + 2cm);
+  }
+
   .marketplace-registro-page.marketplace-login-page--standalone .market-registro-split-xl > [class*="col-lg-6"] {
     min-width: 0;
   }
+
+  .marketplace-registro-page.marketplace-login-page--standalone > #app > #page-main,
+  .marketplace-registro-page.marketplace-login-page--standalone > #app > main.page-main {
+    padding-top: clamp(0.35rem, 1.2vh, 0.75rem);
+  }
+
+  .marketplace-registro-page.marketplace-login-page--standalone .market-registro-section {
+    padding-bottom: clamp(1rem, 2vh, 1.5rem);
+  }
+
+  .marketplace-registro-page.marketplace-login-page--standalone .market-registro-shell {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .marketplace-registro-page.marketplace-login-page--standalone .market-registro-layout-row--split {
+    align-items: flex-start;
+    min-height: auto;
+    --auth-layout-min-h: auto;
+  }
+
+  .marketplace-registro-page.marketplace-login-page--standalone .market-registro-aside {
+    padding-block: var(--auth-panel-top) clamp(1rem, 2vh, 2rem);
+  }
+
+  .marketplace-registro-page.marketplace-login-page--standalone .market-registro-form-col {
+    justify-content: flex-start;
+    align-items: center;
+    padding-top: var(--auth-panel-top);
+    padding-bottom: clamp(1rem, 2vh, 2rem);
+    overflow-x: clip;
+    overflow-y: visible;
+  }
+
+  .marketplace-registro-page.marketplace-login-page--standalone .market-registro-form-col .market-registro-auth-shell {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 100%;
+    min-height: 0 !important;
+    margin-inline: auto;
+    transform-origin: top center;
+    align-items: center;
+  }
+
+  .marketplace-registro-page.marketplace-login-page--standalone .market-registro-auth-shell {
+    --auth-shell-min-h: auto;
+    min-height: 0 !important;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  /* Toggle fijo: misma posición exacta en login y signup */
+  .marketplace-registro-page.marketplace-login-page--standalone .market-registro-auth-toggle {
+    flex: 0 0 auto;
+    width: min(100%, 21rem);
+    max-width: 21rem;
+    min-height: 2.15rem;
+    margin: 0 auto 1rem;
+    align-self: center;
+  }
+
+  .marketplace-registro-page.marketplace-login-page--standalone .market-registro-card--auth {
+    width: 100%;
+    max-width: 100%;
+    flex: 0 1 auto;
+    height: auto;
+    align-items: center;
+  }
+
+  /* Login: bloques estrechos centrados horizontalmente */
+  .marketplace-registro-page.marketplace-login-page--standalone .market-registro-card--login .market-registro-card__head--auth,
+  .marketplace-registro-page.marketplace-login-page--standalone .market-registro-card--login .market-registro-fieldset--panel,
+  .marketplace-registro-page.marketplace-login-page--standalone .market-registro-card--login .market-registro-submit-row--auth,
+  .marketplace-registro-page.marketplace-login-page--standalone .market-registro-card--login .alert,
+  .marketplace-registro-page.marketplace-login-page--standalone .market-registro-card--login .market-registro-form > .btn-outline-success {
+    margin-inline: auto;
+  }
+
+  /* Signup: cabecera y sección cuenta alineadas al centro del panel */
+  .marketplace-registro-page.marketplace-login-page--standalone
+    .market-registro-card--auth:not(.market-registro-card--login)
+    .market-registro-card__head--auth,
+  .marketplace-registro-page.marketplace-login-page--standalone
+    .market-registro-card--auth:not(.market-registro-card--login)
+    form
+    > .market-registro-fieldset.market-registro-fieldset--panel:first-of-type {
+    margin-inline: auto;
+  }
 }
 
-/* ─── Short viewports: avoid vertical clipping ─── */
+/* ─── Short viewports: scroll natural ─── */
 @media (max-height: 720px) and (min-width: 992px) {
   .marketplace-registro-page.marketplace-login-page--standalone {
     --auth-layout-min-h: auto;
@@ -264,5 +378,9 @@
   .marketplace-registro-page.marketplace-login-page--standalone .market-registro-aside {
     position: relative;
     top: auto;
+  }
+
+  .marketplace-registro-page.marketplace-login-page--standalone .market-registro-form-col {
+    overflow-y: auto;
   }
 }
