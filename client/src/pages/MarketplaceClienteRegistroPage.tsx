@@ -284,7 +284,9 @@ export function MarketplaceClienteRegistroPage() {
                   className="col-lg-5 col-xl-4 d-none d-lg-flex market-registro-aside"
                   aria-label={t("reg.aside_aria")}
                 >
-                  <RegistroBrandPanel />
+                  <div className="market-registro-aside-inner">
+                    <RegistroBrandPanel />
+                  </div>
                 </aside>
 
                 <div className="col-12 col-lg-7 col-xl-8 market-registro-form-col">
@@ -360,6 +362,7 @@ export function MarketplaceClienteRegistroPage() {
                   <div className="market-registro-card market-registro-card--auth">
                     <header className="market-registro-card__head market-registro-card__head--auth">
                       <h2 className="market-registro-card__title">{t("reg.form_title")}</h2>
+                      <p className="market-registro-card__desc mb-0">{t("reg.form_subtitle")}</p>
                     </header>
 
                     <form className="market-registro-form" onSubmit={(e) => void handleSubmit(e)} noValidate>

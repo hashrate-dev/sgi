@@ -512,7 +512,7 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "login.logout_switch": "Cerrar sesión e ingresar con otra cuenta",
     "login.hrs_home": "Ir al inicio HRS (panel interno)",
     "login.kicker": "Tienda online",
-    "login.intro": "Ingresa a Hashrate para realizar tu compra en la Tienda Online.",
+    "login.intro": "Ingresa a Hashrate Space y elegí el equipo de mineria ASIC que quieras.",
     "login.intro_strong": "Iniciá sesión",
     "login.intro_after": "para armar tu lista y solicitar cotización.",
     "login.form_title": "Ingresar a tu cuenta",
@@ -742,7 +742,8 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "reg.hero_title": "Crear cuenta cliente",
     "reg.hero_lead": "Completá el formulario para cotizar equipos de minería y gestionar tus datos de contacto.",
     "reg.form_title": "Crear tu cuenta",
-    "reg.form_subtitle": "Empezá gratis. No necesitás tarjeta de crédito.",
+    "reg.form_subtitle":
+      "Ingresa tus datos, crea tu cuenta en Hashrate Space y elegí tus equipos para minar.",
     "reg.toggle_signin": "Iniciar sesión",
     "reg.toggle_signup": "Crear cuenta",
     "reg.auth_toggle_aria": "Acceso o registro",
@@ -1541,7 +1542,8 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "reg.hero_title": "Create client account",
     "reg.hero_lead": "Complete the form to quote mining equipment and manage your contact details.",
     "reg.form_title": "Create your account",
-    "reg.form_subtitle": "Start free. No credit card required.",
+    "reg.form_subtitle":
+      "Enter your details, create your Hashrate Space account and choose your mining equipment.",
     "reg.toggle_signin": "Sign in",
     "reg.toggle_signup": "Create account",
     "reg.auth_toggle_aria": "Sign in or register",

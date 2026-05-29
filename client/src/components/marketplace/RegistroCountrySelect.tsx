@@ -76,7 +76,9 @@ export function RegistroCountrySelect({
 
   useEffect(() => {
     if (!open) return;
-    const tFocus = window.setTimeout(() => searchRef.current?.focus(), 0);
+    const tFocus = window.setTimeout(() => {
+      searchRef.current?.focus({ preventScroll: true });
+    }, 0);
     return () => window.clearTimeout(tFocus);
   }, [open]);
 

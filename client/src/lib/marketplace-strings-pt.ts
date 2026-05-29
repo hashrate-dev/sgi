@@ -698,7 +698,8 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
   "reg.hero_title": "Criar conta cliente",
   "reg.hero_lead": "Preencha o formulário para orçar equipamentos de mineração e gerenciar seus dados de contato.",
   "reg.form_title": "Crie sua conta",
-  "reg.form_subtitle": "Comece grátis. Não é necessário cartão de crédito.",
+  "reg.form_subtitle":
+    "Informe seus dados, crie sua conta na Hashrate Space e escolha seus equipamentos para minerar.",
   "reg.toggle_signin": "Entrar",
   "reg.toggle_signup": "Criar conta",
   "reg.auth_toggle_aria": "Entrar ou cadastrar",
