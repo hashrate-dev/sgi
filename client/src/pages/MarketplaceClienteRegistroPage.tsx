@@ -10,6 +10,7 @@ import { RegistroCountrySelect } from "../components/marketplace/RegistroCountry
 import { MarketplaceSiteFooter } from "../components/marketplace/MarketplaceSiteFooter";
 import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
 import "../styles/marketplace-hashrate.css";
+import "../styles/marketplace-auth-responsive.css";
 import {
   CITY_OTHER_VALUE,
   COUNTRIES_REGISTRO,
@@ -452,7 +453,7 @@ export function MarketplaceClienteRegistroPage() {
                       </div>
 
                       <div className="row g-3 market-registro-split-xl align-items-stretch">
-                        <div className="col-12 col-xl-6 d-flex">
+                        <div className="col-12 col-lg-6 d-flex">
                           <div
                             className="market-registro-fieldset market-registro-fieldset--panel market-registro-fieldset--panel--wide mb-0 flex-grow-1 w-100"
                             role="group"
@@ -532,7 +533,7 @@ export function MarketplaceClienteRegistroPage() {
                             </div>
                           </div>
                         </div>
-                        <div className="col-12 col-xl-6 d-flex">
+                        <div className="col-12 col-lg-6 d-flex">
                           <div
                             className="market-registro-fieldset market-registro-fieldset--panel market-registro-fieldset--panel--wide mb-0 flex-grow-1 w-100"
                             role="group"

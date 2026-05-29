@@ -14,6 +14,7 @@ import { MarketplaceSiteFooter } from "../components/marketplace/MarketplaceSite
 import { MarketplacePasswordField } from "../components/marketplace/MarketplacePasswordField";
 import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
 import "../styles/marketplace-hashrate.css";
+import "../styles/marketplace-auth-responsive.css";
 import "../styles/facturacion.css";
 
 export function MarketplaceClienteLoginPage() {

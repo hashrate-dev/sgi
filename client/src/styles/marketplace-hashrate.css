@@ -7893,14 +7893,6 @@ button.product-modal__btn--quote-cart:active {
   width: 100%;
 }
 
-/* Formulario auth: más ancho; datos personales + ubicación apilados hasta XL */
-@media (min-width: 992px) and (max-width: 1199.98px) {
-  .marketplace-registro-page .market-registro-card--auth .market-registro-split-xl > [class*="col-"] {
-    flex: 0 0 100%;
-    max-width: 100%;
-  }
-}
-
 .market-registro-phone-dial {
   font-variant-numeric: tabular-nums;
   text-align: left;
