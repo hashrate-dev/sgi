@@ -33,6 +33,38 @@ const DEFAULT_TEAM: readonly {
   { id: "dg", imageUrl: wpUpload("DG-Team-HRS-1024x991.png") },
 ] as const;
 
+const KNOWN_TEAM_IDS = new Set<string>(DEFAULT_TEAM.map((m) => m.id));
+
+function isKnownTeamMemberId(id: string): id is DefaultTeamMemberId {
+  return KNOWN_TEAM_IDS.has(id);
+}
+
+function getCompanyMemberBio(t: (key: string) => string, key: DefaultTeamMemberId): string[] {
+  if (key === "jv") {
+    const b1 = t("company.m.jv.b1");
+    const b2 = t("company.m.jv.b2");
+    const b3a = t("company.m.jv.b3a");
+    const brand = t("company.m.jv.brand");
+    const b3b = t("company.m.jv.b3b");
+    const b4 = t("company.m.jv.b4");
+    const b3 = `${b3a}${brand}${b3b}`.trim();
+    return [b1, b2, b3, b4].map((x) => String(x ?? "").trim()).filter(Boolean);
+  }
+  const b1 = t(`company.m.${key}.b1`);
+  const b2 = t(`company.m.${key}.b2`);
+  return [b1, b2].map((x) => String(x ?? "").trim()).filter(Boolean);
+}
+
+function localizeCompanyTeamMember(m: TeamMemberDto, t: (key: string) => string): TeamMemberDto {
+  if (!isKnownTeamMemberId(m.id)) return m;
+  return {
+    ...m,
+    role: t(`company.m.${m.id}.role`),
+    name: t(`company.m.${m.id}.name`),
+    bio: getCompanyMemberBio(t, m.id),
+  };
+}
+
 function LinkedInIcon() {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
@@ -48,35 +80,27 @@ export function MarketplaceCompanyPage() {
   const { t } = useMarketplaceLang();
   const dialogTitleId = useId();
   const fallbackMembers = useMemo<TeamMemberDto[]>(() => {
-    const getBio = (key: DefaultTeamMemberId): string[] => {
-      if (key === "jv") {
-        const b1 = t("company.m.jv.b1");
-        const b2 = t("company.m.jv.b2");
-        const b3a = t("company.m.jv.b3a");
-        const brand = t("company.m.jv.brand");
-        const b3b = t("company.m.jv.b3b");
-        const b4 = t("company.m.jv.b4");
-        const b3 = `${b3a}${brand}${b3b}`.trim();
-        return [b1, b2, b3, b4].map((x) => String(x ?? "").trim()).filter(Boolean);
-      }
-      const b1 = t(`company.m.${key}.b1`);
-      const b2 = t(`company.m.${key}.b2`);
-      return [b1, b2].map((x) => String(x ?? "").trim()).filter(Boolean);
-    };
-
     return DEFAULT_TEAM.map((m) => ({
       id: m.id,
       imageUrl: m.imageUrl,
       linkedin: m.linkedin,
       role: t(`company.m.${m.id}.role`),
       name: t(`company.m.${m.id}.name`),
-      bio: getBio(m.id),
+      bio: getCompanyMemberBio(t, m.id),
       enabled: true,
     }));
   }, [t]);
 
-  const [teamMembers, setTeamMembers] = useState<TeamMemberDto[]>(() => fallbackMembers);
+  const [rawTeamMembers, setRawTeamMembers] = useState<TeamMemberDto[] | null>(null);
   const [openMemberId, setOpenMemberId] = useState<string | null>(null);
+
+  const teamMembers = useMemo(() => {
+    const source =
+      rawTeamMembers && rawTeamMembers.length > 0
+        ? rawTeamMembers.filter((m) => m.enabled !== false)
+        : fallbackMembers;
+    return source.map((m) => localizeCompanyTeamMember(m, t));
+  }, [rawTeamMembers, fallbackMembers, t]);
 
   useEffect(() => {
     const prevTitle = document.title;
@@ -130,7 +154,7 @@ export function MarketplaceCompanyPage() {
           const incoming = (Array.isArray(res.members) ? res.members : []).filter((m) => m.enabled !== false);
           if (cancelled) return;
           if (incoming.length === 0) return;
-          setTeamMembers(
+          setRawTeamMembers(
             incoming.map((m) => ({
               id: m.id,
               imageUrl: m.imageUrl,
