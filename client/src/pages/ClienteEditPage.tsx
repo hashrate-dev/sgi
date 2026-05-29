@@ -21,6 +21,7 @@ import {
   parseDocumentoIdentidadStored,
   parseStoredPhoneToDialLocal,
 } from "../lib/marketplaceRegistroGeo";
+import { useRegistroCities } from "../hooks/useRegistroCities";
 
 /** Cliente creado desde /marketplace/signup (legacy: /marketplace/registro) (código A90001… o histórico WEB-). */
 function isClienteTiendaOnline(code: string | undefined): boolean {
@@ -74,8 +75,11 @@ export function ClienteEditPage() {
   const [teDocNumero, setTeDocNumero] = useState("");
   const [teCelDialId, setTeCelDialId] = useState<string>(DEFAULT_PHONE_DIAL_COUNTRY_ID);
   const [teCelLocal, setTeCelLocal] = useState("");
+  const [pendingCityFromClient, setPendingCityFromClient] = useState<string | null>(null);
   const teCountryPrevRef = useRef<string | null>(null);
   const countriesPhoneSel = useMemo(() => countriesForPhoneSelect(), []);
+  const { cities: teCities, loading: teCitiesLoading } = useRegistroCities(teCountryId);
+  const paisTe = countryById(teCountryId);
 
   if (user && !canEdit) return <Navigate to="/clients/hosting" replace />;
 
@@ -132,9 +136,21 @@ export function ClienteEditPage() {
     if (!client || !isClienteTiendaOnline(client.code)) return;
     const cid = findCountryIdByName(client.country ?? "");
     setTeCountryId(cid || "");
-    const pais = countryById(cid);
-    const cname = (client.city ?? "").trim();
-    if (pais && cname && pais.cities.includes(cname)) {
+    setPendingCityFromClient((client.city ?? "").trim() || null);
+    const doc = parseDocumentoIdentidadStored(client.documento_identidad ?? "");
+    setTeDocTipo(doc.tipo);
+    setTeDocNumero(doc.numero);
+    const ph = parseStoredPhoneToDialLocal(client.phone ?? "");
+    setTeCelDialId(ph.dialId || DEFAULT_PHONE_DIAL_COUNTRY_ID);
+    setTeCelLocal(ph.local);
+    teCountryPrevRef.current = cid || null;
+  }, [client]);
+
+  useEffect(() => {
+    if (pendingCityFromClient === null || !teCountryId || teCitiesLoading) return;
+    const cname = pendingCityFromClient;
+    setPendingCityFromClient(null);
+    if (teCities.includes(cname)) {
       setTeCity(cname);
       setTeCityOther("");
     } else if (cname) {
@@ -144,14 +160,7 @@ export function ClienteEditPage() {
       setTeCity("");
       setTeCityOther("");
     }
-    const doc = parseDocumentoIdentidadStored(client.documento_identidad ?? "");
-    setTeDocTipo(doc.tipo);
-    setTeDocNumero(doc.numero);
-    const ph = parseStoredPhoneToDialLocal(client.phone ?? "");
-    setTeCelDialId(ph.dialId || DEFAULT_PHONE_DIAL_COUNTRY_ID);
-    setTeCelLocal(ph.local);
-    teCountryPrevRef.current = cid || null;
-  }, [client]);
+  }, [pendingCityFromClient, teCountryId, teCities, teCitiesLoading]);
 
   useEffect(() => {
     if (!client || !isClienteTiendaOnline(client.code)) return;
@@ -330,7 +339,6 @@ export function ClienteEditPage() {
   }
 
   const tiendaOnline = isClienteTiendaOnline(client.code);
-  const paisTe = countryById(teCountryId);
 
   return (
     <div className={`fact-page${tiendaOnline ? " fact-page--cte-tienda-edit" : ""}`}>
@@ -482,11 +490,17 @@ export function ClienteEditPage() {
                               onChange={(e) => setTeCity(e.target.value)}
                               autoComplete="address-level2"
                               aria-label="Ciudad"
-                              disabled={!paisTe}
+                              disabled={!paisTe || teCitiesLoading}
                               required
                             >
-                              <option value="">{paisTe ? "Seleccioná tu ciudad…" : "Elegí primero el país"}</option>
-                              {paisTe?.cities.map((c) => (
+                              <option value="">
+                                {!paisTe
+                                  ? "Elegí primero el país"
+                                  : teCitiesLoading
+                                    ? "Cargando ciudades…"
+                                    : "Seleccioná tu ciudad…"}
+                              </option>
+                              {teCities.map((c) => (
                                 <option key={c} value={c}>
                                   {c}
                                 </option>

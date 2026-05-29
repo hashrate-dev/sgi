@@ -726,6 +726,7 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
   "reg.country_search_empty": "Nenhum país corresponde à busca.",
   "reg.label_city": "Cidade",
   "reg.city_pick": "Selecione sua cidade…",
+  "reg.city_loading": "Carregando cidades…",
   "reg.city_need_country": "Escolha o país primeiro",
   "reg.city_other": "Outra cidade…",
   "reg.ph_city_other": "Nome da cidade",

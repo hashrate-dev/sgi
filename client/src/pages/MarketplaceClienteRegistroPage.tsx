@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import { MARKETPLACE } from "../lib/marketplacePaths.js";
 import { useAuth } from "../contexts/AuthContext";
@@ -17,6 +17,7 @@ import {
   normalizeLocalPhoneInput,
   sortCountriesRegistroByName,
 } from "../lib/marketplaceRegistroGeo";
+import { useRegistroCities } from "../hooks/useRegistroCities";
 import {
   COMMON_EMAIL_DOMAINS,
   filterEmailDomainSuggestions,
@@ -41,7 +42,6 @@ export function MarketplaceClienteRegistroPage() {
   const [apellidos, setApellidos] = useState("");
   const [countryId, setCountryId] = useState("");
   const [city, setCity] = useState("");
-  const [cityOther, setCityOther] = useState("");
   /** País asociado al prefijo E.164 (independiente del país de dirección; se sincroniza con él al cambiar). */
   const [celularDialId, setCelularDialId] = useState(DEFAULT_PHONE_DIAL_COUNTRY_ID);
   const [celularLocal, setCelularLocal] = useState("");
@@ -66,6 +66,23 @@ export function MarketplaceClienteRegistroPage() {
   }, []);
 
   const paisSeleccionado = countryById(countryId);
+  const { cities: registroCities, loading: citiesLoading } = useRegistroCities(countryId);
+  const countryCityInitRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!countryId) {
+      countryCityInitRef.current = null;
+      setCity("");
+      return;
+    }
+    if (citiesLoading) {
+      setCity("");
+      return;
+    }
+    if (countryCityInitRef.current === countryId) return;
+    countryCityInitRef.current = countryId;
+    setCity(registroCities.length === 0 ? CITY_OTHER_VALUE : "");
+  }, [countryId, citiesLoading, registroCities]);
 
   const countriesSorted = useMemo(
     () => sortCountriesRegistroByName(COUNTRIES_REGISTRO, marketplaceLocale(lang)),
@@ -100,24 +117,12 @@ export function MarketplaceClienteRegistroPage() {
     setEmailSuggestFocus(false);
   }
 
-  /** Ciudad según país de ubicación (al cambiar país o al sincronizar desde prefijo). */
-  function applyCityForCountry(id: string) {
-    setCityOther("");
-    if (!id) {
-      setCity("");
-      return;
-    }
-    const pais = countryById(id);
-    setCity(pais && pais.cities.length === 0 ? CITY_OTHER_VALUE : "");
-  }
-
   /** País de ubicación → actualiza prefijo; el usuario puede cambiar el prefijo después. */
   function handleCountryChange(id: string) {
     setCountryId(id);
     if (id) {
       setCelularDialId(id);
     }
-    applyCityForCountry(id);
   }
 
   /**
@@ -128,7 +133,6 @@ export function MarketplaceClienteRegistroPage() {
     setCelularDialId(id);
     if (!id || countryId) return;
     setCountryId(id);
-    applyCityForCountry(id);
   }
 
   if (!loading && user) {
@@ -209,10 +213,11 @@ export function MarketplaceClienteRegistroPage() {
       setError(t("reg.err.city"));
       return;
     }
-    const cityFinal = city === CITY_OTHER_VALUE ? cityOther.trim() : city.trim();
-    if (!cityFinal || cityFinal.length < 2) {
+    const cityFinal =
+      city === CITY_OTHER_VALUE ? t("reg.city_other").replace(/[.…]+$/g, "").trim() : city.trim();
+    if (!cityFinal) {
       setErrorKind("client");
-      setError(city === CITY_OTHER_VALUE ? t("reg.err.city_other") : t("reg.err.city"));
+      setError(t("reg.err.city"));
       return;
     }
     if (!celularDialId) {
@@ -564,13 +569,17 @@ export function MarketplaceClienteRegistroPage() {
                                   onChange={(e) => setCity(e.target.value)}
                                   autoComplete="address-level2"
                                   aria-label={t("reg.label_city")}
-                                  disabled={!paisSeleccionado}
+                                  disabled={!paisSeleccionado || citiesLoading}
                                   required
                                 >
                                   <option value="">
-                                    {paisSeleccionado ? t("reg.city_pick") : t("reg.city_need_country")}
+                                    {!paisSeleccionado
+                                      ? t("reg.city_need_country")
+                                      : citiesLoading
+                                        ? t("reg.city_loading")
+                                        : t("reg.city_pick")}
                                   </option>
-                                  {paisSeleccionado?.cities.map((c) => (
+                                  {registroCities.map((c) => (
                                     <option key={c} value={c}>
                                       {c}
                                     </option>
@@ -579,20 +588,6 @@ export function MarketplaceClienteRegistroPage() {
                                     <option value={CITY_OTHER_VALUE}>{t("reg.city_other")}</option>
                                   ) : null}
                                 </select>
-                                {paisSeleccionado && city === CITY_OTHER_VALUE ? (
-                                  <div className="market-registro-field--field-icon market-registro-field--icon-city-other mt-2">
-                                    <input
-                                      type="text"
-                                      className="form-control"
-                                      value={cityOther}
-                                      onChange={(e) => setCityOther(e.target.value)}
-                                      placeholder={t("reg.ph_city_other")}
-                                      autoComplete="address-level2"
-                                      aria-label={t("reg.ph_city_other")}
-                                      required
-                                    />
-                                  </div>
-                                ) : null}
                               </div>
                               <div
                                 className="market-registro-field market-registro-field--grid-spacer"
