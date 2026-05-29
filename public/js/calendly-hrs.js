@@ -1,8 +1,8 @@
 (function () {
   var LABELS = {
-    es: "📅 Reserva una reunión",
-    en: "📅 Book a meeting",
-    pt: "📅 Agende uma reunião",
+    es: "Reserva una reunión",
+    en: "Book a meeting",
+    pt: "Agende uma reunião",
   };
 
   var spinnerPurgeRaf = null;
