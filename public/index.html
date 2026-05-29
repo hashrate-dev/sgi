@@ -55,9 +55,23 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <!-- Calendly: botón flotante + popup modal (la página actual queda visible detrás) -->
     <link href="https://assets.calendly.com/assets/external/widget.css" rel="stylesheet" />
-    <link href="/css/calendly-hrs.css" rel="stylesheet" />
+    <script>
+      (function () {
+        var a = Element.prototype.appendChild;
+        var b = Element.prototype.insertBefore;
+        Element.prototype.appendChild = function (c) {
+          if (c && c.classList && c.classList.contains("calendly-spinner")) return c;
+          return a.call(this, c);
+        };
+        Element.prototype.insertBefore = function (c, r) {
+          if (c && c.classList && c.classList.contains("calendly-spinner")) return c;
+          return b.call(this, c, r);
+        };
+      })();
+    </script>
+    <link href="/css/calendly-hrs.css?v=9" rel="stylesheet" />
     <script src="https://assets.calendly.com/assets/external/widget.js" type="text/javascript" async></script>
-    <script src="/js/calendly-hrs.js" defer></script>
+    <script src="/js/calendly-hrs.js?v=9" defer></script>
 </body>
 
     <link rel="stylesheet" href="index.css">
