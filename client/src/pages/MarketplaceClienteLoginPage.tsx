@@ -139,7 +139,7 @@ export function MarketplaceClienteLoginPage() {
             <div className="container-fluid market-registro-shell px-3 px-sm-4 px-xl-5">
               <div className="row g-3 g-lg-4 align-items-stretch market-registro-layout-row market-registro-layout-row--split">
                 <aside
-                  className="col-lg-5 col-xl-4 d-none d-lg-flex market-registro-aside"
+                  className="col-lg-6 d-none d-lg-flex market-registro-aside"
                   aria-label={t("login.aside_aria")}
                 >
                   <div className="market-registro-aside-inner">
@@ -147,7 +147,7 @@ export function MarketplaceClienteLoginPage() {
                   </div>
                 </aside>
 
-                <div className="col-12 col-lg-7 col-xl-8 market-registro-form-col">
+                <div className="col-12 col-lg-6 market-registro-form-col">
                   <div className="market-registro-hero-compact d-lg-none">
                     <RegistroBrandPanel compact variant="login" />
                   </div>

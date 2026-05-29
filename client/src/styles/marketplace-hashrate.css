@@ -863,7 +863,7 @@ button.market-link-hrs {
 /* Acceso tienda: sin header ni tabs de registro */
 .marketplace-login-page--standalone > #app > #page-main,
 .marketplace-login-page--standalone > #app > main.page-main {
-  padding-top: clamp(1.5rem, 5vh, 2.75rem);
+  padding-top: clamp(0.65rem, 2.5vh, 1.5rem);
 }
 
 .marketplace-login-page--standalone .market-registro-aside {
@@ -6151,7 +6151,7 @@ button.product-modal__btn--quote-cart:active {
 
 .marketplace-registro-page.marketplace-login-page--standalone > #app > #page-main,
 .marketplace-registro-page.marketplace-login-page--standalone > #app > main.page-main {
-  padding-top: clamp(1.5rem, 5vh, 2.75rem);
+  padding-top: clamp(0.65rem, 2.5vh, 1.5rem);
 }
 
 .marketplace-registro-page.marketplace-login-page--standalone .market-registro-aside {
@@ -6504,6 +6504,11 @@ button.product-modal__btn--quote-cart:active {
   --market-registro-auth-account-fields-w: min(100%, 28rem);
 }
 
+.marketplace-registro-page.marketplace-login-page--standalone {
+  --market-registro-auth-shell-w: 100%;
+  --market-registro-auth-account-fields-w: 100%;
+}
+
 .market-registro-auth-shell {
   display: flex;
   flex-direction: column;
@@ -6532,6 +6537,7 @@ button.product-modal__btn--quote-cart:active {
 
 .marketplace-registro-page .market-registro-layout-row--split {
   --bs-gutter-x: clamp(1.5rem, 3.5vw, 3rem);
+  min-height: clamp(36rem, calc(100vh - 6rem), 52rem);
 }
 
 .market-registro-auth-toggle {
@@ -6602,14 +6608,14 @@ button.product-modal__btn--quote-cart:active {
 }
 
 .marketplace-registro-page.marketplace-login-page--standalone .market-registro-form-col {
-  align-items: center;
+  align-items: stretch;
 }
 
 .marketplace-registro-page.marketplace-login-page--standalone .market-registro-form-col .market-registro-auth-shell {
   width: 100%;
-  max-width: min(100%, var(--market-registro-auth-shell-w, 36rem));
-  margin-inline: auto;
-  align-items: center;
+  max-width: 100%;
+  margin-inline: 0;
+  align-items: stretch;
 }
 
 .marketplace-registro-page.marketplace-login-page--standalone .market-registro-card--auth .market-registro-form,
@@ -7240,25 +7246,69 @@ button.product-modal__btn--quote-cart:active {
   .marketplace-registro-page .market-registro-aside {
     align-self: stretch;
     align-items: center;
-    justify-content: flex-start;
-    padding-inline: clamp(1rem, 3vw, 2.5rem);
-    padding-top: clamp(0.5rem, 1.5vw, 1rem);
+    justify-content: center;
+    padding-inline: clamp(1rem, 2vw, 2rem);
+    padding-block: clamp(1rem, 2vh, 2rem);
+    min-height: 100%;
   }
 
   .marketplace-registro-page.marketplace-login-page--standalone .market-registro-aside,
   .marketplace-login-page--standalone .market-registro-aside {
     align-self: stretch;
+    position: relative;
+    top: auto;
+    justify-content: flex-start;
+    padding-block: clamp(0.75rem, 2vh, 1.25rem) clamp(1rem, 2vh, 2rem);
   }
 
   .marketplace-registro-page .market-registro-aside-inner {
     display: flex;
     flex-direction: column;
-    justify-content: flex-start;
-    width: min(100%, 23rem);
-    max-width: 23rem;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    max-width: min(100%, 30rem);
     margin-inline: auto;
-    flex: 0 1 auto;
-    align-self: center;
+    flex: 1 1 auto;
+    align-self: stretch;
+    min-height: 100%;
+    transform: translateX(-5cm);
+  }
+
+  .marketplace-registro-page.marketplace-login-page--standalone .market-registro-aside-inner {
+    justify-content: flex-start;
+    align-items: flex-start;
+    min-height: 0;
+    flex: 0 0 auto;
+    align-self: auto;
+    transform: translateX(-5cm);
+  }
+
+  .marketplace-registro-page .market-registro-brand-panel__logo {
+    max-width: min(260px, 82%);
+    max-height: 66px;
+    margin-bottom: clamp(1.1rem, 2vw, 1.55rem);
+  }
+
+  .marketplace-registro-page.marketplace-login-page--standalone .market-registro-brand-panel__logo {
+    display: block;
+    flex-shrink: 0;
+    min-height: 66px;
+  }
+
+  .marketplace-registro-page.marketplace-login-page--standalone .market-registro-form-col {
+    justify-content: flex-start;
+    padding-top: clamp(0.75rem, 2vh, 1.25rem);
+    transform: none;
+  }
+
+  .marketplace-registro-page.marketplace-login-page--standalone .market-registro-form-col .market-registro-auth-shell {
+    transform: scale(1.035);
+    transform-origin: top center;
+  }
+
+  .marketplace-registro-page.marketplace-login-page--standalone .market-registro-card__head--auth .market-registro-card__title {
+    font-size: clamp(1.34rem, 2vw, 1.62rem);
   }
 
   .marketplace-registro-page
@@ -7267,8 +7317,14 @@ button.product-modal__btn--quote-cart:active {
     width: 100%;
     max-width: none;
     flex: 0 0 auto;
+    margin-inline: auto;
+    padding: 0 clamp(0.75rem, 2vw, 1.25rem);
+  }
+
+  .marketplace-registro-page.marketplace-login-page--standalone
+    .market-registro-aside-inner
+    > .market-registro-brand-panel:not(.market-registro-brand-panel--compact) {
     margin-inline: 0;
-    padding: 0 clamp(0.75rem, 2vw, 1.25rem) clamp(0.5rem, 1.5vw, 1rem);
   }
 
   .marketplace-registro-page .market-registro-brand-panel__lead {
@@ -7325,9 +7381,9 @@ button.product-modal__btn--quote-cart:active {
   position: relative;
   z-index: 1;
   width: auto;
-  max-width: min(200px, 72%);
+  max-width: min(220px, 76%);
   height: auto;
-  max-height: 52px;
+  max-height: 58px;
   margin-bottom: clamp(1.35rem, 2.5vw, 2rem);
   object-fit: contain;
 }
