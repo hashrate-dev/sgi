@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { db, getDb } from "../db.js";
+import { hostingFxClientTotalPayment } from "../lib/hostingFxClientTotalPayment.js";
 import { assignHostingInvoiceCommissionsToFxOps, type HostingCommissionInvoiceRow } from "../lib/hostingFxInvoiceCommissionMatch.js";
 import { requireRole } from "../middleware/auth.js";
 import { requireModuleGrant } from "../middleware/moduleGrant.js";
@@ -356,7 +357,7 @@ hostingFxOperationsRouter.post(
     const d = parsed.data;
     const hostingFlow = Boolean(d.compraFlowHostingCommission);
     const operationType: "usdt_to_usd" | "usd_to_usdt" = d.usdtSide === "buy_usdt" ? "usd_to_usdt" : "usdt_to_usd";
-    const transferAmount = Math.max(0, d.operationAmount - (d.operationAmount * d.hrsCommissionPct) / 100);
+    const transferAmount = hostingFxClientTotalPayment(d.operationAmount, d.hrsCommissionPct, hostingFlow);
     const client = (await db.prepare("SELECT id FROM clients WHERE id = ?").get(d.clientId)) as { id: number } | undefined;
     if (!client) return res.status(404).json({ error: { message: "Cliente de hosting no encontrado." } });
 
@@ -438,13 +439,23 @@ hostingFxOperationsRouter.put(
     if (nextOperationType != null) push("operation_type = ?", nextOperationType);
     if (d.notes != null) push("notes = ?", d.notes);
     if (d.compraFlowHostingCommission != null) push("compra_flow_hosting_commission = ?", d.compraFlowHostingCommission ? 1 : 0);
-    if (d.operationAmount != null || d.hrsCommissionPct != null) {
+    if (d.operationAmount != null || d.hrsCommissionPct != null || d.compraFlowHostingCommission != null) {
       const current = (await db
-        .prepare("SELECT operation_amount, hrs_commission_pct FROM hosting_fx_operations WHERE id = ?")
-        .get(id)) as { operation_amount?: number; hrs_commission_pct?: number } | undefined;
+        .prepare(
+          "SELECT operation_amount, hrs_commission_pct, compra_flow_hosting_commission FROM hosting_fx_operations WHERE id = ?"
+        )
+        .get(id)) as {
+        operation_amount?: number;
+        hrs_commission_pct?: number;
+        compra_flow_hosting_commission?: number;
+      } | undefined;
       const opAmount = d.operationAmount ?? Number(current?.operation_amount ?? 0);
       const commPct = d.hrsCommissionPct ?? Number(current?.hrs_commission_pct ?? 0);
-      const transferAmount = Math.max(0, opAmount - (opAmount * commPct) / 100);
+      const hostingFlow =
+        d.compraFlowHostingCommission != null
+          ? Boolean(d.compraFlowHostingCommission)
+          : Number(current?.compra_flow_hosting_commission ?? 0) === 1;
+      const transferAmount = hostingFxClientTotalPayment(opAmount, commPct, hostingFlow);
       push("client_total_payment = ?", transferAmount);
     }
     push("updated_at = ?", new Date().toISOString());

@@ -26,6 +26,8 @@ import {
   type HostingInvoiceTransferCommissionRow,
 } from "../lib/api";
 import { downloadHostingFxTicketPdf } from "../lib/generateHostingFxTicketPdf";
+import { hostingFxClientTotalPayment } from "../lib/hostingFxClientTotalPayment";
+import { hostingFxOperationProfitUsd } from "../lib/hostingFxOperationProfit";
 import "../styles/facturacion.css";
 
 type FxFormState = HostingFxOperationPayload;
@@ -171,21 +173,25 @@ export function HostingExchangeOperationsPage() {
       setPdfLoadingId(null);
     }
   }, []);
-  const transferAmount = useMemo(() => {
-    const opAmount = Number.isFinite(form.operationAmount) ? form.operationAmount : 0;
-    const comm = Number.isFinite(form.hrsCommissionPct) ? form.hrsCommissionPct : 0;
-    const commissionAmount = (opAmount * comm) / 100;
-    return Math.max(0, opAmount - commissionAmount);
-  }, [form.operationAmount, form.hrsCommissionPct]);
+  const isHostingCommissionFlow = clientCompraSelect === "hosting_commission";
+  const transferAmount = useMemo(
+    () =>
+      hostingFxClientTotalPayment(
+        form.operationAmount,
+        form.hrsCommissionPct,
+        isHostingCommissionFlow
+      ),
+    [form.operationAmount, form.hrsCommissionPct, isHostingCommissionFlow]
+  );
   const profitAmount = useMemo(
     () =>
-      Math.max(
-        0,
-        (Number.isFinite(form.operationAmount) ? form.operationAmount : 0) -
-          transferAmount -
-          (Number.isFinite(form.bankFeeAmount) ? form.bankFeeAmount : 0)
-      ),
-    [form.operationAmount, transferAmount, form.bankFeeAmount]
+      hostingFxOperationProfitUsd({
+        operationAmount: form.operationAmount,
+        clientTotalPayment: transferAmount,
+        bankFeeAmount: form.bankFeeAmount,
+        compraFlowHostingCommission: isHostingCommissionFlow,
+      }),
+    [form.operationAmount, transferAmount, form.bankFeeAmount, isHostingCommissionFlow]
   );
   const bankFieldsEnabled = form.deliveryMethod === "usd_to_bank";
 

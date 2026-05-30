@@ -1,8 +1,17 @@
 import type { HostingFxOperation } from "./api";
 
-/** Misma fórmula que la columna «Ganancia operación» en operaciones de cambio USDT/USD (hosting). */
+/** Misma fórmula que «Ganancia operación» en el formulario y KPIs de cambio. */
 export function hostingFxOperationProfitUsd(
-  op: Pick<HostingFxOperation, "operationAmount" | "clientTotalPayment" | "bankFeeAmount">
+  op: Pick<
+    HostingFxOperation,
+    "operationAmount" | "clientTotalPayment" | "bankFeeAmount" | "compraFlowHostingCommission"
+  >
 ): number {
-  return Math.max(0, op.operationAmount - op.clientTotalPayment - op.bankFeeAmount);
+  const opAmt = Number.isFinite(op.operationAmount) ? op.operationAmount : 0;
+  const transfer = Number.isFinite(op.clientTotalPayment) ? op.clientTotalPayment : 0;
+  const bank = Number.isFinite(op.bankFeeAmount) ? op.bankFeeAmount : 0;
+  if (op.compraFlowHostingCommission) {
+    return Math.max(0, transfer - opAmt - bank);
+  }
+  return Math.max(0, opAmt - transfer - bank);
 }
