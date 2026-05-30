@@ -83,10 +83,11 @@ const MARGIN_TOP_BOTTOM = 22; /* 18 + 4mm: 0.4 cm más arriba y abajo */
 const MARGIN_SIDES = 26; /* 22 + 4mm: 0.2 cm más por cada costado (24→26) */
 const PAGE_W = 210;
 const PAGE_H = 297;
-const COL_DESC = 108;
+const COL_DESC = 98;
 const COL_PRECIO = 27;
-const COL_CANT = 30;
-const COL_TOTAL = 35;
+const COL_CANT = 32;
+const COL_TOTAL = 30;
+/** Ancho total fijo: mantiene márgenes laterales ~11,5 mm (centrado en A4). */
 const TABLE_W = COL_DESC + COL_PRECIO + COL_CANT + COL_TOTAL;
 const ROW_H = 9;
 const HEADER_ROW_H = 10;
