@@ -4,6 +4,7 @@ import { saveAs } from "file-saver";
 import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
 import { getClients } from "../lib/api";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
+import { prepareLineItemsForPdf } from "../lib/prepareLineItemsForPdf";
 import { loadInvoicesAsic } from "../lib/storage";
 import type { Invoice } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
@@ -181,25 +182,7 @@ export function PendientesMineriaPage() {
         invoiceDate = new Date();
       }
 
-      const validItems = inv.items.map((item) => {
-        let serviceKey: "A" | "B" | "C" | "D" = (item.serviceKey as "A" | "B" | "C" | "D") || "A";
-        if (!item.serviceKey && item.serviceName) {
-          if (item.serviceName.includes("L7") || item.serviceName.includes("L9")) {
-            serviceKey = item.serviceName.includes("L9") ? "B" : "A";
-          } else {
-            serviceKey = "C";
-          }
-        }
-        
-        return {
-          serviceKey,
-          serviceName: item.serviceName || "Servicio",
-          month: item.month || inv.month,
-          quantity: item.quantity || 1,
-          price: item.price || 0,
-          discount: item.discount || 0
-        };
-      });
+      const validItems = prepareLineItemsForPdf(inv.items, inv.month);
 
       const doc = generateFacturaPdf(
         {

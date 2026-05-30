@@ -5,6 +5,7 @@ import { deleteAllInvoices, deleteEmittedDocumentOne, deleteEmittedDocumentsAll,
 import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
 import { dispatchEmittedChanged } from "../lib/emittedEvents";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
+import { prepareLineItemsForPdf } from "../lib/prepareLineItemsForPdf";
 import { loadInvoicesAsic, saveInvoicesAsic } from "../lib/storage";
 import type { ComprobanteType, Invoice } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
@@ -621,28 +622,7 @@ export function HistorialMineriaPage() {
         invoiceDate = new Date();
       }
 
-      // Validar y asegurar que los items tengan la estructura correcta
-      const validItems = inv.items.map((item) => {
-        // Asegurar que serviceKey existe, si no, intentar inferirlo desde serviceName
-        let serviceKey: "A" | "B" | "C" | "D" = (item.serviceKey as "A" | "B" | "C" | "D") || "A";
-        if (!item.serviceKey && item.serviceName) {
-          // Intentar inferir desde el nombre del servicio
-          if (item.serviceName.includes("L7") || item.serviceName.includes("L9")) {
-            serviceKey = item.serviceName.includes("L9") ? "B" : "A";
-          } else {
-            serviceKey = "C";
-          }
-        }
-        
-        return {
-          serviceKey,
-          serviceName: item.serviceName || "Servicio",
-          month: item.month || inv.month,
-          quantity: item.quantity || 1,
-          price: item.price || 0,
-          discount: item.discount || 0
-        };
-      });
+      const validItems = prepareLineItemsForPdf(inv.items, inv.month);
 
       const relatedForNc =
         inv.type === "Nota de Crédito"

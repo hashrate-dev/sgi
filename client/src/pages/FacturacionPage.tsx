@@ -25,6 +25,7 @@ import { canEditFacturacion, lectorAllowsModule } from "../lib/auth";
 import { formatCurrencyNumber, formatUSD } from "../lib/formatCurrency";
 import { isClienteTiendaOnline } from "../lib/clientTienda";
 import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
+import { getLineItemDescription } from "../lib/invoiceLineItemDescription";
 import { isLinkedToInvoice } from "../lib/invoiceLinks";
 import { buildReciboPaymentLineDescription, buildReciboConceptLine, getReciboConceptParts } from "../lib/reciboConceptText";
 import { reciboHasSettlementRows, reciboIsPaymentLineSettledTable } from "../lib/receiptSettlementLine";
@@ -868,7 +869,7 @@ export function FacturacionPage() {
       discounts: finalDiscounts,
       total: finalTotal,
       items: itemsToEmit.map((it) => ({
-        service: it.serviceName || "Servicio",
+        service: getLineItemDescription(it),
         month: it.month,
         quantity: it.quantity,
         price: it.price,

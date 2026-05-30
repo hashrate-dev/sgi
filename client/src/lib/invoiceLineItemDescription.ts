@@ -8,32 +8,91 @@ export function ymToMonthYearInvoice(ym: string): string {
   return `${m}-${y}`;
 }
 
+/** Quita sufijo " - MM-YYYY" / "-MM-YYYY" del final y devuelve mes en YYYY-MM si aplica. */
+export function stripTrailingInvoiceMonth(text: string): { label: string; month?: string } {
+  const s = String(text ?? "").trim();
+  const m = s.match(/\s*-\s*(\d{2})-(\d{4})\s*$/);
+  if (!m) return { label: s };
+  return {
+    label: s.slice(0, m.index).trim(),
+    month: `${m[2]}-${m[1]}`,
+  };
+}
+
+/** "… L9 - 05-2026" / "… S21 - 10-2025" → "… L9-05-2026" (sin espacios antes del mes). */
+export function compactInvoiceMonthSpacing(text: string): string {
+  return String(text ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\s+-\s+(\d{1,2}-\d{4})/g, (_, my: string) => {
+      const [mm, yyyy] = my.split("-");
+      const mmPad = mm.length === 1 ? `0${mm}` : mm;
+      return `-${mmPad}-${yyyy}`;
+    });
+}
+
+/** Texto final para celda DESCRIPCION: compacto, una sola línea. */
+export function normalizeInvoiceDescriptionForCell(text: string): string {
+  return compactInvoiceMonthSpacing(text);
+}
+
+/** Sufijo de mes sin espacios: "… L9-03-2025" (evita wrap en PDF). */
+export function invoiceDescWithMonth(base: string, month?: string): string {
+  const { label, month: embeddedMonth } = stripTrailingInvoiceMonth(base);
+  const cleanBase = label || String(base ?? "").trim();
+  const effectiveMonth = month || embeddedMonth;
+  if (!effectiveMonth) return compactInvoiceMonthSpacing(cleanBase || "Item");
+  const suffix = ymToMonthYearInvoice(effectiveMonth);
+  if (!cleanBase) return suffix;
+  return `${cleanBase}-${suffix}`;
+}
+
+/** Texto final DESCRIPCION: una línea, formato compacto, sin duplicar mes. */
+export function formatInvoiceItemDescription(rawLabel: string, month?: string): string {
+  const raw = String(rawLabel ?? "").trim();
+  if (!raw) return month ? invoiceDescWithMonth("Item", month) : "Item";
+  return invoiceDescWithMonth(raw, month);
+}
+
+function lineItemServiceLabel(it: LineItem): string {
+  return String(it.serviceName ?? it.service ?? "").trim();
+}
+
 /** Texto completo de la columna DESCRIPCION (sin truncar). */
 export function getLineItemDescription(it: LineItem): string {
   const settlementKind = getReceiptSettlementRowKind(it);
   if (settlementKind === "payment_line") {
-    return String(it.serviceName ?? "").trim() || "Pago";
+    return normalizeInvoiceDescriptionForCell(lineItemServiceLabel(it) || "Pago");
   }
   if (settlementKind === "invoice_ref") {
-    return it.month ? `${it.serviceName ?? "Factura"} - ${ymToMonthYearInvoice(it.month)}` : (it.serviceName ?? "Factura");
+    const desc = it.month
+      ? formatInvoiceItemDescription(it.serviceName ?? it.service ?? "Factura", it.month)
+      : compactInvoiceMonthSpacing(it.serviceName ?? it.service ?? "Factura");
+    return normalizeInvoiceDescriptionForCell(desc);
   }
   if (settlementKind === "credit_note" || settlementKind === "prior_receipt") {
-    return it.month ? `${it.serviceName ?? ""} - ${ymToMonthYearInvoice(it.month)}` : (it.serviceName ?? "");
+    const label = it.serviceName ?? it.service ?? "";
+    const desc = it.month ? formatInvoiceItemDescription(label, it.month) : compactInvoiceMonthSpacing(label);
+    return normalizeInvoiceDescriptionForCell(desc);
   }
-  if (it.setupId && it.setupNombre) return it.setupNombre;
-  if (it.reparacionTipoId && it.reparacionNombre) return it.reparacionNombre;
-  if (it.transporteFleteTipoId && it.transporteFleteNombre) return it.transporteFleteNombre;
+  if (it.setupId && it.setupNombre) return normalizeInvoiceDescriptionForCell(it.setupNombre);
+  if (it.reparacionTipoId && it.reparacionNombre) return normalizeInvoiceDescriptionForCell(it.reparacionNombre);
+  if (it.transporteFleteTipoId && it.transporteFleteNombre) return normalizeInvoiceDescriptionForCell(it.transporteFleteNombre);
   if (it.marcaEquipo && it.modeloEquipo && it.procesadorEquipo) {
     const equipoDesc = `${it.marcaEquipo} - ${it.modeloEquipo} - ${it.procesadorEquipo}`;
-    return it.month ? `${equipoDesc} - ${ymToMonthYearInvoice(it.month)}` : equipoDesc;
+    return normalizeInvoiceDescriptionForCell(
+      it.month ? formatInvoiceItemDescription(equipoDesc, it.month) : equipoDesc
+    );
   }
   if (it.garantiaCodigo || it.garantiaMarca || it.garantiaModelo) {
     return [it.garantiaCodigo, "Garantías", it.garantiaMarca, it.garantiaModelo].filter(Boolean).join(" - ") || "Garantía";
   }
-  if (it.serviceName) {
-    return it.month ? `${it.serviceName} - ${ymToMonthYearInvoice(it.month)}` : it.serviceName;
+  const serviceLabel = lineItemServiceLabel(it);
+  if (serviceLabel) {
+    const desc = it.month ? formatInvoiceItemDescription(serviceLabel, it.month) : compactInvoiceMonthSpacing(serviceLabel);
+    return normalizeInvoiceDescriptionForCell(desc);
   }
-  return it.month ? `Item - ${ymToMonthYearInvoice(it.month)}` : "Item";
+  return normalizeInvoiceDescriptionForCell(it.month ? formatInvoiceItemDescription("Item", it.month) : "Item");
 }
 
 export function getLineItemDiscountDescription(it: LineItem): string {

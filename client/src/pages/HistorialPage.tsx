@@ -10,6 +10,7 @@ import { loadInvoices, loadInvoicesAsic, saveInvoices, saveInvoicesAsic } from "
 import type { ComprobanteType, Invoice, LineItem } from "../lib/types";
 import { buildReciboConceptLine, getReciboConceptParts } from "../lib/reciboConceptText";
 import { getReceiptSettlementRowKind, reciboHasSettlementRows, reciboIsPaymentLineSettledTable } from "../lib/receiptSettlementLine";
+import { prepareLineItemsForPdf } from "../lib/prepareLineItemsForPdf";
 import { PageHeader } from "../components/PageHeader";
 import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
@@ -724,34 +725,17 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
             showToast("Esta factura no tiene ítems en la base de datos. No se puede generar el PDF.", "error");
             return;
           }
-          const loadedItems = apiItems.map((item) => {
-            const serviceName = item.service || "";
-            const base: LineItem = {
-              serviceName: serviceName || "",
+          const loadedItems = prepareLineItemsForPdf(
+            apiItems.map((item) => ({
               service: item.service,
+              serviceName: item.service,
               month: item.month || inv.month,
               quantity: item.quantity || 1,
               price: item.price || 0,
               discount: item.discount || 0,
-            };
-            const settlement = getReceiptSettlementRowKind(base);
-            if (settlement) {
-              return {
-                ...base,
-                reciboLineKind: settlement,
-                serviceName: serviceName || "Documento",
-              };
-            }
-            const key = (["A", "B", "C", "D"] as const).find((k) => serviceCatalog[k].name === serviceName || serviceCatalog[k].price === item.price) ?? "A";
-            return {
-              serviceKey: key,
-              serviceName: serviceName || serviceCatalog[key].name,
-              month: item.month || inv.month,
-              quantity: item.quantity || 1,
-              price: item.price || 0,
-              discount: item.discount || 0,
-            };
-          });
+            })),
+            inv.month
+          );
           invoiceToUse = { ...inv, items: loadedItems };
         } catch {
           showToast("No se pudo cargar el detalle de la factura. No se puede generar el PDF.", "error");
@@ -802,47 +786,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
         invoiceDate = new Date();
       }
 
-      // Validar y asegurar que los items tengan la estructura correcta
-      const validItems = invoiceToUse.items.map((item) => {
-        const line: LineItem = {
-          ...item,
-          serviceName: item.serviceName || "",
-          service: item.service,
-        };
-        const settlement = line.reciboLineKind ?? getReceiptSettlementRowKind(line);
-        if (settlement) {
-          return {
-            reciboLineKind: settlement,
-            serviceName: item.serviceName || "Servicio",
-            service: item.service,
-            month: item.month || invoiceToUse.month,
-            quantity: item.quantity || 1,
-            price: item.price || 0,
-            discount: item.discount || 0,
-          };
-        }
-        // Asegurar que serviceKey existe, si no, intentar inferirlo desde serviceName
-        let serviceKey: "A" | "B" | "C" | "D" = (item.serviceKey as "A" | "B" | "C" | "D") || "A";
-        if (!item.serviceKey && item.serviceName) {
-          // Intentar inferir desde el nombre del servicio
-          if (item.serviceName.includes("4%") || item.serviceName.includes("Gastos Operativos Transferencia")) {
-            serviceKey = "D";
-          } else if (item.serviceName.includes("L7") || item.serviceName.includes("L9")) {
-            serviceKey = item.serviceName.includes("L9") ? "B" : "A";
-          } else {
-            serviceKey = "C";
-          }
-        }
-
-        return {
-          serviceKey,
-          serviceName: item.serviceName || "Servicio",
-          month: item.month || invoiceToUse.month,
-          quantity: item.quantity || 1,
-          price: item.price || 0,
-          discount: item.discount || 0
-        };
-      });
+      const validItems = prepareLineItemsForPdf(invoiceToUse.items, invoiceToUse.month);
 
       const invWithSource = inv as InvoiceWithSource;
       const sameSource = all.filter(

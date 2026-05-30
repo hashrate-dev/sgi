@@ -1,9 +1,10 @@
 import { jsPDF } from "jspdf";
 import type { ComprobanteType, LineItem } from "./types";
-import { effectiveInvoiceClientName2 } from "./clientInvoiceDisplay";
+import { invoiceClientDisplayNames } from "./clientInvoiceDisplay";
 import { formatUSD } from "./formatCurrency";
 import { recibimosMontoEnDosLineas } from "./numberToWords";
-import { getLineItemDescription } from "./invoiceLineItemDescription";
+import { getLineItemDescription, normalizeInvoiceDescriptionForCell } from "./invoiceLineItemDescription";
+import { prepareLineItemsForPdf } from "./prepareLineItemsForPdf";
 import {
   collapseLegacyReciboSettlementItemsForPdf,
   getReceiptSettlementRowKind,
@@ -82,10 +83,10 @@ const MARGIN_TOP_BOTTOM = 22; /* 18 + 4mm: 0.4 cm más arriba y abajo */
 const MARGIN_SIDES = 26; /* 22 + 4mm: 0.2 cm más por cada costado (24→26) */
 const PAGE_W = 210;
 const PAGE_H = 297;
-const COL_DESC = 95;
-const COL_PRECIO = 32;
+const COL_DESC = 100;
+const COL_PRECIO = 29;
 const COL_CANT = 22;
-const COL_TOTAL = 38;
+const COL_TOTAL = 36;
 const TABLE_W = COL_DESC + COL_PRECIO + COL_CANT + COL_TOTAL;
 const ROW_H = 9;
 const HEADER_ROW_H = 10;
@@ -98,25 +99,39 @@ const LOGO_WIDTH_MM = 50; // Ancho ajustado para mejor proporción
 const LOGO_HEIGHT_MM = 14; // Altura ajustada para mantener proporción (relación ~3.57:1)
 
 const DESC_TEXT_W = COL_DESC - 6;
-const PDF_DESC_LINE_H = 4.2;
+/** Cuerpo de tabla: 10pt para que descripciones largas entren en una sola línea */
+const TABLE_BODY_FONT_SIZE = 10;
 
 type FacturaPdfTableRow = {
   desc: string;
   precio: string;
   cant: string;
   total: string;
-  rowH: number;
 };
 
-function pdfRowHeightForDesc(doc: jsPDF, desc: string): number {
-  const lines = doc.splitTextToSize((desc || "—").trim(), DESC_TEXT_W) as string[];
-  const textH = lines.length * PDF_DESC_LINE_H;
-  return Math.max(ROW_H, 4 + textH + 2.5);
+/** Una sola línea en PDF; reduce fuente si hace falta; trunca con … solo en casos extremos. */
+function pdfDescriptionOneLine(
+  doc: jsPDF,
+  desc: string,
+  maxW: number
+): { text: string; fontSize: number } {
+  const text = normalizeInvoiceDescriptionForCell((desc || "—").trim());
+  doc.setFont("helvetica", "normal");
+  for (const size of [TABLE_BODY_FONT_SIZE, 9, 8.5] as const) {
+    doc.setFontSize(size);
+    if (doc.getTextWidth(text) <= maxW) return { text, fontSize: size };
+  }
+  doc.setFontSize(8.5);
+  let s = text;
+  while (s.length > 1 && doc.getTextWidth(`${s}…`) > maxW) {
+    s = s.slice(0, -1);
+  }
+  return { text: `${s}…`, fontSize: 8.5 };
 }
 
 function buildFacturaPdfTableRows(doc: jsPDF, items: LineItem[]): FacturaPdfTableRow[] {
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(11);
+  doc.setFontSize(TABLE_BODY_FONT_SIZE);
   const rows: FacturaPdfTableRow[] = [];
   for (const it of items) {
     const settlementKind = getReceiptSettlementRowKind(it);
@@ -138,7 +153,6 @@ function buildFacturaPdfTableRows(doc: jsPDF, items: LineItem[]): FacturaPdfTabl
       precio,
       cant: String(it.quantity),
       total,
-      rowH: pdfRowHeightForDesc(doc, desc),
     });
   }
   return rows;
@@ -151,7 +165,9 @@ function buildFacturaPdfTableRows(doc: jsPDF, items: LineItem[]): FacturaPdfTabl
  */
 export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImages): jsPDF {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const pdfItems = collapseLegacyReciboSettlementItemsForPdf(data.type, data.items, data.relatedInvoiceNumber);
+  const pdfItems = prepareLineItemsForPdf(
+    collapseLegacyReciboSettlementItemsForPdf(data.type, data.items, data.relatedInvoiceNumber)
+  );
   const now = data.date;
   const vencimiento = data.dueDate
     ? new Date(data.dueDate)
@@ -320,7 +336,14 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
     return yy - yStart;
   };
 
-  const clientName2Pdf = effectiveInvoiceClientName2(data.clientName, data.clientName2);
+  const clientNamesPdf = invoiceClientDisplayNames(
+    data.clientName,
+    data.clientName2,
+    data.clientPhone2,
+    data.clientEmail2,
+    data.clientAddress2,
+    data.clientCity2
+  );
 
   const yClientStart = y;
   const colGap = 4; // mm entre columnas
@@ -353,17 +376,17 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
     return nameLines.length * 5; // 5mm por línea
   };
   
-  const client1NameHeight = getClientNameHeight(data.clientName);
+  const client1NameHeight = getClientNameHeight(clientNamesPdf.name1);
 
   // Si ambos tienen nombre, alinearlos a la misma altura
   // Si solo el primero tiene nombre, el segundo comienza después del nombre del primero
   const yClient2Start =
-    hasText(data.clientName) && hasText(clientName2Pdf)
+    hasText(clientNamesPdf.name1) && hasText(clientNamesPdf.name2)
       ? yClientStart // Ambos tienen nombre: misma altura
       : yClientStart + client1NameHeight; // Solo el primero tiene nombre: segundo después
   
   const h1 = drawClientColumn(tableLeft, yClientStart, colW, {
-    name: data.clientName,
+    name: clientNamesPdf.name1,
     phone: data.clientPhone,
     email: data.clientEmail,
     address: data.clientAddress,
@@ -371,7 +394,7 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   });
   
   const h2 = drawClientColumn(tableLeft + colW + colGap, yClient2Start, colW, {
-    name: clientName2Pdf,
+    name: clientNamesPdf.name2,
     phone: data.clientPhone2,
     email: data.clientEmail2,
     address: data.clientAddress2,
@@ -409,7 +432,7 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
   const tableRows = buildFacturaPdfTableRows(doc, pdfItems);
-  const tableTotalH = HEADER_ROW_H + tableRows.reduce((s, r) => s + r.rowH, 0);
+  const tableTotalH = HEADER_ROW_H + tableRows.length * ROW_H;
   const R = TABLE_RADIUS;
   const k = 0.5522847498; // Bezier para arco 90°
 
@@ -459,19 +482,22 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
 
   y = tableTop + HEADER_ROW_H;
 
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(TABLE_BODY_FONT_SIZE);
   for (const row of tableRows) {
-    const descLines = doc.splitTextToSize(row.desc.trim() || "—", DESC_TEXT_W) as string[];
-    const textBlockH = descLines.length * PDF_DESC_LINE_H;
-    const textY = y + Math.max(4, (row.rowH - textBlockH) / 2 + 2);
-    doc.text(descLines, tableLeft + 3, textY);
-    const midY = y + row.rowH / 2 + 1.5;
+    const { text: descLine, fontSize: descFontSize } = pdfDescriptionOneLine(doc, row.desc, DESC_TEXT_W);
+    const midY = y + ROW_H / 2 + 1.5;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(descFontSize);
+    doc.text([descLine], tableLeft + 3, midY);
+    doc.setFontSize(TABLE_BODY_FONT_SIZE);
     doc.text(row.precio, centerPrecio, midY, { align: "center" });
     doc.text(row.cant, centerCant, midY, { align: "center" });
     doc.text(row.total, centerTotal, midY, { align: "center" });
-    if (y + row.rowH < tableTop + tableTotalH) {
-      doc.line(tableLeft, y + row.rowH, tableLeft + TABLE_W, y + row.rowH);
+    if (y + ROW_H < tableTop + tableTotalH) {
+      doc.line(tableLeft, y + ROW_H, tableLeft + TABLE_W, y + ROW_H);
     }
-    y += row.rowH;
+    y += ROW_H;
   }
 
   y += 6;

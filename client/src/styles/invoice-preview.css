@@ -198,6 +198,7 @@
 
 .invoice-preview-table {
   width: 187mm; /* TABLE_W */
+  table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
   border: 0.5px solid rgb(226, 232, 240); /* TABLE_BORDER, doc.setLineWidth(0.5) */
@@ -227,13 +228,13 @@
 }
 
 .invoice-preview-th-desc {
-  width: 95mm; /* COL_DESC */
+  width: 100mm; /* COL_DESC */
   text-align: left;
   padding-left: 3mm; /* tableLeft + 3 */
 }
 
 .invoice-preview-th-precio {
-  width: 32mm; /* COL_PRECIO */
+  width: 29mm; /* COL_PRECIO */
   text-align: center;
 }
 
@@ -243,13 +244,13 @@
 }
 
 .invoice-preview-th-total {
-  width: 38mm; /* COL_TOTAL */
+  width: 36mm; /* COL_TOTAL */
   text-align: center;
 }
 
 .invoice-preview-table tbody tr {
-  height: auto;
-  min-height: 9mm; /* ROW_H mínimo (una línea) */
+  height: 9mm;
+  max-height: 9mm;
   border-bottom: 0.5px solid rgb(226, 232, 240); /* TABLE_BORDER */
 }
 
@@ -258,33 +259,37 @@
 }
 
 .invoice-preview-table td {
-  font-size: 11pt; /* doc.setFontSize(11) */
+  font-size: 10pt; /* TABLE_BODY_FONT_SIZE en PDF */
   font-weight: normal;
   color: #000000;
   padding: 0;
-  height: auto;
-  min-height: 9mm;
+  height: 9mm;
+  max-height: 9mm;
   vertical-align: middle;
   border: none;
   border-right: 0.5px solid rgb(226, 232, 240); /* línea entre columnas */
-  line-height: 1.25;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .invoice-preview-table td:last-child {
   border-right: none;
 }
 
 .invoice-preview-td-desc {
-  width: 95mm; /* COL_DESC */
+  width: 100mm; /* COL_DESC */
+  max-width: 100mm;
   text-align: left;
-  padding: 2mm 2mm 2mm 3mm; /* tableLeft + 3 */
-  white-space: normal;
-  word-wrap: break-word;
-  overflow-wrap: anywhere;
+  padding: 0 2mm 0 3mm; /* tableLeft + 3 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   vertical-align: middle;
 }
 
 .invoice-preview-td-precio {
-  width: 32mm; /* COL_PRECIO */
+  width: 29mm; /* COL_PRECIO */
   text-align: center;
   vertical-align: middle;
 }
@@ -296,7 +301,7 @@
 }
 
 .invoice-preview-td-total {
-  width: 38mm; /* COL_TOTAL */
+  width: 36mm; /* COL_TOTAL */
   text-align: center;
 }
 

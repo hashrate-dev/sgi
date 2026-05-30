@@ -7,7 +7,7 @@ import {
   reciboIsPaymentLineSettledTable,
 } from "../lib/receiptSettlementLine";
 import { recibimosMontoEnDosLineas } from "../lib/numberToWords";
-import { effectiveInvoiceClientName2, hasSecondaryClientColumn } from "../lib/clientInvoiceDisplay";
+import { invoiceClientDisplayNames, hasSecondaryClientColumn } from "../lib/clientInvoiceDisplay";
 import { getLineItemDescription } from "../lib/invoiceLineItemDescription";
 import "../styles/invoice-preview.css";
 
@@ -117,9 +117,18 @@ export function InvoicePreview({
     return [nameStr];
   };
 
-  const client1NameLines = getClientNameLines(client?.name);
-  const clientName2Effective = client ? effectiveInvoiceClientName2(client.name, client.name2) : "";
-  const client2NameLines = getClientNameLines(clientName2Effective);
+  const clientNames = client
+    ? invoiceClientDisplayNames(
+        client.name,
+        client.name2,
+        client.phone2,
+        client.email2,
+        client.address2,
+        client.city2
+      )
+    : { name1: "", name2: "" };
+  const client1NameLines = getClientNameLines(clientNames.name1);
+  const client2NameLines = getClientNameLines(clientNames.name2);
 
   return (
     <div className="invoice-preview-container">

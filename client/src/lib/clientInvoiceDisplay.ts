@@ -26,6 +26,25 @@ export function effectiveInvoiceClientName2(primaryName?: string, name2?: string
   return raw2;
 }
 
+/** Nombres para columnas cliente: une apellido en name2 si no hay otro dato en col. 2. */
+export function invoiceClientDisplayNames(
+  primaryName?: string,
+  name2?: string,
+  phone2?: string,
+  email2?: string,
+  address2?: string,
+  city2?: string
+): { name1: string; name2: string } {
+  const n1 = String(primaryName ?? "").trim();
+  const n2 = effectiveInvoiceClientName2(primaryName, name2);
+  const col2HasContact =
+    hasTrim(phone2) || hasTrim(email2) || hasTrim(address2) || hasTrim(city2);
+  if (n2 && !col2HasContact) {
+    return { name1: `${n1} ${n2}`.trim(), name2: "" };
+  }
+  return { name1: n1, name2: n2 };
+}
+
 /** Persistir en el comprobante: no grabar clientName2 si solo duplica el apellido ya incluido en clientName. */
 export function clientName2ForComprobante(primaryName?: string, name2?: string): string | undefined {
   const s = effectiveInvoiceClientName2(primaryName, name2);
@@ -40,8 +59,16 @@ export function hasSecondaryClientColumn(
   address2?: string,
   city2?: string
 ): boolean {
+  const { name2: col2Name } = invoiceClientDisplayNames(
+    primaryName,
+    name2,
+    phone2,
+    email2,
+    address2,
+    city2
+  );
   return (
-    hasTrim(effectiveInvoiceClientName2(primaryName, name2)) ||
+    hasTrim(col2Name) ||
     hasTrim(phone2) ||
     hasTrim(email2) ||
     hasTrim(address2) ||
