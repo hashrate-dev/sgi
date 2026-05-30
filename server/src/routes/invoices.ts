@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { db, getDb } from "../db.js";
 import { rebuildReciboSettlementByNumber } from "../lib/rebuildReciboSettlement.js";
+import { normalizeInvoiceServiceStored } from "../lib/invoiceItemDescription.js";
 import { requireRole } from "../middleware/auth.js";
 import { requireModuleGrant } from "../middleware/moduleGrant.js";
 
@@ -279,7 +280,14 @@ invoicesRouter.post(
         VALUES (?, ?, ?, ?, ?, ?)
       `);
       for (const item of inv.items) {
-        await insertItem.run(invoiceId, item.service, item.month, item.quantity, item.price, item.discount);
+        await insertItem.run(
+          invoiceId,
+          normalizeInvoiceServiceStored(item.service),
+          item.month,
+          item.quantity,
+          item.price,
+          item.discount
+        );
       }
       const createdRow = await tx.prepare(
         `SELECT id, number, type, ${clientNameCol()} as clientName, date, month, subtotal, discounts, total,

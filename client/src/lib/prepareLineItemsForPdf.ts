@@ -1,4 +1,5 @@
 import { serviceCatalog } from "./constants";
+import { getLineItemDescription } from "./invoiceLineItemDescription";
 import { getReceiptSettlementRowKind } from "./receiptSettlementLine";
 import type { LineItem } from "./types";
 
@@ -28,21 +29,25 @@ export function prepareLineItemForPdf(item: LineItem, fallbackMonth?: string): L
   };
   const settlement = base.reciboLineKind ?? getReceiptSettlementRowKind(base);
   if (settlement) {
-    return {
+    const prepared: LineItem = {
       ...base,
       reciboLineKind: settlement,
       serviceName: serviceText || "Documento",
       service: serviceText || "Documento",
     };
+    const desc = getLineItemDescription(prepared);
+    return { ...prepared, service: desc, serviceName: desc };
   }
   const serviceKey = inferServiceKey(base);
   const catalogName = serviceCatalog[serviceKey].name;
-  return {
+  const prepared: LineItem = {
     ...base,
     serviceKey,
     serviceName: serviceText || catalogName,
     service: serviceText || catalogName,
   };
+  const desc = getLineItemDescription(prepared);
+  return { ...prepared, service: desc, serviceName: desc };
 }
 
 export function prepareLineItemsForPdf(items: LineItem[], fallbackMonth?: string): LineItem[] {

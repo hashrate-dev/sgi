@@ -228,23 +228,23 @@
 }
 
 .invoice-preview-th-desc {
-  width: 100mm; /* COL_DESC */
+  width: 108mm; /* COL_DESC */
   text-align: left;
   padding-left: 3mm; /* tableLeft + 3 */
 }
 
 .invoice-preview-th-precio {
-  width: 29mm; /* COL_PRECIO */
+  width: 27mm; /* COL_PRECIO */
   text-align: center;
 }
 
 .invoice-preview-th-cant {
-  width: 22mm; /* COL_CANT */
+  width: 20mm; /* COL_CANT */
   text-align: center;
 }
 
 .invoice-preview-th-total {
-  width: 36mm; /* COL_TOTAL */
+  width: 35mm; /* COL_TOTAL */
   text-align: center;
 }
 
@@ -278,8 +278,8 @@
 }
 
 .invoice-preview-td-desc {
-  width: 100mm; /* COL_DESC */
-  max-width: 100mm;
+  width: 108mm; /* COL_DESC */
+  max-width: 108mm;
   text-align: left;
   padding: 0 2mm 0 3mm; /* tableLeft + 3 */
   white-space: nowrap;
@@ -289,19 +289,19 @@
 }
 
 .invoice-preview-td-precio {
-  width: 29mm; /* COL_PRECIO */
+  width: 27mm; /* COL_PRECIO */
   text-align: center;
   vertical-align: middle;
 }
 
 .invoice-preview-td-cant {
-  width: 22mm; /* COL_CANT */
+  width: 20mm; /* COL_CANT */
   text-align: center;
   vertical-align: middle;
 }
 
 .invoice-preview-td-total {
-  width: 36mm; /* COL_TOTAL */
+  width: 35mm; /* COL_TOTAL */
   text-align: center;
 }
 

@@ -83,10 +83,10 @@ const MARGIN_TOP_BOTTOM = 22; /* 18 + 4mm: 0.4 cm más arriba y abajo */
 const MARGIN_SIDES = 26; /* 22 + 4mm: 0.2 cm más por cada costado (24→26) */
 const PAGE_W = 210;
 const PAGE_H = 297;
-const COL_DESC = 100;
-const COL_PRECIO = 29;
-const COL_CANT = 22;
-const COL_TOTAL = 36;
+const COL_DESC = 108;
+const COL_PRECIO = 27;
+const COL_CANT = 20;
+const COL_TOTAL = 35;
 const TABLE_W = COL_DESC + COL_PRECIO + COL_CANT + COL_TOTAL;
 const ROW_H = 9;
 const HEADER_ROW_H = 10;
@@ -117,7 +117,7 @@ function pdfDescriptionOneLine(
 ): { text: string; fontSize: number } {
   const text = normalizeInvoiceDescriptionForCell((desc || "—").trim());
   doc.setFont("helvetica", "normal");
-  for (const size of [TABLE_BODY_FONT_SIZE, 9, 8.5] as const) {
+  for (const size of [TABLE_BODY_FONT_SIZE, 9, 8.5, 8, 7.5] as const) {
     doc.setFontSize(size);
     if (doc.getTextWidth(text) <= maxW) return { text, fontSize: size };
   }
@@ -135,7 +135,7 @@ function buildFacturaPdfTableRows(doc: jsPDF, items: LineItem[]): FacturaPdfTabl
   const rows: FacturaPdfTableRow[] = [];
   for (const it of items) {
     const settlementKind = getReceiptSettlementRowKind(it);
-    const desc = getLineItemDescription(it);
+    const desc = normalizeInvoiceDescriptionForCell(getLineItemDescription(it));
     // Si es ítem normal: precio neto = price - discount (para NO renderizar una segunda fila).
     // Si es línea de liquidación (payment_line / invoice_ref / credit_note / prior_receipt):
     // mantenemos la lógica existente.
@@ -484,8 +484,11 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(TABLE_BODY_FONT_SIZE);
-  for (const row of tableRows) {
-    const { text: descLine, fontSize: descFontSize } = pdfDescriptionOneLine(doc, row.desc, DESC_TEXT_W);
+  for (let i = 0; i < tableRows.length; i++) {
+    const row = tableRows[i];
+    const item = pdfItems[i];
+    const descRaw = item ? normalizeInvoiceDescriptionForCell(getLineItemDescription(item)) : row.desc;
+    const { text: descLine, fontSize: descFontSize } = pdfDescriptionOneLine(doc, descRaw, DESC_TEXT_W);
     const midY = y + ROW_H / 2 + 1.5;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(descFontSize);
