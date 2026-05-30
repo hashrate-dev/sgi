@@ -114,37 +114,42 @@ export function MonitorResultadoMargenCard({
         labels,
         datasets: [
           {
-            type: "bar",
+            type: "line",
             label: "Resultado (USD)",
             data: resultados,
             yAxisID: "y",
+            borderColor: "#14532d",
+            borderWidth: 2.5,
+            tension: 0.35,
+            pointRadius: (c) => (Math.abs(Number(resultados[c.dataIndex] ?? 0)) > 0.005 ? 5 : 0),
+            pointHoverRadius: (c) => (Math.abs(Number(resultados[c.dataIndex] ?? 0)) > 0.005 ? 6 : 0),
+            pointBackgroundColor: (c) => {
+              const v = Number(resultados[c.dataIndex] ?? 0);
+              return v >= 0 ? ACCENT_POS : ACCENT_NEG;
+            },
+            pointBorderColor: (c) => {
+              const v = Number(resultados[c.dataIndex] ?? 0);
+              return v >= 0 ? ACCENT_POS : ACCENT_NEG;
+            },
+            pointBorderWidth: 2,
+            fill: false,
+            order: 10,
+          },
+          {
+            type: "bar",
+            label: "Margen sobre ingresos (%)",
+            data: margenes,
+            yAxisID: "y1",
             maxBarThickness: 44,
             borderSkipped: false,
             borderRadius: 4,
             order: 2,
             backgroundColor(ctx: { dataIndex: number }) {
-              const v = Number(resultados[ctx.dataIndex] ?? 0);
+              const v = Number(margenes[ctx.dataIndex]);
+              if (!Number.isFinite(v)) return withAlphaHex("#94a3b8", 0.25);
               const op = barFillOpacityForMonthFilter(ctx.dataIndex, hi);
               return barColorForResultado(v, op);
             },
-          },
-          {
-            type: "line",
-            label: "Margen sobre ingresos (%)",
-            data: margenes,
-            yAxisID: "y1",
-            borderColor: ACCENT_MARGEN,
-            backgroundColor: withAlphaHex(ACCENT_MARGEN, 0.08),
-            borderWidth: 2.5,
-            tension: 0.3,
-            spanGaps: true,
-            pointRadius: (c) => (Number.isFinite(Number(c.dataset.data[c.dataIndex])) ? 5 : 0),
-            pointHoverRadius: (c) => (Number.isFinite(Number(c.dataset.data[c.dataIndex])) ? 6 : 0),
-            pointBackgroundColor: "#ffffff",
-            pointBorderColor: ACCENT_MARGEN,
-            pointBorderWidth: 2,
-            fill: false,
-            order: 10,
           },
         ],
       },
@@ -152,6 +157,9 @@ export function MonitorResultadoMargenCard({
         responsive: true,
         maintainAspectRatio: false,
         interaction: { intersect: false, mode: "index" },
+        datasets: {
+          bar: { categoryPercentage: 0.72, barPercentage: 0.9 },
+        },
         plugins: {
           legend: {
             display: true,
@@ -183,7 +191,9 @@ export function MonitorResultadoMargenCard({
               label(ctx) {
                 const v = ctx.parsed.y;
                 if (v == null || !Number.isFinite(v)) return "";
-                if (ctx.datasetIndex === 0) return `Resultado: ${formatCurrency(Number(v))}`;
+                if (ctx.dataset.label?.includes("Resultado")) {
+                  return `Resultado: ${formatCurrency(Number(v))}`;
+                }
                 return `Margen: ${Number(v).toFixed(1)}%`;
               },
             },
@@ -333,7 +343,7 @@ export function MonitorResultadoMargenCard({
         <div className="reportes-dash__canvas-wrap monitor-financiero-dash__canvas monitor-financiero-dash__canvas--combo">
           <canvas
             ref={canvasRef}
-            aria-label="Resultado mensual en USD y margen porcentual sobre ingresos"
+            aria-label="Resultado mensual en USD (línea) y margen porcentual (barras)"
             role="img"
           />
         </div>
