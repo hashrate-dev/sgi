@@ -23,6 +23,7 @@ import { GastosPorRubroDonut } from "../components/GastosPorRubroDonut";
 import { GastosPorProveedorListCard } from "../components/GastosPorProveedorListCard";
 import { GastosPorMedioPagoListCard } from "../components/GastosPorMedioPagoListCard";
 import { CambioGananciasMensualAreaCard } from "../components/CambioGananciasMensualAreaCard";
+import { MonitorResultadoMargenCard } from "../components/MonitorResultadoMargenCard";
 import "../styles/facturacion.css";
 import "../styles/reportes-dashboard.css";
 
@@ -385,6 +386,21 @@ export function MonitorFinancieroPage() {
                 invoicesAsic={invoicesAsic}
                 years={yearsAvailable}
                 hidePeriodSelectors
+                presupuestoFilter={{
+                  year: filterYear,
+                  mesYm: filterMesYm,
+                  onYearChange: setFilterYear,
+                  onMesYmChange: setFilterMesYm,
+                }}
+              />
+            </div>
+
+            <div className="mb-4">
+              <MonitorResultadoMargenCard
+                gastosItems={items}
+                operations={fxOperations}
+                hostingInvoices={invoicesHosting}
+                asicInvoices={invoicesAsic}
                 presupuestoFilter={{
                   year: filterYear,
                   mesYm: filterMesYm,
