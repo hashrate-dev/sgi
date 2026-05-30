@@ -13,7 +13,7 @@ import {
   type HostingFxOperation,
   type ProveedorHrs,
 } from "../lib/api";
-import { computeTripleKpiResult, type InvoiceMonthNetRow } from "../lib/monitorTripleIngresoKpi";
+import { cashMonthKeyFromInvoice, computeTripleKpiResult, type InvoiceMonthNetRow } from "../lib/monitorTripleIngresoKpi";
 import {
   MonitorGastosMensualCard,
   collectYearsFromPresupuestoItems,
@@ -44,12 +44,21 @@ function normalizeMedio(raw: string): string {
   return String(raw ?? "").trim();
 }
 
-/** Reparte cada movimiento (ya en USD) en un solo bucket según medio de pago. */
-function mapInvoicesToMonthRows(inv: { invoices?: Array<{ type: string; month: string; total: number }> }): InvoiceMonthNetRow[] {
+function mapInvoicesToMonthRows(inv: {
+  invoices?: Array<{
+    type: string;
+    month: string;
+    total: number;
+    paymentDate?: string;
+    date?: string;
+  }>;
+}): InvoiceMonthNetRow[] {
   return (inv.invoices ?? []).map((x) => ({
     type: String(x.type ?? ""),
     month: String(x.month ?? ""),
     total: Number(x.total) || 0,
+    paymentDate: x.paymentDate,
+    date: x.date,
   }));
 }
 
@@ -89,11 +98,11 @@ function collectMonitorFinancieroYearOptions(
     if (y != null) s.add(y);
   }
   for (const row of hostingInv) {
-    const y = yearFromYYYYMM(row.month);
+    const y = yearFromYYYYMM(cashMonthKeyFromInvoice(row) ?? row.month);
     if (y != null) s.add(y);
   }
   for (const row of asicInv) {
-    const y = yearFromYYYYMM(row.month);
+    const y = yearFromYYYYMM(cashMonthKeyFromInvoice(row) ?? row.month);
     if (y != null) s.add(y);
   }
   return [...s].sort((a, b) => b - a);

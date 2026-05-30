@@ -1,8 +1,16 @@
 import type { HostingFxOperation } from "./api";
 import { hostingFxOperationProfitUsd } from "./hostingFxOperationProfit";
 
-/** Comprobantes con `month` del período facturado (YYYY-MM). */
-export type InvoiceMonthNetRow = { type: string; month: string; total: number };
+/** Fila de comprobante para el monitor de ingresos. */
+export type InvoiceMonthNetRow = {
+  type: string;
+  month: string;
+  total: number;
+  /** Recibo: fecha de cobro. */
+  paymentDate?: string;
+  /** Fecha de emisión (NC, respaldo). */
+  date?: string;
+};
 
 function normalizeInvoiceMonthKey(mm: string | undefined): string {
   if (!mm || typeof mm !== "string") return "";
@@ -15,7 +23,72 @@ function normalizeInvoiceMonthKey(mm: string | undefined): string {
   return mm.trim();
 }
 
-/** Neto Factura − Nota de crédito por mes del comprobante (índice 0 = enero). */
+/** YYYY-MM desde fecha ISO, DD/MM/YYYY o similar. */
+export function yyyyMmFromDate(raw: string | undefined): string | null {
+  const t = String(raw ?? "").trim();
+  if (!t) return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0, 7);
+  const isoMonth = t.match(/^(\d{4})-(\d{1,2})$/);
+  if (isoMonth) {
+    const y = isoMonth[1]!;
+    const m = Math.max(1, Math.min(12, Number.parseInt(isoMonth[2]!, 10)));
+    return `${y}-${String(m).padStart(2, "0")}`;
+  }
+  const slash = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slash) {
+    const m = Math.max(1, Math.min(12, Number.parseInt(slash[2]!, 10)));
+    return `${slash[3]}-${String(m).padStart(2, "0")}`;
+  }
+  const d = new Date(t);
+  if (!Number.isNaN(d.getTime())) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }
+  return null;
+}
+
+/** Mes calendario para caja: Recibo → fecha de pago; NC / devolución → fecha de emisión. */
+export function cashMonthKeyFromInvoice(inv: InvoiceMonthNetRow): string | null {
+  const type = String(inv.type ?? "").trim();
+  if (type === "Recibo" || type === "Recibo Devolución") {
+    return (
+      yyyyMmFromDate(inv.paymentDate) ??
+      yyyyMmFromDate(inv.date) ??
+      (normalizeInvoiceMonthKey(inv.month) || null)
+    );
+  }
+  if (type === "Nota de Crédito") {
+    return yyyyMmFromDate(inv.date) ?? (normalizeInvoiceMonthKey(inv.month) || null);
+  }
+  return null;
+}
+
+/**
+ * Cobros netos por mes calendario (índice 0 = enero):
+ * + Recibos (fecha de pago), − NC y recibos devolución (fecha emisión/pago).
+ * No incluye facturas sin cobro (criterio «a mes vencido» / caja).
+ */
+export function monthlyInvoiceCashCollected12(
+  invoices: InvoiceMonthNetRow[] | null | undefined,
+  year: number
+): number[] {
+  const list = Array.isArray(invoices) ? invoices : [];
+  const yStr = String(year);
+  const keys = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
+  const totals = keys.map(() => 0);
+  for (const inv of list) {
+    const type = String(inv.type ?? "").trim();
+    const mk = cashMonthKeyFromInvoice(inv);
+    if (!mk || !/^\d{4}-\d{2}$/.test(mk) || mk.slice(0, 4) !== yStr) continue;
+    const mi = keys.indexOf(mk);
+    if (mi < 0) continue;
+    const amt = Math.abs(Number(inv.total) || 0);
+    if (type === "Recibo") totals[mi] += amt;
+    else if (type === "Nota de Crédito" || type === "Recibo Devolución") totals[mi] -= amt;
+  }
+  return totals;
+}
+
+/** @deprecated Solo devengado (Factura − NC por MES). El monitor usa `monthlyInvoiceCashCollected12`. */
 export function monthlyInvoiceNetTotals12(invoices: InvoiceMonthNetRow[] | null | undefined, year: number): number[] {
   const list = Array.isArray(invoices) ? invoices : [];
   const yStr = String(year);
@@ -51,8 +124,8 @@ export function monthlyFxProfitTotals12(operations: HostingFxOperation[] | null 
 }
 
 /**
- * Series mensuales alineadas al año (índice 0 = enero): cambio por fecha de operación;
- * hosting y ASIC por mes del comprobante (neto Factura − NC); `combined` = suma por mes.
+ * Series mensuales alineadas al año (índice 0 = enero):
+ * cambio por fecha de operación; hosting y ASIC por **fecha de cobro** (recibos / NC).
  */
 export function monthlyTripleIngresosArrays(
   operations: HostingFxOperation[] | null | undefined,
@@ -61,8 +134,8 @@ export function monthlyTripleIngresosArrays(
   year: number
 ): { cambio: number[]; hosting: number[]; asic: number[]; combined: number[] } {
   const cambio = monthlyFxProfitTotals12(operations, year);
-  const hosting = monthlyInvoiceNetTotals12(hostingInvoices, year);
-  const asic = monthlyInvoiceNetTotals12(asicInvoices, year);
+  const hosting = monthlyInvoiceCashCollected12(hostingInvoices, year);
+  const asic = monthlyInvoiceCashCollected12(asicInvoices, year);
   const combined = cambio.map((c, i) => c + hosting[i]! + asic[i]!);
   return { cambio, hosting, asic, combined };
 }

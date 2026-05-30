@@ -140,7 +140,7 @@ function chartMonthKeys(year: number): string[] {
 }
 
 /**
- * Doce meses del año: barras = cambio + hosting + ASIC (misma agregación que el KPI).
+ * Doce meses del año: barras = cambio + cobros hosting + ASIC (misma agregación que el KPI).
  * `chartRangeTitle` tipo «Ene. – Dic. · 2026» para el título de evolución.
  */
 function buildMonthlyTripleIngresoChartSeries(
@@ -190,11 +190,13 @@ export function CambioGananciasMensualAreaCard({
   hidePeriodSelectors,
   chartFootnote = (
     <>
-      Misma fórmula que{" "}
+      Cambio: fecha de operación. Hosting y ASIC: <strong>cobros</strong> por mes (recibos según fecha de pago; NC y
+      devoluciones según fecha del comprobante). Servicio de abril cobrado en mayo → figura en <strong>mayo</strong>.
+      Vista anual completa: el filtro de mes no acorta el gráfico; aplica a los totales de la izquierda.{" "}
       <Link to="/hosting/exchange-operations" className="link-primary link-underline-opacity-75">
         Operaciones de cambio
       </Link>
-      . Vista anual completa: el filtro de mes no acorta el gráfico; aplica a los totales de la izquierda.
+      .
     </>
   ),
 }: Props) {
@@ -258,7 +260,7 @@ export function CambioGananciasMensualAreaCard({
             },
           },
           {
-            label: "Hosting",
+            label: "Cobros hosting",
             data: chartYearSeries.hosting,
             stack: "ing",
             maxBarThickness: 42,
@@ -273,7 +275,7 @@ export function CambioGananciasMensualAreaCard({
             },
           },
           {
-            label: "ASIC",
+            label: "Cobros ASIC",
             data: chartYearSeries.asic,
             stack: "ing",
             maxBarThickness: 42,
@@ -458,13 +460,13 @@ export function CambioGananciasMensualAreaCard({
             </span>
           </div>
           <div className="d-flex justify-content-between align-items-baseline small mb-1 gap-2">
-            <span className="text-muted">Facturación hosting</span>
+            <span className="text-muted">Cobros hosting</span>
             <span className="fw-bold" style={{ color: ACCENT_HOSTING }}>
               {formatCurrency(triple.totalHosting)}
             </span>
           </div>
           <div className="d-flex justify-content-between align-items-baseline small gap-2">
-            <span className="text-muted">Venta ASIC</span>
+            <span className="text-muted">Cobros ASIC</span>
             <span className="fw-bold" style={{ color: ACCENT_ASIC }}>
               {formatCurrency(triple.totalAsic)}
             </span>
@@ -512,17 +514,15 @@ export function CambioGananciasMensualAreaCard({
 
       <div className="reportes-dash__chart">
         <p className="reportes-dash__chart-title">
-          Evolución mensual — Cambio + Hosting + ASIC (ingresos) ({chartYearSeries.chartRangeTitle}) — USD
+          Evolución mensual — Cambio + cobros Hosting + ASIC ({chartYearSeries.chartRangeTitle}) — USD
         </p>
-        {mesYm != null && mesYm !== "" ? (
-          <p className="text-muted small mb-2 mb-0" style={{ fontSize: "0.7rem", lineHeight: 1.35 }}>
-            {chartFootnote}
-          </p>
-        ) : null}
+        <p className="text-muted small mb-2 mb-0" style={{ fontSize: "0.7rem", lineHeight: 1.35 }}>
+          {chartFootnote}
+        </p>
         <div className="reportes-dash__canvas-wrap monitor-financiero-dash__canvas monitor-financiero-dash__canvas--combo">
           <canvas
             ref={canvasRef}
-            aria-label="Ingresos mensuales: cambio, hosting y ASIC, en USD"
+            aria-label="Ingresos mensuales: cambio y cobros hosting y ASIC, en USD"
             role="img"
           />
         </div>
