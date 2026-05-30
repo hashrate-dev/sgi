@@ -239,7 +239,7 @@
 }
 
 .invoice-preview-th-cant {
-  width: 20mm; /* COL_CANT */
+  width: 30mm; /* COL_CANT */
   text-align: center;
 }
 
@@ -295,7 +295,7 @@
 }
 
 .invoice-preview-td-cant {
-  width: 20mm; /* COL_CANT */
+  width: 30mm; /* COL_CANT */
   text-align: center;
   vertical-align: middle;
 }
