@@ -17,7 +17,74 @@ import type { PresupuestoFilterControl } from "./MonitorGastosMensualCard";
 
 const ACCENT_POS = "#15803d";
 const ACCENT_NEG = "#dc2626";
-const ACCENT_MARGEN = "#1d4ed8";
+const ACCENT_MARGEN = "#2563eb";
+
+/** Ejes USD y % con el cero en la misma altura visual. */
+function dualAxisZeroAligned(
+  usdValues: number[],
+  pctValues: number[],
+  padRatio = 0.14
+): { yMin: number; yMax: number; y1Min: number; y1Max: number } {
+  const minR = Math.min(...usdValues, 0);
+  const maxR = Math.max(...usdValues, 0);
+  const padUsd = Math.max(Math.abs(minR), Math.abs(maxR), 500) * padRatio;
+
+  const finitePct = pctValues.filter(Number.isFinite);
+  const minP = finitePct.length ? Math.min(...finitePct, 0) : -15;
+  const maxP = finitePct.length ? Math.max(...finitePct, 0) : 15;
+  const padPct = Math.max(Math.abs(minP), Math.abs(maxP), 8) * padRatio;
+
+  let yMin = minR - (minR < 0 ? padUsd : 0);
+  let yMax = maxR + padUsd;
+  if (yMin >= 0) yMin = 0;
+  if (yMax <= 0) yMax = padUsd;
+
+  let y1Min = minP - (minP < 0 ? padPct : 0);
+  let y1Max = maxP + padPct;
+  if (y1Min >= 0) y1Min = 0;
+  if (y1Max <= 0) y1Max = padPct;
+
+  const zeroFrac = (min: number, max: number) => {
+    if (max <= 0) return 1;
+    if (min >= 0) return 0;
+    return -min / (max - min);
+  };
+
+  let fUsd = zeroFrac(yMin, yMax);
+  const fPct = zeroFrac(y1Min, y1Max);
+  const target = Math.max(fUsd, fPct, 0.08);
+
+  if (fUsd < target && yMax > 0) {
+    yMin = (-target * yMax) / (1 - target);
+  }
+  if (fPct < target && y1Max > 0) {
+    y1Min = (-target * y1Max) / (1 - target);
+  }
+
+  return { yMin, yMax, y1Min, y1Max };
+}
+
+function barGradientResultado(
+  ctx: CanvasRenderingContext2D,
+  chartArea: { top: number; bottom: number } | undefined,
+  value: number,
+  opacity: number
+) {
+  const bottom = chartArea?.bottom ?? 300;
+  const top = chartArea?.top ?? 0;
+  const g = ctx.createLinearGradient(0, value >= 0 ? bottom : top, 0, value >= 0 ? top : bottom);
+  const light = value >= 0 ? "#86efac" : "#fca5a5";
+  const dark = value >= 0 ? ACCENT_POS : ACCENT_NEG;
+  g.addColorStop(0, withAlphaHex(light, opacity));
+  g.addColorStop(1, withAlphaHex(dark, opacity));
+  return g;
+}
+
+function formatMargenPct(v: number | null): string {
+  if (v == null || !Number.isFinite(v)) return "—";
+  const sign = v > 0 ? "+" : "";
+  return `${sign}${v.toFixed(1)}%`;
+}
 
 function ResultadoKpiTrend({ pct }: { pct: number | null }) {
   if (pct == null || !Number.isFinite(pct)) {
@@ -42,17 +109,6 @@ function ResultadoKpiTrend({ pct }: { pct: number | null }) {
   );
 }
 
-function barColorForResultado(value: number, opacity: number): string {
-  const base = value >= 0 ? ACCENT_POS : ACCENT_NEG;
-  return withAlphaHex(base, opacity);
-}
-
-function formatMargenPct(v: number | null): string {
-  if (v == null || !Number.isFinite(v)) return "—";
-  const sign = v > 0 ? "+" : "";
-  return `${sign}${v.toFixed(1)}%`;
-}
-
 export type MonitorResultadoMargenCardProps = {
   gastosItems: ContabilidadGasto[];
   operations: HostingFxOperation[] | null | undefined;
@@ -62,8 +118,8 @@ export type MonitorResultadoMargenCardProps = {
 };
 
 /**
- * Resultado mensual (ingresos cobrados − gastos presupuesto) y margen sobre ingresos.
- * Gráfico combo: barras USD + línea de margen %.
+ * Resultado mensual (ingresos cobrados − gastos presupuesto) + margen %.
+ * Barras divergentes USD + línea de margen (estándar P&L).
  */
 export function MonitorResultadoMargenCard({
   gastosItems,
@@ -91,6 +147,21 @@ export function MonitorResultadoMargenCard({
   const highlightMonthIndex = chartMonthDataIndex(mesYm, year);
   const chartDataKey = `${year}|${mesYm ?? ""}|${chartYearSeries.map((m) => m.resultadoUsd).join(",")}`;
 
+  const chartInsights = useMemo(() => {
+    let best = chartYearSeries[0];
+    let worst = chartYearSeries[0];
+    for (const m of chartYearSeries) {
+      if (m.resultadoUsd > (best?.resultadoUsd ?? -Infinity)) best = m;
+      if (m.resultadoUsd < (worst?.resultadoUsd ?? Infinity)) worst = m;
+    }
+    const withIngreso = chartYearSeries.filter((m) => m.ingresos > 0.005 && m.margenPct != null);
+    const avgMargen =
+      withIngreso.length > 0
+        ? withIngreso.reduce((s, m) => s + (m.margenPct ?? 0), 0) / withIngreso.length
+        : null;
+    return { best, worst, avgMargen };
+  }, [chartYearSeries]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -100,12 +171,7 @@ export function MonitorResultadoMargenCard({
     const margenes = chartYearSeries.map((m) => (m.margenPct != null ? m.margenPct : NaN));
     const hi = highlightMonthIndex;
 
-    const minR = Math.min(...resultados, 0);
-    const maxR = Math.max(...resultados, 0);
-    const padUsd = Math.max(Math.abs(minR), Math.abs(maxR), 1) * 0.12;
-    const maxMargen = Math.max(...margenes.filter(Number.isFinite), 0, 10);
-    const minMargen = Math.min(...margenes.filter(Number.isFinite), 0, -10);
-    const capMargen = Math.max(Math.abs(maxMargen), Math.abs(minMargen), 15) * 1.2;
+    const { yMin, yMax, y1Min, y1Max } = dualAxisZeroAligned(resultados, margenes);
 
     chartRef.current?.destroy();
     chartRef.current = new Chart(canvas, {
@@ -114,42 +180,38 @@ export function MonitorResultadoMargenCard({
         labels,
         datasets: [
           {
-            type: "line",
-            label: "Resultado (USD)",
+            type: "bar",
+            label: "Resultado neto (USD)",
             data: resultados,
             yAxisID: "y",
-            borderColor: "#14532d",
-            borderWidth: 2.5,
-            tension: 0.35,
-            pointRadius: (c) => (Math.abs(Number(resultados[c.dataIndex] ?? 0)) > 0.005 ? 5 : 0),
-            pointHoverRadius: (c) => (Math.abs(Number(resultados[c.dataIndex] ?? 0)) > 0.005 ? 6 : 0),
-            pointBackgroundColor: (c) => {
-              const v = Number(resultados[c.dataIndex] ?? 0);
-              return v >= 0 ? ACCENT_POS : ACCENT_NEG;
+            maxBarThickness: 40,
+            borderSkipped: false,
+            borderRadius: 4,
+            order: 1,
+            backgroundColor(ctx: { dataIndex: number; chart: ChartInstance }) {
+              const v = Number(resultados[ctx.dataIndex] ?? 0);
+              if (Math.abs(v) <= 0.005) return withAlphaHex("#94a3b8", 0.25);
+              const op = barFillOpacityForMonthFilter(ctx.dataIndex, hi);
+              return barGradientResultado(ctx.chart.ctx, ctx.chart.chartArea, v, op);
             },
-            pointBorderColor: (c) => {
-              const v = Number(resultados[c.dataIndex] ?? 0);
-              return v >= 0 ? ACCENT_POS : ACCENT_NEG;
-            },
-            pointBorderWidth: 2,
-            fill: false,
-            order: 10,
           },
           {
-            type: "bar",
+            type: "line",
             label: "Margen sobre ingresos (%)",
             data: margenes,
             yAxisID: "y1",
-            maxBarThickness: 44,
-            borderSkipped: false,
-            borderRadius: 4,
-            order: 2,
-            backgroundColor(ctx: { dataIndex: number }) {
-              const v = Number(margenes[ctx.dataIndex]);
-              if (!Number.isFinite(v)) return withAlphaHex("#94a3b8", 0.25);
-              const op = barFillOpacityForMonthFilter(ctx.dataIndex, hi);
-              return barColorForResultado(v, op);
-            },
+            borderColor: ACCENT_MARGEN,
+            borderWidth: 2.5,
+            borderDash: [5, 4],
+            tension: 0,
+            spanGaps: false,
+            pointRadius: (c) => (Number.isFinite(Number(c.dataset.data[c.dataIndex])) ? 5 : 0),
+            pointHoverRadius: (c) => (Number.isFinite(Number(c.dataset.data[c.dataIndex])) ? 6 : 0),
+            pointBackgroundColor: "#ffffff",
+            pointBorderColor: ACCENT_MARGEN,
+            pointBorderWidth: 2,
+            fill: false,
+            order: 10,
           },
         ],
       },
@@ -164,8 +226,25 @@ export function MonitorResultadoMargenCard({
           legend: {
             display: true,
             position: "top",
-            align: "end",
-            labels: { boxWidth: 10, boxHeight: 10, font: { size: 10 } },
+            align: "start",
+            labels: {
+              boxWidth: 10,
+              boxHeight: 10,
+              font: { size: 10 },
+              padding: 14,
+              generateLabels(chart: ChartInstance) {
+                return chart.data.datasets.map((ds, i) => ({
+                  text: String(ds.label ?? ""),
+                  fillStyle: i === 0 ? ACCENT_POS : ACCENT_MARGEN,
+                  strokeStyle: i === 1 ? ACCENT_MARGEN : ACCENT_POS,
+                  lineWidth: i === 1 ? 2 : 0,
+                  lineDash: i === 1 ? [5, 4] : [],
+                  hidden: !chart.isDatasetVisible(i),
+                  datasetIndex: i,
+                  pointStyle: i === 1 ? "line" : "rect",
+                }));
+              },
+            },
           },
           tooltip: {
             callbacks: {
@@ -176,7 +255,7 @@ export function MonitorResultadoMargenCard({
                 const row = chartYearSeries[i];
                 return row ? `${row.label} · ${row.ym}` : "";
               },
-              afterBody(items) {
+              beforeBody(items) {
                 const i = items[0]?.dataIndex;
                 if (i == null) return [];
                 const row = chartYearSeries[i];
@@ -184,17 +263,22 @@ export function MonitorResultadoMargenCard({
                 return [
                   `Ingresos (cobros): ${formatCurrency(row.ingresos)}`,
                   `Gastos (presupuesto): ${formatCurrency(row.gastos)}`,
-                  `Resultado: ${formatCurrency(row.resultadoUsd)}`,
-                  `Margen: ${formatMargenPct(row.margenPct)}`,
                 ];
+              },
+              afterBody(items) {
+                const i = items[0]?.dataIndex;
+                if (i == null) return [];
+                const row = chartYearSeries[i];
+                if (!row) return [];
+                return [`Margen: ${formatMargenPct(row.margenPct)}`];
               },
               label(ctx) {
                 const v = ctx.parsed.y;
                 if (v == null || !Number.isFinite(v)) return "";
-                if (ctx.dataset.label?.includes("Resultado")) {
-                  return `Resultado: ${formatCurrency(Number(v))}`;
+                if (ctx.dataset.label?.includes("Margen")) {
+                  return `Margen: ${Number(v).toFixed(1)}%`;
                 }
-                return `Margen: ${Number(v).toFixed(1)}%`;
+                return `Resultado: ${formatCurrency(Number(v))}`;
               },
             },
           },
@@ -206,12 +290,11 @@ export function MonitorResultadoMargenCard({
           },
           y: {
             position: "left",
-            beginAtZero: false,
-            suggestedMin: minR < 0 ? minR - padUsd : 0,
-            suggestedMax: maxR > 0 ? maxR + padUsd : padUsd,
+            min: yMin,
+            max: yMax,
             title: {
               display: true,
-              text: "Resultado USD",
+              text: "Resultado neto (USD)",
               font: { size: 10, weight: 600 },
               color: "#64748b",
             },
@@ -225,14 +308,16 @@ export function MonitorResultadoMargenCard({
                 return formatCurrencyNumber(n);
               },
             },
-            grid: { color: "rgba(148, 163, 184, 0.22)" },
+            grid: {
+              color: (ctx) => (ctx.tick.value === 0 ? "rgba(15, 23, 42, 0.4)" : "rgba(148, 163, 184, 0.18)"),
+              lineWidth: (ctx) => (ctx.tick.value === 0 ? 2 : 1),
+            },
             border: { display: false },
           },
           y1: {
             position: "right",
-            beginAtZero: false,
-            suggestedMin: -capMargen,
-            suggestedMax: capMargen,
+            min: y1Min,
+            max: y1Max,
             title: {
               display: true,
               text: "Margen %",
@@ -264,9 +349,6 @@ export function MonitorResultadoMargenCard({
   const resultadoColor = kpi.resultadoUsd >= 0 ? ACCENT_POS : ACCENT_NEG;
   const margenColor =
     kpi.margenPct != null && kpi.margenPct >= 0 ? ACCENT_POS : kpi.margenPct != null ? ACCENT_NEG : "#64748b";
-
-  const chartFootnote =
-    "Ingresos = cobros (cambio + hosting + ASIC por fecha de pago). Gastos = suma por mes de presupuesto. Resultado = ingresos − gastos. Margen = resultado ÷ ingresos.";
 
   return (
     <div className="reportes-dash monitor-financiero-dash">
@@ -337,13 +419,44 @@ export function MonitorResultadoMargenCard({
         <p className="reportes-dash__chart-title">
           Resultado mensual y margen ({kpi.chartRangeTitle})
         </p>
+        <div
+          className="d-flex flex-wrap gap-2 mb-2"
+          style={{ fontSize: "0.72rem" }}
+          aria-label="Resumen del gráfico"
+        >
+          {chartInsights.best && Math.abs(chartInsights.best.resultadoUsd) > 0.005 ? (
+            <span
+              className="badge rounded-pill fw-normal"
+              style={{ background: "rgba(21, 128, 61, 0.12)", color: ACCENT_POS }}
+            >
+              Mejor: {chartInsights.best.label} {formatCurrency(chartInsights.best.resultadoUsd)}
+            </span>
+          ) : null}
+          {chartInsights.worst && Math.abs(chartInsights.worst.resultadoUsd) > 0.005 ? (
+            <span
+              className="badge rounded-pill fw-normal"
+              style={{ background: "rgba(220, 38, 38, 0.1)", color: ACCENT_NEG }}
+            >
+              Peor: {chartInsights.worst.label} {formatCurrency(chartInsights.worst.resultadoUsd)}
+            </span>
+          ) : null}
+          {chartInsights.avgMargen != null ? (
+            <span
+              className="badge rounded-pill fw-normal"
+              style={{ background: "rgba(37, 99, 235, 0.1)", color: ACCENT_MARGEN }}
+            >
+              Margen prom. (meses con cobros): {formatMargenPct(chartInsights.avgMargen)}
+            </span>
+          ) : null}
+        </div>
         <p className="text-muted small mb-2 mb-0" style={{ fontSize: "0.7rem", lineHeight: 1.35 }}>
-          {chartFootnote}
+          Barras = resultado neto (ingresos − gastos). Línea = margen % sobre ingresos cobrados. La línea de cero
+          marca equilibrio. Ingresos por caja; gastos por mes de presupuesto.
         </p>
-        <div className="reportes-dash__canvas-wrap monitor-financiero-dash__canvas monitor-financiero-dash__canvas--combo">
+        <div className="reportes-dash__canvas-wrap monitor-financiero-dash__canvas monitor-financiero-dash__canvas--resultado">
           <canvas
             ref={canvasRef}
-            aria-label="Resultado mensual en USD (línea) y margen porcentual (barras)"
+            aria-label="Resultado mensual en USD (barras) y margen porcentual (línea)"
             role="img"
           />
         </div>

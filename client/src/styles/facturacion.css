@@ -12033,6 +12033,14 @@ button.nh-watcher-btc-card__corner-btn:hover {
   padding: 0.35rem 0.25rem 0;
 }
 
+.monitor-financiero-dash__canvas--resultado {
+  min-height: 300px;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  padding: 0.5rem 0.35rem 0.25rem;
+}
+
 /* Proveedores + medios | rubro: misma columna izquierda que .reportes-dash (KPI «Gastos corporativos») */
 .monitor-financiero-below-grid {
   display: grid;
