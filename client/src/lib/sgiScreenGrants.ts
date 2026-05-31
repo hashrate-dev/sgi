@@ -170,6 +170,7 @@ export function collectPathPrefixesFromScreenGrants(grants: readonly string[]): 
   const seesFin =
     grantsIncludeScreen(g, "fin-proveedores") ||
     grantsIncludeScreen(g, "fin-contabilidad") ||
+    grantsIncludeScreen(g, "fin-resumen-presupuesto") ||
     grantsIncludeScreen(g, "fin-monitor") ||
     grantsIncludeScreen(g, "fin-exchange-hub") ||
     grantsIncludeScreen(g, "fin-exchange-ops") ||

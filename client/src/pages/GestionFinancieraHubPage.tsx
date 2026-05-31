@@ -25,6 +25,12 @@ const hubItems: readonly FinHubItem[] = [
     desc: "Registro de gastos de empresa: fecha, proveedor, descripción, moneda (UYU / USD / PYG) e importe",
   },
   {
+    to: "/gestion-financiera/resumen-presupuesto",
+    icon: "bi-table",
+    label: "Resumen de Presupuesto",
+    desc: "Tabla de todos los gastos con filtros por mes de presupuesto, proveedor, moneda y medio de pago",
+  },
+  {
     to: "/gestion-financiera/monitor-financiero",
     icon: "bi-speedometer2",
     label: "Monitor Financiero",

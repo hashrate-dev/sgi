@@ -13,6 +13,7 @@ import { SGI_PERMISSION_SCREEN_MAP } from "./sgiPermissionsScreenMap";
 const FIN_HUB_SCREENS = [
   "fin-proveedores",
   "fin-contabilidad",
+  "fin-resumen-presupuesto",
   "fin-monitor",
   "fin-exchange-hub",
   "fin-exchange-ops",

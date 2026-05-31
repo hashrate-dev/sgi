@@ -17,6 +17,7 @@ import { FxExchangeClienteEditPage } from "./pages/FxExchangeClienteEditPage";
 import { GestionFinancieraHubPage } from "./pages/GestionFinancieraHubPage";
 import { ProveedoresHrsPage } from "./pages/ProveedoresHrsPage";
 import { ContabilidadGastosPage } from "./pages/ContabilidadGastosPage";
+import { ResumenPresupuestoPage } from "./pages/ResumenPresupuestoPage";
 import { MonitorFinancieroPage } from "./pages/MonitorFinancieroPage";
 import { FacturasMesHostingPage } from "./pages/FacturasMesHostingPage";
 import { HostingExchangeOperationsPage } from "./pages/HostingExchangeOperationsPage";
@@ -454,6 +455,7 @@ function App() {
             <Route path="/gestion-financiera" element={<GestionFinancieraHubPage />} />
             <Route path="/gestion-financiera/proveedores" element={<ProveedoresHrsPage />} />
             <Route path="/gestion-financiera/contabilidad" element={<ContabilidadGastosPage />} />
+            <Route path="/gestion-financiera/resumen-presupuesto" element={<ResumenPresupuestoPage />} />
             <Route path="/gestion-financiera/monitor-financiero" element={<MonitorFinancieroPage />} />
             <Route path="/hosting" element={<HostingHubPage />} />
             <Route path="/hosting/email-flow" element={<FacturasMesHostingPage />} />

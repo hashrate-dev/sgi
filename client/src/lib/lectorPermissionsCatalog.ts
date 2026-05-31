@@ -171,7 +171,7 @@ export const LECTOR_GRANT_PATH_PREFIXES: Record<LectorPermissionKey, readonly st
   garantias: ["/asic/ande-warranty", "/asic/warranty-items", "/asic/warranties-history", "/equipos-asic"],
   setups: ["/asic/setup", "/equipos-asic/setup", "/asic/reparacion"],
   leads: [],
-  finanzas_contabilidad: ["/gestion-financiera/contabilidad", "/gestion-financiera/monitor-financiero"],
+  finanzas_contabilidad: ["/gestion-financiera/contabilidad", "/gestion-financiera/resumen-presupuesto", "/gestion-financiera/monitor-financiero"],
   finanzas_proveedores: ["/gestion-financiera/proveedores"],
   finanzas_asic_costos: ["/asic/cotizador-china-py"],
   hosting_tipo_cambio: [

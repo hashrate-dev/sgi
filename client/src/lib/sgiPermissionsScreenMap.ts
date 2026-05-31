@@ -428,6 +428,16 @@ export const SGI_PERMISSION_SCREEN_MAP: readonly SgiPermissionScreenRow[] = [
     audience: ["staff", "lector"],
   },
   {
+    id: "fin-resumen-presupuesto",
+    zoneOrder: 60,
+    zone: "Gestión Financiera",
+    legacyModule: "finanzas_contabilidad",
+    title: "Resumen de Presupuesto",
+    routes: ["/gestion-financiera/resumen-presupuesto"],
+    accessNote: "Tabla consulta de gastos con filtros por presupuesto, proveedor y moneda.",
+    audience: ["staff", "lector"],
+  },
+  {
     id: "fin-monitor",
     zoneOrder: 60,
     zone: "Gestión Financiera",
