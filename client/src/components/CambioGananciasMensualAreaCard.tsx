@@ -1,6 +1,4 @@
-import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef } from "react";
-import { Link } from "react-router-dom";
 import Chart from "chart.js/auto";
 import type { Chart as ChartInstance } from "chart.js";
 import type { HostingFxOperation } from "../lib/api";
@@ -177,8 +175,6 @@ type Props = {
   presupuestoFilter: PresupuestoFilterControl;
   /** Cuando el período se elige arriba en la página (un solo filtro global). */
   hidePeriodSelectors?: boolean;
-  /** Texto bajo el gráfico (fórmula / enlace). */
-  chartFootnote?: ReactNode;
 };
 
 export function CambioGananciasMensualAreaCard({
@@ -188,17 +184,6 @@ export function CambioGananciasMensualAreaCard({
   years,
   presupuestoFilter,
   hidePeriodSelectors,
-  chartFootnote = (
-    <>
-      Cambio: fecha de operación. Hosting y ASIC: <strong>cobros</strong> por mes (recibos según fecha de pago; NC y
-      devoluciones según fecha del comprobante). Servicio de abril cobrado en mayo → figura en <strong>mayo</strong>.
-      Vista anual completa: el filtro de mes no acorta el gráfico; aplica a los totales de la izquierda.{" "}
-      <Link to="/hosting/exchange-operations" className="link-primary link-underline-opacity-75">
-        Operaciones de cambio
-      </Link>
-      .
-    </>
-  ),
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<ChartInstance | null>(null);
@@ -515,9 +500,6 @@ export function CambioGananciasMensualAreaCard({
       <div className="reportes-dash__chart">
         <p className="reportes-dash__chart-title">
           Evolución mensual — Cambio + cobros Hosting + ASIC ({chartYearSeries.chartRangeTitle}) — USD
-        </p>
-        <p className="text-muted small mb-2 mb-0" style={{ fontSize: "0.7rem", lineHeight: 1.35 }}>
-          {chartFootnote}
         </p>
         <div className="reportes-dash__canvas-wrap monitor-financiero-dash__canvas monitor-financiero-dash__canvas--combo">
           <canvas
