@@ -42,13 +42,6 @@ function formatYmDisplay(ym: string): string {
   return cap.replace(/\s+de\s+/gi, " ");
 }
 
-function formatMontoOriginal(moneda: ContabilidadMoneda, monto: number): string {
-  if (!Number.isFinite(monto)) return "—";
-  if (moneda === "PYG") return `${Math.round(monto).toLocaleString("es-PY")} Gs.`;
-  if (moneda === "USD") return formatCurrencyNumber(monto);
-  return formatCurrencyNumber(monto);
-}
-
 const MONEDA_FILTER_OPTIONS: ReadonlyArray<{ value: "" | ContabilidadMoneda; label: string }> = [
   { value: "", label: "Todas" },
   { value: "UYU", label: "UYU" },
@@ -350,7 +343,6 @@ export function ResumenPresupuestoPage() {
                       <col className="rp-col-mes-svc" />
                       <col className="rp-col-presup" />
                       <col className="rp-col-moneda" />
-                      <col className="rp-col-monto-orig" />
                       <col className="rp-col-usd" />
                     </colgroup>
                     <thead className="table-dark">
@@ -364,14 +356,13 @@ export function ResumenPresupuestoPage() {
                         <th className="text-start rp-col-mes-svc" title="Mes de servicio">M. serv.</th>
                         <th className="text-start rp-col-presup" title="Mes de presupuesto">Presup.</th>
                         <th className="text-center rp-col-moneda">Mon.</th>
-                        <th className="text-end rp-col-monto-orig" title="Monto en moneda original">M. orig.</th>
                         <th className="text-end rp-col-usd">USD</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filtered.length === 0 ? (
                         <tr>
-                          <td colSpan={11} className="text-center text-muted py-4">
+                          <td colSpan={10} className="text-center text-muted py-4">
                             {items.length === 0
                               ? "No hay gastos registrados."
                               : "Ningún gasto coincide con los filtros aplicados."}
@@ -405,9 +396,6 @@ export function ResumenPresupuestoPage() {
                                 {formatYmDisplay(row.presupuestoMes)}
                               </td>
                               <td className="text-center rp-col-moneda">{row.moneda}</td>
-                              <td className="text-end rp-col-monto-orig rp-monto-cell">
-                                {formatMontoOriginal(row.moneda, row.montoOriginal ?? row.monto)}
-                              </td>
                               <td className="text-end fw-semibold rp-col-usd rp-monto-cell">
                                 {formatCurrencyNumber(row.monto)}
                               </td>

@@ -5160,23 +5160,21 @@ button.fact-back {
 .historial-listado-wrap .resumen-presupuesto-table col.rp-col-prov,
 .historial-listado-wrap .resumen-presupuesto-table .rp-col-prov { width: 5.5%; }
 .historial-listado-wrap .resumen-presupuesto-table col.rp-col-nombre,
-.historial-listado-wrap .resumen-presupuesto-table .rp-col-nombre { width: 14%; }
+.historial-listado-wrap .resumen-presupuesto-table .rp-col-nombre { width: 16%; }
 .historial-listado-wrap .resumen-presupuesto-table col.rp-col-rubro,
-.historial-listado-wrap .resumen-presupuesto-table .rp-col-rubro { width: 8%; }
+.historial-listado-wrap .resumen-presupuesto-table .rp-col-rubro { width: 9%; }
 .historial-listado-wrap .resumen-presupuesto-table col.rp-col-desc,
-.historial-listado-wrap .resumen-presupuesto-table .rp-col-desc { width: 24%; }
+.historial-listado-wrap .resumen-presupuesto-table .rp-col-desc { width: 28%; }
 .historial-listado-wrap .resumen-presupuesto-table col.rp-col-factura,
-.historial-listado-wrap .resumen-presupuesto-table .rp-col-factura { width: 8%; }
+.historial-listado-wrap .resumen-presupuesto-table .rp-col-factura { width: 9%; }
 .historial-listado-wrap .resumen-presupuesto-table col.rp-col-mes-svc,
-.historial-listado-wrap .resumen-presupuesto-table .rp-col-mes-svc { width: 7%; white-space: nowrap; }
+.historial-listado-wrap .resumen-presupuesto-table .rp-col-mes-svc { width: 7.5%; white-space: nowrap; }
 .historial-listado-wrap .resumen-presupuesto-table col.rp-col-presup,
-.historial-listado-wrap .resumen-presupuesto-table .rp-col-presup { width: 7%; white-space: nowrap; }
+.historial-listado-wrap .resumen-presupuesto-table .rp-col-presup { width: 7.5%; white-space: nowrap; }
 .historial-listado-wrap .resumen-presupuesto-table col.rp-col-moneda,
-.historial-listado-wrap .resumen-presupuesto-table .rp-col-moneda { width: 4.5%; }
-.historial-listado-wrap .resumen-presupuesto-table col.rp-col-monto-orig,
-.historial-listado-wrap .resumen-presupuesto-table .rp-col-monto-orig { width: 9%; }
+.historial-listado-wrap .resumen-presupuesto-table .rp-col-moneda { width: 5%; }
 .historial-listado-wrap .resumen-presupuesto-table col.rp-col-usd,
-.historial-listado-wrap .resumen-presupuesto-table .rp-col-usd { width: 7%; }
+.historial-listado-wrap .resumen-presupuesto-table .rp-col-usd { width: 8%; }
 .historial-listado-wrap .resumen-presupuesto-table .rp-col-fecha,
 .historial-listado-wrap .resumen-presupuesto-table .rp-col-mes-svc,
 .historial-listado-wrap .resumen-presupuesto-table .rp-col-presup,
@@ -5189,7 +5187,7 @@ button.fact-back {
     -webkit-overflow-scrolling: touch;
   }
   .historial-listado-wrap .resumen-presupuesto-table {
-    min-width: 980px;
+    min-width: 880px;
     table-layout: auto;
   }
 }
