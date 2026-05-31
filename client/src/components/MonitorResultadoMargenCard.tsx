@@ -18,6 +18,7 @@ import type { PresupuestoFilterControl } from "./MonitorGastosMensualCard";
 const ACCENT_POS = "#15803d";
 const ACCENT_NEG = "#dc2626";
 const ACCENT_MARGEN = "#2563eb";
+const ACCENT_PROMEDIO = "#78716c";
 
 /** Ejes USD y % con el cero en la misma altura visual. */
 function dualAxisZeroAligned(
@@ -154,12 +155,17 @@ export function MonitorResultadoMargenCard({
       if (m.resultadoUsd > (best?.resultadoUsd ?? -Infinity)) best = m;
       if (m.resultadoUsd < (worst?.resultadoUsd ?? Infinity)) worst = m;
     }
+    const withMovement = chartYearSeries.filter((m) => m.ingresos > 0.005 || m.gastos > 0.005);
+    const avgResultado =
+      withMovement.length > 0
+        ? withMovement.reduce((s, m) => s + m.resultadoUsd, 0) / withMovement.length
+        : null;
     const withIngreso = chartYearSeries.filter((m) => m.ingresos > 0.005 && m.margenPct != null);
     const avgMargen =
       withIngreso.length > 0
         ? withIngreso.reduce((s, m) => s + (m.margenPct ?? 0), 0) / withIngreso.length
         : null;
-    return { best, worst, avgMargen };
+    return { best, worst, avgResultado, avgMargen, nMovement: withMovement.length };
   }, [chartYearSeries]);
 
   useEffect(() => {
@@ -170,8 +176,18 @@ export function MonitorResultadoMargenCard({
     const resultados = chartYearSeries.map((m) => m.resultadoUsd);
     const margenes = chartYearSeries.map((m) => (m.margenPct != null ? m.margenPct : NaN));
     const hi = highlightMonthIndex;
+    const avgResultado = chartInsights.avgResultado;
 
-    const { yMin, yMax, y1Min, y1Max } = dualAxisZeroAligned(resultados, margenes);
+    const usdForScale =
+      avgResultado != null && Number.isFinite(avgResultado)
+        ? [...resultados, avgResultado]
+        : resultados;
+    const { yMin, yMax, y1Min, y1Max } = dualAxisZeroAligned(usdForScale, margenes);
+
+    const promedioLine =
+      avgResultado != null && Number.isFinite(avgResultado)
+        ? Array.from({ length: labels.length }, () => avgResultado)
+        : null;
 
     chartRef.current?.destroy();
     chartRef.current = new Chart(canvas, {
@@ -195,6 +211,24 @@ export function MonitorResultadoMargenCard({
               return barGradientResultado(ctx.chart.ctx, ctx.chart.chartArea, v, op);
             },
           },
+          ...(promedioLine
+            ? [
+                {
+                  type: "line" as const,
+                  label: "Promedio mensual (USD)",
+                  data: promedioLine,
+                  yAxisID: "y",
+                  borderColor: ACCENT_PROMEDIO,
+                  borderWidth: 2,
+                  borderDash: [7, 5],
+                  tension: 0,
+                  pointRadius: 0,
+                  pointHoverRadius: 0,
+                  fill: false,
+                  order: 8,
+                },
+              ]
+            : []),
           {
             type: "line",
             label: "Margen sobre ingresos (%)",
@@ -233,16 +267,20 @@ export function MonitorResultadoMargenCard({
               font: { size: 10 },
               padding: 14,
               generateLabels(chart: ChartInstance) {
-                return chart.data.datasets.map((ds, i) => ({
-                  text: String(ds.label ?? ""),
-                  fillStyle: i === 0 ? ACCENT_POS : ACCENT_MARGEN,
-                  strokeStyle: i === 1 ? ACCENT_MARGEN : ACCENT_POS,
-                  lineWidth: i === 1 ? 2 : 0,
-                  lineDash: i === 1 ? [5, 4] : [],
-                  hidden: !chart.isDatasetVisible(i),
-                  datasetIndex: i,
-                  pointStyle: i === 1 ? "line" : "rect",
-                }));
+                return chart.data.datasets.map((ds, i) => {
+                  const isMargen = String(ds.label ?? "").includes("Margen");
+                  const isPromedio = String(ds.label ?? "").includes("Promedio");
+                  return {
+                    text: String(ds.label ?? ""),
+                    fillStyle: isMargen ? ACCENT_MARGEN : isPromedio ? ACCENT_PROMEDIO : ACCENT_POS,
+                    strokeStyle: isMargen ? ACCENT_MARGEN : isPromedio ? ACCENT_PROMEDIO : ACCENT_POS,
+                    lineWidth: isMargen || isPromedio ? 2 : 0,
+                    lineDash: isMargen ? [5, 4] : isPromedio ? [7, 5] : [],
+                    hidden: !chart.isDatasetVisible(i),
+                    datasetIndex: i,
+                    pointStyle: isMargen || isPromedio ? "line" : "rect",
+                  };
+                });
               },
             },
           },
@@ -277,6 +315,9 @@ export function MonitorResultadoMargenCard({
                 if (v == null || !Number.isFinite(v)) return "";
                 if (ctx.dataset.label?.includes("Margen")) {
                   return `Margen: ${Number(v).toFixed(1)}%`;
+                }
+                if (ctx.dataset.label?.includes("Promedio")) {
+                  return `Promedio mensual: ${formatCurrency(Number(v))}`;
                 }
                 return `Resultado: ${formatCurrency(Number(v))}`;
               },
@@ -344,7 +385,7 @@ export function MonitorResultadoMargenCard({
       chartRef.current?.destroy();
       chartRef.current = null;
     };
-  }, [chartDataKey, chartYearSeries, highlightMonthIndex]);
+  }, [chartDataKey, chartYearSeries, highlightMonthIndex, chartInsights.avgResultado]);
 
   const resultadoColor = kpi.resultadoUsd >= 0 ? ACCENT_POS : ACCENT_NEG;
   const margenColor =
@@ -440,6 +481,15 @@ export function MonitorResultadoMargenCard({
               Peor: {chartInsights.worst.label} {formatCurrency(chartInsights.worst.resultadoUsd)}
             </span>
           ) : null}
+          {chartInsights.avgResultado != null ? (
+            <span
+              className="badge rounded-pill fw-normal"
+              style={{ background: "rgba(120, 113, 108, 0.15)", color: ACCENT_PROMEDIO }}
+            >
+              Promedio mensual: {formatCurrency(chartInsights.avgResultado)}
+              {chartInsights.nMovement > 0 ? ` (${chartInsights.nMovement} meses)` : ""}
+            </span>
+          ) : null}
           {chartInsights.avgMargen != null ? (
             <span
               className="badge rounded-pill fw-normal"
@@ -450,8 +500,8 @@ export function MonitorResultadoMargenCard({
           ) : null}
         </div>
         <p className="text-muted small mb-2 mb-0" style={{ fontSize: "0.7rem", lineHeight: 1.35 }}>
-          Barras = resultado neto (ingresos − gastos). Línea = margen % sobre ingresos cobrados. La línea de cero
-          marca equilibrio. Ingresos por caja; gastos por mes de presupuesto.
+          Barras = resultado neto (ingresos − gastos). Línea gris = promedio mensual del resultado. Línea azul =
+          margen % sobre ingresos cobrados. Ingresos por caja; gastos por mes de presupuesto.
         </p>
         <div className="reportes-dash__canvas-wrap monitor-financiero-dash__canvas monitor-financiero-dash__canvas--resultado">
           <canvas
