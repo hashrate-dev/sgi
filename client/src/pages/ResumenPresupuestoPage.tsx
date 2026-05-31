@@ -7,7 +7,6 @@ import { formatCurrencyNumber } from "../lib/formatCurrency";
 import { sgiHome } from "../lib/marketplacePaths.js";
 import {
   CONTABILIDAD_MEDIOS_PAGO,
-  fetchContabilidadGastoFacturaPdfBlob,
   getContabilidadGastos,
   getProveedoresHrs,
   type ContabilidadGasto,
@@ -63,7 +62,6 @@ export function ResumenPresupuestoPage() {
   const [proveedores, setProveedores] = useState<ProveedorHrs[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
-  const [pdfBusyId, setPdfBusyId] = useState<number | null>(null);
 
   const [qBuscar, setQBuscar] = useState("");
   const [qProveedorId, setQProveedorId] = useState("");
@@ -178,21 +176,6 @@ export function ResumenPresupuestoPage() {
   useEffect(() => {
     setPage((p) => Math.min(p, totalPages));
   }, [totalPages]);
-
-  const openFacturaPdf = async (row: ContabilidadGasto) => {
-    if (!row.hasFacturaPdf) return;
-    setPdfBusyId(row.id);
-    try {
-      const blob = await fetchContabilidadGastoFacturaPdfBlob(row.id);
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank", "noopener,noreferrer");
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch (e) {
-      window.alert(e instanceof Error ? e.message : "No se pudo abrir el PDF.");
-    } finally {
-      setPdfBusyId(null);
-    }
-  };
 
   if (!loading && !user) return <Navigate to="/login" replace />;
   if (!loading && user && !canAccessFinanzaContabilidadHub(user)) {
@@ -355,7 +338,7 @@ export function ResumenPresupuestoPage() {
                   ) : null}
                 </div>
 
-                <div className="table-responsive">
+                <div className="table-responsive resumen-presupuesto-tabla-wrap">
                   <table className="table table-sm align-middle resumen-presupuesto-table">
                     <colgroup>
                       <col className="rp-col-fecha" />
@@ -369,7 +352,6 @@ export function ResumenPresupuestoPage() {
                       <col className="rp-col-moneda" />
                       <col className="rp-col-monto-orig" />
                       <col className="rp-col-usd" />
-                      <col className="rp-col-pdf" />
                     </colgroup>
                     <thead className="table-dark">
                       <tr>
@@ -384,13 +366,12 @@ export function ResumenPresupuestoPage() {
                         <th className="text-center rp-col-moneda">Mon.</th>
                         <th className="text-end rp-col-monto-orig" title="Monto en moneda original">M. orig.</th>
                         <th className="text-end rp-col-usd">USD</th>
-                        <th className="text-center rp-col-pdf">PDF</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filtered.length === 0 ? (
                         <tr>
-                          <td colSpan={12} className="text-center text-muted py-4">
+                          <td colSpan={11} className="text-center text-muted py-4">
                             {items.length === 0
                               ? "No hay gastos registrados."
                               : "Ningún gasto coincide con los filtros aplicados."}
@@ -403,16 +384,16 @@ export function ResumenPresupuestoPage() {
                             <tr key={row.id}>
                               <td className="text-start rp-col-fecha">{formatGastoFechaTabla(row.fecha)}</td>
                               <td className="text-start rp-col-prov">
-                                <code>{row.supplierNumber}</code>
+                                <span className="rp-prov-badge">{row.supplierNumber}</span>
                               </td>
                               <td className="text-start rp-col-nombre" title={row.supplierName}>
-                                <span className="rp-cliente-nombre">{row.supplierName}</span>
+                                <span className="rp-text-ellipsis">{row.supplierName}</span>
                               </td>
                               <td className="text-start rp-col-rubro" title={rubro !== "—" ? rubro : undefined}>
-                                {rubro}
+                                <span className="rp-text-ellipsis">{rubro}</span>
                               </td>
                               <td className="text-start rp-col-desc" title={row.descripcion}>
-                                {row.descripcion || "—"}
+                                <span className="rp-desc-text">{row.descripcion || "—"}</span>
                               </td>
                               <td className="text-start rp-col-factura" title={row.numeroFactura || undefined}>
                                 {row.numeroFactura || "—"}
@@ -429,25 +410,6 @@ export function ResumenPresupuestoPage() {
                               </td>
                               <td className="text-end fw-semibold rp-col-usd rp-monto-cell">
                                 {formatCurrencyNumber(row.monto)}
-                              </td>
-                              <td className="text-center rp-col-pdf">
-                                {row.hasFacturaPdf ? (
-                                  <button
-                                    type="button"
-                                    className="btn btn-sm btn-outline-secondary rp-pdf-btn"
-                                    title="Ver PDF adjunto"
-                                    disabled={pdfBusyId === row.id}
-                                    onClick={() => void openFacturaPdf(row)}
-                                  >
-                                    {pdfBusyId === row.id ? (
-                                      <span className="spinner-border spinner-border-sm" role="status" aria-hidden />
-                                    ) : (
-                                      <i className="bi bi-file-earmark-pdf" />
-                                    )}
-                                  </button>
-                                ) : (
-                                  <span className="text-muted">—</span>
-                                )}
                               </td>
                             </tr>
                           );
