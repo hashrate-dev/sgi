@@ -342,7 +342,6 @@ export function ResumenPresupuestoPage() {
                       <col className="rp-col-factura" />
                       <col className="rp-col-mes-svc" />
                       <col className="rp-col-presup" />
-                      <col className="rp-col-moneda" />
                       <col className="rp-col-usd" />
                     </colgroup>
                     <thead className="table-dark">
@@ -355,14 +354,13 @@ export function ResumenPresupuestoPage() {
                         <th className="text-start rp-col-factura" title="Número de factura o comprobante">Nº fact.</th>
                         <th className="text-start rp-col-mes-svc" title="Mes de servicio">M. serv.</th>
                         <th className="text-start rp-col-presup" title="Mes de presupuesto">Presup.</th>
-                        <th className="text-center rp-col-moneda">Mon.</th>
                         <th className="text-end rp-col-usd">USD</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filtered.length === 0 ? (
                         <tr>
-                          <td colSpan={10} className="text-center text-muted py-4">
+                          <td colSpan={9} className="text-center text-muted py-4">
                             {items.length === 0
                               ? "No hay gastos registrados."
                               : "Ningún gasto coincide con los filtros aplicados."}
@@ -395,7 +393,6 @@ export function ResumenPresupuestoPage() {
                               <td className="text-start rp-col-presup" title={row.presupuestoMes || undefined}>
                                 {formatYmDisplay(row.presupuestoMes)}
                               </td>
-                              <td className="text-center rp-col-moneda">{row.moneda}</td>
                               <td className="text-end fw-semibold rp-col-usd rp-monto-cell">
                                 {formatCurrencyNumber(row.monto)}
                               </td>
