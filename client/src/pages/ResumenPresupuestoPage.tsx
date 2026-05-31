@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
-import { MedioPagoIcon } from "../components/MedioPagoSelect";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
 import { canAccessFinanzaContabilidadHub } from "../lib/auth";
@@ -370,7 +369,6 @@ export function ResumenPresupuestoPage() {
                       <col className="rp-col-moneda" />
                       <col className="rp-col-monto-orig" />
                       <col className="rp-col-usd" />
-                      <col className="rp-col-medio" />
                       <col className="rp-col-pdf" />
                     </colgroup>
                     <thead className="table-dark">
@@ -386,14 +384,13 @@ export function ResumenPresupuestoPage() {
                         <th className="text-center rp-col-moneda">Mon.</th>
                         <th className="text-end rp-col-monto-orig" title="Monto en moneda original">M. orig.</th>
                         <th className="text-end rp-col-usd">USD</th>
-                        <th className="text-center rp-col-medio" title="Medio de pago">Medio</th>
                         <th className="text-center rp-col-pdf">PDF</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filtered.length === 0 ? (
                         <tr>
-                          <td colSpan={13} className="text-center text-muted py-4">
+                          <td colSpan={12} className="text-center text-muted py-4">
                             {items.length === 0
                               ? "No hay gastos registrados."
                               : "Ningún gasto coincide con los filtros aplicados."}
@@ -432,9 +429,6 @@ export function ResumenPresupuestoPage() {
                               </td>
                               <td className="text-end fw-semibold rp-col-usd rp-monto-cell">
                                 {formatCurrencyNumber(row.monto)}
-                              </td>
-                              <td className="text-center rp-col-medio" title={row.medioPago || undefined}>
-                                <MedioPagoIcon code={row.medioPago} />
                               </td>
                               <td className="text-center rp-col-pdf">
                                 {row.hasFacturaPdf ? (

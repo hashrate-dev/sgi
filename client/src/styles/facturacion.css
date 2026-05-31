@@ -5135,11 +5135,9 @@ button.fact-back {
 .historial-listado-wrap .resumen-presupuesto-table col.rp-col-monto-orig,
 .historial-listado-wrap .resumen-presupuesto-table .rp-col-monto-orig { width: 8%; }
 .historial-listado-wrap .resumen-presupuesto-table col.rp-col-usd,
-.historial-listado-wrap .resumen-presupuesto-table .rp-col-usd { width: 7%; }
-.historial-listado-wrap .resumen-presupuesto-table col.rp-col-medio,
-.historial-listado-wrap .resumen-presupuesto-table .rp-col-medio { width: 5%; }
+.historial-listado-wrap .resumen-presupuesto-table .rp-col-usd { width: 8%; }
 .historial-listado-wrap .resumen-presupuesto-table col.rp-col-pdf,
-.historial-listado-wrap .resumen-presupuesto-table .rp-col-pdf { width: 4%; }
+.historial-listado-wrap .resumen-presupuesto-table .rp-col-pdf { width: 5%; }
 .historial-listado-wrap .resumen-presupuesto-table .rp-pdf-btn {
   width: 1.5rem;
   height: 1.5rem;
