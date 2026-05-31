@@ -5110,10 +5110,13 @@ button.fact-back {
   border-radius: 0 12px 0 0;
 }
 .historial-listado-wrap .resumen-presupuesto-table tbody td {
-  padding: 0.6rem 0.5rem;
-  vertical-align: middle;
+  padding: 0.55rem 0.5rem;
+  vertical-align: top;
   line-height: 1.35;
   border-bottom: 1px solid #eef2f6;
+}
+.historial-listado-wrap .resumen-presupuesto-table tbody tr {
+  min-height: 2.75rem;
 }
 .historial-listado-wrap .resumen-presupuesto-table tbody tr:nth-child(even) td {
   background: #fafbfc;
@@ -5124,19 +5127,16 @@ button.fact-back {
 .historial-listado-wrap .resumen-presupuesto-table tbody tr:last-child td {
   border-bottom: none;
 }
-.historial-listado-wrap .resumen-presupuesto-table .rp-text-ellipsis {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.historial-listado-wrap .resumen-presupuesto-table .rp-desc-text {
+/* Texto en celdas: hasta 2 líneas visibles */
+.historial-listado-wrap .resumen-presupuesto-table .rp-wrap-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   line-height: 1.35;
   word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 .historial-listado-wrap .resumen-presupuesto-table .rp-prov-badge {
   display: inline-block;
@@ -5154,6 +5154,18 @@ button.fact-back {
 .historial-listado-wrap .resumen-presupuesto-table td.rp-monto-cell {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  vertical-align: top;
+}
+.historial-listado-wrap .resumen-presupuesto-table .rp-col-fecha,
+.historial-listado-wrap .resumen-presupuesto-table .rp-col-presup {
+  white-space: nowrap;
+}
+.historial-listado-wrap .resumen-presupuesto-table .rp-col-nombre,
+.historial-listado-wrap .resumen-presupuesto-table .rp-col-rubro,
+.historial-listado-wrap .resumen-presupuesto-table .rp-col-desc,
+.historial-listado-wrap .resumen-presupuesto-table .rp-col-factura {
+  white-space: normal;
+  word-break: break-word;
 }
 .historial-listado-wrap .resumen-presupuesto-table col.rp-col-fecha,
 .historial-listado-wrap .resumen-presupuesto-table .rp-col-fecha { width: 6%; }
@@ -5168,14 +5180,9 @@ button.fact-back {
 .historial-listado-wrap .resumen-presupuesto-table col.rp-col-factura,
 .historial-listado-wrap .resumen-presupuesto-table .rp-col-factura { width: 10%; }
 .historial-listado-wrap .resumen-presupuesto-table col.rp-col-presup,
-.historial-listado-wrap .resumen-presupuesto-table .rp-col-presup { width: 9%; white-space: nowrap; }
+.historial-listado-wrap .resumen-presupuesto-table .rp-col-presup { width: 9%; }
 .historial-listado-wrap .resumen-presupuesto-table col.rp-col-usd,
 .historial-listado-wrap .resumen-presupuesto-table .rp-col-usd { width: 9%; }
-.historial-listado-wrap .resumen-presupuesto-table .rp-col-fecha,
-.historial-listado-wrap .resumen-presupuesto-table .rp-col-presup,
-.historial-listado-wrap .resumen-presupuesto-table .rp-col-factura {
-  white-space: nowrap;
-}
 @media (max-width: 1199.98px) {
   .historial-listado-wrap .resumen-presupuesto-tabla-wrap {
     overflow-x: auto;

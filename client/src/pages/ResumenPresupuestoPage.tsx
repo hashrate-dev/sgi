@@ -374,16 +374,16 @@ export function ResumenPresupuestoPage() {
                                 <span className="rp-prov-badge">{row.supplierNumber}</span>
                               </td>
                               <td className="text-start rp-col-nombre" title={row.supplierName}>
-                                <span className="rp-text-ellipsis">{row.supplierName}</span>
+                                <span className="rp-wrap-2">{row.supplierName}</span>
                               </td>
                               <td className="text-start rp-col-rubro" title={rubro !== "—" ? rubro : undefined}>
-                                <span className="rp-text-ellipsis">{rubro}</span>
+                                <span className="rp-wrap-2">{rubro}</span>
                               </td>
                               <td className="text-start rp-col-desc" title={row.descripcion}>
-                                <span className="rp-desc-text">{row.descripcion || "—"}</span>
+                                <span className="rp-wrap-2">{row.descripcion || "—"}</span>
                               </td>
                               <td className="text-start rp-col-factura" title={row.numeroFactura || undefined}>
-                                {row.numeroFactura || "—"}
+                                <span className="rp-wrap-2">{row.numeroFactura || "—"}</span>
                               </td>
                               <td className="text-start rp-col-presup" title={row.presupuestoMes || undefined}>
                                 {formatYmDisplay(row.presupuestoMes)}
