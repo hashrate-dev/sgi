@@ -345,32 +345,67 @@ export function PendientesPage() {
                     </div>
                   )}
                 </div>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="pendientes-listado-wrap">
+          <div className="pendientes-listado-wrap">
           <div className="d-flex justify-content-between align-items-center mb-2">
             <h6 className="fw-bold m-0">📄 Facturas Pendientes{user && !canExportData ? " (solo consulta)" : ""}</h6>
           </div>
 
           <div className="table-responsive pendientes-facturas-table-scroll">
             <table className="table table-sm align-middle pendientes-facturas-table">
+              <colgroup>
+                <col className="pendientes-col-num" />
+                <col className="pendientes-col-cliente" />
+                <col className="pendientes-col-fecha" />
+                <col className="pendientes-col-hora" />
+                <col className="pendientes-col-fecha" />
+                <col className="pendientes-col-monto" />
+                <col className="pendientes-col-monto" />
+                <col className="pendientes-col-monto" />
+                <col className="pendientes-col-monto" />
+                <col className="pendientes-col-monto" />
+                <col className="pendientes-col-monto pendientes-col-saldo" />
+                <col className="pendientes-col-estado" />
+                <col className="pendientes-col-acciones" />
+              </colgroup>
               <thead className="table-dark">
                 <tr>
                   <th className="text-start pendientes-col-num">N°</th>
                   <th className="text-start pendientes-col-cliente">Cliente</th>
-                  <th className="text-start pendientes-col-fecha-emision">Fecha<br />Emisión</th>
-                  <th className="text-start pendientes-col-hora">Hora<br />Emisión</th>
-                  <th className="text-start pendientes-col-fecha-venc">Fecha<br />Venc.</th>
-                  <th className="text-start pendientes-col-monto">Total<br />(S/Desc)</th>
-                  <th className="text-start pendientes-col-monto">Descuento</th>
-                  <th className="text-start pendientes-col-monto">Total<br />Factura</th>
-                  <th className="text-start pendientes-col-monto">NC<br />Aplicada</th>
-                  <th className="text-start pendientes-col-monto">Cobros</th>
-                  <th className="text-start pendientes-col-monto pendientes-col-saldo">Saldo<br />Pendiente</th>
-                  <th className="text-center pendientes-col-estado">Estado</th>
-                  <th className="text-center pendientes-col-acciones">Acciones</th>
+                  <th className="text-start pendientes-col-fecha" title="Fecha de emisión">
+                    F. emisión
+                  </th>
+                  <th className="text-start pendientes-col-hora" title="Hora de emisión">
+                    Hora
+                  </th>
+                  <th className="text-start pendientes-col-fecha" title="Fecha de vencimiento">
+                    F. venc.
+                  </th>
+                  <th className="text-end pendientes-col-monto" title="Total sin descuento">
+                    Total s/desc
+                  </th>
+                  <th className="text-end pendientes-col-monto" title="Descuento">
+                    Desc.
+                  </th>
+                  <th className="text-end pendientes-col-monto" title="Total factura">
+                    Total
+                  </th>
+                  <th className="text-end pendientes-col-monto" title="Nota de crédito aplicada">
+                    NC
+                  </th>
+                  <th className="text-end pendientes-col-monto" title="Cobros aplicados">
+                    Cobros
+                  </th>
+                  <th className="text-end pendientes-col-monto pendientes-col-saldo" title="Saldo pendiente">
+                    Saldo
+                  </th>
+                  <th className="text-center pendientes-col-estado" title="Estado">
+                    Est.
+                  </th>
+                  <th className="text-center pendientes-col-acciones">Acc.</th>
                 </tr>
               </thead>
               <tbody>
@@ -395,20 +430,20 @@ export function PendientesPage() {
                         <td className="text-start pendientes-col-cliente" title={inv.invoice.clientName}>
                           <span className="pendientes-cliente-nombre">{inv.invoice.clientName}</span>
                         </td>
-                        <td className="text-start pendientes-col-fecha-emision">{inv.invoice.date}</td>
+                        <td className="text-start pendientes-col-fecha">{inv.invoice.date}</td>
                         <td className="text-start pendientes-col-hora">{inv.invoice.emissionTime || "—"}</td>
-                        <td className="text-start pendientes-col-fecha-venc">{dueDate}</td>
-                        <td className="text-start pendientes-col-monto pendientes-monto-cell">{formatCurrency(inv.invoice.subtotal)}</td>
-                        <td className="text-start pendientes-col-monto pendientes-monto-cell">{formatCurrency(inv.invoice.discounts)}</td>
-                        <td className="text-start pendientes-col-monto pendientes-monto-cell">{formatCurrency(inv.originalTotal)}</td>
-                        <td className="text-start pendientes-col-monto pendientes-monto-cell text-info">
-                          − {formatCurrency(inv.creditApplied)}
+                        <td className="text-start pendientes-col-fecha">{dueDate}</td>
+                        <td className="text-end pendientes-col-monto pendientes-monto-cell">{formatCurrencyNumber(inv.invoice.subtotal)}</td>
+                        <td className="text-end pendientes-col-monto pendientes-monto-cell">{formatCurrencyNumber(inv.invoice.discounts)}</td>
+                        <td className="text-end pendientes-col-monto pendientes-monto-cell">{formatCurrencyNumber(inv.originalTotal)}</td>
+                        <td className="text-end pendientes-col-monto pendientes-monto-cell text-info">
+                          −{formatCurrencyNumber(inv.creditApplied)}
                         </td>
-                        <td className="text-start pendientes-col-monto pendientes-monto-cell text-primary">
-                          − {formatCurrency(inv.paidApplied)}
+                        <td className="text-end pendientes-col-monto pendientes-monto-cell text-primary">
+                          −{formatCurrencyNumber(inv.paidApplied)}
                         </td>
-                        <td className="text-start pendientes-col-monto pendientes-col-saldo pendientes-monto-cell fw-bold text-danger">
-                          {formatCurrency(inv.pendingAmount)}
+                        <td className="text-end pendientes-col-monto pendientes-col-saldo pendientes-monto-cell fw-bold text-danger">
+                          {formatCurrencyNumber(inv.pendingAmount)}
                         </td>
                         <td className="text-center pendientes-col-estado">
                           <span
@@ -474,7 +509,7 @@ export function PendientesPage() {
               </div>
             </div>
           )}
-        </div>
+          </div>
         </div>
 
         {/* Estadísticas */}

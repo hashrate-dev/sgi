@@ -4,7 +4,7 @@ import type { ComprobanteType, Invoice } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { showToast } from "../components/ToastNotification";
-import { formatCurrency, formatCurrencyNumber } from "../lib/formatCurrency";
+import { formatCurrencyNumber } from "../lib/formatCurrency";
 import "../styles/facturacion.css";
 
 const STORAGE_PREFIX = "hosting_mail_sent_";
@@ -407,8 +407,7 @@ export function FacturasMesHostingPage() {
             </div>
           </div>
 
-          <div className="historial-filtros-outer flujo-emails-listado-outer">
-            <div className="pendientes-listado-wrap">
+          <div className="historial-listado-wrap">
           <div className="d-flex justify-content-between align-items-center mb-2">
             <h6 className="fw-bold m-0 listado-table-title">📩 Flujo de Emails — {opcionesMesAnio.find((o) => o.value === selectedMonth)?.label ?? formatMonth(selectedMonth)}</h6>
           </div>
@@ -431,18 +430,29 @@ export function FacturasMesHostingPage() {
             </div>
           ) : (
           <div className="table-responsive">
-            <table className="table table-sm align-middle" style={{ fontSize: "0.9rem" }}>
+            <table className="table table-sm align-middle facturas-mes-table">
+              <colgroup>
+                <col className="facturas-mes-col-num" />
+                <col className="facturas-mes-col-tipo" />
+                <col className="facturas-mes-col-cliente" />
+                <col className="facturas-mes-col-fecha" />
+                <col className="facturas-mes-col-mes" />
+                <col className="facturas-mes-col-total" />
+                <col className="facturas-mes-col-obs" />
+                <col className="facturas-mes-col-mail" />
+                <col className="facturas-mes-col-estado" />
+              </colgroup>
               <thead className="table-dark">
                 <tr>
-                  <th className="text-start">N°</th>
-                  <th className="text-start">Tipo</th>
-                  <th className="text-start">Cliente</th>
-                  <th className="text-start">Fecha</th>
-                  <th className="text-start">Mes</th>
-                  <th className="text-start">Total</th>
-                  <th className="text-start">Observaciones</th>
-                  <th className="text-start">Enviado por Mail</th>
-                  <th className="text-center facturas-mes-col-estado">Estado</th>
+                  <th className="text-start facturas-mes-col-num">N°</th>
+                  <th className="text-start facturas-mes-col-tipo">Tipo</th>
+                  <th className="text-start facturas-mes-col-cliente">Cliente</th>
+                  <th className="text-start facturas-mes-col-fecha">Fecha</th>
+                  <th className="text-start facturas-mes-col-mes">Mes</th>
+                  <th className="text-end facturas-mes-col-total">Total</th>
+                  <th className="text-start facturas-mes-col-obs">Obs.</th>
+                  <th className="text-center facturas-mes-col-mail" title="Enviado por mail">Mail</th>
+                  <th className="text-center facturas-mes-col-estado" title="Estado">Est.</th>
                 </tr>
               </thead>
               <tbody>
@@ -457,17 +467,18 @@ export function FacturasMesHostingPage() {
                 ) : (
                   filtered.map((inv) => (
                     <tr key={inv.id} className={isRowConnected(inv) ? "facturas-mes-row-connected" : undefined}>
-                      <td className="fw-bold text-start">{inv.number}</td>
-                      <td className="text-start">{inv.type === "Nota de Crédito" ? "NC" : inv.type}</td>
-                      <td className="text-start">{inv.clientName}</td>
-                      <td className="text-start">{inv.date}</td>
-                      <td className="text-start" title={inv.month || undefined}>{formatMonth(inv.month)}</td>
-                      <td className="text-start">{formatCurrency(inv.total)}</td>
-                      <td className="text-start">{getObservaciones(inv)}</td>
-                      <td className="text-start">
+                      <td className="fw-bold text-start facturas-mes-col-num">{inv.number}</td>
+                      <td className="text-start facturas-mes-col-tipo">{inv.type === "Nota de Crédito" ? "NC" : inv.type === "Factura" ? "Fact." : inv.type === "Recibo" ? "Rec." : inv.type}</td>
+                      <td className="text-start facturas-mes-col-cliente" title={inv.clientName}>
+                        <span className="facturas-mes-cliente-nombre">{inv.clientName}</span>
+                      </td>
+                      <td className="text-start facturas-mes-col-fecha">{inv.date}</td>
+                      <td className="text-start facturas-mes-col-mes" title={inv.month || undefined}>{formatMonth(inv.month)}</td>
+                      <td className="text-end facturas-mes-col-total facturas-mes-monto-cell">{formatCurrencyNumber(inv.total)}</td>
+                      <td className="text-start facturas-mes-col-obs" title={getObservaciones(inv)}>{getObservaciones(inv)}</td>
+                      <td className="text-center facturas-mes-col-mail">
                         <select
-                          className={`form-select form-select-sm ${getMailSent(inv.id) === "SI" ? "facturas-mes-mail-si" : getMailSent(inv.id) === "Cancelado" ? "facturas-mes-mail-cancelado" : ""}`}
-                          style={{ width: "auto", minWidth: "6.5rem" }}
+                          className={`form-select form-select-sm facturas-mes-mail-select ${getMailSent(inv.id) === "SI" ? "facturas-mes-mail-si" : getMailSent(inv.id) === "Cancelado" ? "facturas-mes-mail-cancelado" : ""}`}
                           value={getMailSent(inv.id)}
                           onChange={(e) => handleMailSentChange(inv, e.target.value as MailSentStatus)}
                         >
@@ -478,13 +489,13 @@ export function FacturasMesHostingPage() {
                       </td>
                       <td className="text-center facturas-mes-col-estado">
                         {fullySentConnectedIds.has(inv.id) ? (
-                          <span title="Factura y recibo/NC enviados por mail"><span role="img" aria-hidden>✅✅</span> Confirmado</span>
+                          <span className="facturas-mes-estado-badge" title="Factura y recibo/NC enviados por mail"><span role="img" aria-hidden>✅✅</span></span>
                         ) : getMailSent(inv.id) === "SI" ? (
-                          <span title="Enviado por mail"><span role="img" aria-hidden>✅</span> Confirmado</span>
+                          <span className="facturas-mes-estado-badge" title="Enviado por mail"><span role="img" aria-hidden>✅</span></span>
                         ) : getMailSent(inv.id) === "Cancelado" ? (
-                          <span title="Documento cancelado"><span role="img" aria-hidden>⛔</span> Cancelado</span>
+                          <span className="facturas-mes-estado-badge" title="Documento cancelado"><span role="img" aria-hidden>⛔</span></span>
                         ) : (
-                          <span title="No enviado por mail"><span role="img" aria-hidden>🕐</span> Pendiente...</span>
+                          <span className="facturas-mes-estado-badge" title="No enviado por mail"><span role="img" aria-hidden>🕐</span></span>
                         )}
                       </td>
                     </tr>
@@ -554,7 +565,6 @@ export function FacturasMesHostingPage() {
               </div>
             </div>
           </div>
-            </div>
           </div>
         </div>
 

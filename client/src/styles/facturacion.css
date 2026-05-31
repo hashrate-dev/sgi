@@ -4568,6 +4568,9 @@ button.fact-back {
   margin-right: -1.5rem;
   margin-top: -1.5rem;
   margin-bottom: 0;
+  width: calc(100% + 3rem);
+  max-width: none;
+  box-sizing: border-box;
 }
 
 /* Contenedor verde que incluye la “franja” inferior (mismo color y bordes redondeados) */
@@ -4695,6 +4698,10 @@ button.fact-back {
   margin-top: 1.5rem;
   margin-left: -1.5rem;
   margin-right: -1.5rem;
+  /* Igual ancho visual que .pendientes-filtros-outer (compensa p-4 del hrs-card) */
+  width: calc(100% + 3rem);
+  max-width: none;
+  box-sizing: border-box;
   padding: 1.25rem 2rem;
   border-top: 2px solid #e2e8f0;
   background: #fff;
@@ -4713,87 +4720,88 @@ button.fact-back {
   border: 1px solid #e2e8f0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   background: #fff;
-  overflow-x: auto;
+  overflow-x: visible;
   overflow-y: visible;
   -webkit-overflow-scrolling: touch;
 }
 .pendientes-listado-wrap .table-responsive .table,
 .pendientes-listado-wrap .pendientes-facturas-table {
-  border-collapse: separate;
+  border-collapse: collapse;
   border-spacing: 0;
   margin-bottom: 0;
   background: #fff;
 }
 .pendientes-listado-wrap .pendientes-facturas-table {
   width: 100%;
-  min-width: 1320px;
-  font-size: 0.8125rem;
+  max-width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+  font-size: 0.72rem;
 }
 .pendientes-listado-wrap .pendientes-facturas-table thead.table-dark th {
-  padding: 0.75rem 0.55rem;
-  white-space: normal;
-  word-break: keep-all;
-  line-height: 1.2;
+  padding: 0.45rem 0.28rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.15;
   vertical-align: middle;
+  font-size: 0.68rem;
+  text-transform: none;
+  letter-spacing: 0.01em;
 }
 .pendientes-listado-wrap .pendientes-facturas-table tbody td {
-  padding: 0.65rem 0.55rem;
+  padding: 0.4rem 0.28rem;
   vertical-align: middle;
-  line-height: 1.35;
-  word-break: normal;
-  overflow-wrap: normal;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .pendientes-listado-wrap .pendientes-facturas-table th.pendientes-col-num,
 .pendientes-listado-wrap .pendientes-facturas-table td.pendientes-col-num {
-  min-width: 5.75rem;
-  width: 5.75rem;
+  width: 5%;
   white-space: nowrap;
-  word-break: keep-all;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
 }
 .pendientes-listado-wrap .pendientes-facturas-table th.pendientes-col-cliente,
 .pendientes-listado-wrap .pendientes-facturas-table td.pendientes-col-cliente {
-  min-width: 8rem;
-  max-width: 12rem;
-  white-space: normal;
+  width: 13%;
+  white-space: nowrap;
 }
 .pendientes-listado-wrap .pendientes-facturas-table .pendientes-cliente-nombre {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  display: block;
   overflow: hidden;
-  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.25;
 }
-.pendientes-listado-wrap .pendientes-facturas-table th.pendientes-col-fecha-emision,
-.pendientes-listado-wrap .pendientes-facturas-table td.pendientes-col-fecha-emision,
-.pendientes-listado-wrap .pendientes-facturas-table th.pendientes-col-fecha-venc,
-.pendientes-listado-wrap .pendientes-facturas-table td.pendientes-col-fecha-venc {
-  min-width: 5.25rem;
+.pendientes-listado-wrap .pendientes-facturas-table th.pendientes-col-fecha,
+.pendientes-listado-wrap .pendientes-facturas-table td.pendientes-col-fecha {
+  width: 6.5%;
   white-space: nowrap;
 }
 .pendientes-listado-wrap .pendientes-facturas-table th.pendientes-col-hora,
 .pendientes-listado-wrap .pendientes-facturas-table td.pendientes-col-hora {
-  min-width: 4.75rem;
+  width: 4.5%;
   white-space: nowrap;
 }
 .pendientes-listado-wrap .pendientes-facturas-table th.pendientes-col-monto,
 .pendientes-listado-wrap .pendientes-facturas-table td.pendientes-col-monto {
-  min-width: 6.5rem;
+  width: 7.5%;
   white-space: nowrap;
+}
+.pendientes-listado-wrap .pendientes-facturas-table th.pendientes-col-saldo,
+.pendientes-listado-wrap .pendientes-facturas-table td.pendientes-col-saldo {
+  width: 8%;
 }
 .pendientes-listado-wrap .pendientes-facturas-table td.pendientes-monto-cell {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-}
-.pendientes-listado-wrap .pendientes-facturas-table th.pendientes-col-saldo,
-.pendientes-listado-wrap .pendientes-facturas-table td.pendientes-col-saldo {
-  min-width: 7rem;
+  text-align: right;
 }
 .pendientes-listado-wrap .pendientes-facturas-table th.pendientes-col-estado,
 .pendientes-listado-wrap .pendientes-facturas-table td.pendientes-col-estado {
-  min-width: 3.5rem;
-  width: 3.5rem;
+  width: 3.5%;
   text-align: center;
   white-space: nowrap;
 }
@@ -4801,20 +4809,35 @@ button.fact-back {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.25rem;
-  height: 1.25rem;
-  font-size: 0.95rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  font-size: 0.85rem;
   line-height: 1;
   color: #ffc107;
 }
 .pendientes-listado-wrap .pendientes-facturas-table th.pendientes-col-acciones,
 .pendientes-listado-wrap .pendientes-facturas-table td.pendientes-col-acciones {
-  min-width: 5.5rem;
+  width: 5.5%;
   text-align: center;
   white-space: nowrap;
 }
-.pendientes-listado-wrap .table thead.table-dark,
-.pendientes-listado-wrap .table thead.table-dark th {
+.pendientes-listado-wrap .pendientes-facturas-table td.pendientes-col-acciones .historial-accion-btn {
+  width: 1.15rem;
+  height: 1.15rem;
+  min-width: 1.15rem;
+  padding: 0;
+  font-size: 0.65rem;
+}
+@media (max-width: 1199.98px) {
+  .pendientes-listado-wrap .table-responsive {
+    overflow-x: auto;
+  }
+  .pendientes-listado-wrap .pendientes-facturas-table {
+    min-width: 960px;
+    table-layout: auto;
+  }
+}
+.pendientes-listado-wrap .table:not(.pendientes-facturas-table) thead.table-dark th {
   background-color: #2D5D46 !important;
   border-bottom: 2px solid rgba(255, 255, 255, 0.2);
   color: #fff;
@@ -4824,15 +4847,36 @@ button.fact-back {
   letter-spacing: 0.03em;
   padding: 1rem;
 }
+.pendientes-listado-wrap .pendientes-facturas-table thead.table-dark th {
+  background-color: #2D5D46 !important;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-weight: 600;
+}
+.pendientes-listado-wrap .table thead.table-dark,
+.pendientes-listado-wrap .table thead.table-dark th {
+  background-color: #2D5D46 !important;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-weight: 600;
+}
 .pendientes-listado-wrap .table thead.table-dark tr th:first-child {
   border-radius: 12px 0 0 0;
 }
 .pendientes-listado-wrap .table thead.table-dark tr th:last-child {
   border-radius: 0 12px 0 0;
 }
-.pendientes-listado-wrap .table tbody td {
+.pendientes-listado-wrap .table:not(.pendientes-facturas-table) tbody td {
   border-bottom: 1px solid #f1f5f9;
   padding: 1rem;
+  background: #fff;
+}
+.pendientes-listado-wrap .pendientes-facturas-table tbody td {
+  border-bottom: 1px solid #f1f5f9;
+  background: #fff;
+}
+.pendientes-listado-wrap .table tbody td {
+  border-bottom: 1px solid #f1f5f9;
   background: #fff;
 }
 .pendientes-listado-wrap .table tbody tr:last-child td {
@@ -4843,39 +4887,173 @@ button.fact-back {
 }
 
 /* Filas conectadas: factura + recibo/NC que la cancela (mismo color suave para remarcar relación) */
-.pendientes-listado-wrap .table tbody tr.facturas-mes-row-connected td {
+.pendientes-listado-wrap .table tbody tr.facturas-mes-row-connected td,
+.historial-listado-wrap .facturas-mes-table tbody tr.facturas-mes-row-connected td {
   background: #e8f5e9;
 }
-.pendientes-listado-wrap .table tbody tr.facturas-mes-row-connected:hover td {
+.pendientes-listado-wrap .table tbody tr.facturas-mes-row-connected:hover td,
+.historial-listado-wrap .facturas-mes-table tbody tr.facturas-mes-row-connected:hover td {
   background: #c8e6c9;
 }
 
 /* Select Enviado por Mail: cuando está en SI, botón en gris claro */
-.pendientes-listado-wrap .table select.facturas-mes-mail-si {
+.pendientes-listado-wrap .table select.facturas-mes-mail-si,
+.historial-listado-wrap .facturas-mes-table select.facturas-mes-mail-si {
   background-color: #d1d5db;
   color: #374151;
   border-color: #9ca3af;
 }
 .pendientes-listado-wrap .table select.facturas-mes-mail-si:hover,
-.pendientes-listado-wrap .table select.facturas-mes-mail-si:focus {
+.pendientes-listado-wrap .table select.facturas-mes-mail-si:focus,
+.historial-listado-wrap .facturas-mes-table select.facturas-mes-mail-si:hover,
+.historial-listado-wrap .facturas-mes-table select.facturas-mes-mail-si:focus {
   background-color: #9ca3af;
   border-color: #6b7280;
   color: #fff;
 }
 
 /* Select Cancelado: estilo gris/rojo suave */
-.pendientes-listado-wrap .table select.facturas-mes-mail-cancelado {
+.pendientes-listado-wrap .table select.facturas-mes-mail-cancelado,
+.historial-listado-wrap .facturas-mes-table select.facturas-mes-mail-cancelado {
   background-color: #fecaca;
   color: #991b1b;
   border-color: #f87171;
 }
 
-/* Columna Estado: ancho fijo para que no se corra la tabla al cambiar SI/NO (Pendiente... / Confirmado / doble check) */
-.pendientes-listado-wrap .table th.facturas-mes-col-estado,
-.pendientes-listado-wrap .table td.facturas-mes-col-estado {
-  width: 1%;
-  min-width: 11rem;
+/* ========== Flujo de Emails: tabla compacta (legible, sin scroll en desktop) ========== */
+.historial-listado-wrap .facturas-mes-table {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+  font-size: 0.8125rem;
+  border-collapse: collapse;
+  margin-bottom: 0;
+}
+.historial-listado-wrap .facturas-mes-table thead.table-dark th {
+  background-color: #2D5D46 !important;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  padding: 0.6rem 0.4rem;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
+  vertical-align: middle;
+}
+.historial-listado-wrap .facturas-mes-table tbody td {
+  padding: 0.55rem 0.4rem;
+  vertical-align: middle;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-bottom: 1px solid #eef2f6;
+}
+.historial-listado-wrap .facturas-mes-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.historial-listado-wrap .facturas-mes-table tbody tr:hover td {
+  background: #f8fafc;
+}
+.historial-listado-wrap .facturas-mes-table col.facturas-mes-col-num,
+.historial-listado-wrap .facturas-mes-table th.facturas-mes-col-num,
+.historial-listado-wrap .facturas-mes-table td.facturas-mes-col-num {
+  width: 7%;
+  white-space: nowrap;
+}
+.historial-listado-wrap .facturas-mes-table td.facturas-mes-col-num {
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.historial-listado-wrap .facturas-mes-table col.facturas-mes-col-tipo,
+.historial-listado-wrap .facturas-mes-table th.facturas-mes-col-tipo,
+.historial-listado-wrap .facturas-mes-table td.facturas-mes-col-tipo {
+  width: 5.5%;
+  white-space: nowrap;
+}
+.historial-listado-wrap .facturas-mes-table col.facturas-mes-col-cliente,
+.historial-listado-wrap .facturas-mes-table th.facturas-mes-col-cliente,
+.historial-listado-wrap .facturas-mes-table td.facturas-mes-col-cliente {
+  width: 16%;
+  white-space: nowrap;
+}
+.historial-listado-wrap .facturas-mes-table .facturas-mes-cliente-nombre {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.35;
+}
+.historial-listado-wrap .facturas-mes-table col.facturas-mes-col-fecha,
+.historial-listado-wrap .facturas-mes-table th.facturas-mes-col-fecha,
+.historial-listado-wrap .facturas-mes-table td.facturas-mes-col-fecha {
+  width: 7%;
+  white-space: nowrap;
+}
+.historial-listado-wrap .facturas-mes-table col.facturas-mes-col-mes,
+.historial-listado-wrap .facturas-mes-table th.facturas-mes-col-mes,
+.historial-listado-wrap .facturas-mes-table td.facturas-mes-col-mes {
+  width: 8%;
+  white-space: nowrap;
+}
+.historial-listado-wrap .facturas-mes-table col.facturas-mes-col-total,
+.historial-listado-wrap .facturas-mes-table th.facturas-mes-col-total,
+.historial-listado-wrap .facturas-mes-table td.facturas-mes-col-total {
+  width: 8%;
+  white-space: nowrap;
+}
+.historial-listado-wrap .facturas-mes-table td.facturas-mes-monto-cell {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.historial-listado-wrap .facturas-mes-table col.facturas-mes-col-obs,
+.historial-listado-wrap .facturas-mes-table th.facturas-mes-col-obs,
+.historial-listado-wrap .facturas-mes-table td.facturas-mes-col-obs {
+  width: 22%;
+  white-space: nowrap;
+}
+.historial-listado-wrap .facturas-mes-table col.facturas-mes-col-mail,
+.historial-listado-wrap .facturas-mes-table th.facturas-mes-col-mail,
+.historial-listado-wrap .facturas-mes-table td.facturas-mes-col-mail {
+  width: 11%;
+  white-space: nowrap;
+  text-align: center;
+}
+.historial-listado-wrap .facturas-mes-table select.facturas-mes-mail-select {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 1.75rem;
+  padding: 0.25rem 1.6rem 0.25rem 0.45rem;
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+.historial-listado-wrap .facturas-mes-table col.facturas-mes-col-estado,
+.historial-listado-wrap .facturas-mes-table th.facturas-mes-col-estado,
+.historial-listado-wrap .facturas-mes-table td.facturas-mes-col-estado {
+  width: 5.5%;
+  text-align: center;
+  white-space: nowrap;
+}
+.historial-listado-wrap .facturas-mes-table .facturas-mes-estado-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-size: 1rem;
+}
+@media (max-width: 1199.98px) {
+  .historial-listado-wrap .table-responsive:has(.facturas-mes-table) {
+    overflow-x: auto;
+  }
+  .historial-listado-wrap .facturas-mes-table {
+    min-width: 900px;
+    table-layout: auto;
+  }
 }
 
 /* ========== Página Historial: mismo diseño que Pendientes (Filtros + Listado) ========== */
@@ -4884,16 +5062,10 @@ button.fact-back {
   margin-right: -1.5rem;
   margin-top: -1.5rem;
   margin-bottom: 0;
+  width: calc(100% + 3rem);
+  max-width: none;
+  box-sizing: border-box;
 }
-/* Flujo de Emails: tabla al mismo ancho que el bloque de filtros */
-.flujo-emails-listado-outer {
-  margin-top: 1.5rem;
-}
-.flujo-emails-listado-outer .pendientes-listado-wrap {
-  margin-left: 0;
-  margin-right: 0;
-}
-
 .historial-filtros-container {
   background: #2D5D46;
   border-radius: 16px;
@@ -5020,6 +5192,9 @@ button.fact-back {
   margin-top: 1.5rem;
   margin-left: -1.5rem;
   margin-right: -1.5rem;
+  width: calc(100% + 3rem);
+  max-width: none;
+  box-sizing: border-box;
   padding: 1.25rem 2rem;
   border-top: 2px solid #e2e8f0;
   background: #fff;
@@ -5032,66 +5207,59 @@ button.fact-back {
   margin-bottom: 1rem;
 }
 
-/* Tabla Listado Historial: contenedor estirado 0.5 cm por lado */
+/* Tabla Listado Historial: compacta, columnas visibles sin scroll en desktop */
 .historial-listado-wrap .table-responsive {
   border-radius: 12px;
   border: 1px solid #e2e8f0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   background: #fff;
-  overflow-x: auto;
+  overflow-x: visible;
   overflow-y: visible;
-  width: calc(100% + 1cm);
-  margin-left: -0.5cm;
-  margin-right: -0.5cm;
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
   -webkit-overflow-scrolling: touch;
 }
 .historial-listado-wrap .historial-listado-table {
-  border-collapse: separate;
+  border-collapse: collapse;
   border-spacing: 0;
   margin-bottom: 0;
   background: #fff;
   width: 100%;
-  min-width: min-content;
+  max-width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+  font-size: 0.72rem;
 }
-/* Encabezado: compacto, sin romper etiquetas de columna */
 .historial-listado-wrap .historial-listado-table thead.table-dark th {
   background-color: #2D5D46 !important;
   border-bottom: 2px solid rgba(255, 255, 255, 0.2);
   color: #fff;
   font-weight: 600;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 0.75rem 0.55rem;
+  font-size: 0.68rem;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  padding: 0.45rem 0.28rem;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.15;
   vertical-align: middle;
-  text-align: left;
 }
-/* Celdas cuerpo */
 .historial-listado-wrap .historial-listado-table tbody td {
   border-bottom: 1px solid #eef2f6;
-  padding: 0.65rem 0.55rem;
+  padding: 0.4rem 0.28rem;
   background: #fff;
   vertical-align: middle;
-  font-size: 0.8125rem;
-  line-height: 1.35;
-  min-height: 0;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-/* Columna Origen: solo "HOSTING" o "ASIC" */
-.historial-listado-wrap .historial-listado-table th.historial-col-origen,
-.historial-listado-wrap .historial-listado-table td.historial-col-origen {
-  min-width: 4.25rem;
-  white-space: nowrap;
-  padding-left: 0.5rem;
-  padding-right: 0.35rem;
-}
-
-/* Montos en una sola fila (ej. "20.000,00 USD") */
 .historial-listado-wrap .historial-listado-table td.historial-monto-cell {
   white-space: nowrap;
-  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
-
 .historial-listado-wrap .historial-listado-table thead.table-dark tr th:first-child {
   border-radius: 12px 0 0 0;
 }
@@ -5104,198 +5272,139 @@ button.fact-back {
 .historial-listado-wrap .historial-listado-table tbody tr:hover td {
   background: #f8fafc;
 }
-
-/* ---- Anchos por columna (legibles; N° nunca en una letra por fila) ---- */
+.historial-listado-wrap .historial-listado-table col.historial-col-origen,
+.historial-listado-wrap .historial-listado-table th.historial-col-origen,
+.historial-listado-wrap .historial-listado-table td.historial-col-origen {
+  width: 5.5%;
+}
+.historial-listado-wrap .historial-listado-table col.historial-col-num,
 .historial-listado-wrap .historial-listado-table th.historial-col-num,
 .historial-listado-wrap .historial-listado-table td.historial-col-num {
-  min-width: 5.75rem;
-  width: 5.75rem;
-  max-width: 7rem;
+  width: 5.5%;
   white-space: nowrap;
-  word-break: keep-all;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .historial-listado-wrap .historial-listado-table td.historial-col-num {
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
 }
+.historial-listado-wrap .historial-listado-table col.historial-col-tipo,
 .historial-listado-wrap .historial-listado-table th.historial-col-tipo,
 .historial-listado-wrap .historial-listado-table td.historial-col-tipo {
-  min-width: 4.25rem;
+  width: 4.5%;
   white-space: nowrap;
 }
+.historial-listado-wrap .historial-listado-table col.historial-col-cliente,
 .historial-listado-wrap .historial-listado-table th.historial-col-cliente,
 .historial-listado-wrap .historial-listado-table td.historial-col-cliente {
-  min-width: 7.5rem;
-  max-width: 14rem;
-  width: auto;
-  white-space: normal;
-  word-break: break-word;
-  vertical-align: middle;
-  box-sizing: border-box;
+  width: 14%;
+  white-space: nowrap;
 }
 .historial-listado-wrap .historial-listado-table td.historial-col-cliente .historial-cliente-nombre {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  display: block;
   overflow: hidden;
-  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.25;
 }
+.historial-listado-wrap .historial-listado-table col.historial-col-fecha-emision,
 .historial-listado-wrap .historial-listado-table th.historial-col-fecha-emision,
 .historial-listado-wrap .historial-listado-table td.historial-col-fecha-emision {
-  min-width: 5.25rem;
-  text-align: left;
-  padding-left: 0.45rem;
-  padding-right: 0.4rem;
-}
-.historial-listado-wrap .historial-listado-table th.historial-col-fecha-emision {
-  white-space: normal;
-  line-height: 1.15;
-  text-align: left;
-}
-.historial-listado-wrap .historial-listado-table td.historial-col-fecha-emision {
+  width: 6.5%;
   white-space: nowrap;
 }
+.historial-listado-wrap .historial-listado-table col.historial-col-hora,
 .historial-listado-wrap .historial-listado-table th.historial-col-hora,
 .historial-listado-wrap .historial-listado-table td.historial-col-hora {
-  min-width: 4.25rem;
-  padding-left: 0.4rem;
-  padding-right: 0.4rem;
-}
-.historial-listado-wrap .historial-listado-table th.historial-col-hora {
-  white-space: normal;
-  line-height: 1.15;
-}
-.historial-listado-wrap .historial-listado-table td.historial-col-hora {
+  width: 4.5%;
   white-space: nowrap;
 }
+.historial-listado-wrap .historial-listado-table col.historial-col-fecha-venc,
 .historial-listado-wrap .historial-listado-table th.historial-col-fecha-venc,
 .historial-listado-wrap .historial-listado-table td.historial-col-fecha-venc {
-  min-width: 5.25rem;
-  text-align: left;
-  padding-left: 0.45rem;
-  padding-right: 0.4rem;
+  width: 6.5%;
+  white-space: nowrap;
 }
-.historial-listado-wrap .historial-listado-table th.historial-col-fecha-venc {
-  white-space: normal;
-  line-height: 1.15;
-}
+.historial-listado-wrap .historial-listado-table col.historial-col-fecha-pago,
 .historial-listado-wrap .historial-listado-table th.historial-col-fecha-pago,
 .historial-listado-wrap .historial-listado-table td.historial-col-fecha-pago {
-  min-width: 5.5rem;
-  text-align: left;
-  padding-left: 0.45rem;
-  padding-right: 0.4rem;
-}
-.historial-listado-wrap .historial-listado-table th.historial-col-fecha-pago {
-  white-space: normal;
-  line-height: 1.15;
+  width: 7%;
+  white-space: nowrap;
 }
 .historial-listado-wrap .historial-listado-table th.historial-col-mes,
 .historial-listado-wrap .historial-listado-table td.historial-col-mes {
-  min-width: 4rem;
-  text-align: left;
-  padding-left: 0.5rem;
-  padding-right: 0.35rem;
+  width: 5%;
+  white-space: nowrap;
 }
-.historial-listado-wrap .historial-listado-table td.historial-col-mes {
-  white-space: normal;
-  line-height: 1.25;
-}
-/* Columnas de montos: una fila "X.XXX,XX USD", ancho suficiente */
+.historial-listado-wrap .historial-listado-table col.historial-col-total-sdesc,
 .historial-listado-wrap .historial-listado-table th.historial-col-total-sdesc,
 .historial-listado-wrap .historial-listado-table td.historial-col-total-sdesc {
-  min-width: 5.5rem;
-  text-align: left;
-  padding-left: 0.3rem;
-  padding-right: 0.25rem;
-}
-.historial-listado-wrap .historial-listado-table th.historial-col-total-sdesc {
-  white-space: normal;
-  line-height: 1.2;
+  width: 7.5%;
+  white-space: nowrap;
 }
 .historial-listado-wrap .historial-listado-table th.historial-col-desc,
 .historial-listado-wrap .historial-listado-table td.historial-col-desc {
-  min-width: 5rem;
-  text-align: left;
-  padding-left: 0.3rem;
-  padding-right: 0.25rem;
+  width: 6.5%;
+  white-space: nowrap;
 }
+.historial-listado-wrap .historial-listado-table col.historial-col-cambio-header,
+.historial-listado-wrap .historial-listado-table th.historial-col-cambio-header,
+.historial-listado-wrap .historial-listado-table td.historial-col-cambio {
+  width: 5.5%;
+  white-space: nowrap;
+}
+.historial-listado-wrap .historial-listado-table col.historial-col-total,
 .historial-listado-wrap .historial-listado-table th.historial-col-total,
 .historial-listado-wrap .historial-listado-table td.historial-col-total {
-  min-width: 6.25rem;
-  text-align: left;
-  padding-left: 0.35rem;
-  padding-right: 0.3rem;
-}
-.historial-listado-wrap .historial-listado-table thead.table-dark th.historial-col-total {
-  text-align: left !important;
-  padding-left: 0.35rem;
+  width: 7.5%;
+  white-space: nowrap;
 }
 .historial-listado-wrap .historial-listado-table th.historial-col-total-stc,
 .historial-listado-wrap .historial-listado-table td.historial-col-total-stc {
-  min-width: 6.25rem;
-  text-align: left;
-  padding-left: 0.35rem;
-  padding-right: 0.3rem;
+  width: 7.5%;
+  white-space: nowrap;
 }
-.historial-listado-wrap .historial-listado-table th.historial-col-total-stc {
-  white-space: normal;
-  line-height: 1.2;
-}
-/* TC: ancho para "X.XXX,XX USD" en una fila */
-.historial-listado-wrap .historial-listado-table th.historial-col-cambio-header,
-.historial-listado-wrap .historial-listado-table td.historial-col-cambio {
-  min-width: 5rem;
-  text-align: left;
-  padding-left: 0.35rem;
-  padding-right: 0.35rem;
-}
-.historial-listado-wrap .historial-listado-table thead.table-dark th.historial-col-cambio-header {
-  padding-left: 0.35rem;
-}
-/* Estado: ancho para encabezado "Estado" e ícono */
+.historial-listado-wrap .historial-listado-table col.historial-col-estado,
 .historial-listado-wrap .historial-listado-table th.historial-col-estado,
 .historial-listado-wrap .historial-listado-table td.historial-col-estado {
-  min-width: 3.5rem;
-  width: auto;
-  padding-left: 0.35rem;
-  padding-right: 0.35rem;
+  width: 3.5%;
   text-align: center;
-}
-.historial-listado-wrap .historial-listado-table th.historial-col-estado {
   white-space: nowrap;
-  text-align: center;
 }
-/* Acciones: ancho para "Acciones" y botones; encabezado y celdas centrados */
+.historial-listado-wrap .historial-listado-table col.historial-col-acciones,
 .historial-listado-wrap .historial-listado-table th.historial-col-acciones,
 .historial-listado-wrap .historial-listado-table td.historial-col-acciones {
-  min-width: 8rem;
+  width: 5.5%;
   text-align: center;
-}
-.historial-listado-wrap .historial-listado-table thead.table-dark th.historial-col-acciones {
-  text-align: center;
-}
-
-.historial-listado-wrap .historial-listado-table thead.table-dark th.historial-col-acciones,
-.historial-listado-wrap .historial-listado-table tbody td.historial-col-acciones {
-  position: sticky;
-  right: 0;
-  z-index: 2;
-  min-width: 8rem;
   white-space: nowrap;
-  padding-left: 0.5rem;
-  padding-right: 0.5rem;
 }
-.historial-listado-wrap .historial-listado-table thead.table-dark th.historial-col-acciones {
-  background-color: #2D5D46 !important;
+.historial-listado-wrap .historial-listado-table td.historial-col-acciones .historial-accion-btn {
+  width: 1.15rem;
+  height: 1.15rem;
+  min-width: 1.15rem;
+  padding: 0;
+  font-size: 0.65rem;
 }
-.historial-listado-wrap .historial-listado-table tbody td.historial-col-acciones {
-  background: #fff;
-}
-.historial-listado-wrap .historial-listado-table tbody tr:hover td.historial-col-acciones {
-  background: #f8fafc;
+@media (max-width: 1199.98px) {
+  .historial-listado-wrap .table-responsive {
+    overflow-x: auto;
+  }
+  .historial-listado-wrap .historial-listado-table {
+    min-width: 1050px;
+    table-layout: auto;
+  }
+  .historial-listado-wrap .historial-listado-table thead.table-dark th.historial-col-acciones,
+  .historial-listado-wrap .historial-listado-table tbody td.historial-col-acciones {
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    background: #fff;
+  }
+  .historial-listado-wrap .historial-listado-table thead.table-dark th.historial-col-acciones {
+    background-color: #2D5D46 !important;
+  }
+  .historial-listado-wrap .historial-listado-table tbody tr:hover td.historial-col-acciones {
+    background: #f8fafc;
+  }
 }
 
 /* ========== Página Clientes: mismo diseño de Filtros y Listado que Historial ========== */

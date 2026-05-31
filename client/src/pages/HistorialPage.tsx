@@ -977,22 +977,37 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
             </div>
             <p className="text-muted small mb-3">{pageSubtitle}</p>
             <div className="table-responsive">
-            <table className="table table-sm align-middle historial-listado-table" style={{ fontSize: "0.85rem" }}>
+            <table className="table table-sm align-middle historial-listado-table">
+              <colgroup>
+                <col className="historial-col-origen" />
+                <col className="historial-col-num" />
+                <col className="historial-col-tipo" />
+                <col className="historial-col-cliente" />
+                <col className="historial-col-fecha-emision" />
+                <col className="historial-col-hora" />
+                <col className="historial-col-fecha-venc" />
+                <col className="historial-col-fecha-pago" />
+                <col className="historial-col-total-sdesc" />
+                <col className="historial-col-cambio-header" />
+                <col className="historial-col-total" />
+                <col className="historial-col-estado" />
+                <col className="historial-col-acciones" />
+              </colgroup>
               <thead className="table-dark">
                 <tr>
                   <th className="text-start historial-col-origen">Origen</th>
                   <th className="text-start historial-col-num">N°</th>
                   <th className="text-start historial-col-tipo">Tipo</th>
                   <th className="text-start historial-col-cliente">Cliente</th>
-                  <th className="text-start historial-col-fecha-emision">Fecha<br />Emisión</th>
-                  <th className="text-start historial-col-hora">Hora<br />Emisión</th>
-                  <th className="text-start historial-col-fecha-venc">Fecha<br />Venc.</th>
-                  <th className="text-start historial-col-fecha-pago">Fecha<br />Pago</th>
-                  <th className="text-start historial-col-total-sdesc">Total<br />(S/Desc)</th>
-                  <th className="text-start historial-col-cambio-header">TC</th>
-                  <th className="text-start historial-col-total">Total</th>
-                  <th className="text-center historial-col-estado">Estado</th>
-                  <th className="text-center historial-col-acciones">Acciones</th>
+                  <th className="text-start historial-col-fecha-emision" title="Fecha de emisión">F. emisión</th>
+                  <th className="text-start historial-col-hora" title="Hora de emisión">Hora</th>
+                  <th className="text-start historial-col-fecha-venc" title="Fecha de vencimiento">F. venc.</th>
+                  <th className="text-start historial-col-fecha-pago" title="Fecha de pago">F. pago</th>
+                  <th className="text-end historial-col-total-sdesc" title="Total sin descuento">Total s/d</th>
+                  <th className="text-end historial-col-cambio-header" title="4% Gastos Operativos Transferencia (si aplica)">TC</th>
+                  <th className="text-end historial-col-total" title="Total">Total</th>
+                  <th className="text-center historial-col-estado" title="Estado">Est.</th>
+                  <th className="text-center historial-col-acciones">Acc.</th>
                 </tr>
               </thead>
               <tbody>
@@ -1057,11 +1072,11 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
                         <td className="text-start historial-col-hora">{formatTimeNoSeconds(inv.emissionTime)}</td>
                         <td className="text-start historial-col-fecha-venc">{dueDate}</td>
                         <td className="text-start historial-col-fecha-pago">{paymentDateCell}</td>
-                        <td className="text-start historial-col-total-sdesc historial-monto-cell">{formatCurrency(subtotal)}</td>
-                        <td className="text-start historial-col-cambio historial-monto-cell" title="4% Gastos Operativos Transferencia (si aplica)">
-                          {getCambio4Pct(inv) != null ? formatCurrency(getCambio4Pct(inv)!) : "-"}
+                        <td className="text-end historial-col-total-sdesc historial-monto-cell">{formatCurrencyNumber(subtotal)}</td>
+                        <td className="text-end historial-col-cambio historial-monto-cell" title="4% Gastos Operativos Transferencia (si aplica)">
+                          {getCambio4Pct(inv) != null ? formatCurrencyNumber(getCambio4Pct(inv)!) : "-"}
                         </td>
-                        <td className="text-start fw-bold historial-col-total historial-monto-cell">{formatCurrency(total)}</td>
+                        <td className="text-end fw-bold historial-col-total historial-monto-cell">{formatCurrencyNumber(total)}</td>
                         <td className="text-center historial-col-estado">
                           {isClosed ? (
                             isCancelledByNC ? (

@@ -268,11 +268,11 @@ export function PendientesMineriaPage() {
                     </div>
                   )}
                 </div>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="pendientes-listado-wrap">
+          <div className="pendientes-listado-wrap">
           <div className="d-flex justify-content-between align-items-center mb-2">
             <h6 className="fw-bold m-0">📄 Facturas Pendientes (ASIC){user && !canExportData ? " (solo consulta)" : ""}</h6>
           </div>
@@ -374,7 +374,7 @@ export function PendientesMineriaPage() {
               </div>
             </div>
           )}
-        </div>
+          </div>
         </div>
 
         {/* Estadísticas */}

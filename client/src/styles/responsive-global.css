@@ -84,10 +84,8 @@ html {
   }
 }
 
-/* Tablas anchas: scroll táctil sin romper el layout */
+/* Tablas anchas: scroll táctil sin romper el layout (contenedores internos, no el wrap de página) */
 .table-responsive,
-.pendientes-listado-wrap,
-.historial-listado-wrap,
 .leads-base-listado-wrap,
 .asic-cotizador-registros-wrap,
 .hosting-fx-ops-table-wrap,
