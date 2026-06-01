@@ -585,7 +585,7 @@ usersRouter.get(
   const rows = (await db
     .prepare(
       `SELECT a.id, a.user_id, a.event, a.created_at, a.ip_address, a.user_agent, a.duration_seconds,
-              u.email, u.username
+              u.email, u.username, u.role
        FROM user_activity a
        JOIN users u ON u.id = a.user_id
        ORDER BY a.created_at DESC
@@ -601,11 +601,13 @@ usersRouter.get(
     duration_seconds: number | null;
     email: string | null;
     username: string;
+    role: string;
   }>;
   const activity = rows.map((r) => ({
     id: r.id,
     user_id: r.user_id,
     user_email: r.email ?? r.username,
+    user_role: r.role,
     event: r.event,
     created_at: r.created_at,
     ip_address: r.ip_address ?? undefined,

@@ -1023,6 +1023,7 @@ export type ActivityItem = {
   id: number;
   user_id: number;
   user_email: string;
+  user_role?: string;
   event: "login" | "logout";
   created_at: string;
   ip_address?: string;

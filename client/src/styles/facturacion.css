@@ -7833,6 +7833,40 @@ button.fact-back {
   border-radius: 10px;
 }
 
+/* Actividad de sesiones: tabla con estilo SGI (verde) */
+.historial-listado-wrap .actividad-usuarios-tabla-wrap {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  background: #fff;
+  overflow-x: auto;
+}
+.historial-listado-wrap .actividad-usuarios-table {
+  width: 100%;
+  margin-bottom: 0;
+  font-size: 0.8125rem;
+}
+.historial-listado-wrap .actividad-usuarios-table thead.table-dark th {
+  background-color: #2D5D46 !important;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.75rem;
+  padding: 0.6rem 0.5rem;
+  white-space: nowrap;
+}
+.historial-listado-wrap .actividad-usuarios-table tbody td {
+  padding: 0.55rem 0.5rem;
+  vertical-align: middle;
+  border-bottom: 1px solid #eef2f6;
+}
+.historial-listado-wrap .actividad-usuarios-table tbody tr:nth-child(even) td {
+  background: #fafbfc;
+}
+.historial-listado-wrap .actividad-usuarios-table tbody tr:hover td {
+  background: #f0fdf4;
+}
+
 /* Loading y estado vacío */
 .usuarios-page .usuarios-loading,
 .usuarios-page .activity-loading {

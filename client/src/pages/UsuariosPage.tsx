@@ -114,6 +114,11 @@ export function UsuariosPage() {
   const [pageSizeUsers, setPageSizeUsers] = useState<number>(20);
   const [pageActivity, setPageActivity] = useState(1);
   const [pageSizeActivity, setPageSizeActivity] = useState<number>(20);
+  const [actividadFRol, setActividadFRol] = useState<"" | UserRole | "staff">("");
+  const [actividadFEvent, setActividadFEvent] = useState<"" | "login" | "logout">("");
+  const [actividadFBuscar, setActividadFBuscar] = useState("");
+  const [actividadFFechaDesde, setActividadFFechaDesde] = useState("");
+  const [actividadFFechaHasta, setActividadFFechaHasta] = useState("");
   const [goToPageUsers, setGoToPageUsers] = useState("");
   const [goToPageActivity, setGoToPageActivity] = useState("");
   const [grantsExplicit, setGrantsExplicit] = useState(false);
@@ -129,7 +134,7 @@ export function UsuariosPage() {
   function loadActivity() {
     setActivityLoading(true);
     setActivityError(false);
-    getUsersActivity(200)
+    getUsersActivity(500)
       .then((r) => {
         setActivity(Array.isArray(r?.activity) ? r.activity : []);
         setActivityError(false);
@@ -398,11 +403,44 @@ export function UsuariosPage() {
     return users.slice(start, start + pageSizeUsers);
   }, [users, pageUsers, pageSizeUsers]);
 
-  const totalPagesActivity = Math.max(1, Math.ceil(activity.length / pageSizeActivity));
+  const filteredActivity = useMemo(() => {
+    const q = actividadFBuscar.trim().toLowerCase();
+    const desde = actividadFFechaDesde.trim();
+    const hasta = actividadFFechaHasta.trim();
+    return activity.filter((a) => {
+      const role = String(a.user_role ?? "").trim();
+      if (actividadFRol === "staff") {
+        if (role === "cliente") return false;
+      } else if (actividadFRol && role !== actividadFRol) {
+        return false;
+      }
+      if (actividadFEvent && a.event !== actividadFEvent) return false;
+      if (q) {
+        const hay = [a.user_email, role].join(" ").toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      if (desde || hasta) {
+        const day = String(a.created_at || "").slice(0, 10);
+        if (desde && day < desde) return false;
+        if (hasta && day > hasta) return false;
+      }
+      return true;
+    });
+  }, [activity, actividadFRol, actividadFEvent, actividadFBuscar, actividadFFechaDesde, actividadFFechaHasta]);
+
+  const totalPagesActivity = Math.max(1, Math.ceil(filteredActivity.length / pageSizeActivity));
   const paginatedActivity = useMemo(() => {
     const start = (pageActivity - 1) * pageSizeActivity;
-    return activity.slice(start, start + pageSizeActivity);
-  }, [activity, pageActivity, pageSizeActivity]);
+    return filteredActivity.slice(start, start + pageSizeActivity);
+  }, [filteredActivity, pageActivity, pageSizeActivity]);
+
+  useEffect(() => {
+    setPageActivity(1);
+  }, [actividadFRol, actividadFEvent, actividadFBuscar, actividadFFechaDesde, actividadFFechaHasta, pageSizeActivity]);
+
+  useEffect(() => {
+    setPageActivity((p) => Math.min(p, totalPagesActivity));
+  }, [totalPagesActivity]);
 
   function handlePageSizeUsersChange(v: number) {
     setPageSizeUsers(v);
@@ -666,27 +704,116 @@ export function UsuariosPage() {
             ) : null}
 
             {routeMode === "actividad" ? (
-            <div className="usuarios-page-card usuarios-page-activity-card">
-              <div className="usuarios-page-header usuarios-page-header--activity">
-                <div className="usuarios-page-header-inner">
-                  <h2 className="usuarios-page-title" id="usuarios-heading-actividad">
-                    <span className="usuarios-page-title-icon usuarios-page-title-icon--activity" aria-hidden>
-                      <i className="bi bi-clock-history" />
-                    </span>
-                    Actividad de usuarios
-                  </h2>
-                  <p className="usuarios-page-subtitle">Entradas y salidas al sistema, horarios y tiempo conectado.</p>
+            <div className="hrs-card hrs-card--rect p-4">
+              <div className="historial-filtros-outer">
+                <div className="historial-filtros-container">
+                  <div className="card historial-filtros-card">
+                    <h6 className="fw-bold border-bottom pb-2">🔍 Filtros</h6>
+                    <div className="row g-3 align-items-end facturas-mes-filtros-row">
+                      <div className="col-6 col-md-2">
+                        <label className="form-label small fw-bold mb-1">Rol</label>
+                        <select
+                          className="form-select form-select-sm w-100"
+                          value={actividadFRol}
+                          onChange={(e) => setActividadFRol(e.target.value as "" | UserRole | "staff")}
+                        >
+                          <option value="">Todos</option>
+                          <option value="staff">Staff SGI (sin tienda)</option>
+                          {ROLES.map((r) => (
+                            <option key={r.value} value={r.value}>
+                              {r.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="col-6 col-md-2">
+                        <label className="form-label small fw-bold mb-1">Evento</label>
+                        <select
+                          className="form-select form-select-sm w-100"
+                          value={actividadFEvent}
+                          onChange={(e) => setActividadFEvent(e.target.value as "" | "login" | "logout")}
+                        >
+                          <option value="">Todos</option>
+                          <option value="login">Entrada</option>
+                          <option value="logout">Salida</option>
+                        </select>
+                      </div>
+                      <div className="col-6 col-md-2">
+                        <label className="form-label small fw-bold mb-1">Desde</label>
+                        <input
+                          type="date"
+                          className="form-control form-control-sm w-100"
+                          value={actividadFFechaDesde}
+                          onChange={(e) => setActividadFFechaDesde(e.target.value)}
+                        />
+                      </div>
+                      <div className="col-6 col-md-2">
+                        <label className="form-label small fw-bold mb-1">Hasta</label>
+                        <input
+                          type="date"
+                          className="form-control form-control-sm w-100"
+                          value={actividadFFechaHasta}
+                          onChange={(e) => setActividadFFechaHasta(e.target.value)}
+                        />
+                      </div>
+                      <div className="col-12 col-md-4">
+                        <label className="form-label small fw-bold mb-1">Buscar usuario</label>
+                        <input
+                          className="form-control form-control-sm w-100"
+                          placeholder="Correo o rol…"
+                          value={actividadFBuscar}
+                          onChange={(e) => setActividadFBuscar(e.target.value)}
+                        />
+                      </div>
+                      <div className="col-6 col-md-auto d-flex align-items-end filtros-limpiar-col">
+                        <button
+                          type="button"
+                          className="btn btn-outline-secondary btn-sm filtros-limpiar-btn"
+                          onClick={() => {
+                            setActividadFRol("");
+                            setActividadFEvent("");
+                            setActividadFBuscar("");
+                            setActividadFFechaDesde("");
+                            setActividadFFechaHasta("");
+                          }}
+                        >
+                          Limpiar
+                        </button>
+                      </div>
+                      <div className="col-6 col-md-auto d-flex align-items-end ms-md-auto">
+                        <button
+                          type="button"
+                          className="btn btn-outline-secondary btn-sm filtros-limpiar-btn"
+                          onClick={loadActivity}
+                          disabled={activityLoading}
+                        >
+                          <i className="bi bi-arrow-clockwise me-1" />
+                          Actualizar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="usuarios-page-body">
+
+              <div className="historial-listado-wrap">
+                <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                  <h6 className="fw-bold m-0 listado-table-title">
+                    🕐 Actividad de sesiones ({filteredActivity.length})
+                  </h6>
+                </div>
+                <p className="text-muted small mb-3">
+                  Entradas y salidas al sistema (SGI y tienda online). Filtrá por rol, evento, fechas o correo.
+                </p>
+
                 {activityLoading ? (
-                  <div className="activity-loading">
-                    <div className="spinner-border" role="status" aria-label="Espere un momento" />
+                  <div className="activity-loading py-5">
+                    <div className="spinner-border text-secondary" role="status" aria-label="Espere un momento" />
                   </div>
                 ) : activityError ? (
                   <div className="empty-activity">
                     <i className="bi bi-exclamation-triangle text-warning" />
-                    <p className="mb-2">No se pudo cargar la actividad. Si estás en Vercel, verificá que la API esté desplegada (Root Directory en raíz del repo).</p>
+                    <p className="mb-2">No se pudo cargar la actividad. Si estás en Vercel, verificá que la API esté desplegada.</p>
                     <button type="button" className="btn btn-sm btn-outline-secondary" onClick={loadActivity}>
                       Reintentar
                     </button>
@@ -696,57 +823,71 @@ export function UsuariosPage() {
                     <i className="bi bi-inbox" />
                     <p className="mb-0">Sin registros aún. La actividad se mostrará cuando los usuarios inicien o cierren sesión.</p>
                   </div>
+                ) : filteredActivity.length === 0 ? (
+                  <div className="empty-activity">
+                    <i className="bi bi-funnel" />
+                    <p className="mb-0">Ningún registro coincide con los filtros aplicados.</p>
+                  </div>
                 ) : (
-                  <div className="monitor-asic-equipos-group usuarios-table-registro rounded-3 border bg-white shadow-sm overflow-hidden">
-                    <div className="table-responsive">
-                      <table className="table table-sm table-hover align-middle mb-0 small">
-                        <thead className="table-light">
-                          <tr>
-                            <th scope="col" className="text-start">
-                              Usuario
-                            </th>
-                            <th scope="col" className="text-start">
-                              Evento
-                            </th>
-                            <th scope="col" className="text-start">
-                              Fecha y hora
-                            </th>
-                            <th scope="col" className="text-start">
-                              Tiempo conectado
-                            </th>
-                            <th scope="col" className="text-start">
-                              Ubicación (IP)
-                            </th>
-                          </tr>
-                        </thead>
+                  <div className="table-responsive actividad-usuarios-tabla-wrap">
+                    <table className="table table-sm align-middle actividad-usuarios-table mb-0">
+                      <thead className="table-dark">
+                        <tr>
+                          <th className="text-start">Usuario</th>
+                          <th className="text-start">Rol</th>
+                          <th className="text-start">Evento</th>
+                          <th className="text-start">Fecha y hora</th>
+                          <th className="text-start">Tiempo conectado</th>
+                          <th className="text-start">Ubicación (IP)</th>
+                        </tr>
+                      </thead>
                       <tbody>
-                        {paginatedActivity.map((a) => (
-                          <tr key={a.id}>
-                            <td>
-                              <span className="user-email sgi-tech-code">{a.user_email}</span>
-                            </td>
-                            <td>
-                              <span className={a.event === "login" ? "event-badge event-badge--login" : "event-badge event-badge--logout"}>
-                                {a.event === "login" ? <><i className="bi bi-box-arrow-in-right" /> Entrada</> : <><i className="bi bi-box-arrow-right" /> Salida</>}
-                              </span>
-                            </td>
-                            <td>{new Date(a.created_at).toLocaleString("es-AR")}</td>
-                            <td className="activity-duration">
-                              {a.duration_seconds != null
-                                ? `${Math.floor(a.duration_seconds / 3600)}h ${Math.floor((a.duration_seconds % 3600) / 60)}min`
-                                : "—"}
-                            </td>
-                            <td>
-                              <span className="activity-ip sgi-tech-code">{a.ip_address || "—"}</span>
-                            </td>
-                          </tr>
-                        ))}
-                        </tbody>
-                      </table>
-                    </div>
+                        {paginatedActivity.map((a) => {
+                          const role = String(a.user_role ?? "");
+                          return (
+                            <tr key={a.id}>
+                              <td>
+                                <span className="user-email sgi-tech-code">{a.user_email}</span>
+                              </td>
+                              <td>
+                                {role ? (
+                                  <span className={getRoleBadgeClass(role, currentUser?.role)}>
+                                    {getRoleDisplayLabel(role, currentUser?.role)}
+                                  </span>
+                                ) : (
+                                  "—"
+                                )}
+                              </td>
+                              <td>
+                                <span className={a.event === "login" ? "event-badge event-badge--login" : "event-badge event-badge--logout"}>
+                                  {a.event === "login" ? (
+                                    <>
+                                      <i className="bi bi-box-arrow-in-right" /> Entrada
+                                    </>
+                                  ) : (
+                                    <>
+                                      <i className="bi bi-box-arrow-right" /> Salida
+                                    </>
+                                  )}
+                                </span>
+                              </td>
+                              <td className="text-nowrap">{new Date(a.created_at).toLocaleString("es-AR")}</td>
+                              <td className="activity-duration">
+                                {a.duration_seconds != null
+                                  ? `${Math.floor(a.duration_seconds / 3600)}h ${Math.floor((a.duration_seconds % 3600) / 60)}min`
+                                  : "—"}
+                              </td>
+                              <td>
+                                <span className="activity-ip sgi-tech-code">{a.ip_address || "—"}</span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 )}
-                {!activityLoading && !activityError && activity.length > 0 && (
+                {!activityLoading && !activityError && filteredActivity.length > 0 && (
                   <div className="usuarios-pagination d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3 px-1">
                     <div className="d-flex align-items-center gap-2">
                       <label className="text-muted small mb-0">Mostrar</label>
@@ -757,15 +898,19 @@ export function UsuariosPage() {
                         onChange={(e) => handlePageSizeActivityChange(Number(e.target.value))}
                       >
                         {PAGE_SIZE_OPTIONS.map((n) => (
-                          <option key={n} value={n}>{n}</option>
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
                         ))}
                       </select>
-                      <span className="text-muted small">registros</span>
+                      <span className="text-muted small">
+                        {((pageActivity - 1) * pageSizeActivity) + 1}–{Math.min(pageActivity * pageSizeActivity, filteredActivity.length)} de {filteredActivity.length}
+                        {filteredActivity.length !== activity.length ? (
+                          <span className="ms-1">(sobre {activity.length} cargados)</span>
+                        ) : null}
+                      </span>
                     </div>
                     <div className="d-flex align-items-center gap-2">
-                      <span className="text-muted small">
-                        Mostrando {((pageActivity - 1) * pageSizeActivity) + 1}-{Math.min(pageActivity * pageSizeActivity, activity.length)} de {activity.length}
-                      </span>
                       <button type="button" className="btn btn-sm btn-outline-secondary" disabled={pageActivity <= 1} onClick={() => setPageActivity((p) => Math.max(1, p - 1))}>
                         ‹ Anterior
                       </button>
