@@ -1007,10 +1007,18 @@ function MonitorEquiposAsicPageContent() {
                           </th>
                           <th scope="col">Usuario</th>
                           <th scope="col">Modelo</th>
-                          <th scope="col">Potencia</th>
-                          <th scope="col">Nombre ant.</th>
-                          <th scope="col">Nombre nuevo</th>
-                          <th scope="col">Serial</th>
+                          <th scope="col" style={{ minWidth: "calc(10.5rem + 1cm)" }}>
+                            Potencia
+                          </th>
+                          <th scope="col" style={{ minWidth: "calc(6.5rem - 1cm)" }}>
+                            Nombre ant.
+                          </th>
+                          <th scope="col" style={{ minWidth: "calc(7.5rem - 1cm)" }}>
+                            Nombre nuevo
+                          </th>
+                          <th scope="col" style={{ minWidth: "calc(6.5rem + 1cm)" }}>
+                            Serial
+                          </th>
                           <th scope="col" style={{ minWidth: "7rem" }}>
                             Pool
                           </th>
@@ -1092,7 +1100,11 @@ function MonitorEquiposAsicPageContent() {
                                   </span>
                                 </div>
                               </td>
-                              <td style={{ minWidth: potenciaUnit ? "10.5rem" : "7rem" }}>
+                              <td
+                                style={{
+                                  minWidth: potenciaUnit ? "calc(10.5rem + 1cm)" : "calc(7rem + 1cm)",
+                                }}
+                              >
                                 <div className="input-group input-group-sm monitor-asic-potencia-input">
                                   <span className="input-group-text monitor-asic-potencia-icon-slot py-0 px-2">
                                     <i className="bi bi-speedometer2" aria-hidden />
@@ -1135,7 +1147,7 @@ function MonitorEquiposAsicPageContent() {
                                   ) : null}
                                 </div>
                               </td>
-                              <td style={{ minWidth: "6.5rem" }}>
+                              <td style={{ minWidth: "calc(6.5rem - 1cm)" }}>
                                 <input
                                   className="form-control form-control-sm font-monospace"
                                   value={row.nombreAnt}
@@ -1145,7 +1157,7 @@ function MonitorEquiposAsicPageContent() {
                                   aria-label="Nombre anterior"
                                 />
                               </td>
-                              <td style={{ minWidth: "7.5rem" }}>
+                              <td style={{ minWidth: "calc(7.5rem - 1cm)" }}>
                                 <input
                                   className="form-control form-control-sm font-monospace"
                                   value={row.nombreNuevo}
@@ -1154,7 +1166,7 @@ function MonitorEquiposAsicPageContent() {
                                   aria-label="Nombre nuevo"
                                 />
                               </td>
-                              <td style={{ minWidth: "6.5rem" }}>
+                              <td style={{ minWidth: "calc(6.5rem + 1cm)" }}>
                                 <div className="input-group input-group-sm monitor-asic-serial-input">
                                   <span className="input-group-text monitor-asic-serial-icon-slot py-0 px-2">
                                     <i className="bi bi-upc-scan" aria-hidden />

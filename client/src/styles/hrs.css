@@ -4,6 +4,7 @@
 :root {
   --bs-body-font-family: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
   --hrs-app-bg-soft: #f1f5f9;
+  --hrs-login-bg: linear-gradient(135deg, #074025 0%, #49f227 100%);
 }
 
 * {
@@ -107,11 +108,34 @@ html.hrs-home-bg body {
   }
 }
 
+/**
+ * /login y /reset-password: `body`/`#root` usan #f1f5f9 y `scrollbar-gutter: stable` → franja gris a la derecha.
+ * Pintar html/body/#root con el verde de marca (mismo patrón que `html.hrs-home-bg` y marketplace `:has`).
+ */
+html:has(.hrs-login-page) {
+  background: var(--hrs-login-bg);
+  overflow-x: hidden;
+}
+
+body:has(.hrs-login-page) {
+  background: var(--hrs-login-bg);
+  scrollbar-gutter: auto;
+  overflow-x: hidden;
+}
+
+#root:has(.hrs-login-page) {
+  background: transparent;
+  overflow-x: hidden;
+}
+
 /** Pantalla /login: recupera el fondo verde marca (body ya no lo lleva) */
 .hrs-login-page {
   min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
-  background: linear-gradient(135deg, #074025 0%, #49f227 100%);
+  background: var(--hrs-login-bg);
   position: relative;
   overflow: hidden;
 }
