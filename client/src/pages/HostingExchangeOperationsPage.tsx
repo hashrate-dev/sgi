@@ -50,7 +50,9 @@ const INITIAL_FORM: FxFormState = {
 
 const BANK_OPTIONS = ["Banco Santander", "BROU", "Banco Itau", "BBVA", "Prex", "Mi Dinero"] as const;
 const DEFAULT_BANK_HOSTING_COMMISSION = BANK_OPTIONS[0]!;
-const HRS_COMMISSION_PCT_OPTIONS = [0.8, 1, 1.5, 1.6, 1.7, 2, 2.5, 2.6, 2.7, 2.8, 2.9, 3, 3.5, 4] as const;
+const HRS_COMMISSION_PCT_OPTIONS = [
+  0.8, 1, 1.5, 1.6, 1.7, 2, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3, 3.5, 4,
+] as const;
 
 /** Valores del select «Cliente»: los dos primeros son operaciones FX; el tercero solo enlaza a la tabla de comisión 4% facturas. */
 type ClientCompraSelectValue = FxFormState["usdtSide"] | "hosting_commission";
