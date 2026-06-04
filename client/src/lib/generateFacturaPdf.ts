@@ -3,7 +3,12 @@ import type { ComprobanteType, LineItem } from "./types";
 import { invoiceClientDisplayNames } from "./clientInvoiceDisplay";
 import { formatUSD } from "./formatCurrency";
 import { recibimosMontoEnDosLineas } from "./numberToWords";
-import { getLineItemDescription, normalizeInvoiceDescriptionForCell } from "./invoiceLineItemDescription";
+import {
+  getLineItemDescription,
+  getLineItemDiscountDescription,
+  normalizeInvoiceDescriptionForCell,
+} from "./invoiceLineItemDescription";
+import { alignLineItemDiscountsForDisplay } from "./invoiceDiscountDisplay";
 import { prepareLineItemsForPdf } from "./prepareLineItemsForPdf";
 import {
   collapseLegacyReciboSettlementItemsForPdf,
@@ -137,13 +142,8 @@ function buildFacturaPdfTableRows(doc: jsPDF, items: LineItem[]): FacturaPdfTabl
   for (const it of items) {
     const settlementKind = getReceiptSettlementRowKind(it);
     const desc = normalizeInvoiceDescriptionForCell(getLineItemDescription(it));
-    // Si es ítem normal: precio neto = price - discount (para NO renderizar una segunda fila).
-    // Si es línea de liquidación (payment_line / invoice_ref / credit_note / prior_receipt):
-    // mantenemos la lógica existente.
-    const netUnitPrice = settlementKind == null ? Math.max(0, it.price - it.discount) : it.price;
-    const netLineTotal = netUnitPrice * it.quantity;
-    let precio = formatUSD(netUnitPrice);
-    let total = formatUSD(netLineTotal);
+    let precio = formatUSD(it.price);
+    let total = formatUSD(it.price * it.quantity);
     if (settlementKind === "credit_note" || settlementKind === "prior_receipt") {
       const amt = it.discount * it.quantity;
       precio = "—";
@@ -155,6 +155,16 @@ function buildFacturaPdfTableRows(doc: jsPDF, items: LineItem[]): FacturaPdfTabl
       cant: String(it.quantity),
       total,
     });
+    const unitDiscount = Number(it.discount) || 0;
+    if (unitDiscount > 0 && settlementKind == null) {
+      const discountAmount = unitDiscount * (Number(it.quantity) || 1);
+      rows.push({
+        desc: normalizeInvoiceDescriptionForCell(getLineItemDiscountDescription(it)),
+        precio: "- " + formatUSD(unitDiscount),
+        cant: String(it.quantity),
+        total: "- " + formatUSD(discountAmount),
+      });
+    }
   }
   return rows;
 }
@@ -166,8 +176,11 @@ function buildFacturaPdfTableRows(doc: jsPDF, items: LineItem[]): FacturaPdfTabl
  */
 export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImages): jsPDF {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const pdfItems = prepareLineItemsForPdf(
-    collapseLegacyReciboSettlementItemsForPdf(data.type, data.items, data.relatedInvoiceNumber)
+  const pdfItems = alignLineItemDiscountsForDisplay(
+    prepareLineItemsForPdf(
+      collapseLegacyReciboSettlementItemsForPdf(data.type, data.items, data.relatedInvoiceNumber)
+    ),
+    data.discounts
   );
   const now = data.date;
   const vencimiento = data.dueDate

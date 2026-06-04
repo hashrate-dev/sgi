@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import type { Client, ComprobanteType, LineItem } from "../lib/types";
 import { formatUSD } from "../lib/formatCurrency";
 import {
@@ -8,7 +8,8 @@ import {
 } from "../lib/receiptSettlementLine";
 import { recibimosMontoEnDosLineas } from "../lib/numberToWords";
 import { invoiceClientDisplayNames, hasSecondaryClientColumn } from "../lib/clientInvoiceDisplay";
-import { getLineItemDescription } from "../lib/invoiceLineItemDescription";
+import { alignLineItemDiscountsForDisplay } from "../lib/invoiceDiscountDisplay";
+import { getLineItemDescription, getLineItemDiscountDescription } from "../lib/invoiceLineItemDescription";
 import "../styles/invoice-preview.css";
 
 const EMISOR = {
@@ -65,6 +66,7 @@ export function InvoicePreview({
   client,
   date,
   items,
+  discounts,
   total,
   dueDateDays = 6,
   relatedInvoiceNumber,
@@ -96,10 +98,10 @@ export function InvoicePreview({
 
   const hasText = (s?: string) => Boolean(s && s.trim());
 
-  const displayItems = useMemo(
-    () => collapseLegacyReciboSettlementItemsForPdf(type, items, relatedInvoiceNumber),
-    [type, items, relatedInvoiceNumber]
-  );
+  const displayItems = useMemo(() => {
+    const collapsed = collapseLegacyReciboSettlementItemsForPdf(type, items, relatedInvoiceNumber);
+    return alignLineItemDiscountsForDisplay(collapsed, discounts);
+  }, [type, items, relatedInvoiceNumber, discounts]);
   const showReciboConceptBlock = type === "Recibo" && hasText(reciboConceptText) && !reciboIsPaymentLineSettledTable(displayItems);
 
   // Manejar nombres con guion para dividirlos en líneas
@@ -243,20 +245,27 @@ export function InvoicePreview({
                     );
                   }
 
-                  // Para mantener una MUY buena calidad visual: cada servicio debe renderearse en una
-                  // sola fila (sin duplicar “DESCRIPCION”). Si existe discount en ítems normales,
-                  // lo reflejamos como precio neto para que no aparezca un segundo <tr>.
-                  const netUnitPrice =
-                    settlementKind == null ? Math.max(0, item.price - item.discount) : item.price;
-                  const lineTotalServicio = netUnitPrice * item.quantity;
+                  const unitDiscount = Number(item.discount) || 0;
+                  const lineTotalServicio = item.price * item.quantity;
+                  const showDiscountRow = unitDiscount > 0 && settlementKind == null;
 
                   return (
-                    <tr key={idx}>
-                      <td className="invoice-preview-td-desc">{desc}</td>
-                      <td className="invoice-preview-td-precio">{formatUSD(netUnitPrice)}</td>
-                      <td className="invoice-preview-td-cant">{item.quantity}</td>
-                      <td className="invoice-preview-td-total">{formatUSD(lineTotalServicio)}</td>
-                    </tr>
+                    <Fragment key={idx}>
+                      <tr>
+                        <td className="invoice-preview-td-desc">{desc}</td>
+                        <td className="invoice-preview-td-precio">{formatUSD(item.price)}</td>
+                        <td className="invoice-preview-td-cant">{item.quantity}</td>
+                        <td className="invoice-preview-td-total">{formatUSD(lineTotalServicio)}</td>
+                      </tr>
+                      {showDiscountRow ? (
+                        <tr>
+                          <td className="invoice-preview-td-desc">{getLineItemDiscountDescription(item)}</td>
+                          <td className="invoice-preview-td-precio">- {formatUSD(unitDiscount)}</td>
+                          <td className="invoice-preview-td-cant">{item.quantity}</td>
+                          <td className="invoice-preview-td-total">- {formatUSD(unitDiscount * item.quantity)}</td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
                   );
                 })}
               </tbody>

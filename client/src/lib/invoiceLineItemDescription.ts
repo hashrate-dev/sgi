@@ -104,5 +104,10 @@ export function getLineItemDiscountDescription(it: LineItem): string {
   if (it.serviceKey === "A") return "Descuento HASHRATE L7";
   if (it.serviceKey === "B") return "Descuento HASHRATE L9";
   if (it.serviceKey) return "Descuento HASHRATE S21";
+  const serviceLabel = lineItemServiceLabel(it);
+  if (serviceLabel) {
+    const { label } = stripTrailingInvoiceMonth(serviceLabel);
+    if (label) return `Descuento ${label}`;
+  }
   return "Descuento";
 }
