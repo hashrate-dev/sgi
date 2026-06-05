@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   addEmittedDocument,
   createInvoice,
   getEmittedDocuments,
   getClients,
   getEquipos,
+  getInvoiceById,
+  getInvoices,
   getNextInvoiceNumber,
   getReparacionTipos,
   getTransporteFleteTipos,
@@ -94,6 +96,26 @@ function calcTotals(items: LineItem[]) {
   return { subtotal, discounts, total };
 }
 
+function normalizeClientName(name: string | undefined | null): string {
+  if (!name) return "";
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9\s]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isNumericId(id: string | undefined): boolean {
+  return typeof id === "string" && /^\d+$/.test(id);
+}
+
+function currentMonthValue(): string {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}`;
+}
+
 function isLinkedToInvoice(comp: Invoice, factura: Invoice): boolean {
   const matchId = comp.relatedInvoiceId != null && String(comp.relatedInvoiceId) === String(factura.id);
   const matchNumber = comp.relatedInvoiceNumber != null && comp.relatedInvoiceNumber === factura.number;
@@ -127,6 +149,8 @@ export function FacturacionMineriaPage() {
   const [dueDateDays, setDueDateDays] = useState<5 | 6 | 7>(6);
 
   const [invoices, setInvoices] = useState<Invoice[]>(() => loadInvoicesAsic());
+  /** Facturas ASIC en base (source=asic): necesarias para Recibo/NC sobre facturas emitidas en servidor u otro equipo */
+  const [dbInvoices, setDbInvoices] = useState<Invoice[]>([]);
   /** Siguiente número desde el servidor; null = aún no pedido, "" = API falló (usar fallback local) */
   const [nextNumFromApi, setNextNumFromApi] = useState<string | null>(null);
   const [equiposAsic, setEquiposAsic] = useState<EquipoASIC[]>([]);
@@ -139,9 +163,58 @@ export function FacturacionMineriaPage() {
   /** Documento emitido a mostrar en la vista previa (al hacer clic en Visualizar) */
   const [previewEmitted, setPreviewEmitted] = useState<{ invoice: Invoice; emittedAt: string } | null>(null);
 
+  const fetchDbInvoices = useCallback(async () => {
+    try {
+      await wakeUpBackend();
+      const r = await getInvoices({ source: "asic" });
+      const list: Invoice[] = (r.invoices ?? []).map((inv) => ({
+        id: String(inv.id),
+        number: inv.number,
+        type: inv.type as ComprobanteType,
+        clientName: inv.clientName,
+        date: inv.date,
+        month: inv.month,
+        subtotal: inv.subtotal,
+        discounts: inv.discounts,
+        total: inv.total,
+        relatedInvoiceId: inv.relatedInvoiceId != null ? String(inv.relatedInvoiceId) : undefined,
+        relatedInvoiceNumber: inv.relatedInvoiceNumber,
+        paymentDate: inv.paymentDate,
+        emissionTime: inv.emissionTime,
+        dueDate: inv.dueDate,
+        items: [],
+      }));
+      setDbInvoices(list);
+    } catch {
+      setDbInvoices([]);
+    }
+  }, []);
+
+  /** Local + BD (prioriza id numérico de base, igual que Hosting). */
+  const invoicesAll = useMemo<Invoice[]>(() => {
+    const map = new Map<string, Invoice>();
+    const addAll = (src: Invoice[]) => {
+      for (const inv of src) {
+        const key = `${inv.type}-${inv.number}`;
+        const prev = map.get(key);
+        if (!prev) {
+          map.set(key, inv);
+          continue;
+        }
+        const prevIsDb = isNumericId(prev.id);
+        const invIsDb = isNumericId(inv.id);
+        if (!prevIsDb && invIsDb) map.set(key, inv);
+      }
+    };
+    addAll(invoices);
+    addAll(dbInvoices);
+    return Array.from(map.values());
+  }, [invoices, dbInvoices]);
+
   // Recargar desde localStorage/API al montar
   useEffect(() => {
     setInvoices(loadInvoicesAsic());
+    void fetchDbInvoices();
     wakeUpBackend()
       .then(() => Promise.all([getEquipos(), getSetups(), getReparacionTipos(), getTransporteFleteTipos()]))
       .then(([equiposRes, setupsRes, repRes, fleteRes]) => {
@@ -190,15 +263,19 @@ export function FacturacionMineriaPage() {
   useEffect(() => {
     if (location.pathname !== "/asic/billing" && location.pathname !== "/asic/billing/") return;
     fetchEmittedAsic();
-  }, [location.pathname]);
+    void fetchDbInvoices();
+  }, [location.pathname, fetchDbInvoices]);
 
   /** Refrescar lista al volver a esta pestaña (p. ej. después de borrar en Historial) */
   useEffect(() => {
     if (location.pathname !== "/asic/billing" && location.pathname !== "/asic/billing/") return;
-    const onFocus = () => fetchEmittedAsic();
+    const onFocus = () => {
+      fetchEmittedAsic();
+      void fetchDbInvoices();
+    };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [location.pathname]);
+  }, [location.pathname, fetchDbInvoices]);
 
   /** Refrescar Documentos Emitidos cuando se elimina en Historial (asic) */
   useEffect(() => {
@@ -235,8 +312,8 @@ export function FacturacionMineriaPage() {
   }, [type]);
 
   const number = useMemo(
-    () => (nextNumFromApi !== null && nextNumFromApi !== "" ? nextNumFromApi : nextNumber(type, invoices)),
-    [type, invoices, nextNumFromApi]
+    () => (nextNumFromApi !== null && nextNumFromApi !== "" ? nextNumFromApi : nextNumber(type, invoicesAll)),
+    [type, invoicesAll, nextNumFromApi]
   );
   const totals = useMemo(() => calcTotals(items), [items]);
 
@@ -265,36 +342,34 @@ export function FacturacionMineriaPage() {
   // Obtener facturas disponibles para Nota de Crédito: sin NC y sin Recibo (no pagadas)
   const invoicesWithoutCreditNote = useMemo(() => {
     if (!selectedClient || type !== "Nota de Crédito") return [];
-    // Obtener todas las facturas del cliente
-    const facturas = invoices.filter(
-      (inv) => inv.clientName === selectedClient.name && inv.type === "Factura"
+    const clientNorm = normalizeClientName(selectedClient.name);
+    const facturas = invoicesAll.filter(
+      (inv) => normalizeClientName(inv.clientName) === clientNorm && inv.type === "Factura"
     );
-    // Obtener IDs de facturas que ya tienen Nota de Crédito conectada
     const facturasConNC = new Set(
-      invoices
+      invoicesAll
         .filter((inv) => inv.type === "Nota de Crédito" && inv.relatedInvoiceId)
         .map((inv) => inv.relatedInvoiceId)
     );
-    // Obtener IDs de facturas que ya tienen Recibo (pagadas) — no se puede emitir NC sobre factura pagada
     const facturasConRecibo = new Set(
-      invoices
+      invoicesAll
         .filter((inv) => inv.type === "Recibo" && inv.relatedInvoiceId)
         .map((inv) => inv.relatedInvoiceId)
     );
-    // Filtrar: sin NC y sin Recibo (no pagadas)
     return facturas.filter(
       (inv) => !facturasConNC.has(inv.id) && !facturasConRecibo.has(inv.id)
     );
-  }, [invoices, selectedClient, type]);
+  }, [invoicesAll, selectedClient, type]);
 
   // Recibo: facturas del cliente con saldo pendiente (NC parcial + recibo del resto)
   const invoicesWithoutReceipt = useMemo(() => {
     if (!selectedClient || type !== "Recibo") return [];
-    const facturas = invoices.filter(
-      (inv) => inv.clientName === selectedClient.name && inv.type === "Factura"
+    const clientNorm = normalizeClientName(selectedClient.name);
+    const facturas = invoicesAll.filter(
+      (inv) => normalizeClientName(inv.clientName) === clientNorm && inv.type === "Factura"
     );
-    return facturas.filter((f) => invoicePendingCollectionAmount(f, invoices) > INVOICE_BALANCE_EPS);
-  }, [invoices, selectedClient, type]);
+    return facturas.filter((f) => invoicePendingCollectionAmount(f, invoicesAll) > INVOICE_BALANCE_EPS);
+  }, [invoicesAll, selectedClient, type]);
 
   // Limpiar factura relacionada cuando cambia el tipo o el cliente
   useEffect(() => {
@@ -314,7 +389,7 @@ export function FacturacionMineriaPage() {
   // Cargar ítems de la factura relacionada cuando se selecciona
   useEffect(() => {
     if ((type === "Nota de Crédito" || type === "Recibo") && relatedInvoiceId && selectedClient) {
-      const relatedInvoice = invoices.find((inv) => inv.id === relatedInvoiceId);
+      const relatedInvoice = invoicesAll.find((inv) => String(inv.id) === String(relatedInvoiceId));
       if (relatedInvoice && relatedInvoice.items && relatedInvoice.items.length > 0) {
         // Cargar los ítems de la factura relacionada con todos los campos copiados correctamente
         const loadedItems: LineItem[] = relatedInvoice.items.map((item) => {
@@ -364,13 +439,79 @@ export function FacturacionMineriaPage() {
           showToast(`Factura ${relatedInvoice.number} cargada. Puedes modificar los ítems si es necesario.`, "info");
         }
       } else if (relatedInvoice && (!relatedInvoice.items || relatedInvoice.items.length === 0)) {
-        showToast(`La factura ${relatedInvoice.number} no tiene ítems cargados.`, "warning");
-        setItemsLocked(false);
+        const invId = Number(relatedInvoice.id);
+        if (!Number.isFinite(invId)) {
+          const totalAbs = Math.abs(Number(relatedInvoice.total) || 0);
+          const month =
+            relatedInvoice.month && /^\d{4}-\d{2}$/.test(relatedInvoice.month)
+              ? relatedInvoice.month
+              : currentMonthValue();
+          setItems([
+            {
+              reparacionNombre: `Total factura ${relatedInvoice.number}`,
+              serviceName: `Total factura ${relatedInvoice.number}`,
+              month,
+              quantity: 1,
+              price: totalAbs,
+              discount: 0,
+            },
+          ]);
+          setItemsLocked(true);
+          return;
+        }
+        getInvoiceById(invId)
+          .then((res) => {
+            const apiItems = res.invoice?.items ?? [];
+            if (apiItems.length > 0) {
+              const loadedItems: LineItem[] = apiItems.map((item) => {
+                const serviceName = String(item.service || "").trim();
+                return {
+                  reparacionNombre: serviceName || undefined,
+                  serviceName: serviceName || "Servicio ASIC",
+                  month: item.month || relatedInvoice.month || currentMonthValue(),
+                  quantity: item.quantity || 1,
+                  price: item.price || 0,
+                  discount: item.discount || 0,
+                };
+              });
+              setItems(loadedItems);
+              setItemsLocked(true);
+              showToast(
+                `Factura ${relatedInvoice.number} cargada con sus ítems. Podés emitir el ${type === "Recibo" ? "recibo" : "NC"}.`,
+                "success"
+              );
+            } else {
+              const totalAbs = Math.abs(Number(relatedInvoice.total) || 0);
+              const month =
+                relatedInvoice.month && /^\d{4}-\d{2}$/.test(relatedInvoice.month)
+                  ? relatedInvoice.month
+                  : currentMonthValue();
+              setItems([
+                {
+                  reparacionNombre: `Total factura ${relatedInvoice.number}`,
+                  serviceName: `Total factura ${relatedInvoice.number}`,
+                  month,
+                  quantity: 1,
+                  price: totalAbs,
+                  discount: 0,
+                },
+              ]);
+              setItemsLocked(true);
+              showToast(
+                `Factura ${relatedInvoice.number} sin ítems en la base; se usó el total. Podés emitir el ${type === "Recibo" ? "recibo" : "NC"}.`,
+                "success"
+              );
+            }
+          })
+          .catch(() => {
+            showToast(`La factura ${relatedInvoice.number} no tiene ítems cargados.`, "warning");
+            setItemsLocked(false);
+          });
       }
     } else {
       setItemsLocked(false);
     }
-  }, [relatedInvoiceId, type, selectedClient, invoices]);
+  }, [relatedInvoiceId, type, selectedClient, invoicesAll]);
 
   function addItem() {
     // Si hay equipos ASIC disponibles, usar el primero; sino si hay Setup, usar el primero; sino crear item vacío
@@ -460,9 +601,12 @@ export function FacturacionMineriaPage() {
       return;
     }
     if (type === "Nota de Crédito" && relatedInvoiceId) {
-      const hasExistingNC = invoices.some(
-        (inv) => inv.type === "Nota de Crédito" && inv.relatedInvoiceId === relatedInvoiceId
+      const facturaTarget = invoicesAll.find(
+        (i) => i.type === "Factura" && String(i.id) === String(relatedInvoiceId)
       );
+      const hasExistingNC = facturaTarget
+        ? invoicesAll.some((inv) => inv.type === "Nota de Crédito" && isLinkedToInvoice(inv, facturaTarget))
+        : false;
       if (hasExistingNC) {
         showToast("Esta factura ya tiene una Nota de Crédito relacionada. No se puede crear otra.", "error");
         return;
@@ -473,8 +617,8 @@ export function FacturacionMineriaPage() {
       return;
     }
     if (type === "Recibo" && relatedInvoiceId) {
-      const factura = invoices.find((i) => i.type === "Factura" && String(i.id) === String(relatedInvoiceId)) ?? null;
-      if (factura && invoicePendingCollectionAmount(factura, invoices) <= INVOICE_BALANCE_EPS) {
+      const factura = invoicesAll.find((i) => i.type === "Factura" && String(i.id) === String(relatedInvoiceId)) ?? null;
+      if (factura && invoicePendingCollectionAmount(factura, invoicesAll) <= INVOICE_BALANCE_EPS) {
         showToast(
           "Esta factura no tiene saldo pendiente de cobro (puede estar totalmente pagada o cancelada por nota(s) de crédito).",
           "error"
@@ -522,7 +666,9 @@ export function FacturacionMineriaPage() {
     dueDate.setDate(dueDate.getDate() + dueDateDays);
     const dueDateStr = dueDate.toLocaleDateString();
 
-    const relatedInvoice = relatedInvoiceId ? invoices.find((inv) => inv.id === relatedInvoiceId) : null;
+    const relatedInvoice = relatedInvoiceId
+      ? invoicesAll.find((inv) => String(inv.id) === String(relatedInvoiceId))
+      : null;
     const isNegativeType = type === "Recibo" || type === "Nota de Crédito";
     const finalSubtotal = isNegativeType ? -(Math.abs(subtotal)) : subtotal;
     const finalDiscounts = isNegativeType ? -(Math.abs(discounts)) : discounts;
@@ -552,7 +698,7 @@ export function FacturacionMineriaPage() {
       dueDate: dueDateStr
     };
 
-    let createdInvoice: { number: string };
+    let createdInvoice: { id: number; number: string };
     try {
       const res = await createInvoice(apiBody);
       createdInvoice = res.invoice;
@@ -616,7 +762,7 @@ export function FacturacionMineriaPage() {
     }
 
     const inv: Invoice = {
-      id: genId(),
+      id: createdInvoice.id != null ? String(createdInvoice.id) : genId(),
       number: numberToUse,
       type,
       clientName: selectedClient.name,
@@ -645,6 +791,7 @@ export function FacturacionMineriaPage() {
     hist.push(inv);
     saveInvoicesAsic(hist);
     setInvoices(loadInvoicesAsic());
+    void fetchDbInvoices();
     const now = Date.now();
     const emittedAt = new Date().toISOString();
     const windowMs = 10 * 24 * 60 * 60 * 1000 + 22 * 60 * 60 * 1000;
@@ -689,7 +836,7 @@ export function FacturacionMineriaPage() {
     }
     const relatedForNc =
       inv.type === "Nota de Crédito"
-        ? invoices.find(
+        ? invoicesAll.find(
             (i) =>
               i.type === "Factura" &&
               (i.number === inv.relatedInvoiceNumber || String(i.id) === String(inv.relatedInvoiceId ?? ""))
@@ -1448,7 +1595,7 @@ export function FacturacionMineriaPage() {
                       creditNoteMode={
                         previewEmitted.invoice.type === "Nota de Crédito"
                           ? (() => {
-                              const related = invoices.find(
+                              const related = invoicesAll.find(
                                 (i) =>
                                   i.type === "Factura" &&
                                   (i.number === previewEmitted.invoice.relatedInvoiceNumber ||
@@ -1475,13 +1622,13 @@ export function FacturacionMineriaPage() {
                       dueDateDays={dueDateDays}
                       relatedInvoiceNumber={
                         type === "Nota de Crédito"
-                          ? invoices.find((i) => String(i.id) === String(relatedInvoiceId))?.number
+                          ? invoicesAll.find((i) => String(i.id) === String(relatedInvoiceId))?.number
                           : undefined
                       }
                       creditNoteMode={
                         type === "Nota de Crédito"
                           ? (() => {
-                              const related = invoices.find((i) => String(i.id) === String(relatedInvoiceId));
+                              const related = invoicesAll.find((i) => String(i.id) === String(relatedInvoiceId));
                               if (!related) return undefined;
                               return Math.abs(Math.abs(totals.total) - Math.abs(related.total)) < 0.0001
                                 ? "total"
