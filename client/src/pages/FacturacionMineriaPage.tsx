@@ -14,6 +14,11 @@ import {
   wakeUpBackend,
   type InvoiceCreateBody,
 } from "../lib/api";
+import {
+  asicLineItemDisplayLabel,
+  asicLineItemHasCatalogSelection,
+  enrichAsicLineItemsFromCatalogs,
+} from "../lib/asicLineItemCatalogMatch";
 import { serviceCatalog } from "../lib/constants";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadInvoicesAsic, saveInvoicesAsic } from "../lib/storage";
@@ -339,6 +344,34 @@ export function FacturacionMineriaPage() {
     [clients, selectedClientId]
   );
 
+  const asicCatalogs = useMemo(
+    () => ({ equiposAsic, setups, reparacionTipos, transporteFleteTipos }),
+    [equiposAsic, setups, reparacionTipos, transporteFleteTipos]
+  );
+
+  /** Recibo/NC bloqueado: si el ítem solo trae texto de factura (BD), enlazar al catálogo cuando cargue. */
+  useEffect(() => {
+    if (!itemsLocked || items.length === 0) return;
+    const needsId = items.some(
+      (it) =>
+        !it.equipoId &&
+        !it.setupId &&
+        !it.reparacionTipoId &&
+        !it.transporteFleteTipoId &&
+        Boolean(asicLineItemDisplayLabel(it))
+    );
+    if (!needsId) return;
+    const enriched = enrichAsicLineItemsFromCatalogs(items, asicCatalogs);
+    const changed = enriched.some(
+      (it, i) =>
+        it.reparacionTipoId !== items[i]?.reparacionTipoId ||
+        it.setupId !== items[i]?.setupId ||
+        it.equipoId !== items[i]?.equipoId ||
+        it.transporteFleteTipoId !== items[i]?.transporteFleteTipoId
+    );
+    if (changed) setItems(enriched);
+  }, [itemsLocked, items, asicCatalogs]);
+
   // Obtener facturas disponibles para Nota de Crédito: sin NC y sin Recibo (no pagadas)
   const invoicesWithoutCreditNote = useMemo(() => {
     if (!selectedClient || type !== "Nota de Crédito") return [];
@@ -427,8 +460,8 @@ export function FacturacionMineriaPage() {
           
           return loadedItem;
         });
-        
-        setItems(loadedItems);
+
+        setItems(enrichAsicLineItemsFromCatalogs(loadedItems, asicCatalogs));
         // Para recibos y notas de crédito, bloquear la edición de items para que coincidan exactamente con la factura
         if (type === "Recibo" || type === "Nota de Crédito") {
           setItemsLocked(true);
@@ -474,7 +507,7 @@ export function FacturacionMineriaPage() {
                   discount: item.discount || 0,
                 };
               });
-              setItems(loadedItems);
+              setItems(enrichAsicLineItemsFromCatalogs(loadedItems, asicCatalogs));
               setItemsLocked(true);
               showToast(
                 `Factura ${relatedInvoice.number} cargada con sus ítems. Podés emitir el ${type === "Recibo" ? "recibo" : "NC"}.`,
@@ -511,7 +544,7 @@ export function FacturacionMineriaPage() {
     } else {
       setItemsLocked(false);
     }
-  }, [relatedInvoiceId, type, selectedClient, invoicesAll]);
+  }, [relatedInvoiceId, type, selectedClient, invoicesAll, asicCatalogs]);
 
   function addItem() {
     // Si hay equipos ASIC disponibles, usar el primero; sino si hay Setup, usar el primero; sino crear item vacío
@@ -634,13 +667,7 @@ export function FacturacionMineriaPage() {
       showToast("Hay que llenar los campos para emitir el documento. El total no puede ser cero.", "error");
       return;
     }
-    if (items.some((it) => {
-      const tieneEquipo = it.equipoId && it.marcaEquipo && it.modeloEquipo && it.procesadorEquipo;
-      const tieneSetup = it.setupId && it.setupNombre;
-      const tieneReparacion = it.reparacionTipoId && it.reparacionNombre;
-      const tieneTransporteFlete = it.transporteFleteTipoId && it.transporteFleteNombre;
-      return !tieneEquipo && !tieneSetup && !tieneReparacion && !tieneTransporteFlete;
-    })) {
+    if (items.some((it) => !asicLineItemHasCatalogSelection(it))) {
       showToast(
         "Todos los ítems deben tener un equipo ASIC, Setup, tipo de Reparación o ítem de Transporte/Flete seleccionado.",
         "error"
@@ -1186,9 +1213,35 @@ export function FacturacionMineriaPage() {
                         ) : (
                         items.map((it, idx) => {
                           const lineTotal = (it.price - it.discount) * it.quantity;
+                          const itemDisplayLabel = asicLineItemDisplayLabel(it);
+                          const selectValue = it.equipoId
+                            ? `equipo_${it.equipoId}`
+                            : it.setupId
+                              ? `setup_${it.setupId}`
+                              : it.reparacionTipoId
+                                ? `reparacion_${it.reparacionTipoId}`
+                                : it.transporteFleteTipoId
+                                  ? `flete_${it.transporteFleteTipoId}`
+                                  : "";
+                          const showLockedServiceLabel = itemsLocked && !selectValue && Boolean(itemDisplayLabel);
                           return (
                             <tr key={idx}>
                               <td>
+                                {showLockedServiceLabel ? (
+                                  <input
+                                    readOnly
+                                    className="fact-input"
+                                    value={itemDisplayLabel}
+                                    style={{
+                                      padding: "0.4rem 0.5rem",
+                                      fontSize: "0.8125rem",
+                                      width: "100%",
+                                      backgroundColor: "#f3f4f6",
+                                      cursor: "not-allowed",
+                                    }}
+                                    title="Detalle cargado desde la factura"
+                                  />
+                                ) : (
                                 <select
                                   className="fact-select"
                                   style={{ 
@@ -1200,17 +1253,7 @@ export function FacturacionMineriaPage() {
                                     cursor: itemsLocked ? "not-allowed" : "pointer",
                                     opacity: itemsLocked ? 0.7 : 1
                                   }}
-                                  value={
-                                    it.equipoId
-                                      ? `equipo_${it.equipoId}`
-                                      : it.setupId
-                                        ? `setup_${it.setupId}`
-                                        : it.reparacionTipoId
-                                          ? `reparacion_${it.reparacionTipoId}`
-                                          : it.transporteFleteTipoId
-                                            ? `flete_${it.transporteFleteTipoId}`
-                                            : ""
-                                  }
+                                  value={selectValue}
                                   onChange={(e) => {
                                     if (itemsLocked) return;
                                     const value = e.target.value;
@@ -1305,7 +1348,7 @@ export function FacturacionMineriaPage() {
                                   }}
                                   disabled={itemsLocked}
                                 >
-                                  <option value="">Seleccionar...</option>
+                                  <option value="">{itemDisplayLabel && !selectValue ? itemDisplayLabel : "Seleccionar..."}</option>
                                   {equiposAsic.length > 0 && (
                                     <optgroup label="Equipos ASIC">
                                       {equiposAsic.map((eq) => (
@@ -1355,6 +1398,7 @@ export function FacturacionMineriaPage() {
                                     )}
                                   </optgroup>
                                 </select>
+                                )}
                               </td>
                               <td className="fact-cell-center">
                                 <input
