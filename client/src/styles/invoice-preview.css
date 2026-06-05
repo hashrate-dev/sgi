@@ -258,49 +258,55 @@
   border-bottom: none;
 }
 
-.invoice-preview-table td {
+.invoice-preview-table tbody td {
   font-size: 10pt; /* TABLE_BODY_FONT_SIZE en PDF — tamaño fijo, sin achicar */
   font-weight: normal;
   color: #000000;
   padding: 0;
   min-height: 9mm;
+  height: auto;
   vertical-align: middle;
   border: none;
   border-right: 0.5px solid rgb(226, 232, 240); /* línea entre columnas */
   line-height: 1.35;
-  white-space: nowrap;
 }
-.invoice-preview-table td:last-child {
+.invoice-preview-table tbody td:last-child {
   border-right: none;
 }
 
-.invoice-preview-td-desc {
+/* DESCRIPCION: 10pt fijo, salto de línea en la misma fila (mismo criterio que el PDF) */
+.invoice-preview-table tbody td.invoice-preview-td-desc {
   width: 98mm; /* COL_DESC */
   max-width: 98mm;
   text-align: left;
   padding: 1.75mm 2mm 1.75mm 3mm; /* tableLeft + 3 */
   white-space: normal;
   overflow: visible;
+  text-overflow: clip;
   word-break: break-word;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   vertical-align: middle;
+  box-sizing: border-box;
 }
 
-.invoice-preview-td-precio {
+.invoice-preview-table tbody td.invoice-preview-td-precio {
   width: 27mm; /* COL_PRECIO */
   text-align: center;
   vertical-align: middle;
+  white-space: nowrap;
 }
 
-.invoice-preview-td-cant {
+.invoice-preview-table tbody td.invoice-preview-td-cant {
   width: 32mm; /* COL_CANT */
   text-align: center;
   vertical-align: middle;
+  white-space: nowrap;
 }
 
-.invoice-preview-td-total {
+.invoice-preview-table tbody td.invoice-preview-td-total {
   width: 30mm; /* COL_TOTAL */
   text-align: center;
+  white-space: nowrap;
 }
 
 /* Bloque de fechas - Exacto del PDF */
