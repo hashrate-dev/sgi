@@ -105,8 +105,11 @@ const LOGO_WIDTH_MM = 50; // Ancho ajustado para mejor proporción
 const LOGO_HEIGHT_MM = 14; // Altura ajustada para mantener proporción (relación ~3.57:1)
 
 const DESC_TEXT_W = COL_DESC - 6;
-/** Cuerpo de tabla: 10pt para que descripciones largas entren en una sola línea */
+/** Cuerpo de tabla: 10pt fijo (mismo tamaño que factura); descripción larga hace salto de línea en la misma fila. */
 const TABLE_BODY_FONT_SIZE = 10;
+/** Altura por línea de descripción a 10pt (mm). */
+const DESC_LINE_H = 4.2;
+const DESC_ROW_PAD = 3.5;
 
 type FacturaPdfTableRow = {
   desc: string;
@@ -115,24 +118,28 @@ type FacturaPdfTableRow = {
   total: string;
 };
 
-/** Una sola línea en PDF; reduce fuente si hace falta; trunca con … solo en casos extremos. */
-function pdfDescriptionOneLine(
-  doc: jsPDF,
-  desc: string,
-  maxW: number
-): { text: string; fontSize: number } {
+type FacturaPdfTableRowLayout = FacturaPdfTableRow & {
+  descLines: string[];
+  rowH: number;
+};
+
+/** Descripción a 10pt sin achicar: parte en 2ª línea dentro de la misma fila de tabla. */
+function pdfDescriptionWrapped(doc: jsPDF, desc: string, maxW: number): { lines: string[]; rowH: number } {
   const text = normalizeInvoiceDescriptionForCell((desc || "—").trim());
   doc.setFont("helvetica", "normal");
-  for (const size of [TABLE_BODY_FONT_SIZE, 9, 8.5, 8, 7.5] as const) {
-    doc.setFontSize(size);
-    if (doc.getTextWidth(text) <= maxW) return { text, fontSize: size };
-  }
-  doc.setFontSize(8.5);
-  let s = text;
-  while (s.length > 1 && doc.getTextWidth(`${s}…`) > maxW) {
-    s = s.slice(0, -1);
-  }
-  return { text: `${s}…`, fontSize: 8.5 };
+  doc.setFontSize(TABLE_BODY_FONT_SIZE);
+  const lines = doc.splitTextToSize(text, maxW) as string[];
+  const lineCount = Math.max(1, lines.length);
+  const contentH = lineCount * DESC_LINE_H;
+  const rowH = Math.max(ROW_H, contentH + DESC_ROW_PAD);
+  return { lines, rowH };
+}
+
+function layoutFacturaPdfTableRows(doc: jsPDF, rows: FacturaPdfTableRow[]): FacturaPdfTableRowLayout[] {
+  return rows.map((row) => {
+    const { lines, rowH } = pdfDescriptionWrapped(doc, row.desc, DESC_TEXT_W);
+    return { ...row, descLines: lines, rowH };
+  });
 }
 
 function buildFacturaPdfTableRows(doc: jsPDF, items: LineItem[]): FacturaPdfTableRow[] {
@@ -446,7 +453,8 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
   const tableRows = buildFacturaPdfTableRows(doc, pdfItems);
-  const tableTotalH = HEADER_ROW_H + tableRows.length * ROW_H;
+  const layoutRows = layoutFacturaPdfTableRows(doc, tableRows);
+  const tableTotalH = HEADER_ROW_H + layoutRows.reduce((sum, r) => sum + r.rowH, 0);
   const R = TABLE_RADIUS;
   const k = 0.5522847498; // Bezier para arco 90°
 
@@ -498,23 +506,24 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(TABLE_BODY_FONT_SIZE);
-  for (let i = 0; i < tableRows.length; i++) {
-    const row = tableRows[i];
-    const item = pdfItems[i];
-    const descRaw = item ? normalizeInvoiceDescriptionForCell(getLineItemDescription(item)) : row.desc;
-    const { text: descLine, fontSize: descFontSize } = pdfDescriptionOneLine(doc, descRaw, DESC_TEXT_W);
-    const midY = y + ROW_H / 2 + 1.5;
+  for (let i = 0; i < layoutRows.length; i++) {
+    const row = layoutRows[i];
+    const rowH = row.rowH;
+    const midY = y + rowH / 2 + 1.5;
+    const descBlockH = row.descLines.length * DESC_LINE_H;
+    const descFirstBaseline = y + (rowH - descBlockH) / 2 + DESC_LINE_H * 0.85;
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(descFontSize);
-    doc.text([descLine], tableLeft + 3, midY);
     doc.setFontSize(TABLE_BODY_FONT_SIZE);
+    for (let li = 0; li < row.descLines.length; li++) {
+      doc.text(row.descLines[li], tableLeft + 3, descFirstBaseline + li * DESC_LINE_H);
+    }
     doc.text(row.precio, centerPrecio, midY, { align: "center" });
     doc.text(row.cant, centerCant, midY, { align: "center" });
     doc.text(row.total, centerTotal, midY, { align: "center" });
-    if (y + ROW_H < tableTop + tableTotalH) {
-      doc.line(tableLeft, y + ROW_H, tableLeft + TABLE_W, y + ROW_H);
+    if (i < layoutRows.length - 1) {
+      doc.line(tableLeft, y + rowH, tableLeft + TABLE_W, y + rowH);
     }
-    y += ROW_H;
+    y += rowH;
   }
 
   y += 6;

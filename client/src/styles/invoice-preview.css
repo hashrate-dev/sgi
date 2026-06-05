@@ -249,8 +249,8 @@
 }
 
 .invoice-preview-table tbody tr {
-  height: 9mm;
-  max-height: 9mm;
+  min-height: 9mm;
+  height: auto;
   border-bottom: 0.5px solid rgb(226, 232, 240); /* TABLE_BORDER */
 }
 
@@ -259,19 +259,16 @@
 }
 
 .invoice-preview-table td {
-  font-size: 10pt; /* TABLE_BODY_FONT_SIZE en PDF */
+  font-size: 10pt; /* TABLE_BODY_FONT_SIZE en PDF — tamaño fijo, sin achicar */
   font-weight: normal;
   color: #000000;
   padding: 0;
-  height: 9mm;
-  max-height: 9mm;
+  min-height: 9mm;
   vertical-align: middle;
   border: none;
   border-right: 0.5px solid rgb(226, 232, 240); /* línea entre columnas */
-  line-height: 1;
+  line-height: 1.35;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .invoice-preview-table td:last-child {
   border-right: none;
@@ -281,10 +278,11 @@
   width: 98mm; /* COL_DESC */
   max-width: 98mm;
   text-align: left;
-  padding: 0 2mm 0 3mm; /* tableLeft + 3 */
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  padding: 1.75mm 2mm 1.75mm 3mm; /* tableLeft + 3 */
+  white-space: normal;
+  overflow: visible;
+  word-break: break-word;
+  overflow-wrap: anywhere;
   vertical-align: middle;
 }
 
