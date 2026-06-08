@@ -6,7 +6,6 @@ import {
   getClients,
   getEquipos,
   getInvoiceById,
-  getInvoices,
   getNextInvoiceNumber,
   getReparacionTipos,
   getTransporteFleteTipos,
@@ -21,6 +20,7 @@ import {
 } from "../lib/asicLineItemCatalogMatch";
 import { serviceCatalog } from "../lib/constants";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
+import { fetchAsicInvoiceLedger } from "../lib/asicInvoiceLedger";
 import { loadInvoicesAsic, saveInvoicesAsic } from "../lib/storage";
 import type {
   Client,
@@ -170,25 +170,7 @@ export function FacturacionMineriaPage() {
 
   const fetchDbInvoices = useCallback(async () => {
     try {
-      await wakeUpBackend();
-      const r = await getInvoices({ source: "asic" });
-      const list: Invoice[] = (r.invoices ?? []).map((inv) => ({
-        id: String(inv.id),
-        number: inv.number,
-        type: inv.type as ComprobanteType,
-        clientName: inv.clientName,
-        date: inv.date,
-        month: inv.month,
-        subtotal: inv.subtotal,
-        discounts: inv.discounts,
-        total: inv.total,
-        relatedInvoiceId: inv.relatedInvoiceId != null ? String(inv.relatedInvoiceId) : undefined,
-        relatedInvoiceNumber: inv.relatedInvoiceNumber,
-        paymentDate: inv.paymentDate,
-        emissionTime: inv.emissionTime,
-        dueDate: inv.dueDate,
-        items: [],
-      }));
+      const list = await fetchAsicInvoiceLedger();
       setDbInvoices(list);
     } catch {
       setDbInvoices([]);
@@ -719,6 +701,7 @@ export function FacturacionMineriaPage() {
         price: Number(it.price) || 0,
         discount: Number(it.discount) || 0
       })),
+      relatedInvoiceId: relatedInvoice?.id,
       relatedInvoiceNumber: relatedInvoice?.number,
       paymentDate: type === "Recibo" ? paymentDate : undefined,
       emissionTime,

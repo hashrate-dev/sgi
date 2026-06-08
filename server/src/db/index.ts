@@ -108,6 +108,14 @@ async function runSupabaseSchema(pool: Pool) {
 
 export async function initDb() {
   _db = await loadDb();
+  try {
+    const { migrateAsicInvoiceSource } = await import("../lib/migrateAsicInvoiceSource.js");
+    await migrateAsicInvoiceSource();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // eslint-disable-next-line no-console
+    console.warn("[DB] migrateAsicInvoiceSource:", msg);
+  }
   return _db;
 }
 

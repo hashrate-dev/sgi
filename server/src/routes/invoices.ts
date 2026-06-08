@@ -138,8 +138,29 @@ invoicesRouter.get(
     params.push(q.data.month);
   }
   if (q.data.source) {
-    clauses.push(`(${sourceCol()} = ?)`);
-    params.push(q.data.source);
+    if (q.data.source === "asic") {
+      const idCast = isPg() ? "id::text" : "CAST(id AS TEXT)";
+      const relIdCast = isPg() ? "related_invoice_id::text" : "CAST(related_invoice_id AS TEXT)";
+      clauses.push(`(
+        ${sourceCol()} = ?
+        OR number IN (
+          SELECT related_invoice_number FROM invoices
+          WHERE ${sourceCol()} = ?
+            AND related_invoice_number IS NOT NULL
+            AND TRIM(related_invoice_number) != ''
+        )
+        OR ${idCast} IN (
+          SELECT ${relIdCast} FROM invoices
+          WHERE ${sourceCol()} = ?
+            AND related_invoice_id IS NOT NULL
+            AND TRIM(${relIdCast}) != ''
+        )
+      )`);
+      params.push("asic", "asic", "asic");
+    } else {
+      clauses.push(`(${sourceCol()} = ?)`);
+      params.push(q.data.source);
+    }
   }
 
   const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
