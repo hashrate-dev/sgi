@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
+import { fetchAsicInvoiceLedger, mergeInvoiceLists } from "../lib/asicInvoiceLedger";
 import { addEmittedDocument, deleteAllInvoices, deleteEmittedDocumentOne, deleteEmittedDocumentsAll, deleteInvoice, getClients, getInvoiceById, getInvoices, verifyPassword, wakeUpBackend } from "../lib/api";
 import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
 import { dispatchEmittedChanged } from "../lib/emittedEvents";
@@ -255,18 +256,28 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
     const doFetch = () => {
       wakeUpBackend().then(() => {
         if (cancelled) return;
-        const fetchSource = (src: "hosting" | "asic") =>
-          getInvoices({ source: src })
+        const fetchHosting = () =>
+          getInvoices({ source: "hosting" })
             .then((r) => {
               if (cancelled) return;
-              const list = (r.invoices ?? []).map((inv) => toInvoice(inv, src));
-              if (src === "hosting") setAllHosting(list);
-              else setAllAsic(list);
+              const apiList = (r.invoices ?? []).map((inv) => {
+                const { _source: _s, ...invoice } = toInvoice(inv, "hosting");
+                void _s;
+                return invoice;
+              });
+              setAllHosting(mergeInvoiceLists(loadInvoices(), apiList));
             })
             .catch(() => {});
-        if (sourceFilter === "hosting") void fetchSource("hosting");
-        else if (sourceFilter === "asic") void fetchSource("asic");
-        else void Promise.all([fetchSource("hosting"), fetchSource("asic")]);
+        const fetchAsic = () =>
+          fetchAsicInvoiceLedger()
+            .then((list) => {
+              if (cancelled) return;
+              setAllAsic(list);
+            })
+            .catch(() => {});
+        if (sourceFilter === "hosting") void fetchHosting();
+        else if (sourceFilter === "asic") void fetchAsic();
+        else void Promise.all([fetchHosting(), fetchAsic()]);
       });
     };
     doFetch();

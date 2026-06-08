@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
-import { deleteAllInvoices, deleteEmittedDocumentOne, deleteEmittedDocumentsAll, deleteInvoice, getClients, getInvoices, verifyPassword, wakeUpBackend } from "../lib/api";
+import { fetchAsicInvoiceLedger } from "../lib/asicInvoiceLedger";
+import { deleteAllInvoices, deleteEmittedDocumentOne, deleteEmittedDocumentsAll, deleteInvoice, getClients, verifyPassword } from "../lib/api";
 import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
 import { dispatchEmittedChanged } from "../lib/emittedEvents";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
@@ -211,32 +212,12 @@ export function HistorialMineriaPage() {
   useEffect(() => {
     let cancelled = false;
     const doFetch = () => {
-      wakeUpBackend().then(() => {
-        if (cancelled) return;
-        getInvoices({ source: "asic" })
-          .then((r) => {
-            if (cancelled) return;
-            const list = (r.invoices ?? []).map((inv) => ({
-              id: String(inv.id),
-              number: inv.number,
-              type: inv.type as ComprobanteType,
-              clientName: inv.clientName,
-              date: inv.date,
-              month: inv.month,
-              subtotal: inv.subtotal,
-              discounts: inv.discounts,
-              total: inv.total,
-              relatedInvoiceId: inv.relatedInvoiceId != null ? String(inv.relatedInvoiceId) : undefined,
-              relatedInvoiceNumber: inv.relatedInvoiceNumber,
-              paymentDate: inv.paymentDate,
-              emissionTime: inv.emissionTime,
-              dueDate: inv.dueDate,
-              items: []
-            }));
-            setAll(list);
-          })
-          .catch(() => {});
-      });
+      fetchAsicInvoiceLedger()
+        .then((list) => {
+          if (cancelled) return;
+          setAll(list);
+        })
+        .catch(() => {});
     };
     doFetch();
     const onVisible = () => { if (document.visibilityState === "visible") doFetch(); };
