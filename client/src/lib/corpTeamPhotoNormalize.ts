@@ -93,7 +93,7 @@ export async function normalizeCorpTeamPhotoFile(file: File): Promise<File> {
   const canvas = renderTeamPhotoCanvas(img);
   const hosted = marketplaceUploadUsesInlineImages();
   const maxBytes = hosted ? HOSTED_INLINE_IMAGE_MAX_BYTES : 650_000;
-  let out = await canvasToPngFile(canvas, file.name);
+  const out = await canvasToPngFile(canvas, file.name);
   if (out.size > maxBytes) {
     throw new Error("La foto normalizada supera el tamaño máximo permitido. Probá con una imagen más pequeña.");
   }
