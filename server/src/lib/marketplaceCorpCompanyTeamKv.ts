@@ -22,6 +22,30 @@ const MAX_BIO_PARAS = 8;
 const MAX_BIO_PARA_LEN = 2000;
 const MAX_MEMBER_ID_LEN = 80;
 
+/** Fotos estáticas del team (PNG con círculo + alpha). Misma ruta que el front. */
+export const BUILTIN_CORP_TEAM_IMAGE: Readonly<Record<string, string>> = {
+  fab: "/images/wp-uploads/FB-Team-1-1024x991.png?v=2",
+  jv: "/images/wp-uploads/JV-Team-1024x991.png",
+  af: "/images/wp-uploads/AF-Team-1024x991.png",
+  rg: "/images/wp-uploads/RG-1024x991.png",
+  dv: "/images/wp-uploads/DV-Team.png",
+  ab: "/images/wp-uploads/AB-Team-1024x991.png",
+  dg: "/images/wp-uploads/DG-Team-HRS-1024x991.png",
+};
+
+/**
+ * JPEG/data-URI opaco en miembros legacy: el CSS recorta mal y el círculo se ve más chico.
+ * Preferir PNG estático con transparencia fuera del círculo.
+ */
+export function resolveCorpTeamMemberImageForPublic(id: string, imageUrl: string): string {
+  const url = imageUrl.trim();
+  const builtin = BUILTIN_CORP_TEAM_IMAGE[id];
+  if (builtin && /^data:image\/jpe?g/i.test(url)) {
+    return builtin;
+  }
+  return url;
+}
+
 function isPg(): boolean {
   return (getDb() as { isPostgres?: boolean }).isPostgres === true;
 }
@@ -127,7 +151,12 @@ export async function readCorpCompanyTeamPublic(): Promise<CorpCompanyTeamMember
     | { value: string }
     | undefined;
   const list = parseCorpCompanyTeamJson(row?.value);
-  return list.filter((m) => m.enabled);
+  return list
+    .filter((m) => m.enabled)
+    .map((m) => ({
+      ...m,
+      imageUrl: resolveCorpTeamMemberImageForPublic(m.id, m.imageUrl),
+    }));
 }
 
 export async function readCorpCompanyTeamAdmin(): Promise<CorpCompanyTeamMemberRecord[]> {
@@ -138,7 +167,10 @@ export async function readCorpCompanyTeamAdmin(): Promise<CorpCompanyTeamMemberR
 }
 
 export async function writeCorpCompanyTeamAdmin(members: CorpCompanyTeamMemberRecord[]): Promise<CorpCompanyTeamMemberRecord[]> {
-  const sanitized = sanitizeCorpCompanyTeamInput(members);
+  const sanitized = sanitizeCorpCompanyTeamInput(members).map((m) => ({
+    ...m,
+    imageUrl: resolveCorpTeamMemberImageForPublic(m.id, m.imageUrl),
+  }));
   await writeKvTeam(sanitized);
   return sanitized;
 }

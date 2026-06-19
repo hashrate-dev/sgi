@@ -66,6 +66,16 @@ function localizeCompanyTeamMember(m: TeamMemberDto, t: (key: string) => string)
   };
 }
 
+/** JPEG inline en KV recorta distinto que PNG con alpha → círculo más chico. */
+function resolveCompanyTeamPhotoUrl(memberId: string, imageUrl: string): string {
+  const raw = (imageUrl ?? "").trim();
+  const fallback = DEFAULT_TEAM.find((m) => m.id === memberId)?.imageUrl;
+  if (fallback && /^data:image\/jpe?g/i.test(raw)) {
+    return fallback;
+  }
+  return normalizeMarketplaceImageSrc(raw);
+}
+
 function LinkedInIcon() {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
@@ -159,7 +169,7 @@ export function MarketplaceCompanyPage() {
           setRawTeamMembers(
             incoming.map((m) => ({
               id: m.id,
-              imageUrl: normalizeMarketplaceImageSrc(m.imageUrl),
+              imageUrl: resolveCompanyTeamPhotoUrl(m.id, m.imageUrl),
               linkedin: m.linkedin,
               role: m.role,
               name: m.name,
