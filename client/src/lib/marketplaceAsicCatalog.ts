@@ -701,7 +701,7 @@ export function formatAsicPriceUsd(n: number, langOrLocale?: string): string {
  * y unifica textos legacy al mensaje actual de vitrina.
  */
 export function normalizeConsultPriceLabelForDisplay(label: string): string {
-  let s = label
+  const s = label
     .replace(/\s*[—–-]\s*te asesoramos sin compromiso\.?\s*$/i, "")
     .trim();
   if (/^solicit[áa]\s+tu\s+cotizaci[oó]n\.?$/iu.test(s)) {

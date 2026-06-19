@@ -365,7 +365,7 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
           throw makeApiError(errMsg, res.status, payload?.error?.code);
         }
         return data as T;
-      } catch (e) {
+      } catch {
         /* siguiente fallback */
       }
     }

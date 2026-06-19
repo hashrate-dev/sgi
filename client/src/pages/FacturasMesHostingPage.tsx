@@ -15,14 +15,16 @@ function getMailSent(invoiceId: string): MailSentStatus {
   try {
     const v = localStorage.getItem(STORAGE_PREFIX + invoiceId);
     if (v === "SI" || v === "NO" || v === "Cancelado") return v;
-  } catch {}
+  } catch {
+    /* localStorage no disponible */
+  }
   return "NO";
 }
 
 function setMailSent(invoiceId: string, value: MailSentStatus) {
   try {
     localStorage.setItem(STORAGE_PREFIX + invoiceId, value);
-  } catch (e) {
+  } catch {
     showToast("No se pudo guardar.", "error");
   }
 }
@@ -317,7 +319,9 @@ export function FacturasMesHostingPage() {
       await deleteInvoice(id);
       try {
         localStorage.removeItem(STORAGE_PREFIX + confirmCancelado.id);
-      } catch {}
+      } catch {
+        /* localStorage no disponible */
+      }
       setConfirmCancelado(null);
       fetchDocuments();
       showToast("Documento eliminado de la base de datos.", "success");

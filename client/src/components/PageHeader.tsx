@@ -14,6 +14,6 @@ export interface PageHeaderProps {
   logoLinkAriaLabel?: string;
 }
 
-export function PageHeader(_props: PageHeaderProps) {
+export function PageHeader(_: PageHeaderProps) {
   return null;
 }

@@ -249,7 +249,7 @@ export function PrecioHistorialFullModal({
 
   async function handleDownloadReport() {
     if (!desc.length) return;
-    const baseName = `historial_precios_${(codigoProducto?.trim() || `${marca}_${modelo}`).replace(/[^\w\-]+/g, "_")}`;
+    const baseName = `historial_precios_${(codigoProducto?.trim() || `${marca}_${modelo}`).replace(/[^\w-]+/g, "_")}`;
 
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("Historico precios");

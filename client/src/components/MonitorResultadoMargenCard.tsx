@@ -51,7 +51,7 @@ function dualAxisZeroAligned(
     return -min / (max - min);
   };
 
-  let fUsd = zeroFrac(yMin, yMax);
+  const fUsd = zeroFrac(yMin, yMax);
   const fPct = zeroFrac(y1Min, y1Max);
   const target = Math.max(fUsd, fPct, 0.08);
 
