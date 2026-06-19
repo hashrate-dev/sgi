@@ -4,6 +4,8 @@ import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
 import { wpUpload } from "../lib/marketplaceWpAssets.js";
 import {
   getEquiposMarketplaceCorpCompanyTeam,
+  notifyCorpCompanyTeamUpdated,
+  patchEquiposMarketplaceCorpCompanyTeamPhoto,
   putEquiposMarketplaceCorpCompanyTeam,
   uploadMarketplaceAsicImage,
   type CorpCompanyTeamMemberDto,
@@ -151,6 +153,7 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
         savedSnapshotRef.current = JSON.stringify(saved);
         loadedOriginalPhotosRef.current = snapshotOriginalPhotos(saved);
         setPhotoUndoByMemberId({});
+        notifyCorpCompanyTeamUpdated();
         if (toastMsg) showToast(toastMsg, "success", "Equipo de la empresa");
       } catch (e) {
         showToast(e instanceof Error ? e.message : "Error al guardar", "error", "Equipo de la empresa");
@@ -183,9 +186,13 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
       if (previousUrl && previousUrl !== url) {
         setPhotoUndoByMemberId((prev) => ({ ...prev, [memberId]: previousUrl }));
       }
-      const next = members.map((m) => (m.id === memberId ? { ...m, imageUrl: url } : m));
-      setMembers(next);
-      // No persistimos auto para no forzar múltiples PUT; el usuario guarda al final.
+      const patched = await patchEquiposMarketplaceCorpCompanyTeamPhoto(memberId, url);
+      const saved = patched.members ?? members.map((m) => (m.id === memberId ? { ...m, imageUrl: url } : m));
+      setMembers(saved);
+      savedSnapshotRef.current = JSON.stringify(saved);
+      loadedOriginalPhotosRef.current = snapshotOriginalPhotos(saved);
+      notifyCorpCompanyTeamUpdated();
+      showToast("Foto guardada — ya visible en /company", "success", "Equipo de la empresa");
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Error al subir imagen", "error", "Equipo de la empresa");
     } finally {

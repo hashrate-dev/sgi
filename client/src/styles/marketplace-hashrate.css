@@ -11008,7 +11008,7 @@ a.market-corp-clients__item {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: clamp(1.35rem, 3.1vw, 2.1rem);
-  align-items: start;
+  align-items: stretch;
 }
 
 @media (min-width: 640px) {
@@ -11019,14 +11019,18 @@ a.market-corp-clients__item {
 
 .market-corp-team-card {
   margin: 0;
-  height: auto;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .market-corp-team-card__btn {
   display: flex;
   flex-direction: column;
   width: 100%;
-  height: auto;
+  height: 100%;
+  flex: 1 1 auto;
+  min-height: 100%;
   padding: 0;
   border: none;
   background: transparent;
@@ -11093,9 +11097,8 @@ a.market-corp-clients__item {
   flex-direction: column;
   gap: 0.25rem;
   padding: 1rem 0.9rem 1.2rem;
-  min-height: min-content;
+  flex: 1 1 auto;
   justify-content: flex-start;
-  flex: 0 0 auto;
   background: #fff;
   border: 1px solid #e5e7eb;
   border-top: none;
@@ -11109,6 +11112,8 @@ a.market-corp-clients__item {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #059669;
+  /* Reserva 2 líneas para que el rol largo/corto no cambie la altura de la card */
+  min-height: calc(0.72rem * 1.35 * 2);
 }
 
 .market-corp-team-card__name {

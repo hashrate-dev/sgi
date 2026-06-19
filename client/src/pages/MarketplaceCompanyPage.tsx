@@ -5,7 +5,7 @@ import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
 import "../styles/marketplace-hashrate.css";
 
 import { wpUpload } from "../lib/marketplaceWpAssets.js";
-import { getMarketplaceCorpCompanyTeam } from "../lib/api.js";
+import { CORP_COMPANY_TEAM_UPDATED_EVENT, getMarketplaceCorpCompanyTeam } from "../lib/api.js";
 
 type DefaultTeamMemberId = "fab" | "jv" | "af" | "dg" | "rg" | "ab" | "dv";
 
@@ -175,10 +175,21 @@ export function MarketplaceCompanyPage() {
     const onVisible = () => {
       if (document.visibilityState === "visible") loadTeamFromApi();
     };
+    const onFocus = () => loadTeamFromApi();
+    const onTeamUpdated = () => loadTeamFromApi();
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === CORP_COMPANY_TEAM_UPDATED_EVENT) loadTeamFromApi();
+    };
     document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onFocus);
+    window.addEventListener(CORP_COMPANY_TEAM_UPDATED_EVENT, onTeamUpdated);
+    window.addEventListener("storage", onStorage);
     return () => {
       cancelled = true;
       document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener(CORP_COMPANY_TEAM_UPDATED_EVENT, onTeamUpdated);
+      window.removeEventListener("storage", onStorage);
     };
   }, []);
 
@@ -249,7 +260,15 @@ export function MarketplaceCompanyPage() {
                           aria-controls={openMemberId === m.id ? dialogTitleId : undefined}
                         >
                           <span className="market-corp-team-card__media">
-                            <img src={m.imageUrl} alt="" width={500} height={500} loading="lazy" decoding="async" />
+                            <img
+                              key={m.imageUrl}
+                              src={m.imageUrl}
+                              alt=""
+                              width={500}
+                              height={500}
+                              loading="lazy"
+                              decoding="async"
+                            />
                           </span>
                           <span className="market-corp-team-card__meta">
                             <span className="market-corp-team-card__role">{m.role}</span>

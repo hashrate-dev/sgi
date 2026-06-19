@@ -2220,7 +2220,7 @@ export type CorpCompanyTeamMemberDto = {
 
 /** Equipo de la empresa en sección de compañía (público). */
 export function getMarketplaceCorpCompanyTeam(): Promise<{ members: CorpCompanyTeamMemberDto[] }> {
-  return api<{ members: CorpCompanyTeamMemberDto[] }>("/api/marketplace/corp-company-team", {
+  return api<{ members: CorpCompanyTeamMemberDto[] }>(`/api/marketplace/corp-company-team?_=${Date.now()}`, {
     cache: "no-store",
   });
 }
@@ -2239,6 +2239,32 @@ export function putEquiposMarketplaceCorpCompanyTeam(body: {
     method: "PUT",
     body: JSON.stringify(body),
   });
+}
+
+/** Actualizar solo la foto de un integrante (admin). */
+export function patchEquiposMarketplaceCorpCompanyTeamPhoto(
+  memberId: string,
+  imageUrl: string
+): Promise<{ ok: boolean; member: CorpCompanyTeamMemberDto; members: CorpCompanyTeamMemberDto[] }> {
+  return api<{ ok: boolean; member: CorpCompanyTeamMemberDto; members: CorpCompanyTeamMemberDto[] }>(
+    `/api/equipos/marketplace-corp-company-team/${encodeURIComponent(memberId)}/photo`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ imageUrl }),
+    }
+  );
+}
+
+export const CORP_COMPANY_TEAM_UPDATED_EVENT = "corp-company-team-updated";
+
+export function notifyCorpCompanyTeamUpdated(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(CORP_COMPANY_TEAM_UPDATED_EVENT));
+  try {
+    localStorage.setItem(CORP_COMPANY_TEAM_UPDATED_EVENT, String(Date.now()));
+  } catch {
+    /* ignore */
+  }
 }
 
 /**

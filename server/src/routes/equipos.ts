@@ -651,6 +651,37 @@ equiposRouter.put(
   }
 );
 
+/** PATCH /equipos/marketplace-corp-company-team/:memberId/photo — actualizar solo la foto de un integrante. */
+equiposRouter.patch(
+  "/equipos/marketplace-corp-company-team/:memberId/photo",
+  requireAuth,
+  ...requireEquiposTiendaAdmin,
+  async (req, res: Response) => {
+    const memberId = String(req.params.memberId ?? "").trim();
+    const imageUrl = String((req.body as { imageUrl?: unknown })?.imageUrl ?? "").trim();
+    if (!memberId || memberId.length > 80) {
+      return res.status(400).json({ error: { message: "Integrante inválido" } });
+    }
+    if (!imageUrl || imageUrl.length > 2_800_000) {
+      return res.status(400).json({ error: { message: "URL de imagen inválida" } });
+    }
+    try {
+      const members = await readCorpCompanyTeamAdmin();
+      const idx = members.findIndex((m) => m.id === memberId);
+      if (idx < 0) {
+        return res.status(404).json({ error: { message: "Integrante no encontrado" } });
+      }
+      members[idx] = { ...members[idx]!, imageUrl };
+      const saved = await writeCorpCompanyTeamAdmin(members);
+      const member = saved.find((m) => m.id === memberId);
+      res.json({ ok: true, member, members: saved });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      res.status(500).json({ error: { message: msg } });
+    }
+  }
+);
+
 /** PUT /equipos/marketplace-corp-interesting — guardar sección home (solo admin A/B). */
 equiposRouter.put(
   "/equipos/marketplace-corp-interesting",
