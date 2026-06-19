@@ -11092,6 +11092,39 @@ a.market-corp-clients__item {
   transform-origin: center center;
 }
 
+/* Admin: vista previa / en vivo igual que tarjeta en /company */
+.corp-team-production-preview {
+  max-width: 320px;
+  width: 100%;
+}
+
+.corp-team-production-preview__btn {
+  pointer-events: none;
+  cursor: default;
+}
+
+.corp-team-production-preview-panel {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.corp-team-production-preview-panel__label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 0.65rem;
+}
+
+.corp-team-production-preview-panel__label--draft {
+  color: #047857;
+}
+
+.corp-team-production-preview-panel__label--live {
+  color: #4b5563;
+}
+
 .market-corp-team-card__meta {
   display: flex;
   flex-direction: column;

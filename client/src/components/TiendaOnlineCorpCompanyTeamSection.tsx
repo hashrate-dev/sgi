@@ -4,6 +4,7 @@ import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
 import { wpUpload } from "../lib/marketplaceWpAssets.js";
 import {
   getEquiposMarketplaceCorpCompanyTeam,
+  getMarketplaceCorpCompanyTeam,
   notifyCorpCompanyTeamUpdated,
   patchEquiposMarketplaceCorpCompanyTeamPhoto,
   putEquiposMarketplaceCorpCompanyTeam,
@@ -13,7 +14,11 @@ import {
 import { normalizeCorpTeamPhotoFile } from "../lib/corpTeamPhotoNormalize.js";
 import { isAcceptableMarketplaceImageFile } from "../lib/marketplaceImageOptimize.js";
 import { showToast } from "./ToastNotification.js";
-import { AppButton, AppCard } from "./ui/index.js";
+import { AppButton, AppCard, AppModal } from "./ui/index.js";
+import {
+  CorpTeamProductionCardPreview,
+  toCorpTeamProductionCardMember,
+} from "./CorpTeamProductionCardPreview.js";
 
 type TeamDefaultKey = "fab" | "jv" | "af" | "rg" | "ab" | "dv" | "dg";
 
@@ -117,6 +122,24 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
   const [pendingAddName, setPendingAddName] = useState("");
   const [pendingAddLinkedin, setPendingAddLinkedin] = useState("");
   const [pendingAddBioText, setPendingAddBioText] = useState("");
+  /** Tarjetas en producción (/company), API pública con URLs resueltas. */
+  const [liveById, setLiveById] = useState<Record<string, CorpCompanyTeamMemberDto>>({});
+  const [cardPreviewMemberId, setCardPreviewMemberId] = useState<string | null>(null);
+
+  const refreshLiveFromProduction = useCallback(() => {
+    void getMarketplaceCorpCompanyTeam()
+      .then((res) => {
+        const map: Record<string, CorpCompanyTeamMemberDto> = {};
+        for (const m of Array.isArray(res.members) ? res.members : []) {
+          if (m.enabled === false) continue;
+          map[m.id] = m;
+        }
+        setLiveById(map);
+      })
+      .catch(() => {
+        /* silencioso: draft sigue usable */
+      });
+  }, []);
 
   const load = useCallback((opts?: { silent?: boolean }) => {
     const silent = opts?.silent === true && hasLoadedOnceRef.current;
@@ -131,13 +154,14 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
         loadedOriginalPhotosRef.current = snapshotOriginalPhotos(next);
         setPhotoUndoByMemberId({});
         hasLoadedOnceRef.current = true;
+        refreshLiveFromProduction();
       })
       .catch(() => setLoadError("No se pudieron cargar los datos del equipo."))
       .finally(() => {
         setLoading(false);
         setHydratedFromApi(true);
       });
-  }, []);
+  }, [refreshLiveFromProduction]);
 
   useEffect(() => {
     load();
@@ -154,6 +178,7 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
         loadedOriginalPhotosRef.current = snapshotOriginalPhotos(saved);
         setPhotoUndoByMemberId({});
         notifyCorpCompanyTeamUpdated();
+        refreshLiveFromProduction();
         if (toastMsg) showToast(toastMsg, "success", "Equipo de la empresa");
       } catch (e) {
         showToast(e instanceof Error ? e.message : "Error al guardar", "error", "Equipo de la empresa");
@@ -162,7 +187,7 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
         setSaving(false);
       }
     },
-    []
+    [refreshLiveFromProduction]
   );
 
   function handleFieldChange(id: string, patch: Partial<CorpCompanyTeamMemberDto>) {
@@ -192,6 +217,7 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
       savedSnapshotRef.current = JSON.stringify(saved);
       loadedOriginalPhotosRef.current = snapshotOriginalPhotos(saved);
       notifyCorpCompanyTeamUpdated();
+      refreshLiveFromProduction();
       showToast("Foto guardada — ya visible en /company", "success", "Equipo de la empresa");
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Error al subir imagen", "error", "Equipo de la empresa");
@@ -289,6 +315,33 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
   const membersJson = JSON.stringify(members);
   const hasUnsavedChanges = hydratedFromApi && membersJson !== savedSnapshotRef.current;
 
+  function openCardPreviewModal(memberId: string) {
+    setCardPreviewMemberId(memberId);
+  }
+
+  function closeCardPreviewModal() {
+    setCardPreviewMemberId(null);
+  }
+
+  function savedMemberById(memberId: string): CorpCompanyTeamMemberDto | undefined {
+    try {
+      const saved = JSON.parse(savedSnapshotRef.current) as CorpCompanyTeamMemberDto[];
+      return Array.isArray(saved) ? saved.find((x) => x.id === memberId) : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  const readBioLabel = t("company.team.read_bio");
+
+  const previewMember = cardPreviewMemberId ? members.find((m) => m.id === cardPreviewMemberId) : undefined;
+  const previewDraftCard = previewMember ? toCorpTeamProductionCardMember(previewMember, t) : null;
+  const previewLiveSource = cardPreviewMemberId
+    ? liveById[cardPreviewMemberId] ?? savedMemberById(cardPreviewMemberId)
+    : undefined;
+  const previewLiveCard = previewLiveSource ? toCorpTeamProductionCardMember(previewLiveSource, t) : null;
+  const previewMemberName = previewMember?.name.trim() || previewDraftCard?.name || "Integrante";
+
   return (
     <AppCard borderColor="green.200" mt={4} aria-labelledby="hrs-corp-team-h" p={{ base: 4, md: 5 }}>
       <input
@@ -357,6 +410,7 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
             {members.map((m) => {
               const originalPhotoUrl = originalPhotoUrlFor(m.id, loadedOriginalPhotosRef.current);
               const canRestoreOriginal = Boolean(originalPhotoUrl && m.imageUrl !== originalPhotoUrl);
+              const isPreviewModalOpen = cardPreviewMemberId === m.id;
               return (
               <AppCard key={m.id} borderColor="gray.200" bg="white" p={3}>
                 <Flex gap={3} align="flex-start">
@@ -465,6 +519,14 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
                       >
                         Quitar
                       </button>
+                      <button
+                        type="button"
+                        className={`btn btn-sm ${isPreviewModalOpen ? "btn-success" : "btn-outline-success"}`}
+                        disabled={loading}
+                        onClick={() => openCardPreviewModal(m.id)}
+                      >
+                        Ver tarjeta
+                      </button>
                     </Flex>
                   </Box>
                 </Flex>
@@ -544,6 +606,46 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
           </Flex>
         </>
       )}
+
+      <AppModal
+        open={cardPreviewMemberId !== null}
+        onOpenChange={(open) => {
+          if (!open) closeCardPreviewModal();
+        }}
+        title={`Tarjeta en /company — ${previewMemberName}`}
+        description="Compará la vista previa (cambios sin guardar) con la tarjeta en vivo en producción."
+        contentMaxW="min(100%, 760px)"
+        variant="emerald_panel"
+      >
+        <Grid templateColumns={{ base: "1fr", md: "repeat(2, minmax(0, 1fr))" }} gap={4} py={2}>
+          <Box>
+            <Text
+              className="corp-team-production-preview-panel__label corp-team-production-preview-panel__label--draft"
+              mb={2}
+            >
+              Vista previa
+            </Text>
+            {previewDraftCard ? (
+              <CorpTeamProductionCardPreview member={previewDraftCard} readBioLabel={readBioLabel} />
+            ) : null}
+          </Box>
+          <Box>
+            <Text
+              className="corp-team-production-preview-panel__label corp-team-production-preview-panel__label--live"
+              mb={2}
+            >
+              En vivo (producción)
+            </Text>
+            {previewLiveCard ? (
+              <CorpTeamProductionCardPreview member={previewLiveCard} readBioLabel={readBioLabel} />
+            ) : (
+              <Text fontSize="sm" color="gray.500">
+                No hay datos en producción para este integrante.
+              </Text>
+            )}
+          </Box>
+        </Grid>
+      </AppModal>
     </AppCard>
   );
 }
