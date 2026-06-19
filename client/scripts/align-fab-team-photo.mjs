@@ -87,10 +87,31 @@ async function buildTeamPhoto(portraitBuf) {
     .png()
     .toBuffer();
 
-  return sharp(placed)
+  const masked = await sharp(placed)
     .composite([{ input: await sharp(circleMaskSvg()).png().toBuffer(), blend: "dest-in" }])
     .png()
     .toBuffer();
+
+  return hardClearOutsideCircle(masked);
+}
+
+/** Elimina alpha residual fuera del círculo (evita halo oscuro sobre #f3f4f6). */
+async function hardClearOutsideCircle(buf) {
+  const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const w = info.width;
+  const h = info.height;
+  const ch = info.channels;
+  const r2 = R * R;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const dx = x - CX;
+      const dy = y - CY;
+      if (dx * dx + dy * dy > r2) {
+        data[(y * w + x) * ch + 3] = 0;
+      }
+    }
+  }
+  return sharp(data, { raw: { width: w, height: h, channels: ch } }).png().toBuffer();
 }
 
 async function measure(name, buf) {

@@ -68,7 +68,29 @@ function renderTeamPhotoCanvas(img: HTMLImageElement): HTMLCanvasElement {
   drawCoverWithFocus(ctx, img, cx - radius, cy - radius, box, box, 0.5, TEAM_FOCUS_Y);
   ctx.restore();
 
+  scrubAlphaOutsideCircle(ctx, w, h);
+
   return canvas;
+}
+
+function scrubAlphaOutsideCircle(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+  const cx = w / 2;
+  const cy = h * TEAM_CIRCLE_CY_RATIO;
+  const radius = (w * TEAM_CIRCLE_DIAM_RATIO) / 2;
+  const r2 = radius * radius;
+  const imgData = ctx.getImageData(0, 0, w, h);
+  const d = imgData.data;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const dx = x - cx;
+      const dy = y - cy;
+      if (dx * dx + dy * dy > r2) {
+        const i = (y * w + x) * 4;
+        d[i + 3] = 0;
+      }
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
 }
 
 async function canvasToPngFile(canvas: HTMLCanvasElement, baseName: string): Promise<File> {
@@ -87,12 +109,23 @@ export async function normalizeCorpTeamPhotoFile(file: File): Promise<File> {
     Math.abs(img.width - CORP_TEAM_PHOTO_WIDTH) <= 12 &&
     Math.abs(img.height - CORP_TEAM_PHOTO_HEIGHT) <= 12 &&
     Math.abs(aspect - targetAspect) < 0.02;
-  if (isAlreadyTeamCanvas) {
-    return file;
-  }
-  const canvas = renderTeamPhotoCanvas(img);
   const hosted = marketplaceUploadUsesInlineImages();
   const maxBytes = hosted ? HOSTED_INLINE_IMAGE_MAX_BYTES : 650_000;
+  if (isAlreadyTeamCanvas) {
+    const canvas = document.createElement("canvas");
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext("2d", { alpha: true });
+    if (!ctx) throw new Error("No se pudo preparar la foto.");
+    ctx.drawImage(img, 0, 0);
+    scrubAlphaOutsideCircle(ctx, canvas.width, canvas.height);
+    const out = await canvasToPngFile(canvas, file.name);
+    if (out.size > maxBytes) {
+      throw new Error("La foto normalizada supera el tamaño máximo permitido. Probá con una imagen más pequeña.");
+    }
+    return out;
+  }
+  const canvas = renderTeamPhotoCanvas(img);
   const out = await canvasToPngFile(canvas, file.name);
   if (out.size > maxBytes) {
     throw new Error("La foto normalizada supera el tamaño máximo permitido. Probá con una imagen más pequeña.");

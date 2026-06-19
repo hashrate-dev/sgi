@@ -5,6 +5,7 @@ import { useMarketplaceLang } from "../contexts/MarketplaceLanguageContext.js";
 import "../styles/marketplace-hashrate.css";
 
 import { wpUpload } from "../lib/marketplaceWpAssets.js";
+import { normalizeMarketplaceImageSrc } from "../lib/marketplaceAsicCatalog.js";
 import { CORP_COMPANY_TEAM_UPDATED_EVENT, getMarketplaceCorpCompanyTeam } from "../lib/api.js";
 
 type DefaultTeamMemberId = "fab" | "jv" | "af" | "dg" | "rg" | "ab" | "dv";
@@ -24,7 +25,7 @@ const DEFAULT_TEAM: readonly {
   imageUrl: string;
   linkedin?: string;
 }[] = [
-  { id: "fab", imageUrl: wpUpload("FB-Team-1-1024x991.png"), linkedin: "https://www.linkedin.com/in/fabrianchi/" },
+  { id: "fab", imageUrl: wpUpload("FB-Team-1-1024x991.png?v=2"), linkedin: "https://www.linkedin.com/in/fabrianchi/" },
   { id: "jv", imageUrl: wpUpload("JV-Team-1024x991.png"), linkedin: "https://www.linkedin.com/in/jlvilasoler/" },
   { id: "af", imageUrl: wpUpload("AF-Team-1024x991.png"), linkedin: "https://www.linkedin.com/in/figueroaanthony/" },
   { id: "rg", imageUrl: wpUpload("RG-1024x991.png") },
@@ -92,6 +93,7 @@ export function MarketplaceCompanyPage() {
   }, [t]);
 
   const [rawTeamMembers, setRawTeamMembers] = useState<TeamMemberDto[] | null>(null);
+  const [teamHydrated, setTeamHydrated] = useState(false);
   const [openMemberId, setOpenMemberId] = useState<string | null>(null);
 
   const teamMembers = useMemo(() => {
@@ -157,7 +159,7 @@ export function MarketplaceCompanyPage() {
           setRawTeamMembers(
             incoming.map((m) => ({
               id: m.id,
-              imageUrl: m.imageUrl,
+              imageUrl: normalizeMarketplaceImageSrc(m.imageUrl),
               linkedin: m.linkedin,
               role: m.role,
               name: m.name,
@@ -168,6 +170,9 @@ export function MarketplaceCompanyPage() {
         })
         .catch(() => {
           /* mantener fallback i18n */
+        })
+        .finally(() => {
+          if (!cancelled) setTeamHydrated(true);
         });
     };
 
@@ -260,15 +265,16 @@ export function MarketplaceCompanyPage() {
                           aria-controls={openMemberId === m.id ? dialogTitleId : undefined}
                         >
                           <span className="market-corp-team-card__media">
-                            <img
-                              key={m.imageUrl}
-                              src={m.imageUrl}
-                              alt=""
-                              width={500}
-                              height={500}
-                              loading="lazy"
-                              decoding="async"
-                            />
+                            {teamHydrated ? (
+                              <img
+                                src={m.imageUrl}
+                                alt=""
+                                width={500}
+                                height={500}
+                                loading="lazy"
+                                decoding="async"
+                              />
+                            ) : null}
                           </span>
                           <span className="market-corp-team-card__meta">
                             <span className="market-corp-team-card__role">{m.role}</span>

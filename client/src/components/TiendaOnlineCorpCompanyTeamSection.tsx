@@ -22,7 +22,7 @@ const TEAM_DEFAULTS: readonly {
   img: string;
   linkedin?: string;
 }[] = [
-  { key: "fab", img: wpUpload("FB-Team-1-1024x991.png"), linkedin: "https://www.linkedin.com/in/fabrianchi/" },
+  { key: "fab", img: wpUpload("FB-Team-1-1024x991.png?v=2"), linkedin: "https://www.linkedin.com/in/fabrianchi/" },
   { key: "jv", img: wpUpload("JV-Team-1024x991.png"), linkedin: "https://www.linkedin.com/in/jlvilasoler/" },
   { key: "af", img: wpUpload("AF-Team-1024x991.png"), linkedin: "https://www.linkedin.com/in/figueroaanthony/" },
   { key: "rg", img: wpUpload("RG-1024x991.png") },
