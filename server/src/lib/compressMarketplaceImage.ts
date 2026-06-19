@@ -17,34 +17,51 @@ export async function compressMarketplaceImageBuffer(
     return { buf, mime: "image/gif" };
   }
 
-  let pipeline = sharp(buf, { failOn: "none" }).rotate();
-  const meta = await pipeline.metadata();
+  const meta = await sharp(buf, { failOn: "none" }).rotate().metadata();
   const w = meta.width ?? 0;
   const h = meta.height ?? 0;
-  if (w > MAX_DIM || h > MAX_DIM) {
-    pipeline = pipeline.resize(MAX_DIM, MAX_DIM, { fit: "inside", withoutEnlargement: true });
-  }
 
-  if (fmt === "png") {
-    const pngBuf = await pipeline.png({ compressionLevel: 9, palette: true }).toBuffer();
-    if (pngBuf.length <= HOSTED_MAX_BYTES) {
-      return { buf: pngBuf, mime: "image/png" };
-    }
-    pipeline = sharp(buf, { failOn: "none" }).rotate();
-    if (w > MAX_DIM || h > MAX_DIM) {
-      pipeline = pipeline.resize(MAX_DIM, MAX_DIM, { fit: "inside", withoutEnlargement: true });
-    }
-  }
-
-  let quality = 85;
-  let jpegBuf = await pipeline.jpeg({ quality, mozjpeg: true }).toBuffer();
-  while (jpegBuf.length > HOSTED_MAX_BYTES && quality > 52) {
-    quality -= 8;
+  function basePipeline() {
     let p = sharp(buf, { failOn: "none" }).rotate();
     if (w > MAX_DIM || h > MAX_DIM) {
       p = p.resize(MAX_DIM, MAX_DIM, { fit: "inside", withoutEnlargement: true });
     }
-    jpegBuf = await p.jpeg({ quality, mozjpeg: true }).toBuffer();
+    return p;
+  }
+
+  if (fmt === "png") {
+    const pngBuf = await basePipeline()
+      .png({ compressionLevel: 9, palette: meta.hasAlpha ? false : true })
+      .toBuffer();
+    if (pngBuf.length <= HOSTED_MAX_BYTES) {
+      return { buf: pngBuf, mime: "image/png" };
+    }
+    if (meta.hasAlpha) {
+      let quality = 82;
+      let webpBuf = await basePipeline().webp({ quality, alphaQuality: quality }).toBuffer();
+      while (webpBuf.length > HOSTED_MAX_BYTES && quality > 52) {
+        quality -= 6;
+        webpBuf = await basePipeline().webp({ quality, alphaQuality: quality }).toBuffer();
+      }
+      return { buf: webpBuf, mime: "image/webp" };
+    }
+  }
+
+  if (fmt === "webp") {
+    let quality = 82;
+    let webpBuf = await basePipeline().webp({ quality, alphaQuality: quality }).toBuffer();
+    while (webpBuf.length > HOSTED_MAX_BYTES && quality > 52) {
+      quality -= 6;
+      webpBuf = await basePipeline().webp({ quality, alphaQuality: quality }).toBuffer();
+    }
+    return { buf: webpBuf, mime: "image/webp" };
+  }
+
+  let quality = 85;
+  let jpegBuf = await basePipeline().jpeg({ quality, mozjpeg: true }).toBuffer();
+  while (jpegBuf.length > HOSTED_MAX_BYTES && quality > 52) {
+    quality -= 8;
+    jpegBuf = await basePipeline().jpeg({ quality, mozjpeg: true }).toBuffer();
   }
   return { buf: jpegBuf, mime: "image/jpeg" };
 }

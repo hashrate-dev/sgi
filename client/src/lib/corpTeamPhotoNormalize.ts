@@ -1,4 +1,4 @@
-import { HOSTED_INLINE_IMAGE_MAX_BYTES, marketplaceUploadUsesInlineImages } from "./marketplaceImageOptimize.js";
+import { marketplaceUploadUsesInlineImages } from "./marketplaceImageOptimize.js";
 
 /** Mismo lienzo que PNG legacy (JV-Team-1024x991.png). */
 export const CORP_TEAM_PHOTO_WIDTH = 1024;
@@ -93,11 +93,26 @@ function scrubAlphaOutsideCircle(ctx: CanvasRenderingContext2D, w: number, h: nu
   ctx.putImageData(imgData, 0, 0);
 }
 
-async function canvasToPngFile(canvas: HTMLCanvasElement, baseName: string): Promise<File> {
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-  if (!blob || blob.size <= 0) throw new Error("No se pudo exportar la foto.");
+/** Team PNG 1024×991 suele ~520 KB; en Vercel cabe 1 foto por PATCH (no 4 como vitrina). */
+const CORP_TEAM_PHOTO_MAX_BYTES_HOSTED = 320_000;
+const CORP_TEAM_PHOTO_MAX_BYTES_LOCAL = 650_000;
+
+async function canvasToTeamPhotoFile(canvas: HTMLCanvasElement, baseName: string, maxBytes: number): Promise<File> {
   const safeBase = baseName.replace(/\.[^.]+$/, "").replace(/[^\w.-]+/g, "-") || "team";
-  return new File([blob], `${safeBase}-team.png`, { type: "image/png" });
+
+  for (let q = 0.88; q >= 0.52; q -= 0.04) {
+    const webp = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", q));
+    if (webp && webp.size > 0 && webp.size <= maxBytes) {
+      return new File([webp], `${safeBase}-team.webp`, { type: "image/webp" });
+    }
+  }
+
+  const png = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (png && png.size > 0 && png.size <= maxBytes) {
+    return new File([png], `${safeBase}-team.png`, { type: "image/png" });
+  }
+
+  throw new Error("La foto normalizada supera el tamaño máximo permitido. Probá con una imagen más pequeña.");
 }
 
 /** Convierte cualquier foto rectangular al formato circular del team (1024×991). */
@@ -110,7 +125,7 @@ export async function normalizeCorpTeamPhotoFile(file: File): Promise<File> {
     Math.abs(img.height - CORP_TEAM_PHOTO_HEIGHT) <= 12 &&
     Math.abs(aspect - targetAspect) < 0.02;
   const hosted = marketplaceUploadUsesInlineImages();
-  const maxBytes = hosted ? HOSTED_INLINE_IMAGE_MAX_BYTES : 650_000;
+  const maxBytes = hosted ? CORP_TEAM_PHOTO_MAX_BYTES_HOSTED : CORP_TEAM_PHOTO_MAX_BYTES_LOCAL;
   if (isAlreadyTeamCanvas) {
     const canvas = document.createElement("canvas");
     canvas.width = img.width;
@@ -119,16 +134,8 @@ export async function normalizeCorpTeamPhotoFile(file: File): Promise<File> {
     if (!ctx) throw new Error("No se pudo preparar la foto.");
     ctx.drawImage(img, 0, 0);
     scrubAlphaOutsideCircle(ctx, canvas.width, canvas.height);
-    const out = await canvasToPngFile(canvas, file.name);
-    if (out.size > maxBytes) {
-      throw new Error("La foto normalizada supera el tamaño máximo permitido. Probá con una imagen más pequeña.");
-    }
-    return out;
+    return canvasToTeamPhotoFile(canvas, file.name, maxBytes);
   }
   const canvas = renderTeamPhotoCanvas(img);
-  const out = await canvasToPngFile(canvas, file.name);
-  if (out.size > maxBytes) {
-    throw new Error("La foto normalizada supera el tamaño máximo permitido. Probá con una imagen más pequeña.");
-  }
-  return out;
+  return canvasToTeamPhotoFile(canvas, file.name, maxBytes);
 }
