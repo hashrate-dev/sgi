@@ -8,6 +8,8 @@ import {
   uploadMarketplaceAsicImage,
   type CorpCompanyTeamMemberDto,
 } from "../lib/api.js";
+import { normalizeCorpTeamPhotoFile } from "../lib/corpTeamPhotoNormalize.js";
+import { isAcceptableMarketplaceImageFile } from "../lib/marketplaceImageOptimize.js";
 import { showToast } from "./ToastNotification.js";
 import { AppButton, AppCard } from "./ui/index.js";
 
@@ -27,6 +29,11 @@ const TEAM_DEFAULTS: readonly {
   { key: "dg", img: wpUpload("DG-Team-HRS-1024x991.png") },
 ];
 
+/** Foto de fábrica (wp-uploads) por id legacy del team. */
+const BUILTIN_ORIGINAL_PHOTO: Record<string, string> = Object.fromEntries(
+  TEAM_DEFAULTS.map((d) => [d.key, d.img])
+);
+
 function newTeamMemberId(): string {
   return typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `tm-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
@@ -43,6 +50,14 @@ function bioTextToParas(text: string): string[] {
 
 function parasToBioText(paras: string[]): string {
   return (paras ?? []).map((p) => p.trim()).filter(Boolean).join("\n\n");
+}
+
+function snapshotOriginalPhotos(list: CorpCompanyTeamMemberDto[]): Record<string, string> {
+  return Object.fromEntries(list.map((m) => [m.id, m.imageUrl]));
+}
+
+function originalPhotoUrlFor(memberId: string, loaded: Record<string, string>): string | undefined {
+  return BUILTIN_ORIGINAL_PHOTO[memberId] ?? loaded[memberId];
 }
 
 export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEditionLocked: boolean }) {
@@ -82,11 +97,15 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  /** URL de la foto previa por integrante (solo tras «Cambiar foto» en esta sesión). */
+  const [photoUndoByMemberId, setPhotoUndoByMemberId] = useState<Record<string, string>>({});
 
   const fallbackMembersRef = useRef(fallbackMembers);
   fallbackMembersRef.current = fallbackMembers;
   const hasLoadedOnceRef = useRef(false);
   const savedSnapshotRef = useRef<string>("");
+  /** Foto al cargar/guardar (integrantes nuevos); legacy usa BUILTIN_ORIGINAL_PHOTO. */
+  const loadedOriginalPhotosRef = useRef<Record<string, string>>({});
   const [hydratedFromApi, setHydratedFromApi] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -107,6 +126,8 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
         const next = incoming.length > 0 ? incoming : fallbackMembersRef.current;
         setMembers(next);
         savedSnapshotRef.current = JSON.stringify(next);
+        loadedOriginalPhotosRef.current = snapshotOriginalPhotos(next);
+        setPhotoUndoByMemberId({});
         hasLoadedOnceRef.current = true;
       })
       .catch(() => setLoadError("No se pudieron cargar los datos del equipo."))
@@ -128,6 +149,8 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
         const saved = r.members ?? next;
         setMembers(saved);
         savedSnapshotRef.current = JSON.stringify(saved);
+        loadedOriginalPhotosRef.current = snapshotOriginalPhotos(saved);
+        setPhotoUndoByMemberId({});
         if (toastMsg) showToast(toastMsg, "success", "Equipo de la empresa");
       } catch (e) {
         showToast(e instanceof Error ? e.message : "Error al guardar", "error", "Equipo de la empresa");
@@ -144,10 +167,22 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
     setMembers((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch } : m)));
   }
 
+  async function prepareTeamPhotoUpload(file: File): Promise<File> {
+    if (!(await isAcceptableMarketplaceImageFile(file))) {
+      throw new Error("Archivo no válido. Usá JPG, PNG o WebP.");
+    }
+    return normalizeCorpTeamPhotoFile(file);
+  }
+
   async function uploadImageForMember(memberId: string, file: File) {
     setUploadingId(memberId);
     try {
-      const { url } = await uploadMarketplaceAsicImage(file);
+      const previousUrl = members.find((m) => m.id === memberId)?.imageUrl;
+      const prepared = await prepareTeamPhotoUpload(file);
+      const { url } = await uploadMarketplaceAsicImage(prepared);
+      if (previousUrl && previousUrl !== url) {
+        setPhotoUndoByMemberId((prev) => ({ ...prev, [memberId]: previousUrl }));
+      }
       const next = members.map((m) => (m.id === memberId ? { ...m, imageUrl: url } : m));
       setMembers(next);
       // No persistimos auto para no forzar múltiples PUT; el usuario guarda al final.
@@ -156,6 +191,32 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
     } finally {
       setUploadingId(null);
     }
+  }
+
+  function restorePreviousPhoto(memberId: string) {
+    if (isEditionLocked) return;
+    const previousUrl = photoUndoByMemberId[memberId];
+    if (!previousUrl) return;
+    setMembers((prev) => prev.map((m) => (m.id === memberId ? { ...m, imageUrl: previousUrl } : m)));
+    setPhotoUndoByMemberId((prev) => {
+      const next = { ...prev };
+      delete next[memberId];
+      return next;
+    });
+    showToast("Se restauró la foto anterior (pendiente de guardar).", "success", "Equipo de la empresa");
+  }
+
+  function restoreOriginalPhoto(memberId: string) {
+    if (isEditionLocked) return;
+    const originalUrl = originalPhotoUrlFor(memberId, loadedOriginalPhotosRef.current);
+    if (!originalUrl) return;
+    setMembers((prev) => prev.map((m) => (m.id === memberId ? { ...m, imageUrl: originalUrl } : m)));
+    setPhotoUndoByMemberId((prev) => {
+      const next = { ...prev };
+      delete next[memberId];
+      return next;
+    });
+    showToast("Se restauró la foto original (pendiente de guardar).", "success", "Equipo de la empresa");
   }
 
   function triggerReplaceImage(memberId: string) {
@@ -182,7 +243,8 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
     const id = newTeamMemberId();
     try {
       setUploadingId(id);
-      const { url } = await uploadMarketplaceAsicImage(file);
+      const prepared = await prepareTeamPhotoUpload(file);
+      const { url } = await uploadMarketplaceAsicImage(prepared);
       const next: CorpCompanyTeamMemberDto[] = [
         ...members,
         {
@@ -285,7 +347,10 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
             </Text>
           ) : null}
           <Grid templateColumns={{ base: "1fr", lg: "repeat(2, minmax(0, 1fr))" }} gap={3} mb={4}>
-            {members.map((m) => (
+            {members.map((m) => {
+              const originalPhotoUrl = originalPhotoUrlFor(m.id, loadedOriginalPhotosRef.current);
+              const canRestoreOriginal = Boolean(originalPhotoUrl && m.imageUrl !== originalPhotoUrl);
+              return (
               <AppCard key={m.id} borderColor="gray.200" bg="white" p={3}>
                 <Flex gap={3} align="flex-start">
                   <Box
@@ -298,17 +363,11 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
                     borderColor="gray.200"
                     overflow="hidden"
                     position="relative"
-                    display="flex"
-                    alignItems="center"
-                    justifyContent="center"
-                    className="corp-logo-home-style"
+                    className="corp-team-editor-photo"
+                    data-member-id={m.id}
                   >
                     {m.imageUrl ? (
-                      <img
-                        src={m.imageUrl}
-                        alt={m.name}
-                        style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 24%" }}
-                      />
+                      <img src={m.imageUrl} alt={m.name} className="corp-team-editor-photo__img" />
                     ) : (
                       <Text fontSize="xs" color="gray.400">
                         Sin foto
@@ -371,6 +430,26 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
                       >
                         {uploadingId === m.id ? "Subiendo…" : "Cambiar foto"}
                       </button>
+                      {photoUndoByMemberId[m.id] ? (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-secondary"
+                          disabled={isEditionLocked || uploadingId === m.id || saving}
+                          onClick={() => restorePreviousPhoto(m.id)}
+                        >
+                          Foto anterior
+                        </button>
+                      ) : null}
+                      {canRestoreOriginal ? (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-secondary"
+                          disabled={isEditionLocked || uploadingId === m.id || saving}
+                          onClick={() => restoreOriginalPhoto(m.id)}
+                        >
+                          Foto original
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         className="btn btn-sm btn-outline-danger"
@@ -383,7 +462,8 @@ export function TiendaOnlineCorpCompanyTeamSection({ isEditionLocked }: { isEdit
                   </Box>
                 </Flex>
               </AppCard>
-            ))}
+              );
+            })}
           </Grid>
 
           <AppCard borderColor="gray.200" bg="gray.50" p={3} mb={3}>

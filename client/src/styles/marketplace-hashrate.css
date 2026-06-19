@@ -11071,6 +11071,23 @@ a.market-corp-clients__item {
   transform: scale(1.42);
 }
 
+/* Panel admin: mismo encuadre/zoom que tarjetas públicas */
+.corp-team-editor-photo {
+  background-color: #f3f4f6;
+  overflow: hidden;
+}
+
+.corp-team-editor-photo__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 24%;
+  display: block;
+  background-color: #f3f4f6;
+  transform: scale(1.3);
+  transform-origin: center center;
+}
+
 .market-corp-team-card__meta {
   display: flex;
   flex-direction: column;
