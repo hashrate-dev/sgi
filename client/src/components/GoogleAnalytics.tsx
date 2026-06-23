@@ -4,7 +4,7 @@ import { initGoogleAnalytics, trackGoogleAnalyticsPageView } from "../lib/google
 
 /**
  * GA4 en todas las rutas del SPA (marketplace público + SGI interno).
- * Solo activo en producción (`import.meta.env.PROD`).
+ * gtag.js se carga en index.html; aquí se envían las vistas al cambiar de ruta.
  */
 export function GoogleAnalytics() {
   const { pathname, search, hash } = useLocation();
