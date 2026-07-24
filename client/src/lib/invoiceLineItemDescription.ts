@@ -95,15 +95,26 @@ export function getLineItemDescription(it: LineItem): string {
   return normalizeInvoiceDescriptionForCell(it.month ? formatInvoiceItemDescription("Item", it.month) : "Item");
 }
 
+/** Modelo de hosting (L7 / L9 / S21) desde nombre o serviceKey. */
+function hostingModelFromLineItem(it: LineItem): "L7" | "L9" | "S21" | null {
+  const label = `${lineItemServiceLabel(it)} ${it.modeloEquipo ?? ""}`.toUpperCase();
+  if (/\bS21\b/.test(label)) return "S21";
+  if (/\bL9\b/.test(label)) return "L9";
+  if (/\bL7\b/.test(label)) return "L7";
+  if (it.serviceKey === "A") return "L7";
+  if (it.serviceKey === "B") return "L9";
+  if (it.serviceKey === "C") return "S21";
+  return null;
+}
+
 export function getLineItemDiscountDescription(it: LineItem): string {
   if (it.setupId && it.setupNombre) return `Descuento ${it.setupNombre}`;
   if (it.reparacionTipoId && it.reparacionNombre) return `Descuento ${it.reparacionNombre}`;
   if (it.transporteFleteTipoId && it.transporteFleteNombre) return `Descuento ${it.transporteFleteNombre}`;
   if (it.marcaEquipo && it.modeloEquipo) return `Descuento ${it.marcaEquipo} ${it.modeloEquipo}`;
   if (it.garantiaMarca && it.garantiaModelo) return `Descuento ${it.garantiaMarca} ${it.garantiaModelo}`;
-  if (it.serviceKey === "A") return "Descuento HASHRATE L7";
-  if (it.serviceKey === "B") return "Descuento HASHRATE L9";
-  if (it.serviceKey) return "Descuento HASHRATE S21";
+  const hostingModel = hostingModelFromLineItem(it);
+  if (hostingModel) return `DESCUENTO ${hostingModel}`;
   const serviceLabel = lineItemServiceLabel(it);
   if (serviceLabel) {
     const { label } = stripTrailingInvoiceMonth(serviceLabel);

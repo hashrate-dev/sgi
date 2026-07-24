@@ -4,13 +4,14 @@ import { getReceiptSettlementRowKind } from "./receiptSettlementLine";
 import type { LineItem } from "./types";
 
 function inferServiceKey(item: LineItem): "A" | "B" | "C" | "D" {
+  const label = String(item.serviceName ?? item.service ?? "").trim();
+  // Preferir el modelo en el texto (evita serviceKey desactualizado → Descuento L7 con servicio S21)
+  if (label.includes("4%") || label.includes("Gastos Operativos Transferencia")) return "D";
+  if (/\bS21\b/i.test(label)) return "C";
+  if (/\bL9\b/i.test(label)) return "B";
+  if (/\bL7\b/i.test(label)) return "A";
   const k = item.serviceKey as "A" | "B" | "C" | "D" | undefined;
   if (k) return k;
-  const label = String(item.serviceName ?? item.service ?? "").trim();
-  if (label.includes("4%") || label.includes("Gastos Operativos Transferencia")) return "D";
-  if (label.includes("L9")) return "B";
-  if (label.includes("L7")) return "A";
-  if (label.includes("S21")) return "C";
   const byCatalog = (["A", "B", "C", "D"] as const).find(
     (key) => serviceCatalog[key].name === label || serviceCatalog[key].price === item.price
   );
