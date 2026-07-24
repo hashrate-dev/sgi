@@ -114,7 +114,7 @@ export function getLineItemDiscountDescription(it: LineItem): string {
   if (it.marcaEquipo && it.modeloEquipo) return `Descuento ${it.marcaEquipo} ${it.modeloEquipo}`;
   if (it.garantiaMarca && it.garantiaModelo) return `Descuento ${it.garantiaMarca} ${it.garantiaModelo}`;
   const hostingModel = hostingModelFromLineItem(it);
-  if (hostingModel) return `DESCUENTO ${hostingModel}`;
+  if (hostingModel) return `Descuento HASHRATE ${hostingModel}`;
   const serviceLabel = lineItemServiceLabel(it);
   if (serviceLabel) {
     const { label } = stripTrailingInvoiceMonth(serviceLabel);
