@@ -9340,23 +9340,41 @@ button.fact-back {
   padding-top: 0.25rem;
 }
 
-/* Mismo ancho que Filtros: el listado tiene padding 2rem y deja el panel más estrecho a la derecha */
-.clientes-listado-wrap:has(.hrs-equipo-asic-listado-grupos) {
+/*
+ * responsive-global.css aplica [class*="listado-wrap"] { width/max-width: 100% }.
+ * Con width fijo, margin-left: -1.5rem corre el bloque a la izquierda y el derecho
+ * no se expande (el margen derecho se descarta). Filtros usa width: auto y sí queda simétrico.
+ */
+.clientes-listado-wrap.hrs-equipo-asic-listado {
+  width: auto;
+  max-width: none;
   overflow: visible;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.hrs-equipo-asic-listado-header {
+  padding-left: 2rem;
+  padding-right: 2rem;
+}
+
+.hrs-equipo-asic-listado > *:not(.hrs-equipo-asic-listado-header):not(.hrs-equipo-asic-listado-grupos) {
+  margin-left: 2rem;
+  margin-right: 2rem;
 }
 
 .hrs-equipo-asic-listado-grupos {
-  width: calc(100% + 4rem);
+  width: 100%;
   max-width: none;
-  margin-left: -2rem;
-  margin-right: -2rem;
+  margin-left: 0;
+  margin-right: 0;
   box-sizing: border-box;
 }
 
 /* Grupo tienda (visibles en /marketplace): panel con fondo verde claro */
 .hrs-equipo-asic-listado-grupos--tienda {
   background: linear-gradient(180deg, rgba(236, 253, 245, 0.97) 0%, rgba(209, 250, 229, 0.9) 100%);
-  border: 1px solid rgba(16, 185, 129, 0.28);
+  border: none;
   border-radius: 0;
   padding: 1.1rem 2rem 1.35rem;
   margin-bottom: 1.25rem !important;

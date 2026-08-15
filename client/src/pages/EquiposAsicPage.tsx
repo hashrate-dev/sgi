@@ -1275,8 +1275,8 @@ export function EquiposAsicPage() {
             </div>
           </div>
 
-          <div className="clientes-listado-wrap">
-            <Flex justify="space-between" align={{ base: "flex-start", md: "center" }} mb={2} wrap="wrap" gap={2}>
+          <div className="clientes-listado-wrap hrs-equipo-asic-listado">
+            <Flex className="hrs-equipo-asic-listado-header" justify="space-between" align={{ base: "flex-start", md: "center" }} mb={2} wrap="wrap" gap={2}>
               <Box>
                 <Heading size="sm" m={0}>
                   ⚙️ Listado de Equipos ASIC ({filteredEquipos.length})
