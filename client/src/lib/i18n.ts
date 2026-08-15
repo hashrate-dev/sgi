@@ -334,6 +334,8 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "modal.price_note":
       "Precio en dólares estadounidenses (USD). Impuestos y logística incluidos en el precio. Valores sujetos a variación de mercado y disponibilidad.",
     "modal.price_box_label": "Precio",
+    "modal.out_of_stock": "NO HAY STOCK",
+    "shelf.out_of_stock": "NO HAY STOCK",
     "modal.specs_aria": "Especificaciones técnicas",
     "modal.yield_title": "Rendimiento estimado",
     "modal.yield_loading": "…",
@@ -1140,6 +1142,8 @@ const STRINGS: Record<MarketplaceLang, Record<string, string>> = {
     "modal.price_note":
       "Reference price in USD. Taxes and logistics depend on the deal. Subject to market and availability.",
     "modal.price_box_label": "Reference price",
+    "modal.out_of_stock": "OUT OF STOCK",
+    "shelf.out_of_stock": "OUT OF STOCK",
     "modal.specs_aria": "Technical specifications",
     "modal.yield_title": "Estimated performance",
     "modal.yield_loading": "…",

@@ -3983,6 +3983,25 @@ button.fact-back {
   border-color: #15803d;
 }
 
+.hrs-equipo-asic-modal-form__price-card--oos {
+  background: linear-gradient(145deg, #fef2f2 0%, #fee2e2 50%, #fecaca 100%);
+  border-color: #b91c1c;
+}
+
+.hrs-equipo-asic-modal-form__price-amount--oos {
+  font-size: 1.15rem !important;
+  letter-spacing: 0.04em;
+  color: #991b1b;
+}
+
+.hrs-equipo-asic-modal-form__price-consult-toggle--oos {
+  border-color: rgba(185, 28, 28, 0.28);
+}
+
+.hrs-equipo-asic-modal-form__price-consult-toggle--oos .hrs-equipo-asic-modal-form__price-consult-checkbox {
+  accent-color: #b91c1c;
+}
+
 .hrs-equipo-asic-modal-form__price-consult-toggle {
   display: flex;
   align-items: flex-start;

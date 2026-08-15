@@ -213,7 +213,11 @@ function withMarketplacePriceVisibility<T extends { priceUsd: number; priceDispl
   canViewPrices: boolean
 ): T[] {
   if (canViewPrices) return products;
-  return products.map((p) => ({ ...p, priceUsd: 0, priceDisplayLabel: "SOLICITAR PRECIO" }));
+  return products.map((p) => {
+    const label = String(p.priceDisplayLabel ?? "").trim();
+    if (/^no\s+hay\s+stock/iu.test(label)) return p;
+    return { ...p, priceUsd: 0, priceDisplayLabel: "SOLICITAR PRECIO" };
+  });
 }
 
 /** Respuestas con/sin precios según sesión: no cachear en CDN compartido entre anónimo y logueado. */

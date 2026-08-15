@@ -149,7 +149,7 @@ const EquipoBodySchema = z
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message:
-        "Para publicar sin precio fijo: completá un texto comercial (ej. «SOLICITA PRECIO») o indicá precio USD mayor a 0.",
+        "Para publicar sin precio fijo: usá «SOLICITA PRECIO» o «NO HAY STOCK», o indicá precio USD mayor a 0.",
       path: ["marketplacePriceLabel"],
     });
   });

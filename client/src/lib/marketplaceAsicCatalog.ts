@@ -264,7 +264,7 @@ export type AsicProduct = {
   hashrate: string;
   /** precio entero USD (para mailto / modal) */
   priceUsd: number;
-  /** Si existe, se muestra en vitrina/modal en lugar de «X USD» (precio bajo consulta). */
+  /** Si existe, se muestra en vitrina/modal en lugar de «X USD» (precio bajo consulta o sin stock). */
   priceDisplayLabel?: string;
   /** Ruta pública de la foto principal; vacío = listado sin imagen (sin placeholder de catálogo). */
   imageSrc: string;
@@ -710,7 +710,31 @@ export function normalizeConsultPriceLabelForDisplay(label: string): string {
   if (/^solicit[áa]\s+precio\.?$/iu.test(s)) {
     return "SOLICITA PRECIO";
   }
+  if (/^no\s+hay\s+stock\.?$/iu.test(s) || /^out\s+of\s+stock\.?$/iu.test(s) || /^sem\s+estoque\.?$/iu.test(s)) {
+    return "NO HAY STOCK";
+  }
   return s;
+}
+
+export const MARKETPLACE_OUT_OF_STOCK_LABEL = "NO HAY STOCK";
+
+export function isMarketplaceOutOfStockLabel(label: string): boolean {
+  return normalizeConsultPriceLabelForDisplay(label) === MARKETPLACE_OUT_OF_STOCK_LABEL;
+}
+
+export function asicProductIsOutOfStock(product: Pick<AsicProduct, "priceUsd" | "priceDisplayLabel">): boolean {
+  const lb = product.priceDisplayLabel?.trim() ?? "";
+  return Boolean(lb) && isMarketplaceOutOfStockLabel(lb) && !(product.priceUsd > 0);
+}
+
+function localizeOutOfStockLabel(langOrLocale?: string): string {
+  const loc =
+    typeof langOrLocale === "string" && langOrLocale.length >= 2
+      ? langOrLocale.slice(0, 2).toLowerCase()
+      : "es";
+  if (loc === "en") return "OUT OF STOCK";
+  if (loc === "pt") return "SEM ESTOQUE";
+  return MARKETPLACE_OUT_OF_STOCK_LABEL;
 }
 
 /** Etiquetas que el servidor usa al ocultar precios a visitantes (no deben mostrarse si hay precio USD real). */
@@ -725,6 +749,7 @@ export function formatAsicProductPriceDisplay(product: AsicProduct, langOrLocale
   const lb = product.priceDisplayLabel?.trim();
   if (lb) {
     const n = normalizeConsultPriceLabelForDisplay(lb);
+    if (n && isMarketplaceOutOfStockLabel(n)) return localizeOutOfStockLabel(langOrLocale);
     if (n && !(product.priceUsd > 0 && isMarketplaceGuestHiddenPriceLabel(lb))) return n;
   }
   return formatAsicPriceUsd(product.priceUsd, langOrLocale);

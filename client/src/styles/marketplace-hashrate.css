@@ -1412,6 +1412,15 @@ button.market-link-hrs {
   text-wrap: balance;
 }
 
+.shelf-product__price-value--oos {
+  display: block;
+  font-size: 1.2rem;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #b91c1c;
+  letter-spacing: 0.03em;
+}
+
 .shelf-product__specs-box {
   padding: 0.65rem 0.75rem;
   background: #e0f2fe;
@@ -1652,6 +1661,13 @@ button.market-link-hrs {
   font-weight: 800;
   color: #646c6f;
   letter-spacing: -0.02em;
+}
+
+.market-shelf-grid--catalog-v2 .shelf-product__price-current--oos {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #b91c1c;
+  letter-spacing: 0.03em;
 }
 
 .market-shelf-grid--catalog-v2 .shelf-product__price-locked {
@@ -2453,6 +2469,11 @@ body:has(.asic-email-window) {
 .product-modal__price-box--share .product-modal__price--in-box.product-modal__price--consult {
   font-size: 1.6rem !important;
   color: #020617 !important;
+}
+
+.product-modal__price--oos {
+  color: #b91c1c !important;
+  letter-spacing: 0.03em !important;
 }
 
 .product-modal__price-note {

@@ -26,6 +26,9 @@ function normalizeConsultPriceLabelForDisplay(label: string): string {
   if (/^solicit[áa]\s+precio\.?$/iu.test(s)) {
     return "SOLICITA PRECIO";
   }
+  if (/^no\s+hay\s+stock\.?$/iu.test(s) || /^out\s+of\s+stock\.?$/iu.test(s) || /^sem\s+estoque\.?$/iu.test(s)) {
+    return "NO HAY STOCK";
+  }
   return s;
 }
 

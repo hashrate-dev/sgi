@@ -311,6 +311,8 @@ export const MARKETPLACE_STRINGS_PT: Record<string, string> = {
   "modal.price_note":
     "Preço referencial em USD. Impostos e logística conforme a operação. Valores sujeitos a variação de mercado e disponibilidade.",
   "modal.price_box_label": "Preço referencial",
+  "modal.out_of_stock": "SEM ESTOQUE",
+  "shelf.out_of_stock": "SEM ESTOQUE",
   "modal.specs_aria": "Especificações técnicas",
   "modal.yield_title": "Rendimento estimado",
   "modal.yield_loading": "…",

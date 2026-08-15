@@ -3,6 +3,7 @@ import type { EquipoASIC } from "../../lib/types";
 import {
   defaultAsicShelfImageSrc,
   formatAsicPriceUsd,
+  isMarketplaceOutOfStockLabel,
   normalizeConsultPriceLabelForDisplay,
   publicImageUrl,
 } from "../../lib/marketplaceAsicCatalog";
@@ -40,6 +41,7 @@ export function EquipoAsicDashboardCard({ equipo: e, canEdit, onDetail, onEdit, 
     .slice(0, 4);
   const mpLabelRaw = e.marketplacePriceLabel?.trim() ?? "";
   const mpLabelDisplay = mpLabelRaw ? normalizeConsultPriceLabelForDisplay(mpLabelRaw) : "";
+  const outOfStock = Boolean(mpLabelDisplay) && isMarketplaceOutOfStockLabel(mpLabelDisplay) && (e.precioUSD ?? 0) <= 0;
 
   return (
     <article className="shelf-product hrs-asic-dash-card" data-equipo-id={e.id}>
@@ -83,7 +85,12 @@ export function EquipoAsicDashboardCard({ equipo: e, canEdit, onDetail, onEdit, 
         <div className="shelf-product__price-box">
           <span
             className={
-              "shelf-product__price-value" + (mpLabelDisplay ? " shelf-product__price-value--consult" : "")
+              "shelf-product__price-value" +
+              (outOfStock
+                ? " shelf-product__price-value--oos"
+                : mpLabelDisplay
+                  ? " shelf-product__price-value--consult"
+                  : "")
             }
           >
             {mpLabelDisplay || formatAsicPriceUsd(e.precioUSD ?? 0)}

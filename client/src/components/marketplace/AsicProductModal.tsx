@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AsicProduct } from "../../lib/marketplaceAsicCatalog.js";
 import {
   asicProductShowsMinerEconomyContent,
+  asicProductIsOutOfStock,
   capProductGalleryUrls,
   dedupeGalleryUrls,
   defaultAsicShelfImageSrc,
   galleryFileKey,
   normalizeMarketplaceImageSrc,
   formatAsicPriceUsd,
+  formatAsicProductPriceDisplay,
   isBitmainAntminerRandomXCatalogBlob,
   normalizeConsultPriceLabelForDisplay,
   productHashrateShareParts,
@@ -106,17 +108,20 @@ export function AsicProductModal({
   const priceLabelNorm = product.priceDisplayLabel?.trim()
     ? normalizeConsultPriceLabelForDisplay(product.priceDisplayLabel.trim())
     : "";
-  const displayPriceStr = priceLabelNorm
-    ? hashrateShareView && productSupportsHashrateShare(product)
-      ? `${priceLabelNorm} (${shareViewPct}%)`
-      : priceLabelNorm
-    : formatAsicPriceUsd(displayPriceUsd, lang);
+  const outOfStock = asicProductIsOutOfStock(product);
+  const displayPriceStr = outOfStock
+    ? formatAsicProductPriceDisplay(product, lang)
+    : priceLabelNorm
+      ? hashrateShareView && productSupportsHashrateShare(product)
+        ? `${priceLabelNorm} (${shareViewPct}%)`
+        : priceLabelNorm
+      : formatAsicPriceUsd(displayPriceUsd, lang);
   const hiddenPriceLabel = lang === "en"
     ? "Sign up to see the price"
     : lang === "pt"
       ? "Registre-se para ver o preço"
       : "Registrate para ver precio";
-  const safePriceForDisplay = showPrice ? displayPriceStr : hiddenPriceLabel;
+  const safePriceForDisplay = showPrice || outOfStock ? displayPriceStr : hiddenPriceLabel;
   const mailText = useMemo(() => {
     const subject = tf("modal.mail.subject", {
       brand: product.brand,
@@ -451,12 +456,12 @@ export function AsicProductModal({
               <p
                 className={
                   "product-modal__price product-modal__price--xl product-modal__price--in-box" +
-                  (priceLabelNorm ? " product-modal__price--consult" : "")
+                  (outOfStock ? " product-modal__price--oos" : priceLabelNorm ? " product-modal__price--consult" : "")
                 }
               >
                 {safePriceForDisplay}
               </p>
-              {showPrice ? (
+              {showPrice && !outOfStock ? (
                 <p className="product-modal__price-note product-modal__price-note--in-box" role="note">
                   <i className="bi bi-info-circle-fill product-modal__price-note-icon" aria-hidden />
                   <span className="product-modal__price-note-txt">{t("modal.price_note")}</span>

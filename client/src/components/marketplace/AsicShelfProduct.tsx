@@ -4,6 +4,7 @@ import {
   defaultAsicShelfImageSrc,
   formatAsicProductPriceDisplay,
   marketplaceShelfImageApiUrl,
+  asicProductIsOutOfStock,
   normalizeConsultPriceLabelForDisplay,
   normalizeMarketplaceImageSrc,
   pickMarketplaceShelfSpecRows,
@@ -57,6 +58,8 @@ export function AsicShelfProduct({
   const consultLabel = product.priceDisplayLabel?.trim()
     ? normalizeConsultPriceLabelForDisplay(product.priceDisplayLabel.trim())
     : "";
+  const outOfStock = asicProductIsOutOfStock(product);
+  const showNumericOrLabel = showPrice || outOfStock;
   const lockedPriceLabel = lang === "en"
     ? "Sign up to view price"
     : lang === "pt"
@@ -118,10 +121,15 @@ export function AsicShelfProduct({
           <p className="shelf-product__subtitle">{product.hashrate}</p>
         </div>
         <div className="shelf-product__price-stack">
-          {showPrice ? (
+          {showNumericOrLabel ? (
             <span
               className={
-                "shelf-product__price-current" + (consultLabel ? " shelf-product__price-current--consult" : "")
+                "shelf-product__price-current" +
+                (outOfStock
+                  ? " shelf-product__price-current--oos"
+                  : consultLabel
+                    ? " shelf-product__price-current--consult"
+                    : "")
               }
             >
               {formatAsicProductPriceDisplay(product, lang)}

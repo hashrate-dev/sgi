@@ -46,7 +46,7 @@ import {
   canExport,
 } from "../lib/auth";
 import { codigoProductoVitrina as vitrinaCodigoFromSpecs } from "../lib/marketplaceProductCode";
-import { resolveMarketplaceListingKind } from "../lib/marketplaceAsicCatalog";
+import { isMarketplaceOutOfStockLabel, MARKETPLACE_OUT_OF_STOCK_LABEL, resolveMarketplaceListingKind } from "../lib/marketplaceAsicCatalog";
 import "../styles/facturacion.css";
 import "../styles/marketplace-hashrate.css";
 import { AppButton, AppCard, AppModal } from "../components/ui";
@@ -346,6 +346,8 @@ type EquipoFormState = {
   }>;
   /** Publicar en tienda sin importe USD: se muestra `marketplacePriceLabel` en la vitrina. */
   marketplacePriceConsultMode: boolean;
+  /** Publicar sin precio: aviso «NO HAY STOCK» en vitrina. */
+  marketplaceOutOfStockMode: boolean;
   marketplacePriceLabel: string;
   marketplaceImageSrc: string;
   marketplaceGalleryLines: string;
@@ -434,7 +436,8 @@ function buildMarketplacePayload(form: EquipoFormState): {
   const galleryJson = vis && lines.length > 0 ? JSON.stringify(lines) : null;
   const detailTrim = form.marketplaceDetailRowsJson.trim();
   const detailJson = vis && detailTrim ? sanitizeDetailRowsForApi(form.marketplaceDetailRowsJson) : null;
-  const consult = vis && form.marketplacePriceConsultMode === true;
+  const consult = vis && form.marketplacePriceConsultMode === true && form.marketplaceOutOfStockMode !== true;
+  const outOfStock = vis && form.marketplaceOutOfStockMode === true;
   const labelTrim = form.marketplacePriceLabel.trim();
   const shareEnabled = form.marketplaceHashrateSellEnabled === true;
   const shareParts = shareEnabled ? normalizeHashrateParts(form.marketplaceHashrateParts) : [];
@@ -450,8 +453,11 @@ function buildMarketplacePayload(form: EquipoFormState): {
           electricityUsdPerKwh: customYieldCost,
         } satisfies MarketplaceYieldConfig)
       : null;
-  const marketplacePriceLabel =
-    consult ? (labelTrim || DEFAULT_MARKETPLACE_PRICE_LABEL).slice(0, 120) : null;
+  const marketplacePriceLabel = outOfStock
+    ? MARKETPLACE_OUT_OF_STOCK_LABEL
+    : consult
+      ? (labelTrim || DEFAULT_MARKETPLACE_PRICE_LABEL).slice(0, 120)
+      : null;
   /** Siempre automático (heurística marca/modelo en vitrina); sin override manual en formulario. */
   const marketplaceListingKind = null;
   return {
@@ -506,6 +512,7 @@ function emptyEquipoForm(): EquipoFormState {
     marketplaceHashrateSellEnabled: false,
     marketplaceHashrateParts: [],
     marketplacePriceConsultMode: false,
+    marketplaceOutOfStockMode: false,
     marketplacePriceLabel: "",
     marketplaceImageSrc: "",
     marketplaceGalleryLines: "",
@@ -653,7 +660,9 @@ export function EquiposAsicPage() {
       }
     }
     if (formData.marketplaceVisible) {
-      if (formData.marketplacePriceConsultMode) {
+      if (formData.marketplaceOutOfStockMode) {
+        /* aviso «NO HAY STOCK» en vitrina */
+      } else if (formData.marketplacePriceConsultMode) {
         const lbl = (formData.marketplacePriceLabel.trim() || DEFAULT_MARKETPLACE_PRICE_LABEL).slice(0, 120);
         if (lbl.length < 8) {
           showToast("Completá un texto comercial claro para el precio bajo consulta (mín. 8 caracteres).", "error", "Equipos ASIC");
@@ -661,7 +670,7 @@ export function EquiposAsicPage() {
         }
       } else if (formData.precioUSD <= 0) {
         showToast(
-          "Para publicar con precio de lista indicá un importe USD mayor a 0, o activá «Precio bajo consulta».",
+          "Para publicar con precio de lista indicá un importe USD mayor a 0, o activá «Precio bajo consulta» / «NO HAY STOCK».",
           "error",
           "Equipos ASIC"
         );
@@ -799,7 +808,14 @@ export function EquiposAsicPage() {
       marketplaceHashrateParts: normalizeHashrateParts(
         Array.isArray(e.marketplaceHashrateParts) ? e.marketplaceHashrateParts : []
       ),
-      marketplacePriceConsultMode: Boolean(e.marketplacePriceLabel?.trim()) && (e.precioUSD ?? 0) <= 0,
+      marketplacePriceConsultMode:
+        Boolean(e.marketplacePriceLabel?.trim()) &&
+        (e.precioUSD ?? 0) <= 0 &&
+        !isMarketplaceOutOfStockLabel(e.marketplacePriceLabel ?? ""),
+      marketplaceOutOfStockMode:
+        Boolean(e.marketplacePriceLabel?.trim()) &&
+        (e.precioUSD ?? 0) <= 0 &&
+        isMarketplaceOutOfStockLabel(e.marketplacePriceLabel ?? ""),
       marketplacePriceLabel: e.marketplacePriceLabel?.trim() ?? "",
       marketplaceImageSrc: e.marketplaceImageSrc ?? "",
       marketplaceGalleryLines: galleryLinesFromJson(e.marketplaceGalleryJson),
@@ -813,8 +829,14 @@ export function EquiposAsicPage() {
 
   function openPrecioModal() {
     if (!canEditTienda) return;
-    if (formData.marketplacePriceConsultMode) {
-      showToast("Desactivá «Precio bajo consulta» para cargar un importe fijo en USD.", "warning", "Equipos ASIC");
+    if (formData.marketplacePriceConsultMode || formData.marketplaceOutOfStockMode) {
+      showToast(
+        formData.marketplaceOutOfStockMode
+          ? "Desactivá «NO HAY STOCK» para cargar un importe fijo en USD."
+          : "Desactivá «Precio bajo consulta» para cargar un importe fijo en USD.",
+        "warning",
+        "Equipos ASIC"
+      );
       return;
     }
     setPrecioModalInput(formData.precioUSD > 0 ? String(formData.precioUSD) : "");
@@ -860,8 +882,14 @@ export function EquiposAsicPage() {
 
   async function handleConfirmPrecioModal() {
     if (!canEditTienda) return;
-    if (formData.marketplacePriceConsultMode) {
-      showToast("Desactivá «Precio bajo consulta» antes de guardar un precio en USD.", "warning", "Equipos ASIC");
+    if (formData.marketplacePriceConsultMode || formData.marketplaceOutOfStockMode) {
+      showToast(
+        formData.marketplaceOutOfStockMode
+          ? "Desactivá «NO HAY STOCK» antes de guardar un precio en USD."
+          : "Desactivá «Precio bajo consulta» antes de guardar un precio en USD.",
+        "warning",
+        "Equipos ASIC"
+      );
       return;
     }
     const newP = Math.max(0, parseInt(precioModalInput, 10) || 0);
@@ -890,6 +918,7 @@ export function EquiposAsicPage() {
           ...prev,
           precioUSD: newP,
           marketplacePriceConsultMode: false,
+          marketplaceOutOfStockMode: false,
           marketplacePriceLabel: "",
           precioHistorialLocal: sortPrecioHistorialAsc(row?.precioHistorial ?? []),
         }));
@@ -899,6 +928,7 @@ export function EquiposAsicPage() {
           ...prev,
           precioUSD: newP,
           marketplacePriceConsultMode: false,
+          marketplaceOutOfStockMode: false,
           marketplacePriceLabel: "",
           precioHistorialLocal: appendPrecioHistorialClient(prev.precioHistorialLocal, newP, isoAlGuardar),
         }));
@@ -1848,33 +1878,57 @@ export function EquiposAsicPage() {
                         </div>
                       </div>
 
-                      <aside className="hrs-equipo-asic-modal-form__price-card" aria-label="Precio y cotización">
+                      <aside
+                        className={
+                          "hrs-equipo-asic-modal-form__price-card" +
+                          (formData.marketplaceOutOfStockMode ? " hrs-equipo-asic-modal-form__price-card--oos" : "")
+                        }
+                        aria-label="Precio y cotización"
+                      >
                         <p className="hrs-equipo-asic-modal-form__price-eyebrow">Precio de lista</p>
-                        <p className="hrs-equipo-asic-modal-form__price-currency">USD</p>
-                        <p className="hrs-equipo-asic-modal-form__price-amount">
-                          {formData.marketplacePriceConsultMode
-                            ? "—"
-                            : formData.precioUSD > 0
-                              ? formData.precioUSD.toLocaleString("es-PY")
-                              : "—"}
+                        <p className="hrs-equipo-asic-modal-form__price-currency">
+                          {formData.marketplaceOutOfStockMode ? "" : "USD"}
+                        </p>
+                        <p
+                          className={
+                            "hrs-equipo-asic-modal-form__price-amount" +
+                            (formData.marketplaceOutOfStockMode
+                              ? " hrs-equipo-asic-modal-form__price-amount--oos"
+                              : "")
+                          }
+                        >
+                          {formData.marketplaceOutOfStockMode
+                            ? MARKETPLACE_OUT_OF_STOCK_LABEL
+                            : formData.marketplacePriceConsultMode
+                              ? "—"
+                              : formData.precioUSD > 0
+                                ? formData.precioUSD.toLocaleString("es-PY")
+                                : "—"}
                         </p>
                         <Button
                           type="button"
                           variant="plain"
                           className="hrs-equipo-asic-modal-form__price-btn"
                           onClick={openPrecioModal}
-                          disabled={!canEditTienda || formData.marketplacePriceConsultMode}
+                          disabled={
+                            !canEditTienda ||
+                            formData.marketplacePriceConsultMode ||
+                            formData.marketplaceOutOfStockMode
+                          }
                           title={
-                            formData.marketplacePriceConsultMode
-                              ? "Desactivá «Precio bajo consulta» para cargar un importe fijo en USD."
-                              : !canEditTienda
-                                ? "Solo AdministradorA o AdministradorB pueden cambiar el precio."
-                                : undefined
+                            formData.marketplaceOutOfStockMode
+                              ? "Desactivá «NO HAY STOCK» para cargar un importe fijo en USD."
+                              : formData.marketplacePriceConsultMode
+                                ? "Desactivá «Precio bajo consulta» para cargar un importe fijo en USD."
+                                : !canEditTienda
+                                  ? "Solo AdministradorA o AdministradorB pueden cambiar el precio."
+                                  : undefined
                           }
                         >
                           Modificar precio
                         </Button>
                         {canEditTienda ? (
+                          <>
                           <label className="hrs-equipo-asic-modal-form__price-consult-toggle hrs-equipo-asic-modal-form__price-consult-toggle--after-list-price">
                             <input
                               type="checkbox"
@@ -1885,10 +1939,12 @@ export function EquiposAsicPage() {
                                 setFormData((prev) => ({
                                   ...prev,
                                   marketplacePriceConsultMode: on,
-                                  marketplacePriceLabel:
-                                    on && !prev.marketplacePriceLabel.trim()
-                                      ? DEFAULT_MARKETPLACE_PRICE_LABEL
-                                      : prev.marketplacePriceLabel,
+                                  marketplaceOutOfStockMode: on ? false : prev.marketplaceOutOfStockMode,
+                                  marketplacePriceLabel: on
+                                    ? prev.marketplacePriceLabel.trim() || DEFAULT_MARKETPLACE_PRICE_LABEL
+                                    : prev.marketplaceOutOfStockMode
+                                      ? prev.marketplacePriceLabel
+                                      : "",
                                   precioUSD: on ? 0 : prev.precioUSD,
                                   ...(on ? { precioHistorialLocal: [] } : {}),
                                 }));
@@ -1898,6 +1954,32 @@ export function EquiposAsicPage() {
                               <strong>Precio bajo consulta en tienda</strong>
                             </span>
                           </label>
+                          <label className="hrs-equipo-asic-modal-form__price-consult-toggle hrs-equipo-asic-modal-form__price-consult-toggle--after-list-price hrs-equipo-asic-modal-form__price-consult-toggle--oos">
+                            <input
+                              type="checkbox"
+                              className="hrs-equipo-asic-modal-form__price-consult-checkbox"
+                              checked={formData.marketplaceOutOfStockMode}
+                              onChange={(e) => {
+                                const on = e.target.checked;
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  marketplaceOutOfStockMode: on,
+                                  marketplacePriceConsultMode: on ? false : prev.marketplacePriceConsultMode,
+                                  marketplacePriceLabel: on
+                                    ? MARKETPLACE_OUT_OF_STOCK_LABEL
+                                    : prev.marketplacePriceConsultMode
+                                      ? prev.marketplacePriceLabel.trim() || DEFAULT_MARKETPLACE_PRICE_LABEL
+                                      : "",
+                                  precioUSD: on ? 0 : prev.precioUSD,
+                                  ...(on ? { precioHistorialLocal: [] } : {}),
+                                }));
+                              }}
+                            />
+                            <span className="hrs-equipo-asic-modal-form__price-consult-toggle-text">
+                              <strong>NO HAY STOCK</strong>
+                            </span>
+                          </label>
+                          </>
                         ) : null}
                         {formData.precioHistorialLocal.length > 0 ? (
                           <Button

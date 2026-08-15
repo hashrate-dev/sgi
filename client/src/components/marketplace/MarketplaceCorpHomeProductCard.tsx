@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { AsicProduct } from "../../lib/marketplaceAsicCatalog.js";
 import {
+  asicProductIsOutOfStock,
   defaultAsicShelfImageSrc,
   formatAsicProductPriceDisplay,
   marketplaceShelfImageApiUrl,
@@ -31,6 +32,8 @@ export function MarketplaceCorpHomeProductCard({
   const aria = `${product.brand} ${product.model} ${product.hashrate} — ${t("corp.mp_card_link_aria")}`;
   const specRows = useMemo(() => pickMarketplaceShelfSpecRows(product.detailRows), [product.detailRows]);
   const consultLabel = product.priceDisplayLabel?.trim();
+  const outOfStock = asicProductIsOutOfStock(product);
+  const showLabelOrPrice = showPrice || outOfStock;
   const goAsic = () => {
     void navigate(to);
   };
@@ -95,10 +98,15 @@ export function MarketplaceCorpHomeProductCard({
         <div className="shelf-product__price-box">
           <span
             className={
-              "shelf-product__price-value" + (consultLabel && showPrice ? " shelf-product__price-value--consult" : "")
+              "shelf-product__price-value" +
+              (outOfStock && showLabelOrPrice
+                ? " shelf-product__price-value--oos"
+                : consultLabel && showLabelOrPrice
+                  ? " shelf-product__price-value--consult"
+                  : "")
             }
           >
-            {showPrice ? formatAsicProductPriceDisplay(product, lang) : hiddenPriceLabel}
+            {showLabelOrPrice ? formatAsicProductPriceDisplay(product, lang) : hiddenPriceLabel}
           </span>
         </div>
         <div className="shelf-product__specs-box" role="group" aria-label={t("shelf.techspecs")}>
