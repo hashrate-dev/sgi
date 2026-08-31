@@ -285,21 +285,21 @@ export function CuentaClienteDetallePage() {
                       </div>
                     </div>
 
-                    <div className="table-responsive">
-                      <table className="table table-sm align-middle historial-listado-table" style={{ fontSize: "0.85rem" }}>
+                    <div className="table-responsive cuenta-cliente-documentos-table-wrap">
+                      <table className="table table-sm align-middle historial-listado-table cuenta-cliente-documentos-table">
                         <thead className="table-dark">
                           <tr>
                             <th className="text-start historial-col-origen">Origen</th>
                             <th className="text-start historial-col-num">N°</th>
                             <th className="text-start historial-col-tipo">Tipo</th>
                             <th className="text-start historial-col-cliente">Cliente</th>
-                            <th className="text-start historial-col-fecha-emision">Fecha<br />Emisión</th>
-                            <th className="text-start historial-col-hora">Hora<br />Emisión</th>
-                            <th className="text-start historial-col-fecha-venc">Fecha<br />Venc.</th>
-                            <th className="text-start historial-col-fecha-pago">Fecha<br />Pago</th>
-                            <th className="text-start historial-col-total-sdesc">Total<br />(S/Desc)</th>
-                            <th className="text-start historial-col-total">Total</th>
-                            <th className="text-start">Fact. relacionada</th>
+                            <th className="text-start historial-col-fecha-emision" title="Fecha de emisión">F. emisión</th>
+                            <th className="text-start historial-col-hora" title="Hora de emisión">Hora</th>
+                            <th className="text-start historial-col-fecha-venc" title="Fecha de vencimiento">F. venc.</th>
+                            <th className="text-start historial-col-fecha-pago" title="Fecha de pago">F. pago</th>
+                            <th className="text-end historial-col-total-sdesc" title="Total sin descuento">Total s/d</th>
+                            <th className="text-end historial-col-total">Total</th>
+                            <th className="text-start historial-col-fact-relacionada">Fact. relacionada</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -337,9 +337,9 @@ export function CuentaClienteDetallePage() {
                                 <td className="text-start historial-col-hora">{formatTimeNoSeconds(inv.emissionTime)}</td>
                                 <td className="text-start historial-col-fecha-venc">{dueDate}</td>
                                 <td className="text-start historial-col-fecha-pago">{paymentDateCell}</td>
-                                <td className="text-start historial-col-total-sdesc historial-monto-cell">{formatCurrency(subtotal)}</td>
-                                <td className="text-start fw-bold historial-col-total historial-monto-cell">{formatCurrency(total)}</td>
-                                <td className="text-start">{inv.relatedInvoiceNumber ?? "-"}</td>
+                                <td className="text-end historial-col-total-sdesc historial-monto-cell">{formatCurrency(subtotal)}</td>
+                                <td className="text-end fw-bold historial-col-total historial-monto-cell">{formatCurrency(total)}</td>
+                                <td className="text-start historial-col-fact-relacionada">{inv.relatedInvoiceNumber ?? "-"}</td>
                               </tr>
                             );
                           })}

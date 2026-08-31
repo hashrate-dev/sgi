@@ -8879,6 +8879,92 @@ button.fact-back {
   color: #2563eb;
 }
 
+/* Detalle cuenta cliente: tabla de documentos legible (no hereda columnas compactas de Historial) */
+.cuenta-cliente-page .historial-listado-wrap {
+  margin-left: 0;
+  margin-right: 0;
+  width: 100%;
+  padding: 0;
+  border-top: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.cuenta-cliente-page .cuenta-cliente-documentos-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cuenta-cliente-page .cuenta-cliente-documentos-table {
+  table-layout: auto;
+  width: 100%;
+  min-width: 980px;
+  font-size: 0.8125rem;
+}
+
+.cuenta-cliente-page .cuenta-cliente-documentos-table thead.table-dark th {
+  font-size: 0.75rem;
+  padding: 0.55rem 0.65rem;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.cuenta-cliente-page .cuenta-cliente-documentos-table tbody td {
+  padding: 0.5rem 0.65rem;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.cuenta-cliente-page .cuenta-cliente-documentos-table td.historial-col-cliente .historial-cliente-nombre {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.cuenta-cliente-page .cuenta-cliente-documentos-table .historial-col-origen {
+  width: auto;
+  min-width: 4.25rem;
+}
+
+.cuenta-cliente-page .cuenta-cliente-documentos-table .historial-col-num {
+  width: auto;
+  min-width: 7.25rem;
+}
+
+.cuenta-cliente-page .cuenta-cliente-documentos-table .historial-col-tipo {
+  width: auto;
+  min-width: 4.75rem;
+}
+
+.cuenta-cliente-page .cuenta-cliente-documentos-table .historial-col-cliente {
+  width: auto;
+  min-width: 10rem;
+}
+
+.cuenta-cliente-page .cuenta-cliente-documentos-table .historial-col-fecha-emision,
+.cuenta-cliente-page .cuenta-cliente-documentos-table .historial-col-fecha-venc,
+.cuenta-cliente-page .cuenta-cliente-documentos-table .historial-col-fecha-pago {
+  width: auto;
+  min-width: 5.75rem;
+}
+
+.cuenta-cliente-page .cuenta-cliente-documentos-table .historial-col-hora {
+  width: auto;
+  min-width: 4rem;
+}
+
+.cuenta-cliente-page .cuenta-cliente-documentos-table .historial-col-total-sdesc,
+.cuenta-cliente-page .cuenta-cliente-documentos-table .historial-col-total {
+  width: auto;
+  min-width: 6.75rem;
+}
+
+.cuenta-cliente-page .cuenta-cliente-documentos-table .historial-col-fact-relacionada {
+  width: auto;
+  min-width: 7.5rem;
+}
+
 /* Cuenta Cliente - Filtro verde (como Historial) + Directorio con fondo gris */
 .cuenta-cliente-filtro-block {
   margin-bottom: 1rem;
