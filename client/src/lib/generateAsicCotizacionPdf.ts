@@ -93,13 +93,11 @@ export async function downloadAsicCotizacionPdf(opts: AsicCotizacionPdfOptions):
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(GREEN.r, GREEN.g, GREEN.b);
-  doc.text("HRS GROUP S.A.", rx, y + 4, { align: "right" });
+  doc.text("HRS GROUP S.A.", rx, y + 6, { align: "right" });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(MUTED.r, MUTED.g, MUTED.b);
-  doc.text("Hashrate Space", rx, y + 8.5, { align: "right" });
-  doc.text("Juan de Salazar 1857 — Asunción, Paraguay", rx, y + 12.5, { align: "right" });
-  doc.text("sales@hashrate.space · (+595) 993 358 387", rx, y + 16.5, { align: "right" });
+  doc.text("sales@hashrate.space · (+595) 993 358 387", rx, y + 11.5, { align: "right" });
 
   y += 22;
   doc.setDrawColor(GREEN.r, GREEN.g, GREEN.b);
@@ -128,10 +126,7 @@ export async function downloadAsicCotizacionPdf(opts: AsicCotizacionPdfOptions):
     y += 5;
   }
 
-  doc.setFontSize(8);
-  doc.setTextColor(MUTED.r, MUTED.g, MUTED.b);
-  doc.text("Precios de referencia en USD. Sujetos a disponibilidad y condiciones de mercado.", M, y);
-  y += 7;
+  y += 2;
 
   const col = {
     n: M,
