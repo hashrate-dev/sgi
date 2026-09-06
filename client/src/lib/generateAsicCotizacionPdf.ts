@@ -163,7 +163,6 @@ export async function downloadAsicCotizacionPdf(opts: AsicCotizacionPdfOptions):
 
   drawHeader();
 
-  let total = 0;
   let rowIndex = 0;
 
   const ensureSpace = (need: number) => {
@@ -178,7 +177,6 @@ export async function downloadAsicCotizacionPdf(opts: AsicCotizacionPdfOptions):
     const proc = (item.procesador || "—").trim() || "—";
     const obs = (item.observaciones || "").trim() || "—";
     const precio = Number(item.precioVenta) || 0;
-    total += precio;
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8.5);
@@ -223,20 +221,12 @@ export async function downloadAsicCotizacionPdf(opts: AsicCotizacionPdfOptions):
     doc.line(M, y - 3.2, PAGE_W - M, y - 3.2);
   }
 
-  ensureSpace(16);
-  y += 3;
+  ensureSpace(10);
+  y += 2;
   doc.setDrawColor(GREEN.r, GREEN.g, GREEN.b);
-  doc.setLineWidth(0.45);
-  doc.line(M, y - 4, PAGE_W - M, y - 4);
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.setTextColor(GREEN.r, GREEN.g, GREEN.b);
-  doc.text("Total cotización", M, y + 2);
-  doc.setFontSize(11);
-  doc.setTextColor(TEXT.r, TEXT.g, TEXT.b);
-  doc.text(moneyUsd(total), PAGE_W - M, y + 2, { align: "right" });
-  y += 10;
+  doc.setLineWidth(0.4);
+  doc.line(M, y, PAGE_W - M, y);
+  y += 7;
 
   const nota = (opts.nota || "").trim() || DEFAULT_LEGAL;
   doc.setFont("helvetica", "normal");
