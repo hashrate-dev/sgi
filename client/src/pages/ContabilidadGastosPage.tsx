@@ -13,6 +13,7 @@ import {
   deleteContabilidadGasto,
   fetchContabilidadGastoFacturaPdfBlob,
   getContabilidadGastos,
+  getContabilidadTipoCambio,
   getProveedoresHrs,
   scanContabilidadFacturaPdf,
   updateContabilidadGasto,
@@ -172,6 +173,10 @@ export function ContabilidadGastosPage() {
   const [moneda, setMoneda] = useState<ContabilidadMoneda>("UYU");
   const [montoStr, setMontoStr] = useState("");
   const [tipoCambioStr, setTipoCambioStr] = useState("");
+  /** Evita que el auto-BCU pise un valor que el usuario editó a mano (hasta cambiar fecha/moneda). */
+  const tipoCambioManualRef = useRef(false);
+  const [tipoCambioAutoHint, setTipoCambioAutoHint] = useState("");
+  const [tipoCambioAutoBusy, setTipoCambioAutoBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [listLoading, setListLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -220,6 +225,54 @@ export function ContabilidadGastosPage() {
       void loadGastos();
     }
   }, [loading, user, loadProveedores, loadGastos]);
+
+  /** Cotización automática BCU según fecha (último hábil si fin de semana / feriado). */
+  useEffect(() => {
+    if (moneda === "USD") {
+      setTipoCambioStr("");
+      setTipoCambioAutoHint("");
+      setTipoCambioAutoBusy(false);
+      return;
+    }
+    const fechaIso = String(fecha || "").slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaIso)) return;
+    if (tipoCambioManualRef.current) return;
+
+    let cancelled = false;
+    setTipoCambioAutoBusy(true);
+    setTipoCambioAutoHint(
+      moneda === "PYG" ? "Consultando Gs./USD (par USD/PYG)…" : "Consultando cotización BCU…"
+    );
+    void (async () => {
+      try {
+        const r = await getContabilidadTipoCambio(fechaIso, moneda);
+        if (cancelled || tipoCambioManualRef.current) return;
+        if (r.tipoCambio != null && Number.isFinite(r.tipoCambio) && r.tipoCambio > 0) {
+          setTipoCambioStr(tipoCambioToFormStr(r.tipoCambio));
+          const fc = r.fechaCotizacion ? ` (hábil ${r.fechaCotizacion})` : "";
+          setTipoCambioAutoHint(
+            r.detalle
+              ? `${r.detalle}`
+              : `Cotización BCU automática${fc}. Podés editarla a mano si hace falta.`
+          );
+        } else {
+          setTipoCambioAutoHint("Sin cotización BCU para esa fecha; ingresala a mano.");
+        }
+      } catch (e) {
+        if (cancelled) return;
+        setTipoCambioAutoHint(
+          e instanceof Error
+            ? e.message
+            : "No se pudo obtener la cotización BCU; ingresala a mano."
+        );
+      } finally {
+        if (!cancelled) setTipoCambioAutoBusy(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [fecha, moneda]);
 
   useEffect(() => {
     if (detailRow == null) return;
@@ -352,6 +405,8 @@ export function ContabilidadGastosPage() {
   }
 
   const resetFormToNew = () => {
+    tipoCambioManualRef.current = false;
+    setTipoCambioAutoHint("");
     setDescripcion("");
     setNumeroFactura("");
     setMesServicio(currentYearMonth());
@@ -378,6 +433,8 @@ export function ContabilidadGastosPage() {
     setEditingId(row.id);
     setErr("");
     setOk("");
+    tipoCambioManualRef.current = true;
+    setTipoCambioAutoHint("Valor del gasto (podés editarlo). Al cambiar fecha o moneda se vuelve a consultar BCU.");
     setFecha(row.fecha);
     setProveedorIdStr(String(row.proveedorId));
     setDescripcion(row.descripcion);
@@ -425,6 +482,7 @@ export function ContabilidadGastosPage() {
     try {
       const r = await scanContabilidadFacturaPdf(file);
       setEditingId(null);
+      tipoCambioManualRef.current = false;
       const d = r.draft;
       if (d.fecha && /^\d{4}-\d{2}-\d{2}$/.test(d.fecha)) setFecha(d.fecha);
       if (d.proveedorId != null && Number.isFinite(d.proveedorId) && d.proveedorId > 0) {
@@ -655,7 +713,10 @@ export function ContabilidadGastosPage() {
                         type="date"
                         className="form-control"
                         value={fecha}
-                        onChange={(e) => setFecha(e.target.value)}
+                        onChange={(e) => {
+                          tipoCambioManualRef.current = false;
+                          setFecha(e.target.value);
+                        }}
                         required
                       />
                     </div>
@@ -722,6 +783,7 @@ export function ContabilidadGastosPage() {
                         buttonId="contabilidad-moneda-btn"
                         value={moneda}
                         onChange={(v) => {
+                          tipoCambioManualRef.current = false;
                           setMoneda(v);
                           if (v === "USD") setTipoCambioStr("");
                         }}
@@ -748,23 +810,24 @@ export function ContabilidadGastosPage() {
                         autoComplete="off"
                         className="form-control"
                         value={tipoCambioStr}
-                        onChange={(e) => setTipoCambioStr(e.target.value)}
-                        placeholder={moneda === "USD" ? "No aplica" : "Ej. 40,25"}
-                        disabled={moneda === "USD" || busy}
+                        onChange={(e) => {
+                          tipoCambioManualRef.current = true;
+                          setTipoCambioStr(e.target.value);
+                          setTipoCambioAutoHint("Cotización editada a mano.");
+                        }}
+                        placeholder={moneda === "USD" ? "No aplica" : tipoCambioAutoBusy ? "Consultando BCU…" : "Ej. 40,25"}
+                        disabled={moneda === "USD" || busy || tipoCambioAutoBusy}
                         aria-describedby="contabilidad-tipo-cambio-hint"
                       />
                       <span id="contabilidad-tipo-cambio-hint" className="form-text text-white-50 small">
                         {moneda === "USD"
                           ? "Gasto en dólares: no se usa tipo de cambio."
-                          : moneda === "BRL"
-                            ? "Cotización manual (reales por USD). Obligatoria para BRL."
-                            : moneda === "ARS"
-                              ? "Cotización manual (pesos argentinos por USD). Obligatoria para ARS."
-                              : moneda === "EUR"
-                                ? "Cotización manual (euros por USD). Obligatoria para EUR."
-                                : moneda === "PYG"
-                                  ? "Cotización manual (guaraníes por USD). Obligatoria para PYG."
-                                  : "Cotización manual (pesos por USD). Obligatoria para UYU."}
+                          : tipoCambioAutoHint ||
+                            (moneda === "PYG"
+                              ? "Cotización automática Gs./USD (par USD/PYG, mismo que Investing). Si no hay dato del día, usa el último hábil."
+                              : moneda === "UYU"
+                                ? "Cotización automática BCU (pesos por USD). Si es fin de semana o feriado, usa el último día hábil."
+                                : "Cotización automática BCU (unidades de la moneda por USD). Editable a mano.")}
                       </span>
                     </div>
                     <div className="col-12 col-md-6">

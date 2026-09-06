@@ -1573,6 +1573,21 @@ export function uploadContabilidadMedioPagoLogo(
   );
 }
 
+export function getContabilidadTipoCambio(
+  fecha: string,
+  moneda: ContabilidadMoneda
+): Promise<{
+  moneda: string;
+  fechaSolicitada?: string;
+  fechaCotizacion?: string;
+  tipoCambio: number | null;
+  fuente: string | null;
+  detalle: string;
+}> {
+  const q = new URLSearchParams({ fecha: String(fecha).slice(0, 10), moneda });
+  return api(`/api/contabilidad/tipo-cambio?${q.toString()}`);
+}
+
 export type ContabilidadGasto = {
   id: number;
   fecha: string;

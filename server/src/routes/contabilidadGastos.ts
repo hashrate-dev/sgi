@@ -21,6 +21,7 @@ import { requireModuleGrant } from "../middleware/moduleGrant.js";
 import { extractDraftFromFacturaText, type ProveedorLite } from "../lib/contabilidadFacturaPdfScan.js";
 import { ensureProveedoresHrsSchema } from "./proveedoresHrs.js";
 import { contabilidadMedioPagoExists, ensureContabilidadMediosPagoSchema } from "../lib/contabilidadMediosPagoCatalog.js";
+import { resolveContabilidadTipoCambio } from "../lib/bcuCotizaciones.js";
 
 export const contabilidadGastosRouter = Router();
 
@@ -345,6 +346,53 @@ function mapGasto(raw: GastoDbRow) {
     hasFacturaPdf,
   };
 }
+
+contabilidadGastosRouter.get(
+  "/contabilidad/tipo-cambio",
+  requireRole("admin_a", "admin_b", "operador", "lector"),
+  requireModuleGrant("finanzas_contabilidad"),
+  async (req, res) => {
+    const fecha = String(req.query.fecha ?? "").trim().slice(0, 10);
+    const moneda = String(req.query.moneda ?? "UYU")
+      .trim()
+      .toUpperCase();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+      return res.status(400).json({ error: { message: "Fecha inválida (YYYY-MM-DD)." } });
+    }
+    if (moneda === "USD") {
+      return res.json({ moneda, tipoCambio: null, fuente: null, detalle: "USD no requiere tipo de cambio." });
+    }
+    try {
+      const result = await resolveContabilidadTipoCambio(moneda, fecha);
+      return res.json(result);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg === "USD_SIN_TC") {
+        return res.json({ moneda, tipoCambio: null, fuente: null, detalle: "USD no requiere tipo de cambio." });
+      }
+      if (msg === "MONEDA_NO_SOPORTADA") {
+        return res.status(400).json({ error: { message: "Moneda no soportada para cotización automática." } });
+      }
+      if (msg === "FECHA_INVALIDA") {
+        return res.status(400).json({ error: { message: "Fecha inválida." } });
+      }
+      if (msg === "PYG_SIN_DATO") {
+        return res.status(502).json({
+          error: { message: "No se pudo obtener Gs./USD (par USD/PYG). Completá el tipo de cambio a mano." },
+        });
+      }
+      console.error("[contabilidad/tipo-cambio]", e);
+      return res.status(502).json({
+        error: {
+          message:
+            env.NODE_ENV === "development"
+              ? `No se pudo obtener la cotización (${msg}).`
+              : "No se pudo obtener la cotización automática. Completá el tipo de cambio a mano.",
+        },
+      });
+    }
+  }
+);
 
 contabilidadGastosRouter.get(
   "/contabilidad/gastos",
