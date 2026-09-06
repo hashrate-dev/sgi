@@ -1,5 +1,5 @@
 .hrs-mplive-page .container {
-  max-width: 1320px;
+  max-width: var(--sgi-layout-max, 1320px);
 }
 
 .hrs-mplive-panel {

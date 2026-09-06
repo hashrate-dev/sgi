@@ -271,7 +271,7 @@ export function TiendaOnlineBannersHomePage() {
 
   return (
     <Box minH="100vh" px={{ base: 4, md: 6 }} pt={{ base: 2, md: 2 }} pb={{ base: 3, md: 4 }} bgGradient="linear(135deg, #074025 0%, #49f227 100%)">
-      <Box maxW="1320px" mx="auto">
+      <Box className="sgi-layout-frame" maxW="var(--sgi-layout-max, 1400px)" mx="auto">
         <PageHeader title="Tienda Online Banners Home" showBackButton backTo="/" backText="Volver al inicio" />
 
         {loadError ? (

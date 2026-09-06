@@ -206,7 +206,7 @@ export function KryptexPage() {
       }
       return (
         <div className="hrs-home">
-          <div className="hrs-home-container container" style={{ maxWidth: "1320px" }}>
+          <div className="hrs-home-container container">
             <PageHeader title="Kryptex" />
             <div className="alert alert-danger">
               <p className="mb-2">{lectorError}</p>
@@ -236,7 +236,7 @@ export function KryptexPage() {
 
   return (
     <div className="hrs-home">
-      <div className="hrs-home-container container" style={{ maxWidth: "1320px" }}>
+      <div className="hrs-home-container container">
         <PageHeader
           title="Kryptex"
           showBackButton={!isLector}

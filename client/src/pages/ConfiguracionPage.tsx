@@ -74,7 +74,7 @@ export function ConfiguracionPage() {
 
   return (
     <Box minH="100vh" px={{ base: 4, md: 6 }} pt={{ base: 2, md: 2 }} pb={{ base: 3, md: 4 }} bgGradient="linear(135deg, #f0fdf4 0%, #ffffff 30%, #f0f9f4 100%)">
-      <Box maxW="1320px" mx="auto">
+      <Box className="sgi-layout-frame" maxW="var(--sgi-layout-max, 1400px)" mx="auto">
         <PageHeader title="Configuración" />
 
         <AppCard mt={3} p={{ base: 3, md: 4 }}>

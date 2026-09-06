@@ -2783,6 +2783,8 @@ button.fact-back {
   text-align: right;
 }
 
+/* Cotizador ASIC — listado observaciones */
+
 .asic-cotizador-registros-table td.asic-cotizador-obs-cell {
   max-width: 14rem;
   white-space: normal;
@@ -12107,10 +12109,12 @@ button.nh-watcher-btc-card__corner-btn:hover {
   }
 }
 .sgi-protected-root .nh-watcher-fullpage__container {
-  max-width: 1320px;
+  max-width: var(--sgi-layout-max, 1400px);
   width: 100%;
   margin-left: auto;
   margin-right: auto;
+  padding-left: max(var(--sgi-layout-pad, 1.5rem), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--sgi-layout-pad, 1.5rem), env(safe-area-inset-right, 0px));
 }
 .nh-watcher-fullpage-main {
   width: 100%;

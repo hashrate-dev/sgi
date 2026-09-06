@@ -36,7 +36,7 @@
 }
 
 .hrs-home-container {
-  max-width: 1320px;
+  max-width: var(--sgi-layout-max, 1320px);
   margin: 0 auto;
   position: relative;
   z-index: 1;

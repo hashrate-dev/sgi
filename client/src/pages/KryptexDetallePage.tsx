@@ -76,7 +76,7 @@ export function KryptexDetallePage() {
   if (!wallet) {
     return (
       <div className="hrs-home">
-        <div className="hrs-home-container container" style={{ maxWidth: "1320px" }}>
+        <div className="hrs-home-container container">
           <PageHeader title="Kryptex - Detalle" showBackButton backTo="/kryptex" backText="Volver a Kryptex" />
           <div className="alert alert-warning">No se especificó una cuenta. <Link to="/kryptex">Volver a Kryptex</Link></div>
         </div>
@@ -88,7 +88,7 @@ export function KryptexDetallePage() {
 
   return (
     <div className="hrs-home">
-      <div className="hrs-home-container container" style={{ maxWidth: "1320px" }}>
+      <div className="hrs-home-container container">
         <PageHeader
           title={`Cuenta: ${shortWallet}${data?.usuario ? ` · ${data.usuario}` : ""}`}
           showBackButton

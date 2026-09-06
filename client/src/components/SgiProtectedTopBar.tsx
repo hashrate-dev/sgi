@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link as RouterLink, useLocation, useNavigate } from "react-router-dom";
-import { Badge, Box, Flex, Heading, Image as ChakraImage, Stack, Text } from "@chakra-ui/react";
+import { Box, Flex, Heading, Image as ChakraImage, Stack, Text } from "@chakra-ui/react";
 import { useAuth } from "../contexts/AuthContext";
 import { updateMyPassword } from "../lib/api";
 import { HOME_DASHBOARD_SHELL } from "../lib/sgiDashboardShell";
@@ -80,15 +80,26 @@ export function SgiProtectedTopBar({ onHeightChange }: SgiProtectedTopBarProps) 
         as="header"
         role="banner"
         aria-label="Cabecera SGI"
-        className="hrs-dashboard-glass-top hrs-sgi-home-topbar hrs-sgi-shell-header"
+        className="hrs-sgi-shell-header"
       >
-        <Box w="100%" {...HOME_DASHBOARD_SHELL} py={{ base: 3, md: 3 }} className="hrs-sgi-shell-header__inner">
-          <Flex align="center" justify="space-between" gap={{ base: 3, lg: 4 }} flexWrap={{ base: "wrap", lg: "nowrap" }} w="100%">
+        <Box
+          w="100%"
+          {...HOME_DASHBOARD_SHELL}
+          className="hrs-sgi-shell-header__inner"
+        >
+          <Flex
+            className="hrs-sgi-shell-header__row"
+            align="center"
+            justify="space-between"
+            gap={{ base: 3, lg: 4 }}
+            flexWrap={{ base: "wrap", lg: "nowrap" }}
+            w="100%"
+          >
             <RouterLink
               to={homePath}
               aria-label="Ir al inicio SGI"
               title="Ir al inicio SGI"
-              style={{ textDecoration: "none", color: "inherit", minWidth: 0, flexShrink: 0 }}
+              className="hrs-sgi-shell-header__brand"
             >
               <Flex align="center" gap={3} minW={0} flex={{ base: "1 1 100%", lg: "0 1 auto" }}>
                 <ChakraImage
@@ -102,17 +113,17 @@ export function SgiProtectedTopBar({ onHeightChange }: SgiProtectedTopBarProps) 
                   flexShrink={0}
                   onError={() => setLogoSrc("/images/HASHRATELOGO2.png")}
                 />
-                <Box minW={0} lineHeight="1.15">
-                  <Heading fontSize={{ base: "0.95rem", md: "1.05rem" }} fontWeight="700" color="gray.800" lineHeight="1.15">
+                <Box minW={0} lineHeight="1.15" className="hrs-sgi-shell-header__titles">
+                  <Heading as="h1" className="hrs-sgi-shell-header__title">
                     HRS GROUP S.A
                   </Heading>
-                  <Text fontSize="xs" color="gray.600" mt={0.5} lineHeight="1.2">
-                    Sistema de gestión interna
-                  </Text>
+                  <Text className="hrs-sgi-shell-header__subtitle">Sistema de gestión interna</Text>
                 </Box>
               </Flex>
             </RouterLink>
+
             <Flex
+              className="hrs-sgi-shell-header__actions"
               flex={{ base: "1 1 100%", lg: "0 1 auto" }}
               minW={0}
               align="center"
@@ -123,137 +134,91 @@ export function SgiProtectedTopBar({ onHeightChange }: SgiProtectedTopBarProps) 
               ml={{ base: 0, lg: "auto" }}
             >
               {!isHome ? (
-                <AppButton
-                  variant="plain"
-                  size="xs"
-                  h="auto"
-                  minW="auto"
-                  px={1}
-                  py={0.5}
-                  color="gray.600"
-                  fontWeight="medium"
-                  borderRadius="sm"
-                  _hover={{ bg: "transparent", color: "green.700", textDecoration: "underline" }}
-                  _active={{ bg: "transparent" }}
+                <button
+                  type="button"
+                  className="hrs-sgi-shell-header__link"
                   onClick={() => navigate(homePath)}
-                  flexShrink={0}
                 >
-                  <Flex align="center" gap={2}>
-                    <Box as="i" className="bi bi-house-door" fontSize="12px" aria-hidden />
-                    Volver al inicio
-                  </Flex>
-                </AppButton>
-              ) : null}
-              {isHome ? (
-                <AppButton
-                  variant="plain"
-                  size="xs"
-                  h="auto"
-                  minW="auto"
-                  px={1}
-                  py={0.5}
-                  color="gray.600"
-                  fontWeight="medium"
-                  borderRadius="sm"
-                  _hover={{ bg: "transparent", color: "green.700", textDecoration: "underline" }}
-                  _active={{ bg: "transparent" }}
+                  <i className="bi bi-house-door" aria-hidden />
+                  <span>Volver al inicio</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="hrs-sgi-shell-header__link"
                   onClick={() => setShowPasswordModal(true)}
-                  flexShrink={0}
                 >
-                  <Flex align="center" gap={2}>
-                    <Box as="i" className="bi bi-key" fontSize="12px" aria-hidden />
-                    Cambiar contraseña
-                  </Flex>
-                </AppButton>
-              ) : null}
-              <Badge
-                colorPalette="green"
-                px={2.5}
-                py={1}
-                borderRadius="full"
-                fontWeight="medium"
-                maxW={{ base: "min(100%, 22rem)", md: "min(100%, 24rem)" }}
-                flexShrink={0}
-              >
-                <Flex as="span" align="center" gap={1.5} minW={0}>
-                  <Box as="i" className="bi bi-person-circle" flexShrink={0} aria-hidden />
-                  <Text as="span" truncate fontSize="xs">
-                    {user.email || user.username} · {user.role}
-                  </Text>
-                </Flex>
-              </Badge>
-              <AppButton
-                variant="solid"
-                size="xs"
-                h="24px"
-                minH="24px"
-                px={2.5}
-                fontSize="xs"
-                borderRadius="full"
-                fontWeight="semibold"
-                onClick={logout}
-                flexShrink={0}
-              >
-                <Flex align="center" gap={1.5}>
-                  <Box as="i" className="bi bi-box-arrow-right" fontSize="11px" aria-hidden />
-                  Cerrar sesión
-                </Flex>
-              </AppButton>
+                  <i className="bi bi-key" aria-hidden />
+                  <span>Cambiar contraseña</span>
+                </button>
+              )}
+
+              <span className="hrs-sgi-shell-header__user" title={`${user.email || user.username} · ${user.role}`}>
+                <i className="bi bi-person-circle" aria-hidden />
+                <span className="hrs-sgi-shell-header__user-text">
+                  {user.email || user.username} · {user.role}
+                </span>
+              </span>
+
+              <button type="button" className="hrs-sgi-shell-header__logout" onClick={logout}>
+                <i className="bi bi-box-arrow-right" aria-hidden />
+                <span>Cerrar sesión</span>
+              </button>
             </Flex>
           </Flex>
         </Box>
       </Box>
 
       {isHome ? (
-      <AppModal
-        open={showPasswordModal}
-        onOpenChange={setShowPasswordModal}
-        title="Cambiar mi contraseña"
-        description="Elegí una contraseña segura. Mínimo 6 caracteres; podés combinar letras y números."
-        size="md"
-        footer={
-          <>
-            <AppButton variant="outline" size="md" minH="42px" px={5} onClick={() => setShowPasswordModal(false)}>
-              Cancelar
-            </AppButton>
-            <AppButton size="md" minH="42px" px={5} onClick={handleChangePassword} loading={saving}>
-              Guardar contraseña
-            </AppButton>
-          </>
-        }
-      >
-        <Stack gap={5} align="stretch">
-          <AppInput
-            label="Usuario"
-            value={user.email || user.username}
-            readOnly
-            bg="gray.50"
-            color="gray.700"
-            cursor="default"
-            _readOnly={{ opacity: 1, cursor: "default" }}
-            helperText="Solo lectura. El usuario no se modifica desde aquí."
-          />
-          <AppInput
-            label="Nueva contraseña"
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            minLength={6}
-            autoComplete="new-password"
-            placeholder="Mínimo 6 caracteres"
-            helperText="No compartas esta contraseña con nadie."
-          />
-          <AppInput
-            label="Confirmar nueva contraseña"
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            minLength={6}
-            autoComplete="new-password"
-            placeholder="Repetí la misma contraseña"
-          />
-        </Stack>
-      </AppModal>
+        <AppModal
+          open={showPasswordModal}
+          onOpenChange={setShowPasswordModal}
+          title="Cambiar mi contraseña"
+          description="Elegí una contraseña segura. Mínimo 6 caracteres; podés combinar letras y números."
+          size="md"
+          footer={
+            <>
+              <AppButton variant="outline" size="md" minH="42px" px={5} onClick={() => setShowPasswordModal(false)}>
+                Cancelar
+              </AppButton>
+              <AppButton size="md" minH="42px" px={5} onClick={handleChangePassword} loading={saving}>
+                Guardar contraseña
+              </AppButton>
+            </>
+          }
+        >
+          <Stack gap={5} align="stretch">
+            <AppInput
+              label="Usuario"
+              value={user.email || user.username}
+              readOnly
+              bg="gray.50"
+              color="gray.700"
+              cursor="default"
+              _readOnly={{ opacity: 1, cursor: "default" }}
+              helperText="Solo lectura. El usuario no se modifica desde aquí."
+            />
+            <AppInput
+              label="Nueva contraseña"
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              minLength={6}
+              autoComplete="new-password"
+              placeholder="Mínimo 6 caracteres"
+              helperText="No compartas esta contraseña con nadie."
+            />
+            <AppInput
+              label="Confirmar nueva contraseña"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              minLength={6}
+              autoComplete="new-password"
+              placeholder="Repetí la misma contraseña"
+            />
+          </Stack>
+        </AppModal>
       ) : null}
     </>
   );

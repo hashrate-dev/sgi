@@ -31,7 +31,7 @@ html {
   text-size-adjust: 100%;
 }
 
-/* Padding lateral seguro; el max-width lo define Bootstrap + hrs.css (1320px) */
+/* Padding lateral seguro; el max-width SGI lo define hrs.css (--sgi-layout-max; unificado en todo el SGI) */
 .sgi-protected-root .container {
   padding-left: max(var(--hrs-page-pad-x), var(--hrs-safe-left));
   padding-right: max(var(--hrs-page-pad-x), var(--hrs-safe-right));
@@ -159,8 +159,8 @@ html {
 
 @media (max-width: 899.98px) {
   .site-header--marketplace .site-header__inner {
-    padding-left: max(0.75rem, var(--hrs-safe-left));
-    padding-right: max(0.75rem, var(--hrs-safe-right));
+    padding-left: max(var(--mp-header-layout-pad, 0.9rem), var(--hrs-safe-left));
+    padding-right: max(var(--mp-header-layout-pad, 0.9rem), var(--hrs-safe-right));
   }
 
   .site-header--marketplace .site-logo-img {
@@ -495,10 +495,6 @@ canvas,
 @media (min-width: 768px) and (max-width: 1024px) {
   .reportes-grid {
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  }
-
-  .site-header--marketplace .site-header__inner {
-    max-width: 100%;
   }
 }
 
