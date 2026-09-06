@@ -8,6 +8,7 @@ import { sgiHome } from "../lib/marketplacePaths.js";
 import {
   CONTABILIDAD_MEDIOS_PAGO,
   getContabilidadGastos,
+  getContabilidadMediosPago,
   getProveedoresHrs,
   type ContabilidadGasto,
   type ContabilidadMoneda,
@@ -47,6 +48,9 @@ const MONEDA_FILTER_OPTIONS: ReadonlyArray<{ value: "" | ContabilidadMoneda; lab
   { value: "UYU", label: "UYU" },
   { value: "USD", label: "USD" },
   { value: "PYG", label: "PYG" },
+  { value: "BRL", label: "BRL" },
+  { value: "ARS", label: "ARS" },
+  { value: "EUR", label: "EUR" },
 ];
 
 export function ResumenPresupuestoPage() {
@@ -61,6 +65,7 @@ export function ResumenPresupuestoPage() {
   const [qPresupuestoYm, setQPresupuestoYm] = useState("");
   const [qMoneda, setQMoneda] = useState<"" | ContabilidadMoneda>("");
   const [qMedioPago, setQMedioPago] = useState("");
+  const [mediosPagoOptions, setMediosPagoOptions] = useState<string[]>(() => [...CONTABILIDAD_MEDIOS_PAGO]);
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(1);
 
@@ -68,9 +73,16 @@ export function ResumenPresupuestoPage() {
     setListLoading(true);
     setFetchError("");
     try {
-      const [gRes, pRes] = await Promise.all([getContabilidadGastos(), getProveedoresHrs()]);
+      const [gRes, pRes, mRes] = await Promise.all([
+        getContabilidadGastos(),
+        getProveedoresHrs(),
+        getContabilidadMediosPago().catch(() => null),
+      ]);
       setItems(Array.isArray(gRes.items) ? gRes.items : []);
       setProveedores(Array.isArray(pRes.items) ? pRes.items : []);
+      if (mRes && Array.isArray(mRes.items) && mRes.items.length > 0) {
+        setMediosPagoOptions(mRes.items.map((x) => x.codigo).filter(Boolean));
+      }
     } catch {
       setItems([]);
       setProveedores([]);
@@ -242,7 +254,7 @@ export function ResumenPresupuestoPage() {
                       onChange={(e) => setQMedioPago(e.target.value)}
                     >
                       <option value="">Todos</option>
-                      {CONTABILIDAD_MEDIOS_PAGO.map((m) => (
+                      {mediosPagoOptions.map((m) => (
                         <option key={m} value={m}>
                           {m}
                         </option>

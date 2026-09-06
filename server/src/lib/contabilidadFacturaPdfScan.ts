@@ -15,7 +15,7 @@ export type ContabilidadFacturaScanDraft = {
   numeroFactura: string | null;
   descripcion: string | null;
   monto: number | null;
-  moneda: "UYU" | "USD" | "PYG" | null;
+  moneda: "UYU" | "USD" | "PYG" | "BRL" | "ARS" | "EUR" | null;
   proveedorId: number | null;
   mesServicio: string | null;
   presupuestoMes: string | null;
@@ -298,7 +298,7 @@ export function extractDraftFromFacturaText(text: string, proveedores: Proveedor
   const importeAcreditarConDolares =
     /importe\s+a\s+acreditar\s*[:.]?[\s\S]{0,120}?(?:U\$\s*S|U\$S)/i.test(raw) || Boolean(labeledHit?.forceUsd);
 
-  let moneda: "UYU" | "USD" | "PYG" | null = null;
+  let moneda: "UYU" | "USD" | "PYG" | "BRL" | "ARS" | "EUR" | null = null;
   if (importeAcreditarConDolares) {
     moneda = "USD";
     detected.push("moneda");
@@ -307,6 +307,15 @@ export function extractDraftFromFacturaText(text: string, proveedores: Proveedor
     detected.push("moneda");
   } else if (/\bGS\b|\bPYG\b|\bGUARAN/i.test(raw.toUpperCase())) {
     moneda = "PYG";
+    detected.push("moneda");
+  } else if (/\bBRL\b|\bR\$\b|\bREALES?\b|\bREAIS\b/i.test(raw)) {
+    moneda = "BRL";
+    detected.push("moneda");
+  } else if (/\bARS\b|\bARGENTIN/i.test(raw)) {
+    moneda = "ARS";
+    detected.push("moneda");
+  } else if (/\bEUR\b|\bEURO\b|€/i.test(raw)) {
+    moneda = "EUR";
     detected.push("moneda");
   } else {
     moneda = "UYU";

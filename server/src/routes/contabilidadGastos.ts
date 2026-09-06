@@ -20,6 +20,7 @@ import { requireRole } from "../middleware/auth.js";
 import { requireModuleGrant } from "../middleware/moduleGrant.js";
 import { extractDraftFromFacturaText, type ProveedorLite } from "../lib/contabilidadFacturaPdfScan.js";
 import { ensureProveedoresHrsSchema } from "./proveedoresHrs.js";
+import { contabilidadMedioPagoExists, ensureContabilidadMediosPagoSchema } from "../lib/contabilidadMediosPagoCatalog.js";
 
 export const contabilidadGastosRouter = Router();
 
@@ -61,18 +62,10 @@ const uploadFacturaPdf = multer({
   },
 });
 
-const MonedaGastoSchema = z.enum(["UYU", "USD", "PYG"]);
+const MonedaGastoSchema = z.enum(["UYU", "USD", "PYG", "BRL", "ARS", "EUR"]);
 
-const MedioPagoGastoSchema = z.enum([
-  "USD BANCO SANTANDER UY",
-  "USD BANCO INTERFISA",
-  "USD BANCO BROU UY",
-  "USDT BINANCE",
-  "USDC BINANCE",
-  "USD CONTADO",
-  "PESOS URUGUAYOS CONTADO",
-  "GS CONTADO",
-]);
+/** Catálogo dinámico en BD; se valida existencia al crear/actualizar. */
+const MedioPagoGastoSchema = z.string().min(1).max(80).trim();
 
 const YmSchema = z.string().regex(/^\d{4}-\d{2}$/);
 
@@ -90,13 +83,13 @@ const CreateContabilidadGastoSchema = z
     /** Monto en moneda de la operación (formulario). El servidor guarda además el equivalente en USD. */
     monto: z.number().positive().finite(),
     /**
-     * UYU / PYG: obligatorio (pesos o guaraníes por USD). USD: ignorado / null.
+     * UYU / PYG / BRL / ARS / EUR: obligatorio (unidades locales por USD). USD: ignorado / null.
      */
     tipoCambio: z.union([z.number().positive().finite(), z.null()]).optional(),
   })
   .refine(
     (d) => d.moneda === "USD" || (d.tipoCambio != null && Number.isFinite(d.tipoCambio) && d.tipoCambio > 0),
-    { message: "Para pesos o guaraníes el tipo de cambio es obligatorio.", path: ["tipoCambio"] }
+    { message: "Para UYU, PYG, BRL, ARS o EUR el tipo de cambio es obligatorio.", path: ["tipoCambio"] }
   );
 
 let gastosSchemaEnsured = false;
@@ -162,7 +155,7 @@ async function ensureContabilidadMontoOriginalCol(): Promise<void> {
   await db
     .prepare(
       `UPDATE contabilidad_gastos SET monto = monto_original / tipo_cambio
-       WHERE moneda IN ('UYU', 'PYG') AND tipo_cambio IS NOT NULL AND tipo_cambio > 0 AND monto = monto_original`
+       WHERE moneda IN ('UYU', 'PYG', 'BRL', 'ARS', 'EUR') AND tipo_cambio IS NOT NULL AND tipo_cambio > 0 AND monto = monto_original`
     )
     .run();
   contabilidadMontoOriginalEnsured = true;
@@ -257,7 +250,7 @@ async function ensureContabilidadGastosSchema(): Promise<void> {
         mes_servicio TEXT NOT NULL DEFAULT '',
         presupuesto_mes TEXT NOT NULL DEFAULT '',
         medio_pago TEXT NOT NULL DEFAULT '',
-        moneda TEXT NOT NULL CHECK (moneda IN ('UYU', 'USD', 'PYG')),
+        moneda TEXT NOT NULL CHECK (moneda IN ('UYU', 'USD', 'PYG', 'BRL', 'ARS', 'EUR')),
         monto NUMERIC(18, 4) NOT NULL,
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
       )`
@@ -269,6 +262,17 @@ async function ensureContabilidadGastosSchema(): Promise<void> {
   await db
     .prepare(`CREATE INDEX IF NOT EXISTS idx_contabilidad_gastos_prov ON contabilidad_gastos(proveedor_id)`)
     .run();
+  /* Instalaciones previas: ampliar CHECK de moneda. */
+  try {
+    await db.prepare(`ALTER TABLE contabilidad_gastos DROP CONSTRAINT IF EXISTS contabilidad_gastos_moneda_check`).run();
+    await db
+      .prepare(
+        `ALTER TABLE contabilidad_gastos ADD CONSTRAINT contabilidad_gastos_moneda_check CHECK (moneda IN ('UYU', 'USD', 'PYG', 'BRL', 'ARS', 'EUR'))`
+      )
+      .run();
+  } catch (e: unknown) {
+    console.warn("[contabilidad/gastos] no se pudo actualizar CHECK de moneda:", e);
+  }
   gastosSchemaEnsured = true;
 }
 
@@ -331,7 +335,7 @@ function mapGasto(raw: GastoDbRow) {
     mesServicio: String(raw.mes_servicio ?? "").slice(0, 7),
     presupuestoMes: String(raw.presupuesto_mes ?? "").slice(0, 7),
     medioPago: String(raw.medio_pago ?? "").slice(0, 80),
-    moneda: String(raw.moneda ?? "") as "UYU" | "USD" | "PYG",
+    moneda: String(raw.moneda ?? "") as "UYU" | "USD" | "PYG" | "BRL" | "ARS" | "EUR",
     /** Equivalente en USD (uso contable / listados en USD). */
     monto: Number.isFinite(m) ? m : 0,
     montoOriginal,
@@ -377,6 +381,10 @@ contabilidadGastosRouter.post(
       return res.status(400).json({ error: { message: "Datos inválidos para registrar el gasto." } });
     }
     const d = parsed.data;
+    await ensureContabilidadMediosPagoSchema();
+    if (!(await contabilidadMedioPagoExists(d.medioPago))) {
+      return res.status(400).json({ error: { message: "Medio de pago no válido o inactivo." } });
+    }
     const stored = computeStoredMontos(d);
     try {
       const prov = (await db
@@ -469,6 +477,10 @@ contabilidadGastosRouter.put(
       return res.status(400).json({ error: { message: "Datos inválidos para actualizar el gasto." } });
     }
     const d = parsed.data;
+    await ensureContabilidadMediosPagoSchema();
+    if (!(await contabilidadMedioPagoExists(d.medioPago))) {
+      return res.status(400).json({ error: { message: "Medio de pago no válido o inactivo." } });
+    }
     const stored = computeStoredMontos(d);
     try {
       const exists = (await db.prepare(`SELECT id FROM contabilidad_gastos WHERE id = ?`).get(id)) as { id?: number } | undefined;

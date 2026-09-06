@@ -4,8 +4,10 @@ import { sgiHome } from "../lib/marketplacePaths.js";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
-import { canAccessFinanzaContabilidadHub, canEditContabilidadGastos } from "../lib/auth";
+import { canAccessFinanzaContabilidadHub, canEditContabilidadGastos, canEditProveedoresHrs } from "../lib/auth";
 import { MedioPagoIcon, MedioPagoSelect } from "../components/MedioPagoSelect";
+import { MONEDA_OPTIONS, MonedaSelect } from "../components/MonedaSelect";
+import { ProveedorHrsSelect } from "../components/ProveedorHrsSelect";
 import {
   createContabilidadGasto,
   deleteContabilidadGasto,
@@ -26,17 +28,19 @@ import { MonitorGastosMensualCard } from "../components/MonitorGastosMensualCard
 import "../styles/facturacion.css";
 import "../styles/reportes-dashboard.css";
 
-const MONEDA_OPTIONS: ReadonlyArray<{ value: ContabilidadMoneda; label: string }> = [
-  { value: "UYU", label: "Pesos uruguayos ($)" },
-  { value: "USD", label: "Dólares estadounidenses (US$)" },
-  { value: "PYG", label: "Guaraníes (Gs.)" },
-];
-
 const MEDIO_PAGO_DEFAULT: ContabilidadMedioPago = CONTABILIDAD_MEDIOS_PAGO[0];
 
 function medioPagoFromStored(raw: string): ContabilidadMedioPago {
   const t = String(raw ?? "").trim();
-  return (CONTABILIDAD_MEDIOS_PAGO as readonly string[]).includes(t) ? (t as ContabilidadMedioPago) : MEDIO_PAGO_DEFAULT;
+  const legacy: Record<string, string> = {
+    "USD CONTADO": "USD EFECTIVO",
+    "PESOS URUGUAYOS CONTADO": "PESOS URUGUAYOS EFECTIVO",
+    "PESOS ARGENTINOS CONTADO": "PESOS ARGENTINOS EFECTIVO",
+    "REALES BRASIL CONTADO": "REALES BRASIL EFECTIVO",
+    "GS CONTADO": "GS EFECTIVO",
+  };
+  const mapped = (legacy[t] ?? t).trim();
+  return mapped || MEDIO_PAGO_DEFAULT;
 }
 
 function montoToFormStr(moneda: ContabilidadMoneda, monto: number): string {
@@ -130,6 +134,21 @@ function formatMontoInline(moneda: ContabilidadMoneda, monto: number): string {
         monto
       );
     }
+    if (moneda === "BRL") {
+      return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
+        monto
+      );
+    }
+    if (moneda === "ARS") {
+      return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
+        monto
+      );
+    }
+    if (moneda === "EUR") {
+      return new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
+        monto
+      );
+    }
     return new Intl.NumberFormat("es-UY", { style: "currency", currency: "UYU", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
       monto
     );
@@ -172,6 +191,7 @@ export function ContabilidadGastosPage() {
   const [gastosListPage, setGastosListPage] = useState(1);
 
   const canEdit = Boolean(user && canEditContabilidadGastos(user));
+  const canAddProveedor = Boolean(user && canEditProveedoresHrs(user));
 
   const loadProveedores = useCallback(async () => {
     try {
@@ -234,7 +254,13 @@ export function ContabilidadGastosPage() {
     const hint =
       moneda === "UYU"
         ? "Equivalente: monto en pesos ÷ tipo de cambio (pesos por USD)."
-        : "Equivalente: monto en guaraníes ÷ tipo de cambio (guaraníes por USD).";
+        : moneda === "BRL"
+          ? "Equivalente: monto en reales ÷ tipo de cambio (reales por USD)."
+          : moneda === "ARS"
+            ? "Equivalente: monto en pesos argentinos ÷ tipo de cambio (pesos por USD)."
+            : moneda === "EUR"
+              ? "Equivalente: monto en euros ÷ tipo de cambio (euros por USD)."
+              : "Equivalente: monto en guaraníes ÷ tipo de cambio (guaraníes por USD).";
     return { kind: "ok" as const, usd: m / tc, hint };
   }, [montoStr, tipoCambioStr, moneda]);
 
@@ -410,7 +436,14 @@ export function ContabilidadGastosPage() {
       if (ms && /^\d{4}-\d{2}$/.test(ms)) setMesServicio(ms);
       const pm = d.presupuestoMes?.slice(0, 7);
       if (pm && /^\d{4}-\d{2}$/.test(pm)) setPresupuestoMes(pm);
-      if (d.moneda === "UYU" || d.moneda === "USD" || d.moneda === "PYG") {
+      if (
+        d.moneda === "UYU" ||
+        d.moneda === "USD" ||
+        d.moneda === "PYG" ||
+        d.moneda === "BRL" ||
+        d.moneda === "ARS" ||
+        d.moneda === "EUR"
+      ) {
         setMoneda(d.moneda);
         if (d.moneda === "USD") setTipoCambioStr("");
       }
@@ -459,7 +492,7 @@ export function ContabilidadGastosPage() {
       tipoCambioPayload = null;
     } else {
       if (tcTrim === "") {
-        setErr("Para pesos o guaraníes completá el tipo de cambio (cotización respecto al dólar).");
+        setErr("Para UYU, PYG, BRL, ARS o EUR completá el tipo de cambio (cotización respecto al dólar).");
         return;
       }
       const tc = Number.parseFloat(tcTrim.replace(",", "."));
@@ -563,7 +596,8 @@ export function ContabilidadGastosPage() {
 
                 {canEdit && proveedores.length === 0 ? (
                   <div className="alert alert-warning small py-2 border-0 mb-3">
-                    No hay proveedores cargados todavía. Primero cargá proveedores en{" "}
+                    No hay proveedores cargados todavía. Abrí el listado y usá{" "}
+                    <strong>+ Agregar nuevo proveedor</strong>, o cargalos en{" "}
                     <Link to="/gestion-financiera/proveedores">Proveedores HRS</Link>.
                   </div>
                 ) : null}
@@ -626,20 +660,22 @@ export function ContabilidadGastosPage() {
                       />
                     </div>
                     <div className="col-12 col-md-6 col-xl-4">
-                      <label className="form-label">Nº proveedor (listado Proveedores HRS)</label>
-                      <select
-                        className="form-select"
+                      <label className="form-label" htmlFor="contabilidad-proveedor-select">
+                        Nº proveedor (listado Proveedores HRS)
+                      </label>
+                      <ProveedorHrsSelect
+                        buttonId="contabilidad-proveedor-select"
                         value={proveedorIdStr}
-                        onChange={(e) => setProveedorIdStr(e.target.value)}
+                        onChange={setProveedorIdStr}
+                        proveedores={proveedoresOrdenadosLista}
+                        canAdd={canAddProveedor}
+                        disabled={busy || scanPdfBusy}
                         required
-                      >
-                        <option value="">— Seleccionar —</option>
-                        {proveedores.map((p) => (
-                          <option key={p.id} value={String(p.id)}>
-                            {p.supplierNumber} — {p.supplierName}
-                          </option>
-                        ))}
-                      </select>
+                        onProveedorCreated={async (item) => {
+                          await loadProveedores();
+                          setOk(`Proveedor agregado al listado HRS: ${item.supplierNumber} — ${item.supplierName}`);
+                        }}
+                      />
                     </div>
                     <div className="col-12 col-md-6 col-xl-4">
                       <label className="form-label">Nº de factura</label>
@@ -679,22 +715,18 @@ export function ContabilidadGastosPage() {
                       />
                     </div>
                     <div className="col-12 col-md-6 col-xl-4">
-                      <label className="form-label">Moneda</label>
-                      <select
-                        className="form-select"
+                      <label className="form-label" htmlFor="contabilidad-moneda-btn">
+                        Moneda
+                      </label>
+                      <MonedaSelect
+                        buttonId="contabilidad-moneda-btn"
                         value={moneda}
-                        onChange={(e) => {
-                          const v = e.target.value as ContabilidadMoneda;
+                        onChange={(v) => {
                           setMoneda(v);
                           if (v === "USD") setTipoCambioStr("");
                         }}
-                      >
-                        {MONEDA_OPTIONS.map((o) => (
-                          <option key={o.value} value={o.value}>
-                            {o.label}
-                          </option>
-                        ))}
-                      </select>
+                        disabled={busy || scanPdfBusy}
+                      />
                     </div>
                     <div className="col-12 col-md-6 col-xl-4">
                       <label className="form-label">Monto</label>
@@ -724,7 +756,15 @@ export function ContabilidadGastosPage() {
                       <span id="contabilidad-tipo-cambio-hint" className="form-text text-white-50 small">
                         {moneda === "USD"
                           ? "Gasto en dólares: no se usa tipo de cambio."
-                          : "Cotización manual (pesos o guaraníes por USD). Obligatoria para UYU o PYG."}
+                          : moneda === "BRL"
+                            ? "Cotización manual (reales por USD). Obligatoria para BRL."
+                            : moneda === "ARS"
+                              ? "Cotización manual (pesos argentinos por USD). Obligatoria para ARS."
+                              : moneda === "EUR"
+                                ? "Cotización manual (euros por USD). Obligatoria para EUR."
+                                : moneda === "PYG"
+                                  ? "Cotización manual (guaraníes por USD). Obligatoria para PYG."
+                                  : "Cotización manual (pesos por USD). Obligatoria para UYU."}
                       </span>
                     </div>
                     <div className="col-12 col-md-6">
@@ -765,7 +805,7 @@ export function ContabilidadGastosPage() {
                       ) : null}
                       {totalUsdPreview.kind === "need_tc" ? (
                         <p className="small text-warning mb-0 mt-2 text-end">
-                          Completá el tipo de cambio para calcular el equivalente en USD (pesos o guaraníes por dólar).
+                          Completá el tipo de cambio para calcular el equivalente en USD (unidades de la moneda por dólar).
                         </p>
                       ) : null}
                       {totalUsdPreview.kind === "bad_tc" ? (

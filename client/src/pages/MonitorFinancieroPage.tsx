@@ -32,14 +32,21 @@ const MEDIOS_USD_FIAT = new Set([
   "USD BANCO SANTANDER UY",
   "USD BANCO INTERFISA",
   "USD BANCO BROU UY",
-  "USD CONTADO",
+  "USD ITAU UY",
+  "USD BANCO ITAU UY",
+  "USD BANCO ITAU PY",
+  "USD BBVA UY",
+  "USD SCOTIABANK UY",
+  "USD UENO BANK PY",
+  "USD EFECTIVO",
+  "USD CONTADO", // legacy
 ]);
 
 /** Stablecoins en registro. */
 const MEDIOS_USDT_USDC = new Set(["USDT BINANCE", "USDC BINANCE"]);
 
-const MEDIO_PESOS_CONTADO = "PESOS URUGUAYOS CONTADO";
-const MEDIO_GS_CONTADO = "GS CONTADO";
+const MEDIO_PESOS_EFECTIVO = "PESOS URUGUAYOS EFECTIVO";
+const MEDIO_GS_EFECTIVO = "GS EFECTIVO";
 
 function normalizeMedio(raw: string): string {
   return String(raw ?? "").trim();
@@ -112,8 +119,8 @@ function collectMonitorFinancieroYearOptions(
 function bucketMedio(g: ContabilidadGasto): "bank" | "stable" | "pesos" | "gs" | "other" {
   const m = normalizeMedio(g.medioPago);
   if (MEDIOS_USDT_USDC.has(m) || /USDT|USDC/i.test(m)) return "stable";
-  if (m === MEDIO_PESOS_CONTADO) return "pesos";
-  if (m === MEDIO_GS_CONTADO) return "gs";
+  if (m === MEDIO_PESOS_EFECTIVO || m === "PESOS URUGUAYOS CONTADO" || m === "PESOS URUGUAYOS SCOTIABANK UY" || /^PESOS URUGUAYOS/i.test(m)) return "pesos";
+  if (m === MEDIO_GS_EFECTIVO || m === "GS CONTADO" || m === "GS UENO BANK PY" || /^GS\b/i.test(m)) return "gs";
   if (MEDIOS_USD_FIAT.has(m)) return "bank";
   return "other";
 }

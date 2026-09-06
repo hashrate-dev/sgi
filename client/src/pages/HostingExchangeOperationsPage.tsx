@@ -28,6 +28,7 @@ import {
 import { downloadHostingFxTicketPdf } from "../lib/generateHostingFxTicketPdf";
 import { hostingFxClientTotalPayment } from "../lib/hostingFxClientTotalPayment";
 import { hostingFxOperationProfitUsd } from "../lib/hostingFxOperationProfit";
+import { HrsCommissionPctSelect } from "../components/HrsCommissionPctSelect";
 import "../styles/facturacion.css";
 
 type FxFormState = HostingFxOperationPayload;
@@ -50,9 +51,6 @@ const INITIAL_FORM: FxFormState = {
 
 const BANK_OPTIONS = ["Banco Santander", "BROU", "Banco Itau", "BBVA", "Prex", "Mi Dinero"] as const;
 const DEFAULT_BANK_HOSTING_COMMISSION = BANK_OPTIONS[0]!;
-const HRS_COMMISSION_PCT_OPTIONS = [
-  0.8, 1, 1.5, 1.6, 1.7, 2, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3, 3.5, 4,
-] as const;
 
 /** Valores del select «Cliente»: los dos primeros son operaciones FX; el tercero solo enlaza a la tabla de comisión 4% facturas. */
 type ClientCompraSelectValue = FxFormState["usdtSide"] | "hosting_commission";
@@ -61,11 +59,11 @@ function deliveryWhenClientCompraSideChanges(usdtSide: FxFormState["usdtSide"]):
   return usdtSide === "buy_usdt" ? "usdt_to_hrs_binance" : "usd_to_bank";
 }
 
-function normalizeHrsCommissionPct(n: number): number {
-  const allowed = HRS_COMMISSION_PCT_OPTIONS as readonly number[];
+function clampHrsCommissionPct(n: number): number {
   if (!Number.isFinite(n)) return 1;
-  if (allowed.includes(n)) return n;
-  return allowed.reduce((best, c) => (Math.abs(c - n) < Math.abs(best - n) ? c : best), allowed[0]!);
+  if (n < 0) return 0;
+  if (n > 100) return 100;
+  return Math.round(n * 1000) / 1000;
 }
 
 export function HostingExchangeOperationsPage() {
@@ -130,10 +128,10 @@ export function HostingExchangeOperationsPage() {
     void loadData();
   }, [loading, user, loadData]);
 
-  /** Corrige comisión fuera de la lista (p. ej. 0% en estado viejo) para que el % y el monto transferencia coincidan. */
+  /** Normaliza comisión inválida (NaN / fuera de 0–100). */
   useEffect(() => {
     setForm((p) => {
-      const fixed = normalizeHrsCommissionPct(p.hrsCommissionPct);
+      const fixed = clampHrsCommissionPct(p.hrsCommissionPct);
       if (fixed === p.hrsCommissionPct) return p;
       return { ...p, hrsCommissionPct: fixed };
     });
@@ -151,6 +149,11 @@ export function HostingExchangeOperationsPage() {
 
   const canEdit = Boolean(user && canEditHostingTipoCambio(user));
   const canDelete = Boolean(user && canDeleteHostingFxOperation(user));
+
+  const commissionExtraOptions = useMemo(
+    () => operations.map((op) => clampHrsCommissionPct(op.hrsCommissionPct)),
+    [operations]
+  );
 
   const clientOptions = useMemo(
     () =>
@@ -307,7 +310,7 @@ export function HostingExchangeOperationsPage() {
       clientId: op.clientId,
       operationDate: op.operationDate,
       operationAmount: Number(op.operationAmount ?? op.clientTotalPayment ?? 0),
-      hrsCommissionPct: normalizeHrsCommissionPct(op.hrsCommissionPct),
+      hrsCommissionPct: clampHrsCommissionPct(op.hrsCommissionPct),
       bankFeeAmount: Number(op.bankFeeAmount ?? 0),
       deliveryMethod:
         op.usdtSide === "buy_usdt"
@@ -419,19 +422,17 @@ export function HostingExchangeOperationsPage() {
                 />
               </div>
               <div className="col-12 col-md-6 col-lg-3">
-                <label className="fact-label">% comisión Hashrate</label>
-                <select
-                  className="fact-select"
-                  value={normalizeHrsCommissionPct(form.hrsCommissionPct)}
-                  onChange={(e) => setForm((p) => ({ ...p, hrsCommissionPct: Number(e.target.value) }))}
+                <label className="fact-label" htmlFor="hrs-commission-pct-btn">
+                  % comisión Hashrate
+                </label>
+                <HrsCommissionPctSelect
+                  buttonId="hrs-commission-pct-btn"
+                  value={clampHrsCommissionPct(form.hrsCommissionPct)}
+                  onChange={(pct) => setForm((p) => ({ ...p, hrsCommissionPct: pct }))}
+                  extraOptions={commissionExtraOptions}
+                  canAdd={canEdit}
                   disabled={!canEdit || busy}
-                >
-                  {HRS_COMMISSION_PCT_OPTIONS.map((pct) => (
-                    <option key={pct} value={pct}>
-                      {pct}%
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
               <div className="col-12 col-md-6 col-lg-3">
                 <label className="fact-label">Monto Transferencia</label>

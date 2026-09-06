@@ -23,6 +23,7 @@ import { hostingFxOperationsRouter } from "./routes/hostingFxOperations.js";
 import { asicCostosRouter } from "./routes/asicCostos.js";
 import { proveedoresHrsRouter } from "./routes/proveedoresHrs.js";
 import { contabilidadGastosRouter } from "./routes/contabilidadGastos.js";
+import { contabilidadMediosPagoRouter } from "./routes/contabilidadMediosPago.js";
 import { luxorRouter } from "./routes/luxor.js";
 import { monitorEquiposAsicHistorialRouter } from "./routes/monitorEquiposAsicHistorial.js";
 import { potencialesClientesRouter } from "./routes/potencialesClientes.js";
@@ -150,6 +151,7 @@ export function createApp() {
   app.use("/api", requireAuth, asicCostosRouter);
   app.use("/api", requireAuth, proveedoresHrsRouter);
   app.use("/api", requireAuth, contabilidadGastosRouter);
+  app.use("/api", requireAuth, contabilidadMediosPagoRouter);
   app.use("/api", requireAuth, luxorRouter);
   app.use("/api", requireAuth, monitorEquiposAsicHistorialRouter);
   app.use("/api", requireAuth, potencialesClientesRouter);

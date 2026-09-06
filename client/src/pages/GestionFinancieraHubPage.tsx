@@ -22,7 +22,7 @@ const hubItems: readonly FinHubItem[] = [
     to: "/gestion-financiera/contabilidad",
     icon: "bi-calculator",
     label: "Contabilidad",
-    desc: "Registro de gastos de empresa: fecha, proveedor, descripción, moneda (UYU / USD / PYG) e importe",
+    desc: "Registro de gastos de empresa: fecha, proveedor, descripción, moneda (UYU / USD / PYG / BRL / ARS / EUR) e importe",
   },
   {
     to: "/gestion-financiera/resumen-presupuesto",

@@ -825,13 +825,85 @@ CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_visitor ON marketplace_presence_
     mes_servicio TEXT NOT NULL DEFAULT '',
     presupuesto_mes TEXT NOT NULL DEFAULT '',
     medio_pago TEXT NOT NULL DEFAULT '',
-    moneda TEXT NOT NULL CHECK (moneda IN ('UYU','USD','PYG')),
+    moneda TEXT NOT NULL CHECK (moneda IN ('UYU','USD','PYG','BRL','ARS','EUR')),
     monto REAL NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (proveedor_id) REFERENCES proveedores_hrs(id)
   )`);
   native.exec(`CREATE INDEX IF NOT EXISTS idx_contabilidad_gastos_fecha ON contabilidad_gastos(fecha DESC)`);
   native.exec(`CREATE INDEX IF NOT EXISTS idx_contabilidad_gastos_prov ON contabilidad_gastos(proveedor_id)`);
+
+  /* DBs locales antiguas: CHECK sin EUR → recrear tabla con monedas actuales. */
+  const gastosSqlRow = native.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='contabilidad_gastos'").get() as
+    | { sql: string }
+    | undefined;
+  if (gastosSqlRow?.sql && !gastosSqlRow.sql.includes("'EUR'")) {
+    native.exec("PRAGMA foreign_keys=OFF");
+    native.exec("BEGIN");
+    try {
+      native.exec(`CREATE TABLE contabilidad_gastos__eur (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        fecha TEXT NOT NULL,
+        proveedor_id INTEGER NOT NULL,
+        supplier_number TEXT NOT NULL DEFAULT '',
+        supplier_name TEXT NOT NULL DEFAULT '',
+        numero_factura TEXT NOT NULL DEFAULT '',
+        descripcion TEXT NOT NULL,
+        observaciones TEXT NOT NULL DEFAULT '',
+        mes_servicio TEXT NOT NULL DEFAULT '',
+        presupuesto_mes TEXT NOT NULL DEFAULT '',
+        medio_pago TEXT NOT NULL DEFAULT '',
+        moneda TEXT NOT NULL CHECK (moneda IN ('UYU','USD','PYG','BRL','ARS','EUR')),
+        monto REAL NOT NULL,
+        tipo_cambio REAL,
+        monto_original REAL,
+        factura_pdf_adjunto INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (proveedor_id) REFERENCES proveedores_hrs(id)
+      )`);
+      const cols = native.prepare("PRAGMA table_info(contabilidad_gastos)").all() as Array<{ name: string }>;
+      const colNames = new Set(cols.map((c) => c.name));
+      const selectCols = [
+        "id",
+        "fecha",
+        "proveedor_id",
+        "supplier_number",
+        "supplier_name",
+        colNames.has("numero_factura") ? "numero_factura" : "'' AS numero_factura",
+        "descripcion",
+        colNames.has("observaciones") ? "observaciones" : "'' AS observaciones",
+        colNames.has("mes_servicio") ? "mes_servicio" : "'' AS mes_servicio",
+        colNames.has("presupuesto_mes") ? "presupuesto_mes" : "'' AS presupuesto_mes",
+        colNames.has("medio_pago") ? "medio_pago" : "'' AS medio_pago",
+        "moneda",
+        "monto",
+        colNames.has("tipo_cambio") ? "tipo_cambio" : "NULL AS tipo_cambio",
+        colNames.has("monto_original") ? "monto_original" : "NULL AS monto_original",
+        colNames.has("factura_pdf_adjunto") ? "factura_pdf_adjunto" : "0 AS factura_pdf_adjunto",
+        "created_at",
+      ].join(", ");
+      native.exec(
+        `INSERT INTO contabilidad_gastos__eur (
+          id, fecha, proveedor_id, supplier_number, supplier_name, numero_factura, descripcion, observaciones,
+          mes_servicio, presupuesto_mes, medio_pago, moneda, monto, tipo_cambio, monto_original, factura_pdf_adjunto, created_at
+        ) SELECT ${selectCols} FROM contabilidad_gastos`
+      );
+      native.exec("DROP TABLE contabilidad_gastos");
+      native.exec("ALTER TABLE contabilidad_gastos__eur RENAME TO contabilidad_gastos");
+      native.exec(`CREATE INDEX IF NOT EXISTS idx_contabilidad_gastos_fecha ON contabilidad_gastos(fecha DESC)`);
+      native.exec(`CREATE INDEX IF NOT EXISTS idx_contabilidad_gastos_prov ON contabilidad_gastos(proveedor_id)`);
+      native.exec("COMMIT");
+    } catch (e) {
+      try {
+        native.exec("ROLLBACK");
+      } catch {
+        /* ignore */
+      }
+      throw e;
+    } finally {
+      native.exec("PRAGMA foreign_keys=ON");
+    }
+  }
 
   try {
     native.exec("ALTER TABLE contabilidad_gastos ADD COLUMN numero_factura TEXT NOT NULL DEFAULT ''");

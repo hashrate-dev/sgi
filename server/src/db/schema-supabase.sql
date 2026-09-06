@@ -444,7 +444,7 @@ CREATE TABLE IF NOT EXISTS contabilidad_gastos (
   mes_servicio TEXT NOT NULL DEFAULT '',
   presupuesto_mes TEXT NOT NULL DEFAULT '',
   medio_pago TEXT NOT NULL DEFAULT '',
-  moneda TEXT NOT NULL CHECK (moneda IN ('UYU', 'USD', 'PYG')),
+  moneda TEXT NOT NULL CHECK (moneda IN ('UYU', 'USD', 'PYG', 'BRL', 'ARS', 'EUR')),
   monto NUMERIC(18, 4) NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -457,6 +457,10 @@ ALTER TABLE contabilidad_gastos ADD COLUMN IF NOT EXISTS medio_pago TEXT NOT NUL
 ALTER TABLE contabilidad_gastos ADD COLUMN IF NOT EXISTS tipo_cambio NUMERIC(18, 6);
 ALTER TABLE contabilidad_gastos ADD COLUMN IF NOT EXISTS monto_original NUMERIC(18, 4);
 ALTER TABLE contabilidad_gastos ADD COLUMN IF NOT EXISTS factura_pdf_adjunto SMALLINT NOT NULL DEFAULT 0;
+
+/* Ampliar CHECK de moneda en instalaciones previas. */
+ALTER TABLE contabilidad_gastos DROP CONSTRAINT IF EXISTS contabilidad_gastos_moneda_check;
+ALTER TABLE contabilidad_gastos ADD CONSTRAINT contabilidad_gastos_moneda_check CHECK (moneda IN ('UYU', 'USD', 'PYG', 'BRL', 'ARS', 'EUR'));
 
 CREATE INDEX IF NOT EXISTS idx_contabilidad_gastos_fecha ON contabilidad_gastos(fecha DESC);
 CREATE INDEX IF NOT EXISTS idx_contabilidad_gastos_prov ON contabilidad_gastos(proveedor_id);

@@ -10041,6 +10041,84 @@ button.fact-back {
   white-space: nowrap;
 }
 
+/* Contabilidad — select de proveedor HRS (misma metodología que medio de pago) */
+.contabilidad-proveedor-dd {
+  max-width: 100%;
+}
+
+.contabilidad-proveedor-dd-btn {
+  --contabilidad-dd-chevron: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+  cursor: pointer;
+  min-width: 0;
+  max-width: 100%;
+  min-height: calc(1.5em + 0.75rem + 2px);
+  padding-top: 0.375rem;
+  padding-bottom: 0.375rem;
+  line-height: 1.5;
+  padding-right: 2.6rem;
+  background-image: var(--contabilidad-dd-chevron);
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 16px 12px;
+}
+
+.contabilidad-proveedor-dd--disabled .contabilidad-proveedor-dd-btn {
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+
+.contabilidad-proveedor-dd-item:hover {
+  background-color: #f1f5f9 !important;
+}
+
+.contabilidad-proveedor-dd-item.active {
+  background-color: #e2e8f0 !important;
+}
+
+.contabilidad-proveedor-dd-add {
+  color: #1e293b;
+}
+
+/* Contabilidad — alta rápida de proveedor HRS (legacy panel; se mantiene por si queda en caché) */
+.contabilidad-nuevo-proveedor-toggle {
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.contabilidad-nuevo-proveedor-panel {
+  margin-top: 0.15rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+  color: #1e293b;
+}
+
+.contabilidad-nuevo-proveedor-panel__title {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #14532d;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.65rem;
+}
+
+.contabilidad-nuevo-proveedor-panel__hint {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.contabilidad-nuevo-proveedor-panel .form-label-sm {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 0.2rem;
+}
+
 /* ========== Contabilidad — tabla gastos ========== */
 .contabilidad-gastos-tabla-wrap.table-responsive {
   overflow-x: auto;
@@ -10341,6 +10419,118 @@ button.fact-back {
   object-fit: contain;
 }
 
+.contabilidad-medio-pago-country-flag {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+.contabilidad-medio-pago-clase-label {
+  flex: 0 0 auto;
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: #adb5bd;
+  text-transform: uppercase;
+  user-select: none;
+  margin-right: 0.1rem;
+}
+
+.contabilidad-medio-pago-clase-label--btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0.15rem 0.2rem;
+  margin: 0;
+  cursor: pointer;
+  border-radius: 0.25rem;
+}
+
+.contabilidad-medio-pago-clase-label--btn:hover:not(:disabled) {
+  color: #6c757d;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.contabilidad-medio-pago-clase-label--btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.contabilidad-medio-pago-dd-row-inner {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  gap: 0.25rem;
+  padding-right: 0.65rem;
+}
+
+.contabilidad-medio-pago-dd-row-inner:hover,
+.contabilidad-medio-pago-dd-row-inner--active {
+  background-color: rgba(13, 110, 253, 0.08);
+}
+
+.contabilidad-medio-pago-dd-item {
+  flex: 1 1 auto;
+  width: auto !important;
+  max-width: 100%;
+  min-width: 0;
+  background: transparent !important;
+}
+
+.contabilidad-medio-pago-dd-flag-slot {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  min-height: 20px;
+}
+
+.contabilidad-medio-pago-dd-admin {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  order: 0;
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: max-width 0.12s ease, opacity 0.12s ease, margin 0.12s ease;
+  margin-right: 0;
+}
+
+.contabilidad-medio-pago-dd-row-inner--admin:hover .contabilidad-medio-pago-dd-admin,
+.contabilidad-medio-pago-dd-row-inner--admin:focus-within .contabilidad-medio-pago-dd-admin {
+  max-width: 6.75rem;
+  opacity: 1;
+  pointer-events: auto;
+  margin-right: 0.1rem;
+}
+
+.contabilidad-medio-pago-dd-admin .btn {
+  font-size: 0.75rem;
+  line-height: 1.2;
+  min-width: 1.6rem;
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(0, 0, 0, 0.18);
+  color: #495057;
+}
+
+.contabilidad-medio-pago-dd-menu {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.contabilidad-medio-pago-dd-menu > li {
+  width: 100%;
+}
+
 /* Medio de pago — mismo ancho que inputs en la misma fila (col); el botón es flex y sin min-width:0 el texto largo ensanchaba la columna */
 .contabilidad-medio-pago-dd {
   max-width: 100%;
@@ -10363,13 +10553,18 @@ button.fact-back {
   background-size: 16px 12px;
 }
 
+.contabilidad-medio-pago-dd-btn .contabilidad-medio-pago-country-flag {
+  margin-left: 0.15rem;
+}
+
 .contabilidad-medio-pago-dd--disabled .contabilidad-medio-pago-dd-btn {
   opacity: 0.65;
   cursor: not-allowed;
 }
 
-.contabilidad-medio-pago-dd-item:hover {
-  background-color: rgba(13, 110, 253, 0.08) !important;
+.contabilidad-medio-pago-dd-item:hover,
+.contabilidad-medio-pago-dd-item.active {
+  background-color: transparent !important;
 }
 
 .contabilidad-medio-pago-dd-item:focus-visible {

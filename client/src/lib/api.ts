@@ -1491,20 +1491,87 @@ export function deleteProveedorHrs(id: number): Promise<{ ok: boolean }> {
   return api<{ ok: boolean }>(`/api/proveedores-hrs/${encodeURIComponent(String(id))}`, { method: "DELETE" });
 }
 
-export type ContabilidadMoneda = "UYU" | "USD" | "PYG";
+export type ContabilidadMoneda = "UYU" | "USD" | "PYG" | "BRL" | "ARS" | "EUR";
 
 export const CONTABILIDAD_MEDIOS_PAGO = [
   "USD BANCO SANTANDER UY",
   "USD BANCO INTERFISA",
   "USD BANCO BROU UY",
+  "USD ITAU UY",
+  "USD BANCO ITAU UY",
+  "USD BANCO ITAU PY",
+  "USD BBVA UY",
+  "USD SCOTIABANK UY",
+  "USD UENO BANK PY",
   "USDT BINANCE",
   "USDC BINANCE",
-  "USD CONTADO",
-  "PESOS URUGUAYOS CONTADO",
-  "GS CONTADO",
+  "USD EFECTIVO",
+  "PESOS URUGUAYOS EFECTIVO",
+  "PESOS URUGUAYOS SCOTIABANK UY",
+  "PESOS ARGENTINOS EFECTIVO",
+  "REALES BRASIL EFECTIVO",
+  "GS EFECTIVO",
+  "GS UENO BANK PY",
 ] as const;
 
-export type ContabilidadMedioPago = (typeof CONTABILIDAD_MEDIOS_PAGO)[number];
+/** Código de medio de pago (catálogo dinámico en BD; el array de arriba es fallback/seed). */
+export type ContabilidadMedioPago = string;
+
+export type ContabilidadMedioPagoClase = "FIAT" | "CRIPTO";
+
+export type ContabilidadMedioPagoCatalogItem = {
+  id: number;
+  codigo: string;
+  logoUrl: string;
+  clase: ContabilidadMedioPagoClase;
+  sortOrder: number;
+  activo: boolean;
+};
+
+export function getContabilidadMediosPago(): Promise<{
+  items: ContabilidadMedioPagoCatalogItem[];
+  canManage: boolean;
+}> {
+  return api<{ items: ContabilidadMedioPagoCatalogItem[]; canManage: boolean }>("/api/contabilidad/medios-pago");
+}
+
+export function createContabilidadMedioPago(
+  codigo: string,
+  clase?: ContabilidadMedioPagoClase
+): Promise<{ ok: boolean; item: ContabilidadMedioPagoCatalogItem }> {
+  return api<{ ok: boolean; item: ContabilidadMedioPagoCatalogItem }>("/api/contabilidad/medios-pago", {
+    method: "POST",
+    body: JSON.stringify({ codigo, ...(clase ? { clase } : {}) }),
+  });
+}
+
+export function updateContabilidadMedioPago(
+  id: number,
+  patch: { codigo?: string; clase?: ContabilidadMedioPagoClase }
+): Promise<{ ok: boolean; item: ContabilidadMedioPagoCatalogItem }> {
+  return api<{ ok: boolean; item: ContabilidadMedioPagoCatalogItem }>(
+    `/api/contabilidad/medios-pago/${encodeURIComponent(String(id))}`,
+    { method: "PATCH", body: JSON.stringify(patch) }
+  );
+}
+
+export function deleteContabilidadMedioPago(id: number): Promise<{ ok: boolean }> {
+  return api<{ ok: boolean }>(`/api/contabilidad/medios-pago/${encodeURIComponent(String(id))}`, {
+    method: "DELETE",
+  });
+}
+
+export function uploadContabilidadMedioPagoLogo(
+  id: number,
+  file: File
+): Promise<{ ok: boolean; item: ContabilidadMedioPagoCatalogItem }> {
+  const fd = new FormData();
+  fd.append("file", file);
+  return api<{ ok: boolean; item: ContabilidadMedioPagoCatalogItem }>(
+    `/api/contabilidad/medios-pago/${encodeURIComponent(String(id))}/logo`,
+    { method: "POST", body: fd }
+  );
+}
 
 export type ContabilidadGasto = {
   id: number;
@@ -1523,7 +1590,7 @@ export type ContabilidadGasto = {
   monto: number;
   /** Importe en la moneda de la operación (factura / pago). */
   montoOriginal: number;
-  /** Manual: moneda local por USD (UYU/PYG); null si el gasto fue en USD. */
+  /** Manual: moneda local por USD (UYU/PYG/BRL/ARS/EUR); null si el gasto fue en USD. */
   tipoCambio: number | null;
   createdAt: string;
   /** True si se adjuntó el PDF al guardar (escaneo / mismo archivo del formulario). */
@@ -1542,7 +1609,7 @@ export type ContabilidadGastoPayload = {
   moneda: ContabilidadMoneda;
   /** Monto en moneda de la operación; el servidor persiste el equivalente en USD en `monto`. */
   monto: number;
-  /** UYU/PYG: obligatorio. USD: `null`. */
+  /** UYU/PYG/BRL/ARS/EUR: obligatorio. USD: `null`. */
   tipoCambio?: number | null;
 };
 
