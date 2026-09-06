@@ -624,8 +624,7 @@ export function AsicCotizadorChinaPyPage() {
                           />
                         </th>
                         <th>Fecha</th>
-                        <th>Marca</th>
-                        <th>Modelo</th>
+                        <th>Equipo</th>
                         <th>Procesador</th>
                         <th>Observaciones</th>
                         <th className="text-end">Costo origen</th>
@@ -643,6 +642,16 @@ export function AsicCotizadorChinaPyPage() {
                       {registros.map((r) => {
                         const selected = selectedIds.has(r.id);
                         const obs = r.observaciones?.trim() || "";
+                        const created = new Date(r.createdAt);
+                        const fechaCorta = created.toLocaleDateString("es-PY", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "2-digit",
+                        });
+                        const horaCorta = created.toLocaleTimeString("es-PY", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        });
                         return (
                           <tr key={r.id} className={selected ? "asic-cotizador-row--selected" : undefined}>
                             <td className="asic-cotizador-col-check text-center">
@@ -655,16 +664,13 @@ export function AsicCotizadorChinaPyPage() {
                               />
                             </td>
                             <td className="asic-cotizador-reg-fecha">
-                              {new Date(r.createdAt).toLocaleString("es-PY", {
-                                year: "numeric",
-                                month: "2-digit",
-                                day: "2-digit",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
+                              <span className="asic-cotizador-reg-fecha__dia">{fechaCorta}</span>
+                              <span className="asic-cotizador-reg-fecha__hora">{horaCorta}</span>
                             </td>
-                            <td>{r.marca}</td>
-                            <td>{r.modelo}</td>
+                            <td className="asic-cotizador-reg-equipo">
+                              <span className="asic-cotizador-reg-equipo__marca">{r.marca || "—"}</span>
+                              <span className="asic-cotizador-reg-equipo__modelo">{r.modelo || "—"}</span>
+                            </td>
                             <td>{r.procesador}</td>
                             <td className="asic-cotizador-obs-cell" title={obs || undefined}>
                               {obs || "—"}
