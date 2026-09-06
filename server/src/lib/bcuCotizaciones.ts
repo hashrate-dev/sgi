@@ -34,7 +34,11 @@ export function toIsoDate(d: Date): string {
 export function parseIsoDateUtc(iso: string): Date | null {
   const t = String(iso ?? "").trim().slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return null;
-  const [y, m, d] = t.split("-").map((x) => Number.parseInt(x, 10));
+  const parts = t.split("-").map((x) => Number.parseInt(x, 10));
+  const y = parts[0];
+  const m = parts[1];
+  const d = parts[2];
+  if (y == null || m == null || d == null) return null;
   if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null;
   const dt = new Date(Date.UTC(y, m - 1, d));
   if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null;
