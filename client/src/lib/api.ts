@@ -1343,6 +1343,26 @@ export function createAsicCotizadorCatalogo(body: {
   });
 }
 
+export function updateAsicCotizadorCatalogo(
+  id: number,
+  body: { valor: string }
+): Promise<{
+  ok: boolean;
+  item: AsicCotizadorCatalogItem;
+  changed: boolean;
+  previousValor?: string;
+}> {
+  return api<{
+    ok: boolean;
+    item: AsicCotizadorCatalogItem;
+    changed: boolean;
+    previousValor?: string;
+  }>(`/api/asic/cotizador-catalogo/${encodeURIComponent(String(id))}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
 /** Lead en tabla POTENCIALES CLIENTES (compradores potenciales de mineros). */
 export type PotencialClienteLead = {
   id: number;

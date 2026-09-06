@@ -2,10 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createAsicCotizadorCatalogo,
   getAsicCotizadorCatalogo,
+  updateAsicCotizadorCatalogo,
   type AsicCotizadorCatalogTipo,
 } from "../lib/api";
 
 const MAX_VALOR_LEN = 120;
+
+type CatalogOpt = { id: number | null; valor: string };
 
 type Props = {
   tipo: AsicCotizadorCatalogTipo;
@@ -22,15 +25,25 @@ type Props = {
   onError?: (msg: string) => void;
 };
 
-function mergeOpciones(catalogo: string[], value: string): string[] {
-  const map = new Map<string, string>();
-  for (const raw of [...catalogo, value]) {
-    const v = raw.trim();
+function mergeOpciones(catalogo: CatalogOpt[], value: string): CatalogOpt[] {
+  const map = new Map<string, CatalogOpt>();
+  for (const raw of catalogo) {
+    const v = raw.valor.trim();
     if (!v) continue;
     const key = v.toLocaleLowerCase("es");
-    if (!map.has(key)) map.set(key, v);
+    const prev = map.get(key);
+    if (!prev) {
+      map.set(key, { id: raw.id, valor: v });
+    } else if (prev.id == null && raw.id != null) {
+      map.set(key, { id: raw.id, valor: v });
+    }
   }
-  return [...map.values()].sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+  const vv = value.trim();
+  if (vv) {
+    const key = vv.toLocaleLowerCase("es");
+    if (!map.has(key)) map.set(key, { id: null, valor: vv });
+  }
+  return [...map.values()].sort((a, b) => a.valor.localeCompare(b.valor, "es", { sensitivity: "base" }));
 }
 
 export function AsicCotizadorCatalogSelect({
@@ -49,18 +62,22 @@ export function AsicCotizadorCatalogSelect({
   const rootRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const nuevaRef = useRef<HTMLInputElement>(null);
+  const editRef = useRef<HTMLInputElement>(null);
 
   const [abierto, setAbierto] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [modoNuevo, setModoNuevo] = useState(false);
   const [nuevaValor, setNuevaValor] = useState("");
-  const [catalogo, setCatalogo] = useState<string[]>([]);
+  const [editandoId, setEditandoId] = useState<number | null>(null);
+  const [editValor, setEditValor] = useState("");
+  const [catalogo, setCatalogo] = useState<CatalogOpt[]>([]);
   const [loading, setLoading] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
   const parentKey = parent.trim();
   const needsParent = tipo === "procesador";
   const canLoad = !needsParent || Boolean(parentKey);
+  const enEdicion = editandoId != null;
 
   const loadCatalogo = useCallback(async () => {
     if (!canLoad) {
@@ -73,7 +90,14 @@ export function AsicCotizadorCatalogSelect({
         tipo,
         parent: needsParent ? parentKey : undefined,
       });
-      setCatalogo((r.items ?? []).map((x) => x.valor).filter(Boolean));
+      setCatalogo(
+        (r.items ?? [])
+          .map((x) => ({
+            id: Number.isFinite(x.id) && x.id > 0 ? x.id : null,
+            valor: String(x.valor ?? "").trim(),
+          }))
+          .filter((x) => x.valor)
+      );
     } catch (e) {
       onError?.(e instanceof Error ? e.message : "No se pudo cargar el catálogo.");
       setCatalogo([]);
@@ -96,7 +120,7 @@ export function AsicCotizadorCatalogSelect({
   const filtradas = useMemo(() => {
     const t = busqueda.trim().toLowerCase();
     if (!t) return todas;
-    return todas.filter((x) => x.toLowerCase().includes(t));
+    return todas.filter((x) => x.valor.toLowerCase().includes(t));
   }, [busqueda, todas]);
 
   const cerrar = useCallback(() => {
@@ -104,14 +128,22 @@ export function AsicCotizadorCatalogSelect({
     setBusqueda("");
     setModoNuevo(false);
     setNuevaValor("");
+    setEditandoId(null);
+    setEditValor("");
+  }, []);
+
+  const cancelarEdicion = useCallback(() => {
+    setEditandoId(null);
+    setEditValor("");
   }, []);
 
   const elegir = useCallback(
     (v: string) => {
+      if (enEdicion || modoNuevo) return;
       onChange(v);
       cerrar();
     },
-    [onChange, cerrar]
+    [onChange, cerrar, enEdicion, modoNuevo]
   );
 
   const abrir = () => {
@@ -120,18 +152,29 @@ export function AsicCotizadorCatalogSelect({
     setBusqueda("");
     setModoNuevo(false);
     setNuevaValor("");
+    setEditandoId(null);
+    setEditValor("");
   };
 
   const abrirNuevo = (sugerida = "") => {
+    cancelarEdicion();
     setNuevaValor(sugerida.trim().slice(0, MAX_VALOR_LEN));
     setModoNuevo(true);
+  };
+
+  const abrirEditar = (opt: CatalogOpt) => {
+    if (opt.id == null) return;
+    setModoNuevo(false);
+    setNuevaValor("");
+    setEditandoId(opt.id);
+    setEditValor(opt.valor.slice(0, MAX_VALOR_LEN));
   };
 
   const guardarNueva = async () => {
     const nombre = nuevaValor.trim().slice(0, MAX_VALOR_LEN);
     if (!nombre) return;
 
-    const yaExiste = todas.some((c) => c.localeCompare(nombre, "es", { sensitivity: "accent" }) === 0);
+    const yaExiste = todas.some((c) => c.valor.localeCompare(nombre, "es", { sensitivity: "accent" }) === 0);
     if (yaExiste) {
       onChange(nombre);
       cerrar();
@@ -146,7 +189,13 @@ export function AsicCotizadorCatalogSelect({
         parent: needsParent ? parentKey : undefined,
       });
       const creado = resp.item?.valor?.trim() || nombre;
-      setCatalogo((prev) => mergeOpciones([...prev, creado], ""));
+      const creadoId = Number(resp.item?.id ?? 0);
+      setCatalogo((prev) =>
+        mergeOpciones(
+          [...prev, { id: Number.isFinite(creadoId) && creadoId > 0 ? creadoId : null, valor: creado }],
+          ""
+        )
+      );
       onChange(creado);
       cerrar();
     } catch (e) {
@@ -156,17 +205,64 @@ export function AsicCotizadorCatalogSelect({
     }
   };
 
+  const guardarEdicion = async () => {
+    if (editandoId == null) return;
+    const nombre = editValor.trim().slice(0, MAX_VALOR_LEN);
+    if (!nombre) return;
+
+    const actual = todas.find((x) => x.id === editandoId);
+    if (actual && actual.valor.localeCompare(nombre, "es", { sensitivity: "accent" }) === 0) {
+      cancelarEdicion();
+      return;
+    }
+
+    const conflicto = todas.some(
+      (c) => c.id !== editandoId && c.valor.localeCompare(nombre, "es", { sensitivity: "accent" }) === 0
+    );
+    if (conflicto) {
+      onError?.(`Ya existe «${nombre}» en este catálogo.`);
+      return;
+    }
+
+    setGuardando(true);
+    try {
+      const resp = await updateAsicCotizadorCatalogo(editandoId, { valor: nombre });
+      const nuevo = resp.item?.valor?.trim() || nombre;
+      const prevValor = (resp.previousValor ?? actual?.valor ?? "").trim();
+      setCatalogo((prev) =>
+        prev.map((x) => (x.id === editandoId ? { id: editandoId, valor: nuevo } : x))
+      );
+      if (value.trim() && prevValor && value.localeCompare(prevValor, "es", { sensitivity: "accent" }) === 0) {
+        onChange(nuevo);
+      }
+      cancelarEdicion();
+    } catch (e) {
+      onError?.(e instanceof Error ? e.message : "No se pudo editar la opción.");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
   useEffect(() => {
-    if (!abierto || modoNuevo) return;
+    if (!abierto || modoNuevo || enEdicion) return;
     const t = window.setTimeout(() => searchRef.current?.focus(), 0);
     return () => window.clearTimeout(t);
-  }, [abierto, modoNuevo]);
+  }, [abierto, modoNuevo, enEdicion]);
 
   useEffect(() => {
     if (!modoNuevo) return;
     const t = window.setTimeout(() => nuevaRef.current?.focus(), 0);
     return () => window.clearTimeout(t);
   }, [modoNuevo]);
+
+  useEffect(() => {
+    if (!enEdicion) return;
+    const t = window.setTimeout(() => {
+      editRef.current?.focus();
+      editRef.current?.select();
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [enEdicion, editandoId]);
 
   useEffect(() => {
     if (!abierto) return;
@@ -179,6 +275,7 @@ export function AsicCotizadorCatalogSelect({
 
   const textoSeleccion = value.trim() || placeholder;
   const triggerDisabled = disabled || !canLoad;
+  const listaBloqueada = modoNuevo || enEdicion;
 
   return (
     <div className="asic-cotizador-catalog-select" ref={rootRef}>
@@ -224,11 +321,12 @@ export function AsicCotizadorCatalogSelect({
               className="form-control form-control-sm"
               placeholder={searchPlaceholder}
               value={busqueda}
-              disabled={modoNuevo}
+              disabled={listaBloqueada}
               onChange={(e) => setBusqueda(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Escape") {
                   if (modoNuevo) setModoNuevo(false);
+                  else if (enEdicion) cancelarEdicion();
                   else cerrar();
                 }
               }}
@@ -239,7 +337,7 @@ export function AsicCotizadorCatalogSelect({
               ? "Cargando catálogo…"
               : busqueda.trim()
                 ? `${filtradas.length} coincidencia(s) de ${todas.length}`
-                : `${todas.length} en catálogo · buscá o agregá`}
+                : `${todas.length} en catálogo · buscá, editá o agregá`}
           </p>
 
           {modoNuevo ? (
@@ -286,7 +384,7 @@ export function AsicCotizadorCatalogSelect({
           ) : null}
 
           <ul className="asic-cotizador-catalog-list" role="listbox">
-            {!modoNuevo ? (
+            {!listaBloqueada ? (
               <li>
                 <button type="button" className="asic-cotizador-catalog-item-nuevo" onClick={() => abrirNuevo()}>
                   <strong>+</strong>
@@ -295,7 +393,7 @@ export function AsicCotizadorCatalogSelect({
               </li>
             ) : null}
 
-            {!modoNuevo && filtradas.length === 0 && busqueda.trim() ? (
+            {!listaBloqueada && filtradas.length === 0 && busqueda.trim() ? (
               <li>
                 <button
                   type="button"
@@ -309,19 +407,93 @@ export function AsicCotizadorCatalogSelect({
             ) : null}
 
             {!modoNuevo
-              ? filtradas.map((opt) => (
-                  <li key={opt}>
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={value === opt}
-                      className={`asic-cotizador-catalog-item${value === opt ? " is-selected" : ""}`}
-                      onClick={() => elegir(opt)}
-                    >
-                      {opt}
-                    </button>
-                  </li>
-                ))
+              ? filtradas.map((opt) => {
+                  const key = opt.id != null ? `id-${opt.id}` : `v-${opt.valor}`;
+                  const editingThis = opt.id != null && editandoId === opt.id;
+
+                  if (editingThis) {
+                    return (
+                      <li key={key} className="asic-cotizador-catalog-edit-row">
+                        <div
+                          className="asic-cotizador-catalog-edit"
+                          role="group"
+                          aria-label={`Editar ${opt.valor}`}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !guardando) {
+                              e.preventDefault();
+                              void guardarEdicion();
+                            }
+                            if (e.key === "Escape") {
+                              e.preventDefault();
+                              cancelarEdicion();
+                            }
+                          }}
+                        >
+                          <label className="form-label small mb-1" htmlFor={`${labelId}-edit-${opt.id}`}>
+                            Editar
+                          </label>
+                          <input
+                            ref={editRef}
+                            id={`${labelId}-edit-${opt.id}`}
+                            type="text"
+                            className="form-control form-control-sm"
+                            maxLength={MAX_VALOR_LEN}
+                            value={editValor}
+                            disabled={guardando}
+                            onChange={(e) => setEditValor(e.target.value)}
+                          />
+                          <div className="asic-cotizador-catalog-nuevo-actions">
+                            <button
+                              type="button"
+                              className="btn btn-success btn-sm"
+                              disabled={!editValor.trim() || guardando}
+                              onClick={() => void guardarEdicion()}
+                            >
+                              {guardando ? "Guardando…" : "Guardar"}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-outline-secondary btn-sm"
+                              disabled={guardando}
+                              onClick={cancelarEdicion}
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  }
+
+                  return (
+                    <li key={key} className="asic-cotizador-catalog-row-item">
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={value === opt.valor}
+                        className={`asic-cotizador-catalog-item${value === opt.valor ? " is-selected" : ""}`}
+                        onClick={() => elegir(opt.valor)}
+                        disabled={enEdicion}
+                      >
+                        {opt.valor}
+                      </button>
+                      {opt.id != null && !enEdicion ? (
+                        <button
+                          type="button"
+                          className="asic-cotizador-catalog-edit-btn"
+                          title="Editar"
+                          aria-label={`Editar ${opt.valor}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            abrirEditar(opt);
+                          }}
+                        >
+                          Editar
+                        </button>
+                      ) : null}
+                    </li>
+                  );
+                })
               : null}
           </ul>
         </div>

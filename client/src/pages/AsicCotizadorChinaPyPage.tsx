@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { PageHeader } from "../components/PageHeader";
 import { AsicCotizadorCatalogSelect } from "../components/AsicCotizadorCatalogSelect";
 import { createAsicCostoEquipo, deleteAsicCostoEquipo, getAsicCostosEquipos, type AsicCostoEquipoItem } from "../lib/api";
@@ -610,97 +610,123 @@ export function AsicCotizadorChinaPyPage() {
                   </div>
                 </div>
                 <div className="table-responsive asic-cotizador-registros-wrap">
-                  <table className="table table-sm align-middle asic-cotizador-registros-table">
-                  <thead>
-                    <tr>
-                      <th className="asic-cotizador-col-check text-center">
-                        <input
-                          type="checkbox"
-                          className="form-check-input"
-                          checked={allVisibleSelected}
-                          onChange={(e) => toggleSelectAll(e.target.checked)}
-                          aria-label="Seleccionar todos"
-                          title="Seleccionar todos"
-                        />
-                      </th>
-                      <th>Fecha</th>
-                      <th>Marca</th>
-                      <th>Modelo</th>
-                      <th>Procesador</th>
-                      <th>Observaciones</th>
-                      <th className="text-end">Costo origen</th>
-                      <th className="text-end">Monto</th>
-                      <th className="text-end">Coef.</th>
-                      <th className="text-end">Proveedor</th>
-                      <th className="text-end">Total nacionalizado</th>
-                      <th className="text-end">Margen</th>
-                      <th className="text-end">% Margen</th>
-                      <th className="text-end">Precio venta</th>
-                      <th className="text-end">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {registros.map((r) => (
-                      <tr key={r.id} className={selectedIds.has(r.id) ? "asic-cotizador-row--selected" : undefined}>
-                        <td className="asic-cotizador-col-check text-center">
+                  <table className="table table-sm align-middle asic-cotizador-registros-table asic-cotizador-registros-table--dual">
+                    <thead>
+                      <tr>
+                        <th className="asic-cotizador-col-check text-center" rowSpan={2}>
                           <input
                             type="checkbox"
                             className="form-check-input"
-                            checked={selectedIds.has(r.id)}
-                            onChange={(e) => toggleSelectOne(r.id, e.target.checked)}
-                            aria-label={`Seleccionar ${r.marca} ${r.modelo}`}
+                            checked={allVisibleSelected}
+                            onChange={(e) => toggleSelectAll(e.target.checked)}
+                            aria-label="Seleccionar todos"
+                            title="Seleccionar todos"
                           />
-                        </td>
-                        <td>
-                          {new Date(r.createdAt).toLocaleString("es-PY", {
-                            year: "numeric",
-                            month: "2-digit",
-                            day: "2-digit",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            second: "2-digit",
-                          })}
-                        </td>
-                        <td>{r.marca}</td>
-                        <td>{r.modelo}</td>
-                        <td>{r.procesador}</td>
-                        <td className="asic-cotizador-obs-cell" title={r.observaciones?.trim() || undefined}>
-                          {r.observaciones?.trim() ? r.observaciones.trim() : "—"}
-                        </td>
-                        <td className="text-end">
-                          {formatUsd(r.precioOrigen)}
-                        </td>
-                        <td className="text-end">
-                          {formatUsd(r.montoUsd)}
-                        </td>
-                        <td className="text-end">{new Intl.NumberFormat("es-PY", { maximumFractionDigits: 6 }).format(r.coeficiente)}</td>
-                        <td className="text-end">
-                          {formatUsd(r.proveedorPy)}
-                        </td>
-                        <td className="text-end fw-semibold">
-                          {formatUsd(r.totalNacionalizado)}
-                        </td>
-                        <td className="text-end text-success fw-semibold">
-                          +{formatWhole(r.margenUsd)}
-                        </td>
-                        <td className="text-end">{formatWhole(r.pctMargen)}%</td>
-                        <td className="text-end fw-bold">
-                          {formatUsd(r.precioVenta)}
-                        </td>
-                        <td className="text-end">
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-outline-danger"
-                            title="Eliminar registro"
-                            onClick={() => void handleEliminarRegistro(r)}
-                            disabled={eliminandoIds.has(r.id)}
-                          >
-                            <i className="bi bi-trash" aria-hidden="true" />
-                          </button>
-                        </td>
+                        </th>
+                        <th>Fecha</th>
+                        <th>Marca</th>
+                        <th>Modelo</th>
+                        <th>Procesador</th>
+                        <th colSpan={4}>Observaciones</th>
+                        <th className="text-end" rowSpan={2}>
+                          Acciones
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
+                      <tr className="asic-cotizador-registros-thead-sub">
+                        <th className="text-end">Costo origen</th>
+                        <th className="text-end">Monto</th>
+                        <th className="text-end">Coef.</th>
+                        <th className="text-end">Proveedor</th>
+                        <th className="text-end">Total nac.</th>
+                        <th className="text-end">Margen</th>
+                        <th className="text-end">% Margen</th>
+                        <th className="text-end">Precio venta</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {registros.map((r) => {
+                        const selected = selectedIds.has(r.id);
+                        const fecha = new Date(r.createdAt);
+                        const fechaDia = fecha.toLocaleDateString("es-PY", {
+                          year: "numeric",
+                          month: "2-digit",
+                          day: "2-digit",
+                        });
+                        const fechaHora = fecha.toLocaleTimeString("es-PY", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        });
+                        const obs = r.observaciones?.trim() || "";
+                        return (
+                          <Fragment key={r.id}>
+                            <tr
+                              className={`asic-cotizador-reg-top${selected ? " asic-cotizador-row--selected" : ""}`}
+                            >
+                              <td className="asic-cotizador-col-check text-center" rowSpan={2}>
+                                <input
+                                  type="checkbox"
+                                  className="form-check-input"
+                                  checked={selected}
+                                  onChange={(e) => toggleSelectOne(r.id, e.target.checked)}
+                                  aria-label={`Seleccionar ${r.marca} ${r.modelo}`}
+                                />
+                              </td>
+                              <td className="asic-cotizador-reg-fecha">
+                                <span className="asic-cotizador-reg-fecha__dia">{fechaDia}</span>
+                                <span className="asic-cotizador-reg-fecha__hora">{fechaHora}</span>
+                              </td>
+                              <td>
+                                <span className="asic-cotizador-reg-clamp">{r.marca}</span>
+                              </td>
+                              <td>
+                                <span className="asic-cotizador-reg-clamp">{r.modelo}</span>
+                              </td>
+                              <td>
+                                <span className="asic-cotizador-reg-clamp">{r.procesador}</span>
+                              </td>
+                              <td className="asic-cotizador-obs-cell" colSpan={4} title={obs || undefined}>
+                                <span className="asic-cotizador-reg-clamp">{obs || "—"}</span>
+                              </td>
+                              <td className="text-end asic-cotizador-reg-actions" rowSpan={2}>
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-outline-danger"
+                                  title="Eliminar registro"
+                                  onClick={() => void handleEliminarRegistro(r)}
+                                  disabled={eliminandoIds.has(r.id)}
+                                >
+                                  <i className="bi bi-trash" aria-hidden="true" />
+                                </button>
+                              </td>
+                            </tr>
+                            <tr
+                              className={`asic-cotizador-reg-bottom${selected ? " asic-cotizador-row--selected" : ""}`}
+                            >
+                              <td className="text-end">
+                                <span className="asic-cotizador-reg-clamp">{formatUsd(r.precioOrigen)}</span>
+                              </td>
+                              <td className="text-end">
+                                <span className="asic-cotizador-reg-clamp">{formatUsd(r.montoUsd)}</span>
+                              </td>
+                              <td className="text-end">
+                                {new Intl.NumberFormat("es-PY", { maximumFractionDigits: 6 }).format(r.coeficiente)}
+                              </td>
+                              <td className="text-end">
+                                <span className="asic-cotizador-reg-clamp">{formatUsd(r.proveedorPy)}</span>
+                              </td>
+                              <td className="text-end fw-semibold">
+                                <span className="asic-cotizador-reg-clamp">{formatUsd(r.totalNacionalizado)}</span>
+                              </td>
+                              <td className="text-end text-success fw-semibold">+{formatWhole(r.margenUsd)}</td>
+                              <td className="text-end">{formatWhole(r.pctMargen)}%</td>
+                              <td className="text-end fw-bold">
+                                <span className="asic-cotizador-reg-clamp">{formatUsd(r.precioVenta)}</span>
+                              </td>
+                            </tr>
+                          </Fragment>
+                        );
+                      })}
+                    </tbody>
                   </table>
                 </div>
               </>

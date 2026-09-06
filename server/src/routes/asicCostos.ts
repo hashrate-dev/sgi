@@ -314,6 +314,10 @@ const CotizadorCatalogCreateSchema = z.object({
   parent: z.string().trim().max(120).optional(),
 });
 
+const CotizadorCatalogUpdateSchema = z.object({
+  valor: z.string().trim().min(1).max(120),
+});
+
 type CotizadorCatalogRow = {
   id: number;
   tipo: string;
@@ -435,6 +439,105 @@ asicCostosRouter.post(
       }
       console.error("[asic] POST /asic/cotizador-catalogo", e);
       return res.status(500).json({ error: { message: "No se pudo guardar la opción del catálogo." } });
+    }
+  }
+);
+
+asicCostosRouter.patch(
+  "/asic/cotizador-catalogo/:id",
+  requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("finanzas_asic_costos"),
+  async (req, res) => {
+    await ensureAsicCostosSchema();
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      return res.status(400).json({ error: { message: "id inválido." } });
+    }
+    const parsed = CotizadorCatalogUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: { message: "Datos inválidos para editar el catálogo." } });
+    }
+    const nuevoValor = normalizeCatalogValor(parsed.data.valor);
+    if (!nuevoValor) {
+      return res.status(400).json({ error: { message: "El valor no puede estar vacío." } });
+    }
+
+    const existing = (await db
+      .prepare(
+        `SELECT id, tipo, parent_key, valor, created_at
+         FROM asic_cotizador_catalogo
+         WHERE id = ?`
+      )
+      .get(id)) as CotizadorCatalogRow | undefined;
+    if (!existing) {
+      return res.status(404).json({ error: { message: "Opción no encontrada en el catálogo." } });
+    }
+
+    const tipo = String(existing.tipo ?? "") as CotizadorCatalogTipo;
+    const parent = String(existing.parent_key ?? "");
+    const valorAnterior = normalizeCatalogValor(String(existing.valor ?? ""));
+
+    if (valorAnterior.localeCompare(nuevoValor, "es", { sensitivity: "accent" }) === 0) {
+      return res.json({
+        ok: true,
+        item: mapCatalogRow(existing as unknown as Record<string, unknown>),
+        changed: false,
+      });
+    }
+
+    const conflict = (await db
+      .prepare(
+        `SELECT id
+         FROM asic_cotizador_catalogo
+         WHERE tipo = ? AND parent_key = ? AND LOWER(valor) = LOWER(?) AND id <> ?
+         LIMIT 1`
+      )
+      .get(tipo, parent, nuevoValor, id)) as { id?: number } | undefined;
+    if (conflict?.id) {
+      return res.status(409).json({
+        error: { message: `Ya existe «${nuevoValor}» en este catálogo.` },
+      });
+    }
+
+    try {
+      await db.prepare(`UPDATE asic_cotizador_catalogo SET valor = ? WHERE id = ?`).run(nuevoValor, id);
+
+      // Si se renombra un modelo, los procesadores cuelgan de parent_key = modelo.
+      if (tipo === "modelo" && valorAnterior) {
+        await db
+          .prepare(
+            `UPDATE asic_cotizador_catalogo
+             SET parent_key = ?
+             WHERE tipo = 'procesador' AND parent_key = ?`
+          )
+          .run(nuevoValor, valorAnterior);
+      }
+
+      const updated = (await db
+        .prepare(
+          `SELECT id, tipo, parent_key, valor, created_at
+           FROM asic_cotizador_catalogo
+           WHERE id = ?`
+        )
+        .get(id)) as CotizadorCatalogRow | undefined;
+
+      return res.json({
+        ok: true,
+        item: updated
+          ? mapCatalogRow(updated as unknown as Record<string, unknown>)
+          : { id, tipo, parent, valor: nuevoValor, createdAt: String(existing.created_at ?? "") },
+        changed: true,
+        previousValor: valorAnterior,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/unique|duplicate/i.test(msg)) {
+        return res.status(409).json({
+          error: { message: `Ya existe «${nuevoValor}» en este catálogo.` },
+        });
+      }
+      console.error("[asic] PATCH /asic/cotizador-catalogo/:id", e);
+      return res.status(500).json({ error: { message: "No se pudo editar la opción del catálogo." } });
     }
   }
 );

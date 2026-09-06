@@ -2716,6 +2716,48 @@ button.fact-back {
   background: #fff;
 }
 
+.asic-cotizador-catalog-row-item {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.asic-cotizador-catalog-row-item .asic-cotizador-catalog-item {
+  flex: 1 1 auto;
+  min-width: 0;
+  border-bottom: none;
+}
+
+.asic-cotizador-catalog-edit-btn {
+  flex: 0 0 auto;
+  border: none;
+  border-left: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #2D5D46;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  padding: 0 0.65rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.asic-cotizador-catalog-edit-btn:hover {
+  background: #eef5ef;
+  color: #166534;
+}
+
+.asic-cotizador-catalog-edit-row {
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.asic-cotizador-catalog-edit {
+  padding: 0.65rem;
+  background: #f0fdf4;
+  border-left: 3px solid #2D5D46;
+}
+
 .fact-panel-nuevo-documento .asic-cotizador-field-wrap--obs {
   background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
   border-color: #cbd5e1;
@@ -2742,11 +2784,11 @@ button.fact-back {
 }
 
 .asic-cotizador-registros-table td.asic-cotizador-obs-cell {
-  max-width: 14rem;
+  max-width: none;
   white-space: normal;
-  overflow-wrap: anywhere;
   font-size: 0.8rem;
   color: #475569;
+  line-height: 1.35;
 }
 
 .asic-cotizador-pdf-toolbar {
@@ -2848,6 +2890,11 @@ button.fact-back {
   border-spacing: 0;
   min-width: 1120px;
 }
+.asic-cotizador-registros-table--dual {
+  min-width: 780px;
+  width: 100%;
+  table-layout: fixed;
+}
 .asic-cotizador-registros-table thead th {
   position: sticky;
   top: 0;
@@ -2863,6 +2910,17 @@ button.fact-back {
   white-space: nowrap;
   box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.14);
 }
+.asic-cotizador-registros-table--dual thead tr.asic-cotizador-registros-thead-sub th {
+  top: 2.15rem;
+  z-index: 1;
+  background: #3a6f55;
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  padding: 0.42rem 0.55rem;
+  white-space: normal;
+  line-height: 1.2;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+}
 .asic-cotizador-registros-table tbody td {
   padding: 0.56rem 0.55rem;
   border-top: 0;
@@ -2873,14 +2931,88 @@ button.fact-back {
   white-space: nowrap;
   font-size: 0.84rem;
 }
+.asic-cotizador-registros-table--dual tbody td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  vertical-align: top;
+  padding: 0.45rem 0.5rem;
+  line-height: 1.3;
+}
+.asic-cotizador-reg-clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+  line-height: 1.3;
+}
+.asic-cotizador-registros-table--dual tbody tr.asic-cotizador-reg-top td {
+  border-bottom: 1px dashed #dbe3ea;
+  padding-top: 0.55rem;
+}
+.asic-cotizador-registros-table--dual tbody tr.asic-cotizador-reg-bottom td {
+  border-bottom: 2px solid #cbd5e1;
+  padding-bottom: 0.6rem;
+  font-size: 0.8rem;
+  color: #1e293b;
+}
+.asic-cotizador-registros-table--dual tbody td.asic-cotizador-col-check,
+.asic-cotizador-registros-table--dual tbody td.asic-cotizador-reg-actions {
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.asic-cotizador-registros-table--dual .asic-cotizador-reg-fecha {
+  white-space: normal;
+}
+.asic-cotizador-registros-table--dual .asic-cotizador-reg-fecha__dia,
+.asic-cotizador-registros-table--dual .asic-cotizador-reg-fecha__hora {
+  display: block;
+  line-height: 1.25;
+}
+.asic-cotizador-registros-table--dual .asic-cotizador-reg-fecha__hora {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 500;
+}
 .asic-cotizador-registros-table tbody tr:nth-child(even) td {
+  background: #f8fafc;
+}
+.asic-cotizador-registros-table--dual tbody tr:nth-child(even) td {
+  background: #fff;
+}
+.asic-cotizador-registros-table--dual tbody tr.asic-cotizador-reg-top:nth-child(4n + 1) td,
+.asic-cotizador-registros-table--dual tbody tr.asic-cotizador-reg-bottom:nth-child(4n + 2) td {
+  background: #fff;
+}
+.asic-cotizador-registros-table--dual tbody tr.asic-cotizador-reg-top:nth-child(4n + 3) td,
+.asic-cotizador-registros-table--dual tbody tr.asic-cotizador-reg-bottom:nth-child(4n + 4) td {
   background: #f8fafc;
 }
 .asic-cotizador-registros-table tbody tr:hover td {
   background: #f0fdf4;
 }
+.asic-cotizador-registros-table--dual tbody tr.asic-cotizador-reg-top:hover td,
+.asic-cotizador-registros-table--dual tbody tr.asic-cotizador-reg-top:hover + tr.asic-cotizador-reg-bottom td,
+.asic-cotizador-registros-table--dual tbody tr.asic-cotizador-reg-bottom:hover td {
+  background: #f0fdf4;
+}
 .asic-cotizador-registros-table tbody td.text-end {
   font-variant-numeric: tabular-nums;
+}
+.asic-cotizador-registros-table--dual tbody tr.asic-cotizador-row--selected td {
+  background: #ecfdf5;
+}
+.asic-cotizador-registros-table--dual tbody tr.asic-cotizador-reg-top.asic-cotizador-row--selected:hover td,
+.asic-cotizador-registros-table--dual
+  tbody
+  tr.asic-cotizador-reg-top.asic-cotizador-row--selected:hover
+  + tr.asic-cotizador-reg-bottom
+  td,
+.asic-cotizador-registros-table--dual tbody tr.asic-cotizador-reg-bottom.asic-cotizador-row--selected:hover td {
+  background: #d1fae5;
 }
 
 .asic-cotizador-hoy-modal__title {
@@ -14441,6 +14573,10 @@ button.nh-watcher-btc-card__corner-btn:hover {
 @media (max-width: 575.98px) {
   .asic-cotizador-registros-table {
     min-width: 720px;
+  }
+
+  .asic-cotizador-registros-table--dual {
+    min-width: 640px;
   }
 
   .hosting-fx-ops-table {
