@@ -2784,11 +2784,11 @@ button.fact-back {
 }
 
 .asic-cotizador-registros-table td.asic-cotizador-obs-cell {
-  max-width: none;
+  max-width: 14rem;
   white-space: normal;
+  overflow-wrap: anywhere;
   font-size: 0.8rem;
   color: #475569;
-  line-height: 1.35;
 }
 
 .asic-cotizador-pdf-toolbar {
@@ -2888,12 +2888,7 @@ button.fact-back {
   margin-bottom: 0;
   border-collapse: separate;
   border-spacing: 0;
-  min-width: 1120px;
-}
-.asic-cotizador-registros-table--dual {
-  min-width: 780px;
-  width: 100%;
-  table-layout: fixed;
+  min-width: 720px;
 }
 .asic-cotizador-registros-table thead th {
   position: sticky;
@@ -2910,17 +2905,6 @@ button.fact-back {
   white-space: nowrap;
   box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.14);
 }
-.asic-cotizador-registros-table--dual thead tr.asic-cotizador-registros-thead-sub th {
-  top: 2.15rem;
-  z-index: 1;
-  background: #3a6f55;
-  font-size: 0.68rem;
-  letter-spacing: 0.02em;
-  padding: 0.42rem 0.55rem;
-  white-space: normal;
-  line-height: 1.2;
-  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.1);
-}
 .asic-cotizador-registros-table tbody td {
   padding: 0.56rem 0.55rem;
   border-top: 0;
@@ -2931,88 +2915,258 @@ button.fact-back {
   white-space: nowrap;
   font-size: 0.84rem;
 }
-.asic-cotizador-registros-table--dual tbody td {
-  white-space: normal;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  vertical-align: top;
-  padding: 0.45rem 0.5rem;
-  line-height: 1.3;
-}
-.asic-cotizador-reg-clamp {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  white-space: normal;
-  line-height: 1.3;
-}
-.asic-cotizador-registros-table--dual tbody tr.asic-cotizador-reg-top td {
-  border-bottom: 1px dashed #dbe3ea;
-  padding-top: 0.55rem;
-}
-.asic-cotizador-registros-table--dual tbody tr.asic-cotizador-reg-bottom td {
-  border-bottom: 2px solid #cbd5e1;
-  padding-bottom: 0.6rem;
-  font-size: 0.8rem;
-  color: #1e293b;
-}
-.asic-cotizador-registros-table--dual tbody td.asic-cotizador-col-check,
-.asic-cotizador-registros-table--dual tbody td.asic-cotizador-reg-actions {
-  vertical-align: middle;
-  white-space: nowrap;
-}
-.asic-cotizador-registros-table--dual .asic-cotizador-reg-fecha {
-  white-space: normal;
-}
-.asic-cotizador-registros-table--dual .asic-cotizador-reg-fecha__dia,
-.asic-cotizador-registros-table--dual .asic-cotizador-reg-fecha__hora {
-  display: block;
-  line-height: 1.25;
-}
-.asic-cotizador-registros-table--dual .asic-cotizador-reg-fecha__hora {
-  font-size: 0.75rem;
-  color: #64748b;
-  font-weight: 500;
-}
 .asic-cotizador-registros-table tbody tr:nth-child(even) td {
-  background: #f8fafc;
-}
-.asic-cotizador-registros-table--dual tbody tr:nth-child(even) td {
-  background: #fff;
-}
-.asic-cotizador-registros-table--dual tbody tr.asic-cotizador-reg-top:nth-child(4n + 1) td,
-.asic-cotizador-registros-table--dual tbody tr.asic-cotizador-reg-bottom:nth-child(4n + 2) td {
-  background: #fff;
-}
-.asic-cotizador-registros-table--dual tbody tr.asic-cotizador-reg-top:nth-child(4n + 3) td,
-.asic-cotizador-registros-table--dual tbody tr.asic-cotizador-reg-bottom:nth-child(4n + 4) td {
   background: #f8fafc;
 }
 .asic-cotizador-registros-table tbody tr:hover td {
   background: #f0fdf4;
 }
-.asic-cotizador-registros-table--dual tbody tr.asic-cotizador-reg-top:hover td,
-.asic-cotizador-registros-table--dual tbody tr.asic-cotizador-reg-top:hover + tr.asic-cotizador-reg-bottom td,
-.asic-cotizador-registros-table--dual tbody tr.asic-cotizador-reg-bottom:hover td {
-  background: #f0fdf4;
-}
 .asic-cotizador-registros-table tbody td.text-end {
   font-variant-numeric: tabular-nums;
 }
-.asic-cotizador-registros-table--dual tbody tr.asic-cotizador-row--selected td {
-  background: #ecfdf5;
+
+/* Listado de registros como tarjetas legibles */
+.asic-cotizador-registros-list-wrap {
+  border-radius: 12px;
+  border: 1px solid #dbe4dc;
+  background: linear-gradient(180deg, #f7faf8 0%, #f1f5f3 100%);
+  padding: 0.65rem;
 }
-.asic-cotizador-registros-table--dual tbody tr.asic-cotizador-reg-top.asic-cotizador-row--selected:hover td,
-.asic-cotizador-registros-table--dual
-  tbody
-  tr.asic-cotizador-reg-top.asic-cotizador-row--selected:hover
-  + tr.asic-cotizador-reg-bottom
-  td,
-.asic-cotizador-registros-table--dual tbody tr.asic-cotizador-reg-bottom.asic-cotizador-row--selected:hover td {
-  background: #d1fae5;
+.asic-cotizador-registros-list-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.15rem 0.35rem 0.55rem;
+}
+.asic-cotizador-registros-list-selectall {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  user-select: none;
+}
+.asic-cotizador-registros-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+.asic-cotizador-reg-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(9.5rem, 12rem);
+  gap: 0.75rem 0.9rem;
+  align-items: stretch;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #2d5d46;
+  border-radius: 12px;
+  padding: 0.85rem 0.9rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.asic-cotizador-reg-card:hover {
+  border-color: #c5d5cb;
+  box-shadow: 0 4px 14px rgba(45, 93, 70, 0.08);
+}
+.asic-cotizador-reg-card.is-selected {
+  background: #f0fdf4;
+  border-color: #86efac;
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.18);
+}
+.asic-cotizador-reg-card__check {
+  display: flex;
+  align-items: flex-start;
+  padding-top: 0.2rem;
+}
+.asic-cotizador-reg-card__main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.asic-cotizador-reg-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.35rem 0.85rem;
+}
+.asic-cotizador-reg-card__title-block {
+  min-width: 0;
+}
+.asic-cotizador-reg-card__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 750;
+  line-height: 1.25;
+  color: #14532d;
+  overflow-wrap: anywhere;
+}
+.asic-cotizador-reg-card__proc {
+  margin: 0.15rem 0 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #475569;
+  overflow-wrap: anywhere;
+}
+.asic-cotizador-reg-card__fecha {
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  background: #f1f5f9;
+  border-radius: 999px;
+  padding: 0.22rem 0.65rem;
+  white-space: nowrap;
+}
+.asic-cotizador-reg-card__obs {
+  margin: 0;
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  color: #475569;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+.asic-cotizador-reg-card__obs-label {
+  display: inline-block;
+  margin-right: 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+.asic-cotizador-reg-card__metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.4rem, 1fr));
+  gap: 0.4rem;
+}
+.asic-cotizador-reg-metric {
+  min-width: 0;
+  padding: 0.4rem 0.5rem;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #eef2f6;
+}
+.asic-cotizador-reg-metric__label {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  margin-bottom: 0.15rem;
+}
+.asic-cotizador-reg-metric__value {
+  display: block;
+  font-size: 0.84rem;
+  font-weight: 650;
+  color: #1e293b;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+.asic-cotizador-reg-metric__value--strong {
+  color: #0f172a;
+  font-weight: 750;
+}
+.asic-cotizador-reg-metric__value--ok {
+  color: #15803d;
+}
+.asic-cotizador-reg-card__aside {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 0.55rem;
+  min-width: 0;
+  padding-left: 0.75rem;
+  border-left: 1px solid #e2e8f0;
+}
+.asic-cotizador-reg-card__precio {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  background: linear-gradient(160deg, #ecfdf5 0%, #dcfce7 100%);
+  border: 1px solid #bbf7d0;
+  text-align: right;
+}
+.asic-cotizador-reg-card__precio-label {
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #166534;
+}
+.asic-cotizador-reg-card__precio-value {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #14532d;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.asic-cotizador-reg-card__delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  width: 100%;
+}
+.asic-cotizador-reg-card__delete span {
+  font-weight: 600;
+}
+
+@media (max-width: 991.98px) {
+  .asic-cotizador-reg-card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .asic-cotizador-reg-card__aside {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: center;
+    padding-left: 0;
+    padding-top: 0.55rem;
+    border-left: 0;
+    border-top: 1px solid #e2e8f0;
+  }
+  .asic-cotizador-reg-card__precio {
+    flex: 1 1 auto;
+    text-align: left;
+  }
+  .asic-cotizador-reg-card__delete {
+    width: auto;
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .asic-cotizador-registros-list-wrap {
+    padding: 0.45rem;
+  }
+  .asic-cotizador-reg-card {
+    padding: 0.7rem;
+    gap: 0.55rem;
+  }
+  .asic-cotizador-reg-card__metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .asic-cotizador-reg-card__precio-value {
+    font-size: 1.05rem;
+  }
 }
 
 .asic-cotizador-hoy-modal__title {
@@ -14573,10 +14727,6 @@ button.nh-watcher-btc-card__corner-btn:hover {
 @media (max-width: 575.98px) {
   .asic-cotizador-registros-table {
     min-width: 720px;
-  }
-
-  .asic-cotizador-registros-table--dual {
-    min-width: 640px;
   }
 
   .hosting-fx-ops-table {
