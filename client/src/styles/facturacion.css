@@ -2464,6 +2464,8 @@ button.fact-back {
 
 /* Cotizador ASIC — Parámetros: cada campo con bloque blanco, borde y acento verde (igual que Margen USD) */
 .fact-panel-nuevo-documento .asic-cotizador-field-wrap {
+  position: relative;
+  overflow: visible;
   padding: 0.75rem 0.9rem;
   border-radius: 10px;
   background: #fff;
@@ -2506,6 +2508,276 @@ button.fact-back {
   color: #94a3b8;
   opacity: 0.9;
   cursor: not-allowed;
+}
+
+/* Cotizador ASIC: panel verde con overflow visible para el menú del catálogo */
+.fact-panel-nuevo-documento.asic-cotizador-params-panel {
+  overflow: visible;
+}
+
+.fact-panel-nuevo-documento.asic-cotizador-params-panel .fact-card-body {
+  overflow: visible;
+}
+
+.fact-panel-nuevo-documento.asic-cotizador-params-panel .asic-cotizador-catalog-row,
+.fact-panel-nuevo-documento.asic-cotizador-params-panel .asic-cotizador-costos-row {
+  overflow: visible;
+}
+
+.fact-panel-nuevo-documento.asic-cotizador-params-panel .asic-cotizador-field-wrap {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.fact-panel-nuevo-documento.asic-cotizador-params-panel .asic-cotizador-costos-row > [class*="col"] {
+  min-width: 0;
+}
+
+@media (min-width: 1200px) {
+  .fact-panel-nuevo-documento.asic-cotizador-params-panel .asic-cotizador-costos-row > .col-xl {
+    flex: 1 1 0;
+    width: 20%;
+    max-width: 20%;
+  }
+}
+
+/* Cotizador ASIC: select con catálogo + «Agregar nuevo» (estilo SCG remedios) */
+.asic-cotizador-catalog-select {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  z-index: 1;
+}
+
+.asic-cotizador-catalog-select:has(.asic-cotizador-catalog-panel) {
+  z-index: 30;
+}
+
+.asic-cotizador-catalog-shell {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  max-width: 100%;
+}
+
+.asic-cotizador-catalog-trigger {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  padding-right: 2.25rem !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%232D5D46' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.65rem center;
+  background-size: 12px 10px;
+}
+
+.asic-cotizador-catalog-trigger > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.asic-cotizador-catalog-placeholder {
+  color: #94a3b8;
+}
+
+.asic-cotizador-catalog-clear {
+  position: absolute;
+  right: 1.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 1.1rem;
+  line-height: 1;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 999px;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.asic-cotizador-catalog-clear:hover {
+  background: rgba(45, 93, 70, 0.12);
+  color: #1e293b;
+}
+
+.asic-cotizador-catalog-panel {
+  position: absolute;
+  z-index: 50;
+  left: 0;
+  right: 0;
+  width: 100%;
+  max-width: 100%;
+  margin-top: 0.35rem;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.asic-cotizador-catalog-search {
+  padding: 0.55rem 0.55rem 0;
+}
+
+.asic-cotizador-catalog-meta {
+  margin: 0.35rem 0.65rem 0.25rem;
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.asic-cotizador-catalog-nuevo {
+  padding: 0.65rem;
+  border-top: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.asic-cotizador-catalog-nuevo-title {
+  margin: 0 0 0.45rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.asic-cotizador-catalog-nuevo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+}
+
+.asic-cotizador-catalog-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.asic-cotizador-catalog-item,
+.asic-cotizador-catalog-item-nuevo {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: none;
+  border-bottom: 1px solid #f1f5f9;
+  background: #fff;
+  font-family: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  cursor: pointer;
+  color: #1e293b;
+}
+
+.asic-cotizador-catalog-item:hover {
+  background: #f0fdf4;
+}
+
+.asic-cotizador-catalog-item.is-selected {
+  background: #dcfce7;
+  font-weight: 600;
+  color: #166534;
+}
+
+.asic-cotizador-catalog-item-nuevo {
+  border-bottom: 1px dashed #cbd5e1;
+  background: #f8faf8;
+  color: #2D5D46;
+  font-weight: 600;
+}
+
+.asic-cotizador-catalog-item-nuevo strong {
+  font-size: 1rem;
+  line-height: 1;
+  color: #2D5D46;
+}
+
+.asic-cotizador-catalog-item-nuevo:hover {
+  background: #eef5ef;
+}
+
+.asic-cotizador-catalog-item-nuevo--sugerido {
+  background: #fff;
+}
+
+.fact-panel-nuevo-documento .asic-cotizador-field-wrap--obs {
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border-color: #cbd5e1;
+  border-left-color: #64748b;
+}
+
+.fact-panel-nuevo-documento .asic-cotizador-field-wrap--obs .fact-label {
+  color: #334155;
+}
+
+.fact-panel-nuevo-documento .asic-cotizador-observaciones {
+  min-height: 5.25rem;
+  resize: vertical;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.fact-panel-nuevo-documento .asic-cotizador-observaciones-meta {
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+  color: #64748b;
+  text-align: right;
+}
+
+.asic-cotizador-registros-table td.asic-cotizador-obs-cell {
+  max-width: 14rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: 0.8rem;
+  color: #475569;
+}
+
+.asic-cotizador-pdf-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+
+.asic-cotizador-pdf-toolbar__dest {
+  flex: 1 1 16rem;
+  min-width: 12rem;
+  max-width: 28rem;
+}
+
+.asic-cotizador-pdf-toolbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.asic-cotizador-registros-table .asic-cotizador-col-check {
+  width: 2.25rem;
+  vertical-align: middle;
+}
+
+.asic-cotizador-registros-table tbody tr.asic-cotizador-row--selected td {
+  background: #ecfdf5;
 }
 
 /* Parámetros — campos de costo (precio, monto, coef., proveedor): tono rojo suave */

@@ -1268,6 +1268,7 @@ export type AsicCostoEquipoItem = {
   marca: string;
   modelo: string;
   procesador: string;
+  observaciones?: string;
   precioOrigen: number;
   montoUsd: number;
   coeficiente: number;
@@ -1282,6 +1283,7 @@ export type AsicCostoEquipoPayload = {
   marca?: string;
   modelo?: string;
   procesador?: string;
+  observaciones?: string;
   precioOrigen: number;
   montoUsd: number;
   coeficiente: number;
@@ -1308,6 +1310,36 @@ export function createAsicCostoEquipo(
 export function deleteAsicCostoEquipo(id: number): Promise<void> {
   return api<void>(`/api/asic/costos-equipos/${encodeURIComponent(String(id))}`, {
     method: "DELETE",
+  });
+}
+
+export type AsicCotizadorCatalogTipo = "marca" | "modelo" | "procesador";
+
+export type AsicCotizadorCatalogItem = {
+  id: number;
+  tipo: AsicCotizadorCatalogTipo;
+  parent: string;
+  valor: string;
+  createdAt: string;
+};
+
+export function getAsicCotizadorCatalogo(params: {
+  tipo: AsicCotizadorCatalogTipo;
+  parent?: string;
+}): Promise<{ items: AsicCotizadorCatalogItem[] }> {
+  const q = new URLSearchParams({ tipo: params.tipo });
+  if (params.parent?.trim()) q.set("parent", params.parent.trim());
+  return api<{ items: AsicCotizadorCatalogItem[] }>(`/api/asic/cotizador-catalogo?${q.toString()}`);
+}
+
+export function createAsicCotizadorCatalogo(body: {
+  tipo: AsicCotizadorCatalogTipo;
+  valor: string;
+  parent?: string;
+}): Promise<{ ok: boolean; item: AsicCotizadorCatalogItem; created: boolean }> {
+  return api<{ ok: boolean; item: AsicCotizadorCatalogItem; created: boolean }>("/api/asic/cotizador-catalogo", {
+    method: "POST",
+    body: JSON.stringify(body),
   });
 }
 

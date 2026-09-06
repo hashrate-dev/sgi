@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "../components/PageHeader";
+import { AsicCotizadorCatalogSelect } from "../components/AsicCotizadorCatalogSelect";
 import { createAsicCostoEquipo, deleteAsicCostoEquipo, getAsicCostosEquipos, type AsicCostoEquipoItem } from "../lib/api";
+import { downloadAsicCotizacionPdf } from "../lib/generateAsicCotizacionPdf";
 import "../styles/facturacion.css";
 
 /** Valores por defecto de la fórmula: ((PRECIO ORIGEN + 220 USD) × 1,23) + 300 */
@@ -10,20 +12,6 @@ const COEFICIENTE_FIJO = 1.23;
 const DEFAULT_PROVEEDOR_USD = 300;
 import { HASHRATE_SPACE_LOGO } from "../lib/marketplaceWpAssets.js";
 const HASHRATE_LOGO = HASHRATE_SPACE_LOGO;
-
-const ASIC_MODELOS = ["S21", "S23", "L7", "L9", "L11", "Z15", "X9", "U3S21exPH"] as const;
-
-/** Hashrate / variante de procesador según modelo */
-const PROCESADOR_POR_MODELO: Record<(typeof ASIC_MODELOS)[number], readonly string[]> = {
-  S21: ["200 ths", "234 ths", "235 ths", "245 ths", "270 ths", "473 ths hydro"],
-  S23: ["305 ths"],
-  L7: ["8800 mhs", "9050 mhs", "9500 mhs"],
-  L9: ["15.000 mhs", "16.000 mhs", "16.500 mhs", "17.000 mhs"],
-  L11: ["20.000 mhs", "21.000 mhs", "32.000 mhs hydro"],
-  Z15: ["840 kSol/s", "860 kSol/s"],
-  X9: ["1.000K"],
-  U3S21exPH: ["860 ths hydro", "H 860 ths"],
-};
 
 function parseMoney(raw: string): number {
   const t = raw.trim().replace(/\s/g, "").replace(",", ".");
@@ -91,30 +79,19 @@ export function AsicCotizadorChinaPyPage() {
   const [marca, setMarca] = useState("");
   const [modelo, setModelo] = useState("");
   const [procesador, setProcesador] = useState("");
+  const [observaciones, setObservaciones] = useState("");
   const [registros, setRegistros] = useState<AsicCostoEquipoItem[]>([]);
   const [registrosLoading, setRegistrosLoading] = useState(false);
   const [registrosError, setRegistrosError] = useState("");
   const [eliminandoIds, setEliminandoIds] = useState<Set<number>>(() => new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
+  const [pdfDestinatario, setPdfDestinatario] = useState("");
+  const [pdfBusy, setPdfBusy] = useState(false);
   const [showHoyModal, setShowHoyModal] = useState(false);
 
-  const opcionesProcesador = useMemo((): string[] => {
-    if (modelo && modelo in PROCESADOR_POR_MODELO) {
-      return [...PROCESADOR_POR_MODELO[modelo as keyof typeof PROCESADOR_POR_MODELO]];
-    }
-    return [];
-  }, [modelo]);
-
   useEffect(() => {
-    if (opcionesProcesador.length === 0) {
-      setProcesador("");
-      return;
-    }
-    setProcesador((prev) => {
-      if (opcionesProcesador.includes(prev)) return prev;
-      if (opcionesProcesador.length === 1) return opcionesProcesador[0]!;
-      return "";
-    });
-  }, [modelo, opcionesProcesador]);
+    setProcesador("");
+  }, [modelo]);
 
   useEffect(() => {
     let mounted = true;
@@ -188,6 +165,7 @@ export function AsicCotizadorChinaPyPage() {
         marca: marca.trim(),
         modelo: modelo.trim(),
         procesador: procesador.trim(),
+        observaciones: observaciones.trim(),
         precioOrigen: parseMoney(precioOrigen),
         montoUsd: parseMoney(bloqueUsd),
         coeficiente: COEFICIENTE_FIJO,
@@ -197,9 +175,55 @@ export function AsicCotizadorChinaPyPage() {
         precioVenta,
         pctMargen: Math.round(pctMargenSobrePvp),
       });
-      if (resp.item) setRegistros((prev) => [resp.item!, ...prev]);
+      if (resp.item) {
+        setRegistros((prev) => [resp.item!, ...prev]);
+        setObservaciones("");
+      }
     } catch (e) {
       setRegistrosError(e instanceof Error ? e.message : "No se pudo registrar la cotización.");
+    }
+  }
+
+  const selectedRegistros = useMemo(
+    () => registros.filter((r) => selectedIds.has(r.id)),
+    [registros, selectedIds]
+  );
+
+  const allVisibleSelected = registros.length > 0 && registros.every((r) => selectedIds.has(r.id));
+
+  function toggleSelectAll(checked: boolean): void {
+    if (!checked) {
+      setSelectedIds(new Set());
+      return;
+    }
+    setSelectedIds(new Set(registros.map((r) => r.id)));
+  }
+
+  function toggleSelectOne(id: number, checked: boolean): void {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  async function handleDescargarPdfCotizacion(): Promise<void> {
+    if (selectedRegistros.length === 0) {
+      setRegistrosError("Seleccioná al menos un registro para generar el PDF.");
+      return;
+    }
+    setRegistrosError("");
+    setPdfBusy(true);
+    try {
+      await downloadAsicCotizacionPdf({
+        items: selectedRegistros,
+        destinatario: pdfDestinatario.trim(),
+      });
+    } catch (e) {
+      setRegistrosError(e instanceof Error ? e.message : "No se pudo generar el PDF.");
+    } finally {
+      setPdfBusy(false);
     }
   }
 
@@ -216,6 +240,11 @@ export function AsicCotizadorChinaPyPage() {
 
     // Optimista: sacar la fila inmediatamente; si el DELETE falla, re-cargamos.
     setRegistros((prev) => prev.filter((r) => r.id !== item.id));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(item.id);
+      return next;
+    });
     try {
       await deleteAsicCostoEquipo(item.id);
     } catch (e) {
@@ -360,7 +389,7 @@ export function AsicCotizadorChinaPyPage() {
           </div>
         </section>
 
-        <div className="fact-card fact-panel-nuevo-documento mb-4">
+        <div className="fact-card fact-panel-nuevo-documento asic-cotizador-params-panel mb-4">
           <div className="fact-panel-nuevo-documento-header">Parámetros de cotización</div>
           <div className="fact-card-body">
             <form
@@ -368,64 +397,59 @@ export function AsicCotizadorChinaPyPage() {
                 e.preventDefault();
               }}
             >
-              <div className="row g-3 mb-2">
+              <div className="row g-3 mb-2 asic-cotizador-catalog-row">
                 <div className="col-12 col-md-4 asic-cotizador-field-wrap">
                   <label className="fact-label" htmlFor="cot-marca">
                     Marca
                   </label>
-                  <input
-                    id="cot-marca"
-                    className="fact-input"
-                    type="text"
-                    autoComplete="off"
-                    placeholder="ej. Bitmain"
+                  <AsicCotizadorCatalogSelect
+                    tipo="marca"
                     value={marca}
-                    onChange={(e) => setMarca(e.target.value)}
+                    onChange={setMarca}
+                    labelId="cot-marca"
+                    placeholder="Seleccionar marca"
+                    searchPlaceholder="Buscar marca…"
+                    addLabel="Agregar nueva marca"
+                    newTitle="Nueva marca"
+                    onError={(msg) => setRegistrosError(msg)}
                   />
                 </div>
                 <div className="col-12 col-md-4 asic-cotizador-field-wrap">
                   <label className="fact-label" htmlFor="cot-modelo">
                     Modelo
                   </label>
-                  <select
-                    id="cot-modelo"
-                    className="fact-select"
+                  <AsicCotizadorCatalogSelect
+                    tipo="modelo"
                     value={modelo}
-                    onChange={(e) => setModelo(e.target.value)}
-                  >
-                    <option value="">Seleccionar modelo</option>
-                    {ASIC_MODELOS.map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setModelo}
+                    labelId="cot-modelo"
+                    placeholder="Seleccionar modelo"
+                    searchPlaceholder="Buscar modelo…"
+                    addLabel="Agregar nuevo modelo"
+                    newTitle="Nuevo modelo"
+                    onError={(msg) => setRegistrosError(msg)}
+                  />
                 </div>
                 <div className="col-12 col-md-4 asic-cotizador-field-wrap">
                   <label className="fact-label" htmlFor="cot-procesador">
                     Procesador
                   </label>
-                  <select
-                    id="cot-procesador"
-                    className="fact-select"
+                  <AsicCotizadorCatalogSelect
+                    tipo="procesador"
+                    parent={modelo}
                     value={procesador}
-                    onChange={(e) => setProcesador(e.target.value)}
-                    disabled={!modelo || opcionesProcesador.length === 0}
-                    title={!modelo ? "Elegí primero el modelo" : undefined}
-                  >
-                    <option value="">
-                      {modelo ? "Seleccionar procesador" : "Seleccionar modelo primero"}
-                    </option>
-                    {opcionesProcesador.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setProcesador}
+                    labelId="cot-procesador"
+                    placeholder={modelo ? "Seleccionar procesador" : "Seleccionar modelo primero"}
+                    searchPlaceholder="Buscar procesador…"
+                    addLabel="Agregar nuevo procesador"
+                    newTitle="Nuevo procesador"
+                    onError={(msg) => setRegistrosError(msg)}
+                  />
                 </div>
               </div>
-              <div className="row row-cols-1 row-cols-md-2 row-cols-xl-5 g-3">
-                <div className="col asic-cotizador-field-wrap asic-cotizador-field-wrap--costo">
+              <div className="row g-3 asic-cotizador-costos-row">
+                <div className="col-12 col-sm-6 col-xl asic-cotizador-field-wrap asic-cotizador-field-wrap--costo">
                   <label className="fact-label" htmlFor="cot-precio-origen">
                     Precio ASIC en origen (China) <span className="text-muted">USD</span>
                   </label>
@@ -440,7 +464,7 @@ export function AsicCotizadorChinaPyPage() {
                     onChange={(e) => setPrecioOrigen(sanitizeNumberInput(removeMinus(e.target.value)))}
                   />
                 </div>
-                <div className="col asic-cotizador-field-wrap asic-cotizador-field-wrap--costo">
+                <div className="col-12 col-sm-6 col-xl asic-cotizador-field-wrap asic-cotizador-field-wrap--costo">
                   <label className="fact-label" htmlFor="cot-bloque">
                     Monto en USD (ej. 220) <span className="text-muted">USD</span>
                   </label>
@@ -455,7 +479,7 @@ export function AsicCotizadorChinaPyPage() {
                     onChange={(e) => setBloqueUsd(sanitizeNumberInput(removeMinus(e.target.value)))}
                   />
                 </div>
-                <div className="col asic-cotizador-field-wrap asic-cotizador-field-wrap--costo">
+                <div className="col-12 col-sm-6 col-xl asic-cotizador-field-wrap asic-cotizador-field-wrap--costo">
                   <label className="fact-label" htmlFor="cot-mult">
                     Coeficiente <span className="text-muted">(fijo)</span>
                   </label>
@@ -469,7 +493,7 @@ export function AsicCotizadorChinaPyPage() {
                     value="1,23"
                   />
                 </div>
-                <div className="col asic-cotizador-field-wrap asic-cotizador-field-wrap--costo">
+                <div className="col-12 col-sm-6 col-xl asic-cotizador-field-wrap asic-cotizador-field-wrap--costo">
                   <label className="fact-label" htmlFor="cot-proveedor">
                     Proveedor PY <span className="text-muted">USD</span>
                   </label>
@@ -484,7 +508,7 @@ export function AsicCotizadorChinaPyPage() {
                     onChange={(e) => setProveedorPy(sanitizeNumberInput(removeMinus(e.target.value)))}
                   />
                 </div>
-                <div className="col asic-cotizador-field-wrap asic-cotizador-field-wrap--margen-amarillo">
+                <div className="col-12 col-sm-6 col-xl asic-cotizador-field-wrap asic-cotizador-field-wrap--margen-amarillo">
                   <label className="fact-label" htmlFor="cot-margen-param">
                     Margen USD
                   </label>
@@ -499,6 +523,26 @@ export function AsicCotizadorChinaPyPage() {
                     onChange={(e) => setMargen(sanitizeNumberInput(e.target.value))}
                     aria-describedby="cot-margen-hint"
                   />
+                </div>
+              </div>
+              <div className="row g-3 mt-1 asic-cotizador-obs-row">
+                <div className="col-12 asic-cotizador-field-wrap asic-cotizador-field-wrap--obs">
+                  <label className="fact-label" htmlFor="cot-observaciones">
+                    Observaciones
+                  </label>
+                  <textarea
+                    id="cot-observaciones"
+                    className="fact-input asic-cotizador-observaciones"
+                    rows={3}
+                    maxLength={2000}
+                    autoComplete="off"
+                    placeholder="Detalles u observaciones de esta cotización (opcional)…"
+                    value={observaciones}
+                    onChange={(e) => setObservaciones(e.target.value)}
+                  />
+                  <div className="asic-cotizador-observaciones-meta">
+                    {observaciones.trim() ? `${observaciones.trim().length}/2000` : "Opcional"}
+                  </div>
                 </div>
               </div>
               <div className="d-flex justify-content-end mt-3">
@@ -526,24 +570,64 @@ export function AsicCotizadorChinaPyPage() {
               <div className="text-muted small">Todavia no hay cotizaciones registradas.</div>
             ) : (
               <>
-                <div className="d-flex justify-content-end mb-2">
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-success asic-cotizador-hoy-btn"
-                    onClick={() => setShowHoyModal(true)}
-                  >
-                    <i className="bi bi-card-list me-1" />
-                    Equipos de hoy
-                  </button>
+                <div className="asic-cotizador-pdf-toolbar mb-3">
+                  <div className="asic-cotizador-pdf-toolbar__dest">
+                    <label className="form-label small mb-1" htmlFor="cot-pdf-destinatario">
+                      Destinatario del PDF (opcional)
+                    </label>
+                    <input
+                      id="cot-pdf-destinatario"
+                      type="text"
+                      className="form-control form-control-sm"
+                      placeholder="Nombre del cliente o potencial cliente"
+                      value={pdfDestinatario}
+                      onChange={(e) => setPdfDestinatario(e.target.value)}
+                      maxLength={160}
+                    />
+                  </div>
+                  <div className="asic-cotizador-pdf-toolbar__actions">
+                    <span className="text-muted small">
+                      {selectedIds.size > 0 ? `${selectedIds.size} seleccionado(s)` : "Sin selección"}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-success asic-cotizador-hoy-btn"
+                      onClick={() => setShowHoyModal(true)}
+                    >
+                      <i className="bi bi-card-list me-1" />
+                      Equipos de hoy
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-success"
+                      disabled={pdfBusy || selectedIds.size === 0}
+                      onClick={() => void handleDescargarPdfCotizacion()}
+                      title={selectedIds.size === 0 ? "Seleccioná uno o más registros" : "Descargar PDF de cotización"}
+                    >
+                      <i className="bi bi-file-earmark-pdf me-1" aria-hidden />
+                      {pdfBusy ? "Generando PDF…" : "Descargar PDF cotización"}
+                    </button>
+                  </div>
                 </div>
                 <div className="table-responsive asic-cotizador-registros-wrap">
                   <table className="table table-sm align-middle asic-cotizador-registros-table">
                   <thead>
                     <tr>
+                      <th className="asic-cotizador-col-check text-center">
+                        <input
+                          type="checkbox"
+                          className="form-check-input"
+                          checked={allVisibleSelected}
+                          onChange={(e) => toggleSelectAll(e.target.checked)}
+                          aria-label="Seleccionar todos"
+                          title="Seleccionar todos"
+                        />
+                      </th>
                       <th>Fecha</th>
                       <th>Marca</th>
                       <th>Modelo</th>
                       <th>Procesador</th>
+                      <th>Observaciones</th>
                       <th className="text-end">Costo origen</th>
                       <th className="text-end">Monto</th>
                       <th className="text-end">Coef.</th>
@@ -557,7 +641,16 @@ export function AsicCotizadorChinaPyPage() {
                   </thead>
                   <tbody>
                     {registros.map((r) => (
-                      <tr key={r.id}>
+                      <tr key={r.id} className={selectedIds.has(r.id) ? "asic-cotizador-row--selected" : undefined}>
+                        <td className="asic-cotizador-col-check text-center">
+                          <input
+                            type="checkbox"
+                            className="form-check-input"
+                            checked={selectedIds.has(r.id)}
+                            onChange={(e) => toggleSelectOne(r.id, e.target.checked)}
+                            aria-label={`Seleccionar ${r.marca} ${r.modelo}`}
+                          />
+                        </td>
                         <td>
                           {new Date(r.createdAt).toLocaleString("es-PY", {
                             year: "numeric",
@@ -571,6 +664,9 @@ export function AsicCotizadorChinaPyPage() {
                         <td>{r.marca}</td>
                         <td>{r.modelo}</td>
                         <td>{r.procesador}</td>
+                        <td className="asic-cotizador-obs-cell" title={r.observaciones?.trim() || undefined}>
+                          {r.observaciones?.trim() ? r.observaciones.trim() : "—"}
+                        </td>
                         <td className="text-end">
                           {formatUsd(r.precioOrigen)}
                         </td>
