@@ -609,124 +609,92 @@ export function AsicCotizadorChinaPyPage() {
                     </button>
                   </div>
                 </div>
-                <div className="asic-cotizador-registros-list-wrap">
-                  <div className="asic-cotizador-registros-list-toolbar">
-                    <label className="asic-cotizador-registros-list-selectall">
-                      <input
-                        type="checkbox"
-                        className="form-check-input"
-                        checked={allVisibleSelected}
-                        onChange={(e) => toggleSelectAll(e.target.checked)}
-                        aria-label="Seleccionar todos"
-                      />
-                      <span>Seleccionar todos</span>
-                    </label>
-                  </div>
-                  <div className="asic-cotizador-registros-list" role="list">
-                    {registros.map((r) => {
-                      const selected = selectedIds.has(r.id);
-                      const fecha = new Date(r.createdAt);
-                      const fechaTxt = fecha.toLocaleString("es-PY", {
-                        year: "numeric",
-                        month: "2-digit",
-                        day: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      });
-                      const obs = r.observaciones?.trim() || "";
-                      const equipoTitulo = [r.marca, r.modelo].filter(Boolean).join(" ") || "Equipo ASIC";
-                      return (
-                        <article
-                          key={r.id}
-                          role="listitem"
-                          className={`asic-cotizador-reg-card${selected ? " is-selected" : ""}`}
-                        >
-                          <div className="asic-cotizador-reg-card__check">
-                            <input
-                              type="checkbox"
-                              className="form-check-input"
-                              checked={selected}
-                              onChange={(e) => toggleSelectOne(r.id, e.target.checked)}
-                              aria-label={`Seleccionar ${equipoTitulo}`}
-                            />
-                          </div>
-
-                          <div className="asic-cotizador-reg-card__main">
-                            <div className="asic-cotizador-reg-card__head">
-                              <div className="asic-cotizador-reg-card__title-block">
-                                <h3 className="asic-cotizador-reg-card__title">{equipoTitulo}</h3>
-                                <p className="asic-cotizador-reg-card__proc">{r.procesador || "—"}</p>
-                              </div>
-                              <time className="asic-cotizador-reg-card__fecha" dateTime={r.createdAt}>
-                                {fechaTxt}
-                              </time>
-                            </div>
-
-                            {obs ? (
-                              <p className="asic-cotizador-reg-card__obs" title={obs}>
-                                <span className="asic-cotizador-reg-card__obs-label">Observaciones</span>
-                                {obs}
-                              </p>
-                            ) : null}
-
-                            <div className="asic-cotizador-reg-card__metrics">
-                              <div className="asic-cotizador-reg-metric">
-                                <span className="asic-cotizador-reg-metric__label">Costo origen</span>
-                                <span className="asic-cotizador-reg-metric__value">{formatUsd(r.precioOrigen)}</span>
-                              </div>
-                              <div className="asic-cotizador-reg-metric">
-                                <span className="asic-cotizador-reg-metric__label">Monto</span>
-                                <span className="asic-cotizador-reg-metric__value">{formatUsd(r.montoUsd)}</span>
-                              </div>
-                              <div className="asic-cotizador-reg-metric">
-                                <span className="asic-cotizador-reg-metric__label">Coef.</span>
-                                <span className="asic-cotizador-reg-metric__value">
-                                  {new Intl.NumberFormat("es-PY", { maximumFractionDigits: 6 }).format(r.coeficiente)}
-                                </span>
-                              </div>
-                              <div className="asic-cotizador-reg-metric">
-                                <span className="asic-cotizador-reg-metric__label">Proveedor</span>
-                                <span className="asic-cotizador-reg-metric__value">{formatUsd(r.proveedorPy)}</span>
-                              </div>
-                              <div className="asic-cotizador-reg-metric">
-                                <span className="asic-cotizador-reg-metric__label">Total nac.</span>
-                                <span className="asic-cotizador-reg-metric__value asic-cotizador-reg-metric__value--strong">
-                                  {formatUsd(r.totalNacionalizado)}
-                                </span>
-                              </div>
-                              <div className="asic-cotizador-reg-metric">
-                                <span className="asic-cotizador-reg-metric__label">Margen</span>
-                                <span className="asic-cotizador-reg-metric__value asic-cotizador-reg-metric__value--ok">
-                                  +{formatWhole(r.margenUsd)}
-                                </span>
-                              </div>
-                              <div className="asic-cotizador-reg-metric">
-                                <span className="asic-cotizador-reg-metric__label">% Margen</span>
-                                <span className="asic-cotizador-reg-metric__value">{formatWhole(r.pctMargen)}%</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="asic-cotizador-reg-card__aside">
-                            <div className="asic-cotizador-reg-card__precio">
-                              <span className="asic-cotizador-reg-card__precio-label">Precio venta</span>
-                              <span className="asic-cotizador-reg-card__precio-value">{formatUsd(r.precioVenta)}</span>
-                            </div>
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-outline-danger asic-cotizador-reg-card__delete"
-                              title="Eliminar registro"
-                              onClick={() => void handleEliminarRegistro(r)}
-                              disabled={eliminandoIds.has(r.id)}
-                            >
-                              <i className="bi bi-trash" aria-hidden="true" />
-                              <span>Eliminar</span>
-                            </button>
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
+                <div className="table-responsive asic-cotizador-registros-wrap">
+                  <table className="table table-sm align-middle asic-cotizador-registros-table">
+                    <thead>
+                      <tr>
+                        <th className="asic-cotizador-col-check text-center">
+                          <input
+                            type="checkbox"
+                            className="form-check-input"
+                            checked={allVisibleSelected}
+                            onChange={(e) => toggleSelectAll(e.target.checked)}
+                            aria-label="Seleccionar todos"
+                            title="Seleccionar todos"
+                          />
+                        </th>
+                        <th>Fecha</th>
+                        <th>Marca</th>
+                        <th>Modelo</th>
+                        <th>Procesador</th>
+                        <th>Observaciones</th>
+                        <th className="text-end">Costo origen</th>
+                        <th className="text-end">Monto</th>
+                        <th className="text-end">Coef.</th>
+                        <th className="text-end">Proveedor</th>
+                        <th className="text-end">Total nac.</th>
+                        <th className="text-end">Margen</th>
+                        <th className="text-end">% Margen</th>
+                        <th className="text-end">Precio venta</th>
+                        <th className="text-end">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {registros.map((r) => {
+                        const selected = selectedIds.has(r.id);
+                        const obs = r.observaciones?.trim() || "";
+                        return (
+                          <tr key={r.id} className={selected ? "asic-cotizador-row--selected" : undefined}>
+                            <td className="asic-cotizador-col-check text-center">
+                              <input
+                                type="checkbox"
+                                className="form-check-input"
+                                checked={selected}
+                                onChange={(e) => toggleSelectOne(r.id, e.target.checked)}
+                                aria-label={`Seleccionar ${r.marca} ${r.modelo}`}
+                              />
+                            </td>
+                            <td className="asic-cotizador-reg-fecha">
+                              {new Date(r.createdAt).toLocaleString("es-PY", {
+                                year: "numeric",
+                                month: "2-digit",
+                                day: "2-digit",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </td>
+                            <td>{r.marca}</td>
+                            <td>{r.modelo}</td>
+                            <td>{r.procesador}</td>
+                            <td className="asic-cotizador-obs-cell" title={obs || undefined}>
+                              {obs || "—"}
+                            </td>
+                            <td className="text-end">{formatUsd(r.precioOrigen)}</td>
+                            <td className="text-end">{formatUsd(r.montoUsd)}</td>
+                            <td className="text-end">
+                              {new Intl.NumberFormat("es-PY", { maximumFractionDigits: 6 }).format(r.coeficiente)}
+                            </td>
+                            <td className="text-end">{formatUsd(r.proveedorPy)}</td>
+                            <td className="text-end fw-semibold">{formatUsd(r.totalNacionalizado)}</td>
+                            <td className="text-end text-success fw-semibold">+{formatWhole(r.margenUsd)}</td>
+                            <td className="text-end">{formatWhole(r.pctMargen)}%</td>
+                            <td className="text-end fw-bold">{formatUsd(r.precioVenta)}</td>
+                            <td className="text-end">
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-danger"
+                                title="Eliminar registro"
+                                onClick={() => void handleEliminarRegistro(r)}
+                                disabled={eliminandoIds.has(r.id)}
+                              >
+                                <i className="bi bi-trash" aria-hidden="true" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </>
             )}
