@@ -346,6 +346,75 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_hosting_fx_ticket_code_unique ON hosting_f
   )`);
   db.prepare("INSERT OR IGNORE INTO hosting_fx_ticket_seq (id, next_num) VALUES (1, 100)").run();
 
+  db.exec(`
+CREATE TABLE IF NOT EXISTS garantias_ande_clientes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  client_id INTEGER NOT NULL,
+  marca TEXT NOT NULL DEFAULT '',
+  modelo TEXT NOT NULL DEFAULT '',
+  procesador TEXT NOT NULL DEFAULT '',
+  numero_serie TEXT NOT NULL DEFAULT '',
+  nombre_equipo TEXT NOT NULL DEFAULT '',
+  monto_usd REAL NOT NULL DEFAULT 0,
+  fecha_inicio TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (client_id) REFERENCES clients(id)
+);
+CREATE INDEX IF NOT EXISTS idx_garantias_ande_clientes_fecha ON garantias_ande_clientes(fecha_inicio DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_garantias_ande_clientes_client ON garantias_ande_clientes(client_id, fecha_inicio DESC);
+`);
+  try {
+    db.exec("ALTER TABLE garantias_ande_clientes ADD COLUMN numero_serie TEXT NOT NULL DEFAULT ''");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+  try {
+    db.exec("ALTER TABLE garantias_ande_clientes ADD COLUMN nombre_equipo TEXT NOT NULL DEFAULT ''");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+
+  db.exec(`
+CREATE TABLE IF NOT EXISTS sgi_crypto_noticias (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  summary TEXT NOT NULL DEFAULT '',
+  url TEXT NOT NULL UNIQUE,
+  source_name TEXT NOT NULL DEFAULT '',
+  topics_json TEXT NOT NULL DEFAULT '[]',
+  published_at TEXT NOT NULL,
+  fetched_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_sgi_crypto_noticias_published ON sgi_crypto_noticias(published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sgi_crypto_noticias_fetched ON sgi_crypto_noticias(fetched_at DESC);
+`);
+  for (const col of ["title_es TEXT", "title_pt TEXT", "summary_es TEXT", "summary_pt TEXT"] as const) {
+    try {
+      db.exec(`ALTER TABLE sgi_crypto_noticias ADD COLUMN ${col}`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!msg.includes("duplicate column")) throw e;
+    }
+  }
+
+  db.exec(`
+CREATE TABLE IF NOT EXISTS sgi_crypto_noticias_medios (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  feed_key TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  url TEXT NOT NULL,
+  topics_json TEXT NOT NULL DEFAULT '["cripto"]',
+  enabled INTEGER NOT NULL DEFAULT 1,
+  is_builtin INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_sgi_crypto_noticias_medios_enabled ON sgi_crypto_noticias_medios(enabled, id);
+`);
+
   db.exec(`CREATE TABLE IF NOT EXISTS tienda_online_client_seq (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     next_code_num INTEGER NOT NULL

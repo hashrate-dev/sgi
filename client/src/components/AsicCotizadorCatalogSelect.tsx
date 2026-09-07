@@ -22,6 +22,8 @@ type Props = {
   searchPlaceholder?: string;
   addLabel?: string;
   newTitle?: string;
+  /** Si false, no se puede agregar/editar opciones del catálogo (solo elegir). */
+  allowCreate?: boolean;
   onError?: (msg: string) => void;
 };
 
@@ -57,6 +59,7 @@ export function AsicCotizadorCatalogSelect({
   searchPlaceholder = "Buscar…",
   addLabel = "Agregar nuevo",
   newTitle = "Nueva opción",
+  allowCreate = true,
   onError,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -384,7 +387,7 @@ export function AsicCotizadorCatalogSelect({
           ) : null}
 
           <ul className="asic-cotizador-catalog-list" role="listbox">
-            {!listaBloqueada ? (
+            {allowCreate && !listaBloqueada ? (
               <li>
                 <button type="button" className="asic-cotizador-catalog-item-nuevo" onClick={() => abrirNuevo()}>
                   <strong>+</strong>
@@ -393,7 +396,7 @@ export function AsicCotizadorCatalogSelect({
               </li>
             ) : null}
 
-            {!listaBloqueada && filtradas.length === 0 && busqueda.trim() ? (
+            {allowCreate && !listaBloqueada && filtradas.length === 0 && busqueda.trim() ? (
               <li>
                 <button
                   type="button"
@@ -477,7 +480,7 @@ export function AsicCotizadorCatalogSelect({
                       >
                         {opt.valor}
                       </button>
-                      {opt.id != null && !enEdicion ? (
+                      {allowCreate && opt.id != null && !enEdicion ? (
                         <button
                           type="button"
                           className="asic-cotizador-catalog-edit-btn"

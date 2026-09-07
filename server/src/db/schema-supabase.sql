@@ -143,6 +143,65 @@ ALTER TABLE hosting_fx_operations ADD COLUMN IF NOT EXISTS delivery_method TEXT 
 ALTER TABLE hosting_fx_operations ADD COLUMN IF NOT EXISTS account_holder_name TEXT NOT NULL DEFAULT '';
 ALTER TABLE hosting_fx_operations ADD COLUMN IF NOT EXISTS ticket_code TEXT;
 ALTER TABLE hosting_fx_operations ADD COLUMN IF NOT EXISTS compra_flow_hosting_commission INTEGER NOT NULL DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS garantias_ande_clientes (
+  id BIGSERIAL PRIMARY KEY,
+  client_id INTEGER NOT NULL REFERENCES clients(id),
+  marca TEXT NOT NULL DEFAULT '',
+  modelo TEXT NOT NULL DEFAULT '',
+  procesador TEXT NOT NULL DEFAULT '',
+  numero_serie TEXT NOT NULL DEFAULT '',
+  nombre_equipo TEXT NOT NULL DEFAULT '',
+  monto_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+  fecha_inicio TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_garantias_ande_clientes_fecha ON garantias_ande_clientes(fecha_inicio DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_garantias_ande_clientes_client ON garantias_ande_clientes(client_id, fecha_inicio DESC);
+ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS numero_serie TEXT NOT NULL DEFAULT '';
+ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS nombre_equipo TEXT NOT NULL DEFAULT '';
+ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS estado TEXT NOT NULL DEFAULT 'activa';
+ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS fecha_devolucion TEXT;
+ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS monto_devuelto_usd DOUBLE PRECISION;
+ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS baja_equipo_id TEXT;
+ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS devolucion_nota TEXT NOT NULL DEFAULT '';
+
+CREATE TABLE IF NOT EXISTS sgi_crypto_noticias (
+  id BIGSERIAL PRIMARY KEY,
+  title TEXT NOT NULL,
+  summary TEXT NOT NULL DEFAULT '',
+  url TEXT NOT NULL,
+  source_name TEXT NOT NULL DEFAULT '',
+  topics_json TEXT NOT NULL DEFAULT '[]',
+  published_at TIMESTAMPTZ NOT NULL,
+  fetched_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (url)
+);
+CREATE INDEX IF NOT EXISTS idx_sgi_crypto_noticias_published ON sgi_crypto_noticias(published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sgi_crypto_noticias_fetched ON sgi_crypto_noticias(fetched_at DESC);
+ALTER TABLE sgi_crypto_noticias ADD COLUMN IF NOT EXISTS title_es TEXT;
+ALTER TABLE sgi_crypto_noticias ADD COLUMN IF NOT EXISTS title_pt TEXT;
+ALTER TABLE sgi_crypto_noticias ADD COLUMN IF NOT EXISTS summary_es TEXT;
+ALTER TABLE sgi_crypto_noticias ADD COLUMN IF NOT EXISTS summary_pt TEXT;
+
+CREATE TABLE IF NOT EXISTS sgi_crypto_noticias_medios (
+  id BIGSERIAL PRIMARY KEY,
+  feed_key TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  url TEXT NOT NULL,
+  topics_json TEXT NOT NULL DEFAULT '["cripto"]',
+  enabled INTEGER NOT NULL DEFAULT 1,
+  is_builtin INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_sgi_crypto_noticias_medios_enabled ON sgi_crypto_noticias_medios(enabled, id);
+
+ALTER TABLE monitor_equipo_asic_baja ADD COLUMN IF NOT EXISTS garantia_ande_cliente_id INTEGER;
+ALTER TABLE monitor_equipo_asic_baja ADD COLUMN IF NOT EXISTS devolucion_monto_usd DOUBLE PRECISION;
+ALTER TABLE monitor_equipo_asic_baja ADD COLUMN IF NOT EXISTS devolucion_client_id INTEGER;
+
 CREATE TABLE IF NOT EXISTS hosting_fx_ticket_seq (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   next_num BIGINT NOT NULL

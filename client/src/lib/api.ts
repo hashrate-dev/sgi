@@ -748,6 +748,9 @@ export type MonitorEquipoAsicBajaEntry = {
   motivo: string;
   createdAt: string;
   createdByEmail: string;
+  garantiaAndeClienteId?: number | null;
+  devolucionMontoUsd?: number | null;
+  devolucionClientId?: number | null;
 };
 
 export async function getMonitorEquiposAsicBajas(): Promise<{ bajas: MonitorEquipoAsicBajaEntry[] }> {
@@ -896,8 +899,18 @@ export async function postMonitorEquipoAsicBaja(payload: {
   equipoId: string;
   rowSnapshot: Record<string, unknown>;
   motivo?: string;
-}): Promise<{ ok: boolean }> {
-  return api<{ ok: boolean }>("/api/monitor-equipos-asic/baja", {
+  registrarDevolucionGarantia?: boolean;
+  garantiaAndeClienteId?: number;
+  devolucionMontoUsd?: number;
+}): Promise<{
+  ok: boolean;
+  devolucionGarantia?: {
+    garantiaAndeClienteId: number;
+    montoUsd: number | null;
+    clientId: number | null;
+  } | null;
+}> {
+  return api("/api/monitor-equipos-asic/baja", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -1893,6 +1906,191 @@ export function deleteGarantiaEmittedOne(invoiceNumber: string): Promise<{ ok: b
 
 export function deleteGarantiasEmittedAll(): Promise<{ ok: boolean; deleted: number }> {
   return api<{ ok: boolean; deleted: number }>("/api/garantias/emitted", { method: "DELETE" });
+}
+
+// ——— Garantías ANDE (Clientes) — registro USD por cliente hosting ———
+export type GarantiaAndeClienteItem = {
+  id: number;
+  clientId: number;
+  marca: string;
+  modelo: string;
+  procesador: string;
+  numeroSerie: string;
+  nombreEquipo: string;
+  montoUsd: number;
+  fechaInicio: string;
+  estado?: "activa" | "devuelta";
+  fechaDevolucion?: string;
+  montoDevueltoUsd?: number | null;
+  bajaEquipoId?: string;
+  devolucionNota?: string;
+  createdAt: string;
+  updatedAt: string;
+  clientCode?: string;
+  clientName?: string;
+  clientName2?: string;
+};
+
+export type GarantiaAndeClientePayload = {
+  clientId: number;
+  marca: string;
+  modelo: string;
+  procesador: string;
+  numeroSerie: string;
+  nombreEquipo: string;
+  montoUsd: number;
+  fechaInicio: string;
+};
+
+export function getGarantiasAndeClientes(): Promise<{ items: GarantiaAndeClienteItem[] }> {
+  return api<{ items: GarantiaAndeClienteItem[] }>("/api/garantias-ande-clientes");
+}
+
+export function matchGarantiasAndeClientes(params: {
+  serial?: string;
+  nombreEquipo?: string;
+}): Promise<{ items: GarantiaAndeClienteItem[] }> {
+  const q = new URLSearchParams();
+  if (params.serial?.trim()) q.set("serial", params.serial.trim());
+  if (params.nombreEquipo?.trim()) q.set("nombreEquipo", params.nombreEquipo.trim());
+  const qs = q.toString();
+  return api<{ items: GarantiaAndeClienteItem[] }>(
+    `/api/garantias-ande-clientes/match${qs ? `?${qs}` : ""}`
+  );
+}
+
+export function getGarantiasAndeHostingClients(): Promise<{
+  clients: Array<{ id: number; code: string; name: string; name2?: string }>;
+}> {
+  return api("/api/garantias-ande-clientes/hosting-clients");
+}
+
+export function createGarantiaAndeCliente(body: GarantiaAndeClientePayload): Promise<{ ok: boolean }> {
+  return api<{ ok: boolean }>("/api/garantias-ande-clientes", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateGarantiaAndeCliente(
+  id: number,
+  body: Partial<GarantiaAndeClientePayload>
+): Promise<{ ok: boolean }> {
+  return api<{ ok: boolean }>(`/api/garantias-ande-clientes/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+export function deleteGarantiaAndeCliente(id: number): Promise<{ ok: boolean }> {
+  return api<{ ok: boolean }>(`/api/garantias-ande-clientes/${id}`, { method: "DELETE" });
+}
+
+// ——— Noticias cripto (bot + historial) ———
+export type CryptoNoticiaTopic =
+  | "bitcoin"
+  | "dogecoin"
+  | "litecoin"
+  | "zcash"
+  | "cripto"
+  | "inversion"
+  | "gobierno_usa"
+  | "uruguay"
+  | "usa";
+
+export type CryptoNoticiaItem = {
+  id: number;
+  title: string;
+  summary: string;
+  url: string;
+  sourceName: string;
+  topics: CryptoNoticiaTopic[];
+  publishedAt: string;
+  fetchedAt: string;
+  lang?: "es" | "pt" | "en";
+  translated?: boolean;
+};
+
+export function getCryptoNoticiasMeta(): Promise<{
+  total: number;
+  lastFetchedAt: string | null;
+  topics: Array<{ id: string; label: string }>;
+  refreshIntervalMs: number;
+}> {
+  return api("/api/crypto-noticias/meta");
+}
+
+export function getCryptoNoticias(params?: {
+  topic?: string;
+  q?: string;
+  limit?: number;
+  offset?: number;
+  /** Idioma de lectura: traduce titulares/resúmenes a ES o PT (EN = original). */
+  lang?: "es" | "pt" | "en";
+}): Promise<{
+  items: CryptoNoticiaItem[];
+  total: number;
+  offset: number;
+  limit: number;
+  lang?: string;
+  lastIngestAt: string | null;
+}> {
+  const q = new URLSearchParams();
+  if (params?.topic) q.set("topic", params.topic);
+  if (params?.q) q.set("q", params.q);
+  if (params?.limit != null) q.set("limit", String(params.limit));
+  if (params?.offset != null) q.set("offset", String(params.offset));
+  if (params?.lang) q.set("lang", params.lang);
+  const qs = q.toString();
+  return api(`/api/crypto-noticias${qs ? `?${qs}` : ""}`);
+}
+
+export function refreshCryptoNoticias(): Promise<{
+  ok: boolean;
+  inserted: number;
+  scanned: number;
+  feedErrors: number;
+}> {
+  return api("/api/crypto-noticias/refresh", { method: "POST", body: "{}" });
+}
+
+export type CryptoNoticiaMedio = {
+  id: number;
+  feedKey: string;
+  name: string;
+  url: string;
+  topics: CryptoNoticiaTopic[];
+  enabled: boolean;
+  isBuiltin: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function getCryptoNoticiasMedios(): Promise<{
+  items: CryptoNoticiaMedio[];
+  topics: Array<{ id: string; label: string }>;
+}> {
+  return api("/api/crypto-noticias/medios");
+}
+
+export function createCryptoNoticiaMedio(body: {
+  name: string;
+  url: string;
+  topics?: string[];
+  enabled?: boolean;
+}): Promise<{ ok: boolean; item: CryptoNoticiaMedio | null }> {
+  return api("/api/crypto-noticias/medios", { method: "POST", body: JSON.stringify(body) });
+}
+
+export function updateCryptoNoticiaMedio(
+  id: number,
+  body: { name?: string; url?: string; topics?: string[]; enabled?: boolean }
+): Promise<{ ok: boolean; item: CryptoNoticiaMedio | null }> {
+  return api(`/api/crypto-noticias/medios/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+export function deleteCryptoNoticiaMedio(id: number): Promise<{ ok: boolean }> {
+  return api(`/api/crypto-noticias/medios/${id}`, { method: "DELETE" });
 }
 
 export type GarantiasItemsResponse = { items: import("./types.js").ItemGarantiaAnde[] };

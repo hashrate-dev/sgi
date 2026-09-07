@@ -461,3 +461,21 @@ export function canAccessGarantiasModule(user: PermUser): boolean {
   return false;
 }
 
+export function canEditGarantiasModule(user: PermUser): boolean {
+  if (!user || user.role === "lector") return false;
+  return canAccessGarantiasModule(user);
+}
+
+export function canAccessNoticiasModule(user: PermUser): boolean {
+  if (!user) return false;
+  if (user.role === "lector") return lectorAllowsModule(user, "noticias");
+  if (user.role === "admin_a") return true;
+  if (user.role === "operador" || user.role === "admin_b") return adminBAllowsModule(user, "noticias");
+  return false;
+}
+
+export function canEditNoticiasModule(user: PermUser): boolean {
+  if (!user || user.role === "lector") return false;
+  return canAccessNoticiasModule(user);
+}
+

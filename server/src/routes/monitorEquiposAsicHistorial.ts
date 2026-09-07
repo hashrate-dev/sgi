@@ -130,7 +130,67 @@ const postBajaBody = z.object({
     .max(2000)
     .optional()
     .transform((s) => (typeof s === "string" ? s.trim() : "")),
+  /** Si true, marca una garantía ANDE cliente como devuelta (ajuste a devolver al cliente). */
+  registrarDevolucionGarantia: z.boolean().optional(),
+  garantiaAndeClienteId: z.coerce.number().int().positive().optional(),
+  devolucionMontoUsd: z.coerce.number().finite().min(0).optional(),
 });
+
+let bajaExtraColsEnsured = false;
+
+async function ensureBajaDevolucionColumns(): Promise<void> {
+  if (bajaExtraColsEnsured) return;
+  if (db.isPostgres) {
+    await db
+      .prepare("ALTER TABLE monitor_equipo_asic_baja ADD COLUMN IF NOT EXISTS garantia_ande_cliente_id INTEGER")
+      .run();
+    await db
+      .prepare("ALTER TABLE monitor_equipo_asic_baja ADD COLUMN IF NOT EXISTS devolucion_monto_usd DOUBLE PRECISION")
+      .run();
+    await db
+      .prepare("ALTER TABLE monitor_equipo_asic_baja ADD COLUMN IF NOT EXISTS devolucion_client_id INTEGER")
+      .run();
+  } else {
+    for (const col of [
+      "garantia_ande_cliente_id INTEGER",
+      "devolucion_monto_usd REAL",
+      "devolucion_client_id INTEGER",
+    ]) {
+      try {
+        await db.prepare(`ALTER TABLE monitor_equipo_asic_baja ADD COLUMN ${col}`).run();
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (!msg.includes("duplicate column")) throw e;
+      }
+    }
+  }
+  bajaExtraColsEnsured = true;
+}
+
+async function ensureGarantiaDevolucionColumns(): Promise<void> {
+  if (db.isPostgres) {
+    await db.prepare("ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS estado TEXT NOT NULL DEFAULT 'activa'").run();
+    await db.prepare("ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS fecha_devolucion TEXT").run();
+    await db.prepare("ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS monto_devuelto_usd DOUBLE PRECISION").run();
+    await db.prepare("ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS baja_equipo_id TEXT").run();
+    await db.prepare("ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS devolucion_nota TEXT NOT NULL DEFAULT ''").run();
+  } else {
+    for (const col of [
+      "estado TEXT NOT NULL DEFAULT 'activa'",
+      "fecha_devolucion TEXT",
+      "monto_devuelto_usd REAL",
+      "baja_equipo_id TEXT",
+      "devolucion_nota TEXT NOT NULL DEFAULT ''",
+    ]) {
+      try {
+        await db.prepare(`ALTER TABLE garantias_ande_clientes ADD COLUMN ${col}`).run();
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (!msg.includes("duplicate column")) throw e;
+      }
+    }
+  }
+}
 
 const nhWatcherStorageIdField = z
   .string()
@@ -185,6 +245,9 @@ function normBajaListRow(row: Record<string, unknown>) {
   }
   if (!snap || typeof snap !== "object" || Array.isArray(snap)) snap = {};
   const id = Number(row.id ?? lower.id);
+  const garantiaIdRaw = row.garantia_ande_cliente_id ?? lower.garantia_ande_cliente_id;
+  const montoRaw = row.devolucion_monto_usd ?? lower.devolucion_monto_usd;
+  const clientRaw = row.devolucion_client_id ?? lower.devolucion_client_id;
   return {
     id: Number.isFinite(id) ? id : 0,
     equipoId: String(row.equipo_id ?? lower.equipo_id ?? ""),
@@ -192,6 +255,10 @@ function normBajaListRow(row: Record<string, unknown>) {
     motivo: String(row.motivo ?? lower.motivo ?? ""),
     createdAt: String(row.created_at ?? lower.created_at ?? ""),
     createdByEmail: String(row.created_by_email ?? lower.created_by_email ?? ""),
+    garantiaAndeClienteId:
+      garantiaIdRaw == null || garantiaIdRaw === "" ? null : Number(garantiaIdRaw),
+    devolucionMontoUsd: montoRaw == null || montoRaw === "" ? null : Number(montoRaw),
+    devolucionClientId: clientRaw == null || clientRaw === "" ? null : Number(clientRaw),
   };
 }
 
@@ -361,9 +428,12 @@ monitorEquiposAsicHistorialRouter.get(
   requireRole("admin_a", "admin_b"),
   requireAdminBGrant("equipos"),
   async (_req: Request, res: Response) => {
+    await ensureBajaDevolucionColumns();
     const raw = (await db
       .prepare(
-        `SELECT id, equipo_id, row_snapshot, motivo, created_at, created_by_email FROM monitor_equipo_asic_baja ORDER BY created_at DESC LIMIT 500`
+        `SELECT id, equipo_id, row_snapshot, motivo, created_at, created_by_email,
+                garantia_ande_cliente_id, devolucion_monto_usd, devolucion_client_id
+         FROM monitor_equipo_asic_baja ORDER BY created_at DESC LIMIT 500`
       )
       .all()) as Record<string, unknown>[];
     const bajas = raw.map((row) => normBajaListRow(row));
@@ -381,7 +451,7 @@ monitorEquiposAsicHistorialRouter.post(
       res.status(400).json({ error: { message: "Datos inválidos para dar de baja (equipoId UUID y snapshot)." } });
       return;
     }
-    const { equipoId, motivo } = parsed.data;
+    const { equipoId, motivo, registrarDevolucionGarantia, garantiaAndeClienteId, devolucionMontoUsd } = parsed.data;
     const snapIn = parsed.data.rowSnapshot;
     const snapObj =
       snapIn && typeof snapIn === "object" && !Array.isArray(snapIn) ? (snapIn as Record<string, unknown>) : {};
@@ -395,12 +465,77 @@ monitorEquiposAsicHistorialRouter.post(
     const createdAt = new Date().toISOString();
     const historialBody =
       motivo.trim().length > 0 ? `${MONITOR_HISTORIAL_BAJA_PREFIX}\n${motivo.trim()}` : MONITOR_HISTORIAL_BAJA_PREFIX;
+
+    let garantiaId: number | null = null;
+    let devolucionMonto: number | null = null;
+    let devolucionClientId: number | null = null;
+    let garantiaLabel = "";
+
+    if (registrarDevolucionGarantia) {
+      if (!garantiaAndeClienteId) {
+        res.status(400).json({
+          error: { message: "Seleccioná la garantía ANDE a devolver al cliente." },
+        });
+        return;
+      }
+      await ensureGarantiaDevolucionColumns();
+      const gRow = (await db
+        .prepare(
+          `SELECT g.id, g.client_id, g.monto_usd, g.estado, g.numero_serie, g.nombre_equipo,
+                  c.code AS client_code, c.name AS client_name
+           FROM garantias_ande_clientes g
+           JOIN clients c ON c.id = g.client_id
+           WHERE g.id = ?`
+        )
+        .get(garantiaAndeClienteId)) as
+        | {
+            id: number;
+            client_id: number;
+            monto_usd: number;
+            estado?: string;
+            numero_serie?: string;
+            nombre_equipo?: string;
+            client_code?: string;
+            client_name?: string;
+          }
+        | undefined;
+      if (!gRow) {
+        res.status(400).json({ error: { message: "No se encontró la garantía ANDE indicada." } });
+        return;
+      }
+      if (String(gRow.estado ?? "activa").toLowerCase() === "devuelta") {
+        res.status(409).json({ error: { message: "Esa garantía ya está marcada como devuelta." } });
+        return;
+      }
+      garantiaId = Number(gRow.id);
+      devolucionClientId = Number(gRow.client_id);
+      devolucionMonto =
+        devolucionMontoUsd != null && Number.isFinite(devolucionMontoUsd)
+          ? Number(devolucionMontoUsd)
+          : Number(gRow.monto_usd ?? 0);
+      garantiaLabel = `${String(gRow.client_code ?? "").trim()} ${String(gRow.client_name ?? "").trim()} · ${formatUsdPlain(devolucionMonto)}`;
+    }
+
+    await ensureBajaDevolucionColumns();
+
     try {
       await db
         .prepare(
-          `INSERT INTO monitor_equipo_asic_baja (equipo_id, row_snapshot, motivo, created_by_user_id, created_by_email) VALUES (?, ?, ?, ?, ?)`
+          `INSERT INTO monitor_equipo_asic_baja (
+             equipo_id, row_snapshot, motivo, created_by_user_id, created_by_email,
+             garantia_ande_cliente_id, devolucion_monto_usd, devolucion_client_id
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
         )
-        .run(equipoId, snapshotJson, motivo ?? "", user.id, user.email ?? "");
+        .run(
+          equipoId,
+          snapshotJson,
+          motivo ?? "",
+          user.id,
+          user.email ?? "",
+          garantiaId,
+          devolucionMonto,
+          devolucionClientId
+        );
     } catch (e) {
       if (isUniqueConstraintError(e)) {
         res.status(409).json({
@@ -413,18 +548,62 @@ monitorEquiposAsicHistorialRouter.post(
       }
       throw e;
     }
+
+    if (garantiaId != null && devolucionMonto != null) {
+      const notaParts = [
+        `Devolución por baja de equipo ${equipoId}`,
+        motivo.trim() ? `Motivo baja: ${motivo.trim()}` : "",
+      ].filter(Boolean);
+      const nowSql = db.isPostgres ? "NOW()" : "datetime('now')";
+      await db
+        .prepare(
+          `UPDATE garantias_ande_clientes
+           SET estado = 'devuelta',
+               fecha_devolucion = ?,
+               monto_devuelto_usd = ?,
+               baja_equipo_id = ?,
+               devolucion_nota = ?,
+               updated_at = ${nowSql}
+           WHERE id = ?`
+        )
+        .run(createdAt.slice(0, 10), devolucionMonto, equipoId, notaParts.join(" · "), garantiaId);
+    }
+
     try {
+      const histExtra =
+        garantiaId != null && devolucionMonto != null
+          ? `\nDevolución garantía ANDE al cliente: ${garantiaLabel || formatUsdPlain(devolucionMonto)}`
+          : "";
       await db
         .prepare(
           `INSERT INTO monitor_equipo_asic_historial (equipo_id, body, created_at, created_by_user_id, created_by_email) VALUES (?, ?, ?, ?, ?)`
         )
-        .run(equipoId, historialBody, createdAt, user.id, user.email ?? "");
+        .run(equipoId, `${historialBody}${histExtra}`, createdAt, user.id, user.email ?? "");
     } catch (e) {
       console.error("monitor baja: historial insert:", e);
     }
-    res.status(201).json({ ok: true });
+    res.status(201).json({
+      ok: true,
+      devolucionGarantia:
+        garantiaId != null
+          ? {
+              garantiaAndeClienteId: garantiaId,
+              montoUsd: devolucionMonto,
+              clientId: devolucionClientId,
+            }
+          : null,
+    });
   }
 );
+
+function formatUsdPlain(n: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number.isFinite(n) ? n : 0);
+}
 
 /** Proxy lectura-only al endpoint público NiceHash «external» (enlace watcher /my/miner/{uuid}). */
 monitorEquiposAsicHistorialRouter.get(

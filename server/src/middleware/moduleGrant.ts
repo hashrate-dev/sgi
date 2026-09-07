@@ -7,6 +7,12 @@ import { lectorHasGrant } from "../lib/lectorPermissions.js";
  * `admin_a` pasa siempre; `admin_b` y `operador` según lista en `admin_b_grants_json`.
  */
 export function requireModuleGrant(permission: AdminBPermissionKey) {
+  return requireAnyModuleGrant(permission);
+}
+
+/** Pasa si el usuario tiene al menos uno de los módulos indicados. */
+export function requireAnyModuleGrant(...permissions: AdminBPermissionKey[]) {
+  const list = permissions.length > 0 ? permissions : ([] as AdminBPermissionKey[]);
   return (req: Request, res: Response, next: NextFunction): void => {
     const u = req.user;
     if (!u) {
@@ -14,7 +20,7 @@ export function requireModuleGrant(permission: AdminBPermissionKey) {
       return;
     }
     if (u.role === "admin_b" || u.role === "operador") {
-      if (adminBHasGrant(u.admin_b_grants ?? null, permission)) {
+      if (list.some((permission) => adminBHasGrant(u.admin_b_grants ?? null, permission))) {
         next();
         return;
       }
@@ -27,7 +33,7 @@ export function requireModuleGrant(permission: AdminBPermissionKey) {
       return;
     }
     if (u.role === "lector") {
-      if (lectorHasGrant(u.lector_grants ?? null, permission)) {
+      if (list.some((permission) => lectorHasGrant(u.lector_grants ?? null, permission))) {
         next();
         return;
       }

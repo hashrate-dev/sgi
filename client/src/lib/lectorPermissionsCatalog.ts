@@ -12,6 +12,7 @@ export type LectorPermissionKey =
   | "garantias"
   | "setups"
   | "leads"
+  | "noticias"
   | "finanzas_contabilidad"
   | "finanzas_proveedores"
   | "finanzas_asic_costos"
@@ -76,6 +77,13 @@ export const LECTOR_PERMISSION_CATALOG: readonly LectorPermissionCatalogItem[] =
     key: "leads",
     label: "Leads (Nuevos Leads + Leads Base)",
     description: "Registrar prospectos y consultar la base POTENCIALES CLIENTES.",
+  },
+  {
+    sectionOrder: 1,
+    sectionLabel: "Operación Hosting, ASIC y clientes — solo lectura",
+    key: "noticias",
+    label: "Noticias cripto",
+    description: "Consultar el wire de noticias cripto e historial capturado por el bot.",
   },
   {
     sectionOrder: 2,
@@ -168,9 +176,10 @@ export const LECTOR_GRANT_PATH_PREFIXES: Record<LectorPermissionKey, readonly st
   clientes: ["/clients", "/cuenta-cliente", "/clientes", "/clientes-hub"],
   equipos: ["/asic/equipment", "/asic", "/equipos-asic", "/asic/cotizador-china-py"],
   equipos_tienda: ["/marketplace/home-banners", "/tienda-online-banners-home", "/asic/equipment"],
-  garantias: ["/asic/ande-warranty", "/asic/warranty-items", "/asic/warranties-history", "/equipos-asic"],
+  garantias: ["/asic/ande-warranty", "/asic/warranty-items", "/asic/warranties-history", "/equipos-asic", "/gestion-administrativa/garantias-ande-clientes"],
   setups: ["/asic/setup", "/equipos-asic/setup", "/asic/reparacion"],
   leads: [],
+  noticias: ["/gestion-administrativa/noticias"],
   finanzas_contabilidad: ["/gestion-financiera/contabilidad", "/gestion-financiera/resumen-presupuesto", "/gestion-financiera/monitor-financiero"],
   finanzas_proveedores: ["/gestion-financiera/proveedores"],
   finanzas_asic_costos: ["/asic/cotizador-china-py"],
@@ -193,6 +202,7 @@ const LECTOR_KEYS_FOR_GESTION_ADMIN: readonly LectorPermissionKey[] = [
   "garantias",
   "setups",
   "leads",
+  "noticias",
 ];
 
 const LECTOR_KEYS_FOR_GESTION_FIN: readonly LectorPermissionKey[] = [

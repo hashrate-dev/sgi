@@ -7,6 +7,8 @@ import type { AdminBPermissionKey } from "./adminBPermissions.js";
 export const SGI_SCREEN_GRANT_IDS = [
   "ga-nuevos-leads",
   "ga-leads-base",
+  "ga-garantias-ande-clientes",
+  "ga-noticias",
   "hosting-billing",
   "hosting-history",
   "hosting-pending",
@@ -50,6 +52,8 @@ const SCREEN_SET = new Set<string>(SGI_SCREEN_GRANT_IDS);
 const SCREEN_TO_LEGACY: Record<string, AdminBPermissionKey> = {
   "ga-nuevos-leads": "leads",
   "ga-leads-base": "leads",
+  "ga-garantias-ande-clientes": "garantias",
+  "ga-noticias": "noticias",
   "hosting-billing": "facturacion",
   "hosting-history": "facturacion",
   "hosting-pending": "facturacion",

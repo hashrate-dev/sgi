@@ -9,6 +9,7 @@ export type AdminBPermissionKey =
   | "garantias"
   | "setups"
   | "leads"
+  | "noticias"
   | "marketplace_pedidos"
   | "marketplace_presencia"
   | "finanzas_contabilidad"
@@ -65,7 +66,8 @@ export const ADMIN_B_PERMISSION_CATALOG: readonly AdminBPermissionCatalogItem[] 
     sectionLabel: "Gestión Administrativa — operación Hosting, ASIC y tienda corporativa",
     key: "garantias",
     label: "Garantías Ande",
-    description: "Emisión y mantenimiento de garantías/recibos vinculados a Ande en el circuito Hosting/ASIC.",
+    description:
+      "Emisión y mantenimiento de garantías/recibos Ande, más el registro de garantías ANDE (Clientes) en USD.",
   },
   {
     sectionOrder: 1,
@@ -81,6 +83,14 @@ export const ADMIN_B_PERMISSION_CATALOG: readonly AdminBPermissionCatalogItem[] 
     label: "Leads (Nuevos Leads + Leads Base)",
     description:
       "Formulario de registro de prospectos y tabla POTENCIALES CLIENTES en Gestión Administrativa.",
+  },
+  {
+    sectionOrder: 1,
+    sectionLabel: "Gestión Administrativa — operación Hosting, ASIC y tienda corporativa",
+    key: "noticias",
+    label: "Noticias cripto (sala de redacción)",
+    description:
+      "Wire interno de noticias: Bitcoin, altcoins, inversiones, gobierno USA, Uruguay y USA. Bot + historial.",
   },
   {
     sectionOrder: 2,

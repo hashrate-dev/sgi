@@ -2519,6 +2519,20 @@ button.fact-back {
   overflow: visible;
 }
 
+/* Garantías ANDE: mismos dropdowns absolutos (cliente hosting / catálogo) — no recortar el menú */
+.fact-panel-nuevo-documento.garantias-ande-form-panel {
+  overflow: visible;
+}
+
+.fact-panel-nuevo-documento.garantias-ande-form-panel .fact-card-body {
+  overflow: visible;
+}
+
+.fact-panel-nuevo-documento.garantias-ande-form-panel .row,
+.fact-panel-nuevo-documento.garantias-ande-form-panel [class*="col-"] {
+  overflow: visible;
+}
+
 .fact-panel-nuevo-documento.asic-cotizador-params-panel .asic-cotizador-catalog-row,
 .fact-panel-nuevo-documento.asic-cotizador-params-panel .asic-cotizador-costos-row {
   overflow: visible;

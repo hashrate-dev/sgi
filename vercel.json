@@ -41,5 +41,11 @@
         }
       ]
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/crypto-noticias/cron-ingest",
+      "schedule": "0 * * * *"
+    }
   ]
 }

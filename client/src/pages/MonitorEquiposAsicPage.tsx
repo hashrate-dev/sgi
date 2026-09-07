@@ -17,11 +17,13 @@ import {
 import {
   getMonitorEquiposAsicHistorial,
   isBenignFetchAbort,
+  matchGarantiasAndeClientes,
   postMonitorEquipoAsicBaja,
   postMonitorEquiposAsicHistorialFeed,
   postMonitorEquiposAsicHistorialNote,
   postMonitorEquiposAsicHistorialSummary,
   wakeUpBackend,
+  type GarantiaAndeClienteItem,
   type MonitorEquipoAsicHistorialEntry,
   type MonitorEquipoAsicHistorialFeedEntry,
 } from "../lib/api";
@@ -377,6 +379,15 @@ function MonitorEquiposAsicPageContent() {
   const [globalFeedLoading, setGlobalFeedLoading] = useState(false);
   const [globalFeedError, setGlobalFeedError] = useState<string | null>(null);
   const [rowMenu, setRowMenu] = useState<MonitorAsicRowMenuOpen>(null);
+  const [bajaModal, setBajaModal] = useState<{ row: MonitorEquipoAsicRow } | null>(null);
+  const [bajaMotivo, setBajaMotivo] = useState("");
+  const [bajaDevolucion, setBajaDevolucion] = useState(false);
+  const [bajaGarantiaMatches, setBajaGarantiaMatches] = useState<GarantiaAndeClienteItem[]>([]);
+  const [bajaGarantiaId, setBajaGarantiaId] = useState<number>(0);
+  const [bajaDevolucionMonto, setBajaDevolucionMonto] = useState(0);
+  const [bajaGarantiaLoading, setBajaGarantiaLoading] = useState(false);
+  const [bajaGarantiaErr, setBajaGarantiaErr] = useState("");
+  const [bajaBusy, setBajaBusy] = useState(false);
 
 
   /** Contadores por equipo para badges Notas (no leídas / total en ventana 20 días, servidor). Hidrata desde sessionStorage. */
@@ -654,38 +665,117 @@ function MonitorEquiposAsicPageContent() {
     showToast("Equipo quitado del listado local.", "success");
   }
 
-  async function darDeBajaEquipoFromMenu(equipoId: string) {
+  function openBajaModal(equipoId: string) {
     const row = rows.find((r) => r.equipoId === equipoId);
     if (!row) {
       showToast("No se encontró la fila del equipo.", "error");
       setRowMenu(null);
       return;
     }
-    if (
-      !window.confirm(
-        "¿Dar de baja este equipo? Se quitará del listado del monitor en este navegador y quedará registrado en el servidor (retiro, venta, etc.). Las notas en el servidor no se eliminan."
-      )
-    ) {
-      return;
-    }
-    const motivoRaw = window.prompt("Motivo (opcional), ej. venta, retiro de cliente:", "");
-    if (motivoRaw === null) return;
-    const motivo = motivoRaw.trim();
     setRowMenu(null);
+    setBajaMotivo("");
+    setBajaDevolucion(false);
+    setBajaGarantiaMatches([]);
+    setBajaGarantiaId(0);
+    setBajaDevolucionMonto(0);
+    setBajaGarantiaErr("");
+    setBajaModal({ row });
+  }
+
+  useEffect(() => {
+    if (!bajaModal || !bajaDevolucion) return;
+    let cancelled = false;
+    const row = bajaModal.row;
+    setBajaGarantiaLoading(true);
+    setBajaGarantiaErr("");
+    void matchGarantiasAndeClientes({
+      serial: row.serial?.trim() || undefined,
+      nombreEquipo: row.nombreNuevo?.trim() || undefined,
+    })
+      .then((r) => {
+        if (cancelled) return;
+        const items = r.items || [];
+        setBajaGarantiaMatches(items);
+        if (items.length === 1) {
+          setBajaGarantiaId(items[0]!.id);
+          setBajaDevolucionMonto(Number(items[0]!.montoUsd) || 0);
+        } else if (items.length > 1) {
+          setBajaGarantiaId(items[0]!.id);
+          setBajaDevolucionMonto(Number(items[0]!.montoUsd) || 0);
+        } else {
+          setBajaGarantiaId(0);
+          setBajaDevolucionMonto(0);
+        }
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setBajaGarantiaMatches([]);
+        setBajaGarantiaId(0);
+        setBajaGarantiaErr(
+          e instanceof Error ? e.message : "No se pudieron buscar garantías ANDE activas."
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setBajaGarantiaLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [bajaModal, bajaDevolucion]);
+
+  async function confirmDarDeBajaEquipo() {
+    if (!bajaModal) return;
+    const row = bajaModal.row;
+    if (bajaDevolucion) {
+      if (!bajaGarantiaId || bajaGarantiaId <= 0) {
+        showToast("Seleccioná la garantía ANDE a devolver, o desmarcá el ajuste de devolución.", "error");
+        return;
+      }
+      if (!Number.isFinite(bajaDevolucionMonto) || bajaDevolucionMonto < 0) {
+        showToast("El monto a devolver debe ser 0 o mayor.", "error");
+        return;
+      }
+    }
+    setBajaBusy(true);
     const rowSnapshot: Record<string, unknown> = { ...row };
     try {
-      await postMonitorEquipoAsicBaja({
+      const motivo = bajaMotivo.trim();
+      const res = await postMonitorEquipoAsicBaja({
         equipoId: row.equipoId,
         rowSnapshot,
         ...(motivo ? { motivo } : {}),
+        ...(bajaDevolucion
+          ? {
+              registrarDevolucionGarantia: true,
+              garantiaAndeClienteId: bajaGarantiaId,
+              devolucionMontoUsd: bajaDevolucionMonto,
+            }
+          : {}),
       });
       removeEquipoFromLocalState(row.equipoId);
+      setBajaModal(null);
       void refreshGlobalFeed();
       void refreshNotasSummary();
-      showToast("Equipo dado de baja. Podés verlo en Equipos ASIC → Equipos ASIC dados de baja.", "success");
+      if (res.devolucionGarantia?.montoUsd != null) {
+        showToast(
+          `Equipo dado de baja y devolución de garantía registrada (${new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency: "USD",
+          }).format(res.devolucionGarantia.montoUsd)}).`,
+          "success"
+        );
+      } else {
+        showToast("Equipo dado de baja. Podés verlo en Equipos ASIC → Equipos ASIC dados de baja.", "success");
+      }
     } catch (e) {
       showToast(e instanceof Error ? e.message : "No se pudo registrar la baja en el servidor.", "error");
+    } finally {
+      setBajaBusy(false);
     }
+  }
+
+  async function darDeBajaEquipoFromMenu(equipoId: string) {
+    openBajaModal(equipoId);
   }
 
   async function handleMonitorOnlineToggle(index: number, row: MonitorEquipoAsicRow) {
@@ -1315,6 +1405,143 @@ function MonitorEquiposAsicPageContent() {
             document.body
           )
         : null}
+
+      <AppModal
+        open={bajaModal != null}
+        onOpenChange={(open) => {
+          if (!open && !bajaBusy) setBajaModal(null);
+        }}
+        title="Dar de baja equipo"
+        description="Se registra el retiro en el servidor y se quita del monitor de este navegador. Opcionalmente podés registrar la devolución de la garantía ANDE al cliente."
+        size="lg"
+        contentMaxW="min(calc(100vw - 2rem), 640px)"
+        closeOnInteractOutside={!bajaBusy}
+        footer={
+          <Flex w="100%" justify="flex-end" align="center" gap={2} flexWrap="wrap">
+            <AppButton
+              type="button"
+              variant="outline"
+              colorPalette="gray"
+              disabled={bajaBusy}
+              onClick={() => setBajaModal(null)}
+            >
+              Cancelar
+            </AppButton>
+            <AppButton
+              type="button"
+              colorPalette="green"
+              disabled={bajaBusy || (bajaDevolucion && bajaGarantiaLoading)}
+              onClick={() => void confirmDarDeBajaEquipo()}
+            >
+              {bajaBusy ? "Registrando…" : bajaDevolucion ? "Dar de baja y devolver garantía" : "Dar de baja"}
+            </AppButton>
+          </Flex>
+        }
+      >
+        {bajaModal ? (
+          <div className="d-flex flex-column gap-3">
+            <div className="small bg-light border rounded-3 p-3">
+              <div>
+                <strong>Usuario:</strong> {bajaModal.row.usuario?.trim() || "—"}
+              </div>
+              <div>
+                <strong>Nombre equipo:</strong> {bajaModal.row.nombreNuevo?.trim() || "—"}
+              </div>
+              <div>
+                <strong>Nº serie:</strong> {bajaModal.row.serial?.trim() || "—"}
+              </div>
+              <div>
+                <strong>Modelo:</strong> {bajaModal.row.modelo?.trim() || "—"}
+              </div>
+            </div>
+            <div>
+              <label className="fact-label" htmlFor="monitor-baja-motivo">
+                Motivo (opcional)
+              </label>
+              <textarea
+                id="monitor-baja-motivo"
+                className="fact-input"
+                rows={2}
+                value={bajaMotivo}
+                disabled={bajaBusy}
+                onChange={(e) => setBajaMotivo(e.target.value)}
+                placeholder="Ej. venta, retiro de cliente…"
+              />
+            </div>
+            <div className="form-check">
+              <input
+                id="monitor-baja-devolucion"
+                type="checkbox"
+                className="form-check-input"
+                checked={bajaDevolucion}
+                disabled={bajaBusy}
+                onChange={(e) => setBajaDevolucion(e.target.checked)}
+              />
+              <label className="form-check-label" htmlFor="monitor-baja-devolucion">
+                Registrar devolución de garantía ANDE al cliente (ajuste)
+              </label>
+            </div>
+            {bajaDevolucion ? (
+              <div className="border rounded-3 p-3 bg-white">
+                {bajaGarantiaLoading ? (
+                  <div className="text-muted small">Buscando garantía activa por serie / nombre…</div>
+                ) : null}
+                {bajaGarantiaErr ? <div className="alert alert-warning py-2 small mb-2">{bajaGarantiaErr}</div> : null}
+                {!bajaGarantiaLoading && bajaGarantiaMatches.length === 0 ? (
+                  <div className="alert alert-warning py-2 small mb-2">
+                    No hay garantía ANDE activa que coincida con el serie/nombre. Registrala antes en Gestión
+                    Administrativa → Garantías ANDE (Clientes), o desmarcá el ajuste.
+                  </div>
+                ) : null}
+                {bajaGarantiaMatches.length > 0 ? (
+                  <>
+                    <label className="fact-label" htmlFor="monitor-baja-garantia">
+                      Garantía a devolver
+                    </label>
+                    <select
+                      id="monitor-baja-garantia"
+                      className="fact-select mb-2"
+                      value={bajaGarantiaId}
+                      disabled={bajaBusy}
+                      onChange={(e) => {
+                        const id = Number(e.target.value);
+                        setBajaGarantiaId(id);
+                        const hit = bajaGarantiaMatches.find((x) => x.id === id);
+                        if (hit) setBajaDevolucionMonto(Number(hit.montoUsd) || 0);
+                      }}
+                    >
+                      {bajaGarantiaMatches.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {`${g.clientCode ?? ""} — ${g.clientName ?? ""}${g.clientName2 ? ` ${g.clientName2}` : ""} · ${
+                            g.nombreEquipo || g.numeroSerie || "sin nombre"
+                          } · USD ${Number(g.montoUsd).toFixed(2)}`}
+                        </option>
+                      ))}
+                    </select>
+                    <label className="fact-label" htmlFor="monitor-baja-monto">
+                      Monto a devolver (USD)
+                    </label>
+                    <input
+                      id="monitor-baja-monto"
+                      type="number"
+                      step="0.01"
+                      min={0}
+                      className="fact-input"
+                      value={bajaDevolucionMonto}
+                      disabled={bajaBusy}
+                      onChange={(e) => setBajaDevolucionMonto(Number(e.target.value))}
+                    />
+                    <p className="small text-muted mb-0 mt-2">
+                      Queda registrado el ajuste: garantía marcada como <strong>devuelta</strong> y vinculada a esta
+                      baja.
+                    </p>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </AppModal>
 
       <AppModal
         open={historialModal != null}

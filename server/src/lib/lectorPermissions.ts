@@ -57,6 +57,13 @@ export const LECTOR_PERMISSION_CATALOG = [
     description: "Registrar prospectos y consultar la base POTENCIALES CLIENTES.",
   },
   {
+    sectionOrder: 1,
+    sectionLabel: "Operación Hosting, ASIC y clientes — solo lectura",
+    key: "noticias",
+    label: "Noticias cripto",
+    description: "Consultar el wire de noticias cripto e historial capturado por el bot.",
+  },
+  {
     sectionOrder: 2,
     sectionLabel: "Gestión financiera — solo lectura",
     key: "finanzas_contabilidad",

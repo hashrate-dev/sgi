@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { db } from "../db.js";
 import { requireRole } from "../middleware/auth.js";
-import { requireModuleGrant } from "../middleware/moduleGrant.js";
+import { requireAnyModuleGrant, requireModuleGrant } from "../middleware/moduleGrant.js";
 
 export const clientsRouter = Router();
 
@@ -300,7 +300,7 @@ clientsRouter.get(
 clientsRouter.get(
   "/clients/next-code",
   requireRole("admin_a", "admin_b", "operador", "lector"),
-  requireModuleGrant("clientes"),
+  requireAnyModuleGrant("clientes", "garantias"),
   async (_req, res) => {
   const code = await getNextClientCodeFromDb();
   res.json({ code });
@@ -382,7 +382,7 @@ clientsRouter.post(
 clientsRouter.post(
   "/clients",
   requireRole("admin_a", "admin_b", "operador"),
-  requireModuleGrant("clientes"),
+  requireAnyModuleGrant("clientes", "garantias"),
   async (req, res, next) => {
   try {
     const parsed = ClientCreateSchema.extend({

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { db } from "../db.js";
 import { requireRole } from "../middleware/auth.js";
-import { requireModuleGrant } from "../middleware/moduleGrant.js";
+import { requireAnyModuleGrant, requireModuleGrant } from "../middleware/moduleGrant.js";
 import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
 
 export const asicCostosRouter = Router();
@@ -340,7 +340,7 @@ function mapCatalogRow(raw: Record<string, unknown>) {
 asicCostosRouter.get(
   "/asic/cotizador-catalogo",
   requireRole("admin_a", "admin_b", "operador", "lector"),
-  requireModuleGrant("finanzas_asic_costos"),
+  requireAnyModuleGrant("finanzas_asic_costos", "garantias"),
   async (req, res) => {
     await ensureAsicCostosSchema();
     const tipoParsed = CotizadorCatalogTipoSchema.safeParse(String(req.query.tipo ?? "").trim());

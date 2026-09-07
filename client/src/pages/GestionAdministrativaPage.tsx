@@ -49,6 +49,18 @@ const hubItems: readonly HubItem[] = [
     label: "Leads Base",
     desc: "Consulta de todos los leads en POTENCIALES CLIENTES",
   },
+  {
+    to: "/gestion-administrativa/garantias-ande-clientes",
+    icon: "bi-shield-check",
+    label: "Garantías ANDE (Clientes)",
+    desc: "Registro de garantías ANDE en USD por cliente de hosting y equipo ASIC",
+  },
+  {
+    to: "/gestion-administrativa/noticias",
+    icon: "bi-newspaper",
+    label: "NOTICIAS",
+    desc: "Sala de redacción: bot que captura e historializa cripto, BTC, alts, USA, Uruguay e inversiones",
+  },
 ];
 
 export function GestionAdministrativaPage() {

@@ -67,7 +67,12 @@ export function MonitorEquiposAsicBajasPage() {
           <p className="text-muted small mb-3">
             Equipos retirados del monitor operativo (venta, baja del sistema). Se guarda una copia de la fila y la fecha;
             el historial de notas en servidor sigue asociado al mismo <code className="small sgi-tech-code">equipoId</code>{" "}
-            (UUID).
+            (UUID). Si al dar de baja se registró devolución de garantía ANDE, aparece la marca{" "}
+            <span className="badge text-bg-warning text-dark">YA DEVUELTA</span>. El detalle completo también está en{" "}
+            <Link to="/gestion-administrativa/garantias-ande-clientes" className="link-success">
+              Garantías ANDE (Clientes)
+            </Link>
+            .
           </p>
           {loadErr ? <div className="alert alert-danger py-2">{loadErr}</div> : null}
           {tableLoading ? (
@@ -93,6 +98,9 @@ export function MonitorEquiposAsicBajasPage() {
                     <th scope="col">Pool</th>
                     <th scope="col">Nombre nuevo</th>
                     <th scope="col">Serial</th>
+                    <th scope="col" className="text-end">
+                      Devolución garantía
+                    </th>
                     <th scope="col" className="text-center">
                       Online
                     </th>
@@ -122,6 +130,24 @@ export function MonitorEquiposAsicBajasPage() {
                         <td>{snapStr(s, "pool")}</td>
                         <td className="font-monospace small">{snapStr(s, "nombreNuevo")}</td>
                         <td className="font-monospace small">{snapStr(s, "serial")}</td>
+                        <td className="text-end text-nowrap">
+                          {b.devolucionMontoUsd != null && Number.isFinite(b.devolucionMontoUsd) ? (
+                            <div>
+                              <span className="badge text-bg-warning text-dark mb-1">
+                                <i className="bi bi-arrow-return-left me-1" aria-hidden />
+                                YA DEVUELTA
+                              </span>
+                              <div className="fw-semibold">
+                                {new Intl.NumberFormat("en-US", {
+                                  style: "currency",
+                                  currency: "USD",
+                                }).format(b.devolucionMontoUsd)}
+                              </div>
+                            </div>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
                         <td className="text-center">{snapStr(s, "online")}</td>
                       </tr>
                     );

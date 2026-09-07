@@ -12,6 +12,8 @@ import { invoicesRouter } from "./routes/invoices.js";
 import { renderRouter } from "./routes/render.js";
 import { emittedRouter } from "./routes/emitted.js";
 import { garantiasRouter } from "./routes/garantias.js";
+import { garantiasAndeClientesRouter } from "./routes/garantiasAndeClientes.js";
+import { cryptoNoticiasRouter } from "./routes/cryptoNoticias.js";
 import { reparacionTiposRouter } from "./routes/reparacionTipos.js";
 import { transporteFleteTiposRouter } from "./routes/transporteFleteTipos.js";
 import { setupsRouter } from "./routes/setups.js";
@@ -143,6 +145,8 @@ export function createApp() {
   app.use("/api", requireAuth, renderRouter);
   app.use("/api", emittedRouter);
   app.use("/api", garantiasRouter);
+  app.use("/api", requireAuth, garantiasAndeClientesRouter);
+  app.use("/api", cryptoNoticiasRouter);
   app.use("/api", requireAuth, setupsRouter);
   app.use("/api", requireAuth, reparacionTiposRouter);
   app.use("/api", requireAuth, transporteFleteTiposRouter);
