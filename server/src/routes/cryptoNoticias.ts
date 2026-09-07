@@ -367,7 +367,7 @@ async function warmRecentTranslations(limit: number): Promise<void> {
        ORDER BY published_at DESC, id DESC
        LIMIT ?`
     )
-    .all(Math.max(1, Math.min(120, limit))) as Record<string, unknown>[];
+    .all(Math.max(1, Math.min(120, limit)))) as Record<string, unknown>[];
   const mapped = rows.map((r) => mapRow(r));
   await ensureTranslations(mapped, "es");
   await ensureTranslations(mapped, "pt");
