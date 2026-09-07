@@ -238,17 +238,13 @@ body.calendly-overlay-open .market-registro-auth-toggle {
   box-shadow: 0 0 0 3px rgba(54, 160, 142, 0.45), 0 10px 24px rgba(15, 39, 66, 0.28);
 }
 
-/* SGI (pie fijo): el FAB va por encima del footer, no tapa «Sistema de Gestión Interna» */
-body:has(.sgi-admin-fixed-footer) #hrs-calendly-fab {
-  bottom: calc(4.25rem - 5mm + env(safe-area-inset-bottom, 0px));
-  right: max(1.25rem, env(safe-area-inset-right, 0px));
-  z-index: 1010;
-}
-
-@media (max-width: 768px) {
-  body:has(.sgi-admin-fixed-footer) #hrs-calendly-fab {
-    bottom: calc(5.75rem - 5mm + env(safe-area-inset-bottom, 0px));
-  }
+/* SGI: no mostrar FAB «Reserva una reunión» (solo marketplace / web pública) */
+body:has(.sgi-protected-root) #hrs-calendly-fab,
+html.hrs-home-bg #hrs-calendly-fab,
+html.hrs-protected-green-bg #hrs-calendly-fab {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 @media (max-width: 575.98px) {

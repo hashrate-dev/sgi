@@ -181,8 +181,8 @@ export function HrsCommissionPctSelect({
             </li>
           ))}
           {canAdd ? (
-            <li role="none" className="border-top mt-1 pt-1 px-2 pb-2">
-              {err ? <div className="small text-danger mb-1">{err}</div> : null}
+            <li role="none" className={`border-top mt-1${adding ? " pt-1 px-2 pb-2" : " pt-0 px-0 pb-0"}`}>
+              {err ? <div className="small text-danger mb-1 px-2">{err}</div> : null}
               {adding ? (
                 <div className="d-flex align-items-center gap-1">
                   <input
@@ -217,14 +217,15 @@ export function HrsCommissionPctSelect({
               ) : (
                 <button
                   type="button"
-                  className="btn btn-sm btn-outline-primary w-100"
+                  className="asic-cotizador-catalog-item-nuevo"
                   onClick={(e) => {
                     e.stopPropagation();
                     setAdding(true);
                     setErr("");
                   }}
                 >
-                  + Agregar % de comisión
+                  <strong>+</strong>
+                  <span>Agregar % de comisión</span>
                 </button>
               )}
             </li>

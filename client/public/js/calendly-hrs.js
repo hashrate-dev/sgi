@@ -299,7 +299,16 @@
     });
   }
 
+  function isSgiAppShell() {
+    return !!document.querySelector(".sgi-protected-root");
+  }
+
   function ensureFab() {
+    if (isSgiAppShell()) {
+      var onSgi = document.getElementById("hrs-calendly-fab");
+      if (onSgi) onSgi.remove();
+      return null;
+    }
     var existing = document.getElementById("hrs-calendly-fab");
     if (existing) {
       existing.textContent = getLabel();
@@ -322,6 +331,18 @@
     if (legacy) legacy.style.display = "none";
   }
 
+  function watchSgiShell() {
+    if (typeof MutationObserver === "undefined") return;
+    var timer = null;
+    var obs = new MutationObserver(function () {
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(function () {
+        ensureFab();
+      }, 50);
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+  }
+
   function init() {
     patchSpinnerAppendChild();
     injectSpinnerKillCss();
@@ -329,6 +350,7 @@
     hideLegacyBadge();
     setupCalendlyMessageListener();
     ensureFab();
+    watchSgiShell();
     window.addEventListener("marketplace-lang-change", function () {
       ensureFab();
     });
