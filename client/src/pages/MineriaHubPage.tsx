@@ -47,7 +47,7 @@ export function MineriaHubPage() {
       <div className="container">
         <PageHeader title="Equipos ASIC" />
 
-        <div className="hrs-card p-4">
+        <div className="hrs-card sgi-hub-card p-4">
           <p className="text-muted small mb-3">Espacio para gestionar todo lo relacionado a la venta de Equipos ASIC:</p>
           <div className="reportes-grid">
             {visible.map((item) => (

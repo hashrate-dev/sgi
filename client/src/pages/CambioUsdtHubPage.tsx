@@ -39,7 +39,7 @@ export function CambioUsdtHubPage() {
           backTo="/gestion-administrativa"
           backText="Volver a Gestión Administrativa"
         />
-        <div className="hrs-card p-4">
+        <div className="hrs-card sgi-hub-card p-4">
           <p className="text-muted small mb-3">
             Gestión de clientes exclusivos de cambio y operaciones USDT/USD vinculadas al SGI.
           </p>

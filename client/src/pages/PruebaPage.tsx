@@ -38,7 +38,7 @@ export function PruebaPage() {
           backTo="/gestion-financiera"
           backText="Volver a Gestión Financiera"
         />
-        <div className="hrs-card p-4">
+        <div className="hrs-card sgi-hub-card p-4">
           <div className="reportes-grid">
             {visible.map((item) => (
               <Link key={item.to} to={item.to} className="reportes-card mineria-hub-card">

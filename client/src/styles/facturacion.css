@@ -5930,6 +5930,9 @@ button.fact-back {
   margin-right: -1.5rem;
   margin-top: -1.5rem;
   margin-bottom: 0;
+  width: calc(100% + 3rem);
+  max-width: none;
+  box-sizing: border-box;
 }
 .clientes-filtros-container {
   background: #2D5D46;
@@ -6085,12 +6088,59 @@ button.fact-back {
   margin-top: 1.5rem;
   margin-left: -1.5rem;
   margin-right: -1.5rem;
+  /* Mismo ancho que .clientes-filtros-outer (compensa p-4 del hrs-card + width:100% de responsive-global) */
+  width: calc(100% + 3rem);
+  max-width: none;
+  box-sizing: border-box;
   padding: 1.25rem 2rem;
   border-top: 2px solid #e2e8f0;
   background: #fff;
   border-radius: 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   overflow: hidden;
+}
+
+/* Transporte y fletes: Editar / Eliminar mismo tamaño */
+.transporte-fletes-acciones {
+  align-items: stretch;
+}
+
+.transporte-fletes-accion-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 5.5rem;
+  height: 2rem;
+  padding: 0 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+.transporte-fletes-accion-btn--edit {
+  background: #e8eef5;
+  border: 1px solid #c5d0dc;
+  color: #1e3a5f;
+}
+
+.transporte-fletes-accion-btn--edit:hover {
+  background: #d9e4f0;
+  border-color: #a8b8c9;
+  color: #152a45;
+}
+
+.transporte-fletes-accion-btn--delete {
+  background: #fff;
+  border: 1px solid #dc3545;
+  color: #dc3545;
+}
+
+.transporte-fletes-accion-btn--delete:hover {
+  background: #dc3545;
+  border-color: #dc3545;
+  color: #fff;
 }
 .clientes-listado-wrap > .d-flex {
   margin-bottom: 1rem;
@@ -6809,14 +6859,64 @@ button.fact-back {
   min-width: 120px;
 }
 
-/* Setup global marketplace - panel moderno */
+/* Setup page: panel global pegado abajo contra el footer */
+.fact-page.setup-page {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 52px);
+}
+
+.sgi-protected-root:not(.sgi-protected-root--admin-footer) .fact-page.setup-page {
+  min-height: 100vh;
+}
+
+@media (max-width: 768px) {
+  .sgi-protected-root.sgi-protected-root--admin-footer .fact-page.setup-page {
+    min-height: calc(100vh - 78px);
+  }
+}
+
+.setup-page__body {
+  flex: 1 1 auto;
+  width: 100%;
+}
+
+.setup-page__dock {
+  flex: 0 0 auto;
+  margin-top: auto;
+  padding-top: 1.25rem;
+  /* Espacio para footer SGI + botón flotante "Reserva una reunión" */
+  padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  margin-bottom: 1.75rem;
+  width: 100%;
+}
+
+.sgi-protected-root--admin-footer .setup-page__dock {
+  margin-bottom: 2.25rem;
+  padding-bottom: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .sgi-protected-root--admin-footer .setup-page__dock {
+    margin-bottom: 2.75rem;
+    padding-bottom: 1.75rem;
+  }
+}
+
+/* Setup global marketplace - mismo ancho del container (alineado al listado) */
 .setup-global-marketplace-panel {
+  margin-top: 0;
+  margin-left: 0;
+  margin-right: 0;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
   background: linear-gradient(145deg, #f8fafc 0%, #ffffff 65%);
   border: 1px solid #dbe5ef;
   border-left: 4px solid #2d5d46;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
-  padding: 0.95rem 1rem;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 1.25rem 2rem;
 }
 .setup-global-marketplace-panel__head {
   display: flex;
@@ -6873,6 +6973,35 @@ button.fact-back {
 .setup-global-marketplace-panel__apply {
   font-size: 0.8125rem;
   padding: 0.5rem 0.9rem;
+}
+
+/* Listado Setup: botón Editar sin wrap */
+.setup-listado-acciones {
+  flex-wrap: nowrap;
+}
+
+.setup-listado-accion-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 5.25rem;
+  height: 2rem;
+  padding: 0 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  border-radius: 8px;
+  box-sizing: border-box;
+  background: #e8eef5;
+  border: 1px solid #c5d0dc;
+  color: #1e3a5f;
+}
+
+.setup-listado-accion-btn:hover {
+  background: #d9e4f0;
+  border-color: #a8b8c9;
+  color: #152a45;
 }
 
 /* Formulario cliente ordenado: Código arriba + dos contactos (cada uno con nombre, tel, email, dirección, ciudad) */
@@ -12297,11 +12426,22 @@ button.nh-watcher-btc-card__corner-btn:hover {
 .fact-page.mineria-page.nh-watcher-fullpage {
   min-height: calc(100vh - 52px);
   overflow-x: hidden;
+  /* Espacio libre bajo el último gráfico: footer fijo + Calendly + logo */
+  padding-bottom: 3.5rem;
 }
 @media (max-width: 768px) {
   .fact-page.mineria-page.nh-watcher-fullpage {
     min-height: calc(100vh - 78px);
+    padding-bottom: 4.25rem;
   }
+}
+
+.sgi-protected-root--admin-footer .fact-page {
+  padding-bottom: 1.5rem;
+}
+
+.sgi-protected-root--admin-footer .fact-page.mineria-page.nh-watcher-fullpage {
+  padding-bottom: 4rem;
 }
 .sgi-protected-root .nh-watcher-fullpage__container {
   max-width: var(--sgi-layout-max, 1400px);

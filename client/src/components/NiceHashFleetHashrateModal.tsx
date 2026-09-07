@@ -525,15 +525,21 @@ export function NiceHashFleetHashrateModal({ open, onClose, rows, slotRows }: Pr
 
   useEffect(() => {
     if (!open) return;
+    const root = document.documentElement;
+    const body = document.body;
+    root.classList.add("hrs-nh-fleet-hash-open");
+    body.classList.add("hrs-nh-fleet-hash-open");
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const prev = body.style.overflow;
+    body.style.overflow = "hidden";
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
+      body.style.overflow = prev;
+      root.classList.remove("hrs-nh-fleet-hash-open");
+      body.classList.remove("hrs-nh-fleet-hash-open");
     };
   }, [open, onClose]);
 

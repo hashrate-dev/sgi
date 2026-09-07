@@ -23,11 +23,36 @@ html {
 }
 
 html.hrs-home-bg {
-  background: linear-gradient(135deg, #074025 0%, #2d8f3a 55%, #49f227 100%);
+  background-color: #071510;
+  background-image: url("/images/sgi-home-datacenter-aerial-night.png");
+  background-size: cover;
+  background-position: center 35%;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+body.hrs-home-bg {
+  background: transparent;
+}
+
+html.hrs-home-bg #root {
+  overflow-x: visible;
+  background: transparent;
+}
+
+@media (max-width: 768px) {
+  html.hrs-home-bg {
+    background-attachment: scroll;
+  }
 }
 
 html.hrs-protected-green-bg {
-  background: var(--hrs-app-bg-soft);
+  background-color: #0b1f16;
+  background-image: url("/images/config-mining-datacenter-bg.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
 }
 
 body {
@@ -42,11 +67,11 @@ body {
 }
 
 body.hrs-home-bg {
-  background: linear-gradient(135deg, #074025 0%, #2d8f3a 55%, #49f227 100%);
+  background: transparent;
 }
 
 body.hrs-protected-green-bg {
-  background: var(--hrs-app-bg-soft);
+  background: transparent;
 }
 
 #root {
@@ -57,6 +82,10 @@ body.hrs-protected-green-bg {
   max-width: 100%;
   background-color: var(--hrs-app-bg-soft);
   overflow-x: hidden;
+}
+
+html.hrs-protected-green-bg #root {
+  background: transparent;
 }
 
 /* Home SGI: #root recortaba la cabecera (100vw / sticky) → franja a la derecha; fixed + viewport */
@@ -95,6 +124,88 @@ html.hrs-home-bg body {
 
 .sgi-protected-root:not(.sgi-protected-root--admin-footer) .fact-page {
   min-height: 100vh;
+}
+
+/* Secciones SGI (no home): fondo granja + paneles glass */
+.sgi-protected-root--farm-bg .fact-page {
+  background: transparent !important;
+  position: relative;
+  z-index: 1;
+}
+
+/* Kryptex y páginas que aún usan .hrs-home fuera del dashboard */
+.sgi-protected-root--farm-bg .hrs-home {
+  background: transparent !important;
+  overflow: visible;
+}
+
+.sgi-protected-root--farm-bg .hrs-home::before,
+.sgi-protected-root--farm-bg .hrs-home::after {
+  display: none !important;
+}
+
+.sgi-protected-root--admin-footer .hrs-home {
+  padding-bottom: 4rem;
+}
+
+/*
+ * Estilo granja SGI:
+ * - Menús hub (elegir sección): glass → .sgi-hub-card / .sgi-glass-panel
+ * - Páginas de trabajo (filtros/tablas/formularios): sin bandeja glass
+ * - Home: no usa --farm-bg
+ */
+.sgi-protected-root--farm-bg .hrs-card.hrs-card--rect {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding-bottom: 0 !important;
+}
+
+.sgi-protected-root--farm-bg .hrs-card.sgi-hub-card,
+.sgi-protected-root--farm-bg .sgi-glass-panel {
+  background: rgba(255, 255, 255, 0.42) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.35) !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18) !important;
+}
+
+.sgi-protected-root--farm-bg .hrs-card.hrs-card--rect .clientes-listado-wrap,
+.sgi-protected-root--farm-bg .hrs-card.hrs-card--rect .historial-listado-wrap,
+.sgi-protected-root--farm-bg .hrs-card.hrs-card--rect .pendientes-listado-wrap {
+  margin-bottom: 0;
+  border-radius: 16px;
+  box-shadow:
+    0 8px 28px rgba(0, 0, 0, 0.16),
+    0 1px 0 rgba(255, 255, 255, 0.55) inset;
+}
+
+.sgi-protected-root--farm-bg .hrs-card.hrs-card--rect .clientes-filtros-container,
+.sgi-protected-root--farm-bg .hrs-card.hrs-card--rect .historial-filtros-container,
+.sgi-protected-root--farm-bg .hrs-card.hrs-card--rect .pendientes-filtros-container {
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.22),
+    0 1px 0 rgba(255, 255, 255, 0.12) inset;
+}
+
+/* Tarjetas de menú internas: opacas para lectura */
+.sgi-protected-root--farm-bg .reportes-card,
+.sgi-protected-root--farm-bg .mineria-hub-card,
+.sgi-protected-root--farm-bg a.reportes-card,
+.sgi-protected-root--farm-bg a.mineria-hub-card {
+  background: rgba(255, 255, 255, 0.96) !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px solid rgba(226, 232, 240, 0.9) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08) !important;
+}
+
+@media (max-width: 768px) {
+  html.hrs-protected-green-bg {
+    background-attachment: scroll;
+  }
 }
 
 /* Ancho de contenido SGI (similar a SAG) — todo el Sistema de Gestión Interna */

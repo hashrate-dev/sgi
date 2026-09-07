@@ -501,7 +501,7 @@ export function UsuariosPage() {
             />
 
             {routeMode === "hub" ? (
-              <div className="hrs-card p-4">
+              <div className="hrs-card sgi-hub-card p-4">
                 <p className="text-muted small mb-3">
                   Espacio para administrar cuentas del sistema, sesiones y trazabilidad de la tienda online (mismo
                   estilo de accesos que <strong>Servicios de Hosting</strong>).

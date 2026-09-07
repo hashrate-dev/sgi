@@ -35,8 +35,8 @@ type MenuItem = {
 };
 
 const ICON_SLOT_PROPS = {
-  w: "74px",
-  h: "74px",
+  w: "88px",
+  h: "88px",
   align: "center" as const,
   justify: "center" as const,
   borderRadius: "xl",
@@ -48,7 +48,7 @@ const ICON_SLOT_PROPS = {
 };
 
 /** Tamaño uniforme de iconos Bootstrap en tarjetas del home (rellena más el recuadre) */
-const DASHBOARD_BI_ICON_SIZE_LG = "3rem";
+const DASHBOARD_BI_ICON_SIZE_LG = "3.55rem";
 
 /** Enlace que ocupa toda la celda del grid para igualar alturas entre tarjetas (misma fila = misma altura) */
 const DASHBOARD_CARD_LINK_STYLE: CSSProperties = {
@@ -112,7 +112,7 @@ const menuItems: MenuItem[] = [
     to: "/asic/monitor-equipos?watcher=total",
     icon: "bi-activity",
     label: "Watcher Equipos",
-    desc: "NiceHash: vista TOTAL (todos los enlaces W1…WN) o un watcher suelto. El inicio abre TOTAL para ver todos los ASICs configurados.",
+    desc: "Monitor de Equipos ASIC conectados a NiceHash",
     roles: ["admin_a", "admin_b"],
     iconBg: "#ecf8f2",
     iconColor: "#2d5d46",
@@ -319,27 +319,39 @@ export function HomePage() {
     lineHeight: "1.12",
     mb: 1.5,
     letterSpacing: "-0.01em",
+    noOfLines: 2 as const,
   };
 
   const cardDescProps = {
     fontSize: { base: "0.88rem", md: "0.9rem" },
     color: "gray.600",
     lineHeight: "1.28",
+    noOfLines: 2 as const,
   };
 
+  /** Altura uniforme = referencia Configuración (icono + título + descripción); −1cm ≈ 38px. */
   const dashboardCardProps = {
     flex: 1,
     w: "100%",
-    minH: "208px",
-    h: "100%",
+    h: { base: "190px", md: "198px" },
+    minH: { base: "190px", md: "198px" },
+    maxH: { base: "190px", md: "198px" },
     /* Más aire arriba: el slot de icono quedaba pegado al borde superior de la tarjeta */
     pt: { base: 5, md: 6 },
     px: 4,
     pb: 4,
     display: "flex",
     flexDirection: "column" as const,
-    transition: "box-shadow 0.2s ease, transform 0.2s ease",
-    _hover: { transform: "translateY(-2px)", boxShadow: "md", borderColor: "green.200" },
+    overflow: "hidden" as const,
+    transition: "box-shadow 0.22s ease, transform 0.22s ease, border-color 0.22s ease",
+    boxShadow: "0 10px 28px rgba(0, 0, 0, 0.18)",
+    borderColor: "rgba(255,255,255,0.55)",
+    bg: "rgba(255,255,255,0.96)",
+    _hover: {
+      transform: "translateY(-3px)",
+      boxShadow: "0 16px 36px rgba(0, 0, 0, 0.22)",
+      borderColor: "green.200",
+    },
   };
 
   if (user?.role === "lector") {
@@ -361,8 +373,9 @@ export function HomePage() {
       minW={0}
       px={0}
       pt={0}
-      pb={{ base: 3, md: 4 }}
-      bgGradient="linear(135deg, #074025 0%, #2d8f3a 55%, #49f227 100%)"
+      pb={{ base: 4, md: 6 }}
+      bg="transparent"
+      position="relative"
     >
       <Box {...HOME_DASHBOARD_SHELL} pt={{ base: 3, md: 4 }}>
         <Grid
@@ -458,7 +471,7 @@ export function HomePage() {
                 </Flex>
                 <Heading {...cardTitleProps}>Órdenes marketplace</Heading>
                 <Text {...cardDescProps}>
-                  Borrador = carrito sin orden; pendiente = orden generada para cierre por ventas (tel./WhatsApp).
+                  Monitor de Carrito de Pedidos
                 </Text>
               </AppCard>
             </RouterLink>
@@ -495,11 +508,9 @@ export function HomePage() {
                   />
                 </Flex>
                 <Heading {...cardTitleProps}>Marketplace en vivo</Heading>
-                <Text fontSize="sm" fontWeight="semibold" color="gray.700" mb={1.5} lineHeight="short">
-                  {marketplaceOnlineTotal} en línea ahora
-                </Text>
                 <Text {...cardDescProps}>
-                  Logueados: {marketplaceOnlineLogged} · Sin cuenta: {marketplaceOnlineAnon}
+                  {marketplaceOnlineTotal} en línea · Logueados: {marketplaceOnlineLogged} · Sin cuenta:{" "}
+                  {marketplaceOnlineAnon}
                 </Text>
               </AppCard>
             </RouterLink>

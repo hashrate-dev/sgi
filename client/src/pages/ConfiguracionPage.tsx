@@ -32,7 +32,7 @@ type ConfigCardItem = { to: string; icon: string; label: string; desc: string };
 
 function ConfigMenuCard(item: ConfigCardItem) {
   return (
-    <RouterLink to={item.to} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+    <RouterLink to={item.to} style={{ textDecoration: "none", color: "inherit", display: "block", height: "100%" }}>
       <AppCard
         className="reportes-card mineria-hub-card"
         h="100%"
@@ -40,23 +40,13 @@ function ConfigMenuCard(item: ConfigCardItem) {
         transition="all 0.2s ease"
         _hover={{ transform: "translateY(-2px)", boxShadow: "md" }}
       >
-        <Flex
-          className="reportes-card-icon"
-          mb={3}
-        >
+        <Flex className="reportes-card-icon" mb={3}>
           <i className={`bi ${item.icon}`} aria-hidden />
         </Flex>
-        <Heading
-          as="h3"
-          className="reportes-card-title"
-        >
+        <Heading as="h3" className="reportes-card-title">
           {item.label}
         </Heading>
-        <Text
-          className="reportes-card-desc"
-        >
-          {item.desc}
-        </Text>
+        <Text className="reportes-card-desc">{item.desc}</Text>
       </AppCard>
     </RouterLink>
   );
@@ -73,12 +63,22 @@ export function ConfiguracionPage() {
   ];
 
   return (
-    <Box minH="100vh" px={{ base: 4, md: 6 }} pt={{ base: 2, md: 2 }} pb={{ base: 3, md: 4 }} bgGradient="linear(135deg, #f0fdf4 0%, #ffffff 30%, #f0f9f4 100%)">
+    <Box minH="100vh" px={{ base: 4, md: 6 }} pt={{ base: 2, md: 2 }} pb={{ base: 20, md: 24 }} bg="transparent">
       <Box className="sgi-layout-frame" maxW="var(--sgi-layout-max, 1400px)" mx="auto">
         <PageHeader title="Configuración" />
 
-        <AppCard mt={3} p={{ base: 3, md: 4 }}>
-          <Text color="gray.600" fontSize="sm" mb={3}>Opciones de configuración del sistema:</Text>
+        <AppCard
+          className="sgi-glass-panel"
+          mt={3}
+          p={{ base: 3, md: 4 }}
+          bg="rgba(255,255,255,0.42)"
+          backdropFilter="blur(10px)"
+          borderColor="rgba(255,255,255,0.35)"
+          boxShadow="0 12px 40px rgba(0,0,0,0.18)"
+        >
+          <Text color="gray.600" fontSize="sm" mb={3}>
+            Opciones de configuración del sistema:
+          </Text>
           <Grid templateColumns={{ base: "1fr", md: "repeat(2, minmax(0, 1fr))", xl: "repeat(3, minmax(0, 1fr))" }} gap={4}>
             {cards.map((item) => (
               <Box key={`${item.label}-${item.to}`}>{ConfigMenuCard(item)}</Box>

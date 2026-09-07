@@ -355,19 +355,17 @@ export function TransporteFletesPage() {
                         <td className="text-start">{normalizePrecioUsd(s.precioUSD)} USD</td>
                         {canEdit && (
                           <td className="text-start">
-                            <div className="d-flex gap-1 flex-wrap">
+                            <div className="d-flex gap-1 flex-wrap transporte-fletes-acciones">
                               <button
                                 type="button"
-                                className="fact-btn fact-btn-secondary btn-sm"
-                                style={{ padding: "0.35rem 0.75rem", fontSize: "0.8125rem" }}
+                                className="btn btn-sm transporte-fletes-accion-btn transporte-fletes-accion-btn--edit"
                                 onClick={() => openEdit(s)}
                               >
                                 Editar
                               </button>
                               <button
                                 type="button"
-                                className="btn btn-outline-danger btn-sm"
-                                style={{ padding: "0.35rem 0.75rem", fontSize: "0.8125rem" }}
+                                className="btn btn-sm transporte-fletes-accion-btn transporte-fletes-accion-btn--delete"
                                 onClick={() => setDeleteTarget(s)}
                               >
                                 Eliminar

@@ -33,7 +33,7 @@ export function ClientesHubPage() {
       <div className="container">
         <PageHeader title="Clientes" backTo="/" backText="Volver al inicio" />
 
-        <div className="hrs-card p-4">
+        <div className="hrs-card sgi-hub-card p-4">
           <p className="text-muted small mb-3">
             Elegí el tipo de cartera: facturación <strong>hosting</strong> o cuentas de la <strong>tienda online</strong>.
           </p>

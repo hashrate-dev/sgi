@@ -1653,7 +1653,7 @@ export function ReportesPage() {
       <div className="container">
         <PageHeader title="Reportes" />
 
-        <div className="hrs-card p-4">
+        <div className={view === "menu" ? "hrs-card sgi-hub-card p-4" : "hrs-card p-4"}>
           {view === "menu" && (
             <div className="reportes-grid">
               {reportesMenuItems.map((item) => (

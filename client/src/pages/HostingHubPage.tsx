@@ -26,7 +26,7 @@ export function HostingHubPage() {
       <div className="container">
         <PageHeader title="Servicios de Hosting" />
 
-        <div className="hrs-card p-4">
+        <div className="hrs-card sgi-hub-card p-4">
           <p className="text-muted small mb-3">Espacio para gestionar todo lo relacionado a la venta de Servicios de Hosting de Minería:</p>
           <div className="reportes-grid">
             {visible.map((item) => (

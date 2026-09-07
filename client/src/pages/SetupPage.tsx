@@ -305,8 +305,8 @@ export function SetupPage() {
   }, [setups, searchTerm]);
 
   return (
-    <div className="fact-page">
-      <div className="container">
+    <div className="fact-page setup-page">
+      <div className="container setup-page__body">
         <PageHeader title="Gestión de Setup" />
 
         <div className="hrs-card hrs-card--rect p-4">
@@ -404,7 +404,7 @@ export function SetupPage() {
                       <th className="text-start">Nº</th>
                       <th className="text-start">Nombre</th>
                       <th className="text-start">Precio USD</th>
-                      {canEdit && <th className="text-start" style={{ width: "120px" }}>Acciones</th>}
+                      {canEdit && <th className="text-start" style={{ width: "140px" }}>Acciones</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -440,7 +440,7 @@ export function SetupPage() {
                       <th className="text-start">Nombre</th>
                       <th className="text-start">Precio USD</th>
                       {canEdit && (
-                        <th className="text-start" style={{ width: "120px" }}>
+                        <th className="text-start" style={{ width: "140px" }}>
                           Acciones
                         </th>
                       )}
@@ -456,11 +456,10 @@ export function SetupPage() {
                         </td>
                         {canEdit && (
                           <td className="text-start">
-                            <div className="d-flex gap-1">
+                            <div className="d-flex gap-1 align-items-center setup-listado-acciones">
                               <button
                                 type="button"
-                                className="fact-btn fact-btn-secondary btn-sm"
-                                style={{ padding: "0.35rem 0.75rem", fontSize: "0.8125rem" }}
+                                className="btn btn-sm setup-listado-accion-btn"
                                 onClick={() => handleEdit(s)}
                               >
                                 Editar
@@ -481,47 +480,6 @@ export function SetupPage() {
               </div>
             )}
           </div>
-
-          {canEdit && (
-            <div className="setup-global-marketplace-panel mt-4">
-              <div className="setup-global-marketplace-panel__head">
-                <div>
-                  <h6 className="setup-global-marketplace-panel__title mb-1">Setup global marketplace</h6>
-                  <p className="setup-global-marketplace-panel__desc mb-0">
-                    Aplicá a todos los equipos del marketplace, solo con compra completa de unidad. No incluye compra de Hashrate (% de Equipo ASIC).
-                  </p>
-                </div>
-                <span className="setup-global-marketplace-panel__badge">
-                  {setupGlobalMarketplaceUsd === 50 ? "Modo ON · 50 USD" : "Modo OFF · 0 USD"}
-                </span>
-              </div>
-              <div className="setup-global-marketplace-panel__controls">
-                <div className="form-check form-switch setup-global-marketplace-panel__switch">
-                  <input
-                    className="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                    id="setup-global-marketplace-switch"
-                    checked={setupGlobalMarketplaceUsd === 50}
-                    onChange={(e) => setSetupGlobalMarketplaceUsd(e.target.checked ? 50 : 0)}
-                    disabled={applyingSetupGlobal}
-                  />
-                  <label className="form-check-label" htmlFor="setup-global-marketplace-switch">
-                    {setupGlobalMarketplaceUsd === 50 ? "Setup activado (50 USD)" : "Setup desactivado (0 USD)"}
-                  </label>
-                </div>
-                <button
-                  type="button"
-                  className="fact-btn fact-btn-primary setup-global-marketplace-panel__apply"
-                  onClick={() => void handleApplySetupGlobalMarketplace()}
-                  disabled={applyingSetupGlobal}
-                  title="Aplica setupUsd a todos los equipos del marketplace con fracciones de hashrate"
-                >
-                  {applyingSetupGlobal ? "Aplicando..." : "⚡ Aplicar a todo marketplace"}
-                </button>
-              </div>
-            </div>
-          )}
         </div>
 
         {showAddModal && (
@@ -709,6 +667,50 @@ export function SetupPage() {
           </div>
         )}
       </div>
+
+      {canEdit ? (
+        <div className="container setup-page__dock">
+          <div className="setup-global-marketplace-panel">
+            <div className="setup-global-marketplace-panel__head">
+              <div>
+                <h6 className="setup-global-marketplace-panel__title mb-1">Setup global marketplace</h6>
+                <p className="setup-global-marketplace-panel__desc mb-0">
+                  Aplicá a todos los equipos del marketplace, solo con compra completa de unidad. No incluye compra de
+                  Hashrate (% de Equipo ASIC).
+                </p>
+              </div>
+              <span className="setup-global-marketplace-panel__badge">
+                {setupGlobalMarketplaceUsd === 50 ? "Modo ON · 50 USD" : "Modo OFF · 0 USD"}
+              </span>
+            </div>
+            <div className="setup-global-marketplace-panel__controls">
+              <div className="form-check form-switch setup-global-marketplace-panel__switch">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                  id="setup-global-marketplace-switch"
+                  checked={setupGlobalMarketplaceUsd === 50}
+                  onChange={(e) => setSetupGlobalMarketplaceUsd(e.target.checked ? 50 : 0)}
+                  disabled={applyingSetupGlobal}
+                />
+                <label className="form-check-label" htmlFor="setup-global-marketplace-switch">
+                  {setupGlobalMarketplaceUsd === 50 ? "Setup activado (50 USD)" : "Setup desactivado (0 USD)"}
+                </label>
+              </div>
+              <button
+                type="button"
+                className="fact-btn fact-btn-primary setup-global-marketplace-panel__apply"
+                onClick={() => void handleApplySetupGlobalMarketplace()}
+                disabled={applyingSetupGlobal}
+                title="Aplica setupUsd a todos los equipos del marketplace con fracciones de hashrate"
+              >
+                {applyingSetupGlobal ? "Aplicando..." : "⚡ Aplicar a todo marketplace"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

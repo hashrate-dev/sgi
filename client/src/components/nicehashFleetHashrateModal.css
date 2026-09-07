@@ -2,11 +2,27 @@
 .nh-fleet-hash-overlay {
   position: fixed;
   inset: 0;
-  z-index: 2200;
+  /* Por encima de header SGI, footer y FAB Calendly */
+  z-index: 100050;
   display: flex;
   align-items: stretch;
   justify-content: center;
   padding: 0;
+}
+
+html.hrs-nh-fleet-hash-open .hrs-sgi-shell-header,
+body.hrs-nh-fleet-hash-open .hrs-sgi-shell-header,
+html.hrs-nh-fleet-hash-open .sgi-admin-fixed-footer,
+body.hrs-nh-fleet-hash-open .sgi-admin-fixed-footer,
+html.hrs-nh-fleet-hash-open .sgi-hashrate-brand-logo,
+body.hrs-nh-fleet-hash-open .sgi-hashrate-brand-logo,
+html.hrs-nh-fleet-hash-open .sgi-topbar-spacer,
+body.hrs-nh-fleet-hash-open .sgi-topbar-spacer,
+html.hrs-nh-fleet-hash-open #hrs-calendly-fab,
+body.hrs-nh-fleet-hash-open #hrs-calendly-fab {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 .nh-fleet-hash-backdrop {

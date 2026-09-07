@@ -64,7 +64,7 @@ export function GestionAdministrativaPage() {
       <div className="container">
         <PageHeader title="Gestión Administrativa — HRS GROUP S.A." />
 
-        <div className="hrs-card p-4">
+        <div className="hrs-card sgi-hub-card p-4">
           <p className="text-muted small mb-3">
             Área interna corporativa: Hosting, Equipos ASIC y Gestión Financiera (mismo estilo de tarjetas que en el resto del
             SGI).

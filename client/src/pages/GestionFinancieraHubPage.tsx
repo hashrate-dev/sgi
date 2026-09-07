@@ -63,7 +63,7 @@ export function GestionFinancieraHubPage() {
       <div className="container">
         <PageHeader title="Gestión Financiera" backTo="/gestion-administrativa" backText="Volver a Gestión Administrativa" />
 
-        <div className="hrs-card p-4">
+        <div className="hrs-card sgi-hub-card p-4">
           <p className="text-muted small mb-3">
             Herramientas de consulta y seguimiento financiero vinculadas al SGI (mismo estilo de accesos que en Hosting /
             ASIC).
