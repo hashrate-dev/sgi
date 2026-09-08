@@ -19,6 +19,17 @@ import {
   sampleTimeBucketMs,
 } from "../lib/nhWatcherRigHashSamples.js";
 import { normalizeNhWatcherStorageId } from "../lib/nhWatcherConfig.js";
+import {
+  applyAccrual,
+  detectAccountWithdrawal,
+  isNhEarningsAccountName,
+  normalizeNhRigDisplayName,
+  normalizeUnpaidDisplay,
+  rollBuckets,
+  type NhRigEarningsRow,
+  utcDayKey,
+  utcMonthKey,
+} from "../lib/nhWatcherRigEarnings.js";
 
 export const monitorEquiposAsicHistorialRouter = Router();
 
@@ -873,5 +884,305 @@ monitorEquiposAsicHistorialRouter.post(
       )
       .run(user.id, ck, at, parsed.data.profitBtc24h);
     res.json({ ok: true, inserted: true });
+  }
+);
+
+const postNhEarningsSyncBody = z.object({
+  contextKey: z.string().trim().min(8).max(120),
+  samples: z
+    .array(
+      z.object({
+        watcherId: z.string().uuid(),
+        rigName: z.string().trim().min(2).max(120),
+        profitabilityBtc24h: z.number().finite().nonnegative().max(50).nullable(),
+        unpaidBtc: z.number().finite().nonnegative().max(500).nullable(),
+        lastPayoutTimestamp: z.string().trim().max(64).nullable().optional(),
+      })
+    )
+    .max(80),
+});
+
+monitorEquiposAsicHistorialRouter.post(
+  "/monitor-equipos-asic/nicehash-watcher-earnings-sync",
+  requireRole("admin_a", "admin_b"),
+  requireAdminBGrant("equipos"),
+  async (req: Request, res: Response) => {
+    const parsed = postNhEarningsSyncBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: { message: "Body inválido (contextKey, samples)." } });
+      return;
+    }
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ error: { message: "No autenticado." } });
+      return;
+    }
+    const ck = normalizeNhProfitContextKey(parsed.data.contextKey);
+    if (!ck) {
+      res.status(400).json({ error: { message: "contextKey inválido." } });
+      return;
+    }
+    const now = Date.now();
+    let updated = 0;
+    let withdrawals = 0;
+
+    for (const s of parsed.data.samples) {
+      const wid = normalizeNhWatcherStorageId(s.watcherId);
+      const name = normalizeNhRigDisplayName(s.rigName);
+      if (!wid || !name) continue;
+      const isAccount = isNhEarningsAccountName(name);
+
+      const existing = (await db
+        .prepare(
+          `SELECT day_utc, day_btc, month_ym, month_btc, lifetime_btc, last_unpaid_btc, last_sample_at,
+                  last_profitability, first_seen_at, last_payout_ts
+           FROM nh_watcher_rig_earnings WHERE user_id = ? AND watcher_id = ? AND rig_name = ?`
+        )
+        .get(user.id, wid, name)) as
+        | {
+            day_utc: string;
+            day_btc: number;
+            month_ym: string;
+            month_btc: number;
+            lifetime_btc: number;
+            last_unpaid_btc: number | null;
+            last_sample_at: number;
+            last_profitability: number | null;
+            first_seen_at: number;
+            last_payout_ts: string | null;
+          }
+        | undefined;
+
+      const base: NhRigEarningsRow = existing
+        ? {
+            day_utc: String(existing.day_utc),
+            day_btc: Number(existing.day_btc) || 0,
+            month_ym: String(existing.month_ym),
+            month_btc: Number(existing.month_btc) || 0,
+            lifetime_btc: Number(existing.lifetime_btc) || 0,
+            last_unpaid_btc:
+              existing.last_unpaid_btc == null ? null : Number(existing.last_unpaid_btc),
+            last_sample_at: Number(existing.last_sample_at) || now,
+            last_profitability:
+              existing.last_profitability == null ? null : Number(existing.last_profitability),
+            first_seen_at: Number(existing.first_seen_at) || now,
+            last_payout_ts: existing.last_payout_ts ? String(existing.last_payout_ts) : null,
+          }
+        : {
+            day_utc: utcDayKey(now),
+            day_btc: 0,
+            month_ym: utcMonthKey(now),
+            month_btc: 0,
+            lifetime_btc: 0,
+            last_unpaid_btc: null,
+            last_sample_at: now,
+            last_profitability: null,
+            first_seen_at: now,
+            last_payout_ts: null,
+          };
+
+      let accrued: NhRigEarningsRow;
+      if (isAccount) {
+        accrued = { ...rollBuckets(base, now), last_sample_at: now, last_profitability: null };
+      } else if (existing) {
+        accrued = applyAccrual(base, s.profitabilityBtc24h, now);
+      } else {
+        accrued = {
+          ...rollBuckets(base, now),
+          last_sample_at: now,
+          last_profitability: s.profitabilityBtc24h,
+        };
+      }
+
+      let storeUnpaid: number | null = isAccount
+        ? s.unpaidBtc == null
+          ? base.last_unpaid_btc
+          : normalizeUnpaidDisplay(s.unpaidBtc)
+        : null;
+      let storePayoutTs = s.lastPayoutTimestamp?.trim() || base.last_payout_ts;
+
+      if (isAccount && s.unpaidBtc != null) {
+        const detected = detectAccountWithdrawal({
+          prevUnpaid: base.last_unpaid_btc,
+          nextUnpaid: s.unpaidBtc,
+          prevPayoutTs: base.last_payout_ts,
+          nextPayoutTs: s.lastPayoutTimestamp?.trim() || null,
+        });
+        if (detected) {
+          await db
+            .prepare(
+              `INSERT INTO nh_watcher_withdrawals
+               (user_id, watcher_id, amount_btc, unpaid_before, unpaid_after, payout_ts, detected_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)`
+            )
+            .run(
+              user.id,
+              wid,
+              detected.amountBtc,
+              base.last_unpaid_btc,
+              s.unpaidBtc,
+              s.lastPayoutTimestamp?.trim() || null,
+              now
+            );
+          withdrawals += 1;
+          storeUnpaid = detected.storeUnpaidBtc;
+          if (s.lastPayoutTimestamp?.trim()) storePayoutTs = s.lastPayoutTimestamp.trim();
+        }
+      }
+
+      await db
+        .prepare(
+          `INSERT INTO nh_watcher_rig_earnings (
+             user_id, watcher_id, rig_name, day_utc, day_btc, month_ym, month_btc, lifetime_btc,
+             last_unpaid_btc, last_sample_at, last_profitability, first_seen_at, last_payout_ts
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(user_id, watcher_id, rig_name) DO UPDATE SET
+             day_utc = excluded.day_utc,
+             day_btc = excluded.day_btc,
+             month_ym = excluded.month_ym,
+             month_btc = excluded.month_btc,
+             lifetime_btc = excluded.lifetime_btc,
+             last_unpaid_btc = excluded.last_unpaid_btc,
+             last_sample_at = excluded.last_sample_at,
+             last_profitability = excluded.last_profitability,
+             last_payout_ts = excluded.last_payout_ts`
+        )
+        .run(
+          user.id,
+          wid,
+          name,
+          accrued.day_utc,
+          isAccount ? 0 : accrued.day_btc,
+          accrued.month_ym,
+          isAccount ? 0 : accrued.month_btc,
+          isAccount ? 0 : accrued.lifetime_btc,
+          storeUnpaid,
+          accrued.last_sample_at,
+          isAccount ? null : accrued.last_profitability,
+          base.first_seen_at,
+          storePayoutTs
+        );
+      updated += 1;
+    }
+
+    res.json({ ok: true, updated, withdrawals, contextKey: ck });
+  }
+);
+
+monitorEquiposAsicHistorialRouter.get(
+  "/monitor-equipos-asic/nicehash-watcher-earnings-summary",
+  requireRole("admin_a", "admin_b"),
+  requireAdminBGrant("equipos"),
+  async (req: Request, res: Response) => {
+    const rawKey = typeof req.query.contextKey === "string" ? req.query.contextKey : "";
+    const ck = normalizeNhProfitContextKey(rawKey);
+    if (!ck) {
+      res.status(400).json({ error: { message: "contextKey inválido." } });
+      return;
+    }
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ error: { message: "No autenticado." } });
+      return;
+    }
+
+    const watcherFilter =
+      ck === "fleet:total:v1"
+        ? null
+        : ck.startsWith("watcher:")
+          ? ck.slice("watcher:".length)
+          : null;
+
+    const rows = watcherFilter
+      ? ((await db
+          .prepare(
+            `SELECT watcher_id, rig_name, day_utc, day_btc, month_ym, month_btc, lifetime_btc,
+                    last_unpaid_btc, first_seen_at
+             FROM nh_watcher_rig_earnings WHERE user_id = ? AND watcher_id = ?`
+          )
+          .all(user.id, watcherFilter)) as Array<Record<string, unknown>>)
+      : ((await db
+          .prepare(
+            `SELECT watcher_id, rig_name, day_utc, day_btc, month_ym, month_btc, lifetime_btc,
+                    last_unpaid_btc, first_seen_at
+             FROM nh_watcher_rig_earnings WHERE user_id = ?`
+          )
+          .all(user.id)) as Array<Record<string, unknown>>);
+
+    const now = Date.now();
+    const today = utcDayKey(now);
+    const month = utcMonthKey(now);
+    let dayBtc = 0;
+    let monthBtc = 0;
+    let lifetimeBtc = 0;
+    let unpaidBtc = 0;
+    const byRig: Array<{
+      watcherId: string;
+      rigName: string;
+      dayBtc: number;
+      monthBtc: number;
+      lifetimeBtc: number;
+      unpaidBtc: number;
+      firstSeenAt: number;
+    }> = [];
+
+    for (const r of rows) {
+      const rigName = String(r.rig_name);
+      if (isNhEarningsAccountName(rigName)) {
+        unpaidBtc += normalizeUnpaidDisplay(
+          r.last_unpaid_btc == null ? 0 : Number(r.last_unpaid_btc)
+        );
+        continue;
+      }
+      const dayOk = String(r.day_utc) === today ? Number(r.day_btc) || 0 : 0;
+      const monthOk = String(r.month_ym) === month ? Number(r.month_btc) || 0 : 0;
+      const life = Number(r.lifetime_btc) || 0;
+      dayBtc += dayOk;
+      monthBtc += monthOk;
+      lifetimeBtc += life;
+      byRig.push({
+        watcherId: String(r.watcher_id),
+        rigName,
+        dayBtc: dayOk,
+        monthBtc: monthOk,
+        lifetimeBtc: life,
+        unpaidBtc: 0,
+        firstSeenAt: Number(r.first_seen_at) || 0,
+      });
+    }
+
+    const wRow = watcherFilter
+      ? ((await db
+          .prepare(
+            `SELECT amount_btc, detected_at, payout_ts FROM nh_watcher_withdrawals
+             WHERE user_id = ? AND watcher_id = ? ORDER BY detected_at DESC LIMIT 1`
+          )
+          .get(user.id, watcherFilter)) as { amount_btc?: unknown; detected_at?: unknown; payout_ts?: unknown } | undefined)
+      : ((await db
+          .prepare(
+            `SELECT amount_btc, detected_at, payout_ts FROM nh_watcher_withdrawals
+             WHERE user_id = ? ORDER BY detected_at DESC LIMIT 1`
+          )
+          .get(user.id)) as { amount_btc?: unknown; detected_at?: unknown; payout_ts?: unknown } | undefined);
+
+    const lastWithdrawal =
+      wRow && Number.isFinite(Number(wRow.amount_btc))
+        ? {
+            amountBtc: Number(wRow.amount_btc),
+            detectedAt: Number(wRow.detected_at) || 0,
+            payoutTimestamp: wRow.payout_ts ? String(wRow.payout_ts) : null,
+          }
+        : null;
+
+    res.json({
+      contextKey: ck,
+      dayBtc,
+      monthBtc,
+      lifetimeBtc,
+      unpaidBtc: normalizeUnpaidDisplay(unpaidBtc),
+      lastWithdrawal,
+      rigCount: byRig.length,
+      byRig: byRig.sort((a, b) => a.rigName.localeCompare(b.rigName, "es")),
+    });
   }
 );

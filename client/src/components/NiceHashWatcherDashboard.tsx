@@ -2,12 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   getNiceHashExternalRigs2,
+  getNiceHashWatcherEarningsSummary,
   getNiceHashWatcherProfitMonth,
   getNiceHashWatcherRigHashHistory,
+  postNiceHashWatcherEarningsSync,
   postNiceHashWatcherProfitSnapshot,
   postNiceHashWatcherRigHashHistorySamples,
   wakeUpBackend,
   type NiceHashExternalRigs2Payload,
+  type NhWatcherEarningsSummary,
 } from "../lib/api";
 import {
   getNiceHashWatcherNicknamesStorageKey,
@@ -43,7 +46,17 @@ import { NICEHASH_WATCHER_ID, NH_WATCHER_FLEET_TOOLBAR_WATCHER_ID } from "../lib
 import { NiceHashFleetHashrateModal } from "./NiceHashFleetHashrateModal";
 import { NiceHashRigAsicIcon } from "./NiceHashRigAsicIcon";
 import { NiceHashRigHashSparkline } from "./NiceHashRigHashSparkline";
+import { NiceHashWatcherAlertBoard } from "./NiceHashWatcherAlertBoard";
 import { AppModal } from "./ui";
+import {
+  evaluateNhWatcherFleetAlerts,
+  isNhWatcherAlertSoundMuted,
+  playNhWatcherAlertSounds,
+  setNhWatcherAlertSoundMuted,
+  updateNhWatcherAlertPrevSnaps,
+  type NhWatcherAlertPrevSnap,
+  type NhWatcherFleetAlert,
+} from "../lib/nicehashWatcherAlerts";
 import {
   appendNiceHashRigHashrateSample,
   appendWatcherToolbarSpeedSamplesReturn,
@@ -59,6 +72,7 @@ import {
   replaceNiceHashRigHashrateHistoryMap,
 } from "../lib/nicehashWatcherRigHashrateHistory";
 import "../styles/facturacion.css";
+import "../styles/nicehash-watcher-pro.css";
 
 /** Referencia estable para sparklines sin serie (evita re-renders por `?? []` nuevo cada vez). */
 const NH_SPARKLINE_VALUES_EMPTY: number[] = [];
@@ -240,6 +254,13 @@ function nhRigStatusClass(status: string): string {
   if (u === "MINING") return "nh-watcher-rig-card__status nh-watcher-rig-card__status--mining";
   if (u === "OFFLINE" || u === "STOPPED" || u === "DISABLED") return "nh-watcher-rig-card__status nh-watcher-rig-card__status--off";
   return "nh-watcher-rig-card__status nh-watcher-rig-card__status--other";
+}
+
+function nhRigCardToneClass(status: string): string {
+  const u = status.trim().toUpperCase();
+  if (u === "MINING") return " is-mining";
+  if (u === "OFFLINE" || u === "STOPPED" || u === "DISABLED") return " is-off";
+  return " is-other";
 }
 
 function nhRejectPctLabel(stats: unknown[] | undefined): string {
@@ -810,6 +831,13 @@ export function NiceHashWatcherDashboard({
   const [clientBtcSpotUsd, setClientBtcSpotUsd] = useState<number | null>(null);
   /** Evita registrar hashrate de un payload obsoleto si cambió el watcher antes de terminar el fetch. */
   const payloadWatcherMatchRef = useRef<string | null>(null);
+  const [fleetAlerts, setFleetAlerts] = useState<NhWatcherFleetAlert[]>([]);
+  const [dismissedAlertIds, setDismissedAlertIds] = useState<Set<string>>(() => new Set());
+  const [alertSoundMuted, setAlertSoundMuted] = useState(() => isNhWatcherAlertSoundMuted());
+  const [focusAlertSeriesKey, setFocusAlertSeriesKey] = useState<string | null>(null);
+  const alertPrevSnapsRef = useRef<Map<string, NhWatcherAlertPrevSnap>>(new Map());
+  const alertSoundedIdsRef = useRef<Set<string>>(new Set());
+  const alertWarmupDoneRef = useRef(false);
 
   const nhAgg = useMemo((): NhWatcherAgg | null => {
     if (isTotal) {
@@ -860,6 +888,8 @@ export function NiceHashWatcherDashboard({
     snapshotCount: number;
   } | null>(null);
   const [monthProfitLoading, setMonthProfitLoading] = useState(false);
+  const [earningsSummary, setEarningsSummary] = useState<NhWatcherEarningsSummary | null>(null);
+  const [earningsLoading, setEarningsLoading] = useState(false);
 
   useEffect(() => {
     setMonthProfit(null);
@@ -917,6 +947,140 @@ export function NiceHashWatcherDashboard({
       cancelled = true;
     };
   }, [active, nhAgg, nhProfitContextKey, fetchedAt, reloadMonthProfit]);
+
+  const reloadEarningsSummary = useCallback(async () => {
+    try {
+      setEarningsLoading(true);
+      const r = await getNiceHashWatcherEarningsSummary({ contextKey: nhProfitContextKey });
+      setEarningsSummary(r);
+    } catch {
+      setEarningsSummary(null);
+    } finally {
+      setEarningsLoading(false);
+    }
+  }, [nhProfitContextKey]);
+
+  useEffect(() => {
+    setEarningsSummary(null);
+  }, [nhProfitContextKey]);
+
+  /** Sync acumulado HRS por nombre de equipo (Hash…) e indicadores custom. */
+  useEffect(() => {
+    if (!active || !nhAgg) return;
+    const rows = isTotal
+      ? (flatRigs ?? [])
+      : (payload?.miningRigs ?? []).map((rig, rigIndex) => ({
+          slotIndex: activeSlot,
+          watcherId: effectiveWatcherId,
+          rig,
+          rigIndex,
+          payload: payload!,
+        }));
+    if (rows.length === 0) return;
+
+    const samples = rows
+      .map(({ watcherId, rig, payload: pl }) => {
+        const name = (rig.name ?? "").trim();
+        if (name.length < 2) return null;
+        const st = nhPickPrimaryMiningStat(rig.stats as unknown[]);
+        const profit =
+          typeof rig.profitability === "number" && Number.isFinite(rig.profitability)
+            ? rig.profitability
+            : typeof st?.profitability === "number" && Number.isFinite(st.profitability as number)
+              ? (st.profitability as number)
+              : null;
+        return {
+          watcherId: watcherId.trim().toLowerCase(),
+          rigName: name,
+          profitabilityBtc24h: profit != null && profit >= 0 ? profit : null,
+          unpaidBtc: null as number | null,
+          lastPayoutTimestamp: pl.lastPayoutTimestamp ?? null,
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x != null);
+
+    // Unpaid / retiros: a nivel CUENTA NiceHash (no por ASIC).
+    const accountByWatcher = new Map<string, { unpaidBtc: number | null; lastPayoutTimestamp: string | null }>();
+    if (isTotal) {
+      for (const { watcherId, payload: pl } of multiOk) {
+        const wid = watcherId.trim().toLowerCase();
+        accountByWatcher.set(wid, {
+          unpaidBtc: parseNiceHashAmountString(pl.unpaidAmount ?? null),
+          lastPayoutTimestamp: pl.lastPayoutTimestamp ?? null,
+        });
+      }
+    } else if (payload) {
+      accountByWatcher.set(effectiveWatcherId.trim().toLowerCase(), {
+        unpaidBtc: parseNiceHashAmountString(payload.unpaidAmount ?? null),
+        lastPayoutTimestamp: payload.lastPayoutTimestamp ?? null,
+      });
+    }
+    for (const [wid, acc] of accountByWatcher) {
+      samples.push({
+        watcherId: wid,
+        rigName: "__NH_ACCOUNT__",
+        profitabilityBtc24h: null,
+        unpaidBtc: acc.unpaidBtc,
+        lastPayoutTimestamp: acc.lastPayoutTimestamp,
+      });
+    }
+
+    if (samples.length === 0) return;
+    const nowMs = Date.now();
+    const syncKey = `nhEarnSyncAt:${nhProfitContextKey}`;
+    try {
+      const last = Number(window.localStorage.getItem(syncKey) || "0");
+      if (Number.isFinite(last) && nowMs - last < 45_000) {
+        void reloadEarningsSummary();
+        return;
+      }
+    } catch {
+      /* ignore */
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        await postNiceHashWatcherEarningsSync({ contextKey: nhProfitContextKey, samples });
+        try {
+          window.localStorage.setItem(syncKey, String(nowMs));
+        } catch {
+          /* ignore */
+        }
+        if (!cancelled) await reloadEarningsSummary();
+      } catch {
+        if (!cancelled) void reloadEarningsSummary();
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    active,
+    nhAgg,
+    isTotal,
+    flatRigs,
+    payload,
+    activeSlot,
+    effectiveWatcherId,
+    nhProfitContextKey,
+    fetchedAt,
+    multiOk,
+    reloadEarningsSummary,
+  ]);
+
+  const paraRetirarBtc = useMemo(() => {
+    const live = parseNiceHashAmountString(nhAgg?.unpaid ?? null);
+    const stored = earningsSummary?.unpaidBtc;
+    const lw = earningsSummary?.lastWithdrawal;
+    const recentWithdraw = Boolean(lw && Date.now() - lw.detectedAt < 30 * 60 * 1000);
+
+    // Tras un retiro detectado, forzar 0 mientras NiceHash aún no bajó el unpaid.
+    if (recentWithdraw && (stored == null || stored <= 1e-8)) return 0;
+
+    if (live != null) return live <= 1e-8 ? 0 : live;
+    if (typeof stored === "number" && Number.isFinite(stored)) return stored <= 1e-8 ? 0 : stored;
+    return null;
+  }, [nhAgg?.unpaid, earningsSummary?.unpaidBtc, earningsSummary?.lastWithdrawal]);
 
   const spotDependencyKey = useMemo(
     () => (isTotal ? multiOk.map((x) => x.watcherId).sort().join("|") : effectiveWatcherId),
@@ -1155,6 +1319,16 @@ export function NiceHashWatcherDashboard({
     void wakeUpBackend();
     void refresh();
   }, [active, refresh]);
+
+  /** Al cambiar de vista/watcher, re-armar baseline de alertas sin sonar de entrada. */
+  useEffect(() => {
+    alertWarmupDoneRef.current = false;
+    alertPrevSnapsRef.current = new Map();
+    alertSoundedIdsRef.current = new Set();
+    setDismissedAlertIds(new Set());
+    setFleetAlerts([]);
+    setFocusAlertSeriesKey(null);
+  }, [isTotal, effectiveWatcherId]);
 
   /** Renovación automática cada 1 min sin pantalla en blanco (actualización silenciosa). */
   useEffect(() => {
@@ -1402,6 +1576,70 @@ export function NiceHashWatcherDashboard({
     }));
   }, [nhAgg, isTotal, flatRigs, payload, activeSlot, effectiveWatcherId]);
 
+  /** Detecta apagones / hashrate bajo y alimenta el tablero de mando (+ sonido en alertas nuevas). */
+  useEffect(() => {
+    if (!active || rigRowsForList.length === 0) {
+      setFleetAlerts([]);
+      return;
+    }
+    const inputs = rigRowsForList.map((row) => {
+      const { slotIndex, watcherId, rig, rigIndex } = row;
+      const label = (rig.name ?? rig.rigId ?? "—").trim() || "—";
+      const rigKeyLocal = nhWatcherRigStorageKey(rig, rigIndex);
+      const seriesKey = isTotal ? nhCompositeRigKey(watcherId, rigKeyLocal) : rigKeyLocal;
+      const status = (rig.minerStatus ?? "—").trim() || "—";
+      const spd = nhRigSpeedAcceptedFromStats(rig.stats as unknown[]);
+      const slotNick = watcherSlotNicknameTrimmed(slotRows, slotIndex);
+      const nick = rigNicknames[seriesKey] ?? slotNick ?? "";
+      const spark = rigHashSeriesMap[seriesKey] ?? [];
+      const statusTimeMs =
+        typeof rig.statusTime === "number" && Number.isFinite(rig.statusTime) ? rig.statusTime : null;
+      return {
+        seriesKey,
+        rigLabel: label,
+        nick,
+        status,
+        speedAccepted: spd,
+        statusTimeMs,
+        spark,
+      };
+    });
+
+    const now = Date.now();
+    const evaluated = evaluateNhWatcherFleetAlerts(inputs, alertPrevSnapsRef.current, now);
+    updateNhWatcherAlertPrevSnaps(alertPrevSnapsRef.current, inputs, now);
+
+    if (!alertWarmupDoneRef.current) {
+      alertWarmupDoneRef.current = true;
+      for (const a of evaluated) alertSoundedIdsRef.current.add(a.id);
+      setFleetAlerts(evaluated.filter((a) => !dismissedAlertIds.has(a.id)));
+      return;
+    }
+
+    const fresh = evaluated.filter((a) => !alertSoundedIdsRef.current.has(a.id));
+    if (fresh.length > 0) {
+      playNhWatcherAlertSounds(fresh);
+      for (const a of fresh) alertSoundedIdsRef.current.add(a.id);
+    }
+    // Limpiar sounded ids de alertas que ya no aplican (para re-sonar si vuelve el fallo)
+    const liveIds = new Set(evaluated.map((a) => a.id));
+    for (const id of [...alertSoundedIdsRef.current]) {
+      if (!liveIds.has(id)) alertSoundedIdsRef.current.delete(id);
+    }
+
+    setFleetAlerts(evaluated.filter((a) => !dismissedAlertIds.has(a.id)));
+  }, [
+    active,
+    rigRowsForList,
+    rigHashSeriesMap,
+    rigNicknames,
+    slotRows,
+    isTotal,
+    dismissedAlertIds,
+  ]);
+
+  const visibleFleetAlerts = fleetAlerts;
+
   const fleetHashModalRows = useMemo(
     () =>
       rigRowsForList.map(({ slotIndex, watcherId, rigIndex, rig }) => ({
@@ -1427,7 +1665,7 @@ export function NiceHashWatcherDashboard({
   if (!active) return null;
 
   const shell = (
-    <div className="nh-watcher-shell">
+    <div className={`nh-watcher-shell${layout === "fullscreen" ? " nh-watcher-shell--pro" : ""}`}>
       {layout === "embedded" && !isTotal ? (
         <WatcherSlotBar
           variant="embedded"
@@ -1465,42 +1703,105 @@ export function NiceHashWatcherDashboard({
         </div>
       ) : null}
       {nhAgg ? (
-        <div className="nh-watcher-inner px-3 px-md-4 pt-3 pb-3">
-          <div className="nh-watcher-kpi-grid nh-watcher-kpi-grid--pro mb-3" role="list">
+        <div
+          className={`nh-watcher-inner px-3 px-md-4 pt-3 pb-3${
+            layout === "fullscreen" ? " nh-watcher-inner--pro" : ""
+          }`}
+        >
+          {layout === "fullscreen" ? (
+            <header className="nh-watcher-hero">
+              <div className="nh-watcher-hero__top">
+                <div className="min-w-0">
+                  <div className="nh-watcher-kicker">
+                    <span
+                      className={`nh-watcher-live-pulse${loading || fetchedAt ? " is-on" : ""}`}
+                      aria-hidden
+                    />
+                    NiceHash · Flota ASIC
+                  </div>
+                  <h2 className="nh-watcher-hero__title">
+                    {isTotal ? "Monitor total de minería" : "Monitor de flota"}
+                  </h2>
+
+                </div>
+                <div className="nh-watcher-hero__stats" aria-label="Resumen de flota">
+                  <div className="nh-watcher-hero-stat">
+                    <span className="nh-watcher-hero-stat__label">En marcha</span>
+                    <span className="nh-watcher-hero-stat__value">
+                      {nhAgg.miningN}/{nhAgg.totalRigs || nhAgg.rigs.length}
+                    </span>
+                  </div>
+                  {nhAgg.sumTh > 0 ? (
+                    <div className="nh-watcher-hero-stat">
+                      <span className="nh-watcher-hero-stat__label">Hashrate</span>
+                      <span className="nh-watcher-hero-stat__value nh-watcher-hero-stat__value--sm">
+                        {nhAgg.sumTh.toFixed(2)} TH/s
+                      </span>
+                    </div>
+                  ) : null}
+                  {nhAgg.btc24 != null ? (
+                    <div className="nh-watcher-hero-stat">
+                      <span className="nh-watcher-hero-stat__label">Rent. 24 h</span>
+                      <span className="nh-watcher-hero-stat__value nh-watcher-hero-stat__value--sm mono">
+                        {formatNiceHashBtc8(nhAgg.btc24)} BTC
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </header>
+          ) : null}
+          {layout === "fullscreen" && visibleFleetAlerts.length > 0 ? (
+            <NiceHashWatcherAlertBoard
+              alerts={visibleFleetAlerts}
+              soundMuted={alertSoundMuted}
+              onToggleMute={() => {
+                const next = !alertSoundMuted;
+                setAlertSoundMuted(next);
+                setNhWatcherAlertSoundMuted(next);
+              }}
+              onDismiss={(id) => setDismissedAlertIds((prev) => new Set(prev).add(id))}
+              onDismissAll={() =>
+                setDismissedAlertIds((prev) => {
+                  const n = new Set(prev);
+                  for (const a of visibleFleetAlerts) n.add(a.id);
+                  return n;
+                })
+              }
+              onFocusRig={(seriesKey) => {
+                setFocusAlertSeriesKey(seriesKey);
+                const el = document.querySelector(
+                  `.nh-watcher-rig-card[data-nh-series="${CSS.escape(seriesKey)}"]`
+                );
+                el?.scrollIntoView({ behavior: "smooth", block: "center" });
+                window.setTimeout(() => setFocusAlertSeriesKey(null), 4200);
+              }}
+            />
+          ) : null}
+          <div className="nh-watcher-kpi-grid nh-watcher-kpi-grid--pro nh-watcher-kpi-grid--hrs mb-3" role="list">
             <article className="nh-watcher-kpi nh-watcher-kpi--pro nh-watcher-kpi--pro-hero" role="listitem">
               <header className="nh-watcher-kpi__head">
                 <span className="nh-watcher-kpi__icon-wrap" aria-hidden>
-                  <i className="bi bi-hdd-network nh-watcher-kpi__icon" />
+                  <i className="bi bi-sun nh-watcher-kpi__icon" />
                 </span>
-                <h3 className="nh-watcher-kpi__label">ASICs en marcha</h3>
-              </header>
-              <div className="nh-watcher-kpi__body">
-                <p className="nh-watcher-kpi__value nh-watcher-kpi__value--hero">
-                  <span className="nh-watcher-kpi__value-main">{nhAgg.miningN}</span>
-                  <span className="nh-watcher-kpi__value-sep">/</span>
-                  <span className="nh-watcher-kpi__value-dim">{nhAgg.totalRigs || nhAgg.rigs.length}</span>
-                </p>
-              </div>
-            </article>
-            <article className="nh-watcher-kpi nh-watcher-kpi--pro nh-watcher-kpi--pro-profit" role="listitem">
-              <header className="nh-watcher-kpi__head">
-                <span className="nh-watcher-kpi__icon-wrap" aria-hidden>
-                  <i className="bi bi-graph-up-arrow nh-watcher-kpi__icon" />
-                </span>
-                <h3 className="nh-watcher-kpi__label">Rentabilidad (24 h)</h3>
+                <h3 className="nh-watcher-kpi__label">BTC generado hoy</h3>
               </header>
               <div className="nh-watcher-kpi__body">
                 <p className="nh-watcher-kpi__value nh-watcher-kpi__value--btc">
-                  {nhAgg.btc24 != null ? (
+                  {earningsLoading && !earningsSummary ? (
+                    <span className="nh-watcher-kpi__value-pulse">…</span>
+                  ) : (
                     <>
-                      <span className="nh-watcher-kpi__value-main">{formatNiceHashBtc8(nhAgg.btc24)}</span>
+                      <span className="nh-watcher-kpi__value-main">
+                        {formatNiceHashBtc8(earningsSummary?.dayBtc ?? 0)}
+                      </span>
                       <span className="nh-watcher-kpi__unit">BTC</span>
                     </>
-                  ) : (
-                    "—"
                   )}
                 </p>
-                <p className="nh-watcher-kpi__fiat">{formatRent24hUsdApprox(displayPayload, nhAgg.btc24, effectiveBtcSpotUsd) ?? "—"}</p>
+                <p className="nh-watcher-kpi__fiat">
+                  {formatRent24hUsdApprox(displayPayload, earningsSummary?.dayBtc ?? 0, effectiveBtcSpotUsd) ?? "—"}
+                </p>
               </div>
             </article>
             <article className="nh-watcher-kpi nh-watcher-kpi--pro nh-watcher-kpi--pro-profit" role="listitem">
@@ -1508,25 +1809,46 @@ export function NiceHashWatcherDashboard({
                 <span className="nh-watcher-kpi__icon-wrap" aria-hidden>
                   <i className="bi bi-calendar3 nh-watcher-kpi__icon" />
                 </span>
-                <h3 className="nh-watcher-kpi__label">Rentabilidad (mes acum.)</h3>
+                <h3 className="nh-watcher-kpi__label">BTC generado mes</h3>
               </header>
               <div className="nh-watcher-kpi__body">
                 <p className="nh-watcher-kpi__value nh-watcher-kpi__value--btc">
-                  {monthProfitLoading && monthProfit == null ? (
+                  {earningsLoading && !earningsSummary ? (
                     <span className="nh-watcher-kpi__value-pulse">…</span>
-                  ) : monthProfit != null ? (
+                  ) : (
                     <>
-                      <span className="nh-watcher-kpi__value-main">{formatNiceHashBtc8(monthProfit.totalBtc)}</span>
+                      <span className="nh-watcher-kpi__value-main">
+                        {formatNiceHashBtc8(earningsSummary?.monthBtc ?? 0)}
+                      </span>
                       <span className="nh-watcher-kpi__unit">BTC</span>
                     </>
-                  ) : (
-                    "—"
                   )}
                 </p>
                 <p className="nh-watcher-kpi__fiat">
-                  {monthProfit != null
-                    ? formatRent24hUsdApprox(displayPayload, monthProfit.totalBtc, effectiveBtcSpotUsd) ?? "—"
-                    : "—"}
+                  {formatRent24hUsdApprox(displayPayload, earningsSummary?.monthBtc ?? 0, effectiveBtcSpotUsd) ?? "—"}
+                </p>
+              </div>
+            </article>
+            <article className="nh-watcher-kpi nh-watcher-kpi--pro nh-watcher-kpi--pro-profit" role="listitem">
+              <header className="nh-watcher-kpi__head">
+                <span className="nh-watcher-kpi__icon-wrap" aria-hidden>
+                  <i className="bi bi-infinity nh-watcher-kpi__icon" />
+                </span>
+                <h3 className="nh-watcher-kpi__label">Total acumulado (Hash…)</h3>
+              </header>
+              <div className="nh-watcher-kpi__body">
+                <p className="nh-watcher-kpi__value nh-watcher-kpi__value--btc">
+                  <>
+                    <span className="nh-watcher-kpi__value-main">
+                      {formatNiceHashBtc8(earningsSummary?.lifetimeBtc ?? 0)}
+                    </span>
+                    <span className="nh-watcher-kpi__unit">BTC</span>
+                  </>
+                </p>
+                <p className="nh-watcher-kpi__fiat nh-watcher-kpi__fiat--muted">
+                  {earningsSummary?.rigCount
+                    ? `${earningsSummary.rigCount} equipo${earningsSummary.rigCount === 1 ? "" : "s"} · desde 1ª detección SGI`
+                    : "Se acumula con el nombre del ASIC"}
                 </p>
               </div>
             </article>
@@ -1535,35 +1857,57 @@ export function NiceHashWatcherDashboard({
                 <span className="nh-watcher-kpi__icon-wrap" aria-hidden>
                   <i className="bi bi-wallet2 nh-watcher-kpi__icon" />
                 </span>
-                <h3 className="nh-watcher-kpi__label">Saldo impago (minería)</h3>
+                <h3 className="nh-watcher-kpi__label">Para retirar</h3>
               </header>
               <div className="nh-watcher-kpi__body">
                 <p className="nh-watcher-kpi__value nh-watcher-kpi__value--btc">
-                  {nhAgg.unpaid ? (
+                  {paraRetirarBtc == null ? (
+                    "—"
+                  ) : (
                     <>
-                      <span className="nh-watcher-kpi__value-main">{nhAgg.unpaid}</span>
+                      <span className="nh-watcher-kpi__value-main">{formatNiceHashBtc8(paraRetirarBtc)}</span>
+                      <span className="nh-watcher-kpi__unit">BTC</span>
+                    </>
+                  )}
+                </p>
+                <p className="nh-watcher-kpi__fiat">
+                  {paraRetirarBtc == null
+                    ? "—"
+                    : paraRetirarBtc <= 0
+                      ? "Sin saldo pendiente"
+                      : formatUnpaidMiningUsdApprox(displayPayload, nhAgg.unpaid, effectiveBtcSpotUsd) ??
+                        formatRent24hUsdApprox(displayPayload, paraRetirarBtc, effectiveBtcSpotUsd) ??
+                        "—"}
+                </p>
+              </div>
+            </article>
+            <article className="nh-watcher-kpi nh-watcher-kpi--pro nh-watcher-kpi--pro-time" role="listitem">
+              <header className="nh-watcher-kpi__head">
+                <span className="nh-watcher-kpi__icon-wrap" aria-hidden>
+                  <i className="bi bi-box-arrow-up-right nh-watcher-kpi__icon" />
+                </span>
+                <h3 className="nh-watcher-kpi__label">Último retiro</h3>
+              </header>
+              <div className="nh-watcher-kpi__body">
+                <p className="nh-watcher-kpi__value nh-watcher-kpi__value--btc">
+                  {earningsSummary?.lastWithdrawal ? (
+                    <>
+                      <span className="nh-watcher-kpi__value-main">
+                        {formatNiceHashBtc8(earningsSummary.lastWithdrawal.amountBtc)}
+                      </span>
                       <span className="nh-watcher-kpi__unit">BTC</span>
                     </>
                   ) : (
                     "—"
                   )}
                 </p>
-                <p className="nh-watcher-kpi__fiat">{formatUnpaidMiningUsdApprox(displayPayload, nhAgg.unpaid, effectiveBtcSpotUsd) ?? "—"}</p>
-              </div>
-            </article>
-            <article className="nh-watcher-kpi nh-watcher-kpi--pro nh-watcher-kpi--pro-time" role="listitem">
-              <header className="nh-watcher-kpi__head">
-                <span className="nh-watcher-kpi__icon-wrap" aria-hidden>
-                  <i className="bi bi-hourglass-split nh-watcher-kpi__icon" />
-                </span>
-                <h3 className="nh-watcher-kpi__label">Próximo pago (estim.)</h3>
-              </header>
-              <div className="nh-watcher-kpi__body">
-                <p className="nh-watcher-kpi__value nh-watcher-kpi__value--countdown">
-                  <WatcherLiveCountdown iso={nhAgg.nextPayout} />
-                </p>
                 <p className="nh-watcher-kpi__fiat nh-watcher-kpi__fiat--muted">
-                  {nhAgg.nextPayout ? formatNiceHashIsoShort(nhAgg.nextPayout) : "—"}
+                  {earningsSummary?.lastWithdrawal
+                    ? formatNiceHashStatusTime(earningsSummary.lastWithdrawal.detectedAt) ||
+                      (earningsSummary.lastWithdrawal.payoutTimestamp
+                        ? formatNiceHashIsoShort(earningsSummary.lastWithdrawal.payoutTimestamp)
+                        : "Detectado al bajar el impago")
+                    : "Al pagar NiceHash queda en 0 «Para retirar»"}
                 </p>
               </div>
             </article>
@@ -1681,7 +2025,11 @@ export function NiceHashWatcherDashboard({
           <h3 className="nh-watcher-section-title nh-watcher-section-title--pro">
             {isTotal ? "Todos los ASICs · TOTAL" : "Mis ASICs"}
           </h3>
-          <div className="nh-watcher-rig-list">
+          <div
+            className={`nh-watcher-rig-list${
+              layout === "fullscreen" ? ` nh-watcher-rig-list--pro${rigRowsForList.length >= 4 ? " is-dense" : ""}` : ""
+            }`}
+          >
             {rigRowsForList.length === 0 ? (
               <div className="text-center text-secondary py-4">No hay ASICs en la respuesta.</div>
             ) : (
@@ -1711,7 +2059,13 @@ export function NiceHashWatcherDashboard({
                     ? `Apodo del watcher · NiceHash: ${nhTypeLabel}`
                     : `Apodo por defecto · NiceHash: ${nhTypeLabel}`;
                 return (
-                  <article key={seriesKey} className="nh-watcher-rig-card nh-watcher-rig-card--pro">
+                  <article
+                    key={seriesKey}
+                    data-nh-series={seriesKey}
+                    className={`nh-watcher-rig-card nh-watcher-rig-card--pro${nhRigCardToneClass(status)}${
+                      visibleFleetAlerts.some((a) => a.seriesKey === seriesKey) ? " is-alert" : ""
+                    }${focusAlertSeriesKey === seriesKey ? " is-alert-focus" : ""}`}
+                  >
                     <div className="nh-watcher-rig-card__head">
                       <div className="nh-watcher-rig-card__grow">
                         <div className="nh-watcher-rig-card__name">

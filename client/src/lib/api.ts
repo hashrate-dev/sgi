@@ -895,6 +895,51 @@ export function postNiceHashWatcherProfitSnapshot(payload: {
   );
 }
 
+export type NhWatcherEarningsSummary = {
+  contextKey: string;
+  dayBtc: number;
+  monthBtc: number;
+  lifetimeBtc: number;
+  unpaidBtc: number;
+  lastWithdrawal: { amountBtc: number; detectedAt: number; payoutTimestamp: string | null } | null;
+  rigCount: number;
+  byRig: Array<{
+    watcherId: string;
+    rigName: string;
+    dayBtc: number;
+    monthBtc: number;
+    lifetimeBtc: number;
+    unpaidBtc: number;
+    firstSeenAt: number;
+  }>;
+};
+
+export function getNiceHashWatcherEarningsSummary(params: {
+  contextKey: string;
+}): Promise<NhWatcherEarningsSummary> {
+  const q = new URLSearchParams({ contextKey: params.contextKey.trim() });
+  return api<NhWatcherEarningsSummary>(
+    `/api/monitor-equipos-asic/nicehash-watcher-earnings-summary?${q.toString()}`
+  );
+}
+
+export function postNiceHashWatcherEarningsSync(payload: {
+  contextKey: string;
+  samples: Array<{
+    watcherId: string;
+    rigName: string;
+    profitabilityBtc24h: number | null;
+    unpaidBtc: number | null;
+    lastPayoutTimestamp?: string | null;
+  }>;
+}): Promise<{ ok: boolean; updated: number; withdrawals: number; contextKey: string }> {
+  return api(`/api/monitor-equipos-asic/nicehash-watcher-earnings-sync`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function postMonitorEquipoAsicBaja(payload: {
   equipoId: string;
   rowSnapshot: Record<string, unknown>;

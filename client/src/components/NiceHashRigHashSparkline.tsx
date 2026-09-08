@@ -4,8 +4,6 @@ import { sanitizeRigHashSparklineValues } from "../lib/nicehashWatcherRigHashrat
 const W = 128;
 const H = 36;
 const PAD = 4;
-/** Etiquetas Mín/Máx dentro del gráfico (izquierda); Últ a la derecha. */
-const LABEL_INSET_X = 3;
 
 type SparkScale = {
   yAt: (v: number) => number;
@@ -61,7 +59,10 @@ function computeSparkScale(values: number[]): SparkScale | null {
 
 type LevelKind = "min" | "max" | "last";
 
-function mergeLevelRows(stats: { min: number; max: number; last: number }, scale: SparkScale): { v: number; yLine: number; labelY: number; kinds: LevelKind[] }[] {
+function mergeLevelRows(
+  stats: { min: number; max: number; last: number },
+  scale: SparkScale
+): { v: number; yLine: number; labelY: number; kinds: LevelKind[] }[] {
   const eps = 1e-9 * (Math.abs(stats.max) + Math.abs(stats.min) + 1);
   const raw: { v: number; kind: LevelKind }[] = [
     { v: stats.max, kind: "max" },
@@ -92,7 +93,6 @@ function mergeLevelRows(stats: { min: number; max: number; last: number }, scale
   return rows;
 }
 
-/** Catmull-Rom → cúbicas; `k=1/6` es el estándar (curva suave entre puntos). */
 const SMOOTH_K = 1 / 6;
 
 function catmullRomCurveThrough(pts: Array<{ x: number; y: number }>): string {
@@ -134,13 +134,12 @@ function buildSparkLayout(values: number[]): {
   const baseY = PAD + (H - PAD * 2);
   const curve = catmullRomCurveThrough(pts);
   const line = `M ${pts[0].x.toFixed(2)} ${pts[0].y.toFixed(2)}${curve}`;
-  const area =
-    `M ${pts[0].x.toFixed(2)} ${baseY.toFixed(2)} L ${pts[0].x.toFixed(2)} ${pts[0].y.toFixed(2)}${curve} L ${pts[pts.length - 1].x.toFixed(2)} ${baseY.toFixed(2)} Z`;
+  const area = `M ${pts[0].x.toFixed(2)} ${baseY.toFixed(2)} L ${pts[0].x.toFixed(2)} ${pts[0].y.toFixed(2)}${curve} L ${pts[pts.length - 1].x.toFixed(2)} ${baseY.toFixed(2)} Z`;
 
   return { d: { line, area }, hasArea: n >= 2, scale };
 }
 
-function guideRowSvgTitle(kinds: LevelKind[]): string {
+function guideRowTitle(kinds: LevelKind[]): string {
   const has = (k: LevelKind) => kinds.includes(k);
   const parts: string[] = [];
   if (has("max")) parts.push("Máximo");
@@ -149,7 +148,6 @@ function guideRowSvgTitle(kinds: LevelKind[]): string {
   return parts.join(" · ");
 }
 
-/** Prefijo visible corto (misma prioridad visual que las guías al combinar niveles). */
 function kindPrefixShort(kinds: LevelKind[]): string {
   const has = (k: LevelKind) => kinds.includes(k);
   const parts: string[] = [];
@@ -159,7 +157,10 @@ function kindPrefixShort(kinds: LevelKind[]): string {
   return parts.length ? `${parts.join("/")} ` : "";
 }
 
-/** Sparkline: fondo oscuro suave, rejilla ligera, curva esmeralda, guías neutras y tipografía sans clara. */
+/**
+ * Sparkline a ancho completo del contenedor (preserveAspectRatio=none).
+ * Etiquetas en HTML encima para que no se deformen al estirar el SVG.
+ */
 function NiceHashRigHashSparklineInner({ values, title, formatHashrate }: NiceHashRigHashSparklineProps) {
   const gid = useId().replace(/:/g, "");
   const gradId = `nhRigSparkFill-${gid}`;
@@ -189,88 +190,71 @@ function NiceHashRigHashSparklineInner({ values, title, formatHashrate }: NiceHa
     );
   }
 
-  const innerSvg = (
-    <svg viewBox={`0 0 ${W} ${H}`} className="nh-watcher-rig-spark__svg" preserveAspectRatio="none" aria-hidden>
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#34d399" stopOpacity="0.18" />
-          <stop offset="72%" stopColor="#34d399" stopOpacity="0.05" />
-          <stop offset="100%" stopColor="#34d399" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <rect x="0" y="0" width={W} height={H} rx="6" className="nh-watcher-rig-spark__bg" />
-      <rect x="0.5" y="0.5" width={W - 1} height={H - 1} rx="5.5" className="nh-watcher-rig-spark__frame" fill="none" />
-      {[1, 2, 3].map((i) => {
-        const innerH = H - PAD * 2;
-        const y = PAD + (innerH * i) / 4;
-        return (
-          <line
-            key={`grid-${i}`}
-            x1={PAD}
-            y1={y}
-            x2={W - PAD}
-            y2={y}
-            className="nh-watcher-rig-spark__grid"
-            vectorEffect="non-scaling-stroke"
-          />
-        );
-      })}
-      {guideRows && scale
-        ? guideRows.map(({ v, yLine }, idx) => {
-            const x1 = PAD;
-            const x2 = PAD + scale.plotW;
+  return (
+    <div
+      className="nh-watcher-rig-spark"
+      title={combinedTitle || title || "Tendencia hashrate (~1 min entre muestras; historial por usuario en servidor)"}
+    >
+      <div className="nh-watcher-rig-spark__canvas">
+        <svg viewBox={`0 0 ${W} ${H}`} className="nh-watcher-rig-spark__svg" preserveAspectRatio="none" aria-hidden>
+          <defs>
+            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#34d399" stopOpacity="0.18" />
+              <stop offset="72%" stopColor="#34d399" stopOpacity="0.05" />
+              <stop offset="100%" stopColor="#34d399" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <rect x="0" y="0" width={W} height={H} rx="6" className="nh-watcher-rig-spark__bg" />
+          <rect x="0.5" y="0.5" width={W - 1} height={H - 1} rx="5.5" className="nh-watcher-rig-spark__frame" fill="none" />
+          {[1, 2, 3].map((i) => {
+            const innerH = H - PAD * 2;
+            const y = PAD + (innerH * i) / 4;
             return (
               <line
-                key={`${idx}-${v}`}
-                x1={x1}
-                y1={yLine}
-                x2={x2}
-                y2={yLine}
-                className="nh-watcher-rig-spark__guide"
+                key={`grid-${i}`}
+                x1={PAD}
+                y1={y}
+                x2={W - PAD}
+                y2={y}
+                className="nh-watcher-rig-spark__grid"
                 vectorEffect="non-scaling-stroke"
               />
             );
-          })
-        : null}
-      {hasArea ? <path d={d.area} fill={`url(#${gradId})`} className="nh-watcher-rig-spark__fill" /> : null}
-      <path d={d.line} fill="none" className="nh-watcher-rig-spark__line" vectorEffect="non-scaling-stroke" />
-      {guideRows && formatHashrate
-        ? guideRows.map(({ v, labelY, kinds }, idx) => {
-            const ultDerecha = kinds.includes("last");
-            const pre = kindPrefixShort(kinds);
-            return (
-              <text
-                key={`t-${idx}-${v}`}
-                x={ultDerecha ? W - PAD - LABEL_INSET_X : PAD + LABEL_INSET_X}
-                y={labelY}
-                className="nh-watcher-rig-spark__guide-label"
-                textAnchor={ultDerecha ? "end" : "start"}
-                dominantBaseline="middle"
-              >
-                <title>{guideRowSvgTitle(kinds)}</title>
-                {pre ? <tspan className="nh-watcher-rig-spark__lbl-pre">{pre}</tspan> : null}
-                <tspan className="nh-watcher-rig-spark__lbl-val">{formatHashrate(v)}</tspan>
-              </text>
-            );
-          })
-        : null}
-    </svg>
-  );
-
-  if (!formatHashrate || !stats) {
-    return (
-      <div
-        className="nh-watcher-rig-spark"
-        title={combinedTitle || title || "Tendencia hashrate (~1 min entre muestras; historial por usuario en servidor)"}
-      >
-        {innerSvg}
+          })}
+          {guideRows && scale
+            ? guideRows.map(({ v, yLine }, idx) => (
+                <line
+                  key={`${idx}-${v}`}
+                  x1={PAD}
+                  y1={yLine}
+                  x2={PAD + scale.plotW}
+                  y2={yLine}
+                  className="nh-watcher-rig-spark__guide"
+                  vectorEffect="non-scaling-stroke"
+                />
+              ))
+            : null}
+          {hasArea ? <path d={d.area} fill={`url(#${gradId})`} className="nh-watcher-rig-spark__fill" /> : null}
+          <path d={d.line} fill="none" className="nh-watcher-rig-spark__line" vectorEffect="non-scaling-stroke" />
+        </svg>
+        {guideRows && formatHashrate
+          ? guideRows.map(({ v, labelY, kinds }, idx) => {
+              const ultDerecha = kinds.includes("last");
+              const topPct = (labelY / H) * 100;
+              return (
+                <span
+                  key={`lbl-${idx}-${v}`}
+                  className={`nh-watcher-rig-spark__html-label${ultDerecha ? " is-right" : " is-left"}`}
+                  style={{ top: `${topPct}%` }}
+                  title={guideRowTitle(kinds)}
+                >
+                  {kindPrefixShort(kinds)}
+                  <strong>{formatHashrate(v)}</strong>
+                </span>
+              );
+            })
+          : null}
       </div>
-    );
-  }
-
-  return (
-    <div className="nh-watcher-rig-spark" title={combinedTitle}>
-      {innerSvg}
     </div>
   );
 }

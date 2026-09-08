@@ -1030,6 +1030,43 @@ CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_visitor ON marketplace_presence_
     `CREATE INDEX IF NOT EXISTS idx_nh_profit_snap_user_ctx_time ON nh_watcher_profit_snapshots(user_id, context_key, snapshot_at)`
   );
 
+  /** Acumulado BTC por nombre de equipo (Hash…) — día / mes / lifetime + último unpaid. */
+  native.exec(`CREATE TABLE IF NOT EXISTS nh_watcher_rig_earnings (
+    user_id INTEGER NOT NULL,
+    watcher_id TEXT NOT NULL,
+    rig_name TEXT NOT NULL,
+    day_utc TEXT NOT NULL,
+    day_btc REAL NOT NULL DEFAULT 0,
+    month_ym TEXT NOT NULL,
+    month_btc REAL NOT NULL DEFAULT 0,
+    lifetime_btc REAL NOT NULL DEFAULT 0,
+    last_unpaid_btc REAL,
+    last_sample_at INTEGER NOT NULL,
+    last_profitability REAL,
+    first_seen_at INTEGER NOT NULL,
+    last_payout_ts TEXT,
+    PRIMARY KEY (user_id, watcher_id, rig_name),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`);
+  native.exec(
+    `CREATE INDEX IF NOT EXISTS idx_nh_rig_earn_user_wid ON nh_watcher_rig_earnings(user_id, watcher_id)`
+  );
+
+  native.exec(`CREATE TABLE IF NOT EXISTS nh_watcher_withdrawals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    watcher_id TEXT NOT NULL,
+    amount_btc REAL NOT NULL,
+    unpaid_before REAL,
+    unpaid_after REAL,
+    payout_ts TEXT,
+    detected_at INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`);
+  native.exec(
+    `CREATE INDEX IF NOT EXISTS idx_nh_withdraw_user_time ON nh_watcher_withdrawals(user_id, detected_at DESC)`
+  );
+
   const txWrap = {
     prepare: (sql: string) => createStatement(native, sql),
   };
