@@ -3,10 +3,8 @@ import { Link, useSearchParams } from "react-router-dom";
 import {
   getNiceHashExternalRigs2,
   getNiceHashWatcherEarningsSummary,
-  getNiceHashWatcherProfitMonth,
   getNiceHashWatcherRigHashHistory,
   postNiceHashWatcherEarningsSync,
-  postNiceHashWatcherProfitSnapshot,
   postNiceHashWatcherRigHashHistorySamples,
   wakeUpBackend,
   type NiceHashExternalRigs2Payload,
@@ -152,13 +150,6 @@ function formatNiceHashBtc8(n: number | undefined | null): string {
   return n.toFixed(8);
 }
 
-function utcYearMonthFromMs(ms: number): string {
-  const d = new Date(ms);
-  const y = d.getUTCFullYear();
-  const m = d.getUTCMonth() + 1;
-  return `${y}-${String(m).padStart(2, "0")}`;
-}
-
 /** Parsea montos string del API NiceHash (coma o punto decimal). */
 function parseNiceHashAmountString(s: string | null | undefined): number | null {
   if (s == null) return null;
@@ -219,23 +210,6 @@ function formatNiceHashRelativeAge(statusTimeMs?: number): string {
   if (h < 72) return `hace ${h}h`;
   const d = Math.floor(h / 24);
   return `hace ${d}d`;
-}
-
-function formatCountdownToIso(iso: string | null | undefined, nowMs: number): string {
-  if (!iso || typeof iso !== "string") return "—";
-  const t = Date.parse(iso);
-  if (!Number.isFinite(t)) return "—";
-  const ms = t - nowMs;
-  if (ms <= 0) return "En curso";
-  const s = Math.floor(ms / 1000);
-  const d = Math.floor(s / 86400);
-  const h = Math.floor((s % 86400) / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  if (d > 0) return `${d}d ${h}h ${m}m`;
-  if (h > 0) return `${h}h ${m}m ${sec}s`;
-  if (m > 0) return `${m}m ${sec}s`;
-  return `${sec}s`;
 }
 
 function nhWatcherAlgoLine(rigs: NiceHashExternalRigs2Payload["miningRigs"]): string {
@@ -507,22 +481,6 @@ function formatUptimeFromConnected(timeConnectedMs?: number): string {
   if (h > 0) return `${h}h ${m}m`;
   if (m > 0) return `${m}m`;
   return `${s}s`;
-}
-
-/** Cuenta atrás al próximo pago: intervalo local (no re-renderiza todo el tablero cada 1s). */
-function WatcherLiveCountdown({ iso }: { iso: string | null | undefined }) {
-  const [text, setText] = useState(() => formatCountdownToIso(iso, Date.now()));
-  useEffect(() => {
-    if (!iso) {
-      setText("—");
-      return;
-    }
-    const tick = () => setText(formatCountdownToIso(iso, Date.now()));
-    tick();
-    const id = window.setInterval(tick, 1000);
-    return () => window.clearInterval(id);
-  }, [iso]);
-  return <>{text}</>;
 }
 
 /** “hace Xs” en última señal: solo este bloque se actualiza por segundo. */
@@ -879,74 +837,8 @@ export function NiceHashWatcherDashboard({
     [isTotal, effectiveWatcherId]
   );
 
-  const [profitMonthClockMs, setProfitMonthClockMs] = useState(() => Date.now());
-  const utcYearMonthProfit = useMemo(() => utcYearMonthFromMs(profitMonthClockMs), [profitMonthClockMs]);
-
-  const [monthProfit, setMonthProfit] = useState<{
-    yearMonth: string;
-    totalBtc: number;
-    snapshotCount: number;
-  } | null>(null);
-  const [monthProfitLoading, setMonthProfitLoading] = useState(false);
   const [earningsSummary, setEarningsSummary] = useState<NhWatcherEarningsSummary | null>(null);
   const [earningsLoading, setEarningsLoading] = useState(false);
-
-  useEffect(() => {
-    setMonthProfit(null);
-  }, [nhProfitContextKey]);
-
-  const reloadMonthProfit = useCallback(async () => {
-    const ym = utcYearMonthFromMs(Date.now());
-    try {
-      setMonthProfitLoading(true);
-      const r = await getNiceHashWatcherProfitMonth({ contextKey: nhProfitContextKey, yearMonth: ym });
-      setMonthProfit({
-        yearMonth: r.yearMonth,
-        totalBtc: r.totalBtc,
-        snapshotCount: r.snapshotCount,
-      });
-    } catch {
-      setMonthProfit(null);
-    } finally {
-      setMonthProfitLoading(false);
-    }
-  }, [nhProfitContextKey]);
-
-  useEffect(() => {
-    if (!active) return;
-    const id = window.setInterval(() => setProfitMonthClockMs(Date.now()), 60_000);
-    return () => window.clearInterval(id);
-  }, [active]);
-
-  useEffect(() => {
-    if (!active || !nhAgg) return;
-    void reloadMonthProfit();
-  }, [active, nhAgg, nhProfitContextKey, utcYearMonthProfit, reloadMonthProfit]);
-
-  useEffect(() => {
-    if (!active || !nhAgg || nhAgg.btc24 == null || !Number.isFinite(nhAgg.btc24) || nhAgg.btc24 < 0) return;
-    const ck = nhProfitContextKey;
-    const profit = nhAgg.btc24;
-    const lsKey = `nhWatcherProfitSnapAt:${ck}`;
-    let cancelled = false;
-    void (async () => {
-      try {
-        if (typeof window === "undefined") return;
-        const last = Number(window.localStorage.getItem(lsKey) || "0");
-        const now = Date.now();
-        if (Number.isFinite(last) && now - last < 23 * 60 * 60 * 1000) return;
-        const r = await postNiceHashWatcherProfitSnapshot({ contextKey: ck, profitBtc24h: profit });
-        if (cancelled || !r.ok) return;
-        window.localStorage.setItem(lsKey, String(now));
-        if (r.inserted) void reloadMonthProfit();
-      } catch {
-        /* sin sesión o red */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [active, nhAgg, nhProfitContextKey, fetchedAt, reloadMonthProfit]);
 
   const reloadEarningsSummary = useCallback(async () => {
     try {
