@@ -38,6 +38,7 @@ type NewsRowMapped = {
   summaryPt: string;
   url: string;
   sourceName: string;
+  imageUrl: string;
   topics: CryptoNoticiaTopic[];
   publishedAt: string;
   fetchedAt: string;
@@ -61,6 +62,7 @@ async function ensureCryptoNoticiasSchema(): Promise<void> {
           title_pt TEXT,
           summary_es TEXT,
           summary_pt TEXT,
+          image_url TEXT NOT NULL DEFAULT '',
           UNIQUE (url)
         )`
       )
@@ -69,6 +71,7 @@ async function ensureCryptoNoticiasSchema(): Promise<void> {
     await db.prepare("ALTER TABLE sgi_crypto_noticias ADD COLUMN IF NOT EXISTS title_pt TEXT").run();
     await db.prepare("ALTER TABLE sgi_crypto_noticias ADD COLUMN IF NOT EXISTS summary_es TEXT").run();
     await db.prepare("ALTER TABLE sgi_crypto_noticias ADD COLUMN IF NOT EXISTS summary_pt TEXT").run();
+    await db.prepare("ALTER TABLE sgi_crypto_noticias ADD COLUMN IF NOT EXISTS image_url TEXT NOT NULL DEFAULT ''").run();
   } else {
     await db
       .prepare(
@@ -84,13 +87,14 @@ async function ensureCryptoNoticiasSchema(): Promise<void> {
           title_es TEXT,
           title_pt TEXT,
           summary_es TEXT,
-          summary_pt TEXT
+          summary_pt TEXT,
+          image_url TEXT NOT NULL DEFAULT ''
         )`
       )
       .run();
-    for (const col of ["title_es", "title_pt", "summary_es", "summary_pt"] as const) {
+    for (const col of ["title_es TEXT", "title_pt TEXT", "summary_es TEXT", "summary_pt TEXT", "image_url TEXT NOT NULL DEFAULT ''"] as const) {
       try {
-        await db.prepare(`ALTER TABLE sgi_crypto_noticias ADD COLUMN ${col} TEXT`).run();
+        await db.prepare(`ALTER TABLE sgi_crypto_noticias ADD COLUMN ${col}`).run();
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         if (!/duplicate column/i.test(msg)) throw e;
@@ -256,6 +260,7 @@ function mapRow(raw: Record<string, unknown>): NewsRowMapped {
     summaryPt: String(r.summary_pt ?? "").trim(),
     url: String(r.url ?? ""),
     sourceName: String(r.source_name ?? ""),
+    imageUrl: String(r.image_url ?? "").trim(),
     topics: parseTopics(r.topics_json),
     publishedAt: String(r.published_at ?? ""),
     fetchedAt: String(r.fetched_at ?? ""),
@@ -284,6 +289,7 @@ function presentItem(row: NewsRowMapped, lang: NewsLang) {
     summary,
     url: row.url,
     sourceName: row.sourceName,
+    imageUrl: row.imageUrl,
     topics: row.topics,
     publishedAt: row.publishedAt,
     fetchedAt: row.fetchedAt,
@@ -335,13 +341,23 @@ async function runIngest(): Promise<{ inserted: number; scanned: number; feedErr
     try {
       const info = await db
         .prepare(
-          `INSERT INTO sgi_crypto_noticias (title, summary, url, source_name, topics_json, published_at, fetched_at)
-           VALUES (?, ?, ?, ?, ?, ?, ${db.isPostgres ? "NOW()" : "datetime('now')"})
+          `INSERT INTO sgi_crypto_noticias (title, summary, url, source_name, topics_json, published_at, fetched_at, image_url)
+           VALUES (?, ?, ?, ?, ?, ?, ${db.isPostgres ? "NOW()" : "datetime('now')"}, ?)
            ON CONFLICT (url) DO NOTHING`
         )
-        .run(d.title, d.summary, d.url, d.sourceName, JSON.stringify(d.topics), d.publishedAt);
+        .run(d.title, d.summary, d.url, d.sourceName, JSON.stringify(d.topics), d.publishedAt, d.imageUrl || "");
       const changes = Number((info as { changes?: number })?.changes ?? 0);
-      if (changes > 0) inserted += 1;
+      if (changes > 0) {
+        inserted += 1;
+      } else if (d.imageUrl) {
+        await db
+          .prepare(
+            `UPDATE sgi_crypto_noticias
+             SET image_url = ?
+             WHERE url = ? AND (image_url IS NULL OR image_url = '')`
+          )
+          .run(d.imageUrl, d.url);
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (!/unique|duplicate/i.test(msg)) {
@@ -362,7 +378,7 @@ async function warmRecentTranslations(limit: number): Promise<void> {
   const rows = (await db
     .prepare(
       `SELECT id, title, summary, url, source_name, topics_json, published_at, fetched_at,
-              title_es, title_pt, summary_es, summary_pt
+              title_es, title_pt, summary_es, summary_pt, image_url
        FROM sgi_crypto_noticias
        ORDER BY published_at DESC, id DESC
        LIMIT ?`
@@ -446,7 +462,7 @@ cryptoNoticiasRouter.get("/crypto-noticias", ...readMw, async (req, res, next) =
     const rows = (await db
       .prepare(
         `SELECT id, title, summary, url, source_name, topics_json, published_at, fetched_at,
-                title_es, title_pt, summary_es, summary_pt
+                title_es, title_pt, summary_es, summary_pt, image_url
          FROM sgi_crypto_noticias
          ORDER BY published_at DESC, id DESC
          LIMIT 800`

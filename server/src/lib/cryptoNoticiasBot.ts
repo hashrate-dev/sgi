@@ -21,6 +21,7 @@ export type CryptoNoticiaDraft = {
   sourceName: string;
   topics: CryptoNoticiaTopic[];
   publishedAt: string;
+  imageUrl: string;
 };
 
 type FeedDef = {
@@ -143,6 +144,92 @@ function normalizeUrl(raw: string): string {
   }
 }
 
+function normalizeImageUrl(raw: string): string {
+  const u = raw.trim().replace(/^<|>$/g, "").replace(/&amp;/g, "&");
+  if (!u) return "";
+  if (u.startsWith("//")) return `https:${u}`;
+  try {
+    const parsed = new URL(u);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
+    // Evitar tracking 1x1 / pixeles típicos
+    if (/1x1|pixel|spacer|blank\.gif|doubleclick|facebook\.com\/tr/i.test(parsed.href)) return "";
+    return parsed.toString().slice(0, 2000);
+  } catch {
+    return "";
+  }
+}
+
+/** Extrae la imagen principal del ítem RSS (enclosure / media / img en HTML). */
+function extractItemImage(block: string): string {
+  const enclosureUrl = tagAttr(block, "enclosure", "url");
+  const enclosureType = tagAttr(block, "enclosure", "type").toLowerCase();
+  if (enclosureUrl && (!enclosureType || enclosureType.startsWith("image/"))) {
+    const n = normalizeImageUrl(enclosureUrl);
+    if (n) return n;
+  }
+
+  const mediaContent =
+    tagAttr(block, "media:content", "url") ||
+    tagAttr(block, "media:thumbnail", "url") ||
+    tagAttr(block, "media:thumbnail", "href");
+  if (mediaContent) {
+    const n = normalizeImageUrl(mediaContent);
+    if (n) return n;
+  }
+
+  // Algunos feeds usan <image><url>...</url></image> por ítem
+  const imageBlock = block.match(/<image\b[\s\S]*?<\/image>/i)?.[0] ?? "";
+  if (imageBlock) {
+    const fromImage = tag(imageBlock, "url") || tagAttr(imageBlock, "url", "href");
+    const n = normalizeImageUrl(fromImage);
+    if (n) return n;
+  }
+
+  const htmlBits = [
+    tag(block, "content:encoded") || "",
+    tag(block, "description") || "",
+    block,
+  ].join("\n");
+  const imgMatch =
+    htmlBits.match(/<img[^>]+src=["']([^"']+)["']/i) ||
+    htmlBits.match(/src=["'](https?:\/\/[^"']+\.(?:jpe?g|png|webp|gif)[^"']*)["']/i);
+  if (imgMatch?.[1]) {
+    const n = normalizeImageUrl(decodeEntities(imgMatch[1]));
+    if (n) return n;
+  }
+  return "";
+}
+
+async function fetchOgImage(articleUrl: string): Promise<string> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 10_000);
+  try {
+    const res = await fetch(articleUrl, {
+      signal: ctrl.signal,
+      headers: {
+        "User-Agent": UA,
+        Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+      },
+      redirect: "follow",
+    });
+    if (!res.ok) return "";
+    const html = (await res.text()).slice(0, 180_000);
+    const og =
+      html.match(/<meta[^>]+property=["']og:image:secure_url["'][^>]+content=["']([^"']+)["']/i)?.[1] ||
+      html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image:secure_url["']/i)?.[1] ||
+      html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1] ||
+      html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i)?.[1] ||
+      html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i)?.[1] ||
+      html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i)?.[1] ||
+      "";
+    return normalizeImageUrl(decodeEntities(og));
+  } catch {
+    return "";
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function toIsoDate(raw: string): string {
   const t = Date.parse(raw);
   if (Number.isFinite(t)) return new Date(t).toISOString();
@@ -195,6 +282,7 @@ export function parseRssFeedXml(xml: string, feedTopics: CryptoNoticiaTopic[]): 
       sourceName: sourceName.slice(0, 160),
       topics: inferTopics(title, summary, feedTopics),
       publishedAt: toIsoDate(pub),
+      imageUrl: extractItemImage(block),
     });
   }
   return out;
@@ -241,7 +329,11 @@ export async function harvestCryptoNoticiasDrafts(
             continue;
           }
           const topics = new Set([...prev.topics, ...item.topics]);
-          byUrl.set(item.url, { ...prev, topics: [...topics] });
+          byUrl.set(item.url, {
+            ...prev,
+            topics: [...topics],
+            imageUrl: prev.imageUrl || item.imageUrl,
+          });
         }
       } catch (e) {
         feedErrors.push({
@@ -253,5 +345,21 @@ export async function harvestCryptoNoticiasDrafts(
   );
 
   const drafts = [...byUrl.values()].sort((a, b) => (a.publishedAt < b.publishedAt ? 1 : -1));
+
+  // Completar imagen principal vía og:image cuando el RSS no la trae (tope para no demorar el ingest).
+  const needImg = drafts.filter((d) => !d.imageUrl).slice(0, 40);
+  if (needImg.length > 0) {
+    let cursor = 0;
+    const workers = Array.from({ length: Math.min(4, needImg.length) }, async () => {
+      while (cursor < needImg.length) {
+        const i = cursor++;
+        const d = needImg[i]!;
+        const img = await fetchOgImage(d.url);
+        if (img) d.imageUrl = img;
+      }
+    });
+    await Promise.all(workers);
+  }
+
   return { drafts, feedErrors };
 }

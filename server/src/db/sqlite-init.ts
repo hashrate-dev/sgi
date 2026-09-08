@@ -391,7 +391,13 @@ CREATE TABLE IF NOT EXISTS sgi_crypto_noticias (
 CREATE INDEX IF NOT EXISTS idx_sgi_crypto_noticias_published ON sgi_crypto_noticias(published_at DESC);
 CREATE INDEX IF NOT EXISTS idx_sgi_crypto_noticias_fetched ON sgi_crypto_noticias(fetched_at DESC);
 `);
-  for (const col of ["title_es TEXT", "title_pt TEXT", "summary_es TEXT", "summary_pt TEXT"] as const) {
+  for (const col of [
+    "title_es TEXT",
+    "title_pt TEXT",
+    "summary_es TEXT",
+    "summary_pt TEXT",
+    "image_url TEXT NOT NULL DEFAULT ''",
+  ] as const) {
     try {
       db.exec(`ALTER TABLE sgi_crypto_noticias ADD COLUMN ${col}`);
     } catch (e: unknown) {

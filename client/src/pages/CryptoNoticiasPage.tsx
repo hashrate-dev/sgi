@@ -415,55 +415,87 @@ export function CryptoNoticiasPage() {
         ) : (
           <>
             {featured ? (
-              <article className="crypto-news-feature hrs-card sgi-glass-panel">
-                <div className="crypto-news-feature__meta">
-                  <span className="crypto-news-source">{featured.sourceName || "Wire"}</span>
-                  <span className="crypto-news-dot" aria-hidden />
-                  <time dateTime={featured.publishedAt}>{timeAgo(featured.publishedAt, lang)}</time>
-                </div>
-                <h2 className="crypto-news-feature__title">
-                  <a href={featured.url} target="_blank" rel="noopener noreferrer">
-                    {featured.title}
+              <article
+                className={`crypto-news-feature hrs-card sgi-glass-panel${
+                  featured.imageUrl ? "" : " crypto-news-feature--no-media"
+                }`}
+              >
+                {featured.imageUrl ? (
+                  <a
+                    className="crypto-news-feature__media"
+                    href={featured.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    tabIndex={-1}
+                    aria-hidden
+                  >
+                    <img src={featured.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" />
                   </a>
-                </h2>
-                {featured.summary ? <p className="crypto-news-feature__summary">{featured.summary}</p> : null}
-                <div className="crypto-news-tags">
-                  {featured.topics.map((t) => (
-                    <span key={t} className="crypto-news-tag">
-                      {topicLabels[t] ?? t}
-                    </span>
-                  ))}
+                ) : null}
+                <div className="crypto-news-feature__body">
+                  <div className="crypto-news-feature__meta">
+                    <span className="crypto-news-source">{featured.sourceName || "Wire"}</span>
+                    <span className="crypto-news-dot" aria-hidden />
+                    <time dateTime={featured.publishedAt}>{timeAgo(featured.publishedAt, lang)}</time>
+                  </div>
+                  <h2 className="crypto-news-feature__title">
+                    <a href={featured.url} target="_blank" rel="noopener noreferrer">
+                      {featured.title}
+                    </a>
+                  </h2>
+                  {featured.summary ? <p className="crypto-news-feature__summary">{featured.summary}</p> : null}
+                  <div className="crypto-news-tags">
+                    {featured.topics.map((t) => (
+                      <span key={t} className="crypto-news-tag">
+                        {topicLabels[t] ?? t}
+                      </span>
+                    ))}
+                  </div>
+                  <a
+                    className="crypto-news-read"
+                    href={featured.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {copy.read}
+                  </a>
                 </div>
-                <a
-                  className="crypto-news-read"
-                  href={featured.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {copy.read}
-                </a>
               </article>
             ) : null}
 
             <section className="crypto-news-grid" aria-label="Historial de noticias">
               {rest.map((n) => (
                 <article key={n.id} className="crypto-news-card">
-                  <div className="crypto-news-card__meta">
-                    <span className="crypto-news-source">{n.sourceName || "Wire"}</span>
-                    <time dateTime={n.publishedAt}>{timeAgo(n.publishedAt, lang)}</time>
-                  </div>
-                  <h3 className="crypto-news-card__title">
-                    <a href={n.url} target="_blank" rel="noopener noreferrer">
-                      {n.title}
+                  {n.imageUrl ? (
+                    <a
+                      className="crypto-news-card__media"
+                      href={n.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      tabIndex={-1}
+                      aria-hidden
+                    >
+                      <img src={n.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" />
                     </a>
-                  </h3>
-                  {n.summary ? <p className="crypto-news-card__summary">{n.summary}</p> : null}
-                  <div className="crypto-news-tags">
-                    {n.topics.slice(0, 4).map((t) => (
-                      <span key={t} className="crypto-news-tag">
-                        {topicLabels[t] ?? t}
-                      </span>
-                    ))}
+                  ) : null}
+                  <div className="crypto-news-card__body">
+                    <div className="crypto-news-card__meta">
+                      <span className="crypto-news-source">{n.sourceName || "Wire"}</span>
+                      <time dateTime={n.publishedAt}>{timeAgo(n.publishedAt, lang)}</time>
+                    </div>
+                    <h3 className="crypto-news-card__title">
+                      <a href={n.url} target="_blank" rel="noopener noreferrer">
+                        {n.title}
+                      </a>
+                    </h3>
+                    {n.summary ? <p className="crypto-news-card__summary">{n.summary}</p> : null}
+                    <div className="crypto-news-tags">
+                      {n.topics.slice(0, 4).map((t) => (
+                        <span key={t} className="crypto-news-tag">
+                          {topicLabels[t] ?? t}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </article>
               ))}

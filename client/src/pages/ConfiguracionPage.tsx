@@ -33,13 +33,7 @@ type ConfigCardItem = { to: string; icon: string; label: string; desc: string };
 function ConfigMenuCard(item: ConfigCardItem) {
   return (
     <RouterLink to={item.to} style={{ textDecoration: "none", color: "inherit", display: "block", height: "100%" }}>
-      <AppCard
-        className="reportes-card mineria-hub-card"
-        h="100%"
-        minH={{ base: "176px", md: "176px" }}
-        transition="all 0.2s ease"
-        _hover={{ transform: "translateY(-2px)", boxShadow: "md" }}
-      >
+      <AppCard className="reportes-card mineria-hub-card sgi-menu-tile" h="100%" minH={{ base: "176px", md: "176px" }}>
         <Flex className="reportes-card-icon" mb={3}>
           <i className={`bi ${item.icon}`} aria-hidden />
         </Flex>
@@ -67,16 +61,8 @@ export function ConfiguracionPage() {
       <Box className="sgi-layout-frame" maxW="var(--sgi-layout-max, 1400px)" mx="auto">
         <PageHeader title="Configuración" />
 
-        <AppCard
-          className="sgi-glass-panel"
-          mt={3}
-          p={{ base: 3, md: 4 }}
-          bg="rgba(255,255,255,0.42)"
-          backdropFilter="blur(10px)"
-          borderColor="rgba(255,255,255,0.35)"
-          boxShadow="0 12px 40px rgba(0,0,0,0.18)"
-        >
-          <Text color="gray.600" fontSize="sm" mb={3}>
+        <AppCard className="sgi-glass-panel" mt={3} p={{ base: 3, md: 4 }}>
+          <Text className="text-muted" fontSize="sm" mb={3} color="rgba(232,238,245,0.72)">
             Opciones de configuración del sistema:
           </Text>
           <Grid templateColumns={{ base: "1fr", md: "repeat(2, minmax(0, 1fr))", xl: "repeat(3, minmax(0, 1fr))" }} gap={4}>

@@ -149,11 +149,21 @@ html.hrs-home-bg body {
 }
 
 /*
- * Estilo granja SGI:
- * - Menús hub (elegir sección): glass → .sgi-hub-card / .sgi-glass-panel
- * - Páginas de trabajo (filtros/tablas/formularios): sin bandeja glass
+ * Estilo granja SGI — glass dark (mismo tono que sala de redacción / NOTICIAS):
+ * - Menús hub: .sgi-hub-card / .sgi-glass-panel + tarjetas .reportes-card
+ * - Páginas de trabajo (tablas/formularios densos): sin forzar bandeja glass
  * - Home: no usa --farm-bg
  */
+.sgi-protected-root--farm-bg {
+  --sgi-ink: #e8eef5;
+  --sgi-muted: rgba(232, 238, 245, 0.72);
+  --sgi-line: rgba(255, 255, 255, 0.12);
+  --sgi-accent: #3dba9a;
+  --sgi-accent-2: #1f8f76;
+  --sgi-glass: rgba(12, 28, 24, 0.55);
+  --sgi-glass-deep: rgba(8, 20, 18, 0.62);
+}
+
 .sgi-protected-root--farm-bg .hrs-card.hrs-card--rect {
   background: transparent !important;
   backdrop-filter: none !important;
@@ -165,11 +175,98 @@ html.hrs-home-bg body {
 
 .sgi-protected-root--farm-bg .hrs-card.sgi-hub-card,
 .sgi-protected-root--farm-bg .sgi-glass-panel {
-  background: rgba(255, 255, 255, 0.42) !important;
+  background:
+    radial-gradient(900px 320px at 6% -20%, rgba(61, 186, 154, 0.14), transparent 55%),
+    radial-gradient(700px 280px at 100% 0%, rgba(15, 80, 70, 0.28), transparent 50%),
+    var(--sgi-glass) !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--sgi-line) !important;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.28) !important;
+  color: var(--sgi-ink);
+}
+
+.sgi-protected-root--farm-bg .hrs-card.sgi-hub-card .text-muted,
+.sgi-protected-root--farm-bg .sgi-glass-panel .text-muted,
+.sgi-protected-root--farm-bg .hrs-card.sgi-hub-card p,
+.sgi-protected-root--farm-bg .sgi-glass-panel p {
+  color: var(--sgi-muted) !important;
+}
+
+.sgi-protected-root--farm-bg .hrs-card.sgi-hub-card h1,
+.sgi-protected-root--farm-bg .hrs-card.sgi-hub-card h2,
+.sgi-protected-root--farm-bg .hrs-card.sgi-hub-card h3,
+.sgi-protected-root--farm-bg .sgi-glass-panel h1,
+.sgi-protected-root--farm-bg .sgi-glass-panel h2,
+.sgi-protected-root--farm-bg .sgi-glass-panel h3,
+.sgi-protected-root--farm-bg .sgi-glass-panel .fs-4,
+.sgi-protected-root--farm-bg .sgi-glass-panel .fw-semibold {
+  color: #fff !important;
+}
+
+/* Tarjetas de menú SGI (home + hubs): mismo botón glass dark */
+.sgi-protected-root .reportes-card,
+.sgi-protected-root .mineria-hub-card,
+.sgi-protected-root a.reportes-card,
+.sgi-protected-root a.mineria-hub-card,
+.sgi-protected-root .sgi-menu-tile {
+  background: var(--sgi-glass-deep, rgba(8, 20, 18, 0.62)) !important;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.35) !important;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18) !important;
+  border: 1px solid var(--sgi-line, rgba(255, 255, 255, 0.12)) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22) !important;
+  color: var(--sgi-ink, #e8eef5) !important;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+}
+
+.sgi-protected-root .reportes-card:hover,
+.sgi-protected-root a.reportes-card:hover,
+.sgi-protected-root a.mineria-hub-card:hover,
+.sgi-protected-root .sgi-menu-tile:hover {
+  transform: translateY(-2px);
+  border-color: rgba(61, 186, 154, 0.45) !important;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3) !important;
+  background: rgba(16, 40, 34, 0.78) !important;
+  color: #fff !important;
+}
+
+.sgi-protected-root .reportes-card-icon,
+.sgi-protected-root .sgi-menu-tile .dashboard-card-icon-slot {
+  background: rgba(61, 186, 154, 0.14) !important;
+  color: var(--sgi-accent, #3dba9a) !important;
+  border: 1px solid rgba(61, 186, 154, 0.32) !important;
+}
+
+.sgi-protected-root .reportes-card:hover .reportes-card-icon,
+.sgi-protected-root .sgi-menu-tile:hover .dashboard-card-icon-slot {
+  background: rgba(61, 186, 154, 0.24) !important;
+  color: #6ee7b7 !important;
+  border-color: rgba(110, 231, 183, 0.45) !important;
+}
+
+.sgi-protected-root .reportes-card-title,
+.sgi-protected-root .sgi-menu-tile .sgi-menu-tile__title {
+  color: #fff !important;
+}
+
+.sgi-protected-root .reportes-card-desc,
+.sgi-protected-root .sgi-menu-tile .sgi-menu-tile__desc {
+  color: var(--sgi-muted, rgba(232, 238, 245, 0.72)) !important;
+}
+
+/* Variables también en home (además de farm-bg) */
+.sgi-protected-root--home {
+  --sgi-ink: #e8eef5;
+  --sgi-muted: rgba(232, 238, 245, 0.72);
+  --sgi-line: rgba(255, 255, 255, 0.12);
+  --sgi-accent: #3dba9a;
+  --sgi-accent-2: #1f8f76;
+  --sgi-glass: rgba(12, 28, 24, 0.55);
+  --sgi-glass-deep: rgba(8, 20, 18, 0.62);
 }
 
 .sgi-protected-root--farm-bg .hrs-card.hrs-card--rect .clientes-listado-wrap,
@@ -190,16 +287,45 @@ html.hrs-home-bg body {
     0 1px 0 rgba(255, 255, 255, 0.12) inset;
 }
 
-/* Tarjetas de menú internas: opacas para lectura */
-.sgi-protected-root--farm-bg .reportes-card,
-.sgi-protected-root--farm-bg .mineria-hub-card,
-.sgi-protected-root--farm-bg a.reportes-card,
-.sgi-protected-root--farm-bg a.mineria-hub-card {
-  background: rgba(255, 255, 255, 0.96) !important;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  border: 1px solid rgba(226, 232, 240, 0.9) !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08) !important;
+/* Botones dentro de hubs / glass: misma familia que NOTICIAS */
+.sgi-protected-root--farm-bg .sgi-hub-card .btn-success,
+.sgi-protected-root--farm-bg .sgi-glass-panel .btn-success {
+  background: linear-gradient(135deg, var(--sgi-accent-2), var(--sgi-accent)) !important;
+  border-color: transparent !important;
+  color: #06241c !important;
+  font-weight: 700;
+}
+
+.sgi-protected-root--farm-bg .sgi-hub-card .btn-outline-light,
+.sgi-protected-root--farm-bg .sgi-glass-panel .btn-outline-light,
+.sgi-protected-root--farm-bg .sgi-hub-card .btn-outline-secondary,
+.sgi-protected-root--farm-bg .sgi-glass-panel .btn-outline-secondary {
+  color: var(--sgi-ink) !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+.sgi-protected-root--farm-bg .sgi-hub-card .btn-outline-light:hover,
+.sgi-protected-root--farm-bg .sgi-glass-panel .btn-outline-light:hover,
+.sgi-protected-root--farm-bg .sgi-hub-card .btn-outline-secondary:hover,
+.sgi-protected-root--farm-bg .sgi-glass-panel .btn-outline-secondary:hover {
+  border-color: rgba(61, 186, 154, 0.55) !important;
+  color: #fff !important;
+  background: rgba(61, 186, 154, 0.12) !important;
+}
+
+.sgi-protected-root--farm-bg .sgi-hub-card .link-success,
+.sgi-protected-root--farm-bg .sgi-glass-panel .link-success {
+  color: var(--sgi-accent) !important;
+}
+
+.sgi-protected-root--farm-bg .sgi-hub-card .form-control,
+.sgi-protected-root--farm-bg .sgi-glass-panel .form-control,
+.sgi-protected-root--farm-bg .sgi-hub-card .fact-input,
+.sgi-protected-root--farm-bg .sgi-glass-panel .fact-input {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #0f172a;
 }
 
 @media (max-width: 768px) {

@@ -184,6 +184,7 @@ ALTER TABLE sgi_crypto_noticias ADD COLUMN IF NOT EXISTS title_es TEXT;
 ALTER TABLE sgi_crypto_noticias ADD COLUMN IF NOT EXISTS title_pt TEXT;
 ALTER TABLE sgi_crypto_noticias ADD COLUMN IF NOT EXISTS summary_es TEXT;
 ALTER TABLE sgi_crypto_noticias ADD COLUMN IF NOT EXISTS summary_pt TEXT;
+ALTER TABLE sgi_crypto_noticias ADD COLUMN IF NOT EXISTS image_url TEXT NOT NULL DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS sgi_crypto_noticias_medios (
   id BIGSERIAL PRIMARY KEY,

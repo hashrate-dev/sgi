@@ -40,11 +40,11 @@ const ICON_SLOT_PROPS = {
   align: "center" as const,
   justify: "center" as const,
   borderRadius: "xl",
-  bg: "green.50",
-  color: "green.700",
+  bg: "rgba(61, 186, 154, 0.14)",
+  color: "#3dba9a",
   flexShrink: 0,
   borderWidth: "1px",
-  borderColor: "green.100",
+  borderColor: "rgba(61, 186, 154, 0.32)",
 };
 
 /** Tamaño uniforme de iconos Bootstrap en tarjetas del home (rellena más el recuadre) */
@@ -62,13 +62,13 @@ const DASHBOARD_CARD_LINK_STYLE: CSSProperties = {
 
 const marketplaceLiveAlertPulse = keyframes`
   0%, 100% {
-    background: #f0fdf4;
-    border-color: #dcfce7;
+    background: rgba(61, 186, 154, 0.14);
+    border-color: rgba(61, 186, 154, 0.32);
     box-shadow: 0 0 0 rgba(249, 115, 22, 0);
   }
   50% {
-    background: #ffedd5;
-    border-color: #fb923c;
+    background: rgba(249, 115, 22, 0.22);
+    border-color: rgba(251, 146, 60, 0.55);
     box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.24);
   }
 `;
@@ -150,9 +150,6 @@ function DashboardCardIconSlot({ item }: { item: MenuItem }) {
       <Flex
         {...ICON_SLOT_PROPS}
         className="dashboard-card-icon-slot dashboard-card-icon-slot--marketplace"
-        bg="#fff7d1"
-        color="#1f2937"
-        borderColor="#fcd34d"
         transition="background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease"
         position="relative"
         mb={3}
@@ -167,7 +164,7 @@ function DashboardCardIconSlot({ item }: { item: MenuItem }) {
           w="14px"
           h="14px"
           borderRadius="4px"
-          bg="#f59e0b"
+          bg="#1f8f76"
           align="center"
           justify="center"
         >
@@ -178,11 +175,7 @@ function DashboardCardIconSlot({ item }: { item: MenuItem }) {
   }
   if (item.cardLogoSrc) {
     return (
-      <Flex
-        {...ICON_SLOT_PROPS}
-        className="dashboard-card-icon-slot"
-        mb={3}
-      >
+      <Flex {...ICON_SLOT_PROPS} className="dashboard-card-icon-slot" mb={3}>
         <img
           src={item.cardLogoSrc}
           alt={item.cardLogoAlt ?? "Hashrate"}
@@ -202,9 +195,6 @@ function DashboardCardIconSlot({ item }: { item: MenuItem }) {
       <Flex
         {...ICON_SLOT_PROPS}
         className="dashboard-card-icon-slot"
-        bg={item.iconBg ?? ICON_SLOT_PROPS.bg}
-        color={item.iconColor ?? ICON_SLOT_PROPS.color}
-        borderColor={item.iconBorderColor ?? ICON_SLOT_PROPS.borderColor}
         transition="background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease"
         mb={3}
       >
@@ -313,9 +303,10 @@ export function HomePage() {
 
   const cardTitleProps = {
     as: "h2" as const,
+    className: "sgi-menu-tile__title",
     fontSize: { base: "1.55rem", md: "1.65rem" },
     fontWeight: "700",
-    color: "gray.800",
+    color: "white",
     lineHeight: "1.12",
     mb: 1.5,
     letterSpacing: "-0.01em",
@@ -323,34 +314,37 @@ export function HomePage() {
   };
 
   const cardDescProps = {
+    className: "sgi-menu-tile__desc",
     fontSize: { base: "0.88rem", md: "0.9rem" },
-    color: "gray.600",
+    color: "rgba(232, 238, 245, 0.72)",
     lineHeight: "1.28",
     noOfLines: 2 as const,
   };
 
   /** Altura uniforme = referencia Configuración (icono + título + descripción); −1cm ≈ 38px. */
   const dashboardCardProps = {
+    className: "sgi-menu-tile",
     flex: 1,
     w: "100%",
     h: { base: "190px", md: "198px" },
     minH: { base: "190px", md: "198px" },
     maxH: { base: "190px", md: "198px" },
-    /* Más aire arriba: el slot de icono quedaba pegado al borde superior de la tarjeta */
     pt: { base: 5, md: 6 },
     px: 4,
     pb: 4,
     display: "flex",
     flexDirection: "column" as const,
     overflow: "hidden" as const,
-    transition: "box-shadow 0.22s ease, transform 0.22s ease, border-color 0.22s ease",
-    boxShadow: "0 10px 28px rgba(0, 0, 0, 0.18)",
-    borderColor: "rgba(255,255,255,0.55)",
-    bg: "rgba(255,255,255,0.96)",
+    transition: "box-shadow 0.22s ease, transform 0.22s ease, border-color 0.22s ease, background 0.22s ease",
+    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.22)",
+    borderColor: "rgba(255,255,255,0.12)",
+    bg: "rgba(8, 20, 18, 0.62)",
+    backdropFilter: "blur(10px)",
     _hover: {
-      transform: "translateY(-3px)",
-      boxShadow: "0 16px 36px rgba(0, 0, 0, 0.22)",
-      borderColor: "green.200",
+      transform: "translateY(-2px)",
+      boxShadow: "0 12px 28px rgba(0, 0, 0, 0.3)",
+      borderColor: "rgba(61, 186, 154, 0.45)",
+      bg: "rgba(16, 40, 34, 0.78)",
     },
   };
 
@@ -385,29 +379,7 @@ export function HomePage() {
         >
           {visibleMenuItems.map((item) => (
             <RouterLink key={item.to + item.label} to={item.to} style={DASHBOARD_CARD_LINK_STYLE}>
-              <AppCard
-                {...dashboardCardProps}
-                _hover={{
-                  ...dashboardCardProps._hover,
-                  "& .dashboard-card-icon-slot": {
-                    bg: item.iconHoverBg ?? "green.200",
-                    color: item.iconHoverColor ?? "green.800",
-                    borderColor: item.iconHoverBorderColor ?? "green.300",
-                  },
-                  ...(item.to === MARKETPLACE.catalog
-                    ? {
-                        "& .dashboard-card-icon-slot--marketplace": {
-                          bg: "#d97706",
-                          color: "white",
-                          borderColor: "#d97706",
-                        },
-                        "& .dashboard-card-icon-slot__marketplace-play": {
-                          bg: "#b45309",
-                        },
-                      }
-                    : {}),
-                }}
-              >
+              <AppCard {...dashboardCardProps}>
                 <DashboardCardIconSlot item={item} />
                 <Heading {...cardTitleProps}>{item.label}</Heading>
                 <Text {...cardDescProps}>{item.desc}</Text>
@@ -417,17 +389,7 @@ export function HomePage() {
 
           {canSeeMarketplaceOrdersCard ? (
             <RouterLink to="/marketplace/orders" style={DASHBOARD_CARD_LINK_STYLE}>
-              <AppCard
-                {...dashboardCardProps}
-                _hover={{
-                  ...dashboardCardProps._hover,
-                  "& .dashboard-card-icon-slot": {
-                    bg: "green.200",
-                    color: "green.800",
-                    borderColor: "green.300",
-                  },
-                }}
-              >
+              <AppCard {...dashboardCardProps}>
                 <Flex
                   {...ICON_SLOT_PROPS}
                   className="dashboard-card-icon-slot"
@@ -479,17 +441,7 @@ export function HomePage() {
 
           {canSeeMarketplacePresenceCard ? (
             <RouterLink to="/marketplace/presence" role="status" aria-live="polite" style={DASHBOARD_CARD_LINK_STYLE}>
-              <AppCard
-                {...dashboardCardProps}
-                _hover={{
-                  ...dashboardCardProps._hover,
-                  "& .dashboard-card-icon-slot": {
-                    bg: "green.200",
-                    color: "green.800",
-                    borderColor: "green.300",
-                  },
-                }}
-              >
+              <AppCard {...dashboardCardProps}>
                 <Flex
                   {...ICON_SLOT_PROPS}
                   className="dashboard-card-icon-slot"
@@ -518,17 +470,7 @@ export function HomePage() {
 
           {canSeeMarketplaceBannersCard ? (
             <RouterLink to="/marketplace/home-banners" style={DASHBOARD_CARD_LINK_STYLE}>
-              <AppCard
-                {...dashboardCardProps}
-                _hover={{
-                  ...dashboardCardProps._hover,
-                  "& .dashboard-card-icon-slot": {
-                    bg: "green.200",
-                    color: "green.800",
-                    borderColor: "green.300",
-                  },
-                }}
-              >
+              <AppCard {...dashboardCardProps}>
                 <Flex {...ICON_SLOT_PROPS} className="dashboard-card-icon-slot" mb={3}>
                   <Box as="i" className="bi bi-images" fontSize={DASHBOARD_BI_ICON_SIZE_LG} lineHeight={1} aria-hidden />
                 </Flex>
@@ -544,11 +486,6 @@ export function HomePage() {
                 {...dashboardCardProps}
                 _hover={{
                   ...dashboardCardProps._hover,
-                  "& .dashboard-card-icon-slot": {
-                    bg: "green.200",
-                    color: "green.800",
-                    borderColor: "green.300",
-                  },
                   "& .dashboard-card-icon--gear": {
                     transform: "rotate(18deg)",
                   },

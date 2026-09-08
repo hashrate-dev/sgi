@@ -2004,6 +2004,7 @@ export type CryptoNoticiaItem = {
   summary: string;
   url: string;
   sourceName: string;
+  imageUrl?: string;
   topics: CryptoNoticiaTopic[];
   publishedAt: string;
   fetchedAt: string;
