@@ -4,6 +4,7 @@ import { db } from "../db.js";
 import {
   CRYPTO_NOTICIAS_FEEDS,
   CRYPTO_TOPIC_LABELS,
+  fetchOgImage,
   harvestCryptoNoticiasDrafts,
   type CryptoNoticiaTopic,
   type HarvestFeed,
@@ -305,22 +306,28 @@ async function ensureTranslations(rows: NewsRowMapped[], lang: NewsTranslateLang
   });
   if (missing.length === 0) return rows;
 
-  await mapPool(missing, 2, async (row) => {
+  // En producción el refresh/listado no puede bloquearse minutos traduciendo todo el wire.
+  const deadline = Date.now() + 10_000;
+  const budget = missing.slice(0, 12);
+  await mapPool(budget, 2, async (row) => {
+    if (Date.now() > deadline) return row;
     const titleT = await translateNewsText(row.title, lang);
     await sleepSoft();
-    const summaryT = row.summary ? await translateNewsText(row.summary, lang) : "";
+    const summaryT = row.summary && Date.now() < deadline ? await translateNewsText(row.summary, lang) : row.summary ? "" : "";
     if (lang === "es") {
+      if (titleT) {
+        await db
+          .prepare("UPDATE sgi_crypto_noticias SET title_es = ?, summary_es = COALESCE(NULLIF(?, ''), summary_es) WHERE id = ?")
+          .run(titleT, summaryT, row.id);
+        row.titleEs = titleT;
+        if (summaryT) row.summaryEs = summaryT;
+      }
+    } else if (titleT) {
       await db
-        .prepare("UPDATE sgi_crypto_noticias SET title_es = ?, summary_es = ? WHERE id = ?")
-        .run(titleT, summaryT, row.id);
-      row.titleEs = titleT;
-      row.summaryEs = summaryT;
-    } else {
-      await db
-        .prepare("UPDATE sgi_crypto_noticias SET title_pt = ?, summary_pt = ? WHERE id = ?")
+        .prepare("UPDATE sgi_crypto_noticias SET title_pt = ?, summary_pt = COALESCE(NULLIF(?, ''), summary_pt) WHERE id = ?")
         .run(titleT, summaryT, row.id);
       row.titlePt = titleT;
-      row.summaryPt = summaryT;
+      if (summaryT) row.summaryPt = summaryT;
     }
     return row;
   });
@@ -335,8 +342,12 @@ function sleepSoft(): Promise<void> {
 async function runIngest(): Promise<{ inserted: number; scanned: number; feedErrors: number }> {
   await ensureCryptoNoticiasSchema();
   const feeds = await loadEnabledHarvestFeeds();
-  const { drafts, feedErrors } = await harvestCryptoNoticiasDrafts(feeds);
+  // Refresh rápido: RSS + insert. Imágenes og:image en segundo plano (pocas).
+  const { drafts, feedErrors } = await harvestCryptoNoticiasDrafts(feeds, {
+    enrichImages: false,
+  });
   let inserted = 0;
+  const newUrls: string[] = [];
   for (const d of drafts) {
     try {
       const info = await db
@@ -349,14 +360,7 @@ async function runIngest(): Promise<{ inserted: number; scanned: number; feedErr
       const changes = Number((info as { changes?: number })?.changes ?? 0);
       if (changes > 0) {
         inserted += 1;
-      } else if (d.imageUrl) {
-        await db
-          .prepare(
-            `UPDATE sgi_crypto_noticias
-             SET image_url = ?
-             WHERE url = ? AND (image_url IS NULL OR image_url = '')`
-          )
-          .run(d.imageUrl, d.url);
+        newUrls.push(d.url);
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -366,8 +370,28 @@ async function runIngest(): Promise<{ inserted: number; scanned: number; feedErr
     }
   }
   lastIngestAtMs = Date.now();
-  // Precalentar traducciones de las piezas más nuevas (no bloquea la respuesta del refresh).
-  void warmRecentTranslations(60).catch((e) =>
+
+  // Backfill liviano de imágenes solo para piezas nuevas (no bloquea el HTTP).
+  void (async () => {
+    try {
+      const targets = drafts.filter((d) => !d.imageUrl && newUrls.includes(d.url)).slice(0, 8);
+      for (const d of targets) {
+        const img = await fetchOgImage(d.url);
+        if (!img) continue;
+        await db
+          .prepare(
+            `UPDATE sgi_crypto_noticias
+             SET image_url = ?
+             WHERE url = ? AND (image_url IS NULL OR image_url = '')`
+          )
+          .run(img, d.url);
+      }
+    } catch (e) {
+      console.error("[crypto-noticias] image-backfill", e instanceof Error ? e.message : e);
+    }
+  })();
+
+  void warmRecentTranslations(24).catch((e) =>
     console.error("[crypto-noticias] warm-translate", e instanceof Error ? e.message : e)
   );
   return { inserted, scanned: drafts.length, feedErrors: feedErrors.length };

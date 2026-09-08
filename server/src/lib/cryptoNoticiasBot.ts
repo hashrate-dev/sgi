@@ -200,7 +200,7 @@ function extractItemImage(block: string): string {
   return "";
 }
 
-async function fetchOgImage(articleUrl: string): Promise<string> {
+export async function fetchOgImage(articleUrl: string): Promise<string> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 10_000);
   try {
@@ -308,7 +308,8 @@ export async function fetchFeedXml(url: string): Promise<string> {
 }
 
 export async function harvestCryptoNoticiasDrafts(
-  feeds: readonly HarvestFeed[] = CRYPTO_NOTICIAS_FEEDS
+  feeds: readonly HarvestFeed[] = CRYPTO_NOTICIAS_FEEDS,
+  opts?: { enrichImages?: boolean; imageLimit?: number }
 ): Promise<{
   drafts: CryptoNoticiaDraft[];
   feedErrors: Array<{ feedId: string; message: string }>;
@@ -346,19 +347,23 @@ export async function harvestCryptoNoticiasDrafts(
 
   const drafts = [...byUrl.values()].sort((a, b) => (a.publishedAt < b.publishedAt ? 1 : -1));
 
-  // Completar imagen principal vía og:image cuando el RSS no la trae (tope para no demorar el ingest).
-  const needImg = drafts.filter((d) => !d.imageUrl).slice(0, 40);
-  if (needImg.length > 0) {
-    let cursor = 0;
-    const workers = Array.from({ length: Math.min(4, needImg.length) }, async () => {
-      while (cursor < needImg.length) {
-        const i = cursor++;
-        const d = needImg[i]!;
-        const img = await fetchOgImage(d.url);
-        if (img) d.imageUrl = img;
-      }
-    });
-    await Promise.all(workers);
+  // og:image es costoso en Vercel: solo bajo demanda y con tope bajo.
+  const enrichImages = opts?.enrichImages === true;
+  const imageLimit = Math.max(0, Math.min(20, opts?.imageLimit ?? 8));
+  if (enrichImages && imageLimit > 0) {
+    const needImg = drafts.filter((d) => !d.imageUrl).slice(0, imageLimit);
+    if (needImg.length > 0) {
+      let cursor = 0;
+      const workers = Array.from({ length: Math.min(3, needImg.length) }, async () => {
+        while (cursor < needImg.length) {
+          const i = cursor++;
+          const d = needImg[i]!;
+          const img = await fetchOgImage(d.url);
+          if (img) d.imageUrl = img;
+        }
+      });
+      await Promise.all(workers);
+    }
   }
 
   return { drafts, feedErrors };

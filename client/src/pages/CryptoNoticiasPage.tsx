@@ -266,10 +266,11 @@ export function CryptoNoticiasPage() {
     try {
       const r = await refreshCryptoNoticias();
       setOk(copy.okBot(r.inserted, r.scanned, r.feedErrors));
-      await Promise.all([loadNews(), loadMeta()]);
+      // Liberar el botón ya: la recarga/traducción no debe dejarlo colgado en «Capturando…».
+      setRefreshing(false);
+      void Promise.all([loadNews(), loadMeta()]).catch(() => undefined);
     } catch (e) {
       setErr(e instanceof Error ? e.message : copy.errRefresh);
-    } finally {
       setRefreshing(false);
     }
   };
