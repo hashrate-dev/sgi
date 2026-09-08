@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   createCryptoNoticiaMedio,
   deleteCryptoNoticiaMedio,
@@ -10,6 +10,8 @@ import {
 
 type Props = {
   canEdit: boolean;
+  open: boolean;
+  onClose: () => void;
 };
 
 const TOPIC_OPTS: Array<{ id: CryptoNoticiaTopic; label: string }> = [
@@ -24,8 +26,9 @@ const TOPIC_OPTS: Array<{ id: CryptoNoticiaTopic; label: string }> = [
   { id: "uruguay", label: "Cripto Uruguay" },
 ];
 
-export function CryptoNoticiasMediosConfig({ canEdit }: Props) {
-  const [open, setOpen] = useState(false);
+export function CryptoNoticiasMediosConfig({ canEdit, open, onClose }: Props) {
+  const titleId = useId();
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
   const [items, setItems] = useState<CryptoNoticiaMedio[]>([]);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -51,8 +54,26 @@ export function CryptoNoticiasMediosConfig({ canEdit }: Props) {
 
   useEffect(() => {
     if (!open) return;
+    setOk("");
+    setErr("");
     void load();
+    const t = window.setTimeout(() => closeBtnRef.current?.focus(), 30);
+    return () => window.clearTimeout(t);
   }, [open, load]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open, onClose]);
 
   const toggleEnabled = async (m: CryptoNoticiaMedio) => {
     if (!canEdit) return;
@@ -96,8 +117,13 @@ export function CryptoNoticiasMediosConfig({ canEdit }: Props) {
         topics: topics.length ? topics : ["cripto"],
         enabled: true,
       });
-      if (r.item) setItems((prev) => [...prev, r.item!].sort((a, b) => Number(b.isBuiltin) - Number(a.isBuiltin) || a.name.localeCompare(b.name, "es")));
-      else await load();
+      if (r.item) {
+        setItems((prev) =>
+          [...prev, r.item!].sort(
+            (a, b) => Number(b.isBuiltin) - Number(a.isBuiltin) || a.name.localeCompare(b.name, "es")
+          )
+        );
+      } else await load();
       setName("");
       setUrl("");
       setTopics(["cripto"]);
@@ -126,30 +152,52 @@ export function CryptoNoticiasMediosConfig({ canEdit }: Props) {
     }
   };
 
+  if (!open) return null;
+
   const enabledCount = items.filter((x) => x.enabled).length;
 
   return (
-    <section className="crypto-news-medios hrs-card sgi-glass-panel">
-      <div className="crypto-news-medios__head">
-        <div>
-          <h2 className="crypto-news-medios__title">Configuración de medios</h2>
-          <p className="crypto-news-medios__lead">
-            Aceptá o rechazá las fuentes que el bot consulta. También podés indicar un medio propio con su URL RSS.
-            {open && !loading ? ` (${enabledCount} activos de ${items.length})` : ""}
-          </p>
+    <div
+      className="crypto-news-medios-modal"
+      role="presentation"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="crypto-news-medios-modal__dialog hrs-card sgi-glass-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
+        <div className="crypto-news-medios-modal__head">
+          <div>
+            <h2 id={titleId} className="crypto-news-medios__title">
+              Configuración de medios
+            </h2>
+            <p className="crypto-news-medios__lead">
+              Aceptá o rechazá las fuentes que el bot consulta. También podés indicar un medio propio con
+              su URL RSS.
+              {!loading ? ` (${enabledCount} activos de ${items.length})` : ""}
+            </p>
+          </div>
+          <button
+            ref={closeBtnRef}
+            type="button"
+            className="crypto-news-medios-modal__close"
+            onClick={onClose}
+            aria-label="Cerrar configuración de medios"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
+              <path
+                fill="currentColor"
+                d="M18.3 5.71a1 1 0 0 0-1.41 0L12 10.59 7.11 5.7A1 1 0 0 0 5.7 7.11L10.59 12 5.7 16.89a1 1 0 1 0 1.41 1.41L12 13.41l4.89 4.89a1 1 0 0 0 1.41-1.41L13.41 12l4.89-4.89a1 1 0 0 0 0-1.4Z"
+              />
+            </svg>
+          </button>
         </div>
-        <button
-          type="button"
-          className="btn btn-outline-light btn-sm"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-        >
-          {open ? "Ocultar" : "Abrir configuración"}
-        </button>
-      </div>
 
-      {open ? (
-        <div className="crypto-news-medios__body">
+        <div className="crypto-news-medios-modal__body crypto-news-medios__body">
           {err ? <div className="alert alert-danger py-2">{err}</div> : null}
           {ok ? <div className="alert alert-success py-2">{ok}</div> : null}
           {loading ? (
@@ -263,12 +311,14 @@ export function CryptoNoticiasMediosConfig({ canEdit }: Props) {
                   </div>
                 </div>
               ) : (
-                <p className="text-muted small mb-0 mt-2">Solo lectura: pedile a un administrador que active o agregue medios.</p>
+                <p className="text-muted small mb-0 mt-2">
+                  Solo lectura: pedile a un administrador que active o agregue medios.
+                </p>
               )}
             </>
           )}
         </div>
-      ) : null}
-    </section>
+      </div>
+    </div>
   );
 }

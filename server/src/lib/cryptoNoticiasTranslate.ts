@@ -11,19 +11,59 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+/** Señales fuertes de inglés (titulares cripto típicos del wire). */
+export function looksLikeEnglish(text: string): boolean {
+  const t = text.trim();
+  if (t.length < 8) return false;
+  if (/[áéíóúñ¿¡]/i.test(t)) return false;
+  if (
+    /\b(the|and|with|from|into|after|before|million|billion|price|market|stocks?|shares?|etfs?|took in|slide|slides|gains?|surge|plunges?|presale|september|august|july|crypto news)\b/i.test(
+      t
+    )
+  ) {
+    return true;
+  }
+  // Muchas mayúsculas estilo título EN + pocas tildes
+  const words = t.split(/\s+/).filter(Boolean);
+  if (words.length >= 5) {
+    const capped = words.filter((w) => /^[A-Z][a-z]+/.test(w)).length;
+    if (capped >= 3 && /\b(on|to|for|as|by|at|in)\b/.test(t)) return true;
+  }
+  return false;
+}
+
 export function looksLikeTargetLang(text: string, lang: NewsTranslateLang): boolean {
   const t = text.trim();
-  if (t.length < 12) return false;
+  if (t.length < 8) return false;
   if (lang === "es") {
-    return (
-      /\b(el|la|los|las|de|del|una|unos|criptomonedas|bitcoin|mercado|gobierno|estados unidos)\b/i.test(t) &&
-      /[áéíóúñ¿¡]/i.test(t)
+    // Si parece inglés, no lo trates como español (evita cachear EN en title_es).
+    if (looksLikeEnglish(t)) return false;
+    if (/[áéíóúñ¿¡]/i.test(t)) return true;
+    return /\b(el|la|los|las|del|una|unos|unas|criptomonedas|mercado|gobierno|estados unidos|sube|cae|según|hacia|precio|noticias)\b/i.test(
+      t
     );
   }
+  if (looksLikeEnglish(t) && !/[áàâãéêíóôõúç]/i.test(t)) return false;
   return (
     /\b(o|a|os|as|de|do|da|uma|criptomoedas|mercado|governo|estados unidos)\b/i.test(t) &&
     /[áàâãéêíóôõúç]/i.test(t)
   );
+}
+
+/** True si falta traducción usable al idioma pedido. */
+export function needsNewsTranslation(
+  original: string,
+  cached: string,
+  lang: NewsTranslateLang
+): boolean {
+  const src = original.trim();
+  if (!src) return false;
+  const c = cached.trim();
+  if (!c) return true;
+  if (lang === "es" && looksLikeEnglish(c)) return true;
+  if (lang === "pt" && looksLikeEnglish(c) && !looksLikeTargetLang(c, "pt")) return true;
+  if (c === src && !looksLikeTargetLang(src, lang)) return true;
+  return false;
 }
 
 async function translateViaGoogle(text: string, tl: NewsTranslateLang): Promise<string> {

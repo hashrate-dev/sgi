@@ -2055,6 +2055,69 @@ export function refreshCryptoNoticias(): Promise<{
   return api("/api/crypto-noticias/refresh", { method: "POST", body: "{}" });
 }
 
+export type CryptoNewsSentimentReport = {
+  signal: {
+    score: number;
+    bias: "alcista_fuerte" | "alcista" | "neutral" | "bajista" | "bajista_fuerte";
+    biasLabel: string;
+    momentum: number;
+    momentumLabel: string;
+    confidence: number;
+    verdict: string;
+  };
+  horizons: Array<{
+    id: "corto" | "mediano" | "largo";
+    label: string;
+    windowLabel: string;
+    score: number;
+    bias: "alcista" | "neutral" | "bajista";
+    biasLabel: string;
+    articles: number;
+    positive: number;
+    negative: number;
+    neutral: number;
+    coverage: number;
+  }>;
+  chart: {
+    labels: string[];
+    scores: number[];
+    positivePct: number[];
+    negativePct: number[];
+  };
+  drivers: {
+    bullish: Array<{ id: number; title: string; score: number; publishedAt?: string }>;
+    bearish: Array<{ id: number; title: string; score: number; publishedAt?: string }>;
+  };
+  sampleSize: number;
+  computedAt: string;
+};
+
+export function getCryptoNoticiasSentiment(params?: {
+  topic?: string;
+}): Promise<CryptoNewsSentimentReport> {
+  const q = new URLSearchParams();
+  if (params?.topic) q.set("topic", params.topic);
+  const qs = q.toString();
+  return api(`/api/crypto-noticias/sentiment${qs ? `?${qs}` : ""}`);
+}
+
+export type CryptoNewsLivePrice = {
+  id: "bitcoin" | "dogecoin" | "litecoin" | "zcash";
+  symbol: string;
+  name: string;
+  priceUsd: number;
+  changePct24h: number;
+  spark: number[];
+  updatedAt: string;
+};
+
+export function getCryptoNoticiasLivePrices(): Promise<{
+  items: CryptoNewsLivePrice[];
+  fetchedAt: string;
+}> {
+  return api("/api/crypto-noticias/live-prices");
+}
+
 export type CryptoNoticiaMedio = {
   id: number;
   feedKey: string;

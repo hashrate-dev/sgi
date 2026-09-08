@@ -6,11 +6,17 @@ import {
   CRYPTO_TOPIC_LABELS,
   fetchOgImage,
   harvestCryptoNoticiasDrafts,
+  isAcceptableArticleImage,
+  isBlockedNewsSource,
   type CryptoNoticiaTopic,
   type HarvestFeed,
 } from "../lib/cryptoNoticiasBot.js";
+import { buildMarketSentimentReport } from "../lib/cryptoNoticiasSentiment.js";
+import { fetchLiveCoinQuotes } from "../lib/cryptoNoticiasLivePrices.js";
 import {
   mapPool,
+  needsNewsTranslation,
+  looksLikeEnglish,
   translateNewsText,
   type NewsTranslateLang,
 } from "../lib/cryptoNoticiasTranslate.js";
@@ -109,7 +115,105 @@ async function ensureCryptoNoticiasSchema(): Promise<void> {
     .prepare("CREATE INDEX IF NOT EXISTS idx_sgi_crypto_noticias_fetched ON sgi_crypto_noticias(fetched_at DESC)")
     .run();
   await ensureMediosSchema();
+  await purgeBlockedNewsSources();
+  await purgeJunkNewsImages();
   schemaEnsured = true;
+}
+
+/** Elimina del historial fuentes bloqueadas (p. ej. Moomoo). */
+async function purgeBlockedNewsSources(): Promise<void> {
+  try {
+    if (db.isPostgres) {
+      await db
+        .prepare(
+          `DELETE FROM sgi_crypto_noticias
+           WHERE source_name ILIKE '%moomoo%'
+              OR url ILIKE '%moomoo.com%'`
+        )
+        .run();
+    } else {
+      await db
+        .prepare(
+          `DELETE FROM sgi_crypto_noticias
+           WHERE LOWER(source_name) LIKE '%moomoo%'
+              OR LOWER(url) LIKE '%moomoo.com%'`
+        )
+        .run();
+    }
+  } catch (e) {
+    console.error("[crypto-noticias] purge-blocked", e instanceof Error ? e.message : e);
+  }
+}
+
+/**
+ * Limpia image_url basura: Google/gstatic/googleusercontent y la misma URL
+ * repetida en muchas noticias (placeholders idénticos).
+ */
+async function purgeJunkNewsImages(): Promise<void> {
+  try {
+    if (db.isPostgres) {
+      await db
+        .prepare(
+          `UPDATE sgi_crypto_noticias
+           SET image_url = ''
+           WHERE image_url <> ''
+             AND (
+               image_url ILIKE '%google.%'
+               OR image_url ILIKE '%gstatic.com%'
+               OR image_url ILIKE '%googleusercontent.com%'
+               OR image_url ILIKE '%ggpht.com%'
+               OR image_url ILIKE '%news.google%'
+               OR image_url ILIKE '%microlink.io%/screenshot%'
+             )`
+        )
+        .run();
+      await db
+        .prepare(
+          `UPDATE sgi_crypto_noticias n
+           SET image_url = ''
+           FROM (
+             SELECT image_url
+             FROM sgi_crypto_noticias
+             WHERE image_url <> ''
+             GROUP BY image_url
+             HAVING COUNT(*) >= 4
+           ) d
+           WHERE n.image_url = d.image_url`
+        )
+        .run();
+    } else {
+      await db
+        .prepare(
+          `UPDATE sgi_crypto_noticias
+           SET image_url = ''
+           WHERE image_url <> ''
+             AND (
+               LOWER(image_url) LIKE '%google.%'
+               OR LOWER(image_url) LIKE '%gstatic.com%'
+               OR LOWER(image_url) LIKE '%googleusercontent.com%'
+               OR LOWER(image_url) LIKE '%ggpht.com%'
+               OR LOWER(image_url) LIKE '%news.google%'
+               OR LOWER(image_url) LIKE '%microlink.io%/screenshot%'
+             )`
+        )
+        .run();
+      await db
+        .prepare(
+          `UPDATE sgi_crypto_noticias
+           SET image_url = ''
+           WHERE image_url IN (
+             SELECT image_url
+             FROM sgi_crypto_noticias
+             WHERE image_url <> ''
+             GROUP BY image_url
+             HAVING COUNT(*) >= 4
+           )`
+        )
+        .run();
+    }
+  } catch (e) {
+    console.error("[crypto-noticias] purge-junk-images", e instanceof Error ? e.message : e);
+  }
 }
 
 async function ensureMediosSchema(): Promise<void> {
@@ -261,7 +365,10 @@ function mapRow(raw: Record<string, unknown>): NewsRowMapped {
     summaryPt: String(r.summary_pt ?? "").trim(),
     url: String(r.url ?? ""),
     sourceName: String(r.source_name ?? ""),
-    imageUrl: String(r.image_url ?? "").trim(),
+    imageUrl: (() => {
+      const img = String(r.image_url ?? "").trim();
+      return img && isAcceptableArticleImage(img) ? img : "";
+    })(),
     topics: parseTopics(r.topics_json),
     publishedAt: String(r.published_at ?? ""),
     fetchedAt: String(r.fetched_at ?? ""),
@@ -276,14 +383,30 @@ function parseLang(raw: unknown): NewsLang {
 }
 
 function presentItem(row: NewsRowMapped, lang: NewsLang) {
-  const title =
-    lang === "es" ? row.titleEs || row.title : lang === "pt" ? row.titlePt || row.title : row.title;
-  const summary =
-    lang === "es"
-      ? row.summaryEs || row.summary
-      : lang === "pt"
-        ? row.summaryPt || row.summary
-        : row.summary;
+  if (lang === "es") {
+    const titleOut =
+      row.titleEs && !looksLikeEnglish(row.titleEs) ? row.titleEs : row.titleEs || row.title;
+    const summaryOut =
+      row.summaryEs && !looksLikeEnglish(row.summaryEs)
+        ? row.summaryEs
+        : row.summaryEs || row.summary;
+    const okTitle = Boolean(row.titleEs) && !looksLikeEnglish(row.titleEs);
+    return {
+      id: row.id,
+      title: okTitle ? row.titleEs : titleOut,
+      summary: row.summaryEs && !looksLikeEnglish(row.summaryEs) ? row.summaryEs : summaryOut,
+      url: row.url,
+      sourceName: row.sourceName,
+      imageUrl: row.imageUrl,
+      topics: row.topics,
+      publishedAt: row.publishedAt,
+      fetchedAt: row.fetchedAt,
+      lang,
+      translated: okTitle,
+    };
+  }
+  const title = lang === "pt" ? row.titlePt || row.title : row.title;
+  const summary = lang === "pt" ? row.summaryPt || row.summary : row.summary;
   return {
     id: row.id,
     title,
@@ -295,37 +418,85 @@ function presentItem(row: NewsRowMapped, lang: NewsLang) {
     publishedAt: row.publishedAt,
     fetchedAt: row.fetchedAt,
     lang,
-    translated: lang === "en" ? false : lang === "es" ? Boolean(row.titleEs) : Boolean(row.titlePt),
+    translated: lang === "en" ? false : Boolean(row.titlePt),
   };
 }
 
-async function ensureTranslations(rows: NewsRowMapped[], lang: NewsTranslateLang): Promise<NewsRowMapped[]> {
+async function ensureTranslations(
+  rows: NewsRowMapped[],
+  lang: NewsTranslateLang,
+  opts?: { deadlineMs?: number; maxItems?: number; concurrency?: number }
+): Promise<NewsRowMapped[]> {
   const missing = rows.filter((r) => {
-    if (lang === "es") return !r.titleEs || (Boolean(r.summary) && !r.summaryEs);
-    return !r.titlePt || (Boolean(r.summary) && !r.summaryPt);
+    if (lang === "es") {
+      return (
+        needsNewsTranslation(r.title, r.titleEs, "es") ||
+        (Boolean(r.summary) && needsNewsTranslation(r.summary, r.summaryEs, "es"))
+      );
+    }
+    return (
+      needsNewsTranslation(r.title, r.titlePt, "pt") ||
+      (Boolean(r.summary) && needsNewsTranslation(r.summary, r.summaryPt, "pt"))
+    );
   });
   if (missing.length === 0) return rows;
 
-  // En producción el refresh/listado no puede bloquearse minutos traduciendo todo el wire.
-  const deadline = Date.now() + 10_000;
-  const budget = missing.slice(0, 12);
-  await mapPool(budget, 2, async (row) => {
+  const deadlineMs = opts?.deadlineMs ?? (lang === "es" ? 14_000 : 8_000);
+  const maxItems = opts?.maxItems ?? (lang === "es" ? Math.min(rows.length, 36) : 12);
+  const concurrency = opts?.concurrency ?? (lang === "es" ? 4 : 2);
+  const deadline = Date.now() + deadlineMs;
+  const budget = missing.slice(0, maxItems);
+  await mapPool(budget, concurrency, async (row) => {
     if (Date.now() > deadline) return row;
-    const titleT = await translateNewsText(row.title, lang);
-    await sleepSoft();
-    const summaryT = row.summary && Date.now() < deadline ? await translateNewsText(row.summary, lang) : row.summary ? "" : "";
+    const needTitle =
+      lang === "es"
+        ? needsNewsTranslation(row.title, row.titleEs, "es")
+        : needsNewsTranslation(row.title, row.titlePt, "pt");
+    const needSummary =
+      lang === "es"
+        ? Boolean(row.summary) && needsNewsTranslation(row.summary, row.summaryEs, "es")
+        : Boolean(row.summary) && needsNewsTranslation(row.summary, row.summaryPt, "pt");
+
+    const titleT = needTitle ? await translateNewsText(row.title, lang) : lang === "es" ? row.titleEs : row.titlePt;
+    if (Date.now() < deadline) await sleepSoft();
+    const summaryT =
+      needSummary && Date.now() < deadline
+        ? await translateNewsText(row.summary, lang)
+        : lang === "es"
+          ? row.summaryEs
+          : row.summaryPt;
+
     if (lang === "es") {
-      if (titleT) {
+      const finalTitle =
+        titleT && !looksLikeEnglish(titleT)
+          ? titleT
+          : row.titleEs && !looksLikeEnglish(row.titleEs)
+            ? row.titleEs
+            : "";
+      const finalSummary =
+        summaryT && !looksLikeEnglish(summaryT)
+          ? summaryT
+          : row.summaryEs && !looksLikeEnglish(row.summaryEs)
+            ? row.summaryEs
+            : "";
+      if (finalTitle) {
         await db
-          .prepare("UPDATE sgi_crypto_noticias SET title_es = ?, summary_es = COALESCE(NULLIF(?, ''), summary_es) WHERE id = ?")
-          .run(titleT, summaryT, row.id);
-        row.titleEs = titleT;
-        if (summaryT) row.summaryEs = summaryT;
+          .prepare(
+            "UPDATE sgi_crypto_noticias SET title_es = ?, summary_es = COALESCE(NULLIF(?, ''), summary_es) WHERE id = ?"
+          )
+          .run(finalTitle, finalSummary || "", row.id);
+        row.titleEs = finalTitle;
+        if (finalSummary) row.summaryEs = finalSummary;
+      } else if (finalSummary) {
+        await db
+          .prepare("UPDATE sgi_crypto_noticias SET summary_es = ? WHERE id = ?")
+          .run(finalSummary, row.id);
+        row.summaryEs = finalSummary;
       }
     } else if (titleT) {
       await db
         .prepare("UPDATE sgi_crypto_noticias SET title_pt = ?, summary_pt = COALESCE(NULLIF(?, ''), summary_pt) WHERE id = ?")
-        .run(titleT, summaryT, row.id);
+        .run(titleT, summaryT || "", row.id);
       row.titlePt = titleT;
       if (summaryT) row.summaryPt = summaryT;
     }
@@ -339,16 +510,68 @@ function sleepSoft(): Promise<void> {
   return new Promise((r) => setTimeout(r, 90));
 }
 
+let imageBackfillRunning = false;
+
+/** Completa image_url con la imagen principal del artículo (og:image) para la página visible. */
+async function ensureImagesForRows(rows: NewsRowMapped[]): Promise<NewsRowMapped[]> {
+  const missing = rows.filter((r) => !r.imageUrl && r.url);
+  if (missing.length === 0) return rows;
+
+  // Más presupuesto: casi todas las tarjetas visibles deberían salir con foto.
+  const deadline = Date.now() + 11_000;
+  const budget = missing.slice(0, 36);
+  await mapPool(budget, 5, async (row) => {
+    if (Date.now() > deadline) return row;
+    const img = await fetchOgImage(row.url);
+    if (!img || !isAcceptableArticleImage(img)) return row;
+    try {
+      await db
+        .prepare(
+          `UPDATE sgi_crypto_noticias
+           SET image_url = ?
+           WHERE id = ?`
+        )
+        .run(img, row.id);
+      row.imageUrl = img;
+    } catch (e) {
+      console.error("[crypto-noticias] image-save", e instanceof Error ? e.message : e);
+    }
+    return row;
+  });
+  return rows;
+}
+
+async function backfillRecentImages(limit = 40): Promise<void> {
+  if (imageBackfillRunning) return;
+  imageBackfillRunning = true;
+  try {
+    await ensureCryptoNoticiasSchema();
+    const rows = (await db
+      .prepare(
+        `SELECT id, title, summary, url, source_name, topics_json, published_at, fetched_at,
+                title_es, title_pt, summary_es, summary_pt, image_url
+         FROM sgi_crypto_noticias
+         WHERE image_url IS NULL OR image_url = ''
+         ORDER BY published_at DESC, id DESC
+         LIMIT ?`
+      )
+      .all(Math.max(1, Math.min(60, limit)))) as Record<string, unknown>[];
+    await ensureImagesForRows(rows.map((r) => mapRow(r)));
+  } finally {
+    imageBackfillRunning = false;
+  }
+}
+
 async function runIngest(): Promise<{ inserted: number; scanned: number; feedErrors: number }> {
   await ensureCryptoNoticiasSchema();
   const feeds = await loadEnabledHarvestFeeds();
-  // Refresh rápido: RSS + insert. Imágenes og:image en segundo plano (pocas).
+  // Refresh rápido: RSS + insert. Imágenes en segundo plano.
   const { drafts, feedErrors } = await harvestCryptoNoticiasDrafts(feeds, {
     enrichImages: false,
   });
   let inserted = 0;
-  const newUrls: string[] = [];
   for (const d of drafts) {
+    if (isBlockedNewsSource(d.sourceName, d.url)) continue;
     try {
       const info = await db
         .prepare(
@@ -358,10 +581,7 @@ async function runIngest(): Promise<{ inserted: number; scanned: number; feedErr
         )
         .run(d.title, d.summary, d.url, d.sourceName, JSON.stringify(d.topics), d.publishedAt, d.imageUrl || "");
       const changes = Number((info as { changes?: number })?.changes ?? 0);
-      if (changes > 0) {
-        inserted += 1;
-        newUrls.push(d.url);
-      }
+      if (changes > 0) inserted += 1;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (!/unique|duplicate/i.test(msg)) {
@@ -371,25 +591,13 @@ async function runIngest(): Promise<{ inserted: number; scanned: number; feedErr
   }
   lastIngestAtMs = Date.now();
 
-  // Backfill liviano de imágenes solo para piezas nuevas (no bloquea el HTTP).
-  void (async () => {
-    try {
-      const targets = drafts.filter((d) => !d.imageUrl && newUrls.includes(d.url)).slice(0, 8);
-      for (const d of targets) {
-        const img = await fetchOgImage(d.url);
-        if (!img) continue;
-        await db
-          .prepare(
-            `UPDATE sgi_crypto_noticias
-             SET image_url = ?
-             WHERE url = ? AND (image_url IS NULL OR image_url = '')`
-          )
-          .run(img, d.url);
-      }
-    } catch (e) {
-      console.error("[crypto-noticias] image-backfill", e instanceof Error ? e.message : e);
-    }
-  })();
+  void purgeBlockedNewsSources().catch(() => undefined);
+  void purgeJunkNewsImages().catch(() => undefined);
+
+  // Rellena imágenes de lo más reciente sin foto (incluye históricas sin image_url).
+  void backfillRecentImages(40).catch((e) =>
+    console.error("[crypto-noticias] image-backfill", e instanceof Error ? e.message : e)
+  );
 
   void warmRecentTranslations(24).catch((e) =>
     console.error("[crypto-noticias] warm-translate", e instanceof Error ? e.message : e)
@@ -397,20 +605,29 @@ async function runIngest(): Promise<{ inserted: number; scanned: number; feedErr
   return { inserted, scanned: drafts.length, feedErrors: feedErrors.length };
 }
 
-async function warmRecentTranslations(limit: number): Promise<void> {
-  await ensureCryptoNoticiasSchema();
-  const rows = (await db
-    .prepare(
-      `SELECT id, title, summary, url, source_name, topics_json, published_at, fetched_at,
-              title_es, title_pt, summary_es, summary_pt, image_url
-       FROM sgi_crypto_noticias
-       ORDER BY published_at DESC, id DESC
-       LIMIT ?`
-    )
-    .all(Math.max(1, Math.min(120, limit)))) as Record<string, unknown>[];
-  const mapped = rows.map((r) => mapRow(r));
-  await ensureTranslations(mapped, "es");
-  await ensureTranslations(mapped, "pt");
+let translateWarmRunning = false;
+
+async function warmRecentTranslations(limit: number, langs: NewsTranslateLang[] = ["es", "pt"]): Promise<void> {
+  if (translateWarmRunning) return;
+  translateWarmRunning = true;
+  try {
+    await ensureCryptoNoticiasSchema();
+    const rows = (await db
+      .prepare(
+        `SELECT id, title, summary, url, source_name, topics_json, published_at, fetched_at,
+                title_es, title_pt, summary_es, summary_pt, image_url
+         FROM sgi_crypto_noticias
+         ORDER BY published_at DESC, id DESC
+         LIMIT ?`
+      )
+      .all(Math.max(1, Math.min(120, limit)))) as Record<string, unknown>[];
+    const mapped = rows.map((r) => mapRow(r));
+    for (const tl of langs) {
+      await ensureTranslations(mapped, tl);
+    }
+  } finally {
+    translateWarmRunning = false;
+  }
 }
 
 function kickIngest(): Promise<{ inserted: number; scanned: number; feedErrors: number }> {
@@ -472,6 +689,73 @@ cryptoNoticiasRouter.get("/crypto-noticias/meta", ...readMw, async (_req, res, n
   }
 });
 
+/** Precios en vivo BTC / DOGE / LTC / ZEC + sparkline 1m. */
+cryptoNoticiasRouter.get("/crypto-noticias/live-prices", ...readMw, async (_req, res, next) => {
+  try {
+    const items = await fetchLiveCoinQuotes();
+    res.json({ items, fetchedAt: new Date().toISOString() });
+  } catch (e) {
+    next(e);
+  }
+});
+
+/** KPI de sentimiento del mercado según el wire (corto / mediano / largo). */
+cryptoNoticiasRouter.get("/crypto-noticias/sentiment", ...readMw, async (req, res, next) => {
+  try {
+    await ensureCryptoNoticiasSchema();
+    const topic = String(req.query.topic ?? "").trim().toLowerCase();
+    // Rápido: solo columnas necesarias + tope menor.
+    const rows = (await db
+      .prepare(
+        `SELECT id, title, summary, topics_json, published_at, title_es, summary_es
+         FROM sgi_crypto_noticias
+         ORDER BY published_at DESC, id DESC
+         LIMIT 400`
+      )
+      .all()) as Record<string, unknown>[];
+
+    let items = rows.map((r) => {
+      const m = mapRow({
+        ...r,
+        url: "",
+        source_name: "",
+        title_pt: "",
+        summary_pt: "",
+        image_url: "",
+        fetched_at: "",
+      });
+      return m;
+    });
+    if (topic && TOPIC_SET.has(topic)) {
+      items = items.filter((x) => x.topics.includes(topic as CryptoNoticiaTopic));
+    }
+
+    // Instantáneo: el lexicón funciona en EN/ES. Sin traducir aquí (eso enlentecía todo).
+    const report = buildMarketSentimentReport(
+      items.map((x) => ({
+        id: x.id,
+        title: x.title,
+        summary: x.summary,
+        titleEs: x.titleEs,
+        summaryEs: x.summaryEs,
+        topics: x.topics,
+        publishedAt: x.publishedAt,
+      }))
+    );
+
+    res.json(report);
+
+    // Traduce drivers en background para la próxima visita (no bloquea).
+    void (async () => {
+      const ids = [...report.drivers.bullish, ...report.drivers.bearish].map((d) => d.id);
+      const subset = items.filter((x) => ids.includes(x.id));
+      if (subset.length) await ensureTranslations(subset, "es", { deadlineMs: 8_000, maxItems: 8, concurrency: 3 });
+    })().catch(() => undefined);
+  } catch (e) {
+    next(e);
+  }
+});
+
 cryptoNoticiasRouter.get("/crypto-noticias", ...readMw, async (req, res, next) => {
   try {
     await ensureCryptoNoticiasSchema();
@@ -489,11 +773,11 @@ cryptoNoticiasRouter.get("/crypto-noticias", ...readMw, async (req, res, next) =
                 title_es, title_pt, summary_es, summary_pt, image_url
          FROM sgi_crypto_noticias
          ORDER BY published_at DESC, id DESC
-         LIMIT 800`
+         LIMIT 400`
       )
       .all()) as Record<string, unknown>[];
 
-    let items = rows.map((r) => mapRow(r));
+    let items = rows.map((r) => mapRow(r)).filter((x) => !isBlockedNewsSource(x.sourceName, x.url));
     if (topic && TOPIC_SET.has(topic)) {
       items = items.filter((x) => x.topics.includes(topic as CryptoNoticiaTopic));
     }
@@ -508,8 +792,18 @@ cryptoNoticiasRouter.get("/crypto-noticias", ...readMw, async (req, res, next) =
     const total = items.length;
     items = items.slice(offset, offset + limit);
 
+    // Filtro liviano en memoria (sin DELETE/UPDATE pesados en el request).
+    for (const it of items) {
+      if (it.imageUrl && !isAcceptableArticleImage(it.imageUrl)) it.imageUrl = "";
+    }
+
+    // Burst corto de traducción (≤2s) para lo visible; el resto en background.
     if (lang === "es" || lang === "pt") {
-      await ensureTranslations(items, lang);
+      await ensureTranslations(items, lang, {
+        deadlineMs: 2_000,
+        maxItems: 8,
+        concurrency: 4,
+      });
     }
 
     res.json({
@@ -520,6 +814,14 @@ cryptoNoticiasRouter.get("/crypto-noticias", ...readMw, async (req, res, next) =
       lang,
       lastIngestAt: lastIngestAtMs ? new Date(lastIngestAtMs).toISOString() : null,
     });
+
+    // Completa ES + fotos fuera del camino crítico.
+    if (lang === "es" || lang === "pt") {
+      void ensureTranslations(items, lang, { deadlineMs: 12_000, maxItems: 36, concurrency: 3 }).catch(
+        () => undefined
+      );
+      void warmRecentTranslations(40, lang === "es" ? ["es"] : ["pt"]).catch(() => undefined);
+    }
   } catch (e) {
     next(e);
   }
