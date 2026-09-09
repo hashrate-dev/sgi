@@ -3,6 +3,7 @@ import { PageHeader } from "../components/PageHeader";
 import { AsicCotizadorCatalogSelect } from "../components/AsicCotizadorCatalogSelect";
 import { createAsicCostoEquipo, deleteAsicCostoEquipo, getAsicCostosEquipos, type AsicCostoEquipoItem } from "../lib/api";
 import { downloadAsicCotizacionPdf } from "../lib/generateAsicCotizacionPdf";
+import { AsicCotizadorEvolucionModal } from "../components/AsicCotizadorEvolucionModal";
 import "../styles/facturacion.css";
 
 /** Valores por defecto de la fórmula: ((PRECIO ORIGEN + 220 USD) × 1,23) + 300 */
@@ -104,6 +105,7 @@ export function AsicCotizadorChinaPyPage() {
   const [showHoyModal, setShowHoyModal] = useState(false);
   const [showTxtModal, setShowTxtModal] = useState(false);
   const [txtCopyDone, setTxtCopyDone] = useState(false);
+  const [showEvoModal, setShowEvoModal] = useState(false);
 
   useEffect(() => {
     setProcesador("");
@@ -664,6 +666,20 @@ export function AsicCotizadorChinaPyPage() {
                       <i className="bi bi-file-text me-1" aria-hidden />
                       Texto precios
                     </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-success asic-cotizador-hoy-btn"
+                      disabled={registros.length === 0}
+                      onClick={() => setShowEvoModal(true)}
+                      title={
+                        registros.length === 0
+                          ? "Todavía no hay cotizaciones registradas"
+                          : "Ver evolución de precio final y margen por equipo"
+                      }
+                    >
+                      <i className="bi bi-graph-up-arrow me-1" aria-hidden />
+                      Evolución precios
+                    </button>
                   </div>
                 </div>
                 <div className="table-responsive asic-cotizador-registros-wrap">
@@ -910,6 +926,13 @@ export function AsicCotizadorChinaPyPage() {
             />
           </>
         ) : null}
+
+        <AsicCotizadorEvolucionModal
+          open={showEvoModal}
+          onClose={() => setShowEvoModal(false)}
+          registros={registros}
+          preferredIds={[...selectedIds]}
+        />
       </div>
     </div>
   );

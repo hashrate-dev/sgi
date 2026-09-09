@@ -10248,6 +10248,12 @@ button.fact-back {
   box-shadow: 0 0 0 0.2rem rgba(0, 166, 82, 0.2);
 }
 
+.contabilidad-proveedor-dd-menu--portal {
+  background: #fff !important;
+  color: #1e293b;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.22) !important;
+}
+
 /* Contabilidad — alta rápida de proveedor HRS (legacy panel; se mantiene por si queda en caché) */
 .contabilidad-nuevo-proveedor-toggle {
   white-space: nowrap;
