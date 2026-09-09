@@ -1156,7 +1156,11 @@ export function FacturacionPage() {
                   aria-hidden={
                     type === "Factura"
                       ? false
-                      : !((type === "Nota de Crédito" || type === "Recibo") && !selectedClient)
+                      : !(
+                          ((type === "Nota de Crédito" || type === "Recibo") && !selectedClient) ||
+                          (type === "Recibo" && !!selectedClient && invoicesWithoutReceipt.length === 0) ||
+                          (type === "Recibo" && !!relatedInvoiceId)
+                        )
                   }
                 >
                   {type === "Factura" ? (
@@ -1179,6 +1183,18 @@ export function FacturacionPage() {
                     <div className="fact-select-client-hint-box">
                       <small className="text-warning">
                         Seleccionar un cliente para ver facturas disponibles.
+                      </small>
+                    </div>
+                  ) : type === "Recibo" && relatedInvoiceId ? (
+                    <div className="fact-select-client-hint-box fact-select-client-hint-box--info">
+                      <small>
+                        ✓ Los ítems se cargaron automáticamente.
+                      </small>
+                    </div>
+                  ) : type === "Recibo" && selectedClient && invoicesWithoutReceipt.length === 0 ? (
+                    <div className="fact-select-client-hint-box fact-select-client-hint-box--ok">
+                      <small>
+                        ℹ️ Este cliente no tiene facturas por liquidar pendientes.
                       </small>
                     </div>
                   ) : null}
@@ -1291,20 +1307,6 @@ export function FacturacionPage() {
                             </option>
                           ))}
                         </select>
-                        {invoicesWithoutReceipt.length === 0 && selectedClient && (
-                          <div style={{ padding: "0.75rem 1rem", backgroundColor: "#f0fdf4", border: "1px solid #86efac", borderRadius: "8px", marginTop: "0.5rem", color: "#166534" }}>
-                            <small style={{ fontWeight: 500 }}>
-                              ℹ️ Este cliente no tiene facturas por liquidar pendientes.
-                            </small>
-                          </div>
-                        )}
-                        {relatedInvoiceId && (
-                          <div style={{ padding: "0.75rem", backgroundColor: "#d1ecf1", border: "1px solid #0d6efd", borderRadius: "4px", marginTop: "0.5rem" }}>
-                            <small className="text-info" style={{ fontWeight: "bold" }}>
-                              ✓ Los ítems se cargaron automáticamente.
-                            </small>
-                          </div>
-                        )}
                       </>
                     ) : null}
                     <div className="fact-field" style={{ borderTop: "none", paddingTop: "0.65rem", marginTop: "0.35rem" }}>
