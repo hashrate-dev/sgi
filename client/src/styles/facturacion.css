@@ -471,7 +471,7 @@ button.fact-back {
   grid-template-columns: 320px 1fr;
   gap: 1.5rem;
   align-items: stretch;
-  min-height: calc(100vh - 11rem);
+  min-height: calc(100dvh - 11.5rem);
 }
 
 @media (max-width: 991px) {
@@ -481,16 +481,17 @@ button.fact-back {
   }
 }
 
-/* Panel izquierdo - Configuración: altura hasta abajo de la pantalla */
+/* Panel izquierdo - altura FIJA (igual en Factura / Recibo / NC), dejando aire sobre el footer */
 .fact-sidebar {
   position: sticky;
-  top: 1rem;
-  align-self: stretch;
+  top: 0.75rem;
+  align-self: start;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 2rem);
-  max-height: calc(100vh - 2rem);
-  min-height: 0;
+  box-sizing: border-box;
+  height: calc(100dvh - 8rem);
+  min-height: calc(100dvh - 8rem);
+  max-height: calc(100dvh - 8rem);
 }
 
 /* ========== Panel "Nuevo documento": mismo estilo que Detalle de servicios (verde #2D5D46) ========== */
@@ -501,11 +502,15 @@ button.fact-back {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   overflow: hidden;
   position: relative;
+}
+
+.fact-sidebar > .fact-panel-nuevo-documento {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  height: 100%;
+  height: 100% !important;
+  max-height: 100%;
 }
 
 .fact-panel-nuevo-documento::before {
@@ -540,31 +545,79 @@ button.fact-back {
   padding: 1.25rem 1.5rem;
   position: relative;
   z-index: 1;
+}
+
+.fact-sidebar > .fact-panel-nuevo-documento .fact-card-body {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
+}
+
+/* Reserva fija: plazo (Factura) o aviso amarillo (Recibo/NC) — Cliente no salta de posición */
+.fact-sidebar .fact-field--doc-extra-top {
+  flex: 0 0 4.6rem;
+  min-height: 4.6rem;
+  max-height: 4.6rem;
+  padding-top: 0.5rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.fact-sidebar .fact-select-client-hint-box {
+  padding: 0.45rem 0.65rem;
+  background-color: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 6px;
+  line-height: 1.25;
+}
+
+.fact-sidebar .fact-select-client-hint-box small {
+  font-size: 0.8125rem;
+}
+
+/* Reserva fija debajo del cliente (= altura del bloque Recibo: factura + fecha)
+   Así el FORM Cliente queda igual de alto en Factura, Recibo y NC. */
+.fact-sidebar .fact-field--doc-extra-bottom {
+  flex: 0 0 10.75rem;
+  min-height: 10.75rem;
+  max-height: 10.75rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+  overflow-x: hidden;
   overflow-y: auto;
+  box-sizing: border-box;
 }
 
-.fact-panel-nuevo-documento .fact-field--cliente {
+.fact-sidebar .fact-field--doc-extra-bottom[aria-hidden="true"] {
+  border-top-color: transparent;
+  pointer-events: none;
+}
+
+.fact-sidebar .fact-field--cliente {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding-top: 0.75rem;
+}
+
+.fact-sidebar .billing-hosting-client-picker {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
 
-.fact-panel-nuevo-documento .billing-hosting-client-picker {
+.fact-sidebar .billing-hosting-client-picker .fact-select[size] {
   flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
   min-height: 0;
-}
-
-.fact-panel-nuevo-documento .billing-hosting-client-picker .fact-select[size] {
-  flex: 1 1 auto;
-  min-height: 16rem;
-  height: auto;
+  height: 100% !important;
+  max-height: 100%;
 }
 
 .fact-panel-nuevo-documento .fact-label {
@@ -609,7 +662,7 @@ button.fact-back {
 
 /* ========== Vista previa de la factura: mismo estilo verde que Detalle de servicios ========== */
 .fact-panel-vista-previa {
-  margin-top: 2rem;
+  margin-top: 0;
   background: #2D5D46;
   border-radius: 16px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -642,13 +695,17 @@ button.fact-back {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-shrink: 0;
 }
 
 .fact-panel-vista-previa-body {
   padding: 1.25rem 1.5rem;
   position: relative;
   z-index: 1;
-  min-height: 280px;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 /* Caja blanca para el documento: tipo “hoja” sobre el panel verde */
@@ -657,14 +714,18 @@ button.fact-back {
   border-radius: 12px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  overflow: visible;
+  overflow: auto;
   max-width: 100%;
   min-height: 260px;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Estado vacío: "No hay documento" cuando no hay datos para previsualizar */
 .fact-panel-vista-previa-empty {
   min-height: 260px;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -802,12 +863,33 @@ button.fact-back {
   border-radius: 6px;
 }
 
-/* Panel derecho - Detalle */
+/* Panel derecho - Detalle + Vista previa alineados con Nuevo documento */
 .fact-main {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1rem;
   min-width: 0; /* Permite que el grid no desborde; el scroll va en fact-table-wrap */
+  box-sizing: border-box;
+  height: calc(100dvh - 8rem);
+  min-height: calc(100dvh - 8rem);
+  max-height: calc(100dvh - 8rem);
+  position: sticky;
+  top: 0.75rem;
+  align-self: start;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.fact-main > .fact-card:first-of-type {
+  flex: 0 0 auto;
+}
+
+.fact-main > .fact-panel-vista-previa {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin-top: 0;
 }
 
 .fact-section-header {
@@ -1540,7 +1622,7 @@ button.fact-back {
 .fact-detail-servicios-outer {
   margin-left: -0.5rem;
   margin-right: -0.5rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .fact-detail-servicios-container {
@@ -1659,10 +1741,10 @@ button.fact-back {
     inset 0 -1px 0 rgba(0, 0, 0, 0.06),
     0 4px 12px rgba(0, 0, 0, 0.12);
   overflow: hidden;
-  max-height: 455px; /* ~2 cm más que 380px */
+  max-height: 520px;
   overflow-y: auto;
   margin-bottom: 1.25rem;
-  min-height: 220px;
+  min-height: 280px; /* un poco más alto */
 }
 
 /* Franja superior: mismo verde que la tabla (sin rallitas) */
@@ -4026,7 +4108,48 @@ button.fact-back {
     position: static;
     margin-bottom: 1.5rem;
     height: auto;
+    min-height: 0;
     max-height: none;
+  }
+
+  .fact-main {
+    position: static;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+  }
+
+  .fact-main > .fact-panel-vista-previa {
+    flex: 0 0 auto;
+    margin-top: 1rem;
+  }
+
+  .fact-panel-vista-previa-body,
+  .fact-panel-vista-previa-inner,
+  .fact-panel-vista-previa-empty {
+    flex: 0 0 auto;
+    min-height: 260px;
+  }
+
+  .fact-sidebar > .fact-panel-nuevo-documento {
+    height: auto !important;
+    max-height: none;
+  }
+
+  .fact-sidebar > .fact-panel-nuevo-documento .fact-card-body {
+    overflow: visible;
+  }
+
+  .fact-sidebar .fact-field--doc-extra-top,
+  .fact-sidebar .fact-field--doc-extra-bottom {
+    flex: 0 0 auto;
+    min-height: 0;
+    max-height: none;
+  }
+
+  .fact-sidebar .billing-hosting-client-picker .fact-select[size] {
+    min-height: 12rem;
+    height: auto !important;
   }
   
   .clients-table-container {

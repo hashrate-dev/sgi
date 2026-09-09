@@ -1151,24 +1151,40 @@ export function FacturacionPage() {
                     </div>
                   </div>
                 </div>
-                {type === "Factura" && (
-                <div className="fact-field" style={{ paddingTop: "0.5rem" }}>
-                  <label className="fact-label"><span style={{ fontSize: "1.1em" }}>📅</span> Plazo de vencimiento</label>
-                  <div className="d-flex gap-2 mt-1 flex-wrap">
-                    {([5, 6, 7] as const).map((d) => (
-                      <button
-                        key={d}
-                        type="button"
-                        className={`btn btn-sm ${dueDateDays === d ? "btn-success" : "btn-outline-secondary"}`}
-                        onClick={() => setDueDateDays(d)}
-                      >
-                        {d} días
-                      </button>
-                    ))}
-                  </div>
+                <div
+                  className="fact-field fact-field--doc-extra-top"
+                  aria-hidden={
+                    type === "Factura"
+                      ? false
+                      : !((type === "Nota de Crédito" || type === "Recibo") && !selectedClient)
+                  }
+                >
+                  {type === "Factura" ? (
+                    <>
+                      <label className="fact-label"><span style={{ fontSize: "1.1em" }}>📅</span> Plazo de vencimiento</label>
+                      <div className="d-flex gap-2 mt-1 flex-wrap">
+                        {([5, 6, 7] as const).map((d) => (
+                          <button
+                            key={d}
+                            type="button"
+                            className={`btn btn-sm ${dueDateDays === d ? "btn-success" : "btn-outline-secondary"}`}
+                            onClick={() => setDueDateDays(d)}
+                          >
+                            {d} días
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  ) : (type === "Nota de Crédito" || type === "Recibo") && !selectedClient ? (
+                    <div className="fact-select-client-hint-box">
+                      <small className="text-warning">
+                        Seleccionar un cliente para ver facturas disponibles.
+                      </small>
+                    </div>
+                  ) : null}
                 </div>
-                )}
-                <div className="fact-field fact-field--cliente" style={{ paddingTop: "0.75rem" }}>
+
+                <div className="fact-field fact-field--cliente">
                   <label className="fact-label" htmlFor="hosting-billing-cliente">
                     <span style={{ fontSize: "1.25em", lineHeight: 1 }}>👤</span> Cliente
                   </label>
@@ -1185,19 +1201,17 @@ export function FacturacionPage() {
                   />
                 </div>
 
+                <div
+                  className="fact-field fact-field--doc-extra-bottom"
+                  aria-hidden={type !== "Nota de Crédito" && type !== "Recibo"}
+                >
                 {/* Selector de factura relacionada para Nota de Crédito */}
                 {type === "Nota de Crédito" && (
-                  <div className="fact-field" style={{ borderTop: "2px solid #00a652", paddingTop: "1rem", marginTop: "1rem" }}>
+                  <div className="fact-field" style={{ borderTop: "none", paddingTop: 0, marginTop: 0 }}>
                     <label className="fact-label" style={{ fontWeight: "bold", color: "#00a652" }}>
                       ⚠️ Factura a cancelar (Requerido)
                     </label>
-                    {!selectedClient ? (
-                      <div style={{ padding: "0.75rem", backgroundColor: "#fff3cd", border: "1px solid #ffc107", borderRadius: "4px" }}>
-                        <small className="text-warning">
-                          Primero debe seleccionar un cliente para ver las facturas disponibles.
-                        </small>
-                      </div>
-                    ) : (
+                    {selectedClient ? (
                       <>
                         <select
                           className="fact-select"
@@ -1252,23 +1266,17 @@ export function FacturacionPage() {
                           </label>
                         )}
                       </>
-                    )}
+                    ) : null}
                   </div>
                 )}
 
                 {/* Selector de factura relacionada para Recibo */}
                 {type === "Recibo" && (
-                  <div className="fact-field" style={{ borderTop: "1px solid rgba(255, 255, 255, 0.25)", paddingTop: "1rem", marginTop: "1rem" }}>
+                  <div className="fact-field" style={{ borderTop: "none", paddingTop: 0, marginTop: 0 }}>
                     <label className="fact-label" style={{ fontWeight: "bold", color: "#fff" }}>
                       <span style={{ fontSize: "1.3em", lineHeight: 1 }}>🧾</span> Factura abonada (Requerido)
                     </label>
-                    {!selectedClient ? (
-                      <div style={{ padding: "0.75rem", backgroundColor: "#fff3cd", border: "1px solid #ffc107", borderRadius: "4px" }}>
-                        <small className="text-warning">
-                          Primero debe seleccionar un cliente para ver las facturas disponibles.
-                        </small>
-                      </div>
-                    ) : (
+                    {selectedClient ? (
                       <>
                         <select
                           className="fact-select"
@@ -1298,26 +1306,23 @@ export function FacturacionPage() {
                           </div>
                         )}
                       </>
-                    )}
+                    ) : null}
+                    <div className="fact-field" style={{ borderTop: "none", paddingTop: "0.65rem", marginTop: "0.35rem" }}>
+                      <label className="fact-label" style={{ fontWeight: "bold", color: "#ffcdd2" }}>
+                        📅 Fecha de pago (Requerido)
+                      </label>
+                      <input
+                        type="date"
+                        className="fact-input"
+                        value={paymentDate}
+                        onChange={(e) => setPaymentDate(e.target.value)}
+                        style={{ border: paymentDate ? "2px solid #0d6efd" : "2px solid #dc3545" }}
+                        required
+                      />
+                    </div>
                   </div>
                 )}
-
-                {/* Campo de fecha de pago para Recibo */}
-                {type === "Recibo" && (
-                  <div className="fact-field" style={{ borderTop: "1px solid rgba(255, 255, 255, 0.25)", paddingTop: "1rem", marginTop: "1rem" }}>
-                    <label className="fact-label" style={{ fontWeight: "bold", color: "#ffcdd2" }}>
-                      📅 Fecha de pago (Requerido)
-                    </label>
-                    <input
-                      type="date"
-                      className="fact-input"
-                      value={paymentDate}
-                      onChange={(e) => setPaymentDate(e.target.value)}
-                      style={{ border: paymentDate ? "2px solid #0d6efd" : "2px solid #dc3545" }}
-                      required
-                    />
-                  </div>
-                )}
+                </div>
               </div>
             </div>
           </aside>
