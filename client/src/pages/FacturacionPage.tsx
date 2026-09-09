@@ -20,7 +20,7 @@ import { PageHeader } from "../components/PageHeader";
 import { InvoicePreview } from "../components/InvoicePreview";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { showToast } from "../components/ToastNotification";
-import { HostingClientSelect, type HostingClientOption } from "../components/HostingClientSelect";
+import { BillingHostingClientPicker } from "../components/BillingHostingClientPicker";
 import { useAuth } from "../contexts/AuthContext";
 import { canEditClientes, canEditFacturacion, lectorAllowsModule } from "../lib/auth";
 import { formatCurrencyNumber, formatUSD } from "../lib/formatCurrency";
@@ -532,17 +532,6 @@ export function FacturacionPage() {
       return same ? prev : ordered;
     });
   }, [items]);
-
-  const hostingClientOptions = useMemo((): HostingClientOption[] => {
-    return clients
-      .map((c) => ({
-        id: Number(c.id ?? 0),
-        code: String(c.code ?? "").trim(),
-        name: String(c.name ?? "").trim(),
-        name2: String(c.name2 ?? "").trim() || undefined,
-      }))
-      .filter((c) => Number.isFinite(c.id) && c.id > 0);
-  }, [clients]);
 
   const canAddHostingClient = Boolean(user && canEditClientes(user));
 
@@ -1179,28 +1168,21 @@ export function FacturacionPage() {
                   </div>
                 </div>
                 )}
-                <div className="fact-field" style={{ paddingTop: "0.75rem" }}>
+                <div className="fact-field fact-field--cliente" style={{ paddingTop: "0.75rem" }}>
                   <label className="fact-label" htmlFor="hosting-billing-cliente">
                     <span style={{ fontSize: "1.25em", lineHeight: 1 }}>👤</span> Cliente
                   </label>
-                  <HostingClientSelect
-                    buttonId="hosting-billing-cliente"
-                    value={typeof selectedClientId === "number" ? selectedClientId : 0}
-                    onChange={(clientId) => setSelectedClientId(clientId > 0 ? clientId : "")}
-                    clients={hostingClientOptions}
+                  <BillingHostingClientPicker
+                    listId="hosting-billing-cliente"
+                    clients={clients}
+                    selectedClientId={selectedClientId}
+                    onSelectClientId={(id) => setSelectedClientId(id === "" ? "" : Number(id))}
                     canAdd={canAddHostingClient}
-                    required
-                    placeholder="Seleccionar cliente ASIC / Hosting"
                     onClientCreated={async (created) => {
                       await reloadHostingClients(created.id);
                       showToast(`Cliente agregado: ${created.code} — ${created.name}`, "success");
                     }}
                   />
-                  {clients.length === 0 && (
-                    <small className="text-muted d-block mt-1">
-                      No hay clientes cargados. Usá “+ Agregar cliente ASIC / Hosting” o Clientes → Hosting.
-                    </small>
-                  )}
                 </div>
 
                 {/* Selector de factura relacionada para Nota de Crédito */}

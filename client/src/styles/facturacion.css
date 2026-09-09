@@ -470,19 +470,27 @@ button.fact-back {
   display: grid;
   grid-template-columns: 320px 1fr;
   gap: 1.5rem;
-  align-items: start;
+  align-items: stretch;
+  min-height: calc(100vh - 11rem);
 }
 
 @media (max-width: 991px) {
   .fact-layout {
     grid-template-columns: 1fr;
+    min-height: 0;
   }
 }
 
-/* Panel izquierdo - Configuración */
+/* Panel izquierdo - Configuración: altura hasta abajo de la pantalla */
 .fact-sidebar {
   position: sticky;
   top: 1rem;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 2rem);
+  max-height: calc(100vh - 2rem);
+  min-height: 0;
 }
 
 /* ========== Panel "Nuevo documento": mismo estilo que Detalle de servicios (verde #2D5D46) ========== */
@@ -493,6 +501,11 @@ button.fact-back {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   overflow: hidden;
   position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
 }
 
 .fact-panel-nuevo-documento::before {
@@ -527,6 +540,31 @@ button.fact-back {
   padding: 1.25rem 1.5rem;
   position: relative;
   z-index: 1;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.fact-panel-nuevo-documento .fact-field--cliente {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.fact-panel-nuevo-documento .billing-hosting-client-picker {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.fact-panel-nuevo-documento .billing-hosting-client-picker .fact-select[size] {
+  flex: 1 1 auto;
+  min-height: 16rem;
+  height: auto;
 }
 
 .fact-panel-nuevo-documento .fact-label {
@@ -1621,9 +1659,10 @@ button.fact-back {
     inset 0 -1px 0 rgba(0, 0, 0, 0.06),
     0 4px 12px rgba(0, 0, 0, 0.12);
   overflow: hidden;
-  max-height: 380px;
+  max-height: 455px; /* ~2 cm más que 380px */
   overflow-y: auto;
   margin-bottom: 1.25rem;
+  min-height: 220px;
 }
 
 /* Franja superior: mismo verde que la tabla (sin rallitas) */
@@ -3986,6 +4025,8 @@ button.fact-back {
   .fact-sidebar {
     position: static;
     margin-bottom: 1.5rem;
+    height: auto;
+    max-height: none;
   }
   
   .clients-table-container {
@@ -10252,6 +10293,21 @@ button.fact-back {
   background: #fff !important;
   color: #1e293b;
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.22) !important;
+}
+
+.fact-panel-nuevo-documento .billing-hosting-client-picker__add .btn-outline-light {
+  border-color: rgba(255, 255, 255, 0.45);
+  color: #fff;
+}
+
+.fact-panel-nuevo-documento .billing-hosting-client-picker__add .btn-outline-light:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.fact-panel-nuevo-documento .billing-hosting-client-picker__add-form .fact-input {
+  background: #fff;
+  color: #1e293b;
 }
 
 /* Contabilidad — alta rápida de proveedor HRS (legacy panel; se mantiene por si queda en caché) */

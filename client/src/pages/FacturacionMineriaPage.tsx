@@ -38,7 +38,7 @@ import { PageHeader } from "../components/PageHeader";
 import { InvoicePreview } from "../components/InvoicePreview";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { showToast } from "../components/ToastNotification";
-import { HostingClientSelect, type HostingClientOption } from "../components/HostingClientSelect";
+import { BillingHostingClientPicker } from "../components/BillingHostingClientPicker";
 import { useAuth } from "../contexts/AuthContext";
 import { canEditClientes, canEditFacturacion, lectorAllowsModule } from "../lib/auth";
 import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
@@ -312,17 +312,6 @@ export function FacturacionMineriaPage() {
     [type, invoicesAll, nextNumFromApi]
   );
   const totals = useMemo(() => calcTotals(items), [items]);
-
-  const hostingClientOptions = useMemo((): HostingClientOption[] => {
-    return clients
-      .map((c) => ({
-        id: Number(c.id ?? 0),
-        code: String(c.code ?? "").trim(),
-        name: String(c.name ?? "").trim(),
-        name2: String(c.name2 ?? "").trim() || undefined,
-      }))
-      .filter((c) => Number.isFinite(c.id) && c.id > 0);
-  }, [clients]);
 
   const canAddHostingClient = Boolean(user && canEditClientes(user));
 
@@ -982,28 +971,22 @@ export function FacturacionMineriaPage() {
                   </div>
                 )}
                 </div>
-                <div className="fact-field" style={{ paddingTop: "0.75rem" }}>
+                <div className="fact-field fact-field--cliente" style={{ paddingTop: "0.75rem" }}>
                   <label className="fact-label" htmlFor="asic-billing-cliente">
                     <span style={{ fontSize: "1.25em", lineHeight: 1 }}>👤</span> Cliente
                   </label>
-                  <HostingClientSelect
-                    buttonId="asic-billing-cliente"
-                    value={Number(selectedClientId) || 0}
-                    onChange={(clientId) => setSelectedClientId(clientId > 0 ? String(clientId) : "")}
-                    clients={hostingClientOptions}
+                  <BillingHostingClientPicker
+                    listId="asic-billing-cliente"
+                    clients={clients}
+                    selectedClientId={selectedClientId}
+                    onSelectClientId={(id) => setSelectedClientId(id === "" ? "" : String(id))}
                     canAdd={canAddHostingClient}
-                    required
-                    placeholder="Seleccionar cliente ASIC / Hosting"
                     onClientCreated={async (created) => {
                       await reloadHostingClients(created.id);
                       showToast(`Cliente agregado: ${created.code} — ${created.name}`, "success");
                     }}
+                    emptyHint="No hay clientes cargados. Usá “+ Agregar cliente ASIC / Hosting” o la hoja Clientes."
                   />
-                  {clients.length === 0 && (
-                    <small className="text-muted d-block mt-1">
-                      No hay clientes cargados. Usá “+ Agregar cliente ASIC / Hosting” o la hoja Clientes.
-                    </small>
-                  )}
                 </div>
 
                 {/* Selector de factura relacionada para Nota de Crédito */}
