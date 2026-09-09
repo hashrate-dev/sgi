@@ -143,7 +143,7 @@ export function HostingClientSelect({
         className="form-select w-100 min-w-0 d-flex align-items-center gap-2 text-start contabilidad-proveedor-dd-btn"
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label="Cliente de hosting"
+        aria-label="Cliente ASIC / Hosting"
         aria-required={required || undefined}
         onClick={() => {
           if (!disabled) setOpen((o) => !o);
@@ -290,7 +290,7 @@ export function HostingClientSelect({
                     setAdding(true);
                   }}
                 >
-                  + Agregar cliente de hosting
+                  + Agregar cliente ASIC / Hosting
                 </button>
               )}
             </li>

@@ -38,8 +38,9 @@ import { PageHeader } from "../components/PageHeader";
 import { InvoicePreview } from "../components/InvoicePreview";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { showToast } from "../components/ToastNotification";
+import { HostingClientSelect, type HostingClientOption } from "../components/HostingClientSelect";
 import { useAuth } from "../contexts/AuthContext";
-import { canEditFacturacion, lectorAllowsModule } from "../lib/auth";
+import { canEditClientes, canEditFacturacion, lectorAllowsModule } from "../lib/auth";
 import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
 import { isClienteTiendaOnline } from "../lib/clientTienda";
 import { formatCurrencyNumber, formatUSD } from "../lib/formatCurrency";
@@ -143,7 +144,6 @@ export function FacturacionMineriaPage() {
   const { user } = useAuth();
   const location = useLocation();
   const [type, setType] = useState<ComprobanteType>("Factura");
-  const [clientQuery, setClientQuery] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [items, setItems] = useState<LineItem[]>([]);
@@ -273,15 +273,24 @@ export function FacturacionMineriaPage() {
     return () => window.removeEventListener("hrs-emitted-changed", handler as EventListener);
   }, []);
 
-  useEffect(() => {
-    getClients()
-      .then((r) => {
-        const all = (r.clients ?? []) as Client[];
-        // Solo clientes de hosting (/clientes), no cuentas tienda online (/clientes-tienda-online).
-        setClients(all.filter((c) => !isClienteTiendaOnline(c)));
-      })
-      .catch(() => setClients([]));
+  const reloadHostingClients = useCallback(async (preferSelectId?: number) => {
+    try {
+      const r = await getClients();
+      const all = (r.clients ?? []) as Client[];
+      // Solo clientes de hosting (/clientes), no cuentas tienda online (/clientes-tienda-online).
+      const hosting = all.filter((c) => !isClienteTiendaOnline(c));
+      setClients(hosting);
+      if (preferSelectId != null && Number.isFinite(preferSelectId) && preferSelectId > 0) {
+        setSelectedClientId(String(preferSelectId));
+      }
+    } catch {
+      setClients([]);
+    }
   }, []);
+
+  useEffect(() => {
+    void reloadHostingClients();
+  }, [reloadHostingClients]);
 
   useEffect(() => {
     if (!selectedClientId) return;
@@ -304,22 +313,18 @@ export function FacturacionMineriaPage() {
   );
   const totals = useMemo(() => calcTotals(items), [items]);
 
-  const visibleClients = useMemo(() => {
-    const q = clientQuery.trim().toLowerCase();
-    if (!q) return clients;
-    return clients.filter(
-      (c) => `${c.code} - ${c.name}`.toLowerCase().includes(q) || c.name.toLowerCase().includes(q)
-    );
-  }, [clients, clientQuery]);
+  const hostingClientOptions = useMemo((): HostingClientOption[] => {
+    return clients
+      .map((c) => ({
+        id: Number(c.id ?? 0),
+        code: String(c.code ?? "").trim(),
+        name: String(c.name ?? "").trim(),
+        name2: String(c.name2 ?? "").trim() || undefined,
+      }))
+      .filter((c) => Number.isFinite(c.id) && c.id > 0);
+  }, [clients]);
 
-  /** Lista de clientes para el select: incluye siempre el seleccionado aunque no coincida con el filtro */
-  const clientsForSelect = useMemo(() => {
-    if (!selectedClientId) return visibleClients;
-    const sel = clients.find((c) => String(c.id ?? "") === String(selectedClientId));
-    if (!sel) return visibleClients;
-    if (visibleClients.some((c) => String(c.id ?? "") === String(selectedClientId))) return visibleClients;
-    return [sel, ...visibleClients];
-  }, [clients, visibleClients, selectedClientId]);
+  const canAddHostingClient = Boolean(user && canEditClientes(user));
 
   const selectedClient = useMemo(
     () => (selectedClientId ? clients.find((c) => String(c.id ?? "") === String(selectedClientId)) ?? null : null),
@@ -978,30 +983,26 @@ export function FacturacionMineriaPage() {
                 )}
                 </div>
                 <div className="fact-field" style={{ paddingTop: "0.75rem" }}>
-                  <label className="fact-label"><span style={{ fontSize: "1.25em", lineHeight: 1 }}>👤</span> Cliente</label>
-                  <input
-                    className="fact-input"
-                    type="text"
-                    placeholder="Buscar por nombre o código..."
-                    value={clientQuery}
-                    onChange={(e) => setClientQuery(e.target.value)}
+                  <label className="fact-label" htmlFor="asic-billing-cliente">
+                    <span style={{ fontSize: "1.25em", lineHeight: 1 }}>👤</span> Cliente
+                  </label>
+                  <HostingClientSelect
+                    buttonId="asic-billing-cliente"
+                    value={Number(selectedClientId) || 0}
+                    onChange={(clientId) => setSelectedClientId(clientId > 0 ? String(clientId) : "")}
+                    clients={hostingClientOptions}
+                    canAdd={canAddHostingClient}
+                    required
+                    placeholder="Seleccionar cliente ASIC / Hosting"
+                    onClientCreated={async (created) => {
+                      await reloadHostingClients(created.id);
+                      showToast(`Cliente agregado: ${created.code} — ${created.name}`, "success");
+                    }}
                   />
-                  <select
-                    className="fact-select"
-                    size={8}
-                    value={selectedClientId}
-                    onChange={(e) => setSelectedClientId(e.target.value)}
-                    style={{ marginTop: "0.5rem" }}
-                  >
-                    <option value="">Seleccione cliente</option>
-                    {clientsForSelect.map((c) => (
-                      <option key={c.id ?? c.code} value={String(c.id ?? "")}>
-                        {c.code} - {c.name}
-                      </option>
-                    ))}
-                  </select>
                   {clients.length === 0 && (
-                    <small className="text-muted d-block mt-1">Cargá clientes en la hoja Clientes.</small>
+                    <small className="text-muted d-block mt-1">
+                      No hay clientes cargados. Usá “+ Agregar cliente ASIC / Hosting” o la hoja Clientes.
+                    </small>
                   )}
                 </div>
 

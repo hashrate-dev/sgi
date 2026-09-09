@@ -53,6 +53,20 @@ function formatWhole(value: number): string {
   }).format(Math.round(value));
 }
 
+/** Línea de texto comercial: Marca - Modelo procesador —-> precio usd [obs] */
+function buildCotizacionTxtLine(item: AsicCostoEquipoItem): string {
+  const marca = (item.marca || "").trim();
+  const modelo = (item.modelo || "").trim();
+  const procesador = (item.procesador || "").trim();
+  const obs = (item.observaciones || "").trim();
+  const equipoParts = [marca, modelo].filter(Boolean);
+  const equipo = equipoParts.length > 0 ? equipoParts.join(" - ") : "Equipo ASIC";
+  const left = procesador ? `${equipo} ${procesador}` : equipo;
+  const price = `${formatWhole(item.precioVenta)} usd`;
+  const base = `${left} —-> ${price}`;
+  return obs ? `${base} — ${obs}` : base;
+}
+
 function displayAsPositive(raw: string): string {
   if (!raw.trim()) return "";
   return `+${formatDisplayNumber(raw).replace(/^[+-]+/, "")}`;
@@ -88,6 +102,8 @@ export function AsicCotizadorChinaPyPage() {
   const [pdfDestinatario, setPdfDestinatario] = useState("");
   const [pdfBusy, setPdfBusy] = useState(false);
   const [showHoyModal, setShowHoyModal] = useState(false);
+  const [showTxtModal, setShowTxtModal] = useState(false);
+  const [txtCopyDone, setTxtCopyDone] = useState(false);
 
   useEffect(() => {
     setProcesador("");
@@ -189,6 +205,11 @@ export function AsicCotizadorChinaPyPage() {
     [registros, selectedIds]
   );
 
+  const selectedCotizacionTxt = useMemo(
+    () => selectedRegistros.map(buildCotizacionTxtLine).join("\n"),
+    [selectedRegistros]
+  );
+
   const allVisibleSelected = registros.length > 0 && registros.every((r) => selectedIds.has(r.id));
 
   function toggleSelectAll(checked: boolean): void {
@@ -224,6 +245,28 @@ export function AsicCotizadorChinaPyPage() {
       setRegistrosError(e instanceof Error ? e.message : "No se pudo generar el PDF.");
     } finally {
       setPdfBusy(false);
+    }
+  }
+
+  function handleAbrirTxtCotizacion(): void {
+    if (selectedRegistros.length === 0) {
+      setRegistrosError("Seleccioná al menos un registro para generar el texto.");
+      return;
+    }
+    setRegistrosError("");
+    setTxtCopyDone(false);
+    setShowTxtModal(true);
+  }
+
+  async function handleCopiarTxtCotizacion(): Promise<void> {
+    const text = selectedCotizacionTxt;
+    if (!text.trim()) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setTxtCopyDone(true);
+      window.setTimeout(() => setTxtCopyDone(false), 2000);
+    } catch {
+      setRegistrosError("No se pudo copiar al portapapeles. Seleccioná el texto manualmente.");
     }
   }
 
@@ -607,6 +650,20 @@ export function AsicCotizadorChinaPyPage() {
                       <i className="bi bi-file-earmark-pdf me-1" aria-hidden />
                       {pdfBusy ? "Generando PDF…" : "Descargar PDF cotización"}
                     </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-success"
+                      disabled={selectedIds.size === 0}
+                      onClick={handleAbrirTxtCotizacion}
+                      title={
+                        selectedIds.size === 0
+                          ? "Seleccioná uno o más registros"
+                          : "Ver precios finales en texto para copiar"
+                      }
+                    >
+                      <i className="bi bi-file-text me-1" aria-hidden />
+                      Texto precios
+                    </button>
                   </div>
                 </div>
                 <div className="table-responsive asic-cotizador-registros-wrap">
@@ -776,6 +833,81 @@ export function AsicCotizadorChinaPyPage() {
               </div>
             </div>
             <div className="modal-backdrop fade show" onClick={() => setShowHoyModal(false)} />
+          </>
+        ) : null}
+
+        {showTxtModal ? (
+          <>
+            <div className="modal fade show d-block" tabIndex={-1} role="dialog" aria-modal="true">
+              <div className="modal-dialog modal-lg modal-dialog-scrollable" role="document">
+                <div className="modal-content asic-cotizador-hoy-modal__content">
+                  <div className="modal-header asic-cotizador-hoy-modal__header">
+                    <h5 className="modal-title asic-cotizador-hoy-modal__title">
+                      <img
+                        src={HASHRATE_LOGO}
+                        alt="Hashrate"
+                        className="asic-cotizador-hoy-modal__logo"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                      <span className="asic-cotizador-hoy-modal__title-text">
+                        Precios finales (texto) — {selectedRegistros.length} equipo(s)
+                      </span>
+                    </h5>
+                    <button
+                      type="button"
+                      className="btn-close"
+                      aria-label="Cerrar"
+                      onClick={() => {
+                        setShowTxtModal(false);
+                        setTxtCopyDone(false);
+                      }}
+                    />
+                  </div>
+                  <div className="modal-body">
+                    <p className="text-muted small mb-2">
+                      Texto listo para copiar y pegar. Incluye observaciones cuando el registro las tiene.
+                    </p>
+                    <textarea
+                      className="form-control asic-cotizador-txt-modal__textarea"
+                      readOnly
+                      rows={Math.min(16, Math.max(6, selectedRegistros.length + 2))}
+                      value={selectedCotizacionTxt}
+                      onFocus={(e) => e.currentTarget.select()}
+                      aria-label="Texto de precios finales seleccionados"
+                    />
+                  </div>
+                  <div className="modal-footer flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-success"
+                      onClick={() => void handleCopiarTxtCotizacion()}
+                      disabled={!selectedCotizacionTxt.trim()}
+                    >
+                      <i className={`bi ${txtCopyDone ? "bi-check2" : "bi-clipboard"} me-1`} aria-hidden />
+                      {txtCopyDone ? "Copiado" : "Copiar texto"}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => {
+                        setShowTxtModal(false);
+                        setTxtCopyDone(false);
+                      }}
+                    >
+                      Cerrar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div
+              className="modal-backdrop fade show"
+              onClick={() => {
+                setShowTxtModal(false);
+                setTxtCopyDone(false);
+              }}
+            />
           </>
         ) : null}
       </div>

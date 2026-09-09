@@ -3070,6 +3070,18 @@ button.fact-back {
   font-style: italic;
 }
 
+.asic-cotizador-txt-modal__textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  white-space: pre;
+  resize: vertical;
+  min-height: 12rem;
+  color: #0f172a;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+}
+
 .asic-cotizador-hoy-btn {
   border-color: #1f8f5f;
   color: #15724c;
@@ -10220,6 +10232,20 @@ button.fact-back {
 
 .contabilidad-proveedor-dd-add {
   color: #1e293b;
+}
+
+/* Facturación ASIC/Hosting: selector de cliente con alta rápida (misma metodología Exchange/forms) */
+.fact-panel-nuevo-documento .contabilidad-proveedor-dd-btn {
+  border: 1px solid rgba(45, 93, 70, 0.35);
+  background-color: #fff;
+  color: #1e293b;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+.fact-panel-nuevo-documento .contabilidad-proveedor-dd-btn:focus {
+  border-color: #00a652;
+  box-shadow: 0 0 0 0.2rem rgba(0, 166, 82, 0.2);
 }
 
 /* Contabilidad — alta rápida de proveedor HRS (legacy panel; se mantiene por si queda en caché) */
