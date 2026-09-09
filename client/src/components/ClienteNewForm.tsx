@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { createClient, createClientsBulk, getClients, getNextClientCode } from "../lib/api";
+import type { ClientFields } from "../lib/api";
 import { parseExcelFile } from "../lib/parseClientExcel";
 import { showToast } from "./ToastNotification";
 import "../styles/facturacion.css";
@@ -22,16 +23,19 @@ const emptyForm = {
 };
 
 type Props = {
-  onSuccess: (message?: string) => void;
+  onSuccess: (message?: string, created?: ClientFields) => void;
   onCancel: () => void;
   /** "modal" = solo cuerpo + pie para usar dentro del modal; "card" = card completa con header */
   variant?: "card" | "modal";
+  /** Mostrar bloque de importación Excel (por defecto sí). */
+  showExcel?: boolean;
 };
 
-export function ClienteNewForm({ onSuccess, onCancel, variant = "card" }: Props) {
+export function ClienteNewForm({ onSuccess, onCancel, variant = "card", showExcel = true }: Props) {
   const [form, setForm] = useState(emptyForm);
   const [excelLoading, setExcelLoading] = useState(false);
   const [nextCodeLoading, setNextCodeLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -74,17 +78,20 @@ export function ClienteNewForm({ onSuccess, onCancel, variant = "card" }: Props)
       return;
     }
 
+    setSaving(true);
     createClient(payload)
-      .then(() => {
+      .then((res) => {
+        const created = res?.client;
         setForm({ ...emptyForm, code: "" });
         setNextCodeLoading(true);
         void getNextClientCode()
           .then((r) => setForm((prev) => ({ ...prev, code: String(r?.code ?? "").trim() })))
           .catch(() => {})
           .finally(() => setNextCodeLoading(false));
-        onSuccess("Cliente agregado correctamente.");
+        onSuccess("Cliente agregado correctamente.", created);
       })
-      .catch((err) => showToast(err instanceof Error ? err.message : "Error al crear", "error", TOAST_CONTEXT));
+      .catch((err) => showToast(err instanceof Error ? err.message : "Error al crear", "error", TOAST_CONTEXT))
+      .finally(() => setSaving(false));
   }
 
   async function handleExcelChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -167,7 +174,8 @@ export function ClienteNewForm({ onSuccess, onCancel, variant = "card" }: Props)
                   className="fact-input"
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="Nombre o razón social"
+                  placeholder="APELLIDO, NOMBRE"
+                  autoFocus={variant === "modal"}
                 />
               </div>
               <div className="fact-field">
@@ -177,7 +185,7 @@ export function ClienteNewForm({ onSuccess, onCancel, variant = "card" }: Props)
                   type="tel"
                   value={form.phone}
                   onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                  placeholder="Teléfono"
+                  placeholder="+598 91 123 456"
                 />
               </div>
               <div className="fact-field">
@@ -268,49 +276,53 @@ export function ClienteNewForm({ onSuccess, onCancel, variant = "card" }: Props)
         </section>
 
         <div className="clientes-new-actions">
-          <button type="button" className="fact-btn fact-btn-secondary" onClick={onCancel}>
+          <button type="button" className="fact-btn fact-btn-secondary" onClick={onCancel} disabled={saving || excelLoading}>
             Cancelar
           </button>
-          <button type="submit" className="fact-btn fact-btn-primary">
-            Agregar cliente
+          <button type="submit" className="fact-btn fact-btn-primary" disabled={saving || excelLoading}>
+            {saving ? "Guardando…" : "Agregar cliente"}
           </button>
         </div>
 
-        <hr className="clientes-new-divider" />
+        {showExcel ? (
+          <>
+            <hr className="clientes-new-divider" />
 
-        <section className="clientes-new-paso clientes-new-paso-excel" aria-labelledby="paso-excel-title">
-          <h3 id="paso-excel-title" className="clientes-new-paso-title">
-            <span className="clientes-new-paso-num">B</span>
-            Automático — Importar desde Excel (base de clientes)
-          </h3>
-        <div className="clientes-new-excel-box">
-          <p className="clientes-new-excel-text">
-            Usá un archivo tipo Excel para cargar la Base de Clientes (.xlsx):
-          </p>
-          <ul className="clientes-new-excel-columns">
-            <li><strong>Código</strong>, <strong>Usuario</strong></li>
-            <li><strong>Contacto Principal</strong> y <strong>Contacto Alternativo</strong>: para cada uno, columnas — Nombre o Razón Social, Teléfono, Email, Dirección, Ciudad / País.</li>
-          </ul>
-          <div className="clientes-new-excel-actions">
-            <label
-              className="btn btn-outline-secondary btn-sm historial-import-excel-btn mb-0"
-              style={{
-                backgroundColor: "rgba(45, 93, 70, 0.35)",
-                cursor: excelLoading ? "not-allowed" : "pointer",
-              }}
-            >
-              {excelLoading ? "⏳ Importando..." : "📥 Importar Excel"}
-              <input
-                type="file"
-                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                className="d-none"
-                onChange={handleExcelChange}
-                disabled={excelLoading}
-              />
-            </label>
-          </div>
-        </div>
-        </section>
+            <section className="clientes-new-paso clientes-new-paso-excel" aria-labelledby="paso-excel-title">
+              <h3 id="paso-excel-title" className="clientes-new-paso-title">
+                <span className="clientes-new-paso-num">B</span>
+                Automático — Importar desde Excel (base de clientes)
+              </h3>
+            <div className="clientes-new-excel-box">
+              <p className="clientes-new-excel-text">
+                Usá un archivo tipo Excel para cargar la Base de Clientes (.xlsx):
+              </p>
+              <ul className="clientes-new-excel-columns">
+                <li><strong>Código</strong>, <strong>Usuario</strong></li>
+                <li><strong>Contacto Principal</strong> y <strong>Contacto Alternativo</strong>: para cada uno, columnas — Nombre o Razón Social, Teléfono, Email, Dirección, Ciudad / País.</li>
+              </ul>
+              <div className="clientes-new-excel-actions">
+                <label
+                  className="btn btn-outline-secondary btn-sm historial-import-excel-btn mb-0"
+                  style={{
+                    backgroundColor: "rgba(45, 93, 70, 0.35)",
+                    cursor: excelLoading ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {excelLoading ? "⏳ Importando..." : "📥 Importar Excel"}
+                  <input
+                    type="file"
+                    accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    className="d-none"
+                    onChange={handleExcelChange}
+                    disabled={excelLoading}
+                  />
+                </label>
+              </div>
+            </div>
+            </section>
+          </>
+        ) : null}
       </>
   );
 

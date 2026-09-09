@@ -1147,7 +1147,7 @@ export function logoutApi(): Promise<void> {
   return api<void>("/api/auth/logout", { method: "POST" });
 }
 
-type ClientFields = {
+export type ClientFields = {
   id?: number | string;
   code: string;
   name: string;

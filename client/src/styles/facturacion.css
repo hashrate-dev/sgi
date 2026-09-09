@@ -10492,20 +10492,44 @@ button.fact-back {
 
 .billing-hosting-client-add-dialog {
   overflow: hidden;
+  max-height: min(94vh, 920px);
 }
 
 .billing-hosting-client-add-modal {
-  padding: 1.1rem 1.25rem 1.2rem;
+  padding: 1.55rem 1.75rem 1.65rem;
   background:
     radial-gradient(120% 80% at 100% 0%, rgba(45, 93, 70, 0.08), transparent 55%),
     linear-gradient(180deg, #f3f7f5 0%, #eef2f6 100%);
+}
+
+.billing-hosting-client-add-modal--full {
+  padding: 0.85rem 1rem 1rem;
+  max-height: min(78vh, 760px);
+  overflow: auto;
+}
+
+.billing-hosting-client-add-modal--full .professional-modal-body {
+  padding: 0.35rem 0.25rem 0.5rem;
+}
+
+.billing-hosting-client-add-modal--full .clientes-new-paso-title {
+  color: #1f4a37;
+}
+
+.billing-hosting-client-add-modal--full .fact-label {
+  color: #1f4a37;
+}
+
+.billing-hosting-client-add-modal--full .clientes-new-actions {
+  margin-top: 1rem;
+  margin-bottom: 0.25rem;
 }
 
 .billing-hosting-client-add-modal__panel {
   background: #fff;
   border: 1px solid rgba(45, 93, 70, 0.18);
   border-radius: 16px;
-  padding: 1.15rem 1.2rem 1.3rem;
+  padding: 1.5rem 1.6rem 1.65rem;
   box-shadow:
     0 1px 2px rgba(15, 23, 42, 0.04),
     0 12px 28px rgba(15, 23, 42, 0.07);
@@ -10553,8 +10577,8 @@ button.fact-back {
 
 .billing-hosting-client-add-modal__input {
   width: 100%;
-  min-height: 2.55rem;
-  padding: 0.55rem 0.8rem;
+  min-height: 2.75rem;
+  padding: 0.65rem 0.9rem;
   background: #fff;
   color: #0f172a;
   border: 1.5px solid #d5dde7;
