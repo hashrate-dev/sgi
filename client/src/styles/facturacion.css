@@ -10435,19 +10435,250 @@ button.fact-back {
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.22) !important;
 }
 
-.fact-panel-nuevo-documento .billing-hosting-client-picker__add .btn-outline-light {
-  border-color: rgba(255, 255, 255, 0.45);
+.fact-panel-nuevo-documento .billing-hosting-client-picker__add-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.55rem 0.9rem;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  color: #fff;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+
+.fact-panel-nuevo-documento .billing-hosting-client-picker__add-btn:hover {
+  background: #4a9d6e;
+  border-color: rgba(255, 255, 255, 0.8);
   color: #fff;
 }
 
-.fact-panel-nuevo-documento .billing-hosting-client-picker__add .btn-outline-light:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
+.fact-panel-nuevo-documento .billing-hosting-client-picker__add-btn:active {
+  transform: translateY(1px);
 }
 
-.fact-panel-nuevo-documento .billing-hosting-client-picker__add-form .fact-input {
+.fact-panel-nuevo-documento .billing-hosting-client-picker__add-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.28);
+}
+
+.billing-hosting-client-picker__add-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Modal alta rápida de cliente (Nuevo documento) */
+.billing-hosting-client-add-dialog {
+  overflow: hidden;
+}
+
+.billing-hosting-client-add-modal {
+  padding: 1.1rem 1.25rem 1.2rem;
+  background:
+    radial-gradient(120% 80% at 100% 0%, rgba(45, 93, 70, 0.08), transparent 55%),
+    linear-gradient(180deg, #f3f7f5 0%, #eef2f6 100%);
+}
+
+.billing-hosting-client-add-modal__panel {
   background: #fff;
-  color: #1e293b;
+  border: 1px solid rgba(45, 93, 70, 0.18);
+  border-radius: 16px;
+  padding: 1.15rem 1.2rem 1.3rem;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 12px 28px rgba(15, 23, 42, 0.07);
+}
+
+.billing-hosting-client-add-modal__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.95rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(45, 93, 70, 0.08);
+  border: 1px solid rgba(45, 93, 70, 0.18);
+  color: #1f4a37;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.billing-hosting-client-add-modal__label {
+  display: block;
+  margin: 0.9rem 0 0.4rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #1f4a37;
+  letter-spacing: 0.01em;
+}
+
+.billing-hosting-client-add-modal__label:first-of-type,
+.billing-hosting-client-add-modal__error + .billing-hosting-client-add-modal__label,
+.billing-hosting-client-add-modal__badge + .billing-hosting-client-add-modal__label {
+  margin-top: 0;
+}
+
+.billing-hosting-client-add-modal__req {
+  color: #c2410c;
+  font-weight: 700;
+}
+
+.billing-hosting-client-add-modal__optional {
+  font-weight: 500;
+  color: #64748b;
+}
+
+.billing-hosting-client-add-modal__input {
+  width: 100%;
+  min-height: 2.55rem;
+  padding: 0.55rem 0.8rem;
+  background: #fff;
+  color: #0f172a;
+  border: 1.5px solid #d5dde7;
+  border-radius: 11px;
+  box-shadow: none;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+}
+
+.billing-hosting-client-add-modal__input::placeholder {
+  color: #94a3b8;
+}
+
+.billing-hosting-client-add-modal__input:hover:not(:disabled) {
+  border-color: #b7c4d3;
+}
+
+.billing-hosting-client-add-modal__input:focus {
+  border-color: #2d5d46;
+  box-shadow: 0 0 0 3px rgba(45, 93, 70, 0.16);
+  outline: none;
+}
+
+.billing-hosting-client-add-modal__input:disabled {
+  opacity: 0.7;
+  background: #f8fafc;
+}
+
+.billing-hosting-client-add-modal__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+}
+
+.billing-hosting-client-add-modal__col {
+  min-width: 0;
+}
+
+.billing-hosting-client-add-modal__error {
+  margin-bottom: 0.85rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 10px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.billing-hosting-client-add-modal__actions {
+  display: flex;
+  width: 100%;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.billing-hosting-client-add-modal__btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.55rem;
+  padding: 0.55rem 1.15rem;
+  border-radius: 11px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+  -webkit-font-smoothing: antialiased;
+  text-shadow: none;
+  -webkit-text-stroke: 0;
+  box-shadow: none;
+}
+
+.billing-hosting-client-add-modal__btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.billing-hosting-client-add-modal__btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.billing-hosting-client-add-modal__btn--ghost {
+  background: #fff;
+  color: #1f4a37;
+  border: 1.5px solid rgba(45, 93, 70, 0.35);
+}
+
+.billing-hosting-client-add-modal__btn--ghost:hover:not(:disabled) {
+  background: #f3faf6;
+  border-color: #2d5d46;
+  color: #16382a;
+}
+
+.billing-hosting-client-add-modal__btn--primary {
+  background: linear-gradient(180deg, #3a7558 0%, #2d5d46 100%);
+  color: #fff !important;
+  border: 1.5px solid #245239;
+  box-shadow: 0 6px 14px rgba(45, 93, 70, 0.22);
+}
+
+.billing-hosting-client-add-modal__btn--primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #449067 0%, #356b50 100%);
+  border-color: #1f4a37;
+  color: #fff !important;
+}
+
+.billing-hosting-client-add-modal__btn--primary:focus-visible,
+.billing-hosting-client-add-modal__btn--ghost:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(45, 93, 70, 0.22);
+}
+
+@media (max-width: 480px) {
+  .billing-hosting-client-add-modal__row {
+    grid-template-columns: 1fr;
+  }
+
+  .billing-hosting-client-add-modal__actions {
+    flex-direction: column-reverse;
+  }
+
+  .billing-hosting-client-add-modal__btn {
+    width: 100%;
+  }
 }
 
 /* Contabilidad — alta rápida de proveedor HRS (legacy panel; se mantiene por si queda en caché) */

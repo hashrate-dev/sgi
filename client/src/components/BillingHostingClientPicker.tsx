@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { createClient } from "../lib/api";
 import type { Client } from "../lib/types";
+import { AppModal } from "./ui";
 
 type Props = {
   clients: Client[];
@@ -21,7 +22,7 @@ function clientOptionLabel(c: Client): string {
 
 /**
  * Listado siempre visible (como el select size=8 histórico de facturación)
- * + búsqueda + alta rápida opcional debajo.
+ * + búsqueda + alta rápida opcional en modal.
  */
 export function BillingHostingClientPicker({
   clients,
@@ -61,6 +62,12 @@ export function BillingHostingClientPicker({
     setPhone("");
     setEmail("");
     setErr("");
+  };
+
+  const closeAddModal = () => {
+    if (busy) return;
+    setAdding(false);
+    resetDraft();
   };
 
   const saveNew = async () => {
@@ -131,64 +138,128 @@ export function BillingHostingClientPicker({
 
       {canAdd ? (
         <div className="billing-hosting-client-picker__add mt-2">
-          {err ? <div className="small text-danger mb-1">{err}</div> : null}
-          {adding ? (
-            <div className="billing-hosting-client-picker__add-form">
-              <input
-                className="fact-input mb-1"
-                placeholder="Nombre completo / razón social *"
-                value={name}
-                disabled={busy}
-                autoFocus
-                onChange={(e) => setName(e.target.value)}
-              />
-              <input
-                className="fact-input mb-1"
-                placeholder="Nombre 2 (opcional)"
-                value={name2}
-                disabled={busy}
-                onChange={(e) => setName2(e.target.value)}
-              />
-              <div className="d-flex gap-1 mb-1">
+          <button
+            type="button"
+            className="billing-hosting-client-picker__add-btn"
+            onClick={() => setAdding(true)}
+          >
+            <span className="billing-hosting-client-picker__add-btn-icon" aria-hidden>
+              +
+            </span>
+            Agregar cliente ASIC / Hosting
+          </button>
+        </div>
+      ) : null}
+
+      <AppModal
+        open={adding}
+        onOpenChange={(open) => {
+          if (!open) closeAddModal();
+          else setAdding(true);
+        }}
+        title="Nuevo cliente"
+        description="Alta rápida para facturación ASIC / Hosting"
+        variant="emerald_panel"
+        contentMaxW="min(100%, 480px)"
+        contentClassName="billing-hosting-client-add-dialog"
+        closeOnInteractOutside={!busy}
+        footer={
+          <div className="billing-hosting-client-add-modal__actions">
+            <button
+              type="button"
+              className="billing-hosting-client-add-modal__btn billing-hosting-client-add-modal__btn--ghost"
+              disabled={busy}
+              onClick={closeAddModal}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="billing-hosting-client-add-modal__btn billing-hosting-client-add-modal__btn--primary"
+              disabled={busy}
+              onClick={() => void saveNew()}
+            >
+              {busy ? "Guardando…" : "Agregar cliente"}
+            </button>
+          </div>
+        }
+      >
+        <div className="billing-hosting-client-add-modal">
+          <div className="billing-hosting-client-add-modal__panel">
+            <div className="billing-hosting-client-add-modal__badge" aria-hidden>
+              <span>👤</span>
+              <span>Cliente ASIC / Hosting</span>
+            </div>
+
+            {err ? <div className="billing-hosting-client-add-modal__error">{err}</div> : null}
+
+            <label className="billing-hosting-client-add-modal__label" htmlFor="billing-new-client-name">
+              Nombre completo / razón social
+              <span className="billing-hosting-client-add-modal__req" aria-hidden>
+                {" "}
+                *
+              </span>
+            </label>
+            <input
+              id="billing-new-client-name"
+              className="fact-input billing-hosting-client-add-modal__input"
+              placeholder="Ej. PIROTTO, PABLO"
+              value={name}
+              disabled={busy}
+              autoFocus
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void saveNew();
+                }
+              }}
+            />
+
+            <label className="billing-hosting-client-add-modal__label" htmlFor="billing-new-client-name2">
+              Nombre 2 <span className="billing-hosting-client-add-modal__optional">(opcional)</span>
+            </label>
+            <input
+              id="billing-new-client-name2"
+              className="fact-input billing-hosting-client-add-modal__input"
+              placeholder="Segundo nombre o alias"
+              value={name2}
+              disabled={busy}
+              onChange={(e) => setName2(e.target.value)}
+            />
+
+            <div className="billing-hosting-client-add-modal__row">
+              <div className="billing-hosting-client-add-modal__col">
+                <label className="billing-hosting-client-add-modal__label" htmlFor="billing-new-client-phone">
+                  Teléfono <span className="billing-hosting-client-add-modal__optional">(opcional)</span>
+                </label>
                 <input
-                  className="fact-input"
-                  placeholder="Teléfono"
+                  id="billing-new-client-phone"
+                  className="fact-input billing-hosting-client-add-modal__input"
+                  placeholder="(+598) …"
                   value={phone}
                   disabled={busy}
                   onChange={(e) => setPhone(e.target.value)}
                 />
+              </div>
+              <div className="billing-hosting-client-add-modal__col">
+                <label className="billing-hosting-client-add-modal__label" htmlFor="billing-new-client-email">
+                  Email <span className="billing-hosting-client-add-modal__optional">(opcional)</span>
+                </label>
                 <input
-                  className="fact-input"
-                  placeholder="Email"
+                  id="billing-new-client-email"
+                  className="fact-input billing-hosting-client-add-modal__input"
+                  type="email"
+                  placeholder="correo@ejemplo.com"
                   value={email}
                   disabled={busy}
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
-              <div className="d-flex flex-wrap gap-1">
-                <button type="button" className="btn btn-sm btn-success" disabled={busy} onClick={() => void saveNew()}>
-                  {busy ? "Guardando…" : "Agregar"}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-light"
-                  disabled={busy}
-                  onClick={() => {
-                    setAdding(false);
-                    resetDraft();
-                  }}
-                >
-                  Cancelar
-                </button>
-              </div>
             </div>
-          ) : (
-            <button type="button" className="btn btn-sm btn-outline-light w-100" onClick={() => setAdding(true)}>
-              + Agregar cliente ASIC / Hosting
-            </button>
-          )}
+          </div>
         </div>
-      ) : null}
+      </AppModal>
     </div>
   );
 }
