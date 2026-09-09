@@ -20,6 +20,8 @@ type AppModalProps = {
   variant?: "default" | "nicehash_watcher" | "emerald_panel";
   /** Clases extra en el panel del diálogo (p. ej. sombra o radio). */
   contentClassName?: string;
+  /** Difumina y oscurece el fondo de la página detrás del modal. */
+  blurBackdrop?: boolean;
 };
 
 export function AppModal({
@@ -36,9 +38,11 @@ export function AppModal({
   closeOnInteractOutside = true,
   variant = "default",
   contentClassName,
+  blurBackdrop = false,
 }: AppModalProps) {
   const nh = variant === "nicehash_watcher";
   const emerald = variant === "emerald_panel";
+  const softBackdrop = blurBackdrop || emerald;
   return (
     <Dialog.Root
       open={open}
@@ -47,12 +51,18 @@ export function AppModal({
       onOpenChange={(details) => onOpenChange(details.open)}
     >
       <Portal>
-        <Dialog.Backdrop bg="blackAlpha.600" />
-        <Dialog.Positioner px={{ base: 3, md: 5 }} py={{ base: 4, md: 8 }}>
+        <Dialog.Backdrop
+          className={softBackdrop ? "app-modal-backdrop--blur" : undefined}
+          bg={softBackdrop ? "rgba(8, 20, 14, 0.52)" : "blackAlpha.600"}
+          backdropFilter={softBackdrop ? "blur(10px)" : undefined}
+          style={softBackdrop ? { WebkitBackdropFilter: "blur(10px)" } : undefined}
+          zIndex={2300}
+        />
+        <Dialog.Positioner px={{ base: 3, md: 5 }} py={{ base: 4, md: 8 }} zIndex={2301}>
           <Dialog.Content
             borderRadius="2xl"
             overflow="hidden"
-            boxShadow={emerald ? "0 25px 50px -12px rgba(15, 23, 42, 0.35)" : "xl"}
+            boxShadow={emerald ? "0 25px 50px -12px rgba(15, 23, 42, 0.45)" : "xl"}
             borderWidth="1px"
             borderColor={nh ? "#30363d" : emerald ? "rgba(16, 185, 129, 0.28)" : "gray.200"}
             maxW={contentMaxW}
@@ -61,6 +71,7 @@ export function AppModal({
             display="flex"
             flexDirection="column"
             className={contentClassName}
+            zIndex={2302}
           >
             <Dialog.Header
               px={{ base: 5, md: 8 }}

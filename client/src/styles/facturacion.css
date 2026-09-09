@@ -10484,6 +10484,12 @@ button.fact-back {
 }
 
 /* Modal alta rápida de cliente (Nuevo documento) */
+.app-modal-backdrop--blur {
+  background: rgba(8, 20, 14, 0.52) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(0.85);
+  backdrop-filter: blur(10px) saturate(0.85);
+}
+
 .billing-hosting-client-add-dialog {
   overflow: hidden;
 }

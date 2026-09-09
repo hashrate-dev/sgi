@@ -162,6 +162,7 @@ export function BillingHostingClientPicker({
         variant="emerald_panel"
         contentMaxW="min(100%, 480px)"
         contentClassName="billing-hosting-client-add-dialog"
+        blurBackdrop
         closeOnInteractOutside={!busy}
         footer={
           <div className="billing-hosting-client-add-modal__actions">
