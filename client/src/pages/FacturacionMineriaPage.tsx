@@ -151,7 +151,7 @@ export function FacturacionMineriaPage() {
   const [paymentDate, setPaymentDate] = useState<string>("");
   const [itemsLocked, setItemsLocked] = useState(false); // Indica si los items están bloqueados por venir de factura relacionada
   /** Días para fecha de vencimiento (5, 6 o 7). Por defecto 6. */
-  const [dueDateDays, setDueDateDays] = useState<5 | 6 | 7>(6);
+  const dueDateDays = 6;
 
   const [invoices, setInvoices] = useState<Invoice[]>(() => loadInvoicesAsic());
   /** Facturas ASIC en base (source=asic): necesarias para Recibo/NC sobre facturas emitidas en servidor u otro equipo */
@@ -957,32 +957,14 @@ export function FacturacionMineriaPage() {
                 <div
                   className="fact-field fact-field--doc-extra-top"
                   aria-hidden={
-                    type === "Factura"
-                      ? false
-                      : !(
-                          ((type === "Nota de Crédito" || type === "Recibo") && !selectedClient) ||
-                          (type === "Recibo" && !!selectedClient && invoicesWithoutReceipt.length === 0) ||
-                          (type === "Recibo" && !!relatedInvoiceId)
-                        )
+                    !(
+                      ((type === "Nota de Crédito" || type === "Recibo") && !selectedClient) ||
+                      (type === "Recibo" && !!selectedClient && invoicesWithoutReceipt.length === 0) ||
+                      (type === "Recibo" && !!relatedInvoiceId)
+                    )
                   }
                 >
-                  {type === "Factura" ? (
-                    <>
-                      <label className="fact-label"><span style={{ fontSize: "1.1em" }}>📅</span> Plazo de vencimiento</label>
-                      <div className="d-flex gap-2 flex-wrap">
-                        {([5, 6, 7] as const).map((d) => (
-                          <button
-                            key={d}
-                            type="button"
-                            className={`btn btn-sm ${dueDateDays === d ? "btn-success" : "btn-outline-secondary"}`}
-                            onClick={() => setDueDateDays(d)}
-                          >
-                            {d} días
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  ) : (type === "Nota de Crédito" || type === "Recibo") && !selectedClient ? (
+                  {(type === "Nota de Crédito" || type === "Recibo") && !selectedClient ? (
                     <div className="fact-select-client-hint-box">
                       <small className="text-warning">
                         Seleccionar un cliente para ver comprobantes disponibles.
