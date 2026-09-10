@@ -26,7 +26,7 @@ const asicMenuItems: Array<{ to: string; icon: string; label: string; desc: stri
   },
   { to: "/asic/billing", icon: "bi-receipt", label: "Emitir comprobantes de pago ASIC", desc: "Emisión de comprobantes de pago, Notas de Crédito y Recibos" },
   { to: "/asic/history", icon: "bi-clock-history", label: "Historial Venta de ASIC", desc: "Ver y gestionar comprobantes por Ventas de Equipos ASIC" },
-  { to: "/asic/pending", icon: "bi-hourglass-split", label: "Pendientes de Cobro", desc: "Comprobantes pendientes de cobro por venta de Equipos ASIC" },
+  { to: "/asic/pending", icon: "bi-hourglass-split", label: "Pendientes de Cobro", desc: "Facturas de reparación/flete ASIC pendientes de recibo" },
   { to: "/asic/ande-warranty", icon: "bi-file-earmark-text", label: "Recibos Garantía ANDE", desc: "Emisión de recibos de garantía ANDE para equipos" },
   { to: "/asic/warranties-history", icon: "bi-clock-history", label: "Historial Garantías ANDE", desc: "Ver y gestionar documentos de Garantia ANDE" },
 ];

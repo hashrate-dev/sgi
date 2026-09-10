@@ -14,6 +14,7 @@ import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import { canDeleteHistorial, canExport } from "../lib/auth";
 import { formatCurrency, formatCurrencyNumber } from "../lib/formatCurrency";
+import { isAsicEquipmentSaleInvoice } from "../lib/asicDocumentKind";
 import "../styles/facturacion.css";
 
 /** Normaliza mes a YYYY-MM para filtrar por columna MES */
@@ -279,8 +280,12 @@ export function HistorialMineriaPage() {
     const sumaFacturas = src.filter((i) => i.type === "Factura").reduce((s, i) => s + Math.abs(Number(i.total) || 0), 0);
     const sumaNotasCredito = src.filter((i) => i.type === "Nota de Crédito").reduce((s, i) => s + Math.abs(Number(i.total) || 0), 0);
     const sumaRecibos = src.filter((i) => i.type === "Recibo").reduce((s, i) => s + Math.abs(Number(i.total) || 0), 0);
+    /** Venta de equipos: comprobante de pago (sin recibo) cuenta como cobrado al emitir. */
+    const sumaVentaEquipos = src
+      .filter((i) => isAsicEquipmentSaleInvoice(i))
+      .reduce((s, i) => s + Math.abs(Number(i.total) || 0), 0);
     const facturacionTotal = sumaFacturas - sumaNotasCredito;
-    const cobrosRealizados = sumaRecibos;
+    const cobrosRealizados = sumaRecibos + sumaVentaEquipos;
     const cobrosPendientes = Math.max(0, facturacionTotal - cobrosRealizados);
     return { facturas, recibos, notasCredito, facturacionTotal, cobrosPendientes, cobrosRealizados, registros: filtered.length };
   }, [filtered]);
@@ -306,7 +311,7 @@ export function HistorialMineriaPage() {
 
     all.forEach((inv) => {
       // Calcular fecha de vencimiento si no existe
-      const dueDate = inv.dueDate || calculateDueDate(inv.date);
+      const dueDate = isAsicEquipmentSaleInvoice(inv) ? "-" : (inv.dueDate || calculateDueDate(inv.date));
       // Aplicar signo negativo a las Notas de Crédito y Recibos relacionados con facturas
       const isNegative = inv.type === "Nota de Crédito" || (inv.type === "Recibo" && inv.relatedInvoiceId);
       const subtotal = isNegative ? -(Math.abs(inv.subtotal) || 0) : (inv.subtotal || 0);
@@ -326,11 +331,16 @@ export function HistorialMineriaPage() {
       let isClosed = false;
       let isCancelledByNC = false;
       if (inv.type === "Factura") {
-        const hasReceipt = all.some((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id);
         const creditNotes = all.filter((nc) => nc.type === "Nota de Crédito" && nc.relatedInvoiceId === inv.id);
         const hasCreditNote = creditNotes.some((nc) => getCreditNoteMode(nc, inv) === "total");
-        isClosed = hasReceipt || hasCreditNote;
         isCancelledByNC = hasCreditNote;
+        if (isAsicEquipmentSaleInvoice(inv)) {
+          /* Venta equipos: comprobante de pago — cerrado al emitir (no requiere recibo). */
+          isClosed = true;
+        } else {
+          const hasReceipt = all.some((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id);
+          isClosed = hasReceipt || hasCreditNote;
+        }
       } else if (inv.type === "Recibo" && inv.relatedInvoiceId) {
         isClosed = true;
       } else if (inv.type === "Nota de Crédito" && inv.relatedInvoiceId) {
@@ -365,6 +375,7 @@ export function HistorialMineriaPage() {
       if (inv.type === "Factura") {
         if (relatedReciboPayment?.paymentDate) paymentDateExportCell = new Date(relatedReciboPayment.paymentDate).toLocaleDateString();
         else if (relatedNCPayment) paymentDateExportCell = relatedNCPaymentMode === "total" ? "Cancelada" : "Parcial";
+        else if (isAsicEquipmentSaleInvoice(inv)) paymentDateExportCell = inv.date || "-";
         else paymentDateExportCell = "Pendiente";
       } else if (inv.type === "Nota de Crédito") {
         paymentDateExportCell = inv.date || (inv.paymentDate ? new Date(inv.paymentDate).toLocaleDateString() : "-");
@@ -647,7 +658,7 @@ export function HistorialMineriaPage() {
           total: inv.total || 0,
           relatedInvoiceNumber: relatedInvoiceNumberForPdf,
           creditNoteMode: inferredNcMode,
-          documentContext: "comprobante-pago",
+          documentContext: isAsicEquipmentSaleInvoice(inv) ? "comprobante-pago" : undefined,
         },
         { logoBase64 }
       );
@@ -693,7 +704,7 @@ export function HistorialMineriaPage() {
                       style={{ maxWidth: "8.5rem" }}
                     >
                       <option value="">Todos</option>
-                      <option value="Factura">Comprobante de pago</option>
+                      <option value="Factura">Factura / Comp. pago</option>
                       <option value="Recibo">Recibo</option>
                       <option value="Nota de Crédito">Nota de Crédito</option>
                     </select>
@@ -794,8 +805,10 @@ export function HistorialMineriaPage() {
                   </tr>
                 ) : (
                   paginated.map((inv) => {
-                    // Calcular fecha de vencimiento si no existe (para facturas antiguas)
-                    const dueDate = inv.dueDate || calculateDueDate(inv.date);
+                    // Calcular fecha de vencimiento si no existe (para facturas antiguas). Venta equipos: sin vencimiento.
+                    const dueDate = isAsicEquipmentSaleInvoice(inv)
+                      ? "-"
+                      : (inv.dueDate || calculateDueDate(inv.date));
                     // Aplicar signo negativo a las Notas de Crédito y Recibos relacionados con facturas
                     const isNegativeType = inv.type === "Nota de Crédito" || (inv.type === "Recibo" && inv.relatedInvoiceId);
                     const subtotal = isNegativeType ? -(Math.abs(inv.subtotal) || 0) : (inv.subtotal || 0);
@@ -820,22 +833,26 @@ export function HistorialMineriaPage() {
                     if (inv.type === "Factura") {
                       if (relatedReciboForPayment?.paymentDate) paymentDateCell = new Date(relatedReciboForPayment.paymentDate).toLocaleDateString();
                       else if (relatedNCForPayment) paymentDateCell = relatedNCMode === "total" ? "Cancelada" : "Parcial";
+                      else if (isAsicEquipmentSaleInvoice(inv)) paymentDateCell = inv.date || "-";
                       else paymentDateCell = "Pendiente";
                     } else if (inv.type === "Nota de Crédito") {
                       paymentDateCell = inv.date || (inv.paymentDate ? new Date(inv.paymentDate).toLocaleDateString() : "-");
                     } else {
                       paymentDateCell = paymentDateDisplay ? new Date(paymentDateDisplay).toLocaleDateString() : "-";
                     }
-                    // Verificar si la operación está cerrada (factura con recibo relacionado, factura cancelada por NC, o recibo/NC con factura relacionada)
+                    // Verificar si la operación está cerrada
                     let isClosed = false;
                     let isCancelledByNC = false;
                     if (inv.type === "Factura") {
-                      // Buscar si existe un recibo relacionado con esta factura
-                      const hasReceipt = all.some((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id);
                       const creditNotes = all.filter((nc) => nc.type === "Nota de Crédito" && nc.relatedInvoiceId === inv.id);
                       const hasCreditNote = creditNotes.some((nc) => getCreditNoteMode(nc, inv) === "total");
-                      isClosed = hasReceipt || hasCreditNote;
                       isCancelledByNC = hasCreditNote;
+                      if (isAsicEquipmentSaleInvoice(inv)) {
+                        isClosed = true;
+                      } else {
+                        const hasReceipt = all.some((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id);
+                        isClosed = hasReceipt || hasCreditNote;
+                      }
                     } else if (inv.type === "Recibo" && inv.relatedInvoiceId) {
                       // Si es un recibo con factura relacionada, está cerrado
                       isClosed = true;
@@ -853,7 +870,7 @@ export function HistorialMineriaPage() {
                     return (
                       <tr key={inv.id}>
                         <td className="fw-bold text-start">{inv.number}</td>
-                        <td className="text-start">{inv.type === "Nota de Crédito" ? "NC" : inv.type === "Factura" ? "Comp. pago" : inv.type}</td>
+                        <td className="text-start">{inv.type === "Nota de Crédito" ? "NC" : inv.type === "Factura" ? (isAsicEquipmentSaleInvoice(inv) ? "Comp. pago" : "Factura") : inv.type}</td>
                         <td className="text-start">{inv.clientName}</td>
                         <td className="text-start">{inv.date}</td>
                         <td className="text-start">{inv.emissionTime || "-"}</td>
@@ -869,12 +886,12 @@ export function HistorialMineriaPage() {
                                 ✓
                               </span>
                             ) : (
-                              <span className="badge bg-success d-inline-flex" style={{ fontSize: "0.65rem", padding: "0.1rem 0.2rem", borderRadius: "50%", width: "1.05rem", height: "1.05rem", alignItems: "center", justifyContent: "center" }} title="Operación cerrada - Cliente pagó">
+                              <span className="badge bg-success d-inline-flex" style={{ fontSize: "0.65rem", padding: "0.1rem 0.2rem", borderRadius: "50%", width: "1.05rem", height: "1.05rem", alignItems: "center", justifyContent: "center" }} title={isAsicEquipmentSaleInvoice(inv) ? "Comprobante de pago (venta equipos) — cerrado al emitir" : "Operación cerrada - Cliente pagó"}>
                                 ✓
                               </span>
                             )
                           ) : inv.type === "Factura" ? (
-                            <span className="d-inline-flex" style={{ fontSize: "0.95rem", padding: "0.1rem 0.2rem", borderRadius: "50%", width: "1.05rem", height: "1.05rem", alignItems: "center", justifyContent: "center", backgroundColor: "transparent", color: "#ffc107" }} title="Factura pendiente de pago">
+                            <span className="d-inline-flex" style={{ fontSize: "0.95rem", padding: "0.1rem 0.2rem", borderRadius: "50%", width: "1.05rem", height: "1.05rem", alignItems: "center", justifyContent: "center", backgroundColor: "transparent", color: "#ffc107" }} title="Pendiente de cobro (reparación / flete — requiere recibo)">
                               ⚠️
                             </span>
                           ) : (
@@ -1080,7 +1097,7 @@ export function HistorialMineriaPage() {
                 <div className="modal-body">
                   {(() => {
                     const inv = detailInvoice;
-                    const dueDate = inv.dueDate || calculateDueDate(inv.date);
+                    const dueDate = isAsicEquipmentSaleInvoice(inv) ? "-" : (inv.dueDate || calculateDueDate(inv.date));
                     const relatedRecibo = all.find((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id);
                     const relatedNC = all.find((n) => n.type === "Nota de Crédito" && n.relatedInvoiceId === inv.id);
                     const relatedFactura = inv.relatedInvoiceId ? all.find((f) => f.id === inv.relatedInvoiceId) : null;
@@ -1090,7 +1107,7 @@ export function HistorialMineriaPage() {
                       <>
                         <div className="row g-2 small mb-3">
                           <div className="col-md-4"><strong>Número:</strong> {inv.number}</div>
-                          <div className="col-md-4"><strong>Tipo:</strong> {inv.type === "Factura" ? "Comprobante de pago" : inv.type}</div>
+                          <div className="col-md-4"><strong>Tipo:</strong> {inv.type === "Factura" ? (isAsicEquipmentSaleInvoice(inv) ? "Comprobante de pago" : "Factura") : inv.type}</div>
                           <div className="col-md-4"><strong>Cliente:</strong> {inv.clientName}</div>
                           <div className="col-md-4"><strong>Fecha emisión:</strong> {inv.date}</div>
                           <div className="col-md-4"><strong>Hora emisión:</strong> {inv.emissionTime || "-"}</div>
@@ -1155,9 +1172,21 @@ export function HistorialMineriaPage() {
                           </div>
                         )}
                         {inv.type === "Factura" && !relatedRecibo && !relatedNC && (
-                          <div className="rounded p-3" style={{ backgroundColor: "#fff3cd", border: "1px solid #856404" }}>
-                            <strong style={{ color: "#856404" }}>Pendiente de Pago</strong>
-                          </div>
+                          isAsicEquipmentSaleInvoice(inv) ? (
+                            <div className="rounded p-3" style={{ backgroundColor: "#d1e7dd", border: "1px solid #0f5132" }}>
+                              <strong style={{ color: "#0f5132" }}>✓ Comprobante de pago (venta equipos)</strong>
+                              <div className="mt-1 small" style={{ color: "#0f5132" }}>
+                                No requiere recibo — queda cerrado al emitir.
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="rounded p-3" style={{ backgroundColor: "#fff3cd", border: "1px solid #856404" }}>
+                              <strong style={{ color: "#856404" }}>Pendiente de Pago</strong>
+                              <div className="mt-1 small" style={{ color: "#856404" }}>
+                                Reparación / flete: emitir recibo para cerrar el cobro.
+                              </div>
+                            </div>
+                          )
                         )}
                         {inv.type === "Recibo" && inv.paymentDate && (
                           <div className="rounded p-3 mb-2" style={{ backgroundColor: "#d1e7dd", border: "1px solid #0f5132" }}>

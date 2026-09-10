@@ -12,6 +12,7 @@ import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import { canExport } from "../lib/auth";
 import { formatCurrency, formatCurrencyNumber } from "../lib/formatCurrency";
+import { isAsicEquipmentSaleInvoice } from "../lib/asicDocumentKind";
 import "../styles/facturacion.css";
 
 // Función para calcular fecha de vencimiento desde fecha de emisión
@@ -106,9 +107,9 @@ export function PendientesMineriaPage() {
     receipts: Invoice[];
   };
 
-  // Pendiente real = Factura - NC aplicadas - Recibos aplicados
+  // Pendiente real = Factura (reparación/flete) - NC - Recibos. Venta de equipos no entra (sin recibo).
   const pendingInvoices = useMemo<PendingInvoiceView[]>(() => {
-    const facturas = all.filter((inv) => inv.type === "Factura");
+    const facturas = all.filter((inv) => inv.type === "Factura" && !isAsicEquipmentSaleInvoice(inv));
     return facturas
       .map((factura) => {
         const creditNotes = all.filter((nc) => nc.type === "Nota de Crédito" && isLinkedToInvoice(nc, factura));
@@ -257,7 +258,7 @@ export function PendientesMineriaPage() {
           subtotal: inv.subtotal || 0,
           discounts: inv.discounts || 0,
           total: inv.total || 0,
-          documentContext: "comprobante-pago",
+          documentContext: isAsicEquipmentSaleInvoice(inv) ? "comprobante-pago" : undefined,
         },
         { logoBase64 }
       );

@@ -44,6 +44,8 @@ import { canEditClientes, canEditFacturacion, lectorAllowsModule } from "../lib/
 import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
 import { isClienteTiendaOnline } from "../lib/clientTienda";
 import { formatCurrencyNumber, formatUSD } from "../lib/formatCurrency";
+import { isAsicEquipmentSaleDocument, isAsicEquipmentSaleInvoice } from "../lib/asicDocumentKind";
+import type { InvoiceDocumentContext } from "../lib/invoiceDocumentContext";
 import "../styles/facturacion.css";
 
 function todayLocale() {
@@ -370,15 +372,24 @@ export function FacturacionMineriaPage() {
     );
   }, [invoicesAll, selectedClient, type]);
 
-  // Recibo: facturas del cliente con saldo pendiente (NC parcial + recibo del resto)
+  // Recibo: solo facturas de reparación/flete con saldo (venta equipos = comprobante, sin recibo)
   const invoicesWithoutReceipt = useMemo(() => {
     if (!selectedClient || type !== "Recibo") return [];
     const clientNorm = normalizeClientName(selectedClient.name);
     const facturas = invoicesAll.filter(
-      (inv) => normalizeClientName(inv.clientName) === clientNorm && inv.type === "Factura"
+      (inv) =>
+        normalizeClientName(inv.clientName) === clientNorm &&
+        inv.type === "Factura" &&
+        !isAsicEquipmentSaleInvoice(inv)
     );
     return facturas.filter((f) => invoicePendingCollectionAmount(f, invoicesAll) > INVOICE_BALANCE_EPS);
   }, [invoicesAll, selectedClient, type]);
+
+  /** Venta equipos → COMPROBANTE DE PAGO; reparación/flete → FACTURA CREDITO (+ recibo). */
+  const asicFacturaDocumentContext = useMemo<InvoiceDocumentContext | undefined>(() => {
+    if (type !== "Factura") return undefined;
+    return isAsicEquipmentSaleDocument(items) ? "comprobante-pago" : undefined;
+  }, [type, items]);
 
   // Limpiar factura relacionada cuando cambia el tipo o el cliente
   useEffect(() => {
@@ -753,16 +764,35 @@ export function FacturacionMineriaPage() {
           dueDateDays,
           relatedInvoiceNumber: relatedInvoice?.number,
           creditNoteMode: inferredNcMode,
-          documentContext: "comprobante-pago",
+          documentContext:
+            type === "Factura"
+              ? isAsicEquipmentSaleDocument(items)
+                ? "comprobante-pago"
+                : undefined
+              : undefined,
         },
         { logoBase64 }
       );
       const safeName = selectedClient.name.replace(/[^\w\s-]/g, "").replace(/\s+/g, " ").trim() || "cliente";
       doc.save(`${numberToUse}_${safeName}.pdf`);
-      const tipoMensaje = type === "Factura" ? "Comprobante de pago" : type === "Recibo" ? "Recibo" : "Nota de Crédito";
+      const tipoMensaje =
+        type === "Factura"
+          ? isAsicEquipmentSaleDocument(items)
+            ? "Comprobante de pago"
+            : "Factura"
+          : type === "Recibo"
+            ? "Recibo"
+            : "Nota de Crédito";
       showToast(`${tipoMensaje} generado y guardado correctamente.`, "success");
     } else {
-      const tipoMensaje = type === "Factura" ? "Comprobante de pago" : type === "Recibo" ? "Recibo" : "Nota de Crédito";
+      const tipoMensaje =
+        type === "Factura"
+          ? isAsicEquipmentSaleDocument(items)
+            ? "Comprobante de pago"
+            : "Factura"
+          : type === "Recibo"
+            ? "Recibo"
+            : "Nota de Crédito";
       showToast(`${tipoMensaje} registrado correctamente.`, "success");
     }
 
@@ -875,7 +905,7 @@ export function FacturacionMineriaPage() {
         dueDate: parseDueDateStr(inv.dueDate ?? ""),
         relatedInvoiceNumber: inv.relatedInvoiceNumber ?? relatedForNc?.number,
         creditNoteMode: inferredNcMode,
-        documentContext: "comprobante-pago",
+        documentContext: isAsicEquipmentSaleInvoice(inv) ? "comprobante-pago" : undefined,
       },
       { logoBase64 }
     );
@@ -941,10 +971,17 @@ export function FacturacionMineriaPage() {
                           }
                         }}
                       >
-                        <option value="Factura">Comprobante de pago</option>
+                        <option value="Factura">Factura / Comp. pago</option>
                         <option value="Recibo">Recibo</option>
                         <option value="Nota de Crédito">NC</option>
                       </select>
+                      {type === "Factura" && items.length > 0 && (
+                        <small className="text-muted d-block mt-1">
+                          {asicFacturaDocumentContext === "comprobante-pago"
+                            ? "Venta equipos → Comp. pago (sin recibo)"
+                            : "Reparación / flete → Factura + Recibo"}
+                        </small>
+                      )}
                     </div>
                   </div>
                   <div className="col-6">
@@ -1491,7 +1528,13 @@ export function FacturacionMineriaPage() {
                             return (
                               <tr key={item.invoice.id}>
                                 <td>
-                                  {inv.type === "Nota de Crédito" ? "Nota C." : inv.type === "Factura" ? "Comp. pago" : inv.type}
+                                  {inv.type === "Nota de Crédito"
+                                    ? "Nota C."
+                                    : inv.type === "Factura"
+                                      ? isAsicEquipmentSaleInvoice(inv)
+                                        ? "Comp. pago"
+                                        : "Factura"
+                                      : inv.type}
                                   {inv.type === "Recibo" && " "}
                                   {(inv.type === "Factura" || inv.type === "Recibo" || inv.type === "Nota de Crédito") && (Date.now() - new Date(item.emittedAt).getTime() < MS_22H) && (
                                     <span
@@ -1608,7 +1651,11 @@ export function FacturacionMineriaPage() {
                             })()
                           : undefined
                       }
-                      documentContext="comprobante-pago"
+                      documentContext={
+                        previewEmitted.invoice.type === "Factura" && isAsicEquipmentSaleInvoice(previewEmitted.invoice)
+                          ? "comprobante-pago"
+                          : undefined
+                      }
                     />
                   ) : selectedClient && items.length > 0 ? (
                     <InvoicePreview
@@ -1637,7 +1684,7 @@ export function FacturacionMineriaPage() {
                             })()
                           : undefined
                       }
-                      documentContext="comprobante-pago"
+                      documentContext={asicFacturaDocumentContext}
                     />
                   ) : (
                     <div className="fact-panel-vista-previa-empty">
