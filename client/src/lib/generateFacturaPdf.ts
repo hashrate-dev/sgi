@@ -548,7 +548,8 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   const isComprobantePagoFactura =
     data.documentContext === "comprobante-pago" && data.type === "Factura";
   if (data.type === "Recibo" || data.type === "Recibo Devolución" || isComprobantePagoFactura) {
-    const montoTipo = data.type === "Factura" ? "Recibo" : data.type;
+    const montoTipo: "Recibo" | "Recibo Devolución" =
+      data.type === "Recibo Devolución" ? "Recibo Devolución" : "Recibo";
     const { line1, line2 } = recibimosMontoEnDosLineas(
       data.total,
       montoTipo,

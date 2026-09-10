@@ -287,7 +287,8 @@ export function InvoicePreview({
             type === "Recibo Devolución" ||
             (documentContext === "comprobante-pago" && type === "Factura")) &&
           (() => {
-          const montoTipo = type === "Factura" ? "Recibo" : type;
+          const montoTipo: "Recibo" | "Recibo Devolución" =
+            type === "Recibo Devolución" ? "Recibo Devolución" : "Recibo";
           const { line1, line2 } = recibimosMontoEnDosLineas(total, montoTipo, documentContext === "garantia-ande" ? "garantia-ande" : undefined);
           const notaGuarani = "El monto que se devuelve puede ser distinto al monto contable, debido a que se ajusta por el valor del Guaraní a la fecha.";
           if (documentContext === "garantia-ande") {
