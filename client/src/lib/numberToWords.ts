@@ -70,18 +70,28 @@ function toSentenceCase(str: string): string {
  * Texto para recibo en dos líneas, minúsculas con primera letra mayúscula.
  * Para "Recibo": "Recibimos la cantidad de [monto]..."
  * Para "Recibo Devolución": "Se devuelve la cantidad de [monto]..."
+ * Con documentContext "garantia-ande": frases de depósito en garantía.
  * Línea 2: "dólares estadounidenses con XX/100"
  */
 export function recibimosMontoEnDosLineas(
   amount: number,
-  tipo?: "Recibo" | "Recibo Devolución"
+  tipo?: "Recibo" | "Recibo Devolución",
+  documentContext?: "garantia-ande"
 ): { line1: string; line2: string } {
   const abs = Math.abs(amount);
   const entero = Math.floor(abs);
   const centavos = Math.round((abs - entero) * 100) % 100;
   const centStr = String(centavos).padStart(2, "0");
   const parteEntera = intToWordsEs(entero);
-  const prefix = tipo === "Recibo Devolución" ? "SE DEVUELVE LA CANTIDAD DE" : "RECIBIMOS LA CANTIDAD DE";
+  let prefix: string;
+  if (documentContext === "garantia-ande") {
+    prefix =
+      tipo === "Recibo Devolución"
+        ? "SE RESTITUYE EL DEPÓSITO EN GARANTÍA POR LA CANTIDAD DE"
+        : "RECIBIMOS EN CONCEPTO DE DEPÓSITO EN GARANTÍA LA CANTIDAD DE";
+  } else {
+    prefix = tipo === "Recibo Devolución" ? "SE DEVUELVE LA CANTIDAD DE" : "RECIBIMOS LA CANTIDAD DE";
+  }
   return {
     line1: toSentenceCase(`${prefix} ${parteEntera}`),
     line2: `dólares estadounidenses con ${centStr}/100.`

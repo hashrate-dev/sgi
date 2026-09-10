@@ -15,6 +15,11 @@ import {
   getReceiptSettlementRowKind,
   reciboIsPaymentLineSettledTable,
 } from "./receiptSettlementLine";
+import {
+  garantiaLegalText,
+  invoiceTipoLabel,
+  type InvoiceDocumentContext,
+} from "./invoiceDocumentContext";
 
 /** Colores HRS (verde marca) */
 const HRS_GREEN = { r: 0, g: 166, b: 82 };
@@ -66,6 +71,8 @@ export type FacturaPdfData = {
   creditNoteMode?: "partial" | "total";
   /** Recibo: explicación de pago sobre factura y NC / recibos previos (bloque bajo el cliente, antes de la tabla). */
   reciboConceptText?: string;
+  /** Contexto de documento (p. ej. depósito garantía ANDE) para títulos/frases/legal. */
+  documentContext?: InvoiceDocumentContext;
 };
 
 export type FacturaPdfImages = {
@@ -228,17 +235,14 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   // ---------- Misma información pero al lado derecho del logo (arriba de la hoja) ----------
   // Orden: izquierda = emisor, derecha = FACTURA CREDITO + VIA CLIENTE + FECHA + TOTAL + RUC
   let y = yTop; // Comenzar desde el margen superior
-  const tipoLabel = 
-    data.type === "Factura" ? "FACTURA CREDITO" : 
-    data.type === "Recibo" ? "RECIBO" : 
-    data.type === "Recibo Devolución" ? "RECIBO DEVOLUCIÓN" : 
-    "NOTA DE CRÉDITO";
+  const tipoLabel = invoiceTipoLabel(data.type, data.documentContext);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(12); /* igual que vista previa: company-name 12pt */
   doc.text(EMISOR.nombre, COMPANY_INFO_X, y);
-  doc.setFontSize(11); /* igual que vista previa: type 11pt */
-  doc.text(`${tipoLabel} - ${data.number}`, contentRight, y, { align: "right" });
+  doc.setFontSize(data.documentContext === "garantia-ande" ? 9 : 11);
+  const headerDocLabel = `${tipoLabel} - ${data.number}`;
+  doc.text(headerDocLabel, contentRight, y, { align: "right" });
   y += 5;
 
   doc.setFont("helvetica", "normal");
@@ -248,7 +252,9 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   y += 5;
 
   doc.text(EMISOR.ciudad, COMPANY_INFO_X, y);
-  doc.text("FECHA", contentRight, y, { align: "right" });
+  if (data.documentContext !== "garantia-ande") {
+    doc.text("FECHA", contentRight, y, { align: "right" });
+  }
   y += 5;
 
   doc.text(EMISOR.telefono, COMPANY_INFO_X, y);
@@ -540,28 +546,36 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
 
   // ---------- Recibo / Recibo Devolución: texto dentro del contenedor con borde ----------
   if (data.type === "Recibo" || data.type === "Recibo Devolución") {
-    const { line1, line2 } = recibimosMontoEnDosLineas(data.total, data.type);
-    const notaGuarani = "El monto que se devuelve puede ser distinto al monto contable, debido a que se ajusta por el valor del Guaraní a la fecha.";
-    const yRecTop = y + 40;
+    const { line1, line2 } = recibimosMontoEnDosLineas(data.total, data.type, data.documentContext);
+    const notaGuarani =
+      "El monto que se devuelve puede ser distinto al monto contable, debido a que se ajusta por el valor del Guaraní a la fecha.";
+    const yRecTop = y + (data.documentContext === "garantia-ande" ? 32 : 40);
     const recPaddingTop = 5;
     const recPaddingBottom = 5;
     const recLineH = 6;
-    doc.setFontSize(12);
+    const gapBetweenBlocks = 3;
     doc.setFont("helvetica", "normal");
     doc.setTextColor(0, 0, 0);
-
-    const textoCompleto =
-      data.type === "Recibo Devolución"
-        ? `${line1} ${line2} ${notaGuarani}`
-        : `${line1} ${line2}`;
-    const lineas = doc.splitTextToSize(textoCompleto, TABLE_W - 6);
-    const recBlockH = recPaddingTop + lineas.length * recLineH + recPaddingBottom;
-
     doc.setDrawColor(TABLE_BORDER.r, TABLE_BORDER.g, TABLE_BORDER.b);
     doc.setLineWidth(0.5);
-    doc.rect(tableLeft, yRecTop, TABLE_W, recBlockH, "S");
-    doc.text(lineas, tableLeft + 3, yRecTop + recPaddingTop + 4);
-    y = yRecTop + recBlockH;
+
+    const drawTextBlock = (texto: string, topY: number, fontSize: number, lineH: number): number => {
+      doc.setFontSize(fontSize);
+      const lineas = doc.splitTextToSize(texto, TABLE_W - 6);
+      const recBlockH = recPaddingTop + lineas.length * lineH + recPaddingBottom;
+      doc.rect(tableLeft, topY, TABLE_W, recBlockH, "S");
+      doc.text(lineas, tableLeft + 3, topY + recPaddingTop + 4);
+      return topY + recBlockH;
+    };
+
+    if (data.documentContext === "garantia-ande") {
+      const afterMonto = drawTextBlock(`${line1} ${line2}`, yRecTop, 10, 6);
+      y = drawTextBlock(garantiaLegalText(data.type), afterMonto + gapBetweenBlocks, 8.5, 5);
+    } else {
+      const textoCompleto =
+        data.type === "Recibo Devolución" ? `${line1} ${line2} ${notaGuarani}` : `${line1} ${line2}`;
+      y = drawTextBlock(textoCompleto, yRecTop, 12, recLineH);
+    }
   } else {
     // Nota de Crédito: mostrar referencia arriba del bloque de fechas con el mismo estilo del texto de recibos
     if (data.type === "Nota de Crédito" && data.relatedInvoiceNumber) {
@@ -636,8 +650,10 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   const TOTAL_BOX_W = 58;
   const TOTAL_LABEL_W = 24;
   const totalBoxLeft = totalTableRight - TOTAL_BOX_W;
-  const yTotal = PAGE_H - MARGIN_TOP_BOTTOM;
-  const totalBoxTop = yTotal - TOTAL_ROW_H;
+  const preferredTotalTop = PAGE_H - MARGIN_TOP_BOTTOM - TOTAL_ROW_H;
+  /* Garantía: si el bloque legal baja mucho, el TOTAL queda debajo con espacio; si no, al pie. */
+  const totalBoxTop =
+    data.documentContext === "garantia-ande" ? Math.max(preferredTotalTop, y + 12) : preferredTotalTop;
   const totalBoxBottom = totalBoxTop + TOTAL_ROW_H;
   const Rt = TABLE_RADIUS;
   const kt = 0.5522847498;

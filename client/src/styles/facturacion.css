@@ -2671,6 +2671,37 @@ button.fact-back {
   overflow: visible;
 }
 
+/* Garantía ANDE: Vista previa más alta para ver el recibo de depósito completo */
+.fact-page--garantia-ande .fact-main {
+  height: auto;
+  min-height: calc(100dvh - 8rem);
+  max-height: none;
+  overflow: visible;
+}
+
+.fact-page--garantia-ande .fact-main > .fact-card:first-of-type {
+  flex: 0 0 auto;
+}
+
+.fact-page--garantia-ande .fact-detail-servicios-table-wrap {
+  min-height: 140px;
+  max-height: 240px;
+}
+
+.fact-page--garantia-ande .fact-main > .fact-panel-vista-previa {
+  flex: 0 0 auto;
+  min-height: 1180px;
+}
+
+.fact-page--garantia-ande .fact-panel-vista-previa-body {
+  min-height: 1120px;
+}
+
+.fact-page--garantia-ande .fact-panel-vista-previa-inner,
+.fact-page--garantia-ande .fact-panel-vista-previa-empty {
+  min-height: 1100px;
+}
+
 .fact-panel-nuevo-documento.asic-cotizador-params-panel .asic-cotizador-catalog-row,
 .fact-panel-nuevo-documento.asic-cotizador-params-panel .asic-cotizador-costos-row {
   overflow: visible;
@@ -12967,13 +12998,13 @@ button.nh-watcher-btc-card__corner-btn:hover {
 .fact-page.mineria-page.nh-watcher-fullpage {
   min-height: calc(100vh - 52px);
   overflow-x: hidden;
-  /* Espacio libre bajo el último gráfico: footer fijo + Calendly + logo */
-  padding-bottom: 3.5rem;
+  /* Hueco para barra fija (arriba del footer) + logo HASHRATE */
+  padding-bottom: 5.5rem;
 }
 @media (max-width: 768px) {
   .fact-page.mineria-page.nh-watcher-fullpage {
     min-height: calc(100vh - 78px);
-    padding-bottom: 4.25rem;
+    padding-bottom: 7.5rem;
   }
 }
 
@@ -12982,7 +13013,7 @@ button.nh-watcher-btc-card__corner-btn:hover {
 }
 
 .sgi-protected-root--admin-footer .fact-page.mineria-page.nh-watcher-fullpage {
-  padding-bottom: 4rem;
+  padding-bottom: 5.75rem;
 }
 .sgi-protected-root .nh-watcher-fullpage__container {
   max-width: var(--sgi-layout-max, 1400px);
@@ -12996,6 +13027,31 @@ button.nh-watcher-btc-card__corner-btn:hover {
   width: 100%;
   max-width: 100%;
   min-width: 0;
+}
+
+/* Barra Último pago / Actualizar: fija pegada arriba del footer,
+   mismo ancho horizontal que la barra verde de slots (.nh-watcher-slot-bar--page) */
+.fact-page.mineria-page.nh-watcher-fullpage .nh-watcher-page-footer--sgi {
+  position: fixed;
+  z-index: 6;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  bottom: 64px;
+  width: min(
+    calc(100vw - 2 * max(var(--sgi-layout-pad, 1.5rem), env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px))),
+    calc(var(--sgi-layout-max, 1400px) - 2 * var(--sgi-layout-pad, 1.5rem))
+  );
+  max-width: none;
+  margin: 0 !important;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .fact-page.mineria-page.nh-watcher-fullpage .nh-watcher-page-footer--sgi {
+    /* Encima del logo fijo (bottom 88px + alto logo) para no taparlo */
+    bottom: calc(88px + 28px + 0.45rem);
+  }
 }
 /* Cabecera página watcher: misma barra verde SGI que .fact-topbar; ancho = .container (como Historial). */
 .nh-watcher-page-top {

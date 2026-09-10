@@ -41,14 +41,14 @@ function genId() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
-/** Recibo: R + 4 dígitos desde R0100. Recibo Devolución: RD + 4 dígitos desde RD0200. */
+/** Recibo: RG + 4 dígitos desde RG0201. Recibo Devolución: RD + 4 dígitos desde RD0201. */
 const GARANTIA_NUM_CONFIG: Record<string, { prefix: string; digits: number; startNum: number }> = {
-  Recibo: { prefix: "R", digits: 4, startNum: 100 },
-  "Recibo Devolución": { prefix: "RD", digits: 4, startNum: 200 }
+  Recibo: { prefix: "RG", digits: 4, startNum: 201 },
+  "Recibo Devolución": { prefix: "RD", digits: 4, startNum: 201 }
 };
 
 function nextValeNumber(emitted: { invoice: Invoice }[], tipo: "Recibo" | "Recibo Devolución"): string {
-  const { prefix, digits, startNum } = GARANTIA_NUM_CONFIG[tipo] ?? { prefix: "R", digits: 4, startNum: 100 };
+  const { prefix, digits, startNum } = GARANTIA_NUM_CONFIG[tipo] ?? { prefix: "RG", digits: 4, startNum: 201 };
   const formatRegex = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\d{1,${digits}})$`, "i");
   const filtered = emitted.filter((e) => formatRegex.test(e.invoice.number));
   const next =
@@ -284,7 +284,7 @@ export function GarantiaAndePage() {
 
   async function executePdfAndSave(savePdf: boolean) {
     if (!selectedClient) return;
-    if (savePdf) showToast("Generando recibo PDF...", "info");
+    if (savePdf) showToast("Generando PDF del depósito en garantía...", "info");
 
     const { subtotal, discounts, total } = calcTotals(items);
     const dateNow = new Date();
@@ -318,7 +318,8 @@ export function GarantiaAndePage() {
         subtotal,
         discounts,
         total,
-        dueDateDays: 7
+        dueDateDays: 7,
+        documentContext: "garantia-ande",
       },
       { logoBase64 }
     );
@@ -375,7 +376,12 @@ export function GarantiaAndePage() {
       setItemsLocked(false);
       setShowConfirmPdf(false);
       getNextGarantiaNumber(tipoGarantia, { peek: true }).then((r) => setNextNumFromApi(r.number)).catch(() => {});
-      showToast(`${tipoGarantia} ${assignedNumber} guardado en el servidor.`, "success");
+      showToast(
+        isReciboDevolucion
+          ? `${assignedNumber} guardado. El depósito queda cancelado (saldo 0).`
+          : `${tipoGarantia} ${assignedNumber} guardado en el servidor.`,
+        "success"
+      );
     } catch (e) {
       showToast(e instanceof Error ? e.message : `Error al guardar el ${tipoGarantia.toLowerCase()}.`, "error");
     }
@@ -411,7 +417,8 @@ export function GarantiaAndePage() {
         items: inv.items,
         subtotal,
         discounts,
-        total
+        total,
+        documentContext: "garantia-ande",
       },
       { logoBase64 }
     );
@@ -423,11 +430,11 @@ export function GarantiaAndePage() {
   const canEdit = !user || canEditFacturacion(user);
 
   return (
-    <div className="fact-page">
+    <div className="fact-page fact-page--garantia-ande">
       <ConfirmModal
         open={showConfirmPdf}
         title="Guardar documento PDF"
-        message="¿Querés guardar el recibo PDF?"
+        message="¿Querés guardar el PDF del depósito en garantía?"
         confirmLabel="Sí"
         cancelLabel="No"
         variant="info"
@@ -502,7 +509,7 @@ export function GarantiaAndePage() {
                 {tipoGarantia === "Recibo Devolución" && (
                   <div className="fact-field" style={{ borderTop: "2px solid #00a652", paddingTop: "1rem", marginTop: "1rem" }}>
                     <label className="fact-label" style={{ fontWeight: "bold", color: "#00a652" }}>
-                      🧾 Recibo a devolver / cancelar (Requerido)
+                      🧾 Depósito a restituir (Requerido)
                     </label>
                     {!selectedClient ? (
                       <div style={{ padding: "0.75rem", backgroundColor: "#fff3cd", border: "1px solid #ffc107", borderRadius: "4px" }}>
@@ -604,7 +611,7 @@ export function GarantiaAndePage() {
                               <tr>
                                 <td colSpan={5} className="fact-detail-servicios-empty">
                                   <span className="fact-detail-servicios-empty-icon">📋</span>
-                                  <p className="fact-detail-servicios-empty-text">Agregá ítems para armar el recibo.</p>
+                                  <p className="fact-detail-servicios-empty-text">Agregá ítems para armar el depósito en garantía.</p>
                                 </td>
                               </tr>
                             ) : (
@@ -695,10 +702,10 @@ export function GarantiaAndePage() {
                                       >
                                         <option value="">Seleccionar...</option>
                                         {itemsGarantia.length > 0 && (
-                                          <optgroup label="Garantías">
+                                          <optgroup label="Depósito garantía">
                                             {itemsGarantia.map((g) => (
                                               <option key={g.id} value={`garantia_${g.id}`}>
-                                                {g.codigo} - Garantías - {g.marca} - {g.modelo}
+                                                {g.codigo} - Depósito garantía - {g.marca} - {g.modelo}
                                               </option>
                                             ))}
                                           </optgroup>
@@ -895,6 +902,7 @@ export function GarantiaAndePage() {
                       discounts={Math.abs(previewEmitted.invoice.discounts ?? 0)}
                       total={Math.abs(previewEmitted.invoice.total ?? 0)}
                       dueDateDays={7}
+                      documentContext="garantia-ande"
                     />
                   ) : selectedClient && items.length > 0 ? (
                     <InvoicePreview
@@ -907,6 +915,7 @@ export function GarantiaAndePage() {
                       discounts={totals.discounts}
                       total={totals.total}
                       dueDateDays={7}
+                      documentContext="garantia-ande"
                     />
                   ) : (
                     <div className="fact-panel-vista-previa-empty">

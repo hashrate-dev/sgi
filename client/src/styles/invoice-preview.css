@@ -93,6 +93,14 @@
   white-space: nowrap; /* RECIBO DEVOLUCIÓN - RDxxxx en una sola fila */
 }
 
+.invoice-preview-type--garantia {
+  font-size: 9pt;
+  white-space: nowrap; /* título + número en una sola fila */
+  max-width: none;
+  margin-left: auto;
+  text-align: right;
+}
+
 .invoice-preview-label {
   font-size: 9pt;
   font-weight: normal;
@@ -389,6 +397,25 @@
 }
 
 /* Recibo: RECIBIMOS LA CANTIDAD DE... en dos filas, alineado a la izquierda (reemplaza tabla de fechas) */
+.invoice-preview-recibimos-stack {
+  width: 187mm;
+  margin: 6.2cm auto 0 auto; /* un poco más arriba que el recibo estándar (7cm) */
+  display: flex;
+  flex-direction: column;
+  gap: 4mm;
+  margin-bottom: 0;
+}
+
+.invoice-preview-recibimos-stack .invoice-preview-recibimos-block {
+  width: 100%;
+  margin: 0;
+}
+
+/* Espacio claro entre el bloque legal y la fila TOTAL */
+.invoice-preview-recibimos-stack + .invoice-preview-total-wrap {
+  margin-top: 16mm;
+}
+
 .invoice-preview-recibimos-block {
   width: 187mm;
   margin: 7cm auto 0 auto;
@@ -417,6 +444,11 @@
   font-weight: normal;
   color: #000000;
   line-height: 1.5;
+}
+
+.invoice-preview-recibimos-texto-legal {
+  font-size: 10pt;
+  line-height: 1.45;
 }
 
 /* Total al pie: contra abajo de la A4, mismo margen 18mm que los extremos de la hoja */

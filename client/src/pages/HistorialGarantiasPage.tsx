@@ -82,7 +82,8 @@ export function HistorialGarantiasPage() {
 
   const stats = useMemo(() => {
     const totalRecibos = itemsInPeriod.length;
-    const montoTotal = itemsInPeriod.reduce((s, item) => s + Math.abs(item.invoice.total || 0), 0);
+    /* Suma con signo: RG + RD cancelados dejan neto ~0 */
+    const montoTotal = itemsInPeriod.reduce((s, item) => s + (item.invoice.total || 0), 0);
     return { totalRecibos, montoTotal, registros: itemsInPeriod.length };
   }, [itemsInPeriod]);
 
@@ -350,6 +351,7 @@ export function HistorialGarantiasPage() {
         subtotal: Math.abs(inv.subtotal),
         discounts: Math.abs(inv.discounts),
         total: Math.abs(inv.total),
+        documentContext: "garantia-ande",
       },
       { logoBase64 }
     );
@@ -602,7 +604,7 @@ export function HistorialGarantiasPage() {
                               <tbody>
                                 {inv.items.map((item, idx) => {
                                   const desc = item.garantiaCodigo
-                                    ? [item.garantiaCodigo, "Garantías", item.garantiaMarca, item.garantiaModelo].filter(Boolean).join(" - ")
+                                    ? [item.garantiaCodigo, "Depósito garantía", item.garantiaMarca, item.garantiaModelo].filter(Boolean).join(" - ")
                                     : item.setupNombre || item.marcaEquipo ? `${item.marcaEquipo || ""} ${item.modeloEquipo || ""}`.trim() || "Ítem" : "Ítem";
                                   const lineTotal = (item.price || 0) * (item.quantity || 1) - (item.discount || 0) * (item.quantity || 1);
                                   const priceDisplay = isReciboDevolucion ? Math.abs(item.price || 0) : (item.price || 0);

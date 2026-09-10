@@ -85,7 +85,7 @@ export function getLineItemDescription(it: LineItem): string {
     );
   }
   if (it.garantiaCodigo || it.garantiaMarca || it.garantiaModelo) {
-    return [it.garantiaCodigo, "Garantías", it.garantiaMarca, it.garantiaModelo].filter(Boolean).join(" - ") || "Garantía";
+    return [it.garantiaCodigo, "Depósito garantía", it.garantiaMarca, it.garantiaModelo].filter(Boolean).join(" - ") || "Depósito garantía";
   }
   const serviceLabel = lineItemServiceLabel(it);
   if (serviceLabel) {

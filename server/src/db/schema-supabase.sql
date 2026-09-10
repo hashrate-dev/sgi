@@ -214,7 +214,7 @@ CREATE TABLE IF NOT EXISTS garantia_sequences (
   type TEXT PRIMARY KEY CHECK (type IN ('Recibo', 'Recibo Devolución')),
   last_number INTEGER NOT NULL DEFAULT 100
 );
-INSERT INTO garantia_sequences (type, last_number) VALUES ('Recibo', 100), ('Recibo Devolución', 200)
+INSERT INTO garantia_sequences (type, last_number) VALUES ('Recibo', 200), ('Recibo Devolución', 200)
 ON CONFLICT (type) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS emitted_garantias (

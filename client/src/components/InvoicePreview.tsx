@@ -7,6 +7,11 @@ import {
   reciboIsPaymentLineSettledTable,
 } from "../lib/receiptSettlementLine";
 import { recibimosMontoEnDosLineas } from "../lib/numberToWords";
+import {
+  garantiaLegalText,
+  invoiceTipoLabel,
+  type InvoiceDocumentContext,
+} from "../lib/invoiceDocumentContext";
 import { invoiceClientDisplayNames, hasSecondaryClientColumn } from "../lib/clientInvoiceDisplay";
 import { alignLineItemDiscountsForDisplay } from "../lib/invoiceDiscountDisplay";
 import { getLineItemDescription, getLineItemDiscountDescription } from "../lib/invoiceLineItemDescription";
@@ -58,6 +63,8 @@ interface InvoicePreviewProps {
   creditNoteMode?: "partial" | "total";
   /** Recibo: bloque de concepto (pago sobre factura + NC / recibos previos). */
   reciboConceptText?: string;
+  /** Contexto de documento (p. ej. depósito garantía ANDE) para títulos/frases/legal. */
+  documentContext?: InvoiceDocumentContext;
 }
 
 export function InvoicePreview({
@@ -72,6 +79,7 @@ export function InvoicePreview({
   relatedInvoiceNumber,
   creditNoteMode,
   reciboConceptText,
+  documentContext,
 }: InvoicePreviewProps) {
   const [logoSrc, setLogoSrc] = useState<string | null>(null);
 
@@ -87,11 +95,7 @@ export function InvoicePreview({
     img.src = "/images/LOGO-HASHRATE.png";
   }, []);
 
-  const tipoLabel =
-    type === "Factura" ? "FACTURA CREDITO" :
-    type === "Recibo" ? "RECIBO" :
-    type === "Recibo Devolución" ? "RECIBO DEVOLUCIÓN" :
-    "NOTA DE CRÉDITO";
+  const tipoLabel = invoiceTipoLabel(type, documentContext);
 
   const vencimiento = new Date(date);
   vencimiento.setDate(vencimiento.getDate() + dueDateDays);
@@ -151,9 +155,13 @@ export function InvoicePreview({
               <div className="invoice-preview-company-detail">{EMISOR.email}</div>
             </div>
             <div className="invoice-preview-company-right">
-              <div className="invoice-preview-type">{tipoLabel} - {number}</div>
+              <div className={`invoice-preview-type${documentContext === "garantia-ande" ? " invoice-preview-type--garantia" : ""}`}>
+                {tipoLabel} - {number}
+              </div>
               <div className="invoice-preview-label">VIA CLIENTE</div>
-              <div className="invoice-preview-label">FECHA</div>
+              <div className="invoice-preview-label">
+                {documentContext === "garantia-ande" ? "\u00A0" : "FECHA"}
+              </div>
               <div className="invoice-preview-value">{formatFechaTexto(date)}</div>
               <div className="invoice-preview-ruc">{EMISOR.ruc}</div>
             </div>
@@ -273,10 +281,26 @@ export function InvoicePreview({
           </div>
         )}
 
-        {/* Recibo / Recibo Devolución: "Recibimos la cantidad de..." o "Se devuelve la cantidad de..." */}
+        {/* Recibo / Recibo Devolución: monto en palabras (+ legal depósito si aplica) */}
         {displayItems.length > 0 && (type === "Recibo" || type === "Recibo Devolución") && (() => {
-          const { line1, line2 } = recibimosMontoEnDosLineas(total, type);
+          const { line1, line2 } = recibimosMontoEnDosLineas(total, type, documentContext);
           const notaGuarani = "El monto que se devuelve puede ser distinto al monto contable, debido a que se ajusta por el valor del Guaraní a la fecha.";
+          if (documentContext === "garantia-ande") {
+            return (
+              <div className="invoice-preview-recibimos-stack">
+                <div className="invoice-preview-recibimos-block">
+                  <div className="invoice-preview-recibimos-texto-seguido">
+                    {line1} {line2}
+                  </div>
+                </div>
+                <div className="invoice-preview-recibimos-block">
+                  <div className="invoice-preview-recibimos-texto-seguido invoice-preview-recibimos-texto-legal">
+                    {garantiaLegalText(type)}
+                  </div>
+                </div>
+              </div>
+            );
+          }
           return (
             <div className="invoice-preview-recibimos-block">
               {type === "Recibo Devolución" ? (

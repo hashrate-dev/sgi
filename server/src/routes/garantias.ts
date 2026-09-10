@@ -27,9 +27,10 @@ const AddEmittedGarantiaSchema = z.object({
   preserveNumber: z.boolean().optional() /* true = import histórico, usa número del cliente */
 });
 
-const GARANTIA_PREFIX: Record<string, string> = { Recibo: "R", "Recibo Devolución": "RD" };
-const GARANTIA_DIGITS = 4;
-const GARANTIA_START: Record<string, number> = { Recibo: 100, "Recibo Devolución": 200 };
+const GARANTIA_PREFIX: Record<string, string> = { Recibo: "RG", "Recibo Devolución": "RD" };
+const GARANTIA_DIGITS: Record<string, number> = { Recibo: 4, "Recibo Devolución": 4 };
+/** Primer recibo de emisión: RG0201; devolución: RD0201. */
+const GARANTIA_START: Record<string, number> = { Recibo: 201, "Recibo Devolución": 201 };
 
 /** Obtiene el siguiente número de garantía: max(secuencia, max_en_emitted) + 1. Atómico en transacción. */
 async function getNextGarantiaNumber(
@@ -37,15 +38,22 @@ async function getNextGarantiaNumber(
   type: "Recibo" | "Recibo Devolución",
   consume: boolean
 ): Promise<string> {
-  const prefix = GARANTIA_PREFIX[type] ?? "R";
-  const startNum = GARANTIA_START[type] ?? 100;
-  const formatNum = (n: number) => `${prefix}${String(n).padStart(GARANTIA_DIGITS, "0")}`;
+  const prefix = GARANTIA_PREFIX[type] ?? "RG";
+  const digits = GARANTIA_DIGITS[type] ?? 4;
+  const startNum = GARANTIA_START[type] ?? 201;
+  const formatNum = (n: number) => `${prefix}${String(n).padStart(digits, "0")}`;
+
+  /* Asegura piso de secuencia (p. ej. bases viejas con last_number 100/101). */
+  const floor = startNum - 1;
+  await tx.prepare(
+    "UPDATE garantia_sequences SET last_number = ? WHERE type = ? AND last_number < ?"
+  ).run(floor, type, floor);
 
   const seqRow = (await tx.prepare("SELECT last_number FROM garantia_sequences WHERE type = ?").get(type)) as { last_number: number } | undefined;
-  const seqVal = seqRow?.last_number ?? startNum;
+  const seqVal = seqRow?.last_number ?? floor;
 
   const rows = (await tx.prepare("SELECT invoice_json FROM emitted_garantias").all()) as { invoice_json: string }[];
-  const regex = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\d{1,${GARANTIA_DIGITS}})$`, "i");
+  const regex = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\d{1,${digits}})$`, "i");
   const nums = (Array.isArray(rows) ? rows : [])
     .map((r) => {
       try {
@@ -142,8 +150,9 @@ garantiasRouter.post("/garantias/emitted", requireAuth, ...garantiasRw, async (r
       let number: string;
       if (preserveNumber && typeof invoice === "object" && invoice !== null && typeof (invoice as { number?: string }).number === "string") {
         number = (invoice as { number: string }).number;
-        const prefix = GARANTIA_PREFIX[type] ?? "R";
-        const regex = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\d{1,${GARANTIA_DIGITS}})$`, "i");
+        const prefix = GARANTIA_PREFIX[type] ?? "RG";
+        const digits = GARANTIA_DIGITS[type] ?? 4;
+        const regex = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\d{1,${digits}})$`, "i");
         const m = number.match(regex);
         if (m) {
           const n = parseInt(m[1]!, 10);
