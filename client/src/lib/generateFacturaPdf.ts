@@ -240,7 +240,7 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(12); /* igual que vista previa: company-name 12pt */
   doc.text(EMISOR.nombre, COMPANY_INFO_X, y);
-  doc.setFontSize(data.documentContext === "garantia-ande" ? 9 : 11);
+  doc.setFontSize(data.documentContext === "garantia-ande" || data.documentContext === "comprobante-pago" ? 9 : 11);
   const headerDocLabel = `${tipoLabel} - ${data.number}`;
   doc.text(headerDocLabel, contentRight, y, { align: "right" });
   y += 5;
@@ -544,9 +544,16 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   const Rd = TABLE_RADIUS;
   const kd = 0.5522847498;
 
-  // ---------- Recibo / Recibo Devolución: texto dentro del contenedor con borde ----------
-  if (data.type === "Recibo" || data.type === "Recibo Devolución") {
-    const { line1, line2 } = recibimosMontoEnDosLineas(data.total, data.type, data.documentContext);
+  // ---------- Recibo / Recibo Devolución / Comprobante de pago ASIC: texto monto ----------
+  const isComprobantePagoFactura =
+    data.documentContext === "comprobante-pago" && data.type === "Factura";
+  if (data.type === "Recibo" || data.type === "Recibo Devolución" || isComprobantePagoFactura) {
+    const montoTipo = data.type === "Factura" ? "Recibo" : data.type;
+    const { line1, line2 } = recibimosMontoEnDosLineas(
+      data.total,
+      montoTipo,
+      data.documentContext === "garantia-ande" ? "garantia-ande" : undefined
+    );
     const notaGuarani =
       "El monto que se devuelve puede ser distinto al monto contable, debido a que se ajusta por el valor del Guaraní a la fecha.";
     const yRecTop = y + (data.documentContext === "garantia-ande" ? 32 : 40);
@@ -653,7 +660,9 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
   const preferredTotalTop = PAGE_H - MARGIN_TOP_BOTTOM - TOTAL_ROW_H;
   /* Garantía: si el bloque legal baja mucho, el TOTAL queda debajo con espacio; si no, al pie. */
   const totalBoxTop =
-    data.documentContext === "garantia-ande" ? Math.max(preferredTotalTop, y + 12) : preferredTotalTop;
+    data.documentContext === "garantia-ande" || isComprobantePagoFactura
+      ? Math.max(preferredTotalTop, y + 12)
+      : preferredTotalTop;
   const totalBoxBottom = totalBoxTop + TOTAL_ROW_H;
   const Rt = TABLE_RADIUS;
   const kt = 0.5522847498;

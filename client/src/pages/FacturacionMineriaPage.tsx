@@ -442,10 +442,10 @@ export function FacturacionMineriaPage() {
         if (type === "Recibo" || type === "Nota de Crédito") {
           setItemsLocked(true);
           const tipoMensaje = type === "Recibo" ? "recibo" : "nota de crédito";
-          showToast(`Factura ${relatedInvoice.number} cargada. Los detalles están bloqueados para mantener el mismo monto que la factura en este ${tipoMensaje}.`, "success");
+          showToast(`Comprobante ${relatedInvoice.number} cargado. Los detalles están bloqueados para mantener el mismo monto que el comprobante en este ${tipoMensaje}.`, "success");
         } else {
           setItemsLocked(false);
-          showToast(`Factura ${relatedInvoice.number} cargada. Puedes modificar los ítems si es necesario.`, "info");
+          showToast(`Comprobante ${relatedInvoice.number} cargado. Puedes modificar los ítems si es necesario.`, "info");
         }
       } else if (relatedInvoice && (!relatedInvoice.items || relatedInvoice.items.length === 0)) {
         const invId = Number(relatedInvoice.id);
@@ -457,8 +457,8 @@ export function FacturacionMineriaPage() {
               : currentMonthValue();
           setItems([
             {
-              reparacionNombre: `Total factura ${relatedInvoice.number}`,
-              serviceName: `Total factura ${relatedInvoice.number}`,
+              reparacionNombre: `Total comprobante ${relatedInvoice.number}`,
+              serviceName: `Total comprobante ${relatedInvoice.number}`,
               month,
               quantity: 1,
               price: totalAbs,
@@ -486,7 +486,7 @@ export function FacturacionMineriaPage() {
               setItems(enrichAsicLineItemsFromCatalogs(loadedItems, asicCatalogs));
               setItemsLocked(true);
               showToast(
-                `Factura ${relatedInvoice.number} cargada con sus ítems. Podés emitir el ${type === "Recibo" ? "recibo" : "NC"}.`,
+                `Comprobante ${relatedInvoice.number} cargado con sus ítems. Podés emitir el ${type === "Recibo" ? "recibo" : "NC"}.`,
                 "success"
               );
             } else {
@@ -497,8 +497,8 @@ export function FacturacionMineriaPage() {
                   : currentMonthValue();
               setItems([
                 {
-                  reparacionNombre: `Total factura ${relatedInvoice.number}`,
-                  serviceName: `Total factura ${relatedInvoice.number}`,
+                  reparacionNombre: `Total comprobante ${relatedInvoice.number}`,
+                  serviceName: `Total comprobante ${relatedInvoice.number}`,
                   month,
                   quantity: 1,
                   price: totalAbs,
@@ -507,13 +507,13 @@ export function FacturacionMineriaPage() {
               ]);
               setItemsLocked(true);
               showToast(
-                `Factura ${relatedInvoice.number} sin ítems en la base; se usó el total. Podés emitir el ${type === "Recibo" ? "recibo" : "NC"}.`,
+                `Comprobante ${relatedInvoice.number} sin ítems en la base; se usó el total. Podés emitir el ${type === "Recibo" ? "recibo" : "NC"}.`,
                 "success"
               );
             }
           })
           .catch(() => {
-            showToast(`La factura ${relatedInvoice.number} no tiene ítems cargados.`, "warning");
+            showToast(`El comprobante ${relatedInvoice.number} no tiene ítems cargados.`, "warning");
             setItemsLocked(false);
           });
       }
@@ -606,7 +606,7 @@ export function FacturacionMineriaPage() {
       return;
     }
     if (type === "Nota de Crédito" && !relatedInvoiceId) {
-      showToast("Debe seleccionar una factura a cancelar para la Nota de Crédito.", "error");
+      showToast("Debe seleccionar un comprobante a cancelar para la Nota de Crédito.", "error");
       return;
     }
     if (type === "Nota de Crédito" && relatedInvoiceId) {
@@ -617,7 +617,7 @@ export function FacturacionMineriaPage() {
         ? invoicesAll.some((inv) => inv.type === "Nota de Crédito" && isLinkedToInvoice(inv, facturaTarget))
         : false;
       if (hasExistingNC) {
-        showToast("Esta factura ya tiene una Nota de Crédito relacionada. No se puede crear otra.", "error");
+        showToast("Este comprobante ya tiene una Nota de Crédito relacionada. No se puede crear otra.", "error");
         return;
       }
     }
@@ -629,14 +629,14 @@ export function FacturacionMineriaPage() {
       const factura = invoicesAll.find((i) => i.type === "Factura" && String(i.id) === String(relatedInvoiceId)) ?? null;
       if (factura && invoicePendingCollectionAmount(factura, invoicesAll) <= INVOICE_BALANCE_EPS) {
         showToast(
-          "Esta factura no tiene saldo pendiente de cobro (puede estar totalmente pagada o cancelada por nota(s) de crédito).",
+          "Este comprobante no tiene saldo pendiente de cobro (puede estar totalmente pagado o cancelado por nota(s) de crédito).",
           "error"
         );
         return;
       }
     }
     if (items.length === 0) {
-      showToast("La factura no tiene ítems cargados.", "error");
+      showToast("El comprobante no tiene ítems cargados.", "error");
       return;
     }
     if (totals.total === 0) {
@@ -718,7 +718,7 @@ export function FacturacionMineriaPage() {
     const numberToUse = createdInvoice.number;
 
     if (downloadPdf) {
-      showToast("Generando factura PDF...", "info");
+      showToast("Generando comprobante PDF...", "info");
       let logoBase64: string | undefined;
       try {
         logoBase64 = await loadImageAsBase64("/images/LOGO-HASHRATE.png");
@@ -752,17 +752,18 @@ export function FacturacionMineriaPage() {
           total,
           dueDateDays,
           relatedInvoiceNumber: relatedInvoice?.number,
-          creditNoteMode: inferredNcMode
+          creditNoteMode: inferredNcMode,
+          documentContext: "comprobante-pago",
         },
         { logoBase64 }
       );
       const safeName = selectedClient.name.replace(/[^\w\s-]/g, "").replace(/\s+/g, " ").trim() || "cliente";
       doc.save(`${numberToUse}_${safeName}.pdf`);
-      const tipoMensaje = type === "Factura" ? "Factura" : type === "Recibo" ? "Recibo" : "Nota de Crédito";
-      showToast(`${tipoMensaje} generada y guardada correctamente.`, "success");
+      const tipoMensaje = type === "Factura" ? "Comprobante de pago" : type === "Recibo" ? "Recibo" : "Nota de Crédito";
+      showToast(`${tipoMensaje} generado y guardado correctamente.`, "success");
     } else {
-      const tipoMensaje = type === "Factura" ? "Factura" : type === "Recibo" ? "Recibo" : "Nota de Crédito";
-      showToast(`${tipoMensaje} registrada correctamente.`, "success");
+      const tipoMensaje = type === "Factura" ? "Comprobante de pago" : type === "Recibo" ? "Recibo" : "Nota de Crédito";
+      showToast(`${tipoMensaje} registrado correctamente.`, "success");
     }
 
     const inv: Invoice = {
@@ -873,7 +874,8 @@ export function FacturacionMineriaPage() {
         total,
         dueDate: parseDueDateStr(inv.dueDate ?? ""),
         relatedInvoiceNumber: inv.relatedInvoiceNumber ?? relatedForNc?.number,
-        creditNoteMode: inferredNcMode
+        creditNoteMode: inferredNcMode,
+        documentContext: "comprobante-pago",
       },
       { logoBase64 }
     );
@@ -896,13 +898,13 @@ export function FacturacionMineriaPage() {
       return <Navigate to="/asic/history" replace />;
     }
     return (
-      <div className="fact-page">
+      <div className="fact-page fact-page--asic-billing">
         <div className="container py-5">
           <div className="alert alert-warning d-flex align-items-center" role="alert">
             <i className="bi bi-lock-fill me-3" style={{ fontSize: "1.5rem" }} />
             <div>
               <h5 className="alert-heading mb-1">Sin permiso</h5>
-              <p className="mb-0">Su rol (Lector) solo permite consultar. No puede emitir facturas, recibos ni notas de crédito.</p>
+              <p className="mb-0">Su rol (Lector) solo permite consultar. No puede emitir comprobantes de pago, recibos ni notas de crédito.</p>
               <Link to={sgiHome()} className="alert-link mt-2 d-inline-block">Volver al inicio</Link>
             </div>
           </div>
@@ -912,9 +914,9 @@ export function FacturacionMineriaPage() {
   }
 
   return (
-    <div className="fact-page">
+    <div className="fact-page fact-page--asic-billing">
       <div className="container">
-        <PageHeader title="Facturación Equipos" />
+        <PageHeader title="Comprobantes de pago" />
 
         <div className="fact-layout">
           {/* Panel configuración: mismo estilo que Detalle de servicios (panel verde) */}
@@ -939,7 +941,7 @@ export function FacturacionMineriaPage() {
                           }
                         }}
                       >
-                        <option value="Factura">Factura</option>
+                        <option value="Factura">Comprobante de pago</option>
                         <option value="Recibo">Recibo</option>
                         <option value="Nota de Crédito">NC</option>
                       </select>
@@ -983,7 +985,7 @@ export function FacturacionMineriaPage() {
                   ) : (type === "Nota de Crédito" || type === "Recibo") && !selectedClient ? (
                     <div className="fact-select-client-hint-box">
                       <small className="text-warning">
-                        Seleccionar un cliente para ver facturas disponibles.
+                        Seleccionar un cliente para ver comprobantes disponibles.
                       </small>
                     </div>
                   ) : type === "Recibo" && relatedInvoiceId ? (
@@ -995,7 +997,7 @@ export function FacturacionMineriaPage() {
                   ) : type === "Recibo" && selectedClient && invoicesWithoutReceipt.length === 0 ? (
                     <div className="fact-select-client-hint-box fact-select-client-hint-box--ok">
                       <small>
-                        ℹ️ Este cliente no tiene facturas por liquidar pendientes.
+                        ℹ️ Este cliente no tiene comprobantes por liquidar pendientes.
                       </small>
                     </div>
                   ) : null}
@@ -1027,7 +1029,7 @@ export function FacturacionMineriaPage() {
                 {type === "Nota de Crédito" && (
                   <div className="fact-field" style={{ borderTop: "none", paddingTop: 0, marginTop: 0 }}>
                     <label className="fact-label" style={{ fontWeight: "bold", color: "#00a652" }}>
-                      ⚠️ Factura a cancelar (Requerido)
+                      ⚠️ Comprobante a cancelar (Requerido)
                     </label>
                     {selectedClient ? (
                       <>
@@ -1038,7 +1040,7 @@ export function FacturacionMineriaPage() {
                           style={{ border: relatedInvoiceId ? "2px solid #00a652" : "2px solid #dc3545" }}
                           required
                         >
-                          <option value="">-- Seleccione factura --</option>
+                          <option value="">-- Seleccione comprobante --</option>
                           {invoicesWithoutCreditNote.map((inv) => (
                             <option key={inv.id} value={inv.id}>
                               {inv.number} - {inv.date} - Total: {formatUSD(Math.abs(inv.total))}
@@ -1048,14 +1050,14 @@ export function FacturacionMineriaPage() {
                         {invoicesWithoutCreditNote.length === 0 && selectedClient && (
                           <div style={{ padding: "0.75rem", backgroundColor: "#f8d7da", border: "1px solid #dc3545", borderRadius: "4px", marginTop: "0.5rem" }}>
                             <small className="text-danger">
-                              ⚠️ Este cliente no tiene Facturas disponibles en Pendientes.
+                              ⚠️ Este cliente no tiene comprobantes disponibles en Pendientes.
                             </small>
                           </div>
                         )}
                         {relatedInvoiceId && (
                           <div style={{ padding: "0.75rem", backgroundColor: "#d1e7dd", border: "1px solid #00a652", borderRadius: "4px", marginTop: "0.5rem" }}>
                             <small className="text-success" style={{ fontWeight: "bold" }}>
-                              ✓ Factura Pendiente seleccionada para cancelar con Nota de Credito.
+                              ✓ Comprobante pendiente seleccionado para cancelar con Nota de Credito.
                             </small>
                           </div>
                         )}
@@ -1068,7 +1070,7 @@ export function FacturacionMineriaPage() {
                 {type === "Recibo" && (
                   <div className="fact-field" style={{ borderTop: "none", paddingTop: 0, marginTop: 0 }}>
                     <label className="fact-label" style={{ fontWeight: "bold", color: "#fff" }}>
-                      <span style={{ fontSize: "1.3em", lineHeight: 1 }}>🧾</span> Factura abonada (Requerido)
+                      <span style={{ fontSize: "1.3em", lineHeight: 1 }}>🧾</span> Comprobante abonado (Requerido)
                     </label>
                     {selectedClient ? (
                       <>
@@ -1078,7 +1080,7 @@ export function FacturacionMineriaPage() {
                           onChange={(e) => setRelatedInvoiceId(e.target.value)}
                           style={{ border: relatedInvoiceId ? "2px solid #0d6efd" : "1px solid #ced4da" }}
                         >
-                          <option value="">-- Seleccione factura --</option>
+                          <option value="">-- Seleccione comprobante --</option>
                           {invoicesWithoutReceipt.map((inv) => (
                             <option key={inv.id} value={inv.id}>
                               {inv.number} - {inv.date} - Total: {formatUSD(Math.abs(inv.total))}
@@ -1131,7 +1133,7 @@ export function FacturacionMineriaPage() {
                             className="fact-detail-servicios-btn-add"
                             onClick={addItem}
                             disabled={itemsLocked || (type === "Nota de Crédito" && !relatedInvoiceId) || !selectedClient}
-                            title={itemsLocked ? "Los detalles están bloqueados porque vienen de una factura relacionada" : !selectedClient ? "Primero debe seleccionar un cliente" : type === "Nota de Crédito" && !relatedInvoiceId ? "Primero debe seleccionar una factura a cancelar" : (type === "Recibo" || type === "Nota de Crédito") && relatedInvoiceId ? "Los ítems se cargaron desde la factura relacionada" : ""}
+                            title={itemsLocked ? "Los detalles están bloqueados porque vienen de un comprobante relacionado" : !selectedClient ? "Primero debe seleccionar un cliente" : type === "Nota de Crédito" && !relatedInvoiceId ? "Primero debe seleccionar un comprobante a cancelar" : (type === "Recibo" || type === "Nota de Crédito") && relatedInvoiceId ? "Los ítems se cargaron desde el comprobante relacionado" : ""}
                           >
                             + Agregar ítem
                           </button>
@@ -1140,21 +1142,21 @@ export function FacturacionMineriaPage() {
                       {type === "Nota de Crédito" && !relatedInvoiceId && (
                         <div style={{ padding: "1rem", backgroundColor: "rgba(255, 193, 7, 0.2)", border: "1px solid rgba(255, 193, 7, 0.6)", borderRadius: "10px", marginBottom: "1rem" }}>
                           <small style={{ fontWeight: "bold", color: "#fff" }}>
-                            ⚠️ Para crear una Nota de Crédito, primero debe seleccionar una factura a cancelar en el panel izquierdo.
+                            ⚠️ Para crear una Nota de Crédito, primero debe seleccionar un comprobante a cancelar en el panel izquierdo.
                           </small>
                         </div>
                       )}
                       {type === "Nota de Crédito" && relatedInvoiceId && (
                         <div style={{ padding: "0.75rem", backgroundColor: "rgba(255, 255, 255, 0.15)", border: "1px solid rgba(255, 255, 255, 0.4)", borderRadius: "10px", marginBottom: "1rem" }}>
                           <small style={{ fontWeight: "bold", color: "#fff" }}>
-                            ✓ Nota de Crédito seleccionada para cancelar la factura correspondiente.
+                            ✓ Nota de Crédito seleccionada para cancelar el comprobante correspondiente.
                           </small>
                         </div>
                       )}
                       {type === "Recibo" && relatedInvoiceId && (
                         <div style={{ padding: "0.75rem", backgroundColor: "rgba(255, 255, 255, 0.15)", border: "1px solid rgba(255, 255, 255, 0.4)", borderRadius: "10px", marginBottom: "1rem" }}>
                           <small style={{ fontWeight: "bold", color: "#fff" }}>
-                            🔒 Recibo relacionado con factura. Los detalles están bloqueados.
+                            🔒 Recibo relacionado con comprobante. Los detalles están bloqueados.
                           </small>
                         </div>
                       )}
@@ -1177,8 +1179,8 @@ export function FacturacionMineriaPage() {
                               <span className="fact-detail-servicios-empty-icon">📋</span>
                               <p className="fact-detail-servicios-empty-text">
                                 {type === "Nota de Crédito" && !relatedInvoiceId
-                                  ? "Seleccioná una factura a cancelar en el panel izquierdo para cargar los ítems."
-                                  : "Agregá tu primer ítem para armar la factura."}
+                                  ? "Seleccioná un comprobante a cancelar en el panel izquierdo para cargar los ítems."
+                                  : "Agregá tu primer ítem para armar el comprobante."}
                               </p>
                             </td>
                           </tr>
@@ -1211,7 +1213,7 @@ export function FacturacionMineriaPage() {
                                       backgroundColor: "#f3f4f6",
                                       cursor: "not-allowed",
                                     }}
-                                    title="Detalle cargado desde la factura"
+                                    title="Detalle cargado desde el comprobante"
                                   />
                                 ) : (
                                 <select
@@ -1440,7 +1442,7 @@ export function FacturacionMineriaPage() {
                                     if (itemsLocked) return;
                                     removeItem(idx);
                                   }}
-                                  title={itemsLocked ? "No se pueden eliminar ítems cuando vienen de una factura relacionada" : "Quitar ítem"}
+                                  title={itemsLocked ? "No se pueden eliminar ítems cuando vienen de un comprobante relacionado" : "Quitar ítem"}
                                   disabled={itemsLocked}
                                 >
                                   ×
@@ -1507,7 +1509,7 @@ export function FacturacionMineriaPage() {
                             return (
                               <tr key={item.invoice.id}>
                                 <td>
-                                  {inv.type === "Nota de Crédito" ? "Nota C." : inv.type}
+                                  {inv.type === "Nota de Crédito" ? "Nota C." : inv.type === "Factura" ? "Comp. pago" : inv.type}
                                   {inv.type === "Recibo" && " "}
                                   {(inv.type === "Factura" || inv.type === "Recibo" || inv.type === "Nota de Crédito") && (Date.now() - new Date(item.emittedAt).getTime() < MS_22H) && (
                                     <span
@@ -1624,6 +1626,7 @@ export function FacturacionMineriaPage() {
                             })()
                           : undefined
                       }
+                      documentContext="comprobante-pago"
                     />
                   ) : selectedClient && items.length > 0 ? (
                     <InvoicePreview
@@ -1652,6 +1655,7 @@ export function FacturacionMineriaPage() {
                             })()
                           : undefined
                       }
+                      documentContext="comprobante-pago"
                     />
                   ) : (
                     <div className="fact-panel-vista-previa-empty">

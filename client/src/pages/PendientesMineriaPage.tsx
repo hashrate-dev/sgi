@@ -256,7 +256,8 @@ export function PendientesMineriaPage() {
           items: validItems,
           subtotal: inv.subtotal || 0,
           discounts: inv.discounts || 0,
-          total: inv.total || 0
+          total: inv.total || 0,
+          documentContext: "comprobante-pago",
         },
         { logoBase64 }
       );
@@ -334,7 +335,7 @@ export function PendientesMineriaPage() {
 
           <div className="pendientes-listado-wrap">
           <div className="d-flex justify-content-between align-items-center mb-2">
-            <h6 className="fw-bold m-0">📄 Facturas Pendientes (ASIC){user && !canExportData ? " (solo consulta)" : ""}</h6>
+            <h6 className="fw-bold m-0">📄 Comprobantes pendientes (ASIC){user && !canExportData ? " (solo consulta)" : ""}</h6>
           </div>
 
           <div className="table-responsive pendientes-facturas-table-scroll">
@@ -381,7 +382,7 @@ export function PendientesMineriaPage() {
                 ) : filtered.length === 0 ? (
                   <tr>
                     <td colSpan={13} className="text-center text-muted py-4">
-                      <small>{pendingInvoices.length === 0 ? "No hay facturas pendientes de cobro." : "No se encontraron facturas con los filtros aplicados."}</small>
+                      <small>{pendingInvoices.length === 0 ? "No hay comprobantes pendientes de cobro." : "No se encontraron comprobantes con los filtros aplicados."}</small>
                     </td>
                   </tr>
                 ) : (
@@ -470,7 +471,7 @@ export function PendientesMineriaPage() {
           <div className="col-6 col-md-4">
             <div className="card stat-card p-3">
               <div className="stat-accent bg-danger" />
-              <div className="stat-label">Total facturas pendientes</div>
+              <div className="stat-label">Total comprobantes pendientes</div>
               <div className="stat-value text-danger">{stats.totalPendientes}</div>
             </div>
           </div>
@@ -548,13 +549,13 @@ export function PendientesMineriaPage() {
                         <div className="row g-2 small mb-3">
                           <div className="col-md-4 text-end"><strong>Total (S/Desc):</strong> {formatCurrency(inv.subtotal)}</div>
                           <div className="col-md-4 text-end"><strong>Descuento:</strong> {formatCurrency(inv.discounts)}</div>
-                          <div className="col-md-4 text-end"><strong>Total Factura:</strong> {formatCurrency(originalTotal)}</div>
+                          <div className="col-md-4 text-end"><strong>Total comprobante:</strong> {formatCurrency(originalTotal)}</div>
                           <div className="col-md-4 text-end text-info"><strong>NC aplicada:</strong> - {formatCurrency(creditApplied)}</div>
                           <div className="col-md-4 text-end text-primary"><strong>Cobros aplicados:</strong> - {formatCurrency(paidApplied)}</div>
                           <div className="col-md-4 text-end text-danger"><strong>Saldo pendiente:</strong> {formatCurrency(pendingAmount)}</div>
                         </div>
                         <div className="alert alert-warning">
-                          <strong>⚠️ Estado:</strong> Esta factura está pendiente de cobro con saldo neto (Factura - NC - Cobros).
+                          <strong>⚠️ Estado:</strong> Este comprobante está pendiente de cobro con saldo neto (Comprobante - NC - Cobros).
                         </div>
                       </>
                     );

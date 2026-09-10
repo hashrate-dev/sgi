@@ -155,7 +155,7 @@ export function InvoicePreview({
               <div className="invoice-preview-company-detail">{EMISOR.email}</div>
             </div>
             <div className="invoice-preview-company-right">
-              <div className={`invoice-preview-type${documentContext === "garantia-ande" ? " invoice-preview-type--garantia" : ""}`}>
+              <div className={`invoice-preview-type${documentContext === "garantia-ande" || documentContext === "comprobante-pago" ? " invoice-preview-type--garantia" : ""}`}>
                 {tipoLabel} - {number}
               </div>
               <div className="invoice-preview-label">VIA CLIENTE</div>
@@ -281,9 +281,14 @@ export function InvoicePreview({
           </div>
         )}
 
-        {/* Recibo / Recibo Devolución: monto en palabras (+ legal depósito si aplica) */}
-        {displayItems.length > 0 && (type === "Recibo" || type === "Recibo Devolución") && (() => {
-          const { line1, line2 } = recibimosMontoEnDosLineas(total, type, documentContext);
+        {/* Recibo / Recibo Devolución / Comprobante de pago ASIC: monto en palabras */}
+        {displayItems.length > 0 &&
+          (type === "Recibo" ||
+            type === "Recibo Devolución" ||
+            (documentContext === "comprobante-pago" && type === "Factura")) &&
+          (() => {
+          const montoTipo = type === "Factura" ? "Recibo" : type;
+          const { line1, line2 } = recibimosMontoEnDosLineas(total, montoTipo, documentContext === "garantia-ande" ? "garantia-ande" : undefined);
           const notaGuarani = "El monto que se devuelve puede ser distinto al monto contable, debido a que se ajusta por el valor del Guaraní a la fecha.";
           if (documentContext === "garantia-ande") {
             return (
@@ -307,6 +312,10 @@ export function InvoicePreview({
                 <div className="invoice-preview-recibimos-texto-seguido">
                   {line1} {line2} {notaGuarani}
                 </div>
+              ) : documentContext === "comprobante-pago" && type === "Factura" ? (
+                <div className="invoice-preview-recibimos-texto-seguido">
+                  {line1} {line2}
+                </div>
               ) : (
                 <>
                   <div className="invoice-preview-recibimos-line1">{line1}</div>
@@ -316,7 +325,10 @@ export function InvoicePreview({
             </div>
           );
         })()}
-        {displayItems.length > 0 && type !== "Recibo" && type !== "Recibo Devolución" && (
+        {displayItems.length > 0 &&
+          type !== "Recibo" &&
+          type !== "Recibo Devolución" &&
+          !(documentContext === "comprobante-pago" && type === "Factura") && (
           <div className="invoice-preview-dates-wrap">
             {type === "Nota de Crédito" && relatedInvoiceNumber && (
               <div className="invoice-preview-credit-note-ref">

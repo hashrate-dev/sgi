@@ -646,7 +646,8 @@ export function HistorialMineriaPage() {
           discounts: inv.discounts || 0,
           total: inv.total || 0,
           relatedInvoiceNumber: relatedInvoiceNumberForPdf,
-          creditNoteMode: inferredNcMode
+          creditNoteMode: inferredNcMode,
+          documentContext: "comprobante-pago",
         },
         { logoBase64 }
       );
@@ -692,7 +693,7 @@ export function HistorialMineriaPage() {
                       style={{ maxWidth: "8.5rem" }}
                     >
                       <option value="">Todos</option>
-                      <option value="Factura">Factura</option>
+                      <option value="Factura">Comprobante de pago</option>
                       <option value="Recibo">Recibo</option>
                       <option value="Nota de Crédito">Nota de Crédito</option>
                     </select>
@@ -852,7 +853,7 @@ export function HistorialMineriaPage() {
                     return (
                       <tr key={inv.id}>
                         <td className="fw-bold text-start">{inv.number}</td>
-                        <td className="text-start">{inv.type === "Nota de Crédito" ? "NC" : inv.type}</td>
+                        <td className="text-start">{inv.type === "Nota de Crédito" ? "NC" : inv.type === "Factura" ? "Comp. pago" : inv.type}</td>
                         <td className="text-start">{inv.clientName}</td>
                         <td className="text-start">{inv.date}</td>
                         <td className="text-start">{inv.emissionTime || "-"}</td>
@@ -980,7 +981,7 @@ export function HistorialMineriaPage() {
           <div className="col-6 col-md-2">
             <div className="card stat-card p-3">
               <div className="stat-accent bg-primary" />
-              <div className="stat-label">Total facturas</div>
+              <div className="stat-label">Total comprobantes</div>
               <div className="stat-value text-primary">{stats.facturas}</div>
             </div>
           </div>
@@ -1089,7 +1090,7 @@ export function HistorialMineriaPage() {
                       <>
                         <div className="row g-2 small mb-3">
                           <div className="col-md-4"><strong>Número:</strong> {inv.number}</div>
-                          <div className="col-md-4"><strong>Tipo:</strong> {inv.type}</div>
+                          <div className="col-md-4"><strong>Tipo:</strong> {inv.type === "Factura" ? "Comprobante de pago" : inv.type}</div>
                           <div className="col-md-4"><strong>Cliente:</strong> {inv.clientName}</div>
                           <div className="col-md-4"><strong>Fecha emisión:</strong> {inv.date}</div>
                           <div className="col-md-4"><strong>Hora emisión:</strong> {inv.emissionTime || "-"}</div>

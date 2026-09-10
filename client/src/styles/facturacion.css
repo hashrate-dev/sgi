@@ -2702,6 +2702,37 @@ button.fact-back {
   min-height: 1100px;
 }
 
+/* ASIC comprobante de pago: Vista previa más alta (mismo criterio que Garantía ANDE) */
+.fact-page--asic-billing .fact-main {
+  height: auto;
+  min-height: calc(100dvh - 8rem);
+  max-height: none;
+  overflow: visible;
+}
+
+.fact-page--asic-billing .fact-main > .fact-card:first-of-type {
+  flex: 0 0 auto;
+}
+
+.fact-page--asic-billing .fact-detail-servicios-table-wrap {
+  min-height: 140px;
+  max-height: 280px;
+}
+
+.fact-page--asic-billing .fact-main > .fact-panel-vista-previa {
+  flex: 0 0 auto;
+  min-height: 1180px;
+}
+
+.fact-page--asic-billing .fact-panel-vista-previa-body {
+  min-height: 1120px;
+}
+
+.fact-page--asic-billing .fact-panel-vista-previa-inner,
+.fact-page--asic-billing .fact-panel-vista-previa-empty {
+  min-height: 1100px;
+}
+
 .fact-panel-nuevo-documento.asic-cotizador-params-panel .asic-cotizador-catalog-row,
 .fact-panel-nuevo-documento.asic-cotizador-params-panel .asic-cotizador-costos-row {
   overflow: visible;
