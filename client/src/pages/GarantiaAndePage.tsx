@@ -23,6 +23,7 @@ import { InvoicePreview } from "../components/InvoicePreview";
 import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import { canEditFacturacion } from "../lib/auth";
+import { buildAsicComprobantePdfFilename } from "../lib/asicPdfFilename";
 import "../styles/facturacion.css";
 
 function todayLocale() {
@@ -323,9 +324,16 @@ export function GarantiaAndePage() {
       },
       { logoBase64 }
     );
-    const safeName = selectedClient.name.replace(/[^\w\s-]/g, "").replace(/\s+/g, " ").trim() || "cliente";
     if (savePdf) {
-      doc.save(`${number}_${safeName}.pdf`);
+      doc.save(
+        buildAsicComprobantePdfFilename({
+          number,
+          clientName: selectedClient.name,
+          type: tipoGarantia,
+          items,
+          documentContext: "garantia-ande",
+        })
+      );
     }
     showToast(savePdf ? `${tipoGarantia} generado y guardado correctamente.` : `${tipoGarantia} emitido correctamente.`, "success");
 
@@ -422,8 +430,15 @@ export function GarantiaAndePage() {
       },
       { logoBase64 }
     );
-    const safeName = inv.clientName.replace(/[^\w\s-]/g, "").replace(/\s+/g, " ").trim() || "cliente";
-    doc.save(`${inv.number}_${safeName}.pdf`);
+    doc.save(
+      buildAsicComprobantePdfFilename({
+        number: inv.number,
+        clientName: inv.clientName,
+        type: inv.type,
+        items: inv.items,
+        documentContext: "garantia-ande",
+      })
+    );
     showToast(`PDF ${inv.number} descargado.`, "success");
   }
 

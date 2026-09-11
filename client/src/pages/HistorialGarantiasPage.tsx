@@ -16,6 +16,7 @@ import { PageHeader } from "../components/PageHeader";
 import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency, formatCurrencyNumber } from "../lib/formatCurrency";
+import { buildAsicComprobantePdfFilename } from "../lib/asicPdfFilename";
 import "../styles/facturacion.css";
 
 function genId() {
@@ -355,8 +356,15 @@ export function HistorialGarantiasPage() {
       },
       { logoBase64 }
     );
-    const safeName = inv.clientName.replace(/[^\w\s-]/g, "").replace(/\s+/g, " ").trim() || "cliente";
-    doc.save(`${inv.number}_${safeName}.pdf`);
+    doc.save(
+      buildAsicComprobantePdfFilename({
+        number: inv.number,
+        clientName: inv.clientName,
+        type: inv.type,
+        items: inv.items,
+        documentContext: "garantia-ande",
+      })
+    );
     showToast(`PDF ${inv.number} descargado.`, "success");
   }
 

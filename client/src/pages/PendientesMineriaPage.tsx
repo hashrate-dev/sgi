@@ -13,6 +13,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { canExport } from "../lib/auth";
 import { formatCurrency, formatCurrencyNumber } from "../lib/formatCurrency";
 import { isAsicEquipmentSaleInvoice } from "../lib/asicDocumentKind";
+import { buildAsicComprobantePdfFilename } from "../lib/asicPdfFilename";
 import "../styles/facturacion.css";
 
 // Función para calcular fecha de vencimiento desde fecha de emisión
@@ -263,8 +264,15 @@ export function PendientesMineriaPage() {
         { logoBase64 }
       );
 
-      const safeName = client.name.replace(/[^\w\s-]/g, "").replace(/\s+/g, " ").trim() || "cliente";
-      doc.save(`${inv.number}_${safeName}.pdf`);
+      doc.save(
+        buildAsicComprobantePdfFilename({
+          number: inv.number,
+          clientName: client.name,
+          type: inv.type,
+          items: validItems,
+          documentContext: isAsicEquipmentSaleInvoice(inv) ? "comprobante-pago" : undefined,
+        })
+      );
       showToast("PDF generado correctamente.", "success", "Pendientes");
     } catch (error) {
       console.error("Error al generar PDF:", error);

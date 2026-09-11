@@ -45,6 +45,7 @@ import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
 import { isClienteTiendaOnline } from "../lib/clientTienda";
 import { formatCurrencyNumber, formatUSD } from "../lib/formatCurrency";
 import { isAsicEquipmentSaleDocument, isAsicEquipmentSaleInvoice } from "../lib/asicDocumentKind";
+import { buildAsicComprobantePdfFilename } from "../lib/asicPdfFilename";
 import type { InvoiceDocumentContext } from "../lib/invoiceDocumentContext";
 import "../styles/facturacion.css";
 
@@ -773,8 +774,17 @@ export function FacturacionMineriaPage() {
         },
         { logoBase64 }
       );
-      const safeName = selectedClient.name.replace(/[^\w\s-]/g, "").replace(/\s+/g, " ").trim() || "cliente";
-      doc.save(`${numberToUse}_${safeName}.pdf`);
+      const emitDocContext =
+        type === "Factura" && isAsicEquipmentSaleDocument(items) ? ("comprobante-pago" as const) : undefined;
+      doc.save(
+        buildAsicComprobantePdfFilename({
+          number: numberToUse,
+          clientName: selectedClient.name,
+          type,
+          items,
+          documentContext: emitDocContext,
+        })
+      );
       const tipoMensaje =
         type === "Factura"
           ? isAsicEquipmentSaleDocument(items)
@@ -909,8 +919,15 @@ export function FacturacionMineriaPage() {
       },
       { logoBase64 }
     );
-    const safeName = inv.clientName.replace(/[^\w\s-]/g, "").replace(/\s+/g, " ").trim() || "cliente";
-    doc.save(`${inv.number}_${safeName}.pdf`);
+    doc.save(
+      buildAsicComprobantePdfFilename({
+        number: inv.number,
+        clientName: inv.clientName,
+        type: inv.type,
+        items: inv.items,
+        documentContext: isAsicEquipmentSaleInvoice(inv) ? "comprobante-pago" : undefined,
+      })
+    );
     showToast(`PDF ${inv.number} descargado.`, "success");
   }
 

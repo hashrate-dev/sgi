@@ -15,6 +15,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { canDeleteHistorial, canExport } from "../lib/auth";
 import { formatCurrency, formatCurrencyNumber } from "../lib/formatCurrency";
 import { isAsicEquipmentSaleInvoice } from "../lib/asicDocumentKind";
+import { buildAsicComprobantePdfFilename } from "../lib/asicPdfFilename";
 import "../styles/facturacion.css";
 
 /** Normaliza mes a YYYY-MM para filtrar por columna MES */
@@ -664,8 +665,15 @@ export function HistorialMineriaPage() {
       );
 
       // Guardar el PDF
-      const safeName = client.name.replace(/[^\w\s-]/g, "").replace(/\s+/g, " ").trim() || "cliente";
-      doc.save(`${inv.number}_${safeName}.pdf`);
+      doc.save(
+        buildAsicComprobantePdfFilename({
+          number: inv.number,
+          clientName: client.name,
+          type: inv.type,
+          items: validItems,
+          documentContext: isAsicEquipmentSaleInvoice(inv) ? "comprobante-pago" : undefined,
+        })
+      );
       showToast("PDF generado correctamente.", "success");
     } catch (error) {
       console.error("Error al generar PDF:", error);
