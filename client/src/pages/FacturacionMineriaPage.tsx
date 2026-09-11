@@ -988,17 +988,10 @@ export function FacturacionMineriaPage() {
                           }
                         }}
                       >
-                        <option value="Factura">Factura / Comp. pago</option>
+                        <option value="Factura">Factura</option>
                         <option value="Recibo">Recibo</option>
                         <option value="Nota de Crédito">NC</option>
                       </select>
-                      {type === "Factura" && items.length > 0 && (
-                        <small className="text-muted d-block mt-1">
-                          {asicFacturaDocumentContext === "comprobante-pago"
-                            ? "Venta equipos → Comp. pago (sin recibo)"
-                            : "Reparación / flete → Factura + Recibo"}
-                        </small>
-                      )}
                     </div>
                   </div>
                   <div className="col-6">
@@ -1012,13 +1005,28 @@ export function FacturacionMineriaPage() {
                   className="fact-field fact-field--doc-extra-top"
                   aria-hidden={
                     !(
+                      (type === "Factura" && items.length > 0) ||
                       ((type === "Nota de Crédito" || type === "Recibo") && !selectedClient) ||
                       (type === "Recibo" && !!selectedClient && invoicesWithoutReceipt.length === 0) ||
                       (type === "Recibo" && !!relatedInvoiceId)
                     )
                   }
                 >
-                  {(type === "Nota de Crédito" || type === "Recibo") && !selectedClient ? (
+                  {type === "Factura" && items.length > 0 ? (
+                    <div
+                      className={`fact-select-client-hint-box ${
+                        asicFacturaDocumentContext === "comprobante-pago"
+                          ? "fact-select-client-hint-box--ok"
+                          : "fact-select-client-hint-box--info"
+                      }`}
+                    >
+                      <small>
+                        {asicFacturaDocumentContext === "comprobante-pago"
+                          ? "Venta equipos · Comp. pago (sin recibo)"
+                          : "Reparación / flete · Factura + Recibo"}
+                      </small>
+                    </div>
+                  ) : (type === "Nota de Crédito" || type === "Recibo") && !selectedClient ? (
                     <div className="fact-select-client-hint-box">
                       <small className="text-warning">
                         Seleccionar un cliente para ver comprobantes disponibles.
