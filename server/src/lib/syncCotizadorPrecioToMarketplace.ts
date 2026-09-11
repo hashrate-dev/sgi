@@ -127,6 +127,44 @@ export function scoreCotizadorEquipoMatch(
   return null;
 }
 
+/** Carga candidatos de tienda para match cotizador↔marketplace. */
+export async function loadCotizadorMarketplaceCandidates(): Promise<CotizadorMatchCandidate[]> {
+  return (await db
+    .prepare(
+      `SELECT id, numero_serie, fecha_ingreso, marca_equipo, modelo, procesador, precio_usd, mp_visible, precio_historial_json
+       FROM equipos_asic`
+    )
+    .all()) as CotizadorMatchCandidate[];
+}
+
+/**
+ * ¿Este precio de cotización es el que está publicado en tienda?
+ * Solo true si hay match único visible y `precio_usd` == `precioVenta` (redondeado).
+ */
+export function cotizacionPrecioPublicadoEnMarketplace(
+  cotiz: { marca: string; modelo: string; procesador: string; precioVenta: number },
+  rows: CotizadorMatchCandidate[]
+): {
+  marketplacePublished: boolean;
+  marketplacePrecioUsd?: number;
+  marketplaceLabel?: string;
+  marketplaceEquipoId?: string;
+} {
+  const resolved = resolveCotizadorMarketplaceTarget(cotiz, rows);
+  if (resolved.status !== "ok" || !resolved.target) {
+    return { marketplacePublished: false };
+  }
+  const mpPrecio = Math.round(Number(resolved.target.precio_usd) || 0);
+  const cotizPrecio = Math.round(Number(cotiz.precioVenta) || 0);
+  const label = `${resolved.target.marca_equipo} ${resolved.target.modelo} · ${resolved.target.procesador}`.trim();
+  return {
+    marketplacePublished: mpPrecio === cotizPrecio && cotizPrecio > 0,
+    marketplacePrecioUsd: mpPrecio,
+    marketplaceLabel: label,
+    marketplaceEquipoId: resolved.target.id,
+  };
+}
+
 /**
  * Resuelve a qué equipo de tienda actualizaría (sin escribir).
  * Solo considera `mp_visible`; si hay 0 o >1 → no actualiza.
@@ -177,12 +215,7 @@ export async function syncCotizadorPrecioToMarketplace(params: {
     return { status: "skipped", message: "Falta modelo/procesador; no se actualizó marketplace." };
   }
 
-  const rows = (await db
-    .prepare(
-      `SELECT id, numero_serie, fecha_ingreso, marca_equipo, modelo, procesador, precio_usd, mp_visible, precio_historial_json
-       FROM equipos_asic`
-    )
-    .all()) as CotizadorMatchCandidate[];
+  const rows = await loadCotizadorMarketplaceCandidates();
 
   const cotiz = {
     marca: String(params.marca ?? "").trim(),
@@ -289,12 +322,7 @@ export async function backfillLatestCotizadorPreciosToMarketplace(user: AuthUser
   let unchanged = 0;
   let skipped = 0;
 
-  const equipos = (await db
-    .prepare(
-      `SELECT id, numero_serie, fecha_ingreso, marca_equipo, modelo, procesador, precio_usd, mp_visible, precio_historial_json
-       FROM equipos_asic`
-    )
-    .all()) as CotizadorMatchCandidate[];
+  const equipos = await loadCotizadorMarketplaceCandidates();
 
   for (const row of costos) {
     const marca = String(row.marca ?? "").trim();

@@ -4,7 +4,7 @@ import { db } from "../db.js";
 import { requireRole } from "../middleware/auth.js";
 import { requireAnyModuleGrant, requireModuleGrant } from "../middleware/moduleGrant.js";
 import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
-import { syncCotizadorPrecioToMarketplace, backfillLatestCotizadorPreciosToMarketplace } from "../lib/syncCotizadorPrecioToMarketplace.js";
+import { syncCotizadorPrecioToMarketplace, backfillLatestCotizadorPreciosToMarketplace, loadCotizadorMarketplaceCandidates, cotizacionPrecioPublicadoEnMarketplace } from "../lib/syncCotizadorPrecioToMarketplace.js";
 
 export const asicCostosRouter = Router();
 let asicCostosSchemaEnsured = false;
@@ -198,9 +198,12 @@ type AsicCostoRow = {
   pct_margen: number;
 };
 
-function mapAsicCostoRow(raw: Record<string, unknown>) {
+function mapAsicCostoRow(
+  raw: Record<string, unknown>,
+  marketplace?: ReturnType<typeof cotizacionPrecioPublicadoEnMarketplace>
+) {
   const r = rowKeysToLowercase(raw);
-  return {
+  const base = {
     id: Number(r.id ?? 0),
     createdAt: String(r.created_at ?? ""),
     marca: String(r.marca ?? ""),
@@ -215,6 +218,13 @@ function mapAsicCostoRow(raw: Record<string, unknown>) {
     totalNacionalizado: Number(r.total_nacionalizado ?? 0),
     precioVenta: Number(r.precio_venta ?? 0),
     pctMargen: Number(r.pct_margen ?? 0),
+  };
+  if (!marketplace) return base;
+  return {
+    ...base,
+    marketplacePublished: marketplace.marketplacePublished,
+    marketplacePrecioUsd: marketplace.marketplacePrecioUsd ?? null,
+    marketplaceLabel: marketplace.marketplaceLabel ?? null,
   };
 }
 
@@ -232,7 +242,28 @@ asicCostosRouter.get(
          ORDER BY created_at DESC, id DESC`
       )
       .all()) as AsicCostoRow[];
-    res.json({ items: rows.map((x) => mapAsicCostoRow(x as unknown as Record<string, unknown>)) });
+    let mpRows: Awaited<ReturnType<typeof loadCotizadorMarketplaceCandidates>> = [];
+    try {
+      mpRows = await loadCotizadorMarketplaceCandidates();
+    } catch (e) {
+      console.warn("[GET /asic/costos-equipos] marketplace candidates:", e);
+    }
+    res.json({
+      items: rows.map((x) => {
+        const raw = x as unknown as Record<string, unknown>;
+        const mappedBase = mapAsicCostoRow(raw);
+        const pub = cotizacionPrecioPublicadoEnMarketplace(
+          {
+            marca: mappedBase.marca,
+            modelo: mappedBase.modelo,
+            procesador: mappedBase.procesador,
+            precioVenta: mappedBase.precioVenta,
+          },
+          mpRows
+        );
+        return mapAsicCostoRow(raw, pub);
+      }),
+    });
   }
 );
 
@@ -301,9 +332,31 @@ asicCostosRouter.post(
       };
     }
 
+    let itemOut: ReturnType<typeof mapAsicCostoRow> | null = null;
+    if (inserted) {
+      const raw = inserted as unknown as Record<string, unknown>;
+      const mapped = mapAsicCostoRow(raw);
+      let mpRows: Awaited<ReturnType<typeof loadCotizadorMarketplaceCandidates>> = [];
+      try {
+        mpRows = await loadCotizadorMarketplaceCandidates();
+      } catch {
+        /* ignore */
+      }
+      const pub = cotizacionPrecioPublicadoEnMarketplace(
+        {
+          marca: mapped.marca,
+          modelo: mapped.modelo,
+          procesador: mapped.procesador,
+          precioVenta: mapped.precioVenta,
+        },
+        mpRows
+      );
+      itemOut = mapAsicCostoRow(raw, pub);
+    }
+
     res.status(201).json({
       ok: true,
-      item: inserted ? mapAsicCostoRow(inserted as unknown as Record<string, unknown>) : null,
+      item: itemOut,
       marketplaceSync,
     });
   }

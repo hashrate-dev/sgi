@@ -3191,6 +3191,20 @@ button.fact-back {
   font-size: 0.78rem;
 }
 
+.asic-cotizador-precio-venta-cell__inner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.asic-cotizador-mp-published {
+  color: #198754;
+  font-size: 0.95rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
 .asic-cotizador-hoy-modal__title {
   display: flex;
   align-items: center;

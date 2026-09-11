@@ -1335,6 +1335,10 @@ export type AsicCostoEquipoItem = {
   totalNacionalizado: number;
   precioVenta: number;
   pctMargen: number;
+  /** Precio de venta de esta fila = precio publicado en marketplace (match único). */
+  marketplacePublished?: boolean;
+  marketplacePrecioUsd?: number | null;
+  marketplaceLabel?: string | null;
 };
 
 export type AsicCostoEquipoPayload = {

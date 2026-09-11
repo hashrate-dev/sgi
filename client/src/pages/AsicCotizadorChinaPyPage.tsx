@@ -232,6 +232,8 @@ export function AsicCotizadorChinaPyPage() {
         r.updated > 0 ? "success" : "info",
         "Cotizador ASIC"
       );
+      const refreshed = await getAsicCostosEquipos();
+      setRegistros(refreshed.items || []);
     } catch (e) {
       showToast(e instanceof Error ? e.message : "No se pudo sincronizar marketplace.", "error", "Cotizador ASIC");
     } finally {
@@ -804,7 +806,22 @@ export function AsicCotizadorChinaPyPage() {
                             <td className="text-end fw-semibold">{formatUsd(r.totalNacionalizado)}</td>
                             <td className="text-end text-success fw-semibold">+{formatWhole(r.margenUsd)}</td>
                             <td className="text-end">{formatWhole(r.pctMargen)}%</td>
-                            <td className="text-end fw-bold">{formatUsd(r.precioVenta)}</td>
+                            <td className="text-end fw-bold asic-cotizador-precio-venta-cell">
+                              <span className="asic-cotizador-precio-venta-cell__inner">
+                                {r.marketplacePublished ? (
+                                  <i
+                                    className="bi bi-check-circle-fill asic-cotizador-mp-published"
+                                    title={
+                                      r.marketplaceLabel
+                                        ? `Precio publicado en marketplace: ${r.marketplaceLabel}`
+                                        : "Este precio de venta está publicado en marketplace"
+                                    }
+                                    aria-label="Precio publicado en marketplace"
+                                  />
+                                ) : null}
+                                {formatUsd(r.precioVenta)}
+                              </span>
+                            </td>
                             <td className="text-end">
                               <button
                                 type="button"
