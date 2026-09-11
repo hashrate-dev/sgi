@@ -33,6 +33,25 @@ function catalogParentKey(tipo: CotizadorCatalogTipo, parentRaw: string | null |
   return normalizeCatalogValor(parentRaw ?? "");
 }
 
+/** Alinea parent de procesador con el catálogo del cotizador (S21 vs Antminer S21). */
+function canonicalProcesadorParentKey(parentRaw: string): string {
+  const p = normalizeCatalogValor(parentRaw);
+  if (!p) return "";
+  const stripped = p.replace(/^(antminer|whatsminer|canaan|microbt)\s+/i, "").trim() || p;
+  if (/^s21e\s*xp/i.test(stripped) || /u3s21/i.test(p)) return "U3S21exPH";
+  const known = ["S21", "S23", "L7", "L9", "L11", "Z15", "X9", "U3S21exPH"] as const;
+  for (const k of known) {
+    if (stripped.localeCompare(k, undefined, { sensitivity: "accent" }) === 0) return k;
+  }
+  const token = stripped.match(/\b([A-Za-z]*\d+[A-Za-z]*)\b/);
+  if (token?.[1]) {
+    for (const k of known) {
+      if (token[1].localeCompare(k, undefined, { sensitivity: "accent" }) === 0) return k;
+    }
+  }
+  return stripped;
+}
+
 async function seedAsicCotizadorCatalogoIfEmpty(): Promise<void> {
   const countRow = (await db.prepare("SELECT COUNT(*) AS c FROM asic_cotizador_catalogo").get()) as
     | { c?: number | string }
@@ -439,7 +458,7 @@ function mapCatalogRow(raw: Record<string, unknown>) {
 asicCostosRouter.get(
   "/asic/cotizador-catalogo",
   requireRole("admin_a", "admin_b", "operador", "lector"),
-  requireAnyModuleGrant("finanzas_asic_costos", "garantias"),
+  requireAnyModuleGrant("finanzas_asic_costos", "garantias", "equipos"),
   async (req, res) => {
     await ensureAsicCostosSchema();
     const tipoParsed = CotizadorCatalogTipoSchema.safeParse(String(req.query.tipo ?? "").trim());
@@ -452,18 +471,45 @@ asicCostosRouter.get(
       return res.json({ items: [] });
     }
 
-    const rows = (await db
-      .prepare(
-        `SELECT id, tipo, parent_key, valor, created_at
-         FROM asic_cotizador_catalogo
-         WHERE tipo = ? AND parent_key = ?
-         ORDER BY valor ASC, id ASC`
-      )
-      .all(tipo, parent)) as CotizadorCatalogRow[];
+    /** Equipos ASIC suele guardar "Antminer S21"; cotizador usa "S21" — unificar al listar. */
+    const parentKeys =
+      tipo === "procesador"
+        ? (() => {
+            const keys: string[] = [];
+            const add = (raw: string) => {
+              const n = normalizeCatalogValor(raw);
+              if (!n) return;
+              if (!keys.some((k) => k.toLowerCase() === n.toLowerCase())) keys.push(n);
+            };
+            add(parent);
+            const stripped = parent.replace(/^(antminer|whatsminer|canaan|microbt)\s+/i, "").trim();
+            if (stripped) add(stripped);
+            if (/s21e\s*xp/i.test(stripped) || /u3s21/i.test(parent)) add("U3S21exPH");
+            const token = stripped.match(/\b([a-z]*\d+[a-z]*)\b/i);
+            if (token?.[1]) add(token[1]);
+            return keys;
+          })()
+        : [parent];
 
-    const items = rows
-      .map((x) => mapCatalogRow(x as unknown as Record<string, unknown>))
-      .sort((a, b) => a.valor.localeCompare(b.valor, "es", { sensitivity: "base" }));
+    const byId = new Map<number, ReturnType<typeof mapCatalogRow>>();
+    for (const pk of parentKeys) {
+      const rows = (await db
+        .prepare(
+          `SELECT id, tipo, parent_key, valor, created_at
+           FROM asic_cotizador_catalogo
+           WHERE tipo = ? AND parent_key = ?
+           ORDER BY valor ASC, id ASC`
+        )
+        .all(tipo, pk)) as CotizadorCatalogRow[];
+      for (const x of rows) {
+        const mapped = mapCatalogRow(x as unknown as Record<string, unknown>);
+        if (!byId.has(mapped.id)) byId.set(mapped.id, mapped);
+      }
+    }
+
+    const items = [...byId.values()].sort((a, b) =>
+      a.valor.localeCompare(b.valor, "es", { sensitivity: "base" })
+    );
     res.json({ items });
   }
 );
@@ -471,7 +517,7 @@ asicCostosRouter.get(
 asicCostosRouter.post(
   "/asic/cotizador-catalogo",
   requireRole("admin_a", "admin_b", "operador"),
-  requireModuleGrant("finanzas_asic_costos"),
+  requireAnyModuleGrant("finanzas_asic_costos", "equipos"),
   async (req, res) => {
     await ensureAsicCostosSchema();
     const parsed = CotizadorCatalogCreateSchema.safeParse(req.body);
@@ -480,7 +526,8 @@ asicCostosRouter.post(
     }
     const tipo = parsed.data.tipo;
     const valor = normalizeCatalogValor(parsed.data.valor);
-    const parent = catalogParentKey(tipo, parsed.data.parent);
+    const parentRaw = catalogParentKey(tipo, parsed.data.parent);
+    const parent = tipo === "procesador" ? canonicalProcesadorParentKey(parentRaw) : parentRaw;
     if (!valor) {
       return res.status(400).json({ error: { message: "El valor no puede estar vacío." } });
     }
@@ -545,7 +592,7 @@ asicCostosRouter.post(
 asicCostosRouter.patch(
   "/asic/cotizador-catalogo/:id",
   requireRole("admin_a", "admin_b", "operador"),
-  requireModuleGrant("finanzas_asic_costos"),
+  requireAnyModuleGrant("finanzas_asic_costos", "equipos"),
   async (req, res) => {
     await ensureAsicCostosSchema();
     const id = Number(req.params.id);

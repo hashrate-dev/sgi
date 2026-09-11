@@ -8,7 +8,6 @@ import {
   Flex,
   Heading,
   Input,
-  NativeSelect,
   Portal,
   Text,
 } from "@chakra-ui/react";
@@ -26,6 +25,7 @@ import {
 } from "../lib/api";
 import type { EquipoASIC } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
+import { AsicCotizadorCatalogSelect } from "../components/AsicCotizadorCatalogSelect";
 import { EquipoAsicDashboardCard } from "../components/equipos/EquipoAsicDashboardCard";
 import { CardImageUploadField, GalleryImagesUploadField } from "../components/equipos/MarketplaceImageUploadFields";
 import { MarketplaceDetailRowsEditor, sanitizeDetailRowsForApi } from "../components/equipos/MarketplaceDetailRowsEditor";
@@ -62,21 +62,7 @@ function findCol(headerRow: (string | number)[], ...names: string[]): number {
   return -1;
 }
 
-/** Opciones del formulario; si un equipo ya guardado tiene otro texto, se muestra como opción extra al editar. */
-const MARCAS_EQUIPO_OPCIONES = ["Bitmain"] as const;
-/** Modelos del desplegable; en edición, si en BD hay otro texto se ofrece como opción extra. */
-const MODELOS_EQUIPO_OPCIONES = [
-  "Antminer S21",
-  "Antminer S23",
-  "Antminer S21e XP",
-  "Antminer X9",
-  "Antminer L7",
-  "Antminer L9",
-  "Antminer L11",
-  "Antminer Z15",
-  "AntSpace Hydro HW5",
-  "AntSpace Hydro MD5",
-] as const;
+/** Opciones de Marca/Modelo/Procesador: catálogo compartido con Cotizador China→PY (`AsicCotizadorCatalogSelect`). */
 
 const MODELO_CANONICO_S21E_XP = "Antminer S21e XP";
 const PROCESADOR_CANONICO_S21E_XP = "U3 Hydro 860 TH/s";
@@ -90,10 +76,30 @@ function normalizeModeloEquipo(modelo: string): string {
   return t;
 }
 
+/** Parent del catálogo de procesadores (cotizador usa S21; equipos puede tener Antminer S21). */
+function cotizadorCatalogModeloParent(modelo: string): string {
+  const t = normalizeModeloEquipo(modelo);
+  if (!t) return "";
+  const stripped = t.replace(/^(antminer|whatsminer|canaan|microbt)\s+/i, "").trim() || t;
+  if (/^s21e\s*xp/i.test(stripped) || /u3s21/i.test(t)) return "U3S21exPH";
+  const known = ["S21", "S23", "L7", "L9", "L11", "Z15", "X9", "U3S21exPH"] as const;
+  for (const k of known) {
+    if (stripped.localeCompare(k, undefined, { sensitivity: "accent" }) === 0) return k;
+  }
+  const token = stripped.match(/\b([A-Za-z]*\d+[A-Za-z]*)\b/);
+  if (token?.[1]) {
+    for (const k of known) {
+      if (token[1].localeCompare(k, undefined, { sensitivity: "accent" }) === 0) return k;
+    }
+  }
+  return stripped;
+}
+
 /** Alinea hashrates legacy del S21e XP al preset actual. */
 function normalizeProcesadorEquipo(modelo: string, procesador: string): string {
   const mod = normalizeModeloEquipo(modelo);
-  if (familiaProcesadorPreset(mod) !== "s21exp") return (procesador ?? "").trim();
+  const parent = cotizadorCatalogModeloParent(mod);
+  if (parent !== "U3S21exPH") return (procesador ?? "").trim();
   const p = (procesador ?? "").trim();
   if (!p || /^860\s*th\/s\s*hydro$/i.test(p) || /^h\s*860\s*th\/s$/i.test(p)) {
     return PROCESADOR_CANONICO_S21E_XP;
@@ -103,111 +109,6 @@ function normalizeProcesadorEquipo(modelo: string, procesador: string): string {
 
 /** Texto por defecto en vitrina cuando el producto no tiene precio fijo (editable). */
 const DEFAULT_MARKETPLACE_PRICE_LABEL = "SOLICITA PRECIO";
-
-function opcionesModeloConActual(actual: string): string[] {
-  const base = [...MODELOS_EQUIPO_OPCIONES];
-  const a = normalizeModeloEquipo(actual);
-  if (a && !base.some((x) => x === a)) return [a, ...base];
-  return base;
-}
-
-type FamiliaProcesadorPreset = "l9" | "l7" | "l11" | "s21" | "s23" | "s21exp" | "z15";
-
-/** Presets de hashrate según modelo (texto guardado en BD = valor del `option`). L7/L9/L11 en MH/s, S21/S23/U3 en TH/s. */
-const PROCESADOR_PRESETS_L9 = ["15.000 MH/s", "16.000 MH/s", "16.500 MH/s", "17.000 MH/s"] as const;
-const PROCESADOR_PRESETS_L7 = ["8.800 MH/s", "9.050 MH/s", "9.500 MH/s"] as const;
-const PROCESADOR_PRESETS_L11 = ["20.000 MH/s", "21.000 MH/s", "32.000 MH/s Hydro"] as const;
-const PROCESADOR_PRESETS_Z15 = ["420 kSol/s", "840 kSol/s", "860 kSol/s"] as const;
-const PROCESADOR_PRESETS_S21 = [
-  "200 TH/s",
-  "234 TH/s",
-  "235 TH/s",
-  "245 TH/s",
-  "270 TH/s",
-  "473 TH/s Hydro",
-] as const;
-const PROCESADOR_PRESETS_S23 = ["305 TH/s"] as const;
-const PROCESADOR_PRESETS_S21E_XP = ["U3 Hydro 860 TH/s"] as const;
-
-/** S21 → TH/s; L7 / L9 (y variantes en texto libre) → MH/s — solo para modelo sin preset de lista. */
-function unidadProcesadorDesdeModelo(modelo: string): "th" | "mh" | null {
-  const m = (modelo ?? "").trim().toLowerCase();
-  if (!m) return null;
-  if (/\bl7\b/.test(m) || /\bl9\b/.test(m)) return "mh";
-  if (/\bl11\b/.test(m)) return "mh";
-  if (/\bs21e\s*xp\b/.test(m) || /\bu3s21\b/.test(m) || /\bs23\b/.test(m) || /\bs21\b/.test(m)) return "th";
-  return null;
-}
-
-function familiaProcesadorPreset(modelo: string): FamiliaProcesadorPreset | null {
-  const m = (modelo ?? "").trim().toLowerCase();
-  if (!m) return null;
-  if (/\bl9\b/.test(m)) return "l9";
-  if (/\bl11\b/.test(m)) return "l11";
-  if (/\bl7\b/.test(m)) return "l7";
-  if (/\bz15\b/.test(m)) return "z15";
-  if (/\bs21e\s*xp\b/.test(m) || /\bu3s21\b/.test(m)) return "s21exp";
-  if (/\bs23\b/.test(m)) return "s23";
-  if (/\bs21\b/.test(m)) return "s21";
-  return null;
-}
-
-function presetsProcesadorFamilia(f: FamiliaProcesadorPreset): readonly string[] {
-  switch (f) {
-    case "l9":
-      return PROCESADOR_PRESETS_L9;
-    case "l7":
-      return PROCESADOR_PRESETS_L7;
-    case "l11":
-      return PROCESADOR_PRESETS_L11;
-    case "z15":
-      return PROCESADOR_PRESETS_Z15;
-    case "s21":
-      return PROCESADOR_PRESETS_S21;
-    case "s23":
-      return PROCESADOR_PRESETS_S23;
-    case "s21exp":
-      return PROCESADOR_PRESETS_S21E_XP;
-  }
-}
-
-/** Opciones del desplegable: presets + valor actual si no está en la lista (import Excel / datos viejos). */
-function opcionesProcesadorSelect(f: FamiliaProcesadorPreset, actual: string): string[] {
-  const base = [...presetsProcesadorFamilia(f)];
-  const a = (actual ?? "").trim();
-  if (a && !base.some((x) => x === a)) return [a, ...base];
-  return base;
-}
-
-/** Intercambia la unidad en Procesador si el modelo no usa presets (texto libre). */
-function ajustarProcesadorSegunModelo(modelo: string, procesador: string): string {
-  if (familiaProcesadorPreset(modelo)) return procesador;
-  const objetivo = unidadProcesadorDesdeModelo(modelo);
-  if (!objetivo) return procesador;
-  const p = (procesador ?? "").trim();
-  if (!p) return objetivo === "th" ? "TH/s" : "MH/s";
-  if (objetivo === "th") {
-    return p
-      .replace(/\b(mh\/s|mhs)\b/gi, "TH/s")
-      .replace(/\b(gh\/s|ghs)\b/gi, "TH/s");
-  }
-  return p.replace(/\b(th\/s|ths)\b/gi, "MH/s");
-}
-
-function procesadorTrasCambioModelo(modeloAnterior: string, modeloNuevo: string, procesador: string): string {
-  const prev = familiaProcesadorPreset(modeloAnterior);
-  const next = familiaProcesadorPreset(modeloNuevo);
-  if (next !== prev) return next ? "" : ajustarProcesadorSegunModelo(modeloNuevo, procesador);
-  if (next) return procesador;
-  return ajustarProcesadorSegunModelo(modeloNuevo, procesador);
-}
-
-function opcionesMarcaConActual(actual: string): string[] {
-  const a = (actual ?? "").trim();
-  const base = [...MARCAS_EQUIPO_OPCIONES];
-  if (a && !base.some((x) => x === a)) return [a, ...base];
-  return base;
-}
 
 /** Parsea Excel de equipos ASIC (mismo formato que exportExcel: Código de Producto, Fecha Ingreso, Marca Equipo, Modelo, Procesador, Precio USD, Observaciones) */
 async function parseExcelEquipos(file: File): Promise<Omit<EquipoASIC, "id">[]> {
@@ -1768,112 +1669,72 @@ export function EquiposAsicPage() {
                           </div>
                         ) : null}
                         <div className="hrs-equipo-asic-modal-form__equipo-fields">
-                          <div className="fact-field">
-                            <label className="fact-label">Marca *</label>
-                            <NativeSelect.Root disabled={specsFieldsLocked} width="100%">
-                              <NativeSelect.Field
-                                className={
-                                  "fact-input" + (specsFieldsLocked ? " hrs-equipo-asic-modal-form__spec-input--locked" : "")
-                                }
-                                value={formData.marcaEquipo}
-                                onChange={(e) => setFormData({ ...formData, marcaEquipo: e.target.value })}
-                                aria-label="Marca del equipo"
-                              >
-                                <option value="">Seleccionar…</option>
-                                {opcionesMarcaConActual(formData.marcaEquipo).map((m) => (
-                                  <option key={m} value={m}>
-                                    {m}
-                                  </option>
-                                ))}
-                              </NativeSelect.Field>
-                              <NativeSelect.Indicator />
-                            </NativeSelect.Root>
+                          <div className="fact-field asic-cotizador-field-wrap">
+                            <label className="fact-label" htmlFor="eq-asic-marca">
+                              Marca *
+                            </label>
+                            <AsicCotizadorCatalogSelect
+                              tipo="marca"
+                              value={formData.marcaEquipo}
+                              onChange={(v) => setFormData({ ...formData, marcaEquipo: v })}
+                              disabled={specsFieldsLocked}
+                              labelId="eq-asic-marca"
+                              placeholder="Seleccionar marca…"
+                              searchPlaceholder="Buscar marca…"
+                              addLabel="Agregar nueva marca"
+                              newTitle="Nueva marca"
+                              allowCreate={!specsFieldsLocked}
+                              onError={(msg) => showToast(msg, "error", "Equipos ASIC")}
+                            />
                           </div>
-                          <div className="fact-field">
-                            <label className="fact-label">Modelo *</label>
-                            <NativeSelect.Root disabled={specsFieldsLocked} width="100%">
-                              <NativeSelect.Field
-                                className={
-                                  "fact-input" + (specsFieldsLocked ? " hrs-equipo-asic-modal-form__spec-input--locked" : "")
-                                }
-                                value={(() => {
-                                  const modeloNorm = normalizeModeloEquipo(formData.modelo);
-                                  const opts = opcionesModeloConActual(formData.modelo);
-                                  return opts.includes(modeloNorm) ? modeloNorm : "";
-                                })()}
-                                onChange={(e) => {
-                                  const v = e.target.value;
-                                  const nuevoProc = procesadorTrasCambioModelo(formData.modelo, v, formData.procesador);
-                                  setFormData({
-                                    ...formData,
-                                    modelo: v,
-                                    procesador: nuevoProc,
-                                  });
-                                }}
-                                aria-label="Modelo del equipo"
-                              >
-                                <option value="">Seleccionar…</option>
-                                {opcionesModeloConActual(formData.modelo).map((m) => (
-                                  <option key={m} value={m}>
-                                    {m}
-                                  </option>
-                                ))}
-                              </NativeSelect.Field>
-                              <NativeSelect.Indicator />
-                            </NativeSelect.Root>
+                          <div className="fact-field asic-cotizador-field-wrap">
+                            <label className="fact-label" htmlFor="eq-asic-modelo">
+                              Modelo *
+                            </label>
+                            <AsicCotizadorCatalogSelect
+                              tipo="modelo"
+                              value={normalizeModeloEquipo(formData.modelo)}
+                              onChange={(v) => {
+                                const prevParent = cotizadorCatalogModeloParent(formData.modelo);
+                                const nextParent = cotizadorCatalogModeloParent(v);
+                                setFormData({
+                                  ...formData,
+                                  modelo: v,
+                                  procesador: prevParent === nextParent ? formData.procesador : "",
+                                });
+                              }}
+                              disabled={specsFieldsLocked}
+                              labelId="eq-asic-modelo"
+                              placeholder="Seleccionar modelo…"
+                              searchPlaceholder="Buscar modelo…"
+                              addLabel="Agregar nuevo modelo"
+                              newTitle="Nuevo modelo"
+                              allowCreate={!specsFieldsLocked}
+                              onError={(msg) => showToast(msg, "error", "Equipos ASIC")}
+                            />
                           </div>
-                          <div className="fact-field">
-                            <label className="fact-label">Procesador *</label>
-                            {(() => {
-                              const fam = familiaProcesadorPreset(formData.modelo);
-                              if (fam) {
-                                const opts = opcionesProcesadorSelect(fam, formData.procesador);
-                                const val =
-                                  formData.procesador && opts.includes(formData.procesador) ? formData.procesador : "";
-                                return (
-                                  <NativeSelect.Root disabled={specsFieldsLocked} width="100%">
-                                    <NativeSelect.Field
-                                      className={
-                                        "fact-input" +
-                                        (specsFieldsLocked ? " hrs-equipo-asic-modal-form__spec-input--locked" : "")
-                                      }
-                                      value={val}
-                                      onChange={(e) => setFormData({ ...formData, procesador: e.target.value })}
-                                      aria-label="Hashrate (procesador)"
-                                    >
-                                      <option value="">Seleccionar hashrate…</option>
-                                      {opts.map((o) => (
-                                        <option key={o} value={o}>
-                                          {o}
-                                        </option>
-                                      ))}
-                                    </NativeSelect.Field>
-                                    <NativeSelect.Indicator />
-                                  </NativeSelect.Root>
-                                );
+                          <div className="fact-field asic-cotizador-field-wrap">
+                            <label className="fact-label" htmlFor="eq-asic-procesador">
+                              Procesador *
+                            </label>
+                            <AsicCotizadorCatalogSelect
+                              tipo="procesador"
+                              parent={cotizadorCatalogModeloParent(formData.modelo) || formData.modelo}
+                              value={formData.procesador}
+                              onChange={(v) => setFormData({ ...formData, procesador: v })}
+                              disabled={specsFieldsLocked || !String(formData.modelo ?? "").trim()}
+                              labelId="eq-asic-procesador"
+                              placeholder={
+                                String(formData.modelo ?? "").trim()
+                                  ? "Seleccionar hashrate…"
+                                  : "Seleccionar modelo primero"
                               }
-                              return (
-                                <Input
-                                  type="text"
-                                  className={
-                                    "fact-input" +
-                                    (specsFieldsLocked ? " hrs-equipo-asic-modal-form__spec-input--locked" : "")
-                                  }
-                                  value={formData.procesador}
-                                  onChange={(e) => setFormData({ ...formData, procesador: e.target.value })}
-                                  readOnly={specsFieldsLocked}
-                                  placeholder={(() => {
-                                    const mod = (formData.modelo ?? "").trim().toLowerCase();
-                                    if (/\bz15\b/.test(mod)) return "Ej: 840 kSol/s";
-                                    const u = unidadProcesadorDesdeModelo(formData.modelo);
-                                    if (u === "th") return "Ej: 245 TH/s";
-                                    if (u === "mh") return "Ej: 17.000 MH/s";
-                                    return "Ej: 245 TH/s o 17.000 MH/s";
-                                  })()}
-                                  required
-                                />
-                              );
-                            })()}
+                              searchPlaceholder="Buscar hashrate…"
+                              addLabel="Agregar nuevo hashrate"
+                              newTitle="Nuevo hashrate"
+                              allowCreate={!specsFieldsLocked && Boolean(String(formData.modelo ?? "").trim())}
+                              onError={(msg) => showToast(msg, "error", "Equipos ASIC")}
+                            />
                           </div>
                         </div>
                       </div>
