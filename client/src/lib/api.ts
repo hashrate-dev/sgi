@@ -1358,8 +1358,20 @@ export function getAsicCostosEquipos(): Promise<{ items: AsicCostoEquipoItem[] }
 
 export function createAsicCostoEquipo(
   body: AsicCostoEquipoPayload
-): Promise<{ ok: boolean; item: AsicCostoEquipoItem | null }> {
-  return api<{ ok: boolean; item: AsicCostoEquipoItem | null }>("/api/asic/costos-equipos", {
+): Promise<{
+  ok: boolean;
+  item: AsicCostoEquipoItem | null;
+  marketplaceSync?: {
+    status: "updated" | "unchanged" | "no_match" | "ambiguous" | "skipped";
+    equipoId?: string;
+    codigoProducto?: string | null;
+    label?: string;
+    oldPrecio?: number;
+    newPrecio?: number;
+    message: string;
+  } | null;
+}> {
+  return api("/api/asic/costos-equipos", {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -1369,6 +1381,22 @@ export function deleteAsicCostoEquipo(id: number): Promise<void> {
   return api<void>(`/api/asic/costos-equipos/${encodeURIComponent(String(id))}`, {
     method: "DELETE",
   });
+}
+
+export function syncAsicCotizadorMarketplaceFromLatest(): Promise<{
+  ok: boolean;
+  updated: number;
+  unchanged: number;
+  skipped: number;
+  details: Array<{
+    status: string;
+    message: string;
+    label?: string;
+    oldPrecio?: number;
+    newPrecio?: number;
+  }>;
+}> {
+  return api("/api/asic/costos-equipos/sync-marketplace", { method: "POST", body: "{}" });
 }
 
 export type AsicCotizadorCatalogTipo = "marca" | "modelo" | "procesador";

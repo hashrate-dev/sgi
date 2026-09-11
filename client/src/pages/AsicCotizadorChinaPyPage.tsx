@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "../components/PageHeader";
 import { AsicCotizadorCatalogSelect } from "../components/AsicCotizadorCatalogSelect";
-import { createAsicCostoEquipo, deleteAsicCostoEquipo, getAsicCostosEquipos, type AsicCostoEquipoItem } from "../lib/api";
+import { createAsicCostoEquipo, deleteAsicCostoEquipo, getAsicCostosEquipos, syncAsicCotizadorMarketplaceFromLatest, type AsicCostoEquipoItem } from "../lib/api";
 import { downloadAsicCotizacionPdf } from "../lib/generateAsicCotizacionPdf";
 import { AsicCotizadorEvolucionModal } from "../components/AsicCotizadorEvolucionModal";
+import { showToast } from "../components/ToastNotification";
 import "../styles/facturacion.css";
 
 /** Valores por defecto de la fórmula: ((PRECIO ORIGEN + 220 USD) × 1,23) + 300 */
@@ -106,6 +107,7 @@ export function AsicCotizadorChinaPyPage() {
   const [showTxtModal, setShowTxtModal] = useState(false);
   const [txtCopyDone, setTxtCopyDone] = useState(false);
   const [showEvoModal, setShowEvoModal] = useState(false);
+  const [syncMarketplaceBusy, setSyncMarketplaceBusy] = useState(false);
 
   useEffect(() => {
     setProcesador("");
@@ -197,8 +199,43 @@ export function AsicCotizadorChinaPyPage() {
         setRegistros((prev) => [resp.item!, ...prev]);
         setObservaciones("");
       }
+      const sync = resp.marketplaceSync;
+      if (sync?.status === "updated") {
+        showToast(sync.message, "success", "Cotizador ASIC");
+      } else if (sync?.status === "unchanged") {
+        showToast(sync.message, "info", "Cotizador ASIC");
+      } else if (sync?.status === "ambiguous" || sync?.status === "no_match") {
+        showToast(
+          `Cotización registrada. ${sync.message}`,
+          "info",
+          "Cotizador ASIC"
+        );
+      } else {
+        showToast("Cotización registrada.", "success", "Cotizador ASIC");
+      }
     } catch (e) {
       setRegistrosError(e instanceof Error ? e.message : "No se pudo registrar la cotización.");
+    }
+  }
+
+  async function aplicarUltimosPreciosMarketplace(): Promise<void> {
+    setSyncMarketplaceBusy(true);
+    try {
+      const r = await syncAsicCotizadorMarketplaceFromLatest();
+      const sample = r.details
+        .filter((d) => d.status === "updated")
+        .slice(0, 3)
+        .map((d) => d.message)
+        .join(" · ");
+      showToast(
+        `Tienda: ${r.updated} actualizado(s), ${r.unchanged} sin cambio, ${r.skipped} omitido(s).${sample ? ` ${sample}` : ""}`,
+        r.updated > 0 ? "success" : "info",
+        "Cotizador ASIC"
+      );
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "No se pudo sincronizar marketplace.", "error", "Cotizador ASIC");
+    } finally {
+      setSyncMarketplaceBusy(false);
     }
   }
 
@@ -679,6 +716,16 @@ export function AsicCotizadorChinaPyPage() {
                     >
                       <i className="bi bi-graph-up-arrow me-1" aria-hidden />
                       Evolución precios
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-primary"
+                      disabled={syncMarketplaceBusy || registros.length === 0}
+                      onClick={() => void aplicarUltimosPreciosMarketplace()}
+                      title="Toma el último precio cotizado de cada equipo y lo aplica a la tienda (historial incluido)"
+                    >
+                      <i className="bi bi-shop me-1" aria-hidden />
+                      {syncMarketplaceBusy ? "Actualizando tienda…" : "Aplicar precios a tienda"}
                     </button>
                   </div>
                 </div>

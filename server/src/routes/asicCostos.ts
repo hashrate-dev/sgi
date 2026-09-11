@@ -4,6 +4,7 @@ import { db } from "../db.js";
 import { requireRole } from "../middleware/auth.js";
 import { requireAnyModuleGrant, requireModuleGrant } from "../middleware/moduleGrant.js";
 import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
+import { syncCotizadorPrecioToMarketplace, backfillLatestCotizadorPreciosToMarketplace } from "../lib/syncCotizadorPrecioToMarketplace.js";
 
 export const asicCostosRouter = Router();
 let asicCostosSchemaEnsured = false;
@@ -281,10 +282,55 @@ asicCostosRouter.post(
       )
       .get(insertedId)) as AsicCostoRow | undefined;
 
+    let marketplaceSync: Awaited<ReturnType<typeof syncCotizadorPrecioToMarketplace>> | null = null;
+    try {
+      if (req.user) {
+        marketplaceSync = await syncCotizadorPrecioToMarketplace({
+          marca: d.marca?.trim() || "",
+          modelo: d.modelo?.trim() || "",
+          procesador: d.procesador?.trim() || "",
+          precioVenta: d.precioVenta,
+          user: req.user,
+        });
+      }
+    } catch (syncErr) {
+      console.warn("[POST /asic/costos-equipos] sync marketplace:", syncErr);
+      marketplaceSync = {
+        status: "skipped",
+        message: "Cotización guardada; no se pudo sincronizar el precio de marketplace.",
+      };
+    }
+
     res.status(201).json({
       ok: true,
       item: inserted ? mapAsicCostoRow(inserted as unknown as Record<string, unknown>) : null,
+      marketplaceSync,
     });
+  }
+);
+
+asicCostosRouter.post(
+  "/asic/costos-equipos/sync-marketplace",
+  requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("finanzas_asic_costos"),
+  async (req, res) => {
+    await ensureAsicCostosSchema();
+    if (!req.user) {
+      return res.status(401).json({ error: { message: "No autenticado" } });
+    }
+    try {
+      const result = await backfillLatestCotizadorPreciosToMarketplace(req.user);
+      res.json({
+        ok: true,
+        updated: result.updated,
+        unchanged: result.unchanged,
+        skipped: result.skipped,
+        details: result.details.filter((d) => d.status === "updated" || d.status === "unchanged"),
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      res.status(500).json({ error: { message: msg } });
+    }
   }
 );
 
