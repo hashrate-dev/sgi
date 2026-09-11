@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   addEmittedDocument,
+  createEquipo,
   createInvoice,
+  createReparacionTipo,
+  createSetup,
+  createTransporteFleteTipo,
   getEmittedDocuments,
   getClients,
   getEquipos,
@@ -39,12 +43,17 @@ import { InvoicePreview } from "../components/InvoicePreview";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { showToast } from "../components/ToastNotification";
 import { BillingHostingClientPicker } from "../components/BillingHostingClientPicker";
+import {
+  AsicBillingCatalogQuickAddModal,
+  type AsicBillingCatalogQuickAddForm,
+  type AsicBillingCatalogQuickAddKind,
+} from "../components/AsicBillingCatalogQuickAddModal";
 import { useAuth } from "../contexts/AuthContext";
-import { canEditClientes, canEditFacturacion, lectorAllowsModule } from "../lib/auth";
+import { canEditClientes, canEditEquiposInventory, canEditFacturacion, lectorAllowsModule } from "../lib/auth";
 import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
 import { isClienteTiendaOnline } from "../lib/clientTienda";
 import { formatCurrencyNumber, formatUSD } from "../lib/formatCurrency";
-import { isAsicEquipmentSaleDocument, isAsicEquipmentSaleInvoice } from "../lib/asicDocumentKind";
+import { isAsicEquipmentSaleInvoice } from "../lib/asicDocumentKind";
 import { buildAsicComprobantePdfFilename } from "../lib/asicPdfFilename";
 import type { InvoiceDocumentContext } from "../lib/invoiceDocumentContext";
 import "../styles/facturacion.css";
@@ -67,6 +76,12 @@ function genId() {
 
 const MAX_INVOICE_NUM = 999999;
 const MIN_INVOICE_NUM = 1001;
+
+/** Valores sentinel del select de ítems → alta rápida de catálogo. */
+const NEW_EQUIPO_VALUE = "__new_equipo__";
+const NEW_SETUP_VALUE = "__new_setup__";
+const NEW_REPARACION_VALUE = "__new_reparacion__";
+const NEW_FLETE_VALUE = "__new_flete__";
 
 function nextNumber(type: ComprobanteType, invoices: Invoice[]) {
   const prefix = 
@@ -170,6 +185,12 @@ export function FacturacionMineriaPage() {
   const [showEmitPdfConfirm, setShowEmitPdfConfirm] = useState(false);
   /** Documento emitido a mostrar en la vista previa (al hacer clic en Visualizar) */
   const [previewEmitted, setPreviewEmitted] = useState<{ invoice: Invoice; emittedAt: string } | null>(null);
+  /** Alta rápida de catálogo desde el select de ítems (equipo / setup / reparación / flete). */
+  const [catalogQuickAdd, setCatalogQuickAdd] = useState<{
+    kind: AsicBillingCatalogQuickAddKind;
+    rowIdx: number;
+  } | null>(null);
+  const [catalogQuickAddBusy, setCatalogQuickAddBusy] = useState(false);
 
   const fetchDbInvoices = useCallback(async () => {
     try {
@@ -201,25 +222,38 @@ export function FacturacionMineriaPage() {
     return Array.from(map.values());
   }, [invoices, dbInvoices]);
 
+  const reloadAsicCatalogs = useCallback(async () => {
+    const [equiposRes, setupsRes, repRes, fleteRes] = await Promise.all([
+      getEquipos(),
+      getSetups(),
+      getReparacionTipos(),
+      getTransporteFleteTipos(),
+    ]);
+    setEquiposAsic(equiposRes.items ?? []);
+    setSetups(setupsRes.items ?? []);
+    setReparacionTipos(repRes.items ?? []);
+    setTransporteFleteTipos(fleteRes.items ?? []);
+    return {
+      equipos: equiposRes.items ?? [],
+      setups: setupsRes.items ?? [],
+      reparacionTipos: repRes.items ?? [],
+      transporteFleteTipos: fleteRes.items ?? [],
+    };
+  }, []);
+
   // Recargar desde localStorage/API al montar
   useEffect(() => {
     setInvoices(loadInvoicesAsic());
     void fetchDbInvoices();
     wakeUpBackend()
-      .then(() => Promise.all([getEquipos(), getSetups(), getReparacionTipos(), getTransporteFleteTipos()]))
-      .then(([equiposRes, setupsRes, repRes, fleteRes]) => {
-        setEquiposAsic(equiposRes.items ?? []);
-        setSetups(setupsRes.items ?? []);
-        setReparacionTipos(repRes.items ?? []);
-        setTransporteFleteTipos(fleteRes.items ?? []);
-      })
+      .then(() => reloadAsicCatalogs())
       .catch(() => {
         setEquiposAsic([]);
         setSetups([]);
         setReparacionTipos([]);
         setTransporteFleteTipos([]);
       });
-  }, []);
+  }, [fetchDbInvoices, reloadAsicCatalogs]);
 
   /** Emoji naranja 🔖 solo las primeras 22 h; la tabla muestra documentos hasta 10 días 22 h */
   const MS_22H = 22 * 60 * 60 * 1000;
@@ -317,6 +351,129 @@ export function FacturacionMineriaPage() {
   const totals = useMemo(() => calcTotals(items), [items]);
 
   const canAddHostingClient = Boolean(user && canEditClientes(user));
+  const canQuickAddSetupRepFlete = Boolean(user && canEditClientes(user));
+  const canQuickAddEquipo = Boolean(user && canEditEquiposInventory(user));
+
+  async function saveCatalogQuickAdd(kind: AsicBillingCatalogQuickAddKind, form: AsicBillingCatalogQuickAddForm) {
+    if (!catalogQuickAdd || catalogQuickAdd.kind !== kind) return;
+    const rowIdx = catalogQuickAdd.rowIdx;
+    setCatalogQuickAddBusy(true);
+    try {
+      if (kind === "equipo") {
+        const marcaEquipo = form.marcaEquipo.trim();
+        const modelo = form.modelo.trim();
+        const procesador = form.procesador.trim();
+        if (!marcaEquipo || !modelo || !procesador) {
+          showToast("Completá marca, modelo y procesador del equipo.", "error");
+          return;
+        }
+        const created = await createEquipo({
+          marcaEquipo,
+          modelo,
+          procesador,
+          precioUSD: form.precioUSD,
+        });
+        const catalogs = await reloadAsicCatalogs();
+        const equipo = catalogs.equipos.find((eq) => eq.id === created.id);
+        if (equipo) {
+          updateItem(rowIdx, {
+            equipoId: equipo.id,
+            marcaEquipo: equipo.marcaEquipo,
+            modeloEquipo: equipo.modelo,
+            procesadorEquipo: equipo.procesador,
+            setupId: undefined,
+            setupNombre: undefined,
+            reparacionTipoId: undefined,
+            reparacionNombre: undefined,
+            transporteFleteTipoId: undefined,
+            transporteFleteNombre: undefined,
+            price: equipo.precioUSD,
+          });
+        }
+        showToast(`Equipo ${marcaEquipo} ${modelo} guardado y seleccionado.`, "success");
+      } else if (kind === "setup") {
+        const nombre = form.nombre.trim();
+        if (!nombre) {
+          showToast("Ingresá el nombre del Setup.", "error");
+          return;
+        }
+        const created = await createSetup({ nombre, precioUSD: form.precioUSD });
+        const catalogs = await reloadAsicCatalogs();
+        const setup = catalogs.setups.find((s) => s.id === created.id);
+        if (setup) {
+          updateItem(rowIdx, {
+            setupId: setup.id,
+            setupNombre: setup.nombre,
+            equipoId: undefined,
+            marcaEquipo: undefined,
+            modeloEquipo: undefined,
+            procesadorEquipo: undefined,
+            reparacionTipoId: undefined,
+            reparacionNombre: undefined,
+            transporteFleteTipoId: undefined,
+            transporteFleteNombre: undefined,
+            price: setup.precioUSD,
+          });
+        }
+        showToast(`Setup «${nombre}» guardado y seleccionado.`, "success");
+      } else if (kind === "reparacion") {
+        const nombre = form.nombre.trim();
+        if (!nombre) {
+          showToast("Ingresá el nombre del tipo de reparación.", "error");
+          return;
+        }
+        const created = await createReparacionTipo({ nombre, precioUSD: form.precioUSD });
+        const catalogs = await reloadAsicCatalogs();
+        const rt = catalogs.reparacionTipos.find((x) => x.id === created.id);
+        if (rt) {
+          updateItem(rowIdx, {
+            reparacionTipoId: rt.id,
+            reparacionNombre: rt.nombre,
+            equipoId: undefined,
+            marcaEquipo: undefined,
+            modeloEquipo: undefined,
+            procesadorEquipo: undefined,
+            setupId: undefined,
+            setupNombre: undefined,
+            transporteFleteTipoId: undefined,
+            transporteFleteNombre: undefined,
+            price: rt.precioUSD,
+          });
+        }
+        showToast(`Reparación «${nombre}» guardada y seleccionada.`, "success");
+      } else {
+        const nombre = form.nombre.trim();
+        if (!nombre) {
+          showToast("Ingresá el nombre del ítem de transporte/flete.", "error");
+          return;
+        }
+        const created = await createTransporteFleteTipo({ nombre, precioUSD: form.precioUSD });
+        const catalogs = await reloadAsicCatalogs();
+        const ft = catalogs.transporteFleteTipos.find((x) => x.id === created.id);
+        if (ft) {
+          updateItem(rowIdx, {
+            transporteFleteTipoId: ft.id,
+            transporteFleteNombre: ft.nombre,
+            equipoId: undefined,
+            marcaEquipo: undefined,
+            modeloEquipo: undefined,
+            procesadorEquipo: undefined,
+            setupId: undefined,
+            setupNombre: undefined,
+            reparacionTipoId: undefined,
+            reparacionNombre: undefined,
+            price: ft.precioUSD,
+          });
+        }
+        showToast(`Transporte/flete «${nombre}» guardado y seleccionado.`, "success");
+      }
+      setCatalogQuickAdd(null);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "No se pudo guardar el ítem de catálogo.", "error");
+    } finally {
+      setCatalogQuickAddBusy(false);
+    }
+  }
 
   const selectedClient = useMemo(
     () => (selectedClientId ? clients.find((c) => String(c.id ?? "") === String(selectedClientId)) ?? null : null),
@@ -373,28 +530,26 @@ export function FacturacionMineriaPage() {
     );
   }, [invoicesAll, selectedClient, type]);
 
-  // Recibo: solo facturas de reparación/flete con saldo (venta equipos = comprobante, sin recibo)
-  const invoicesWithoutReceipt = useMemo(() => {
-    if (!selectedClient || type !== "Recibo") return [];
-    const clientNorm = normalizeClientName(selectedClient.name);
-    const facturas = invoicesAll.filter(
-      (inv) =>
-        normalizeClientName(inv.clientName) === clientNorm &&
-        inv.type === "Factura" &&
-        !isAsicEquipmentSaleInvoice(inv)
-    );
-    return facturas.filter((f) => invoicePendingCollectionAmount(f, invoicesAll) > INVOICE_BALANCE_EPS);
-  }, [invoicesAll, selectedClient, type]);
+  /** Venta ASIC: solo Factura (comprobante de pago) y NC — sin emisión de Recibo. */
+  useEffect(() => {
+    if (type === "Recibo" || type === "Recibo Devolución") {
+      setType("Factura");
+      setRelatedInvoiceId("");
+      setItems([]);
+      setItemsLocked(false);
+      setPaymentDate("");
+    }
+  }, [type]);
 
-  /** Venta equipos → COMPROBANTE DE PAGO; reparación/flete → FACTURA CREDITO (+ recibo). */
+  /** Toda Factura ASIC → COMPROBANTE DE PAGO (sin recibo). */
   const asicFacturaDocumentContext = useMemo<InvoiceDocumentContext | undefined>(() => {
     if (type !== "Factura") return undefined;
-    return isAsicEquipmentSaleDocument(items) ? "comprobante-pago" : undefined;
-  }, [type, items]);
+    return "comprobante-pago";
+  }, [type]);
 
   // Limpiar factura relacionada cuando cambia el tipo o el cliente
   useEffect(() => {
-    if (type !== "Nota de Crédito" && type !== "Recibo") {
+    if (type !== "Nota de Crédito") {
       setRelatedInvoiceId("");
       setItemsLocked(false);
     }
@@ -765,44 +920,25 @@ export function FacturacionMineriaPage() {
           dueDateDays,
           relatedInvoiceNumber: relatedInvoice?.number,
           creditNoteMode: inferredNcMode,
-          documentContext:
-            type === "Factura"
-              ? isAsicEquipmentSaleDocument(items)
-                ? "comprobante-pago"
-                : undefined
-              : undefined,
+          documentContext: type === "Factura" ? "comprobante-pago" : undefined,
         },
         { logoBase64 }
       );
-      const emitDocContext =
-        type === "Factura" && isAsicEquipmentSaleDocument(items) ? ("comprobante-pago" as const) : undefined;
       doc.save(
         buildAsicComprobantePdfFilename({
           number: numberToUse,
           clientName: selectedClient.name,
           type,
           items,
-          documentContext: emitDocContext,
+          documentContext: type === "Factura" ? "comprobante-pago" : undefined,
         })
       );
       const tipoMensaje =
-        type === "Factura"
-          ? isAsicEquipmentSaleDocument(items)
-            ? "Comprobante de pago"
-            : "Factura"
-          : type === "Recibo"
-            ? "Recibo"
-            : "Nota de Crédito";
+        type === "Factura" ? "Comprobante de pago" : type === "Nota de Crédito" ? "Nota de Crédito" : type;
       showToast(`${tipoMensaje} generado y guardado correctamente.`, "success");
     } else {
       const tipoMensaje =
-        type === "Factura"
-          ? isAsicEquipmentSaleDocument(items)
-            ? "Comprobante de pago"
-            : "Factura"
-          : type === "Recibo"
-            ? "Recibo"
-            : "Nota de Crédito";
+        type === "Factura" ? "Comprobante de pago" : type === "Nota de Crédito" ? "Nota de Crédito" : type;
       showToast(`${tipoMensaje} registrado correctamente.`, "success");
     }
 
@@ -915,7 +1051,7 @@ export function FacturacionMineriaPage() {
         dueDate: parseDueDateStr(inv.dueDate ?? ""),
         relatedInvoiceNumber: inv.relatedInvoiceNumber ?? relatedForNc?.number,
         creditNoteMode: inferredNcMode,
-        documentContext: isAsicEquipmentSaleInvoice(inv) ? "comprobante-pago" : undefined,
+        documentContext: inv.type === "Factura" ? "comprobante-pago" : undefined,
       },
       { logoBase64 }
     );
@@ -925,7 +1061,7 @@ export function FacturacionMineriaPage() {
         clientName: inv.clientName,
         type: inv.type,
         items: inv.items,
-        documentContext: isAsicEquipmentSaleInvoice(inv) ? "comprobante-pago" : undefined,
+        documentContext: inv.type === "Factura" ? "comprobante-pago" : undefined,
       })
     );
     showToast(`PDF ${inv.number} descargado.`, "success");
@@ -989,7 +1125,6 @@ export function FacturacionMineriaPage() {
                         }}
                       >
                         <option value="Factura">Factura</option>
-                        <option value="Recibo">Recibo</option>
                         <option value="Nota de Crédito">NC</option>
                       </select>
                     </div>
@@ -1006,42 +1141,25 @@ export function FacturacionMineriaPage() {
                   aria-hidden={
                     !(
                       (type === "Factura" && items.length > 0) ||
-                      ((type === "Nota de Crédito" || type === "Recibo") && !selectedClient) ||
-                      (type === "Recibo" && !!selectedClient && invoicesWithoutReceipt.length === 0) ||
-                      (type === "Recibo" && !!relatedInvoiceId)
+                      (type === "Nota de Crédito" && !selectedClient) ||
+                      (type === "Nota de Crédito" && !!selectedClient && invoicesWithoutCreditNote.length === 0)
                     )
                   }
                 >
                   {type === "Factura" && items.length > 0 ? (
-                    <div
-                      className={`fact-select-client-hint-box ${
-                        asicFacturaDocumentContext === "comprobante-pago"
-                          ? "fact-select-client-hint-box--ok"
-                          : "fact-select-client-hint-box--info"
-                      }`}
-                    >
-                      <small>
-                        {asicFacturaDocumentContext === "comprobante-pago"
-                          ? "Venta equipos · Comp. pago (sin recibo)"
-                          : "Reparación / flete · Factura + Recibo"}
-                      </small>
+                    <div className="fact-select-client-hint-box fact-select-client-hint-box--ok">
+                      <small>Comprobante de pago (sin recibo)</small>
                     </div>
-                  ) : (type === "Nota de Crédito" || type === "Recibo") && !selectedClient ? (
+                  ) : type === "Nota de Crédito" && !selectedClient ? (
                     <div className="fact-select-client-hint-box">
                       <small className="text-warning">
                         Seleccionar un cliente para ver comprobantes disponibles.
                       </small>
                     </div>
-                  ) : type === "Recibo" && relatedInvoiceId ? (
-                    <div className="fact-select-client-hint-box fact-select-client-hint-box--info">
+                  ) : type === "Nota de Crédito" && selectedClient && invoicesWithoutCreditNote.length === 0 ? (
+                    <div className="fact-select-client-hint-box fact-select-client-hint-box--danger">
                       <small>
-                        ✓ Los ítems se cargaron automáticamente.
-                      </small>
-                    </div>
-                  ) : type === "Recibo" && selectedClient && invoicesWithoutReceipt.length === 0 ? (
-                    <div className="fact-select-client-hint-box fact-select-client-hint-box--ok">
-                      <small>
-                        ℹ️ Este cliente no tiene comprobantes por liquidar pendientes.
+                        ⚠️ Este cliente no tiene comprobantes disponibles en Pendientes.
                       </small>
                     </div>
                   ) : null}
@@ -1067,7 +1185,7 @@ export function FacturacionMineriaPage() {
 
                 <div
                   className="fact-field fact-field--doc-extra-bottom"
-                  aria-hidden={type !== "Nota de Crédito" && type !== "Recibo"}
+                  aria-hidden={type !== "Nota de Crédito"}
                 >
                 {/* Selector de factura relacionada para Nota de Crédito */}
                 {type === "Nota de Crédito" && (
@@ -1091,13 +1209,6 @@ export function FacturacionMineriaPage() {
                             </option>
                           ))}
                         </select>
-                        {invoicesWithoutCreditNote.length === 0 && selectedClient && (
-                          <div style={{ padding: "0.75rem", backgroundColor: "#f8d7da", border: "1px solid #dc3545", borderRadius: "4px", marginTop: "0.5rem" }}>
-                            <small className="text-danger">
-                              ⚠️ Este cliente no tiene comprobantes disponibles en Pendientes.
-                            </small>
-                          </div>
-                        )}
                         {relatedInvoiceId && (
                           <div style={{ padding: "0.75rem", backgroundColor: "#d1e7dd", border: "1px solid #00a652", borderRadius: "4px", marginTop: "0.5rem" }}>
                             <small className="text-success" style={{ fontWeight: "bold" }}>
@@ -1107,45 +1218,6 @@ export function FacturacionMineriaPage() {
                         )}
                       </>
                     ) : null}
-                  </div>
-                )}
-
-                {/* Selector de factura relacionada para Recibo */}
-                {type === "Recibo" && (
-                  <div className="fact-field" style={{ borderTop: "none", paddingTop: 0, marginTop: 0 }}>
-                    <label className="fact-label" style={{ fontWeight: "bold", color: "#fff" }}>
-                      <span style={{ fontSize: "1.3em", lineHeight: 1 }}>🧾</span> Comprobante abonado (Requerido)
-                    </label>
-                    {selectedClient ? (
-                      <>
-                        <select
-                          className="fact-select"
-                          value={relatedInvoiceId}
-                          onChange={(e) => setRelatedInvoiceId(e.target.value)}
-                          style={{ border: relatedInvoiceId ? "2px solid #0d6efd" : "1px solid #ced4da" }}
-                        >
-                          <option value="">-- Seleccione comprobante --</option>
-                          {invoicesWithoutReceipt.map((inv) => (
-                            <option key={inv.id} value={inv.id}>
-                              {inv.number} - {inv.date} - Total: {formatUSD(Math.abs(inv.total))}
-                            </option>
-                          ))}
-                        </select>
-                      </>
-                    ) : null}
-                    <div className="fact-field" style={{ borderTop: "none", paddingTop: "0.65rem", marginTop: "0.35rem" }}>
-                      <label className="fact-label" style={{ fontWeight: "bold", color: "#ffcdd2" }}>
-                        📅 Fecha de pago (Requerido)
-                      </label>
-                      <input
-                        type="date"
-                        className="fact-input"
-                        value={paymentDate}
-                        onChange={(e) => setPaymentDate(e.target.value)}
-                        style={{ border: paymentDate ? "2px solid #0d6efd" : "2px solid #dc3545" }}
-                        required
-                      />
-                    </div>
                   </div>
                 )}
                 </div>
@@ -1194,13 +1266,6 @@ export function FacturacionMineriaPage() {
                         <div style={{ padding: "0.75rem", backgroundColor: "rgba(255, 255, 255, 0.15)", border: "1px solid rgba(255, 255, 255, 0.4)", borderRadius: "10px", marginBottom: "1rem" }}>
                           <small style={{ fontWeight: "bold", color: "#fff" }}>
                             ✓ Nota de Crédito seleccionada para cancelar el comprobante correspondiente.
-                          </small>
-                        </div>
-                      )}
-                      {type === "Recibo" && relatedInvoiceId && (
-                        <div style={{ padding: "0.75rem", backgroundColor: "rgba(255, 255, 255, 0.15)", border: "1px solid rgba(255, 255, 255, 0.4)", borderRadius: "10px", marginBottom: "1rem" }}>
-                          <small style={{ fontWeight: "bold", color: "#fff" }}>
-                            🔒 Recibo relacionado con comprobante. Los detalles están bloqueados.
                           </small>
                         </div>
                       )}
@@ -1275,6 +1340,38 @@ export function FacturacionMineriaPage() {
                                   onChange={(e) => {
                                     if (itemsLocked) return;
                                     const value = e.target.value;
+                                    if (value === NEW_EQUIPO_VALUE) {
+                                      if (!canQuickAddEquipo) {
+                                        showToast("No tenés permiso para agregar equipos ASIC.", "warning");
+                                        return;
+                                      }
+                                      setCatalogQuickAdd({ kind: "equipo", rowIdx: idx });
+                                      return;
+                                    }
+                                    if (value === NEW_SETUP_VALUE) {
+                                      if (!canQuickAddSetupRepFlete) {
+                                        showToast("No tenés permiso para agregar Setup.", "warning");
+                                        return;
+                                      }
+                                      setCatalogQuickAdd({ kind: "setup", rowIdx: idx });
+                                      return;
+                                    }
+                                    if (value === NEW_REPARACION_VALUE) {
+                                      if (!canQuickAddSetupRepFlete) {
+                                        showToast("No tenés permiso para agregar tipos de reparación.", "warning");
+                                        return;
+                                      }
+                                      setCatalogQuickAdd({ kind: "reparacion", rowIdx: idx });
+                                      return;
+                                    }
+                                    if (value === NEW_FLETE_VALUE) {
+                                      if (!canQuickAddSetupRepFlete) {
+                                        showToast("No tenés permiso para agregar transporte/flete.", "warning");
+                                        return;
+                                      }
+                                      setCatalogQuickAdd({ kind: "flete", rowIdx: idx });
+                                      return;
+                                    }
                                     if (value.startsWith("equipo_")) {
                                       const equipoId = value.slice("equipo_".length);
                                       const equipo = equiposAsic.find((eq) => eq.id === equipoId);
@@ -1367,13 +1464,16 @@ export function FacturacionMineriaPage() {
                                   disabled={itemsLocked}
                                 >
                                   <option value="">{itemDisplayLabel && !selectValue ? itemDisplayLabel : "Seleccionar..."}</option>
-                                  {equiposAsic.length > 0 && (
+                                  {(equiposAsic.length > 0 || canQuickAddEquipo) && (
                                     <optgroup label="Equipos ASIC">
                                       {equiposAsic.map((eq) => (
                                         <option key={eq.id} value={`equipo_${eq.id}`}>
                                           {eq.marcaEquipo} - {eq.modelo} - {eq.procesador}
                                         </option>
                                       ))}
+                                      {canQuickAddEquipo && (
+                                        <option value={NEW_EQUIPO_VALUE}>+ Nuevo equipo ASIC…</option>
+                                      )}
                                     </optgroup>
                                   )}
                                   <optgroup label="Setup">
@@ -1385,8 +1485,11 @@ export function FacturacionMineriaPage() {
                                       ))
                                     ) : (
                                       <option value="" disabled>
-                                        No hay Setup disponibles. Agregue Setup desde Gestión de Setup.
+                                        No hay Setup disponibles.
                                       </option>
+                                    )}
+                                    {canQuickAddSetupRepFlete && (
+                                      <option value={NEW_SETUP_VALUE}>+ Nuevo Setup…</option>
                                     )}
                                   </optgroup>
                                   <optgroup label="Reparación">
@@ -1398,8 +1501,11 @@ export function FacturacionMineriaPage() {
                                       ))
                                     ) : (
                                       <option value="" disabled>
-                                        No hay tipos de reparación. Configurarlos en Gestión de Reparación.
+                                        No hay tipos de reparación.
                                       </option>
+                                    )}
+                                    {canQuickAddSetupRepFlete && (
+                                      <option value={NEW_REPARACION_VALUE}>+ Nuevo tipo de reparación…</option>
                                     )}
                                   </optgroup>
                                   <optgroup label="Transporte y fletes">
@@ -1411,8 +1517,11 @@ export function FacturacionMineriaPage() {
                                       ))
                                     ) : (
                                       <option value="" disabled>
-                                        No hay ítems. Configurarlos en Gestión de Transporte y Fletes.
+                                        No hay ítems de transporte/flete.
                                       </option>
+                                    )}
+                                    {canQuickAddSetupRepFlete && (
+                                      <option value={NEW_FLETE_VALUE}>+ Nuevo transporte / flete…</option>
                                     )}
                                   </optgroup>
                                 </select>
@@ -1677,9 +1786,7 @@ export function FacturacionMineriaPage() {
                           : undefined
                       }
                       documentContext={
-                        previewEmitted.invoice.type === "Factura" && isAsicEquipmentSaleInvoice(previewEmitted.invoice)
-                          ? "comprobante-pago"
-                          : undefined
+                        previewEmitted.invoice.type === "Factura" ? "comprobante-pago" : undefined
                       }
                     />
                   ) : selectedClient && items.length > 0 ? (
@@ -1723,6 +1830,15 @@ export function FacturacionMineriaPage() {
           </main>
         </div>
       </div>
+      <AsicBillingCatalogQuickAddModal
+        kind={catalogQuickAdd?.kind ?? null}
+        busy={catalogQuickAddBusy}
+        onClose={() => {
+          if (catalogQuickAddBusy) return;
+          setCatalogQuickAdd(null);
+        }}
+        onSubmit={saveCatalogQuickAdd}
+      />
       <ConfirmModal
         open={showEmitPdfConfirm}
         title="Emitir documento"

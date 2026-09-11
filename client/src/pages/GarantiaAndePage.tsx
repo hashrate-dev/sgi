@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   addGarantiaEmitted,
+  createGarantiaItem,
   getGarantiasEmitted,
   getGarantiasItems,
   getNextGarantiaNumber,
@@ -20,9 +21,13 @@ import type { Client, EquipoASIC, Invoice, ItemGarantiaAnde, LineItem, Setup } f
 import { ConfirmModal } from "../components/ConfirmModal";
 import { PageHeader } from "../components/PageHeader";
 import { InvoicePreview } from "../components/InvoicePreview";
+import {
+  GarantiaCatalogQuickAddModal,
+  type GarantiaCatalogQuickAddForm,
+} from "../components/GarantiaCatalogQuickAddModal";
 import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
-import { canEditFacturacion } from "../lib/auth";
+import { canEditClientes, canEditFacturacion } from "../lib/auth";
 import { buildAsicComprobantePdfFilename } from "../lib/asicPdfFilename";
 import "../styles/facturacion.css";
 
@@ -41,6 +46,19 @@ function getCurrentTime() {
 function genId() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
+
+function getNextCodigoGarantia(items: ItemGarantiaAnde[]): string {
+  const nums = items
+    .map((i) => {
+      const m = i.codigo.trim().toUpperCase().match(/^G(\d+)$/i);
+      return m ? parseInt(m[1], 10) : 0;
+    })
+    .filter((n) => n > 0);
+  const next = nums.length === 0 ? 1 : Math.max(...nums) + 1;
+  return `G${String(next).padStart(3, "0")}`;
+}
+
+const NEW_GARANTIA_VALUE = "__new_garantia__";
 
 /** Recibo: RG + 4 dígitos desde RG0201. Recibo Devolución: RD + 4 dígitos desde RD0201. */
 const GARANTIA_NUM_CONFIG: Record<string, { prefix: string; digits: number; startNum: number }> = {
@@ -95,6 +113,9 @@ export function GarantiaAndePage() {
   const [previewEmitted, setPreviewEmitted] = useState<{ invoice: Invoice; emittedAt: string } | null>(null);
   /** Número de vista previa desde el servidor (evita duplicados); fallback a nextValeNumber si falla la API */
   const [nextNumFromApi, setNextNumFromApi] = useState<string | null>(null);
+  /** Alta rápida de ítem de garantía desde el select de la fila. */
+  const [garantiaQuickAddRowIdx, setGarantiaQuickAddRowIdx] = useState<number | null>(null);
+  const [garantiaQuickAddBusy, setGarantiaQuickAddBusy] = useState(false);
 
   const emittedInLast5Days = useMemo(() => {
     const now = Date.now();
@@ -443,6 +464,63 @@ export function GarantiaAndePage() {
   }
 
   const canEdit = !user || canEditFacturacion(user);
+  const canQuickAddGarantia = Boolean(user && canEditClientes(user));
+  const nextGarantiaCodigo = useMemo(() => getNextCodigoGarantia(itemsGarantia), [itemsGarantia]);
+
+  async function saveGarantiaQuickAdd(form: GarantiaCatalogQuickAddForm) {
+    if (garantiaQuickAddRowIdx == null) return;
+    const rowIdx = garantiaQuickAddRowIdx;
+    const marca = form.marca.trim();
+    const modelo = form.modelo.trim();
+    if (!marca || !modelo) {
+      showToast("Completá marca y modelo del ítem de garantía.", "error");
+      return;
+    }
+    const id = genId();
+    const codigo = getNextCodigoGarantia(itemsGarantia);
+    const precioGarantia =
+      form.precioGarantia === "" ? undefined : Number(form.precioGarantia);
+    setGarantiaQuickAddBusy(true);
+    try {
+      await createGarantiaItem({
+        id,
+        codigo,
+        marca,
+        modelo,
+        fechaIngreso: new Date().toISOString().slice(0, 10),
+        precioGarantia,
+      });
+      const refreshed = await getGarantiasItems();
+      const list = refreshed.items ?? [];
+      setItemsGarantia(list);
+      const created = list.find((g) => g.id === id);
+      if (created) {
+        const priceFromCatalog =
+          created.precioGarantia != null && Number.isFinite(Number(created.precioGarantia))
+            ? Number(created.precioGarantia)
+            : 0;
+        updateItem(rowIdx, {
+          garantiaId: created.id,
+          garantiaCodigo: created.codigo,
+          garantiaMarca: created.marca,
+          garantiaModelo: created.modelo,
+          equipoId: undefined,
+          marcaEquipo: undefined,
+          modeloEquipo: undefined,
+          procesadorEquipo: undefined,
+          setupId: undefined,
+          setupNombre: undefined,
+          price: priceFromCatalog,
+        });
+      }
+      setGarantiaQuickAddRowIdx(null);
+      showToast(`Ítem ${codigo} guardado y seleccionado.`, "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "No se pudo guardar el ítem de garantía.", "error");
+    } finally {
+      setGarantiaQuickAddBusy(false);
+    }
+  }
 
   return (
     <div className="fact-page fact-page--garantia-ande">
@@ -461,6 +539,16 @@ export function GarantiaAndePage() {
           setShowConfirmPdf(false);
           executePdfAndSave(false);
         }}
+      />
+      <GarantiaCatalogQuickAddModal
+        open={garantiaQuickAddRowIdx != null}
+        nextCodigo={nextGarantiaCodigo}
+        busy={garantiaQuickAddBusy}
+        onClose={() => {
+          if (garantiaQuickAddBusy) return;
+          setGarantiaQuickAddRowIdx(null);
+        }}
+        onSubmit={saveGarantiaQuickAdd}
       />
       <div className="container">
         <PageHeader title="Garantía ANDE" />
@@ -646,9 +734,21 @@ export function GarantiaAndePage() {
                                         value={it.garantiaId ? `garantia_${it.garantiaId}` : it.equipoId ? `equipo_${it.equipoId}` : it.setupId ? `setup_${it.setupId}` : ""}
                                         onChange={(e) => {
                                           const value = e.target.value;
+                                          if (value === NEW_GARANTIA_VALUE) {
+                                            if (!canQuickAddGarantia) {
+                                              showToast("No tenés permiso para agregar ítems de garantía.", "warning");
+                                              return;
+                                            }
+                                            setGarantiaQuickAddRowIdx(idx);
+                                            return;
+                                          }
                                           if (value.startsWith("garantia_")) {
                                             const g = itemsGarantia.find((x) => x.id === value.replace("garantia_", ""));
                                             if (g) {
+                                              const priceFromCatalog =
+                                                g.precioGarantia != null && Number.isFinite(Number(g.precioGarantia))
+                                                  ? Number(g.precioGarantia)
+                                                  : 0;
                                               updateItem(idx, {
                                                 garantiaId: g.id,
                                                 garantiaCodigo: g.codigo,
@@ -660,7 +760,7 @@ export function GarantiaAndePage() {
                                                 procesadorEquipo: undefined,
                                                 setupId: undefined,
                                                 setupNombre: undefined,
-                                                price: 0
+                                                price: priceFromCatalog
                                               });
                                             }
                                           } else if (value.startsWith("equipo_")) {
@@ -716,13 +816,16 @@ export function GarantiaAndePage() {
                                         disabled={!canEdit || itemsLocked}
                                       >
                                         <option value="">Seleccionar...</option>
-                                        {itemsGarantia.length > 0 && (
+                                        {(itemsGarantia.length > 0 || canQuickAddGarantia) && (
                                           <optgroup label="Depósito garantía">
                                             {itemsGarantia.map((g) => (
                                               <option key={g.id} value={`garantia_${g.id}`}>
                                                 {g.codigo} - Depósito garantía - {g.marca} - {g.modelo}
                                               </option>
                                             ))}
+                                            {canQuickAddGarantia && !itemsLocked && (
+                                              <option value={NEW_GARANTIA_VALUE}>+ Nuevo ítem de garantía…</option>
+                                            )}
                                           </optgroup>
                                         )}
                                       </select>

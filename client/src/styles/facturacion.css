@@ -581,6 +581,12 @@ button.fact-back {
   color: #166534;
 }
 
+.fact-sidebar .fact-select-client-hint-box--danger {
+  background-color: #f8d7da;
+  border-color: #dc3545;
+  color: #842029;
+}
+
 .fact-sidebar .fact-select-client-hint-box--info {
   background-color: #d1ecf1;
   border-color: #0d6efd;

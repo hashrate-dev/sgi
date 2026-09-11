@@ -1,6 +1,6 @@
 import type { Invoice, LineItem } from "./types";
 
-/** Ítem de reparación o flete (requiere Factura + Recibo de cobro). */
+/** Ítem de reparación o flete. */
 export function isAsicServiceLineItem(it: LineItem): boolean {
   return Boolean(it.reparacionTipoId || it.transporteFleteTipoId);
 }
@@ -12,17 +12,13 @@ export function isAsicEquipmentSaleLineItem(it: LineItem): boolean {
 }
 
 /**
- * Comprobante de pago por venta de equipos ASIC: no lleva recibo;
- * queda cerrado (check verde) al emitirse.
- * Si hay reparación o flete, el documento sigue el flujo Factura + Recibo.
+ * Emisión ASIC: ya no hay Recibo.
+ * Toda Factura se trata como COMPROBANTE DE PAGO (cerrado al emitir, sin cobro posterior).
  */
-export function isAsicEquipmentSaleDocument(items: LineItem[] | undefined | null): boolean {
-  const list = items ?? [];
-  if (list.length === 0) return false;
-  if (list.some(isAsicServiceLineItem)) return false;
-  return list.some(isAsicEquipmentSaleLineItem);
+export function isAsicEquipmentSaleDocument(_items?: LineItem[] | null): boolean {
+  return true;
 }
 
 export function isAsicEquipmentSaleInvoice(inv: Pick<Invoice, "type" | "items">): boolean {
-  return inv.type === "Factura" && isAsicEquipmentSaleDocument(inv.items);
+  return inv.type === "Factura";
 }
