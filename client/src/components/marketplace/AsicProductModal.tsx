@@ -42,15 +42,26 @@ function renderYieldLineParts(text: string): ReactNode {
   );
 }
 
-/** URLs únicas para miniaturas + hero: tarjeta primero, luego detalle (sin perder la principal). */
-function gallerySources(product: AsicProduct): string[] {
+/**
+ * URLs únicas para miniaturas + hero.
+ * - Tienda: solo tarjeta (`imageSrc`, sin logo Hashrate). Las de detalle llevan watermark.
+ * - Inventario: detalle primero (logo Hashrate), luego tarjeta tienda.
+ */
+function gallerySources(product: AsicProduct, inventoryMode: boolean): string[] {
   const fb = defaultAsicShelfImageSrc(product.brand, product.model);
   const fbUrl = fb ? normalizeMarketplaceImageSrc(fb) : "";
   const main = normalizeMarketplaceImageSrc(product.imageSrc ?? "");
   const detail = dedupeGalleryUrls(
     (product.gallerySrcs ?? []).map((x) => normalizeMarketplaceImageSrc(String(x))).filter(Boolean)
   );
-  const merged = dedupeGalleryUrls([main, ...detail].filter(Boolean)).filter((u) => !fbUrl || u !== fbUrl);
+
+  if (!inventoryMode) {
+    const storeOnly = main ? [main] : [];
+    if (storeOnly.length > 0) return capProductModalThumbUrls(storeOnly);
+    return capProductModalThumbUrls(fbUrl ? [fbUrl] : []);
+  }
+
+  const merged = dedupeGalleryUrls([...detail, main].filter(Boolean));
   if (merged.length > 0) return capProductModalThumbUrls(merged);
   return capProductModalThumbUrls(fbUrl ? [fbUrl] : []);
 }
@@ -134,9 +145,10 @@ export function AsicProductModal({
     return `https://wa.me/595993358387?text=${waText}`;
   }, [mailText.body]);
 
+  const inventoryMode = Boolean(inventoryAside);
   const thumbs = useMemo(
-    () => (galleryLoading ? [] : gallerySources(product)),
-    [product, galleryLoading]
+    () => (galleryLoading ? [] : gallerySources(product, inventoryMode)),
+    [product, galleryLoading, inventoryMode]
   );
   const shelfFallbackSrc = useMemo(
     () => normalizeMarketplaceImageSrc(defaultAsicShelfImageSrc(product.brand, product.model)),

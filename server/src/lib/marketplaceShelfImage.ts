@@ -1,27 +1,11 @@
 import { normalizeMarketplaceImageSrc } from "./marketplaceImageSrc.js";
 
-function parseGalleryRawUrls(json: string | null | undefined): string[] {
-  if (!json?.trim()) return [];
-  try {
-    const g = JSON.parse(json) as unknown;
-    if (!Array.isArray(g)) return [];
-    return g
-      .filter((x): x is string => typeof x === "string" && x.trim().length > 0)
-      .map((x) => x.trim());
-  } catch {
-    return [];
-  }
-}
-
-/** Orden: imagen principal → galería (para servir bytes o redirect sin meter base64 en JSON). */
+/** Orden: solo imagen de tarjeta. La galería es para ficha inventario (logo Hashrate). */
 export function pickMarketplaceShelfImageRaw(
   mpImageSrc: string | null | undefined,
-  mpGalleryJson: string | null | undefined
+  _mpGalleryJson?: string | null | undefined
 ): string {
-  const main = String(mpImageSrc ?? "").trim();
-  if (main) return main;
-  const gallery = parseGalleryRawUrls(mpGalleryJson);
-  return gallery[0] ?? "";
+  return String(mpImageSrc ?? "").trim();
 }
 
 export function sendMarketplaceShelfImageResponse(

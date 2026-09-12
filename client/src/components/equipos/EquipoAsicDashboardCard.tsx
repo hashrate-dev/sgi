@@ -10,6 +10,21 @@ import {
 import { AsicDetailSvg } from "../marketplace/AsicDetailIcon";
 import { parseDetailRowsJson } from "./MarketplaceDetailRowsEditor";
 
+function firstGalleryImageSrc(galleryJson: string | null | undefined): string {
+  const raw = galleryJson?.trim() ?? "";
+  if (!raw) return "";
+  try {
+    const g = JSON.parse(raw) as unknown;
+    if (!Array.isArray(g)) return "";
+    for (const x of g) {
+      if (typeof x === "string" && x.trim()) return x.trim();
+    }
+  } catch {
+    /* ignore */
+  }
+  return "";
+}
+
 type Props = {
   equipo: EquipoASIC;
   canEdit: boolean;
@@ -23,19 +38,23 @@ type Props = {
  */
 export function EquipoAsicDashboardCard({ equipo: e, canEdit, onDetail, onEdit, onDelete }: Props) {
   const explicit = e.marketplaceImageSrc?.trim() ?? "";
+  const inventoryBrand = firstGalleryImageSrc(e.marketplaceGalleryJson);
   const fallbackPath = defaultAsicShelfImageSrc(e.marcaEquipo ?? "", e.modelo ?? "");
-  const [imgSrc, setImgSrc] = useState(() => publicImageUrl(explicit || fallbackPath));
+  /** En SGI preferimos la foto con logo Hashrate (galería); la tarjeta sin logo es solo tienda. */
+  const preferred = inventoryBrand || explicit || fallbackPath;
+  const [imgSrc, setImgSrc] = useState(() => publicImageUrl(preferred));
   const [imgBroken, setImgBroken] = useState(false);
 
   useEffect(() => {
     const ex = e.marketplaceImageSrc?.trim() ?? "";
+    const brand = firstGalleryImageSrc(e.marketplaceGalleryJson);
     const fb = defaultAsicShelfImageSrc(e.marcaEquipo ?? "", e.modelo ?? "");
-    setImgSrc(publicImageUrl(ex || fb));
+    setImgSrc(publicImageUrl(brand || ex || fb));
     setImgBroken(false);
-  }, [e.id, e.marketplaceImageSrc, e.marcaEquipo, e.modelo]);
+  }, [e.id, e.marketplaceImageSrc, e.marketplaceGalleryJson, e.marcaEquipo, e.modelo]);
 
   const src = imgSrc;
-  const hasPhoto = Boolean((explicit || fallbackPath).trim()) && !imgBroken;
+  const hasPhoto = Boolean(preferred.trim()) && !imgBroken;
   const detailRows = parseDetailRowsJson(e.marketplaceDetailRowsJson ?? "")
     .filter((r) => r.text.trim())
     .slice(0, 4);
@@ -65,7 +84,13 @@ export function EquipoAsicDashboardCard({ equipo: e, canEdit, onDetail, onEdit, 
                 decoding="async"
                 className="shelf-product__photo"
                 onError={() => {
-                  if (explicit && fallbackPath && imgSrc === publicImageUrl(explicit)) {
+                  const brand = firstGalleryImageSrc(e.marketplaceGalleryJson);
+                  const ex = e.marketplaceImageSrc?.trim() ?? "";
+                  if (brand && imgSrc === publicImageUrl(brand) && ex) {
+                    setImgSrc(publicImageUrl(ex));
+                    return;
+                  }
+                  if (ex && fallbackPath && imgSrc === publicImageUrl(ex)) {
                     setImgSrc(publicImageUrl(fallbackPath));
                     return;
                   }

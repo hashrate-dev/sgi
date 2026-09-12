@@ -416,10 +416,10 @@ export function MarketplaceAnuncioPhotosField({
     <div className="fact-field hrs-upload-field hrs-upload-unified">
       <div className="hrs-upload-slots">
         <div className="hrs-upload-slot hrs-upload-slot--card">
-          <span className="hrs-upload-slot-label">Tarjeta (principal)</span>
+          <span className="hrs-upload-slot-label">Tienda (sin logo)</span>
           {card ? (
             <div className="hrs-upload-slot-thumb">
-              <img src={imgSrcForPreview(card)} alt="Imagen de tarjeta" />
+              <img src={imgSrcForPreview(card)} alt="Imagen de tarjeta en tienda" />
               {!disabled ? (
                 <button type="button" className="hrs-upload-gallery-remove" onClick={clearCard} title="Quitar" aria-label="Quitar imagen de tarjeta">
                   ×
@@ -440,7 +440,7 @@ export function MarketplaceAnuncioPhotosField({
 
         <div className="hrs-upload-slot hrs-upload-slot--gallery">
           <span className="hrs-upload-slot-label">
-            Detalle ({gallery.length}/{MARKETPLACE_PRODUCT_GALLERY_MAX})
+            Inventario · logo Hashrate ({gallery.length}/{MARKETPLACE_PRODUCT_GALLERY_MAX})
           </span>
           <div className="hrs-upload-gallery-grid hrs-upload-gallery-grid--unified">
             {gallery.map((u, i) => (
@@ -461,9 +461,9 @@ export function MarketplaceAnuncioPhotosField({
                       type="button"
                       className="hrs-upload-make-card"
                       onClick={() => promoteGalleryToCard(i)}
-                      title="Usar como imagen de tarjeta"
+                      title="Usar en tienda (sin logo Hashrate)"
                     >
-                      Tarjeta
+                      Tienda
                     </button>
                   </>
                 ) : null}
@@ -528,8 +528,8 @@ export function MarketplaceAnuncioPhotosField({
           </p>
           <p className="hrs-upload-dropzone-hint">
             {card
-              ? `Las nuevas fotos van a Detalle (quedan ${gallerySlotsLeft}).`
-              : `La primera va a Tarjeta; el resto a Detalle (máx. ${MARKETPLACE_PRODUCT_GALLERY_MAX}).`}
+              ? `Nuevas fotos → Inventario con logo Hashrate (quedan ${gallerySlotsLeft}). La tienda pública solo usa «Tienda (sin logo)».`
+              : `La primera va a Tienda (sin logo); el resto a Inventario con logo Hashrate (máx. ${MARKETPLACE_PRODUCT_GALLERY_MAX}).`}
             {marketplaceUploadUsesInlineImages()
               ? " · en hashrate.space se comprimen (~300 KB c/u)"
               : " · JPG, PNG, WebP o GIF"}
