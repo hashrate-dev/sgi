@@ -72,44 +72,83 @@ export function formatCryptoWireTelegramDigest(items: CryptoWireNewsItem[], opts
   ].join("\n");
 }
 
-export async function sendTelegramText(chatId: string, text: string): Promise<void> {
+export function isTelegramChatMissingError(msg: string): boolean {
+  const m = msg.toLowerCase();
+  return (
+    m.includes("chat not found") ||
+    m.includes("can't initiate conversation") ||
+    m.includes("bot was blocked") ||
+    m.includes("user is deactivated") ||
+    m.includes("forbidden")
+  );
+}
+
+export async function telegramFetchJson(
+  method: string,
+  body?: Record<string, unknown>
+): Promise<{ ok: boolean; description?: string; result?: unknown }> {
   const token = botToken();
   if (!token) throw new Error("Falta TELEGRAM_BOT_TOKEN en el servidor");
-  const chat = normalizeTelegramChatId(chatId);
-  if (!chat) throw new Error("Chat ID de Telegram inválido");
-
-  const url = `https://api.telegram.org/bot${token}/sendMessage`;
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), 12_000);
-  let res: Response;
   try {
-    res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+      method: body ? "POST" : "GET",
+      headers: body ? { "Content-Type": "application/json" } : undefined,
       signal: ac.signal,
-      body: JSON.stringify({
-        chat_id: chat,
-        text: clip(text, 3900),
-        disable_web_page_preview: true,
-      }),
+      body: body ? JSON.stringify(body) : undefined,
     });
+    const text = await res.text();
+    try {
+      return JSON.parse(text) as { ok: boolean; description?: string; result?: unknown };
+    } catch {
+      return { ok: false, description: clip(text, 280) };
+    }
   } catch (e) {
     const aborted = e instanceof Error && (e.name === "AbortError" || /abort/i.test(e.message));
     throw new Error(aborted ? "Telegram no respondió a tiempo. Probá de nuevo en unos segundos." : String(e instanceof Error ? e.message : e));
   } finally {
     clearTimeout(timer);
   }
-  const bodyText = await res.text();
-  let ok = res.ok;
-  let description = bodyText;
-  try {
-    const j = JSON.parse(bodyText) as { ok?: boolean; description?: string };
-    ok = Boolean(j.ok);
-    if (j.description) description = j.description;
-  } catch {
-    /* keep */
+}
+
+export async function getTelegramBotIdentity(): Promise<{ username: string; id: string; name: string } | null> {
+  const j = await telegramFetchJson("getMe");
+  if (!j.ok || !j.result || typeof j.result !== "object") return null;
+  const r = j.result as { id?: number; username?: string; first_name?: string };
+  return {
+    id: String(r.id ?? ""),
+    username: String(r.username ?? "").replace(/^@/, ""),
+    name: String(r.first_name ?? r.username ?? "bot"),
+  };
+}
+
+function chatIdForApi(chat: string): string | number {
+  return /^-?\d+$/.test(chat) ? Number(chat) : chat;
+}
+
+export function explainTelegramSendFailure(raw: string, botUsername?: string): string {
+  const user = botUsername ? `@${botUsername.replace(/^@/, "")}` : "tu bot";
+  const link = botUsername ? `https://t.me/${botUsername.replace(/^@/, "")}` : "el enlace t.me que te dio BotFather";
+  if (isTelegramChatMissingError(raw)) {
+    return (
+      `El bot ${user} todavía no tiene un chat abierto con vos. ` +
+      `Abrí ${link} , tocá Start (o mandá /start) y después «Enviar prueba» otra vez. ` +
+      `Tiene que ser ESE bot (el del token de Vercel), no el de Get ID.`
+    );
   }
-  if (!ok) throw new Error(`Telegram API: ${clip(description, 280)}`);
+  return clip(raw, 280);
+}
+
+export async function sendTelegramText(chatId: string, text: string): Promise<void> {
+  const chat = normalizeTelegramChatId(chatId);
+  if (!chat) throw new Error("Chat ID de Telegram inválido");
+  const j = await telegramFetchJson("sendMessage", {
+    chat_id: chatIdForApi(chat),
+    text: clip(text, 3900),
+    disable_web_page_preview: true,
+  });
+  if (!j.ok) throw new Error(`Telegram API: ${clip(j.description || "error", 280)}`);
   // eslint-disable-next-line no-console
   console.log(`[telegram] mensaje OK → ${chat}`);
 }
@@ -117,52 +156,31 @@ export async function sendTelegramText(chatId: string, text: string): Promise<vo
 export type CryptoWireTelegramResult = {
   sent: boolean;
   reason?: string;
+  chatId?: string;
 };
 
-export async function notifyCryptoWireTelegram(
-  chatId: string,
-  items: CryptoWireNewsItem[]
-): Promise<CryptoWireTelegramResult> {
-  const list = items.filter((x) => String(x.title ?? "").trim());
-  if (!list.length) return { sent: false, reason: "sin_items" };
-  const chat = normalizeTelegramChatId(chatId);
-  if (!chat) return { sent: false, reason: "chat_invalido" };
-  if (!botToken()) return { sent: false, reason: "faltan_credenciales" };
-  await sendTelegramText(chat, formatCryptoWireTelegramDigest(list));
-  return { sent: true };
+function pickChatFromUpdate(u: Record<string, unknown>): { id: number; type?: string; first_name?: string; last_name?: string; username?: string; title?: string } | null {
+  const bags = [u.message, u.edited_message, u.my_chat_member, u.chat_member, u.channel_post];
+  for (const b of bags) {
+    if (!b || typeof b !== "object") continue;
+    const chat = (b as { chat?: Record<string, unknown> }).chat;
+    if (chat && typeof chat.id === "number") {
+      return chat as { id: number; type?: string; first_name?: string; last_name?: string; username?: string; title?: string };
+    }
+  }
+  return null;
 }
 
-/** Últimos chats privados que le escribieron al bot (para autocompletar Chat ID). */
 export async function listRecentTelegramPrivateChats(limit = 8): Promise<
   Array<{ chatId: string; name: string; username?: string }>
 > {
-  const token = botToken();
-  if (!token) throw new Error("Falta TELEGRAM_BOT_TOKEN en el servidor");
-  const url = `https://api.telegram.org/bot${token}/getUpdates?limit=50`;
-  const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), 10_000);
-  let res: Response;
-  try {
-    res = await fetch(url, { signal: ac.signal });
-  } catch {
-    throw new Error("No se pudo hablar con Telegram (timeout). Probá de nuevo.");
-  } finally {
-    clearTimeout(timer);
-  }
-  const bodyText = await res.text();
-  const j = JSON.parse(bodyText) as {
-    ok?: boolean;
-    description?: string;
-    result?: Array<{
-      message?: {
-        chat?: { id?: number; type?: string; first_name?: string; last_name?: string; username?: string; title?: string };
-      };
-    }>;
-  };
+  await telegramFetchJson("deleteWebhook", { drop_pending_updates: false }).catch(() => undefined);
+  const j = await telegramFetchJson("getUpdates?limit=50");
   if (!j.ok) throw new Error(j.description || "getUpdates falló");
+  const rows = Array.isArray(j.result) ? (j.result as Record<string, unknown>[]) : [];
   const byId = new Map<string, { chatId: string; name: string; username?: string }>();
-  for (const u of j.result ?? []) {
-    const chat = u.message?.chat;
+  for (const u of rows) {
+    const chat = pickChatFromUpdate(u);
     if (!chat?.id) continue;
     if (chat.type !== "private" && chat.type !== "group" && chat.type !== "supergroup") continue;
     const chatId = String(chat.id);
@@ -177,4 +195,40 @@ export async function listRecentTelegramPrivateChats(limit = 8): Promise<
     });
   }
   return [...byId.values()].slice(-Math.max(1, Math.min(20, limit))).reverse();
+}
+
+export async function notifyCryptoWireTelegram(
+  chatId: string,
+  items: CryptoWireNewsItem[]
+): Promise<CryptoWireTelegramResult> {
+  const list = items.filter((x) => String(x.title ?? "").trim());
+  if (!list.length) return { sent: false, reason: "sin_items" };
+  let chat = normalizeTelegramChatId(chatId);
+  if (!botToken()) return { sent: false, reason: "faltan_credenciales" };
+  const digest = formatCryptoWireTelegramDigest(list);
+
+  const trySend = async (id: string) => {
+    await sendTelegramText(id, digest);
+  };
+
+  if (chat) {
+    try {
+      await trySend(chat);
+      return { sent: true, chatId: chat };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!isTelegramChatMissingError(msg)) throw e;
+    }
+  }
+
+  const discovered = await listRecentTelegramPrivateChats(10);
+  const fallback = discovered[0]?.chatId;
+  if (fallback) {
+    await trySend(fallback);
+    return { sent: true, chatId: fallback };
+  }
+
+  const ident = await getTelegramBotIdentity().catch(() => null);
+  const raw = chat ? "chat not found" : "chat_invalido";
+  throw new Error(explainTelegramSendFailure(raw, ident?.username || getTelegramBotStatus().botUsernameHint));
 }

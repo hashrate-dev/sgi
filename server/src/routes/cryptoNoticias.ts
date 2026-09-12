@@ -24,6 +24,8 @@ import { requireAuth, requireRole } from "../middleware/auth.js";
 import { requireModuleGrant } from "../middleware/moduleGrant.js";
 import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
 import {
+  explainTelegramSendFailure,
+  getTelegramBotIdentity,
   getTelegramBotStatus,
   listRecentTelegramPrivateChats,
   normalizeTelegramChatId,
@@ -1039,10 +1041,16 @@ cryptoNoticiasRouter.post("/crypto-noticias/telegram/test", ...writeMw, async (r
           : result.reason || "No se pudo enviar";
       return res.status(400).json({ error: { message: hint } });
     }
+    if (result.chatId && result.chatId !== settings.chatId) {
+      settings = await saveWireTgSettings({ enabled: true, chatId: result.chatId });
+    }
     res.json({ ok: true, via: "telegram", ...telegramSettingsPayload(settings) });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    res.status(502).json({ error: { message: msg } });
+    const ident = await getTelegramBotIdentity().catch(() => null);
+    res.status(502).json({
+      error: { message: explainTelegramSendFailure(msg, ident?.username || getTelegramBotStatus().botUsernameHint) },
+    });
   }
 });
 
