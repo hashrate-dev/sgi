@@ -3,6 +3,7 @@ import type { AsicProduct } from "../../lib/marketplaceAsicCatalog.js";
 import {
   asicProductShowsMinerEconomyContent,
   asicProductIsOutOfStock,
+  capProductModalThumbUrls,
   dedupeGalleryUrls,
   defaultAsicShelfImageSrc,
   normalizeMarketplaceImageSrc,
