@@ -5,8 +5,10 @@
 
 export type CryptoWireNewsItem = {
   title: string;
+  summary?: string;
   sourceName?: string;
   url?: string;
+  imageUrl?: string;
 };
 
 export type TelegramBotStatus = {
@@ -27,10 +29,22 @@ function botToken(): string {
   return (process.env.TELEGRAM_BOT_TOKEN || "").trim();
 }
 
-function wireSalaUrl(): string {
-  const base = (process.env.APP_PUBLIC_URL || "https://hashrate.space").replace(/\/$/, "");
-  return `${base}/gestion-administrativa/noticias`;
+function escapeTelegramHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
+
+function articleLink(raw?: string): string {
+  const url = String(raw ?? "").trim();
+  if (!/^https?:\/\//i.test(url)) return "";
+  if (/hashrate\.space\/gestion-administrativa\/noticias/i.test(url)) return "";
+  return url;
+}
+
+export type CryptoWireTelegramResult = {
+  sent: boolean;
+  reason?: string;
+  chatId?: string;
+};
 
 export function getTelegramBotStatus(): TelegramBotStatus {
   return {
@@ -57,19 +71,27 @@ export function formatCryptoWireTelegramDigest(items: CryptoWireNewsItem[], opts
   const list = items.filter((x) => String(x.title ?? "").trim());
   const head = list.slice(0, maxItems);
   const extra = Math.max(0, list.length - head.length);
-  const lines = head.map((it, i) => {
+  const blocks = head.map((it, i) => {
     const src = String(it.sourceName ?? "").trim();
-    const title = clip(it.title, 160);
-    return `${i + 1}) ${title}${src ? ` (${clip(src, 40)})` : ""}`;
+    const title = clip(it.title.replace(/\s+/g, " "), 160);
+    const url = articleLink(it.url);
+    return [`${i + 1}) ${title}${src ? ` (${clip(src, 40)})` : ""}`, url].filter(Boolean).join("\n");
   });
-  if (extra > 0) lines.push(`+${extra} más en la sala de redacción`);
-  return [
-    `📡 Wire cripto HRS · ${list.length} nueva${list.length === 1 ? "" : "s"}`,
-    "",
-    ...lines,
-    "",
-    wireSalaUrl(),
-  ].join("\n");
+  if (extra > 0) blocks.push(`+${extra} más`);
+  return [`📡 Wire cripto HRS · ${list.length} nueva${list.length === 1 ? "" : "s"}`, "", ...blocks].join("\n");
+}
+
+/** Caption / cuerpo de una noticia: foto arriba (sendPhoto), título, descripción y link al artículo. */
+export function formatCryptoWireArticleHtml(item: CryptoWireNewsItem): string {
+  const url = articleLink(item.url);
+  const footer = url ? `\n\nLeer la noticia:\n${escapeTelegramHtml(url)}` : "";
+  const src = clip(String(item.sourceName ?? "").trim(), 60);
+  const title = escapeTelegramHtml(clip(String(item.title ?? "").replace(/\s+/g, " ").trim(), 220));
+  const head = `<b>${title}</b>${src ? `\n<i>${escapeTelegramHtml(src)}</i>` : ""}`;
+  const budget = Math.max(0, 1024 - head.length - footer.length - 2);
+  const summary = clip(String(item.summary ?? "").replace(/\s+/g, " ").trim(), budget);
+  const mid = summary ? `\n\n${escapeTelegramHtml(summary)}` : "";
+  return `${head}${mid}${footer}`;
 }
 
 export function isTelegramChatMissingError(msg: string): boolean {
@@ -85,12 +107,13 @@ export function isTelegramChatMissingError(msg: string): boolean {
 
 export async function telegramFetchJson(
   method: string,
-  body?: Record<string, unknown>
+  body?: Record<string, unknown>,
+  timeoutMs = 12_000
 ): Promise<{ ok: boolean; description?: string; result?: unknown }> {
   const token = botToken();
   if (!token) throw new Error("Falta TELEGRAM_BOT_TOKEN en el servidor");
   const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), 12_000);
+  const timer = setTimeout(() => ac.abort(), timeoutMs);
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
       method: body ? "POST" : "GET",
@@ -140,24 +163,93 @@ export function explainTelegramSendFailure(raw: string, botUsername?: string): s
   return clip(raw, 280);
 }
 
-export async function sendTelegramText(chatId: string, text: string): Promise<void> {
+export async function sendTelegramText(
+  chatId: string,
+  text: string,
+  opts?: { html?: boolean; disablePreview?: boolean }
+): Promise<void> {
   const chat = normalizeTelegramChatId(chatId);
   if (!chat) throw new Error("Chat ID de Telegram inválido");
   const j = await telegramFetchJson("sendMessage", {
     chat_id: chatIdForApi(chat),
     text: clip(text, 3900),
-    disable_web_page_preview: true,
+    disable_web_page_preview: opts?.disablePreview !== false,
+    ...(opts?.html ? { parse_mode: "HTML" } : {}),
   });
   if (!j.ok) throw new Error(`Telegram API: ${clip(j.description || "error", 280)}`);
   // eslint-disable-next-line no-console
   console.log(`[telegram] mensaje OK → ${chat}`);
 }
 
-export type CryptoWireTelegramResult = {
-  sent: boolean;
-  reason?: string;
-  chatId?: string;
-};
+export async function sendTelegramPhoto(chatId: string, photoUrl: string, caption: string): Promise<void> {
+  const chat = normalizeTelegramChatId(chatId);
+  if (!chat) throw new Error("Chat ID de Telegram inválido");
+  const photo = String(photoUrl || "").trim();
+  if (!/^https?:\/\//i.test(photo)) throw new Error("URL de imagen inválida");
+  const j = await telegramFetchJson(
+    "sendPhoto",
+    {
+      chat_id: chatIdForApi(chat),
+      photo,
+      caption: clip(caption, 1024),
+      parse_mode: "HTML",
+    },
+    20_000
+  );
+  if (!j.ok) throw new Error(`Telegram API: ${clip(j.description || "error", 280)}`);
+  // eslint-disable-next-line no-console
+  console.log(`[telegram] foto OK → ${chat}`);
+}
+
+export async function notifyCryptoWireTelegramArticle(
+  chatId: string,
+  item: CryptoWireNewsItem
+): Promise<CryptoWireTelegramResult> {
+  const title = String(item.title ?? "").trim();
+  if (!title) return { sent: false, reason: "sin_items" };
+  const chat = normalizeTelegramChatId(chatId);
+  if (!chat) return { sent: false, reason: "chat_invalido" };
+  if (!botToken()) return { sent: false, reason: "faltan_credenciales" };
+  const caption = formatCryptoWireArticleHtml({ ...item, title });
+  const photo = String(item.imageUrl ?? "").trim();
+  if (/^https?:\/\//i.test(photo)) {
+    try {
+      await sendTelegramPhoto(chat, photo, caption);
+      return { sent: true, chatId: chat };
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn("[telegram] sendPhoto falló, envío texto", e instanceof Error ? e.message : e);
+    }
+  }
+  await sendTelegramText(chat, caption, { html: true, disablePreview: !articleLink(item.url) });
+  return { sent: true, chatId: chat };
+}
+
+export async function notifyCryptoWireTelegramArticleMany(
+  chatIds: string[],
+  item: CryptoWireNewsItem
+): Promise<{ sent: number; failed: number; lastError?: string }> {
+  const ids = [...new Set(chatIds.map((x) => normalizeTelegramChatId(x)).filter(Boolean))];
+  if (!ids.length) return { sent: 0, failed: 0, lastError: "sin_chats" };
+  let sent = 0;
+  let failed = 0;
+  let lastError: string | undefined;
+  for (const id of ids) {
+    try {
+      const r = await notifyCryptoWireTelegramArticle(id, item);
+      if (r.sent) sent += 1;
+      else {
+        failed += 1;
+        lastError = r.reason;
+      }
+    } catch (e) {
+      failed += 1;
+      lastError = e instanceof Error ? e.message : String(e);
+    }
+  }
+  if (sent === 0 && lastError) throw new Error(lastError);
+  return { sent, failed, lastError };
+}
 
 function pickChatFromUpdate(u: Record<string, unknown>): { id: number; type?: string; first_name?: string; last_name?: string; username?: string; title?: string } | null {
   const bags = [u.message, u.edited_message, u.my_chat_member, u.chat_member, u.channel_post];

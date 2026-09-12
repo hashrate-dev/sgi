@@ -30,6 +30,7 @@ import {
   listRecentTelegramPrivateChats,
   normalizeTelegramChatId,
   notifyCryptoWireTelegram,
+  notifyCryptoWireTelegramArticleMany,
   notifyCryptoWireTelegramMany,
   type CryptoWireNewsItem,
 } from "../lib/telegramWire.js";
@@ -1134,7 +1135,6 @@ cryptoNoticiasRouter.post("/crypto-noticias/telegram/test", ...writeMw, async (r
       {
         title: "Prueba Wire HRS — si ves esto, el aviso de noticias por Telegram ya funciona",
         sourceName: "SGI Hashrate",
-        url: "https://hashrate.space/gestion-administrativa/noticias",
       },
     ]);
     if (!result.sent) {
@@ -1173,12 +1173,20 @@ cryptoNoticiasRouter.post("/crypto-noticias/telegram/send-item", ...writeMw, asy
     await ensureCryptoNoticiasSchema();
     const row = (await db
       .prepare(
-        `SELECT title, title_es, source_name, url
+        `SELECT title, title_es, summary, summary_es, source_name, url, image_url
          FROM sgi_crypto_noticias
          WHERE id = ?`
       )
       .get(parsed.data.id)) as
-      | { title?: string; title_es?: string; source_name?: string; url?: string }
+      | {
+          title?: string;
+          title_es?: string;
+          summary?: string;
+          summary_es?: string;
+          source_name?: string;
+          url?: string;
+          image_url?: string;
+        }
       | undefined;
     if (!row) {
       return res.status(404).json({ error: { message: "No encontré esa noticia." } });
@@ -1193,14 +1201,27 @@ cryptoNoticiasRouter.post("/crypto-noticias/telegram/send-item", ...writeMw, asy
       await unclaimManualTelegramSend(parsed.data.id);
       return res.status(400).json({ error: { message: "Esa noticia no tiene título." } });
     }
+    let imageUrl = String(row.image_url || "").trim();
+    if (!isAcceptableArticleImage(imageUrl)) imageUrl = "";
+    if (!imageUrl && url) {
+      try {
+        const og = await fetchOgImage(url);
+        if (og && isAcceptableArticleImage(og)) {
+          imageUrl = og;
+          await db.prepare("UPDATE sgi_crypto_noticias SET image_url = ? WHERE id = ?").run(og, parsed.data.id);
+        }
+      } catch {
+        /* sin foto: el mensaje igual sale con título, texto y link */
+      }
+    }
     try {
-      const result = await notifyCryptoWireTelegramMany(dest, [
-        {
-          title: url ? `${title}\n${url}` : title,
-          sourceName: String(row.source_name || "").trim(),
-          url,
-        },
-      ]);
+      const result = await notifyCryptoWireTelegramArticleMany(dest, {
+        title,
+        summary: String(row.summary_es || row.summary || "").trim(),
+        sourceName: String(row.source_name || "").trim(),
+        url,
+        imageUrl,
+      });
       res.json({ ok: true, via: "telegram", sentTo: result.sent, ...telegramSettingsPayload(settings) });
     } catch (sendErr) {
       await unclaimManualTelegramSend(parsed.data.id);
