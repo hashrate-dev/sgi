@@ -207,6 +207,7 @@ export function MarketplaceAnuncioPhotosField({
   onCardChange,
   galleryLines,
   onGalleryLinesChange,
+  onPhotosChange,
   library = [],
   disabled,
 }: {
@@ -214,6 +215,8 @@ export function MarketplaceAnuncioPhotosField({
   onCardChange: (src: string) => void;
   galleryLines: string;
   onGalleryLinesChange: (lines: string) => void;
+  /** Preferible para aplicar tarjeta+galería en un solo setState (evita que se pisen). */
+  onPhotosChange?: (next: { cardSrc: string; galleryLines: string }) => void;
   library?: MarketplaceImageLibraryItem[];
   disabled?: boolean;
 }) {
@@ -263,8 +266,12 @@ export function MarketplaceAnuncioPhotosField({
       return;
     }
 
-    onCardChange(nextCard);
-    onGalleryLinesChange(nextGal.join("\n"));
+    if (onPhotosChange) {
+      onPhotosChange({ cardSrc: nextCard, galleryLines: nextGal.join("\n") });
+    } else {
+      onCardChange(nextCard);
+      onGalleryLinesChange(nextGal.join("\n"));
+    }
     showToast(
       added === 1 ? "1 foto agregada." : `${added} fotos agregadas.`,
       "success",

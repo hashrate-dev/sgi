@@ -2108,10 +2108,19 @@ export function EquiposAsicPage() {
                               <p className="hrs-equipo-asic-modal-form__media-panel-title">Fotos del anuncio</p>
                               <MarketplaceAnuncioPhotosField
                                 cardSrc={formData.marketplaceImageSrc}
-                                onCardChange={(marketplaceImageSrc) => setFormData({ ...formData, marketplaceImageSrc })}
+                                onCardChange={(marketplaceImageSrc) =>
+                                  setFormData((prev) => ({ ...prev, marketplaceImageSrc }))
+                                }
                                 galleryLines={formData.marketplaceGalleryLines}
                                 onGalleryLinesChange={(marketplaceGalleryLines) =>
-                                  setFormData({ ...formData, marketplaceGalleryLines })
+                                  setFormData((prev) => ({ ...prev, marketplaceGalleryLines }))
+                                }
+                                onPhotosChange={({ cardSrc, galleryLines }) =>
+                                  setFormData((prev) => ({
+                                    ...prev,
+                                    marketplaceImageSrc: cardSrc,
+                                    marketplaceGalleryLines: galleryLines,
+                                  }))
                                 }
                                 library={marketplaceImageLibrary}
                                 disabled={!canEditTienda}
