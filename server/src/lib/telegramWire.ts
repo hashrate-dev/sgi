@@ -287,7 +287,7 @@ async function uploadTelegramPhoto(chat: string, photoUrl: string, caption: stri
       },
     });
     if (!imgRes.ok) return false;
-    const ct = (imgRes.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+    const ct = (imgRes.headers.get("content-type") || "").split(";")[0]?.trim().toLowerCase() || "";
     if (ct.includes("svg") || (ct && !ct.startsWith("image/") && ct !== "application/octet-stream")) return false;
     const buf = Buffer.from(await imgRes.arrayBuffer());
     if (buf.length < 120 || buf.length > 9_000_000) return false;
