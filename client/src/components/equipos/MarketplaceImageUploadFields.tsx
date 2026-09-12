@@ -45,7 +45,7 @@ export function collectMarketplaceImageLibrary(
     const pushUrl = (raw: string | null | undefined) => {
       const url = String(raw ?? "").trim();
       if (!url) return;
-      const key = galleryFileKey(url) || url.slice(0, 80);
+      const key = imageIdentity(url) || galleryFileKey(url) || url.slice(0, 80);
       if (byKey.has(key)) return;
       byKey.set(key, { url, label });
     };
@@ -83,12 +83,28 @@ function parseGalleryLines(lines: string): string[] {
     .filter(Boolean);
 }
 
-/** Identidad estable para dedupe (data URLs no usan galleryFileKey completo). */
+/** Identidad estable para dedupe. Distingue bien data URLs distintas (p. ej. sin logo vs con logo). */
 function imageIdentity(url: string): string {
   const t = url.trim();
   if (!t) return "";
   if (/^data:image\//i.test(t)) {
-    return `data:${t.length}:${t.slice(5, 48)}:${t.slice(-48)}`;
+    const comma = t.indexOf(",");
+    const body = comma >= 0 ? t.slice(comma + 1) : t;
+    let h = 2166136261 >>> 0;
+    const step = Math.max(1, Math.floor(body.length / 1024));
+    for (let i = 0; i < body.length; i += step) {
+      h ^= body.charCodeAt(i);
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    const mid = Math.floor(body.length / 2);
+    for (const start of [0, mid, Math.max(0, body.length - 96)]) {
+      const end = Math.min(start + 96, body.length);
+      for (let j = start; j < end; j++) {
+        h ^= body.charCodeAt(j);
+        h = Math.imul(h, 16777619) >>> 0;
+      }
+    }
+    return `data:${body.length}:${h.toString(16)}`;
   }
   return galleryFileKey(t) || t.toLowerCase();
 }
@@ -120,7 +136,9 @@ function ExistingImagesPicker({
       const t = u.trim();
       if (!t) continue;
       s.add(t);
-      s.add(galleryFileKey(t));
+      s.add(imageIdentity(t));
+      const fk = galleryFileKey(t);
+      if (fk && !/^data:/i.test(t)) s.add(fk);
     }
     return s;
   }, [excludeUrls]);
@@ -128,8 +146,11 @@ function ExistingImagesPicker({
   const visible = useMemo(
     () =>
       library.filter((item) => {
+        const id = imageIdentity(item.url);
         const key = galleryFileKey(item.url);
-        return !excludeKeys.has(item.url) && !excludeKeys.has(key);
+        if (excludeKeys.has(item.url) || excludeKeys.has(id)) return false;
+        if (key && !/^data:/i.test(item.url) && excludeKeys.has(key)) return false;
+        return true;
       }),
     [library, excludeKeys]
   );
@@ -282,8 +303,8 @@ export function MarketplaceAnuncioPhotosField({
     if (added === 0) {
       showToast(
         emptySlots <= 0
-          ? `Ya tenés la tarjeta y ${MARKETPLACE_PRODUCT_GALLERY_MAX} fotos de detalle.`
-          : "Esas fotos ya estaban agregadas. Probá con otras.",
+          ? `Ya tenés la foto de tienda y ${MARKETPLACE_PRODUCT_GALLERY_MAX} de inventario.`
+          : "Esa foto ya está en este equipo. Subí otro archivo (p. ej. la versión con logo Hashrate para Inventario).",
         emptySlots <= 0 ? "warning" : "info",
         "Equipos ASIC"
       );
