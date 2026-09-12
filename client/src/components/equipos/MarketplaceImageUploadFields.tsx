@@ -280,7 +280,11 @@ export function MarketplaceAnuncioPhotosField({
     const preferGallery = opts?.preferGallery === true;
     let nextCard = card;
     const nextGal = [...gallery];
-    const seen = new Set(allUrls.map((u) => imageIdentity(u)));
+    /** Tienda e Inventario son destinos distintos: se puede repetir la misma foto en ambos. */
+    const fillGallery = preferGallery || Boolean(nextCard);
+    const seen = new Set(
+      (fillGallery ? nextGal : nextCard ? [nextCard] : []).map((u) => imageIdentity(u)).filter(Boolean)
+    );
     let added = 0;
 
     for (const raw of incoming) {
@@ -304,7 +308,9 @@ export function MarketplaceAnuncioPhotosField({
       showToast(
         emptySlots <= 0
           ? `Ya tenés la foto de tienda y ${MARKETPLACE_PRODUCT_GALLERY_MAX} de inventario.`
-          : "Esa foto ya está en este equipo. Subí otro archivo (p. ej. la versión con logo Hashrate para Inventario).",
+          : fillGallery
+            ? "Esa foto ya está en Inventario. Sacala con × o elegí otro archivo."
+            : "Esa foto ya está en Tienda. Elegí otro archivo o usá Inventario.",
         emptySlots <= 0 ? "warning" : "info",
         "Equipos ASIC"
       );
@@ -583,8 +589,8 @@ export function MarketplaceAnuncioPhotosField({
           setLibraryOpen(false);
         }}
         library={library}
-        maxSelect={Math.max(1, addTargetRef.current === "gallery" ? gallerySlotsLeft : emptySlots)}
-        excludeUrls={allUrls}
+        maxSelect={Math.max(1, addTargetRef.current === "gallery" || card ? gallerySlotsLeft : emptySlots)}
+        excludeUrls={card ? gallery : allUrls}
         onConfirm={(urls) => {
           const preferGallery = addTargetRef.current === "gallery" || Boolean(card);
           addTargetRef.current = "auto";
