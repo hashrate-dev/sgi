@@ -224,6 +224,47 @@
   line-height: 1.4;
 }
 
+.crypto-news-wa {
+  margin: 0 0 1rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(37, 211, 102, 0.28);
+  background: rgba(37, 211, 102, 0.06);
+}
+
+.crypto-news-wa__status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.crypto-news-wa__check {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin: 0;
+  color: var(--cn-ink);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.crypto-news-wa__check input {
+  margin-top: 0.2rem;
+}
+
+.crypto-news-wa__hint {
+  color: var(--cn-muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.crypto-news-wa__hint code {
+  font-size: 0.74rem;
+  color: #9fe8c8;
+}
+
 .crypto-news-medios__list {
   list-style: none;
   margin: 0;

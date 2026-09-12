@@ -23,6 +23,11 @@ import {
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { requireModuleGrant } from "../middleware/moduleGrant.js";
 import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
+import {
+  getWhatsAppCloudStatus,
+  notifyCryptoWireWhatsApp,
+  type CryptoWireNewsItem,
+} from "../lib/whatsappCloud.js";
 
 export const cryptoNoticiasRouter = Router();
 
@@ -115,6 +120,7 @@ async function ensureCryptoNoticiasSchema(): Promise<void> {
     .prepare("CREATE INDEX IF NOT EXISTS idx_sgi_crypto_noticias_fetched ON sgi_crypto_noticias(fetched_at DESC)")
     .run();
   await ensureMediosSchema();
+  await ensureWaSettingsSchema();
   await purgeBlockedNewsSources();
   await purgeJunkNewsImages();
   schemaEnsured = true;
@@ -213,6 +219,87 @@ async function purgeJunkNewsImages(): Promise<void> {
     }
   } catch (e) {
     console.error("[crypto-noticias] purge-junk-images", e instanceof Error ? e.message : e);
+  }
+}
+
+async function ensureWaSettingsSchema(): Promise<void> {
+  if (db.isPostgres) {
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS sgi_crypto_noticias_wa (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          enabled INTEGER NOT NULL DEFAULT 0,
+          phone_digits TEXT NOT NULL DEFAULT '',
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`
+      )
+      .run();
+  } else {
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS sgi_crypto_noticias_wa (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          enabled INTEGER NOT NULL DEFAULT 0,
+          phone_digits TEXT NOT NULL DEFAULT '',
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )`
+      )
+      .run();
+  }
+  const row = (await db.prepare("SELECT id FROM sgi_crypto_noticias_wa WHERE id = 1").get()) as
+    | { id?: number }
+    | undefined;
+  if (!row?.id) {
+    await db.prepare("INSERT INTO sgi_crypto_noticias_wa (id, enabled, phone_digits) VALUES (1, 0, '')").run();
+  }
+}
+
+type WireWaSettings = {
+  enabled: boolean;
+  phoneDigits: string;
+};
+
+async function loadWireWaSettings(): Promise<WireWaSettings> {
+  await ensureCryptoNoticiasSchema();
+  const row = (await db.prepare("SELECT enabled, phone_digits FROM sgi_crypto_noticias_wa WHERE id = 1").get()) as
+    | { enabled?: number | boolean; phone_digits?: string }
+    | undefined;
+  const enabled = row?.enabled === true || Number(row?.enabled) === 1;
+  const fromDb = String(row?.phone_digits ?? "").replace(/\D/g, "");
+  const fallback = (process.env.WHATSAPP_NOTIFY_TO || "").replace(/\D/g, "");
+  return { enabled, phoneDigits: fromDb || fallback };
+}
+
+async function saveWireWaSettings(next: { enabled: boolean; phoneDigits: string }): Promise<WireWaSettings> {
+  await ensureCryptoNoticiasSchema();
+  const phone = next.phoneDigits.replace(/\D/g, "").slice(0, 20);
+  await db
+    .prepare(
+      `UPDATE sgi_crypto_noticias_wa
+       SET enabled = ?, phone_digits = ?,
+           updated_at = ${db.isPostgres ? "NOW()" : "datetime('now')"}
+       WHERE id = 1`
+    )
+    .run(next.enabled ? 1 : 0, phone);
+  return loadWireWaSettings();
+}
+
+async function maybeNotifyWireWhatsApp(items: CryptoWireNewsItem[]): Promise<void> {
+  if (!items.length) return;
+  try {
+    const settings = await loadWireWaSettings();
+    if (!settings.enabled) return;
+    const to = settings.phoneDigits;
+    if (to.length < 8) {
+      console.warn("[crypto-noticias] WhatsApp wire activo pero sin teléfono válido");
+      return;
+    }
+    const result = await notifyCryptoWireWhatsApp(to, items);
+    if (!result.sent) {
+      console.warn(`[crypto-noticias] WhatsApp wire omitido: ${result.reason || result.via}`);
+    }
+  } catch (e) {
+    console.error("[crypto-noticias] WhatsApp wire", e instanceof Error ? e.message : e);
   }
 }
 
@@ -570,6 +657,7 @@ async function runIngest(): Promise<{ inserted: number; scanned: number; feedErr
     enrichImages: false,
   });
   let inserted = 0;
+  const insertedForWa: CryptoWireNewsItem[] = [];
   for (const d of drafts) {
     if (isBlockedNewsSource(d.sourceName, d.url)) continue;
     try {
@@ -581,7 +669,10 @@ async function runIngest(): Promise<{ inserted: number; scanned: number; feedErr
         )
         .run(d.title, d.summary, d.url, d.sourceName, JSON.stringify(d.topics), d.publishedAt, d.imageUrl || "");
       const changes = Number((info as { changes?: number })?.changes ?? 0);
-      if (changes > 0) inserted += 1;
+      if (changes > 0) {
+        inserted += 1;
+        insertedForWa.push({ title: d.title, sourceName: d.sourceName, url: d.url });
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (!/unique|duplicate/i.test(msg)) {
@@ -602,6 +693,11 @@ async function runIngest(): Promise<{ inserted: number; scanned: number; feedErr
   void warmRecentTranslations(24).catch((e) =>
     console.error("[crypto-noticias] warm-translate", e instanceof Error ? e.message : e)
   );
+
+  if (insertedForWa.length > 0) {
+    void maybeNotifyWireWhatsApp(insertedForWa);
+  }
+
   return { inserted, scanned: drafts.length, feedErrors: feedErrors.length };
 }
 
@@ -833,6 +929,102 @@ cryptoNoticiasRouter.post("/crypto-noticias/refresh", ...writeMw, async (_req, r
     res.json({ ok: true, ...result });
   } catch (e) {
     next(e);
+  }
+});
+
+const waSettingsSchema = z.object({
+  enabled: z.boolean(),
+  phoneDigits: z.string().max(32).optional().nullable(),
+});
+
+cryptoNoticiasRouter.get("/crypto-noticias/whatsapp", ...readMw, async (_req, res, next) => {
+  try {
+    const settings = await loadWireWaSettings();
+    const cloud = getWhatsAppCloudStatus();
+    const channel = cloud.callMeBotKeyConfigured
+      ? "callmebot"
+      : cloud.cloudReady
+        ? "meta_template"
+        : "none";
+    res.json({
+      enabled: settings.enabled,
+      phoneDigits: settings.phoneDigits,
+      channel,
+      cloudReady: cloud.cloudReady,
+      callMeBotReady: cloud.callMeBotKeyConfigured,
+      defaultNotifyTo: cloud.defaultNotifyTo,
+      newsTemplateName: cloud.newsTemplateName,
+      newsTemplateLang: cloud.newsTemplateLang,
+      readyToSend: settings.enabled && settings.phoneDigits.length >= 8 && channel !== "none",
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
+cryptoNoticiasRouter.put("/crypto-noticias/whatsapp", ...writeMw, async (req, res, next) => {
+  try {
+    const parsed = waSettingsSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({ error: { message: "Datos inválidos." } });
+    }
+    const phoneRaw = parsed.data.phoneDigits != null ? String(parsed.data.phoneDigits) : "";
+    const phoneDigits = phoneRaw.replace(/\D/g, "").slice(0, 20);
+    if (parsed.data.enabled && phoneDigits.length < 8) {
+      return res.status(400).json({
+        error: { message: "Indicá un número WhatsApp con código de país (solo dígitos, ej. 595991907308)." },
+      });
+    }
+    const saved = await saveWireWaSettings({
+      enabled: parsed.data.enabled,
+      phoneDigits,
+    });
+    const cloud = getWhatsAppCloudStatus();
+    const channel = cloud.callMeBotKeyConfigured
+      ? "callmebot"
+      : cloud.cloudReady
+        ? "meta_template"
+        : "none";
+    res.json({
+      ok: true,
+      enabled: saved.enabled,
+      phoneDigits: saved.phoneDigits,
+      channel,
+      cloudReady: cloud.cloudReady,
+      callMeBotReady: cloud.callMeBotKeyConfigured,
+      readyToSend: saved.enabled && saved.phoneDigits.length >= 8 && channel !== "none",
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
+cryptoNoticiasRouter.post("/crypto-noticias/whatsapp/test", ...writeMw, async (_req, res, next) => {
+  try {
+    const settings = await loadWireWaSettings();
+    if (settings.phoneDigits.length < 8) {
+      return res.status(400).json({
+        error: { message: "Guardá primero un número WhatsApp válido (con código de país)." },
+      });
+    }
+    const result = await notifyCryptoWireWhatsApp(settings.phoneDigits, [
+      {
+        title: "Prueba Wire HRS — si ves esto, el aviso de noticias ya funciona",
+        sourceName: "SGI Hashrate",
+        url: "https://hashrate.space/gestion-administrativa/noticias",
+      },
+    ]);
+    if (!result.sent) {
+      const hint =
+        result.reason === "faltan_credenciales"
+          ? "Falta WHATSAPP_CALLMEBOT_APIKEY o el par WHATSAPP_ACCESS_TOKEN + WHATSAPP_PHONE_NUMBER_ID en el servidor."
+          : result.reason || "No se pudo enviar";
+      return res.status(400).json({ error: { message: hint }, via: result.via });
+    }
+    res.json({ ok: true, via: result.via });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(502).json({ error: { message: msg } });
   }
 });
 

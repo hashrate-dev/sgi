@@ -3,9 +3,13 @@ import {
   createCryptoNoticiaMedio,
   deleteCryptoNoticiaMedio,
   getCryptoNoticiasMedios,
+  getCryptoNoticiasWhatsApp,
+  putCryptoNoticiasWhatsApp,
+  testCryptoNoticiasWhatsApp,
   updateCryptoNoticiaMedio,
   type CryptoNoticiaMedio,
   type CryptoNoticiaTopic,
+  type CryptoNoticiasWhatsAppSettings,
 } from "../lib/api";
 
 type Props = {
@@ -26,6 +30,13 @@ const TOPIC_OPTS: Array<{ id: CryptoNoticiaTopic; label: string }> = [
   { id: "uruguay", label: "Cripto Uruguay" },
 ];
 
+function channelLabel(s: CryptoNoticiasWhatsAppSettings | null): string {
+  if (!s) return "…";
+  if (s.channel === "callmebot") return "CallMeBot (texto libre)";
+  if (s.channel === "meta_template") return `Meta · plantilla ${s.newsTemplateName || "nueva_noticia_wire"}`;
+  return "Sin canal (faltan credenciales en el servidor)";
+}
+
 export function CryptoNoticiasMediosConfig({ canEdit, open, onClose }: Props) {
   const titleId = useId();
   const closeBtnRef = useRef<HTMLButtonElement>(null);
@@ -39,12 +50,21 @@ export function CryptoNoticiasMediosConfig({ canEdit, open, onClose }: Props) {
   const [topics, setTopics] = useState<CryptoNoticiaTopic[]>(["cripto"]);
   const [saving, setSaving] = useState(false);
 
+  const [wa, setWa] = useState<CryptoNoticiasWhatsAppSettings | null>(null);
+  const [waEnabled, setWaEnabled] = useState(false);
+  const [waPhone, setWaPhone] = useState("");
+  const [waSaving, setWaSaving] = useState(false);
+  const [waTesting, setWaTesting] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     setErr("");
     try {
-      const r = await getCryptoNoticiasMedios();
+      const [r, waRes] = await Promise.all([getCryptoNoticiasMedios(), getCryptoNoticiasWhatsApp()]);
       setItems(r.items || []);
+      setWa(waRes);
+      setWaEnabled(Boolean(waRes.enabled));
+      setWaPhone(waRes.phoneDigits || "");
     } catch (e) {
       setErr(e instanceof Error ? e.message : "No se pudo cargar la configuración de medios.");
     } finally {
@@ -95,6 +115,23 @@ export function CryptoNoticiasMediosConfig({ canEdit, open, onClose }: Props) {
     }
   };
 
+  const onDelete = async (m: CryptoNoticiaMedio) => {
+    if (!canEdit || m.isBuiltin) return;
+    if (!window.confirm(`¿Eliminar el medio «${m.name}»?`)) return;
+    setBusyId(m.id);
+    setErr("");
+    setOk("");
+    try {
+      await deleteCryptoNoticiaMedio(m.id);
+      setItems((prev) => prev.filter((x) => x.id !== m.id));
+      setOk(`Medio eliminado: ${m.name}`);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "No se pudo eliminar el medio.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const onAdd = async () => {
     if (!canEdit) return;
     setErr("");
@@ -135,26 +172,53 @@ export function CryptoNoticiasMediosConfig({ canEdit, open, onClose }: Props) {
     }
   };
 
-  const onDelete = async (m: CryptoNoticiaMedio) => {
-    if (!canEdit || m.isBuiltin) return;
-    if (!window.confirm(`¿Eliminar el medio «${m.name}»?`)) return;
-    setBusyId(m.id);
+  const onSaveWhatsApp = async () => {
+    if (!canEdit) return;
+    setWaSaving(true);
     setErr("");
     setOk("");
     try {
-      await deleteCryptoNoticiaMedio(m.id);
-      setItems((prev) => prev.filter((x) => x.id !== m.id));
-      setOk(`Medio eliminado: ${m.name}`);
+      const r = await putCryptoNoticiasWhatsApp({ enabled: waEnabled, phoneDigits: waPhone });
+      setWa(r);
+      setWaEnabled(Boolean(r.enabled));
+      setWaPhone(r.phoneDigits || "");
+      setOk(
+        r.enabled
+          ? r.readyToSend
+            ? "WhatsApp del wire guardado. Las noticias nuevas del bot se enviarán a ese número."
+            : "Guardado, pero el servidor aún no tiene canal WhatsApp (CallMeBot o Meta)."
+          : "Avisos WhatsApp del wire desactivados."
+      );
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "No se pudo eliminar el medio.");
+      setErr(e instanceof Error ? e.message : "No se pudo guardar WhatsApp.");
     } finally {
-      setBusyId(null);
+      setWaSaving(false);
+    }
+  };
+
+  const onTestWhatsApp = async () => {
+    if (!canEdit) return;
+    setWaTesting(true);
+    setErr("");
+    setOk("");
+    try {
+      await putCryptoNoticiasWhatsApp({ enabled: waEnabled || true, phoneDigits: waPhone });
+      const r = await testCryptoNoticiasWhatsApp();
+      setOk(`Prueba enviada por ${r.via === "callmebot" ? "CallMeBot" : "Meta"}. Revisá WhatsApp.`);
+      const refreshed = await getCryptoNoticiasWhatsApp();
+      setWa(refreshed);
+      setWaEnabled(Boolean(refreshed.enabled));
+      setWaPhone(refreshed.phoneDigits || "");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Falló la prueba de WhatsApp.");
+    } finally {
+      setWaTesting(false);
     }
   };
 
   if (!open) return null;
 
-  const enabledCount = items.filter((x) => x.enabled).length;
+  const enabledCount = items.filter((m) => m.enabled).length;
 
   return (
     <div
@@ -204,6 +268,80 @@ export function CryptoNoticiasMediosConfig({ canEdit, open, onClose }: Props) {
             <p className="text-muted small mb-0">Cargando medios…</p>
           ) : (
             <>
+              <section className="crypto-news-wa" aria-label="WhatsApp wire">
+                <h3 className="crypto-news-medios__add-title">WhatsApp · avisos del bot</h3>
+                <p className="crypto-news-medios__lead" style={{ marginBottom: "0.75rem" }}>
+                  Cuando el bot carga noticias <strong>nuevas</strong> (manual, cron o auto), te manda un
+                  resumen a este número. No reenvía el historial viejo.
+                </p>
+                <div className="crypto-news-wa__status">
+                  <span className={`crypto-news-medios__badge${wa?.readyToSend ? " is-ok" : " is-no"}`}>
+                    {wa?.readyToSend ? "Listo para enviar" : "Pendiente"}
+                  </span>
+                  <span className="crypto-news-medios__badge is-manual">{channelLabel(wa)}</span>
+                </div>
+                {canEdit ? (
+                  <div className="row g-2 align-items-end">
+                    <div className="col-12">
+                      <label className="crypto-news-wa__check">
+                        <input
+                          type="checkbox"
+                          checked={waEnabled}
+                          disabled={waSaving || waTesting}
+                          onChange={(e) => setWaEnabled(e.target.checked)}
+                        />
+                        <span>Enviar noticias nuevas del bot por WhatsApp</span>
+                      </label>
+                    </div>
+                    <div className="col-12 col-md-6">
+                      <label className="form-label small mb-1" htmlFor="crypto-wa-phone">
+                        Número (código país, solo dígitos)
+                      </label>
+                      <input
+                        id="crypto-wa-phone"
+                        className="form-control form-control-sm"
+                        inputMode="numeric"
+                        placeholder="595991907308"
+                        value={waPhone}
+                        disabled={waSaving || waTesting}
+                        onChange={(e) => setWaPhone(e.target.value.replace(/[^\d+\s-]/g, ""))}
+                      />
+                    </div>
+                    <div className="col-12 col-md-6 d-flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className="btn btn-success btn-sm"
+                        disabled={waSaving || waTesting}
+                        onClick={() => void onSaveWhatsApp()}
+                      >
+                        {waSaving ? "Guardando…" : "Guardar WhatsApp"}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline-light btn-sm"
+                        disabled={waSaving || waTesting || waPhone.replace(/\D/g, "").length < 8}
+                        onClick={() => void onTestWhatsApp()}
+                      >
+                        {waTesting ? "Enviando…" : "Enviar prueba"}
+                      </button>
+                    </div>
+                    <div className="col-12">
+                      <p className="crypto-news-wa__hint mb-0">
+                        Canal preferido: <code>WHATSAPP_CALLMEBOT_APIKEY</code> (texto libre, lo más simple).
+                        Si no está, usa Meta Cloud + plantilla <code>nueva_noticia_wire</code>. Detalle en{" "}
+                        <code>server/docs/WHATSAPP_WIRE.md</code>.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-muted small mb-0">
+                    {waEnabled
+                      ? `Avisos activos hacia …${(waPhone || "").slice(-4) || "????"}.`
+                      : "Avisos WhatsApp desactivados."}
+                  </p>
+                )}
+              </section>
+
               <ul className="crypto-news-medios__list">
                 {items.map((m) => (
                   <li key={m.id} className={`crypto-news-medios__item${m.enabled ? " is-on" : " is-off"}`}>
