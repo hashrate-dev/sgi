@@ -194,7 +194,8 @@ export function formatCryptoWireTelegramDigest(items: CryptoWireNewsItem[], opts
 
 /** Una tarjeta: foto arriba + caption como el ejemplo CoinDesk (título, fuente, texto, link). */
 export function formatCryptoWireArticleCaption(item: CryptoWireNewsItem): string {
-  const title = escapeTelegramHtml(clip(decodeNewsText(item.title), 220));
+  const rawTitle = decodeNewsText(item.title);
+  const title = escapeTelegramHtml(rawTitle.length > 380 ? `${rawTitle.slice(0, 379)}…` : rawTitle);
   const src = escapeTelegramHtml(clip(decodeNewsText(item.sourceName || ""), 80));
   const publisherUrl = isArticlePageUrl(item.publisherUrl || "")
     ? articleLink(item.publisherUrl)
@@ -214,7 +215,17 @@ export function formatCryptoWireArticleCaption(item: CryptoWireNewsItem): string
   const footer = footerParts.join("");
   const head = `<b>${title}</b>${src ? `\n<i>${src}</i>` : ""}`;
   const budget = Math.max(0, 1024 - head.length - footer.length - 2);
-  const summary = clip(decodeNewsText(item.summary || ""), budget);
+  let blurb = decodeNewsText(item.summary || "");
+  const titlePlain = decodeNewsText(item.title);
+  if (
+    !blurb ||
+    blurb === titlePlain ||
+    titlePlain.startsWith(blurb.slice(0, 40)) ||
+    blurb.startsWith(titlePlain.slice(0, 40))
+  ) {
+    blurb = "";
+  }
+  const summary = clip(blurb, budget);
   const mid = summary ? `\n\n${escapeTelegramHtml(summary)}` : "";
   return `${head}${mid}${footer}`;
 }

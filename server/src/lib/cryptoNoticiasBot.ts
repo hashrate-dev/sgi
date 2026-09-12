@@ -459,27 +459,147 @@ function extractOgImageFromHtml(html: string): string {
   return "";
 }
 
-async function fetchMicrolinkImage(articleUrl: string, signal: AbortSignal): Promise<string> {
-  // Nunca pedir meta de wrappers de Google: devuelve el mismo preview genérico.
-  if (isGoogleNewsHost(hostOf(articleUrl))) return "";
+function metaTagContent(html: string, keys: string[]): string {
+  for (const key of keys) {
+    const re1 = new RegExp(
+      `<meta[^>]+(?:property|name)=["']${key}["'][^>]+content=["']([^"']+)["']`,
+      "i"
+    );
+    const re2 = new RegExp(
+      `<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${key}["']`,
+      "i"
+    );
+    const raw = html.match(re1)?.[1] || html.match(re2)?.[1] || "";
+    const t = decodeEntities(raw);
+    if (t.length >= 8) return t;
+  }
+  return "";
+}
+
+function firstArticleParagraph(html: string): string {
+  const re = /<p\b[^>]*>([\s\S]*?)<\/p>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html))) {
+    const t = decodeEntities(m[1] ?? "");
+    if (t.length < 70 || t.length > 700) continue;
+    if (/cookie|newsletter|subscribe|sign up|privacy|advertisement/i.test(t)) continue;
+    return t;
+  }
+  return "";
+}
+
+export type ArticlePreview = {
+  url: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+};
+
+export async function fetchArticlePreview(articleUrl: string): Promise<ArticlePreview> {
+  const empty: ArticlePreview = { url: "", title: "", description: "", imageUrl: "" };
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 14_000);
+  try {
+    let target = "";
+    try {
+      target = (await resolvePublisherUrl(articleUrl, ctrl.signal)) || "";
+    } catch {
+      target = "";
+    }
+    if (!target || isGoogleNewsHost(hostOf(target))) {
+      target = articleUrl;
+    }
+    if (!target || isGoogleNewsHost(hostOf(target))) return empty;
+
+    let html = "";
+    let finalUrl = target;
+    try {
+      const res = await fetch(target, {
+        signal: ctrl.signal,
+        redirect: "follow",
+        headers: {
+          "User-Agent": BROWSER_UA,
+          Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "es-419,es;q=0.9,en;q=0.8",
+        },
+      });
+      if (res.ok) {
+        finalUrl = res.url || target;
+        if (isGoogleNewsHost(hostOf(finalUrl))) return empty;
+        html = (await res.text()).slice(0, 320_000);
+      }
+    } catch {
+      /* microlink abajo */
+    }
+
+    let title = html ? metaTagContent(html, ["og:title", "twitter:title"]) : "";
+    if (!title && html) {
+      title = decodeEntities(html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1] || "");
+    }
+    let description = html
+      ? metaTagContent(html, ["og:description", "twitter:description", "description"])
+      : "";
+    if (!description && html) description = firstArticleParagraph(html);
+    let imageUrl = html ? extractOgImageFromHtml(html) : "";
+
+    if ((!title || !description || !imageUrl) && !ctrl.signal.aborted) {
+      const extra = await fetchMicrolinkPreview(finalUrl || target, ctrl.signal);
+      title = title || extra.title;
+      description = description || extra.description;
+      imageUrl = imageUrl || extra.imageUrl;
+    }
+
+    const pageUrl = isGoogleNewsHost(hostOf(finalUrl)) ? "" : finalUrl;
+    return {
+      url: pageUrl,
+      title: title.slice(0, 400),
+      description: description.slice(0, 800),
+      imageUrl,
+    };
+  } catch {
+    return empty;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchMicrolinkPreview(
+  articleUrl: string,
+  signal: AbortSignal
+): Promise<{ title: string; description: string; imageUrl: string }> {
+  const none = { title: "", description: "", imageUrl: "" };
+  if (isGoogleNewsHost(hostOf(articleUrl))) return none;
   try {
     const api = `https://api.microlink.io/?url=${encodeURIComponent(articleUrl)}&meta`;
     const res = await fetch(api, {
       signal,
       headers: { Accept: "application/json", "User-Agent": UA },
     });
-    if (!res.ok) return "";
+    if (!res.ok) return none;
     const data = (await res.json()) as {
       status?: string;
-      data?: { image?: { url?: string } | string; logo?: { url?: string } };
+      data?: {
+        title?: string;
+        description?: string;
+        image?: { url?: string } | string;
+      };
     };
-    if (data.status !== "success") return "";
+    if (data.status !== "success") return none;
     const img = data.data?.image;
-    const url = typeof img === "string" ? img : img?.url || "";
-    return normalizeImageUrl(url);
+    const imageUrl = normalizeImageUrl(typeof img === "string" ? img : img?.url || "");
+    return {
+      title: decodeEntities(String(data.data?.title || "")),
+      description: decodeEntities(String(data.data?.description || "")),
+      imageUrl,
+    };
   } catch {
-    return "";
+    return none;
   }
+}
+
+async function fetchMicrolinkImage(articleUrl: string, signal: AbortSignal): Promise<string> {
+  const extra = await fetchMicrolinkPreview(articleUrl, signal);
+  return extra.imageUrl;
 }
 
 export async function fetchOgImage(articleUrl: string): Promise<string> {

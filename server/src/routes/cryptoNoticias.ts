@@ -5,6 +5,7 @@ import {
   CRYPTO_NOTICIAS_FEEDS,
   CRYPTO_TOPIC_LABELS,
   fetchOgImage,
+  fetchArticlePreview,
   harvestCryptoNoticiasDrafts,
   isAcceptableArticleImage,
   isBlockedNewsSource,
@@ -398,25 +399,49 @@ async function saveWireTgSettings(next: { enabled: boolean; chatId?: string; cha
   return loadWireTgSettings();
 }
 
+function stripSourceSuffix(title: string, sourceName: string): string {
+  const t = title.trim();
+  const src = sourceName.trim();
+  if (!src) return t;
+  const escaped = src.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return t.replace(new RegExp(`\\s*[-–—|]\\s*${escaped}\\s*$`, "i"), "").trim() || t;
+}
+
+function isSameBlurb(title: string, summary: string): boolean {
+  const a = title.toLowerCase().replace(/[.…]+$/g, "").replace(/\s+/g, " ").trim();
+  const b = summary.toLowerCase().replace(/[.…]+$/g, "").replace(/\s+/g, " ").trim();
+  if (!b || b.length < 24) return true;
+  if (a === b) return true;
+  if (a.startsWith(b) || b.startsWith(a)) return true;
+  const a40 = a.slice(0, 40);
+  const b40 = b.slice(0, 40);
+  return Boolean(a40 && b40 && (a.includes(b40) || b.includes(a40)));
+}
+
 async function prepareTelegramCard(item: CryptoWireNewsItem): Promise<CryptoWireNewsItem> {
-  const originalTitle = String(item.title ?? "").trim();
-  const originalSummary = String(item.summary ?? "").trim();
+  const sourceName = String(item.sourceName ?? "").trim();
+  let originalTitle = stripSourceSuffix(String(item.title ?? "").trim(), sourceName);
+  let originalSummary = String(item.summary ?? "").trim();
   let publisher = String(item.publisherUrl || item.url || "").trim();
+  let imageUrl = item.imageUrl && isAcceptableArticleImage(item.imageUrl) ? item.imageUrl : "";
+
   try {
-    const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), 12_000);
-    try {
-      const resolved = await resolvePublisherUrl(publisher, ac.signal);
-      if (resolved) publisher = resolved;
-    } finally {
-      clearTimeout(timer);
+    const preview = await fetchArticlePreview(publisher);
+    if (preview.url) publisher = preview.url;
+    if (preview.title) originalTitle = stripSourceSuffix(preview.title, sourceName);
+    if (preview.description && !isSameBlurb(originalTitle, preview.description)) {
+      originalSummary = preview.description;
+    } else if (isSameBlurb(originalTitle, originalSummary)) {
+      originalSummary = preview.description || "";
+    }
+    if (preview.imageUrl && isAcceptableArticleImage(preview.imageUrl)) {
+      imageUrl = preview.imageUrl;
     }
   } catch {
-    /* keep publisher */
+    /* keep rss fields */
   }
-  const open = wireArticleOpenUrl(publisher, originalTitle, originalSummary);
-  let imageUrl = item.imageUrl && isAcceptableArticleImage(item.imageUrl) ? item.imageUrl : "";
-  if (publisher) {
+
+  if (!imageUrl && publisher) {
     try {
       const og = await fetchOgImage(publisher);
       if (og && isAcceptableArticleImage(og)) imageUrl = og;
@@ -424,28 +449,34 @@ async function prepareTelegramCard(item: CryptoWireNewsItem): Promise<CryptoWire
       /* sin foto */
     }
   }
+
+  const open = wireArticleOpenUrl(publisher, originalTitle, originalSummary);
   let title = originalTitle;
-  let summary = originalSummary;
-  if (looksLikeEnglish(originalTitle)) {
+  let summary = isSameBlurb(originalTitle, originalSummary) ? "" : originalSummary;
+
+  if (looksLikeEnglish(title)) {
     try {
-      const t = await translateNewsText(originalTitle, "es");
+      const t = await translateNewsText(title, "es");
       if (t && !looksLikeEnglish(t)) title = t;
     } catch {
       /* keep original */
     }
   }
-  if (originalSummary && looksLikeEnglish(originalSummary)) {
+  if (summary && looksLikeEnglish(summary)) {
     try {
-      const s = await translateNewsText(originalSummary, "es");
-      if (s) summary = s;
+      const s = await translateNewsText(summary, "es");
+      if (s && !isSameBlurb(title, s)) summary = s;
+      else if (s && isSameBlurb(title, s)) summary = "";
     } catch {
-      /* keep original */
+      if (isSameBlurb(title, summary)) summary = "";
     }
   }
+  if (isSameBlurb(title, summary)) summary = "";
+
   return {
     title,
     summary,
-    sourceName: item.sourceName,
+    sourceName,
     url: open.url,
     publisherUrl: open.publisherUrl,
     translateUrl: open.translateUrl,
@@ -1274,50 +1305,23 @@ cryptoNoticiasRouter.post("/crypto-noticias/telegram/send-item", ...writeMw, asy
     if (!claimed) {
       return res.status(409).json({ error: { message: "Esta noticia ya se envió a Telegram." } });
     }
-    const originalTitle = String(row.title || "").trim();
-    const originalSummary = String(row.summary || "").trim();
-    const title = String(row.title_es || row.title || "").trim();
-    const url = String(row.url || "").trim();
-    if (!title) {
+    const titleHint = String(row.title_es || row.title || "").trim();
+    if (!titleHint) {
       await unclaimManualTelegramSend(parsed.data.id);
       return res.status(400).json({ error: { message: "Esa noticia no tiene título." } });
     }
-    let publisher = url;
     try {
-      const ac = new AbortController();
-      const timer = setTimeout(() => ac.abort(), 16_000);
-      try {
-        const resolved = await resolvePublisherUrl(url, ac.signal);
-        if (resolved) publisher = resolved;
-      } finally {
-        clearTimeout(timer);
-      }
-    } catch {
-      /* seguimos con la URL guardada */
-    }
-    let imageUrl = String(row.image_url || "").trim();
-    if (!isAcceptableArticleImage(imageUrl)) imageUrl = "";
-    try {
-      const og = await fetchOgImage(publisher);
-      if (og && isAcceptableArticleImage(og)) {
-        imageUrl = og;
-        await db.prepare("UPDATE sgi_crypto_noticias SET image_url = ? WHERE id = ?").run(og, parsed.data.id);
-      }
-    } catch {
-      /* si no hay foto del medio, se envía sin imagen */
-    }
-    const open = wireArticleOpenUrl(publisher, originalTitle, originalSummary);
-    try {
-      const result = await notifyCryptoWireTelegramArticleMany(dest, {
-        title,
+      const card = await prepareTelegramCard({
+        title: String(row.title || "").trim(),
         summary: String(row.summary_es || row.summary || "").trim(),
         sourceName: String(row.source_name || "").trim(),
-        url: open.url,
-        publisherUrl: open.publisherUrl,
-        translateUrl: open.translateUrl,
-        imageUrl,
-        readTranslated: open.readTranslated,
+        url: String(row.url || "").trim(),
+        imageUrl: String(row.image_url || "").trim(),
       });
+      if (card.imageUrl) {
+        await db.prepare("UPDATE sgi_crypto_noticias SET image_url = ? WHERE id = ?").run(card.imageUrl, parsed.data.id);
+      }
+      const result = await notifyCryptoWireTelegramArticleMany(dest, card);
       res.json({ ok: true, via: "telegram", sentTo: result.sent, ...telegramSettingsPayload(settings) });
     } catch (sendErr) {
       await unclaimManualTelegramSend(parsed.data.id);
