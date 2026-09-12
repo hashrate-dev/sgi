@@ -10304,24 +10304,6 @@ button.fact-back {
   gap: 0.65rem;
 }
 
-/* Logo Hashrate abajo a la izquierda cuando la tarjeta SGI muestra la foto de tienda (sin watermark). */
-.hrs-asic-dash-card .shelf-product__imglink {
-  position: relative;
-}
-
-.hrs-asic-dash-card__hrs-mark {
-  position: absolute;
-  left: 0.55rem;
-  bottom: 0.5rem;
-  z-index: 2;
-  width: 28px;
-  height: 28px;
-  object-fit: contain;
-  pointer-events: none;
-  opacity: 0.72;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
-}
-
 .hrs-asic-dash-card__meta {
   font-size: 0.72rem;
   line-height: 1.35;

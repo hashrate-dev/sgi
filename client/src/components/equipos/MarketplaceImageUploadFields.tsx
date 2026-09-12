@@ -440,7 +440,7 @@ export function MarketplaceAnuncioPhotosField({
 
         <div className="hrs-upload-slot hrs-upload-slot--gallery">
           <span className="hrs-upload-slot-label">
-            Inventario · logo Hashrate ({gallery.length}/{MARKETPLACE_PRODUCT_GALLERY_MAX})
+            Inventario (1ª = listado SGI) ({gallery.length}/{MARKETPLACE_PRODUCT_GALLERY_MAX})
           </span>
           <div className="hrs-upload-gallery-grid hrs-upload-gallery-grid--unified">
             {gallery.map((u, i) => (
@@ -528,8 +528,8 @@ export function MarketplaceAnuncioPhotosField({
           </p>
           <p className="hrs-upload-dropzone-hint">
             {card
-              ? `Nuevas fotos → Inventario con logo Hashrate (quedan ${gallerySlotsLeft}). La tienda pública solo usa «Tienda (sin logo)».`
-              : `La primera va a Tienda (sin logo); el resto a Inventario con logo Hashrate (máx. ${MARKETPLACE_PRODUCT_GALLERY_MAX}).`}
+              ? `Nuevas fotos → Inventario (quedan ${gallerySlotsLeft}). La 1ª de Inventario se muestra en el listado SGI; el logo va en la imagen que subís (no se superpone).`
+              : `La primera va a Tienda (sin logo); el resto a Inventario (máx. ${MARKETPLACE_PRODUCT_GALLERY_MAX}).`}
             {marketplaceUploadUsesInlineImages()
               ? " · en hashrate.space se comprimen (~300 KB c/u)"
               : " · JPG, PNG, WebP o GIF"}

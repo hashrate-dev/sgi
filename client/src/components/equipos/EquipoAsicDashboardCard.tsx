@@ -7,10 +7,10 @@ import {
   normalizeConsultPriceLabelForDisplay,
   publicImageUrl,
 } from "../../lib/marketplaceAsicCatalog";
-import { HASHRATE_SPACE_MARK } from "../../lib/marketplaceWpAssets";
 import { AsicDetailSvg } from "../marketplace/AsicDetailIcon";
 import { parseDetailRowsJson } from "./MarketplaceDetailRowsEditor";
 
+/** Primera foto de inventario (galería): la que el admin sube con logo Hashrate ya en la imagen. */
 function firstGalleryImageSrc(galleryJson: string | null | undefined): string {
   const raw = galleryJson?.trim() ?? "";
   if (!raw) return "";
@@ -35,34 +35,27 @@ type Props = {
 };
 
 /**
- * Tarjeta visual estilo vitrina para el listado de gestión (/asic/equipment).
- * En SGI se prioriza la foto con logo Hashrate (galería); si solo hay tarjeta de tienda, se superpone el logo.
+ * Tarjeta del listado SGI (/asic/equipment).
+ * Usa la 1ª foto de inventario (galería, con logo ya en el archivo). Sin overlay artificial.
  */
 export function EquipoAsicDashboardCard({ equipo: e, canEdit, onDetail, onEdit, onDelete }: Props) {
   const explicit = e.marketplaceImageSrc?.trim() ?? "";
-  const inventoryBrand = firstGalleryImageSrc(e.marketplaceGalleryJson);
+  const inventoryFirst = firstGalleryImageSrc(e.marketplaceGalleryJson);
   const fallbackPath = defaultAsicShelfImageSrc(e.marcaEquipo ?? "", e.modelo ?? "");
-  /** En SGI preferimos la foto con logo Hashrate (galería); la tarjeta sin logo es solo tienda. */
-  const preferred = inventoryBrand || explicit || fallbackPath;
+  const preferred = inventoryFirst || explicit || fallbackPath;
   const [imgSrc, setImgSrc] = useState(() => publicImageUrl(preferred));
   const [imgBroken, setImgBroken] = useState(false);
 
   useEffect(() => {
     const ex = e.marketplaceImageSrc?.trim() ?? "";
-    const brand = firstGalleryImageSrc(e.marketplaceGalleryJson);
+    const inv = firstGalleryImageSrc(e.marketplaceGalleryJson);
     const fb = defaultAsicShelfImageSrc(e.marcaEquipo ?? "", e.modelo ?? "");
-    setImgSrc(publicImageUrl(brand || ex || fb));
+    setImgSrc(publicImageUrl(inv || ex || fb));
     setImgBroken(false);
   }, [e.id, e.marketplaceImageSrc, e.marketplaceGalleryJson, e.marcaEquipo, e.modelo]);
 
   const src = imgSrc;
   const hasPhoto = Boolean(preferred.trim()) && !imgBroken;
-  const brandUrl = inventoryBrand ? publicImageUrl(inventoryBrand) : "";
-  /**
-   * Si la tarjeta muestra la foto de tienda (sin watermark), superpone el logo Hashrate.
-   * Si ya muestra la de galería (con logo), no duplicar.
-   */
-  const showHrsMark = hasPhoto && (!brandUrl || src !== brandUrl);
   const detailRows = parseDetailRowsJson(e.marketplaceDetailRowsJson ?? "")
     .filter((r) => r.text.trim())
     .slice(0, 4);
@@ -92,9 +85,9 @@ export function EquipoAsicDashboardCard({ equipo: e, canEdit, onDetail, onEdit, 
                 decoding="async"
                 className="shelf-product__photo"
                 onError={() => {
-                  const brand = firstGalleryImageSrc(e.marketplaceGalleryJson);
+                  const inv = firstGalleryImageSrc(e.marketplaceGalleryJson);
                   const ex = e.marketplaceImageSrc?.trim() ?? "";
-                  if (brand && imgSrc === publicImageUrl(brand) && ex) {
+                  if (inv && imgSrc === publicImageUrl(inv) && ex) {
                     setImgSrc(publicImageUrl(ex));
                     return;
                   }
@@ -106,15 +99,6 @@ export function EquipoAsicDashboardCard({ equipo: e, canEdit, onDetail, onEdit, 
                 }}
               />
             )}
-            {showHrsMark ? (
-              <img
-                className="hrs-asic-dash-card__hrs-mark"
-                src={HASHRATE_SPACE_MARK}
-                alt=""
-                aria-hidden
-                decoding="async"
-              />
-            ) : null}
           </button>
         </div>
       </div>
@@ -161,48 +145,39 @@ export function EquipoAsicDashboardCard({ equipo: e, canEdit, onDetail, onEdit, 
           </div>
         </div>
 
-        <button type="button" className="shelf-product__cta" onClick={() => onDetail(e)}>
-          Ver ficha
-        </button>
-
         {canEdit ? (
           <div className="hrs-asic-dash-card__actions d-flex flex-wrap gap-1 justify-content-center">
-            <button
-              type="button"
-              className="btn btn-outline-secondary btn-sm flex-grow-1"
-              style={{ minWidth: "4.5rem", fontSize: "0.78rem" }}
-              onClick={() => onEdit(e)}
-            >
+            <button type="button" className="btn btn-sm btn-success" onClick={() => onDetail(e)}>
+              Ver ficha
+            </button>
+            <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => onEdit(e)}>
               Editar
             </button>
             <button
               type="button"
-              className="btn btn-outline-danger btn-sm"
-              style={{ fontSize: "0.78rem" }}
-              title="Eliminar equipo"
+              className="btn btn-sm btn-outline-danger"
+              title="Eliminar"
+              aria-label="Eliminar"
               onClick={() => onDelete(e)}
             >
-              🗑️
+              <i className="bi bi-trash" aria-hidden />
             </button>
           </div>
-        ) : null}
+        ) : (
+          <div className="hrs-asic-dash-card__actions d-flex justify-content-center">
+            <button type="button" className="btn btn-sm btn-success" onClick={() => onDetail(e)}>
+              Ver ficha
+            </button>
+          </div>
+        )}
       </div>
     </article>
   );
 }
 
-function formatFechaCorta(iso: string): string {
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return iso;
-    return d.toLocaleString("es-PY", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
+function formatFechaCorta(iso: string | undefined): string {
+  if (!iso?.trim()) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString("es-PY", { dateStyle: "short", timeStyle: "short" });
 }
