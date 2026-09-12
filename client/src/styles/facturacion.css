@@ -4932,6 +4932,19 @@ button.fact-back {
   box-sizing: border-box;
 }
 
+.hrs-equipo-asic-modal-form__vitrina-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.hrs-equipo-asic-modal-form__col-media .hrs-equipo-asic-modal-form__vitrina-stack:first-child {
+  margin-top: 0;
+}
+
 .hrs-equipo-asic-modal-form__market-inner {
   display: grid;
   /* Un poco más de ancho a imágenes: la columna de specs queda visualmente más angosta */

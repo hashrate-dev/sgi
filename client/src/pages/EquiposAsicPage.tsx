@@ -1944,166 +1944,9 @@ export function EquiposAsicPage() {
                               </div>
                             </div>
                           ) : null}
-                          <div className="hrs-equipo-asic-modal-form__vitrina-callout hrs-equipo-asic-modal-form__vitrina-callout--under-detail-rows">
-                            <div className="hrs-equipo-asic-modal-form__vitrina-callout-inner">
-                              <input
-                                type="checkbox"
-                                id="mp-visible"
-                                className="hrs-equipo-asic-modal-form__vitrina-checkbox"
-                                checked={formData.marketplaceVisible}
-                                disabled={!canEditTienda}
-                                onChange={(e) => setFormData({ ...formData, marketplaceVisible: e.target.checked })}
-                              />
-                              <div className="hrs-equipo-asic-modal-form__vitrina-callout-text">
-                                <label htmlFor="mp-visible" className="hrs-equipo-asic-modal-form__vitrina-callout-title">
-                                  Publicar en tienda
-                                </label>
-                                <p className="hrs-equipo-asic-modal-form__vitrina-callout-sub">
-                                  Hacé visible este equipo en el catálogo público <strong>/marketplace</strong>.
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                          {canEditTienda ? (
-                            <div
-                              className="hrs-equipo-asic-modal-form__vitrina-callout mt-2"
-                              style={{ background: "rgba(255,255,255,0.72)" }}
-                            >
-                              <div className="hrs-equipo-asic-modal-form__vitrina-callout-inner align-items-start">
-                                <input
-                                  type="checkbox"
-                                  id="mp-hashrate-enabled"
-                                  className="hrs-equipo-asic-modal-form__vitrina-checkbox"
-                                  checked={formData.marketplaceHashrateSellEnabled}
-                                  onChange={(e) =>
-                                    setFormData((prev) => ({
-                                      ...prev,
-                                      marketplaceHashrateSellEnabled: e.target.checked,
-                                      marketplaceHashrateParts:
-                                        e.target.checked && prev.marketplaceHashrateParts.length === 0
-                                          ? [...DEFAULT_HASHRATE_PARTS]
-                                          : prev.marketplaceHashrateParts,
-                                    }))
-                                  }
-                                />
-                                <div className="hrs-equipo-asic-modal-form__vitrina-callout-text w-100">
-                                  <label htmlFor="mp-hashrate-enabled" className="hrs-equipo-asic-modal-form__vitrina-callout-title">
-                                    Vender por partes de hashrate (%)
-                                  </label>
-                                  <p className="hrs-equipo-asic-modal-form__vitrina-callout-sub mb-2">
-                                    Configurá porcentajes y setup USD por parte para este equipo.
-                                  </p>
-                                  {formData.marketplaceHashrateSellEnabled ? (
-                                    <div className="table-responsive">
-                                      <table className="table table-sm align-middle mb-2">
-                                        <thead>
-                                          <tr>
-                                            <th style={{ minWidth: 120 }}>% hashrate</th>
-                                            <th style={{ minWidth: 130 }}>Setup USD</th>
-                                            <th style={{ width: 90 }}>Acción</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          {formData.marketplaceHashrateParts.map((part, idx) => (
-                                            <tr key={`${part.sharePct}-${idx}`}>
-                                              <td>
-                                                <Input
-                                                  type="number"
-                                                  min={1}
-                                                  max={100}
-                                                  value={part.sharePct}
-                                                  onChange={(e) => {
-                                                    const v = Math.max(1, Math.min(100, Math.round(Number(e.target.value) || 0)));
-                                                    setFormData((prev) => {
-                                                      const next = [...prev.marketplaceHashrateParts];
-                                                      next[idx] = { ...next[idx], sharePct: v, warrantyPct: v };
-                                                      return { ...prev, marketplaceHashrateParts: next };
-                                                    });
-                                                  }}
-                                                />
-                                              </td>
-                                              <td>
-                                                <Input
-                                                  type="number"
-                                                  min={0}
-                                                  max={999999}
-                                                  value={part.setupUsd}
-                                                  onChange={(e) => {
-                                                    const v = Math.max(0, Math.min(999999, Math.round(Number(e.target.value) || 0)));
-                                                    setFormData((prev) => {
-                                                      const next = [...prev.marketplaceHashrateParts];
-                                                      next[idx] = { ...next[idx], setupUsd: v };
-                                                      return { ...prev, marketplaceHashrateParts: next };
-                                                    });
-                                                  }}
-                                                />
-                                              </td>
-                                              <td>
-                                                <button
-                                                  type="button"
-                                                  className="btn btn-danger btn-sm"
-                                                  style={{ padding: "0.35rem 0.75rem", fontSize: "0.8125rem" }}
-                                                  onClick={() => handleHashratePartDeleteRequest(idx)}
-                                                  disabled={formData.marketplaceHashrateParts.length <= 1}
-                                                  title="Quitar parte"
-                                                  aria-label="Quitar parte"
-                                                >
-                                                  <i className="bi bi-trash" aria-hidden />
-                                                </button>
-                                              </td>
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
-                                    </div>
-                                  ) : null}
-                                  {formData.marketplaceHashrateSellEnabled ? (
-                                    <p className="small text-muted mb-2">
-                                      El % de garantía se ajusta automáticamente al mismo % de hashrate.
-                                    </p>
-                                  ) : null}
-                                  {formData.marketplaceHashrateSellEnabled ? (
-                                    <div className="d-flex gap-2">
-                                      <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="plain"
-                                        className="fact-btn fact-btn-primary"
-                                        onClick={() =>
-                                          setFormData((prev) => ({
-                                            ...prev,
-                                            marketplaceHashrateParts: [
-                                              ...prev.marketplaceHashrateParts,
-                                              { sharePct: 25, warrantyPct: 25, setupUsd: 40 },
-                                            ],
-                                          }))
-                                        }
-                                      >
-                                        + Agregar parte
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="plain"
-                                        className="fact-btn fact-btn-secondary"
-                                        onClick={() =>
-                                          setFormData((prev) => ({
-                                            ...prev,
-                                            marketplaceHashrateParts: [...DEFAULT_HASHRATE_PARTS],
-                                          }))
-                                        }
-                                      >
-                                        Restaurar sugeridos
-                                      </Button>
-                                    </div>
-                                  ) : null}
-                                </div>
-                              </div>
-                            </div>
-                          ) : null}
                         </div>
-                        {canEditTienda ? (
-                          <div className="client-form-column hrs-equipo-asic-modal-form__col-media">
+                        <div className="client-form-column hrs-equipo-asic-modal-form__col-media">
+                          {canEditTienda ? (
                             <div className="hrs-equipo-asic-modal-form__media-panel">
                               <p className="hrs-equipo-asic-modal-form__media-panel-title">Fotos del anuncio</p>
                               <MarketplaceAnuncioPhotosField
@@ -2126,8 +1969,167 @@ export function EquiposAsicPage() {
                                 disabled={!canEditTienda}
                               />
                             </div>
+                          ) : null}
+                          <div className="hrs-equipo-asic-modal-form__vitrina-stack">
+                            <div className="hrs-equipo-asic-modal-form__vitrina-callout">
+                              <div className="hrs-equipo-asic-modal-form__vitrina-callout-inner">
+                                <input
+                                  type="checkbox"
+                                  id="mp-visible"
+                                  className="hrs-equipo-asic-modal-form__vitrina-checkbox"
+                                  checked={formData.marketplaceVisible}
+                                  disabled={!canEditTienda}
+                                  onChange={(e) => setFormData({ ...formData, marketplaceVisible: e.target.checked })}
+                                />
+                                <div className="hrs-equipo-asic-modal-form__vitrina-callout-text">
+                                  <label htmlFor="mp-visible" className="hrs-equipo-asic-modal-form__vitrina-callout-title">
+                                    Publicar en tienda
+                                  </label>
+                                  <p className="hrs-equipo-asic-modal-form__vitrina-callout-sub">
+                                    Hacé visible este equipo en el catálogo público <strong>/marketplace</strong>.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                            {canEditTienda ? (
+                              <div
+                                className="hrs-equipo-asic-modal-form__vitrina-callout"
+                                style={{ background: "rgba(255,255,255,0.72)" }}
+                              >
+                                <div className="hrs-equipo-asic-modal-form__vitrina-callout-inner align-items-start">
+                                  <input
+                                    type="checkbox"
+                                    id="mp-hashrate-enabled"
+                                    className="hrs-equipo-asic-modal-form__vitrina-checkbox"
+                                    checked={formData.marketplaceHashrateSellEnabled}
+                                    onChange={(e) =>
+                                      setFormData((prev) => ({
+                                        ...prev,
+                                        marketplaceHashrateSellEnabled: e.target.checked,
+                                        marketplaceHashrateParts:
+                                          e.target.checked && prev.marketplaceHashrateParts.length === 0
+                                            ? [...DEFAULT_HASHRATE_PARTS]
+                                            : prev.marketplaceHashrateParts,
+                                      }))
+                                    }
+                                  />
+                                  <div className="hrs-equipo-asic-modal-form__vitrina-callout-text w-100">
+                                    <label htmlFor="mp-hashrate-enabled" className="hrs-equipo-asic-modal-form__vitrina-callout-title">
+                                      Vender por partes de hashrate (%)
+                                    </label>
+                                    <p className="hrs-equipo-asic-modal-form__vitrina-callout-sub mb-2">
+                                      Configurá porcentajes y setup USD por parte para este equipo.
+                                    </p>
+                                    {formData.marketplaceHashrateSellEnabled ? (
+                                      <div className="table-responsive">
+                                        <table className="table table-sm align-middle mb-2">
+                                          <thead>
+                                            <tr>
+                                              <th style={{ minWidth: 120 }}>% hashrate</th>
+                                              <th style={{ minWidth: 130 }}>Setup USD</th>
+                                              <th style={{ width: 90 }}>Acción</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {formData.marketplaceHashrateParts.map((part, idx) => (
+                                              <tr key={`${part.sharePct}-${idx}`}>
+                                                <td>
+                                                  <Input
+                                                    type="number"
+                                                    min={1}
+                                                    max={100}
+                                                    value={part.sharePct}
+                                                    onChange={(e) => {
+                                                      const v = Math.max(1, Math.min(100, Math.round(Number(e.target.value) || 0)));
+                                                      setFormData((prev) => {
+                                                        const next = [...prev.marketplaceHashrateParts];
+                                                        next[idx] = { ...next[idx], sharePct: v, warrantyPct: v };
+                                                        return { ...prev, marketplaceHashrateParts: next };
+                                                      });
+                                                    }}
+                                                  />
+                                                </td>
+                                                <td>
+                                                  <Input
+                                                    type="number"
+                                                    min={0}
+                                                    max={999999}
+                                                    value={part.setupUsd}
+                                                    onChange={(e) => {
+                                                      const v = Math.max(0, Math.min(999999, Math.round(Number(e.target.value) || 0)));
+                                                      setFormData((prev) => {
+                                                        const next = [...prev.marketplaceHashrateParts];
+                                                        next[idx] = { ...next[idx], setupUsd: v };
+                                                        return { ...prev, marketplaceHashrateParts: next };
+                                                      });
+                                                    }}
+                                                  />
+                                                </td>
+                                                <td>
+                                                  <button
+                                                    type="button"
+                                                    className="btn btn-danger btn-sm"
+                                                    style={{ padding: "0.35rem 0.75rem", fontSize: "0.8125rem" }}
+                                                    onClick={() => handleHashratePartDeleteRequest(idx)}
+                                                    disabled={formData.marketplaceHashrateParts.length <= 1}
+                                                    title="Quitar parte"
+                                                    aria-label="Quitar parte"
+                                                  >
+                                                    <i className="bi bi-trash" aria-hidden />
+                                                  </button>
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    ) : null}
+                                    {formData.marketplaceHashrateSellEnabled ? (
+                                      <p className="small text-muted mb-2">
+                                        El % de garantía se ajusta automáticamente al mismo % de hashrate.
+                                      </p>
+                                    ) : null}
+                                    {formData.marketplaceHashrateSellEnabled ? (
+                                      <div className="d-flex gap-2">
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="plain"
+                                          className="fact-btn fact-btn-primary"
+                                          onClick={() =>
+                                            setFormData((prev) => ({
+                                              ...prev,
+                                              marketplaceHashrateParts: [
+                                                ...prev.marketplaceHashrateParts,
+                                                { sharePct: 25, warrantyPct: 25, setupUsd: 40 },
+                                              ],
+                                            }))
+                                          }
+                                        >
+                                          + Agregar parte
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="plain"
+                                          className="fact-btn fact-btn-secondary"
+                                          onClick={() =>
+                                            setFormData((prev) => ({
+                                              ...prev,
+                                              marketplaceHashrateParts: [...DEFAULT_HASHRATE_PARTS],
+                                            }))
+                                          }
+                                        >
+                                          Restaurar sugeridos
+                                        </Button>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </div>
+                            ) : null}
                           </div>
-                        ) : null}
+                        </div>
                       </div>
                     </div>
                   </div>
