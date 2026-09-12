@@ -51,6 +51,22 @@ function isGoogleNewsArticleUrl(raw: string): boolean {
   return h === "news.google.com" || h.endsWith(".news.google.com") || h.includes("news-google-com");
 }
 
+function isArticlePageUrl(raw: string): boolean {
+  const url = articleLink(raw);
+  if (!url) return false;
+  const h = hostOfUrl(url);
+  if (!h) return false;
+  if (isGoogleNewsArticleUrl(url)) return false;
+  if (/(^|\.)googleusercontent\.com$|(^|\.)gstatic\.com$|(^|\.)ggpht\.com$/.test(h)) return false;
+  if (/\.(jpe?g|png|webp|gif|svg)(?:$|\?)/i.test(url)) return false;
+  if (/=w(\d+)/i.test(url) && Number(url.match(/=w(\d+)/i)?.[1] || 0) < 200) return false;
+  return true;
+}
+
+function escapeTelegramHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 /** Abre el medio en su propio dominio vía *.translate.goog (barra ES / original). */
 export function toTranslateGoogUrl(articleUrl: string, sl = "en", tl = "es"): string {
   let u: URL;
@@ -119,10 +135,10 @@ export function wireArticleOpenUrl(
   if (!url) return { url: "", readTranslated: false, publisherUrl: "", translateUrl: "" };
   const inner = innerUrlFromGoogleTranslate(url);
   if (inner) url = inner;
-  const english = looksLikeEnglish(originalTitle) || looksLikeEnglish(originalSummary);
-  if (isGoogleNewsArticleUrl(url)) {
-    return { url, readTranslated: false, publisherUrl: url, translateUrl: "" };
+  if (!isArticlePageUrl(url)) {
+    return { url: "", readTranslated: false, publisherUrl: "", translateUrl: "" };
   }
+  const english = looksLikeEnglish(originalTitle) || looksLikeEnglish(originalSummary);
   if (!english) {
     return { url, readTranslated: false, publisherUrl: url, translateUrl: "" };
   }
@@ -176,30 +192,31 @@ export function formatCryptoWireTelegramDigest(items: CryptoWireNewsItem[], opts
   return [`📡 Wire cripto HRS · ${list.length} nueva${list.length === 1 ? "" : "s"}`, "", ...blocks].join("\n");
 }
 
-/** Texto plano: Telegram auto-linkeá las URLs (más fiable que <a href> cortado). */
-export function formatCryptoWireArticlePlain(item: CryptoWireNewsItem): string {
-  const title = decodeNewsText(item.title);
-  const src = decodeNewsText(item.sourceName || "");
-  const summary = decodeNewsText(item.summary || "");
-  const translateUrl = articleLink(item.translateUrl || "");
-  const publisherUrl = articleLink(item.publisherUrl || item.url);
-  const lines = [clip(title, 280)];
-  if (src) lines.push(clip(src, 60));
-  if (summary) {
-    lines.push("");
-    lines.push(clip(summary, 500));
+/** Una tarjeta: foto arriba + caption como el ejemplo CoinDesk (título, fuente, texto, link). */
+export function formatCryptoWireArticleCaption(item: CryptoWireNewsItem): string {
+  const title = escapeTelegramHtml(clip(decodeNewsText(item.title), 220));
+  const src = escapeTelegramHtml(clip(decodeNewsText(item.sourceName || ""), 80));
+  const publisherUrl = isArticlePageUrl(item.publisherUrl || "")
+    ? articleLink(item.publisherUrl)
+    : isArticlePageUrl(item.url || "")
+      ? articleLink(item.url)
+      : "";
+  const translateUrl = isArticlePageUrl(item.translateUrl || "") ? articleLink(item.translateUrl) : "";
+  const footerParts: string[] = [];
+  if (item.readTranslated && translateUrl) {
+    footerParts.push(`\n\nLeer en español:\n${escapeTelegramHtml(translateUrl)}`);
   }
   if (publisherUrl && publisherUrl !== translateUrl) {
-    lines.push("");
-    lines.push(item.readTranslated ? "Artículo original:" : "Leer la noticia:");
-    lines.push(publisherUrl);
+    footerParts.push(
+      `\n\n${item.readTranslated ? "Artículo original:" : "Leer la noticia:"}\n${escapeTelegramHtml(publisherUrl)}`
+    );
   }
-  if (item.readTranslated && translateUrl) {
-    lines.push("");
-    lines.push("Leer en español:");
-    lines.push(translateUrl);
-  }
-  return lines.join("\n");
+  const footer = footerParts.join("");
+  const head = `<b>${title}</b>${src ? `\n<i>${src}</i>` : ""}`;
+  const budget = Math.max(0, 1024 - head.length - footer.length - 2);
+  const summary = clip(decodeNewsText(item.summary || ""), budget);
+  const mid = summary ? `\n\n${escapeTelegramHtml(summary)}` : "";
+  return `${head}${mid}${footer}`;
 }
 
 export function isTelegramChatMissingError(msg: string): boolean {
@@ -294,7 +311,7 @@ export async function sendTelegramPhoto(chatId: string, photoUrl: string, captio
   if (!chat) throw new Error("Chat ID de Telegram inválido");
   const photo = String(photoUrl || "").trim();
   if (!/^https?:\/\//i.test(photo)) throw new Error("URL de imagen inválida");
-  const captionClipped = clip(decodeNewsText(caption), 900);
+  const captionClipped = caption.length > 1024 ? `${caption.slice(0, 1023)}…` : caption;
   const uploaded = await uploadTelegramPhoto(chat, photo, captionClipped);
   if (uploaded) return;
   const j = await telegramFetchJson(
@@ -303,6 +320,7 @@ export async function sendTelegramPhoto(chatId: string, photoUrl: string, captio
       chat_id: chatIdForApi(chat),
       photo,
       caption: captionClipped,
+      parse_mode: "HTML",
     },
     20_000
   );
@@ -336,6 +354,7 @@ async function uploadTelegramPhoto(chat: string, photoUrl: string, caption: stri
     const form = new FormData();
     form.append("chat_id", String(chatIdForApi(chat)));
     form.append("caption", caption);
+    form.append("parse_mode", "HTML");
     form.append("photo", new Blob([new Uint8Array(buf)], { type: mime }), `noticia.${ext}`);
     const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
       method: "POST",
@@ -363,26 +382,20 @@ export async function notifyCryptoWireTelegramArticle(
   const chat = normalizeTelegramChatId(chatId);
   if (!chat) return { sent: false, reason: "chat_invalido" };
   if (!botToken()) return { sent: false, reason: "faltan_credenciales" };
-  const body = formatCryptoWireArticlePlain({ ...item, title });
+  const caption = formatCryptoWireArticleCaption({ ...item, title });
   const photo = String(item.imageUrl ?? "").trim();
-  const publisher = articleLink(item.publisherUrl);
 
   if (/^https?:\/\//i.test(photo)) {
     try {
-      await sendTelegramPhoto(chat, photo, title);
-      await sendTelegramText(chat, body, { disablePreview: true });
+      await sendTelegramPhoto(chat, photo, caption);
       return { sent: true, chatId: chat };
     } catch (e) {
       // eslint-disable-next-line no-console
-      console.warn("[telegram] sendPhoto falló", e instanceof Error ? e.message : e);
+      console.warn("[telegram] sendPhoto falló, reintento texto", e instanceof Error ? e.message : e);
     }
   }
 
-  // Sin foto: el preview de Telegram usa la primera URL (el medio) y muestra su imagen.
-  const fallback = publisher && !body.includes(publisher)
-    ? `${body}\n\n${publisher}`
-    : body;
-  await sendTelegramText(chat, fallback, { disablePreview: false });
+  await sendTelegramText(chat, caption, { html: true, disablePreview: true });
   return { sent: true, chatId: chat };
 }
 

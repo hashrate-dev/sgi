@@ -429,6 +429,8 @@ export async function resolvePublisherUrl(articleUrl: string, signal?: AbortSign
     if (!resolved) return "";
     const rh = hostOf(resolved);
     if (!rh || isGoogleNewsHost(rh) || /(^|\.)google\./.test(rh)) return "";
+    if (/(^|\.)googleusercontent\.com$|(^|\.)gstatic\.com$/.test(rh)) return "";
+    if (/\.(jpe?g|png|webp|gif|svg)(?:$|\?)/i.test(resolved)) return "";
     return resolved;
   } catch {
     return "";
