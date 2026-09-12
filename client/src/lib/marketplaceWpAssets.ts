@@ -8,6 +8,8 @@ export function wpUpload(fileName: string): string {
 
 export const HASHRATE_SPACE_LOGO = wpUpload("hashrate-LOGO.png");
 export const HASHRATE_SPACE_LOGO_WHITE = wpUpload("hashrate-white-300x46.png");
+/** Solo el isotipo (sin texto), p. ej. marca en fotos de inventario SGI. */
+export const HASHRATE_SPACE_MARK = publicImageUrl("/images/HRSLOGO.png");
 
 /** Vídeo institucional (antes en `https://hashrate.space/video/` del WordPress legado). */
 export const CORP_INSTITUTIONAL_VIDEO_URL = publicImageUrl("/video/Hashrate-Farm-Py.mp4");

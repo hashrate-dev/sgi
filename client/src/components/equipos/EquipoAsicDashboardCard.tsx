@@ -7,7 +7,7 @@ import {
   normalizeConsultPriceLabelForDisplay,
   publicImageUrl,
 } from "../../lib/marketplaceAsicCatalog";
-import { HASHRATE_SPACE_LOGO_WHITE } from "../../lib/marketplaceWpAssets";
+import { HASHRATE_SPACE_MARK } from "../../lib/marketplaceWpAssets";
 import { AsicDetailSvg } from "../marketplace/AsicDetailIcon";
 import { parseDetailRowsJson } from "./MarketplaceDetailRowsEditor";
 
@@ -109,7 +109,7 @@ export function EquipoAsicDashboardCard({ equipo: e, canEdit, onDetail, onEdit, 
             {showHrsMark ? (
               <img
                 className="hrs-asic-dash-card__hrs-mark"
-                src={HASHRATE_SPACE_LOGO_WHITE}
+                src={HASHRATE_SPACE_MARK}
                 alt=""
                 aria-hidden
                 decoding="async"
