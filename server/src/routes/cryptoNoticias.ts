@@ -1226,8 +1226,14 @@ cryptoNoticiasRouter.post("/crypto-noticias/telegram/send-item", ...writeMw, asy
     }
     let publisher = url;
     try {
-      const resolved = await resolvePublisherUrl(url);
-      if (resolved) publisher = resolved;
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), 16_000);
+      try {
+        const resolved = await resolvePublisherUrl(url, ac.signal);
+        if (resolved) publisher = resolved;
+      } finally {
+        clearTimeout(timer);
+      }
     } catch {
       /* seguimos con la URL guardada */
     }
@@ -1249,6 +1255,8 @@ cryptoNoticiasRouter.post("/crypto-noticias/telegram/send-item", ...writeMw, asy
         summary: String(row.summary_es || row.summary || "").trim(),
         sourceName: String(row.source_name || "").trim(),
         url: open.url,
+        publisherUrl: open.publisherUrl,
+        translateUrl: open.translateUrl,
         imageUrl,
         readTranslated: open.readTranslated,
       });
@@ -1299,6 +1307,8 @@ cryptoNoticiasRouter.post("/crypto-noticias/telegram/send-latest", ...writeMw, a
             title: String(r.title_es || r.title || "").trim(),
             sourceName: String(r.source_name || "").trim(),
             url: open.url,
+            publisherUrl: open.publisherUrl,
+            translateUrl: open.translateUrl,
             readTranslated: open.readTranslated,
           };
         })

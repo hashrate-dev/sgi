@@ -5,8 +5,11 @@ export type CryptoWireNewsItem = {
   summary?: string;
   sourceName?: string;
   url?: string;
+  /** URL del medio (para preview / original). */
+  publisherUrl?: string;
+  /** Google Translate website sobre el medio. */
+  translateUrl?: string;
   imageUrl?: string;
-  /** Link pasa por Google Translate (EN → ES); en el traductor se puede ver el original. */
   readTranslated?: boolean;
 };
 
@@ -26,10 +29,6 @@ function clip(s: unknown, max: number): string {
 
 function botToken(): string {
   return (process.env.TELEGRAM_BOT_TOKEN || "").trim();
-}
-
-function escapeTelegramHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function articleLink(raw?: string): string {
@@ -85,24 +84,55 @@ function innerUrlFromGoogleTranslate(raw: string): string {
   }
 }
 
+function decodeNewsText(s: string): string {
+  return String(s ?? "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#(\d+);/g, (_m, n) => {
+      const c = Number(n);
+      return Number.isFinite(c) && c > 0 ? String.fromCharCode(c) : " ";
+    })
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /**
- * Noticia en inglés → el medio en español (translate.goog), sin salir del sitio.
- * No envuelve Google News: hay que resolver antes la URL del publisher.
+ * Visor oficial de Google: traduce el HTML del medio (no el wrapper de Google News).
+ * En la barra se puede volver al inglés.
  */
+export function googleWebsiteTranslateUrl(publisherUrl: string): string {
+  const u = articleLink(publisherUrl);
+  if (!u || isGoogleNewsArticleUrl(u)) return "";
+  return `https://translate.google.com/website?sl=en&tl=es&hl=es&u=${encodeURIComponent(u)}`;
+}
+
 export function wireArticleOpenUrl(
   articleUrl: string,
   originalTitle: string,
   originalSummary = ""
-): { url: string; readTranslated: boolean } {
+): { url: string; readTranslated: boolean; publisherUrl: string; translateUrl: string } {
   let url = articleLink(articleUrl);
-  if (!url) return { url: "", readTranslated: false };
+  if (!url) return { url: "", readTranslated: false, publisherUrl: "", translateUrl: "" };
   const inner = innerUrlFromGoogleTranslate(url);
   if (inner) url = inner;
-  if (isGoogleNewsArticleUrl(url)) return { url, readTranslated: false };
   const english = looksLikeEnglish(originalTitle) || looksLikeEnglish(originalSummary);
-  if (!english) return { url, readTranslated: false };
-  const wrapped = toTranslateGoogUrl(url);
-  return { url: wrapped || url, readTranslated: Boolean(wrapped) };
+  if (isGoogleNewsArticleUrl(url)) {
+    return { url, readTranslated: false, publisherUrl: url, translateUrl: "" };
+  }
+  if (!english) {
+    return { url, readTranslated: false, publisherUrl: url, translateUrl: "" };
+  }
+  const translateUrl = googleWebsiteTranslateUrl(url);
+  return {
+    url: translateUrl || url,
+    readTranslated: Boolean(translateUrl),
+    publisherUrl: url,
+    translateUrl,
+  };
 }
 
 export type CryptoWireTelegramResult = {
@@ -146,19 +176,30 @@ export function formatCryptoWireTelegramDigest(items: CryptoWireNewsItem[], opts
   return [`📡 Wire cripto HRS · ${list.length} nueva${list.length === 1 ? "" : "s"}`, "", ...blocks].join("\n");
 }
 
-/** Caption / cuerpo de una noticia: foto arriba (sendPhoto), título, descripción y link al artículo. */
-export function formatCryptoWireArticleHtml(item: CryptoWireNewsItem): string {
-  const url = articleLink(item.url);
-  const href = url.replace(/&/g, "&amp;");
-  const readLabel = item.readTranslated ? "Leer en español" : "Leer la noticia";
-  const footer = url ? `\n\n<a href="${href}">${readLabel}</a>` : "";
-  const src = clip(String(item.sourceName ?? "").trim(), 60);
-  const title = escapeTelegramHtml(clip(String(item.title ?? "").replace(/\s+/g, " ").trim(), 220));
-  const head = `<b>${title}</b>${src ? `\n<i>${escapeTelegramHtml(src)}</i>` : ""}`;
-  const budget = Math.max(0, 1024 - head.length - footer.length - 2);
-  const summary = clip(String(item.summary ?? "").replace(/\s+/g, " ").trim(), budget);
-  const mid = summary ? `\n\n${escapeTelegramHtml(summary)}` : "";
-  return `${head}${mid}${footer}`;
+/** Texto plano: Telegram auto-linkeá las URLs (más fiable que <a href> cortado). */
+export function formatCryptoWireArticlePlain(item: CryptoWireNewsItem): string {
+  const title = decodeNewsText(item.title);
+  const src = decodeNewsText(item.sourceName || "");
+  const summary = decodeNewsText(item.summary || "");
+  const translateUrl = articleLink(item.translateUrl || "");
+  const publisherUrl = articleLink(item.publisherUrl || item.url);
+  const lines = [clip(title, 280)];
+  if (src) lines.push(clip(src, 60));
+  if (summary) {
+    lines.push("");
+    lines.push(clip(summary, 500));
+  }
+  if (publisherUrl && publisherUrl !== translateUrl) {
+    lines.push("");
+    lines.push(item.readTranslated ? "Artículo original:" : "Leer la noticia:");
+    lines.push(publisherUrl);
+  }
+  if (item.readTranslated && translateUrl) {
+    lines.push("");
+    lines.push("Leer en español:");
+    lines.push(translateUrl);
+  }
+  return lines.join("\n");
 }
 
 export function isTelegramChatMissingError(msg: string): boolean {
@@ -253,7 +294,7 @@ export async function sendTelegramPhoto(chatId: string, photoUrl: string, captio
   if (!chat) throw new Error("Chat ID de Telegram inválido");
   const photo = String(photoUrl || "").trim();
   if (!/^https?:\/\//i.test(photo)) throw new Error("URL de imagen inválida");
-  const captionClipped = clip(caption, 1024);
+  const captionClipped = clip(decodeNewsText(caption), 900);
   const uploaded = await uploadTelegramPhoto(chat, photo, captionClipped);
   if (uploaded) return;
   const j = await telegramFetchJson(
@@ -262,7 +303,6 @@ export async function sendTelegramPhoto(chatId: string, photoUrl: string, captio
       chat_id: chatIdForApi(chat),
       photo,
       caption: captionClipped,
-      parse_mode: "HTML",
     },
     20_000
   );
@@ -296,7 +336,6 @@ async function uploadTelegramPhoto(chat: string, photoUrl: string, caption: stri
     const form = new FormData();
     form.append("chat_id", String(chatIdForApi(chat)));
     form.append("caption", caption);
-    form.append("parse_mode", "HTML");
     form.append("photo", new Blob([new Uint8Array(buf)], { type: mime }), `noticia.${ext}`);
     const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
       method: "POST",
@@ -319,23 +358,31 @@ export async function notifyCryptoWireTelegramArticle(
   chatId: string,
   item: CryptoWireNewsItem
 ): Promise<CryptoWireTelegramResult> {
-  const title = String(item.title ?? "").trim();
+  const title = decodeNewsText(item.title ?? "");
   if (!title) return { sent: false, reason: "sin_items" };
   const chat = normalizeTelegramChatId(chatId);
   if (!chat) return { sent: false, reason: "chat_invalido" };
   if (!botToken()) return { sent: false, reason: "faltan_credenciales" };
-  const caption = formatCryptoWireArticleHtml({ ...item, title });
+  const body = formatCryptoWireArticlePlain({ ...item, title });
   const photo = String(item.imageUrl ?? "").trim();
+  const publisher = articleLink(item.publisherUrl);
+
   if (/^https?:\/\//i.test(photo)) {
     try {
-      await sendTelegramPhoto(chat, photo, caption);
+      await sendTelegramPhoto(chat, photo, title);
+      await sendTelegramText(chat, body, { disablePreview: true });
       return { sent: true, chatId: chat };
     } catch (e) {
       // eslint-disable-next-line no-console
-      console.warn("[telegram] sendPhoto falló, envío texto", e instanceof Error ? e.message : e);
+      console.warn("[telegram] sendPhoto falló", e instanceof Error ? e.message : e);
     }
   }
-  await sendTelegramText(chat, caption, { html: true, disablePreview: true });
+
+  // Sin foto: el preview de Telegram usa la primera URL (el medio) y muestra su imagen.
+  const fallback = publisher && !body.includes(publisher)
+    ? `${body}\n\n${publisher}`
+    : body;
+  await sendTelegramText(chat, fallback, { disablePreview: false });
   return { sent: true, chatId: chat };
 }
 
