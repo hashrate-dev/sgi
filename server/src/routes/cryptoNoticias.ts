@@ -32,7 +32,6 @@ import {
   normalizeTelegramChatId,
   notifyCryptoWireTelegram,
   notifyCryptoWireTelegramArticleMany,
-  notifyCryptoWireTelegramMany,
   wireArticleOpenUrl,
   type CryptoWireNewsItem,
 } from "../lib/telegramWire.js";
@@ -399,6 +398,62 @@ async function saveWireTgSettings(next: { enabled: boolean; chatId?: string; cha
   return loadWireTgSettings();
 }
 
+async function prepareTelegramCard(item: CryptoWireNewsItem): Promise<CryptoWireNewsItem> {
+  const originalTitle = String(item.title ?? "").trim();
+  const originalSummary = String(item.summary ?? "").trim();
+  let publisher = String(item.publisherUrl || item.url || "").trim();
+  try {
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 12_000);
+    try {
+      const resolved = await resolvePublisherUrl(publisher, ac.signal);
+      if (resolved) publisher = resolved;
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {
+    /* keep publisher */
+  }
+  const open = wireArticleOpenUrl(publisher, originalTitle, originalSummary);
+  let imageUrl = item.imageUrl && isAcceptableArticleImage(item.imageUrl) ? item.imageUrl : "";
+  if (publisher) {
+    try {
+      const og = await fetchOgImage(publisher);
+      if (og && isAcceptableArticleImage(og)) imageUrl = og;
+    } catch {
+      /* sin foto */
+    }
+  }
+  let title = originalTitle;
+  let summary = originalSummary;
+  if (looksLikeEnglish(originalTitle)) {
+    try {
+      const t = await translateNewsText(originalTitle, "es");
+      if (t && !looksLikeEnglish(t)) title = t;
+    } catch {
+      /* keep original */
+    }
+  }
+  if (originalSummary && looksLikeEnglish(originalSummary)) {
+    try {
+      const s = await translateNewsText(originalSummary, "es");
+      if (s) summary = s;
+    } catch {
+      /* keep original */
+    }
+  }
+  return {
+    title,
+    summary,
+    sourceName: item.sourceName,
+    url: open.url,
+    publisherUrl: open.publisherUrl,
+    translateUrl: open.translateUrl,
+    imageUrl,
+    readTranslated: open.readTranslated,
+  };
+}
+
 async function maybeNotifyWireTelegram(items: CryptoWireNewsItem[]): Promise<void> {
   if (!items.length) return;
   try {
@@ -408,9 +463,10 @@ async function maybeNotifyWireTelegram(items: CryptoWireNewsItem[]): Promise<voi
       console.warn("[crypto-noticias] Telegram wire activo pero sin chat_id");
       return;
     }
-    const result = await notifyCryptoWireTelegramMany(settings.chatIds, items);
-    if (result.sent === 0) {
-      console.warn(`[crypto-noticias] Telegram wire omitido: ${result.lastError || "unknown"}`);
+    const batch = items.slice(0, 5);
+    for (const raw of batch) {
+      const card = await prepareTelegramCard(raw);
+      await notifyCryptoWireTelegramArticleMany(settings.chatIds, card);
     }
   } catch (e) {
     console.error("[crypto-noticias] Telegram wire", e instanceof Error ? e.message : e);
@@ -789,8 +845,10 @@ async function runIngest(): Promise<{ inserted: number; scanned: number; feedErr
         inserted += 1;
         insertedForWa.push({
           title: d.title,
+          summary: d.summary,
           sourceName: d.sourceName,
-          ...wireArticleOpenUrl(d.url, d.title, d.summary),
+          url: d.url,
+          imageUrl: d.imageUrl || "",
         });
       }
     } catch (e) {
@@ -1294,23 +1352,12 @@ cryptoNoticiasRouter.post("/crypto-noticias/telegram/send-latest", ...writeMw, a
     const items = (
       await Promise.all(
         rows.map(async (r) => {
-          const originalTitle = String(r.title || "").trim();
-          let target = String(r.url || "").trim();
-          try {
-            const resolved = await resolvePublisherUrl(target);
-            if (resolved) target = resolved;
-          } catch {
-            /* keep target */
-          }
-          const open = wireArticleOpenUrl(target, originalTitle, String(r.summary || ""));
-          return {
-            title: String(r.title_es || r.title || "").trim(),
+          return prepareTelegramCard({
+            title: String(r.title || "").trim(),
+            summary: String(r.summary || "").trim(),
             sourceName: String(r.source_name || "").trim(),
-            url: open.url,
-            publisherUrl: open.publisherUrl,
-            translateUrl: open.translateUrl,
-            readTranslated: open.readTranslated,
-          };
+            url: String(r.url || "").trim(),
+          });
         })
       )
     )

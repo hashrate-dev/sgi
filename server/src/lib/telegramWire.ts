@@ -455,16 +455,21 @@ export async function notifyCryptoWireTelegram(
   items: CryptoWireNewsItem[],
   opts?: { discover?: boolean }
 ): Promise<CryptoWireTelegramResult> {
-  const list = items.filter((x) => String(x.title ?? "").trim());
+  const list = items.filter((x) => String(x.title ?? "").trim()).slice(0, 6);
   if (!list.length) return { sent: false, reason: "sin_items" };
   const chat = normalizeTelegramChatId(chatId);
   if (!botToken()) return { sent: false, reason: "faltan_credenciales" };
-  const digest = formatCryptoWireTelegramDigest(list);
   const discover = opts?.discover !== false;
+
+  const sendCards = async (to: string) => {
+    for (const item of list) {
+      await notifyCryptoWireTelegramArticle(to, item);
+    }
+  };
 
   if (chat) {
     try {
-      await sendTelegramText(chat, digest);
+      await sendCards(chat);
       return { sent: true, chatId: chat };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -477,7 +482,7 @@ export async function notifyCryptoWireTelegram(
   const discovered = await listRecentTelegramPrivateChats(10);
   const fallback = discovered[0]?.chatId;
   if (fallback) {
-    await sendTelegramText(fallback, digest);
+    await sendCards(fallback);
     return { sent: true, chatId: fallback };
   }
 
