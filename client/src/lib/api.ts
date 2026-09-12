@@ -2300,6 +2300,13 @@ export function sendLatestCryptoNoticiasTelegram(): Promise<{
   return apiTelegramOnce("/api/crypto-noticias/telegram/send-latest", { method: "POST", body: "{}" });
 }
 
+export function sendCryptoNoticiaTelegram(id: number): Promise<{ ok: boolean; via: string; sentTo: number }> {
+  return apiTelegramOnce("/api/crypto-noticias/telegram/send-item", {
+    method: "POST",
+    body: JSON.stringify({ id }),
+  });
+}
+
 export function detectCryptoNoticiasTelegramChats(): Promise<{
   ok: boolean;
   chats: Array<{ chatId: string; name: string; username?: string }>;

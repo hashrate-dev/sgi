@@ -9,6 +9,7 @@ import {
   getCryptoNoticiasMeta,
   getCryptoNoticiasSentiment,
   refreshCryptoNoticias,
+  sendCryptoNoticiaTelegram,
   type CryptoNoticiaItem,
   type CryptoNewsSentimentReport,
 } from "../lib/api";
@@ -125,6 +126,8 @@ export function CryptoNoticiasPage() {
   const [sentiment, setSentiment] = useState<CryptoNewsSentimentReport | null>(null);
   const [sentimentLoading, setSentimentLoading] = useState(false);
 
+  const [sendingId, setSendingId] = useState<number | null>(null);
+
   const canEdit = Boolean(user && canEditNoticiasModule(user));
   const copy = COPY;
 
@@ -212,6 +215,21 @@ export function CryptoNoticiasPage() {
   }, [loading, user, loadNews, loadMeta, loadSentiment]);
 
   const topicLabels = TOPIC_LABEL;
+
+  const onSendNewsTelegram = async (n: CryptoNoticiaItem) => {
+    if (!canEdit) return;
+    setSendingId(n.id);
+    setErr("");
+    setOk("");
+    try {
+      await sendCryptoNoticiaTelegram(n.id);
+      setOk(`Enviada a Telegram: ${n.title}`);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "No se pudo enviar esa noticia a Telegram.");
+    } finally {
+      setSendingId(null);
+    }
+  };
 
   const onRefreshBot = async () => {
     if (!canEdit) return;
@@ -401,14 +419,26 @@ export function CryptoNoticiasPage() {
                         </span>
                       ))}
                     </div>
-                    <a
-                      className="crypto-news-read"
-                      href={newsOpenUrl(n.url)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {copy.read}
-                    </a>
+                    <div className="crypto-news-card__actions">
+                      <a
+                        className="crypto-news-read"
+                        href={newsOpenUrl(n.url)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {copy.read}
+                      </a>
+                      {canEdit ? (
+                        <button
+                          type="button"
+                          className="crypto-news-send-tg"
+                          disabled={sendingId != null}
+                          onClick={() => void onSendNewsTelegram(n)}
+                        >
+                          {sendingId === n.id ? "Enviando…" : "Enviar a Telegram"}
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 </article>
               ))}

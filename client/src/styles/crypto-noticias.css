@@ -985,6 +985,36 @@
   text-decoration: underline;
 }
 
+.crypto-news-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  margin-top: 0.15rem;
+}
+
+.crypto-news-send-tg {
+  appearance: none;
+  border: 1px solid rgba(38, 166, 217, 0.4);
+  background: rgba(38, 166, 217, 0.12);
+  color: #9fd6f0;
+  font-weight: 650;
+  font-size: 0.82rem;
+  border-radius: 0.4rem;
+  padding: 0.22rem 0.55rem;
+  cursor: pointer;
+}
+
+.crypto-news-send-tg:hover:not(:disabled) {
+  border-color: rgba(38, 166, 217, 0.7);
+  color: #fff;
+}
+
+.crypto-news-send-tg:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
 .crypto-news-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -1103,6 +1103,54 @@ cryptoNoticiasRouter.post("/crypto-noticias/telegram/test", ...writeMw, async (r
   }
 });
 
+cryptoNoticiasRouter.post("/crypto-noticias/telegram/send-item", ...writeMw, async (req, res, next) => {
+  try {
+    const parsed = z.object({ id: z.coerce.number().int().positive() }).safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({ error: { message: "Indicá la noticia a enviar." } });
+    }
+    const settings = await loadWireTgSettings();
+    const dest = settings.chatIds?.length ? settings.chatIds : settings.chatId ? [settings.chatId] : [];
+    if (!settings.enabled || dest.length === 0) {
+      return res.status(400).json({
+        error: { message: "Activá Telegram y guardá el Chat ID en el engranaje de medios." },
+      });
+    }
+    await ensureCryptoNoticiasSchema();
+    const row = (await db
+      .prepare(
+        `SELECT title, title_es, source_name, url
+         FROM sgi_crypto_noticias
+         WHERE id = ?`
+      )
+      .get(parsed.data.id)) as
+      | { title?: string; title_es?: string; source_name?: string; url?: string }
+      | undefined;
+    if (!row) {
+      return res.status(404).json({ error: { message: "No encontré esa noticia." } });
+    }
+    const title = String(row.title_es || row.title || "").trim();
+    const url = String(row.url || "").trim();
+    if (!title) {
+      return res.status(400).json({ error: { message: "Esa noticia no tiene título." } });
+    }
+    const result = await notifyCryptoWireTelegramMany(dest, [
+      {
+        title: url ? `${title}\n${url}` : title,
+        sourceName: String(row.source_name || "").trim(),
+        url,
+      },
+    ]);
+    res.json({ ok: true, via: "telegram", sentTo: result.sent, ...telegramSettingsPayload(settings) });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const ident = await getTelegramBotIdentity().catch(() => null);
+    res.status(502).json({
+      error: { message: explainTelegramSendFailure(msg, ident?.username || getTelegramBotStatus().botUsernameHint) },
+    });
+  }
+});
+
 cryptoNoticiasRouter.post("/crypto-noticias/telegram/send-latest", ...writeMw, async (_req, res, next) => {
   try {
     const settings = await loadWireTgSettings();
