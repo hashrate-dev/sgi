@@ -46,11 +46,18 @@ function convertPlaceholders(sql: string): string {
   });
 }
 
-/** Para INSERT sin RETURNING, añadimos RETURNING id para obtener lastInsertRowId */
+/** Para INSERT sin RETURNING, añadimos RETURNING id para obtener lastInsertRowId.
+ *  No tocar upserts ON CONFLICT ni tablas cuya PK no se llama `id`. */
 function ensureReturningId(sql: string): string {
   const trimmed = sql.trim();
   if (!trimmed.toUpperCase().startsWith("INSERT")) return sql;
   if (/RETURNING\s+/i.test(trimmed)) return sql;
+  if (/ON\s+CONFLICT/i.test(trimmed)) return sql;
+  const cols = trimmed.match(/INSERT\s+INTO\s+\S+\s*\(([^)]+)\)/i);
+  if (cols?.[1]) {
+    const names = cols[1].split(",").map((s) => s.trim().replace(/"/g, "").toLowerCase());
+    if (names.length > 0 && !names.includes("id")) return sql;
+  }
   return `${sql} RETURNING id`;
 }
 

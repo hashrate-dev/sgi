@@ -127,7 +127,11 @@ async function ensureCryptoNoticiasSchema(): Promise<void> {
     .prepare("CREATE INDEX IF NOT EXISTS idx_sgi_crypto_noticias_fetched ON sgi_crypto_noticias(fetched_at DESC)")
     .run();
   await ensureMediosSchema();
-  await ensureTelegramSettingsSchema();
+  try {
+    await ensureTelegramSettingsSchema();
+  } catch (e) {
+    console.warn("[crypto-noticias] telegram schema", e instanceof Error ? e.message : e);
+  }
   await purgeBlockedNewsSources();
   await purgeJunkNewsImages();
   schemaEnsured = true;
@@ -253,11 +257,13 @@ async function ensureTelegramSettingsSchema(): Promise<void> {
       )
       .run();
   }
-  const row = (await db.prepare("SELECT id FROM sgi_crypto_noticias_tg WHERE id = 1").get()) as
-    | { id?: number }
+  const row = (await db.prepare("SELECT chat_id FROM sgi_crypto_noticias_tg LIMIT 1").get()) as
+    | { chat_id?: string }
     | undefined;
-  if (!row?.id) {
-    await db.prepare("INSERT INTO sgi_crypto_noticias_tg (id, enabled, chat_id) VALUES (1, 0, '')").run();
+  if (row == null) {
+    await db
+      .prepare("INSERT INTO sgi_crypto_noticias_tg (id, enabled, chat_id) VALUES (1, 0, '') ON CONFLICT (id) DO NOTHING")
+      .run();
   }
   if (db.isPostgres) {
     await db.prepare("ALTER TABLE sgi_crypto_noticias_tg ADD COLUMN IF NOT EXISTS extra_chat_ids TEXT NOT NULL DEFAULT '[]'").run();
@@ -293,19 +299,28 @@ async function ensureTelegramSettingsSchema(): Promise<void> {
 async function loadManualTelegramSentIds(ids: number[]): Promise<Set<number>> {
   const uniq = [...new Set(ids.filter((n) => Number.isFinite(n) && n > 0))];
   if (!uniq.length) return new Set();
-  await ensureTelegramSettingsSchema();
-  const placeholders = uniq.map(() => "?").join(",");
-  const rows = (await db
-    .prepare(`SELECT noticia_id FROM sgi_crypto_noticias_tg_sent WHERE noticia_id IN (${placeholders})`)
-    .all(...uniq)) as Array<{ noticia_id?: number }>;
-  return new Set(rows.map((r) => Number(r.noticia_id)).filter((n) => Number.isFinite(n) && n > 0));
+  try {
+    await ensureTelegramSettingsSchema();
+    const placeholders = uniq.map(() => "?").join(",");
+    const rows = (await db
+      .prepare(`SELECT noticia_id FROM sgi_crypto_noticias_tg_sent WHERE noticia_id IN (${placeholders})`)
+      .all(...uniq)) as Array<{ noticia_id?: number }>;
+    return new Set(rows.map((r) => Number(r.noticia_id)).filter((n) => Number.isFinite(n) && n > 0));
+  } catch (e) {
+    console.warn("[crypto-noticias] telegram-sent lookup", e instanceof Error ? e.message : e);
+    return new Set();
+  }
 }
 
 async function claimManualTelegramSend(id: number): Promise<boolean> {
   await ensureTelegramSettingsSchema();
   try {
-    await db.prepare("INSERT INTO sgi_crypto_noticias_tg_sent (noticia_id) VALUES (?)").run(id);
-    return true;
+    const info = await db
+      .prepare(
+        "INSERT INTO sgi_crypto_noticias_tg_sent (noticia_id) VALUES (?) ON CONFLICT (noticia_id) DO NOTHING"
+      )
+      .run(id);
+    return Number((info as { changes?: number })?.changes ?? 0) > 0;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (/unique|duplicate|primary key/i.test(msg)) return false;
