@@ -4721,25 +4721,60 @@ button.fact-back {
   border-radius: 4px;
 }
 
-/* Modal “Modificar precio” encima del modal del equipo */
+/* Modal “Modificar precio” encima del modal del equipo (opaco, no se mezcla con el header verde de atrás) */
 .hrs-equipo-precio-modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1080;
+  z-index: 11100 !important;
+}
+
+.hrs-equipo-precio-modal-positioner {
+  z-index: 11110 !important;
 }
 
 .hrs-equipo-precio-modal-dialog {
   width: min(620px, 94vw);
   max-width: none;
   margin: 1rem auto;
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
 }
 
 .hrs-equipo-precio-modal-content {
   width: 100%;
   max-width: none;
-  border: 1px solid rgba(45, 93, 70, 0.28);
+  background: #ffffff !important;
+  border: 1px solid rgba(45, 93, 70, 0.35);
   border-radius: 16px;
   overflow: hidden;
+  isolation: isolate;
+  box-shadow:
+    0 24px 64px rgba(15, 23, 42, 0.35),
+    0 0 0 1px rgba(45, 93, 70, 0.12);
+}
+
+.hrs-equipo-precio-modal-header,
+.hrs-equipo-precio-modal-content > .modal-header.professional-modal-header {
+  background: #2d5d46 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 16px 16px 0 0;
+  opacity: 1 !important;
+}
+
+.hrs-equipo-precio-modal-content .professional-modal-title {
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.hrs-equipo-precio-modal-content .professional-modal-close {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff !important;
+}
+
+.hrs-equipo-precio-modal-content .professional-modal-close:hover {
+  background: rgba(255, 255, 255, 0.35);
+  color: #fff !important;
 }
 
 .hrs-equipo-precio-modal-body {

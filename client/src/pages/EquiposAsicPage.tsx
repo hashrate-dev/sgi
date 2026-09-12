@@ -2168,17 +2168,17 @@ export function EquiposAsicPage() {
           }}
         >
           <Portal>
-            <Dialog.Backdrop className="professional-modal-overlay hrs-equipo-precio-modal-overlay" />
-            <Dialog.Positioner>
+            <Dialog.Backdrop className="professional-modal-overlay professional-modal-overlay--elevated hrs-equipo-precio-modal-overlay" />
+            <Dialog.Positioner className="hrs-equipo-precio-modal-positioner">
               <Box className="modal-dialog modal-dialog-centered modal-dialog-scrollable hrs-equipo-precio-modal-dialog">
                 <Dialog.Content
-                  className="modal-content professional-modal hrs-equipo-precio-modal-content"
+                  className="modal-content professional-modal professional-modal-form hrs-equipo-precio-modal-content"
                   maxH="88dvh"
                   display="flex"
                   flexDirection="column"
                   overflow="hidden"
                 >
-                <div className="modal-header professional-modal-header">
+                <div className="modal-header professional-modal-header hrs-equipo-precio-modal-header">
                   <h5 id="hrs-precio-modal-title" className="modal-title professional-modal-title">
                     Modificar precio USD
                   </h5>
