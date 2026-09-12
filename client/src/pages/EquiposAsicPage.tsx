@@ -27,7 +27,7 @@ import type { EquipoASIC } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
 import { AsicCotizadorCatalogSelect } from "../components/AsicCotizadorCatalogSelect";
 import { EquipoAsicDashboardCard } from "../components/equipos/EquipoAsicDashboardCard";
-import { CardImageUploadField, GalleryImagesUploadField } from "../components/equipos/MarketplaceImageUploadFields";
+import { CardImageUploadField, GalleryImagesUploadField, collectMarketplaceImageLibrary } from "../components/equipos/MarketplaceImageUploadFields";
 import { MarketplaceDetailRowsEditor, sanitizeDetailRowsForApi } from "../components/equipos/MarketplaceDetailRowsEditor";
 import { AsicProductModal } from "../components/marketplace/AsicProductModal";
 import { PrecioHistorialFullModal } from "../components/equipos/PrecioHistorialFullModal";
@@ -517,6 +517,12 @@ export function EquiposAsicPage() {
   const vitrinaCodigoDesdeSpecs = useMemo(
     () => vitrinaCodigoFromSpecs(formData.modelo, formData.procesador, true),
     [formData.modelo, formData.procesador]
+  );
+
+  /** Fotos ya cargadas en otros equipos (para reutilizar en tarjeta/galería). */
+  const marketplaceImageLibrary = useMemo(
+    () => collectMarketplaceImageLibrary(equipos, { excludeEquipoId: editingEquipo?.id }),
+    [equipos, editingEquipo?.id]
   );
 
   useEffect(() => {
@@ -2104,11 +2110,13 @@ export function EquiposAsicPage() {
                                 value={formData.marketplaceImageSrc}
                                 onChange={(marketplaceImageSrc) => setFormData({ ...formData, marketplaceImageSrc })}
                                 disabled={!canEditTienda}
+                                library={marketplaceImageLibrary}
                               />
                               <GalleryImagesUploadField
                                 lines={formData.marketplaceGalleryLines}
                                 onLinesChange={(marketplaceGalleryLines) => setFormData({ ...formData, marketplaceGalleryLines })}
                                 disabled={!canEditTienda}
+                                library={marketplaceImageLibrary}
                               />
                             </div>
                           </div>
