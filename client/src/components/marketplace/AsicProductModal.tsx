@@ -44,8 +44,8 @@ function renderYieldLineParts(text: string): ReactNode {
 
 /**
  * URLs únicas para miniaturas + hero.
- * - Tienda: solo tarjeta (`imageSrc`, sin logo Hashrate). Las de detalle llevan watermark.
- * - Inventario: detalle primero (logo Hashrate), luego tarjeta tienda.
+ * - Tienda: solo tarjeta (`imageSrc`, sin logo Hashrate).
+ * - Inventario: solo fotos de galería (con logo Hashrate). Sin mezclar la de tienda.
  */
 function gallerySources(product: AsicProduct, inventoryMode: boolean): string[] {
   const fb = defaultAsicShelfImageSrc(product.brand, product.model);
@@ -61,8 +61,8 @@ function gallerySources(product: AsicProduct, inventoryMode: boolean): string[] 
     return capProductModalThumbUrls(fbUrl ? [fbUrl] : []);
   }
 
-  const merged = dedupeGalleryUrls([...detail, main].filter(Boolean));
-  if (merged.length > 0) return capProductModalThumbUrls(merged);
+  if (detail.length > 0) return capProductModalThumbUrls(detail);
+  if (main) return capProductModalThumbUrls([main]);
   return capProductModalThumbUrls(fbUrl ? [fbUrl] : []);
 }
 
