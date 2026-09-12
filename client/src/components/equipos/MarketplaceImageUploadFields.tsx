@@ -83,6 +83,16 @@ function parseGalleryLines(lines: string): string[] {
     .filter(Boolean);
 }
 
+/** Identidad estable para dedupe (data URLs no usan galleryFileKey completo). */
+function imageIdentity(url: string): string {
+  const t = url.trim();
+  if (!t) return "";
+  if (/^data:image\//i.test(t)) {
+    return `data:${t.length}:${t.slice(5, 48)}:${t.slice(-48)}`;
+  }
+  return galleryFileKey(t) || t.toLowerCase();
+}
+
 function ExistingImagesPicker({
   open,
   onClose,
@@ -221,37 +231,51 @@ export function MarketplaceAnuncioPhotosField({
   disabled?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const addTargetRef = useRef<"auto" | "gallery">("auto");
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
 
   const card = cardSrc.trim();
   const gallery = parseGalleryLines(galleryLines);
-  const emptySlots = (card ? 0 : 1) + Math.max(0, MARKETPLACE_PRODUCT_GALLERY_MAX - gallery.length);
+  const gallerySlotsLeft = Math.max(0, MARKETPLACE_PRODUCT_GALLERY_MAX - gallery.length);
+  const emptySlots = (card ? 0 : 1) + gallerySlotsLeft;
   const allUrls = card ? [card, ...gallery] : [...gallery];
   const busy = Boolean(disabled || uploading);
   const canAdd = !busy && emptySlots > 0;
+  const canAddGallery = !busy && gallerySlotsLeft > 0;
 
-  function applyNewUrls(incoming: string[]) {
+  function commitPhotos(nextCard: string, nextGal: string[]) {
+    const galleryLinesNext = nextGal.join("\n");
+    if (onPhotosChange) {
+      onPhotosChange({ cardSrc: nextCard, galleryLines: galleryLinesNext });
+      return;
+    }
+    onCardChange(nextCard);
+    onGalleryLinesChange(galleryLinesNext);
+  }
+
+  function applyNewUrls(incoming: string[], opts?: { preferGallery?: boolean }) {
+    const preferGallery = opts?.preferGallery === true;
     let nextCard = card;
     const nextGal = [...gallery];
-    const seen = new Set(allUrls.map((u) => galleryFileKey(u)));
+    const seen = new Set(allUrls.map((u) => imageIdentity(u)));
     let added = 0;
 
     for (const raw of incoming) {
       const url = raw.trim();
       if (!url) continue;
-      const key = galleryFileKey(url) || url;
-      if (seen.has(key)) continue;
-      if (!nextCard) {
+      const key = imageIdentity(url);
+      if (key && seen.has(key)) continue;
+      if (!preferGallery && !nextCard) {
         nextCard = url;
-        seen.add(key);
+        if (key) seen.add(key);
         added += 1;
         continue;
       }
       if (nextGal.length >= MARKETPLACE_PRODUCT_GALLERY_MAX) continue;
       nextGal.push(url);
-      seen.add(key);
+      if (key) seen.add(key);
       added += 1;
     }
 
@@ -259,19 +283,14 @@ export function MarketplaceAnuncioPhotosField({
       showToast(
         emptySlots <= 0
           ? `Ya tenés la tarjeta y ${MARKETPLACE_PRODUCT_GALLERY_MAX} fotos de detalle.`
-          : "Esas fotos ya estaban agregadas.",
+          : "Esas fotos ya estaban agregadas. Probá con otras.",
         emptySlots <= 0 ? "warning" : "info",
         "Equipos ASIC"
       );
       return;
     }
 
-    if (onPhotosChange) {
-      onPhotosChange({ cardSrc: nextCard, galleryLines: nextGal.join("\n") });
-    } else {
-      onCardChange(nextCard);
-      onGalleryLinesChange(nextGal.join("\n"));
-    }
+    commitPhotos(nextCard, nextGal);
     showToast(
       added === 1 ? "1 foto agregada." : `${added} fotos agregadas.`,
       "success",
@@ -280,9 +299,14 @@ export function MarketplaceAnuncioPhotosField({
   }
 
   async function processFiles(files: FileList | File[]) {
-    if (!canAdd) {
+    const preferGallery = addTargetRef.current === "gallery";
+    addTargetRef.current = "auto";
+    const slots = preferGallery ? gallerySlotsLeft : emptySlots;
+    if (slots <= 0 || busy) {
       showToast(
-        `Cupo completo: 1 tarjeta + hasta ${MARKETPLACE_PRODUCT_GALLERY_MAX} de detalle.`,
+        preferGallery
+          ? `La galería admite hasta ${MARKETPLACE_PRODUCT_GALLERY_MAX} fotos de detalle.`
+          : `Cupo completo: 1 tarjeta + hasta ${MARKETPLACE_PRODUCT_GALLERY_MAX} de detalle.`,
         "warning",
         "Equipos ASIC"
       );
@@ -296,10 +320,10 @@ export function MarketplaceAnuncioPhotosField({
       showToast("No hay imágenes válidas (JPG, PNG, WebP o GIF).", "error", "Equipos ASIC");
       return;
     }
-    const toUpload = list.slice(0, emptySlots);
+    const toUpload = list.slice(0, slots);
     if (toUpload.length < list.length) {
       showToast(
-        `Solo se tomaron ${toUpload.length}: queda espacio para ${emptySlots} foto(s).`,
+        `Solo se tomaron ${toUpload.length}: queda espacio para ${slots} foto(s).`,
         "warning",
         "Equipos ASIC"
       );
@@ -312,7 +336,7 @@ export function MarketplaceAnuncioPhotosField({
         const { url } = await uploadMarketplaceAsicImage(optimized);
         urls.push(url);
       }
-      applyNewUrls(urls);
+      applyNewUrls(urls, { preferGallery });
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Error al subir", "error", "Equipos ASIC");
     } finally {
@@ -345,19 +369,30 @@ export function MarketplaceAnuncioPhotosField({
     e.stopPropagation();
     setDragActive(false);
     if (!canAdd) return;
+    addTargetRef.current = "auto";
     if (e.dataTransfer.files?.length) void processFiles(e.dataTransfer.files);
   }
 
-  function openPcPicker() {
-    if (canAdd) inputRef.current?.click();
+  function openPcPicker(target: "auto" | "gallery" = "auto") {
+    if (busy) return;
+    if (target === "gallery") {
+      if (!canAddGallery) {
+        showToast(`Ya hay ${MARKETPLACE_PRODUCT_GALLERY_MAX} fotos de detalle.`, "warning", "Equipos ASIC");
+        return;
+      }
+    } else if (!canAdd) {
+      return;
+    }
+    addTargetRef.current = target;
+    inputRef.current?.click();
   }
 
   function clearCard() {
-    onCardChange("");
+    commitPhotos("", gallery);
   }
 
   function removeGalleryAt(index: number) {
-    onGalleryLinesChange(gallery.filter((_, j) => j !== index).join("\n"));
+    commitPhotos(card, gallery.filter((_, j) => j !== index));
   }
 
   function promoteGalleryToCard(index: number) {
@@ -365,8 +400,7 @@ export function MarketplaceAnuncioPhotosField({
     if (!url) return;
     const rest = gallery.filter((_, j) => j !== index);
     if (card) rest.unshift(card);
-    onCardChange(url);
-    onGalleryLinesChange(rest.slice(0, MARKETPLACE_PRODUCT_GALLERY_MAX).join("\n"));
+    commitPhotos(url, rest.slice(0, MARKETPLACE_PRODUCT_GALLERY_MAX));
   }
 
   const zoneClass = [
@@ -393,15 +427,24 @@ export function MarketplaceAnuncioPhotosField({
               ) : null}
             </div>
           ) : (
-            <div className="hrs-upload-slot-empty">Sin foto</div>
+            <button
+              type="button"
+              className="hrs-upload-slot-empty hrs-upload-slot-empty--btn"
+              disabled={busy}
+              onClick={() => openPcPicker("auto")}
+            >
+              + Agregar
+            </button>
           )}
         </div>
 
         <div className="hrs-upload-slot hrs-upload-slot--gallery">
-          <span className="hrs-upload-slot-label">Detalle (máx. {MARKETPLACE_PRODUCT_GALLERY_MAX})</span>
+          <span className="hrs-upload-slot-label">
+            Detalle ({gallery.length}/{MARKETPLACE_PRODUCT_GALLERY_MAX})
+          </span>
           <div className="hrs-upload-gallery-grid hrs-upload-gallery-grid--unified">
             {gallery.map((u, i) => (
-              <div key={`${i}-${u.slice(0, 24)}`} className="hrs-upload-gallery-item">
+              <div key={`g-${i}-${imageIdentity(u).slice(0, 48)}`} className="hrs-upload-gallery-item">
                 <img src={imgSrcForPreview(u)} alt="" />
                 {!disabled ? (
                   <>
@@ -426,7 +469,21 @@ export function MarketplaceAnuncioPhotosField({
                 ) : null}
               </div>
             ))}
-            {gallery.length === 0 ? <p className="hrs-upload-gallery-empty">Sin fotos de detalle</p> : null}
+            {canAddGallery
+              ? Array.from({ length: gallerySlotsLeft }, (_, i) => (
+                  <button
+                    key={`empty-gal-${i}`}
+                    type="button"
+                    className="hrs-upload-gallery-item hrs-upload-gallery-item--empty"
+                    disabled={busy}
+                    onClick={() => openPcPicker("gallery")}
+                    title="Agregar foto de detalle"
+                    aria-label="Agregar foto de detalle"
+                  >
+                    <span aria-hidden>+</span>
+                  </button>
+                ))
+              : null}
           </div>
         </div>
       </div>
@@ -439,10 +496,10 @@ export function MarketplaceAnuncioPhotosField({
         onKeyDown={(e) => {
           if ((e.key === "Enter" || e.key === " ") && canAdd) {
             e.preventDefault();
-            openPcPicker();
+            openPcPicker("auto");
           }
         }}
-        onClick={() => openPcPicker()}
+        onClick={() => openPcPicker("auto")}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
@@ -456,7 +513,7 @@ export function MarketplaceAnuncioPhotosField({
           aria-hidden
           tabIndex={-1}
           onChange={onFileInput}
-          disabled={!canAdd}
+          disabled={busy}
         />
         <div className="hrs-upload-dropzone-inner">
           <div className="hrs-upload-dropzone-icon" aria-hidden>
@@ -470,7 +527,9 @@ export function MarketplaceAnuncioPhotosField({
                 : "Arrastrá fotos acá o hacé clic para elegirlas en tu PC"}
           </p>
           <p className="hrs-upload-dropzone-hint">
-            La primera foto vacía va a la tarjeta; el resto al detalle (máx. {MARKETPLACE_PRODUCT_GALLERY_MAX}).
+            {card
+              ? `Las nuevas fotos van a Detalle (quedan ${gallerySlotsLeft}).`
+              : `La primera va a Tarjeta; el resto a Detalle (máx. ${MARKETPLACE_PRODUCT_GALLERY_MAX}).`}
             {marketplaceUploadUsesInlineImages()
               ? " · en hashrate.space se comprimen (~300 KB c/u)"
               : " · JPG, PNG, WebP o GIF"}
@@ -479,14 +538,17 @@ export function MarketplaceAnuncioPhotosField({
       </div>
 
       <div className="hrs-upload-unified-actions">
-        <button type="button" className="hrs-upload-btn" disabled={!canAdd} onClick={openPcPicker}>
+        <button type="button" className="hrs-upload-btn" disabled={!canAdd} onClick={() => openPcPicker("auto")}>
           Desde mi PC…
         </button>
         <button
           type="button"
           className="hrs-upload-btn"
           disabled={busy || library.length === 0 || emptySlots <= 0}
-          onClick={() => setLibraryOpen(true)}
+          onClick={() => {
+            addTargetRef.current = card ? "gallery" : "auto";
+            setLibraryOpen(true);
+          }}
           title={library.length === 0 ? "Todavía no hay fotos en otros equipos" : undefined}
         >
           Desde otros equipos…
@@ -495,11 +557,18 @@ export function MarketplaceAnuncioPhotosField({
 
       <ExistingImagesPicker
         open={libraryOpen}
-        onClose={() => setLibraryOpen(false)}
+        onClose={() => {
+          addTargetRef.current = "auto";
+          setLibraryOpen(false);
+        }}
         library={library}
-        maxSelect={Math.max(1, emptySlots)}
+        maxSelect={Math.max(1, addTargetRef.current === "gallery" ? gallerySlotsLeft : emptySlots)}
         excludeUrls={allUrls}
-        onConfirm={(urls) => applyNewUrls(urls)}
+        onConfirm={(urls) => {
+          const preferGallery = addTargetRef.current === "gallery" || Boolean(card);
+          addTargetRef.current = "auto";
+          applyNewUrls(urls, { preferGallery });
+        }}
       />
     </div>
   );
