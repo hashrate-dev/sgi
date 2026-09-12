@@ -2243,19 +2243,53 @@ export type CryptoNoticiasTelegramSettings = {
   readyToSend: boolean;
 };
 
+async function apiTelegramOnce<T>(path: string, options?: RequestInit): Promise<T> {
+  try {
+    await fetch("/api/warmup", { method: "GET", keepalive: true });
+  } catch {
+    /* ignore */
+  }
+  const token = getStoredToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...((options?.headers as Record<string, string>) ?? {}),
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetchWithTimeout(
+    path,
+    { credentials: "include", ...options, headers },
+    25_000
+  );
+  const data = res.status === 204 ? {} : await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    throw new Error((data as { error?: { message?: string } })?.error?.message ?? "Sesión expirada.");
+  }
+  if (!res.ok) {
+    const msg = (data as { error?: { message?: string } })?.error?.message ?? res.statusText;
+    throw new Error(msg || "Error de Telegram");
+  }
+  return data as T;
+}
+
 export function getCryptoNoticiasTelegram(): Promise<CryptoNoticiasTelegramSettings> {
-  return api("/api/crypto-noticias/telegram");
+  return apiTelegramOnce("/api/crypto-noticias/telegram");
 }
 
 export function putCryptoNoticiasTelegram(body: {
   enabled: boolean;
   chatId?: string | null;
 }): Promise<CryptoNoticiasTelegramSettings & { ok: boolean }> {
-  return api("/api/crypto-noticias/telegram", { method: "PUT", body: JSON.stringify(body) });
+  return apiTelegramOnce("/api/crypto-noticias/telegram", { method: "POST", body: JSON.stringify(body) });
 }
 
-export function testCryptoNoticiasTelegram(): Promise<{ ok: boolean; via: string }> {
-  return api("/api/crypto-noticias/telegram/test", { method: "POST", body: "{}" });
+export function testCryptoNoticiasTelegram(body?: {
+  enabled?: boolean;
+  chatId?: string | null;
+}): Promise<CryptoNoticiasTelegramSettings & { ok: boolean; via: string }> {
+  return apiTelegramOnce("/api/crypto-noticias/telegram/test", {
+    method: "POST",
+    body: JSON.stringify(body ?? {}),
+  });
 }
 
 export function detectCryptoNoticiasTelegramChats(): Promise<{
@@ -2263,7 +2297,7 @@ export function detectCryptoNoticiasTelegramChats(): Promise<{
   chats: Array<{ chatId: string; name: string; username?: string }>;
   hint?: string;
 }> {
-  return api("/api/crypto-noticias/telegram/chats");
+  return apiTelegramOnce("/api/crypto-noticias/telegram/chats");
 }
 
 export type GarantiasItemsResponse = { items: import("./types.js").ItemGarantiaAnde[] };

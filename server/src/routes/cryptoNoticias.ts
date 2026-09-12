@@ -262,7 +262,7 @@ type WireTgSettings = {
 };
 
 async function loadWireTgSettings(): Promise<WireTgSettings> {
-  await ensureCryptoNoticiasSchema();
+  await ensureTelegramSettingsSchema();
   const row = (await db.prepare("SELECT enabled, chat_id FROM sgi_crypto_noticias_tg WHERE id = 1").get()) as
     | { enabled?: number | boolean; chat_id?: string }
     | undefined;
@@ -273,7 +273,7 @@ async function loadWireTgSettings(): Promise<WireTgSettings> {
 }
 
 async function saveWireTgSettings(next: { enabled: boolean; chatId: string }): Promise<WireTgSettings> {
-  await ensureCryptoNoticiasSchema();
+  await ensureTelegramSettingsSchema();
   const chatId = normalizeTelegramChatId(next.chatId).slice(0, 64);
   await db
     .prepare(
@@ -985,9 +985,41 @@ cryptoNoticiasRouter.put("/crypto-noticias/telegram", ...writeMw, async (req, re
   }
 });
 
-cryptoNoticiasRouter.post("/crypto-noticias/telegram/test", ...writeMw, async (_req, res, next) => {
+cryptoNoticiasRouter.post("/crypto-noticias/telegram", ...writeMw, async (req, res, next) => {
   try {
-    const settings = await loadWireTgSettings();
+    const parsed = tgSettingsSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({ error: { message: "Datos inválidos." } });
+    }
+    const chatId = normalizeTelegramChatId(parsed.data.chatId != null ? String(parsed.data.chatId) : "");
+    if (parsed.data.enabled && !chatId) {
+      return res.status(400).json({
+        error: {
+          message: "Indicá el Chat ID de Telegram (número, ej. 1022374559).",
+        },
+      });
+    }
+    const saved = await saveWireTgSettings({
+      enabled: parsed.data.enabled,
+      chatId,
+    });
+    res.json({ ok: true, ...telegramSettingsPayload(saved) });
+  } catch (e) {
+    next(e);
+  }
+});
+
+cryptoNoticiasRouter.post("/crypto-noticias/telegram/test", ...writeMw, async (req, res, next) => {
+  try {
+    const parsed = tgSettingsSchema.safeParse(req.body ?? {});
+    let settings = await loadWireTgSettings();
+    if (parsed.success) {
+      const chatId = normalizeTelegramChatId(parsed.data.chatId != null ? String(parsed.data.chatId) : settings.chatId);
+      const enabled = parsed.data.enabled ?? true;
+      if (chatId) {
+        settings = await saveWireTgSettings({ enabled, chatId });
+      }
+    }
     if (!settings.chatId) {
       return res.status(400).json({
         error: { message: "Guardá primero un Chat ID de Telegram." },
@@ -1007,7 +1039,7 @@ cryptoNoticiasRouter.post("/crypto-noticias/telegram/test", ...writeMw, async (_
           : result.reason || "No se pudo enviar";
       return res.status(400).json({ error: { message: hint } });
     }
-    res.json({ ok: true, via: "telegram" });
+    res.json({ ok: true, via: "telegram", ...telegramSettingsPayload(settings) });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     res.status(502).json({ error: { message: msg } });

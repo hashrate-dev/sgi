@@ -206,13 +206,11 @@ export function CryptoNoticiasMediosConfig({ canEdit, open, onClose }: Props) {
     setErr("");
     setOk("");
     try {
-      await putCryptoNoticiasTelegram({ enabled: tgEnabled || true, chatId: tgChatId });
-      await testCryptoNoticiasTelegram();
+      const r = await testCryptoNoticiasTelegram({ enabled: true, chatId: tgChatId });
+      setTg(r);
+      setTgEnabled(Boolean(r.enabled));
+      setTgChatId(r.chatId || tgChatId);
       setOk("Prueba enviada por Telegram. Revisá el chat del bot.");
-      const refreshed = await getCryptoNoticiasTelegram();
-      setTg(refreshed);
-      setTgEnabled(Boolean(refreshed.enabled));
-      setTgChatId(refreshed.chatId || "");
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Falló la prueba de Telegram.");
     } finally {

@@ -79,15 +79,26 @@ export async function sendTelegramText(chatId: string, text: string): Promise<vo
   if (!chat) throw new Error("Chat ID de Telegram inválido");
 
   const url = `https://api.telegram.org/bot${token}/sendMessage`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chat,
-      text: clip(text, 3900),
-      disable_web_page_preview: true,
-    }),
-  });
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), 12_000);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: ac.signal,
+      body: JSON.stringify({
+        chat_id: chat,
+        text: clip(text, 3900),
+        disable_web_page_preview: true,
+      }),
+    });
+  } catch (e) {
+    const aborted = e instanceof Error && (e.name === "AbortError" || /abort/i.test(e.message));
+    throw new Error(aborted ? "Telegram no respondió a tiempo. Probá de nuevo en unos segundos." : String(e instanceof Error ? e.message : e));
+  } finally {
+    clearTimeout(timer);
+  }
   const bodyText = await res.text();
   let ok = res.ok;
   let description = bodyText;
@@ -128,7 +139,16 @@ export async function listRecentTelegramPrivateChats(limit = 8): Promise<
   const token = botToken();
   if (!token) throw new Error("Falta TELEGRAM_BOT_TOKEN en el servidor");
   const url = `https://api.telegram.org/bot${token}/getUpdates?limit=50`;
-  const res = await fetch(url);
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), 10_000);
+  let res: Response;
+  try {
+    res = await fetch(url, { signal: ac.signal });
+  } catch {
+    throw new Error("No se pudo hablar con Telegram (timeout). Probá de nuevo.");
+  } finally {
+    clearTimeout(timer);
+  }
   const bodyText = await res.text();
   const j = JSON.parse(bodyText) as {
     ok?: boolean;
