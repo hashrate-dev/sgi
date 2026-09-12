@@ -8,6 +8,7 @@ import {
   harvestCryptoNoticiasDrafts,
   isAcceptableArticleImage,
   isBlockedNewsSource,
+  resolvePublisherUrl,
   type CryptoNoticiaTopic,
   type HarvestFeed,
 } from "../lib/cryptoNoticiasBot.js";
@@ -1223,20 +1224,25 @@ cryptoNoticiasRouter.post("/crypto-noticias/telegram/send-item", ...writeMw, asy
       await unclaimManualTelegramSend(parsed.data.id);
       return res.status(400).json({ error: { message: "Esa noticia no tiene título." } });
     }
+    let publisher = url;
+    try {
+      const resolved = await resolvePublisherUrl(url);
+      if (resolved) publisher = resolved;
+    } catch {
+      /* seguimos con la URL guardada */
+    }
     let imageUrl = String(row.image_url || "").trim();
     if (!isAcceptableArticleImage(imageUrl)) imageUrl = "";
-    if (!imageUrl && url) {
-      try {
-        const og = await fetchOgImage(url);
-        if (og && isAcceptableArticleImage(og)) {
-          imageUrl = og;
-          await db.prepare("UPDATE sgi_crypto_noticias SET image_url = ? WHERE id = ?").run(og, parsed.data.id);
-        }
-      } catch {
-        /* sin foto: el mensaje igual sale con título, texto y link */
+    try {
+      const og = await fetchOgImage(publisher);
+      if (og && isAcceptableArticleImage(og)) {
+        imageUrl = og;
+        await db.prepare("UPDATE sgi_crypto_noticias SET image_url = ? WHERE id = ?").run(og, parsed.data.id);
       }
+    } catch {
+      /* si no hay foto del medio, se envía sin imagen */
     }
-    const open = wireArticleOpenUrl(url, originalTitle, originalSummary);
+    const open = wireArticleOpenUrl(publisher, originalTitle, originalSummary);
     try {
       const result = await notifyCryptoWireTelegramArticleMany(dest, {
         title,
@@ -1277,17 +1283,27 @@ cryptoNoticiasRouter.post("/crypto-noticias/telegram/send-latest", ...writeMw, a
          LIMIT 5`
       )
       .all()) as Array<{ title?: string; title_es?: string; summary?: string; source_name?: string; url?: string }>;
-    const items = rows
-      .map((r) => {
-        const originalTitle = String(r.title || "").trim();
-        const open = wireArticleOpenUrl(String(r.url || "").trim(), originalTitle, String(r.summary || ""));
-        return {
-          title: String(r.title_es || r.title || "").trim(),
-          sourceName: String(r.source_name || "").trim(),
-          url: open.url,
-          readTranslated: open.readTranslated,
-        };
-      })
+    const items = (
+      await Promise.all(
+        rows.map(async (r) => {
+          const originalTitle = String(r.title || "").trim();
+          let target = String(r.url || "").trim();
+          try {
+            const resolved = await resolvePublisherUrl(target);
+            if (resolved) target = resolved;
+          } catch {
+            /* keep target */
+          }
+          const open = wireArticleOpenUrl(target, originalTitle, String(r.summary || ""));
+          return {
+            title: String(r.title_es || r.title || "").trim(),
+            sourceName: String(r.source_name || "").trim(),
+            url: open.url,
+            readTranslated: open.readTranslated,
+          };
+        })
+      )
+    )
       .filter((x) => x.title);
     if (!items.length) {
       return res.status(400).json({
