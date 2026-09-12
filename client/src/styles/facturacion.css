@@ -7450,181 +7450,247 @@ button.fact-back {
 .hrs-equipo-asic-modal-dialog.clientes-new-modal-dialog {
   max-height: 100vh;
   max-height: 100dvh;
+  height: auto;
   margin-top: 0;
   margin-bottom: 0;
-  padding: 0.35rem 0;
+  padding: 0;
 }
 
 .professional-modal-form.clientes-new-modal-content.hrs-equipo-asic-modal-content {
   max-height: 100vh;
   max-height: 100dvh;
+  height: min(100dvh, 100vh);
 }
 
 /* ——— Equipo ASIC: densidad + sin barra vertical en el cuerpo del modal ——— */
-.clientes-new-modal-content.hrs-equipo-asic-modal-content .modal-body.professional-modal-body {
-  overflow-y: hidden;
-  overflow-x: hidden;
-  padding: 0.55rem 1rem 0.6rem;
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .modal-body.professional-modal-body,
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-body {
+  overflow: hidden !important;
+  overflow-y: hidden !important;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0.4rem 0.85rem 0.45rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content .professional-modal-footer {
-  padding: 0.55rem 1rem;
+  padding: 0.45rem 0.85rem;
+  flex-shrink: 0;
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content > .modal-header.professional-modal-header {
-  padding: 0.75rem 1rem 0.55rem;
+  padding: 0.55rem 0.85rem 0.4rem;
+  flex-shrink: 0;
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content .professional-modal-icon-wrapper {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content .professional-modal-title {
-  font-size: 1.15rem;
+  font-size: 1.05rem;
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form {
-  gap: 0.45rem;
+  gap: 0.35rem;
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__main {
-  gap: 0.5rem 0.95rem;
+  gap: 0.4rem 0.75rem;
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__ident-strip {
-  gap: 0.5rem 0.85rem;
+  gap: 0.4rem 0.65rem;
   margin-bottom: 0;
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__ident-field {
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.2rem;
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__equipo-heading {
-  margin-top: 0.1rem;
-  margin-bottom: 0.3rem;
-  padding-bottom: 0.22rem;
+  margin-top: 0;
+  margin-bottom: 0.2rem;
+  padding-bottom: 0.15rem;
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__equipo-fields {
-  gap: 0.45rem 0.55rem;
+  gap: 0.35rem 0.45rem;
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content .professional-modal-body .form-control,
-.clientes-new-modal-content.hrs-equipo-asic-modal-content .professional-modal-body .form-select {
-  padding: 0.42rem 0.6rem;
-  font-size: 0.9rem;
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .professional-modal-body .form-select,
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-body .form-control,
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-body .form-select {
+  padding: 0.32rem 0.5rem;
+  font-size: 0.85rem;
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__price-card {
-  padding: 0.75rem 0.95rem 0.7rem;
+  padding: 0.55rem 0.75rem 0.5rem;
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__price-amount {
-  margin: 0.08rem 0 0.45rem;
-  font-size: clamp(1.45rem, 3.2vw, 1.95rem);
+  margin: 0.05rem 0 0.35rem;
+  font-size: clamp(1.25rem, 2.8vw, 1.7rem);
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__price-meta {
-  margin: 0.35rem 0 0;
-  font-size: 0.7rem;
+  margin: 0.25rem 0 0;
+  font-size: 0.68rem;
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__market {
-  padding: 0.45rem 0.65rem 0.5rem;
+  padding: 0.35rem 0.5rem 0.4rem;
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__market .client-form-section-title {
-  margin: 0 0 0.2rem;
-  padding-bottom: 0.22rem;
-  font-size: 0.875rem;
+  margin: 0 0 0.15rem;
+  padding-bottom: 0.15rem;
+  font-size: 0.8rem;
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__market-inner {
-  margin-top: 0.35rem;
-  gap: 0.5rem 0.75rem;
+  margin-top: 0.25rem;
+  gap: 0.4rem 0.55rem;
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__detail-rows-panel {
-  padding: 0.45rem 0.55rem 0.5rem;
+  padding: 0.35rem 0.45rem 0.4rem;
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__vitrina-callout {
-  margin-top: 0.5rem;
-  padding: 0.55rem 0.75rem 0.6rem;
+  margin-top: 0;
+  padding: 0.4rem 0.55rem 0.45rem;
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__vitrina-callout-title {
-  font-size: 0.95rem;
-  margin: 0 0 0.22rem;
+  font-size: 0.88rem;
+  margin-bottom: 0.15rem;
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__vitrina-callout-sub {
-  font-size: 0.78rem;
-  line-height: 1.35;
+  font-size: 0.72rem;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__vitrina-stack {
+  margin-top: 0.45rem;
+  gap: 0.35rem;
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__media-panel {
-  padding: 0.5rem 0.65rem 0.55rem;
+  padding: 0.4rem 0.5rem 0.45rem;
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__media-panel-title {
-  margin: 0 0 0.38rem;
-  padding-bottom: 0.28rem;
-  font-size: 0.75rem;
+  margin: 0 0 0.35rem;
+  padding-bottom: 0.25rem;
+  font-size: 0.72rem;
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__col-media .hrs-upload-field {
+  margin-bottom: 0.2rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__col-media .hrs-upload-unified {
+  gap: 0.4rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__col-media .hrs-upload-dropzone,
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__col-media .hrs-upload-unified-drop {
+  min-height: 58px;
+  padding: 0.45rem 0.65rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__col-media .hrs-upload-dropzone-title {
+  font-size: 0.78rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__col-media .hrs-upload-dropzone-hint {
+  font-size: 0.68rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__col-media .hrs-upload-dropzone-icon {
+  font-size: 1.15rem;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__col-media .hrs-upload-gallery-grid--unified {
+  min-height: 64px;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__col-media .hrs-upload-gallery-item {
+  width: 64px;
+  height: 64px;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__col-spec .mt-3.p-3 {
+  margin-top: 0.4rem !important;
+  padding: 0.45rem 0.55rem !important;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__col-spec .mt-3.p-3 h6 {
+  margin-bottom: 0.25rem !important;
+  font-size: 0.75rem !important;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__col-spec .mt-3.p-3 > .small.text-muted {
+  display: none;
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .client-form-section-title {
   margin-bottom: 0.25rem;
+  padding-bottom: 0.25rem;
+  font-size: 0.85rem;
 }
 
-.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__col-media .hrs-upload-dropzone {
-  padding: 0.42rem 0.5rem;
-}
-
-.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__col-media .hrs-upload-dropzone--has-preview {
-  padding: 0.38rem 0.45rem;
-}
-
-.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__col-media .hrs-upload-gallery-drop {
-  min-height: 56px;
-}
-
-.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__col-media .hrs-upload-preview-thumb-wrap {
-  width: 56px;
-  height: 56px;
-}
-
-.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__col-media .hrs-upload-gallery-grid {
-  gap: 0.35rem;
-  margin-bottom: 0.35rem;
-}
-
-.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-detail-rows__list {
-  gap: 0.32rem;
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .fact-label {
+  margin-bottom: 0.15rem;
+  font-size: 0.72rem;
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-detail-rows__row {
-  padding: 0.32rem 0.45rem;
-  gap: 0.38rem 0.5rem;
+  padding: 0.28rem 0.35rem;
+}
+
+@media (max-height: 820px) {
+  .clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__col-media .hrs-upload-dropzone-hint {
+    display: none;
+  }
+  .clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-form__vitrina-callout-sub {
+    display: none;
+  }
+}
+
+.clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-detail-rows__list {
+  gap: 0.28rem;
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-detail-rows__icon-display {
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
 }
 
 .clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-detail-rows__icon-display .shelf-detail-strip__svg {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
 }
 
-/* Pantallas muy bajas: permitir scroll para no cortar contenido */
+/* Pantallas muy bajas: el modal sigue sin barra; el contenido se compacta más arriba */
 @media (max-height: 600px) {
-  .clientes-new-modal-content.hrs-equipo-asic-modal-content .modal-body.professional-modal-body {
-    overflow-y: auto;
+  .clientes-new-modal-content.hrs-equipo-asic-modal-content .modal-body.professional-modal-body,
+  .clientes-new-modal-content.hrs-equipo-asic-modal-content .hrs-equipo-asic-modal-body {
+    overflow-y: hidden !important;
   }
 }
 

@@ -1567,10 +1567,10 @@ export function EquiposAsicPage() {
           <Portal>
             <Dialog.Backdrop className="professional-modal-overlay" />
             <Dialog.Positioner>
-              <Box className="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable clientes-new-modal-dialog hrs-equipo-asic-modal-dialog">
+              <Box className="modal-dialog modal-dialog-centered modal-xl clientes-new-modal-dialog hrs-equipo-asic-modal-dialog">
                 <Dialog.Content
                   className="modal-content professional-modal professional-modal-form clientes-new-modal-content hrs-equipo-asic-modal-content"
-                  maxH="92dvh"
+                  maxH="100dvh"
                   display="flex"
                   flexDirection="column"
                   overflow="hidden"
@@ -1586,7 +1586,7 @@ export function EquiposAsicPage() {
                   </h5>
                   <CloseButton size="sm" className="professional-modal-close" onClick={dismissAddModal} aria-label="Cerrar" />
                 </div>
-                <div className="modal-body professional-modal-body" style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
+                <div className="modal-body professional-modal-body hrs-equipo-asic-modal-body">
                   <div className="hrs-equipo-asic-modal-form">
                     <div className="hrs-equipo-asic-modal-form__main">
                       <div className="client-form-column hrs-equipo-asic-modal-form__left">
