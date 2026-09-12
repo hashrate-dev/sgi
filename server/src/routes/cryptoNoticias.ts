@@ -407,9 +407,21 @@ function stripSourceSuffix(title: string, sourceName: string): string {
   return t.replace(new RegExp(`\\s*[-–—|]\\s*${escaped}\\s*$`, "i"), "").trim() || t;
 }
 
+function isTruncatedHeadline(title: string): boolean {
+  const t = title.trim();
+  if (!t) return true;
+  if (/[.…]\s*$/.test(t) && t.length < 180) return true;
+  return false;
+}
+
 function isSameBlurb(title: string, summary: string): boolean {
   const a = title.toLowerCase().replace(/[.…]+$/g, "").replace(/\s+/g, " ").trim();
-  const b = summary.toLowerCase().replace(/[.…]+$/g, "").replace(/\s+/g, " ").trim();
+  const b = summary
+    .toLowerCase()
+    .replace(/[.…]+$/g, "")
+    .replace(/\s*[-–—|]\s*[a-z0-9 .]{2,40}\s*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
   if (!b || b.length < 24) return true;
   if (a === b) return true;
   if (a.startsWith(b) || b.startsWith(a)) return true;
@@ -428,11 +440,13 @@ async function prepareTelegramCard(item: CryptoWireNewsItem): Promise<CryptoWire
   try {
     const preview = await fetchArticlePreview(publisher);
     if (preview.url) publisher = preview.url;
-    if (preview.title) originalTitle = stripSourceSuffix(preview.title, sourceName);
+    if (preview.title && (!originalTitle || isTruncatedHeadline(originalTitle) || preview.title.length > originalTitle.length)) {
+      originalTitle = stripSourceSuffix(preview.title, sourceName);
+    }
     if (preview.description && !isSameBlurb(originalTitle, preview.description)) {
       originalSummary = preview.description;
     } else if (isSameBlurb(originalTitle, originalSummary)) {
-      originalSummary = preview.description || "";
+      originalSummary = preview.description && !isSameBlurb(originalTitle, preview.description) ? preview.description : "";
     }
     if (preview.imageUrl && isAcceptableArticleImage(preview.imageUrl)) {
       imageUrl = preview.imageUrl;

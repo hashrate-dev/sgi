@@ -425,6 +425,23 @@ export async function resolvePublisherUrl(articleUrl: string, signal?: AbortSign
   if (!isGoogleNewsHost(host)) return articleUrl;
 
   try {
+    const alt = articleUrl.replace("/rss/articles/", "/articles/");
+    if (alt !== articleUrl) {
+      try {
+        const hop = await fetch(alt, {
+          signal: ctrl,
+          redirect: "follow",
+          headers: { "User-Agent": BROWSER_UA, Accept: "text/html" },
+        });
+        const landed = hop.url || "";
+        const lh = hostOf(landed);
+        if (landed && lh && !isGoogleNewsHost(lh) && !/(^|\.)google\./.test(lh)) {
+          return landed;
+        }
+      } catch {
+        /* batchexecute abajo */
+      }
+    }
     const resolved = await resolveGoogleNewsViaBatchexecute(articleUrl, ctrl);
     if (!resolved) return "";
     const rh = hostOf(resolved);
@@ -477,15 +494,105 @@ function metaTagContent(html: string, keys: string[]): string {
 }
 
 function firstArticleParagraph(html: string): string {
-  const re = /<p\b[^>]*>([\s\S]*?)<\/p>/gi;
+  const scoped =
+    html.match(/<article\b[\s\S]{200,180000}<\/article>/i)?.[0] ||
+    html.match(/itemprop=["']articleBody["'][\s\S]{200,180000}/i)?.[0] ||
+    html;
+  const re = /<(?:p|h2|div)[^>]*>([\s\S]*?)<\/(?:p|h2|div)>/gi;
   let m: RegExpExecArray | null;
-  while ((m = re.exec(html))) {
+  while ((m = re.exec(scoped))) {
     const t = decodeEntities(m[1] ?? "");
-    if (t.length < 70 || t.length > 700) continue;
-    if (/cookie|newsletter|subscribe|sign up|privacy|advertisement/i.test(t)) continue;
+    if (t.length < 40 || t.length > 900) continue;
+    if (
+      /cookie|newsletter|subscribe|sign up|privacy|advertisement|javascript|cloudflare|consent/i.test(
+        t
+      )
+    ) {
+      continue;
+    }
     return t;
   }
   return "";
+}
+
+function jsonLdImageUrl(imgRaw: unknown): string {
+  if (typeof imgRaw === "string") return imgRaw;
+  if (Array.isArray(imgRaw) && imgRaw[0]) return jsonLdImageUrl(imgRaw[0]);
+  if (imgRaw && typeof imgRaw === "object" && "url" in imgRaw) {
+    return String((imgRaw as { url?: unknown }).url || "");
+  }
+  return "";
+}
+
+function extractJsonLdPreview(html: string): { title: string; description: string; imageUrl: string } {
+  const none = { title: "", description: "", imageUrl: "" };
+  const re = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html))) {
+    try {
+      const raw = JSON.parse(m[1] ?? "");
+      const rec = raw as { "@graph"?: unknown[] };
+      const nodes: unknown[] = Array.isArray(raw) ? raw : rec["@graph"] ? rec["@graph"] : [raw];
+      for (const n of nodes) {
+        if (!n || typeof n !== "object") continue;
+        const node = n as Record<string, unknown>;
+        const t = String(node["@type"] || "");
+        if (!/article|news|blog|report/i.test(t) && !node.headline && !node.articleBody) continue;
+        const title = decodeEntities(String(node.headline || node.name || ""));
+        const description = decodeEntities(
+          String(node.description || node.articleBody || "").replace(/\s+/g, " ")
+        ).slice(0, 800);
+        const imageUrl = normalizeImageUrl(jsonLdImageUrl(node.image));
+        if (title || description || imageUrl) {
+          return { title, description, imageUrl };
+        }
+      }
+    } catch {
+      /* next block */
+    }
+  }
+  return none;
+}
+
+function isJunkPreviewTitle(t: string): boolean {
+  return /just a moment|attention required|access denied|enable javascript|are you a robot|cloudflare/i.test(
+    t
+  );
+}
+
+async function fetchJinaPreview(
+  articleUrl: string,
+  signal: AbortSignal
+): Promise<{ title: string; description: string; imageUrl: string }> {
+  const none = { title: "", description: "", imageUrl: "" };
+  if (!/^https?:\/\//i.test(articleUrl) || isGoogleNewsHost(hostOf(articleUrl))) return none;
+  try {
+    const res = await fetch(`https://r.jina.ai/${articleUrl}`, {
+      signal,
+      headers: {
+        Accept: "text/plain",
+        "User-Agent": BROWSER_UA,
+        "X-Retain-Images": "all",
+      },
+    });
+    if (!res.ok) return none;
+    const text = (await res.text()).slice(0, 40_000);
+    const title = decodeEntities(text.match(/^Title:\s*(.+)$/m)?.[1] || "").trim();
+    const md = text.split("Markdown Content:")[1] || text;
+    const img = md.match(/!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/)?.[1] || "";
+    const paras = md
+      .split(/\n+/)
+      .map((l) => decodeEntities(l.replace(/^#+\s*/, "").replace(/[*_]/g, "")).trim())
+      .filter((l) => l.length >= 50 && !/^title:/i.test(l) && !/^url source:/i.test(l));
+    const description = (paras.find((p) => p.length > 80) || paras[0] || "").slice(0, 800);
+    return {
+      title: isJunkPreviewTitle(title) ? "" : title.slice(0, 400),
+      description,
+      imageUrl: normalizeImageUrl(img),
+    };
+  } catch {
+    return none;
+  }
 }
 
 export type ArticlePreview = {
@@ -532,21 +639,32 @@ export async function fetchArticlePreview(articleUrl: string): Promise<ArticlePr
       /* microlink abajo */
     }
 
+    const jsonLd = html ? extractJsonLdPreview(html) : { title: "", description: "", imageUrl: "" };
     let title = html ? metaTagContent(html, ["og:title", "twitter:title"]) : "";
     if (!title && html) {
       title = decodeEntities(html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1] || "");
     }
+    if (!title) title = jsonLd.title;
+    if (isJunkPreviewTitle(title)) title = "";
     let description = html
       ? metaTagContent(html, ["og:description", "twitter:description", "description"])
       : "";
     if (!description && html) description = firstArticleParagraph(html);
+    if (!description) description = jsonLd.description;
     let imageUrl = html ? extractOgImageFromHtml(html) : "";
+    if (!imageUrl) imageUrl = jsonLd.imageUrl;
 
     if ((!title || !description || !imageUrl) && !ctrl.signal.aborted) {
       const extra = await fetchMicrolinkPreview(finalUrl || target, ctrl.signal);
       title = title || extra.title;
       description = description || extra.description;
       imageUrl = imageUrl || extra.imageUrl;
+    }
+    if ((!title || !description || !imageUrl) && !ctrl.signal.aborted) {
+      const jina = await fetchJinaPreview(finalUrl || target, ctrl.signal);
+      title = title || jina.title;
+      description = description || jina.description;
+      imageUrl = imageUrl || jina.imageUrl;
     }
 
     const pageUrl = isGoogleNewsHost(hostOf(finalUrl)) ? "" : finalUrl;

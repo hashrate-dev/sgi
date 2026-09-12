@@ -194,8 +194,8 @@ export function formatCryptoWireTelegramDigest(items: CryptoWireNewsItem[], opts
 
 /** Una tarjeta: foto arriba + caption como el ejemplo CoinDesk (título, fuente, texto, link). */
 export function formatCryptoWireArticleCaption(item: CryptoWireNewsItem): string {
-  const rawTitle = decodeNewsText(item.title);
-  const title = escapeTelegramHtml(rawTitle.length > 380 ? `${rawTitle.slice(0, 379)}…` : rawTitle);
+  const rawTitle = decodeNewsText(item.title).replace(/\s+/g, " ").trim();
+  const title = escapeTelegramHtml(rawTitle);
   const src = escapeTelegramHtml(clip(decodeNewsText(item.sourceName || ""), 80));
   const publisherUrl = isArticlePageUrl(item.publisherUrl || "")
     ? articleLink(item.publisherUrl)
@@ -227,7 +227,11 @@ export function formatCryptoWireArticleCaption(item: CryptoWireNewsItem): string
   }
   const summary = clip(blurb, budget);
   const mid = summary ? `\n\n${escapeTelegramHtml(summary)}` : "";
-  return `${head}${mid}${footer}`;
+  let caption = `${head}${mid}${footer}`;
+  if (caption.length > 1024) {
+    caption = `${head}${mid}`.slice(0, 1024);
+  }
+  return caption;
 }
 
 export function isTelegramChatMissingError(msg: string): boolean {
