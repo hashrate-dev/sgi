@@ -203,10 +203,12 @@ CREATE TABLE IF NOT EXISTS sgi_crypto_noticias_tg (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   enabled INTEGER NOT NULL DEFAULT 0,
   chat_id TEXT NOT NULL DEFAULT '',
+  extra_chat_ids TEXT NOT NULL DEFAULT '[]',
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 INSERT INTO sgi_crypto_noticias_tg (id, enabled, chat_id) VALUES (1, 0, '')
 ON CONFLICT (id) DO NOTHING;
+ALTER TABLE sgi_crypto_noticias_tg ADD COLUMN IF NOT EXISTS extra_chat_ids TEXT NOT NULL DEFAULT '[]';
 
 ALTER TABLE monitor_equipo_asic_baja ADD COLUMN IF NOT EXISTS garantia_ande_cliente_id INTEGER;
 ALTER TABLE monitor_equipo_asic_baja ADD COLUMN IF NOT EXISTS devolucion_monto_usd DOUBLE PRECISION;

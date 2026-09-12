@@ -199,36 +199,62 @@ export async function listRecentTelegramPrivateChats(limit = 8): Promise<
 
 export async function notifyCryptoWireTelegram(
   chatId: string,
-  items: CryptoWireNewsItem[]
+  items: CryptoWireNewsItem[],
+  opts?: { discover?: boolean }
 ): Promise<CryptoWireTelegramResult> {
   const list = items.filter((x) => String(x.title ?? "").trim());
   if (!list.length) return { sent: false, reason: "sin_items" };
-  let chat = normalizeTelegramChatId(chatId);
+  const chat = normalizeTelegramChatId(chatId);
   if (!botToken()) return { sent: false, reason: "faltan_credenciales" };
   const digest = formatCryptoWireTelegramDigest(list);
-
-  const trySend = async (id: string) => {
-    await sendTelegramText(id, digest);
-  };
+  const discover = opts?.discover !== false;
 
   if (chat) {
     try {
-      await trySend(chat);
+      await sendTelegramText(chat, digest);
       return { sent: true, chatId: chat };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      if (!isTelegramChatMissingError(msg)) throw e;
+      if (!discover || !isTelegramChatMissingError(msg)) throw e;
     }
   }
+
+  if (!discover) return { sent: false, reason: "chat_invalido", chatId: chat || undefined };
 
   const discovered = await listRecentTelegramPrivateChats(10);
   const fallback = discovered[0]?.chatId;
   if (fallback) {
-    await trySend(fallback);
+    await sendTelegramText(fallback, digest);
     return { sent: true, chatId: fallback };
   }
 
   const ident = await getTelegramBotIdentity().catch(() => null);
   const raw = chat ? "chat not found" : "chat_invalido";
   throw new Error(explainTelegramSendFailure(raw, ident?.username || getTelegramBotStatus().botUsernameHint));
+}
+
+export async function notifyCryptoWireTelegramMany(
+  chatIds: string[],
+  items: CryptoWireNewsItem[]
+): Promise<{ sent: number; failed: number; lastError?: string }> {
+  const ids = [...new Set(chatIds.map((x) => normalizeTelegramChatId(x)).filter(Boolean))];
+  if (!ids.length) return { sent: 0, failed: 0, lastError: "sin_chats" };
+  let sent = 0;
+  let failed = 0;
+  let lastError: string | undefined;
+  for (const id of ids) {
+    try {
+      const r = await notifyCryptoWireTelegram(id, items, { discover: false });
+      if (r.sent) sent += 1;
+      else {
+        failed += 1;
+        lastError = r.reason;
+      }
+    } catch (e) {
+      failed += 1;
+      lastError = e instanceof Error ? e.message : String(e);
+    }
+  }
+  if (sent === 0 && lastError) throw new Error(lastError);
+  return { sent, failed, lastError };
 }

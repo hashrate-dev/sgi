@@ -30,6 +30,7 @@ import {
   listRecentTelegramPrivateChats,
   normalizeTelegramChatId,
   notifyCryptoWireTelegram,
+  notifyCryptoWireTelegramMany,
   type CryptoWireNewsItem,
 } from "../lib/telegramWire.js";
 
@@ -256,35 +257,79 @@ async function ensureTelegramSettingsSchema(): Promise<void> {
   if (!row?.id) {
     await db.prepare("INSERT INTO sgi_crypto_noticias_tg (id, enabled, chat_id) VALUES (1, 0, '')").run();
   }
+  if (db.isPostgres) {
+    await db.prepare("ALTER TABLE sgi_crypto_noticias_tg ADD COLUMN IF NOT EXISTS extra_chat_ids TEXT NOT NULL DEFAULT '[]'").run();
+  } else {
+    try {
+      await db.prepare("ALTER TABLE sgi_crypto_noticias_tg ADD COLUMN extra_chat_ids TEXT NOT NULL DEFAULT '[]'").run();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!/duplicate column/i.test(msg)) throw e;
+    }
+  }
 }
 
 type WireTgSettings = {
   enabled: boolean;
   chatId: string;
+  chatIds: string[];
 };
+
+function uniqueTelegramChatIds(raw: unknown): string[] {
+  const list = Array.isArray(raw) ? raw : [raw];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const x of list) {
+    const id = normalizeTelegramChatId(String(x ?? "")).slice(0, 64);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+    if (out.length >= 20) break;
+  }
+  return out;
+}
+
+function parseExtraChatIds(raw: unknown): string[] {
+  const s = String(raw ?? "").trim();
+  if (!s) return [];
+  try {
+    const j = JSON.parse(s) as unknown;
+    if (Array.isArray(j)) return uniqueTelegramChatIds(j);
+  } catch {
+    /* comma list */
+  }
+  return uniqueTelegramChatIds(s.split(/[,\n;]+/));
+}
 
 async function loadWireTgSettings(): Promise<WireTgSettings> {
   await ensureTelegramSettingsSchema();
-  const row = (await db.prepare("SELECT enabled, chat_id FROM sgi_crypto_noticias_tg WHERE id = 1").get()) as
-    | { enabled?: number | boolean; chat_id?: string }
+  const row = (await db.prepare("SELECT enabled, chat_id, extra_chat_ids FROM sgi_crypto_noticias_tg WHERE id = 1").get()) as
+    | { enabled?: number | boolean; chat_id?: string; extra_chat_ids?: string }
     | undefined;
   const enabled = row?.enabled === true || Number(row?.enabled) === 1;
-  const fromDb = normalizeTelegramChatId(row?.chat_id);
-  const fallback = normalizeTelegramChatId(process.env.TELEGRAM_CHAT_ID);
-  return { enabled, chatId: fromDb || fallback };
+  const fromDb = uniqueTelegramChatIds([row?.chat_id, ...parseExtraChatIds(row?.extra_chat_ids)]);
+  const fallback = uniqueTelegramChatIds([process.env.TELEGRAM_CHAT_ID]);
+  const chatIds = fromDb.length ? fromDb : fallback;
+  return { enabled, chatId: chatIds[0] || "", chatIds };
 }
 
-async function saveWireTgSettings(next: { enabled: boolean; chatId: string }): Promise<WireTgSettings> {
+async function saveWireTgSettings(next: { enabled: boolean; chatId?: string; chatIds?: string[] }): Promise<WireTgSettings> {
   await ensureTelegramSettingsSchema();
-  const chatId = normalizeTelegramChatId(next.chatId).slice(0, 64);
+  const current = await loadWireTgSettings();
+  const chatIds =
+    next.chatIds != null
+      ? uniqueTelegramChatIds([...(next.chatIds ?? []), next.chatId ?? ""])
+      : uniqueTelegramChatIds([next.chatId ?? current.chatId, ...current.chatIds]);
+  const primary = chatIds[0] || "";
+  const extra = JSON.stringify(chatIds.slice(1));
   await db
     .prepare(
       `UPDATE sgi_crypto_noticias_tg
-       SET enabled = ?, chat_id = ?,
+       SET enabled = ?, chat_id = ?, extra_chat_ids = ?,
            updated_at = ${db.isPostgres ? "NOW()" : "datetime('now')"}
        WHERE id = 1`
     )
-    .run(next.enabled ? 1 : 0, chatId);
+    .run(next.enabled ? 1 : 0, primary, extra);
   return loadWireTgSettings();
 }
 
@@ -293,14 +338,13 @@ async function maybeNotifyWireTelegram(items: CryptoWireNewsItem[]): Promise<voi
   try {
     const settings = await loadWireTgSettings();
     if (!settings.enabled) return;
-    const chatId = settings.chatId;
-    if (!chatId) {
+    if (!settings.chatIds.length) {
       console.warn("[crypto-noticias] Telegram wire activo pero sin chat_id");
       return;
     }
-    const result = await notifyCryptoWireTelegram(chatId, items);
-    if (!result.sent) {
-      console.warn(`[crypto-noticias] Telegram wire omitido: ${result.reason || "unknown"}`);
+    const result = await notifyCryptoWireTelegramMany(settings.chatIds, items);
+    if (result.sent === 0) {
+      console.warn(`[crypto-noticias] Telegram wire omitido: ${result.lastError || "unknown"}`);
     }
   } catch (e) {
     console.error("[crypto-noticias] Telegram wire", e instanceof Error ? e.message : e);
@@ -795,7 +839,12 @@ cryptoNoticiasRouter.get("/crypto-noticias/live-prices", ...readMw, async (_req,
     const items = await fetchLiveCoinQuotes();
     res.json({ items, fetchedAt: new Date().toISOString() });
   } catch (e) {
-    next(e);
+    console.error("[crypto-noticias] live-prices", e instanceof Error ? e.message : e);
+    res.status(200).json({
+      items: [],
+      fetchedAt: new Date().toISOString(),
+      error: e instanceof Error ? e.message : "precios no disponibles",
+    });
   }
 });
 
