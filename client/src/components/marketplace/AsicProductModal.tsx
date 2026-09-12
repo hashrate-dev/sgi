@@ -43,24 +43,26 @@ function renderYieldLineParts(text: string): ReactNode {
 }
 
 /**
- * URLs únicas para miniaturas + hero.
- * - Tienda (marketplace): tarjeta + fotos de Inventario (galería).
- * - Inventario SGI: solo fotos de galería (sin mezclar la de tienda).
+ * URLs para miniaturas + hero.
+ * - Tienda (marketplace): tarjeta + Inventario (dedupe de repeticiones exactas).
+ * - Inventario SGI: todas las fotos de Inventario en orden (aunque una sea igual a Tienda).
  */
 function gallerySources(product: AsicProduct, inventoryMode: boolean): string[] {
   const fb = defaultAsicShelfImageSrc(product.brand, product.model);
   const fbUrl = fb ? normalizeMarketplaceImageSrc(fb) : "";
   const main = normalizeMarketplaceImageSrc(product.imageSrc ?? "");
-  const detail = dedupeGalleryUrls(
-    (product.gallerySrcs ?? []).map((x) => normalizeMarketplaceImageSrc(String(x))).filter(Boolean)
-  );
+  const detailRaw = (product.gallerySrcs ?? [])
+    .map((x) => normalizeMarketplaceImageSrc(String(x)))
+    .filter(Boolean);
 
   if (!inventoryMode) {
-    const combined = dedupeGalleryUrls([...(main ? [main] : []), ...detail]);
+    const combined = dedupeGalleryUrls([...(main ? [main] : []), ...detailRaw]);
     if (combined.length > 0) return capProductModalThumbUrls(combined);
     return capProductModalThumbUrls(fbUrl ? [fbUrl] : []);
   }
 
+  // Ficha SGI: no dedupe por nombre de archivo vs Tienda — mostrar las N de Inventario.
+  const detail = dedupeGalleryUrls(detailRaw);
   if (detail.length > 0) return capProductModalThumbUrls(detail);
   if (main) return capProductModalThumbUrls([main]);
   return capProductModalThumbUrls(fbUrl ? [fbUrl] : []);

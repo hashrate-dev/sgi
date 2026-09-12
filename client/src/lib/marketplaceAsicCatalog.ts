@@ -381,14 +381,12 @@ export function normalizeAsicProductImages(product: AsicProduct): AsicProduct {
   let gallerySrcs = dedupeGalleryUrls(
     (product.gallerySrcs ?? []).map((g) => normalizeMarketplaceImageSrc(g)).filter(Boolean)
   );
-  if (gallerySrcs.length > 1 && shelfFb) {
+  if (gallerySrcs.length > 0 && shelfFb) {
     gallerySrcs = gallerySrcs.filter((u) => u !== shelfFb);
   }
-  if (gallerySrcs.length > 1 && imageSrc) {
-    const mainKey = galleryFileKey(imageSrc);
-    const withoutMainDup = gallerySrcs.filter((u) => galleryFileKey(u) !== mainKey);
-    if (withoutMainDup.length > 0) gallerySrcs = withoutMainDup;
-  }
+  // No quitar fotos de Inventario que coincidan con la de Tienda: en la ficha SGI
+  // la galería es la fuente de verdad (puede repetir la de tienda a propósito).
+  // El modal de marketplace ya deduplica al combinar tarjeta + galería.
   gallerySrcs = capProductGalleryUrls(gallerySrcs);
   return {
     ...product,
