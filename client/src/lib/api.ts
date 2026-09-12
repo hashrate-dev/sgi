@@ -2234,31 +2234,36 @@ export function deleteCryptoNoticiaMedio(id: number): Promise<{ ok: boolean }> {
   return api(`/api/crypto-noticias/medios/${id}`, { method: "DELETE" });
 }
 
-export type CryptoNoticiasWhatsAppSettings = {
+export type CryptoNoticiasTelegramSettings = {
   enabled: boolean;
-  phoneDigits: string;
-  channel: "callmebot" | "meta_template" | "none";
-  cloudReady: boolean;
-  callMeBotReady: boolean;
-  defaultNotifyTo?: string;
-  newsTemplateName?: string;
-  newsTemplateLang?: string;
+  chatId: string;
+  tokenConfigured: boolean;
+  botUsername?: string | null;
+  defaultChatId?: string | null;
   readyToSend: boolean;
 };
 
-export function getCryptoNoticiasWhatsApp(): Promise<CryptoNoticiasWhatsAppSettings> {
-  return api("/api/crypto-noticias/whatsapp");
+export function getCryptoNoticiasTelegram(): Promise<CryptoNoticiasTelegramSettings> {
+  return api("/api/crypto-noticias/telegram");
 }
 
-export function putCryptoNoticiasWhatsApp(body: {
+export function putCryptoNoticiasTelegram(body: {
   enabled: boolean;
-  phoneDigits?: string | null;
-}): Promise<CryptoNoticiasWhatsAppSettings & { ok: boolean }> {
-  return api("/api/crypto-noticias/whatsapp", { method: "PUT", body: JSON.stringify(body) });
+  chatId?: string | null;
+}): Promise<CryptoNoticiasTelegramSettings & { ok: boolean }> {
+  return api("/api/crypto-noticias/telegram", { method: "PUT", body: JSON.stringify(body) });
 }
 
-export function testCryptoNoticiasWhatsApp(): Promise<{ ok: boolean; via: string }> {
-  return api("/api/crypto-noticias/whatsapp/test", { method: "POST", body: "{}" });
+export function testCryptoNoticiasTelegram(): Promise<{ ok: boolean; via: string }> {
+  return api("/api/crypto-noticias/telegram/test", { method: "POST", body: "{}" });
+}
+
+export function detectCryptoNoticiasTelegramChats(): Promise<{
+  ok: boolean;
+  chats: Array<{ chatId: string; name: string; username?: string }>;
+  hint?: string;
+}> {
+  return api("/api/crypto-noticias/telegram/chats");
 }
 
 export type GarantiasItemsResponse = { items: import("./types.js").ItemGarantiaAnde[] };

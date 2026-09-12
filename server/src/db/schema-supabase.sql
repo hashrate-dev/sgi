@@ -199,13 +199,13 @@ CREATE TABLE IF NOT EXISTS sgi_crypto_noticias_medios (
 );
 CREATE INDEX IF NOT EXISTS idx_sgi_crypto_noticias_medios_enabled ON sgi_crypto_noticias_medios(enabled, id);
 
-CREATE TABLE IF NOT EXISTS sgi_crypto_noticias_wa (
+CREATE TABLE IF NOT EXISTS sgi_crypto_noticias_tg (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   enabled INTEGER NOT NULL DEFAULT 0,
-  phone_digits TEXT NOT NULL DEFAULT '',
+  chat_id TEXT NOT NULL DEFAULT '',
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-INSERT INTO sgi_crypto_noticias_wa (id, enabled, phone_digits) VALUES (1, 0, '')
+INSERT INTO sgi_crypto_noticias_tg (id, enabled, chat_id) VALUES (1, 0, '')
 ON CONFLICT (id) DO NOTHING;
 
 ALTER TABLE monitor_equipo_asic_baja ADD COLUMN IF NOT EXISTS garantia_ande_cliente_id INTEGER;

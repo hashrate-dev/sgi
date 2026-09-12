@@ -285,8 +285,8 @@ export function CryptoNoticiasPage() {
                 type="button"
                 className="crypto-news-config-btn"
                 onClick={() => setMediosOpen(true)}
-                aria-label="Configuración de medios y WhatsApp"
-                title="Medios RSS y avisos WhatsApp"
+                aria-label="Configuración de medios y Telegram"
+                title="Medios RSS y avisos Telegram"
               >
                 <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
                   <path

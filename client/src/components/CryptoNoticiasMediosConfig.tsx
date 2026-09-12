@@ -2,14 +2,15 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   createCryptoNoticiaMedio,
   deleteCryptoNoticiaMedio,
+  detectCryptoNoticiasTelegramChats,
   getCryptoNoticiasMedios,
-  getCryptoNoticiasWhatsApp,
-  putCryptoNoticiasWhatsApp,
-  testCryptoNoticiasWhatsApp,
+  getCryptoNoticiasTelegram,
+  putCryptoNoticiasTelegram,
+  testCryptoNoticiasTelegram,
   updateCryptoNoticiaMedio,
   type CryptoNoticiaMedio,
   type CryptoNoticiaTopic,
-  type CryptoNoticiasWhatsAppSettings,
+  type CryptoNoticiasTelegramSettings,
 } from "../lib/api";
 
 type Props = {
@@ -30,11 +31,12 @@ const TOPIC_OPTS: Array<{ id: CryptoNoticiaTopic; label: string }> = [
   { id: "uruguay", label: "Cripto Uruguay" },
 ];
 
-function channelLabel(s: CryptoNoticiasWhatsAppSettings | null): string {
+function channelLabel(s: CryptoNoticiasTelegramSettings | null): string {
   if (!s) return "…";
-  if (s.channel === "callmebot") return "CallMeBot (texto libre)";
-  if (s.channel === "meta_template") return `Meta · plantilla ${s.newsTemplateName || "nueva_noticia_wire"}`;
-  return "Sin canal (faltan credenciales en el servidor)";
+  if (s.tokenConfigured) {
+    return s.botUsername ? `Telegram @${s.botUsername}` : "Telegram Bot API";
+  }
+  return "Sin bot (falta TELEGRAM_BOT_TOKEN en el servidor)";
 }
 
 export function CryptoNoticiasMediosConfig({ canEdit, open, onClose }: Props) {
@@ -50,21 +52,23 @@ export function CryptoNoticiasMediosConfig({ canEdit, open, onClose }: Props) {
   const [topics, setTopics] = useState<CryptoNoticiaTopic[]>(["cripto"]);
   const [saving, setSaving] = useState(false);
 
-  const [wa, setWa] = useState<CryptoNoticiasWhatsAppSettings | null>(null);
-  const [waEnabled, setWaEnabled] = useState(false);
-  const [waPhone, setWaPhone] = useState("");
-  const [waSaving, setWaSaving] = useState(false);
-  const [waTesting, setWaTesting] = useState(false);
+  const [tg, setTg] = useState<CryptoNoticiasTelegramSettings | null>(null);
+  const [tgEnabled, setTgEnabled] = useState(false);
+  const [tgChatId, setTgChatId] = useState("");
+  const [tgSaving, setTgSaving] = useState(false);
+  const [tgTesting, setTgTesting] = useState(false);
+  const [tgDetecting, setTgDetecting] = useState(false);
+  const [tgChats, setTgChats] = useState<Array<{ chatId: string; name: string; username?: string }>>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setErr("");
     try {
-      const [r, waRes] = await Promise.all([getCryptoNoticiasMedios(), getCryptoNoticiasWhatsApp()]);
+      const [r, tgRes] = await Promise.all([getCryptoNoticiasMedios(), getCryptoNoticiasTelegram()]);
       setItems(r.items || []);
-      setWa(waRes);
-      setWaEnabled(Boolean(waRes.enabled));
-      setWaPhone(waRes.phoneDigits || "");
+      setTg(tgRes);
+      setTgEnabled(Boolean(tgRes.enabled));
+      setTgChatId(tgRes.chatId || "");
     } catch (e) {
       setErr(e instanceof Error ? e.message : "No se pudo cargar la configuración de medios.");
     } finally {
@@ -172,47 +176,70 @@ export function CryptoNoticiasMediosConfig({ canEdit, open, onClose }: Props) {
     }
   };
 
-  const onSaveWhatsApp = async () => {
+  const onSaveTelegram = async () => {
     if (!canEdit) return;
-    setWaSaving(true);
+    setTgSaving(true);
     setErr("");
     setOk("");
     try {
-      const r = await putCryptoNoticiasWhatsApp({ enabled: waEnabled, phoneDigits: waPhone });
-      setWa(r);
-      setWaEnabled(Boolean(r.enabled));
-      setWaPhone(r.phoneDigits || "");
+      const r = await putCryptoNoticiasTelegram({ enabled: tgEnabled, chatId: tgChatId });
+      setTg(r);
+      setTgEnabled(Boolean(r.enabled));
+      setTgChatId(r.chatId || "");
       setOk(
         r.enabled
           ? r.readyToSend
-            ? "WhatsApp del wire guardado. Las noticias nuevas del bot se enviarán a ese número."
-            : "Guardado, pero el servidor aún no tiene canal WhatsApp (CallMeBot o Meta)."
-          : "Avisos WhatsApp del wire desactivados."
+            ? "Telegram del wire guardado. Las noticias nuevas del bot se enviarán a ese chat."
+            : "Guardado, pero falta TELEGRAM_BOT_TOKEN en el servidor (Vercel)."
+          : "Avisos Telegram del wire desactivados."
       );
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "No se pudo guardar WhatsApp.");
+      setErr(e instanceof Error ? e.message : "No se pudo guardar Telegram.");
     } finally {
-      setWaSaving(false);
+      setTgSaving(false);
     }
   };
 
-  const onTestWhatsApp = async () => {
+  const onTestTelegram = async () => {
     if (!canEdit) return;
-    setWaTesting(true);
+    setTgTesting(true);
     setErr("");
     setOk("");
     try {
-      await putCryptoNoticiasWhatsApp({ enabled: waEnabled || true, phoneDigits: waPhone });
-      const r = await testCryptoNoticiasWhatsApp();
-      setOk(`Prueba enviada por ${r.via === "callmebot" ? "CallMeBot" : "Meta"}. Revisá WhatsApp.`);
-      const refreshed = await getCryptoNoticiasWhatsApp();
-      setWa(refreshed);
-      setWaEnabled(Boolean(refreshed.enabled));
-      setWaPhone(refreshed.phoneDigits || "");
+      await putCryptoNoticiasTelegram({ enabled: tgEnabled || true, chatId: tgChatId });
+      await testCryptoNoticiasTelegram();
+      setOk("Prueba enviada por Telegram. Revisá el chat del bot.");
+      const refreshed = await getCryptoNoticiasTelegram();
+      setTg(refreshed);
+      setTgEnabled(Boolean(refreshed.enabled));
+      setTgChatId(refreshed.chatId || "");
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Falló la prueba de WhatsApp.");
+      setErr(e instanceof Error ? e.message : "Falló la prueba de Telegram.");
     } finally {
-      setWaTesting(false);
+      setTgTesting(false);
+    }
+  };
+
+  const onDetectTelegramChats = async () => {
+    if (!canEdit) return;
+    setTgDetecting(true);
+    setErr("");
+    setOk("");
+    try {
+      const r = await detectCryptoNoticiasTelegramChats();
+      setTgChats(r.chats || []);
+      if (r.chats?.[0]?.chatId && !tgChatId.trim()) {
+        setTgChatId(r.chats[0].chatId);
+      }
+      setOk(
+        r.chats?.length
+          ? `Detecté ${r.chats.length} chat(s). Elegí uno o dejá el Chat ID cargado.`
+          : r.hint || "No hay chats todavía: abrí el bot y mandale /start."
+      );
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "No se pudieron detectar chats.");
+    } finally {
+      setTgDetecting(false);
     }
   };
 
@@ -268,76 +295,102 @@ export function CryptoNoticiasMediosConfig({ canEdit, open, onClose }: Props) {
             <p className="text-muted small mb-0">Cargando medios…</p>
           ) : (
             <>
-              <section className="crypto-news-wa" aria-label="WhatsApp wire">
-                <h3 className="crypto-news-medios__add-title">WhatsApp · avisos del bot</h3>
+              <section className="crypto-news-tg" aria-label="Telegram wire">
+                <h3 className="crypto-news-medios__add-title">Telegram · avisos del bot</h3>
                 <p className="crypto-news-medios__lead" style={{ marginBottom: "0.75rem" }}>
                   Cuando el bot carga noticias <strong>nuevas</strong> (manual, cron o auto), te manda un
-                  resumen a este número. No reenvía el historial viejo.
+                  resumen a este chat. No reenvía el historial viejo.
                 </p>
-                <div className="crypto-news-wa__status">
-                  <span className={`crypto-news-medios__badge${wa?.readyToSend ? " is-ok" : " is-no"}`}>
-                    {wa?.readyToSend ? "Listo para enviar" : "Pendiente"}
+                <div className="crypto-news-tg__status">
+                  <span className={`crypto-news-medios__badge${tg?.readyToSend ? " is-ok" : " is-no"}`}>
+                    {tg?.readyToSend ? "Listo para enviar" : "Pendiente"}
                   </span>
-                  <span className="crypto-news-medios__badge is-manual">{channelLabel(wa)}</span>
+                  <span className="crypto-news-medios__badge is-manual">{channelLabel(tg)}</span>
                 </div>
                 {canEdit ? (
                   <div className="row g-2 align-items-end">
                     <div className="col-12">
-                      <label className="crypto-news-wa__check">
+                      <label className="crypto-news-tg__check">
                         <input
                           type="checkbox"
-                          checked={waEnabled}
-                          disabled={waSaving || waTesting}
-                          onChange={(e) => setWaEnabled(e.target.checked)}
+                          checked={tgEnabled}
+                          disabled={tgSaving || tgTesting || tgDetecting}
+                          onChange={(e) => setTgEnabled(e.target.checked)}
                         />
-                        <span>Enviar noticias nuevas del bot por WhatsApp</span>
+                        <span>Enviar noticias nuevas del bot por Telegram</span>
                       </label>
                     </div>
                     <div className="col-12 col-md-6">
-                      <label className="form-label small mb-1" htmlFor="crypto-wa-phone">
-                        Número (código país, solo dígitos)
+                      <label className="form-label small mb-1" htmlFor="crypto-tg-chat">
+                        Chat ID
                       </label>
                       <input
-                        id="crypto-wa-phone"
+                        id="crypto-tg-chat"
                         className="form-control form-control-sm"
-                        inputMode="numeric"
-                        placeholder="595991907308"
-                        value={waPhone}
-                        disabled={waSaving || waTesting}
-                        onChange={(e) => setWaPhone(e.target.value.replace(/[^\d+\s-]/g, ""))}
+                        placeholder="Ej. 123456789"
+                        value={tgChatId}
+                        disabled={tgSaving || tgTesting || tgDetecting}
+                        onChange={(e) => setTgChatId(e.target.value.trim())}
                       />
                     </div>
                     <div className="col-12 col-md-6 d-flex flex-wrap gap-2">
                       <button
                         type="button"
                         className="btn btn-success btn-sm"
-                        disabled={waSaving || waTesting}
-                        onClick={() => void onSaveWhatsApp()}
+                        disabled={tgSaving || tgTesting || tgDetecting}
+                        onClick={() => void onSaveTelegram()}
                       >
-                        {waSaving ? "Guardando…" : "Guardar WhatsApp"}
+                        {tgSaving ? "Guardando…" : "Guardar Telegram"}
                       </button>
                       <button
                         type="button"
                         className="btn btn-outline-light btn-sm"
-                        disabled={waSaving || waTesting || waPhone.replace(/\D/g, "").length < 8}
-                        onClick={() => void onTestWhatsApp()}
+                        disabled={tgSaving || tgTesting || tgDetecting || !tgChatId.trim()}
+                        onClick={() => void onTestTelegram()}
                       >
-                        {waTesting ? "Enviando…" : "Enviar prueba"}
+                        {tgTesting ? "Enviando…" : "Enviar prueba"}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline-info btn-sm"
+                        disabled={tgSaving || tgTesting || tgDetecting}
+                        onClick={() => void onDetectTelegramChats()}
+                      >
+                        {tgDetecting ? "Detectando…" : "Detectar chats"}
                       </button>
                     </div>
+                    {tgChats.length > 0 ? (
+                      <div className="col-12">
+                        <div className="crypto-news-tg__chats" role="list">
+                          {tgChats.map((c) => (
+                            <button
+                              key={c.chatId}
+                              type="button"
+                              className="btn btn-sm btn-outline-secondary"
+                              onClick={() => setTgChatId(c.chatId)}
+                              title={c.chatId}
+                            >
+                              {c.name}
+                              {c.username ? ` (@${c.username})` : ""} · {c.chatId}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                     <div className="col-12">
-                      <p className="crypto-news-wa__hint mb-0">
-                        Canal preferido: <code>WHATSAPP_CALLMEBOT_APIKEY</code> (texto libre, lo más simple).
-                        Si no está, usa Meta Cloud + plantilla <code>nueva_noticia_wire</code>. Detalle en{" "}
-                        <code>server/docs/WHATSAPP_WIRE.md</code>.
+                      <p className="crypto-news-tg__hint mb-0">
+                        1) Creá un bot con <code>@BotFather</code> → token. 2) En Vercel:{" "}
+                        <code>TELEGRAM_BOT_TOKEN</code> (+ opcional <code>TELEGRAM_BOT_USERNAME</code>). 3)
+                        Abrí el bot, mandá <code>/start</code>, tocá «Detectar chats» o pegá el Chat ID. Detalle
+                        en <code>server/docs/TELEGRAM_WIRE.md</code>.
                       </p>
                     </div>
                   </div>
                 ) : (
                   <p className="text-muted small mb-0">
-                    {waEnabled
-                      ? `Avisos activos hacia …${(waPhone || "").slice(-4) || "????"}.`
-                      : "Avisos WhatsApp desactivados."}
+                    {tgEnabled
+                      ? `Avisos activos hacia chat ${tgChatId || "—"}.`
+                      : "Avisos Telegram desactivados."}
                   </p>
                 )}
               </section>

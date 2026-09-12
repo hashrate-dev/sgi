@@ -131,19 +131,13 @@ export const env: Env = EnvSchema.parse(process.env);
       "[whatsapp] Avisos de órdenes (marketplace): no configurados. Definí en .env: WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_NOTIFY_TO (y plantilla en Meta; ver server/docs/WHATSAPP_MARKETPLACE.md)."
     );
   }
-  const callme = process.env.WHATSAPP_CALLMEBOT_APIKEY?.trim();
-  if (callme) {
+  if (process.env.TELEGRAM_BOT_TOKEN?.trim()) {
     // eslint-disable-next-line no-console
-    console.log("[whatsapp] Wire cripto: CallMeBot disponible (ver server/docs/WHATSAPP_WIRE.md).");
-  } else if (tok && pid) {
-    // eslint-disable-next-line no-console
-    console.log(
-      "[whatsapp] Wire cripto: Meta Cloud listo; plantilla nueva_noticia_wire + toggle en sala de redacción (WHATSAPP_WIRE.md)."
-    );
+    console.log("[telegram] Wire cripto: bot token OK (ver server/docs/TELEGRAM_WIRE.md).");
   } else {
     // eslint-disable-next-line no-console
     console.log(
-      "[whatsapp] Wire cripto: sin canal. Preferí WHATSAPP_CALLMEBOT_APIKEY o Meta Cloud (server/docs/WHATSAPP_WIRE.md)."
+      "[telegram] Wire cripto: sin TELEGRAM_BOT_TOKEN. Creá un bot con @BotFather y cargá el token en Vercel (server/docs/TELEGRAM_WIRE.md)."
     );
   }
 })();

@@ -24,10 +24,12 @@ import { requireAuth, requireRole } from "../middleware/auth.js";
 import { requireModuleGrant } from "../middleware/moduleGrant.js";
 import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
 import {
-  getWhatsAppCloudStatus,
-  notifyCryptoWireWhatsApp,
+  getTelegramBotStatus,
+  listRecentTelegramPrivateChats,
+  normalizeTelegramChatId,
+  notifyCryptoWireTelegram,
   type CryptoWireNewsItem,
-} from "../lib/whatsappCloud.js";
+} from "../lib/telegramWire.js";
 
 export const cryptoNoticiasRouter = Router();
 
@@ -120,7 +122,7 @@ async function ensureCryptoNoticiasSchema(): Promise<void> {
     .prepare("CREATE INDEX IF NOT EXISTS idx_sgi_crypto_noticias_fetched ON sgi_crypto_noticias(fetched_at DESC)")
     .run();
   await ensureMediosSchema();
-  await ensureWaSettingsSchema();
+  await ensureTelegramSettingsSchema();
   await purgeBlockedNewsSources();
   await purgeJunkNewsImages();
   schemaEnsured = true;
@@ -222,14 +224,14 @@ async function purgeJunkNewsImages(): Promise<void> {
   }
 }
 
-async function ensureWaSettingsSchema(): Promise<void> {
+async function ensureTelegramSettingsSchema(): Promise<void> {
   if (db.isPostgres) {
     await db
       .prepare(
-        `CREATE TABLE IF NOT EXISTS sgi_crypto_noticias_wa (
+        `CREATE TABLE IF NOT EXISTS sgi_crypto_noticias_tg (
           id INTEGER PRIMARY KEY CHECK (id = 1),
           enabled INTEGER NOT NULL DEFAULT 0,
-          phone_digits TEXT NOT NULL DEFAULT '',
+          chat_id TEXT NOT NULL DEFAULT '',
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )`
       )
@@ -237,69 +239,69 @@ async function ensureWaSettingsSchema(): Promise<void> {
   } else {
     await db
       .prepare(
-        `CREATE TABLE IF NOT EXISTS sgi_crypto_noticias_wa (
+        `CREATE TABLE IF NOT EXISTS sgi_crypto_noticias_tg (
           id INTEGER PRIMARY KEY CHECK (id = 1),
           enabled INTEGER NOT NULL DEFAULT 0,
-          phone_digits TEXT NOT NULL DEFAULT '',
+          chat_id TEXT NOT NULL DEFAULT '',
           updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         )`
       )
       .run();
   }
-  const row = (await db.prepare("SELECT id FROM sgi_crypto_noticias_wa WHERE id = 1").get()) as
+  const row = (await db.prepare("SELECT id FROM sgi_crypto_noticias_tg WHERE id = 1").get()) as
     | { id?: number }
     | undefined;
   if (!row?.id) {
-    await db.prepare("INSERT INTO sgi_crypto_noticias_wa (id, enabled, phone_digits) VALUES (1, 0, '')").run();
+    await db.prepare("INSERT INTO sgi_crypto_noticias_tg (id, enabled, chat_id) VALUES (1, 0, '')").run();
   }
 }
 
-type WireWaSettings = {
+type WireTgSettings = {
   enabled: boolean;
-  phoneDigits: string;
+  chatId: string;
 };
 
-async function loadWireWaSettings(): Promise<WireWaSettings> {
+async function loadWireTgSettings(): Promise<WireTgSettings> {
   await ensureCryptoNoticiasSchema();
-  const row = (await db.prepare("SELECT enabled, phone_digits FROM sgi_crypto_noticias_wa WHERE id = 1").get()) as
-    | { enabled?: number | boolean; phone_digits?: string }
+  const row = (await db.prepare("SELECT enabled, chat_id FROM sgi_crypto_noticias_tg WHERE id = 1").get()) as
+    | { enabled?: number | boolean; chat_id?: string }
     | undefined;
   const enabled = row?.enabled === true || Number(row?.enabled) === 1;
-  const fromDb = String(row?.phone_digits ?? "").replace(/\D/g, "");
-  const fallback = (process.env.WHATSAPP_NOTIFY_TO || "").replace(/\D/g, "");
-  return { enabled, phoneDigits: fromDb || fallback };
+  const fromDb = normalizeTelegramChatId(row?.chat_id);
+  const fallback = normalizeTelegramChatId(process.env.TELEGRAM_CHAT_ID);
+  return { enabled, chatId: fromDb || fallback };
 }
 
-async function saveWireWaSettings(next: { enabled: boolean; phoneDigits: string }): Promise<WireWaSettings> {
+async function saveWireTgSettings(next: { enabled: boolean; chatId: string }): Promise<WireTgSettings> {
   await ensureCryptoNoticiasSchema();
-  const phone = next.phoneDigits.replace(/\D/g, "").slice(0, 20);
+  const chatId = normalizeTelegramChatId(next.chatId).slice(0, 64);
   await db
     .prepare(
-      `UPDATE sgi_crypto_noticias_wa
-       SET enabled = ?, phone_digits = ?,
+      `UPDATE sgi_crypto_noticias_tg
+       SET enabled = ?, chat_id = ?,
            updated_at = ${db.isPostgres ? "NOW()" : "datetime('now')"}
        WHERE id = 1`
     )
-    .run(next.enabled ? 1 : 0, phone);
-  return loadWireWaSettings();
+    .run(next.enabled ? 1 : 0, chatId);
+  return loadWireTgSettings();
 }
 
-async function maybeNotifyWireWhatsApp(items: CryptoWireNewsItem[]): Promise<void> {
+async function maybeNotifyWireTelegram(items: CryptoWireNewsItem[]): Promise<void> {
   if (!items.length) return;
   try {
-    const settings = await loadWireWaSettings();
+    const settings = await loadWireTgSettings();
     if (!settings.enabled) return;
-    const to = settings.phoneDigits;
-    if (to.length < 8) {
-      console.warn("[crypto-noticias] WhatsApp wire activo pero sin teléfono válido");
+    const chatId = settings.chatId;
+    if (!chatId) {
+      console.warn("[crypto-noticias] Telegram wire activo pero sin chat_id");
       return;
     }
-    const result = await notifyCryptoWireWhatsApp(to, items);
+    const result = await notifyCryptoWireTelegram(chatId, items);
     if (!result.sent) {
-      console.warn(`[crypto-noticias] WhatsApp wire omitido: ${result.reason || result.via}`);
+      console.warn(`[crypto-noticias] Telegram wire omitido: ${result.reason || "unknown"}`);
     }
   } catch (e) {
-    console.error("[crypto-noticias] WhatsApp wire", e instanceof Error ? e.message : e);
+    console.error("[crypto-noticias] Telegram wire", e instanceof Error ? e.message : e);
   }
 }
 
@@ -695,7 +697,7 @@ async function runIngest(): Promise<{ inserted: number; scanned: number; feedErr
   );
 
   if (insertedForWa.length > 0) {
-    void maybeNotifyWireWhatsApp(insertedForWa);
+    void maybeNotifyWireTelegram(insertedForWa);
   }
 
   return { inserted, scanned: drafts.length, feedErrors: feedErrors.length };
@@ -932,84 +934,68 @@ cryptoNoticiasRouter.post("/crypto-noticias/refresh", ...writeMw, async (_req, r
   }
 });
 
-const waSettingsSchema = z.object({
+const tgSettingsSchema = z.object({
   enabled: z.boolean(),
-  phoneDigits: z.string().max(32).optional().nullable(),
+  chatId: z.string().max(64).optional().nullable(),
 });
 
-cryptoNoticiasRouter.get("/crypto-noticias/whatsapp", ...readMw, async (_req, res, next) => {
+function telegramSettingsPayload(settings: { enabled: boolean; chatId: string }) {
+  const bot = getTelegramBotStatus();
+  return {
+    enabled: settings.enabled,
+    chatId: settings.chatId,
+    tokenConfigured: bot.tokenConfigured,
+    botUsername: bot.botUsernameHint || null,
+    defaultChatId: bot.defaultChatId || null,
+    readyToSend: settings.enabled && Boolean(settings.chatId) && bot.tokenConfigured,
+  };
+}
+
+cryptoNoticiasRouter.get("/crypto-noticias/telegram", ...readMw, async (_req, res, next) => {
   try {
-    const settings = await loadWireWaSettings();
-    const cloud = getWhatsAppCloudStatus();
-    const channel = cloud.callMeBotKeyConfigured
-      ? "callmebot"
-      : cloud.cloudReady
-        ? "meta_template"
-        : "none";
-    res.json({
-      enabled: settings.enabled,
-      phoneDigits: settings.phoneDigits,
-      channel,
-      cloudReady: cloud.cloudReady,
-      callMeBotReady: cloud.callMeBotKeyConfigured,
-      defaultNotifyTo: cloud.defaultNotifyTo,
-      newsTemplateName: cloud.newsTemplateName,
-      newsTemplateLang: cloud.newsTemplateLang,
-      readyToSend: settings.enabled && settings.phoneDigits.length >= 8 && channel !== "none",
-    });
+    const settings = await loadWireTgSettings();
+    res.json(telegramSettingsPayload(settings));
   } catch (e) {
     next(e);
   }
 });
 
-cryptoNoticiasRouter.put("/crypto-noticias/whatsapp", ...writeMw, async (req, res, next) => {
+cryptoNoticiasRouter.put("/crypto-noticias/telegram", ...writeMw, async (req, res, next) => {
   try {
-    const parsed = waSettingsSchema.safeParse(req.body ?? {});
+    const parsed = tgSettingsSchema.safeParse(req.body ?? {});
     if (!parsed.success) {
       return res.status(400).json({ error: { message: "Datos inválidos." } });
     }
-    const phoneRaw = parsed.data.phoneDigits != null ? String(parsed.data.phoneDigits) : "";
-    const phoneDigits = phoneRaw.replace(/\D/g, "").slice(0, 20);
-    if (parsed.data.enabled && phoneDigits.length < 8) {
+    const chatId = normalizeTelegramChatId(parsed.data.chatId != null ? String(parsed.data.chatId) : "");
+    if (parsed.data.enabled && !chatId) {
       return res.status(400).json({
-        error: { message: "Indicá un número WhatsApp con código de país (solo dígitos, ej. 595991907308)." },
+        error: {
+          message:
+            "Indicá el Chat ID de Telegram (número que te da el bot tras /start, o usá «Detectar chats»).",
+        },
       });
     }
-    const saved = await saveWireWaSettings({
+    const saved = await saveWireTgSettings({
       enabled: parsed.data.enabled,
-      phoneDigits,
+      chatId,
     });
-    const cloud = getWhatsAppCloudStatus();
-    const channel = cloud.callMeBotKeyConfigured
-      ? "callmebot"
-      : cloud.cloudReady
-        ? "meta_template"
-        : "none";
-    res.json({
-      ok: true,
-      enabled: saved.enabled,
-      phoneDigits: saved.phoneDigits,
-      channel,
-      cloudReady: cloud.cloudReady,
-      callMeBotReady: cloud.callMeBotKeyConfigured,
-      readyToSend: saved.enabled && saved.phoneDigits.length >= 8 && channel !== "none",
-    });
+    res.json({ ok: true, ...telegramSettingsPayload(saved) });
   } catch (e) {
     next(e);
   }
 });
 
-cryptoNoticiasRouter.post("/crypto-noticias/whatsapp/test", ...writeMw, async (_req, res, next) => {
+cryptoNoticiasRouter.post("/crypto-noticias/telegram/test", ...writeMw, async (_req, res, next) => {
   try {
-    const settings = await loadWireWaSettings();
-    if (settings.phoneDigits.length < 8) {
+    const settings = await loadWireTgSettings();
+    if (!settings.chatId) {
       return res.status(400).json({
-        error: { message: "Guardá primero un número WhatsApp válido (con código de país)." },
+        error: { message: "Guardá primero un Chat ID de Telegram." },
       });
     }
-    const result = await notifyCryptoWireWhatsApp(settings.phoneDigits, [
+    const result = await notifyCryptoWireTelegram(settings.chatId, [
       {
-        title: "Prueba Wire HRS — si ves esto, el aviso de noticias ya funciona",
+        title: "Prueba Wire HRS — si ves esto, el aviso de noticias por Telegram ya funciona",
         sourceName: "SGI Hashrate",
         url: "https://hashrate.space/gestion-administrativa/noticias",
       },
@@ -1017,11 +1003,33 @@ cryptoNoticiasRouter.post("/crypto-noticias/whatsapp/test", ...writeMw, async (_
     if (!result.sent) {
       const hint =
         result.reason === "faltan_credenciales"
-          ? "Falta WHATSAPP_CALLMEBOT_APIKEY o el par WHATSAPP_ACCESS_TOKEN + WHATSAPP_PHONE_NUMBER_ID en el servidor."
+          ? "Falta TELEGRAM_BOT_TOKEN en el servidor (Vercel → Environment Variables)."
           : result.reason || "No se pudo enviar";
-      return res.status(400).json({ error: { message: hint }, via: result.via });
+      return res.status(400).json({ error: { message: hint } });
     }
-    res.json({ ok: true, via: result.via });
+    res.json({ ok: true, via: "telegram" });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(502).json({ error: { message: msg } });
+  }
+});
+
+cryptoNoticiasRouter.get("/crypto-noticias/telegram/chats", ...writeMw, async (_req, res, next) => {
+  try {
+    if (!getTelegramBotStatus().tokenConfigured) {
+      return res.status(400).json({
+        error: { message: "Falta TELEGRAM_BOT_TOKEN en el servidor." },
+      });
+    }
+    const chats = await listRecentTelegramPrivateChats(10);
+    res.json({
+      ok: true,
+      chats,
+      hint:
+        chats.length === 0
+          ? "Abrí el bot en Telegram, tocá Start / enviá cualquier mensaje, y volvé a detectar."
+          : undefined,
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     res.status(502).json({ error: { message: msg } });
