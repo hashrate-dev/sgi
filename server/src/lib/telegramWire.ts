@@ -1,7 +1,4 @@
-/**
- * Telegram Bot API: avisos del Wire cripto (texto libre).
- * https://core.telegram.org/bots/api#sendmessage
- */
+import { looksLikeEnglish } from "./cryptoNoticiasTranslate.js";
 
 export type CryptoWireNewsItem = {
   title: string;
@@ -9,6 +6,8 @@ export type CryptoWireNewsItem = {
   sourceName?: string;
   url?: string;
   imageUrl?: string;
+  /** Link pasa por Google Translate (EN → ES); en el traductor se puede ver el original. */
+  readTranslated?: boolean;
 };
 
 export type TelegramBotStatus = {
@@ -38,6 +37,26 @@ function articleLink(raw?: string): string {
   if (!/^https?:\/\//i.test(url)) return "";
   if (/hashrate\.space\/gestion-administrativa\/noticias/i.test(url)) return "";
   return url;
+}
+
+/**
+ * Noticia en inglés → abre el medio vía Google Translate (español),
+ * con la barra para volver al texto original. Si ya está en español, link directo.
+ */
+export function wireArticleOpenUrl(
+  articleUrl: string,
+  originalTitle: string,
+  originalSummary = ""
+): { url: string; readTranslated: boolean } {
+  const url = articleLink(articleUrl);
+  if (!url) return { url: "", readTranslated: false };
+  if (/translate\.google\./i.test(url) || /translatetheweb\.com/i.test(url)) {
+    return { url, readTranslated: true };
+  }
+  const english = looksLikeEnglish(originalTitle) || looksLikeEnglish(originalSummary);
+  if (!english) return { url, readTranslated: false };
+  const wrapped = `https://translate.google.com/translate?hl=es&sl=en&tl=es&u=${encodeURIComponent(url)}`;
+  return { url: wrapped, readTranslated: true };
 }
 
 export type CryptoWireTelegramResult = {
@@ -76,6 +95,7 @@ export function formatCryptoWireTelegramDigest(items: CryptoWireNewsItem[], opts
     const title = clip(it.title.replace(/\s+/g, " "), 160);
     const url = articleLink(it.url);
     return [`${i + 1}) ${title}${src ? ` (${clip(src, 40)})` : ""}`, url].filter(Boolean).join("\n");
+    return [`${i + 1}) ${title}${src ? ` (${clip(src, 40)})` : ""}`, url].filter(Boolean).join("\n");
   });
   if (extra > 0) blocks.push(`+${extra} más`);
   return [`📡 Wire cripto HRS · ${list.length} nueva${list.length === 1 ? "" : "s"}`, "", ...blocks].join("\n");
@@ -84,7 +104,8 @@ export function formatCryptoWireTelegramDigest(items: CryptoWireNewsItem[], opts
 /** Caption / cuerpo de una noticia: foto arriba (sendPhoto), título, descripción y link al artículo. */
 export function formatCryptoWireArticleHtml(item: CryptoWireNewsItem): string {
   const url = articleLink(item.url);
-  const footer = url ? `\n\nLeer la noticia:\n${escapeTelegramHtml(url)}` : "";
+  const readLabel = item.readTranslated ? "Leer en español:" : "Leer la noticia:";
+  const footer = url ? `\n\n${readLabel}\n${escapeTelegramHtml(url)}` : "";
   const src = clip(String(item.sourceName ?? "").trim(), 60);
   const title = escapeTelegramHtml(clip(String(item.title ?? "").replace(/\s+/g, " ").trim(), 220));
   const head = `<b>${title}</b>${src ? `\n<i>${escapeTelegramHtml(src)}</i>` : ""}`;

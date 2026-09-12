@@ -32,6 +32,7 @@ import {
   notifyCryptoWireTelegram,
   notifyCryptoWireTelegramArticleMany,
   notifyCryptoWireTelegramMany,
+  wireArticleOpenUrl,
   type CryptoWireNewsItem,
 } from "../lib/telegramWire.js";
 
@@ -785,7 +786,11 @@ async function runIngest(): Promise<{ inserted: number; scanned: number; feedErr
       const changes = Number((info as { changes?: number })?.changes ?? 0);
       if (changes > 0) {
         inserted += 1;
-        insertedForWa.push({ title: d.title, sourceName: d.sourceName, url: d.url });
+        insertedForWa.push({
+          title: d.title,
+          sourceName: d.sourceName,
+          ...wireArticleOpenUrl(d.url, d.title, d.summary),
+        });
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -1210,6 +1215,8 @@ cryptoNoticiasRouter.post("/crypto-noticias/telegram/send-item", ...writeMw, asy
     if (!claimed) {
       return res.status(409).json({ error: { message: "Esta noticia ya se envió a Telegram." } });
     }
+    const originalTitle = String(row.title || "").trim();
+    const originalSummary = String(row.summary || "").trim();
     const title = String(row.title_es || row.title || "").trim();
     const url = String(row.url || "").trim();
     if (!title) {
@@ -1229,13 +1236,15 @@ cryptoNoticiasRouter.post("/crypto-noticias/telegram/send-item", ...writeMw, asy
         /* sin foto: el mensaje igual sale con título, texto y link */
       }
     }
+    const open = wireArticleOpenUrl(url, originalTitle, originalSummary);
     try {
       const result = await notifyCryptoWireTelegramArticleMany(dest, {
         title,
         summary: String(row.summary_es || row.summary || "").trim(),
         sourceName: String(row.source_name || "").trim(),
-        url,
+        url: open.url,
         imageUrl,
+        readTranslated: open.readTranslated,
       });
       res.json({ ok: true, via: "telegram", sentTo: result.sent, ...telegramSettingsPayload(settings) });
     } catch (sendErr) {
@@ -1262,18 +1271,23 @@ cryptoNoticiasRouter.post("/crypto-noticias/telegram/send-latest", ...writeMw, a
     await ensureCryptoNoticiasSchema();
     const rows = (await db
       .prepare(
-        `SELECT title, title_es, source_name, url
+        `SELECT title, title_es, summary, source_name, url
          FROM sgi_crypto_noticias
          ORDER BY published_at DESC, id DESC
          LIMIT 5`
       )
-      .all()) as Array<{ title?: string; title_es?: string; source_name?: string; url?: string }>;
+      .all()) as Array<{ title?: string; title_es?: string; summary?: string; source_name?: string; url?: string }>;
     const items = rows
-      .map((r) => ({
-        title: String(r.title_es || r.title || "").trim(),
-        sourceName: String(r.source_name || "").trim(),
-        url: String(r.url || "").trim(),
-      }))
+      .map((r) => {
+        const originalTitle = String(r.title || "").trim();
+        const open = wireArticleOpenUrl(String(r.url || "").trim(), originalTitle, String(r.summary || ""));
+        return {
+          title: String(r.title_es || r.title || "").trim(),
+          sourceName: String(r.source_name || "").trim(),
+          url: open.url,
+          readTranslated: open.readTranslated,
+        };
+      })
       .filter((x) => x.title);
     if (!items.length) {
       return res.status(400).json({
