@@ -3,10 +3,8 @@ import type { AsicProduct } from "../../lib/marketplaceAsicCatalog.js";
 import {
   asicProductShowsMinerEconomyContent,
   asicProductIsOutOfStock,
-  capProductGalleryUrls,
   dedupeGalleryUrls,
   defaultAsicShelfImageSrc,
-  galleryFileKey,
   normalizeMarketplaceImageSrc,
   formatAsicPriceUsd,
   formatAsicProductPriceDisplay,
@@ -43,25 +41,17 @@ function renderYieldLineParts(text: string): ReactNode {
   );
 }
 
-/** URLs únicas para miniaturas + hero; sin duplicar la principal ni el fallback de catálogo. */
+/** URLs únicas para miniaturas + hero: tarjeta primero, luego detalle (sin perder la principal). */
 function gallerySources(product: AsicProduct): string[] {
   const fb = defaultAsicShelfImageSrc(product.brand, product.model);
   const fbUrl = fb ? normalizeMarketplaceImageSrc(fb) : "";
   const main = normalizeMarketplaceImageSrc(product.imageSrc ?? "");
-  let g = dedupeGalleryUrls(
+  const detail = dedupeGalleryUrls(
     (product.gallerySrcs ?? []).map((x) => normalizeMarketplaceImageSrc(String(x))).filter(Boolean)
   );
-  if (fbUrl && g.length > 0) g = g.filter((u) => u !== fbUrl);
-  if (g.length > 0) {
-    if (main) {
-      const mainKey = galleryFileKey(main);
-      const withoutMainDup = g.filter((u) => galleryFileKey(u) !== mainKey);
-      if (withoutMainDup.length > 0) g = withoutMainDup;
-    }
-    return capProductGalleryUrls(g);
-  }
-  if (main) return capProductGalleryUrls(main === fbUrl || !fbUrl ? [main] : [main, fbUrl]);
-  return capProductGalleryUrls(fbUrl ? [fbUrl] : []);
+  const merged = dedupeGalleryUrls([main, ...detail].filter(Boolean)).filter((u) => !fbUrl || u !== fbUrl);
+  if (merged.length > 0) return capProductModalThumbUrls(merged);
+  return capProductModalThumbUrls(fbUrl ? [fbUrl] : []);
 }
 
 export function AsicProductModal({
@@ -144,7 +134,7 @@ export function AsicProductModal({
   }, [mailText.body]);
 
   const thumbs = useMemo(
-    () => (galleryLoading ? [] : capProductGalleryUrls(gallerySources(product))),
+    () => (galleryLoading ? [] : gallerySources(product)),
     [product, galleryLoading]
   );
   const shelfFallbackSrc = useMemo(

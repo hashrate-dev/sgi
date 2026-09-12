@@ -159,12 +159,20 @@ export function resolveMarketplaceListingKind(p: AsicListingTitleFields): Market
   return inferMinerListingFromTitles(p.brand, p.model) ? "miner" : "infrastructure";
 }
 
-/** Máximo de miniaturas en el modal de producto (vitrina). */
+/** Máximo de fotos de detalle (sin contar la imagen de tarjeta). */
 export const MARKETPLACE_PRODUCT_GALLERY_MAX = 4;
 
-/** Recorta la galería al máximo visible en el modal. */
+/** Máximo de miniaturas en el modal: tarjeta + detalle. */
+export const MARKETPLACE_PRODUCT_MODAL_THUMBS_MAX = MARKETPLACE_PRODUCT_GALLERY_MAX + 1;
+
+/** Recorta la galería al máximo de fotos de detalle. */
 export function capProductGalleryUrls(urls: string[]): string[] {
   return urls.slice(0, MARKETPLACE_PRODUCT_GALLERY_MAX);
+}
+
+/** Recorta thumbs del modal (incluye imagen principal + galería). */
+export function capProductModalThumbUrls(urls: string[]): string[] {
+  return urls.slice(0, MARKETPLACE_PRODUCT_MODAL_THUMBS_MAX);
 }
 
 /** Rendimiento estimado + bloque hosting del modal solo para fichas tipo minero. */
