@@ -1054,6 +1054,49 @@ cryptoNoticiasRouter.post("/crypto-noticias/telegram/test", ...writeMw, async (r
   }
 });
 
+cryptoNoticiasRouter.post("/crypto-noticias/telegram/send-latest", ...writeMw, async (_req, res, next) => {
+  try {
+    const settings = await loadWireTgSettings();
+    if (!settings.enabled || !settings.chatId) {
+      return res.status(400).json({
+        error: { message: "Activá Telegram, guardá el Chat ID y después enviá las últimas." },
+      });
+    }
+    await ensureCryptoNoticiasSchema();
+    const rows = (await db
+      .prepare(
+        `SELECT title, title_es, source_name, url
+         FROM sgi_crypto_noticias
+         ORDER BY published_at DESC, id DESC
+         LIMIT 5`
+      )
+      .all()) as Array<{ title?: string; title_es?: string; source_name?: string; url?: string }>;
+    const items = rows
+      .map((r) => ({
+        title: String(r.title_es || r.title || "").trim(),
+        sourceName: String(r.source_name || "").trim(),
+        url: String(r.url || "").trim(),
+      }))
+      .filter((x) => x.title);
+    if (!items.length) {
+      return res.status(400).json({
+        error: { message: "No hay noticias en el historial todavía. Tocá «Actualizar bot ahora»." },
+      });
+    }
+    const result = await notifyCryptoWireTelegram(settings.chatId, items);
+    if (!result.sent) {
+      return res.status(400).json({ error: { message: result.reason || "No se pudo enviar" } });
+    }
+    res.json({ ok: true, via: "telegram", sent: items.length, ...telegramSettingsPayload(settings) });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const ident = await getTelegramBotIdentity().catch(() => null);
+    res.status(502).json({
+      error: { message: explainTelegramSendFailure(msg, ident?.username || getTelegramBotStatus().botUsernameHint) },
+    });
+  }
+});
+
 cryptoNoticiasRouter.get("/crypto-noticias/telegram/chats", ...writeMw, async (_req, res, next) => {
   try {
     if (!getTelegramBotStatus().tokenConfigured) {

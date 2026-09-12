@@ -6,6 +6,7 @@ import {
   getCryptoNoticiasMedios,
   getCryptoNoticiasTelegram,
   putCryptoNoticiasTelegram,
+  sendLatestCryptoNoticiasTelegram,
   testCryptoNoticiasTelegram,
   updateCryptoNoticiaMedio,
   type CryptoNoticiaMedio,
@@ -57,6 +58,7 @@ export function CryptoNoticiasMediosConfig({ canEdit, open, onClose }: Props) {
   const [tgChatId, setTgChatId] = useState("");
   const [tgSaving, setTgSaving] = useState(false);
   const [tgTesting, setTgTesting] = useState(false);
+  const [tgSendingLatest, setTgSendingLatest] = useState(false);
   const [tgDetecting, setTgDetecting] = useState(false);
   const [tgChats, setTgChats] = useState<Array<{ chatId: string; name: string; username?: string }>>([]);
 
@@ -218,6 +220,21 @@ export function CryptoNoticiasMediosConfig({ canEdit, open, onClose }: Props) {
     }
   };
 
+  const onSendLatestTelegram = async () => {
+    if (!canEdit) return;
+    setTgSendingLatest(true);
+    setErr("");
+    setOk("");
+    try {
+      const r = await sendLatestCryptoNoticiasTelegram();
+      setOk(`Envié ${r.sent} titular(es) del wire a Telegram.`);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "No se pudieron enviar las últimas noticias.");
+    } finally {
+      setTgSendingLatest(false);
+    }
+  };
+
   const onDetectTelegramChats = async () => {
     if (!canEdit) return;
     setTgDetecting(true);
@@ -343,10 +360,18 @@ export function CryptoNoticiasMediosConfig({ canEdit, open, onClose }: Props) {
                       <button
                         type="button"
                         className="btn btn-outline-light btn-sm"
-                        disabled={tgSaving || tgTesting || tgDetecting || !tgChatId.trim()}
+                        disabled={tgSaving || tgTesting || tgDetecting || tgSendingLatest || !tgChatId.trim()}
                         onClick={() => void onTestTelegram()}
                       >
                         {tgTesting ? "Enviando…" : "Enviar prueba"}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline-success btn-sm"
+                        disabled={tgSaving || tgTesting || tgDetecting || tgSendingLatest || !tgChatId.trim()}
+                        onClick={() => void onSendLatestTelegram()}
+                      >
+                        {tgSendingLatest ? "Enviando…" : "Enviar últimas noticias"}
                       </button>
                       <button
                         type="button"

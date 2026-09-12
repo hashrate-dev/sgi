@@ -2292,6 +2292,14 @@ export function testCryptoNoticiasTelegram(body?: {
   });
 }
 
+export function sendLatestCryptoNoticiasTelegram(): Promise<{
+  ok: boolean;
+  via: string;
+  sent: number;
+} & CryptoNoticiasTelegramSettings> {
+  return apiTelegramOnce("/api/crypto-noticias/telegram/send-latest", { method: "POST", body: "{}" });
+}
+
 export function detectCryptoNoticiasTelegramChats(): Promise<{
   ok: boolean;
   chats: Array<{ chatId: string; name: string; username?: string }>;
