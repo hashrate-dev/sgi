@@ -27,7 +27,7 @@ import type { EquipoASIC } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
 import { AsicCotizadorCatalogSelect } from "../components/AsicCotizadorCatalogSelect";
 import { EquipoAsicDashboardCard } from "../components/equipos/EquipoAsicDashboardCard";
-import { CardImageUploadField, GalleryImagesUploadField, collectMarketplaceImageLibrary } from "../components/equipos/MarketplaceImageUploadFields";
+import { MarketplaceAnuncioPhotosField, collectMarketplaceImageLibrary } from "../components/equipos/MarketplaceImageUploadFields";
 import { MarketplaceDetailRowsEditor, sanitizeDetailRowsForApi } from "../components/equipos/MarketplaceDetailRowsEditor";
 import { AsicProductModal } from "../components/marketplace/AsicProductModal";
 import { PrecioHistorialFullModal } from "../components/equipos/PrecioHistorialFullModal";
@@ -2106,17 +2106,15 @@ export function EquiposAsicPage() {
                           <div className="client-form-column hrs-equipo-asic-modal-form__col-media">
                             <div className="hrs-equipo-asic-modal-form__media-panel">
                               <p className="hrs-equipo-asic-modal-form__media-panel-title">Fotos del anuncio</p>
-                              <CardImageUploadField
-                                value={formData.marketplaceImageSrc}
-                                onChange={(marketplaceImageSrc) => setFormData({ ...formData, marketplaceImageSrc })}
-                                disabled={!canEditTienda}
+                              <MarketplaceAnuncioPhotosField
+                                cardSrc={formData.marketplaceImageSrc}
+                                onCardChange={(marketplaceImageSrc) => setFormData({ ...formData, marketplaceImageSrc })}
+                                galleryLines={formData.marketplaceGalleryLines}
+                                onGalleryLinesChange={(marketplaceGalleryLines) =>
+                                  setFormData({ ...formData, marketplaceGalleryLines })
+                                }
                                 library={marketplaceImageLibrary}
-                              />
-                              <GalleryImagesUploadField
-                                lines={formData.marketplaceGalleryLines}
-                                onLinesChange={(marketplaceGalleryLines) => setFormData({ ...formData, marketplaceGalleryLines })}
                                 disabled={!canEditTienda}
-                                library={marketplaceImageLibrary}
                               />
                             </div>
                           </div>

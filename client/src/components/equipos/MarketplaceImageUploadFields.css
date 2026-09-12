@@ -243,9 +243,101 @@
   margin: 0.25rem 0 0.5rem;
 }
 
-.hrs-upload-reuse-btn {
-  margin-top: 0.5rem;
+.hrs-upload-unified {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.hrs-upload-slots {
+  display: grid;
+  grid-template-columns: minmax(110px, 140px) minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: start;
+}
+
+@media (max-width: 560px) {
+  .hrs-upload-slots {
+    grid-template-columns: 1fr;
+  }
+}
+
+.hrs-upload-slot-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 650;
+  color: #4b5563;
+  margin-bottom: 0.35rem;
+}
+
+.hrs-upload-slot-thumb {
+  position: relative;
   width: 100%;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.hrs-upload-slot-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.hrs-upload-slot-empty {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  border: 1px dashed #d1d5db;
+  background: #f9fafb;
+  color: #9ca3af;
+  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0.5rem;
+}
+
+.hrs-upload-gallery-grid--unified {
+  margin-bottom: 0;
+  min-height: 88px;
+}
+
+.hrs-upload-make-card {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(45, 93, 70, 0.92);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 650;
+  padding: 0.2rem 0.35rem;
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.hrs-upload-make-card:hover {
+  background: #244a39;
+}
+
+.hrs-upload-unified-drop {
+  min-height: 96px;
+}
+
+.hrs-upload-unified-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.hrs-upload-unified-actions .hrs-upload-btn {
+  flex: 1 1 140px;
   justify-content: center;
 }
 
