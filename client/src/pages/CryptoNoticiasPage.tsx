@@ -217,15 +217,20 @@ export function CryptoNoticiasPage() {
   const topicLabels = TOPIC_LABEL;
 
   const onSendNewsTelegram = async (n: CryptoNoticiaItem) => {
-    if (!canEdit) return;
+    if (!canEdit || n.telegramSent) return;
     setSendingId(n.id);
     setErr("");
     setOk("");
     try {
       await sendCryptoNoticiaTelegram(n.id);
+      setItems((prev) => prev.map((it) => (it.id === n.id ? { ...it, telegramSent: true } : it)));
       setOk(`Enviada a Telegram: ${n.title}`);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "No se pudo enviar esa noticia a Telegram.");
+      const msg = e instanceof Error ? e.message : "No se pudo enviar esa noticia a Telegram.";
+      if (/ya se envió/i.test(msg)) {
+        setItems((prev) => prev.map((it) => (it.id === n.id ? { ...it, telegramSent: true } : it)));
+      }
+      setErr(msg);
     } finally {
       setSendingId(null);
     }
@@ -431,11 +436,15 @@ export function CryptoNoticiasPage() {
                       {canEdit ? (
                         <button
                           type="button"
-                          className="crypto-news-send-tg"
-                          disabled={sendingId != null}
+                          className={`crypto-news-send-tg${n.telegramSent ? " crypto-news-send-tg--sent" : ""}`}
+                          disabled={sendingId != null || Boolean(n.telegramSent)}
                           onClick={() => void onSendNewsTelegram(n)}
                         >
-                          {sendingId === n.id ? "Enviando…" : "Enviar a Telegram"}
+                          {n.telegramSent
+                            ? "Ya enviada"
+                            : sendingId === n.id
+                              ? "Enviando…"
+                              : "Enviar a Telegram"}
                         </button>
                       ) : null}
                     </div>

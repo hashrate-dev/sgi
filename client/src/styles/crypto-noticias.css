@@ -1015,6 +1015,15 @@
   cursor: wait;
 }
 
+.crypto-news-send-tg--sent,
+.crypto-news-send-tg--sent:disabled {
+  opacity: 0.85;
+  cursor: default;
+  border-color: rgba(140, 160, 170, 0.35);
+  background: rgba(80, 95, 105, 0.2);
+  color: #a8b8c0;
+}
+
 .crypto-news-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -59,6 +59,7 @@ type NewsRowMapped = {
   topics: CryptoNoticiaTopic[];
   publishedAt: string;
   fetchedAt: string;
+  telegramSent?: boolean;
 };
 
 async function ensureCryptoNoticiasSchema(): Promise<void> {
@@ -267,6 +268,53 @@ async function ensureTelegramSettingsSchema(): Promise<void> {
       if (!/duplicate column/i.test(msg)) throw e;
     }
   }
+  if (db.isPostgres) {
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS sgi_crypto_noticias_tg_sent (
+          noticia_id BIGINT PRIMARY KEY,
+          sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`
+      )
+      .run();
+  } else {
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS sgi_crypto_noticias_tg_sent (
+          noticia_id INTEGER PRIMARY KEY,
+          sent_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )`
+      )
+      .run();
+  }
+}
+
+async function loadManualTelegramSentIds(ids: number[]): Promise<Set<number>> {
+  const uniq = [...new Set(ids.filter((n) => Number.isFinite(n) && n > 0))];
+  if (!uniq.length) return new Set();
+  await ensureTelegramSettingsSchema();
+  const placeholders = uniq.map(() => "?").join(",");
+  const rows = (await db
+    .prepare(`SELECT noticia_id FROM sgi_crypto_noticias_tg_sent WHERE noticia_id IN (${placeholders})`)
+    .all(...uniq)) as Array<{ noticia_id?: number }>;
+  return new Set(rows.map((r) => Number(r.noticia_id)).filter((n) => Number.isFinite(n) && n > 0));
+}
+
+async function claimManualTelegramSend(id: number): Promise<boolean> {
+  await ensureTelegramSettingsSchema();
+  try {
+    await db.prepare("INSERT INTO sgi_crypto_noticias_tg_sent (noticia_id) VALUES (?)").run(id);
+    return true;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/unique|duplicate|primary key/i.test(msg)) return false;
+    throw e;
+  }
+}
+
+async function unclaimManualTelegramSend(id: number): Promise<void> {
+  await ensureTelegramSettingsSchema();
+  await db.prepare("DELETE FROM sgi_crypto_noticias_tg_sent WHERE noticia_id = ?").run(id);
 }
 
 type WireTgSettings = {
@@ -538,6 +586,7 @@ function presentItem(row: NewsRowMapped, lang: NewsLang) {
       fetchedAt: row.fetchedAt,
       lang,
       translated: okTitle,
+      telegramSent: Boolean(row.telegramSent),
     };
   }
   const title = lang === "pt" ? row.titlePt || row.title : row.title;
@@ -554,6 +603,7 @@ function presentItem(row: NewsRowMapped, lang: NewsLang) {
     fetchedAt: row.fetchedAt,
     lang,
     translated: lang === "en" ? false : Boolean(row.titlePt),
+    telegramSent: Boolean(row.telegramSent),
   };
 }
 
@@ -945,6 +995,10 @@ cryptoNoticiasRouter.get("/crypto-noticias", ...readMw, async (req, res, next) =
     for (const it of items) {
       if (it.imageUrl && !isAcceptableArticleImage(it.imageUrl)) it.imageUrl = "";
     }
+    const sentIds = await loadManualTelegramSentIds(items.map((x) => x.id));
+    for (const it of items) {
+      it.telegramSent = sentIds.has(it.id);
+    }
 
     // Burst corto de traducción (≤2s) para lo visible; el resto en background.
     if (lang === "es" || lang === "pt") {
@@ -1129,19 +1183,29 @@ cryptoNoticiasRouter.post("/crypto-noticias/telegram/send-item", ...writeMw, asy
     if (!row) {
       return res.status(404).json({ error: { message: "No encontré esa noticia." } });
     }
+    const claimed = await claimManualTelegramSend(parsed.data.id);
+    if (!claimed) {
+      return res.status(409).json({ error: { message: "Esta noticia ya se envió a Telegram." } });
+    }
     const title = String(row.title_es || row.title || "").trim();
     const url = String(row.url || "").trim();
     if (!title) {
+      await unclaimManualTelegramSend(parsed.data.id);
       return res.status(400).json({ error: { message: "Esa noticia no tiene título." } });
     }
-    const result = await notifyCryptoWireTelegramMany(dest, [
-      {
-        title: url ? `${title}\n${url}` : title,
-        sourceName: String(row.source_name || "").trim(),
-        url,
-      },
-    ]);
-    res.json({ ok: true, via: "telegram", sentTo: result.sent, ...telegramSettingsPayload(settings) });
+    try {
+      const result = await notifyCryptoWireTelegramMany(dest, [
+        {
+          title: url ? `${title}\n${url}` : title,
+          sourceName: String(row.source_name || "").trim(),
+          url,
+        },
+      ]);
+      res.json({ ok: true, via: "telegram", sentTo: result.sent, ...telegramSettingsPayload(settings) });
+    } catch (sendErr) {
+      await unclaimManualTelegramSend(parsed.data.id);
+      throw sendErr;
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     const ident = await getTelegramBotIdentity().catch(() => null);

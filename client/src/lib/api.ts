@@ -2087,6 +2087,7 @@ export type CryptoNoticiaItem = {
   fetchedAt: string;
   lang?: "es" | "pt" | "en";
   translated?: boolean;
+  telegramSent?: boolean;
 };
 
 export function getCryptoNoticiasMeta(): Promise<{
