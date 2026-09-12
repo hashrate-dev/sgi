@@ -271,8 +271,9 @@ function mpPayloadFromBody(d: z.infer<typeof EquipoBodySchema>) {
     mp_visible: mpVisibleToInt(vis),
     mp_algo: vis ? resolveMarketplaceAlgoForPersist(d) : null,
     mp_hashrate_display: null,
-    mp_image_src: vis ? (d.marketplaceImageSrc?.trim() || null) : null,
-    mp_gallery_json: vis ? (d.marketplaceGalleryJson?.trim() || null) : null,
+    // Fotos se guardan siempre: la de tarjeta alimenta la tienda; la galería (logo Hashrate) la ficha SGI.
+    mp_image_src: d.marketplaceImageSrc?.trim() || null,
+    mp_gallery_json: d.marketplaceGalleryJson?.trim() || null,
     mp_detail_rows_json: vis ? (d.marketplaceDetailRowsJson?.trim() || null) : null,
     mp_yield_json: vis ? (d.marketplaceYieldJson?.trim() || null) : null,
     mp_sort_order: vis ? sort : 0,

@@ -7,6 +7,7 @@ import {
   normalizeConsultPriceLabelForDisplay,
   publicImageUrl,
 } from "../../lib/marketplaceAsicCatalog";
+import { HASHRATE_SPACE_LOGO_WHITE } from "../../lib/marketplaceWpAssets";
 import { AsicDetailSvg } from "../marketplace/AsicDetailIcon";
 import { parseDetailRowsJson } from "./MarketplaceDetailRowsEditor";
 
@@ -34,7 +35,8 @@ type Props = {
 };
 
 /**
- * Tarjeta visual estilo vitrina para el listado de gestión (/marketplacedashboard).
+ * Tarjeta visual estilo vitrina para el listado de gestión (/asic/equipment).
+ * En SGI se prioriza la foto con logo Hashrate (galería); si solo hay tarjeta de tienda, se superpone el logo.
  */
 export function EquipoAsicDashboardCard({ equipo: e, canEdit, onDetail, onEdit, onDelete }: Props) {
   const explicit = e.marketplaceImageSrc?.trim() ?? "";
@@ -55,6 +57,12 @@ export function EquipoAsicDashboardCard({ equipo: e, canEdit, onDetail, onEdit, 
 
   const src = imgSrc;
   const hasPhoto = Boolean(preferred.trim()) && !imgBroken;
+  const brandUrl = inventoryBrand ? publicImageUrl(inventoryBrand) : "";
+  /**
+   * Si la tarjeta muestra la foto de tienda (sin watermark), superpone el logo Hashrate.
+   * Si ya muestra la de galería (con logo), no duplicar.
+   */
+  const showHrsMark = hasPhoto && (!brandUrl || src !== brandUrl);
   const detailRows = parseDetailRowsJson(e.marketplaceDetailRowsJson ?? "")
     .filter((r) => r.text.trim())
     .slice(0, 4);
@@ -98,6 +106,15 @@ export function EquipoAsicDashboardCard({ equipo: e, canEdit, onDetail, onEdit, 
                 }}
               />
             )}
+            {showHrsMark ? (
+              <img
+                className="hrs-asic-dash-card__hrs-mark"
+                src={HASHRATE_SPACE_LOGO_WHITE}
+                alt=""
+                aria-hidden
+                decoding="async"
+              />
+            ) : null}
           </button>
         </div>
       </div>
