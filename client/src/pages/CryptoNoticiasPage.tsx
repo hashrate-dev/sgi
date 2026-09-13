@@ -95,17 +95,32 @@ function isPublishedToday(iso: string): boolean {
   );
 }
 
-/** Abre el artículo traducido al español (Google Translate). */
+/** Abre el artículo en el medio. Nunca Google Translate: CoinDesk y otros quedan colgados en translate.goog. */
 function newsOpenUrl(url: string): string {
   const raw = String(url || "").trim();
   if (!raw) return raw;
   try {
-    const host = new URL(raw).hostname.toLowerCase();
-    if (host.includes("translate.google.")) return raw;
+    const u = new URL(raw);
+    const host = u.hostname.toLowerCase();
+    if (host.includes("translate.google.")) {
+      const inner = String(u.searchParams.get("u") || "").trim();
+      if (/^https?:\/\//i.test(inner)) return newsOpenUrl(inner);
+    }
+    if (host.endsWith(".translate.goog")) {
+      const dashed = host.replace(/\.translate\.goog$/i, "");
+      const origHost = dashed.replace(/-/g, ".");
+      const proto = u.searchParams.get("_x_tr_sch") === "http" ? "http:" : "https:";
+      const params = new URLSearchParams(u.search);
+      for (const key of [...params.keys()]) {
+        if (key.startsWith("_x_tr_")) params.delete(key);
+      }
+      const q = params.toString();
+      return `${proto}//${origHost}${u.pathname}${q ? `?${q}` : ""}${u.hash}`;
+    }
   } catch {
     return raw;
   }
-  return `https://translate.google.com/translate?sl=auto&tl=es&hl=es&u=${encodeURIComponent(raw)}`;
+  return raw;
 }
 
 export function CryptoNoticiasPage() {

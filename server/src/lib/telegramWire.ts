@@ -1,4 +1,3 @@
-import { looksLikeEnglish } from "./cryptoNoticiasTranslate.js";
 import { stockPhotoForNewsTitle, telegramPhotoForTitle } from "./cryptoNoticiasBot.js";
 
 export type CryptoWireNewsItem = {
@@ -142,8 +141,8 @@ export function googleWebsiteTranslateUrl(publisherUrl: string): string {
 
 export function wireArticleOpenUrl(
   articleUrl: string,
-  originalTitle: string,
-  originalSummary = ""
+  _originalTitle?: string,
+  _originalSummary = ""
 ): { url: string; readTranslated: boolean; publisherUrl: string; translateUrl: string } {
   let url = articleLink(articleUrl);
   if (!url) return { url: "", readTranslated: false, publisherUrl: "", translateUrl: "" };
@@ -152,17 +151,7 @@ export function wireArticleOpenUrl(
   if (!isArticlePageUrl(url)) {
     return { url, readTranslated: false, publisherUrl: url, translateUrl: "" };
   }
-  const english = looksLikeEnglish(originalTitle) || looksLikeEnglish(originalSummary);
-  if (!english) {
-    return { url, readTranslated: false, publisherUrl: url, translateUrl: "" };
-  }
-  const translateUrl = googleWebsiteTranslateUrl(url);
-  return {
-    url: translateUrl || url,
-    readTranslated: Boolean(translateUrl),
-    publisherUrl: url,
-    translateUrl,
-  };
+  return { url, readTranslated: false, publisherUrl: url, translateUrl: "" };
 }
 
 export type CryptoWireTelegramResult = {
