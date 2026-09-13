@@ -2090,6 +2090,15 @@ export type CryptoNoticiaItem = {
   telegramSent?: boolean;
 };
 
+export function getCryptoNoticiasLeer(articleUrl: string): Promise<{
+  originalUrl: string;
+  title: string;
+  paragraphs: string[];
+  imageUrl: string;
+}> {
+  return api(`/api/crypto-noticias/leer?url=${encodeURIComponent(articleUrl)}`);
+}
+
 export function getCryptoNoticiasMeta(): Promise<{
   total: number;
   lastFetchedAt: string | null;

@@ -6,6 +6,7 @@ import {
   CRYPTO_TOPIC_LABELS,
   fetchOgImage,
   fetchArticlePreview,
+  fetchArticleReading,
   fetchStoryScreenshot,
   telegramPhotoForTitle,
   harvestCryptoNoticiasDrafts,
@@ -774,16 +775,46 @@ function parseTopics(raw: unknown): CryptoNoticiaTopic[] {
   }
 }
 
+function decodeFeedText(s: string): string {
+  return String(s ?? "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isPublicHttpUrl(raw: string): boolean {
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+    const h = u.hostname.toLowerCase();
+    if (!h || h === "localhost" || h.endsWith(".local") || h.endsWith(".internal")) return false;
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) {
+      const parts = h.split(".").map((x) => Number(x));
+      const a = parts[0] ?? 0;
+      const b = parts[1] ?? 0;
+      if (a === 10 || a === 127 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31)) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function mapRow(raw: Record<string, unknown>): NewsRowMapped {
   const r = rowKeysToLowercase(raw);
   return {
     id: Number(r.id ?? 0),
-    title: String(r.title ?? ""),
-    summary: String(r.summary ?? ""),
-    titleEs: String(r.title_es ?? "").trim(),
-    titlePt: String(r.title_pt ?? "").trim(),
-    summaryEs: String(r.summary_es ?? "").trim(),
-    summaryPt: String(r.summary_pt ?? "").trim(),
+    title: decodeFeedText(String(r.title ?? "")),
+    summary: decodeFeedText(String(r.summary ?? "")),
+    titleEs: decodeFeedText(String(r.title_es ?? "")),
+    titlePt: decodeFeedText(String(r.title_pt ?? "")),
+    summaryEs: decodeFeedText(String(r.summary_es ?? "")),
+    summaryPt: decodeFeedText(String(r.summary_pt ?? "")),
     url: String(r.url ?? ""),
     sourceName: String(r.source_name ?? ""),
     imageUrl: (() => {
@@ -1106,6 +1137,42 @@ const writeMw = [
   requireRole("admin_a", "admin_b", "operador"),
   requireModuleGrant("noticias"),
 ] as const;
+
+cryptoNoticiasRouter.get("/crypto-noticias/leer", ...readMw, async (req, res, next) => {
+  try {
+    const raw = String(req.query.url ?? "").trim();
+    if (!isPublicHttpUrl(raw)) {
+      return res.status(400).json({ error: { message: "URL inválida." } });
+    }
+    const reading = await fetchArticleReading(raw);
+    let title = decodeFeedText(reading.title || "");
+    if (!title) title = "Artículo";
+    if (looksLikeEnglish(title)) {
+      const t = await translateNewsText(title, "es");
+      if (t) title = decodeFeedText(t);
+    }
+    const paragraphs: string[] = [];
+    for (const p of reading.paragraphs.slice(0, 6)) {
+      let out = decodeFeedText(p);
+      if (!out) continue;
+      if (looksLikeEnglish(out)) {
+        out = decodeFeedText((await translateNewsText(out.slice(0, 900), "es")) || out);
+      }
+      if (out) paragraphs.push(out);
+    }
+    if (!paragraphs.length && title === "Artículo") {
+      return res.status(422).json({ error: { message: "No pude leer el cuerpo de esa nota." } });
+    }
+    res.json({
+      originalUrl: reading.url || raw,
+      title,
+      paragraphs,
+      imageUrl: reading.imageUrl || "",
+    });
+  } catch (e) {
+    next(e);
+  }
+});
 
 cryptoNoticiasRouter.get("/crypto-noticias/meta", ...readMw, async (_req, res, next) => {
   try {

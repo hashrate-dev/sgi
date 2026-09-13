@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type MouseEvent } from "react";
 import { Navigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { CryptoNoticiasMediosConfig } from "../components/CryptoNoticiasMediosConfig";
@@ -6,6 +6,7 @@ import { CryptoNoticiasSentimentPanel } from "../components/CryptoNoticiasSentim
 import { useAuth } from "../contexts/AuthContext";
 import {
   getCryptoNoticias,
+  getCryptoNoticiasLeer,
   getCryptoNoticiasMeta,
   getCryptoNoticiasSentiment,
   refreshCryptoNoticias,
@@ -15,7 +16,7 @@ import {
 } from "../lib/api";
 import { canAccessNoticiasModule, canEditNoticiasModule } from "../lib/auth";
 import { sgiHome } from "../lib/marketplacePaths.js";
-import { toPublisherSpanishUrl } from "../lib/newsPublisherSpanishUrl";
+import { publisherHasNativeSpanish, toPublisherSpanishUrl } from "../lib/newsPublisherSpanishUrl";
 import "../styles/facturacion.css";
 import "../styles/crypto-noticias.css";
 
@@ -120,6 +121,14 @@ export function CryptoNoticiasPage() {
   const [sentimentLoading, setSentimentLoading] = useState(false);
 
   const [sendingId, setSendingId] = useState<number | null>(null);
+  const [reader, setReader] = useState<{
+    title: string;
+    paragraphs: string[];
+    originalUrl: string;
+    imageUrl: string;
+  } | null>(null);
+  const [readerLoading, setReaderLoading] = useState(false);
+  const [readerErr, setReaderErr] = useState("");
 
   const canEdit = Boolean(user && canEditNoticiasModule(user));
   const copy = COPY;
@@ -209,7 +218,25 @@ export function CryptoNoticiasPage() {
 
   const topicLabels = TOPIC_LABEL;
 
-  const onSendNewsTelegram = async (n: CryptoNoticiaItem) => {
+  const onOpenArticle = async (e: MouseEvent, n: CryptoNoticiaItem) => {
+    e.preventDefault();
+    const href = newsOpenUrl(n.url);
+    if (publisherHasNativeSpanish(n.url)) {
+      window.open(href, "_blank", "noopener,noreferrer");
+      return;
+    }
+    setReaderErr("");
+    setReader(null);
+    setReaderLoading(true);
+    try {
+      const r = await getCryptoNoticiasLeer(n.url);
+      setReader(r);
+    } catch {
+      window.open(n.url, "_blank", "noopener,noreferrer");
+    } finally {
+      setReaderLoading(false);
+    }
+  };
     if (!canEdit || n.telegramSent) return;
     setSendingId(n.id);
     setErr("");
@@ -405,7 +432,7 @@ export function CryptoNoticiasPage() {
                       <time dateTime={n.publishedAt}>{timeAgo(n.publishedAt)}</time>
                     </div>
                     <h3 className="crypto-news-card__title">
-                      <a href={newsOpenUrl(n.url)} target="_blank" rel="noopener noreferrer">
+                      <a href={newsOpenUrl(n.url)} onClick={(e) => void onOpenArticle(e, n)}>
                         {n.title}
                       </a>
                     </h3>
@@ -421,8 +448,7 @@ export function CryptoNoticiasPage() {
                       <a
                         className="crypto-news-read"
                         href={newsOpenUrl(n.url)}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        onClick={(e) => void onOpenArticle(e, n)}
                       >
                         {copy.read}
                       </a>
@@ -452,6 +478,60 @@ export function CryptoNoticiasPage() {
           </>
         )}
       </div>
+
+      {readerLoading || reader || readerErr ? (
+        <div
+          className="crypto-news-reader"
+          role="presentation"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              setReader(null);
+              setReaderErr("");
+              setReaderLoading(false);
+            }
+          }}
+        >
+          <div className="crypto-news-reader__dialog hrs-card sgi-glass-panel" role="dialog" aria-modal="true">
+            <div className="crypto-news-reader__head">
+              <h2 className="crypto-news-reader__title">
+                {readerLoading ? "Traduciendo la nota…" : reader?.title || "Lectura en español"}
+              </h2>
+              <button
+                type="button"
+                className="crypto-news-medios-modal__close"
+                aria-label="Cerrar lectura"
+                onClick={() => {
+                  setReader(null);
+                  setReaderErr("");
+                  setReaderLoading(false);
+                }}
+              >
+                ×
+              </button>
+            </div>
+            {readerErr ? <p className="alert alert-danger py-2">{readerErr}</p> : null}
+            {readerLoading ? <p className="text-muted small">Leyendo el artículo y pasándolo a español…</p> : null}
+            {reader ? (
+              <div className="crypto-news-reader__body">
+                {reader.imageUrl ? (
+                  <img className="crypto-news-reader__img" src={reader.imageUrl} alt="" />
+                ) : null}
+                {reader.paragraphs.map((p, i) => (
+                  <p key={i}>{p}</p>
+                ))}
+                <a
+                  className="crypto-news-read"
+                  href={reader.originalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Ver sitio original
+                </a>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

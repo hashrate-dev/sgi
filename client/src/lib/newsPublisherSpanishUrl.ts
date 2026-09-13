@@ -105,3 +105,15 @@ export function toPublisherSpanishUrl(raw: string): string {
 
   return u.toString();
 }
+
+export function publisherHasNativeSpanish(raw: string): boolean {
+  const original = unwrapGoogleTranslateShell(String(raw || "").trim());
+  const localized = toPublisherSpanishUrl(original);
+  try {
+    const a = new URL(original);
+    const b = new URL(localized);
+    return a.hostname.toLowerCase() !== b.hostname.toLowerCase() || a.pathname !== b.pathname;
+  } catch {
+    return false;
+  }
+}

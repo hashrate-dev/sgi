@@ -566,8 +566,8 @@ function isJunkPreviewTitle(t: string): boolean {
 async function fetchJinaPreview(
   articleUrl: string,
   signal: AbortSignal
-): Promise<{ title: string; description: string; imageUrl: string; url: string }> {
-  const none = { title: "", description: "", imageUrl: "", url: "" };
+): Promise<{ title: string; description: string; imageUrl: string; url: string; paragraphs: string[] }> {
+  const none = { title: "", description: "", imageUrl: "", url: "", paragraphs: [] as string[] };
   if (!/^https?:\/\//i.test(articleUrl)) return none;
   try {
     const res = await fetch(`https://r.jina.ai/${articleUrl}`, {
@@ -575,29 +575,65 @@ async function fetchJinaPreview(
       headers: {
         Accept: "text/plain",
         "User-Agent": BROWSER_UA,
-        "X-Retain-Images": "all",
+        "X-Retain-Images": "none",
       },
     });
     if (!res.ok) return none;
-    const text = (await res.text()).slice(0, 40_000);
+    const text = (await res.text()).slice(0, 50_000);
     const title = decodeEntities(text.match(/^Title:\s*(.+)$/m)?.[1] || "").trim();
     const sourceUrl = String(text.match(/^URL Source:\s*(\S+)/m)?.[1] || "").trim();
     const md = text.split("Markdown Content:")[1] || text;
     const img = md.match(/!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/)?.[1] || "";
-    const paras = md
+    const paragraphs = md
       .split(/\n+/)
       .map((l) => decodeEntities(l.replace(/^#+\s*/, "").replace(/[*_]/g, "")).trim())
-      .filter((l) => l.length >= 50 && !/^title:/i.test(l) && !/^url source:/i.test(l));
-    const description = (paras.find((p) => p.length > 80) || paras[0] || "").slice(0, 800);
+      .filter((l) => l.length >= 50 && l.length <= 900)
+      .filter((l) => !/^title:/i.test(l) && !/^url source:/i.test(l) && !/^published time:/i.test(l))
+      .filter((l) => !/cookie|newsletter|subscribe|sign up|advertisement/i.test(l))
+      .slice(0, 8);
+    const description = (paragraphs.find((p) => p.length > 80) || paragraphs[0] || "").slice(0, 800);
     const resolved = /^https?:\/\//i.test(sourceUrl) && !isGoogleNewsHost(hostOf(sourceUrl)) ? sourceUrl : "";
     return {
       title: isJunkPreviewTitle(title) ? "" : title.slice(0, 400),
       description,
       imageUrl: normalizeImageUrl(img),
       url: resolved,
+      paragraphs,
     };
   } catch {
     return none;
+  }
+}
+
+export async function fetchArticleReading(articleUrl: string): Promise<{
+  url: string;
+  title: string;
+  paragraphs: string[];
+  imageUrl: string;
+}> {
+  const empty = { url: "", title: "", paragraphs: [] as string[], imageUrl: "" };
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 18_000);
+  try {
+    let target = "";
+    try {
+      target = (await resolvePublisherUrl(articleUrl, ctrl.signal)) || "";
+    } catch {
+      target = "";
+    }
+    if (!target) target = articleUrl;
+    const jina = await fetchJinaPreview(target, ctrl.signal);
+    const paragraphs = jina.paragraphs.length ? jina.paragraphs : jina.description ? [jina.description] : [];
+    return {
+      url: jina.url || target,
+      title: jina.title,
+      paragraphs,
+      imageUrl: jina.imageUrl,
+    };
+  } catch {
+    return empty;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
