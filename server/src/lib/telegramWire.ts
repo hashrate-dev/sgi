@@ -1,5 +1,5 @@
 import { looksLikeEnglish } from "./cryptoNoticiasTranslate.js";
-import { fetchNewsHeroImage, stockPhotoForNewsTitle } from "./cryptoNoticiasBot.js";
+import { stockPhotoForNewsTitle, telegramPhotoForTitle } from "./cryptoNoticiasBot.js";
 
 export type CryptoWireNewsItem = {
   title: string;
@@ -411,13 +411,9 @@ export async function notifyCryptoWireTelegramArticle(
   if (!chat) return { sent: false, reason: "chat_invalido" };
   if (!botToken()) return { sent: false, reason: "faltan_credenciales" };
   const caption = formatCryptoWireArticleCaption({ ...item, title });
-  let photo = String(item.imageUrl ?? "").trim();
+  let photo = telegramPhotoForTitle(title, String(item.imageUrl ?? "").trim());
   if (!/^https?:\/\//i.test(photo)) {
-    try {
-      photo = await fetchNewsHeroImage(title);
-    } catch {
-      photo = stockPhotoForNewsTitle(title);
-    }
+    photo = stockPhotoForNewsTitle(title);
   }
 
   if (/^https?:\/\//i.test(photo)) {

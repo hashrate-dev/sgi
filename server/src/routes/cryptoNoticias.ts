@@ -7,7 +7,7 @@ import {
   fetchOgImage,
   fetchArticlePreview,
   fetchStoryScreenshot,
-  fetchNewsHeroImage,
+  telegramPhotoForTitle,
   harvestCryptoNoticiasDrafts,
   isAcceptableArticleImage,
   isBlockedNewsSource,
@@ -565,14 +565,7 @@ async function prepareTelegramCard(item: CryptoWireNewsItem): Promise<CryptoWire
       const shot = await fetchStoryScreenshot(publisher);
       if (shot) imageUrl = shot;
     } catch {
-      /* hero abajo */
-    }
-  }
-  if (!imageUrl) {
-    try {
-      imageUrl = await fetchNewsHeroImage(originalTitle || String(item.title || ""));
-    } catch {
-      imageUrl = "";
+      /* se elige por moneda abajo */
     }
   }
 
@@ -600,6 +593,7 @@ async function prepareTelegramCard(item: CryptoWireNewsItem): Promise<CryptoWire
   if (isSameBlurb(title, excerpt)) excerpt = "";
 
   const summary = hrsDeskComment(title, excerpt, sourceName);
+  imageUrl = telegramPhotoForTitle(`${originalTitle} ${title}`, imageUrl);
 
   return {
     title,

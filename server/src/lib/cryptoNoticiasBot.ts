@@ -755,71 +755,75 @@ function unsplash(id: string): string {
   return `https://images.unsplash.com/${id}?auto=format&fit=crop&w=1280&h=720&q=80`;
 }
 
-/** Foto editorial por tema cuando el medio no da og:image. Nunca la tarjeta verde HRS. */
+export type NewsCryptoAsset = "doge" | "zec" | "ltc" | "eth" | "btc" | "generic";
+
+/** La moneda del titular: gana la que aparece primero (Dogecoin no es Bitcoin). */
+export function primaryCryptoAsset(text: string): NewsCryptoAsset {
+  const t = String(text || "").toLowerCase();
+  const hits: Array<{ asset: NewsCryptoAsset; idx: number }> = [];
+  const push = (asset: NewsCryptoAsset, re: RegExp) => {
+    const m = t.match(re);
+    if (m && m.index != null) hits.push({ asset, idx: m.index });
+  };
+  push("doge", /dogecoin|\bdoge\b/);
+  push("zec", /zcash|\bzec\b/);
+  push("ltc", /litecoin|\bltc\b/);
+  push("eth", /ethereum|\beth\b/);
+  push("btc", /bitcoin|\bbtc\b/);
+  hits.sort((a, b) => a.idx - b.idx);
+  return hits[0]?.asset ?? "generic";
+}
+
+const ASSET_PHOTOS: Record<Exclude<NewsCryptoAsset, "generic">, string> = {
+  doge: "https://coin-images.coingecko.com/coins/images/5/large/dogecoin.png",
+  zec: "https://coin-images.coingecko.com/coins/images/486/large/circle-zcash-color.png",
+  ltc: "https://coin-images.coingecko.com/coins/images/2/large/litecoin.png",
+  eth: "https://coin-images.coingecko.com/coins/images/279/large/ethereum.png",
+  btc: "https://coin-images.coingecko.com/coins/images/1/large/bitcoin.png",
+};
+
+const BITCOIN_IMAGE_RE = /bitcoin|\bbtc\b|photo-1518546305927-5a555bb7020d/i;
+
+export function imageFitsPrimaryAsset(imageUrl: string, asset: NewsCryptoAsset): boolean {
+  const u = imageUrl.toLowerCase();
+  if (!u) return false;
+  if (asset === "generic") return !BITCOIN_IMAGE_RE.test(u);
+  if (asset !== "btc" && BITCOIN_IMAGE_RE.test(u) && !/doge|shiba|kabosu|zcash|litecoin|ethereum/.test(u)) {
+    return false;
+  }
+  if (asset === "doge") return /doge|shiba|kabosu|dogecoin/.test(u);
+  if (asset === "zec") return /zcash|\bzec\b|shield|privacy|lock/.test(u);
+  if (asset === "ltc") return /litecoin|\bltc\b/.test(u);
+  if (asset === "eth") return /ethereum|\beth\b|ether/.test(u);
+  if (asset === "btc") return /bitcoin|\bbtc\b/.test(u) || !/doge|shiba|zcash|litecoin/.test(u);
+  return true;
+}
+
 export function stockPhotoForNewsTitle(title: string): string {
+  const asset = primaryCryptoAsset(title);
+  if (asset !== "generic") return ASSET_PHOTOS[asset];
   const t = title.toLowerCase();
-  if (/zcash|\bzec\b|privacidad|privacy coin|shielded/i.test(t)) {
-    return unsplash("photo-1563013544-824ae1b704d3"); // lock / privacy
-  }
-  if (/quantum|cuántic|cuantic/i.test(t)) {
-    return unsplash("photo-1635070041078-e363dbe005cb"); // physics / quantum
-  }
-  if (/doge|dogecoin/i.test(t)) {
-    return unsplash("photo-1622630998477-20aa696ecb05"); // crypto coins
-  }
-  if (/ethereum|\beth\b/i.test(t)) {
-    return unsplash("photo-1622630998477-20aa696ecb05");
-  }
-  if (/\bltc\b|litecoin/i.test(t)) {
-    return unsplash("photo-1621416894569-0f39ed31d247");
-  }
-  if (/etf|nasdaq|wall street|bolsa/i.test(t)) {
-    return unsplash("photo-1611974789855-9c2a0a7236a3"); // trading screens
-  }
-  if (/mineria|mining|hashrate|asic/i.test(t)) {
-    return unsplash("photo-1518546305927-5a555bb7020d");
-  }
-  if (/bitcoin|\bbtc\b/i.test(t)) {
-    return unsplash("photo-1518546305927-5a555bb7020d");
-  }
-  return unsplash("photo-1639762681485-074b7f938ba0"); // blockchain abstract
+  if (/quantum|cuántic|cuantic/i.test(t)) return unsplash("photo-1635070041078-e363dbe005cb");
+  if (/etf|nasdaq|wall street|bolsa/i.test(t)) return unsplash("photo-1611974789855-9c2a0a7236a3");
+  if (/mineria|mining|hashrate|asic/i.test(t)) return ASSET_PHOTOS.btc;
+  return unsplash("photo-1639762681485-074b7f938ba0");
 }
 
-function newsImagePrompt(title: string): string {
-  const t = title.replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").trim().slice(0, 140);
-  let scene = "cryptocurrency news, blockchain, cinematic photojournalism";
-  if (/zcash|\bzec\b/i.test(t)) scene = "Zcash privacy cryptocurrency, glowing shield, encrypted network, dark cinematic photo";
-  else if (/quantum|cuántic/i.test(t)) scene = "quantum computer laboratory, glowing qubits, science photojournalism";
-  else if (/doge/i.test(t)) scene = "Dogecoin, crypto trading floor, photojournalism";
-  else if (/bitcoin|\bbtc\b/i.test(t)) scene = "Bitcoin gold coin, trading screens, photojournalism";
-  else if (/ethereum|\beth\b/i.test(t)) scene = "Ethereum network, glowing nodes, photojournalism";
-  return `${scene}, inspired by news headline: ${t}, no text overlay, no watermark, no logos, 16:9`;
-}
-
-/** Genera o elige una foto que represente la noticia (no un placeholder de marca). */
-export async function fetchNewsHeroImage(title: string): Promise<string> {
-  const prompt = newsImagePrompt(title);
-  const gen = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1280&height=720&nologo=true`;
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 16_000);
-  try {
-    const res = await fetch(gen, {
-      signal: ctrl.signal,
-      redirect: "follow",
-      headers: {
-        Accept: "image/avif,image/webp,image/*,*/*;q=0.8",
-        "User-Agent": BROWSER_UA,
-      },
-    });
-    const ct = (res.headers.get("content-type") || "").toLowerCase();
-    if (res.ok && ct.startsWith("image/") && !ct.includes("svg")) {
-      return gen;
+/** Foto final para Telegram: si el titular es de una moneda, no se manda la de otra. */
+export function telegramPhotoForTitle(title: string, candidateUrl = ""): string {
+  const asset = primaryCryptoAsset(title);
+  const cand = String(candidateUrl || "").trim();
+  if (cand && /^https?:\/\//i.test(cand) && imageFitsPrimaryAsset(cand, asset)) {
+    if (asset === "generic" && !isAcceptableArticleImage(cand)) {
+      return stockPhotoForNewsTitle(title);
     }
-  } catch {
-    /* stock abajo */
-  } finally {
-    clearTimeout(timer);
+    return cand;
   }
+  return stockPhotoForNewsTitle(title);
+}
+
+/** Elige una foto que represente la noticia (moneda del titular, no un BTC genérico). */
+export async function fetchNewsHeroImage(title: string): Promise<string> {
   return stockPhotoForNewsTitle(title);
 }
 
