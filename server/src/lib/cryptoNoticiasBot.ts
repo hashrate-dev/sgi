@@ -187,6 +187,9 @@ export function isAcceptableArticleImage(raw: string): boolean {
       return false;
     }
 
+    // Placeholders generados por el bot (tarjeta verde HRS)
+    if (/hashrate\.space$/i.test(host) && /wire-card|placeholder/i.test(path)) return false;
+
     if (/1x1|pixel|spacer|blank\.gif|doubleclick|facebook\.com\/tr/i.test(parsed.href)) return false;
     if (/\bfavicon\b|\bapple-touch-icon\b|\bsprite\b|\blogo[-_.]?\b|\bavatar\b|\bplaceholder\b|\bdefault[-_]?(image|thumb|img)\b/i.test(path)) {
       return false;
@@ -563,9 +566,9 @@ function isJunkPreviewTitle(t: string): boolean {
 async function fetchJinaPreview(
   articleUrl: string,
   signal: AbortSignal
-): Promise<{ title: string; description: string; imageUrl: string }> {
-  const none = { title: "", description: "", imageUrl: "" };
-  if (!/^https?:\/\//i.test(articleUrl) || isGoogleNewsHost(hostOf(articleUrl))) return none;
+): Promise<{ title: string; description: string; imageUrl: string; url: string }> {
+  const none = { title: "", description: "", imageUrl: "", url: "" };
+  if (!/^https?:\/\//i.test(articleUrl)) return none;
   try {
     const res = await fetch(`https://r.jina.ai/${articleUrl}`, {
       signal,
@@ -578,6 +581,7 @@ async function fetchJinaPreview(
     if (!res.ok) return none;
     const text = (await res.text()).slice(0, 40_000);
     const title = decodeEntities(text.match(/^Title:\s*(.+)$/m)?.[1] || "").trim();
+    const sourceUrl = String(text.match(/^URL Source:\s*(\S+)/m)?.[1] || "").trim();
     const md = text.split("Markdown Content:")[1] || text;
     const img = md.match(/!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/)?.[1] || "";
     const paras = md
@@ -585,10 +589,12 @@ async function fetchJinaPreview(
       .map((l) => decodeEntities(l.replace(/^#+\s*/, "").replace(/[*_]/g, "")).trim())
       .filter((l) => l.length >= 50 && !/^title:/i.test(l) && !/^url source:/i.test(l));
     const description = (paras.find((p) => p.length > 80) || paras[0] || "").slice(0, 800);
+    const resolved = /^https?:\/\//i.test(sourceUrl) && !isGoogleNewsHost(hostOf(sourceUrl)) ? sourceUrl : "";
     return {
       title: isJunkPreviewTitle(title) ? "" : title.slice(0, 400),
       description,
       imageUrl: normalizeImageUrl(img),
+      url: resolved,
     };
   } catch {
     return none;
@@ -605,7 +611,7 @@ export type ArticlePreview = {
 export async function fetchArticlePreview(articleUrl: string): Promise<ArticlePreview> {
   const empty: ArticlePreview = { url: "", title: "", description: "", imageUrl: "" };
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 14_000);
+  const timer = setTimeout(() => ctrl.abort(), 18_000);
   try {
     let target = "";
     try {
@@ -616,27 +622,30 @@ export async function fetchArticlePreview(articleUrl: string): Promise<ArticlePr
     if (!target || isGoogleNewsHost(hostOf(target))) {
       target = articleUrl;
     }
-    if (!target || isGoogleNewsHost(hostOf(target))) return empty;
+    if (!target) return empty;
 
     let html = "";
     let finalUrl = target;
-    try {
-      const res = await fetch(target, {
-        signal: ctrl.signal,
-        redirect: "follow",
-        headers: {
-          "User-Agent": BROWSER_UA,
-          Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
-          "Accept-Language": "es-419,es;q=0.9,en;q=0.8",
-        },
-      });
-      if (res.ok) {
-        finalUrl = res.url || target;
-        if (isGoogleNewsHost(hostOf(finalUrl))) return empty;
-        html = (await res.text()).slice(0, 320_000);
+    if (!isGoogleNewsHost(hostOf(target))) {
+      try {
+        const res = await fetch(target, {
+          signal: ctrl.signal,
+          redirect: "follow",
+          headers: {
+            "User-Agent": BROWSER_UA,
+            Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "es-419,es;q=0.9,en;q=0.8",
+          },
+        });
+        if (res.ok) {
+          finalUrl = res.url || target;
+          if (!isGoogleNewsHost(hostOf(finalUrl))) {
+            html = (await res.text()).slice(0, 320_000);
+          }
+        }
+      } catch {
+        /* microlink / jina abajo */
       }
-    } catch {
-      /* microlink abajo */
     }
 
     const jsonLd = html ? extractJsonLdPreview(html) : { title: "", description: "", imageUrl: "" };
@@ -654,17 +663,18 @@ export async function fetchArticlePreview(articleUrl: string): Promise<ArticlePr
     let imageUrl = html ? extractOgImageFromHtml(html) : "";
     if (!imageUrl) imageUrl = jsonLd.imageUrl;
 
-    if ((!title || !description || !imageUrl) && !ctrl.signal.aborted) {
+    if ((!title || !description || !imageUrl) && !ctrl.signal.aborted && !isGoogleNewsHost(hostOf(finalUrl))) {
       const extra = await fetchMicrolinkPreview(finalUrl || target, ctrl.signal);
       title = title || extra.title;
       description = description || extra.description;
       imageUrl = imageUrl || extra.imageUrl;
     }
-    if ((!title || !description || !imageUrl) && !ctrl.signal.aborted) {
-      const jina = await fetchJinaPreview(finalUrl || target, ctrl.signal);
+    if ((!title || !description || !imageUrl || isGoogleNewsHost(hostOf(finalUrl))) && !ctrl.signal.aborted) {
+      const jina = await fetchJinaPreview(articleUrl, ctrl.signal);
       title = title || jina.title;
       description = description || jina.description;
       imageUrl = imageUrl || jina.imageUrl;
+      if (jina.url) finalUrl = jina.url;
     }
 
     const pageUrl = isGoogleNewsHost(hostOf(finalUrl)) ? "" : finalUrl;
@@ -739,6 +749,78 @@ export async function fetchStoryScreenshot(articleUrl: string): Promise<string> 
   } finally {
     clearTimeout(timer);
   }
+}
+
+function unsplash(id: string): string {
+  return `https://images.unsplash.com/${id}?auto=format&fit=crop&w=1280&h=720&q=80`;
+}
+
+/** Foto editorial por tema cuando el medio no da og:image. Nunca la tarjeta verde HRS. */
+export function stockPhotoForNewsTitle(title: string): string {
+  const t = title.toLowerCase();
+  if (/zcash|\bzec\b|privacidad|privacy coin|shielded/i.test(t)) {
+    return unsplash("photo-1563013544-824ae1b704d3"); // lock / privacy
+  }
+  if (/quantum|cuántic|cuantic/i.test(t)) {
+    return unsplash("photo-1635070041078-e363dbe005cb"); // physics / quantum
+  }
+  if (/doge|dogecoin/i.test(t)) {
+    return unsplash("photo-1622630998477-20aa696ecb05"); // crypto coins
+  }
+  if (/ethereum|\beth\b/i.test(t)) {
+    return unsplash("photo-1622630998477-20aa696ecb05");
+  }
+  if (/\bltc\b|litecoin/i.test(t)) {
+    return unsplash("photo-1621416894569-0f39ed31d247");
+  }
+  if (/etf|nasdaq|wall street|bolsa/i.test(t)) {
+    return unsplash("photo-1611974789855-9c2a0a7236a3"); // trading screens
+  }
+  if (/mineria|mining|hashrate|asic/i.test(t)) {
+    return unsplash("photo-1518546305927-5a555bb7020d");
+  }
+  if (/bitcoin|\bbtc\b/i.test(t)) {
+    return unsplash("photo-1518546305927-5a555bb7020d");
+  }
+  return unsplash("photo-1639762681485-074b7f938ba0"); // blockchain abstract
+}
+
+function newsImagePrompt(title: string): string {
+  const t = title.replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").trim().slice(0, 140);
+  let scene = "cryptocurrency news, blockchain, cinematic photojournalism";
+  if (/zcash|\bzec\b/i.test(t)) scene = "Zcash privacy cryptocurrency, glowing shield, encrypted network, dark cinematic photo";
+  else if (/quantum|cuántic/i.test(t)) scene = "quantum computer laboratory, glowing qubits, science photojournalism";
+  else if (/doge/i.test(t)) scene = "Dogecoin, crypto trading floor, photojournalism";
+  else if (/bitcoin|\bbtc\b/i.test(t)) scene = "Bitcoin gold coin, trading screens, photojournalism";
+  else if (/ethereum|\beth\b/i.test(t)) scene = "Ethereum network, glowing nodes, photojournalism";
+  return `${scene}, inspired by news headline: ${t}, no text overlay, no watermark, no logos, 16:9`;
+}
+
+/** Genera o elige una foto que represente la noticia (no un placeholder de marca). */
+export async function fetchNewsHeroImage(title: string): Promise<string> {
+  const prompt = newsImagePrompt(title);
+  const gen = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1280&height=720&nologo=true`;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 16_000);
+  try {
+    const res = await fetch(gen, {
+      signal: ctrl.signal,
+      redirect: "follow",
+      headers: {
+        Accept: "image/avif,image/webp,image/*,*/*;q=0.8",
+        "User-Agent": BROWSER_UA,
+      },
+    });
+    const ct = (res.headers.get("content-type") || "").toLowerCase();
+    if (res.ok && ct.startsWith("image/") && !ct.includes("svg")) {
+      return gen;
+    }
+  } catch {
+    /* stock abajo */
+  } finally {
+    clearTimeout(timer);
+  }
+  return stockPhotoForNewsTitle(title);
 }
 
 async function fetchMicrolinkImage(articleUrl: string, signal: AbortSignal): Promise<string> {

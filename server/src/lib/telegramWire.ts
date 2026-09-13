@@ -1,5 +1,5 @@
-import sharp from "sharp";
 import { looksLikeEnglish } from "./cryptoNoticiasTranslate.js";
+import { fetchNewsHeroImage, stockPhotoForNewsTitle } from "./cryptoNoticiasBot.js";
 
 export type CryptoWireNewsItem = {
   title: string;
@@ -220,29 +220,6 @@ export function formatCryptoWireArticleCaption(item: CryptoWireNewsItem): string
   return caption.length > 1024 ? caption.slice(0, 1024) : caption;
 }
 
-function newsTopicHint(title: string): string {
-  const t = title.toLowerCase();
-  if (/doge|dogecoin/.test(t)) return "DOGE";
-  if (/\bbtc\b|bitcoin/.test(t)) return "BTC";
-  if (/\bltc\b|litecoin/.test(t)) return "LTC";
-  if (/\bzec\b|zcash/.test(t)) return "ZEC";
-  if (/ethereum|\beth\b/.test(t)) return "ETH";
-  return "CRIPTO";
-}
-
-export async function renderFallbackNewsImage(title: string): Promise<Buffer> {
-  const topic = newsTopicHint(title);
-  const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg width="1200" height="675" viewBox="0 0 1200 675" xmlns="http://www.w3.org/2000/svg">
-  <rect width="1200" height="675" fill="#0b241c"/>
-  <rect x="0" y="0" width="18" height="675" fill="#3dffb0"/>
-  <text x="64" y="110" fill="#3dffb0" font-size="36" font-family="Arial, Helvetica, sans-serif" font-weight="700">HRS WIRE</text>
-  <text x="64" y="360" fill="#f4fff8" font-size="140" font-family="Arial, Helvetica, sans-serif" font-weight="700">${topic}</text>
-  <text x="64" y="620" fill="#9ec9b5" font-size="28" font-family="Arial, Helvetica, sans-serif">hashrate.space</text>
-</svg>`;
-  return sharp(Buffer.from(svg)).png().toBuffer();
-}
-
 export function isTelegramChatMissingError(msg: string): boolean {
   const m = msg.toLowerCase();
   return (
@@ -434,19 +411,26 @@ export async function notifyCryptoWireTelegramArticle(
   if (!chat) return { sent: false, reason: "chat_invalido" };
   if (!botToken()) return { sent: false, reason: "faltan_credenciales" };
   const caption = formatCryptoWireArticleCaption({ ...item, title });
-  const photo = String(item.imageUrl ?? "").trim();
+  let photo = String(item.imageUrl ?? "").trim();
+  if (!/^https?:\/\//i.test(photo)) {
+    try {
+      photo = await fetchNewsHeroImage(title);
+    } catch {
+      photo = stockPhotoForNewsTitle(title);
+    }
+  }
 
   if (/^https?:\/\//i.test(photo)) {
     try {
       await sendTelegramPhoto(chat, photo, caption);
       return { sent: true, chatId: chat };
     } catch (e) {
-      console.warn("[telegram] sendPhoto URL falló, uso imagen HRS", e instanceof Error ? e.message : e);
+      console.warn("[telegram] sendPhoto URL falló, reintento stock", e instanceof Error ? e.message : e);
     }
   }
 
-  const png = await renderFallbackNewsImage(title);
-  await sendTelegramPhotoBuffer(chat, png, caption);
+  const fallback = stockPhotoForNewsTitle(title);
+  await sendTelegramPhoto(chat, fallback, caption);
   return { sent: true, chatId: chat };
 }
 

@@ -7,6 +7,7 @@ import {
   fetchOgImage,
   fetchArticlePreview,
   fetchStoryScreenshot,
+  fetchNewsHeroImage,
   harvestCryptoNoticiasDrafts,
   isAcceptableArticleImage,
   isBlockedNewsSource,
@@ -435,7 +436,10 @@ function hrsDeskComment(title: string, excerpt: string, sourceName: string): str
   const src = sourceName.trim() || "el medio";
   const t = title.toLowerCase();
   let take = `Desde el desk de HRS: ${src} publica este desarrollo y el titular no alcanza; el contexto está en la nota.`;
-  if (/prediction market|mercado de predicci/i.test(t)) {
+  if (/zcash|\bzec\b/i.test(t)) {
+    take =
+      "Desde el desk de HRS: Zcash se juega su tesis de privacidad frente a Bitcoin. El modelo importa más que el titular de ‘¿puede seguirlo?’.";
+  } else if (/prediction market|mercado de predicci/i.test(t)) {
     take =
       "Desde el desk de HRS: no es el precio spot. Es una apuesta de mercado a una fecha: sirve para leer expectativas, no para cotizar el activo ahora.";
   } else if (/doge|dogecoin/i.test(t) && /price|precio/i.test(t)) {
@@ -498,7 +502,14 @@ async function prepareTelegramCard(item: CryptoWireNewsItem): Promise<CryptoWire
       const shot = await fetchStoryScreenshot(publisher);
       if (shot) imageUrl = shot;
     } catch {
-      /* card HRS al enviar */
+      /* hero abajo */
+    }
+  }
+  if (!imageUrl) {
+    try {
+      imageUrl = await fetchNewsHeroImage(originalTitle || String(item.title || ""));
+    } catch {
+      imageUrl = "";
     }
   }
 
