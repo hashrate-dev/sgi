@@ -271,12 +271,20 @@ async function ensureTelegramSettingsSchema(): Promise<void> {
   }
   if (db.isPostgres) {
     await db.prepare("ALTER TABLE sgi_crypto_noticias_tg ADD COLUMN IF NOT EXISTS extra_chat_ids TEXT NOT NULL DEFAULT '[]'").run();
+    await db.prepare("ALTER TABLE sgi_crypto_noticias_tg ADD COLUMN IF NOT EXISTS send_interval_min INTEGER NOT NULL DEFAULT 60").run();
+    await db.prepare("ALTER TABLE sgi_crypto_noticias_tg ADD COLUMN IF NOT EXISTS last_auto_sent_at TIMESTAMPTZ").run();
   } else {
-    try {
-      await db.prepare("ALTER TABLE sgi_crypto_noticias_tg ADD COLUMN extra_chat_ids TEXT NOT NULL DEFAULT '[]'").run();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (!/duplicate column/i.test(msg)) throw e;
+    for (const sql of [
+      "ALTER TABLE sgi_crypto_noticias_tg ADD COLUMN extra_chat_ids TEXT NOT NULL DEFAULT '[]'",
+      "ALTER TABLE sgi_crypto_noticias_tg ADD COLUMN send_interval_min INTEGER NOT NULL DEFAULT 60",
+      "ALTER TABLE sgi_crypto_noticias_tg ADD COLUMN last_auto_sent_at TEXT",
+    ]) {
+      try {
+        await db.prepare(sql).run();
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (!/duplicate column/i.test(msg)) throw e;
+      }
     }
   }
   if (db.isPostgres) {
@@ -337,10 +345,27 @@ async function unclaimManualTelegramSend(id: number): Promise<void> {
   await db.prepare("DELETE FROM sgi_crypto_noticias_tg_sent WHERE noticia_id = ?").run(id);
 }
 
+const TELEGRAM_SEND_INTERVALS_MIN = [60, 120, 180, 240, 360, 720, 1440] as const;
+
+function clampSendIntervalMin(raw: unknown): number {
+  const n = Number(raw);
+  return (TELEGRAM_SEND_INTERVALS_MIN as readonly number[]).includes(n) ? n : 60;
+}
+
+function parseDbTimestampMs(raw: unknown): number | null {
+  const s = String(raw ?? "").trim();
+  if (!s) return null;
+  const iso = /T/.test(s) ? s : `${s.replace(" ", "T")}Z`;
+  const t = Date.parse(iso);
+  return Number.isFinite(t) ? t : null;
+}
+
 type WireTgSettings = {
   enabled: boolean;
   chatId: string;
   chatIds: string[];
+  sendIntervalMin: number;
+  lastAutoSentAt: string | null;
 };
 
 function uniqueTelegramChatIds(raw: unknown): string[] {
@@ -371,17 +396,43 @@ function parseExtraChatIds(raw: unknown): string[] {
 
 async function loadWireTgSettings(): Promise<WireTgSettings> {
   await ensureTelegramSettingsSchema();
-  const row = (await db.prepare("SELECT enabled, chat_id, extra_chat_ids FROM sgi_crypto_noticias_tg WHERE id = 1").get()) as
-    | { enabled?: number | boolean; chat_id?: string; extra_chat_ids?: string }
+  const row = (await db
+    .prepare("SELECT enabled, chat_id, extra_chat_ids, send_interval_min, last_auto_sent_at FROM sgi_crypto_noticias_tg WHERE id = 1")
+    .get()) as
+    | {
+        enabled?: number | boolean;
+        chat_id?: string;
+        extra_chat_ids?: string;
+        send_interval_min?: number;
+        last_auto_sent_at?: string | Date | null;
+      }
     | undefined;
   const enabled = row?.enabled === true || Number(row?.enabled) === 1;
   const fromDb = uniqueTelegramChatIds([row?.chat_id, ...parseExtraChatIds(row?.extra_chat_ids)]);
   const fallback = uniqueTelegramChatIds([process.env.TELEGRAM_CHAT_ID]);
   const chatIds = fromDb.length ? fromDb : fallback;
-  return { enabled, chatId: chatIds[0] || "", chatIds };
+  const lastRaw = row?.last_auto_sent_at;
+  const lastIso =
+    lastRaw instanceof Date
+      ? lastRaw.toISOString()
+      : parseDbTimestampMs(lastRaw) != null
+        ? new Date(parseDbTimestampMs(lastRaw)!).toISOString()
+        : null;
+  return {
+    enabled,
+    chatId: chatIds[0] || "",
+    chatIds,
+    sendIntervalMin: clampSendIntervalMin(row?.send_interval_min),
+    lastAutoSentAt: lastIso,
+  };
 }
 
-async function saveWireTgSettings(next: { enabled: boolean; chatId?: string; chatIds?: string[] }): Promise<WireTgSettings> {
+async function saveWireTgSettings(next: {
+  enabled: boolean;
+  chatId?: string;
+  chatIds?: string[];
+  sendIntervalMin?: number;
+}): Promise<WireTgSettings> {
   await ensureTelegramSettingsSchema();
   const current = await loadWireTgSettings();
   const chatIds =
@@ -390,15 +441,27 @@ async function saveWireTgSettings(next: { enabled: boolean; chatId?: string; cha
       : uniqueTelegramChatIds([next.chatId ?? current.chatId, ...current.chatIds]);
   const primary = chatIds[0] || "";
   const extra = JSON.stringify(chatIds.slice(1));
+  const interval = clampSendIntervalMin(next.sendIntervalMin ?? current.sendIntervalMin);
   await db
     .prepare(
       `UPDATE sgi_crypto_noticias_tg
-       SET enabled = ?, chat_id = ?, extra_chat_ids = ?,
+       SET enabled = ?, chat_id = ?, extra_chat_ids = ?, send_interval_min = ?,
            updated_at = ${db.isPostgres ? "NOW()" : "datetime('now')"}
        WHERE id = 1`
     )
-    .run(next.enabled ? 1 : 0, primary, extra);
+    .run(next.enabled ? 1 : 0, primary, extra, interval);
   return loadWireTgSettings();
+}
+
+async function touchLastAutoTelegramSent(): Promise<void> {
+  await ensureTelegramSettingsSchema();
+  await db
+    .prepare(
+      `UPDATE sgi_crypto_noticias_tg
+       SET last_auto_sent_at = ${db.isPostgres ? "NOW()" : "datetime('now')"}
+       WHERE id = 1`
+    )
+    .run();
 }
 
 function stripSourceSuffix(title: string, sourceName: string): string {
@@ -559,11 +622,22 @@ async function maybeNotifyWireTelegram(items: CryptoWireNewsItem[]): Promise<voi
       console.warn("[crypto-noticias] Telegram wire activo pero sin chat_id");
       return;
     }
+    const intervalMs = Math.max(60, settings.sendIntervalMin) * 60 * 1000;
+    const lastMs = settings.lastAutoSentAt ? Date.parse(settings.lastAutoSentAt) : 0;
+    if (lastMs && Date.now() - lastMs < intervalMs) {
+      console.log(
+        `[crypto-noticias] Telegram auto omitido: intervalo ${settings.sendIntervalMin} min (último ${settings.lastAutoSentAt})`
+      );
+      return;
+    }
     const batch = items.slice(0, 5);
+    let sent = 0;
     for (const raw of batch) {
       const card = await prepareTelegramCard(raw);
       await notifyCryptoWireTelegramArticleMany(settings.chatIds, card);
+      sent += 1;
     }
+    if (sent > 0) await touchLastAutoTelegramSent();
   } catch (e) {
     console.error("[crypto-noticias] Telegram wire", e instanceof Error ? e.message : e);
   }
@@ -1218,13 +1292,17 @@ cryptoNoticiasRouter.post("/crypto-noticias/refresh", ...writeMw, async (_req, r
 const tgSettingsSchema = z.object({
   enabled: z.boolean(),
   chatId: z.string().max(64).optional().nullable(),
+  sendIntervalMin: z.number().int().optional(),
 });
 
-function telegramSettingsPayload(settings: { enabled: boolean; chatId: string }) {
+function telegramSettingsPayload(settings: WireTgSettings) {
   const bot = getTelegramBotStatus();
   return {
     enabled: settings.enabled,
     chatId: settings.chatId,
+    sendIntervalMin: settings.sendIntervalMin,
+    lastAutoSentAt: settings.lastAutoSentAt,
+    sendIntervalOptionsMin: [...TELEGRAM_SEND_INTERVALS_MIN],
     tokenConfigured: bot.tokenConfigured,
     botUsername: bot.botUsernameHint || null,
     defaultChatId: bot.defaultChatId || null,
@@ -1259,6 +1337,7 @@ cryptoNoticiasRouter.put("/crypto-noticias/telegram", ...writeMw, async (req, re
     const saved = await saveWireTgSettings({
       enabled: parsed.data.enabled,
       chatId,
+      sendIntervalMin: parsed.data.sendIntervalMin,
     });
     res.json({ ok: true, ...telegramSettingsPayload(saved) });
   } catch (e) {
@@ -1283,6 +1362,7 @@ cryptoNoticiasRouter.post("/crypto-noticias/telegram", ...writeMw, async (req, r
     const saved = await saveWireTgSettings({
       enabled: parsed.data.enabled,
       chatId,
+      sendIntervalMin: parsed.data.sendIntervalMin,
     });
     res.json({ ok: true, ...telegramSettingsPayload(saved) });
   } catch (e) {

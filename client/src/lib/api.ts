@@ -2238,6 +2238,9 @@ export function deleteCryptoNoticiaMedio(id: number): Promise<{ ok: boolean }> {
 export type CryptoNoticiasTelegramSettings = {
   enabled: boolean;
   chatId: string;
+  sendIntervalMin?: number;
+  lastAutoSentAt?: string | null;
+  sendIntervalOptionsMin?: number[];
   tokenConfigured: boolean;
   botUsername?: string | null;
   defaultChatId?: string | null;
@@ -2279,6 +2282,7 @@ export function getCryptoNoticiasTelegram(): Promise<CryptoNoticiasTelegramSetti
 export function putCryptoNoticiasTelegram(body: {
   enabled: boolean;
   chatId?: string | null;
+  sendIntervalMin?: number;
 }): Promise<CryptoNoticiasTelegramSettings & { ok: boolean }> {
   return apiTelegramOnce("/api/crypto-noticias/telegram", { method: "POST", body: JSON.stringify(body) });
 }

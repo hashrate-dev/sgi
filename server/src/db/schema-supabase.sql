@@ -209,6 +209,8 @@ CREATE TABLE IF NOT EXISTS sgi_crypto_noticias_tg (
 INSERT INTO sgi_crypto_noticias_tg (id, enabled, chat_id) VALUES (1, 0, '')
 ON CONFLICT (id) DO NOTHING;
 ALTER TABLE sgi_crypto_noticias_tg ADD COLUMN IF NOT EXISTS extra_chat_ids TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE sgi_crypto_noticias_tg ADD COLUMN IF NOT EXISTS send_interval_min INTEGER NOT NULL DEFAULT 60;
+ALTER TABLE sgi_crypto_noticias_tg ADD COLUMN IF NOT EXISTS last_auto_sent_at TIMESTAMPTZ;
 
 CREATE TABLE IF NOT EXISTS sgi_crypto_noticias_tg_sent (
   noticia_id BIGINT PRIMARY KEY,

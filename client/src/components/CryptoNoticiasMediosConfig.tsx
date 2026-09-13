@@ -40,6 +40,20 @@ function channelLabel(s: CryptoNoticiasTelegramSettings | null): string {
   return "Sin bot (falta TELEGRAM_BOT_TOKEN en el servidor)";
 }
 
+const TG_INTERVAL_OPTS: Array<{ min: number; label: string }> = [
+  { min: 60, label: "Cada 1 hora" },
+  { min: 120, label: "Cada 2 horas" },
+  { min: 180, label: "Cada 3 horas" },
+  { min: 240, label: "Cada 4 horas" },
+  { min: 360, label: "Cada 6 horas" },
+  { min: 720, label: "Cada 12 horas" },
+  { min: 1440, label: "Cada 24 horas" },
+];
+
+function intervalLabel(min: number): string {
+  return TG_INTERVAL_OPTS.find((o) => o.min === min)?.label ?? `Cada ${min} min`;
+}
+
 export function CryptoNoticiasMediosConfig({ canEdit, open, onClose }: Props) {
   const titleId = useId();
   const closeBtnRef = useRef<HTMLButtonElement>(null);
@@ -56,6 +70,7 @@ export function CryptoNoticiasMediosConfig({ canEdit, open, onClose }: Props) {
   const [tg, setTg] = useState<CryptoNoticiasTelegramSettings | null>(null);
   const [tgEnabled, setTgEnabled] = useState(false);
   const [tgChatId, setTgChatId] = useState("");
+  const [tgIntervalMin, setTgIntervalMin] = useState(60);
   const [tgSaving, setTgSaving] = useState(false);
   const [tgTesting, setTgTesting] = useState(false);
   const [tgSendingLatest, setTgSendingLatest] = useState(false);
@@ -71,6 +86,7 @@ export function CryptoNoticiasMediosConfig({ canEdit, open, onClose }: Props) {
       setTg(tgRes);
       setTgEnabled(Boolean(tgRes.enabled));
       setTgChatId(tgRes.chatId || "");
+      setTgIntervalMin(Number(tgRes.sendIntervalMin) > 0 ? Number(tgRes.sendIntervalMin) : 60);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "No se pudo cargar la configuración de medios.");
     } finally {
@@ -184,14 +200,19 @@ export function CryptoNoticiasMediosConfig({ canEdit, open, onClose }: Props) {
     setErr("");
     setOk("");
     try {
-      const r = await putCryptoNoticiasTelegram({ enabled: tgEnabled, chatId: tgChatId });
+      const r = await putCryptoNoticiasTelegram({
+        enabled: tgEnabled,
+        chatId: tgChatId,
+        sendIntervalMin: tgIntervalMin,
+      });
       setTg(r);
       setTgEnabled(Boolean(r.enabled));
       setTgChatId(r.chatId || "");
+      setTgIntervalMin(Number(r.sendIntervalMin) > 0 ? Number(r.sendIntervalMin) : 60);
       setOk(
         r.enabled
           ? r.readyToSend
-            ? "Telegram del wire guardado. Las noticias nuevas del bot se enviarán a ese chat."
+            ? `Telegram guardado. Los avisos automáticos salen ${intervalLabel(Number(r.sendIntervalMin) || 60).toLowerCase()}.`
             : "Guardado, pero falta TELEGRAM_BOT_TOKEN en el servidor (Vercel)."
           : "Avisos Telegram del wire desactivados."
       );
@@ -313,14 +334,18 @@ export function CryptoNoticiasMediosConfig({ canEdit, open, onClose }: Props) {
               <section className="crypto-news-tg" aria-label="Telegram wire">
                 <h3 className="crypto-news-medios__add-title">Telegram · avisos del bot</h3>
                 <p className="crypto-news-medios__lead" style={{ marginBottom: "0.75rem" }}>
-                  Cuando el bot carga noticias <strong>nuevas</strong> (manual, cron o auto), te manda un
-                  resumen a este chat. No reenvía el historial viejo.
+                  Cuando el bot carga noticias <strong>nuevas</strong>, te manda tarjetas a este chat.
+                  Acá regulás <strong>cada cuánto</strong> salen solas (el servidor revisa cada hora).
+                  El envío manual no espera ese intervalo.
                 </p>
                 <div className="crypto-news-tg__status">
                   <span className={`crypto-news-medios__badge${tg?.readyToSend ? " is-ok" : " is-no"}`}>
                     {tg?.readyToSend ? "Listo para enviar" : "Pendiente"}
                   </span>
                   <span className="crypto-news-medios__badge is-manual">{channelLabel(tg)}</span>
+                  <span className="crypto-news-medios__badge is-manual">
+                    {intervalLabel(tgIntervalMin)}
+                  </span>
                 </div>
                 {canEdit ? (
                   <div className="row g-2 align-items-end">
@@ -348,7 +373,25 @@ export function CryptoNoticiasMediosConfig({ canEdit, open, onClose }: Props) {
                         onChange={(e) => setTgChatId(e.target.value.trim())}
                       />
                     </div>
-                    <div className="col-12 col-md-6 d-flex flex-wrap gap-2">
+                    <div className="col-12 col-md-6">
+                      <label className="form-label small mb-1" htmlFor="crypto-tg-interval">
+                        Envío automático
+                      </label>
+                      <select
+                        id="crypto-tg-interval"
+                        className="form-select form-select-sm"
+                        value={tgIntervalMin}
+                        disabled={tgSaving || tgTesting || tgDetecting}
+                        onChange={(e) => setTgIntervalMin(Number(e.target.value) || 60)}
+                      >
+                        {TG_INTERVAL_OPTS.map((o) => (
+                          <option key={o.min} value={o.min}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-12 d-flex flex-wrap gap-2">
                       <button
                         type="button"
                         className="btn btn-success btn-sm"
@@ -412,7 +455,7 @@ export function CryptoNoticiasMediosConfig({ canEdit, open, onClose }: Props) {
                 ) : (
                   <p className="text-muted small mb-0">
                     {tgEnabled
-                      ? `Avisos activos hacia chat ${tgChatId || "—"}.`
+                      ? `Avisos activos hacia chat ${tgChatId || "—"}. ${intervalLabel(tgIntervalMin)}.`
                       : "Avisos Telegram desactivados."}
                   </p>
                 )}
