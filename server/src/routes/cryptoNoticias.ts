@@ -6,6 +6,7 @@ import {
   CRYPTO_TOPIC_LABELS,
   fetchOgImage,
   fetchArticlePreview,
+  fetchStoryScreenshot,
   harvestCryptoNoticiasDrafts,
   isAcceptableArticleImage,
   isBlockedNewsSource,
@@ -430,11 +431,40 @@ function isSameBlurb(title: string, summary: string): boolean {
   return Boolean(a40 && b40 && (a.includes(b40) || b.includes(a40)));
 }
 
+function hrsDeskComment(title: string, excerpt: string, sourceName: string): string {
+  const src = sourceName.trim() || "el medio";
+  const t = title.toLowerCase();
+  let take = `Desde el desk de HRS: ${src} publica este desarrollo y el titular no alcanza; el contexto está en la nota.`;
+  if (/prediction market|mercado de predicci/i.test(t)) {
+    take =
+      "Desde el desk de HRS: no es el precio spot. Es una apuesta de mercado a una fecha: sirve para leer expectativas, no para cotizar el activo ahora.";
+  } else if (/doge|dogecoin/i.test(t) && /price|precio/i.test(t)) {
+    take =
+      "Desde el desk de HRS: el foco es Dogecoin y su precio. Antes de tomarlo como dato, hay que ver si es cotización, producto del exchange o una predicción.";
+  } else if (/\betf\b/i.test(t)) {
+    take =
+      "Desde el desk de HRS: cuando entra un ETF, el titular suele ir más rápido que los flujos. Conviene leer cuánto dinero se movió de verdad.";
+  } else if (/\bsec\b|regul/i.test(t)) {
+    take =
+      "Desde el desk de HRS: el ángulo regulatorio cambia el riesgo del sector entero. El detalle de la nota importa más que el titular.";
+  } else if (/bitcoin|\bbtc\b/i.test(t)) {
+    take =
+      "Desde el desk de HRS: Bitcoin mueve el resto del mercado. Esta nota vale por el dato concreto, no por el ruido del headline.";
+  }
+  const extra = excerpt.replace(/\s+/g, " ").trim();
+  if (extra && extra.length > 40 && !isSameBlurb(title, extra)) {
+    const cut = extra.length > 280 ? `${extra.slice(0, 279)}…` : extra;
+    return `${take} ${cut}`;
+  }
+  return take;
+}
+
 async function prepareTelegramCard(item: CryptoWireNewsItem): Promise<CryptoWireNewsItem> {
   const sourceName = String(item.sourceName ?? "").trim();
   let originalTitle = stripSourceSuffix(String(item.title ?? "").trim(), sourceName);
   let originalSummary = String(item.summary ?? "").trim();
   let publisher = String(item.publisherUrl || item.url || "").trim();
+  const rssUrl = String(item.url || publisher).trim();
   let imageUrl = item.imageUrl && isAcceptableArticleImage(item.imageUrl) ? item.imageUrl : "";
 
   try {
@@ -463,10 +493,18 @@ async function prepareTelegramCard(item: CryptoWireNewsItem): Promise<CryptoWire
       /* sin foto */
     }
   }
+  if (!imageUrl && publisher) {
+    try {
+      const shot = await fetchStoryScreenshot(publisher);
+      if (shot) imageUrl = shot;
+    } catch {
+      /* card HRS al enviar */
+    }
+  }
 
-  const open = wireArticleOpenUrl(publisher, originalTitle, originalSummary);
+  const open = wireArticleOpenUrl(publisher || rssUrl, originalTitle, originalSummary);
   let title = originalTitle;
-  let summary = isSameBlurb(originalTitle, originalSummary) ? "" : originalSummary;
+  let excerpt = isSameBlurb(originalTitle, originalSummary) ? "" : originalSummary;
 
   if (looksLikeEnglish(title)) {
     try {
@@ -476,23 +514,25 @@ async function prepareTelegramCard(item: CryptoWireNewsItem): Promise<CryptoWire
       /* keep original */
     }
   }
-  if (summary && looksLikeEnglish(summary)) {
+  if (excerpt && looksLikeEnglish(excerpt)) {
     try {
-      const s = await translateNewsText(summary, "es");
-      if (s && !isSameBlurb(title, s)) summary = s;
-      else if (s && isSameBlurb(title, s)) summary = "";
+      const s = await translateNewsText(excerpt.slice(0, 500), "es");
+      if (s && !isSameBlurb(title, s)) excerpt = s;
+      else excerpt = "";
     } catch {
-      if (isSameBlurb(title, summary)) summary = "";
+      excerpt = isSameBlurb(title, excerpt) ? "" : excerpt;
     }
   }
-  if (isSameBlurb(title, summary)) summary = "";
+  if (isSameBlurb(title, excerpt)) excerpt = "";
+
+  const summary = hrsDeskComment(title, excerpt, sourceName);
 
   return {
     title,
     summary,
     sourceName,
-    url: open.url,
-    publisherUrl: open.publisherUrl,
+    url: open.url || rssUrl,
+    publisherUrl: open.publisherUrl || rssUrl,
     translateUrl: open.translateUrl,
     imageUrl,
     readTranslated: open.readTranslated,

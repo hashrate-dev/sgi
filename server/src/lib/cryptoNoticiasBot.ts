@@ -715,6 +715,32 @@ async function fetchMicrolinkPreview(
   }
 }
 
+export async function fetchStoryScreenshot(articleUrl: string): Promise<string> {
+  if (!/^https?:\/\//i.test(articleUrl) || isGoogleNewsHost(hostOf(articleUrl))) return "";
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 12_000);
+  try {
+    const api = `https://api.microlink.io/?url=${encodeURIComponent(articleUrl)}&screenshot=true&meta=false&viewport.width=1280&viewport.height=720`;
+    const res = await fetch(api, {
+      signal: ctrl.signal,
+      headers: { Accept: "application/json", "User-Agent": UA },
+    });
+    if (!res.ok) return "";
+    const data = (await res.json()) as {
+      status?: string;
+      data?: { screenshot?: { url?: string } | string };
+    };
+    if (data.status !== "success") return "";
+    const shot = data.data?.screenshot;
+    const url = typeof shot === "string" ? shot : shot?.url || "";
+    return /^https?:\/\//i.test(url) ? url : "";
+  } catch {
+    return "";
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function fetchMicrolinkImage(articleUrl: string, signal: AbortSignal): Promise<string> {
   const extra = await fetchMicrolinkPreview(articleUrl, signal);
   return extra.imageUrl;
