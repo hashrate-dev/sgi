@@ -1,4 +1,5 @@
 import { stockPhotoForNewsTitle, telegramPhotoForTitle } from "./cryptoNoticiasBot.js";
+import { toPublisherSpanishUrl } from "./newsPublisherSpanishUrl.js";
 
 export type CryptoWireNewsItem = {
   title: string;
@@ -46,7 +47,7 @@ function newsOpenUrl(item: CryptoWireNewsItem): string {
     const h = hostOfUrl(url);
     if (/(^|\.)googleusercontent\.com$|(^|\.)gstatic\.com$|(^|\.)ggpht\.com$/.test(h)) continue;
     if (/\.(jpe?g|png|webp|gif|svg)(?:$|\?)/i.test(url)) continue;
-    return url;
+    return toPublisherSpanishUrl(url);
   }
   return "";
 }
@@ -148,9 +149,7 @@ export function wireArticleOpenUrl(
   if (!url) return { url: "", readTranslated: false, publisherUrl: "", translateUrl: "" };
   const inner = innerUrlFromGoogleTranslate(url);
   if (inner) url = inner;
-  if (!isArticlePageUrl(url)) {
-    return { url, readTranslated: false, publisherUrl: url, translateUrl: "" };
-  }
+  url = toPublisherSpanishUrl(url);
   return { url, readTranslated: false, publisherUrl: url, translateUrl: "" };
 }
 

@@ -15,6 +15,7 @@ import {
 } from "../lib/api";
 import { canAccessNoticiasModule, canEditNoticiasModule } from "../lib/auth";
 import { sgiHome } from "../lib/marketplacePaths.js";
+import { toPublisherSpanishUrl } from "../lib/newsPublisherSpanishUrl";
 import "../styles/facturacion.css";
 import "../styles/crypto-noticias.css";
 
@@ -95,32 +96,9 @@ function isPublishedToday(iso: string): boolean {
   );
 }
 
-/** Abre el artículo en el medio. Nunca Google Translate: CoinDesk y otros quedan colgados en translate.goog. */
+/** Abre el artículo en español en el propio medio (p. ej. CoinDesk /es/), sin translate.goog. */
 function newsOpenUrl(url: string): string {
-  const raw = String(url || "").trim();
-  if (!raw) return raw;
-  try {
-    const u = new URL(raw);
-    const host = u.hostname.toLowerCase();
-    if (host.includes("translate.google.")) {
-      const inner = String(u.searchParams.get("u") || "").trim();
-      if (/^https?:\/\//i.test(inner)) return newsOpenUrl(inner);
-    }
-    if (host.endsWith(".translate.goog")) {
-      const dashed = host.replace(/\.translate\.goog$/i, "");
-      const origHost = dashed.replace(/-/g, ".");
-      const proto = u.searchParams.get("_x_tr_sch") === "http" ? "http:" : "https:";
-      const params = new URLSearchParams(u.search);
-      for (const key of [...params.keys()]) {
-        if (key.startsWith("_x_tr_")) params.delete(key);
-      }
-      const q = params.toString();
-      return `${proto}//${origHost}${u.pathname}${q ? `?${q}` : ""}${u.hash}`;
-    }
-  } catch {
-    return raw;
-  }
-  return raw;
+  return toPublisherSpanishUrl(url);
 }
 
 export function CryptoNoticiasPage() {
