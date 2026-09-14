@@ -39,7 +39,7 @@ const BROWSER_UA =
 
 function gnews(q: string, locale: "en-US" | "es-UY"): string {
   const exclude =
-    ' -"prediction market" -"crypto prediction" -polymarket -kalshi -predictit';
+    ' -"prediction market" -"crypto prediction" -polymarket -kalshi -predictit -"bar exam" -"testing center"';
   const query = `${q}${exclude}`;
   if (locale === "es-UY") {
     return `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=es-419&gl=UY&ceid=UY:es`;
@@ -51,8 +51,8 @@ function gnews(q: string, locale: "en-US" | "es-UY"): string {
 export const CRYPTO_NOTICIAS_FEEDS: readonly FeedDef[] = [
   { id: "btc", name: "Google News — Bitcoin / BTC", topics: ["bitcoin", "cripto"], url: gnews("Bitcoin OR BTC", "en-US") },
   { id: "doge", name: "Google News — Dogecoin / DOGE", topics: ["dogecoin", "cripto"], url: gnews("Dogecoin OR DOGE", "en-US") },
-  { id: "ltc", name: "Google News — Litecoin / LTC", topics: ["litecoin", "cripto"], url: gnews("Litecoin OR LTC", "en-US") },
-  { id: "zec", name: "Google News — Zcash / ZEC", topics: ["zcash", "cripto"], url: gnews("Zcash OR ZEC", "en-US") },
+  { id: "ltc", name: "Google News — Litecoin / LTC", topics: ["litecoin", "cripto"], url: gnews("Litecoin OR (LTC crypto) OR (LTC cryptocurrency) OR (LTC bitcoin)", "en-US") },
+  { id: "zec", name: "Google News — Zcash / ZEC", topics: ["zcash", "cripto"], url: gnews("Zcash OR (ZEC crypto) OR (ZEC cryptocurrency) OR (ZEC bitcoin)", "en-US") },
   {
     id: "invest",
     name: "Google News — Inversiones cripto / ETF",
@@ -925,8 +925,8 @@ function inferTopics(title: string, summary: string, base: CryptoNoticiaTopic[])
   const set = new Set<CryptoNoticiaTopic>(base);
   if (/\bbitcoin\b|\bbtc\b/.test(hay)) set.add("bitcoin");
   if (/\bdogecoin\b|\bdoge\b/.test(hay)) set.add("dogecoin");
-  if (/\blitecoin\b|\bltc\b/.test(hay)) set.add("litecoin");
-  if (/\bzcash\b|\bzec\b/.test(hay)) set.add("zcash");
+  if (/\blitecoin\b/.test(hay) || (/\bltc\b/.test(hay) && CRYPTO_SUBSTANCE_RE.test(hay))) set.add("litecoin");
+  if (/\bzcash\b/.test(hay) || (/\bzec\b/.test(hay) && CRYPTO_SUBSTANCE_RE.test(hay))) set.add("zcash");
   if (/\buruguay\b|\bmontevideo\b|\bbcu\b/.test(hay)) set.add("uruguay");
   if (/\bsec\b|\bwhite house\b|\bcongress\b|\bfed\b|\btreasury\b|\bgovernment\b/.test(hay)) {
     set.add("gobierno_usa");
@@ -937,9 +937,40 @@ function inferTopics(title: string, summary: string, base: CryptoNoticiaTopic[])
   return [...set];
 }
 
+const CRYPTO_SUBSTANCE_RE =
+  /\b(bitcoin|ethereum|solana|crypto|cripto|cryptocurrency|criptomonedas?|blockchain|litecoin|dogecoin|zcash|web3|deFi|defi|stablecoin|altcoin|minería|mineria|hashrate|coinbase|binance|asic|etf)\b/i;
+
+function hasCryptoSubstance(title: string, summary: string): boolean {
+  return CRYPTO_SUBSTANCE_RE.test(`${title} ${summary}`);
+}
+
+function isKnownCryptoPublisher(url: string, sourceName: string): boolean {
+  const blob = `${url} ${sourceName}`.toLowerCase();
+  return /coindesk|cointelegraph|theblock|decrypt\.co|bitcoinmagazine|beincrypto|newsbtc|cryptoslate|coinbase|binance|hashrate/.test(
+    blob
+  );
+}
+
+function isOffTopicTickerHit(title: string, summary: string, url: string, sourceName: string): boolean {
+  const hay = `${title} ${summary} ${sourceName} ${url}`;
+  if (isKnownCryptoPublisher(url, sourceName)) return false;
+  if (hasCryptoSubstance(title, summary)) return false;
+
+  const hostish = `${sourceName} ${url}`.toLowerCase();
+  if (/\.edu(\.[a-z]{2})?(\/|:|$)/i.test(hostish) || /\bedu\.(ph|ar|mx|br|es)\b/i.test(hostish)) return true;
+  if (/\b(bar exam|examen de (la )?barra|examinad[oa]s|local testing center|testing center)\b/i.test(hay)) return true;
+  if (/\b(university|universidad|college|campus)\b/i.test(hay) && /\bltc\b/i.test(hay) && !/\blitecoin\b/i.test(hay)) {
+    return true;
+  }
+  // LTC / ZEC sueltos, sin el nombre de la moneda ni contexto cripto (p. ej. “Bar Exam LTC”).
+  if (/\bltc\b/i.test(hay) && !/\blitecoin\b/i.test(hay)) return true;
+  if (/\bzec\b/i.test(hay) && !/\bzcash\b/i.test(hay)) return true;
+  return false;
+}
+
 /** Descarta spam típico de feeds (casinos, airdrops, mercados de predicción) para mantener el wire editorial. */
-export function isLowQualityNews(title: string, summary: string, url = ""): boolean {
-  const hay = `${title} ${summary} ${url}`.toLowerCase();
+export function isLowQualityNews(title: string, summary: string, url = "", sourceName = ""): boolean {
+  const hay = `${title} ${summary} ${url} ${sourceName}`.toLowerCase();
   if (
     /\bcasino(s)?\b|\bgambling\b|\bbetting\b|\bsportsbook\b|\bslot(s)?\b|\bpoker\b/.test(hay) ||
     /\bfree\s+spins\b|\bbonus\s+code\b|\bairdrop\s+claim\b|\bbuy\s+now\b/.test(hay) ||
@@ -960,6 +991,7 @@ export function isLowQualityNews(title: string, summary: string, url = ""): bool
   ) {
     return true;
   }
+  if (isOffTopicTickerHit(title, summary, url, sourceName)) return true;
   return false;
 }
 
@@ -988,10 +1020,10 @@ export function parseRssFeedXml(xml: string, feedTopics: CryptoNoticiaTopic[]): 
     const link = normalizeUrl(tag(block, "link") || tagAttr(block, "link", "href"));
     if (!title || !link) continue;
     const summary = tag(block, "description").slice(0, 600);
-    if (isLowQualityNews(title, summary, link)) continue;
-    const pub = tag(block, "pubDate") || tag(block, "published") || tag(block, "updated");
     const sourceName = tag(block, "source") || channelTitle || "Wire";
+    if (isLowQualityNews(title, summary, link, sourceName)) continue;
     if (isBlockedNewsSource(sourceName, link)) continue;
+    const pub = tag(block, "pubDate") || tag(block, "published") || tag(block, "updated");
     out.push({
       title: title.slice(0, 400),
       summary,

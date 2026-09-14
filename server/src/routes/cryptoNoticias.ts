@@ -176,7 +176,7 @@ async function purgeLowQualityNews(): Promise<void> {
   try {
     const rows = (await db
       .prepare(
-        `SELECT id, title, summary, url, title_es, summary_es
+        `SELECT id, title, summary, url, source_name, title_es, summary_es
          FROM sgi_crypto_noticias
          ORDER BY published_at DESC, id DESC
          LIMIT 800`
@@ -186,6 +186,7 @@ async function purgeLowQualityNews(): Promise<void> {
       title?: string;
       summary?: string;
       url?: string;
+      source_name?: string;
       title_es?: string;
       summary_es?: string;
     }>;
@@ -194,7 +195,7 @@ async function purgeLowQualityNews(): Promise<void> {
       const id = Number(r.id);
       if (!Number.isFinite(id)) continue;
       const blob = `${r.title || ""} ${r.title_es || ""} ${r.summary || ""} ${r.summary_es || ""}`;
-      if (isLowQualityNews(blob, "", String(r.url || ""))) ids.push(id);
+      if (isLowQualityNews(blob, "", String(r.url || ""), String(r.source_name || ""))) ids.push(id);
     }
     for (const id of ids) {
       await db.prepare("DELETE FROM sgi_crypto_noticias WHERE id = ?").run(id);
@@ -657,7 +658,7 @@ async function maybeNotifyWireTelegram(items: CryptoWireNewsItem[]): Promise<voi
       return;
     }
     const batch = items
-      .filter((it) => !isLowQualityNews(it.title, it.summary ?? "", it.url ?? ""))
+      .filter((it) => !isLowQualityNews(it.title, it.summary ?? "", it.url ?? "", it.sourceName ?? ""))
       .slice(0, 5);
     let sent = 0;
     for (const raw of batch) {
@@ -1060,7 +1061,7 @@ async function runIngest(): Promise<{ inserted: number; scanned: number; feedErr
   const insertedForWa: CryptoWireNewsItem[] = [];
   for (const d of drafts) {
     if (isBlockedNewsSource(d.sourceName, d.url)) continue;
-    if (isLowQualityNews(d.title, d.summary, d.url)) continue;
+    if (isLowQualityNews(d.title, d.summary, d.url, d.sourceName)) continue;
     try {
       const info = await db
         .prepare(
@@ -1252,7 +1253,7 @@ cryptoNoticiasRouter.get("/crypto-noticias/sentiment", ...readMw, async (req, re
     // Rápido: solo columnas necesarias + tope menor.
     const rows = (await db
       .prepare(
-        `SELECT id, title, summary, url, topics_json, published_at, title_es, summary_es
+        `SELECT id, title, summary, url, source_name, topics_json, published_at, title_es, summary_es
          FROM sgi_crypto_noticias
          ORDER BY published_at DESC, id DESC
          LIMIT 400`
@@ -1263,7 +1264,6 @@ cryptoNoticiasRouter.get("/crypto-noticias/sentiment", ...readMw, async (req, re
       .map((r) => {
         const m = mapRow({
           ...r,
-          source_name: "",
           title_pt: "",
           summary_pt: "",
           image_url: "",
@@ -1271,7 +1271,7 @@ cryptoNoticiasRouter.get("/crypto-noticias/sentiment", ...readMw, async (req, re
         });
         return m;
       })
-      .filter((x) => !isLowQualityNews(x.title, `${x.summary} ${x.titleEs} ${x.summaryEs}`, x.url));
+      .filter((x) => !isLowQualityNews(x.title, `${x.summary} ${x.titleEs} ${x.summaryEs}`, x.url, x.sourceName));
     if (topic && TOPIC_SET.has(topic)) {
       items = items.filter((x) => x.topics.includes(topic as CryptoNoticiaTopic));
     }
@@ -1325,7 +1325,7 @@ cryptoNoticiasRouter.get("/crypto-noticias", ...readMw, async (req, res, next) =
 
     let items = rows
       .map((r) => mapRow(r))
-      .filter((x) => !isBlockedNewsSource(x.sourceName, x.url) && !isLowQualityNews(x.title, `${x.summary} ${x.titleEs} ${x.summaryEs}`, x.url));
+      .filter((x) => !isBlockedNewsSource(x.sourceName, x.url) && !isLowQualityNews(x.title, `${x.summary} ${x.titleEs} ${x.summaryEs}`, x.url, x.sourceName));
     if (topic && TOPIC_SET.has(topic)) {
       items = items.filter((x) => x.topics.includes(topic as CryptoNoticiaTopic));
     }
@@ -1558,7 +1558,8 @@ cryptoNoticiasRouter.post("/crypto-noticias/telegram/send-item", ...writeMw, asy
       isLowQualityNews(
         `${row.title || ""} ${row.title_es || ""}`,
         `${row.summary || ""} ${row.summary_es || ""}`,
-        String(row.url || "")
+        String(row.url || ""),
+        String(row.source_name || "")
       )
     ) {
       await unclaimManualTelegramSend(parsed.data.id);
@@ -1614,7 +1615,8 @@ cryptoNoticiasRouter.post("/crypto-noticias/telegram/send-latest", ...writeMw, a
         !isLowQualityNews(
           `${r.title || ""} ${r.title_es || ""}`,
           String(r.summary || ""),
-          String(r.url || "")
+          String(r.url || ""),
+          String(r.source_name || "")
         )
     ).slice(0, 5);
     const items = (
