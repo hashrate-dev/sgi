@@ -568,10 +568,118 @@
 }
 
 .crypto-news-sentiment__verdict {
-  margin: 0 0 1rem;
+  margin: 0 0 0.85rem;
   color: rgba(232, 238, 245, 0.88);
   font-size: 0.95rem;
   line-height: 1.45;
+}
+
+.crypto-news-desk {
+  margin: 0 0 1.05rem;
+  padding: 0.85rem 0.9rem 0.75rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(61, 186, 154, 0.22);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.crypto-news-desk__kicker {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cn-accent);
+  margin-bottom: 0.25rem;
+}
+
+.crypto-news-desk__lead {
+  margin: 0 0 0.75rem;
+  font-size: 0.78rem;
+  color: var(--cn-muted);
+  line-height: 1.4;
+}
+
+.crypto-news-desk__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+@media (max-width: 900px) {
+  .crypto-news-desk__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.crypto-news-desk__card {
+  padding: 0.7rem 0.75rem 0.75rem;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.crypto-news-desk__card.is-up {
+  border-color: rgba(61, 186, 154, 0.32);
+}
+
+.crypto-news-desk__card.is-down {
+  border-color: rgba(239, 100, 100, 0.32);
+}
+
+.crypto-news-desk__card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.45rem;
+  align-items: flex-start;
+  margin-bottom: 0.45rem;
+}
+
+.crypto-news-desk__label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.crypto-news-desk__label span {
+  color: var(--cn-muted);
+  font-weight: 650;
+}
+
+.crypto-news-desk__play {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.18rem 0.4rem;
+  border-radius: 999px;
+  color: #e8eef5;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.crypto-news-desk__play.is-up {
+  color: #6ee7b7;
+  background: rgba(61, 186, 154, 0.16);
+}
+
+.crypto-news-desk__play.is-down {
+  color: #fca5a5;
+  background: rgba(239, 100, 100, 0.16);
+}
+
+.crypto-news-desk__text {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: rgba(232, 238, 245, 0.9);
+}
+
+.crypto-news-desk__foot {
+  margin: 0.7rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--cn-muted);
 }
 
 .crypto-news-sentiment__grid {

@@ -3,6 +3,7 @@ import Chart from "chart.js/auto";
 import type { Chart as ChartInstance } from "chart.js";
 import type { CryptoNewsSentimentReport } from "../lib/api";
 import { CryptoNoticiasLivePrices } from "./CryptoNoticiasLivePrices";
+import { CryptoNoticiasDeskBriefing } from "./CryptoNoticiasDeskBriefing";
 
 type Props = {
   report: CryptoNewsSentimentReport | null;
@@ -197,6 +198,8 @@ export function CryptoNoticiasSentimentPanel({ report, loading }: Props) {
       </div>
 
       <p className="crypto-news-sentiment__verdict">{signal.verdict}</p>
+
+      <CryptoNoticiasDeskBriefing report={report} />
 
       <div className="crypto-news-sentiment__grid">
         <CryptoNoticiasLivePrices />
