@@ -656,7 +656,9 @@ async function maybeNotifyWireTelegram(items: CryptoWireNewsItem[]): Promise<voi
       );
       return;
     }
-    const batch = items.filter((it) => !isLowQualityNews(it.title, it.summary, it.url)).slice(0, 5);
+    const batch = items
+      .filter((it) => !isLowQualityNews(it.title, it.summary ?? "", it.url ?? ""))
+      .slice(0, 5);
     let sent = 0;
     for (const raw of batch) {
       const card = await prepareTelegramCard(raw);
