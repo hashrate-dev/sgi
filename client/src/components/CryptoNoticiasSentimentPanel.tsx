@@ -171,6 +171,11 @@ export function CryptoNoticiasSentimentPanel({ report, loading }: Props) {
     };
   }, [report]);
 
+  const tradeSignals = useMemo(
+    () => (report ? buildHorizonTradeSignals(report, prices) : null),
+    [report, prices]
+  );
+
   if (loading && !report) {
     return (
       <section className="crypto-news-sentiment hrs-card sgi-glass-panel" aria-busy>
@@ -179,12 +184,11 @@ export function CryptoNoticiasSentimentPanel({ report, loading }: Props) {
     );
   }
 
-  if (!report) return null;
+  if (!report || !tradeSignals) return null;
 
   const { signal, horizons, drivers } = report;
   const tone = scoreTone(signal.score);
   const gaugePct = Math.round(((signal.score + 100) / 200) * 100);
-  const tradeSignals = useMemo(() => buildHorizonTradeSignals(report, prices), [report, prices]);
 
   return (
     <section className="crypto-news-sentiment hrs-card sgi-glass-panel" aria-label="Señal de mercado HRS">
