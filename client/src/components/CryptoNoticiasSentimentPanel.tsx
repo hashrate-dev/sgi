@@ -252,12 +252,14 @@ export function CryptoNoticiasSentimentPanel({ report, loading }: Props) {
                   aria-label={`${h.label}: ${h.biasLabel} ${h.score > 0 ? `+${h.score}` : h.score}. Señal ${call.action}`}
                 >
                   <div className="crypto-news-sentiment__horizon-top">
-                    <span className="crypto-news-sentiment__horizon-chip">{h.label}</span>
+                    <div>
+                      <span className="crypto-news-sentiment__horizon-chip">{h.label}</span>
+                      <div className="crypto-news-sentiment__horizon-bias">{h.biasLabel}</div>
+                    </div>
                     <span className="crypto-news-sentiment__horizon-score">
                       {h.score > 0 ? `+${h.score}` : h.score}
                     </span>
                   </div>
-                  <div className="crypto-news-sentiment__horizon-bias">{h.biasLabel}</div>
                   <div
                     className="crypto-news-sentiment__horizon-meter"
                     role="meter"
@@ -274,35 +276,32 @@ export function CryptoNoticiasSentimentPanel({ report, loading }: Props) {
                     {Number.isFinite(h.coverage) ? ` · ${scoredPct}% puntuadas` : ""}
                   </p>
                   <div className={`crypto-news-sentiment__horizon-call ${callCls}`}>
-                    <span className="crypto-news-sentiment__horizon-call-kicker">Señal · BTC / cripto</span>
                     <span className="crypto-news-sentiment__horizon-call-word">{call.action}</span>
                     <span className="crypto-news-sentiment__horizon-call-why">{call.why}</span>
                   </div>
                   {lead ? (
-                    <div className={`crypto-news-sentiment__lead ${leadCls}`}>
-                      <div className="crypto-news-sentiment__lead-row">
-                        <span>Adelanto · {lead.window}</span>
-                        <strong>
-                          {lead.pUp}% {lead.path}
-                        </strong>
+                    <div className={`crypto-news-sentiment__ahead ${leadCls}`}>
+                      <div className="crypto-news-sentiment__ahead-pct">
+                        <b>{lead.pUp}</b>
+                        <span>%</span>
                       </div>
-                      <div className="crypto-news-sentiment__lead-bar" aria-hidden>
-                        <span className="crypto-news-sentiment__lead-fill" style={{ width: `${lead.pUp}%` }} />
-                        <span className="crypto-news-sentiment__lead-mid" />
+                      <div className="crypto-news-sentiment__ahead-meta">
+                        <span className="crypto-news-sentiment__ahead-path">{lead.path}</span>
+                        <span className="crypto-news-sentiment__ahead-win">{lead.window}</span>
                       </div>
-                      <p className="crypto-news-sentiment__lead-why">{lead.why}</p>
+                      <div className="crypto-news-sentiment__ahead-bar" aria-hidden>
+                        <span className="crypto-news-sentiment__ahead-fill" style={{ width: `${lead.pUp}%` }} />
+                        <span className="crypto-news-sentiment__ahead-mid" />
+                      </div>
+                      <p className="crypto-news-sentiment__ahead-why">{lead.why}</p>
                     </div>
                   ) : null}
                   <ul className="crypto-news-sentiment__horizon-mix">
                     {rows.map((row) => (
                       <li key={row.key} className={row.cls}>
                         <span className="crypto-news-sentiment__horizon-mix-lab">{row.label}</span>
-                        <span className="crypto-news-sentiment__horizon-mix-bar" aria-hidden>
-                          <span style={{ width: `${mixPct(row.count, total)}%` }} />
-                        </span>
                         <span className="crypto-news-sentiment__horizon-mix-n">
-                          {row.count}
-                          <span> {mixPct(row.count, total)}%</span>
+                          {mixPct(row.count, total)}%
                         </span>
                       </li>
                     ))}
