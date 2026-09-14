@@ -916,11 +916,34 @@
 }
 
 .crypto-news-sentiment__chart-wrap {
-  height: 200px;
-  padding: 0.35rem 0.25rem 0.15rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 220px;
+  padding: 0.5rem 0.55rem 0.4rem;
   border-radius: 0.7rem;
   border: 1px solid var(--cn-line);
   background: rgba(0, 0, 0, 0.2);
+}
+
+.crypto-news-sentiment__chart-kicker {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cn-muted);
+  margin-bottom: 0.2rem;
+}
+
+.crypto-news-sentiment__chart-canvas {
+  flex: 1 1 auto;
+  height: 190px;
+  position: relative;
+}
+
+.crypto-news-sentiment__chart-canvas canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .crypto-news-sentiment__drivers {

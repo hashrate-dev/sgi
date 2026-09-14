@@ -60,10 +60,12 @@ export function CryptoNoticiasSentimentPanel({ report, loading }: Props) {
     chartRef.current?.destroy();
     chartRef.current = null;
 
-    const scores = report.chart.scores;
+    const scores = report.chart.scores.map((s) => Number(s) || 0);
     const colors = scores.map((s) =>
-      s >= 15 ? "rgba(61, 186, 154, 0.88)" : s <= -15 ? "rgba(239, 100, 100, 0.88)" : "rgba(180, 190, 200, 0.55)"
+      s >= 15 ? "rgba(61, 186, 154, 0.92)" : s <= -15 ? "rgba(239, 100, 100, 0.92)" : "rgba(148, 174, 196, 0.88)"
     );
+    const peak = Math.max(0, ...scores.map((s) => Math.abs(s)));
+    const yBound = Math.min(100, Math.max(25, Math.ceil((peak + 8) / 5) * 5));
 
     chartRef.current = new Chart(canvas, {
       type: "bar",
@@ -71,22 +73,47 @@ export function CryptoNoticiasSentimentPanel({ report, loading }: Props) {
         labels: report.chart.labels,
         datasets: [
           {
-            label: "Sesgo del wire (−100 bajista · +100 alcista)",
+            label: "Sesgo (−100 a +100)",
             data: scores,
             backgroundColor: colors,
-            borderRadius: 8,
+            borderRadius: 6,
             borderSkipped: false,
-            maxBarThickness: 42,
+            maxBarThickness: 56,
           },
         ],
       },
+      plugins: [
+        {
+          id: "hrsScoreLabels",
+          afterDatasetsDraw(chart) {
+            const meta = chart.getDatasetMeta(0);
+            const { ctx } = chart;
+            ctx.save();
+            ctx.font = "700 12px system-ui, sans-serif";
+            ctx.textAlign = "center";
+            meta.data.forEach((el, i) => {
+              const v = scores[i] ?? 0;
+              const label = v > 0 ? `+${v}` : `${v}`;
+              ctx.fillStyle = v >= 15 ? "#6ee7b7" : v <= -15 ? "#fca5a5" : "#e8eef5";
+              ctx.textBaseline = v >= 0 ? "bottom" : "top";
+              ctx.fillText(label, el.x, v >= 0 ? el.y - 6 : el.y + 6);
+            });
+            ctx.restore();
+          },
+        },
+      ],
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        layout: { padding: { top: 18, bottom: 4 } },
         plugins: {
           legend: { display: false },
           tooltip: {
             callbacks: {
+              label: (ctx) => {
+                const v = Number(ctx.raw) || 0;
+                return `Sesgo ${v > 0 ? `+${v}` : v} (escala −100 a +100)`;
+              },
               afterLabel: (ctx) => {
                 const i = ctx.dataIndex;
                 const pos = report.chart.positivePct[i] ?? 0;
@@ -102,13 +129,16 @@ export function CryptoNoticiasSentimentPanel({ report, loading }: Props) {
             grid: { display: false },
           },
           y: {
-            min: -100,
-            max: 100,
+            min: -yBound,
+            max: yBound,
             ticks: {
               color: "rgba(232,238,245,0.55)",
               callback: (v) => `${v}`,
             },
-            grid: { color: "rgba(255,255,255,0.08)" },
+            grid: {
+              color: (ctx) =>
+                ctx.tick.value === 0 ? "rgba(232,238,245,0.32)" : "rgba(255,255,255,0.08)",
+            },
           },
         },
       },
@@ -229,7 +259,10 @@ export function CryptoNoticiasSentimentPanel({ report, loading }: Props) {
             })}
           </div>
           <div className="crypto-news-sentiment__chart-wrap">
-            <canvas ref={canvasRef} />
+            <div className="crypto-news-sentiment__chart-kicker">Sesgo por plazo</div>
+            <div className="crypto-news-sentiment__chart-canvas">
+              <canvas ref={canvasRef} />
+            </div>
           </div>
         </div>
       </div>
