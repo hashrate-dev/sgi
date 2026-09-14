@@ -12,6 +12,7 @@ import {
   harvestCryptoNoticiasDrafts,
   isAcceptableArticleImage,
   isBlockedNewsSource,
+  isLowQualityNews,
   resolvePublisherUrl,
   type CryptoNoticiaTopic,
   type HarvestFeed,
@@ -138,6 +139,7 @@ async function ensureCryptoNoticiasSchema(): Promise<void> {
     console.warn("[crypto-noticias] telegram schema", e instanceof Error ? e.message : e);
   }
   await purgeBlockedNewsSources();
+  await purgeLowQualityNews();
   await purgeJunkNewsImages();
   schemaEnsured = true;
 }
@@ -150,7 +152,8 @@ async function purgeBlockedNewsSources(): Promise<void> {
         .prepare(
           `DELETE FROM sgi_crypto_noticias
            WHERE source_name ILIKE '%moomoo%'
-              OR url ILIKE '%moomoo.com%'`
+              OR url ILIKE '%moomoo.com%'
+              OR url ILIKE '%biggo.com%'`
         )
         .run();
     } else {
@@ -158,12 +161,46 @@ async function purgeBlockedNewsSources(): Promise<void> {
         .prepare(
           `DELETE FROM sgi_crypto_noticias
            WHERE LOWER(source_name) LIKE '%moomoo%'
-              OR LOWER(url) LIKE '%moomoo.com%'`
+              OR LOWER(url) LIKE '%moomoo.com%'
+              OR LOWER(url) LIKE '%biggo.com%'`
         )
         .run();
     }
   } catch (e) {
     console.error("[crypto-noticias] purge-blocked", e instanceof Error ? e.message : e);
+  }
+}
+
+/** Saca del historial apuestas a fecha / prediction markets (no son noticias del desk). */
+async function purgeLowQualityNews(): Promise<void> {
+  try {
+    const rows = (await db
+      .prepare(
+        `SELECT id, title, summary, url, title_es, summary_es
+         FROM sgi_crypto_noticias
+         ORDER BY published_at DESC, id DESC
+         LIMIT 800`
+      )
+      .all()) as Array<{
+      id?: number;
+      title?: string;
+      summary?: string;
+      url?: string;
+      title_es?: string;
+      summary_es?: string;
+    }>;
+    const ids: number[] = [];
+    for (const r of rows) {
+      const id = Number(r.id);
+      if (!Number.isFinite(id)) continue;
+      const blob = `${r.title || ""} ${r.title_es || ""} ${r.summary || ""} ${r.summary_es || ""}`;
+      if (isLowQualityNews(blob, "", String(r.url || ""))) ids.push(id);
+    }
+    for (const id of ids) {
+      await db.prepare("DELETE FROM sgi_crypto_noticias WHERE id = ?").run(id);
+    }
+  } catch (e) {
+    console.error("[crypto-noticias] purge-low-quality", e instanceof Error ? e.message : e);
   }
 }
 
@@ -503,12 +540,6 @@ function hrsDeskComment(title: string, excerpt: string, sourceName: string): str
   if (/zcash|\bzec\b/i.test(t)) {
     take =
       "Desde el desk de HRS: Zcash se juega su tesis de privacidad frente a Bitcoin. El modelo importa más que el titular de ‘¿puede seguirlo?’.";
-  } else if (/prediction market|mercado de predicci/i.test(t)) {
-    take =
-      "Desde el desk de HRS: no es el precio spot. Es una apuesta de mercado a una fecha: sirve para leer expectativas, no para cotizar el activo ahora.";
-  } else if (/doge|dogecoin/i.test(t) && /price|precio/i.test(t)) {
-    take =
-      "Desde el desk de HRS: el foco es Dogecoin y su precio. Antes de tomarlo como dato, hay que ver si es cotización, producto del exchange o una predicción.";
   } else if (/\betf\b/i.test(t)) {
     take =
       "Desde el desk de HRS: cuando entra un ETF, el titular suele ir más rápido que los flujos. Conviene leer cuánto dinero se movió de verdad.";
@@ -625,7 +656,7 @@ async function maybeNotifyWireTelegram(items: CryptoWireNewsItem[]): Promise<voi
       );
       return;
     }
-    const batch = items.slice(0, 5);
+    const batch = items.filter((it) => !isLowQualityNews(it.title, it.summary, it.url)).slice(0, 5);
     let sent = 0;
     for (const raw of batch) {
       const card = await prepareTelegramCard(raw);
@@ -1027,6 +1058,7 @@ async function runIngest(): Promise<{ inserted: number; scanned: number; feedErr
   const insertedForWa: CryptoWireNewsItem[] = [];
   for (const d of drafts) {
     if (isBlockedNewsSource(d.sourceName, d.url)) continue;
+    if (isLowQualityNews(d.title, d.summary, d.url)) continue;
     try {
       const info = await db
         .prepare(
@@ -1056,6 +1088,7 @@ async function runIngest(): Promise<{ inserted: number; scanned: number; feedErr
   lastIngestAtMs = Date.now();
 
   void purgeBlockedNewsSources().catch(() => undefined);
+  void purgeLowQualityNews().catch(() => undefined);
   void purgeJunkNewsImages().catch(() => undefined);
 
   // Rellena imágenes de lo más reciente sin foto (incluye históricas sin image_url).
@@ -1217,25 +1250,26 @@ cryptoNoticiasRouter.get("/crypto-noticias/sentiment", ...readMw, async (req, re
     // Rápido: solo columnas necesarias + tope menor.
     const rows = (await db
       .prepare(
-        `SELECT id, title, summary, topics_json, published_at, title_es, summary_es
+        `SELECT id, title, summary, url, topics_json, published_at, title_es, summary_es
          FROM sgi_crypto_noticias
          ORDER BY published_at DESC, id DESC
          LIMIT 400`
       )
       .all()) as Record<string, unknown>[];
 
-    let items = rows.map((r) => {
-      const m = mapRow({
-        ...r,
-        url: "",
-        source_name: "",
-        title_pt: "",
-        summary_pt: "",
-        image_url: "",
-        fetched_at: "",
-      });
-      return m;
-    });
+    let items = rows
+      .map((r) => {
+        const m = mapRow({
+          ...r,
+          source_name: "",
+          title_pt: "",
+          summary_pt: "",
+          image_url: "",
+          fetched_at: "",
+        });
+        return m;
+      })
+      .filter((x) => !isLowQualityNews(x.title, `${x.summary} ${x.titleEs} ${x.summaryEs}`, x.url));
     if (topic && TOPIC_SET.has(topic)) {
       items = items.filter((x) => x.topics.includes(topic as CryptoNoticiaTopic));
     }
@@ -1287,7 +1321,9 @@ cryptoNoticiasRouter.get("/crypto-noticias", ...readMw, async (req, res, next) =
       )
       .all()) as Record<string, unknown>[];
 
-    let items = rows.map((r) => mapRow(r)).filter((x) => !isBlockedNewsSource(x.sourceName, x.url));
+    let items = rows
+      .map((r) => mapRow(r))
+      .filter((x) => !isBlockedNewsSource(x.sourceName, x.url) && !isLowQualityNews(x.title, `${x.summary} ${x.titleEs} ${x.summaryEs}`, x.url));
     if (topic && TOPIC_SET.has(topic)) {
       items = items.filter((x) => x.topics.includes(topic as CryptoNoticiaTopic));
     }
@@ -1516,6 +1552,18 @@ cryptoNoticiasRouter.post("/crypto-noticias/telegram/send-item", ...writeMw, asy
       await unclaimManualTelegramSend(parsed.data.id);
       return res.status(400).json({ error: { message: "Esa noticia no tiene título." } });
     }
+    if (
+      isLowQualityNews(
+        `${row.title || ""} ${row.title_es || ""}`,
+        `${row.summary || ""} ${row.summary_es || ""}`,
+        String(row.url || "")
+      )
+    ) {
+      await unclaimManualTelegramSend(parsed.data.id);
+      return res.status(400).json({
+        error: { message: "Ese tipo de nota (mercado de predicción / precio a una fecha) no se publica." },
+      });
+    }
     try {
       const card = await prepareTelegramCard({
         title: String(row.title || "").trim(),
@@ -1556,12 +1604,20 @@ cryptoNoticiasRouter.post("/crypto-noticias/telegram/send-latest", ...writeMw, a
         `SELECT title, title_es, summary, source_name, url
          FROM sgi_crypto_noticias
          ORDER BY published_at DESC, id DESC
-         LIMIT 5`
+         LIMIT 40`
       )
       .all()) as Array<{ title?: string; title_es?: string; summary?: string; source_name?: string; url?: string }>;
+    const eligible = rows.filter(
+      (r) =>
+        !isLowQualityNews(
+          `${r.title || ""} ${r.title_es || ""}`,
+          String(r.summary || ""),
+          String(r.url || "")
+        )
+    ).slice(0, 5);
     const items = (
       await Promise.all(
-        rows.map(async (r) => {
+        eligible.map(async (r) => {
           return prepareTelegramCard({
             title: String(r.title || "").trim(),
             summary: String(r.summary || "").trim(),
@@ -1570,8 +1626,7 @@ cryptoNoticiasRouter.post("/crypto-noticias/telegram/send-latest", ...writeMw, a
           });
         })
       )
-    )
-      .filter((x) => x.title);
+    ).filter((x) => x.title);
     if (!items.length) {
       return res.status(400).json({
         error: { message: "No hay noticias en el historial todavía. Tocá «Actualizar bot ahora»." },

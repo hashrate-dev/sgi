@@ -28,6 +28,11 @@ function isPublishedToday(iso: string | undefined): boolean {
   );
 }
 
+function mixPct(part: number, total: number): number {
+  if (total <= 0) return 0;
+  return Math.round((part / total) * 100);
+}
+
 function timeAgoShort(iso: string | undefined): string {
   if (!iso) return "";
   const t = Date.parse(iso);
@@ -169,19 +174,57 @@ export function CryptoNoticiasSentimentPanel({ report, loading }: Props) {
           <div className="crypto-news-sentiment__horizons">
             {horizons.map((h) => {
               const ht = scoreTone(h.score);
+              const meterPct = Math.round(((h.score + 100) / 200) * 100);
+              const total = Math.max(h.articles, h.positive + h.negative + h.neutral, 1);
+              const rows = [
+                { key: "up", label: "Alcistas", count: h.positive, cls: "is-pos" },
+                { key: "flat", label: "Neutrales", count: h.neutral, cls: "is-neu" },
+                { key: "down", label: "Bajistas", count: h.negative, cls: "is-neg" },
+              ] as const;
+              const scoredPct = Math.round(Math.min(1, Math.max(0, h.coverage)) * 100);
               return (
-                <div key={h.id} className={`crypto-news-sentiment__horizon is-${ht}`}>
+                <article
+                  key={h.id}
+                  className={`crypto-news-sentiment__horizon is-${ht} is-${h.id}`}
+                  aria-label={`${h.label}: ${h.biasLabel} ${h.score > 0 ? `+${h.score}` : h.score}`}
+                >
                   <div className="crypto-news-sentiment__horizon-top">
-                    <span className="crypto-news-sentiment__horizon-label">{h.label}</span>
+                    <span className="crypto-news-sentiment__horizon-chip">{h.label}</span>
                     <span className="crypto-news-sentiment__horizon-score">
                       {h.score > 0 ? `+${h.score}` : h.score}
                     </span>
                   </div>
                   <div className="crypto-news-sentiment__horizon-bias">{h.biasLabel}</div>
-                  <div className="crypto-news-sentiment__horizon-meta">
-                    {h.windowLabel} · {h.articles} notas · +{h.positive} / −{h.negative}
+                  <div
+                    className="crypto-news-sentiment__horizon-meter"
+                    role="meter"
+                    aria-valuemin={-100}
+                    aria-valuemax={100}
+                    aria-valuenow={h.score}
+                    aria-label="Índice de sesgo de −100 a +100"
+                  >
+                    <span className="crypto-news-sentiment__horizon-meter-fill" style={{ width: `${meterPct}%` }} />
+                    <span className="crypto-news-sentiment__horizon-meter-mid" />
                   </div>
-                </div>
+                  <p className="crypto-news-sentiment__horizon-window">
+                    {h.windowLabel} · {h.articles} notas
+                    {Number.isFinite(h.coverage) ? ` · ${scoredPct}% puntuadas` : ""}
+                  </p>
+                  <ul className="crypto-news-sentiment__horizon-mix">
+                    {rows.map((row) => (
+                      <li key={row.key} className={row.cls}>
+                        <span className="crypto-news-sentiment__horizon-mix-lab">{row.label}</span>
+                        <span className="crypto-news-sentiment__horizon-mix-bar" aria-hidden>
+                          <span style={{ width: `${mixPct(row.count, total)}%` }} />
+                        </span>
+                        <span className="crypto-news-sentiment__horizon-mix-n">
+                          {row.count}
+                          <span> {mixPct(row.count, total)}%</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </article>
               );
             })}
           </div>

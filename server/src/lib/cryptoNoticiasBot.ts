@@ -38,10 +38,13 @@ const BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
 
 function gnews(q: string, locale: "en-US" | "es-UY"): string {
+  const exclude =
+    ' -"prediction market" -"crypto prediction" -polymarket -kalshi -predictit';
+  const query = `${q}${exclude}`;
   if (locale === "es-UY") {
-    return `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=es-419&gl=UY&ceid=UY:es`;
+    return `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=es-419&gl=UY&ceid=UY:es`;
   }
-  return `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=en-US&gl=US&ceid=US:en`;
+  return `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
 }
 
 /** Fuentes del bot (consultas temáticas + wire CoinDesk). */
@@ -934,19 +937,35 @@ function inferTopics(title: string, summary: string, base: CryptoNoticiaTopic[])
   return [...set];
 }
 
-/** Descarta spam típico de feeds (casinos, airdrops basura) para mantener el wire editorial. */
-function isLowQualityNews(title: string, summary: string): boolean {
-  const hay = `${title} ${summary}`.toLowerCase();
-  return (
+/** Descarta spam típico de feeds (casinos, airdrops, mercados de predicción) para mantener el wire editorial. */
+export function isLowQualityNews(title: string, summary: string, url = ""): boolean {
+  const hay = `${title} ${summary} ${url}`.toLowerCase();
+  if (
     /\bcasino(s)?\b|\bgambling\b|\bbetting\b|\bsportsbook\b|\bslot(s)?\b|\bpoker\b/.test(hay) ||
     /\bfree\s+spins\b|\bbonus\s+code\b|\bairdrop\s+claim\b|\bbuy\s+now\b/.test(hay) ||
     /\bporn\b|\bxxx\b|\bnude\b/.test(hay)
-  );
+  ) {
+    return true;
+  }
+  // Apuestas a fecha (Polymarket / BigGo / “price on Sep 13 at 10pm”), no cotización ni periodismo.
+  if (
+    /prediction\s*market/.test(hay) ||
+    /mercado\s+de\s+predicc/.test(hay) ||
+    /crypto\s+prediction/.test(hay) ||
+    /price\s+prediction/.test(hay) ||
+    /predicci[oó]n\s+de\s+precio/.test(hay) ||
+    /\bpolymarket\b|\bkalshi\b|\bpredictit\b|\bmetaculus\b/.test(hay) ||
+    /price\s+on\s+[a-z]{3,9}\.?\s+\d{1,2},\s*\d{4}\s+at\s+\d/i.test(`${title} ${summary}`) ||
+    /precio\s+(el|del|al)\s+.+\s+a\s+las\s+\d/i.test(`${title} ${summary}`)
+  ) {
+    return true;
+  }
+  return false;
 }
 
 /** Fuentes que no queremos en el wire (por nombre o dominio). */
 const BLOCKED_SOURCE_RE = /\bmoomoo\b/i;
-const BLOCKED_HOST_RE = /(^|\.)moomoo\.com$/i;
+const BLOCKED_HOST_RE = /(^|\.)moomoo\.com$|(^|\.)biggo\.com$/i;
 
 export function isBlockedNewsSource(sourceName: string, url: string): boolean {
   if (BLOCKED_SOURCE_RE.test(sourceName || "")) return true;
@@ -969,7 +988,7 @@ export function parseRssFeedXml(xml: string, feedTopics: CryptoNoticiaTopic[]): 
     const link = normalizeUrl(tag(block, "link") || tagAttr(block, "link", "href"));
     if (!title || !link) continue;
     const summary = tag(block, "description").slice(0, 600);
-    if (isLowQualityNews(title, summary)) continue;
+    if (isLowQualityNews(title, summary, link)) continue;
     const pub = tag(block, "pubDate") || tag(block, "published") || tag(block, "updated");
     const sourceName = tag(block, "source") || channelTitle || "Wire";
     if (isBlockedNewsSource(sourceName, link)) continue;

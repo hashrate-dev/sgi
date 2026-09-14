@@ -237,6 +237,8 @@ export function CryptoNoticiasPage() {
       setReaderLoading(false);
     }
   };
+
+  const onSendNewsTelegram = async (n: CryptoNoticiaItem) => {
     if (!canEdit || n.telegramSent) return;
     setSendingId(n.id);
     setErr("");

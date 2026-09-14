@@ -604,7 +604,8 @@
 .crypto-news-sentiment__horizons {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.55rem;
+  gap: 0.7rem;
+  align-items: stretch;
 }
 
 @media (max-width: 640px) {
@@ -740,39 +741,62 @@
 }
 
 .crypto-news-sentiment__horizon {
-  padding: 0.7rem 0.75rem;
-  border-radius: 0.7rem;
-  border: 1px solid var(--cn-line);
+  --hz: #94a3b8;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: 0.75rem 0.8rem 0.8rem;
+  border-radius: 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--hz) 32%, rgba(255, 255, 255, 0.08));
   background: rgba(0, 0, 0, 0.22);
 }
 
+.crypto-news-sentiment__horizon.is-corto {
+  --hz: #5eead4;
+}
+
+.crypto-news-sentiment__horizon.is-mediano {
+  --hz: #c4b5fd;
+}
+
+.crypto-news-sentiment__horizon.is-largo {
+  --hz: #fbbf24;
+}
+
 .crypto-news-sentiment__horizon.is-up {
-  border-color: rgba(61, 186, 154, 0.4);
+  border-color: rgba(61, 186, 154, 0.42);
 }
 
 .crypto-news-sentiment__horizon.is-down {
-  border-color: rgba(239, 100, 100, 0.4);
+  border-color: rgba(239, 100, 100, 0.42);
 }
 
 .crypto-news-sentiment__horizon-top {
   display: flex;
   justify-content: space-between;
-  gap: 0.4rem;
-  align-items: baseline;
+  gap: 0.45rem;
+  align-items: flex-start;
 }
 
-.crypto-news-sentiment__horizon-label {
-  font-size: 0.72rem;
+.crypto-news-sentiment__horizon-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.68rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--cn-muted);
-  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: color-mix(in srgb, var(--hz) 82%, #fff);
+  font-weight: 800;
 }
 
 .crypto-news-sentiment__horizon-score {
-  font-size: 1.25rem;
+  font-size: 1.35rem;
   font-weight: 800;
+  line-height: 1;
   color: #fff;
+  font-variant-numeric: tabular-nums;
 }
 
 .crypto-news-sentiment__horizon.is-up .crypto-news-sentiment__horizon-score {
@@ -784,10 +808,105 @@
 }
 
 .crypto-news-sentiment__horizon-bias {
-  font-weight: 650;
-  font-size: 0.88rem;
+  font-weight: 700;
+  font-size: 0.95rem;
   color: #fff;
-  margin: 0.15rem 0;
+  margin: 0.4rem 0 0.55rem;
+}
+
+.crypto-news-sentiment__horizon-meter {
+  position: relative;
+  height: 0.42rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(239, 100, 100, 0.35), rgba(255, 255, 255, 0.12) 50%, rgba(61, 186, 154, 0.4));
+  overflow: hidden;
+}
+
+.crypto-news-sentiment__horizon-meter-fill {
+  display: block;
+  height: 100%;
+  max-width: 100%;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--hz) 55%, transparent);
+}
+
+.crypto-news-sentiment__horizon-meter-mid {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.crypto-news-sentiment__horizon-window {
+  margin: 0.5rem 0 0.55rem;
+  font-size: 0.7rem;
+  color: var(--cn-muted);
+  line-height: 1.35;
+}
+
+.crypto-news-sentiment__horizon-mix {
+  list-style: none;
+  margin: auto 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.38rem;
+}
+
+.crypto-news-sentiment__horizon-mix li {
+  display: grid;
+  grid-template-columns: 4.4rem minmax(0, 1fr) auto;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.crypto-news-sentiment__horizon-mix-lab {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--cn-muted);
+}
+
+.crypto-news-sentiment__horizon-mix-bar {
+  display: block;
+  height: 0.38rem;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.crypto-news-sentiment__horizon-mix-bar > span {
+  display: block;
+  height: 100%;
+  min-width: 0;
+  border-radius: inherit;
+}
+
+.crypto-news-sentiment__horizon-mix .is-pos .crypto-news-sentiment__horizon-mix-bar > span {
+  background: #6ee7b7;
+}
+
+.crypto-news-sentiment__horizon-mix .is-neu .crypto-news-sentiment__horizon-mix-bar > span {
+  background: rgba(180, 190, 200, 0.7);
+}
+
+.crypto-news-sentiment__horizon-mix .is-neg .crypto-news-sentiment__horizon-mix-bar > span {
+  background: #fca5a5;
+}
+
+.crypto-news-sentiment__horizon-mix-n {
+  font-size: 0.68rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: #fff;
+}
+
+.crypto-news-sentiment__horizon-mix-n span {
+  color: var(--cn-muted);
+  font-weight: 650;
 }
 
 .crypto-news-sentiment__horizon-meta {
