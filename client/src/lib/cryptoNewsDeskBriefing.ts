@@ -329,3 +329,141 @@ export function buildHorizonTradeSignals(
     largo: corto && mediano && largo ? largoTrade(largo, mediano, corto) : nada,
   };
 }
+
+export type LeadPath = "SUBA" | "BAJA" | "LATERAL";
+
+export type HorizonLead = {
+  pUp: number;
+  path: LeadPath;
+  why: string;
+  window: string;
+};
+
+export type MarketLeadRadar = {
+  pUp: number;
+  path: LeadPath;
+  setup: "NEWS LEADS" | "PRICE LEADS" | "ALINEADOS" | "CHOP";
+  why: string;
+  corto: HorizonLead;
+  mediano: HorizonLead;
+  largo: HorizonLead;
+};
+
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.min(hi, Math.max(lo, n));
+}
+
+function pFromEdge(x: number): number {
+  return Math.round(clamp(50 + x, 12, 88));
+}
+
+function pathFromP(pUp: number): LeadPath {
+  if (pUp >= 58) return "SUBA";
+  if (pUp <= 42) return "BAJA";
+  return "LATERAL";
+}
+
+function sparkLeadPct(values: number[] | undefined): number {
+  if (!values || values.length < 6) return 0;
+  const n = values.length;
+  const take = Math.min(8, Math.floor(n / 2));
+  const recent = values.slice(-take);
+  const prior = values.slice(Math.max(0, n - take * 2), n - take);
+  if (prior.length < 2 || recent.length < 2) return 0;
+  const a = prior.reduce((s, v) => s + v, 0) / prior.length;
+  const b = recent.reduce((s, v) => s + v, 0) / recent.length;
+  if (!a) return 0;
+  return ((b - a) / a) * 100;
+}
+
+function leadPack(pUp: number, why: string, window: string): HorizonLead {
+  return { pUp, path: pathFromP(pUp), why, window };
+}
+
+export function buildMarketLeadRadar(
+  report: CryptoNewsSentimentReport,
+  prices: CryptoNewsLivePrice[]
+): MarketLeadRadar | null {
+  const corto = hz(report, "corto");
+  const mediano = hz(report, "mediano");
+  const largo = hz(report, "largo");
+  if (!corto || !mediano || !largo) return null;
+
+  const tape = tapeOf(prices);
+  const btc = prices.find((p) => p.symbol === "BTC");
+  const spark = sparkLeadPct(btc?.spark);
+  const impulse = corto.score - mediano.score;
+
+  let cortoX =
+    corto.score * 0.22 +
+    impulse * 0.5 +
+    clamp(tape.hasTape ? tape.btcChg * 1.8 : 0, -12, 12) +
+    clamp(spark * 0.9, -10, 10);
+  if (tape.hasTape) {
+    if (impulse >= 7 && tape.btcChg <= 0) cortoX += 10;
+    if (impulse <= -7 && tape.btcChg >= 0) cortoX -= 10;
+    if (tape.regime === "risk_off") cortoX -= 5;
+    if (tape.regime === "risk_on") cortoX += 5;
+    if (tape.altAvg < tape.btcChg - 1.2) cortoX -= 4;
+    if (tape.altAvg > tape.btcChg + 1.0 && tape.btcChg > 0) cortoX += 3;
+  }
+  const cortoP = pFromEdge(cortoX);
+  let cortoWhy = "Impulso de titulares vs tape de BTC: el 48 h es el que se mueve primero.";
+  if (impulse >= 7 && tape.hasTape && tape.btcChg <= 0) {
+    cortoWhy = "El wire se calienta y BTC aún no: clásico adelanto de rebote. No es entrada, es sesgo.";
+  } else if (impulse <= -7 && tape.hasTape && tape.btcChg >= 0) {
+    cortoWhy = "Titulares enfrían con BTC todavía verde: adelanto de recorte / distribución.";
+  } else if (cortoP >= 58) {
+    cortoWhy = "Impulso 48 h y tape no niegan una suba táctica. Probabilidad, no disparo.";
+  } else if (cortoP <= 42) {
+    cortoWhy = "El flujo 48 h inclina a baja. Esperá confirmación de BTC antes de vender fuerte.";
+  } else {
+    cortoWhy = "Sin adelanto nítido: coin-flip. El % cerca de 50% es no operar dirección.";
+  }
+
+  let medX = mediano.score * 0.32 + impulse * 0.16 + largo.score * 0.12;
+  if (corto.score - largo.score > 22) medX -= 5;
+  if (largo.score - corto.score > 22) medX += 5;
+  const medP = pFromEdge(medX);
+  let medWhy = "14 d = persistencia del régimen, no el tick de hoy.";
+  if (medP >= 58) medWhy = "Si el 48 h no se rompe, el swing sigue con sesgo de suba.";
+  else if (medP <= 42) medWhy = "El 14 d pesa a la baja: un rebote de 48 h no cambia el swing.";
+  else medWhy = "Swing equilibrado. El adelanto mediano no paga un lado todavía.";
+
+  let largoX = largo.score * 0.4 + mediano.score * 0.14;
+  if (impulse > 12 && mediano.score > 0) largoX += 4;
+  if (impulse < -12 && mediano.score < 0) largoX -= 4;
+  const largoP = pFromEdge(largoX);
+  let largoWhy = "45 d se mueve lento: el tape de 24 h casi no cuenta.";
+  if (largoP >= 58) largoWhy = "Fondo constructivo. El adelanto largo es mantener core, no perseguir alts.";
+  else if (largoP <= 42) largoWhy = "Régimen pesado: probabilidad de más presión en semanas, no de un crash mañana.";
+  else largoWhy = "Sin régimen. El % largo cerca de 50% = no rotar el core.";
+
+  let setup: MarketLeadRadar["setup"] = "CHOP";
+  if (tape.hasTape && Math.abs(impulse) >= 7 && Math.sign(impulse) !== Math.sign(tape.btcChg || 0) && Math.abs(tape.btcChg) >= 0.15) {
+    setup = "NEWS LEADS";
+  } else if (tape.hasTape && Math.abs(tape.btcChg) >= 1.4 && Math.abs(impulse) < 5) {
+    setup = "PRICE LEADS";
+  } else if (tape.hasTape && Math.sign(impulse || corto.score) === Math.sign(tape.btcChg) && (Math.abs(impulse) >= 5 || Math.abs(tape.btcChg) >= 0.8)) {
+    setup = "ALINEADOS";
+  }
+
+  const radarWhy =
+    setup === "NEWS LEADS"
+      ? "Setup adelantado: el wire se mueve y el precio todavía no. Ahí está la ventaja."
+      : setup === "PRICE LEADS"
+        ? "El precio se adelantó al wire. Seguí el tape, no inventes narrativa."
+        : setup === "ALINEADOS"
+          ? "Wire y BTC del mismo lado: continuación más que reversión."
+          : "Chop: titulares y tape no se ponen de acuerdo. El % no es licencia para forzar.";
+
+  return {
+    pUp: cortoP,
+    path: pathFromP(cortoP),
+    setup,
+    why: radarWhy,
+    corto: leadPack(cortoP, cortoWhy, "próx. 48–72 h"),
+    mediano: leadPack(medP, medWhy, "próx. 1–3 semanas"),
+    largo: leadPack(largoP, largoWhy, "próx. 4–8 semanas"),
+  };
+}

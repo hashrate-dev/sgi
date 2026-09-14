@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Chart from "chart.js/auto";
 import type { Chart as ChartInstance } from "chart.js";
 import { getCryptoNoticiasLivePrices, type CryptoNewsLivePrice, type CryptoNewsSentimentReport } from "../lib/api";
-import { buildHorizonTradeSignals } from "../lib/cryptoNewsDeskBriefing";
+import { buildHorizonTradeSignals, buildMarketLeadRadar } from "../lib/cryptoNewsDeskBriefing";
 import { CryptoNoticiasLivePrices } from "./CryptoNoticiasLivePrices";
 import { CryptoNoticiasDeskBriefing } from "./CryptoNoticiasDeskBriefing";
 
@@ -175,6 +175,7 @@ export function CryptoNoticiasSentimentPanel({ report, loading }: Props) {
     () => (report ? buildHorizonTradeSignals(report, prices) : null),
     [report, prices]
   );
+  const radar = useMemo(() => (report ? buildMarketLeadRadar(report, prices) : null), [report, prices]);
 
   if (loading && !report) {
     return (
@@ -241,7 +242,9 @@ export function CryptoNoticiasSentimentPanel({ report, loading }: Props) {
               ] as const;
               const scoredPct = Math.round(Math.min(1, Math.max(0, h.coverage)) * 100);
               const call = tradeSignals[h.id];
+              const lead = radar?.[h.id];
               const callCls = call.action === "COMPRAR" ? "is-buy" : call.action === "VENDER" ? "is-sell" : "is-flat";
+              const leadCls = lead?.path === "SUBA" ? "is-up" : lead?.path === "BAJA" ? "is-down" : "is-flat";
               return (
                 <article
                   key={h.id}
@@ -275,6 +278,21 @@ export function CryptoNoticiasSentimentPanel({ report, loading }: Props) {
                     <span className="crypto-news-sentiment__horizon-call-word">{call.action}</span>
                     <span className="crypto-news-sentiment__horizon-call-why">{call.why}</span>
                   </div>
+                  {lead ? (
+                    <div className={`crypto-news-sentiment__lead ${leadCls}`}>
+                      <div className="crypto-news-sentiment__lead-row">
+                        <span>Adelanto · {lead.window}</span>
+                        <strong>
+                          {lead.pUp}% {lead.path}
+                        </strong>
+                      </div>
+                      <div className="crypto-news-sentiment__lead-bar" aria-hidden>
+                        <span className="crypto-news-sentiment__lead-fill" style={{ width: `${lead.pUp}%` }} />
+                        <span className="crypto-news-sentiment__lead-mid" />
+                      </div>
+                      <p className="crypto-news-sentiment__lead-why">{lead.why}</p>
+                    </div>
+                  ) : null}
                   <ul className="crypto-news-sentiment__horizon-mix">
                     {rows.map((row) => (
                       <li key={row.key} className={row.cls}>
@@ -294,6 +312,16 @@ export function CryptoNoticiasSentimentPanel({ report, loading }: Props) {
             })}
           </div>
           <div className="crypto-news-sentiment__chart-wrap">
+            {radar ? (
+              <div className={`crypto-news-sentiment__radar is-${radar.path === "SUBA" ? "up" : radar.path === "BAJA" ? "down" : "flat"}`}>
+                <div className="crypto-news-sentiment__radar-kicker">Adelanto · {radar.setup}</div>
+                <div className="crypto-news-sentiment__radar-main">
+                  <span className="crypto-news-sentiment__radar-pct">{radar.pUp}%</span>
+                  <span className="crypto-news-sentiment__radar-path">{radar.path}</span>
+                </div>
+                <p className="crypto-news-sentiment__radar-why">{radar.why}</p>
+              </div>
+            ) : null}
             <div className="crypto-news-sentiment__chart-kicker">Sesgo por plazo</div>
             <div className="crypto-news-sentiment__chart-canvas">
               <canvas ref={canvasRef} />
