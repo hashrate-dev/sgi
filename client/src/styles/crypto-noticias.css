@@ -949,15 +949,73 @@
 }
 
 .crypto-news-sentiment__horizon-window {
-  margin: 0.5rem 0 0.55rem;
+  margin: 0.5rem 0 0.35rem;
   font-size: 0.7rem;
   color: var(--cn-muted);
   line-height: 1.35;
 }
 
+.crypto-news-sentiment__horizon-call {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  min-height: 5.8rem;
+  margin: 0.15rem 0 0.55rem;
+  padding: 0.55rem 0.45rem 0.6rem;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.crypto-news-sentiment__horizon-call.is-buy {
+  border-color: rgba(61, 186, 154, 0.45);
+  background: rgba(61, 186, 154, 0.12);
+}
+
+.crypto-news-sentiment__horizon-call.is-sell {
+  border-color: rgba(239, 100, 100, 0.45);
+  background: rgba(239, 100, 100, 0.12);
+}
+
+.crypto-news-sentiment__horizon-call-kicker {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cn-muted);
+  margin-bottom: 0.2rem;
+}
+
+.crypto-news-sentiment__horizon-call-word {
+  font-size: 1.55rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  line-height: 1.05;
+  color: #e8eef5;
+}
+
+.crypto-news-sentiment__horizon-call.is-buy .crypto-news-sentiment__horizon-call-word {
+  color: #6ee7b7;
+}
+
+.crypto-news-sentiment__horizon-call.is-sell .crypto-news-sentiment__horizon-call-word {
+  color: #fca5a5;
+}
+
+.crypto-news-sentiment__horizon-call-why {
+  margin-top: 0.35rem;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  color: rgba(232, 238, 245, 0.78);
+  max-width: 16rem;
+}
+
 .crypto-news-sentiment__horizon-mix {
   list-style: none;
-  margin: auto 0 0;
+  margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;

@@ -237,3 +237,95 @@ export function buildDeskBriefing(
 
   return { notes, invalidation, tapeLine };
 }
+
+export type TradeAction = "COMPRAR" | "VENDER" | "NADA";
+
+export type HorizonTradeSignal = {
+  action: TradeAction;
+  why: string;
+};
+
+function newsEdge(h: Horizon): number {
+  const n = Math.max(1, h.articles);
+  return (h.positive - h.negative) / n;
+}
+
+function tooFlat(h: Horizon): boolean {
+  const n = Math.max(1, h.articles);
+  const directional = (h.positive + h.negative) / n;
+  return Math.abs(h.score) < 15 || directional < 0.12;
+}
+
+function cortoTrade(h: Horizon, tape: ReturnType<typeof tapeOf>): HorizonTradeSignal {
+  if (tooFlat(h)) {
+    return { action: "NADA", why: "Wire sin lado. No se opera un mercado 90% neutral." };
+  }
+  if (tape.hasTape && tape.regime === "risk_off" && h.score > 0) {
+    return { action: "NADA", why: "BTC en risk-off: no comprar narrativa contra el tape." };
+  }
+  if (tape.hasTape && tape.regime === "risk_on" && h.score < 0) {
+    return { action: "NADA", why: "Squeeze: no vender titulares feos con BTC bid." };
+  }
+  if (h.score >= 15 && newsEdge(h) >= 0.12 && (!tape.hasTape || tape.btcChg >= -0.8)) {
+    return { action: "COMPRAR", why: "48 h alcista y BTC no niega. Long táctico en pullback." };
+  }
+  if (h.score <= -15 && newsEdge(h) <= -0.12 && (!tape.hasTape || tape.btcChg <= 0.8)) {
+    return { action: "VENDER", why: "48 h bajista y el tape no lo contradice. Reducir riesgo." };
+  }
+  if (tape.hasTape && h.score >= 12 && tape.regime === "risk_on" && tape.btcChg >= 1.2) {
+    return { action: "COMPRAR", why: "Wire y BTC alineados al alza. Seguir, no perseguir vertical." };
+  }
+  if (tape.hasTape && h.score <= -12 && tape.regime === "risk_off" && tape.btcChg <= -1.2) {
+    return { action: "VENDER", why: "Wire y BTC alineados a la baja. No recoger cuchillos." };
+  }
+  return { action: "NADA", why: "Sin alineación wire + BTC. Fuera hasta que haya lado." };
+}
+
+function medianoTrade(h: Horizon, corto: Horizon): HorizonTradeSignal {
+  if (tooFlat(h)) {
+    return { action: "NADA", why: "14 d lateral. El swing no paga dirección." };
+  }
+  const conflict = (corto.score <= -15 && h.score >= 15) || (corto.score >= 15 && h.score <= -15);
+  if (conflict) {
+    return { action: "NADA", why: "48 h pelea con el 14 d. No girar el swing." };
+  }
+  if (h.score >= 15 && newsEdge(h) >= 0.08 && corto.score > -15) {
+    return { action: "COMPRAR", why: "Base de 14 d alcista. Comprar retrocesos de BTC, no FOMO." };
+  }
+  if (h.score <= -15 && newsEdge(h) <= -0.08 && corto.score < 15) {
+    return { action: "VENDER", why: "14 d de presión. Bajar beta / no girar inventario." };
+  }
+  return { action: "NADA", why: "Swing sin tesis nítida. Cash o tamaño mínimo." };
+}
+
+function largoTrade(h: Horizon, mediano: Horizon, corto: Horizon): HorizonTradeSignal {
+  if (tooFlat(h)) {
+    return { action: "NADA", why: "45 d sin régimen. No apostar el core a un lado." };
+  }
+  if (h.score >= 18 && mediano.score >= 0 && newsEdge(h) >= 0.08) {
+    if (corto.score <= -15 && mediano.score < 8) {
+      return { action: "NADA", why: "Fondo ok, pero el tramo corto se rompe. Esperar el 14 d." };
+    }
+    return { action: "COMPRAR", why: "Régimen de 45 d constructivo. Core BTC, alts satélite." };
+  }
+  if (h.score <= -18 && mediano.score <= 0 && newsEdge(h) <= -0.08) {
+    return { action: "VENDER", why: "Régimen de 45 d pesado. Preservar caja, no expandir beta." };
+  }
+  return { action: "NADA", why: "Largo sin señal operable. Mantener, no rotar." };
+}
+
+export function buildHorizonTradeSignals(
+  report: CryptoNewsSentimentReport,
+  prices: CryptoNewsLivePrice[]
+): Record<"corto" | "mediano" | "largo", HorizonTradeSignal> {
+  const nada: HorizonTradeSignal = { action: "NADA", why: "Sin datos de horizonte." };
+  const corto = hz(report, "corto");
+  const mediano = hz(report, "mediano");
+  const largo = hz(report, "largo");
+  const tape = tapeOf(prices);
+  return {
+    corto: corto ? cortoTrade(corto, tape) : nada,
+    mediano: corto && mediano ? medianoTrade(mediano, corto) : nada,
+    largo: corto && mediano && largo ? largoTrade(largo, mediano, corto) : nada,
+  };
+}

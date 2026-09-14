@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Chart from "chart.js/auto";
 import type { Chart as ChartInstance } from "chart.js";
-import type { CryptoNewsSentimentReport } from "../lib/api";
+import { getCryptoNoticiasLivePrices, type CryptoNewsLivePrice, type CryptoNewsSentimentReport } from "../lib/api";
+import { buildHorizonTradeSignals } from "../lib/cryptoNewsDeskBriefing";
 import { CryptoNoticiasLivePrices } from "./CryptoNoticiasLivePrices";
 import { CryptoNoticiasDeskBriefing } from "./CryptoNoticiasDeskBriefing";
 
@@ -53,6 +54,25 @@ function timeAgoShort(iso: string | undefined): string {
 export function CryptoNoticiasSentimentPanel({ report, loading }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chartRef = useRef<ChartInstance | null>(null);
+  const [prices, setPrices] = useState<CryptoNewsLivePrice[]>([]);
+
+  useEffect(() => {
+    let dead = false;
+    const pull = async () => {
+      try {
+        const r = await getCryptoNoticiasLivePrices();
+        if (!dead) setPrices(r.items || []);
+      } catch {
+        if (!dead) setPrices([]);
+      }
+    };
+    void pull();
+    const id = window.setInterval(() => void pull(), 12_000);
+    return () => {
+      dead = true;
+      window.clearInterval(id);
+    };
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -164,6 +184,7 @@ export function CryptoNoticiasSentimentPanel({ report, loading }: Props) {
   const { signal, horizons, drivers } = report;
   const tone = scoreTone(signal.score);
   const gaugePct = Math.round(((signal.score + 100) / 200) * 100);
+  const tradeSignals = useMemo(() => buildHorizonTradeSignals(report, prices), [report, prices]);
 
   return (
     <section className="crypto-news-sentiment hrs-card sgi-glass-panel" aria-label="Señal de mercado HRS">
@@ -215,11 +236,13 @@ export function CryptoNoticiasSentimentPanel({ report, loading }: Props) {
                 { key: "down", label: "Bajistas", count: h.negative, cls: "is-neg" },
               ] as const;
               const scoredPct = Math.round(Math.min(1, Math.max(0, h.coverage)) * 100);
+              const call = tradeSignals[h.id];
+              const callCls = call.action === "COMPRAR" ? "is-buy" : call.action === "VENDER" ? "is-sell" : "is-flat";
               return (
                 <article
                   key={h.id}
-                  className={`crypto-news-sentiment__horizon is-${ht} is-${h.id}`}
-                  aria-label={`${h.label}: ${h.biasLabel} ${h.score > 0 ? `+${h.score}` : h.score}`}
+                  className={`crypto-news-sentiment__horizon is-${ht} is-${h.id} ${callCls}`}
+                  aria-label={`${h.label}: ${h.biasLabel} ${h.score > 0 ? `+${h.score}` : h.score}. Señal ${call.action}`}
                 >
                   <div className="crypto-news-sentiment__horizon-top">
                     <span className="crypto-news-sentiment__horizon-chip">{h.label}</span>
@@ -243,6 +266,11 @@ export function CryptoNoticiasSentimentPanel({ report, loading }: Props) {
                     {h.windowLabel} · {h.articles} notas
                     {Number.isFinite(h.coverage) ? ` · ${scoredPct}% puntuadas` : ""}
                   </p>
+                  <div className={`crypto-news-sentiment__horizon-call ${callCls}`}>
+                    <span className="crypto-news-sentiment__horizon-call-kicker">Señal · BTC / cripto</span>
+                    <span className="crypto-news-sentiment__horizon-call-word">{call.action}</span>
+                    <span className="crypto-news-sentiment__horizon-call-why">{call.why}</span>
+                  </div>
                   <ul className="crypto-news-sentiment__horizon-mix">
                     {rows.map((row) => (
                       <li key={row.key} className={row.cls}>
