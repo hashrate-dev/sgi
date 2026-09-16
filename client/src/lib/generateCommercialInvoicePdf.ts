@@ -244,12 +244,12 @@ export async function downloadCommercialInvoicePdf(fields: CommercialInvoiceFiel
   const prefixW = doc.getTextWidth(prefix);
   doc.setFont("helvetica", "normal");
   const wordsW = doc.getTextWidth(` ${wordsPart}`);
-  const gap = 1.6;
-  if (prefixW + gap + wordsW <= innerW) {
+  const amountGap = 1.6;
+  if (prefixW + amountGap + wordsW <= innerW) {
     doc.setFont("helvetica", "bold");
     doc.text(prefix, M, y);
     doc.setFont("helvetica", "normal");
-    doc.text(` ${wordsPart}`, M + prefixW + gap, y);
+    doc.text(` ${wordsPart}`, M + prefixW + amountGap, y);
     y += 6;
   } else {
     doc.setFont("helvetica", "bold");
