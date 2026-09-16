@@ -28,16 +28,20 @@ export function CommercialInvoiceItemCatalogPicker({
   const searchRef = useRef<HTMLInputElement>(null);
   const [menuBox, setMenuBox] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
 
+  const matchedEquipo =
+    (item.catalogKey?.startsWith("equipo_") ? equipos.find((e) => `equipo_${e.id}` === item.catalogKey) : undefined) ??
+    equipos.find((e) => {
+      const label = commercialInvoiceEquipoLabel(e);
+      const desc = item.description.trim();
+      return label === desc || `${e.marcaEquipo} ${e.modelo}`.trim() === desc;
+    });
+
   const selectValue =
     item.catalogKey === CI_CUSTOM_KEY
       ? CI_CUSTOM_KEY
-      : item.catalogKey?.startsWith("equipo_") && equipos.some((e) => `equipo_${e.id}` === item.catalogKey)
-        ? item.catalogKey
-        : equipos.find((e) => commercialInvoiceEquipoLabel(e) === item.description)
-          ? `equipo_${equipos.find((e) => commercialInvoiceEquipoLabel(e) === item.description)!.id}`
-          : item.description.trim()
-            ? CI_CUSTOM_KEY
-            : "";
+      : matchedEquipo
+        ? `equipo_${matchedEquipo.id}`
+        : "";
 
   const nq = q.trim().toLowerCase();
   const equiposFiltrados = useMemo(
@@ -179,7 +183,7 @@ export function CommercialInvoiceItemCatalogPicker({
             document.body
           )
         : null}
-      {selectValue === CI_CUSTOM_KEY ? (
+      {item.catalogKey === CI_CUSTOM_KEY ? (
         <input
           className="fact-input"
           placeholder="Descripción libre"

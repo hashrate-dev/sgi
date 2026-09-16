@@ -75,14 +75,23 @@ export async function downloadCommercialInvoicePdf(fields: CommercialInvoiceFiel
 
   const drawParty = (title: string, rows: Array<[string, string]>, x: number, startY: number): number => {
     const padX = 3;
-    const labelW = 36;
+    const valueGap = 1.8;
+    const valueMinW = 18;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6.8);
+    const longestLabel = Math.max(...rows.map(([label]) => doc.getTextWidth(`${label}:`)), 28);
+    const labelW = Math.min(longestLabel, colW - padX * 2 - valueMinW - valueGap);
     let body = 3.5;
     const prepared = rows.map(([label, value]) => {
       const val = (value.trim() || "—").replace(/\s+/g, " ");
-      const wrapped = doc.splitTextToSize(val, colW - padX * 2 - labelW) as string[];
-      const h = Math.max(4.1, wrapped.length * 3.6);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(6.8);
+      const labelLines = doc.splitTextToSize(`${label}:`, labelW) as string[];
+      doc.setFont("helvetica", "normal");
+      const wrapped = doc.splitTextToSize(val, colW - padX * 2 - labelW - valueGap) as string[];
+      const h = Math.max(4.1, Math.max(labelLines.length, wrapped.length) * 3.6);
       body += h + 1.15;
-      return { label, wrapped, h };
+      return { labelLines, wrapped, h };
     });
     const headH = 7.4;
     const cardH = headH + body + 1;
@@ -101,10 +110,10 @@ export async function downloadCommercialInvoicePdf(fields: CommercialInvoiceFiel
       doc.setFont("helvetica", "bold");
       doc.setFontSize(6.8);
       navy(doc);
-      doc.text(`${row.label}:`, x + padX, yy);
+      row.labelLines.forEach((line, i) => doc.text(line, x + padX, yy + i * 3.6));
       doc.setFont("helvetica", "normal");
       doc.setTextColor(35, 48, 68);
-      row.wrapped.forEach((line, i) => doc.text(line, x + padX + labelW, yy + i * 3.6));
+      row.wrapped.forEach((line, i) => doc.text(line, x + padX + labelW + valueGap, yy + i * 3.6));
       yy += row.h + 1.15;
     }
     return startY + cardH;

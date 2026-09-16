@@ -489,26 +489,31 @@
 
 .ci-paper__kv {
   display: grid;
-  grid-template-columns: 38mm 1fr;
-  gap: 0.5mm 2mm;
+  grid-template-columns: minmax(0, max-content) minmax(12mm, 1fr);
+  gap: 0.5mm 2.4mm;
   margin: 0 0 1.8mm;
   align-items: start;
 }
 
 .ci-paper__kv dt {
   margin: 0;
+  min-width: 0;
+  max-width: 56mm;
   font-size: 7pt;
   font-weight: 700;
   color: #1b365d;
   line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .ci-paper__kv dd {
   margin: 0;
+  min-width: 0;
   font-size: 8.4pt;
   color: #243044;
   line-height: 1.35;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .ci-paper__goods {
