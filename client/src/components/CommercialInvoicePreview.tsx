@@ -7,6 +7,7 @@ import {
   commercialInvoicePartyTitle,
   commercialInvoiceRecipientRows,
   commercialInvoiceSenderRows,
+  commercialInvoiceSerialLabel,
   commercialInvoiceTotals,
   commercialInvoiceUsdInWords,
   type CommercialInvoiceFields,
@@ -96,7 +97,10 @@ export function CommercialInvoicePreview({
             ) : (
               visibleItems.map((it, i) => (
                 <tr key={i}>
-                  <td className="ci-paper__desc">{it.description || "—"}</td>
+                  <td className="ci-paper__desc">
+                    <div>{it.description || "—"}</div>
+                    {commercialInvoiceSerialLabel(it) ? <div className="ci-paper__sn">{commercialInvoiceSerialLabel(it)}</div> : null}
+                  </td>
                   <td className="ci-c">{it.quantity}</td>
                   <td className="ci-r">{commercialInvoiceMoney(it.unitPrice)}</td>
                   <td className="ci-r">{commercialInvoiceMoney(commercialInvoiceLineAmount(it))}</td>

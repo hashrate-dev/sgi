@@ -1,5 +1,7 @@
 /** Commercial invoice (export / hosting) — IN00101, IN00102, … */
 
+import { COUNTRIES_REGISTRO, countryFlagImgUrl } from "./marketplaceRegistroGeo";
+
 export type CommercialInvoiceItem = {
   description: string;
   quantity: number;
@@ -72,7 +74,7 @@ export function formatCommercialInvoiceNumber(seq: number): string {
 }
 
 export function emptyCommercialInvoiceItem(): CommercialInvoiceItem {
-  return { kind: "goods", description: "", quantity: 1, unit: "un", unitPrice: 0 };
+  return { kind: "goods", description: "", quantity: 1, unit: "un", unitPrice: 0, serialNumber: "" };
 }
 
 export const COMMERCIAL_INVOICE_SHIPPING_CARRIERS = [
@@ -97,6 +99,59 @@ export type CommercialInvoiceRecipient = {
   email: string;
   country: string;
 };
+
+export type CommercialInvoiceSender = CommercialInvoiceRecipient;
+
+export type CommercialInvoiceCountry = {
+  id: number;
+  name: string;
+};
+
+export function normalizeCommercialInvoiceCountry(name: string): string {
+  return name.trim().replace(/\s+/g, " ").toUpperCase();
+}
+
+function foldCountryName(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .trim();
+}
+
+const COMMERCIAL_INVOICE_COUNTRY_ALIASES: Record<string, string> = {
+  usa: "US",
+  eeuu: "US",
+  "united states": "US",
+  "estados unidos de america": "US",
+  uk: "GB",
+  "united kingdom": "GB",
+  england: "GB",
+  "gran bretana": "GB",
+  "reino unido": "GB",
+  holland: "NL",
+  netherlands: "NL",
+  "paises bajos": "NL",
+  russia: "RU",
+  "south korea": "KR",
+  "north korea": "KP",
+  "ivory coast": "CI",
+};
+
+export function commercialInvoiceCountryIso(name: string): string {
+  const raw = name.trim();
+  if (!raw) return "";
+  if (/^[A-Za-z]{2}$/.test(raw)) return raw.toUpperCase();
+  const f = foldCountryName(raw);
+  if (COMMERCIAL_INVOICE_COUNTRY_ALIASES[f]) return COMMERCIAL_INVOICE_COUNTRY_ALIASES[f];
+  const exact = COUNTRIES_REGISTRO.find((c) => foldCountryName(c.name) === f || foldCountryName(c.id) === f);
+  return exact?.id ?? "";
+}
+
+export function commercialInvoiceCountryFlagUrl(name: string): string {
+  const iso = commercialInvoiceCountryIso(name);
+  return iso ? countryFlagImgUrl(iso) : "";
+}
 
 export function formatCommercialInvoiceUserCode(n: number): string {
   return `USR${String(Math.max(0, Math.trunc(n))).padStart(3, "0")}`;
@@ -129,8 +184,55 @@ export function matchCommercialInvoiceRecipient(
   return hit?.id ?? null;
 }
 
+export function applyCommercialInvoiceSender(
+  sender: Pick<CommercialInvoiceSender, "name" | "taxId" | "address" | "phone" | "email" | "country">
+): Pick<
+  CommercialInvoiceFields,
+  "sellerName" | "sellerTaxId" | "sellerAddress" | "sellerPhone" | "sellerEmail" | "sellerCountry" | "originCountry"
+> {
+  return {
+    sellerName: sender.name,
+    sellerTaxId: sender.taxId,
+    sellerAddress: sender.address,
+    sellerPhone: sender.phone,
+    sellerEmail: sender.email,
+    sellerCountry: sender.country,
+    originCountry: sender.country,
+  };
+}
+
+export function matchCommercialInvoiceSender(
+  fields: Pick<CommercialInvoiceFields, "sellerName" | "sellerTaxId">,
+  senders: CommercialInvoiceSender[]
+): number | null {
+  const hit = senders.find(
+    (s) => (s.taxId && s.taxId === fields.sellerTaxId.trim()) || s.name === fields.sellerName.trim()
+  );
+  return hit?.id ?? null;
+}
+
 export function isCommercialInvoiceShippingItem(item: CommercialInvoiceItem): boolean {
   return item.kind === "shipping" || item.catalogKey === "shipping";
+}
+
+export function isPlaceholderCommercialInvoiceItem(item: CommercialInvoiceItem): boolean {
+  if (isCommercialInvoiceShippingItem(item)) {
+    return !String(item.shippingFrom ?? "").trim() && !String(item.shippingTo ?? "").trim() && !(Number(item.unitPrice) > 0);
+  }
+  return !item.description.trim() && !(Number(item.unitPrice) > 0);
+}
+
+export function commercialInvoiceSerialSlots(item: CommercialInvoiceItem): string[] {
+  const n = Math.max(1, Math.min(20, Math.round(Number(item.quantity) || 1)));
+  const parts = String(item.serialNumber ?? "")
+    .split(/[,;\n]+/)
+    .map((s) => s.trim());
+  return Array.from({ length: n }, (_, i) => parts[i] ?? "");
+}
+
+export function commercialInvoiceSerialLabel(item: CommercialInvoiceItem): string {
+  const sn = String(item.serialNumber ?? "").trim();
+  return sn ? `S/N: ${sn}` : "";
 }
 
 export function commercialInvoiceShippingDescription(item: Pick<CommercialInvoiceItem, "shippingCarrier" | "shippingFrom" | "shippingTo">): string {
@@ -318,7 +420,7 @@ export function defaultCommercialInvoiceFields(): CommercialInvoiceFields {
     goodsStatus: "Used / Usado",
     shipmentPurpose: "Shipment of used equipment / Envío de equipos usados",
     goodsOriginCountry: "",
-    items: [emptyCommercialInvoiceItem()],
+    items: [],
   };
 }
 
@@ -344,7 +446,7 @@ export function recallCommercialInvoiceDraft(): CommercialInvoiceFields | null {
       goodsStatus: parsed.goodsStatus ?? "Used / Usado",
       shipmentPurpose: parsed.shipmentPurpose ?? "Shipment of used equipment / Envío de equipos usados",
       goodsOriginCountry: parsed.goodsOriginCountry ?? "",
-      items: Array.isArray(parsed.items) && parsed.items.length ? parsed.items : defaultCommercialInvoiceFields().items,
+      items: Array.isArray(parsed.items) ? parsed.items.filter((it) => !isPlaceholderCommercialInvoiceItem(it as CommercialInvoiceItem)) : [],
     };
   } catch {
     return null;

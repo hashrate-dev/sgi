@@ -1128,6 +1128,23 @@ CREATE TABLE IF NOT EXISTS commercial_invoice_recipients (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS commercial_invoice_senders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_number INTEGER NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  tax_id TEXT NOT NULL DEFAULT '',
+  address TEXT NOT NULL DEFAULT '',
+  phone TEXT NOT NULL DEFAULT '',
+  email TEXT NOT NULL DEFAULT '',
+  country TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS commercial_invoice_countries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `);
 
   const txWrap = {

@@ -9,6 +9,7 @@ import {
   commercialInvoicePartyTitle,
   commercialInvoiceRecipientRows,
   commercialInvoiceSenderRows,
+  commercialInvoiceSerialLabel,
   commercialInvoiceTotals,
   commercialInvoiceUsdInWords,
 } from "./commercialInvoice";
@@ -186,8 +187,10 @@ export async function downloadCommercialInvoicePdf(fields: CommercialInvoiceFiel
     y += 8;
   } else {
     items.forEach((item) => {
+      const sn = commercialInvoiceSerialLabel(item);
       const descLines = doc.splitTextToSize(item.description || "—", cols[0]!.w - 4) as string[];
-      const rowH = Math.max(9, descLines.length * 3.8 + 4);
+      const snLines = sn ? (doc.splitTextToSize(sn, cols[0]!.w - 4) as string[]) : [];
+      const rowH = Math.max(9, descLines.length * 3.8 + snLines.length * 3.4 + 4.4);
       if (y + rowH > PAGE_H - 28) {
         doc.addPage();
         y = M;
@@ -200,7 +203,15 @@ export async function downloadCommercialInvoicePdf(fields: CommercialInvoiceFiel
       doc.setTextColor(30, 40, 55);
       let x = M;
       descLines.forEach((line, li) => doc.text(line, x + 2, y + 4.6 + li * 3.8));
+      if (snLines.length) {
+        doc.setFontSize(7.2);
+        doc.setTextColor(70, 85, 105);
+        const snTop = y + 4.6 + descLines.length * 3.8;
+        snLines.forEach((line, li) => doc.text(line, x + 2, snTop + li * 3.4));
+      }
       x += cols[0]!.w;
+      doc.setFontSize(8);
+      doc.setTextColor(30, 40, 55);
       doc.text(String(item.quantity), x + cols[1]!.w / 2, y + 5.4, { align: "center" });
       x += cols[1]!.w;
       doc.text(commercialInvoiceMoney(item.unitPrice), x + cols[2]!.w - 1.6, y + 5.4, { align: "right" });

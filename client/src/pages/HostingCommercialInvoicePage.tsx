@@ -1,19 +1,28 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
+import { CommercialInvoiceCountrySelect } from "../components/CommercialInvoiceCountrySelect";
 import { CommercialInvoiceItemCatalogPicker } from "../components/CommercialInvoiceItemCatalogPicker";
+import { CommercialInvoicePartyPicker } from "../components/CommercialInvoicePartyPicker";
+import { CommercialInvoiceShippingPicker } from "../components/CommercialInvoiceShippingPicker";
 import { CommercialInvoicePreview } from "../components/CommercialInvoicePreview";
 import { PageHeader } from "../components/PageHeader";
 import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import {
   createCommercialInvoice,
+  createCommercialInvoiceCountry,
+  createCommercialInvoiceSender,
   createCommercialInvoiceRecipient,
   getCommercialInvoiceCatalog,
+  getCommercialInvoiceCountries,
   getCommercialInvoiceNextNumber,
+  getCommercialInvoiceSenders,
   getCommercialInvoiceRecipients,
   getCommercialInvoices,
   updateCommercialInvoice,
   type CommercialInvoiceCatalogEquipo,
+  type CommercialInvoiceCountry,
+  type CommercialInvoiceSender,
   type CommercialInvoiceRecipient,
   type CommercialInvoiceRecord,
 } from "../lib/api";
@@ -23,15 +32,18 @@ import {
   COMMERCIAL_INVOICE_FIRST_SEQ,
   COMMERCIAL_INVOICE_INCOTERMS,
   COMMERCIAL_INVOICE_SHIPMENT_PURPOSES,
-  COMMERCIAL_INVOICE_SHIPPING_CARRIERS,
   applyCommercialInvoiceRecipient,
+  applyCommercialInvoiceSender,
   commercialInvoiceLineAmount,
+  commercialInvoiceSerialSlots,
   defaultCommercialInvoiceFields,
   emptyCommercialInvoiceItem,
   emptyCommercialInvoiceShippingItem,
   formatCommercialInvoiceNumber,
   isCommercialInvoiceShippingItem,
   matchCommercialInvoiceRecipient,
+  matchCommercialInvoiceSender,
+  normalizeCommercialInvoiceCountry,
   patchCommercialInvoiceShipping,
   recallCommercialInvoiceDraft,
   rememberCommercialInvoiceDraft,
@@ -94,6 +106,11 @@ export function HostingCommercialInvoicePage() {
   const [equipos, setEquipos] = useState<CommercialInvoiceCatalogEquipo[]>([]);
   const [recipients, setRecipients] = useState<CommercialInvoiceRecipient[]>([]);
   const [savingRecipient, setSavingRecipient] = useState(false);
+  const [senders, setSenders] = useState<CommercialInvoiceSender[]>([]);
+  const [savingSender, setSavingSender] = useState(false);
+  const [countries, setCountries] = useState<CommercialInvoiceCountry[]>([]);
+  const [previewZoom, setPreviewZoom] = useState(0.72);
+  const previewBodyRef = useRef<HTMLDivElement>(null);
   const displayNumber = savedNumber || peekNumber || "IN00101";
 
   const money = (n: number) =>
@@ -120,6 +137,24 @@ export function HostingCommercialInvoicePage() {
     }
   }, []);
 
+  const loadSenders = useCallback(async () => {
+    try {
+      const res = await getCommercialInvoiceSenders();
+      setSenders(res.senders ?? []);
+    } catch {
+      showToast("No se pudo cargar los expedidores", "error");
+    }
+  }, []);
+
+  const loadCountries = useCallback(async () => {
+    try {
+      const res = await getCommercialInvoiceCountries();
+      setCountries(res.countries ?? []);
+    } catch {
+      showToast("No se pudo cargar los países", "error");
+    }
+  }, []);
+
   useEffect(() => {
     void loadList();
   }, [loadList]);
@@ -127,6 +162,26 @@ export function HostingCommercialInvoicePage() {
   useEffect(() => {
     void loadRecipients();
   }, [loadRecipients]);
+
+  useEffect(() => {
+    void loadSenders();
+  }, [loadSenders]);
+
+  useEffect(() => {
+    void loadCountries();
+  }, [loadCountries]);
+
+  useEffect(() => {
+    const el = previewBodyRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      setPreviewZoom((z) => Math.min(1.6, Math.max(0.4, Math.round((z + (e.deltaY < 0 ? 0.1 : -0.1)) * 10) / 10)));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
 
   useEffect(() => {
     void getCommercialInvoiceCatalog()
@@ -155,12 +210,38 @@ export function HostingCommercialInvoicePage() {
   const addShipping = () => {
     setForm((p) => ({
       ...p,
-      items: [...p.items, emptyCommercialInvoiceShippingItem(p.originCountry, p.destinationCountry)],
+      items: [...p.items, emptyCommercialInvoiceShippingItem()],
     }));
   };
 
   const selectedRecipientId = matchCommercialInvoiceRecipient(form, recipients);
-  const selectedRecipient = recipients.find((r) => r.id === selectedRecipientId) ?? null;
+  const selectedSenderId = matchCommercialInvoiceSender(form, senders);
+
+  const onSaveSender = async () => {
+    if (!canEdit) return;
+    if (!form.sellerName.trim()) {
+      showToast("Completá el nombre del expedidor para guardarlo.", "error");
+      return;
+    }
+    setSavingSender(true);
+    try {
+      const res = await createCommercialInvoiceSender({
+        name: form.sellerName.trim(),
+        taxId: form.sellerTaxId.trim(),
+        address: form.sellerAddress.trim(),
+        phone: form.sellerPhone.trim(),
+        email: form.sellerEmail.trim(),
+        country: (form.sellerCountry || form.originCountry).trim(),
+      });
+      setSenders((p) => [...p.filter((s) => s.id !== res.sender.id), res.sender].sort((a, b) => a.userNumber - b.userNumber));
+      setForm((p) => ({ ...p, ...applyCommercialInvoiceSender(res.sender) }));
+      showToast(`Usuario ${res.sender.userCode} guardado`, "success");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "No se pudo guardar el expedidor", "error");
+    } finally {
+      setSavingSender(false);
+    }
+  };
 
   const onSaveRecipient = async () => {
     if (!canEdit) return;
@@ -185,6 +266,48 @@ export function HostingCommercialInvoicePage() {
       showToast(e instanceof Error ? e.message : "No se pudo guardar el consignatario", "error");
     } finally {
       setSavingRecipient(false);
+    }
+  };
+
+  const countryNames = countries.map((c) => c.name);
+  const countryOptions = (() => {
+    const extras = [
+      form.goodsOriginCountry,
+      form.originCountry,
+      form.destinationCountry,
+      ...form.items.flatMap((it) => [it.shippingFrom ?? "", it.shippingTo ?? ""]),
+    ]
+      .map((v) => v.trim())
+      .filter(Boolean)
+      .filter((v) => !countryNames.some((c) => c.toUpperCase() === v.toUpperCase()));
+    return [...countryNames, ...Array.from(new Set(extras))];
+  })();
+
+  const resolveCountry = (value: string) => {
+    const hit = countries.find((c) => c.name.toUpperCase() === value.trim().toUpperCase());
+    return hit?.name ?? value;
+  };
+
+  const persistNewCountry = async (raw: string): Promise<string | null> => {
+    if (!canEdit) return null;
+    const name = normalizeCommercialInvoiceCountry(raw);
+    if (!name) {
+      showToast("Escribí el país para agregarlo.", "error");
+      return null;
+    }
+    const existing = countries.find((c) => normalizeCommercialInvoiceCountry(c.name) === name);
+    if (existing) {
+      showToast(`${existing.name} ya está en la lista. Elegilo en el selector.`, "error");
+      return existing.name;
+    }
+    try {
+      const res = await createCommercialInvoiceCountry({ name });
+      setCountries((p) => [...p.filter((c) => c.id !== res.country.id), res.country].sort((a, b) => a.name.localeCompare(b.name)));
+      showToast(`${res.country.name} agregado`, "success");
+      return res.country.name;
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "No se pudo guardar el país", "error");
+      return null;
     }
   };
 
@@ -345,34 +468,41 @@ export function HostingCommercialInvoicePage() {
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="fact-label">Country of Origin / País de origen (mercadería)</label>
-                <input className="fact-input" value={form.goodsOriginCountry} disabled={!canEdit || busy} onChange={(e) => set("goodsOriginCountry", e.target.value)} />
-              </div>
-              <div>
-                <label className="fact-label">País origen (expedidor)</label>
-                <input
-                  className="fact-input"
-                  value={form.originCountry}
-                  disabled={!canEdit || busy}
-                  onChange={(e) => {
-                    const originCountry = e.target.value;
-                    setForm((p) => ({ ...p, originCountry, sellerCountry: originCountry }));
-                  }}
-                />
-              </div>
-              <div>
-                <label className="fact-label">País destino (consignatario)</label>
-                <input
-                  className="fact-input"
-                  value={form.destinationCountry}
-                  disabled={!canEdit || busy}
-                  onChange={(e) => {
-                    const destinationCountry = e.target.value;
-                    setForm((p) => ({ ...p, destinationCountry, buyerCountry: destinationCountry }));
-                  }}
-                />
-              </div>
+              {(
+                [
+                  {
+                    slot: "goods" as const,
+                    label: "País de origen (mercadería)",
+                    value: resolveCountry(form.goodsOriginCountry),
+                    onSelect: (origin: string) => set("goodsOriginCountry", origin),
+                  },
+                  {
+                    slot: "origin" as const,
+                    label: "País origen (expedidor)",
+                    value: resolveCountry(form.originCountry),
+                    onSelect: (originCountry: string) => setForm((p) => ({ ...p, originCountry, sellerCountry: originCountry })),
+                  },
+                  {
+                    slot: "dest" as const,
+                    label: "País destino (consignatario)",
+                    value: resolveCountry(form.destinationCountry),
+                    onSelect: (destinationCountry: string) =>
+                      setForm((p) => ({ ...p, destinationCountry, buyerCountry: destinationCountry })),
+                  },
+                ] as const
+              ).map((field) => (
+                <div key={field.slot}>
+                  <label className="fact-label">{field.label}</label>
+                  <CommercialInvoiceCountrySelect
+                    value={field.value}
+                    options={countryOptions}
+                    disabled={!canEdit || busy}
+                    canAdd={canEdit}
+                    onChange={field.onSelect}
+                    onCreate={persistNewCountry}
+                  />
+                </div>
+              ))}
               <div className="ci-span-3">
                 <label className="fact-label">Purpose of Shipment / Propósito del envío</label>
                 <select
@@ -399,23 +529,49 @@ export function HostingCommercialInvoicePage() {
 
             <h2 className="mt-4">1. Sender / Expedidor (quien envía)</h2>
             <div className="ci-grid">
-              <div className="ci-span-2">
-                <label className="fact-label">Name / Nombre</label>
-                <input className="fact-input" value={form.sellerName} disabled={!canEdit || busy} onChange={(e) => set("sellerName", e.target.value)} />
+              <div className="ci-span-2 ci-party-user">
+                <div>
+                  <label className="fact-label">Usuario / expedidor</label>
+                  <CommercialInvoicePartyPicker
+                    parties={senders}
+                    selectedId={selectedSenderId}
+                    name={form.sellerName}
+                    disabled={!canEdit || busy}
+                    onPick={(rec) => setForm((p) => ({ ...p, ...applyCommercialInvoiceSender(rec) }))}
+                    onAddNew={() =>
+                      setForm((p) => ({
+                        ...p,
+                        sellerName: "",
+                        sellerTaxId: "",
+                        sellerAddress: "",
+                        sellerPhone: "",
+                        sellerEmail: "",
+                        sellerCountry: "",
+                      }))
+                    }
+                    onNameChange={(sellerName) => set("sellerName", sellerName)}
+                  />
+                </div>
+                <div className="ci-party-user__save">
+                  {canEdit ? (
+                    <button
+                      type="button"
+                      className="btn btn-outline-success btn-sm"
+                      disabled={busy || savingSender}
+                      onClick={() => void onSaveSender()}
+                    >
+                      {savingSender ? "Guardando…" : "+ Guardar usuario nuevo"}
+                    </button>
+                  ) : null}
+                </div>
               </div>
-              <div className="ci-span-2">
+              <div>
                 <label className="fact-label">Identification / Cédula o Pasaporte</label>
                 <input className="fact-input" value={form.sellerTaxId} disabled={!canEdit || busy} onChange={(e) => set("sellerTaxId", e.target.value)} />
               </div>
-              <div className="ci-span-2">
+              <div>
                 <label className="fact-label">Address / Dirección</label>
-                <textarea
-                  className="fact-input"
-                  rows={2}
-                  value={form.sellerAddress}
-                  disabled={!canEdit || busy}
-                  onChange={(e) => set("sellerAddress", e.target.value)}
-                />
+                <input className="fact-input" value={form.sellerAddress} disabled={!canEdit || busy} onChange={(e) => set("sellerAddress", e.target.value)} />
               </div>
               <div>
                 <label className="fact-label">Phone / Teléfono</label>
@@ -429,15 +585,16 @@ export function HostingCommercialInvoicePage() {
 
             <h2 className="mt-4">2. Recipient / Consignatario (quien recibe)</h2>
             <div className="ci-grid">
-              <div className="ci-span-2">
-                <label className="fact-label">Usuario / consignatario</label>
-                <select
-                  className="fact-input fact-select"
-                  value={selectedRecipientId != null ? String(selectedRecipientId) : "__manual__"}
-                  disabled={!canEdit || busy}
-                  onChange={(e) => {
-                    const id = e.target.value;
-                    if (id === "__manual__") {
+              <div className="ci-span-2 ci-party-user">
+                <div>
+                  <label className="fact-label">Usuario / consignatario</label>
+                  <CommercialInvoicePartyPicker
+                    parties={recipients}
+                    selectedId={selectedRecipientId}
+                    name={form.buyerName}
+                    disabled={!canEdit || busy}
+                    onPick={(rec) => setForm((p) => ({ ...p, ...applyCommercialInvoiceRecipient(rec) }))}
+                    onAddNew={() =>
                       setForm((p) => ({
                         ...p,
                         buyerName: "",
@@ -446,54 +603,31 @@ export function HostingCommercialInvoicePage() {
                         buyerPhone: "",
                         buyerEmail: "",
                         buyerCountry: "",
-                      }));
-                      return;
+                      }))
                     }
-                    const rec = recipients.find((r) => String(r.id) === id);
-                    if (rec) setForm((p) => ({ ...p, ...applyCommercialInvoiceRecipient(rec) }));
-                  }}
-                >
-                  <option value="__manual__">Seleccionar o cargar a mano…</option>
-                  {recipients.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.userCode} — {r.name}
-                    </option>
-                  ))}
-                </select>
+                    onNameChange={(buyerName) => set("buyerName", buyerName)}
+                  />
+                </div>
+                <div className="ci-party-user__save">
+                  {canEdit ? (
+                    <button
+                      type="button"
+                      className="btn btn-outline-success btn-sm"
+                      disabled={busy || savingRecipient}
+                      onClick={() => void onSaveRecipient()}
+                    >
+                      {savingRecipient ? "Guardando…" : "+ Guardar usuario nuevo"}
+                    </button>
+                  ) : null}
+                </div>
               </div>
               <div>
-                <label className="fact-label">Número de usuario</label>
-                <input className="fact-input" readOnly value={selectedRecipient?.userCode ?? "Se asigna al guardar"} />
-              </div>
-              <div className="d-flex align-items-end">
-                {canEdit ? (
-                  <button
-                    type="button"
-                    className="btn btn-outline-success btn-sm mb-1"
-                    disabled={busy || savingRecipient}
-                    onClick={() => void onSaveRecipient()}
-                  >
-                    {savingRecipient ? "Guardando…" : "+ Guardar usuario nuevo"}
-                  </button>
-                ) : null}
-              </div>
-              <div className="ci-span-2">
-                <label className="fact-label">Name / Nombre</label>
-                <input className="fact-input" value={form.buyerName} disabled={!canEdit || busy} onChange={(e) => set("buyerName", e.target.value)} />
-              </div>
-              <div className="ci-span-2">
                 <label className="fact-label">RUC / Tax ID</label>
                 <input className="fact-input" value={form.buyerTaxId} disabled={!canEdit || busy} onChange={(e) => set("buyerTaxId", e.target.value)} />
               </div>
-              <div className="ci-span-2">
+              <div>
                 <label className="fact-label">Address / Dirección</label>
-                <textarea
-                  className="fact-input"
-                  rows={2}
-                  value={form.buyerAddress}
-                  disabled={!canEdit || busy}
-                  onChange={(e) => set("buyerAddress", e.target.value)}
-                />
+                <input className="fact-input" value={form.buyerAddress} disabled={!canEdit || busy} onChange={(e) => set("buyerAddress", e.target.value)} />
               </div>
               <div>
                 <label className="fact-label">Phone / Teléfono</label>
@@ -521,46 +655,37 @@ export function HostingCommercialInvoicePage() {
                   <tr key={idx}>
                     <td className="ci-desc">
                       {isCommercialInvoiceShippingItem(it) ? (
-                        <div className="ci-shipping">
-                          <select
-                            className="fact-input fact-select"
-                            value={it.shippingCarrier || "DHL"}
+                        <div className="ci-shipping-row">
+                          <CommercialInvoiceShippingPicker
+                            item={it}
                             disabled={!canEdit || busy}
-                            onChange={(e) => patchItem(idx, patchCommercialInvoiceShipping(it, { shippingCarrier: e.target.value }))}
-                          >
-                            {COMMERCIAL_INVOICE_SHIPPING_CARRIERS.map((c) => (
-                              <option key={c} value={c}>
-                                {c}
-                              </option>
-                            ))}
-                          </select>
-                          <div className="ci-shipping__route">
-                            <input
-                              className="fact-input"
-                              placeholder="De (origen)"
-                              value={it.shippingFrom || ""}
-                              disabled={!canEdit || busy}
-                              onChange={(e) => patchItem(idx, patchCommercialInvoiceShipping(it, { shippingFrom: e.target.value }))}
-                            />
-                            <span className="ci-shipping__sep">→</span>
-                            <input
-                              className="fact-input"
-                              placeholder="A (destino)"
-                              value={it.shippingTo || ""}
-                              disabled={!canEdit || busy}
-                              onChange={(e) => patchItem(idx, patchCommercialInvoiceShipping(it, { shippingTo: e.target.value }))}
-                            />
-                          </div>
+                            onChange={(next) => patchItem(idx, next)}
+                          />
+                          <CommercialInvoiceCountrySelect
+                            value={resolveCountry(it.shippingFrom || "")}
+                            options={countryOptions}
+                            disabled={!canEdit || busy}
+                            canAdd={canEdit}
+                            placeholder="Origen"
+                            onChange={(shippingFrom) => patchItem(idx, patchCommercialInvoiceShipping(it, { shippingFrom }))}
+                            onCreate={persistNewCountry}
+                          />
+                          <CommercialInvoiceCountrySelect
+                            value={resolveCountry(it.shippingTo || "")}
+                            options={countryOptions}
+                            disabled={!canEdit || busy}
+                            canAdd={canEdit}
+                            placeholder="Destino"
+                            onChange={(shippingTo) => patchItem(idx, patchCommercialInvoiceShipping(it, { shippingTo }))}
+                            onCreate={persistNewCountry}
+                          />
                         </div>
                       ) : (
                         <CommercialInvoiceItemCatalogPicker
                           item={it}
                           equipos={equipos}
                           disabled={!canEdit || busy}
-                          canAddItem={canEdit}
                           onPick={(patch) => patchItem(idx, patch)}
-                          onAddItem={addItem}
-                          onAddShipping={addShipping}
                         />
                       )}
                     </td>
@@ -587,14 +712,16 @@ export function HostingCommercialInvoicePage() {
                       />
                     </td>
                     <td className="text-nowrap">{money(commercialInvoiceLineAmount(it))}</td>
-                    <td>
-                      {canEdit && form.items.length > 1 ? (
+                    <td className="ci-items-remove-cell">
+                      {canEdit ? (
                         <button
                           type="button"
-                          className="btn btn-link btn-sm text-danger"
+                          className="ci-items-remove"
+                          title="Quitar ítem"
+                          aria-label="Quitar ítem"
                           onClick={() => setForm((p) => ({ ...p, items: p.items.filter((_, i) => i !== idx) }))}
                         >
-                          Quitar
+                          ×
                         </button>
                       ) : null}
                     </td>
@@ -602,13 +729,77 @@ export function HostingCommercialInvoicePage() {
                 ))}
               </tbody>
             </table>
+            {canEdit ? (
+              <div className="ci-items-actions">
+                <button type="button" className="btn btn-outline-secondary btn-sm" disabled={busy} onClick={addItem}>
+                  + Agregar ítem
+                </button>
+                <button type="button" className="btn btn-outline-secondary btn-sm" disabled={busy} onClick={addShipping}>
+                  + Agregar Shipping
+                </button>
+              </div>
+            ) : null}
+
+            <h2 className="mt-4">Números de serie</h2>
+            {form.items.filter((it) => !isCommercialInvoiceShippingItem(it)).length === 0 ? (
+              <p className="small text-muted mb-0">Agregá un equipo en Ítems para cargar su número de serie.</p>
+            ) : (
+              <div className="ci-serials">
+                {form.items.map((it, idx) =>
+                  isCommercialInvoiceShippingItem(it) ? null : (
+                    <div key={idx} className="ci-serials__row">
+                      <div className="ci-serials__label">{it.description.trim() || `Equipo ${idx + 1}`}</div>
+                      <div className="ci-serials__fields">
+                        {commercialInvoiceSerialSlots(it).map((sn, si) => (
+                          <input
+                            key={si}
+                            className="fact-input"
+                            placeholder={commercialInvoiceSerialSlots(it).length > 1 ? `N° de serie ${si + 1}` : "Número de serie"}
+                            value={sn}
+                            disabled={!canEdit || busy}
+                            onChange={(e) => {
+                              const slots = commercialInvoiceSerialSlots(it);
+                              slots[si] = e.target.value;
+                              patchItem(idx, { serialNumber: slots.join(", ") });
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+            )}
           </div>
 
           <div className="ci-aside">
             <div className="ci-paper-shell mb-3">
-              <div className="ci-paper-shell__head">Vista previa del documento</div>
-              <div className="ci-paper-shell__body">
-                <CommercialInvoicePreview fields={form} number={displayNumber} />
+              <div className="ci-paper-shell__head">
+                <span>Vista previa del documento</span>
+                <div className="ci-zoom">
+                  <button
+                    type="button"
+                    className="ci-zoom__btn"
+                    aria-label="Alejar"
+                    onClick={() => setPreviewZoom((z) => Math.min(1.6, Math.max(0.4, Math.round((z - 0.1) * 10) / 10)))}
+                  >
+                    −
+                  </button>
+                  <span className="ci-zoom__value">{Math.round(previewZoom * 100)}%</span>
+                  <button
+                    type="button"
+                    className="ci-zoom__btn"
+                    aria-label="Acercar"
+                    onClick={() => setPreviewZoom((z) => Math.min(1.6, Math.max(0.4, Math.round((z + 0.1) * 10) / 10)))}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+              <div className="ci-paper-shell__body" ref={previewBodyRef}>
+                <div className="ci-paper-zoom" style={{ zoom: previewZoom }}>
+                  <CommercialInvoicePreview fields={form} number={displayNumber} />
+                </div>
               </div>
             </div>
 

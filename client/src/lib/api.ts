@@ -1330,6 +1330,33 @@ export function createCommercialInvoiceRecipient(body: {
   return api("/api/commercial-invoices/recipients", { method: "POST", body: JSON.stringify(body) });
 }
 
+export type CommercialInvoiceSender = import("./commercialInvoice").CommercialInvoiceSender;
+
+export function getCommercialInvoiceSenders(): Promise<{ senders: CommercialInvoiceSender[] }> {
+  return api("/api/commercial-invoices/senders");
+}
+
+export function createCommercialInvoiceSender(body: {
+  name: string;
+  taxId?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  country?: string;
+}): Promise<{ sender: CommercialInvoiceSender }> {
+  return api("/api/commercial-invoices/senders", { method: "POST", body: JSON.stringify(body) });
+}
+
+export type CommercialInvoiceCountry = import("./commercialInvoice").CommercialInvoiceCountry;
+
+export function getCommercialInvoiceCountries(): Promise<{ countries: CommercialInvoiceCountry[] }> {
+  return api("/api/commercial-invoices/countries");
+}
+
+export function createCommercialInvoiceCountry(body: { name: string }): Promise<{ country: CommercialInvoiceCountry }> {
+  return api("/api/commercial-invoices/countries", { method: "POST", body: JSON.stringify(body) });
+}
+
 export type CommercialInvoiceCatalogEquipo = {
   id: string;
   numeroSerie: string;

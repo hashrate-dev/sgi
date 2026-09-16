@@ -4,8 +4,6 @@ import type { CommercialInvoiceCatalogEquipo } from "../lib/api";
 import type { CommercialInvoiceItem } from "../lib/commercialInvoice";
 
 export const CI_CUSTOM_KEY = "custom";
-export const CI_ADD_ITEM_VALUE = "__add_item__";
-export const CI_ADD_SHIPPING_VALUE = "__add_shipping__";
 
 export function commercialInvoiceEquipoLabel(eq: CommercialInvoiceCatalogEquipo): string {
   return [eq.marcaEquipo, eq.modelo].filter(Boolean).join(" — ");
@@ -15,20 +13,14 @@ type Props = {
   item: CommercialInvoiceItem;
   equipos: CommercialInvoiceCatalogEquipo[];
   disabled?: boolean;
-  canAddItem?: boolean;
   onPick: (patch: Partial<CommercialInvoiceItem>) => void;
-  onAddItem: () => void;
-  onAddShipping: () => void;
 };
 
 export function CommercialInvoiceItemCatalogPicker({
   item,
   equipos,
   disabled,
-  canAddItem,
   onPick,
-  onAddItem,
-  onAddShipping,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -101,16 +93,6 @@ export function CommercialInvoiceItemCatalogPicker({
   }, [open]);
 
   const apply = (value: string) => {
-    if (value === CI_ADD_ITEM_VALUE) {
-      onAddItem();
-      setOpen(false);
-      return;
-    }
-    if (value === CI_ADD_SHIPPING_VALUE) {
-      onAddShipping();
-      setOpen(false);
-      return;
-    }
     if (!value) {
       onPick({ catalogKey: "", description: "", unitPrice: 0, kind: "goods" });
       setOpen(false);
@@ -130,6 +112,7 @@ export function CommercialInvoiceItemCatalogPicker({
           description: commercialInvoiceEquipoLabel(eq),
           unit: "un",
           unitPrice: eq.precioUSD,
+          serialNumber: eq.numeroSerie || item.serialNumber || "",
         });
       }
       setOpen(false);
@@ -175,17 +158,6 @@ export function CommercialInvoiceItemCatalogPicker({
                 onChange={(e) => setQ(e.target.value)}
                 aria-label="Buscar en catálogo"
               />
-              <button type="button" className="ci-combo__opt ci-combo__opt--action" onClick={() => apply(CI_ADD_ITEM_VALUE)} disabled={disabled || !canAddItem}>
-                + Agregar ítem
-              </button>
-              <button
-                type="button"
-                className="ci-combo__opt ci-combo__opt--action"
-                onClick={() => apply(CI_ADD_SHIPPING_VALUE)}
-                disabled={disabled || !canAddItem}
-              >
-                + Agregar Shipping
-              </button>
               {equiposFiltrados.map((eq) => (
                 <button
                   type="button"

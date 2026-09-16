@@ -214,6 +214,93 @@ async function ensureSchema(): Promise<void> {
   } catch {
     /* seed opcional */
   }
+  if (isPg()) {
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS commercial_invoice_senders (
+          id SERIAL PRIMARY KEY,
+          user_number INTEGER NOT NULL UNIQUE,
+          name TEXT NOT NULL,
+          tax_id TEXT NOT NULL DEFAULT '',
+          address TEXT NOT NULL DEFAULT '',
+          phone TEXT NOT NULL DEFAULT '',
+          email TEXT NOT NULL DEFAULT '',
+          country TEXT NOT NULL DEFAULT '',
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )`
+      )
+      .run();
+  } else {
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS commercial_invoice_senders (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_number INTEGER NOT NULL UNIQUE,
+          name TEXT NOT NULL,
+          tax_id TEXT NOT NULL DEFAULT '',
+          address TEXT NOT NULL DEFAULT '',
+          phone TEXT NOT NULL DEFAULT '',
+          email TEXT NOT NULL DEFAULT '',
+          country TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )`
+      )
+      .run();
+  }
+  try {
+    const senderCount = (await db.prepare("SELECT COUNT(*) AS c FROM commercial_invoice_senders").get()) as { c?: number | string } | undefined;
+    if (Number(senderCount?.c ?? 0) === 0) {
+      await db
+        .prepare(
+          `INSERT INTO commercial_invoice_senders (user_number, name, tax_id, address, phone, email, country)
+           VALUES (1, ?, ?, ?, ?, ?, ?)`
+        )
+        .run(
+          "BUTLER, RETO",
+          "609990",
+          "Kra 1 # 6-70, Gachetá, Cundinamarca",
+          "+57 310 261 5224",
+          "reto@protonmail.com",
+          "COLOMBIA"
+        );
+    }
+  } catch {
+    /* seed opcional */
+  }
+  if (isPg()) {
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS commercial_invoice_countries (
+          id SERIAL PRIMARY KEY,
+          name TEXT NOT NULL UNIQUE,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )`
+      )
+      .run();
+  } else {
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS commercial_invoice_countries (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL UNIQUE,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )`
+      )
+      .run();
+  }
+  for (const countryName of ["COLOMBIA", "PARAGUAY"]) {
+    try {
+      if (isPg()) {
+        await db.prepare("INSERT INTO commercial_invoice_countries (name) VALUES (?) ON CONFLICT (name) DO NOTHING").run(countryName);
+      } else {
+        await db.prepare("INSERT OR IGNORE INTO commercial_invoice_countries (name) VALUES (?)").run(countryName);
+      }
+    } catch {
+      /* seed opcional */
+    }
+  }
   schemaReady = true;
 }
 
@@ -224,7 +311,7 @@ const ItemSchema = z.object({
   unitPrice: z.coerce.number().min(0),
   catalogKey: z.string().max(80).optional(),
   kind: z.enum(["goods", "shipping"]).optional(),
-  serialNumber: z.string().max(80).optional(),
+  serialNumber: z.string().max(400).optional(),
   shippingCarrier: z.string().max(80).optional(),
   shippingFrom: z.string().max(80).optional(),
   shippingTo: z.string().max(80).optional(),
@@ -314,7 +401,7 @@ async function peekOrAllocate(tx: Tx, consume: boolean): Promise<{ number: strin
   return { number: formatNumber(next), seqNum: next };
 }
 
-function mapRecipient(row: Record<string, unknown>) {
+function mapParty(row: Record<string, unknown>) {
   const r = rowKeysToLowercase(row);
   const userNumber = Number(r.user_number ?? 0);
   return {
@@ -332,8 +419,25 @@ function mapRecipient(row: Record<string, unknown>) {
   };
 }
 
+function mapRecipient(row: Record<string, unknown>) {
+  return mapParty(row);
+}
+
 function formatUserCode(n: number): string {
   return `USR${String(Math.max(0, Math.trunc(n))).padStart(3, "0")}`;
+}
+
+function mapCountry(row: Record<string, unknown>) {
+  const r = rowKeysToLowercase(row);
+  return {
+    id: Number(r.id),
+    name: String(r.name ?? ""),
+    createdAt: String(r.created_at ?? ""),
+  };
+}
+
+function normalizeCountryName(name: string): string {
+  return name.trim().replace(/\s+/g, " ").toUpperCase();
 }
 
 function parseItems(raw: unknown): unknown[] {
@@ -513,6 +617,115 @@ commercialInvoicesRouter.post(
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       return res.status(500).json({ error: { message: msg || "Error al guardar consignatario" } });
+    }
+  }
+);
+
+commercialInvoicesRouter.get(
+  "/commercial-invoices/senders",
+  requireRole("admin_a", "admin_b", "operador", "lector"),
+  requireModuleGrant("facturacion"),
+  async (_req, res) => {
+    await ensureSchema();
+    try {
+      const rows = (await db
+        .prepare(
+          `SELECT id, user_number, name, tax_id, address, phone, email, country, created_at, updated_at
+           FROM commercial_invoice_senders
+           ORDER BY user_number ASC`
+        )
+        .all()) as Record<string, unknown>[];
+      return res.json({ senders: (Array.isArray(rows) ? rows : []).map((raw) => mapParty(raw)) });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return res.status(500).json({ error: { message: msg || "No se pudo cargar expedidores" } });
+    }
+  }
+);
+
+commercialInvoicesRouter.post(
+  "/commercial-invoices/senders",
+  requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("facturacion"),
+  async (req, res) => {
+    await ensureSchema();
+    const parsed = RecipientBody.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: { message: "Completá al menos el nombre del expedidor" } });
+    }
+    const body = parsed.data;
+    try {
+      const created = await db.transaction(async (tx) => {
+        const maxRow = (await tx.prepare("SELECT COALESCE(MAX(user_number), 0) AS m FROM commercial_invoice_senders").get()) as
+          | { m?: number | string }
+          | undefined;
+        const next = Math.max(1, Number(maxRow?.m ?? 0) + 1);
+        const returning = `INSERT INTO commercial_invoice_senders (user_number, name, tax_id, address, phone, email, country)
+          VALUES (?,?,?,?,?,?,?) RETURNING id, user_number, name, tax_id, address, phone, email, country, created_at, updated_at`;
+        const row = (await tx.prepare(returning).get(next, body.name, body.taxId, body.address, body.phone, body.email, body.country)) as
+          | Record<string, unknown>
+          | undefined;
+        if (!row) throw new Error("No se pudo guardar el expedidor");
+        return mapParty(row);
+      });
+      return res.status(201).json({ sender: created });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return res.status(500).json({ error: { message: msg || "Error al guardar expedidor" } });
+    }
+  }
+);
+
+commercialInvoicesRouter.get(
+  "/commercial-invoices/countries",
+  requireRole("admin_a", "admin_b", "operador", "lector"),
+  requireModuleGrant("facturacion"),
+  async (_req, res) => {
+    await ensureSchema();
+    try {
+      const rows = (await db
+        .prepare(`SELECT id, name, created_at FROM commercial_invoice_countries ORDER BY name ASC`)
+        .all()) as Record<string, unknown>[];
+      return res.json({ countries: (Array.isArray(rows) ? rows : []).map((raw) => mapCountry(raw)) });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return res.status(500).json({ error: { message: msg || "No se pudo cargar los países" } });
+    }
+  }
+);
+
+const CountryBody = z.object({
+  name: z.string().min(1).max(80).trim(),
+});
+
+commercialInvoicesRouter.post(
+  "/commercial-invoices/countries",
+  requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("facturacion"),
+  async (req, res) => {
+    await ensureSchema();
+    const parsed = CountryBody.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: { message: "Completá el nombre del país" } });
+    }
+    const name = normalizeCountryName(parsed.data.name);
+    if (!name) {
+      return res.status(400).json({ error: { message: "Completá el nombre del país" } });
+    }
+    try {
+      const existing = (await db.prepare("SELECT id, name, created_at FROM commercial_invoice_countries WHERE name = ?").get(name)) as
+        | Record<string, unknown>
+        | undefined;
+      if (existing) {
+        return res.status(409).json({ error: { message: `${name} ya está en la lista. Elegilo en el selector.` } });
+      }
+      const returning = `INSERT INTO commercial_invoice_countries (name) VALUES (?) RETURNING id, name, created_at`;
+      const row = (await db.prepare(returning).get(name)) as Record<string, unknown> | undefined;
+      if (!row) throw new Error("No se pudo guardar el país");
+      return res.status(201).json({ country: mapCountry(row) });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return res.status(500).json({ error: { message: msg || "Error al guardar el país" } });
     }
   }
 );
