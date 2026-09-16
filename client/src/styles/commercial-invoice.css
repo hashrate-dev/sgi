@@ -457,6 +457,7 @@
   grid-template-columns: 1fr 1fr;
   gap: 3.5mm;
   margin-bottom: 4.5mm;
+  align-items: stretch;
 }
 
 .ci-paper__party,
@@ -465,6 +466,14 @@
   border-radius: 1.1mm;
   overflow: hidden;
   background: #fff;
+}
+
+.ci-paper__party {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 100%;
+  align-self: stretch;
 }
 
 .ci-paper__box {
@@ -485,6 +494,7 @@
 .ci-paper__party-body {
   margin: 0;
   padding: 3mm 3.2mm 2.2mm;
+  flex: 1 1 auto;
 }
 
 .ci-paper__kv {

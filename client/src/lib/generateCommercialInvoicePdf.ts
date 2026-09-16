@@ -73,10 +73,12 @@ export async function downloadCommercialInvoicePdf(fields: CommercialInvoiceFiel
   const gap = 3.5;
   const colW = (innerW - gap) / 2;
 
-  const drawParty = (title: string, rows: Array<[string, string]>, x: number, startY: number): number => {
-    const padX = 3;
-    const valueGap = 1.8;
-    const valueMinW = 18;
+  const padX = 3;
+  const valueGap = 1.8;
+  const valueMinW = 18;
+  const headH = 7.4;
+
+  const prepareParty = (rows: Array<[string, string]>) => {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(6.8);
     const longestLabel = Math.max(...rows.map(([label]) => doc.getTextWidth(`${label}:`)), 28);
@@ -93,8 +95,16 @@ export async function downloadCommercialInvoicePdf(fields: CommercialInvoiceFiel
       body += h + 1.15;
       return { labelLines, wrapped, h };
     });
-    const headH = 7.4;
-    const cardH = headH + body + 1;
+    return { prepared, labelW, cardH: headH + body + 1 };
+  };
+
+  const drawParty = (
+    title: string,
+    layout: ReturnType<typeof prepareParty>,
+    x: number,
+    startY: number,
+    cardH: number
+  ): number => {
     doc.setDrawColor(BORDER.r, BORDER.g, BORDER.b);
     doc.setFillColor(255, 255, 255);
     doc.roundedRect(x, startY, colW, cardH, 0.8, 0.8, "FD");
@@ -106,32 +116,37 @@ export async function downloadCommercialInvoicePdf(fields: CommercialInvoiceFiel
     doc.setFontSize(7.3);
     doc.text(title, x + padX, startY + 5);
     let yy = startY + headH + 4.6;
-    for (const row of prepared) {
+    for (const row of layout.prepared) {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(6.8);
       navy(doc);
       row.labelLines.forEach((line, i) => doc.text(line, x + padX, yy + i * 3.6));
       doc.setFont("helvetica", "normal");
       doc.setTextColor(35, 48, 68);
-      row.wrapped.forEach((line, i) => doc.text(line, x + padX + labelW + valueGap, yy + i * 3.6));
+      row.wrapped.forEach((line, i) => doc.text(line, x + padX + layout.labelW + valueGap, yy + i * 3.6));
       yy += row.h + 1.15;
     }
     return startY + cardH;
   };
 
-  const yL = drawParty(
+  const senderLayout = prepareParty(commercialInvoiceSenderRows(fields));
+  const recipientLayout = prepareParty(commercialInvoiceRecipientRows(fields));
+  const partyH = Math.max(senderLayout.cardH, recipientLayout.cardH);
+  drawParty(
     commercialInvoicePartyTitle("sender", fields.originCountry || fields.sellerCountry),
-    commercialInvoiceSenderRows(fields),
+    senderLayout,
     M,
-    y
+    y,
+    partyH
   );
-  const yR = drawParty(
+  drawParty(
     commercialInvoicePartyTitle("recipient", fields.destinationCountry || fields.buyerCountry),
-    commercialInvoiceRecipientRows(fields),
+    recipientLayout,
     M + colW + gap,
-    y
+    y,
+    partyH
   );
-  y = Math.max(yL, yR) + 5;
+  y = y + partyH + 5;
 
   const boxHead = (title: string) => {
     if (y > PAGE_H - 40) {
