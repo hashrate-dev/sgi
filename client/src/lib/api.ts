@@ -1305,6 +1305,59 @@ export function deleteHostingFxOperation(id: number): Promise<{ ok: boolean }> {
   return api<{ ok: boolean }>(`/api/hosting/fx-operations/${id}`, { method: "DELETE" });
 }
 
+export type CommercialInvoiceRecord = import("./commercialInvoice").CommercialInvoice;
+
+export type CommercialInvoicePayload = import("./commercialInvoice").CommercialInvoiceFields;
+
+export function getCommercialInvoices(): Promise<{ invoices: CommercialInvoiceRecord[] }> {
+  return api<{ invoices: CommercialInvoiceRecord[] }>("/api/commercial-invoices");
+}
+
+export type CommercialInvoiceCatalogEquipo = {
+  id: string;
+  numeroSerie: string;
+  marcaEquipo: string;
+  modelo: string;
+  procesador: string;
+  precioUSD: number;
+  marketplaceVisible: boolean;
+};
+
+export type CommercialInvoiceCatalogSetup = {
+  id: string;
+  codigo: string;
+  nombre: string;
+  precioUSD: number;
+};
+
+export function getCommercialInvoiceCatalog(): Promise<{
+  equipos: CommercialInvoiceCatalogEquipo[];
+  setups: CommercialInvoiceCatalogSetup[];
+}> {
+  return api("/api/commercial-invoices/catalog");
+}
+
+export function getCommercialInvoiceNextNumber(params?: { date?: string; suffix?: string; year?: number }): Promise<{
+  number: string;
+  seqYear: number;
+  seqNum: number;
+}> {
+  const sp = new URLSearchParams();
+  if (params?.date) sp.set("date", params.date);
+  if (params?.suffix) sp.set("suffix", params.suffix);
+  if (params?.year != null) sp.set("year", String(params.year));
+  const q = sp.toString();
+  return api(`/api/commercial-invoices/next-number${q ? `?${q}` : ""}`);
+}
+
+export function createCommercialInvoice(body: CommercialInvoicePayload): Promise<{ invoice: CommercialInvoiceRecord }> {
+  return api("/api/commercial-invoices", { method: "POST", body: JSON.stringify(body) });
+}
+
+export function updateCommercialInvoice(id: number, body: CommercialInvoicePayload): Promise<{ invoice: CommercialInvoiceRecord }> {
+  return api(`/api/commercial-invoices/${id}`, { method: "PUT", body: JSON.stringify(body) });
+}
+
 export type HostingInvoiceTransferCommissionRow = {
   invoiceId: number;
   number: string;

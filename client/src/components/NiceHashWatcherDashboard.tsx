@@ -1682,17 +1682,21 @@ export function NiceHashWatcherDashboard({
                 <p className="nh-watcher-kpi__value nh-watcher-kpi__value--btc">
                   {earningsLoading && !earningsSummary ? (
                     <span className="nh-watcher-kpi__value-pulse">…</span>
+                  ) : earningsSummary == null ? (
+                    "—"
                   ) : (
                     <>
                       <span className="nh-watcher-kpi__value-main">
-                        {formatNiceHashBtc8(earningsSummary?.dayBtc ?? 0)}
+                        {formatNiceHashBtc8(earningsSummary.dayBtc)}
                       </span>
                       <span className="nh-watcher-kpi__unit">BTC</span>
                     </>
                   )}
                 </p>
                 <p className="nh-watcher-kpi__fiat">
-                  {formatRent24hUsdApprox(displayPayload, earningsSummary?.dayBtc ?? 0, effectiveBtcSpotUsd) ?? "—"}
+                  {earningsSummary == null
+                    ? "—"
+                    : formatRent24hUsdApprox(displayPayload, earningsSummary.dayBtc, effectiveBtcSpotUsd) ?? "—"}
                 </p>
               </div>
             </article>
@@ -1707,17 +1711,21 @@ export function NiceHashWatcherDashboard({
                 <p className="nh-watcher-kpi__value nh-watcher-kpi__value--btc">
                   {earningsLoading && !earningsSummary ? (
                     <span className="nh-watcher-kpi__value-pulse">…</span>
+                  ) : earningsSummary == null ? (
+                    "—"
                   ) : (
                     <>
                       <span className="nh-watcher-kpi__value-main">
-                        {formatNiceHashBtc8(earningsSummary?.monthBtc ?? 0)}
+                        {formatNiceHashBtc8(earningsSummary.monthBtc)}
                       </span>
                       <span className="nh-watcher-kpi__unit">BTC</span>
                     </>
                   )}
                 </p>
                 <p className="nh-watcher-kpi__fiat">
-                  {formatRent24hUsdApprox(displayPayload, earningsSummary?.monthBtc ?? 0, effectiveBtcSpotUsd) ?? "—"}
+                  {earningsSummary == null
+                    ? "—"
+                    : formatRent24hUsdApprox(displayPayload, earningsSummary.monthBtc, effectiveBtcSpotUsd) ?? "—"}
                 </p>
               </div>
             </article>
@@ -1730,12 +1738,18 @@ export function NiceHashWatcherDashboard({
               </header>
               <div className="nh-watcher-kpi__body">
                 <p className="nh-watcher-kpi__value nh-watcher-kpi__value--btc">
-                  <>
-                    <span className="nh-watcher-kpi__value-main">
-                      {formatNiceHashBtc8(earningsSummary?.lifetimeBtc ?? 0)}
-                    </span>
-                    <span className="nh-watcher-kpi__unit">BTC</span>
-                  </>
+                  {earningsLoading && !earningsSummary ? (
+                    <span className="nh-watcher-kpi__value-pulse">…</span>
+                  ) : earningsSummary == null ? (
+                    "—"
+                  ) : (
+                    <>
+                      <span className="nh-watcher-kpi__value-main">
+                        {formatNiceHashBtc8(earningsSummary.lifetimeBtc)}
+                      </span>
+                      <span className="nh-watcher-kpi__unit">BTC</span>
+                    </>
+                  )}
                 </p>
                 <p className="nh-watcher-kpi__fiat nh-watcher-kpi__fiat--muted">
                   {earningsSummary?.rigCount

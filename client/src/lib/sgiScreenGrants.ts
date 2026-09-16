@@ -125,6 +125,7 @@ export function countSelectedScreens(
 
 export const HOSTING_HUB_SCREENS = [
   "hosting-billing",
+  "hosting-commercial-invoice",
   "hosting-history",
   "hosting-pending",
   "hosting-email-flow",

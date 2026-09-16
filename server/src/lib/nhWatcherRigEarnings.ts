@@ -98,16 +98,30 @@ export function applyAccrual(
   now: number
 ): NhRigEarningsRow {
   let next = rollBuckets(row, now);
-  const profit = profitability != null && Number.isFinite(profitability) && profitability > 0 ? profitability : 0;
+  const live =
+    profitability != null && Number.isFinite(profitability) && profitability > 0 ? profitability : null;
+  const fallback =
+    row.last_profitability != null && Number.isFinite(row.last_profitability) && row.last_profitability > 0
+      ? row.last_profitability
+      : null;
+  const profit = live ?? fallback ?? 0;
+  if (!(profit > 0)) {
+    // Sin tasa usable: no quemar la ventana de tiempo entre samples.
+    return {
+      ...next,
+      last_profitability:
+        profitability != null && Number.isFinite(profitability) ? profitability : next.last_profitability,
+    };
+  }
   const dt = now - (Number.isFinite(row.last_sample_at) ? row.last_sample_at : now);
-  const delta = profit > 0 ? accrueDeltaBtc(profit, dt) : 0;
+  const delta = accrueDeltaBtc(profit, dt);
   next = {
     ...next,
     day_btc: next.day_btc + delta,
     month_btc: next.month_btc + delta,
     lifetime_btc: next.lifetime_btc + delta,
     last_sample_at: now,
-    last_profitability: profitability != null && Number.isFinite(profitability) ? profitability : next.last_profitability,
+    last_profitability: live ?? next.last_profitability,
   };
   return next;
 }

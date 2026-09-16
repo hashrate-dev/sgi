@@ -1,57 +1,47 @@
 # Dominio hashrate.space — DNS y Vercel
 
-## Por qué falla `https://hashrate.space` con ERR_CONNECTION_CLOSED
+## Objetivo
 
-El código de la app ya está preparado para `hashrate.space`, pero **el DNS del dominio raíz (sin www) todavía no apunta a Vercel**:
+- Sitio canónico: **`https://hashrate.space`**
+- **`https://www.hashrate.space`** debe redirigir al apex (misma ruta)
 
-| Host | DNS actual | Estado |
-|------|------------|--------|
-| `www.hashrate.space` | Vercel (`cname.vercel-dns.com`) | OK — responde 200 |
-| `app.hashrate.space` | Vercel | OK — responde 200 |
-| **`hashrate.space` (apex)** | **IP `179.27.153.62`** (servidor antiguo) | **Falla** — cierra la conexión HTTPS |
+## Error `NET::ERR_CERT_COMMON_NAME_INVALID` en www
 
-Hasta cambiar el DNS del apex, usá **`https://www.hashrate.space`** (o `app.hashrate.space`).
+Significa que el navegador llegó a un servidor HTTPS cuyo certificado **no incluye** `www.hashrate.space`.
 
-## Pasos en Vercel
+El redirect en `vercel.json` **solo funciona después** de que Vercel tenga el dominio `www` asignado al proyecto y el certificado Let's Encrypt esté emitido. Sin eso, el TLS falla antes del redirect.
 
-1. Proyecto del frontend → **Settings → Domains**.
+### Checklist (panel Vercel)
+
+1. [Vercel → Project → Settings → Domains](https://vercel.com/dashboard)
 2. Agregar **`hashrate.space`** (apex) si no está.
-3. Agregar **`www.hashrate.space`** si falta.
-4. Esperar certificado SSL “Valid”.
-5. Variables de entorno (Production):
-   - `APP_PUBLIC_URL` = `https://hashrate.space` o `https://www.hashrate.space`
-   - `SUPABASE_DATABASE_URL`, `JWT_SECRET`, etc. (igual que en `app`)
+3. Agregar **`www.hashrate.space`** al **mismo** proyecto.
+4. Esperar estado **Valid Configuration** + certificado listo (puede tardar unos minutos).
+5. DNS (ya suele estar así):
+   - Apex `hashrate.space` → A `76.76.21.21` (o el que indique Vercel)
+   - `www` → CNAME `cname.vercel-dns.com`
 
-## Pasos en el proveedor DNS (donde compraste el dominio)
+### Redirect en código
 
-### Opción recomendada: apex + www en Vercel
+`vercel.json` redirige de forma permanente:
 
-1. **Eliminar** o dejar de usar el registro **A** de `@` → `179.27.153.62` (hosting viejo).
-2. Configurar según lo que muestre Vercel en Domains:
-   - **A** `@` → `76.76.21.22` (IP que indica Vercel para apex), **o**
-   - **ALIAS/ANAME** `@` → `cname.vercel-dns.com` (si tu DNS lo permite).
-3. **CNAME** `www` → `cname.vercel-dns.com` (ya suele estar bien).
+- `www.hashrate.space/*` → `https://hashrate.space/*`
+- `app.hashrate.space/*` → `https://hashrate.space/*`
 
-### Mientras el apex no migre
+Tras agregar el dominio y desplegar, probar:
 
-- Sitio público: **https://www.hashrate.space/marketplace/home**
-- El `vercel.json` redirige `app.hashrate.space` → `www.hashrate.space` tras el próximo deploy.
+```text
+https://www.hashrate.space/
+https://www.hashrate.space/equipment
+```
 
-## URLs antiguas de WordPress
+Deberían responder **308/301** hacia `https://hashrate.space/...` sin aviso de certificado.
 
-| Antes | Ahora |
-|-------|--------|
-| `/en/` | `/marketplace/home` (idioma EN) |
-| `/es/` | `/marketplace/home` (idioma ES) |
-| `/en/services/` | `/marketplace/services` |
+## Verificación DNS
 
-Propagación DNS: puede tardar **hasta 48 h** (a menudo 15–60 min).
-
-## Comprobar
-
-```bash
+```powershell
 nslookup hashrate.space
 nslookup www.hashrate.space
 ```
 
-Cuando el apex esté bien, `hashrate.space` debe resolver a Vercel (no a `179.27.153.62`).
+Ambos deben resolver a infraestructura Vercel (no a IPs antiguas del hosting previo).

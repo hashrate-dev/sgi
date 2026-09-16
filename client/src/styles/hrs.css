@@ -322,9 +322,26 @@ html.hrs-home-bg body {
 .sgi-protected-root--farm-bg .sgi-hub-card .form-control,
 .sgi-protected-root--farm-bg .sgi-glass-panel .form-control,
 .sgi-protected-root--farm-bg .sgi-hub-card .fact-input,
-.sgi-protected-root--farm-bg .sgi-glass-panel .fact-input {
+.sgi-protected-root--farm-bg .sgi-glass-panel .fact-input,
+.sgi-protected-root--farm-bg .sgi-hub-card .fact-select,
+.sgi-protected-root--farm-bg .sgi-glass-panel .fact-select,
+.sgi-protected-root--farm-bg .sgi-hub-card .form-select,
+.sgi-protected-root--farm-bg .sgi-glass-panel .form-select {
+  color-scheme: light;
   background: rgba(255, 255, 255, 0.95);
   border-color: rgba(255, 255, 255, 0.28);
+  color: #0f172a;
+}
+
+.sgi-protected-root--farm-bg .sgi-hub-card .fact-select option,
+.sgi-protected-root--farm-bg .sgi-glass-panel .fact-select option,
+.sgi-protected-root--farm-bg .sgi-hub-card .fact-select optgroup,
+.sgi-protected-root--farm-bg .sgi-glass-panel .fact-select optgroup,
+.sgi-protected-root--farm-bg .sgi-hub-card .form-select option,
+.sgi-protected-root--farm-bg .sgi-glass-panel .form-select option,
+.sgi-protected-root--farm-bg .sgi-hub-card .form-select optgroup,
+.sgi-protected-root--farm-bg .sgi-glass-panel .form-select optgroup {
+  background-color: #ffffff;
   color: #0f172a;
 }
 

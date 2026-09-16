@@ -7,6 +7,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { FacturacionPage } from "./pages/FacturacionPage";
 import { FacturacionMineriaPage } from "./pages/FacturacionMineriaPage";
 import { HostingHubPage } from "./pages/HostingHubPage";
+import { HostingCommercialInvoicePage } from "./pages/HostingCommercialInvoicePage";
 import { GestionAdministrativaPage } from "./pages/GestionAdministrativaPage";
 import { LeadsBasePage } from "./pages/LeadsBasePage";
 import { NuevosLeadsPage } from "./pages/NuevosLeadsPage";
@@ -466,6 +467,7 @@ function App() {
             <Route path="/hosting/exchange-operations" element={<HostingExchangeOperationsPage />} />
             <Route path="/hosting/tipo-cambio-historial" element={<HostingTipoCambioHistorialPage />} />
             <Route path="/hosting/billing" element={<FacturacionPage />} />
+            <Route path="/hosting/commercial-invoices" element={<HostingCommercialInvoicePage />} />
             <Route path="/history" element={<HistorialPage />} />
             <Route path="/hosting/history" element={<HistorialPage sourceFilter="hosting" />} />
             <Route path="/hosting/pending" element={<PendientesPage />} />

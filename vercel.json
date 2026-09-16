@@ -6,6 +6,12 @@
   "redirects": [
     {
       "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.hashrate.space" }],
+      "destination": "https://hashrate.space/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
       "has": [{ "type": "host", "value": "app.hashrate.space" }],
       "destination": "https://hashrate.space/:path*",
       "permanent": true

@@ -153,6 +153,16 @@ export const SGI_PERMISSION_SCREEN_MAP: readonly SgiPermissionScreenRow[] = [
     audience: ["staff", "lector"],
   },
   {
+    id: "hosting-commercial-invoice",
+    zoneOrder: 20,
+    zone: "Hosting — Servicios de hosting",
+    legacyModule: "facturacion",
+    title: "Commercial Invoice (hosting)",
+    routes: ["/hosting/commercial-invoices"],
+    accessNote: "Invoice comercial internacional: formularios, ítems y PDF con numeración única.",
+    audience: ["staff", "lector"],
+  },
+  {
     id: "hosting-history",
     zoneOrder: 20,
     zone: "Hosting — Servicios de hosting",

@@ -738,10 +738,9 @@
   }
 }
 
-/* —— Footer —— */
+/* —— Footer (barra de acciones: posición fija en facturacion.css) —— */
 .nh-watcher-fullpage .nh-watcher-page-footer--sgi {
-  margin-top: 1rem;
-  padding: 0.85rem 1rem;
+  padding: 0.65rem 1rem;
   border-radius: 0.9rem;
   border: 1px solid var(--nh-line);
   background: var(--nh-glass);

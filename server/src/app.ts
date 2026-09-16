@@ -22,6 +22,7 @@ import { marketplaceRouter } from "./routes/marketplace.js";
 import { marketplaceQuoteTicketsRouter } from "./routes/marketplaceQuoteTickets.js";
 import { kryptexRouter } from "./routes/kryptex.js";
 import { hostingFxOperationsRouter } from "./routes/hostingFxOperations.js";
+import { commercialInvoicesRouter } from "./routes/commercialInvoices.js";
 import { asicCostosRouter } from "./routes/asicCostos.js";
 import { proveedoresHrsRouter } from "./routes/proveedoresHrs.js";
 import { contabilidadGastosRouter } from "./routes/contabilidadGastos.js";
@@ -142,6 +143,7 @@ export function createApp() {
   app.use("/api", requireAuth, usersRouter);
   app.use("/api", requireAuth, clientsRouter);
   app.use("/api", requireAuth, invoicesRouter);
+  app.use("/api", requireAuth, commercialInvoicesRouter);
   app.use("/api", requireAuth, renderRouter);
   app.use("/api", emittedRouter);
   app.use("/api", garantiasRouter);

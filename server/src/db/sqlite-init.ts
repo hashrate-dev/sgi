@@ -439,5 +439,56 @@ CREATE INDEX IF NOT EXISTS idx_sgi_crypto_noticias_medios_enabled ON sgi_crypto_
     if (!msg.includes("duplicate column")) throw e;
   }
 
+  db.exec(`
+CREATE TABLE IF NOT EXISTS commercial_invoices (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  number TEXT NOT NULL UNIQUE,
+  seq_year INTEGER NOT NULL,
+  seq_num INTEGER NOT NULL,
+  number_suffix TEXT NOT NULL,
+  invoice_date TEXT NOT NULL,
+  due_date TEXT NOT NULL DEFAULT '',
+  currency TEXT NOT NULL DEFAULT 'USD',
+  po_number TEXT NOT NULL DEFAULT '',
+  payment_terms TEXT NOT NULL DEFAULT '',
+  payment_method TEXT NOT NULL DEFAULT '',
+  incoterms TEXT NOT NULL DEFAULT '',
+  origin_country TEXT NOT NULL DEFAULT '',
+  destination_country TEXT NOT NULL DEFAULT '',
+  seller_name TEXT NOT NULL DEFAULT '',
+  seller_address TEXT NOT NULL DEFAULT '',
+  seller_city TEXT NOT NULL DEFAULT '',
+  seller_country TEXT NOT NULL DEFAULT '',
+  seller_tax_id TEXT NOT NULL DEFAULT '',
+  seller_email TEXT NOT NULL DEFAULT '',
+  seller_phone TEXT NOT NULL DEFAULT '',
+  seller_web TEXT NOT NULL DEFAULT '',
+  buyer_name TEXT NOT NULL DEFAULT '',
+  buyer_address TEXT NOT NULL DEFAULT '',
+  buyer_city TEXT NOT NULL DEFAULT '',
+  buyer_country TEXT NOT NULL DEFAULT '',
+  buyer_tax_id TEXT NOT NULL DEFAULT '',
+  buyer_email TEXT NOT NULL DEFAULT '',
+  buyer_phone TEXT NOT NULL DEFAULT '',
+  goods_status TEXT NOT NULL DEFAULT '',
+  shipment_purpose TEXT NOT NULL DEFAULT '',
+  goods_origin_country TEXT NOT NULL DEFAULT '',
+  notes TEXT NOT NULL DEFAULT '',
+  bank_details TEXT NOT NULL DEFAULT '',
+  items_json TEXT NOT NULL DEFAULT '[]',
+  subtotal REAL NOT NULL DEFAULT 0,
+  tax_label TEXT NOT NULL DEFAULT '',
+  tax_amount REAL NOT NULL DEFAULT 0,
+  total REAL NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_commercial_invoices_year_seq ON commercial_invoices(seq_year, seq_num);
+CREATE TABLE IF NOT EXISTS commercial_invoice_seq (
+  year INTEGER PRIMARY KEY,
+  last_number INTEGER NOT NULL
+);
+`);
+
   return db;
 }
