@@ -115,7 +115,8 @@ export function CommercialInvoicePreview({
 
       <p className="ci-paper__value">
         <strong>TOTAL VALUE / VALOR TOTAL: {commercialInvoiceMoney(total)}</strong>
-        {` (${commercialInvoiceUsdInWords(total)})`}
+        {" "}
+        ({commercialInvoiceUsdInWords(total)})
       </p>
 
       <section className="ci-paper__box">

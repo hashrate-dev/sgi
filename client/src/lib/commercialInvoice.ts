@@ -199,7 +199,7 @@ export function commercialInvoiceUsdInWords(amount: number): string {
     .map((g) => [words0to999(g.v), g.w].filter(Boolean).join(" "))
     .join(" ");
   const d = dollarWords || "zero";
-  const dollarLabel = dollars === 1 ? "dollar" : "dollars";
+  const dollarLabel = dollars === 1 ? "American dollar" : "American dollars";
   let text = `${d} ${dollarLabel}`;
   if (cents) {
     const c = words0to999(cents);

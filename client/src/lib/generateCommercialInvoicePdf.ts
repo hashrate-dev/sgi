@@ -227,14 +227,15 @@ export async function downloadCommercialInvoicePdf(fields: CommercialInvoiceFiel
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.4);
   navy(doc);
-  const valueLead = `TOTAL VALUE / VALOR TOTAL: ${commercialInvoiceMoney(total)}`;
-  const valueRest = ` (${commercialInvoiceUsdInWords(total)})`;
+  const amountTxt = commercialInvoiceMoney(total);
+  const wordsTxt = `(${commercialInvoiceUsdInWords(total)})`;
+  const valueLead = `TOTAL VALUE / VALOR TOTAL: ${amountTxt} `;
   doc.text(valueLead, M, y);
   const leadW = doc.getTextWidth(valueLead);
   doc.setFont("helvetica", "normal");
-  const rest = doc.splitTextToSize(valueRest, innerW - leadW) as string[];
-  doc.text(rest[0] || "", M + leadW, y);
-  y += rest.length > 1 ? 8 : 6;
+  const rest = doc.splitTextToSize(wordsTxt, Math.max(40, innerW - leadW)) as string[];
+  doc.text(rest, M + leadW, y);
+  y += Math.max(6, rest.length * 4);
 
   boxHead("4. SHIPPING & DECLARATION / ENVÍO Y DECLARACIÓN");
   const shipRows: Array<[string, string]> = [
