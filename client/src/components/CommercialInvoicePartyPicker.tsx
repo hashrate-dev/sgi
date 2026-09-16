@@ -1,11 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import type { CommercialInvoiceRecipient } from "../lib/commercialInvoice";
 
-export type CommercialInvoicePartyOption = {
-  id: number;
-  userCode: string;
-  name: string;
-};
+export type CommercialInvoicePartyOption = CommercialInvoiceRecipient;
 
 type Props = {
   parties: CommercialInvoicePartyOption[];
