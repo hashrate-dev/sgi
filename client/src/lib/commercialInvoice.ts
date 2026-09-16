@@ -86,6 +86,49 @@ export const COMMERCIAL_INVOICE_SHIPPING_CARRIERS = [
   "Otro",
 ] as const;
 
+export type CommercialInvoiceRecipient = {
+  id: number;
+  userNumber: number;
+  userCode: string;
+  name: string;
+  taxId: string;
+  address: string;
+  phone: string;
+  email: string;
+  country: string;
+};
+
+export function formatCommercialInvoiceUserCode(n: number): string {
+  return `USR${String(Math.max(0, Math.trunc(n))).padStart(3, "0")}`;
+}
+
+export function applyCommercialInvoiceRecipient(
+  recipient: Pick<CommercialInvoiceRecipient, "name" | "taxId" | "address" | "phone" | "email" | "country">
+): Pick<
+  CommercialInvoiceFields,
+  "buyerName" | "buyerTaxId" | "buyerAddress" | "buyerPhone" | "buyerEmail" | "buyerCountry" | "destinationCountry"
+> {
+  return {
+    buyerName: recipient.name,
+    buyerTaxId: recipient.taxId,
+    buyerAddress: recipient.address,
+    buyerPhone: recipient.phone,
+    buyerEmail: recipient.email,
+    buyerCountry: recipient.country,
+    destinationCountry: recipient.country,
+  };
+}
+
+export function matchCommercialInvoiceRecipient(
+  fields: Pick<CommercialInvoiceFields, "buyerName" | "buyerTaxId">,
+  recipients: CommercialInvoiceRecipient[]
+): number | null {
+  const hit = recipients.find(
+    (r) => (r.taxId && r.taxId === fields.buyerTaxId.trim()) || r.name === fields.buyerName.trim()
+  );
+  return hit?.id ?? null;
+}
+
 export function isCommercialInvoiceShippingItem(item: CommercialInvoiceItem): boolean {
   return item.kind === "shipping" || item.catalogKey === "shipping";
 }

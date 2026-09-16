@@ -1313,6 +1313,23 @@ export function getCommercialInvoices(): Promise<{ invoices: CommercialInvoiceRe
   return api<{ invoices: CommercialInvoiceRecord[] }>("/api/commercial-invoices");
 }
 
+export type CommercialInvoiceRecipient = import("./commercialInvoice").CommercialInvoiceRecipient;
+
+export function getCommercialInvoiceRecipients(): Promise<{ recipients: CommercialInvoiceRecipient[] }> {
+  return api("/api/commercial-invoices/recipients");
+}
+
+export function createCommercialInvoiceRecipient(body: {
+  name: string;
+  taxId?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  country?: string;
+}): Promise<{ recipient: CommercialInvoiceRecipient }> {
+  return api("/api/commercial-invoices/recipients", { method: "POST", body: JSON.stringify(body) });
+}
+
 export type CommercialInvoiceCatalogEquipo = {
   id: string;
   numeroSerie: string;

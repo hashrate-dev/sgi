@@ -691,3 +691,16 @@ CREATE TABLE IF NOT EXISTS commercial_invoice_seq (
   year INTEGER PRIMARY KEY,
   last_number INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS commercial_invoice_recipients (
+  id SERIAL PRIMARY KEY,
+  user_number INTEGER NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  tax_id TEXT NOT NULL DEFAULT '',
+  address TEXT NOT NULL DEFAULT '',
+  phone TEXT NOT NULL DEFAULT '',
+  email TEXT NOT NULL DEFAULT '',
+  country TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

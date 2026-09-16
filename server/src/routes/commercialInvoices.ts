@@ -159,6 +159,61 @@ async function ensureSchema(): Promise<void> {
   } catch {
     /* ya existe */
   }
+  if (isPg()) {
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS commercial_invoice_recipients (
+          id SERIAL PRIMARY KEY,
+          user_number INTEGER NOT NULL UNIQUE,
+          name TEXT NOT NULL,
+          tax_id TEXT NOT NULL DEFAULT '',
+          address TEXT NOT NULL DEFAULT '',
+          phone TEXT NOT NULL DEFAULT '',
+          email TEXT NOT NULL DEFAULT '',
+          country TEXT NOT NULL DEFAULT '',
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )`
+      )
+      .run();
+  } else {
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS commercial_invoice_recipients (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_number INTEGER NOT NULL UNIQUE,
+          name TEXT NOT NULL,
+          tax_id TEXT NOT NULL DEFAULT '',
+          address TEXT NOT NULL DEFAULT '',
+          phone TEXT NOT NULL DEFAULT '',
+          email TEXT NOT NULL DEFAULT '',
+          country TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )`
+      )
+      .run();
+  }
+  try {
+    const countRow = (await db.prepare("SELECT COUNT(*) AS c FROM commercial_invoice_recipients").get()) as { c?: number | string } | undefined;
+    if (Number(countRow?.c ?? 0) === 0) {
+      await db
+        .prepare(
+          `INSERT INTO commercial_invoice_recipients (user_number, name, tax_id, address, phone, email, country)
+           VALUES (1, ?, ?, ?, ?, ?, ?)`
+        )
+        .run(
+          "TENZER, KEN",
+          "8595314-8",
+          "555, Camacho Duré, Asunción, Central, Paraguay, 001520",
+          "+595 993 382 224",
+          "kentenzer@gmail.com",
+          "Paraguay"
+        );
+    }
+  } catch {
+    /* seed opcional */
+  }
   schemaReady = true;
 }
 
@@ -257,6 +312,28 @@ async function peekOrAllocate(tx: Tx, consume: boolean): Promise<{ number: strin
     await tx.prepare("UPDATE commercial_invoice_seq SET last_number = ? WHERE year = ?").run(next, SEQ_SCOPE);
   }
   return { number: formatNumber(next), seqNum: next };
+}
+
+function mapRecipient(row: Record<string, unknown>) {
+  const r = rowKeysToLowercase(row);
+  const userNumber = Number(r.user_number ?? 0);
+  return {
+    id: Number(r.id),
+    userNumber,
+    userCode: formatUserCode(userNumber),
+    name: String(r.name ?? ""),
+    taxId: String(r.tax_id ?? ""),
+    address: String(r.address ?? ""),
+    phone: String(r.phone ?? ""),
+    email: String(r.email ?? ""),
+    country: String(r.country ?? ""),
+    createdAt: String(r.created_at ?? ""),
+    updatedAt: String(r.updated_at ?? ""),
+  };
+}
+
+function formatUserCode(n: number): string {
+  return `USR${String(Math.max(0, Math.trunc(n))).padStart(3, "0")}`;
 }
 
 function parseItems(raw: unknown): unknown[] {
@@ -372,6 +449,70 @@ commercialInvoicesRouter.get(
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       return res.status(500).json({ error: { message: msg || "No se pudo cargar el catálogo ASIC" } });
+    }
+  }
+);
+
+commercialInvoicesRouter.get(
+  "/commercial-invoices/recipients",
+  requireRole("admin_a", "admin_b", "operador", "lector"),
+  requireModuleGrant("facturacion"),
+  async (_req, res) => {
+    await ensureSchema();
+    try {
+      const rows = (await db
+        .prepare(
+          `SELECT id, user_number, name, tax_id, address, phone, email, country, created_at, updated_at
+           FROM commercial_invoice_recipients
+           ORDER BY user_number ASC`
+        )
+        .all()) as Record<string, unknown>[];
+      return res.json({ recipients: (Array.isArray(rows) ? rows : []).map((raw) => mapRecipient(raw)) });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return res.status(500).json({ error: { message: msg || "No se pudo cargar consignatarios" } });
+    }
+  }
+);
+
+const RecipientBody = z.object({
+  name: z.string().min(1).max(200).trim(),
+  taxId: z.string().max(80).trim().optional().default(""),
+  address: z.string().max(500).trim().optional().default(""),
+  phone: z.string().max(80).trim().optional().default(""),
+  email: z.string().max(160).trim().optional().default(""),
+  country: z.string().max(80).trim().optional().default(""),
+});
+
+commercialInvoicesRouter.post(
+  "/commercial-invoices/recipients",
+  requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("facturacion"),
+  async (req, res) => {
+    await ensureSchema();
+    const parsed = RecipientBody.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: { message: "Completá al menos el nombre del consignatario" } });
+    }
+    const body = parsed.data;
+    try {
+      const created = await db.transaction(async (tx) => {
+        const maxRow = (await tx.prepare("SELECT COALESCE(MAX(user_number), 0) AS m FROM commercial_invoice_recipients").get()) as
+          | { m?: number | string }
+          | undefined;
+        const next = Math.max(1, Number(maxRow?.m ?? 0) + 1);
+        const returning = `INSERT INTO commercial_invoice_recipients (user_number, name, tax_id, address, phone, email, country)
+          VALUES (?,?,?,?,?,?,?) RETURNING id, user_number, name, tax_id, address, phone, email, country, created_at, updated_at`;
+        const row = (await tx.prepare(returning).get(next, body.name, body.taxId, body.address, body.phone, body.email, body.country)) as
+          | Record<string, unknown>
+          | undefined;
+        if (!row) throw new Error("No se pudo guardar el consignatario");
+        return mapRecipient(row);
+      });
+      return res.status(201).json({ recipient: created });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return res.status(500).json({ error: { message: msg || "Error al guardar consignatario" } });
     }
   }
 );

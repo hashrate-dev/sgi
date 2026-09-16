@@ -7,11 +7,14 @@ import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import {
   createCommercialInvoice,
+  createCommercialInvoiceRecipient,
   getCommercialInvoiceCatalog,
   getCommercialInvoiceNextNumber,
+  getCommercialInvoiceRecipients,
   getCommercialInvoices,
   updateCommercialInvoice,
   type CommercialInvoiceCatalogEquipo,
+  type CommercialInvoiceRecipient,
   type CommercialInvoiceRecord,
 } from "../lib/api";
 import { canEditFacturacion } from "../lib/auth";
@@ -21,12 +24,14 @@ import {
   COMMERCIAL_INVOICE_INCOTERMS,
   COMMERCIAL_INVOICE_SHIPMENT_PURPOSES,
   COMMERCIAL_INVOICE_SHIPPING_CARRIERS,
+  applyCommercialInvoiceRecipient,
   commercialInvoiceLineAmount,
   defaultCommercialInvoiceFields,
   emptyCommercialInvoiceItem,
   emptyCommercialInvoiceShippingItem,
   formatCommercialInvoiceNumber,
   isCommercialInvoiceShippingItem,
+  matchCommercialInvoiceRecipient,
   patchCommercialInvoiceShipping,
   recallCommercialInvoiceDraft,
   rememberCommercialInvoiceDraft,
@@ -87,6 +92,8 @@ export function HostingCommercialInvoicePage() {
   const [busy, setBusy] = useState(false);
   const [loadingList, setLoadingList] = useState(true);
   const [equipos, setEquipos] = useState<CommercialInvoiceCatalogEquipo[]>([]);
+  const [recipients, setRecipients] = useState<CommercialInvoiceRecipient[]>([]);
+  const [savingRecipient, setSavingRecipient] = useState(false);
   const displayNumber = savedNumber || peekNumber || "IN00101";
 
   const money = (n: number) =>
@@ -104,9 +111,22 @@ export function HostingCommercialInvoicePage() {
     }
   }, []);
 
+  const loadRecipients = useCallback(async () => {
+    try {
+      const res = await getCommercialInvoiceRecipients();
+      setRecipients(res.recipients ?? []);
+    } catch {
+      showToast("No se pudo cargar los consignatarios", "error");
+    }
+  }, []);
+
   useEffect(() => {
     void loadList();
   }, [loadList]);
+
+  useEffect(() => {
+    void loadRecipients();
+  }, [loadRecipients]);
 
   useEffect(() => {
     void getCommercialInvoiceCatalog()
@@ -137,6 +157,35 @@ export function HostingCommercialInvoicePage() {
       ...p,
       items: [...p.items, emptyCommercialInvoiceShippingItem(p.originCountry, p.destinationCountry)],
     }));
+  };
+
+  const selectedRecipientId = matchCommercialInvoiceRecipient(form, recipients);
+  const selectedRecipient = recipients.find((r) => r.id === selectedRecipientId) ?? null;
+
+  const onSaveRecipient = async () => {
+    if (!canEdit) return;
+    if (!form.buyerName.trim()) {
+      showToast("Completá el nombre del consignatario para guardarlo.", "error");
+      return;
+    }
+    setSavingRecipient(true);
+    try {
+      const res = await createCommercialInvoiceRecipient({
+        name: form.buyerName.trim(),
+        taxId: form.buyerTaxId.trim(),
+        address: form.buyerAddress.trim(),
+        phone: form.buyerPhone.trim(),
+        email: form.buyerEmail.trim(),
+        country: (form.buyerCountry || form.destinationCountry).trim(),
+      });
+      setRecipients((p) => [...p.filter((r) => r.id !== res.recipient.id), res.recipient].sort((a, b) => a.userNumber - b.userNumber));
+      setForm((p) => ({ ...p, ...applyCommercialInvoiceRecipient(res.recipient) }));
+      showToast(`Usuario ${res.recipient.userCode} guardado`, "success");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "No se pudo guardar el consignatario", "error");
+    } finally {
+      setSavingRecipient(false);
+    }
   };
 
   if (!user || !canOpen) {
@@ -380,6 +429,54 @@ export function HostingCommercialInvoicePage() {
 
             <h2 className="mt-4">2. Recipient / Consignatario (quien recibe)</h2>
             <div className="ci-grid">
+              <div className="ci-span-2">
+                <label className="fact-label">Usuario / consignatario</label>
+                <select
+                  className="fact-input fact-select"
+                  value={selectedRecipientId != null ? String(selectedRecipientId) : "__manual__"}
+                  disabled={!canEdit || busy}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    if (id === "__manual__") {
+                      setForm((p) => ({
+                        ...p,
+                        buyerName: "",
+                        buyerTaxId: "",
+                        buyerAddress: "",
+                        buyerPhone: "",
+                        buyerEmail: "",
+                        buyerCountry: "",
+                      }));
+                      return;
+                    }
+                    const rec = recipients.find((r) => String(r.id) === id);
+                    if (rec) setForm((p) => ({ ...p, ...applyCommercialInvoiceRecipient(rec) }));
+                  }}
+                >
+                  <option value="__manual__">Seleccionar o cargar a mano…</option>
+                  {recipients.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.userCode} — {r.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="fact-label">Número de usuario</label>
+                <input className="fact-input" readOnly value={selectedRecipient?.userCode ?? "Se asigna al guardar"} />
+              </div>
+              <div className="d-flex align-items-end">
+                {canEdit ? (
+                  <button
+                    type="button"
+                    className="btn btn-outline-success btn-sm mb-1"
+                    disabled={busy || savingRecipient}
+                    onClick={() => void onSaveRecipient()}
+                  >
+                    {savingRecipient ? "Guardando…" : "+ Guardar usuario nuevo"}
+                  </button>
+                ) : null}
+              </div>
               <div className="ci-span-2">
                 <label className="fact-label">Name / Nombre</label>
                 <input className="fact-input" value={form.buyerName} disabled={!canEdit || busy} onChange={(e) => set("buyerName", e.target.value)} />
