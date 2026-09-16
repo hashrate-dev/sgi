@@ -239,14 +239,27 @@ export async function downloadCommercialInvoicePdf(fields: CommercialInvoiceFiel
   doc.setFontSize(8.4);
   navy(doc);
   const amountTxt = commercialInvoiceMoney(total);
-  const wordsTxt = `(${commercialInvoiceUsdInWords(total)})`;
-  const valueLead = `TOTAL VALUE / VALOR TOTAL: ${amountTxt} `;
-  doc.text(valueLead, M, y);
-  const leadW = doc.getTextWidth(valueLead);
+  const prefix = `TOTAL VALUE / VALOR TOTAL: ${amountTxt}`;
+  const wordsPart = `(${commercialInvoiceUsdInWords(total)})`;
+  const prefixW = doc.getTextWidth(prefix);
   doc.setFont("helvetica", "normal");
-  const rest = doc.splitTextToSize(wordsTxt, Math.max(40, innerW - leadW)) as string[];
-  doc.text(rest, M + leadW, y);
-  y += Math.max(6, rest.length * 4);
+  const wordsW = doc.getTextWidth(` ${wordsPart}`);
+  const gap = 1.6;
+  if (prefixW + gap + wordsW <= innerW) {
+    doc.setFont("helvetica", "bold");
+    doc.text(prefix, M, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(` ${wordsPart}`, M + prefixW + gap, y);
+    y += 6;
+  } else {
+    doc.setFont("helvetica", "bold");
+    doc.text(prefix, M, y);
+    y += 4.4;
+    doc.setFont("helvetica", "normal");
+    const lines = doc.splitTextToSize(wordsPart, innerW) as string[];
+    doc.text(lines, M, y);
+    y += lines.length * 4 + 2;
+  }
 
   boxHead("4. SHIPPING & DECLARATION / ENVÍO Y DECLARACIÓN");
   const shipRows: Array<[string, string]> = [
