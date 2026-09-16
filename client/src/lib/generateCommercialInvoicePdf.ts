@@ -18,7 +18,6 @@ const PAGE_H = 297;
 const M = 12;
 const NAVY = { r: 27, g: 54, b: 93 };
 const BORDER = { r: 163, g: 176, b: 191 };
-const MUTED = { r: 55, g: 72, b: 95 };
 const HEAD_BG = { r: 236, g: 241, b: 247 };
 const TOTAL_BG = { r: 236, g: 241, b: 247 };
 
