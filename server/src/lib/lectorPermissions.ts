@@ -40,7 +40,7 @@ export const LECTOR_PERMISSION_CATALOG = [
     sectionLabel: "Operación Hosting, ASIC y clientes — solo lectura",
     key: "garantias",
     label: "Garantías Ande",
-    description: "Consultar garantías, ítems e historiales asociados a Ande.",
+    description: "Consultar garantías ANDE, ítems, historiales y valores de garantías ASIC por máquina.",
   },
   {
     sectionOrder: 1,

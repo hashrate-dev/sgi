@@ -16,6 +16,7 @@ import { CambioUsdtHubPage } from "./pages/CambioUsdtHubPage";
 import { FxExchangeClientsPage } from "./pages/FxExchangeClientsPage";
 import { FxExchangeClienteEditPage } from "./pages/FxExchangeClienteEditPage";
 import { GarantiasAndeClientesPage } from "./pages/GarantiasAndeClientesPage";
+import { ValoresGarantiasAsicPage } from "./pages/ValoresGarantiasAsicPage";
 import { CryptoNoticiasPage } from "./pages/CryptoNoticiasPage";
 import { GestionFinancieraHubPage } from "./pages/GestionFinancieraHubPage";
 import { ProveedoresHrsPage } from "./pages/ProveedoresHrsPage";
@@ -454,6 +455,7 @@ function App() {
               element={<FxExchangeClienteEditPage />}
             />
             <Route path="/gestion-administrativa/garantias-ande-clientes" element={<GarantiasAndeClientesPage />} />
+            <Route path="/gestion-administrativa/valores-garantias-asic" element={<ValoresGarantiasAsicPage />} />
             <Route path="/gestion-administrativa/noticias" element={<CryptoNoticiasPage />} />
             <Route path="/gestion-administrativa/exchange" element={<PruebaPage />} />
             <Route path="/gestion-administrativa/prueba" element={<Navigate to="/gestion-administrativa/exchange" replace />} />

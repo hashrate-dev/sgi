@@ -67,7 +67,7 @@ export const ADMIN_B_PERMISSION_CATALOG: readonly AdminBPermissionCatalogItem[] 
     key: "garantias",
     label: "Garantías Ande",
     description:
-      "Emisión y mantenimiento de garantías/recibos Ande, más el registro de garantías ANDE (Clientes) en USD.",
+      "Emisión y mantenimiento de garantías/recibos Ande, registro ANDE (Clientes) y valores de garantías ASIC por máquina.",
   },
   {
     sectionOrder: 1,

@@ -2160,6 +2160,70 @@ export function deleteGarantiaAndeCliente(id: number): Promise<{ ok: boolean }> 
   return api<{ ok: boolean }>(`/api/garantias-ande-clientes/${id}`, { method: "DELETE" });
 }
 
+// ——— Valores de garantías ASIC (USD por marca / modelo / procesador y consumo) ———
+export type ValorGarantiaAsicItem = {
+  id: number;
+  marca: string;
+  modelo: string;
+  procesador: string;
+  consumoW: number;
+  montoUsd: number;
+  fecha: string;
+  notas: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ValorGarantiaAsicHistorialItem = {
+  id: number;
+  valorId: number;
+  marca: string;
+  modelo: string;
+  procesador: string;
+  consumoW: number;
+  montoUsd: number;
+  fecha: string;
+  createdAt: string;
+};
+
+export type ValorGarantiaAsicPayload = {
+  marca: string;
+  modelo: string;
+  procesador: string;
+  consumoW: number;
+  montoUsd: number;
+  fecha: string;
+  notas?: string;
+};
+
+export function getValoresGarantiasAsic(): Promise<{
+  items: ValorGarantiaAsicItem[];
+  historial: ValorGarantiaAsicHistorialItem[];
+}> {
+  return api("/api/valores-garantias-asic");
+}
+
+export function createValorGarantiaAsic(body: ValorGarantiaAsicPayload): Promise<{ ok: boolean }> {
+  return api("/api/valores-garantias-asic", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateValorGarantiaAsic(
+  id: number,
+  body: Partial<ValorGarantiaAsicPayload>
+): Promise<{ ok: boolean }> {
+  return api(`/api/valores-garantias-asic/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+export function deleteValorGarantiaAsic(id: number): Promise<{ ok: boolean }> {
+  return api(`/api/valores-garantias-asic/${id}`, { method: "DELETE" });
+}
+
 // ——— Noticias cripto (bot + historial) ———
 export type CryptoNoticiaTopic =
   | "bitcoin"

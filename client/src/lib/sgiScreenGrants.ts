@@ -170,6 +170,7 @@ export function collectPathPrefixesFromScreenGrants(grants: readonly string[]): 
     grantsIncludeScreen(g, "ga-cambio-usdt-hub") ||
     grantsIncludeScreen(g, "ga-cambio-usdt-clientes") ||
     grantsIncludeScreen(g, "ga-garantias-ande-clientes") ||
+    grantsIncludeScreen(g, "ga-valores-garantias-asic") ||
     grantsIncludeScreen(g, "ga-noticias");
   const seesFin =
     grantsIncludeScreen(g, "fin-proveedores") ||

@@ -517,7 +517,7 @@ asicCostosRouter.get(
 asicCostosRouter.post(
   "/asic/cotizador-catalogo",
   requireRole("admin_a", "admin_b", "operador"),
-  requireAnyModuleGrant("finanzas_asic_costos", "equipos"),
+  requireAnyModuleGrant("finanzas_asic_costos", "equipos", "garantias"),
   async (req, res) => {
     await ensureAsicCostosSchema();
     const parsed = CotizadorCatalogCreateSchema.safeParse(req.body);
@@ -592,7 +592,7 @@ asicCostosRouter.post(
 asicCostosRouter.patch(
   "/asic/cotizador-catalogo/:id",
   requireRole("admin_a", "admin_b", "operador"),
-  requireAnyModuleGrant("finanzas_asic_costos", "equipos"),
+  requireAnyModuleGrant("finanzas_asic_costos", "equipos", "garantias"),
   async (req, res) => {
     await ensureAsicCostosSchema();
     const id = Number(req.params.id);

@@ -378,6 +378,36 @@ CREATE INDEX IF NOT EXISTS idx_garantias_ande_clientes_client ON garantias_ande_
   }
 
   db.exec(`
+CREATE TABLE IF NOT EXISTS valores_garantias_asic (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  marca TEXT NOT NULL DEFAULT '',
+  modelo TEXT NOT NULL DEFAULT '',
+  procesador TEXT NOT NULL DEFAULT '',
+  consumo_w REAL NOT NULL DEFAULT 0,
+  monto_usd REAL NOT NULL DEFAULT 0,
+  fecha TEXT NOT NULL,
+  notas TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_valores_garantias_asic_fecha ON valores_garantias_asic(fecha DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_valores_garantias_asic_maq ON valores_garantias_asic(marca, modelo, procesador);
+CREATE TABLE IF NOT EXISTS valores_garantias_asic_historial (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  valor_id INTEGER NOT NULL,
+  marca TEXT NOT NULL DEFAULT '',
+  modelo TEXT NOT NULL DEFAULT '',
+  procesador TEXT NOT NULL DEFAULT '',
+  consumo_w REAL NOT NULL DEFAULT 0,
+  monto_usd REAL NOT NULL DEFAULT 0,
+  fecha TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (valor_id) REFERENCES valores_garantias_asic(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_valores_garantias_asic_hist_fecha ON valores_garantias_asic_historial(fecha DESC, id DESC);
+`);
+
+  db.exec(`
 CREATE TABLE IF NOT EXISTS sgi_crypto_noticias (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   title TEXT NOT NULL,

@@ -56,6 +56,12 @@ const hubItems: readonly HubItem[] = [
     desc: "Registro de garantías ANDE en USD por cliente de hosting y equipo ASIC",
   },
   {
+    to: "/gestion-administrativa/valores-garantias-asic",
+    icon: "bi-lightning-charge-fill",
+    label: "Valores de garantías ASIC",
+    desc: "Valores de garantía en USD por marca, modelo y procesador, según el consumo de energía de cada máquina",
+  },
+  {
     to: "/gestion-administrativa/noticias",
     icon: "bi-newspaper",
     label: "NOTICIAS",

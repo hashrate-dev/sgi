@@ -13,6 +13,7 @@ import { renderRouter } from "./routes/render.js";
 import { emittedRouter } from "./routes/emitted.js";
 import { garantiasRouter } from "./routes/garantias.js";
 import { garantiasAndeClientesRouter } from "./routes/garantiasAndeClientes.js";
+import { valoresGarantiasAsicRouter } from "./routes/valoresGarantiasAsic.js";
 import { cryptoNoticiasRouter } from "./routes/cryptoNoticias.js";
 import { reparacionTiposRouter } from "./routes/reparacionTipos.js";
 import { transporteFleteTiposRouter } from "./routes/transporteFleteTipos.js";
@@ -148,6 +149,7 @@ export function createApp() {
   app.use("/api", emittedRouter);
   app.use("/api", garantiasRouter);
   app.use("/api", requireAuth, garantiasAndeClientesRouter);
+  app.use("/api", requireAuth, valoresGarantiasAsicRouter);
   app.use("/api", cryptoNoticiasRouter);
   app.use("/api", requireAuth, setupsRouter);
   app.use("/api", requireAuth, reparacionTiposRouter);

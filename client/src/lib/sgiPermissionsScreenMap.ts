@@ -122,6 +122,16 @@ export const SGI_PERMISSION_SCREEN_MAP: readonly SgiPermissionScreenRow[] = [
     audience: ["staff", "lector"],
   },
   {
+    id: "ga-valores-garantias-asic",
+    zoneOrder: 10,
+    zone: "Gestión Administrativa",
+    legacyModule: "garantias",
+    title: "Valores de garantías ASIC",
+    routes: ["/gestion-administrativa/valores-garantias-asic"],
+    accessNote: "Valores de garantía en USD por marca, modelo y procesador según consumo de energía.",
+    audience: ["staff", "lector"],
+  },
+  {
     id: "ga-noticias",
     zoneOrder: 10,
     zone: "Gestión Administrativa",

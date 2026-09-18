@@ -167,6 +167,34 @@ ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS monto_devuelto_usd 
 ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS baja_equipo_id TEXT;
 ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS devolucion_nota TEXT NOT NULL DEFAULT '';
 
+CREATE TABLE IF NOT EXISTS valores_garantias_asic (
+  id BIGSERIAL PRIMARY KEY,
+  marca TEXT NOT NULL DEFAULT '',
+  modelo TEXT NOT NULL DEFAULT '',
+  procesador TEXT NOT NULL DEFAULT '',
+  consumo_w DOUBLE PRECISION NOT NULL DEFAULT 0,
+  monto_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+  fecha TEXT NOT NULL,
+  notas TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_valores_garantias_asic_fecha ON valores_garantias_asic(fecha DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_valores_garantias_asic_maq ON valores_garantias_asic(marca, modelo, procesador);
+
+CREATE TABLE IF NOT EXISTS valores_garantias_asic_historial (
+  id BIGSERIAL PRIMARY KEY,
+  valor_id BIGINT NOT NULL REFERENCES valores_garantias_asic(id) ON DELETE CASCADE,
+  marca TEXT NOT NULL DEFAULT '',
+  modelo TEXT NOT NULL DEFAULT '',
+  procesador TEXT NOT NULL DEFAULT '',
+  consumo_w DOUBLE PRECISION NOT NULL DEFAULT 0,
+  monto_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+  fecha TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_valores_garantias_asic_hist_fecha ON valores_garantias_asic_historial(fecha DESC, id DESC);
+
 CREATE TABLE IF NOT EXISTS sgi_crypto_noticias (
   id BIGSERIAL PRIMARY KEY,
   title TEXT NOT NULL,

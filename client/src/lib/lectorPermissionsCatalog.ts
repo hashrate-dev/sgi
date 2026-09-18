@@ -62,7 +62,7 @@ export const LECTOR_PERMISSION_CATALOG: readonly LectorPermissionCatalogItem[] =
     sectionLabel: "Operación Hosting, ASIC y clientes — solo lectura",
     key: "garantias",
     label: "Garantías Ande",
-    description: "Consultar garantías, ítems e historiales asociados a Ande.",
+    description: "Consultar garantías ANDE, ítems, historiales y valores de garantías ASIC por máquina.",
   },
   {
     sectionOrder: 1,
@@ -176,7 +176,7 @@ export const LECTOR_GRANT_PATH_PREFIXES: Record<LectorPermissionKey, readonly st
   clientes: ["/clients", "/cuenta-cliente", "/clientes", "/clientes-hub"],
   equipos: ["/asic/equipment", "/asic", "/equipos-asic", "/asic/cotizador-china-py"],
   equipos_tienda: ["/marketplace/home-banners", "/tienda-online-banners-home", "/asic/equipment"],
-  garantias: ["/asic/ande-warranty", "/asic/warranty-items", "/asic/warranties-history", "/equipos-asic", "/gestion-administrativa/garantias-ande-clientes"],
+  garantias: ["/asic/ande-warranty", "/asic/warranty-items", "/asic/warranties-history", "/equipos-asic", "/gestion-administrativa/garantias-ande-clientes", "/gestion-administrativa/valores-garantias-asic"],
   setups: ["/asic/setup", "/equipos-asic/setup", "/asic/reparacion"],
   leads: [],
   noticias: ["/gestion-administrativa/noticias"],
