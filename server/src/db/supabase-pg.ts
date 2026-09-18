@@ -46,19 +46,23 @@ function convertPlaceholders(sql: string): string {
   });
 }
 
-/** Para INSERT sin RETURNING, añadimos RETURNING id para obtener lastInsertRowId.
- *  No tocar upserts ON CONFLICT ni tablas cuya PK no se llama `id`. */
+/** INSERT sin RETURNING: devolvemos la fila para poder leer `id` (SERIAL).
+ *  No se puede inferir la PK por la lista de columnas: un INSERT típico no incluye `id`
+ *  (p. ej. invoices) y antes se omitía RETURNING, dejando lastInsertRowid = null. */
 function ensureReturningId(sql: string): string {
   const trimmed = sql.trim();
   if (!trimmed.toUpperCase().startsWith("INSERT")) return sql;
   if (/RETURNING\s+/i.test(trimmed)) return sql;
   if (/ON\s+CONFLICT/i.test(trimmed)) return sql;
-  const cols = trimmed.match(/INSERT\s+INTO\s+\S+\s*\(([^)]+)\)/i);
-  if (cols?.[1]) {
-    const names = cols[1].split(",").map((s) => s.trim().replace(/"/g, "").toLowerCase());
-    if (names.length > 0 && !names.includes("id")) return sql;
-  }
-  return `${sql} RETURNING id`;
+  return `${sql} RETURNING *`;
+}
+
+function lastInsertIdFromResult(r: QueryResult): number | null {
+  const row = r.rows[0] as Record<string, unknown> | undefined;
+  if (!row) return null;
+  const raw = row.id ?? row.ID;
+  const n = raw != null ? Number(raw) : NaN;
+  return Number.isFinite(n) ? n : null;
 }
 
 export type PgRunResult = { changes: number; lastInsertRowid: number | null };
@@ -74,11 +78,9 @@ function createStatement(sql: string) {
       const sqlWithReturn = ensureReturningId(sql);
       const conv = convertPlaceholders(sqlWithReturn);
       return pool.query(conv, params).then((r: QueryResult) => {
-        const id = (r.rows[0] as { id?: unknown } | undefined)?.id;
-        const n = id != null ? Number(id) : NaN;
         return {
           changes: r.rowCount ?? 0,
-          lastInsertRowid: Number.isFinite(n) ? n : null,
+          lastInsertRowid: lastInsertIdFromResult(r),
         } as PgRunResult;
       });
     },
@@ -104,9 +106,7 @@ export const db = {
             return client
               .query(convertPlaceholders(sqlWithReturn), params)
               .then((r: QueryResult) => {
-                const id = (r.rows[0] as { id?: unknown } | undefined)?.id;
-                const n = id != null ? Number(id) : NaN;
-                return { changes: r.rowCount ?? 0, lastInsertRowid: Number.isFinite(n) ? n : null };
+                return { changes: r.rowCount ?? 0, lastInsertRowid: lastInsertIdFromResult(r) };
               });
           },
         }),

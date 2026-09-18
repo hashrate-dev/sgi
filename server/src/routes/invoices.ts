@@ -295,7 +295,16 @@ invoicesRouter.post(
         inv.dueDate || null,
         sourceVal
       );
-      const invoiceId = info.lastInsertRowid as number;
+      let invoiceId = Number(info.lastInsertRowid);
+      if (!Number.isFinite(invoiceId) || invoiceId <= 0) {
+        const byNumber = (await tx.prepare("SELECT id FROM invoices WHERE number = ?").get(numberToUse)) as
+          | { id?: number }
+          | undefined;
+        invoiceId = Number(byNumber?.id);
+      }
+      if (!Number.isFinite(invoiceId) || invoiceId <= 0) {
+        throw new Error("No se obtuvo el ID del documento al guardar.");
+      }
       const insertItem = tx.prepare(`
         INSERT INTO invoice_items (invoice_id, service, month, quantity, price, discount)
         VALUES (?, ?, ?, ?, ?, ?)
