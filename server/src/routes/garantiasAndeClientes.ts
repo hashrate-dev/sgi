@@ -13,7 +13,10 @@ const hostingOnlyWhereSql =
   "NOT (UPPER(TRIM(COALESCE(code, ''))) LIKE 'A9%' OR UPPER(TRIM(COALESCE(code, ''))) LIKE 'WEB-%' OR UPPER(TRIM(COALESCE(code, ''))) LIKE 'FX%')";
 
 async function ensureGarantiasAndeClientesSchema(): Promise<void> {
-  if (schemaEnsured) return;
+  if (schemaEnsured) {
+    await ensureMontoClienteColumn();
+    return;
+  }
   if (db.isPostgres) {
     await db
       .prepare(
@@ -26,6 +29,7 @@ async function ensureGarantiasAndeClientesSchema(): Promise<void> {
           numero_serie TEXT NOT NULL DEFAULT '',
           nombre_equipo TEXT NOT NULL DEFAULT '',
           monto_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+          monto_cliente_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
           fecha_inicio TEXT NOT NULL,
           estado TEXT NOT NULL DEFAULT 'activa',
           fecha_devolucion TEXT,
@@ -56,6 +60,7 @@ async function ensureGarantiasAndeClientesSchema(): Promise<void> {
           numero_serie TEXT NOT NULL DEFAULT '',
           nombre_equipo TEXT NOT NULL DEFAULT '',
           monto_usd REAL NOT NULL DEFAULT 0,
+          monto_cliente_usd REAL NOT NULL DEFAULT 0,
           fecha_inicio TEXT NOT NULL,
           estado TEXT NOT NULL DEFAULT 'activa',
           fecha_devolucion TEXT,
@@ -96,6 +101,36 @@ async function ensureGarantiasAndeClientesSchema(): Promise<void> {
     )
     .run();
   schemaEnsured = true;
+  await ensureMontoClienteColumn();
+}
+
+async function ensureMontoClienteColumn(): Promise<void> {
+  if (db.isPostgres) {
+    await db
+      .prepare(
+        "ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS monto_cliente_usd DOUBLE PRECISION NOT NULL DEFAULT 0"
+      )
+      .run();
+  } else {
+    try {
+      await db.prepare("ALTER TABLE garantias_ande_clientes ADD COLUMN monto_cliente_usd REAL NOT NULL DEFAULT 0").run();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!msg.includes("duplicate column")) throw e;
+    }
+  }
+  try {
+    await db
+      .prepare(
+        `UPDATE garantias_ande_clientes
+         SET monto_cliente_usd = monto_usd
+         WHERE monto_cliente_usd = 0
+           AND (SELECT COUNT(*) FROM garantias_ande_clientes WHERE monto_cliente_usd <> 0) = 0`
+      )
+      .run();
+  } catch {
+    /* columna puede no existir aún */
+  }
 }
 
 function nowSql(): string {
@@ -110,6 +145,7 @@ const CreateSchema = z.object({
   numeroSerie: z.string().trim().min(1).max(160),
   nombreEquipo: z.string().trim().min(1).max(200),
   montoUsd: z.coerce.number().finite().min(0),
+  montoClienteUsd: z.coerce.number().finite().min(0),
   fechaInicio: z.string().trim().min(1).max(40),
 });
 
@@ -130,6 +166,7 @@ function mapRow(raw: Row) {
     numeroSerie: String(r.numero_serie ?? ""),
     nombreEquipo: String(r.nombre_equipo ?? ""),
     montoUsd: Number(r.monto_usd ?? 0),
+    montoClienteUsd: Number(r.monto_cliente_usd ?? 0),
     fechaInicio: String(r.fecha_inicio ?? ""),
     estado,
     fechaDevolucion: r.fecha_devolucion == null ? "" : String(r.fecha_devolucion),
@@ -147,6 +184,28 @@ function mapRow(raw: Row) {
   };
 }
 
+const LIST_SELECT_FULL = `SELECT g.id, g.client_id, g.marca, g.modelo, g.procesador, g.numero_serie, g.nombre_equipo,
+                g.monto_usd, g.monto_cliente_usd, g.fecha_inicio, g.estado, g.fecha_devolucion, g.monto_devuelto_usd,
+                g.baja_equipo_id, g.devolucion_nota, g.created_at, g.updated_at,
+                c.code AS client_code, c.name AS client_name, c.name2 AS client_name2
+         FROM garantias_ande_clientes g
+         JOIN clients c ON c.id = g.client_id`;
+
+const LIST_SELECT_LEGACY = `SELECT g.id, g.client_id, g.marca, g.modelo, g.procesador, g.numero_serie, g.nombre_equipo,
+                g.monto_usd, g.fecha_inicio, g.estado, g.fecha_devolucion, g.monto_devuelto_usd,
+                g.baja_equipo_id, g.devolucion_nota, g.created_at, g.updated_at,
+                c.code AS client_code, c.name AS client_name, c.name2 AS client_name2
+         FROM garantias_ande_clientes g
+         JOIN clients c ON c.id = g.client_id`;
+
+async function listGarantiaRows(): Promise<Row[]> {
+  try {
+    return (await db.prepare(`${LIST_SELECT_FULL} ORDER BY g.fecha_inicio DESC, g.id DESC`).all()) as Row[];
+  } catch {
+    return (await db.prepare(`${LIST_SELECT_LEGACY} ORDER BY g.fecha_inicio DESC, g.id DESC`).all()) as Row[];
+  }
+}
+
 const readMw = [requireRole("admin_a", "admin_b", "operador", "lector"), requireModuleGrant("garantias")] as const;
 const writeMw = [requireRole("admin_a", "admin_b", "operador"), requireModuleGrant("garantias")] as const;
 /** Monitor (equipos) también consulta matches al dar de baja. */
@@ -158,17 +217,7 @@ const matchMw = [
 garantiasAndeClientesRouter.get("/garantias-ande-clientes", ...readMw, async (_req, res, next) => {
   try {
     await ensureGarantiasAndeClientesSchema();
-    const rows = (await db
-      .prepare(
-        `SELECT g.id, g.client_id, g.marca, g.modelo, g.procesador, g.numero_serie, g.nombre_equipo,
-                g.monto_usd, g.fecha_inicio, g.estado, g.fecha_devolucion, g.monto_devuelto_usd,
-                g.baja_equipo_id, g.devolucion_nota, g.created_at, g.updated_at,
-                c.code AS client_code, c.name AS client_name, c.name2 AS client_name2
-         FROM garantias_ande_clientes g
-         JOIN clients c ON c.id = g.client_id
-         ORDER BY g.fecha_inicio DESC, g.id DESC`
-      )
-      .all()) as Row[];
+    const rows = await listGarantiaRows();
     res.json({ items: rows.map((x) => mapRow(x)) });
   } catch (e) {
     next(e);
@@ -183,18 +232,10 @@ garantiasAndeClientesRouter.get("/garantias-ande-clientes/match", ...matchMw, as
     if (!serial && !nombreEquipo) {
       return res.json({ items: [] });
     }
-    const rows = (await db
-      .prepare(
-        `SELECT g.id, g.client_id, g.marca, g.modelo, g.procesador, g.numero_serie, g.nombre_equipo,
-                g.monto_usd, g.fecha_inicio, g.estado, g.fecha_devolucion, g.monto_devuelto_usd,
-                g.baja_equipo_id, g.devolucion_nota, g.created_at, g.updated_at,
-                c.code AS client_code, c.name AS client_name, c.name2 AS client_name2
-         FROM garantias_ande_clientes g
-         JOIN clients c ON c.id = g.client_id
-         WHERE LOWER(TRIM(COALESCE(g.estado, 'activa'))) = 'activa'
-         ORDER BY g.fecha_inicio DESC, g.id DESC`
-      )
-      .all()) as Row[];
+    const rows = (await listGarantiaRows()).filter((raw) => {
+      const r = rowKeysToLowercase(raw);
+      return String(r.estado ?? "activa").trim().toLowerCase() === "activa";
+    });
     const mapped = rows.map((x) => mapRow(x)).filter((item) => {
       const sn = item.numeroSerie.trim().toLocaleLowerCase("es");
       const ne = item.nombreEquipo.trim().toLocaleLowerCase("es");
@@ -248,8 +289,8 @@ garantiasAndeClientesRouter.post("/garantias-ande-clientes", ...writeMw, async (
     await db
       .prepare(
         `INSERT INTO garantias_ande_clientes (
-           client_id, marca, modelo, procesador, numero_serie, nombre_equipo, monto_usd, fecha_inicio, estado, created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'activa', ${ts}, ${ts})`
+           client_id, marca, modelo, procesador, numero_serie, nombre_equipo, monto_usd, monto_cliente_usd, fecha_inicio, estado, created_at, updated_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'activa', ${ts}, ${ts})`
       )
       .run(
         data.clientId,
@@ -259,6 +300,7 @@ garantiasAndeClientesRouter.post("/garantias-ande-clientes", ...writeMw, async (
         data.numeroSerie,
         data.nombreEquipo,
         data.montoUsd,
+        data.montoClienteUsd,
         data.fechaInicio
       );
     res.json({ ok: true });
@@ -322,6 +364,10 @@ garantiasAndeClientesRouter.put("/garantias-ande-clientes/:id", ...writeMw, asyn
     if (data.montoUsd != null) {
       fields.push("monto_usd = ?");
       values.push(data.montoUsd);
+    }
+    if (data.montoClienteUsd != null) {
+      fields.push("monto_cliente_usd = ?");
+      values.push(data.montoClienteUsd);
     }
     if (data.fechaInicio != null) {
       fields.push("fecha_inicio = ?");

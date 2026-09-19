@@ -2092,6 +2092,7 @@ export type GarantiaAndeClienteItem = {
   numeroSerie: string;
   nombreEquipo: string;
   montoUsd: number;
+  montoClienteUsd: number;
   fechaInicio: string;
   estado?: "activa" | "devuelta";
   fechaDevolucion?: string;
@@ -2113,6 +2114,7 @@ export type GarantiaAndeClientePayload = {
   numeroSerie: string;
   nombreEquipo: string;
   montoUsd: number;
+  montoClienteUsd: number;
   fechaInicio: string;
 };
 

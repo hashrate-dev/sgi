@@ -698,10 +698,10 @@ function MonitorEquiposAsicPageContent() {
         setBajaGarantiaMatches(items);
         if (items.length === 1) {
           setBajaGarantiaId(items[0]!.id);
-          setBajaDevolucionMonto(Number(items[0]!.montoUsd) || 0);
+          setBajaDevolucionMonto(Number(items[0]!.montoClienteUsd ?? items[0]!.montoUsd) || 0);
         } else if (items.length > 1) {
           setBajaGarantiaId(items[0]!.id);
-          setBajaDevolucionMonto(Number(items[0]!.montoUsd) || 0);
+          setBajaDevolucionMonto(Number(items[0]!.montoClienteUsd ?? items[0]!.montoUsd) || 0);
         } else {
           setBajaGarantiaId(0);
           setBajaDevolucionMonto(0);
@@ -1507,14 +1507,16 @@ function MonitorEquiposAsicPageContent() {
                         const id = Number(e.target.value);
                         setBajaGarantiaId(id);
                         const hit = bajaGarantiaMatches.find((x) => x.id === id);
-                        if (hit) setBajaDevolucionMonto(Number(hit.montoUsd) || 0);
+                        if (hit) setBajaDevolucionMonto(Number(hit.montoClienteUsd ?? hit.montoUsd) || 0);
                       }}
                     >
                       {bajaGarantiaMatches.map((g) => (
                         <option key={g.id} value={g.id}>
                           {`${g.clientCode ?? ""} — ${g.clientName ?? ""}${g.clientName2 ? ` ${g.clientName2}` : ""} · ${
                             g.nombreEquipo || g.numeroSerie || "sin nombre"
-                          } · USD ${Number(g.montoUsd).toFixed(2)}`}
+                          } · Hosting USD ${Number(g.montoUsd).toFixed(2)} · Cliente USD ${Number(
+                            g.montoClienteUsd ?? g.montoUsd
+                          ).toFixed(2)}`}
                         </option>
                       ))}
                     </select>

@@ -185,6 +185,7 @@ async function ensureGarantiaDevolucionColumns(): Promise<void> {
     await db.prepare("ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS monto_devuelto_usd DOUBLE PRECISION").run();
     await db.prepare("ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS baja_equipo_id TEXT").run();
     await db.prepare("ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS devolucion_nota TEXT NOT NULL DEFAULT ''").run();
+    await db.prepare("ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS monto_cliente_usd DOUBLE PRECISION NOT NULL DEFAULT 0").run();
   } else {
     for (const col of [
       "estado TEXT NOT NULL DEFAULT 'activa'",
@@ -192,6 +193,7 @@ async function ensureGarantiaDevolucionColumns(): Promise<void> {
       "monto_devuelto_usd REAL",
       "baja_equipo_id TEXT",
       "devolucion_nota TEXT NOT NULL DEFAULT ''",
+      "monto_cliente_usd REAL NOT NULL DEFAULT 0",
     ]) {
       try {
         await db.prepare(`ALTER TABLE garantias_ande_clientes ADD COLUMN ${col}`).run();
@@ -492,7 +494,7 @@ monitorEquiposAsicHistorialRouter.post(
       await ensureGarantiaDevolucionColumns();
       const gRow = (await db
         .prepare(
-          `SELECT g.id, g.client_id, g.monto_usd, g.estado, g.numero_serie, g.nombre_equipo,
+          `SELECT g.id, g.client_id, g.monto_usd, g.monto_cliente_usd, g.estado, g.numero_serie, g.nombre_equipo,
                   c.code AS client_code, c.name AS client_name
            FROM garantias_ande_clientes g
            JOIN clients c ON c.id = g.client_id
@@ -503,6 +505,7 @@ monitorEquiposAsicHistorialRouter.post(
             id: number;
             client_id: number;
             monto_usd: number;
+            monto_cliente_usd?: number;
             estado?: string;
             numero_serie?: string;
             nombre_equipo?: string;
@@ -520,10 +523,11 @@ monitorEquiposAsicHistorialRouter.post(
       }
       garantiaId = Number(gRow.id);
       devolucionClientId = Number(gRow.client_id);
+      const montoCliente = Number(gRow.monto_cliente_usd ?? gRow.monto_usd ?? 0);
       devolucionMonto =
         devolucionMontoUsd != null && Number.isFinite(devolucionMontoUsd)
           ? Number(devolucionMontoUsd)
-          : Number(gRow.monto_usd ?? 0);
+          : montoCliente;
       garantiaLabel = `${String(gRow.client_code ?? "").trim()} ${String(gRow.client_name ?? "").trim()} · ${formatUsdPlain(devolucionMonto)}`;
     }
 

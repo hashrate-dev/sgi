@@ -166,6 +166,7 @@ ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS fecha_devolucion TE
 ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS monto_devuelto_usd DOUBLE PRECISION;
 ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS baja_equipo_id TEXT;
 ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS devolucion_nota TEXT NOT NULL DEFAULT '';
+ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS monto_cliente_usd DOUBLE PRECISION NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS valores_garantias_asic (
   id BIGSERIAL PRIMARY KEY,
