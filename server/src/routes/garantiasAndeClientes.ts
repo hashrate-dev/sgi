@@ -156,8 +156,8 @@ const CreateSchema = z.object({
 
 const UpdateSchema = CreateSchema.partial();
 
-function resolvedClienteUsd(montoUsd: number, montoClienteUsd?: number): number {
-  return Number.isFinite(montoClienteUsd) ? Number(montoClienteUsd) : montoUsd;
+function resolvedHostingUsd(montoHostingUsd?: number): number {
+  return Number.isFinite(montoHostingUsd) ? Number(montoHostingUsd) : 0;
 }
 
 type Row = Record<string, unknown>;
@@ -288,7 +288,7 @@ garantiasAndeClientesRouter.post("/garantias-ande-clientes", ...writeMw, async (
       return res.status(400).json({ error: { message: "Datos inválidos para la garantía ANDE." } });
     }
     const data = parsed.data;
-    const montoClienteUsd = resolvedClienteUsd(data.montoUsd, data.montoClienteUsd);
+    const montoClienteUsd = resolvedHostingUsd(data.montoClienteUsd);
     const client = (await db
       .prepare(`SELECT id FROM clients WHERE id = ? AND ${hostingOnlyWhereSql}`)
       .get(data.clientId)) as { id: number } | undefined;

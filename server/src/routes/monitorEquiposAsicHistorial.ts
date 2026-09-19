@@ -523,7 +523,7 @@ monitorEquiposAsicHistorialRouter.post(
       }
       garantiaId = Number(gRow.id);
       devolucionClientId = Number(gRow.client_id);
-      const montoCliente = Number(gRow.monto_cliente_usd ?? gRow.monto_usd ?? 0);
+      const montoCliente = Number(gRow.monto_usd ?? 0);
       devolucionMonto =
         devolucionMontoUsd != null && Number.isFinite(devolucionMontoUsd)
           ? Number(devolucionMontoUsd)

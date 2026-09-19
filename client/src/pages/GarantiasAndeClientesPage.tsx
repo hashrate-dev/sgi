@@ -224,9 +224,9 @@ export function GarantiasAndeClientesPage() {
     if (!form.procesador.trim()) return "Seleccioná el procesador.";
     if (!form.numeroSerie.trim()) return "Ingresá el número de serie.";
     if (!form.nombreEquipo.trim()) return "Ingresá el nombre del equipo.";
-    if (!Number.isFinite(form.montoUsd) || form.montoUsd < 0) return "El monto de garantía hosting debe ser 0 o mayor.";
+    if (!Number.isFinite(form.montoUsd) || form.montoUsd < 0) return "El monto USD (Cliente) debe ser 0 o mayor.";
     if (!Number.isFinite(form.montoClienteUsd) || form.montoClienteUsd < 0) {
-      return "El monto de garantía cliente debe ser 0 o mayor.";
+      return "El monto USD Hosting debe ser 0 o mayor.";
     }
     if (!form.fechaInicio.trim()) return "Elegí la fecha de inicio.";
     return null;
@@ -252,7 +252,7 @@ export function GarantiasAndeClientesPage() {
         numeroSerie: form.numeroSerie.trim(),
         nombreEquipo: form.nombreEquipo.trim(),
         montoUsd: form.montoUsd,
-        montoClienteUsd: Number.isFinite(form.montoClienteUsd) ? form.montoClienteUsd : form.montoUsd,
+        montoClienteUsd: Number.isFinite(form.montoClienteUsd) ? form.montoClienteUsd : 0,
         fechaInicio: form.fechaInicio.trim(),
       };
       if (editingId != null) {
@@ -326,11 +326,11 @@ export function GarantiasAndeClientesPage() {
 
         <div className="vga-kpis">
           <div className="vga-kpi">
-            <span>Suma hosting activa</span>
+            <span>Suma cliente activa</span>
             <strong>{tableLoading ? "…" : formatUsd(totalUsd)}</strong>
           </div>
           <div className="vga-kpi">
-            <span>Suma cliente activa</span>
+            <span>Suma hosting activa</span>
             <strong>{tableLoading ? "…" : formatUsd(totalClienteUsd)}</strong>
           </div>
           <div className="vga-kpi">
@@ -348,7 +348,10 @@ export function GarantiasAndeClientesPage() {
             <div>
               <p className="vga-kicker">Registro ANDE</p>
               <h2>{editingId != null ? "Editar garantía ANDE" : "Nueva garantía ANDE"}</h2>
-              <p>Asigná el equipo del catálogo ASIC al cliente de hosting. Hosting y cliente se cargan por separado.</p>
+              <p>
+                Asigná el equipo del catálogo ASIC. Cargá por separado el monto USD del cliente y el de hosting; pueden
+                ser distintos.
+              </p>
             </div>
             <div className="vga-date">
               <label htmlFor="ga-ande-fecha">Fecha de inicio</label>
@@ -439,10 +442,10 @@ export function GarantiasAndeClientesPage() {
                 </div>
 
                 <div className="vga-section">
-                  <h3>Identificación y montos</h3>
+                  <h3>Identificación y garantías</h3>
                   <div className="vga-money-pair">
-                    <div className="vga-money vga-money--hosting">
-                      <label htmlFor="ga-ande-monto">Monto USD Hosting</label>
+                    <div className="vga-money vga-money--client">
+                      <label htmlFor="ga-ande-monto">Monto USD (Cliente)</label>
                       <div className="vga-money__box">
                         <em>USD</em>
                         <input
@@ -456,12 +459,12 @@ export function GarantiasAndeClientesPage() {
                         />
                       </div>
                     </div>
-                    <div className="vga-money vga-money--client">
-                      <label htmlFor="ga-ande-monto-cliente">Monto USD Cliente</label>
+                    <div className="vga-money vga-money--hosting">
+                      <label htmlFor="ga-ande-monto-hosting">Monto USD Hosting</label>
                       <div className="vga-money__box">
                         <em>USD</em>
                         <input
-                          id="ga-ande-monto-cliente"
+                          id="ga-ande-monto-hosting"
                           type="number"
                           step="0.01"
                           min={0}
@@ -569,14 +572,8 @@ export function GarantiasAndeClientesPage() {
                   <th>Marca</th>
                   <th>Modelo</th>
                   <th>Procesador</th>
-                  <th className="vga-num">
-                    Monto USD
-                    <span>Hosting</span>
-                  </th>
-                  <th className="vga-num">
-                    Monto USD
-                    <span>Cliente</span>
-                  </th>
+                  <th className="vga-num">Monto USD (Cliente)</th>
+                  <th className="vga-num">Monto USD Hosting</th>
                   <th>Devolución</th>
                   {canEdit ? <th className="vga-num">Acciones</th> : null}
                 </tr>
@@ -616,12 +613,12 @@ export function GarantiasAndeClientesPage() {
                         <td className="vga-model">{row.modelo}</td>
                         <td className="vga-proc">{row.procesador}</td>
                         <td className="vga-num">
-                          <span className={`vga-amt vga-amt--h${isDevuelta ? " text-decoration-line-through" : ""}`}>
+                          <span className={`vga-amt vga-amt--c${isDevuelta ? " text-decoration-line-through" : ""}`}>
                             {formatUsd(row.montoUsd)}
                           </span>
                         </td>
                         <td className="vga-num">
-                          <span className={`vga-amt vga-amt--c${isDevuelta ? " text-decoration-line-through" : ""}`}>
+                          <span className={`vga-amt vga-amt--h${isDevuelta ? " text-decoration-line-through" : ""}`}>
                             {formatUsd(row.montoClienteUsd)}
                           </span>
                         </td>
@@ -630,7 +627,7 @@ export function GarantiasAndeClientesPage() {
                             <>
                               {formatDateShort(row.fechaDevolucion || "")}
                               <span className="vga-sub">
-                                Devuelto {formatUsd(Number(row.montoDevueltoUsd ?? row.montoClienteUsd))}
+                                Devuelto {formatUsd(Number(row.montoDevueltoUsd ?? row.montoUsd))}
                               </span>
                               {row.devolucionNota ? <span className="vga-sub">{row.devolucionNota}</span> : null}
                             </>
@@ -690,14 +687,8 @@ export function GarantiasAndeClientesPage() {
                   <th>Cliente</th>
                   <th>Equipo</th>
                   <th>Nº serie</th>
-                  <th className="vga-num">
-                    Monto USD
-                    <span>Hosting</span>
-                  </th>
-                  <th className="vga-num">
-                    Monto USD
-                    <span>Cliente</span>
-                  </th>
+                  <th className="vga-num">Monto USD (Cliente)</th>
+                  <th className="vga-num">Monto USD Hosting</th>
                   <th className="vga-num">Monto devuelto</th>
                   <th>Detalle / baja</th>
                 </tr>
@@ -731,14 +722,14 @@ export function GarantiasAndeClientesPage() {
                       </td>
                       <td className="vga-sn">{row.numeroSerie || "—"}</td>
                       <td className="vga-num">
-                        <span className="vga-amt vga-amt--h">{formatUsd(row.montoUsd)}</span>
+                        <span className="vga-amt vga-amt--c">{formatUsd(row.montoUsd)}</span>
                       </td>
                       <td className="vga-num">
-                        <span className="vga-amt vga-amt--c">{formatUsd(row.montoClienteUsd)}</span>
+                        <span className="vga-amt vga-amt--h">{formatUsd(row.montoClienteUsd)}</span>
                       </td>
                       <td className="vga-num">
                         <span className="vga-amt vga-amt--c">
-                          {formatUsd(Number(row.montoDevueltoUsd ?? row.montoClienteUsd ?? row.montoUsd))}
+                          {formatUsd(Number(row.montoDevueltoUsd ?? row.montoUsd))}
                         </span>
                       </td>
                       <td className="vga-notes-cell">
