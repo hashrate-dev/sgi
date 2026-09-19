@@ -2168,6 +2168,7 @@ export type ValorGarantiaAsicItem = {
   procesador: string;
   consumoW: number;
   montoUsd: number;
+  montoClienteUsd: number;
   fecha: string;
   notas: string;
   createdAt: string;
@@ -2182,6 +2183,7 @@ export type ValorGarantiaAsicHistorialItem = {
   procesador: string;
   consumoW: number;
   montoUsd: number;
+  montoClienteUsd: number;
   fecha: string;
   createdAt: string;
 };
@@ -2192,6 +2194,7 @@ export type ValorGarantiaAsicPayload = {
   procesador: string;
   consumoW: number;
   montoUsd: number;
+  montoClienteUsd: number;
   fecha: string;
   notas?: string;
 };

@@ -14,7 +14,7 @@ function nowSql(): string {
 }
 
 async function ensureValoresGarantiasAsicSchema(): Promise<void> {
-  if (schemaEnsured) return;
+  if (!schemaEnsured) {
   if (db.isPostgres) {
     await db
       .prepare(
@@ -25,6 +25,7 @@ async function ensureValoresGarantiasAsicSchema(): Promise<void> {
           procesador TEXT NOT NULL DEFAULT '',
           consumo_w DOUBLE PRECISION NOT NULL DEFAULT 0,
           monto_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+          monto_cliente_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
           fecha TEXT NOT NULL,
           notas TEXT NOT NULL DEFAULT '',
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -42,6 +43,7 @@ async function ensureValoresGarantiasAsicSchema(): Promise<void> {
           procesador TEXT NOT NULL DEFAULT '',
           consumo_w DOUBLE PRECISION NOT NULL DEFAULT 0,
           monto_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+          monto_cliente_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
           fecha TEXT NOT NULL,
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )`
@@ -57,6 +59,7 @@ async function ensureValoresGarantiasAsicSchema(): Promise<void> {
           procesador TEXT NOT NULL DEFAULT '',
           consumo_w REAL NOT NULL DEFAULT 0,
           monto_usd REAL NOT NULL DEFAULT 0,
+          monto_cliente_usd REAL NOT NULL DEFAULT 0,
           fecha TEXT NOT NULL,
           notas TEXT NOT NULL DEFAULT '',
           created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -74,6 +77,7 @@ async function ensureValoresGarantiasAsicSchema(): Promise<void> {
           procesador TEXT NOT NULL DEFAULT '',
           consumo_w REAL NOT NULL DEFAULT 0,
           monto_usd REAL NOT NULL DEFAULT 0,
+          monto_cliente_usd REAL NOT NULL DEFAULT 0,
           fecha TEXT NOT NULL,
           created_at TEXT NOT NULL DEFAULT (datetime('now')),
           FOREIGN KEY (valor_id) REFERENCES valores_garantias_asic(id) ON DELETE CASCADE
@@ -94,6 +98,23 @@ async function ensureValoresGarantiasAsicSchema(): Promise<void> {
       "CREATE INDEX IF NOT EXISTS idx_valores_garantias_asic_hist_fecha ON valores_garantias_asic_historial(fecha DESC, id DESC)"
     )
     .run();
+  }
+  if (db.isPostgres) {
+    await db.prepare("ALTER TABLE valores_garantias_asic ADD COLUMN IF NOT EXISTS monto_cliente_usd DOUBLE PRECISION NOT NULL DEFAULT 0").run();
+    await db.prepare("ALTER TABLE valores_garantias_asic_historial ADD COLUMN IF NOT EXISTS monto_cliente_usd DOUBLE PRECISION NOT NULL DEFAULT 0").run();
+  } else {
+    for (const sql of [
+      "ALTER TABLE valores_garantias_asic ADD COLUMN monto_cliente_usd REAL NOT NULL DEFAULT 0",
+      "ALTER TABLE valores_garantias_asic_historial ADD COLUMN monto_cliente_usd REAL NOT NULL DEFAULT 0",
+    ]) {
+      try {
+        await db.prepare(sql).run();
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (!msg.includes("duplicate column")) throw e;
+      }
+    }
+  }
   schemaEnsured = true;
 }
 
@@ -103,6 +124,7 @@ const CreateSchema = z.object({
   procesador: z.string().trim().min(1).max(120),
   consumoW: z.coerce.number().finite().min(0).max(100000),
   montoUsd: z.coerce.number().finite().min(0),
+  montoClienteUsd: z.coerce.number().finite().min(0),
   fecha: z.string().trim().min(1).max(40),
   notas: z.string().trim().max(400).optional(),
 });
@@ -120,6 +142,7 @@ function mapItem(raw: Row) {
     procesador: String(r.procesador ?? ""),
     consumoW: Number(r.consumo_w ?? 0),
     montoUsd: Number(r.monto_usd ?? 0),
+    montoClienteUsd: Number(r.monto_cliente_usd ?? 0),
     fecha: String(r.fecha ?? ""),
     notas: String(r.notas ?? ""),
     createdAt: String(r.created_at ?? ""),
@@ -137,6 +160,7 @@ function mapHist(raw: Row) {
     procesador: String(r.procesador ?? ""),
     consumoW: Number(r.consumo_w ?? 0),
     montoUsd: Number(r.monto_usd ?? 0),
+    montoClienteUsd: Number(r.monto_cliente_usd ?? 0),
     fecha: String(r.fecha ?? ""),
     createdAt: String(r.created_at ?? ""),
   };
@@ -166,20 +190,38 @@ const writeMw = [requireRole("admin_a", "admin_b", "operador"), requireModuleGra
 valoresGarantiasAsicRouter.get("/valores-garantias-asic", ...readMw, async (_req, res, next) => {
   try {
     await ensureValoresGarantiasAsicSchema();
-    const items = (await db
-      .prepare(
-        `SELECT id, marca, modelo, procesador, consumo_w, monto_usd, fecha, notas, created_at, updated_at
-         FROM valores_garantias_asic
-         ORDER BY fecha DESC, id DESC`
-      )
-      .all()) as Row[];
-    const historial = (await db
-      .prepare(
-        `SELECT id, valor_id, marca, modelo, procesador, consumo_w, monto_usd, fecha, created_at
-         FROM valores_garantias_asic_historial
-         ORDER BY fecha DESC, id DESC`
-      )
-      .all()) as Row[];
+    const itemSqlFull =
+      `SELECT id, marca, modelo, procesador, consumo_w, monto_usd, monto_cliente_usd, fecha, notas, created_at, updated_at
+       FROM valores_garantias_asic ORDER BY fecha DESC, id DESC`;
+    const itemSqlLegacy =
+      `SELECT id, marca, modelo, procesador, consumo_w, monto_usd, fecha, notas, created_at, updated_at
+       FROM valores_garantias_asic ORDER BY fecha DESC, id DESC`;
+    let items: Row[] = [];
+    try {
+      items = (await db.prepare(itemSqlFull).all()) as Row[];
+    } catch {
+      items = (await db.prepare(itemSqlLegacy).all()) as Row[];
+    }
+    let historial: Row[] = [];
+    try {
+      historial = (await db
+        .prepare(
+          `SELECT id, valor_id, marca, modelo, procesador, consumo_w, monto_usd, monto_cliente_usd, fecha, created_at
+           FROM valores_garantias_asic_historial ORDER BY fecha DESC, id DESC`
+        )
+        .all()) as Row[];
+    } catch {
+      try {
+        historial = (await db
+          .prepare(
+            `SELECT id, valor_id, marca, modelo, procesador, consumo_w, monto_usd, fecha, created_at
+             FROM valores_garantias_asic_historial ORDER BY fecha DESC, id DESC`
+          )
+          .all()) as Row[];
+      } catch {
+        historial = [];
+      }
+    }
     res.json({ items: items.map(mapItem), historial: historial.map(mapHist) });
   } catch (e) {
     next(e);
@@ -205,10 +247,19 @@ valoresGarantiasAsicRouter.post("/valores-garantias-asic", ...writeMw, async (re
     const ts = nowSql();
     await db
       .prepare(
-        `INSERT INTO valores_garantias_asic (marca, modelo, procesador, consumo_w, monto_usd, fecha, notas, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ${ts}, ${ts})`
+        `INSERT INTO valores_garantias_asic (marca, modelo, procesador, consumo_w, monto_usd, monto_cliente_usd, fecha, notas, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ${ts}, ${ts})`
       )
-      .run(data.marca, data.modelo, data.procesador, data.consumoW, data.montoUsd, data.fecha, data.notas ?? "");
+      .run(
+        data.marca,
+        data.modelo,
+        data.procesador,
+        data.consumoW,
+        data.montoUsd,
+        data.montoClienteUsd,
+        data.fecha,
+        data.notas ?? ""
+      );
     res.json({ ok: true });
   } catch (e) {
     next(e);
@@ -245,15 +296,28 @@ valoresGarantiasAsicRouter.put("/valores-garantias-asic/:id", ...writeMw, async 
     }
     const nextConsumo = data.consumoW ?? mapped.consumoW;
     const nextMonto = data.montoUsd ?? mapped.montoUsd;
-    const valueChanged = nextConsumo !== mapped.consumoW || nextMonto !== mapped.montoUsd;
+    const nextMontoCliente = data.montoClienteUsd ?? mapped.montoClienteUsd;
+    const valueChanged =
+      nextConsumo !== mapped.consumoW ||
+      nextMonto !== mapped.montoUsd ||
+      nextMontoCliente !== mapped.montoClienteUsd;
     if (valueChanged) {
       const ts = nowSql();
       await db
         .prepare(
-          `INSERT INTO valores_garantias_asic_historial (valor_id, marca, modelo, procesador, consumo_w, monto_usd, fecha, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ${ts})`
+          `INSERT INTO valores_garantias_asic_historial (valor_id, marca, modelo, procesador, consumo_w, monto_usd, monto_cliente_usd, fecha, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ${ts})`
         )
-        .run(id, mapped.marca, mapped.modelo, mapped.procesador, mapped.consumoW, mapped.montoUsd, mapped.fecha);
+        .run(
+          id,
+          mapped.marca,
+          mapped.modelo,
+          mapped.procesador,
+          mapped.consumoW,
+          mapped.montoUsd,
+          mapped.montoClienteUsd,
+          mapped.fecha
+        );
     }
     const fields: string[] = [];
     const values: unknown[] = [];
@@ -276,6 +340,10 @@ valoresGarantiasAsicRouter.put("/valores-garantias-asic/:id", ...writeMw, async 
     if (data.montoUsd != null) {
       fields.push("monto_usd = ?");
       values.push(data.montoUsd);
+    }
+    if (data.montoClienteUsd != null) {
+      fields.push("monto_cliente_usd = ?");
+      values.push(data.montoClienteUsd);
     }
     if (data.fecha != null) {
       fields.push("fecha = ?");

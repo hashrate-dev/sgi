@@ -174,6 +174,7 @@ CREATE TABLE IF NOT EXISTS valores_garantias_asic (
   procesador TEXT NOT NULL DEFAULT '',
   consumo_w DOUBLE PRECISION NOT NULL DEFAULT 0,
   monto_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+  monto_cliente_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
   fecha TEXT NOT NULL,
   notas TEXT NOT NULL DEFAULT '',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -181,6 +182,7 @@ CREATE TABLE IF NOT EXISTS valores_garantias_asic (
 );
 CREATE INDEX IF NOT EXISTS idx_valores_garantias_asic_fecha ON valores_garantias_asic(fecha DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_valores_garantias_asic_maq ON valores_garantias_asic(marca, modelo, procesador);
+ALTER TABLE valores_garantias_asic ADD COLUMN IF NOT EXISTS monto_cliente_usd DOUBLE PRECISION NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS valores_garantias_asic_historial (
   id BIGSERIAL PRIMARY KEY,
@@ -190,10 +192,12 @@ CREATE TABLE IF NOT EXISTS valores_garantias_asic_historial (
   procesador TEXT NOT NULL DEFAULT '',
   consumo_w DOUBLE PRECISION NOT NULL DEFAULT 0,
   monto_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+  monto_cliente_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
   fecha TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_valores_garantias_asic_hist_fecha ON valores_garantias_asic_historial(fecha DESC, id DESC);
+ALTER TABLE valores_garantias_asic_historial ADD COLUMN IF NOT EXISTS monto_cliente_usd DOUBLE PRECISION NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS sgi_crypto_noticias (
   id BIGSERIAL PRIMARY KEY,

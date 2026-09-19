@@ -385,6 +385,7 @@ CREATE TABLE IF NOT EXISTS valores_garantias_asic (
   procesador TEXT NOT NULL DEFAULT '',
   consumo_w REAL NOT NULL DEFAULT 0,
   monto_usd REAL NOT NULL DEFAULT 0,
+  monto_cliente_usd REAL NOT NULL DEFAULT 0,
   fecha TEXT NOT NULL,
   notas TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -400,6 +401,7 @@ CREATE TABLE IF NOT EXISTS valores_garantias_asic_historial (
   procesador TEXT NOT NULL DEFAULT '',
   consumo_w REAL NOT NULL DEFAULT 0,
   monto_usd REAL NOT NULL DEFAULT 0,
+  monto_cliente_usd REAL NOT NULL DEFAULT 0,
   fecha TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (valor_id) REFERENCES valores_garantias_asic(id) ON DELETE CASCADE

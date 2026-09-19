@@ -1,0 +1,472 @@
+.vga-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  padding-bottom: 1.5rem;
+}
+
+.vga-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.vga-kpi {
+  border-radius: 16px;
+  padding: 0.95rem 1.05rem 1rem;
+  background: rgba(12, 36, 28, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  color: #edf7f1;
+}
+
+.vga-kpi span {
+  display: block;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.68;
+  font-weight: 700;
+}
+
+.vga-kpi strong {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 1.32rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.vga-composer,
+.vga-sheet {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  border-radius: 18px;
+  background: #f4f7f5;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.16);
+  overflow: visible;
+}
+
+.vga-composer__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.85rem 1.2rem;
+  padding: 1.1rem 1.3rem 1rem;
+  color: #fff;
+  background: linear-gradient(105deg, #143528 0%, #1c4d3a 58%, #246348 100%);
+  border-radius: 18px 18px 0 0;
+}
+
+.vga-kicker {
+  margin: 0 0 0.2rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  font-weight: 700;
+}
+
+.vga-composer__head h2 {
+  margin: 0;
+  font-size: 1.18rem;
+  font-weight: 700;
+}
+
+.vga-composer__head p {
+  margin: 0.28rem 0 0;
+  font-size: 0.82rem;
+  opacity: 0.78;
+  max-width: 42rem;
+}
+
+.vga-date {
+  min-width: 11.5rem;
+}
+
+.vga-date label {
+  display: block;
+  margin-bottom: 0.28rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.75;
+  font-weight: 700;
+}
+
+.vga-date input {
+  width: 100%;
+  border: 0;
+  border-radius: 10px;
+  padding: 0.5rem 0.7rem;
+  background: rgba(255, 255, 255, 0.94);
+  color: #163226;
+  font-weight: 600;
+}
+
+.vga-composer__body {
+  padding: 1.15rem 1.25rem 1.25rem;
+  overflow: visible;
+}
+
+.vga-sections {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 0.9rem;
+  overflow: visible;
+}
+
+.vga-section {
+  background: #fff;
+  border: 1px solid #dce8e1;
+  border-radius: 14px;
+  padding: 1rem 1.05rem 1.1rem;
+  overflow: visible;
+}
+
+.vga-section h3 {
+  margin: 0 0 0.85rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #5d7468;
+  font-weight: 800;
+}
+
+.vga-equipo {
+  display: grid;
+  gap: 0.75rem;
+  overflow: visible;
+}
+
+.vga-field label {
+  display: block;
+  margin-bottom: 0.32rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #33463d;
+}
+
+.vga-money-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem;
+  margin-bottom: 0.8rem;
+}
+
+.vga-money {
+  border-radius: 12px;
+  padding: 0.75rem 0.8rem 0.85rem;
+}
+
+.vga-money--hosting {
+  background: #eef8f2;
+  border: 1px solid #c9e6d5;
+}
+
+.vga-money--client {
+  background: #eef3fb;
+  border: 1px solid #d0dced;
+}
+
+.vga-money label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #294338;
+}
+
+.vga-money--client label {
+  color: #24375a;
+}
+
+.vga-money__box {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+  padding: 0 0.75rem;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid #d5e0da;
+}
+
+.vga-money__box em {
+  font-style: normal;
+  font-weight: 800;
+  color: #64748b;
+}
+
+.vga-money__box input {
+  width: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  padding: 0.58rem 0;
+  font-size: 1.08rem;
+  font-weight: 800;
+  color: #12231c;
+}
+
+.vga-meta {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.vga-affix {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 0.75rem;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid #d5e0da;
+}
+
+.vga-affix input {
+  width: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  padding: 0.55rem 0;
+  font-weight: 700;
+  color: #12231c;
+}
+
+.vga-affix span {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #6b7f75;
+}
+
+.vga-notes {
+  margin-top: 0.9rem;
+}
+
+.vga-notes input {
+  width: 100%;
+  border: 1px solid #d5e0da;
+  border-radius: 10px;
+  padding: 0.62rem 0.8rem;
+  background: #fff;
+}
+
+.vga-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.vga-msg {
+  margin-top: 0.85rem;
+  margin-bottom: 0;
+  border-radius: 10px;
+  padding: 0.55rem 0.8rem;
+  font-size: 0.86rem;
+}
+
+.vga-sheet {
+  padding: 1.15rem 1.25rem 1.2rem;
+}
+
+.vga-sheet__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  margin-bottom: 0.35rem;
+}
+
+.vga-sheet h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  color: #173227;
+  font-weight: 800;
+}
+
+.vga-sheet p {
+  margin: 0 0 0.85rem;
+  color: #5b6d65;
+  font-size: 0.82rem;
+}
+
+.vga-sheet .fact-input {
+  max-width: 260px;
+  background: #fff;
+}
+
+.vga-frame {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid #d4e2da;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.vga-gridtable {
+  width: 100%;
+  border-collapse: collapse;
+  color: #173227;
+}
+
+.vga-gridtable thead th {
+  padding: 0.72rem 0.7rem;
+  background: #e7f0eb;
+  border-bottom: 1px solid #c9dcd1;
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #4d6559;
+  font-weight: 800;
+  text-align: left;
+  white-space: normal;
+  line-height: 1.25;
+  vertical-align: bottom;
+}
+
+.vga-gridtable thead th span {
+  display: block;
+  margin-top: 0.12rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: #2f4a3d;
+}
+
+.vga-gridtable tbody td {
+  padding: 0.78rem 0.7rem;
+  border-bottom: 1px solid #edf3ef;
+  vertical-align: middle;
+  font-size: 0.86rem;
+}
+
+.vga-gridtable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.vga-gridtable tbody tr:hover td {
+  background: #f4faf6;
+}
+
+.vga-num {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.vga-datecell {
+  font-variant-numeric: tabular-nums;
+  color: #5a6f66;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.vga-model {
+  font-weight: 800;
+  color: #12261c;
+}
+
+.vga-proc {
+  color: #3f564b;
+}
+
+.vga-notes-cell {
+  color: #6a7c73;
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vga-amt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 5.6rem;
+  padding: 0.22rem 0.58rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.vga-amt--h {
+  background: #def6e7;
+  color: #146c3a;
+}
+
+.vga-amt--c {
+  background: #e4edfb;
+  color: #1e3a8a;
+}
+
+.vga-row-actions {
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.vga-row-actions button {
+  border: 1px solid #c9d7cf;
+  background: #fff;
+  color: #21513b;
+  border-radius: 8px;
+  padding: 0.22rem 0.55rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.vga-row-actions button:hover {
+  background: #eef7f1;
+}
+
+.vga-row-actions button.is-danger {
+  border-color: #f0c2c2;
+  color: #b42318;
+}
+
+.vga-row-actions button.is-danger:hover {
+  background: #fff1f0;
+}
+
+.vga-empty {
+  text-align: center !important;
+  color: #6b7f75;
+  padding: 1.6rem 0.8rem !important;
+}
+
+.vga-count {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.22rem 0.65rem;
+  background: #e7f0eb;
+  color: #2f4a3d;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+@media (max-width: 1100px) {
+  .vga-kpis,
+  .vga-sections,
+  .vga-money-pair {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .vga-kpis,
+  .vga-sections,
+  .vga-money-pair {
+    grid-template-columns: 1fr;
+  }
+}
