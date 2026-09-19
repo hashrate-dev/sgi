@@ -325,23 +325,23 @@ export function GarantiasAndeClientesPage() {
         />
 
         <div className="vga-kpis">
-          <div className="vga-kpi">
-            <span>Suma cliente activa</span>
-            <strong>{tableLoading ? "…" : formatUsd(totalUsd)}</strong>
+            <div className="vga-kpi">
+              <span>Suma cliente activa</span>
+              <strong>{tableLoading ? "…" : formatUsd(totalUsd)}</strong>
+            </div>
+            <div className="vga-kpi">
+              <span>Suma hosting activa</span>
+              <strong>{tableLoading ? "…" : formatUsd(totalClienteUsd)}</strong>
+            </div>
+            <div className="vga-kpi">
+              <span>Total devuelto a clientes</span>
+              <strong>{tableLoading ? "…" : formatUsd(totalDevueltoUsd)}</strong>
+            </div>
+            <div className="vga-kpi">
+              <span>Registros</span>
+              <strong>{tableLoading ? "…" : items.length}</strong>
+            </div>
           </div>
-          <div className="vga-kpi">
-            <span>Suma hosting activa</span>
-            <strong>{tableLoading ? "…" : formatUsd(totalClienteUsd)}</strong>
-          </div>
-          <div className="vga-kpi">
-            <span>Total devuelto a clientes</span>
-            <strong>{tableLoading ? "…" : formatUsd(totalDevueltoUsd)}</strong>
-          </div>
-          <div className="vga-kpi">
-            <span>Registros</span>
-            <strong>{tableLoading ? "…" : items.length}</strong>
-          </div>
-        </div>
 
         <section className="vga-composer">
           <header className="vga-composer__head">
