@@ -16,6 +16,7 @@ import {
 import { canAccessGarantiasModule, canEditGarantiasModule } from "../lib/auth";
 import { sgiHome } from "../lib/marketplacePaths.js";
 import "../styles/facturacion.css";
+import "../styles/valores-garantias-asic.css";
 
 type FormState = GarantiaAndeClientePayload;
 
@@ -37,6 +38,13 @@ function formatUsd(n: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(Number.isFinite(n) ? n : 0);
+}
+
+function formatDateShort(ymd: string): string {
+  const d = String(ymd ?? "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return d || "—";
+  const [y, m, day] = d.split("-");
+  return `${day}/${m}/${y}`;
 }
 
 function clientFullName(c: {
@@ -294,7 +302,7 @@ export function GarantiasAndeClientesPage() {
 
   return (
     <div className="fact-page">
-      <div className="container">
+      <div className="container vga-page">
         <PageHeader
           title="Garantías ANDE (Clientes)"
           showBackButton
@@ -302,315 +310,298 @@ export function GarantiasAndeClientesPage() {
           backText="Volver atrás"
         />
 
-        <div className="row g-3 mb-4">
-          <div className="col-12 col-md-6 col-xl-4">
-            <div className="hrs-card sgi-glass-panel p-3 h-100">
-              <div className="text-muted small mb-1">Total garantías activas (USD)</div>
-              <div className="fs-4 fw-semibold">{tableLoading ? "…" : formatUsd(totalUsd)}</div>
-            </div>
+        <div className="vga-kpis vga-kpis--3">
+          <div className="vga-kpi">
+            <span>Total garantías activas</span>
+            <strong>{tableLoading ? "…" : formatUsd(totalUsd)}</strong>
           </div>
-          <div className="col-12 col-md-6 col-xl-4">
-            <div className="hrs-card sgi-glass-panel p-3 h-100">
-              <div className="text-muted small mb-1">Total devuelto a clientes (USD)</div>
-              <div className="fs-4 fw-semibold">{tableLoading ? "…" : formatUsd(totalDevueltoUsd)}</div>
-            </div>
+          <div className="vga-kpi">
+            <span>Total devuelto a clientes</span>
+            <strong>{tableLoading ? "…" : formatUsd(totalDevueltoUsd)}</strong>
           </div>
-          <div className="col-12 col-md-6 col-xl-4">
-            <div className="hrs-card sgi-glass-panel p-3 h-100">
-              <div className="text-muted small mb-1">Registros</div>
-              <div className="fs-4 fw-semibold">{tableLoading ? "…" : items.length}</div>
-            </div>
+          <div className="vga-kpi">
+            <span>Registros</span>
+            <strong>{tableLoading ? "…" : items.length}</strong>
           </div>
         </div>
 
-        <div className="fact-card fact-panel-nuevo-documento garantias-ande-form-panel mb-4">
-          <div className="fact-panel-nuevo-documento-header">
-            {editingId != null ? "Editar garantía ANDE" : "Nueva garantía ANDE"}
-          </div>
-          <div className="fact-card-body">
+        <section className="vga-composer">
+          <header className="vga-composer__head">
+            <div>
+              <p className="vga-kicker">Registro ANDE</p>
+              <h2>{editingId != null ? "Editar garantía ANDE" : "Nueva garantía ANDE"}</h2>
+              <p>Asigná el equipo del catálogo ASIC al cliente de hosting y registrá el monto en USD.</p>
+            </div>
+            <div className="vga-date">
+              <label htmlFor="ga-ande-fecha">Fecha de inicio</label>
+              <input
+                id="ga-ande-fecha"
+                type="date"
+                value={form.fechaInicio}
+                onChange={(e) => setForm((p) => ({ ...p, fechaInicio: e.target.value }))}
+                disabled={!canEdit || busy}
+              />
+            </div>
+          </header>
+
+          <div className="vga-composer__body">
             <form onSubmit={onSubmit}>
-              <div className="row g-3">
-                <div className="col-12 col-lg-6">
-                  <label className="fact-label" htmlFor="ga-ande-cliente">
-                    Cliente (listado Hosting)
-                  </label>
-                  <HostingClientSelect
-                    buttonId="ga-ande-cliente"
-                    value={form.clientId}
-                    onChange={(clientId) => setForm((p) => ({ ...p, clientId }))}
-                    clients={clients}
-                    canAdd={canEdit}
-                    disabled={!canEdit || busy}
-                    required
-                    placeholder="Seleccionar cliente de hosting"
-                    onClientCreated={async (created) => {
-                      await reloadHostingClients(created.id);
-                      setOk(`Cliente de hosting agregado: ${created.code} — ${created.name}`);
-                      setErr("");
-                    }}
-                  />
+              <div className="vga-sections">
+                <div className="vga-section">
+                  <h3>Cliente y equipo</h3>
+                  <div className="vga-field">
+                    <label htmlFor="ga-ande-cliente">Cliente (listado Hosting)</label>
+                    <HostingClientSelect
+                      buttonId="ga-ande-cliente"
+                      value={form.clientId}
+                      onChange={(clientId) => setForm((p) => ({ ...p, clientId }))}
+                      clients={clients}
+                      canAdd={canEdit}
+                      disabled={!canEdit || busy}
+                      required
+                      placeholder="Seleccionar cliente de hosting"
+                      onClientCreated={async (created) => {
+                        await reloadHostingClients(created.id);
+                        setOk(`Cliente de hosting agregado: ${created.code} — ${created.name}`);
+                        setErr("");
+                      }}
+                    />
+                  </div>
+                  <div className="vga-equipo">
+                    <div className="vga-field asic-cotizador-field-wrap">
+                      <label htmlFor="ga-ande-marca">Marca</label>
+                      <AsicCotizadorCatalogSelect
+                        tipo="marca"
+                        value={form.marca}
+                        onChange={(marca) => setForm((p) => ({ ...p, marca }))}
+                        disabled={!canEdit || busy}
+                        labelId="ga-ande-marca"
+                        placeholder="Seleccionar marca"
+                        searchPlaceholder="Buscar marca…"
+                        allowCreate={false}
+                        onError={setErr}
+                      />
+                    </div>
+                    <div className="vga-field asic-cotizador-field-wrap">
+                      <label htmlFor="ga-ande-modelo">Modelo</label>
+                      <AsicCotizadorCatalogSelect
+                        tipo="modelo"
+                        value={form.modelo}
+                        onChange={(modelo) =>
+                          setForm((p) => ({
+                            ...p,
+                            modelo,
+                            procesador: modelo === p.modelo ? p.procesador : "",
+                          }))
+                        }
+                        disabled={!canEdit || busy}
+                        labelId="ga-ande-modelo"
+                        placeholder="Seleccionar modelo"
+                        searchPlaceholder="Buscar modelo…"
+                        allowCreate={false}
+                        onError={setErr}
+                      />
+                    </div>
+                    <div className="vga-field asic-cotizador-field-wrap">
+                      <label htmlFor="ga-ande-procesador">Procesador</label>
+                      <AsicCotizadorCatalogSelect
+                        tipo="procesador"
+                        parent={form.modelo}
+                        value={form.procesador}
+                        onChange={(procesador) => setForm((p) => ({ ...p, procesador }))}
+                        disabled={!canEdit || busy}
+                        labelId="ga-ande-procesador"
+                        placeholder={form.modelo ? "Seleccionar procesador" : "Seleccionar modelo primero"}
+                        searchPlaceholder="Buscar procesador…"
+                        allowCreate={false}
+                        onError={setErr}
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="col-12 col-md-6 col-lg-3">
-                  <label className="fact-label" htmlFor="ga-ande-fecha">
-                    Fecha inicio
-                  </label>
-                  <input
-                    id="ga-ande-fecha"
-                    type="date"
-                    className="fact-input"
-                    value={form.fechaInicio}
-                    onChange={(e) => setForm((p) => ({ ...p, fechaInicio: e.target.value }))}
-                    disabled={!canEdit || busy}
-                  />
-                </div>
-                <div className="col-12 col-md-6 col-lg-3">
-                  <label className="fact-label" htmlFor="ga-ande-monto">
-                    Monto garantía (USD)
-                  </label>
-                  <input
-                    id="ga-ande-monto"
-                    type="number"
-                    step="0.01"
-                    min={0}
-                    className="fact-input"
-                    value={form.montoUsd}
-                    onChange={(e) => setForm((p) => ({ ...p, montoUsd: Number(e.target.value) }))}
-                    disabled={!canEdit || busy}
-                  />
-                </div>
-                <div className="col-12 col-md-4 asic-cotizador-field-wrap">
-                  <label className="fact-label" htmlFor="ga-ande-marca">
-                    Marca equipo
-                  </label>
-                  <AsicCotizadorCatalogSelect
-                    tipo="marca"
-                    value={form.marca}
-                    onChange={(marca) => setForm((p) => ({ ...p, marca }))}
-                    disabled={!canEdit || busy}
-                    labelId="ga-ande-marca"
-                    placeholder="Seleccionar marca"
-                    searchPlaceholder="Buscar marca…"
-                    allowCreate={false}
-                    onError={setErr}
-                  />
-                </div>
-                <div className="col-12 col-md-4 asic-cotizador-field-wrap">
-                  <label className="fact-label" htmlFor="ga-ande-modelo">
-                    Modelo de equipo
-                  </label>
-                  <AsicCotizadorCatalogSelect
-                    tipo="modelo"
-                    value={form.modelo}
-                    onChange={(modelo) =>
-                      setForm((p) => ({
-                        ...p,
-                        modelo,
-                        procesador: modelo === p.modelo ? p.procesador : "",
-                      }))
-                    }
-                    disabled={!canEdit || busy}
-                    labelId="ga-ande-modelo"
-                    placeholder="Seleccionar modelo"
-                    searchPlaceholder="Buscar modelo…"
-                    allowCreate={false}
-                    onError={setErr}
-                  />
-                </div>
-                <div className="col-12 col-md-4 asic-cotizador-field-wrap">
-                  <label className="fact-label" htmlFor="ga-ande-procesador">
-                    Procesador
-                  </label>
-                  <AsicCotizadorCatalogSelect
-                    tipo="procesador"
-                    parent={form.modelo}
-                    value={form.procesador}
-                    onChange={(procesador) => setForm((p) => ({ ...p, procesador }))}
-                    disabled={!canEdit || busy}
-                    labelId="ga-ande-procesador"
-                    placeholder={form.modelo ? "Seleccionar procesador" : "Seleccionar modelo primero"}
-                    searchPlaceholder="Buscar procesador…"
-                    allowCreate={false}
-                    onError={setErr}
-                  />
-                </div>
-                <div className="col-12 col-md-6">
-                  <label className="fact-label" htmlFor="ga-ande-serie">
-                    Número de serie
-                  </label>
-                  <input
-                    id="ga-ande-serie"
-                    type="text"
-                    className="fact-input"
-                    value={form.numeroSerie}
-                    onChange={(e) => setForm((p) => ({ ...p, numeroSerie: e.target.value }))}
-                    disabled={!canEdit || busy}
-                    placeholder="Ej. SN-123456"
-                    autoComplete="off"
-                  />
-                </div>
-                <div className="col-12 col-md-6">
-                  <label className="fact-label" htmlFor="ga-ande-nombre-equipo">
-                    Nombre equipo
-                  </label>
-                  <input
-                    id="ga-ande-nombre-equipo"
-                    type="text"
-                    className="fact-input"
-                    value={form.nombreEquipo}
-                    onChange={(e) => setForm((p) => ({ ...p, nombreEquipo: e.target.value }))}
-                    disabled={!canEdit || busy}
-                    placeholder="Nombre identificatorio del equipo"
-                    autoComplete="off"
-                  />
+
+                <div className="vga-section">
+                  <h3>Identificación y monto</h3>
+                  <div className="vga-money vga-money--hosting">
+                    <label htmlFor="ga-ande-monto">Monto garantía (USD)</label>
+                    <div className="vga-money__box">
+                      <em>USD</em>
+                      <input
+                        id="ga-ande-monto"
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        value={form.montoUsd}
+                        onChange={(e) => setForm((p) => ({ ...p, montoUsd: Number(e.target.value) }))}
+                        disabled={!canEdit || busy}
+                      />
+                    </div>
+                  </div>
+                  <div className="vga-field vga-meta">
+                    <label htmlFor="ga-ande-serie">Número de serie</label>
+                    <input
+                      id="ga-ande-serie"
+                      type="text"
+                      className="vga-input"
+                      value={form.numeroSerie}
+                      onChange={(e) => setForm((p) => ({ ...p, numeroSerie: e.target.value }))}
+                      disabled={!canEdit || busy}
+                      placeholder="Ej. SN-123456"
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div className="vga-field vga-meta">
+                    <label htmlFor="ga-ande-nombre-equipo">Nombre equipo</label>
+                    <input
+                      id="ga-ande-nombre-equipo"
+                      type="text"
+                      className="vga-input"
+                      value={form.nombreEquipo}
+                      onChange={(e) => setForm((p) => ({ ...p, nombreEquipo: e.target.value }))}
+                      disabled={!canEdit || busy}
+                      placeholder="Nombre identificatorio del equipo"
+                      autoComplete="off"
+                    />
+                  </div>
                 </div>
               </div>
 
-              {err ? <div className="alert alert-danger py-2 mt-3 mb-0">{err}</div> : null}
-              {ok ? <div className="alert alert-success py-2 mt-3 mb-0">{ok}</div> : null}
+              {err ? <div className="alert alert-danger vga-msg">{err}</div> : null}
+              {ok ? <div className="alert alert-success vga-msg">{ok}</div> : null}
 
-              <div className="d-flex justify-content-end flex-wrap gap-2 mt-4">
-                <button type="submit" className="btn btn-success" disabled={!canEdit || busy}>
-                  {editingId != null ? "Guardar cambios" : "Registrar garantía"}
-                </button>
+              <div className="vga-actions">
                 {editingId != null ? (
                   <button type="button" className="btn btn-outline-secondary" onClick={resetForm} disabled={busy}>
                     Cancelar edición
                   </button>
                 ) : null}
+                <button type="submit" className="btn btn-success" disabled={!canEdit || busy}>
+                  {editingId != null ? "Guardar cambios" : "Registrar garantía"}
+                </button>
               </div>
             </form>
           </div>
-        </div>
+        </section>
 
-        <div className="fact-card">
-          <div className="fact-card-body">
-            <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-              <h2 className="h5 mb-0">REGISTROS DE GARANTÍAS ANDE (USD)</h2>
-              <div className="d-flex flex-wrap align-items-center gap-2">
-                <div className="btn-group btn-group-sm" role="group" aria-label="Filtro de estado">
-                  <button
-                    type="button"
-                    className={`btn ${estadoFiltro === "todas" ? "btn-success" : "btn-outline-secondary"}`}
-                    onClick={() => setEstadoFiltro("todas")}
-                  >
-                    Todas
-                  </button>
-                  <button
-                    type="button"
-                    className={`btn ${estadoFiltro === "activas" ? "btn-success" : "btn-outline-secondary"}`}
-                    onClick={() => setEstadoFiltro("activas")}
-                  >
-                    Activas
-                  </button>
-                  <button
-                    type="button"
-                    className={`btn ${estadoFiltro === "devueltas" ? "btn-success" : "btn-outline-secondary"}`}
-                    onClick={() => setEstadoFiltro("devueltas")}
-                  >
-                    Ya devueltas
-                  </button>
-                </div>
-                <input
-                  type="search"
-                  className="fact-input"
-                  style={{ maxWidth: 280 }}
-                  placeholder="Buscar en la tabla…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
+        <section className="vga-sheet">
+          <div className="vga-sheet__top">
+            <h2>Registros de garantías ANDE (USD)</h2>
+            <div className="vga-sheet__tools">
+              <div className="vga-filters" role="group" aria-label="Filtro de estado">
+                <button
+                  type="button"
+                  className={`vga-filter${estadoFiltro === "todas" ? " is-on" : ""}`}
+                  onClick={() => setEstadoFiltro("todas")}
+                >
+                  Todas
+                </button>
+                <button
+                  type="button"
+                  className={`vga-filter${estadoFiltro === "activas" ? " is-on" : ""}`}
+                  onClick={() => setEstadoFiltro("activas")}
+                >
+                  Activas
+                </button>
+                <button
+                  type="button"
+                  className={`vga-filter${estadoFiltro === "devueltas" ? " is-on" : ""}`}
+                  onClick={() => setEstadoFiltro("devueltas")}
+                >
+                  Ya devueltas
+                </button>
               </div>
+              <input
+                type="search"
+                className="fact-input"
+                placeholder="Buscar en la tabla…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
             </div>
-            <p className="small text-muted mb-3">
-              Cuando un equipo se da de baja con devolución de garantía, el registro queda marcado como{" "}
-              <span className="badge text-bg-warning text-dark">YA DEVUELTA</span> y también figura en el historial
-              debajo.
-            </p>
-            <div className="table-responsive">
-              <table className="table table-sm align-middle mb-0">
-                <thead>
+          </div>
+          <p>
+            Cuando un equipo se da de baja con devolución de garantía, el registro queda marcado como{" "}
+            <strong>ya devuelta</strong> y también figura en el historial debajo.
+          </p>
+          <div className="vga-frame">
+            <table className="vga-gridtable">
+              <thead>
+                <tr>
+                  <th>Estado</th>
+                  <th>Fecha inicio</th>
+                  <th>Cliente</th>
+                  <th>Equipo</th>
+                  <th>Marca</th>
+                  <th>Modelo</th>
+                  <th>Procesador</th>
+                  <th className="vga-num">Monto USD</th>
+                  <th>Devolución</th>
+                  {canEdit ? <th className="vga-num">Acciones</th> : null}
+                </tr>
+              </thead>
+              <tbody>
+                {tableLoading ? (
                   <tr>
-                    <th>Estado</th>
-                    <th>Fecha inicio</th>
-                    <th>Cliente</th>
-                    <th>Nombre equipo</th>
-                    <th>Nº serie</th>
-                    <th>Marca</th>
-                    <th>Modelo</th>
-                    <th>Procesador</th>
-                    <th className="text-end">Monto USD</th>
-                    <th>Devolución</th>
-                    {canEdit ? <th className="text-end">Acciones</th> : null}
+                    <td colSpan={canEdit ? 10 : 9} className="vga-empty">
+                      Cargando registros…
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {tableLoading ? (
-                    <tr>
-                      <td colSpan={canEdit ? 11 : 10} className="text-muted">
-                        Cargando…
-                      </td>
-                    </tr>
-                  ) : filteredItems.length === 0 ? (
-                    <tr>
-                      <td colSpan={canEdit ? 11 : 10} className="text-muted">
-                        No hay garantías registradas.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredItems.map((row) => {
-                      const isDevuelta = row.estado === "devuelta";
-                      return (
-                        <tr
-                          key={row.id}
-                          className={isDevuelta ? "table-warning" : undefined}
-                          style={isDevuelta ? { opacity: 0.92 } : undefined}
-                        >
-                          <td>
-                            {isDevuelta ? (
-                              <span className="badge text-bg-warning text-dark">
-                                <i className="bi bi-arrow-return-left me-1" aria-hidden />
-                                YA DEVUELTA
-                              </span>
-                            ) : (
-                              <span className="badge text-bg-success">Activa</span>
-                            )}
-                          </td>
-                          <td>{row.fechaInicio.slice(0, 10)}</td>
-                          <td>{clientFullName(row)}</td>
-                          <td>{row.nombreEquipo || "—"}</td>
-                          <td>{row.numeroSerie || "—"}</td>
-                          <td>{row.marca}</td>
-                          <td>{row.modelo}</td>
-                          <td>{row.procesador}</td>
-                          <td className="text-end fw-semibold">
-                            {isDevuelta ? (
+                ) : filteredItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={canEdit ? 10 : 9} className="vga-empty">
+                      No hay garantías registradas.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredItems.map((row) => {
+                    const isDevuelta = row.estado === "devuelta";
+                    return (
+                      <tr key={row.id} className={isDevuelta ? "is-returned" : undefined}>
+                        <td>
+                          {isDevuelta ? (
+                            <span className="vga-pill vga-pill--off">Ya devuelta</span>
+                          ) : (
+                            <span className="vga-pill vga-pill--on">Activa</span>
+                          )}
+                        </td>
+                        <td className="vga-datecell">{formatDateShort(row.fechaInicio)}</td>
+                        <td>{clientFullName(row)}</td>
+                        <td>
+                          {row.nombreEquipo || "—"}
+                          <span className="vga-sn vga-sub">{row.numeroSerie || "—"}</span>
+                        </td>
+                        <td>{row.marca}</td>
+                        <td className="vga-model">{row.modelo}</td>
+                        <td className="vga-proc">{row.procesador}</td>
+                        <td className="vga-num">
+                          {isDevuelta ? (
+                            <>
                               <span className="text-decoration-line-through text-muted me-1">
                                 {formatUsd(row.montoUsd)}
                               </span>
-                            ) : null}
-                            {isDevuelta
-                              ? formatUsd(Number(row.montoDevueltoUsd ?? row.montoUsd))
-                              : formatUsd(row.montoUsd)}
-                          </td>
-                          <td className="small">
-                            {isDevuelta ? (
-                              <>
-                                <div className="fw-semibold">{row.fechaDevolucion?.slice(0, 10) || "—"}</div>
-                                <div>{formatUsd(Number(row.montoDevueltoUsd ?? row.montoUsd))}</div>
-                                {row.devolucionNota ? (
-                                  <div className="text-muted" style={{ maxWidth: "14rem" }}>
-                                    {row.devolucionNota}
-                                  </div>
-                                ) : null}
-                              </>
-                            ) : (
-                              "—"
-                            )}
-                          </td>
-                          {canEdit ? (
-                            <td className="text-end text-nowrap">
+                              <span className="vga-amt vga-amt--c">
+                                {formatUsd(Number(row.montoDevueltoUsd ?? row.montoUsd))}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="vga-amt vga-amt--h">{formatUsd(row.montoUsd)}</span>
+                          )}
+                        </td>
+                        <td>
+                          {isDevuelta ? (
+                            <>
+                              {formatDateShort(row.fechaDevolucion || "")}
+                              {row.devolucionNota ? <span className="vga-sub">{row.devolucionNota}</span> : null}
+                            </>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        {canEdit ? (
+                          <td className="vga-num">
+                            <div className="vga-row-actions">
                               <button
                                 type="button"
-                                className="btn btn-sm btn-outline-primary me-1"
                                 disabled={busy || isDevuelta}
                                 title={isDevuelta ? "Garantía ya devuelta: no editable" : "Editar"}
                                 onClick={() => startEdit(row)}
@@ -619,101 +610,95 @@ export function GarantiasAndeClientesPage() {
                               </button>
                               <button
                                 type="button"
-                                className="btn btn-sm btn-outline-danger"
+                                className="is-danger"
                                 disabled={busy}
                                 onClick={() => void removeItem(row.id)}
                               >
                                 Eliminar
                               </button>
-                            </td>
-                          ) : null}
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <div className="fact-card mt-4">
-          <div className="fact-card-body">
-            <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-              <h2 className="h5 mb-0">
-                <i className="bi bi-clock-history me-2" aria-hidden />
-                HISTORIAL DE DEVOLUCIONES DE GARANTÍA
-              </h2>
-              <span className="badge text-bg-secondary">{historialDevoluciones.length} movimientos</span>
-            </div>
-            <p className="small text-muted mb-3">
-              Registro histórico de garantías ANDE ya devueltas al cliente (ajuste al dar de baja el equipo en el
-              monitor).
-            </p>
-            <div className="table-responsive">
-              <table className="table table-sm align-middle mb-0">
-                <thead>
-                  <tr>
-                    <th>Marca</th>
-                    <th>Fecha devolución</th>
-                    <th>Cliente</th>
-                    <th>Equipo</th>
-                    <th>Nº serie</th>
-                    <th className="text-end">Monto devuelto</th>
-                    <th>Detalle / baja</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tableLoading ? (
-                    <tr>
-                      <td colSpan={7} className="text-muted">
-                        Cargando…
-                      </td>
-                    </tr>
-                  ) : historialDevoluciones.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="text-muted">
-                        Todavía no hay devoluciones registradas.
-                      </td>
-                    </tr>
-                  ) : (
-                    historialDevoluciones.map((row) => (
-                      <tr key={`dev-${row.id}`} className="table-warning">
-                        <td>
-                          <span className="badge text-bg-warning text-dark">
-                            <i className="bi bi-check2-circle me-1" aria-hidden />
-                            YA DEVUELTA
-                          </span>
-                        </td>
-                        <td>{row.fechaDevolucion?.slice(0, 10) || "—"}</td>
-                        <td>{clientFullName(row)}</td>
-                        <td>
-                          {row.nombreEquipo || "—"}
-                          <div className="small text-muted">
-                            {row.marca} {row.modelo} {row.procesador}
-                          </div>
-                        </td>
-                        <td className="font-monospace small">{row.numeroSerie || "—"}</td>
-                        <td className="text-end fw-semibold">
-                          {formatUsd(Number(row.montoDevueltoUsd ?? row.montoUsd))}
-                        </td>
-                        <td className="small" style={{ maxWidth: "18rem" }}>
-                          {row.devolucionNota || "—"}
-                          {row.bajaEquipoId ? (
-                            <div className="text-muted mt-1">
-                              Baja equipo:{" "}
-                              <code className="small sgi-tech-code">{row.bajaEquipoId.slice(0, 8)}…</code>
                             </div>
-                          ) : null}
-                        </td>
+                          </td>
+                        ) : null}
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
-        </div>
+        </section>
+
+        <section className="vga-sheet">
+          <div className="vga-sheet__top">
+            <h2>
+              <i className="bi bi-clock-history me-2" aria-hidden />
+              Historial de devoluciones de garantía
+            </h2>
+            <span className="vga-count">{historialDevoluciones.length} movimientos</span>
+          </div>
+          <p>
+            Registro histórico de garantías ANDE ya devueltas al cliente (ajuste al dar de baja el equipo en el
+            monitor).
+          </p>
+          <div className="vga-frame">
+            <table className="vga-gridtable">
+              <thead>
+                <tr>
+                  <th>Estado</th>
+                  <th>Fecha devolución</th>
+                  <th>Cliente</th>
+                  <th>Equipo</th>
+                  <th>Nº serie</th>
+                  <th className="vga-num">Monto devuelto</th>
+                  <th>Detalle / baja</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tableLoading ? (
+                  <tr>
+                    <td colSpan={7} className="vga-empty">
+                      Cargando historial…
+                    </td>
+                  </tr>
+                ) : historialDevoluciones.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="vga-empty">
+                      Todavía no hay devoluciones registradas.
+                    </td>
+                  </tr>
+                ) : (
+                  historialDevoluciones.map((row) => (
+                    <tr key={`dev-${row.id}`} className="is-returned">
+                      <td>
+                        <span className="vga-pill vga-pill--off">Ya devuelta</span>
+                      </td>
+                      <td className="vga-datecell">{formatDateShort(row.fechaDevolucion || "")}</td>
+                      <td>{clientFullName(row)}</td>
+                      <td>
+                        {row.nombreEquipo || "—"}
+                        <span className="vga-sub">
+                          {row.marca} {row.modelo} {row.procesador}
+                        </span>
+                      </td>
+                      <td className="vga-sn">{row.numeroSerie || "—"}</td>
+                      <td className="vga-num">
+                        <span className="vga-amt vga-amt--c">
+                          {formatUsd(Number(row.montoDevueltoUsd ?? row.montoUsd))}
+                        </span>
+                      </td>
+                      <td className="vga-notes-cell">
+                        {row.devolucionNota || "—"}
+                        {row.bajaEquipoId ? (
+                          <span className="vga-sub">Baja equipo: {row.bajaEquipoId.slice(0, 8)}…</span>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
     </div>
   );

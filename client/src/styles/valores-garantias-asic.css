@@ -11,6 +11,10 @@
   gap: 0.75rem;
 }
 
+.vga-kpis--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .vga-kpi {
   border-radius: 16px;
   padding: 0.95rem 1.05rem 1rem;
@@ -140,6 +144,10 @@
   display: grid;
   gap: 0.75rem;
   overflow: visible;
+}
+
+.vga-field + .vga-equipo {
+  margin-top: 0.85rem;
 }
 
 .vga-field label {
@@ -457,6 +465,7 @@
 
 @media (max-width: 1100px) {
   .vga-kpis,
+  .vga-kpis--3,
   .vga-sections,
   .vga-money-pair {
     grid-template-columns: 1fr 1fr;
@@ -465,8 +474,88 @@
 
 @media (max-width: 700px) {
   .vga-kpis,
+  .vga-kpis--3,
   .vga-sections,
   .vga-money-pair {
     grid-template-columns: 1fr;
   }
+}
+
+.vga-input {
+  width: 100%;
+  border: 1px solid #d5e0da;
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+  background: #fff;
+  color: #12231c;
+}
+
+.vga-sheet__tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.vga-filters {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.vga-filter {
+  border: 1px solid #c9d7cf;
+  background: #fff;
+  color: #21513b;
+  border-radius: 999px;
+  padding: 0.22rem 0.7rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.vga-filter.is-on {
+  background: #1c4d3a;
+  border-color: #1c4d3a;
+  color: #fff;
+}
+
+.vga-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 999px;
+  padding: 0.18rem 0.55rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.vga-pill--on {
+  background: #def6e7;
+  color: #146c3a;
+}
+
+.vga-pill--off {
+  background: #fff4d6;
+  color: #92400e;
+}
+
+.vga-gridtable tbody tr.is-returned td {
+  background: #fffdf5;
+}
+
+.vga-sn {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.76rem;
+  color: #3f564b;
+}
+
+.vga-sub {
+  display: block;
+  margin-top: 0.12rem;
+  color: #6a7c73;
+  font-size: 0.74rem;
 }
