@@ -137,6 +137,11 @@ function nowSql(): string {
   return db.isPostgres ? "NOW()" : "datetime('now')";
 }
 
+const optionalMoney = z.preprocess(
+  (v) => (v === "" || v == null ? undefined : v),
+  z.coerce.number().finite().min(0).optional()
+);
+
 const CreateSchema = z.object({
   clientId: z.coerce.number().int().positive(),
   marca: z.string().trim().min(1).max(120),
@@ -145,11 +150,15 @@ const CreateSchema = z.object({
   numeroSerie: z.string().trim().min(1).max(160),
   nombreEquipo: z.string().trim().min(1).max(200),
   montoUsd: z.coerce.number().finite().min(0),
-  montoClienteUsd: z.coerce.number().finite().min(0),
+  montoClienteUsd: optionalMoney,
   fechaInicio: z.string().trim().min(1).max(40),
 });
 
 const UpdateSchema = CreateSchema.partial();
+
+function resolvedClienteUsd(montoUsd: number, montoClienteUsd?: number): number {
+  return Number.isFinite(montoClienteUsd) ? Number(montoClienteUsd) : montoUsd;
+}
 
 type Row = Record<string, unknown>;
 
@@ -279,6 +288,7 @@ garantiasAndeClientesRouter.post("/garantias-ande-clientes", ...writeMw, async (
       return res.status(400).json({ error: { message: "Datos inválidos para la garantía ANDE." } });
     }
     const data = parsed.data;
+    const montoClienteUsd = resolvedClienteUsd(data.montoUsd, data.montoClienteUsd);
     const client = (await db
       .prepare(`SELECT id FROM clients WHERE id = ? AND ${hostingOnlyWhereSql}`)
       .get(data.clientId)) as { id: number } | undefined;
@@ -300,7 +310,7 @@ garantiasAndeClientesRouter.post("/garantias-ande-clientes", ...writeMw, async (
         data.numeroSerie,
         data.nombreEquipo,
         data.montoUsd,
-        data.montoClienteUsd,
+        montoClienteUsd,
         data.fechaInicio
       );
     res.json({ ok: true });

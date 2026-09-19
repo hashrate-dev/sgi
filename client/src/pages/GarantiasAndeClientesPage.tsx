@@ -252,7 +252,7 @@ export function GarantiasAndeClientesPage() {
         numeroSerie: form.numeroSerie.trim(),
         nombreEquipo: form.nombreEquipo.trim(),
         montoUsd: form.montoUsd,
-        montoClienteUsd: form.montoClienteUsd,
+        montoClienteUsd: Number.isFinite(form.montoClienteUsd) ? form.montoClienteUsd : form.montoUsd,
         fechaInicio: form.fechaInicio.trim(),
       };
       if (editingId != null) {
