@@ -13,6 +13,7 @@ export type LectorPermissionKey =
   | "setups"
   | "leads"
   | "noticias"
+  | "comunicacion"
   | "finanzas_contabilidad"
   | "finanzas_proveedores"
   | "finanzas_asic_costos"
@@ -84,6 +85,13 @@ export const LECTOR_PERMISSION_CATALOG: readonly LectorPermissionCatalogItem[] =
     key: "noticias",
     label: "Noticias cripto",
     description: "Consultar el wire de noticias cripto e historial capturado por el bot.",
+  },
+  {
+    sectionOrder: 1,
+    sectionLabel: "Operación Hosting, ASIC y clientes — solo lectura",
+    key: "comunicacion",
+    label: "Comunicación granja",
+    description: "Consultar el historial de comunicados de operaciones de la granja enviados por Telegram.",
   },
   {
     sectionOrder: 2,
@@ -180,6 +188,7 @@ export const LECTOR_GRANT_PATH_PREFIXES: Record<LectorPermissionKey, readonly st
   setups: ["/asic/setup", "/equipos-asic/setup", "/asic/reparacion"],
   leads: [],
   noticias: ["/gestion-administrativa/noticias"],
+  comunicacion: ["/gestion-administrativa/comunicacion"],
   finanzas_contabilidad: ["/gestion-financiera/contabilidad", "/gestion-financiera/resumen-presupuesto", "/gestion-financiera/monitor-financiero"],
   finanzas_proveedores: ["/gestion-financiera/proveedores"],
   finanzas_asic_costos: ["/asic/cotizador-china-py"],
@@ -203,6 +212,7 @@ const LECTOR_KEYS_FOR_GESTION_ADMIN: readonly LectorPermissionKey[] = [
   "setups",
   "leads",
   "noticias",
+  "comunicacion",
 ];
 
 const LECTOR_KEYS_FOR_GESTION_FIN: readonly LectorPermissionKey[] = [

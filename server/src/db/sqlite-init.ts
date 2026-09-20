@@ -429,6 +429,29 @@ CREATE TABLE IF NOT EXISTS sgi_crypto_noticias (
 CREATE INDEX IF NOT EXISTS idx_sgi_crypto_noticias_published ON sgi_crypto_noticias(published_at DESC);
 CREATE INDEX IF NOT EXISTS idx_sgi_crypto_noticias_fetched ON sgi_crypto_noticias(fetched_at DESC);
 `);
+
+  db.exec(`
+CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  titulo TEXT NOT NULL,
+  cuerpo TEXT NOT NULL DEFAULT '',
+  categoria TEXT NOT NULL DEFAULT 'general',
+  image_url TEXT NOT NULL DEFAULT '',
+  telegram_sent INTEGER NOT NULL DEFAULT 0,
+  sent_at TEXT,
+  created_by_email TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_sgi_ops_comunicacion_created ON sgi_ops_comunicacion(created_at DESC, id DESC);
+CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion_tg (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  enabled INTEGER NOT NULL DEFAULT 0,
+  chat_id TEXT NOT NULL DEFAULT '',
+  extra_chat_ids TEXT NOT NULL DEFAULT '[]',
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+INSERT OR IGNORE INTO sgi_ops_comunicacion_tg (id, enabled, chat_id, extra_chat_ids) VALUES (1, 0, '', '[]');
+`);
   for (const col of [
     "title_es TEXT",
     "title_pt TEXT",

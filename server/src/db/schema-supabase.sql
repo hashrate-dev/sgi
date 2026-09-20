@@ -245,6 +245,28 @@ ALTER TABLE sgi_crypto_noticias_tg ADD COLUMN IF NOT EXISTS extra_chat_ids TEXT 
 ALTER TABLE sgi_crypto_noticias_tg ADD COLUMN IF NOT EXISTS send_interval_min INTEGER NOT NULL DEFAULT 60;
 ALTER TABLE sgi_crypto_noticias_tg ADD COLUMN IF NOT EXISTS last_auto_sent_at TIMESTAMPTZ;
 
+CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion (
+  id BIGSERIAL PRIMARY KEY,
+  titulo TEXT NOT NULL,
+  cuerpo TEXT NOT NULL DEFAULT '',
+  categoria TEXT NOT NULL DEFAULT 'general',
+  image_url TEXT NOT NULL DEFAULT '',
+  telegram_sent INTEGER NOT NULL DEFAULT 0,
+  sent_at TIMESTAMPTZ,
+  created_by_email TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_sgi_ops_comunicacion_created ON sgi_ops_comunicacion(created_at DESC, id DESC);
+CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion_tg (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  enabled INTEGER NOT NULL DEFAULT 0,
+  chat_id TEXT NOT NULL DEFAULT '',
+  extra_chat_ids TEXT NOT NULL DEFAULT '[]',
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+INSERT INTO sgi_ops_comunicacion_tg (id, enabled, chat_id) VALUES (1, 0, '')
+ON CONFLICT (id) DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS sgi_crypto_noticias_tg_sent (
   noticia_id BIGINT PRIMARY KEY,
   sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

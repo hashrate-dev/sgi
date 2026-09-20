@@ -67,6 +67,12 @@ const hubItems: readonly HubItem[] = [
     label: "NOTICIAS",
     desc: "Sala de redacción: bot que captura e historializa cripto, BTC, alts, USA, Uruguay e inversiones",
   },
+  {
+    to: "/gestion-administrativa/comunicacion",
+    icon: "bi-broadcast-pin",
+    label: "Comunicación",
+    desc: "Bot de Telegram para comunicar operaciones de la granja de minería (energía, mantenimiento, hashrate)",
+  },
 ];
 
 export function GestionAdministrativaPage() {

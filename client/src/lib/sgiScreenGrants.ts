@@ -21,6 +21,7 @@ const LEGACY_MODULE_KEYS = new Set<string>([
   "setups",
   "leads",
   "noticias",
+  "comunicacion",
   "marketplace_pedidos",
   "marketplace_presencia",
   "finanzas_contabilidad",
@@ -171,7 +172,8 @@ export function collectPathPrefixesFromScreenGrants(grants: readonly string[]): 
     grantsIncludeScreen(g, "ga-cambio-usdt-clientes") ||
     grantsIncludeScreen(g, "ga-garantias-ande-clientes") ||
     grantsIncludeScreen(g, "ga-valores-garantias-asic") ||
-    grantsIncludeScreen(g, "ga-noticias");
+    grantsIncludeScreen(g, "ga-noticias") ||
+    grantsIncludeScreen(g, "ga-comunicacion");
   const seesFin =
     grantsIncludeScreen(g, "fin-proveedores") ||
     grantsIncludeScreen(g, "fin-contabilidad") ||

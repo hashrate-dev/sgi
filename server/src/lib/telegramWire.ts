@@ -28,8 +28,25 @@ function clip(s: unknown, max: number): string {
   return `${t.slice(0, max - 1)}…`;
 }
 
-function botToken(): string {
+function botToken(explicit?: string): string {
+  const t = String(explicit ?? "").trim();
+  if (t) return t;
   return (process.env.TELEGRAM_BOT_TOKEN || "").trim();
+}
+
+/** Bot de Comunicación granja: token propio o el mismo del wire si no hay uno aparte. */
+export function opsComunicacionBotToken(): string {
+  return String(process.env.TELEGRAM_OPS_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || "").trim();
+}
+
+export function getOpsTelegramBotStatus(): TelegramBotStatus {
+  return {
+    tokenConfigured: Boolean(opsComunicacionBotToken()),
+    defaultChatId: String(process.env.TELEGRAM_OPS_CHAT_ID || process.env.TELEGRAM_CHAT_ID || "").trim(),
+    botUsernameHint: String(process.env.TELEGRAM_OPS_BOT_USERNAME || process.env.TELEGRAM_BOT_USERNAME || "")
+      .trim()
+      .replace(/^@/, ""),
+  };
 }
 
 function articleLink(raw?: string): string {
@@ -179,6 +196,21 @@ export function normalizeTelegramChatId(raw: string | null | undefined): string 
   return t.replace(/\s+/g, "");
 }
 
+export function formatOpsFarmTelegramHtml(opts: {
+  title: string;
+  body: string;
+  categoryLabel?: string;
+}): string {
+  const title = escapeTelegramHtml(clip(opts.title.replace(/\s+/g, " "), 180));
+  const body = escapeTelegramHtml(clip(opts.body.replace(/\r\n/g, "\n"), 3200));
+  const cat = opts.categoryLabel ? escapeTelegramHtml(opts.categoryLabel) : "";
+  const lines = ["⚡ <b>Comunicación granja HRS</b>"];
+  if (cat) lines.push(`<i>${cat}</i>`);
+  lines.push("", `<b>${title}</b>`);
+  if (body) lines.push("", body.replace(/\n/g, "\n"));
+  return lines.join("\n");
+}
+
 export function formatCryptoWireTelegramDigest(items: CryptoWireNewsItem[], opts?: { maxItems?: number }): string {
   const maxItems = Math.max(1, Math.min(12, opts?.maxItems ?? 5));
   const list = items.filter((x) => String(x.title ?? "").trim());
@@ -222,9 +254,10 @@ export function isTelegramChatMissingError(msg: string): boolean {
 export async function telegramFetchJson(
   method: string,
   body?: Record<string, unknown>,
-  timeoutMs = 12_000
+  timeoutMs = 12_000,
+  tokenOverride?: string
 ): Promise<{ ok: boolean; description?: string; result?: unknown }> {
-  const token = botToken();
+  const token = botToken(tokenOverride);
   if (!token) throw new Error("Falta TELEGRAM_BOT_TOKEN en el servidor");
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), timeoutMs);
@@ -249,8 +282,10 @@ export async function telegramFetchJson(
   }
 }
 
-export async function getTelegramBotIdentity(): Promise<{ username: string; id: string; name: string } | null> {
-  const j = await telegramFetchJson("getMe");
+export async function getTelegramBotIdentity(
+  tokenOverride?: string
+): Promise<{ username: string; id: string; name: string } | null> {
+  const j = await telegramFetchJson("getMe", undefined, 12_000, tokenOverride);
   if (!j.ok || !j.result || typeof j.result !== "object") return null;
   const r = j.result as { id?: number; username?: string; first_name?: string };
   return {
@@ -280,28 +315,38 @@ export function explainTelegramSendFailure(raw: string, botUsername?: string): s
 export async function sendTelegramText(
   chatId: string,
   text: string,
-  opts?: { html?: boolean; disablePreview?: boolean }
+  opts?: { html?: boolean; disablePreview?: boolean; token?: string }
 ): Promise<void> {
   const chat = normalizeTelegramChatId(chatId);
   if (!chat) throw new Error("Chat ID de Telegram inválido");
-  const j = await telegramFetchJson("sendMessage", {
-    chat_id: chatIdForApi(chat),
-    text: clip(text, 3900),
-    disable_web_page_preview: opts?.disablePreview !== false,
-    ...(opts?.html ? { parse_mode: "HTML" } : {}),
-  });
+  const j = await telegramFetchJson(
+    "sendMessage",
+    {
+      chat_id: chatIdForApi(chat),
+      text: clip(text, 3900),
+      disable_web_page_preview: opts?.disablePreview !== false,
+      ...(opts?.html ? { parse_mode: "HTML" } : {}),
+    },
+    12_000,
+    opts?.token
+  );
   if (!j.ok) throw new Error(`Telegram API: ${clip(j.description || "error", 280)}`);
   // eslint-disable-next-line no-console
   console.log(`[telegram] mensaje OK → ${chat}`);
 }
 
-export async function sendTelegramPhoto(chatId: string, photoUrl: string, caption: string): Promise<void> {
+export async function sendTelegramPhoto(
+  chatId: string,
+  photoUrl: string,
+  caption: string,
+  tokenOverride?: string
+): Promise<void> {
   const chat = normalizeTelegramChatId(chatId);
   if (!chat) throw new Error("Chat ID de Telegram inválido");
   const photo = String(photoUrl || "").trim();
   if (!/^https?:\/\//i.test(photo)) throw new Error("URL de imagen inválida");
   const captionClipped = caption.length > 1024 ? `${caption.slice(0, 1023)}…` : caption;
-  const uploaded = await uploadTelegramPhoto(chat, photo, captionClipped);
+  const uploaded = await uploadTelegramPhoto(chat, photo, captionClipped, tokenOverride);
   if (uploaded) return;
   const j = await telegramFetchJson(
     "sendPhoto",
@@ -311,15 +356,16 @@ export async function sendTelegramPhoto(chatId: string, photoUrl: string, captio
       caption: captionClipped,
       parse_mode: "HTML",
     },
-    20_000
+    20_000,
+    tokenOverride
   );
   if (!j.ok) throw new Error(`Telegram API: ${clip(j.description || "error", 280)}`);
   // eslint-disable-next-line no-console
   console.log(`[telegram] foto OK → ${chat}`);
 }
 
-async function uploadTelegramPhoto(chat: string, photoUrl: string, caption: string): Promise<boolean> {
-  const token = botToken();
+async function uploadTelegramPhoto(chat: string, photoUrl: string, caption: string, tokenOverride?: string): Promise<boolean> {
+  const token = botToken(tokenOverride);
   if (!token) return false;
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), 14_000);
@@ -456,11 +502,14 @@ function pickChatFromUpdate(u: Record<string, unknown>): { id: number; type?: st
   return null;
 }
 
-export async function listRecentTelegramPrivateChats(limit = 8): Promise<
+export async function listRecentTelegramPrivateChats(
+  limit = 8,
+  tokenOverride?: string
+): Promise<
   Array<{ chatId: string; name: string; username?: string }>
 > {
-  await telegramFetchJson("deleteWebhook", { drop_pending_updates: false }).catch(() => undefined);
-  const j = await telegramFetchJson("getUpdates?limit=50");
+  await telegramFetchJson("deleteWebhook", { drop_pending_updates: false }, 12_000, tokenOverride).catch(() => undefined);
+  const j = await telegramFetchJson("getUpdates?limit=50", undefined, 12_000, tokenOverride);
   if (!j.ok) throw new Error(j.description || "getUpdates falló");
   const rows = Array.isArray(j.result) ? (j.result as Record<string, unknown>[]) : [];
   const byId = new Map<string, { chatId: string; name: string; username?: string }>();

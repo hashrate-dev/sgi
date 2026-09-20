@@ -2495,6 +2495,78 @@ export function detectCryptoNoticiasTelegramChats(): Promise<{
   return apiTelegramOnce("/api/crypto-noticias/telegram/chats");
 }
 
+export type OpsComunicacionItem = {
+  id: number;
+  titulo: string;
+  cuerpo: string;
+  categoria: string;
+  categoriaLabel: string;
+  imageUrl: string;
+  telegramSent: boolean;
+  sentAt: string;
+  createdByEmail: string;
+  createdAt: string;
+};
+
+export type OpsComunicacionTelegramSettings = {
+  enabled: boolean;
+  chatId: string;
+  chatIds?: string[];
+  tokenConfigured: boolean;
+  botUsername: string | null;
+  defaultChatId: string | null;
+  readyToSend: boolean;
+};
+
+export function getOpsComunicacion(): Promise<{
+  items: OpsComunicacionItem[];
+  categories: Array<{ id: string; label: string }>;
+}> {
+  return api("/api/ops-comunicacion");
+}
+
+export function createOpsComunicacion(body: {
+  titulo: string;
+  cuerpo?: string;
+  categoria?: string;
+  imageUrl?: string;
+  sendNow?: boolean;
+}): Promise<{ ok: boolean; sentTo?: number; item: OpsComunicacionItem | null }> {
+  return api("/api/ops-comunicacion", { method: "POST", body: JSON.stringify(body) });
+}
+
+export function sendOpsComunicacionTelegram(id: number): Promise<{ ok: boolean; sentTo?: number }> {
+  return apiTelegramOnce(`/api/ops-comunicacion/${id}/send`, { method: "POST", body: "{}" });
+}
+
+export function getOpsComunicacionTelegram(): Promise<OpsComunicacionTelegramSettings> {
+  return apiTelegramOnce("/api/ops-comunicacion/telegram");
+}
+
+export function putOpsComunicacionTelegram(body: {
+  enabled: boolean;
+  chatId?: string | null;
+}): Promise<OpsComunicacionTelegramSettings & { ok: boolean }> {
+  return apiTelegramOnce("/api/ops-comunicacion/telegram", { method: "POST", body: JSON.stringify(body) });
+}
+
+export function testOpsComunicacionTelegram(body?: {
+  enabled?: boolean;
+  chatId?: string | null;
+}): Promise<OpsComunicacionTelegramSettings & { ok: boolean; via: string }> {
+  return apiTelegramOnce("/api/ops-comunicacion/telegram/test", {
+    method: "POST",
+    body: JSON.stringify(body ?? {}),
+  });
+}
+
+export function detectOpsComunicacionTelegramChats(): Promise<{
+  chats: Array<{ chatId: string; name: string; username?: string }>;
+  hint?: string;
+}> {
+  return apiTelegramOnce("/api/ops-comunicacion/telegram/chats");
+}
+
 export type GarantiasItemsResponse = { items: import("./types.js").ItemGarantiaAnde[] };
 
 export function getGarantiasItems(): Promise<GarantiasItemsResponse> {

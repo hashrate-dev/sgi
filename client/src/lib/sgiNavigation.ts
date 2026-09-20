@@ -40,6 +40,7 @@ const GA_HUB_SECTION_SCREENS = [
   "ga-garantias-ande-clientes",
   "ga-valores-garantias-asic",
   "ga-noticias",
+  "ga-comunicacion",
 ] as const;
 
 const CAMBIO_USDT_HUB_SCREENS = ["ga-cambio-usdt-hub", "ga-cambio-usdt-clientes", "fin-exchange-hub"] as const;

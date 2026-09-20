@@ -65,6 +65,14 @@ export const ADMIN_B_PERMISSION_CATALOG = [
     description:
       "Wire interno de noticias: Bitcoin, altcoins, inversiones, gobierno USA, Uruguay y USA. Bot + historial.",
   },
+  {
+    sectionOrder: 1,
+    sectionLabel: "Gestión Administrativa — operación Hosting, ASIC y tienda corporativa",
+    key: "comunicacion",
+    label: "Comunicación granja (Telegram)",
+    description:
+      "Avisos de operaciones de la granja de minería por Telegram: cortes, mantenimiento, hashrate y comunicados internos.",
+  },
   /** --- Marketplace (cotizaciones, pedidos y presencia digital) --- */
   {
     sectionOrder: 2,

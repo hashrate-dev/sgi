@@ -479,3 +479,16 @@ export function canEditNoticiasModule(user: PermUser): boolean {
   return canAccessNoticiasModule(user);
 }
 
+export function canAccessComunicacionModule(user: PermUser): boolean {
+  if (!user) return false;
+  if (user.role === "lector") return lectorAllowsModule(user, "comunicacion");
+  if (user.role === "admin_a") return true;
+  if (user.role === "operador" || user.role === "admin_b") return adminBAllowsModule(user, "comunicacion");
+  return false;
+}
+
+export function canEditComunicacionModule(user: PermUser): boolean {
+  if (!user || user.role === "lector") return false;
+  return canAccessComunicacionModule(user);
+}
+

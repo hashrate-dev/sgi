@@ -64,6 +64,13 @@ export const LECTOR_PERMISSION_CATALOG = [
     description: "Consultar el wire de noticias cripto e historial capturado por el bot.",
   },
   {
+    sectionOrder: 1,
+    sectionLabel: "Operación Hosting, ASIC y clientes — solo lectura",
+    key: "comunicacion",
+    label: "Comunicación granja",
+    description: "Consultar el historial de comunicados de operaciones de la granja enviados por Telegram.",
+  },
+  {
     sectionOrder: 2,
     sectionLabel: "Gestión financiera — solo lectura",
     key: "finanzas_contabilidad",
