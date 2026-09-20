@@ -19,7 +19,10 @@ export function minutesFromOpsTime(raw: string): number | null {
   const n = normalizeOpsTime(raw);
   if (!n) return null;
   if (n === "24:00") return 24 * 60;
-  const [h, min] = n.split(":").map(Number);
+  const parts = n.split(":");
+  const h = Number(parts[0] ?? "");
+  const min = Number(parts[1] ?? "");
+  if (!Number.isFinite(h) || !Number.isFinite(min)) return null;
   return h * 60 + min;
 }
 
@@ -88,8 +91,8 @@ export function parseHorarioWindows(cuerpo: string): Array<{ from: string; to: s
   const re = /(\d{1,2}:\d{2})\s*hs\s*a\s*(\d{1,2}:\d{2})\s*hs/gi;
   let hit: RegExpExecArray | null;
   while ((hit = re.exec(String(cuerpo || "")))) {
-    const from = normalizeOpsTime(hit[1]);
-    const to = normalizeOpsTime(hit[2]);
+    const from = normalizeOpsTime(String(hit[1] ?? ""));
+    const to = normalizeOpsTime(String(hit[2] ?? ""));
     if (from && to) out.push({ from, to });
   }
   return out;

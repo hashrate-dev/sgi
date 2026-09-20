@@ -19,7 +19,10 @@ export function minutesFromOpsTime(raw: string): number | null {
   const n = normalizeOpsTime(raw);
   if (!n) return null;
   if (n === "24:00") return 24 * 60;
-  const [h, min] = n.split(":").map(Number);
+  const parts = n.split(":");
+  const h = Number(parts[0] ?? "");
+  const min = Number(parts[1] ?? "");
+  if (!Number.isFinite(h) || !Number.isFinite(min)) return null;
   return h * 60 + min;
 }
 

@@ -901,8 +901,10 @@ async function backfillEtapas() {
   for (const [, list] of groups) {
     const staged = etapasForWindows(list.map((x) => ({ from: x.from, to: x.to })));
     for (let i = 0; i < list.length; i++) {
+      const row = list[i];
+      if (!row) continue;
       const etapa = staged[i]?.etapa || i + 1;
-      await db.prepare("UPDATE sgi_ops_comunicacion_cortes SET etapa = ? WHERE id = ?").run(etapa, list[i].id);
+      await db.prepare("UPDATE sgi_ops_comunicacion_cortes SET etapa = ? WHERE id = ?").run(etapa, row.id);
     }
   }
 }
@@ -1334,8 +1336,9 @@ opsComunicacionRouter.post("/ops-comunicacion/cortes", ...writeMw, async (req, r
       .all(parsed.data.fecha)) as Record<string, unknown>[];
     let corteNo = 0;
     let etapa = parsed.data.etapa || 0;
-    if (sameDay.length) {
-      corteNo = Number(rowKeysToLowercase(sameDay[0]).corte_no ?? 0) || 0;
+    const first = sameDay[0];
+    if (first) {
+      corteNo = Number(rowKeysToLowercase(first).corte_no ?? 0) || 0;
       const used = new Set(sameDay.map((x) => Number(rowKeysToLowercase(x).etapa ?? 1) || 1));
       if (!etapa) etapa = used.has(1) ? 2 : 1;
     } else {
