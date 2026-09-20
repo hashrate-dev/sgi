@@ -28,24 +28,37 @@ function clip(s: unknown, max: number): string {
   return `${t.slice(0, max - 1)}…`;
 }
 
+/** Evita que el bundler de Vercel reemplace `process.env.NOMBRE` en build (Secret = vacío). */
+function runtimeEnv(name: string): string {
+  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+  const raw = env ? env[name] : undefined;
+  return String(raw ?? "")
+    .trim()
+    .replace(/^["']|["']$/g, "");
+}
+
 function botToken(explicit?: string): string {
   const t = String(explicit ?? "").trim();
   if (t) return t;
-  return (process.env.TELEGRAM_BOT_TOKEN || "").trim();
+  return runtimeEnv("TELEGRAM_BOT_TOKEN");
 }
 
-/** Bot de Comunicación granja: token propio o el mismo del wire si no hay uno aparte. */
-export function opsComunicacionBotToken(): string {
-  return String(process.env.TELEGRAM_OPS_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || "").trim();
+/** Bot de Comunicación: token guardado, TELEGRAM_OPS_BOT_TOKEN, o el del wire. */
+export function opsComunicacionBotToken(stored?: string): string {
+  const fromStore = String(stored ?? "")
+    .trim()
+    .replace(/^["']|["']$/g, "");
+  if (fromStore) return fromStore;
+  const ops = runtimeEnv("TELEGRAM_OPS_BOT_TOKEN");
+  if (ops) return ops;
+  return runtimeEnv("TELEGRAM_BOT_TOKEN");
 }
 
-export function getOpsTelegramBotStatus(): TelegramBotStatus {
+export function getOpsTelegramBotStatus(storedToken?: string): TelegramBotStatus {
   return {
-    tokenConfigured: Boolean(opsComunicacionBotToken()),
-    defaultChatId: String(process.env.TELEGRAM_OPS_CHAT_ID || process.env.TELEGRAM_CHAT_ID || "").trim(),
-    botUsernameHint: String(process.env.TELEGRAM_OPS_BOT_USERNAME || process.env.TELEGRAM_BOT_USERNAME || "")
-      .trim()
-      .replace(/^@/, ""),
+    tokenConfigured: Boolean(opsComunicacionBotToken(storedToken)),
+    defaultChatId: runtimeEnv("TELEGRAM_OPS_CHAT_ID") || runtimeEnv("TELEGRAM_CHAT_ID"),
+    botUsernameHint: (runtimeEnv("TELEGRAM_OPS_BOT_USERNAME") || runtimeEnv("TELEGRAM_BOT_USERNAME")).replace(/^@/, ""),
   };
 }
 
@@ -179,8 +192,8 @@ export type CryptoWireTelegramResult = {
 export function getTelegramBotStatus(): TelegramBotStatus {
   return {
     tokenConfigured: Boolean(botToken()),
-    defaultChatId: String(process.env.TELEGRAM_CHAT_ID || "").trim(),
-    botUsernameHint: String(process.env.TELEGRAM_BOT_USERNAME || "").trim().replace(/^@/, ""),
+    defaultChatId: runtimeEnv("TELEGRAM_CHAT_ID"),
+    botUsernameHint: runtimeEnv("TELEGRAM_BOT_USERNAME").replace(/^@/, ""),
   };
 }
 

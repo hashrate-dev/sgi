@@ -262,10 +262,12 @@ CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion_tg (
   enabled INTEGER NOT NULL DEFAULT 0,
   chat_id TEXT NOT NULL DEFAULT '',
   extra_chat_ids TEXT NOT NULL DEFAULT '[]',
+  bot_token TEXT NOT NULL DEFAULT '',
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 INSERT INTO sgi_ops_comunicacion_tg (id, enabled, chat_id) VALUES (1, 0, '')
 ON CONFLICT (id) DO NOTHING;
+ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS bot_token TEXT NOT NULL DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS sgi_crypto_noticias_tg_sent (
   noticia_id BIGINT PRIMARY KEY,

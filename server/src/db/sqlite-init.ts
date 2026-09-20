@@ -448,10 +448,17 @@ CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion_tg (
   enabled INTEGER NOT NULL DEFAULT 0,
   chat_id TEXT NOT NULL DEFAULT '',
   extra_chat_ids TEXT NOT NULL DEFAULT '[]',
+  bot_token TEXT NOT NULL DEFAULT '',
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 INSERT OR IGNORE INTO sgi_ops_comunicacion_tg (id, enabled, chat_id, extra_chat_ids) VALUES (1, 0, '', '[]');
 `);
+  try {
+    db.exec(`ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN bot_token TEXT NOT NULL DEFAULT ''`);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
   for (const col of [
     "title_es TEXT",
     "title_pt TEXT",

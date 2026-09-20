@@ -18,7 +18,7 @@ function channelLabel(s: OpsComunicacionTelegramSettings | null): string {
   if (s.tokenConfigured) {
     return s.botUsername ? `Telegram @${s.botUsername}` : "Telegram Bot API";
   }
-  return "Sin bot (falta TELEGRAM_BOT_TOKEN o TELEGRAM_OPS_BOT_TOKEN)";
+  return "Sin bot: pegá el token de BotFather abajo y Guardar";
 }
 
 export function OpsComunicacionTelegramConfig({ canEdit, open, onClose }: Props) {
@@ -30,6 +30,7 @@ export function OpsComunicacionTelegramConfig({ canEdit, open, onClose }: Props)
   const [tg, setTg] = useState<OpsComunicacionTelegramSettings | null>(null);
   const [tgEnabled, setTgEnabled] = useState(false);
   const [tgChatId, setTgChatId] = useState("");
+  const [tgBotToken, setTgBotToken] = useState("");
   const [tgSaving, setTgSaving] = useState(false);
   const [tgTesting, setTgTesting] = useState(false);
   const [tgDetecting, setTgDetecting] = useState(false);
@@ -79,16 +80,23 @@ export function OpsComunicacionTelegramConfig({ canEdit, open, onClose }: Props)
     setErr("");
     setOk("");
     try {
-      const r = await putOpsComunicacionTelegram({ enabled: tgEnabled, chatId: tgChatId });
+      const r = await putOpsComunicacionTelegram({
+        enabled: tgEnabled,
+        chatId: tgChatId,
+        botToken: tgBotToken.trim() || undefined,
+      });
       setTg(r);
       setTgEnabled(Boolean(r.enabled));
       setTgChatId(r.chatId || "");
+      setTgBotToken("");
       setOk(
         r.enabled
           ? r.readyToSend
-            ? "Telegram de Comunicación granja guardado. Ya podés enviar comunicados."
-            : "Guardado, pero falta TELEGRAM_BOT_TOKEN (o TELEGRAM_OPS_BOT_TOKEN) en el servidor."
-          : "Avisos Telegram de Comunicación desactivados."
+            ? "Telegram de Comunicación guardado. Ya podés enviar comunicados."
+            : "Guardado. Falta Chat ID o el token del bot."
+          : r.tokenConfigured
+            ? "Token guardado. Detectá chats, activá envíos y Guardar."
+            : "Avisos Telegram de Comunicación desactivados."
       );
     } catch (e) {
       setErr(e instanceof Error ? e.message : "No se pudo guardar Telegram.");
@@ -103,7 +111,11 @@ export function OpsComunicacionTelegramConfig({ canEdit, open, onClose }: Props)
     setErr("");
     setOk("");
     try {
-      const r = await testOpsComunicacionTelegram({ enabled: true, chatId: tgChatId });
+      const r = await testOpsComunicacionTelegram({
+        enabled: true,
+        chatId: tgChatId,
+        botToken: tgBotToken.trim() || undefined,
+      });
       setTg(r);
       setTgEnabled(Boolean(r.enabled));
       setTgChatId(r.chatId || tgChatId);
@@ -121,6 +133,15 @@ export function OpsComunicacionTelegramConfig({ canEdit, open, onClose }: Props)
     setErr("");
     setOk("");
     try {
+      if (tgBotToken.trim()) {
+        const saved = await putOpsComunicacionTelegram({
+          enabled: Boolean(tgEnabled && tgChatId.trim()),
+          chatId: tgChatId,
+          botToken: tgBotToken.trim(),
+        });
+        setTg(saved);
+        setTgBotToken("");
+      }
       const r = await detectOpsComunicacionTelegramChats();
       setTgChats(r.chats || []);
       if (r.chats?.[0]?.chatId && !tgChatId.trim()) {
@@ -160,8 +181,8 @@ export function OpsComunicacionTelegramConfig({ canEdit, open, onClose }: Props)
               Telegram · Comunicación granja
             </h2>
             <p className="crypto-news-medios__lead">
-              Este bot es independiente del wire de noticias de mercado. Sirve solo para avisar operaciones de la
-              granja. Creá un bot en @BotFather con otro nombre, o usá el mismo token del servidor.
+              Este bot avisa operaciones a clientes. Pegá acá el token que te dio @BotFather (el de Hashrate
+              Operations). No hace falta que Vercel lo vea para que funcione.
             </p>
           </div>
           <button
@@ -205,6 +226,21 @@ export function OpsComunicacionTelegramConfig({ canEdit, open, onClose }: Props)
                       />
                       <span>Activar envíos de Comunicación granja por Telegram</span>
                     </label>
+                  </div>
+                  <div className="col-12">
+                    <label className="form-label small mb-1" htmlFor="ops-tg-token">
+                      Token del bot (@BotFather)
+                    </label>
+                    <input
+                      id="ops-tg-token"
+                      className="form-control form-control-sm"
+                      type="password"
+                      autoComplete="off"
+                      placeholder={tg?.tokenConfigured ? "Token ya cargado — pegá uno nuevo solo si lo rotaste" : "123456789:AAH…"}
+                      value={tgBotToken}
+                      disabled={tgSaving || tgTesting || tgDetecting}
+                      onChange={(e) => setTgBotToken(e.target.value)}
+                    />
                   </div>
                   <div className="col-12 col-md-7">
                     <label className="form-label small mb-1" htmlFor="ops-tg-chat">

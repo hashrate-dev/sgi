@@ -2546,6 +2546,7 @@ export function getOpsComunicacionTelegram(): Promise<OpsComunicacionTelegramSet
 export function putOpsComunicacionTelegram(body: {
   enabled: boolean;
   chatId?: string | null;
+  botToken?: string | null;
 }): Promise<OpsComunicacionTelegramSettings & { ok: boolean }> {
   return apiTelegramOnce("/api/ops-comunicacion/telegram", { method: "POST", body: JSON.stringify(body) });
 }
@@ -2553,6 +2554,7 @@ export function putOpsComunicacionTelegram(body: {
 export function testOpsComunicacionTelegram(body?: {
   enabled?: boolean;
   chatId?: string | null;
+  botToken?: string | null;
 }): Promise<OpsComunicacionTelegramSettings & { ok: boolean; via: string }> {
   return apiTelegramOnce("/api/ops-comunicacion/telegram/test", {
     method: "POST",

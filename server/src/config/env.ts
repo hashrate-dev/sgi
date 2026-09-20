@@ -16,20 +16,18 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const serverDir = path.join(__dirname, "..", "..");
 const projectRoot = path.join(serverDir, "..");
 
-// 1) cwd (donde se ejecutó npm)
+// En Vercel las env ya vienen inyectadas; override:true de un .env empaquetado
+// las borra (p. ej. TELEGRAM_* vacíos) y el bot queda “sin token”.
+const dotenvOverride = !process.env.VERCEL;
 dotenv.config();
-// 2) server/.env
 const serverEnv = path.join(serverDir, ".env");
-if (fs.existsSync(serverEnv)) dotenv.config({ path: serverEnv, override: true });
-// 3) raíz del proyecto .env (set-supabase-url.cjs escribe aquí)
+if (fs.existsSync(serverEnv)) dotenv.config({ path: serverEnv, override: dotenvOverride });
 const rootEnv = path.join(projectRoot, ".env");
-if (fs.existsSync(rootEnv)) dotenv.config({ path: rootEnv, override: true });
-// 4) raíz .env.local (secretos locales frecuentes con Vite)
+if (fs.existsSync(rootEnv)) dotenv.config({ path: rootEnv, override: dotenvOverride });
 const rootLocal = path.join(projectRoot, ".env.local");
-if (fs.existsSync(rootLocal)) dotenv.config({ path: rootLocal, override: true });
-// 5) Resend solo (gitignored); evita mezclar con el .env principal
+if (fs.existsSync(rootLocal)) dotenv.config({ path: rootLocal, override: dotenvOverride });
 const resendLocal = path.join(projectRoot, ".env.resend.local");
-if (fs.existsSync(resendLocal)) dotenv.config({ path: resendLocal, override: true });
+if (fs.existsSync(resendLocal)) dotenv.config({ path: resendLocal, override: dotenvOverride });
 
 applyLegacyHashratePublicUrlEnv();
 

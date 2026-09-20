@@ -29,6 +29,13 @@ const CATEGORIES = [
 
 type CategoryId = (typeof CATEGORIES)[number]["id"];
 
+type TgSettings = {
+  enabled: boolean;
+  chatId: string;
+  chatIds: string[];
+  botToken: string;
+};
+
 function categoryLabel(id: string): string {
   return CATEGORIES.find((c) => c.id === id)?.label ?? "Operaciones";
 }
@@ -101,6 +108,16 @@ async function ensureOpsComunicacionSchema(): Promise<void> {
   await db
     .prepare("CREATE INDEX IF NOT EXISTS idx_sgi_ops_comunicacion_created ON sgi_ops_comunicacion(created_at DESC, id DESC)")
     .run();
+  if (db.isPostgres) {
+    await db.prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS bot_token TEXT NOT NULL DEFAULT ''").run();
+  } else {
+    try {
+      await db.prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN bot_token TEXT NOT NULL DEFAULT ''").run();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!/duplicate column/i.test(msg)) throw e;
+    }
+  }
   schemaEnsured = true;
 }
 
@@ -130,31 +147,40 @@ function parseExtraChatIds(raw: unknown): string[] {
   return uniqueChatIds(s.split(/[,\n;]+/));
 }
 
-type TgSettings = { enabled: boolean; chatId: string; chatIds: string[] };
-
 async function loadTgSettings(): Promise<TgSettings> {
   await ensureOpsComunicacionSchema();
   const row = (await db
-    .prepare("SELECT enabled, chat_id, extra_chat_ids FROM sgi_ops_comunicacion_tg WHERE id = 1")
-    .get()) as { enabled?: number | boolean; chat_id?: string; extra_chat_ids?: string } | undefined;
-  const enabled = row?.enabled === true || Number(row?.enabled) === 1;
-  const chatId = normalizeTelegramChatId(String(row?.chat_id ?? ""));
-  const extra = parseExtraChatIds(row?.extra_chat_ids);
+    .prepare("SELECT enabled, chat_id, extra_chat_ids, bot_token FROM sgi_ops_comunicacion_tg WHERE id = 1")
+    .get()) as Record<string, unknown> | undefined;
+  const r = row ? rowKeysToLowercase(row) : {};
+  const enabled = r.enabled === true || Number(r.enabled) === 1;
+  const chatId = normalizeTelegramChatId(String(r.chat_id ?? ""));
+  const extra = parseExtraChatIds(r.extra_chat_ids);
   const chatIds = uniqueChatIds([chatId, ...extra]);
-  return { enabled, chatId, chatIds };
+  const botToken = String(r.bot_token ?? "").trim();
+  return { enabled, chatId, chatIds, botToken };
 }
 
-async function saveTgSettings(input: { enabled: boolean; chatId: string }): Promise<TgSettings> {
+async function saveTgSettings(input: { enabled: boolean; chatId: string; botToken?: string }): Promise<TgSettings> {
   await ensureOpsComunicacionSchema();
   const ts = db.isPostgres ? "NOW()" : "datetime('now')";
-  await db
-    .prepare(`UPDATE sgi_ops_comunicacion_tg SET enabled = ?, chat_id = ?, updated_at = ${ts} WHERE id = 1`)
-    .run(input.enabled ? 1 : 0, input.chatId);
+  const nextToken = input.botToken != null ? String(input.botToken).trim() : "";
+  if (nextToken) {
+    await db
+      .prepare(
+        `UPDATE sgi_ops_comunicacion_tg SET enabled = ?, chat_id = ?, bot_token = ?, updated_at = ${ts} WHERE id = 1`
+      )
+      .run(input.enabled ? 1 : 0, input.chatId, nextToken);
+  } else {
+    await db
+      .prepare(`UPDATE sgi_ops_comunicacion_tg SET enabled = ?, chat_id = ?, updated_at = ${ts} WHERE id = 1`)
+      .run(input.enabled ? 1 : 0, input.chatId);
+  }
   return loadTgSettings();
 }
 
 function telegramPayload(settings: TgSettings) {
-  const bot = getOpsTelegramBotStatus();
+  const bot = getOpsTelegramBotStatus(settings.botToken);
   return {
     enabled: settings.enabled,
     chatId: settings.chatId,
@@ -183,8 +209,13 @@ function mapItem(raw: Record<string, unknown>) {
 }
 
 async function deliverToTelegram(titulo: string, cuerpo: string, categoria: string, imageUrl: string, dest: string[]) {
-  const token = opsComunicacionBotToken();
-  if (!token) throw new Error("Falta TELEGRAM_BOT_TOKEN (o TELEGRAM_OPS_BOT_TOKEN) en el servidor.");
+  const settings = await loadTgSettings();
+  const token = opsComunicacionBotToken(settings.botToken);
+  if (!token) {
+    throw new Error(
+      "Falta el token del bot. Pegalo en el engranaje de Comunicación y Guardar, o definí TELEGRAM_OPS_BOT_TOKEN en Vercel y hacé Redeploy."
+    );
+  }
   const html = formatOpsFarmTelegramHtml({
     title: titulo,
     body: cuerpo,
@@ -212,7 +243,7 @@ async function deliverToTelegram(titulo: string, cuerpo: string, categoria: stri
   }
   if (sent === 0) {
     const ident = await getTelegramBotIdentity(token).catch(() => null);
-    throw new Error(explainTelegramSendFailure(lastError || "No se pudo enviar", ident?.username || getOpsTelegramBotStatus().botUsernameHint));
+    throw new Error(explainTelegramSendFailure(lastError || "No se pudo enviar", ident?.username || getOpsTelegramBotStatus(settings.botToken).botUsernameHint));
   }
   return sent;
 }
@@ -231,6 +262,7 @@ const CreateSchema = z.object({
 const TgSchema = z.object({
   enabled: z.boolean(),
   chatId: z.string().optional().nullable(),
+  botToken: z.string().optional().nullable(),
 });
 
 opsComunicacionRouter.get("/ops-comunicacion", ...readMw, async (_req, res, next) => {
@@ -359,7 +391,11 @@ opsComunicacionRouter.post("/ops-comunicacion/telegram", ...writeMw, async (req,
         },
       });
     }
-    const saved = await saveTgSettings({ enabled: parsed.data.enabled, chatId });
+    const saved = await saveTgSettings({
+      enabled: parsed.data.enabled,
+      chatId,
+      botToken: parsed.data.botToken ?? undefined,
+    });
     res.json({ ok: true, ...telegramPayload(saved) });
   } catch (e) {
     next(e);
@@ -373,7 +409,13 @@ opsComunicacionRouter.post("/ops-comunicacion/telegram/test", ...writeMw, async 
     if (parsed.success) {
       const chatId = normalizeTelegramChatId(parsed.data.chatId != null ? String(parsed.data.chatId) : settings.chatId);
       const enabled = parsed.data.enabled ?? true;
-      if (chatId) settings = await saveTgSettings({ enabled, chatId });
+      if (chatId || parsed.data.botToken) {
+        settings = await saveTgSettings({
+          enabled,
+          chatId: chatId || settings.chatId,
+          botToken: parsed.data.botToken ?? undefined,
+        });
+      }
     }
     if (!settings.chatId) {
       return res.status(400).json({ error: { message: "Guardá primero un Chat ID de Telegram." } });
@@ -393,10 +435,14 @@ opsComunicacionRouter.post("/ops-comunicacion/telegram/test", ...writeMw, async 
 
 opsComunicacionRouter.get("/ops-comunicacion/telegram/chats", ...writeMw, async (_req, res, next) => {
   try {
-    const token = opsComunicacionBotToken();
+    const settings = await loadTgSettings();
+    const token = opsComunicacionBotToken(settings.botToken);
     if (!token) {
       return res.status(400).json({
-        error: { message: "Falta TELEGRAM_BOT_TOKEN (o TELEGRAM_OPS_BOT_TOKEN) en el servidor." },
+        error: {
+          message:
+            "Falta el token del bot. Pegá el token de @BotFather en este formulario y tocá Guardar; o cargá TELEGRAM_OPS_BOT_TOKEN en Vercel y hacé Redeploy.",
+        },
       });
     }
     const chats = await listRecentTelegramPrivateChats(10, token);
