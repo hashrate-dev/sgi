@@ -89,7 +89,8 @@ export function OpsComunicacionPage() {
         horario2To,
       })
     : plantilla;
-  const cuerpoFinal = (cuerpoOverride ?? (plantilla ? cuerpoLleno : cuerpo)).trim();
+  const cuerpoDraft = cuerpoOverride ?? (plantilla ? cuerpoLleno : cuerpo);
+  const cuerpoFinal = cuerpoDraft.trim();
   const modeloDirty = Boolean(
     tituloRow &&
       !mensajeLibre &&
@@ -255,8 +256,8 @@ export function OpsComunicacionPage() {
         <section className="crypto-news-hero hrs-card sgi-glass-panel">
           <div className="crypto-news-hero__top">
             <div>
-              <div className="crypto-news-kicker">Bot Telegram · Operaciones de granja</div>
-              <h1 className="crypto-news-hero__title">Comunicación de la granja</h1>
+              <div className="crypto-news-kicker">Bot Telegram · Operaciones Data Center</div>
+              <h1 className="crypto-news-hero__title">Comunicación de Data Center</h1>
               <p className="crypto-news-hero__lead">
                 Avisos internos de operaciones (energía, mantenimiento, hashrate). No mezcla con el wire de noticias de
                 mercado.
@@ -436,11 +437,12 @@ export function OpsComunicacionPage() {
                   <textarea
                     id="ops-cuerpo"
                     className="fact-input ops-com-textarea"
-                    value={cuerpoFinal}
+                    value={cuerpoDraft}
                     onChange={(e) => {
                       setCuerpoOverride(e.target.value);
                       if (!tituloRow) setCuerpo(e.target.value);
                     }}
+                    onKeyDown={(e) => e.stopPropagation()}
                     disabled={busy || titleBusy}
                     maxLength={8000}
                     rows={14}

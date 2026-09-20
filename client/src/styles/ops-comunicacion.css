@@ -51,6 +51,7 @@
 .ops-com-textarea {
   min-height: 14rem;
   resize: vertical;
+  white-space: pre-wrap;
 }
 
 .ops-com-model-save {
