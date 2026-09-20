@@ -68,6 +68,7 @@ export function OpsComunicacionPage() {
   const [messages, setMessages] = useState<OpsComunicacionMessage[]>([]);
   const [mensajeId, setMensajeId] = useState("");
   const [cuerpoOverride, setCuerpoOverride] = useState<string | null>(null);
+  const [mensajeLibre, setMensajeLibre] = useState(false);
   const prevTituloId = useRef("");
   const [fechaAviso, setFechaAviso] = useState(todayIso);
   const [horario1From, setHorario1From] = useState("9:00");
@@ -85,10 +86,12 @@ export function OpsComunicacionPage() {
   const tituloEsCorte = Boolean(tituloRow?.isBuiltin) || /corte programado/i.test(titulo);
   const corteMessage =
     messages.find((m) => m.isBuiltin) || messages.find((m) => /corte programado/i.test(m.nombre)) || null;
-  const selectedMessage = messages.find((m) => String(m.id) === mensajeId) || (tituloEsCorte ? corteMessage : null);
+  const selectedMessage =
+    messages.find((m) => String(m.id) === mensajeId) ||
+    (!mensajeLibre && tituloEsCorte ? corteMessage : null);
   const mensajeEsFijo =
     Boolean(selectedMessage?.isBuiltin) || /corte programado/i.test(selectedMessage?.nombre || "");
-  const plantilla = selectedMessage?.cuerpo || (tituloEsCorte ? CORTE_PROGRAMADO_CUERPO : "");
+  const plantilla = selectedMessage?.cuerpo || (!mensajeLibre && tituloEsCorte ? CORTE_PROGRAMADO_CUERPO : "");
   const usesSchedule = Boolean(plantilla && messageHasScheduleSlots(plantilla));
   const cuerpoLleno = usesSchedule
     ? fillOpsComunicacionMessage(plantilla, {
@@ -144,6 +147,7 @@ export function OpsComunicacionPage() {
     const switched = prevTituloId.current !== tituloId;
     prevTituloId.current = tituloId;
     if (!switched || !tituloEsCorte) return;
+    setMensajeLibre(false);
     if (corteMessage) setMensajeId(String(corteMessage.id));
     setCategoria("energia");
     setCuerpoOverride(null);
@@ -225,6 +229,21 @@ export function OpsComunicacionPage() {
     } finally {
       setTitleBusy(false);
     }
+  };
+
+  const onClearMensaje = () => {
+    setMensajeLibre(true);
+    setMensajeId("");
+    setCuerpo("");
+    setCuerpoOverride("");
+    setFechaAviso(todayIso());
+    setHorario1From("9:00");
+    setHorario1To("17:00");
+    setHorario2From("20:00");
+    setHorario2To("24:00");
+    setImageUrl("");
+    setErr("");
+    setOk("Mensaje en blanco. Elegí un modelo o escribí uno nuevo.");
   };
 
   const onSend = async (row: OpsComunicacionItem) => {
@@ -376,6 +395,7 @@ export function OpsComunicacionPage() {
                       setErr(msg);
                     }}
                     onChange={(id) => {
+                      setMensajeLibre(false);
                       setMensajeId(id);
                       setCuerpoOverride(null);
                       setErr("");
@@ -394,6 +414,7 @@ export function OpsComunicacionPage() {
                           : "Nuevo comunicado.\n\nCompletá el texto de este modelo.";
                       const r = await createOpsComunicacionMessage({ nombre, cuerpo: cuerpoNuevo });
                       const next = r.messages || [];
+                      setMensajeLibre(false);
                       setMessages(next);
                       setCuerpoOverride(null);
                       return {
@@ -507,10 +528,20 @@ export function OpsComunicacionPage() {
                     >
                       {titleBusy ? "Guardando…" : "Guardar cambios"}
                     </button>
+                    <button
+                      type="button"
+                      className="ops-com-clear-msg-btn"
+                      disabled={busy || titleBusy}
+                      onClick={onClearMensaje}
+                    >
+                      Empezar de cero
+                    </button>
                     <span className="ops-com-model-save__hint">
-                      {modeloDirty
-                        ? "Hay ediciones en el texto. Guardá para actualizar este modelo."
-                        : "El modelo coincide con el texto actual."}
+                      {mensajeLibre
+                        ? "Mensaje en blanco. Elegí un modelo o escribí el texto."
+                        : modeloDirty
+                          ? "Hay ediciones en el texto. Guardá para actualizar este modelo."
+                          : "El modelo coincide con el texto actual."}
                     </span>
                   </div>
                 </div>

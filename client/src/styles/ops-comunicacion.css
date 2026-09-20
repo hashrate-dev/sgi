@@ -81,6 +81,27 @@
   cursor: not-allowed;
 }
 
+.ops-com-clear-msg-btn {
+  min-height: 2.45rem;
+  padding: 0.45rem 1.05rem;
+  border: 1px solid rgba(248, 113, 113, 0.42);
+  border-radius: 0.55rem;
+  background: rgba(127, 29, 29, 0.22);
+  color: #fecaca;
+  font-weight: 750;
+  font-size: 0.88rem;
+}
+
+.ops-com-clear-msg-btn:hover:not(:disabled) {
+  background: rgba(185, 28, 28, 0.35);
+  color: #fff;
+}
+
+.ops-com-clear-msg-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .ops-com-model-save__hint {
   font-size: 0.78rem;
   color: rgba(186, 230, 253, 0.72);
