@@ -536,13 +536,23 @@ export function OpsComunicacionPage() {
         ) : (
           <section className="crypto-news-grid" aria-label="Historial de comunicación granja">
             {items.map((n) => (
-              <article key={n.id} className="crypto-news-card">
+              <article key={n.id} className="crypto-news-card ops-com-hist">
                 <div className="crypto-news-card__body">
                   <div className="crypto-news-card__meta">
                     <span className="crypto-news-source">{n.categoriaLabel}</span>
                     <time dateTime={n.createdAt}>{timeAgo(n.createdAt)}</time>
                   </div>
-                  <h3 className="crypto-news-card__title">{n.titulo}</h3>
+                  <div className="ops-com-hist__head">
+                    <span className="ops-com-hist__mark" title="Aviso" aria-hidden>
+                      <svg viewBox="0 0 24 24" width="20" height="20">
+                        <path
+                          fill="currentColor"
+                          d="M12 2.4 22 21H2L12 2.4Zm0 4.2L5.2 19.2h13.6L12 6.6ZM11 10.2h2v4.6h-2v-4.6Zm0 5.8h2V18h-2v-2Z"
+                        />
+                      </svg>
+                    </span>
+                    <h3 className="crypto-news-card__title">{n.titulo}</h3>
+                  </div>
                   {n.cuerpo ? <p className="crypto-news-card__summary">{n.cuerpo}</p> : null}
                   <div className="crypto-news-card__actions">
                     <span className={`crypto-news-send-tg${n.telegramSent ? " crypto-news-send-tg--sent" : ""}`}>
