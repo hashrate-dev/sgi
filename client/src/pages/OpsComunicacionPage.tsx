@@ -58,6 +58,7 @@ export function OpsComunicacionPage() {
   const [ok, setOk] = useState("");
   const [configOpen, setConfigOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [histOpen, setHistOpen] = useState<OpsComunicacionItem | null>(null);
   const [tituloId, setTituloId] = useState("");
   const [titles, setTitles] = useState<OpsComunicacionTitle[]>([]);
   const [titleBusy, setTitleBusy] = useState(false);
@@ -124,6 +125,20 @@ export function OpsComunicacionPage() {
     if (!canAccessComunicacionModule(user) && !canUserAccessNavPath(user, PATH)) return;
     void load();
   }, [loading, user, load]);
+
+  useEffect(() => {
+    if (!histOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setHistOpen(null);
+    };
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [histOpen]);
 
   useEffect(() => {
     const switched = prevTituloId.current !== tituloId;
@@ -526,6 +541,44 @@ export function OpsComunicacionPage() {
           }
           imageUrl={imageUrl}
         />
+        {histOpen ? (
+          <div
+            className="ops-tg-preview"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ops-hist-full-title"
+            onMouseDown={() => setHistOpen(null)}
+          >
+            <div className="ops-tg-preview__dialog ops-com-hist-modal" onMouseDown={(e) => e.stopPropagation()}>
+              <div className="ops-tg-preview__bar">
+                <p className="ops-tg-preview__bar-title">Mensaje completo</p>
+                <button type="button" className="ops-tg-preview__close" onClick={() => setHistOpen(null)}>
+                  Cerrar
+                </button>
+              </div>
+              <div className="ops-com-hist-modal__panel">
+                <div className="ops-com-hist-modal__head">
+                  <span className="ops-com-hist__mark" title="Aviso" aria-hidden>
+                    <svg viewBox="0 0 24 24" width="20" height="20">
+                      <path
+                        fill="currentColor"
+                        d="M12 2.4 22 21H2L12 2.4Zm0 4.2L5.2 19.2h13.6L12 6.6ZM11 10.2h2v4.6h-2v-4.6Zm0 5.8h2V18h-2v-2Z"
+                      />
+                    </svg>
+                  </span>
+                  <div>
+                    <h2 id="ops-hist-full-title">{histOpen.titulo}</h2>
+                    <p className="ops-com-hist-modal__meta">
+                      {histOpen.categoriaLabel} · {timeAgo(histOpen.createdAt)}
+                      {histOpen.telegramSent ? " · Enviado" : " · Pendiente"}
+                    </p>
+                  </div>
+                </div>
+                <p className="ops-com-hist-modal__body">{histOpen.cuerpo || "Sin texto."}</p>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {tableLoading ? (
           <div className="crypto-news-loading text-muted">Cargando historial…</div>
@@ -558,6 +611,9 @@ export function OpsComunicacionPage() {
                     <span className={`crypto-news-send-tg${n.telegramSent ? " crypto-news-send-tg--sent" : ""}`}>
                       {n.telegramSent ? "Ya enviado" : "Pendiente"}
                     </span>
+                    <button type="button" className="ops-com-hist-full" onClick={() => setHistOpen(n)}>
+                      Ver completo
+                    </button>
                     {canEdit && !n.telegramSent ? (
                       <button
                         type="button"

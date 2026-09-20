@@ -514,23 +514,86 @@
 
 .ops-com-hist .crypto-news-card__summary {
   color: rgba(241, 245, 249, 0.9);
-  display: block;
-  -webkit-line-clamp: unset;
-  overflow: visible;
-  min-height: 0;
-  flex: 1 1 auto;
-  white-space: pre-wrap;
-  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: normal;
+  min-height: calc(1.45em * 3);
+  flex: 0 1 auto;
   margin-bottom: 0.65rem;
 }
 
 .ops-com-hist {
-  height: auto;
+  height: 100%;
   min-height: 17.5rem;
 }
 
 .ops-com-hist .crypto-news-card__actions {
   margin-top: auto;
+}
+
+.ops-com-hist-full {
+  appearance: none;
+  border: 1px solid rgba(250, 204, 21, 0.4);
+  background: rgba(250, 204, 21, 0.12);
+  color: #fde68a;
+  font-weight: 650;
+  font-size: 0.82rem;
+  border-radius: 0.4rem;
+  padding: 0.22rem 0.55rem;
+  cursor: pointer;
+}
+
+.ops-com-hist-full:hover {
+  border-color: rgba(250, 204, 21, 0.7);
+  color: #fff;
+}
+
+.ops-com-hist-modal {
+  width: min(36rem, 100%);
+}
+
+.ops-com-hist-modal__panel {
+  border-radius: 1rem;
+  border: 1px solid rgba(125, 211, 252, 0.28);
+  background: #0e1a22;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+.ops-com-hist-modal__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 1rem 1.05rem 0.75rem;
+  border-bottom: 1px solid rgba(125, 211, 252, 0.16);
+}
+
+.ops-com-hist-modal__head h2 {
+  margin: 0;
+  font-size: 1.12rem;
+  font-weight: 750;
+  color: #f8fafc;
+  line-height: 1.3;
+}
+
+.ops-com-hist-modal__meta {
+  margin: 0.28rem 0 0;
+  font-size: 0.78rem;
+  color: rgba(186, 230, 253, 0.75);
+}
+
+.ops-com-hist-modal__body {
+  margin: 0;
+  padding: 1rem 1.1rem 1.2rem;
+  max-height: min(62vh, 32rem);
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: #e8eef4;
 }
 
 .ops-com-hist__head {
