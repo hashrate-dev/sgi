@@ -30,6 +30,7 @@ import "../styles/crypto-noticias.css";
 import "../styles/ops-comunicacion.css";
 
 const DEFAULT_TG_HEADER = "Comunicación granja HRS";
+const DEFAULT_TG_CIERRE = "Hashrate Space\nhashrate.space";
 const PATH = "/gestion-administrativa/comunicacion";
 
 function todayIso(): string {
@@ -107,9 +108,10 @@ export function OpsComunicacionPage() {
   const [categoria, setCategoria] = useState("general");
   const [telegramHeader, setTelegramHeader] = useState(DEFAULT_TG_HEADER);
   const [headerDraft, setHeaderDraft] = useState(DEFAULT_TG_HEADER);
+  const [telegramCierre, setTelegramCierre] = useState(DEFAULT_TG_CIERRE);
+  const [cierreDraft, setCierreDraft] = useState(DEFAULT_TG_CIERRE);
   const [categoryLabelDraft, setCategoryLabelDraft] = useState("Operaciones");
   const [copyBusy, setCopyBusy] = useState(false);
-  const [imageUrl, setImageUrl] = useState("");
   const [sendNow, setSendNow] = useState(true);
   const [scheduleDate, setScheduleDate] = useState(() => defaultScheduleParts().date);
   const [scheduleTime, setScheduleTime] = useState(() => defaultScheduleParts().time);
@@ -152,7 +154,8 @@ export function OpsComunicacionPage() {
   const savedCategoryLabel = categories.find((c) => c.id === categoria)?.label || "";
   const copyDirty =
     headerDraft.replace(/\s+/g, " ").trim() !== telegramHeader.replace(/\s+/g, " ").trim() ||
-    categoryLabelDraft.replace(/\s+/g, " ").trim() !== savedCategoryLabel.replace(/\s+/g, " ").trim();
+    categoryLabelDraft.replace(/\s+/g, " ").trim() !== savedCategoryLabel.replace(/\s+/g, " ").trim() ||
+    cierreDraft.replace(/\r\n/g, "\n").trim() !== telegramCierre.replace(/\r\n/g, "\n").trim();
 
   const load = useCallback(async () => {
     setTableLoading(true);
@@ -163,6 +166,9 @@ export function OpsComunicacionPage() {
       const header = (res.telegramHeader || DEFAULT_TG_HEADER).trim() || DEFAULT_TG_HEADER;
       setTelegramHeader(header);
       setHeaderDraft(header);
+      const cierre = String(res.telegramCierre || "").replace(/\r\n/g, "\n").trim() || DEFAULT_TG_CIERRE;
+      setTelegramCierre(cierre);
+      setCierreDraft(cierre);
       setTelegramRecipientCount(res.telegramRecipientCount || res.telegramRecipients?.length || 0);
       const nextTitles = res.titles || [];
       setTitles(nextTitles);
@@ -221,7 +227,7 @@ export function OpsComunicacionPage() {
       void translateOpsComunicacion(snapshot)
         .then((r) => {
           if (seq !== cuerpoEnSeq.current) return;
-          setCuerpoEn(String(r.text || ""));
+          setCuerpoEn(String(r.text || "").replace(/\r\n/g, "\n").trim());
         })
         .catch(() => {
           /* se deja el inglés anterior */
@@ -300,11 +306,28 @@ export function OpsComunicacionPage() {
     }
     setBusy(true);
     try {
+      if (copyDirty) {
+        const header = headerDraft.replace(/\s+/g, " ").trim() || DEFAULT_TG_HEADER;
+        const tipo = categoryLabelDraft.replace(/\s+/g, " ").trim();
+        const saved = await putOpsComunicacionCopy({
+          telegramHeader: header,
+          telegramCierre: cierreDraft.replace(/\r\n/g, "\n").trim() || DEFAULT_TG_CIERRE,
+          categories: (categories.length ? categories : [{ id: categoria, label: tipo }]).map((c) =>
+            c.id === categoria && tipo ? { ...c, label: tipo } : c
+          ),
+        });
+        setTelegramHeader(saved.telegramHeader || header);
+        setHeaderDraft(saved.telegramHeader || header);
+        const cierre = String(saved.telegramCierre || "").replace(/\r\n/g, "\n").trim() || DEFAULT_TG_CIERRE;
+        setTelegramCierre(cierre);
+        setCierreDraft(cierre);
+        if (saved.categories?.length) setCategories(saved.categories);
+      }
       const r = await createOpsComunicacion({
         titulo: titulo.trim(),
         cuerpo: cuerpoFinal,
         categoria,
-        imageUrl: imageUrl.trim(),
+        imageUrl: "",
         sendNow,
         ...(scheduledAt ? { scheduledAt } : {}),
         ...(tituloEsCorte || usesSchedule
@@ -327,7 +350,6 @@ export function OpsComunicacionPage() {
             ? `Publicación programada para ${scheduleDate} ${scheduleTime}.`
             : "Comunicado guardado. Todavía no se envió a Telegram."
       );
-      setImageUrl("");
       setCuerpoOverride(null);
       await load();
     } catch (e2) {
@@ -383,7 +405,6 @@ export function OpsComunicacionPage() {
     setHorario1To("17:00");
     setHorario2From("20:00");
     setHorario2To("24:00");
-    setImageUrl("");
     setErr("");
     setOk("Mensaje en blanco. Escribí uno nuevo o volvé a elegir el título.");
   };
@@ -406,6 +427,7 @@ export function OpsComunicacionPage() {
     try {
       const r = await putOpsComunicacionCopy({
         telegramHeader: header,
+        telegramCierre: cierreDraft.replace(/\r\n/g, "\n").trim() || DEFAULT_TG_CIERRE,
         categories: (categories.length
           ? categories
           : [{ id: categoria, label: tipo }]
@@ -414,7 +436,10 @@ export function OpsComunicacionPage() {
       setCategories(r.categories || []);
       setTelegramHeader(r.telegramHeader || header);
       setHeaderDraft(r.telegramHeader || header);
-      setOk("Textos de Telegram guardados. Los próximos envíos usan este encabezado y tipo.");
+      const cierre = String(r.telegramCierre || "").replace(/\r\n/g, "\n").trim() || DEFAULT_TG_CIERRE;
+      setTelegramCierre(cierre);
+      setCierreDraft(cierre);
+      setOk("Textos de Telegram guardados. Los próximos envíos usan este encabezado, tipo y cierre.");
     } catch (e) {
       setErr(e instanceof Error ? e.message : "No se pudieron guardar los textos de Telegram.");
     } finally {
@@ -587,7 +612,7 @@ export function OpsComunicacionPage() {
                     {copyBusy ? "Guardando…" : "Guardar textos"}
                   </button>
                   <span className="ops-com-model-save__hint">
-                    {copyDirty ? "Hay cambios en el encabezado o el tipo." : "Así se ve ahora en Telegram."}
+                    {copyDirty ? "Hay cambios en el encabezado, el tipo o el cierre." : "Así se ve ahora en Telegram."}
                   </span>
                 </div>
               </fieldset>
@@ -770,6 +795,29 @@ export function OpsComunicacionPage() {
                       />
                     </div>
                   </div>
+                  <div className="ops-com-cierre">
+                    <label htmlFor="ops-cierre" className="ops-com-body-split__label">
+                      Cierre (abajo de todo en Telegram)
+                    </label>
+                    <textarea
+                      id="ops-cierre"
+                      className="fact-input ops-com-textarea ops-com-textarea--cierre"
+                      value={cierreDraft}
+                      onChange={(e) => setCierreDraft(e.target.value)}
+                      onBlur={() => {
+                        if (!canEdit || copyBusy) return;
+                        if (cierreDraft.replace(/\r\n/g, "\n").trim() === telegramCierre.replace(/\r\n/g, "\n").trim()) {
+                          return;
+                        }
+                        void onSaveCopy();
+                      }}
+                      onKeyDown={(e) => e.stopPropagation()}
+                      disabled={busy || copyBusy}
+                      maxLength={400}
+                      rows={3}
+                      placeholder={"Hashrate Space\nhashrate.space"}
+                    />
+                  </div>
                   <div className="ops-com-model-save">
                     <button
                       type="button"
@@ -796,18 +844,6 @@ export function OpsComunicacionPage() {
                     </span>
                   </div>
                 </div>
-              </div>
-              <div className="ops-com-field">
-                <label htmlFor="ops-img">Imagen (URL, opcional)</label>
-                <input
-                  id="ops-img"
-                  className="fact-input"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  disabled={busy}
-                  placeholder="https://…"
-                  autoComplete="off"
-                />
               </div>
               <div className="ops-com-actions">
                 <div className="ops-com-publish">
@@ -886,13 +922,12 @@ export function OpsComunicacionPage() {
           open={previewOpen}
           onClose={() => setPreviewOpen(false)}
           title={titulo.trim()}
-          body={composeBilingualOpsCuerpo(cuerpoFinal, cuerpoEn)}
+          body={composeBilingualOpsCuerpo(cuerpoFinal, cuerpoEn, cierreDraft)}
           headerLine={headerDraft}
           categoryLabel={
             categoryLabelDraft.trim() ||
             (categories.find((c) => c.id === categoria) || { label: "Operaciones" }).label
           }
-          imageUrl={imageUrl}
         />
         {queueOpen ? (
           <div

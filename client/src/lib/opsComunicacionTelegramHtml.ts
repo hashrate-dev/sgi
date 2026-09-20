@@ -10,13 +10,18 @@ function escapeTelegramHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-/** El texto de la izquierda (ES) y la réplica de la derecha (EN), uno debajo del otro. */
-export function composeBilingualOpsCuerpo(es: string, en: string): string {
+/** Español, inglés y cierre de firma, en ese orden (el cierre queda al final del Telegram). */
+export function composeBilingualOpsCuerpo(es: string, en: string, cierre?: string): string {
   const left = String(es || "").replace(/\r\n/g, "\n").trim();
   const right = String(en || "").replace(/\r\n/g, "\n").trim();
-  if (!left && !right) return "";
-  if (!right || right === left) return left;
-  return `${left}\n\n────────\n\n${right}`;
+  const sign = String(cierre || "").replace(/\r\n/g, "\n").trim();
+  const parts: string[] = [];
+  if (left) parts.push(left);
+  if (right && right !== left) parts.push(`────────\n\n${right}`);
+  const core = parts.join("\n\n");
+  if (!sign) return core;
+  if (!core) return sign;
+  return `${core}\n\n${sign}`;
 }
 
 /** Misma plantilla HTML que envía el backend a Telegram. */

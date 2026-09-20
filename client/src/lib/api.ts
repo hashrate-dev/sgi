@@ -2548,6 +2548,7 @@ export function getOpsComunicacion(): Promise<{
   items: OpsComunicacionItem[];
   categories: Array<{ id: string; label: string }>;
   telegramHeader?: string;
+  telegramCierre?: string;
   telegramRecipientCount?: number;
   telegramRecipients?: OpsComunicacionTelegramRecipient[];
   titles?: OpsComunicacionTitle[];
@@ -2558,8 +2559,14 @@ export function getOpsComunicacion(): Promise<{
 
 export function putOpsComunicacionCopy(body: {
   telegramHeader: string;
+  telegramCierre: string;
   categories: Array<{ id: string; label: string }>;
-}): Promise<{ ok: boolean; telegramHeader: string; categories: Array<{ id: string; label: string }> }> {
+}): Promise<{
+  ok: boolean;
+  telegramHeader: string;
+  telegramCierre: string;
+  categories: Array<{ id: string; label: string }>;
+}> {
   return api("/api/ops-comunicacion/copy", { method: "POST", body: JSON.stringify(body) });
 }
 

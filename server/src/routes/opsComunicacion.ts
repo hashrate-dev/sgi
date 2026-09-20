@@ -41,11 +41,12 @@ const CATEGORIES = [
 ] as const;
 
 const DEFAULT_TG_HEADER = "Comunicación granja HRS";
+const DEFAULT_TG_CIERRE = "Hashrate Space\nhashrate.space";
 const CATEGORY_ID_ENUM = ["general", "energia", "mantenimiento", "hashrate", "clima", "logistica"] as const;
 
 type CategoryId = (typeof CATEGORIES)[number]["id"];
 type OpsCategory = { id: CategoryId; label: string };
-type CopySettings = { telegramHeader: string; categories: OpsCategory[] };
+type CopySettings = { telegramHeader: string; telegramCierre: string; categories: OpsCategory[] };
 
 type OpsRecipient = { chatId: string; name: string; username?: string; poolUser?: string };
 
@@ -88,6 +89,15 @@ function mergeCategoryLabels(rawJson: unknown): OpsCategory[] {
   });
 }
 
+function normalizeCierre(raw: unknown): string {
+  const t = String(raw ?? "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\u0000/g, "")
+    .trim();
+  if (!t) return DEFAULT_TG_CIERRE;
+  return t.slice(0, 400);
+}
+
 function categoryLabel(id: string, cats?: OpsCategory[]): string {
   const list = cats && cats.length ? cats : [...CATEGORIES];
   return list.find((c) => c.id === id)?.label ?? "Operaciones";
@@ -96,24 +106,33 @@ function categoryLabel(id: string, cats?: OpsCategory[]): string {
 async function loadCopySettings(): Promise<CopySettings> {
   await ensureOpsComunicacionSchema();
   const row = (await db
-    .prepare("SELECT telegram_header, categories_json FROM sgi_ops_comunicacion_tg WHERE id = 1")
+    .prepare("SELECT telegram_header, telegram_cierre, categories_json FROM sgi_ops_comunicacion_tg WHERE id = 1")
     .get()) as Record<string, unknown> | undefined;
   const r = row ? rowKeysToLowercase(row) : {};
   const telegramHeader = normalizeHeaderLine(String(r.telegram_header ?? "")) || DEFAULT_TG_HEADER;
-  return { telegramHeader, categories: mergeCategoryLabels(r.categories_json) };
+  return {
+    telegramHeader,
+    telegramCierre: normalizeCierre(r.telegram_cierre),
+    categories: mergeCategoryLabels(r.categories_json),
+  };
 }
 
-async function saveCopySettings(input: { telegramHeader: string; categories: OpsCategory[] }): Promise<CopySettings> {
+async function saveCopySettings(input: {
+  telegramHeader: string;
+  telegramCierre: string;
+  categories: OpsCategory[];
+}): Promise<CopySettings> {
   await ensureOpsComunicacionSchema();
   const header = normalizeHeaderLine(input.telegramHeader) || DEFAULT_TG_HEADER;
+  const telegramCierre = normalizeCierre(input.telegramCierre);
   const categories = mergeCategoryLabels(JSON.stringify(input.categories));
   const ts = db.isPostgres ? "NOW()" : "datetime('now')";
   await db
     .prepare(
-      `UPDATE sgi_ops_comunicacion_tg SET telegram_header = ?, categories_json = ?, updated_at = ${ts} WHERE id = 1`
+      `UPDATE sgi_ops_comunicacion_tg SET telegram_header = ?, telegram_cierre = ?, categories_json = ?, updated_at = ${ts} WHERE id = 1`
     )
-    .run(header, JSON.stringify(categories));
-  return { telegramHeader: header, categories };
+    .run(header, telegramCierre, JSON.stringify(categories));
+  return { telegramHeader: header, telegramCierre, categories };
 }
 
 let schemaEnsured = false;
@@ -191,6 +210,9 @@ async function ensureOpsComunicacionSchema(): Promise<void> {
       .prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS telegram_header TEXT NOT NULL DEFAULT ''")
       .run();
     await db
+      .prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS telegram_cierre TEXT NOT NULL DEFAULT ''")
+      .run();
+    await db
       .prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS categories_json TEXT NOT NULL DEFAULT ''")
       .run();
     await db
@@ -249,6 +271,7 @@ async function ensureOpsComunicacionSchema(): Promise<void> {
       "ALTER TABLE sgi_ops_comunicacion_titulos ADD COLUMN cuerpo TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE sgi_ops_comunicacion_mensajes ADD COLUMN is_builtin INTEGER NOT NULL DEFAULT 0",
       "ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN telegram_header TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN telegram_cierre TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN categories_json TEXT NOT NULL DEFAULT ''",
     ]) {
       try {
@@ -281,6 +304,9 @@ async function ensureOpsComunicacionSchema(): Promise<void> {
     await db.prepare("ALTER TABLE sgi_ops_comunicacion_mensajes ADD COLUMN IF NOT EXISTS is_builtin INTEGER NOT NULL DEFAULT 0").run();
     await db
       .prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS telegram_header TEXT NOT NULL DEFAULT ''")
+      .run();
+    await db
+      .prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS telegram_cierre TEXT NOT NULL DEFAULT ''")
       .run();
     await db
       .prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS categories_json TEXT NOT NULL DEFAULT ''")
@@ -377,9 +403,7 @@ Por alta demanda energética y restricciones informadas por ANDE, hoy {{FECHA}} 
 {{HORARIOS}}
 
 Esta medida es ajena a Hashrate Space y responde a disposiciones del proveedor eléctrico.
-Quedamos a disposición ante cualquier consulta.
-
-https://www.hashrate.space`;
+Quedamos a disposición ante cualquier consulta.`;
 
 async function seedOpsComunicacionCatalog(): Promise<void> {
   const ts = db.isPostgres ? "NOW()" : "datetime('now')";
@@ -401,6 +425,7 @@ async function seedOpsComunicacionCatalog(): Promise<void> {
                  WHEN TRIM(COALESCE(cuerpo, '')) = ''
                    OR cuerpo LIKE '%Debido a la alta demanda energética%'
                    OR cuerpo LIKE '%Agradecemos su comprensión%'
+                   OR cuerpo LIKE '%https://www.hashrate.space%'
                  THEN ?
                  ELSE cuerpo
                END
@@ -462,6 +487,7 @@ async function seedOpsComunicacionCatalog(): Promise<void> {
                  WHEN TRIM(COALESCE(cuerpo, '')) = ''
                    OR cuerpo LIKE '%Debido a la alta demanda energética%'
                    OR cuerpo LIKE '%Agradecemos su comprensión%'
+                   OR cuerpo LIKE '%https://www.hashrate.space%'
                  THEN ?
                  ELSE cuerpo
                END
@@ -670,7 +696,7 @@ async function deliverToTelegram(titulo: string, cuerpo: string, categoria: stri
   const cuerpoEn = await translateEsToEn(cuerpo);
   const html = formatOpsFarmTelegramHtml({
     title: titulo,
-    body: composeBilingualOpsCuerpo(cuerpo, cuerpoEn),
+    body: composeBilingualOpsCuerpo(cuerpo, cuerpoEn, copy.telegramCierre),
     categoryLabel: categoryLabel(categoria, copy.categories),
     headerLine: copy.telegramHeader,
   });
@@ -1132,6 +1158,7 @@ opsComunicacionRouter.get("/ops-comunicacion", ...readMw, async (_req, res, next
       }),
       categories: copy.categories,
       telegramHeader: copy.telegramHeader,
+      telegramCierre: copy.telegramCierre,
       telegramRecipientCount: settings.chatIds.length,
       telegramRecipients: settings.recipients,
       titles,
@@ -1623,6 +1650,7 @@ opsComunicacionRouter.post("/ops-comunicacion/copy", ...writeMw, async (req, res
     const parsed = z
       .object({
         telegramHeader: z.string().max(80),
+        telegramCierre: z.string().max(400).optional(),
         categories: z
           .array(
             z.object({
@@ -1641,9 +1669,15 @@ opsComunicacionRouter.post("/ops-comunicacion/copy", ...writeMw, async (req, res
     }
     const copy = await saveCopySettings({
       telegramHeader: parsed.data.telegramHeader,
+      telegramCierre: parsed.data.telegramCierre ?? DEFAULT_TG_CIERRE,
       categories: parsed.data.categories,
     });
-    res.json({ ok: true, telegramHeader: copy.telegramHeader, categories: copy.categories });
+    res.json({
+      ok: true,
+      telegramHeader: copy.telegramHeader,
+      telegramCierre: copy.telegramCierre,
+      categories: copy.categories,
+    });
   } catch (e) {
     next(e);
   }

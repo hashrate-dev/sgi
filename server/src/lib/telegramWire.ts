@@ -209,12 +209,17 @@ export function normalizeTelegramChatId(raw: string | null | undefined): string 
   return t.replace(/\s+/g, "");
 }
 
-export function composeBilingualOpsCuerpo(es: string, en: string): string {
+export function composeBilingualOpsCuerpo(es: string, en: string, cierre?: string): string {
   const left = String(es || "").replace(/\r\n/g, "\n").trim();
   const right = String(en || "").replace(/\r\n/g, "\n").trim();
-  if (!left && !right) return "";
-  if (!right || right === left) return left;
-  return `${left}\n\n────────\n\n${right}`;
+  const sign = String(cierre || "").replace(/\r\n/g, "\n").trim();
+  const parts: string[] = [];
+  if (left) parts.push(left);
+  if (right && right !== left) parts.push(`────────\n\n${right}`);
+  const core = parts.join("\n\n");
+  if (!sign) return core;
+  if (!core) return sign;
+  return `${core}\n\n${sign}`;
 }
 
 export function formatOpsFarmTelegramHtml(opts: {

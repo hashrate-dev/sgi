@@ -290,6 +290,18 @@
   color: #dbeafe !important;
 }
 
+.ops-com-cierre {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.15rem;
+}
+
+.ops-com-textarea--cierre {
+  min-height: 4.6rem;
+  height: 4.6rem;
+}
+
 @media (max-width: 860px) {
   .ops-com-body-split {
     grid-template-columns: 1fr;

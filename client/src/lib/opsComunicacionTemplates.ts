@@ -7,9 +7,7 @@ Por alta demanda energética y restricciones informadas por ANDE, hoy {{FECHA}} 
 {{HORARIOS}}
 
 Esta medida es ajena a Hashrate Space y responde a disposiciones del proveedor eléctrico.
-Quedamos a disposición ante cualquier consulta.
-
-https://www.hashrate.space`;
+Quedamos a disposición ante cualquier consulta.`;
 
 export const OPS_COM_FECHA = "{{FECHA}}";
 export const OPS_COM_HORARIOS = "{{HORARIOS}}";

@@ -497,6 +497,7 @@ INSERT OR IGNORE INTO sgi_ops_comunicacion_corte_seq (id, next_num) VALUES (1, 0
   for (const col of [
     "bot_token TEXT NOT NULL DEFAULT ''",
     "telegram_header TEXT NOT NULL DEFAULT ''",
+    "telegram_cierre TEXT NOT NULL DEFAULT ''",
     "categories_json TEXT NOT NULL DEFAULT ''",
   ] as const) {
     try {
