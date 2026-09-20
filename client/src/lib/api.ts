@@ -2600,6 +2600,10 @@ export function deleteOpsComunicacionMessage(id: number): Promise<{ ok: boolean;
   return api(`/api/ops-comunicacion/mensajes/${id}`, { method: "DELETE" });
 }
 
+export function translateOpsComunicacion(text: string): Promise<{ ok: boolean; text: string }> {
+  return api("/api/ops-comunicacion/translate", { method: "POST", body: JSON.stringify({ text }) });
+}
+
 export function createOpsComunicacion(body: {
   titulo: string;
   cuerpo?: string;

@@ -2,24 +2,13 @@ export const CORTE_PROGRAMADO_NOMBRE = "Corte Programado";
 
 export const CORTE_PROGRAMADO_CUERPO = `Estimados clientes,
 
-Debido a la alta demanda energética y a restricciones operativas
-informadas por la empresa estatal proveedora de energía ANDE, les
-comunicamos que hoy {{FECHA}} se realizará una reducción
-temporal del suministro eléctrico en 23 kV, limitándose al 10% de la
-potencia reservada, en los siguientes horarios:
+Por alta demanda energética y restricciones informadas por ANDE, hoy {{FECHA}} se realizará una reducción temporal del suministro eléctrico en 23 kV, limitándose al 10% de la potencia reservada.
 
 {{HORARIOS}}
 
-Esta medida es ajena a nuestra operación y responde a disposiciones del
-proveedor eléctrico.
-Agradecemos su comprensión y quedamos a disposición ante cualquier consulta.
+Esta medida es ajena a Hashrate Space y responde a disposiciones del proveedor eléctrico.
+Quedamos a disposición ante cualquier consulta.
 
-Muchas gracias,
-Equipo de Hashrate Space
-
---
-Notificaciones
-Hashrate Space - Clientes
 https://www.hashrate.space`;
 
 export const OPS_COM_FECHA = "{{FECHA}}";
@@ -41,11 +30,11 @@ export function formatOpsFechaEs(isoDate: string): string {
   return `${weekday} ${m[3]}/${m[2]}/${m[1]}`;
 }
 
-export function formatOpsHorarioLine(from: string, to: string): string {
+export function formatOpsHorarioLine(from: string, to: string, label = ""): string {
   const a = String(from || "").trim();
   const b = String(to || "").trim();
   if (!a || !b) return "";
-  return `•  ${a} hs a ${b} hs`;
+  return label ? `• ${label}: ${a} a ${b} hs` : `• ${a} a ${b} hs`;
 }
 
 export function formatOpsHorariosBlock(opts: {
@@ -54,21 +43,18 @@ export function formatOpsHorariosBlock(opts: {
   horario2From: string;
   horario2To: string;
 }): string {
-  const manana = formatOpsHorarioLine(opts.horario1From, opts.horario1To);
-  const tarde = formatOpsHorarioLine(opts.horario2From, opts.horario2To);
+  const manana = formatOpsHorarioLine(opts.horario1From, opts.horario1To, "Mañana");
+  const tarde = formatOpsHorarioLine(opts.horario2From, opts.horario2To, "Tarde");
   if (manana && tarde) {
     return [
-      "Etapa mañana",
+      "Horarios (UTC-3)",
       manana,
-      "",
-      "Etapa tarde",
       tarde,
-      "",
       "Entre ambas etapas el suministro se restablece un rato.",
     ].join("\n");
   }
-  if (manana) return ["Etapa mañana", manana].join("\n");
-  if (tarde) return ["Etapa tarde", tarde].join("\n");
+  if (manana) return ["Horarios (UTC-3)", manana].join("\n");
+  if (tarde) return ["Horarios (UTC-3)", tarde].join("\n");
   return "";
 }
 

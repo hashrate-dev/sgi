@@ -66,10 +66,10 @@ export function needsNewsTranslation(
   return false;
 }
 
-async function translateViaGoogle(text: string, tl: NewsTranslateLang): Promise<string> {
+async function translateViaGoogle(text: string, tl: string, sl = "auto"): Promise<string> {
   const url = new URL("https://translate.googleapis.com/translate_a/single");
   url.searchParams.set("client", "gtx");
-  url.searchParams.set("sl", "auto");
+  url.searchParams.set("sl", sl);
   url.searchParams.set("tl", tl);
   url.searchParams.set("dt", "t");
   url.searchParams.set("q", text.slice(0, 4500));
@@ -98,10 +98,10 @@ async function translateViaGoogle(text: string, tl: NewsTranslateLang): Promise<
   }
 }
 
-async function translateViaMyMemory(text: string, tl: NewsTranslateLang): Promise<string> {
+async function translateViaMyMemory(text: string, tl: string, sl = "en"): Promise<string> {
   const url = new URL("https://api.mymemory.translated.net/get");
   url.searchParams.set("q", text.slice(0, 450));
-  url.searchParams.set("langpair", `en|${tl}`);
+  url.searchParams.set("langpair", `${sl}|${tl}`);
   url.searchParams.set("de", "noticias@hashrate.space");
 
   const ctrl = new AbortController();
@@ -171,6 +171,69 @@ export async function translateNewsText(text: string, tl: NewsTranslateLang): Pr
     return out.join(" ").trim() || q;
   } catch (e) {
     console.error("[crypto-noticias] translate", e instanceof Error ? e.message : e);
+    return q;
+  }
+}
+
+async function translateEsToEnChunk(text: string): Promise<string> {
+  const q = text.trim();
+  if (!q) return "";
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      if (attempt > 0) await sleep(350 * attempt);
+      return await translateViaGoogle(q, "en", "es");
+    } catch (e) {
+      lastErr = e;
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg !== "RATE_LIMIT" && attempt === 0) break;
+    }
+  }
+  try {
+    await sleep(200);
+    return await translateViaMyMemory(q.slice(0, 450), "en", "es");
+  } catch (e) {
+    console.error(
+      "[ops-comunicacion] translate EN fail",
+      lastErr instanceof Error ? lastErr.message : lastErr,
+      e instanceof Error ? e.message : e
+    );
+    return q;
+  }
+}
+
+/** Español → inglés, conservando saltos de línea del comunicado. */
+export async function translateEsToEn(text: string): Promise<string> {
+  const q = String(text || "").replace(/\r\n/g, "\n");
+  if (!q.trim()) return "";
+  try {
+    const lines = q.split("\n");
+    const out: string[] = [];
+    let buf: string[] = [];
+    const flush = async () => {
+      if (!buf.length) return;
+      const block = buf.join("\n");
+      out.push(await translateEsToEnChunk(block));
+      buf = [];
+    };
+    for (const line of lines) {
+      if (!line.trim()) {
+        await flush();
+        out.push("");
+        continue;
+      }
+      const next = buf.length ? `${buf.join("\n")}\n${line}` : line;
+      if (next.length > 850) {
+        await flush();
+        buf = [line];
+      } else {
+        buf.push(line);
+      }
+    }
+    await flush();
+    return out.join("\n");
+  } catch (e) {
+    console.error("[ops-comunicacion] translate EN", e instanceof Error ? e.message : e);
     return q;
   }
 }

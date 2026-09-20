@@ -4,6 +4,7 @@ import { OpsComunicacionCatalogSelect } from "../components/OpsComunicacionCatal
 import { OpsComunicacionShareBotModal } from "../components/OpsComunicacionShareBotModal";
 import { OpsComunicacionTelegramConfig } from "../components/OpsComunicacionTelegramConfig";
 import { OpsComunicacionTelegramPreview } from "../components/OpsComunicacionTelegramPreview";
+import { composeBilingualOpsCuerpo } from "../lib/opsComunicacionTelegramHtml";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -13,6 +14,7 @@ import {
   getOpsComunicacion,
   putOpsComunicacionCopy,
   sendOpsComunicacionTelegram,
+  translateOpsComunicacion,
   updateOpsComunicacionTitle,
   type OpsComunicacionItem,
   type OpsComunicacionTitle,
@@ -97,6 +99,8 @@ export function OpsComunicacionPage() {
   const [imageUrl, setImageUrl] = useState("");
   const [sendNow, setSendNow] = useState(true);
   const [telegramRecipientCount, setTelegramRecipientCount] = useState(0);
+  const [cuerpoEn, setCuerpoEn] = useState("");
+  const [translatingEn, setTranslatingEn] = useState(false);
 
   const canEdit = Boolean(user && canEditComunicacionModule(user));
   const tituloRow = titles.find((t) => String(t.id) === tituloId);
@@ -170,6 +174,35 @@ export function OpsComunicacionPage() {
       alive = false;
     };
   }, []);
+
+  useEffect(() => {
+    const src = cuerpoDraft;
+    if (!src.trim()) {
+      setCuerpoEn("");
+      setTranslatingEn(false);
+      return;
+    }
+    let alive = true;
+    const t = window.setTimeout(() => {
+      setTranslatingEn(true);
+      void translateOpsComunicacion(src)
+        .then((r) => {
+          if (!alive) return;
+          setCuerpoEn(String(r.text || ""));
+        })
+        .catch(() => {
+          if (!alive) return;
+          setCuerpoEn("");
+        })
+        .finally(() => {
+          if (alive) setTranslatingEn(false);
+        });
+    }, 450);
+    return () => {
+      alive = false;
+      window.clearTimeout(t);
+    };
+  }, [cuerpoDraft]);
 
   useEffect(() => {
     if (!histOpen) return;
@@ -555,6 +588,9 @@ export function OpsComunicacionPage() {
               </div>
               <div className="ops-com-field">
                 <label htmlFor="ops-cuerpo">Mensaje</label>
+                <p className="ops-com-tg-copy__hint" style={{ margin: "0 0 0.45rem" }}>
+                  Lo que escribís a la izquierda se replica en inglés a la derecha. Telegram envía esos dos textos, español arriba e inglés abajo.
+                </p>
                 <div className="ops-com-title">
                   {usesSchedule ? (
                     <div className="ops-com-schedule">
@@ -629,20 +665,41 @@ export function OpsComunicacionPage() {
                       </div>
                     </div>
                   ) : null}
-                  <textarea
-                    id="ops-cuerpo"
-                    className="fact-input ops-com-textarea"
-                    value={cuerpoDraft}
-                    onChange={(e) => {
-                      setCuerpoOverride(e.target.value);
-                      if (!tituloRow) setCuerpo(e.target.value);
-                    }}
-                    onKeyDown={(e) => e.stopPropagation()}
-                    disabled={busy || titleBusy}
-                    maxLength={8000}
-                    rows={14}
-                    placeholder="Texto del comunicado. En modelos con {{FECHA}} y {{HORARIOS}} se completa con la fecha y los horarios de arriba."
-                  />
+                  <div className="ops-com-body-split">
+                    <div className="ops-com-body-split__pane">
+                      <label htmlFor="ops-cuerpo" className="ops-com-body-split__label">
+                        Español
+                      </label>
+                      <textarea
+                        id="ops-cuerpo"
+                        className="fact-input ops-com-textarea"
+                        value={cuerpoDraft}
+                        onChange={(e) => {
+                          setCuerpoOverride(e.target.value);
+                          if (!tituloRow) setCuerpo(e.target.value);
+                        }}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        disabled={busy || titleBusy}
+                        maxLength={8000}
+                        rows={14}
+                        placeholder="Texto del comunicado. En modelos con {{FECHA}} y {{HORARIOS}} se completa con la fecha y los horarios de arriba."
+                      />
+                    </div>
+                    <div className="ops-com-body-split__pane">
+                      <label htmlFor="ops-cuerpo-en" className="ops-com-body-split__label">
+                        Inglés{translatingEn ? " · traduciendo…" : ""}
+                      </label>
+                      <textarea
+                        id="ops-cuerpo-en"
+                        className="fact-input ops-com-textarea ops-com-textarea--en"
+                        value={cuerpoEn}
+                        readOnly
+                        onKeyDown={(e) => e.stopPropagation()}
+                        rows={14}
+                        placeholder="English translation appears here as you type."
+                      />
+                    </div>
+                  </div>
                   <div className="ops-com-model-save">
                     <button
                       type="button"
@@ -726,7 +783,7 @@ export function OpsComunicacionPage() {
           open={previewOpen}
           onClose={() => setPreviewOpen(false)}
           title={titulo.trim()}
-          body={cuerpoFinal}
+          body={composeBilingualOpsCuerpo(cuerpoFinal, cuerpoEn)}
           headerLine={headerDraft}
           categoryLabel={
             categoryLabelDraft.trim() ||

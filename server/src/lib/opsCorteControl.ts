@@ -88,7 +88,7 @@ export function etapasForWindows(windows: Array<{ from: string; to: string }>): 
 
 export function parseHorarioWindows(cuerpo: string): Array<{ from: string; to: string }> {
   const out: Array<{ from: string; to: string }> = [];
-  const re = /(\d{1,2}:\d{2})\s*hs\s*a\s*(\d{1,2}:\d{2})\s*hs/gi;
+  const re = /(\d{1,2}:\d{2})\s*(?:hs\s*)?(?:a|to|-|–|—)\s*(\d{1,2}:\d{2})\s*(?:hs)?/gi;
   let hit: RegExpExecArray | null;
   while ((hit = re.exec(String(cuerpo || "")))) {
     const from = normalizeOpsTime(String(hit[1] ?? ""));

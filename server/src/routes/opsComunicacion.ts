@@ -6,6 +6,7 @@ import { requireModuleGrant } from "../middleware/moduleGrant.js";
 import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
 import {
   explainTelegramSendFailure,
+  composeBilingualOpsCuerpo,
   formatOpsFarmTelegramHtml,
   getOpsTelegramBotStatus,
   getTelegramBotIdentity,
@@ -16,6 +17,7 @@ import {
   sendTelegramPhoto,
   sendTelegramText,
 } from "../lib/telegramWire.js";
+import { translateEsToEn } from "../lib/cryptoNoticiasTranslate.js";
 import {
   durationHours,
   etapasForWindows,
@@ -363,24 +365,13 @@ async function ensureOpsComunicacionSchema(): Promise<void> {
 const CORTE_PROGRAMADO_NOMBRE = "Corte Programado";
 const CORTE_PROGRAMADO_CUERPO = `Estimados clientes,
 
-Debido a la alta demanda energética y a restricciones operativas
-informadas por la empresa estatal proveedora de energía ANDE, les
-comunicamos que hoy {{FECHA}} se realizará una reducción
-temporal del suministro eléctrico en 23 kV, limitándose al 10% de la
-potencia reservada, en los siguientes horarios:
+Por alta demanda energética y restricciones informadas por ANDE, hoy {{FECHA}} se realizará una reducción temporal del suministro eléctrico en 23 kV, limitándose al 10% de la potencia reservada.
 
 {{HORARIOS}}
 
-Esta medida es ajena a nuestra operación y responde a disposiciones del
-proveedor eléctrico.
-Agradecemos su comprensión y quedamos a disposición ante cualquier consulta.
+Esta medida es ajena a Hashrate Space y responde a disposiciones del proveedor eléctrico.
+Quedamos a disposición ante cualquier consulta.
 
-Muchas gracias,
-Equipo de Hashrate Space
-
---
-Notificaciones
-Hashrate Space - Clientes
 https://www.hashrate.space`;
 
 async function seedOpsComunicacionCatalog(): Promise<void> {
@@ -395,7 +386,20 @@ async function seedOpsComunicacionCatalog(): Promise<void> {
   } else {
     const id = Number(rowKeysToLowercase(titleHit).id ?? 0);
     if (id > 0) {
-      await db.prepare("UPDATE sgi_ops_comunicacion_titulos SET is_builtin = 1 WHERE id = ?").run(id);
+      await db
+        .prepare(
+          `UPDATE sgi_ops_comunicacion_titulos
+           SET is_builtin = 1,
+               cuerpo = CASE
+                 WHEN TRIM(COALESCE(cuerpo, '')) = ''
+                   OR cuerpo LIKE '%Debido a la alta demanda energética%'
+                   OR cuerpo LIKE '%Agradecemos su comprensión%'
+                 THEN ?
+                 ELSE cuerpo
+               END
+           WHERE id = ?`
+        )
+        .run(CORTE_PROGRAMADO_CUERPO, id);
     }
   }
   if (db.isPostgres) {
@@ -443,7 +447,20 @@ async function seedOpsComunicacionCatalog(): Promise<void> {
   } else {
     const id = Number(rowKeysToLowercase(msgHit).id ?? 0);
     if (id > 0) {
-      await db.prepare("UPDATE sgi_ops_comunicacion_mensajes SET is_builtin = 1 WHERE id = ?").run(id);
+      await db
+        .prepare(
+          `UPDATE sgi_ops_comunicacion_mensajes
+           SET is_builtin = 1,
+               cuerpo = CASE
+                 WHEN TRIM(COALESCE(cuerpo, '')) = ''
+                   OR cuerpo LIKE '%Debido a la alta demanda energética%'
+                   OR cuerpo LIKE '%Agradecemos su comprensión%'
+                 THEN ?
+                 ELSE cuerpo
+               END
+           WHERE id = ?`
+        )
+        .run(CORTE_PROGRAMADO_CUERPO, id);
     }
   }
 }
@@ -642,9 +659,10 @@ async function deliverToTelegram(titulo: string, cuerpo: string, categoria: stri
       "Falta el token del bot. Pegalo en el engranaje de Comunicación y Guardar, o definí TELEGRAM_OPS_BOT_TOKEN en Vercel y hacé Redeploy."
     );
   }
+  const cuerpoEn = await translateEsToEn(cuerpo);
   const html = formatOpsFarmTelegramHtml({
     title: titulo,
-    body: cuerpo,
+    body: composeBilingualOpsCuerpo(cuerpo, cuerpoEn),
     categoryLabel: categoryLabel(categoria, copy.categories),
     headerLine: copy.telegramHeader,
   });
@@ -988,6 +1006,16 @@ async function listMensajes(): Promise<Array<{ id: number; nombre: string; cuerp
     })
     .filter((x) => x.id > 0 && x.nombre);
 }
+
+opsComunicacionRouter.post("/ops-comunicacion/translate", ...readMw, async (req, res, next) => {
+  try {
+    const text = String((req.body as { text?: unknown } | undefined)?.text ?? "").slice(0, 8000);
+    const translated = await translateEsToEn(text);
+    res.json({ ok: true, text: translated });
+  } catch (e) {
+    next(e);
+  }
+});
 
 opsComunicacionRouter.get("/ops-comunicacion", ...readMw, async (_req, res, next) => {
   try {
