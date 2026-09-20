@@ -181,8 +181,7 @@ export function OpsComunicacionTelegramConfig({ canEdit, open, onClose }: Props)
               Telegram · Comunicación granja
             </h2>
             <p className="crypto-news-medios__lead">
-              Este bot avisa operaciones a clientes. Pegá acá el token que te dio @BotFather (el de Hashrate
-              Operations). No hace falta que Vercel lo vea para que funcione.
+              Bot de avisos operativos a clientes. Independiente del wire de noticias de mercado.
             </p>
           </div>
           <button
@@ -215,47 +214,55 @@ export function OpsComunicacionTelegramConfig({ canEdit, open, onClose }: Props)
                 <span className="crypto-news-medios__badge is-manual">{channelLabel(tg)}</span>
               </div>
               {canEdit ? (
-                <div className="row g-2 align-items-end">
-                  <div className="col-12">
-                    <label className="crypto-news-tg__check">
+                <div className="crypto-news-tg-form">
+                  <label className="crypto-news-tg__check">
+                    <input
+                      type="checkbox"
+                      checked={tgEnabled}
+                      disabled={tgSaving || tgTesting || tgDetecting}
+                      onChange={(e) => setTgEnabled(e.target.checked)}
+                    />
+                    <span>Activar envíos de Comunicación granja por Telegram</span>
+                  </label>
+                  <div className="crypto-news-tg-form__grid">
+                    <div className="crypto-news-tg-field">
+                      <label className="crypto-news-tg-field__label" htmlFor="ops-tg-token">
+                        Token del bot
+                      </label>
                       <input
-                        type="checkbox"
-                        checked={tgEnabled}
+                        id="ops-tg-token"
+                        className="form-control"
+                        type="password"
+                        autoComplete="off"
+                        spellCheck={false}
+                        placeholder={tg?.tokenConfigured ? "Ya está cargado" : "123456789:AAH…"}
+                        value={tgBotToken}
                         disabled={tgSaving || tgTesting || tgDetecting}
-                        onChange={(e) => setTgEnabled(e.target.checked)}
+                        onChange={(e) => setTgBotToken(e.target.value)}
                       />
-                      <span>Activar envíos de Comunicación granja por Telegram</span>
-                    </label>
+                      <p className="crypto-news-tg-field__hint">
+                        {tg?.tokenConfigured
+                          ? "Dejalo vacío. Solo pegá un token nuevo si BotFather te dio otro."
+                          : "Copiá el API Token de @BotFather (Hashrate Operations)."}
+                      </p>
+                    </div>
+                    <div className="crypto-news-tg-field">
+                      <label className="crypto-news-tg-field__label" htmlFor="ops-tg-chat">
+                        Chat ID
+                      </label>
+                      <input
+                        id="ops-tg-chat"
+                        className="form-control"
+                        inputMode="numeric"
+                        placeholder="123456789"
+                        value={tgChatId}
+                        disabled={tgSaving || tgTesting || tgDetecting}
+                        onChange={(e) => setTgChatId(e.target.value.trim())}
+                      />
+                      <p className="crypto-news-tg-field__hint">Destino de los avisos. Detectar chats lo completa.</p>
+                    </div>
                   </div>
-                  <div className="col-12">
-                    <label className="form-label small mb-1" htmlFor="ops-tg-token">
-                      Token del bot (@BotFather)
-                    </label>
-                    <input
-                      id="ops-tg-token"
-                      className="form-control form-control-sm"
-                      type="password"
-                      autoComplete="off"
-                      placeholder={tg?.tokenConfigured ? "Token ya cargado — pegá uno nuevo solo si lo rotaste" : "123456789:AAH…"}
-                      value={tgBotToken}
-                      disabled={tgSaving || tgTesting || tgDetecting}
-                      onChange={(e) => setTgBotToken(e.target.value)}
-                    />
-                  </div>
-                  <div className="col-12 col-md-7">
-                    <label className="form-label small mb-1" htmlFor="ops-tg-chat">
-                      Chat ID
-                    </label>
-                    <input
-                      id="ops-tg-chat"
-                      className="form-control form-control-sm"
-                      placeholder="Ej. 123456789"
-                      value={tgChatId}
-                      disabled={tgSaving || tgTesting || tgDetecting}
-                      onChange={(e) => setTgChatId(e.target.value.trim())}
-                    />
-                  </div>
-                  <div className="col-12 d-flex flex-wrap gap-2 mt-2">
+                  <div className="crypto-news-tg-form__actions">
                     <button
                       type="button"
                       className="btn btn-sm btn-success"
@@ -282,9 +289,9 @@ export function OpsComunicacionTelegramConfig({ canEdit, open, onClose }: Props)
                     </button>
                   </div>
                   {tgChats.length > 0 ? (
-                    <div className="col-12">
-                      <p className="small text-muted mb-1 mt-2">Chats detectados</p>
-                      <div className="d-flex flex-wrap gap-1">
+                    <div>
+                      <p className="crypto-news-tg-field__label">Chats detectados</p>
+                      <div className="crypto-news-tg__chats">
                         {tgChats.map((c) => (
                           <button
                             key={c.chatId}

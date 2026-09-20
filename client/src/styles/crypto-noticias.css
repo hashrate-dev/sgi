@@ -252,6 +252,88 @@
 
 .crypto-news-tg__check input {
   margin-top: 0.2rem;
+  accent-color: var(--cn-accent);
+}
+
+.crypto-news-tg-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.crypto-news-tg-form__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.85fr);
+  gap: 0.75rem;
+}
+
+.crypto-news-tg-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.38rem;
+  min-width: 0;
+}
+
+.crypto-news-tg-field__label {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(186, 230, 253, 0.88);
+}
+
+.crypto-news-tg-field__hint {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--cn-muted);
+}
+
+.crypto-news-tg-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.sgi-glass-panel .crypto-news-tg .form-control,
+.sgi-glass-panel .crypto-news-tg .form-select,
+.crypto-news-tg .form-control,
+.crypto-news-tg .form-select {
+  color-scheme: dark;
+  width: 100%;
+  min-height: 2.65rem;
+  border-radius: 0.7rem;
+  background: rgba(5, 16, 24, 0.78) !important;
+  border: 1px solid rgba(125, 211, 252, 0.28) !important;
+  color: #e8f4fb !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.sgi-glass-panel .crypto-news-tg .form-control::placeholder,
+.crypto-news-tg .form-control::placeholder {
+  color: rgba(186, 230, 253, 0.38) !important;
+}
+
+.sgi-glass-panel .crypto-news-tg .form-control:focus,
+.sgi-glass-panel .crypto-news-tg .form-select:focus,
+.crypto-news-tg .form-control:focus,
+.crypto-news-tg .form-select:focus {
+  outline: none;
+  border-color: rgba(61, 186, 154, 0.7) !important;
+  box-shadow: 0 0 0 3px rgba(61, 186, 154, 0.18);
+}
+
+.sgi-glass-panel .crypto-news-tg .form-select option,
+.crypto-news-tg .form-select option {
+  background: #0b1c22;
+  color: #e8f4fb;
+}
+
+@media (max-width: 700px) {
+  .crypto-news-tg-form__grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .crypto-news-tg__chats {

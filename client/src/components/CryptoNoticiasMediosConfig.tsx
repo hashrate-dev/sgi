@@ -348,50 +348,53 @@ export function CryptoNoticiasMediosConfig({ canEdit, open, onClose }: Props) {
                   </span>
                 </div>
                 {canEdit ? (
-                  <div className="row g-2 align-items-end">
-                    <div className="col-12">
-                      <label className="crypto-news-tg__check">
-                        <input
-                          type="checkbox"
-                          checked={tgEnabled}
-                          disabled={tgSaving || tgTesting || tgDetecting}
-                          onChange={(e) => setTgEnabled(e.target.checked)}
-                        />
-                        <span>Enviar noticias nuevas del bot por Telegram</span>
-                      </label>
-                    </div>
-                    <div className="col-12 col-md-6">
-                      <label className="form-label small mb-1" htmlFor="crypto-tg-chat">
-                        Chat ID
-                      </label>
+                  <div className="crypto-news-tg-form">
+                    <label className="crypto-news-tg__check">
                       <input
-                        id="crypto-tg-chat"
-                        className="form-control form-control-sm"
-                        placeholder="Ej. 123456789"
-                        value={tgChatId}
+                        type="checkbox"
+                        checked={tgEnabled}
                         disabled={tgSaving || tgTesting || tgDetecting}
-                        onChange={(e) => setTgChatId(e.target.value.trim())}
+                        onChange={(e) => setTgEnabled(e.target.checked)}
                       />
+                      <span>Enviar noticias nuevas del bot por Telegram</span>
+                    </label>
+                    <div className="crypto-news-tg-form__grid">
+                      <div className="crypto-news-tg-field">
+                        <label className="crypto-news-tg-field__label" htmlFor="crypto-tg-chat">
+                          Chat ID
+                        </label>
+                        <input
+                          id="crypto-tg-chat"
+                          className="form-control"
+                          inputMode="numeric"
+                          placeholder="123456789"
+                          value={tgChatId}
+                          disabled={tgSaving || tgTesting || tgDetecting}
+                          onChange={(e) => setTgChatId(e.target.value.trim())}
+                        />
+                        <p className="crypto-news-tg-field__hint">Destino de las tarjetas. Detectar chats lo completa.</p>
+                      </div>
+                      <div className="crypto-news-tg-field">
+                        <label className="crypto-news-tg-field__label" htmlFor="crypto-tg-interval">
+                          Envío automático
+                        </label>
+                        <select
+                          id="crypto-tg-interval"
+                          className="form-select"
+                          value={tgIntervalMin}
+                          disabled={tgSaving || tgTesting || tgDetecting}
+                          onChange={(e) => setTgIntervalMin(Number(e.target.value) || 60)}
+                        >
+                          {TG_INTERVAL_OPTS.map((o) => (
+                            <option key={o.min} value={o.min}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="crypto-news-tg-field__hint">Cada cuánto salen solas las noticias nuevas.</p>
+                      </div>
                     </div>
-                    <div className="col-12 col-md-6">
-                      <label className="form-label small mb-1" htmlFor="crypto-tg-interval">
-                        Envío automático
-                      </label>
-                      <select
-                        id="crypto-tg-interval"
-                        className="form-select form-select-sm"
-                        value={tgIntervalMin}
-                        disabled={tgSaving || tgTesting || tgDetecting}
-                        onChange={(e) => setTgIntervalMin(Number(e.target.value) || 60)}
-                      >
-                        {TG_INTERVAL_OPTS.map((o) => (
-                          <option key={o.min} value={o.min}>
-                            {o.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-12 d-flex flex-wrap gap-2">
+                    <div className="crypto-news-tg-form__actions">
                       <button
                         type="button"
                         className="btn btn-success btn-sm"
@@ -426,13 +429,14 @@ export function CryptoNoticiasMediosConfig({ canEdit, open, onClose }: Props) {
                       </button>
                     </div>
                     {tgChats.length > 0 ? (
-                      <div className="col-12">
+                      <div>
+                        <p className="crypto-news-tg-field__label">Chats detectados</p>
                         <div className="crypto-news-tg__chats" role="list">
                           {tgChats.map((c) => (
                             <button
                               key={c.chatId}
                               type="button"
-                              className="btn btn-sm btn-outline-secondary"
+                              className="btn btn-sm btn-outline-light"
                               onClick={() => setTgChatId(c.chatId)}
                               title={c.chatId}
                             >
@@ -443,14 +447,11 @@ export function CryptoNoticiasMediosConfig({ canEdit, open, onClose }: Props) {
                         </div>
                       </div>
                     ) : null}
-                    <div className="col-12">
-                      <p className="crypto-news-tg__hint mb-0">
-                        1) Creá un bot con <code>@BotFather</code> → token. 2) En Vercel:{" "}
-                        <code>TELEGRAM_BOT_TOKEN</code> (+ opcional <code>TELEGRAM_BOT_USERNAME</code>). 3)
-                        Abrí el bot, mandá <code>/start</code>, tocá «Detectar chats» o pegá el Chat ID. Detalle
-                        en <code>server/docs/TELEGRAM_WIRE.md</code>.
-                      </p>
-                    </div>
+                    <p className="crypto-news-tg__hint mb-0">
+                      1) Creá un bot con <code>@BotFather</code> → token. 2) En Vercel:{" "}
+                      <code>TELEGRAM_BOT_TOKEN</code> (+ opcional <code>TELEGRAM_BOT_USERNAME</code>). 3)
+                      Abrí el bot, mandá <code>/start</code>, tocá «Detectar chats» o pegá el Chat ID.
+                    </p>
                   </div>
                 ) : (
                   <p className="text-muted small mb-0">
