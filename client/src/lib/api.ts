@@ -2518,11 +2518,64 @@ export type OpsComunicacionTelegramSettings = {
   readyToSend: boolean;
 };
 
+export type OpsComunicacionTitle = {
+  id: number;
+  titulo: string;
+  isBuiltin?: boolean;
+};
+
+export type OpsComunicacionMessage = {
+  id: number;
+  nombre: string;
+  cuerpo: string;
+  isBuiltin?: boolean;
+};
+
 export function getOpsComunicacion(): Promise<{
   items: OpsComunicacionItem[];
   categories: Array<{ id: string; label: string }>;
+  titles?: OpsComunicacionTitle[];
+  messages?: OpsComunicacionMessage[];
 }> {
   return api("/api/ops-comunicacion");
+}
+
+export function createOpsComunicacionTitle(titulo: string): Promise<{
+  ok: boolean;
+  item: OpsComunicacionTitle | null;
+  titles: OpsComunicacionTitle[];
+}> {
+  return api("/api/ops-comunicacion/titulos", { method: "POST", body: JSON.stringify({ titulo }) });
+}
+
+export function deleteOpsComunicacionTitle(id: number): Promise<{ ok: boolean; titles: OpsComunicacionTitle[] }> {
+  return api(`/api/ops-comunicacion/titulos/${id}`, { method: "DELETE" });
+}
+
+export function updateOpsComunicacionTitle(
+  id: number,
+  titulo: string
+): Promise<{ ok: boolean; item: OpsComunicacionTitle | null; titles: OpsComunicacionTitle[] }> {
+  return api(`/api/ops-comunicacion/titulos/${id}`, { method: "PUT", body: JSON.stringify({ titulo }) });
+}
+
+export function createOpsComunicacionMessage(body: { nombre: string; cuerpo: string }): Promise<{
+  ok: boolean;
+  item: OpsComunicacionMessage | null;
+  messages: OpsComunicacionMessage[];
+}> {
+  return api("/api/ops-comunicacion/mensajes", { method: "POST", body: JSON.stringify(body) });
+}
+
+export function updateOpsComunicacionMessage(
+  id: number,
+  body: { nombre?: string; cuerpo?: string }
+): Promise<{ ok: boolean; item: OpsComunicacionMessage | null; messages: OpsComunicacionMessage[] }> {
+  return api(`/api/ops-comunicacion/mensajes/${id}`, { method: "PUT", body: JSON.stringify(body) });
+}
+
+export function deleteOpsComunicacionMessage(id: number): Promise<{ ok: boolean; messages: OpsComunicacionMessage[] }> {
+  return api(`/api/ops-comunicacion/mensajes/${id}`, { method: "DELETE" });
 }
 
 export function createOpsComunicacion(body: {

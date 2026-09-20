@@ -1,14 +1,25 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
+import { OpsComunicacionCatalogSelect } from "../components/OpsComunicacionCatalogSelect";
 import { OpsComunicacionTelegramConfig } from "../components/OpsComunicacionTelegramConfig";
+import { OpsComunicacionTelegramPreview } from "../components/OpsComunicacionTelegramPreview";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
 import {
   createOpsComunicacion,
+  createOpsComunicacionMessage,
+  createOpsComunicacionTitle,
+  deleteOpsComunicacionMessage,
+  deleteOpsComunicacionTitle,
   getOpsComunicacion,
   sendOpsComunicacionTelegram,
+  updateOpsComunicacionMessage,
+  updateOpsComunicacionTitle,
   type OpsComunicacionItem,
+  type OpsComunicacionMessage,
+  type OpsComunicacionTitle,
 } from "../lib/api";
+import { CORTE_PROGRAMADO_CUERPO, fillOpsComunicacionMessage, messageHasScheduleSlots, plantillaFromFilledMessage } from "../lib/opsComunicacionTemplates";
 import { canAccessComunicacionModule, canEditComunicacionModule } from "../lib/auth";
 import { sgiHome } from "../lib/marketplacePaths.js";
 import { canUserAccessNavPath } from "../lib/sgiNavigation";
@@ -17,6 +28,14 @@ import "../styles/crypto-noticias.css";
 import "../styles/ops-comunicacion.css";
 
 const PATH = "/gestion-administrativa/comunicacion";
+
+function todayIso(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 function timeAgo(iso: string): string {
   const t = Date.parse(iso);
@@ -42,13 +61,50 @@ export function OpsComunicacionPage() {
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
   const [configOpen, setConfigOpen] = useState(false);
-  const [titulo, setTitulo] = useState("");
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [tituloId, setTituloId] = useState("");
+  const [titles, setTitles] = useState<OpsComunicacionTitle[]>([]);
+  const [titleBusy, setTitleBusy] = useState(false);
+  const [messages, setMessages] = useState<OpsComunicacionMessage[]>([]);
+  const [mensajeId, setMensajeId] = useState("");
+  const [cuerpoOverride, setCuerpoOverride] = useState<string | null>(null);
+  const prevTituloId = useRef("");
+  const [fechaAviso, setFechaAviso] = useState(todayIso);
+  const [horario1From, setHorario1From] = useState("9:00");
+  const [horario1To, setHorario1To] = useState("17:00");
+  const [horario2From, setHorario2From] = useState("20:00");
+  const [horario2To, setHorario2To] = useState("24:00");
   const [cuerpo, setCuerpo] = useState("");
   const [categoria, setCategoria] = useState("general");
   const [imageUrl, setImageUrl] = useState("");
   const [sendNow, setSendNow] = useState(true);
 
   const canEdit = Boolean(user && canEditComunicacionModule(user));
+  const tituloRow = titles.find((t) => String(t.id) === tituloId);
+  const titulo = tituloRow?.titulo || "";
+  const tituloEsCorte = Boolean(tituloRow?.isBuiltin) || /corte programado/i.test(titulo);
+  const corteMessage =
+    messages.find((m) => m.isBuiltin) || messages.find((m) => /corte programado/i.test(m.nombre)) || null;
+  const selectedMessage = messages.find((m) => String(m.id) === mensajeId) || (tituloEsCorte ? corteMessage : null);
+  const mensajeEsFijo =
+    Boolean(selectedMessage?.isBuiltin) || /corte programado/i.test(selectedMessage?.nombre || "");
+  const plantilla = selectedMessage?.cuerpo || (tituloEsCorte ? CORTE_PROGRAMADO_CUERPO : "");
+  const usesSchedule = Boolean(plantilla && messageHasScheduleSlots(plantilla));
+  const cuerpoLleno = usesSchedule
+    ? fillOpsComunicacionMessage(plantilla, {
+        fecha: fechaAviso,
+        horario1From,
+        horario1To,
+        horario2From,
+        horario2To,
+      })
+    : plantilla;
+  const cuerpoFinal = (cuerpoOverride ?? (plantilla ? cuerpoLleno : cuerpo)).trim();
+  const modeloDirty = Boolean(
+    selectedMessage &&
+      cuerpoOverride != null &&
+      cuerpoOverride.replace(/\r\n/g, "\n").trim() !== cuerpoLleno.replace(/\r\n/g, "\n").trim()
+  );
 
   const load = useCallback(async () => {
     setTableLoading(true);
@@ -56,6 +112,20 @@ export function OpsComunicacionPage() {
       const res = await getOpsComunicacion();
       setItems(res.items || []);
       setCategories(res.categories || []);
+      const nextTitles = res.titles || [];
+      const nextMessages = res.messages || [];
+      setTitles(nextTitles);
+      setMessages(nextMessages);
+      setTituloId((cur) => {
+        if (nextTitles.some((t) => String(t.id) === cur)) return cur;
+        const corte = nextTitles.find((t) => /corte programado/i.test(t.titulo));
+        return String((corte || nextTitles[0])?.id || "");
+      });
+      setMensajeId((cur) => {
+        if (nextMessages.some((m) => String(m.id) === cur)) return cur;
+        const corte = nextMessages.find((m) => /corte programado/i.test(m.nombre));
+        return String((corte || nextMessages[0])?.id || "");
+      });
     } catch (e) {
       setErr(e instanceof Error ? e.message : "No se pudo cargar Comunicación.");
       setItems([]);
@@ -70,6 +140,15 @@ export function OpsComunicacionPage() {
     void load();
   }, [loading, user, load]);
 
+  useEffect(() => {
+    const switched = prevTituloId.current !== tituloId;
+    prevTituloId.current = tituloId;
+    if (!switched || !tituloEsCorte) return;
+    if (corteMessage) setMensajeId(String(corteMessage.id));
+    setCategoria("energia");
+    setCuerpoOverride(null);
+  }, [tituloEsCorte, tituloId, corteMessage]);
+
   if (!loading && !user) return <Navigate to="/login" replace />;
   if (!loading && user && !canAccessComunicacionModule(user) && !canUserAccessNavPath(user, PATH)) {
     return <Navigate to={sgiHome()} replace />;
@@ -81,14 +160,18 @@ export function OpsComunicacionPage() {
     setErr("");
     setOk("");
     if (titulo.trim().length < 3) {
-      setErr("El título tiene que tener al menos 3 caracteres.");
+      setErr("Elegí un título de la lista o agregá uno nuevo.");
+      return;
+    }
+    if (cuerpoFinal.length < 8) {
+      setErr("Elegí un modelo de mensaje o escribí el texto.");
       return;
     }
     setBusy(true);
     try {
       const r = await createOpsComunicacion({
         titulo: titulo.trim(),
-        cuerpo: cuerpo.trim(),
+        cuerpo: cuerpoFinal,
         categoria,
         imageUrl: imageUrl.trim(),
         sendNow,
@@ -98,15 +181,49 @@ export function OpsComunicacionPage() {
           ? `Comunicado enviado a Telegram${r.sentTo ? ` (${r.sentTo} chat)` : ""}.`
           : "Comunicado guardado. Todavía no se envió a Telegram."
       );
-      setTitulo("");
-      setCuerpo("");
       setImageUrl("");
+      setCuerpoOverride(null);
       await load();
     } catch (e2) {
       setErr(e2 instanceof Error ? e2.message : "No se pudo publicar el comunicado.");
       await load();
     } finally {
       setBusy(false);
+    }
+  };
+
+  const onSaveModelo = async () => {
+    if (!canEdit) return;
+    const id = selectedMessage?.id;
+    if (!id) {
+      setErr("Elegí un modelo de mensaje para guardar los cambios.");
+      return;
+    }
+    if (cuerpoFinal.length < 8) {
+      setErr("El texto del modelo tiene que tener al menos 8 caracteres.");
+      return;
+    }
+    const cuerpoGuardar = usesSchedule
+      ? plantillaFromFilledMessage(cuerpoFinal, plantilla, {
+          fecha: fechaAviso,
+          horario1From,
+          horario1To,
+          horario2From,
+          horario2To,
+        })
+      : cuerpoFinal;
+    setTitleBusy(true);
+    setErr("");
+    setOk("");
+    try {
+      const r = await updateOpsComunicacionMessage(id, { cuerpo: cuerpoGuardar });
+      setMessages(r.messages || []);
+      setCuerpoOverride(null);
+      setOk("Cambios guardados en el modelo. Quedan para la próxima vez.");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "No se pudo guardar el modelo.");
+    } finally {
+      setTitleBusy(false);
     }
   };
 
@@ -182,15 +299,44 @@ export function OpsComunicacionPage() {
               <div className="ops-com-form__row">
                 <div className="ops-com-field">
                   <label htmlFor="ops-titulo">Título</label>
-                  <input
-                    id="ops-titulo"
-                    className="fact-input"
-                    value={titulo}
-                    onChange={(e) => setTitulo(e.target.value)}
-                    disabled={busy}
-                    maxLength={180}
-                    placeholder="Ej. Corte programado ANDE — sitio A"
-                    autoComplete="off"
+                  <OpsComunicacionCatalogSelect
+                    triggerId="ops-titulo"
+                    placeholder="Seleccioná un título"
+                    addLabel="Agregar nuevo título"
+                    newTitle="Nuevo título"
+                    panelLabel="Títulos"
+                    items={titles.map((t) => ({ id: t.id, label: t.titulo, isBuiltin: t.isBuiltin }))}
+                    valueId={tituloId}
+                    disabled={busy || titleBusy}
+                    onError={(msg) => {
+                      setOk("");
+                      setErr(msg);
+                    }}
+                    onChange={(id) => {
+                      setTituloId(id);
+                      setErr("");
+                    }}
+                    create={async (nombre) => {
+                      const r = await createOpsComunicacionTitle(nombre);
+                      const next = r.titles || [];
+                      setTitles(next);
+                      return {
+                        itemId: r.item ? String(r.item.id) : "",
+                        items: next.map((t) => ({ id: t.id, label: t.titulo, isBuiltin: t.isBuiltin })),
+                      };
+                    }}
+                    update={async (id, nombre) => {
+                      const r = await updateOpsComunicacionTitle(id, nombre);
+                      const next = r.titles || [];
+                      setTitles(next);
+                      return { items: next.map((t) => ({ id: t.id, label: t.titulo, isBuiltin: t.isBuiltin })) };
+                    }}
+                    remove={async (id) => {
+                      const r = await deleteOpsComunicacionTitle(id);
+                      const next = r.titles || [];
+                      setTitles(next);
+                      return { items: next.map((t) => ({ id: t.id, label: t.titulo, isBuiltin: t.isBuiltin })) };
+                    }}
                   />
                 </div>
                 <div className="ops-com-field ops-com-field--cat">
@@ -214,17 +360,160 @@ export function OpsComunicacionPage() {
                 </div>
               </div>
               <div className="ops-com-field">
-                <label htmlFor="ops-cuerpo">Mensaje</label>
-                <textarea
-                  id="ops-cuerpo"
-                  className="fact-input ops-com-textarea"
-                  value={cuerpo}
-                  onChange={(e) => setCuerpo(e.target.value)}
-                  disabled={busy}
-                  maxLength={3200}
-                  rows={5}
-                  placeholder="Qué pasa, horario, impacto en la flota y a quién avisar en sitio."
-                />
+                <label htmlFor="ops-mensaje">Mensaje</label>
+                <div className="ops-com-title">
+                  <OpsComunicacionCatalogSelect
+                    triggerId="ops-mensaje"
+                    placeholder="Seleccioná un modelo"
+                    addLabel="Agregar nuevo mensaje"
+                    newTitle="Nuevo mensaje"
+                    panelLabel="Mensajes"
+                    items={messages.map((m) => ({ id: m.id, label: m.nombre, isBuiltin: m.isBuiltin }))}
+                    valueId={mensajeId}
+                    disabled={busy || titleBusy}
+                    onError={(msg) => {
+                      setOk("");
+                      setErr(msg);
+                    }}
+                    onChange={(id) => {
+                      setMensajeId(id);
+                      setCuerpoOverride(null);
+                      setErr("");
+                      const picked = messages.find((m) => String(m.id) === id);
+                      if (picked && /corte programado/i.test(picked.nombre)) {
+                        const matchTitle = titles.find((t) => /corte programado/i.test(t.titulo));
+                        if (matchTitle) setTituloId(String(matchTitle.id));
+                        setCategoria("energia");
+                      }
+                    }}
+                    create={async (nombre) => {
+                      const cuerpoNuevo = mensajeEsFijo
+                        ? "Nuevo comunicado.\n\nCompletá el texto de este modelo."
+                        : cuerpoFinal.length >= 8
+                          ? cuerpoFinal
+                          : "Nuevo comunicado.\n\nCompletá el texto de este modelo.";
+                      const r = await createOpsComunicacionMessage({ nombre, cuerpo: cuerpoNuevo });
+                      const next = r.messages || [];
+                      setMessages(next);
+                      setCuerpoOverride(null);
+                      return {
+                        itemId: r.item ? String(r.item.id) : "",
+                        items: next.map((m) => ({ id: m.id, label: m.nombre, isBuiltin: m.isBuiltin })),
+                      };
+                    }}
+                    update={async (id, nombre) => {
+                      const r = await updateOpsComunicacionMessage(id, { nombre });
+                      const next = r.messages || [];
+                      setMessages(next);
+                      return { items: next.map((m) => ({ id: m.id, label: m.nombre, isBuiltin: m.isBuiltin })) };
+                    }}
+                    remove={async (id) => {
+                      const r = await deleteOpsComunicacionMessage(id);
+                      const next = r.messages || [];
+                      setMessages(next);
+                      setCuerpoOverride(null);
+                      return { items: next.map((m) => ({ id: m.id, label: m.nombre, isBuiltin: m.isBuiltin })) };
+                    }}
+                  />
+                  {usesSchedule ? (
+                    <div className="ops-com-schedule">
+                      <div className="ops-com-field">
+                        <label htmlFor="ops-fecha">Fecha del aviso</label>
+                        <input
+                          id="ops-fecha"
+                          className="fact-input"
+                          type="date"
+                          value={fechaAviso}
+                          onChange={(e) => {
+                            setFechaAviso(e.target.value);
+                            setCuerpoOverride(null);
+                          }}
+                          disabled={busy || titleBusy}
+                        />
+                      </div>
+                      <div className="ops-com-field">
+                        <label htmlFor="ops-h1-from">Horario 1</label>
+                        <div className="ops-com-title__row">
+                          <input
+                            id="ops-h1-from"
+                            className="fact-input"
+                            value={horario1From}
+                            onChange={(e) => {
+                              setHorario1From(e.target.value);
+                              setCuerpoOverride(null);
+                            }}
+                            disabled={busy || titleBusy}
+                            placeholder="9:00"
+                          />
+                          <input
+                            className="fact-input"
+                            value={horario1To}
+                            onChange={(e) => {
+                              setHorario1To(e.target.value);
+                              setCuerpoOverride(null);
+                            }}
+                            disabled={busy || titleBusy}
+                            placeholder="17:00"
+                          />
+                        </div>
+                      </div>
+                      <div className="ops-com-field">
+                        <label htmlFor="ops-h2-from">Horario 2</label>
+                        <div className="ops-com-title__row">
+                          <input
+                            id="ops-h2-from"
+                            className="fact-input"
+                            value={horario2From}
+                            onChange={(e) => {
+                              setHorario2From(e.target.value);
+                              setCuerpoOverride(null);
+                            }}
+                            disabled={busy || titleBusy}
+                            placeholder="20:00"
+                          />
+                          <input
+                            className="fact-input"
+                            value={horario2To}
+                            onChange={(e) => {
+                              setHorario2To(e.target.value);
+                              setCuerpoOverride(null);
+                            }}
+                            disabled={busy || titleBusy}
+                            placeholder="24:00"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                  <textarea
+                    id="ops-cuerpo"
+                    className="fact-input ops-com-textarea"
+                    value={cuerpoFinal}
+                    onChange={(e) => {
+                      setCuerpoOverride(e.target.value);
+                      if (!selectedMessage) setCuerpo(e.target.value);
+                    }}
+                    disabled={busy || titleBusy}
+                    maxLength={8000}
+                    rows={14}
+                    placeholder="Texto del comunicado. En modelos con {{FECHA}} y {{HORARIOS}} se completa con la fecha y los horarios de arriba."
+                  />
+                  <div className="ops-com-model-save">
+                    <button
+                      type="button"
+                      className="ops-com-save-model-btn"
+                      disabled={busy || titleBusy || !selectedMessage || !modeloDirty}
+                      onClick={() => void onSaveModelo()}
+                    >
+                      {titleBusy ? "Guardando…" : "Guardar cambios"}
+                    </button>
+                    <span className="ops-com-model-save__hint">
+                      {modeloDirty
+                        ? "Hay ediciones en el texto. Guardá para actualizar este modelo."
+                        : "El modelo coincide con el texto actual."}
+                    </span>
+                  </div>
+                </div>
               </div>
               <div className="ops-com-field">
                 <label htmlFor="ops-img">Imagen (URL, opcional)</label>
@@ -248,15 +537,35 @@ export function OpsComunicacionPage() {
                   />
                   Enviar ahora a Telegram
                 </label>
-                <button type="submit" className="btn btn-success" disabled={busy}>
-                  {busy ? "Publicando…" : sendNow ? "Publicar y enviar" : "Guardar sin enviar"}
-                </button>
+                <div className="ops-com-actions__btns">
+                  <button type="submit" className="btn btn-success" disabled={busy}>
+                    {busy ? "Publicando…" : sendNow ? "Publicar y enviar" : "Guardar sin enviar"}
+                  </button>
+                  <button
+                    type="button"
+                    className="ops-com-preview-btn"
+                    disabled={busy}
+                    onClick={() => setPreviewOpen(true)}
+                  >
+                    Vista Previa
+                  </button>
+                </div>
               </div>
             </form>
           ) : null}
         </section>
 
         <OpsComunicacionTelegramConfig canEdit={canEdit} open={configOpen} onClose={() => setConfigOpen(false)} />
+        <OpsComunicacionTelegramPreview
+          open={previewOpen}
+          onClose={() => setPreviewOpen(false)}
+          title={titulo.trim()}
+          body={cuerpoFinal}
+          categoryLabel={
+            (categories.find((c) => c.id === categoria) || { label: "Operaciones" }).label
+          }
+          imageUrl={imageUrl}
+        />
 
         {tableLoading ? (
           <div className="crypto-news-loading text-muted">Cargando historial…</div>

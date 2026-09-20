@@ -110,6 +110,21 @@ async function ensureOpsComunicacionSchema(): Promise<void> {
     .run();
   if (db.isPostgres) {
     await db.prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS bot_token TEXT NOT NULL DEFAULT ''").run();
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion_titulos (
+          id BIGSERIAL PRIMARY KEY,
+          titulo TEXT NOT NULL,
+          is_builtin INTEGER NOT NULL DEFAULT 0,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`
+      )
+      .run();
+    await db
+      .prepare(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_sgi_ops_com_titulos_lower ON sgi_ops_comunicacion_titulos (LOWER(titulo))"
+      )
+      .run();
   } else {
     try {
       await db.prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN bot_token TEXT NOT NULL DEFAULT ''").run();
@@ -117,8 +132,116 @@ async function ensureOpsComunicacionSchema(): Promise<void> {
       const msg = e instanceof Error ? e.message : String(e);
       if (!/duplicate column/i.test(msg)) throw e;
     }
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion_titulos (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          titulo TEXT NOT NULL UNIQUE,
+          is_builtin INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )`
+      )
+      .run();
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion_mensajes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          nombre TEXT NOT NULL UNIQUE,
+          cuerpo TEXT NOT NULL,
+          is_builtin INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )`
+      )
+      .run();
+    for (const sql of [
+      "ALTER TABLE sgi_ops_comunicacion_titulos ADD COLUMN is_builtin INTEGER NOT NULL DEFAULT 0",
+      "ALTER TABLE sgi_ops_comunicacion_mensajes ADD COLUMN is_builtin INTEGER NOT NULL DEFAULT 0",
+    ]) {
+      try {
+        await db.prepare(sql).run();
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (!/duplicate column/i.test(msg)) throw e;
+      }
+    }
   }
+  if (db.isPostgres) {
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion_mensajes (
+          id BIGSERIAL PRIMARY KEY,
+          nombre TEXT NOT NULL,
+          cuerpo TEXT NOT NULL,
+          is_builtin INTEGER NOT NULL DEFAULT 0,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`
+      )
+      .run();
+    await db
+      .prepare(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_sgi_ops_com_mensajes_lower ON sgi_ops_comunicacion_mensajes (LOWER(nombre))"
+      )
+      .run();
+    await db.prepare("ALTER TABLE sgi_ops_comunicacion_titulos ADD COLUMN IF NOT EXISTS is_builtin INTEGER NOT NULL DEFAULT 0").run();
+    await db.prepare("ALTER TABLE sgi_ops_comunicacion_mensajes ADD COLUMN IF NOT EXISTS is_builtin INTEGER NOT NULL DEFAULT 0").run();
+  }
+  await seedOpsComunicacionCatalog();
   schemaEnsured = true;
+}
+
+const CORTE_PROGRAMADO_NOMBRE = "Corte Programado";
+const CORTE_PROGRAMADO_CUERPO = `Estimados clientes,
+
+Debido a la alta demanda energética y a restricciones operativas
+informadas por la empresa estatal proveedora de energía ANDE, les
+comunicamos que hoy {{FECHA}} se realizará una reducción
+temporal del suministro eléctrico en 23 kV, limitándose al 10% de la
+potencia reservada, en los siguientes horarios:
+
+{{HORARIOS}}
+
+Esta medida es ajena a nuestra operación y responde a disposiciones del
+proveedor eléctrico.
+Agradecemos su comprensión y quedamos a disposición ante cualquier consulta.
+
+Muchas gracias,
+Equipo de Hashrate Space
+
+--
+Notificaciones
+Hashrate Space - Clientes
+https://www.hashrate.space`;
+
+async function seedOpsComunicacionCatalog(): Promise<void> {
+  const ts = db.isPostgres ? "NOW()" : "datetime('now')";
+  const titleHit = (await db
+    .prepare("SELECT id FROM sgi_ops_comunicacion_titulos WHERE LOWER(titulo) = LOWER(?) LIMIT 1")
+    .get(CORTE_PROGRAMADO_NOMBRE)) as Record<string, unknown> | undefined;
+  if (!titleHit) {
+    await db
+      .prepare(`INSERT INTO sgi_ops_comunicacion_titulos (titulo, is_builtin, created_at) VALUES (?, 1, ${ts})`)
+      .run(CORTE_PROGRAMADO_NOMBRE);
+  } else {
+    const id = Number(rowKeysToLowercase(titleHit).id ?? 0);
+    if (id > 0) {
+      await db.prepare("UPDATE sgi_ops_comunicacion_titulos SET is_builtin = 1 WHERE id = ?").run(id);
+    }
+  }
+  const msgHit = (await db
+    .prepare("SELECT id FROM sgi_ops_comunicacion_mensajes WHERE LOWER(nombre) = LOWER(?) LIMIT 1")
+    .get(CORTE_PROGRAMADO_NOMBRE)) as Record<string, unknown> | undefined;
+  if (!msgHit) {
+    await db
+      .prepare(
+        `INSERT INTO sgi_ops_comunicacion_mensajes (nombre, cuerpo, is_builtin, created_at) VALUES (?, ?, 1, ${ts})`
+      )
+      .run(CORTE_PROGRAMADO_NOMBRE, CORTE_PROGRAMADO_CUERPO);
+  } else {
+    const id = Number(rowKeysToLowercase(msgHit).id ?? 0);
+    if (id > 0) {
+      await db.prepare("UPDATE sgi_ops_comunicacion_mensajes SET is_builtin = 1 WHERE id = ?").run(id);
+    }
+  }
 }
 
 function uniqueChatIds(raw: unknown): string[] {
@@ -253,7 +376,7 @@ const writeMw = [requireRole("admin_a", "admin_b", "operador"), requireModuleGra
 
 const CreateSchema = z.object({
   titulo: z.string().trim().min(3).max(180),
-  cuerpo: z.string().trim().max(3200).optional().default(""),
+  cuerpo: z.string().trim().max(8000).optional().default(""),
   categoria: z.enum(["general", "energia", "mantenimiento", "hashrate", "clima", "logistica"]).optional(),
   imageUrl: z.string().trim().max(500).optional().default(""),
   sendNow: z.boolean().optional(),
@@ -265,6 +388,43 @@ const TgSchema = z.object({
   botToken: z.string().optional().nullable(),
 });
 
+function mapTitulo(raw: Record<string, unknown>) {
+  const r = rowKeysToLowercase(raw);
+  return {
+    id: Number(r.id ?? 0),
+    titulo: String(r.titulo ?? ""),
+    isBuiltin: r.is_builtin === true || Number(r.is_builtin) === 1,
+  };
+}
+
+async function listTitulos(): Promise<Array<{ id: number; titulo: string; isBuiltin: boolean }>> {
+  await ensureOpsComunicacionSchema();
+  await seedOpsComunicacionCatalog();
+  const rows = (await db
+    .prepare("SELECT id, titulo, is_builtin FROM sgi_ops_comunicacion_titulos ORDER BY titulo ASC, id ASC")
+    .all()) as Record<string, unknown>[];
+  return rows.map(mapTitulo).filter((x) => x.id > 0 && x.titulo);
+}
+
+async function listMensajes(): Promise<Array<{ id: number; nombre: string; cuerpo: string; isBuiltin: boolean }>> {
+  await ensureOpsComunicacionSchema();
+  await seedOpsComunicacionCatalog();
+  const rows = (await db
+    .prepare("SELECT id, nombre, cuerpo, is_builtin FROM sgi_ops_comunicacion_mensajes ORDER BY nombre ASC, id ASC")
+    .all()) as Record<string, unknown>[];
+  return rows
+    .map((raw) => {
+      const r = rowKeysToLowercase(raw);
+      return {
+        id: Number(r.id ?? 0),
+        nombre: String(r.nombre ?? ""),
+        cuerpo: String(r.cuerpo ?? ""),
+        isBuiltin: r.is_builtin === true || Number(r.is_builtin) === 1,
+      };
+    })
+    .filter((x) => x.id > 0 && x.nombre);
+}
+
 opsComunicacionRouter.get("/ops-comunicacion", ...readMw, async (_req, res, next) => {
   try {
     await ensureOpsComunicacionSchema();
@@ -274,7 +434,196 @@ opsComunicacionRouter.get("/ops-comunicacion", ...readMw, async (_req, res, next
          FROM sgi_ops_comunicacion ORDER BY created_at DESC, id DESC LIMIT 200`
       )
       .all()) as Record<string, unknown>[];
-    res.json({ items: rows.map((x) => mapItem(x)), categories: CATEGORIES });
+    const titles = await listTitulos();
+    const messages = await listMensajes();
+    res.json({ items: rows.map((x) => mapItem(x)), categories: CATEGORIES, titles, messages });
+  } catch (e) {
+    next(e);
+  }
+});
+
+const TituloSchema = z.object({
+  titulo: z.string().trim().min(3).max(180),
+});
+
+opsComunicacionRouter.post("/ops-comunicacion/titulos", ...writeMw, async (req, res, next) => {
+  try {
+    await ensureOpsComunicacionSchema();
+    const parsed = TituloSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({ error: { message: "El título tiene que tener al menos 3 caracteres." } });
+    }
+    const titulo = parsed.data.titulo;
+    const dup = (await db
+      .prepare("SELECT id FROM sgi_ops_comunicacion_titulos WHERE LOWER(titulo) = LOWER(?) LIMIT 1")
+      .get(titulo)) as Record<string, unknown> | undefined;
+    if (dup) {
+      return res.status(409).json({ error: { message: "Ese título ya está en la lista." } });
+    }
+    const ts = db.isPostgres ? "NOW()" : "datetime('now')";
+    await db.prepare(`INSERT INTO sgi_ops_comunicacion_titulos (titulo, created_at) VALUES (?, ${ts})`).run(titulo);
+    const titles = await listTitulos();
+    const item = titles.find((x) => x.titulo.toLowerCase() === titulo.toLowerCase()) ?? null;
+    res.json({ ok: true, item, titles });
+  } catch (e) {
+    next(e);
+  }
+});
+
+opsComunicacionRouter.delete("/ops-comunicacion/titulos/:id", ...writeMw, async (req, res, next) => {
+  try {
+    await ensureOpsComunicacionSchema();
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      return res.status(400).json({ error: { message: "Id inválido." } });
+    }
+    const row = (await db
+      .prepare("SELECT is_builtin, titulo FROM sgi_ops_comunicacion_titulos WHERE id = ?")
+      .get(id)) as Record<string, unknown> | undefined;
+    const r = row ? rowKeysToLowercase(row) : {};
+    if (r.is_builtin === true || Number(r.is_builtin) === 1 || String(r.titulo ?? "").toLowerCase() === CORTE_PROGRAMADO_NOMBRE.toLowerCase()) {
+      return res.status(400).json({ error: { message: "Corte Programado es fijo y no se puede eliminar." } });
+    }
+    await db.prepare("DELETE FROM sgi_ops_comunicacion_titulos WHERE id = ?").run(id);
+    res.json({ ok: true, titles: await listTitulos() });
+  } catch (e) {
+    next(e);
+  }
+});
+
+opsComunicacionRouter.put("/ops-comunicacion/titulos/:id", ...writeMw, async (req, res, next) => {
+  try {
+    await ensureOpsComunicacionSchema();
+    const id = Number(req.params.id);
+    const parsed = TituloSchema.safeParse(req.body ?? {});
+    if (!Number.isFinite(id) || id <= 0 || !parsed.success) {
+      return res.status(400).json({ error: { message: "Datos inválidos." } });
+    }
+    const locked = (await db
+      .prepare("SELECT is_builtin FROM sgi_ops_comunicacion_titulos WHERE id = ?")
+      .get(id)) as Record<string, unknown> | undefined;
+    const lockedRow = locked ? rowKeysToLowercase(locked) : {};
+    if (lockedRow.is_builtin === true || Number(lockedRow.is_builtin) === 1) {
+      return res.status(400).json({ error: { message: "Corte Programado es fijo y no se puede editar." } });
+    }
+    const titulo = parsed.data.titulo;
+    const dup = (await db
+      .prepare("SELECT id FROM sgi_ops_comunicacion_titulos WHERE LOWER(titulo) = LOWER(?) AND id <> ? LIMIT 1")
+      .get(titulo, id)) as Record<string, unknown> | undefined;
+    if (dup) {
+      return res.status(409).json({ error: { message: "Ese título ya está en la lista." } });
+    }
+    await db.prepare("UPDATE sgi_ops_comunicacion_titulos SET titulo = ? WHERE id = ?").run(titulo, id);
+    const titles = await listTitulos();
+    const item = titles.find((x) => x.id === id) ?? null;
+    res.json({ ok: true, item, titles });
+  } catch (e) {
+    next(e);
+  }
+});
+
+const MensajeSchema = z.object({
+  nombre: z.string().trim().min(3).max(180),
+  cuerpo: z.string().trim().min(8).max(8000),
+});
+
+opsComunicacionRouter.post("/ops-comunicacion/mensajes", ...writeMw, async (req, res, next) => {
+  try {
+    await ensureOpsComunicacionSchema();
+    const parsed = MensajeSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({ error: { message: "El modelo necesita un nombre y un mensaje." } });
+    }
+    const { nombre, cuerpo } = parsed.data;
+    const dup = (await db
+      .prepare("SELECT id FROM sgi_ops_comunicacion_mensajes WHERE LOWER(nombre) = LOWER(?) LIMIT 1")
+      .get(nombre)) as Record<string, unknown> | undefined;
+    if (dup) {
+      return res.status(409).json({ error: { message: "Ese modelo de mensaje ya está en la lista." } });
+    }
+    const ts = db.isPostgres ? "NOW()" : "datetime('now')";
+    await db
+      .prepare(`INSERT INTO sgi_ops_comunicacion_mensajes (nombre, cuerpo, created_at) VALUES (?, ?, ${ts})`)
+      .run(nombre, cuerpo);
+    const messages = await listMensajes();
+    const item = messages.find((x) => x.nombre.toLowerCase() === nombre.toLowerCase()) ?? null;
+    res.json({ ok: true, item, messages });
+  } catch (e) {
+    next(e);
+  }
+});
+
+opsComunicacionRouter.delete("/ops-comunicacion/mensajes/:id", ...writeMw, async (req, res, next) => {
+  try {
+    await ensureOpsComunicacionSchema();
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      return res.status(400).json({ error: { message: "Id inválido." } });
+    }
+    const row = (await db
+      .prepare("SELECT is_builtin, nombre FROM sgi_ops_comunicacion_mensajes WHERE id = ?")
+      .get(id)) as Record<string, unknown> | undefined;
+    const r = row ? rowKeysToLowercase(row) : {};
+    if (r.is_builtin === true || Number(r.is_builtin) === 1 || String(r.nombre ?? "").toLowerCase() === CORTE_PROGRAMADO_NOMBRE.toLowerCase()) {
+      return res.status(400).json({ error: { message: "El modelo de Corte Programado es fijo y no se puede eliminar." } });
+    }
+    await db.prepare("DELETE FROM sgi_ops_comunicacion_mensajes WHERE id = ?").run(id);
+    res.json({ ok: true, messages: await listMensajes() });
+  } catch (e) {
+    next(e);
+  }
+});
+
+opsComunicacionRouter.put("/ops-comunicacion/mensajes/:id", ...writeMw, async (req, res, next) => {
+  try {
+    await ensureOpsComunicacionSchema();
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      return res.status(400).json({ error: { message: "Id inválido." } });
+    }
+    const parsed = z
+      .object({
+        nombre: z.string().trim().min(3).max(180).optional(),
+        cuerpo: z.string().trim().min(8).max(8000).optional(),
+      })
+      .safeParse(req.body ?? {});
+    if (!parsed.success || (!parsed.data.nombre && !parsed.data.cuerpo)) {
+      return res.status(400).json({ error: { message: "Indicá un nombre o un texto para el modelo." } });
+    }
+    const row = (await db
+      .prepare("SELECT is_builtin, nombre FROM sgi_ops_comunicacion_mensajes WHERE id = ?")
+      .get(id)) as Record<string, unknown> | undefined;
+    if (!row) {
+      return res.status(404).json({ error: { message: "Modelo no encontrado." } });
+    }
+    const r = rowKeysToLowercase(row);
+    const locked =
+      r.is_builtin === true ||
+      Number(r.is_builtin) === 1 ||
+      String(r.nombre ?? "").toLowerCase() === CORTE_PROGRAMADO_NOMBRE.toLowerCase();
+    const nombre = parsed.data.nombre;
+    const cuerpo = parsed.data.cuerpo;
+    if (locked && nombre) {
+      return res.status(400).json({ error: { message: "El nombre de Corte Programado es fijo. Podés guardar el texto del modelo." } });
+    }
+    if (nombre) {
+      const dup = (await db
+        .prepare("SELECT id FROM sgi_ops_comunicacion_mensajes WHERE LOWER(nombre) = LOWER(?) AND id <> ? LIMIT 1")
+        .get(nombre, id)) as Record<string, unknown> | undefined;
+      if (dup) {
+        return res.status(409).json({ error: { message: "Ese modelo de mensaje ya está en la lista." } });
+      }
+      if (cuerpo) {
+        await db.prepare("UPDATE sgi_ops_comunicacion_mensajes SET nombre = ?, cuerpo = ? WHERE id = ?").run(nombre, cuerpo, id);
+      } else {
+        await db.prepare("UPDATE sgi_ops_comunicacion_mensajes SET nombre = ? WHERE id = ?").run(nombre, id);
+      }
+    } else if (cuerpo) {
+      await db.prepare("UPDATE sgi_ops_comunicacion_mensajes SET cuerpo = ? WHERE id = ?").run(cuerpo, id);
+    }
+    const messages = await listMensajes();
+    const item = messages.find((x) => x.id === id) ?? null;
+    res.json({ ok: true, item, messages });
   } catch (e) {
     next(e);
   }

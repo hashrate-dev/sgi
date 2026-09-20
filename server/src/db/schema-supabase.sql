@@ -269,6 +269,21 @@ INSERT INTO sgi_ops_comunicacion_tg (id, enabled, chat_id) VALUES (1, 0, '')
 ON CONFLICT (id) DO NOTHING;
 ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS bot_token TEXT NOT NULL DEFAULT '';
 
+CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion_titulos (
+  id BIGSERIAL PRIMARY KEY,
+  titulo TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sgi_ops_com_titulos_lower ON sgi_ops_comunicacion_titulos (LOWER(titulo));
+
+CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion_mensajes (
+  id BIGSERIAL PRIMARY KEY,
+  nombre TEXT NOT NULL,
+  cuerpo TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sgi_ops_com_mensajes_lower ON sgi_ops_comunicacion_mensajes (LOWER(nombre));
+
 CREATE TABLE IF NOT EXISTS sgi_crypto_noticias_tg_sent (
   noticia_id BIGINT PRIMARY KEY,
   sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
