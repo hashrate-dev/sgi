@@ -27,6 +27,7 @@ import "../styles/crypto-noticias.css";
 import "../styles/ops-comunicacion.css";
 
 const DEFAULT_TG_HEADER = "Comunicación granja HRS";
+const PATH = "/gestion-administrativa/comunicacion";
 
 function todayIso(): string {
   const d = new Date();
