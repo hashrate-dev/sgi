@@ -509,10 +509,28 @@
   min-height: 0;
   margin: 0;
   flex: 1 1 auto;
+  -webkit-line-clamp: 2;
 }
 
 .ops-com-hist .crypto-news-card__summary {
   color: rgba(241, 245, 249, 0.9);
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+  min-height: 0;
+  flex: 1 1 auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-bottom: 0.65rem;
+}
+
+.ops-com-hist {
+  height: auto;
+  min-height: 17.5rem;
+}
+
+.ops-com-hist .crypto-news-card__actions {
+  margin-top: auto;
 }
 
 .ops-com-hist__head {
