@@ -15,11 +15,15 @@ export function formatOpsFarmTelegramHtml(opts: {
   title: string;
   body: string;
   categoryLabel?: string;
+  headerLine?: string;
 }): string {
   const title = escapeTelegramHtml(clip(opts.title.replace(/\s+/g, " "), 180));
   const body = escapeTelegramHtml(clip(opts.body.replace(/\r\n/g, "\n"), 3200));
   const cat = opts.categoryLabel ? escapeTelegramHtml(opts.categoryLabel) : "";
-  const lines = ["⚡ <b>Comunicación granja HRS</b>"];
+  const header = escapeTelegramHtml(
+    clip(String(opts.headerLine || "Comunicación granja HRS").replace(/^\s*⚡\s*/u, "").replace(/\s+/g, " "), 80)
+  );
+  const lines = [`⚡ <b>${header}</b>`];
   if (cat) lines.push(`<i>${cat}</i>`);
   lines.push("", `<b>${title}</b>`);
   if (body) lines.push("", body);

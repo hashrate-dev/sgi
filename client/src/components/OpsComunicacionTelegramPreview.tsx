@@ -9,6 +9,7 @@ type Props = {
   body: string;
   categoryLabel: string;
   imageUrl?: string;
+  headerLine?: string;
 };
 
 function clockNow(): string {
@@ -19,7 +20,15 @@ function clockNow(): string {
   }
 }
 
-export function OpsComunicacionTelegramPreview({ open, onClose, title, body, categoryLabel, imageUrl }: Props) {
+export function OpsComunicacionTelegramPreview({
+  open,
+  onClose,
+  title,
+  body,
+  categoryLabel,
+  headerLine,
+  imageUrl,
+}: Props) {
   const titleId = useId();
   const closeBtnRef = useRef<HTMLButtonElement>(null);
   const botName = "Hashrate Operations";
@@ -27,7 +36,7 @@ export function OpsComunicacionTelegramPreview({ open, onClose, title, body, cat
   const [photoBroken, setPhotoBroken] = useState(false);
   const photo = String(imageUrl || "").trim();
   const showPhoto = /^https?:\/\//i.test(photo) && !photoBroken;
-  const html = formatOpsFarmTelegramHtml({ title, body, categoryLabel });
+  const html = formatOpsFarmTelegramHtml({ title, body, categoryLabel, headerLine });
 
   useEffect(() => {
     if (!open) return;

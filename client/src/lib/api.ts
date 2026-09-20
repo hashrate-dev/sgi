@@ -2535,10 +2535,18 @@ export type OpsComunicacionMessage = {
 export function getOpsComunicacion(): Promise<{
   items: OpsComunicacionItem[];
   categories: Array<{ id: string; label: string }>;
+  telegramHeader?: string;
   titles?: OpsComunicacionTitle[];
   messages?: OpsComunicacionMessage[];
 }> {
   return api("/api/ops-comunicacion");
+}
+
+export function putOpsComunicacionCopy(body: {
+  telegramHeader: string;
+  categories: Array<{ id: string; label: string }>;
+}): Promise<{ ok: boolean; telegramHeader: string; categories: Array<{ id: string; label: string }> }> {
+  return api("/api/ops-comunicacion/copy", { method: "POST", body: JSON.stringify(body) });
 }
 
 export function createOpsComunicacionTitle(titulo: string): Promise<{

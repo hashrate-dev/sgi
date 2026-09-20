@@ -10,6 +10,7 @@ import {
   createOpsComunicacionTitle,
   deleteOpsComunicacionTitle,
   getOpsComunicacion,
+  putOpsComunicacionCopy,
   sendOpsComunicacionTelegram,
   updateOpsComunicacionTitle,
   type OpsComunicacionItem,
@@ -24,7 +25,7 @@ import "../styles/facturacion.css";
 import "../styles/crypto-noticias.css";
 import "../styles/ops-comunicacion.css";
 
-const PATH = "/gestion-administrativa/comunicacion";
+const DEFAULT_TG_HEADER = "Comunicación granja HRS";
 
 function todayIso(): string {
   const d = new Date();
@@ -85,6 +86,10 @@ export function OpsComunicacionPage() {
   const [horario2To, setHorario2To] = useState("24:00");
   const [cuerpo, setCuerpo] = useState("");
   const [categoria, setCategoria] = useState("general");
+  const [telegramHeader, setTelegramHeader] = useState(DEFAULT_TG_HEADER);
+  const [headerDraft, setHeaderDraft] = useState(DEFAULT_TG_HEADER);
+  const [categoryLabelDraft, setCategoryLabelDraft] = useState("Operaciones");
+  const [copyBusy, setCopyBusy] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
   const [sendNow, setSendNow] = useState(true);
 
@@ -111,6 +116,10 @@ export function OpsComunicacionPage() {
       cuerpoOverride != null &&
       cuerpoOverride.replace(/\r\n/g, "\n").trim() !== cuerpoLleno.replace(/\r\n/g, "\n").trim()
   );
+  const savedCategoryLabel = categories.find((c) => c.id === categoria)?.label || "";
+  const copyDirty =
+    headerDraft.replace(/\s+/g, " ").trim() !== telegramHeader.replace(/\s+/g, " ").trim() ||
+    categoryLabelDraft.replace(/\s+/g, " ").trim() !== savedCategoryLabel.replace(/\s+/g, " ").trim();
 
   const load = useCallback(async () => {
     setTableLoading(true);
@@ -118,6 +127,9 @@ export function OpsComunicacionPage() {
       const res = await getOpsComunicacion();
       setItems(res.items || []);
       setCategories(res.categories || []);
+      const header = (res.telegramHeader || DEFAULT_TG_HEADER).trim() || DEFAULT_TG_HEADER;
+      setTelegramHeader(header);
+      setHeaderDraft(header);
       const nextTitles = res.titles || [];
       setTitles(nextTitles);
       setTituloId((cur) => {
@@ -175,6 +187,11 @@ export function OpsComunicacionPage() {
     setCuerpoOverride(null);
     if (tituloEsCorte) setCategoria("energia");
   }, [tituloEsCorte, tituloId]);
+
+  useEffect(() => {
+    const lab = categories.find((c) => c.id === categoria)?.label || "";
+    if (lab) setCategoryLabelDraft(lab);
+  }, [categoria, categories]);
 
   if (!loading && !user) return <Navigate to="/login" replace />;
   if (!loading && user && !canAccessComunicacionModule(user) && !canUserAccessNavPath(user, PATH)) {
@@ -269,6 +286,40 @@ export function OpsComunicacionPage() {
     setOk("Mensaje en blanco. Escribí uno nuevo o volvé a elegir el título.");
   };
 
+  const onSaveCopy = async () => {
+    if (!canEdit) return;
+    const header = headerDraft.replace(/\s+/g, " ").trim();
+    const tipo = categoryLabelDraft.replace(/\s+/g, " ").trim();
+    if (header.length < 3) {
+      setErr("El encabezado de Telegram tiene que tener al menos 3 caracteres.");
+      return;
+    }
+    if (tipo.length < 2) {
+      setErr("El tipo (segunda línea de Telegram) tiene que tener al menos 2 caracteres.");
+      return;
+    }
+    setCopyBusy(true);
+    setErr("");
+    setOk("");
+    try {
+      const r = await putOpsComunicacionCopy({
+        telegramHeader: header,
+        categories: (categories.length
+          ? categories
+          : [{ id: categoria, label: tipo }]
+        ).map((c) => (c.id === categoria ? { ...c, label: tipo } : c)),
+      });
+      setCategories(r.categories || []);
+      setTelegramHeader(r.telegramHeader || header);
+      setHeaderDraft(r.telegramHeader || header);
+      setOk("Textos de Telegram guardados. Los próximos envíos usan este encabezado y tipo.");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "No se pudieron guardar los textos de Telegram.");
+    } finally {
+      setCopyBusy(false);
+    }
+  };
+
   const onSend = async (row: OpsComunicacionItem) => {
     if (!canEdit || row.telegramSent) return;
     setSendingId(row.id);
@@ -356,6 +407,51 @@ export function OpsComunicacionPage() {
 
           {canEdit ? (
             <form className="ops-com-form" onSubmit={onSubmit}>
+              <fieldset className="ops-com-tg-copy">
+                <legend>Texto en Telegram</legend>
+                <p className="ops-com-tg-copy__hint">
+                  Primera y segunda línea del mensaje (⚡ encabezado e itálica). Se guardan para todos los envíos.
+                </p>
+                <div className="ops-com-form__row">
+                  <div className="ops-com-field">
+                    <label htmlFor="ops-tg-header">Encabezado</label>
+                    <input
+                      id="ops-tg-header"
+                      className="fact-input"
+                      value={headerDraft}
+                      onChange={(e) => setHeaderDraft(e.target.value)}
+                      disabled={busy || copyBusy}
+                      maxLength={80}
+                      placeholder={DEFAULT_TG_HEADER}
+                    />
+                  </div>
+                  <div className="ops-com-field">
+                    <label htmlFor="ops-tg-tipo-line">Tipo (segunda línea)</label>
+                    <input
+                      id="ops-tg-tipo-line"
+                      className="fact-input"
+                      value={categoryLabelDraft}
+                      onChange={(e) => setCategoryLabelDraft(e.target.value)}
+                      disabled={busy || copyBusy}
+                      maxLength={60}
+                      placeholder="Energía / ANDE"
+                    />
+                  </div>
+                </div>
+                <div className="ops-com-tg-copy__save">
+                  <button
+                    type="button"
+                    className="ops-com-save-model-btn"
+                    disabled={busy || copyBusy || !copyDirty}
+                    onClick={() => void onSaveCopy()}
+                  >
+                    {copyBusy ? "Guardando…" : "Guardar textos"}
+                  </button>
+                  <span className="ops-com-model-save__hint">
+                    {copyDirty ? "Hay cambios en el encabezado o el tipo." : "Así se ve ahora en Telegram."}
+                  </span>
+                </div>
+              </fieldset>
               <div className="ops-com-form__row">
                 <div className="ops-com-field">
                   <label htmlFor="ops-titulo">Título</label>
@@ -581,7 +677,9 @@ export function OpsComunicacionPage() {
           onClose={() => setPreviewOpen(false)}
           title={titulo.trim()}
           body={cuerpoFinal}
+          headerLine={headerDraft}
           categoryLabel={
+            categoryLabelDraft.trim() ||
             (categories.find((c) => c.id === categoria) || { label: "Operaciones" }).label
           }
           imageUrl={imageUrl}

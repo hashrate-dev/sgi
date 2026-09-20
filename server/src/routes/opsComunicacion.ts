@@ -27,7 +27,12 @@ const CATEGORIES = [
   { id: "logistica", label: "Logística" },
 ] as const;
 
+const DEFAULT_TG_HEADER = "Comunicación granja HRS";
+const CATEGORY_ID_ENUM = ["general", "energia", "mantenimiento", "hashrate", "clima", "logistica"] as const;
+
 type CategoryId = (typeof CATEGORIES)[number]["id"];
+type OpsCategory = { id: CategoryId; label: string };
+type CopySettings = { telegramHeader: string; categories: OpsCategory[] };
 
 type TgSettings = {
   enabled: boolean;
@@ -36,8 +41,61 @@ type TgSettings = {
   botToken: string;
 };
 
-function categoryLabel(id: string): string {
-  return CATEGORIES.find((c) => c.id === id)?.label ?? "Operaciones";
+function normalizeHeaderLine(raw: string): string {
+  return String(raw ?? "")
+    .replace(/^\s*⚡\s*/u, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
+}
+
+function mergeCategoryLabels(rawJson: unknown): OpsCategory[] {
+  let overlay: Array<{ id?: unknown; label?: unknown }> = [];
+  const s = String(rawJson ?? "").trim();
+  if (s) {
+    try {
+      const j = JSON.parse(s) as unknown;
+      if (Array.isArray(j)) overlay = j as Array<{ id?: unknown; label?: unknown }>;
+    } catch {
+      overlay = [];
+    }
+  }
+  return CATEGORIES.map((c) => {
+    const hit = overlay.find((x) => String(x.id ?? "") === c.id);
+    const label = String(hit?.label ?? "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 60);
+    return { id: c.id, label: label || c.label };
+  });
+}
+
+function categoryLabel(id: string, cats?: OpsCategory[]): string {
+  const list = cats && cats.length ? cats : [...CATEGORIES];
+  return list.find((c) => c.id === id)?.label ?? "Operaciones";
+}
+
+async function loadCopySettings(): Promise<CopySettings> {
+  await ensureOpsComunicacionSchema();
+  const row = (await db
+    .prepare("SELECT telegram_header, categories_json FROM sgi_ops_comunicacion_tg WHERE id = 1")
+    .get()) as Record<string, unknown> | undefined;
+  const r = row ? rowKeysToLowercase(row) : {};
+  const telegramHeader = normalizeHeaderLine(String(r.telegram_header ?? "")) || DEFAULT_TG_HEADER;
+  return { telegramHeader, categories: mergeCategoryLabels(r.categories_json) };
+}
+
+async function saveCopySettings(input: { telegramHeader: string; categories: OpsCategory[] }): Promise<CopySettings> {
+  await ensureOpsComunicacionSchema();
+  const header = normalizeHeaderLine(input.telegramHeader) || DEFAULT_TG_HEADER;
+  const categories = mergeCategoryLabels(JSON.stringify(input.categories));
+  const ts = db.isPostgres ? "NOW()" : "datetime('now')";
+  await db
+    .prepare(
+      `UPDATE sgi_ops_comunicacion_tg SET telegram_header = ?, categories_json = ?, updated_at = ${ts} WHERE id = 1`
+    )
+    .run(header, JSON.stringify(categories));
+  return { telegramHeader: header, categories };
 }
 
 let schemaEnsured = false;
@@ -111,6 +169,12 @@ async function ensureOpsComunicacionSchema(): Promise<void> {
   if (db.isPostgres) {
     await db.prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS bot_token TEXT NOT NULL DEFAULT ''").run();
     await db
+      .prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS telegram_header TEXT NOT NULL DEFAULT ''")
+      .run();
+    await db
+      .prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS categories_json TEXT NOT NULL DEFAULT ''")
+      .run();
+    await db
       .prepare(
         `CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion_titulos (
           id BIGSERIAL PRIMARY KEY,
@@ -159,6 +223,8 @@ async function ensureOpsComunicacionSchema(): Promise<void> {
       "ALTER TABLE sgi_ops_comunicacion_titulos ADD COLUMN is_builtin INTEGER NOT NULL DEFAULT 0",
       "ALTER TABLE sgi_ops_comunicacion_titulos ADD COLUMN cuerpo TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE sgi_ops_comunicacion_mensajes ADD COLUMN is_builtin INTEGER NOT NULL DEFAULT 0",
+      "ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN telegram_header TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN categories_json TEXT NOT NULL DEFAULT ''",
     ]) {
       try {
         await db.prepare(sql).run();
@@ -188,6 +254,12 @@ async function ensureOpsComunicacionSchema(): Promise<void> {
     await db.prepare("ALTER TABLE sgi_ops_comunicacion_titulos ADD COLUMN IF NOT EXISTS is_builtin INTEGER NOT NULL DEFAULT 0").run();
     await db.prepare("ALTER TABLE sgi_ops_comunicacion_titulos ADD COLUMN IF NOT EXISTS cuerpo TEXT NOT NULL DEFAULT ''").run();
     await db.prepare("ALTER TABLE sgi_ops_comunicacion_mensajes ADD COLUMN IF NOT EXISTS is_builtin INTEGER NOT NULL DEFAULT 0").run();
+    await db
+      .prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS telegram_header TEXT NOT NULL DEFAULT ''")
+      .run();
+    await db
+      .prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS categories_json TEXT NOT NULL DEFAULT ''")
+      .run();
   }
   await seedOpsComunicacionCatalog();
   schemaEnsured = true;
@@ -352,14 +424,15 @@ function telegramPayload(settings: TgSettings) {
   };
 }
 
-function mapItem(raw: Record<string, unknown>) {
+function mapItem(raw: Record<string, unknown>, cats?: OpsCategory[]) {
   const r = rowKeysToLowercase(raw);
+  const categoria = String(r.categoria ?? "general");
   return {
     id: Number(r.id ?? 0),
     titulo: String(r.titulo ?? ""),
     cuerpo: String(r.cuerpo ?? ""),
-    categoria: String(r.categoria ?? "general"),
-    categoriaLabel: categoryLabel(String(r.categoria ?? "general")),
+    categoria,
+    categoriaLabel: categoryLabel(categoria, cats),
     imageUrl: String(r.image_url ?? ""),
     telegramSent: r.telegram_sent === true || Number(r.telegram_sent) === 1,
     sentAt: r.sent_at == null ? "" : String(r.sent_at),
@@ -370,6 +443,7 @@ function mapItem(raw: Record<string, unknown>) {
 
 async function deliverToTelegram(titulo: string, cuerpo: string, categoria: string, imageUrl: string, dest: string[]) {
   const settings = await loadTgSettings();
+  const copy = await loadCopySettings();
   const token = opsComunicacionBotToken(settings.botToken);
   if (!token) {
     throw new Error(
@@ -379,7 +453,8 @@ async function deliverToTelegram(titulo: string, cuerpo: string, categoria: stri
   const html = formatOpsFarmTelegramHtml({
     title: titulo,
     body: cuerpo,
-    categoryLabel: categoryLabel(categoria),
+    categoryLabel: categoryLabel(categoria, copy.categories),
+    headerLine: copy.telegramHeader,
   });
   let sent = 0;
   let lastError = "";
@@ -472,9 +547,16 @@ opsComunicacionRouter.get("/ops-comunicacion", ...readMw, async (_req, res, next
          FROM sgi_ops_comunicacion ORDER BY created_at DESC, id DESC LIMIT 200`
       )
       .all()) as Record<string, unknown>[];
+    const copy = await loadCopySettings();
     const titles = await listTitulos();
     const messages = await listMensajes();
-    res.json({ items: rows.map((x) => mapItem(x)), categories: CATEGORIES, titles, messages });
+    res.json({
+      items: rows.map((x) => mapItem(x, copy.categories)),
+      categories: copy.categories,
+      telegramHeader: copy.telegramHeader,
+      titles,
+      messages,
+    });
   } catch (e) {
     next(e);
   }
@@ -710,7 +792,8 @@ opsComunicacionRouter.post("/ops-comunicacion", ...writeMw, async (req, res, nex
          FROM sgi_ops_comunicacion ORDER BY id DESC LIMIT 1`
       )
       .get()) as Record<string, unknown> | undefined;
-    const item = row ? mapItem(row) : null;
+    const copy = await loadCopySettings();
+    const item = row ? mapItem(row, copy.categories) : null;
     if (data.sendNow && item) {
       const settings = await loadTgSettings();
       const dest = settings.chatIds.length ? settings.chatIds : settings.chatId ? [settings.chatId] : [];
@@ -753,7 +836,8 @@ opsComunicacionRouter.post("/ops-comunicacion/:id/send", ...writeMw, async (req,
       )
       .get(id)) as Record<string, unknown> | undefined;
     if (!row) return res.status(404).json({ error: { message: "Comunicado no encontrado." } });
-    const item = mapItem(row);
+    const copy = await loadCopySettings();
+    const item = mapItem(row, copy.categories);
     if (item.telegramSent) {
       return res.status(409).json({ error: { message: "Este comunicado ya se envió a Telegram." } });
     }
@@ -768,6 +852,38 @@ opsComunicacionRouter.post("/ops-comunicacion/:id/send", ...writeMw, async (req,
     const sentTs = db.isPostgres ? "NOW()" : "datetime('now')";
     await db.prepare(`UPDATE sgi_ops_comunicacion SET telegram_sent = 1, sent_at = ${sentTs} WHERE id = ?`).run(id);
     res.json({ ok: true, sentTo, item: { ...item, telegramSent: true } });
+  } catch (e) {
+    next(e);
+  }
+});
+
+opsComunicacionRouter.post("/ops-comunicacion/copy", ...writeMw, async (req, res, next) => {
+  try {
+    await ensureOpsComunicacionSchema();
+    const parsed = z
+      .object({
+        telegramHeader: z.string().max(80),
+        categories: z
+          .array(
+            z.object({
+              id: z.enum(CATEGORY_ID_ENUM),
+              label: z.string().trim().min(2).max(60),
+            })
+          )
+          .min(1)
+          .max(12),
+      })
+      .safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: { message: "El encabezado y el tipo tienen que tener texto (mínimo 2 caracteres el tipo)." },
+      });
+    }
+    const copy = await saveCopySettings({
+      telegramHeader: parsed.data.telegramHeader,
+      categories: parsed.data.categories,
+    });
+    res.json({ ok: true, telegramHeader: copy.telegramHeader, categories: copy.categories });
   } catch (e) {
     next(e);
   }

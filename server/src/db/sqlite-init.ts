@@ -465,11 +465,17 @@ CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion_mensajes (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `);
-  try {
-    db.exec(`ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN bot_token TEXT NOT NULL DEFAULT ''`);
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (!msg.includes("duplicate column")) throw e;
+  for (const col of [
+    "bot_token TEXT NOT NULL DEFAULT ''",
+    "telegram_header TEXT NOT NULL DEFAULT ''",
+    "categories_json TEXT NOT NULL DEFAULT ''",
+  ] as const) {
+    try {
+      db.exec(`ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN ${col}`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!msg.includes("duplicate column")) throw e;
+    }
   }
   try {
     db.exec(`ALTER TABLE sgi_ops_comunicacion_titulos ADD COLUMN cuerpo TEXT NOT NULL DEFAULT ''`);
