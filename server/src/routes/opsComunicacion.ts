@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
 import { db } from "../db.js";
 import { requireRole } from "../middleware/auth.js";
@@ -185,6 +185,7 @@ async function ensureOpsComunicacionSchema(): Promise<void> {
     .prepare("CREATE INDEX IF NOT EXISTS idx_sgi_ops_comunicacion_created ON sgi_ops_comunicacion(created_at DESC, id DESC)")
     .run();
   if (db.isPostgres) {
+    await db.prepare("ALTER TABLE sgi_ops_comunicacion ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ").run();
     await db.prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS bot_token TEXT NOT NULL DEFAULT ''").run();
     await db
       .prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS telegram_header TEXT NOT NULL DEFAULT ''")
@@ -209,6 +210,12 @@ async function ensureOpsComunicacionSchema(): Promise<void> {
       )
       .run();
   } else {
+    try {
+      await db.prepare("ALTER TABLE sgi_ops_comunicacion ADD COLUMN scheduled_at TEXT").run();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!/duplicate column/i.test(msg)) throw e;
+    }
     try {
       await db.prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN bot_token TEXT NOT NULL DEFAULT ''").run();
     } catch (e: unknown) {
@@ -643,6 +650,7 @@ function mapItem(raw: Record<string, unknown>, cats?: OpsCategory[], corteNo = 0
     imageUrl: String(r.image_url ?? ""),
     telegramSent: r.telegram_sent === true || Number(r.telegram_sent) === 1,
     sentAt: r.sent_at == null ? "" : String(r.sent_at),
+    scheduledAt: r.scheduled_at == null ? "" : String(r.scheduled_at),
     createdByEmail: String(r.created_by_email ?? ""),
     createdAt: String(r.created_at ?? ""),
     corteNo: n,
@@ -693,6 +701,78 @@ async function deliverToTelegram(titulo: string, cuerpo: string, categoria: stri
   return sent;
 }
 
+function isQueuedItem(item: { telegramSent: boolean; scheduledAt: string }): boolean {
+  return !item.telegramSent && Boolean(String(item.scheduledAt || "").trim());
+}
+
+function isDueScheduled(iso: string, nowMs = Date.now()): boolean {
+  const t = Date.parse(iso);
+  return Number.isFinite(t) && t <= nowMs + 1500;
+}
+
+export async function flushDueOpsComunicacion(): Promise<{ sent: number; failed: number }> {
+  await ensureOpsComunicacionSchema();
+  const copy = await loadCopySettings();
+  const rows = (await db
+    .prepare(
+      `SELECT id, titulo, cuerpo, categoria, image_url, telegram_sent, sent_at, scheduled_at, created_by_email, created_at
+       FROM sgi_ops_comunicacion
+       WHERE telegram_sent = 0 AND scheduled_at IS NOT NULL
+       ORDER BY scheduled_at ASC, id ASC
+       LIMIT 40`
+    )
+    .all()) as Record<string, unknown>[];
+  const settings = await loadTgSettings();
+  const dest = settings.chatIds.length ? settings.chatIds : settings.chatId ? [settings.chatId] : [];
+  let sent = 0;
+  let failed = 0;
+  for (const raw of rows) {
+    const item = mapItem(raw, copy.categories);
+    if (!isQueuedItem(item) || !isDueScheduled(item.scheduledAt)) continue;
+    if (!settings.enabled || dest.length === 0) {
+      failed += 1;
+      continue;
+    }
+    try {
+      await deliverToTelegram(item.titulo, item.cuerpo, item.categoria, item.imageUrl, dest);
+      const sentTs = db.isPostgres ? "NOW()" : "datetime('now')";
+      await db.prepare(`UPDATE sgi_ops_comunicacion SET telegram_sent = 1, sent_at = ${sentTs} WHERE id = ?`).run(item.id);
+      sent += 1;
+    } catch {
+      failed += 1;
+    }
+  }
+  return { sent, failed };
+}
+
+export async function opsComunicacionCronHandler(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const auth = String(req.headers.authorization ?? "");
+    const cronHeader = String(req.headers["x-vercel-cron"] ?? "");
+    const secret = String(process.env.CRON_SECRET ?? "").trim();
+    const okBearer = Boolean(secret) && auth === `Bearer ${secret}`;
+    const okVercel = cronHeader === "1";
+    if (!okBearer && !okVercel) {
+      res.status(401).json({ error: { message: "No autorizado." } });
+      return;
+    }
+    const result = await flushDueOpsComunicacion();
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    next(e);
+  }
+}
+
+let schedulerStarted = false;
+export function startOpsComunicacionScheduler(): void {
+  if (schedulerStarted) return;
+  schedulerStarted = true;
+  void flushDueOpsComunicacion().catch(() => undefined);
+  setInterval(() => {
+    void flushDueOpsComunicacion().catch(() => undefined);
+  }, 30_000);
+}
+
 const readMw = [requireRole("admin_a", "admin_b", "operador", "lector"), requireModuleGrant("comunicacion")] as const;
 const writeMw = [requireRole("admin_a", "admin_b", "operador"), requireModuleGrant("comunicacion")] as const;
 
@@ -702,6 +782,7 @@ const CreateSchema = z.object({
   categoria: z.enum(["general", "energia", "mantenimiento", "hashrate", "clima", "logistica"]).optional(),
   imageUrl: z.string().trim().max(500).optional().default(""),
   sendNow: z.boolean().optional(),
+  scheduledAt: z.string().trim().max(40).optional().default(""),
   corteControl: z
     .object({
       fecha: z.string().trim().max(16).optional(),
@@ -1020,9 +1101,10 @@ opsComunicacionRouter.post("/ops-comunicacion/translate", ...readMw, async (req,
 opsComunicacionRouter.get("/ops-comunicacion", ...readMw, async (_req, res, next) => {
   try {
     await ensureOpsComunicacionSchema();
+    await flushDueOpsComunicacion().catch(() => undefined);
     const rows = (await db
       .prepare(
-        `SELECT id, titulo, cuerpo, categoria, image_url, telegram_sent, sent_at, created_by_email, created_at
+        `SELECT id, titulo, cuerpo, categoria, image_url, telegram_sent, sent_at, scheduled_at, created_by_email, created_at
          FROM sgi_ops_comunicacion ORDER BY created_at DESC, id DESC LIMIT 200`
       )
       .all()) as Record<string, unknown>[];
@@ -1277,16 +1359,27 @@ opsComunicacionRouter.post("/ops-comunicacion", ...writeMw, async (req, res, nex
     const imageUrl = data.imageUrl && /^https?:\/\//i.test(data.imageUrl) ? data.imageUrl : "";
     const email = String(req.user?.email ?? "").trim();
     const ts = db.isPostgres ? "NOW()" : "datetime('now')";
+    let scheduledAt: string | null = null;
+    if (!data.sendNow && data.scheduledAt) {
+      const when = Date.parse(data.scheduledAt);
+      if (!Number.isFinite(when)) {
+        return res.status(400).json({ error: { message: "La fecha y hora programadas no son válidas." } });
+      }
+      if (when < Date.now() + 20_000) {
+        return res.status(400).json({ error: { message: "Programá al menos un minuto más adelante." } });
+      }
+      scheduledAt = new Date(when).toISOString();
+    }
     await db
       .prepare(
-        `INSERT INTO sgi_ops_comunicacion (titulo, cuerpo, categoria, image_url, telegram_sent, created_by_email, created_at)
-         VALUES (?, ?, ?, ?, 0, ?, ${ts})`
+        `INSERT INTO sgi_ops_comunicacion (titulo, cuerpo, categoria, image_url, telegram_sent, scheduled_at, created_by_email, created_at)
+         VALUES (?, ?, ?, ?, 0, ?, ?, ${ts})`
       )
-      .run(data.titulo, data.cuerpo ?? "", categoria, imageUrl, email);
+      .run(data.titulo, data.cuerpo ?? "", categoria, imageUrl, scheduledAt, email);
 
     const row = (await db
       .prepare(
-        `SELECT id, titulo, cuerpo, categoria, image_url, telegram_sent, sent_at, created_by_email, created_at
+        `SELECT id, titulo, cuerpo, categoria, image_url, telegram_sent, sent_at, scheduled_at, created_by_email, created_at
          FROM sgi_ops_comunicacion ORDER BY id DESC LIMIT 1`
       )
       .get()) as Record<string, unknown> | undefined;
@@ -1321,6 +1414,9 @@ opsComunicacionRouter.post("/ops-comunicacion", ...writeMw, async (req, res, nex
         sentTo,
         item: { ...item, telegramSent: true, sentAt: new Date().toISOString() },
       });
+    }
+    if (scheduledAt && item) {
+      return res.json({ ok: true, item: { ...item, scheduledAt }, queued: true });
     }
     res.json({ ok: true, item });
   } catch (e) {
@@ -1455,6 +1551,32 @@ opsComunicacionRouter.delete("/ops-comunicacion/cortes/:id", ...writeMw, async (
   }
 });
 
+opsComunicacionRouter.delete("/ops-comunicacion/:id/schedule", ...writeMw, async (req, res, next) => {
+  try {
+    await ensureOpsComunicacionSchema();
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      return res.status(400).json({ error: { message: "Id inválido." } });
+    }
+    const row = (await db
+      .prepare(
+        `SELECT id, titulo, cuerpo, categoria, image_url, telegram_sent, sent_at, scheduled_at, created_by_email, created_at
+         FROM sgi_ops_comunicacion WHERE id = ?`
+      )
+      .get(id)) as Record<string, unknown> | undefined;
+    if (!row) return res.status(404).json({ error: { message: "Comunicado no encontrado." } });
+    const copy = await loadCopySettings();
+    const item = mapItem(row, copy.categories);
+    if (item.telegramSent) {
+      return res.status(409).json({ error: { message: "Este comunicado ya se envió." } });
+    }
+    await db.prepare("UPDATE sgi_ops_comunicacion SET scheduled_at = NULL WHERE id = ?").run(id);
+    res.json({ ok: true, item: { ...item, scheduledAt: "" } });
+  } catch (e) {
+    next(e);
+  }
+});
+
 opsComunicacionRouter.post("/ops-comunicacion/:id/send", ...writeMw, async (req, res, next) => {
   try {
     await ensureOpsComunicacionSchema();
@@ -1464,7 +1586,7 @@ opsComunicacionRouter.post("/ops-comunicacion/:id/send", ...writeMw, async (req,
     }
     const row = (await db
       .prepare(
-        `SELECT id, titulo, cuerpo, categoria, image_url, telegram_sent, sent_at, created_by_email, created_at
+        `SELECT id, titulo, cuerpo, categoria, image_url, telegram_sent, sent_at, scheduled_at, created_by_email, created_at
          FROM sgi_ops_comunicacion WHERE id = ?`
       )
       .get(id)) as Record<string, unknown> | undefined;

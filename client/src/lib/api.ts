@@ -2504,6 +2504,7 @@ export type OpsComunicacionItem = {
   imageUrl: string;
   telegramSent: boolean;
   sentAt: string;
+  scheduledAt?: string;
   createdByEmail: string;
   createdAt: string;
   corteNo?: number;
@@ -2610,12 +2611,13 @@ export function createOpsComunicacion(body: {
   categoria?: string;
   imageUrl?: string;
   sendNow?: boolean;
+  scheduledAt?: string;
   corteControl?: {
     fecha?: string;
     motivo?: string;
     windows?: Array<{ from: string; to: string }>;
   };
-}): Promise<{ ok: boolean; sentTo?: number; item: OpsComunicacionItem | null }> {
+}): Promise<{ ok: boolean; sentTo?: number; queued?: boolean; item: OpsComunicacionItem | null }> {
   return api("/api/ops-comunicacion", { method: "POST", body: JSON.stringify(body) });
 }
 
@@ -2673,6 +2675,10 @@ export function updateOpsComunicacionCorte(
 
 export function deleteOpsComunicacionCorte(id: number): Promise<{ ok: boolean; items: OpsCorteWindow[] }> {
   return api(`/api/ops-comunicacion/cortes/${id}`, { method: "DELETE" });
+}
+
+export function cancelOpsComunicacionSchedule(id: number): Promise<{ ok: boolean; item: OpsComunicacionItem }> {
+  return api(`/api/ops-comunicacion/${id}/schedule`, { method: "DELETE" });
 }
 
 export function sendOpsComunicacionTelegram(id: number): Promise<{ ok: boolean; sentTo?: number }> {

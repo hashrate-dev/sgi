@@ -488,6 +488,12 @@ CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion_corte_seq (
 );
 INSERT OR IGNORE INTO sgi_ops_comunicacion_corte_seq (id, next_num) VALUES (1, 0);
 `);
+  try {
+    db.exec(`ALTER TABLE sgi_ops_comunicacion ADD COLUMN scheduled_at TEXT`);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
   for (const col of [
     "bot_token TEXT NOT NULL DEFAULT ''",
     "telegram_header TEXT NOT NULL DEFAULT ''",

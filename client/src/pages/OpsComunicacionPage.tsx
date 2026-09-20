@@ -10,6 +10,7 @@ import { useAuth } from "../contexts/AuthContext";
 import {
   createOpsComunicacion,
   createOpsComunicacionTitle,
+  cancelOpsComunicacionSchedule,
   deleteOpsComunicacionTitle,
   getOpsComunicacion,
   putOpsComunicacionCopy,
@@ -39,8 +40,20 @@ function todayIso(): string {
   return `${y}-${m}-${day}`;
 }
 
+function defaultScheduleParts(): { date: string; time: string } {
+  const d = new Date(Date.now() + 60 * 60 * 1000);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return { date: `${y}-${m}-${day}`, time: `${hh}:${mm}` };
+}
+
 function publishedAt(row: OpsComunicacionItem): string {
-  return row.telegramSent && row.sentAt ? row.sentAt : row.createdAt;
+  if (row.telegramSent && row.sentAt) return row.sentAt;
+  if (!row.telegramSent && row.scheduledAt) return row.scheduledAt;
+  return row.createdAt;
 }
 
 function formatPublishedParts(iso: string): { date: string; time: string } {
@@ -98,6 +111,10 @@ export function OpsComunicacionPage() {
   const [copyBusy, setCopyBusy] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
   const [sendNow, setSendNow] = useState(true);
+  const [scheduleDate, setScheduleDate] = useState(() => defaultScheduleParts().date);
+  const [scheduleTime, setScheduleTime] = useState(() => defaultScheduleParts().time);
+  const [queueOpen, setQueueOpen] = useState(false);
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
   const [telegramRecipientCount, setTelegramRecipientCount] = useState(0);
   const [cuerpoEn, setCuerpoEn] = useState("");
   const [translatingEn, setTranslatingEn] = useState(false);
@@ -122,6 +139,10 @@ export function OpsComunicacionPage() {
     : plantilla;
   const cuerpoDraft = cuerpoOverride ?? (plantilla ? cuerpoLleno : cuerpo);
   const cuerpoFinal = cuerpoDraft.trim();
+  const queuedItems = items
+    .filter((x) => !x.telegramSent && String(x.scheduledAt || "").trim())
+    .slice()
+    .sort((a, b) => Date.parse(a.scheduledAt || "") - Date.parse(b.scheduledAt || ""));
   const modeloDirty = Boolean(
     tituloRow &&
       !mensajeLibre &&
@@ -264,6 +285,19 @@ export function OpsComunicacionPage() {
       setErr("Escribí el mensaje o elegí un título que ya tenga texto.");
       return;
     }
+    let scheduledAt = "";
+    if (!sendNow) {
+      const when = Date.parse(`${scheduleDate}T${scheduleTime}`);
+      if (!Number.isFinite(when)) {
+        setErr("Completá la fecha y la hora de publicación.");
+        return;
+      }
+      if (when < Date.now() + 20_000) {
+        setErr("Programá al menos un minuto más adelante.");
+        return;
+      }
+      scheduledAt = new Date(when).toISOString();
+    }
     setBusy(true);
     try {
       const r = await createOpsComunicacion({
@@ -272,6 +306,7 @@ export function OpsComunicacionPage() {
         categoria,
         imageUrl: imageUrl.trim(),
         sendNow,
+        ...(scheduledAt ? { scheduledAt } : {}),
         ...(tituloEsCorte || usesSchedule
           ? {
               corteControl: {
@@ -288,7 +323,9 @@ export function OpsComunicacionPage() {
       setOk(
         sendNow
           ? `Comunicado enviado a Telegram${r.sentTo ? ` (${r.sentTo} chat${r.sentTo === 1 ? "" : "s"} privados)` : ""}.`
-          : "Comunicado guardado. Todavía no se envió a Telegram."
+          : r.queued
+            ? `Publicación programada para ${scheduleDate} ${scheduleTime}.`
+            : "Comunicado guardado. Todavía no se envió a Telegram."
       );
       setImageUrl("");
       setCuerpoOverride(null);
@@ -385,6 +422,22 @@ export function OpsComunicacionPage() {
     }
   };
 
+  const onCancelQueue = async (row: OpsComunicacionItem) => {
+    if (!canEdit || row.telegramSent) return;
+    setCancellingId(row.id);
+    setErr("");
+    setOk("");
+    try {
+      await cancelOpsComunicacionSchedule(row.id);
+      setOk(`Se sacó de la cola: ${row.titulo}`);
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "No se pudo cancelar la programación.");
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
   const onSend = async (row: OpsComunicacionItem) => {
     if (!canEdit || row.telegramSent) return;
     setSendingId(row.id);
@@ -460,6 +513,9 @@ export function OpsComunicacionPage() {
                 onClick={() => navigate("/gestion-administrativa/comunicacion/cortes")}
               >
                 Cortes
+              </button>
+              <button type="button" className="ops-com-users-btn" onClick={() => setQueueOpen(true)}>
+                Cola{queuedItems.length ? ` (${queuedItems.length})` : ""}
               </button>
               <button type="button" className="ops-com-users-btn" onClick={() => setShareOpen(true)}>
                 Compartir
@@ -602,9 +658,6 @@ export function OpsComunicacionPage() {
               </div>
               <div className="ops-com-field">
                 <label htmlFor="ops-cuerpo">Mensaje</label>
-                <p className="ops-com-tg-copy__hint" style={{ margin: "0 0 0.45rem" }}>
-                  Lo que escribís a la izquierda se replica en inglés a la derecha. Telegram envía esos dos textos, español arriba e inglés abajo.
-                </p>
                 <div className="ops-com-title">
                   {usesSchedule ? (
                     <div className="ops-com-schedule">
@@ -624,6 +677,9 @@ export function OpsComunicacionPage() {
                       </div>
                       <div className="ops-com-field">
                         <label htmlFor="ops-h1-from">Mañana (etapa 1)</label>
+                        <p className="ops-com-tg-copy__hint" style={{ margin: "0 0 0.35rem" }}>
+                          Si hay un horario:
+                        </p>
                         <div className="ops-com-title__row">
                           <input
                             id="ops-h1-from"
@@ -651,7 +707,7 @@ export function OpsComunicacionPage() {
                       <div className="ops-com-field">
                         <label htmlFor="ops-h2-from">Tarde (etapa 2)</label>
                         <p className="ops-com-tg-copy__hint" style={{ margin: "0 0 0.35rem" }}>
-                          Si hay dos horarios, en el medio se prende. Dejá tarde vacío si ese día es una sola etapa.
+                          Si hay dos horarios, en el medio se prende. Dejá tarde vacío si ese día es una sola etapa:
                         </p>
                         <div className="ops-com-title__row">
                           <input
@@ -754,19 +810,52 @@ export function OpsComunicacionPage() {
                 />
               </div>
               <div className="ops-com-actions">
-                <label className="ops-com-check">
-                  <input
-                    type="checkbox"
-                    checked={sendNow}
-                    disabled={busy}
-                    onChange={(e) => setSendNow(e.target.checked)}
-                  />
-                  Enviar ahora a cada chat privado
-                  {telegramRecipientCount ? ` (${telegramRecipientCount})` : ""}
-                </label>
+                <div className="ops-com-publish">
+                  <label className="ops-com-check">
+                    <input
+                      type="radio"
+                      name="ops-publish-when"
+                      checked={sendNow}
+                      disabled={busy}
+                      onChange={() => setSendNow(true)}
+                    />
+                    Publicar ahora
+                    {telegramRecipientCount ? ` (${telegramRecipientCount})` : ""}
+                  </label>
+                  <label className="ops-com-check">
+                    <input
+                      type="radio"
+                      name="ops-publish-when"
+                      checked={!sendNow}
+                      disabled={busy}
+                      onChange={() => setSendNow(false)}
+                    />
+                    Programar
+                  </label>
+                  {!sendNow ? (
+                    <div className="ops-com-schedule-publish">
+                      <input
+                        className="fact-input"
+                        type="date"
+                        value={scheduleDate}
+                        disabled={busy}
+                        onChange={(e) => setScheduleDate(e.target.value)}
+                        aria-label="Fecha de publicación"
+                      />
+                      <input
+                        className="fact-input"
+                        type="time"
+                        value={scheduleTime}
+                        disabled={busy}
+                        onChange={(e) => setScheduleTime(e.target.value)}
+                        aria-label="Hora de publicación"
+                      />
+                    </div>
+                  ) : null}
+                </div>
                 <div className="ops-com-actions__btns">
                   <button type="submit" className="btn btn-success" disabled={busy}>
-                    {busy ? "Publicando…" : sendNow ? "Publicar y enviar" : "Guardar sin enviar"}
+                    {busy ? "Publicando…" : sendNow ? "Publicar y enviar" : "Programar envío"}
                   </button>
                   <button
                     type="button"
@@ -805,6 +894,62 @@ export function OpsComunicacionPage() {
           }
           imageUrl={imageUrl}
         />
+        {queueOpen ? (
+          <div
+            className="ops-tg-preview"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ops-queue-title"
+            onMouseDown={() => setQueueOpen(false)}
+          >
+            <div className="ops-tg-preview__dialog ops-com-hist-modal" onMouseDown={(e) => e.stopPropagation()}>
+              <div className="ops-tg-preview__bar">
+                <p id="ops-queue-title" className="ops-tg-preview__bar-title">
+                  Cola de publicaciones
+                </p>
+                <button type="button" className="ops-tg-preview__close" onClick={() => setQueueOpen(false)}>
+                  Cerrar
+                </button>
+              </div>
+              <div className="ops-com-hist-modal__panel ops-com-queue">
+                {queuedItems.length === 0 ? (
+                  <p className="ops-com-queue__empty">No hay avisos programados.</p>
+                ) : (
+                  queuedItems.map((n) => (
+                    <div key={n.id} className="ops-com-queue__row">
+                      <div>
+                        <strong>{n.titulo}</strong>
+                        <p>
+                          {formatPublishedParts(n.scheduledAt || "").date} · {formatPublishedParts(n.scheduledAt || "").time}
+                        </p>
+                      </div>
+                      {canEdit ? (
+                        <div className="ops-com-queue__btns">
+                          <button
+                            type="button"
+                            className="crypto-news-send-tg"
+                            disabled={sendingId != null || cancellingId != null}
+                            onClick={() => void onSend(n)}
+                          >
+                            {sendingId === n.id ? "Enviando…" : "Enviar ahora"}
+                          </button>
+                          <button
+                            type="button"
+                            className="ops-com-clear-msg-btn"
+                            disabled={sendingId != null || cancellingId != null}
+                            onClick={() => void onCancelQueue(n)}
+                          >
+                            {cancellingId === n.id ? "Sacando…" : "Sacar de la cola"}
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
         {histOpen ? (
           <div
             className="ops-tg-preview"
@@ -837,7 +982,11 @@ export function OpsComunicacionPage() {
                     </h2>
                     <p className="ops-com-hist-modal__meta">
                       {histOpen.categoriaLabel}
-                      {histOpen.telegramSent ? " · Enviado" : " · Pendiente"}
+                      {histOpen.telegramSent
+                        ? " · Enviado"
+                        : histOpen.scheduledAt
+                          ? " · Programado"
+                          : " · Pendiente"}
                     </p>
                     <OpsComPublishedStamp iso={publishedAt(histOpen)} compact />
                   </div>
@@ -880,7 +1029,7 @@ export function OpsComunicacionPage() {
                   {n.cuerpo ? <p className="crypto-news-card__summary">{n.cuerpo}</p> : null}
                   <div className="crypto-news-card__actions">
                     <span className={`crypto-news-send-tg${n.telegramSent ? " crypto-news-send-tg--sent" : ""}`}>
-                      {n.telegramSent ? "Ya enviado" : "Pendiente"}
+                      {n.telegramSent ? "Ya enviado" : n.scheduledAt ? "Programado" : "Pendiente"}
                     </span>
                     <button type="button" className="ops-com-hist-full" onClick={() => setHistOpen(n)}>
                       Ver completo

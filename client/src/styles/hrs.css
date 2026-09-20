@@ -438,6 +438,25 @@ body:has(.hrs-login-page) {
   overflow-x: hidden;
 }
 
+/**
+ * Carga de sesión (spinner verde): misma franja gris del scrollbar-gutter.
+ */
+html:has(.hrs-auth-boot) {
+  background: var(--hrs-login-bg);
+  overflow-x: hidden;
+}
+
+body:has(.hrs-auth-boot) {
+  background: var(--hrs-login-bg);
+  scrollbar-gutter: auto;
+  overflow-x: hidden;
+}
+
+#root:has(.hrs-auth-boot) {
+  background: transparent;
+  overflow-x: hidden;
+}
+
 /** Pantalla /login: recupera el fondo verde marca (body ya no lo lleva) */
 .hrs-login-page {
   min-height: 100vh;

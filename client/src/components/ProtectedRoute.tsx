@@ -9,7 +9,10 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="d-flex flex-column align-items-center justify-content-center min-vh-100" style={{ background: "linear-gradient(135deg, #074025 0%, #49f227 100%)" }}>
+      <div
+        className="hrs-auth-boot d-flex flex-column align-items-center justify-content-center min-vh-100"
+        style={{ background: "var(--hrs-login-bg)" }}
+      >
         <div className="spinner-border text-light" role="status" aria-label="Espere un momento" style={{ width: "3rem", height: "3rem" }} />
       </div>
     );

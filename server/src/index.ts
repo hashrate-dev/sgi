@@ -2,6 +2,7 @@ import { createApp } from "./app.js";
 import { env } from "./config/env.js";
 import { dbType, initDb } from "./db.js";
 import { runSeedVitrinaEquipos } from "./db/seedVitrinaEquipos.js";
+import { startOpsComunicacionScheduler } from "./routes/opsComunicacion.js";
 
 async function main() {
   try {
@@ -18,6 +19,7 @@ async function main() {
     app.listen(env.PORT, host, () => {
       // eslint-disable-next-line no-console
       console.log(`API listening on http://${host}:${env.PORT}`);
+      startOpsComunicacionScheduler();
       if (env.NODE_ENV === "production" && env.CORS_ORIGIN) {
         // eslint-disable-next-line no-console
         console.log(`CORS allowed origin: ${env.CORS_ORIGIN}`);
