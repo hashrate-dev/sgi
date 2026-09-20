@@ -15,6 +15,7 @@ import {
   type OpsComunicacionItem,
   type OpsComunicacionTitle,
 } from "../lib/api";
+import { getOpsComHiresMarkUrl } from "../lib/opsComunicacionTelegramAvatar";
 import { CORTE_PROGRAMADO_CUERPO, fillOpsComunicacionMessage, messageHasScheduleSlots, plantillaFromFilledMessage } from "../lib/opsComunicacionTemplates";
 import { canAccessComunicacionModule, canEditComunicacionModule } from "../lib/auth";
 import { sgiHome } from "../lib/marketplacePaths.js";
@@ -33,18 +34,29 @@ function todayIso(): string {
   return `${y}-${m}-${day}`;
 }
 
-function timeAgo(iso: string): string {
+function publishedAt(row: OpsComunicacionItem): string {
+  return row.telegramSent && row.sentAt ? row.sentAt : row.createdAt;
+}
+
+function formatPublishedParts(iso: string): { date: string; time: string } {
   const t = Date.parse(iso);
-  if (!Number.isFinite(t)) return "—";
-  const sec = Math.max(0, Math.floor((Date.now() - t) / 1000));
-  if (sec < 60) return "hace instantes";
-  if (sec < 3600) return `hace ${Math.floor(sec / 60)} min`;
-  if (sec < 86400) return `hace ${Math.floor(sec / 3600)} h`;
-  try {
-    return new Date(t).toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" });
-  } catch {
-    return iso.slice(0, 16);
-  }
+  if (!Number.isFinite(t)) return { date: "—", time: "" };
+  const d = new Date(t);
+  return {
+    date: d.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" }),
+    time: d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false }),
+  };
+}
+
+function OpsComPublishedStamp({ iso, compact }: { iso: string; compact?: boolean }) {
+  const { date, time } = formatPublishedParts(iso);
+  return (
+    <time className={`ops-com-hist__when${compact ? " ops-com-hist__when--compact" : ""}`} dateTime={iso}>
+      <span className="ops-com-hist__when-label">Publicado</span>
+      <span className="ops-com-hist__when-date">{date}</span>
+      {time ? <span className="ops-com-hist__when-time">{time} hs</span> : null}
+    </time>
+  );
 }
 
 export function OpsComunicacionPage() {
@@ -59,6 +71,7 @@ export function OpsComunicacionPage() {
   const [configOpen, setConfigOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [histOpen, setHistOpen] = useState<OpsComunicacionItem | null>(null);
+  const [heroMarkSrc, setHeroMarkSrc] = useState("/images/wp-uploads/cropped-favicoin-32x32.png");
   const [tituloId, setTituloId] = useState("");
   const [titles, setTitles] = useState<OpsComunicacionTitle[]>([]);
   const [titleBusy, setTitleBusy] = useState(false);
@@ -125,6 +138,20 @@ export function OpsComunicacionPage() {
     if (!canAccessComunicacionModule(user) && !canUserAccessNavPath(user, PATH)) return;
     void load();
   }, [loading, user, load]);
+
+  useEffect(() => {
+    let alive = true;
+    void getOpsComHiresMarkUrl()
+      .then((url) => {
+        if (alive) setHeroMarkSrc(url);
+      })
+      .catch(() => {
+        /* favicon fallback */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!histOpen) return;
@@ -270,13 +297,31 @@ export function OpsComunicacionPage() {
 
         <section className="crypto-news-hero hrs-card sgi-glass-panel">
           <div className="crypto-news-hero__top">
-            <div>
+            <div className="ops-com-hero-brand">
+              <div className="ops-com-hero-avatar-wrap">
+                <span className="ops-com-hero-avatar" aria-hidden>
+                  <span className="ops-com-hero-avatar__circle">
+                    <span className="ops-com-hero-avatar__farm" />
+                    <img className="ops-com-hero-avatar__mark" src={heroMarkSrc} alt="" draggable={false} />
+                  </span>
+                  <span className="ops-com-hero-avatar__mega" title="Comunicación">
+                    <svg viewBox="0 0 24 24" width="15" height="15">
+                      <path
+                        fill="currentColor"
+                        d="M12 8H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h1v4a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-4h3l5 4V4l-5 4m9.5 4c0 1.71-.96 3.26-2.5 4V8c1.53.75 2.5 2.3 2.5 4Z"
+                      />
+                    </svg>
+                  </span>
+                </span>
+              </div>
+              <div>
               <div className="crypto-news-kicker">Bot Telegram · Operaciones Data Center</div>
               <h1 className="crypto-news-hero__title">Comunicación de Data Center</h1>
               <p className="crypto-news-hero__lead">
                 Avisos internos de operaciones (energía, mantenimiento, hashrate). No mezcla con el wire de noticias de
                 mercado.
               </p>
+              </div>
             </div>
             <div className="crypto-news-hero__stats">
               <div className="crypto-news-stat">
@@ -569,9 +614,10 @@ export function OpsComunicacionPage() {
                   <div>
                     <h2 id="ops-hist-full-title">{histOpen.titulo}</h2>
                     <p className="ops-com-hist-modal__meta">
-                      {histOpen.categoriaLabel} · {timeAgo(histOpen.createdAt)}
+                      {histOpen.categoriaLabel}
                       {histOpen.telegramSent ? " · Enviado" : " · Pendiente"}
                     </p>
+                    <OpsComPublishedStamp iso={publishedAt(histOpen)} compact />
                   </div>
                 </div>
                 <p className="ops-com-hist-modal__body">{histOpen.cuerpo || "Sin texto."}</p>
@@ -591,9 +637,9 @@ export function OpsComunicacionPage() {
             {items.map((n) => (
               <article key={n.id} className="crypto-news-card ops-com-hist">
                 <div className="crypto-news-card__body">
-                  <div className="crypto-news-card__meta">
+                  <div className="crypto-news-card__meta ops-com-hist__meta">
                     <span className="crypto-news-source">{n.categoriaLabel}</span>
-                    <time dateTime={n.createdAt}>{timeAgo(n.createdAt)}</time>
+                    <OpsComPublishedStamp iso={publishedAt(n)} />
                   </div>
                   <div className="ops-com-hist__head">
                     <span className="ops-com-hist__mark" title="Aviso" aria-hidden>

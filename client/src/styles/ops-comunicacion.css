@@ -1,3 +1,86 @@
+.ops-com-hero-brand {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  min-width: 0;
+  flex: 1 1 16rem;
+}
+
+.ops-com-hero-avatar-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+.ops-com-hero-avatar {
+  display: block;
+  position: relative;
+  overflow: visible;
+  flex: 0 0 auto;
+  width: 5.35rem;
+  height: 5.35rem;
+  padding: 0.16rem;
+  border-radius: 1.15rem;
+  background: rgba(6, 16, 14, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+  user-select: none;
+}
+
+.ops-com-hero-avatar__circle {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.ops-com-hero-avatar__farm {
+  position: absolute;
+  inset: 0;
+  background: url("/images/config-mining-datacenter-bg.png") center / cover no-repeat;
+  filter: saturate(1.08) brightness(0.78);
+}
+
+.ops-com-hero-avatar__farm::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 42%, rgba(4, 18, 14, 0.12), rgba(4, 12, 10, 0.55));
+}
+
+.ops-com-hero-avatar__mark {
+  position: relative;
+  z-index: 1;
+  width: 68%;
+  height: 68%;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.55));
+}
+
+.ops-com-hero-avatar__mega {
+  position: absolute;
+  right: -0.15rem;
+  bottom: -0.15rem;
+  z-index: 2;
+  width: 1.55rem;
+  height: 1.55rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #eab308;
+  color: #1a1403;
+  border: 2px solid #0c1613;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
 .ops-com-form {
   margin-top: 1.1rem;
   display: flex;
@@ -527,6 +610,59 @@
 .ops-com-hist {
   height: 100%;
   min-height: 17.5rem;
+}
+
+.ops-com-hist__meta {
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.55rem;
+  margin-bottom: 0.7rem;
+}
+
+.ops-com-hist__when {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.06rem;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: rgba(186, 230, 253, 0.78);
+  line-height: 1.2;
+  text-align: right;
+}
+
+.ops-com-hist__when-label {
+  font-size: 0.62rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.9);
+}
+
+.ops-com-hist__when-date {
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  color: rgba(226, 232, 240, 0.92);
+  font-variant-numeric: tabular-nums;
+}
+
+.ops-com-hist__when-time {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(186, 230, 253, 0.72);
+  font-variant-numeric: tabular-nums;
+}
+
+.ops-com-hist__when--compact {
+  margin: 0.45rem 0 0;
+  margin-left: 0;
+  align-items: flex-start;
+  text-align: left;
 }
 
 .ops-com-hist .crypto-news-card__actions {
