@@ -115,6 +115,7 @@ async function ensureOpsComunicacionSchema(): Promise<void> {
         `CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion_titulos (
           id BIGSERIAL PRIMARY KEY,
           titulo TEXT NOT NULL,
+          cuerpo TEXT NOT NULL DEFAULT '',
           is_builtin INTEGER NOT NULL DEFAULT 0,
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )`
@@ -137,6 +138,7 @@ async function ensureOpsComunicacionSchema(): Promise<void> {
         `CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion_titulos (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           titulo TEXT NOT NULL UNIQUE,
+          cuerpo TEXT NOT NULL DEFAULT '',
           is_builtin INTEGER NOT NULL DEFAULT 0,
           created_at TEXT NOT NULL DEFAULT (datetime('now'))
         )`
@@ -155,6 +157,7 @@ async function ensureOpsComunicacionSchema(): Promise<void> {
       .run();
     for (const sql of [
       "ALTER TABLE sgi_ops_comunicacion_titulos ADD COLUMN is_builtin INTEGER NOT NULL DEFAULT 0",
+      "ALTER TABLE sgi_ops_comunicacion_titulos ADD COLUMN cuerpo TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE sgi_ops_comunicacion_mensajes ADD COLUMN is_builtin INTEGER NOT NULL DEFAULT 0",
     ]) {
       try {
@@ -183,6 +186,7 @@ async function ensureOpsComunicacionSchema(): Promise<void> {
       )
       .run();
     await db.prepare("ALTER TABLE sgi_ops_comunicacion_titulos ADD COLUMN IF NOT EXISTS is_builtin INTEGER NOT NULL DEFAULT 0").run();
+    await db.prepare("ALTER TABLE sgi_ops_comunicacion_titulos ADD COLUMN IF NOT EXISTS cuerpo TEXT NOT NULL DEFAULT ''").run();
     await db.prepare("ALTER TABLE sgi_ops_comunicacion_mensajes ADD COLUMN IF NOT EXISTS is_builtin INTEGER NOT NULL DEFAULT 0").run();
   }
   await seedOpsComunicacionCatalog();
@@ -219,14 +223,47 @@ async function seedOpsComunicacionCatalog(): Promise<void> {
     .get(CORTE_PROGRAMADO_NOMBRE)) as Record<string, unknown> | undefined;
   if (!titleHit) {
     await db
-      .prepare(`INSERT INTO sgi_ops_comunicacion_titulos (titulo, is_builtin, created_at) VALUES (?, 1, ${ts})`)
-      .run(CORTE_PROGRAMADO_NOMBRE);
+      .prepare(`INSERT INTO sgi_ops_comunicacion_titulos (titulo, cuerpo, is_builtin, created_at) VALUES (?, ?, 1, ${ts})`)
+      .run(CORTE_PROGRAMADO_NOMBRE, CORTE_PROGRAMADO_CUERPO);
   } else {
     const id = Number(rowKeysToLowercase(titleHit).id ?? 0);
     if (id > 0) {
       await db.prepare("UPDATE sgi_ops_comunicacion_titulos SET is_builtin = 1 WHERE id = ?").run(id);
     }
   }
+  if (db.isPostgres) {
+    await db
+      .prepare(
+        `UPDATE sgi_ops_comunicacion_titulos AS t
+         SET cuerpo = m.cuerpo
+         FROM sgi_ops_comunicacion_mensajes AS m
+         WHERE LOWER(t.titulo) = LOWER(m.nombre)
+           AND TRIM(COALESCE(t.cuerpo, '')) = ''
+           AND TRIM(COALESCE(m.cuerpo, '')) <> ''`
+      )
+      .run();
+  } else {
+    await db
+      .prepare(
+        `UPDATE sgi_ops_comunicacion_titulos
+         SET cuerpo = (
+           SELECT m.cuerpo FROM sgi_ops_comunicacion_mensajes m
+           WHERE LOWER(m.nombre) = LOWER(sgi_ops_comunicacion_titulos.titulo) AND TRIM(m.cuerpo) <> ''
+           LIMIT 1
+         )
+         WHERE TRIM(COALESCE(cuerpo, '')) = ''
+           AND EXISTS (
+             SELECT 1 FROM sgi_ops_comunicacion_mensajes m
+             WHERE LOWER(m.nombre) = LOWER(sgi_ops_comunicacion_titulos.titulo) AND TRIM(m.cuerpo) <> ''
+           )`
+      )
+      .run();
+  }
+  await db
+    .prepare(
+      `UPDATE sgi_ops_comunicacion_titulos SET cuerpo = ? WHERE is_builtin = 1 AND TRIM(COALESCE(cuerpo, '')) = ''`
+    )
+    .run(CORTE_PROGRAMADO_CUERPO);
   const msgHit = (await db
     .prepare("SELECT id FROM sgi_ops_comunicacion_mensajes WHERE LOWER(nombre) = LOWER(?) LIMIT 1")
     .get(CORTE_PROGRAMADO_NOMBRE)) as Record<string, unknown> | undefined;
@@ -393,15 +430,16 @@ function mapTitulo(raw: Record<string, unknown>) {
   return {
     id: Number(r.id ?? 0),
     titulo: String(r.titulo ?? ""),
+    cuerpo: String(r.cuerpo ?? ""),
     isBuiltin: r.is_builtin === true || Number(r.is_builtin) === 1,
   };
 }
 
-async function listTitulos(): Promise<Array<{ id: number; titulo: string; isBuiltin: boolean }>> {
+async function listTitulos(): Promise<Array<{ id: number; titulo: string; cuerpo: string; isBuiltin: boolean }>> {
   await ensureOpsComunicacionSchema();
   await seedOpsComunicacionCatalog();
   const rows = (await db
-    .prepare("SELECT id, titulo, is_builtin FROM sgi_ops_comunicacion_titulos ORDER BY titulo ASC, id ASC")
+    .prepare("SELECT id, titulo, cuerpo, is_builtin FROM sgi_ops_comunicacion_titulos ORDER BY titulo ASC, id ASC")
     .all()) as Record<string, unknown>[];
   return rows.map(mapTitulo).filter((x) => x.id > 0 && x.titulo);
 }
@@ -461,7 +499,7 @@ opsComunicacionRouter.post("/ops-comunicacion/titulos", ...writeMw, async (req, 
       return res.status(409).json({ error: { message: "Ese título ya está en la lista." } });
     }
     const ts = db.isPostgres ? "NOW()" : "datetime('now')";
-    await db.prepare(`INSERT INTO sgi_ops_comunicacion_titulos (titulo, created_at) VALUES (?, ${ts})`).run(titulo);
+    await db.prepare(`INSERT INTO sgi_ops_comunicacion_titulos (titulo, cuerpo, created_at) VALUES (?, '', ${ts})`).run(titulo);
     const titles = await listTitulos();
     const item = titles.find((x) => x.titulo.toLowerCase() === titulo.toLowerCase()) ?? null;
     res.json({ ok: true, item, titles });
@@ -495,25 +533,43 @@ opsComunicacionRouter.put("/ops-comunicacion/titulos/:id", ...writeMw, async (re
   try {
     await ensureOpsComunicacionSchema();
     const id = Number(req.params.id);
-    const parsed = TituloSchema.safeParse(req.body ?? {});
-    if (!Number.isFinite(id) || id <= 0 || !parsed.success) {
+    const parsed = z
+      .object({
+        titulo: z.string().trim().min(3).max(180).optional(),
+        cuerpo: z.string().max(8000).optional(),
+      })
+      .safeParse(req.body ?? {});
+    if (!Number.isFinite(id) || id <= 0 || !parsed.success || (parsed.data.titulo == null && parsed.data.cuerpo == null)) {
       return res.status(400).json({ error: { message: "Datos inválidos." } });
     }
     const locked = (await db
-      .prepare("SELECT is_builtin FROM sgi_ops_comunicacion_titulos WHERE id = ?")
+      .prepare("SELECT is_builtin, titulo FROM sgi_ops_comunicacion_titulos WHERE id = ?")
       .get(id)) as Record<string, unknown> | undefined;
-    const lockedRow = locked ? rowKeysToLowercase(locked) : {};
-    if (lockedRow.is_builtin === true || Number(lockedRow.is_builtin) === 1) {
-      return res.status(400).json({ error: { message: "Corte Programado es fijo y no se puede editar." } });
+    if (!locked) {
+      return res.status(404).json({ error: { message: "Título no encontrado." } });
     }
+    const lockedRow = rowKeysToLowercase(locked);
+    const builtin = lockedRow.is_builtin === true || Number(lockedRow.is_builtin) === 1;
     const titulo = parsed.data.titulo;
-    const dup = (await db
-      .prepare("SELECT id FROM sgi_ops_comunicacion_titulos WHERE LOWER(titulo) = LOWER(?) AND id <> ? LIMIT 1")
-      .get(titulo, id)) as Record<string, unknown> | undefined;
-    if (dup) {
-      return res.status(409).json({ error: { message: "Ese título ya está en la lista." } });
+    const cuerpo = parsed.data.cuerpo;
+    if (builtin && titulo && titulo.toLowerCase() !== String(lockedRow.titulo ?? "").toLowerCase()) {
+      return res.status(400).json({ error: { message: "El nombre de Corte Programado es fijo. Podés guardar el texto." } });
     }
-    await db.prepare("UPDATE sgi_ops_comunicacion_titulos SET titulo = ? WHERE id = ?").run(titulo, id);
+    if (titulo && !builtin) {
+      const dup = (await db
+        .prepare("SELECT id FROM sgi_ops_comunicacion_titulos WHERE LOWER(titulo) = LOWER(?) AND id <> ? LIMIT 1")
+        .get(titulo, id)) as Record<string, unknown> | undefined;
+      if (dup) {
+        return res.status(409).json({ error: { message: "Ese título ya está en la lista." } });
+      }
+    }
+    if (titulo && cuerpo != null && !builtin) {
+      await db.prepare("UPDATE sgi_ops_comunicacion_titulos SET titulo = ?, cuerpo = ? WHERE id = ?").run(titulo, cuerpo, id);
+    } else if (titulo && !builtin) {
+      await db.prepare("UPDATE sgi_ops_comunicacion_titulos SET titulo = ? WHERE id = ?").run(titulo, id);
+    } else if (cuerpo != null) {
+      await db.prepare("UPDATE sgi_ops_comunicacion_titulos SET cuerpo = ? WHERE id = ?").run(cuerpo, id);
+    }
     const titles = await listTitulos();
     const item = titles.find((x) => x.id === id) ?? null;
     res.json({ ok: true, item, titles });

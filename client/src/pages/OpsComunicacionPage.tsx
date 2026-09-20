@@ -7,16 +7,12 @@ import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
 import {
   createOpsComunicacion,
-  createOpsComunicacionMessage,
   createOpsComunicacionTitle,
-  deleteOpsComunicacionMessage,
   deleteOpsComunicacionTitle,
   getOpsComunicacion,
   sendOpsComunicacionTelegram,
-  updateOpsComunicacionMessage,
   updateOpsComunicacionTitle,
   type OpsComunicacionItem,
-  type OpsComunicacionMessage,
   type OpsComunicacionTitle,
 } from "../lib/api";
 import { CORTE_PROGRAMADO_CUERPO, fillOpsComunicacionMessage, messageHasScheduleSlots, plantillaFromFilledMessage } from "../lib/opsComunicacionTemplates";
@@ -65,8 +61,6 @@ export function OpsComunicacionPage() {
   const [tituloId, setTituloId] = useState("");
   const [titles, setTitles] = useState<OpsComunicacionTitle[]>([]);
   const [titleBusy, setTitleBusy] = useState(false);
-  const [messages, setMessages] = useState<OpsComunicacionMessage[]>([]);
-  const [mensajeId, setMensajeId] = useState("");
   const [cuerpoOverride, setCuerpoOverride] = useState<string | null>(null);
   const [mensajeLibre, setMensajeLibre] = useState(false);
   const prevTituloId = useRef("");
@@ -83,15 +77,8 @@ export function OpsComunicacionPage() {
   const canEdit = Boolean(user && canEditComunicacionModule(user));
   const tituloRow = titles.find((t) => String(t.id) === tituloId);
   const titulo = tituloRow?.titulo || "";
-  const tituloEsCorte = Boolean(tituloRow?.isBuiltin) || /corte programado/i.test(titulo);
-  const corteMessage =
-    messages.find((m) => m.isBuiltin) || messages.find((m) => /corte programado/i.test(m.nombre)) || null;
-  const selectedMessage =
-    messages.find((m) => String(m.id) === mensajeId) ||
-    (!mensajeLibre && tituloEsCorte ? corteMessage : null);
-  const mensajeEsFijo =
-    Boolean(selectedMessage?.isBuiltin) || /corte programado/i.test(selectedMessage?.nombre || "");
-  const plantilla = selectedMessage?.cuerpo || (!mensajeLibre && tituloEsCorte ? CORTE_PROGRAMADO_CUERPO : "");
+  const tituloEsCorte = Boolean(tituloRow?.isBuiltin);
+  const plantilla = mensajeLibre ? "" : tituloRow?.cuerpo || (tituloEsCorte ? CORTE_PROGRAMADO_CUERPO : "");
   const usesSchedule = Boolean(plantilla && messageHasScheduleSlots(plantilla));
   const cuerpoLleno = usesSchedule
     ? fillOpsComunicacionMessage(plantilla, {
@@ -104,7 +91,8 @@ export function OpsComunicacionPage() {
     : plantilla;
   const cuerpoFinal = (cuerpoOverride ?? (plantilla ? cuerpoLleno : cuerpo)).trim();
   const modeloDirty = Boolean(
-    selectedMessage &&
+    tituloRow &&
+      !mensajeLibre &&
       cuerpoOverride != null &&
       cuerpoOverride.replace(/\r\n/g, "\n").trim() !== cuerpoLleno.replace(/\r\n/g, "\n").trim()
   );
@@ -116,18 +104,11 @@ export function OpsComunicacionPage() {
       setItems(res.items || []);
       setCategories(res.categories || []);
       const nextTitles = res.titles || [];
-      const nextMessages = res.messages || [];
       setTitles(nextTitles);
-      setMessages(nextMessages);
       setTituloId((cur) => {
         if (nextTitles.some((t) => String(t.id) === cur)) return cur;
-        const corte = nextTitles.find((t) => /corte programado/i.test(t.titulo));
+        const corte = nextTitles.find((t) => t.isBuiltin);
         return String((corte || nextTitles[0])?.id || "");
-      });
-      setMensajeId((cur) => {
-        if (nextMessages.some((m) => String(m.id) === cur)) return cur;
-        const corte = nextMessages.find((m) => /corte programado/i.test(m.nombre));
-        return String((corte || nextMessages[0])?.id || "");
       });
     } catch (e) {
       setErr(e instanceof Error ? e.message : "No se pudo cargar Comunicación.");
@@ -146,12 +127,11 @@ export function OpsComunicacionPage() {
   useEffect(() => {
     const switched = prevTituloId.current !== tituloId;
     prevTituloId.current = tituloId;
-    if (!switched || !tituloEsCorte) return;
+    if (!switched) return;
     setMensajeLibre(false);
-    if (corteMessage) setMensajeId(String(corteMessage.id));
-    setCategoria("energia");
     setCuerpoOverride(null);
-  }, [tituloEsCorte, tituloId, corteMessage]);
+    if (tituloEsCorte) setCategoria("energia");
+  }, [tituloEsCorte, tituloId]);
 
   if (!loading && !user) return <Navigate to="/login" replace />;
   if (!loading && user && !canAccessComunicacionModule(user) && !canUserAccessNavPath(user, PATH)) {
@@ -168,7 +148,7 @@ export function OpsComunicacionPage() {
       return;
     }
     if (cuerpoFinal.length < 8) {
-      setErr("Elegí un modelo de mensaje o escribí el texto.");
+      setErr("Escribí el mensaje o elegí un título que ya tenga texto.");
       return;
     }
     setBusy(true);
@@ -198,13 +178,13 @@ export function OpsComunicacionPage() {
 
   const onSaveModelo = async () => {
     if (!canEdit) return;
-    const id = selectedMessage?.id;
+    const id = tituloRow?.id;
     if (!id) {
-      setErr("Elegí un modelo de mensaje para guardar los cambios.");
+      setErr("Elegí un título para guardar el mensaje.");
       return;
     }
     if (cuerpoFinal.length < 8) {
-      setErr("El texto del modelo tiene que tener al menos 8 caracteres.");
+      setErr("El texto del mensaje tiene que tener al menos 8 caracteres.");
       return;
     }
     const cuerpoGuardar = usesSchedule
@@ -220,12 +200,13 @@ export function OpsComunicacionPage() {
     setErr("");
     setOk("");
     try {
-      const r = await updateOpsComunicacionMessage(id, { cuerpo: cuerpoGuardar });
-      setMessages(r.messages || []);
+      const r = await updateOpsComunicacionTitle(id, { cuerpo: cuerpoGuardar });
+      setTitles(r.titles || []);
+      setMensajeLibre(false);
       setCuerpoOverride(null);
-      setOk("Cambios guardados en el modelo. Quedan para la próxima vez.");
+      setOk("Mensaje guardado en este título.");
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "No se pudo guardar el modelo.");
+      setErr(e instanceof Error ? e.message : "No se pudo guardar el mensaje.");
     } finally {
       setTitleBusy(false);
     }
@@ -233,7 +214,6 @@ export function OpsComunicacionPage() {
 
   const onClearMensaje = () => {
     setMensajeLibre(true);
-    setMensajeId("");
     setCuerpo("");
     setCuerpoOverride("");
     setFechaAviso(todayIso());
@@ -243,7 +223,7 @@ export function OpsComunicacionPage() {
     setHorario2To("24:00");
     setImageUrl("");
     setErr("");
-    setOk("Mensaje en blanco. Elegí un modelo o escribí uno nuevo.");
+    setOk("Mensaje en blanco. Escribí uno nuevo o volvé a elegir el título.");
   };
 
   const onSend = async (row: OpsComunicacionItem) => {
@@ -333,6 +313,8 @@ export function OpsComunicacionPage() {
                     }}
                     onChange={(id) => {
                       setTituloId(id);
+                      setMensajeLibre(false);
+                      setCuerpoOverride(null);
                       setErr("");
                     }}
                     create={async (nombre) => {
@@ -345,7 +327,7 @@ export function OpsComunicacionPage() {
                       };
                     }}
                     update={async (id, nombre) => {
-                      const r = await updateOpsComunicacionTitle(id, nombre);
+                      const r = await updateOpsComunicacionTitle(id, { titulo: nombre });
                       const next = r.titles || [];
                       setTitles(next);
                       return { items: next.map((t) => ({ id: t.id, label: t.titulo, isBuiltin: t.isBuiltin })) };
@@ -379,63 +361,8 @@ export function OpsComunicacionPage() {
                 </div>
               </div>
               <div className="ops-com-field">
-                <label htmlFor="ops-mensaje">Mensaje</label>
+                <label htmlFor="ops-cuerpo">Mensaje</label>
                 <div className="ops-com-title">
-                  <OpsComunicacionCatalogSelect
-                    triggerId="ops-mensaje"
-                    placeholder="Seleccioná un modelo"
-                    addLabel="Agregar nuevo mensaje"
-                    newTitle="Nuevo mensaje"
-                    panelLabel="Mensajes"
-                    items={messages.map((m) => ({ id: m.id, label: m.nombre, isBuiltin: m.isBuiltin }))}
-                    valueId={mensajeId}
-                    disabled={busy || titleBusy}
-                    onError={(msg) => {
-                      setOk("");
-                      setErr(msg);
-                    }}
-                    onChange={(id) => {
-                      setMensajeLibre(false);
-                      setMensajeId(id);
-                      setCuerpoOverride(null);
-                      setErr("");
-                      const picked = messages.find((m) => String(m.id) === id);
-                      if (picked && /corte programado/i.test(picked.nombre)) {
-                        const matchTitle = titles.find((t) => /corte programado/i.test(t.titulo));
-                        if (matchTitle) setTituloId(String(matchTitle.id));
-                        setCategoria("energia");
-                      }
-                    }}
-                    create={async (nombre) => {
-                      const cuerpoNuevo = mensajeEsFijo
-                        ? "Nuevo comunicado.\n\nCompletá el texto de este modelo."
-                        : cuerpoFinal.length >= 8
-                          ? cuerpoFinal
-                          : "Nuevo comunicado.\n\nCompletá el texto de este modelo.";
-                      const r = await createOpsComunicacionMessage({ nombre, cuerpo: cuerpoNuevo });
-                      const next = r.messages || [];
-                      setMensajeLibre(false);
-                      setMessages(next);
-                      setCuerpoOverride(null);
-                      return {
-                        itemId: r.item ? String(r.item.id) : "",
-                        items: next.map((m) => ({ id: m.id, label: m.nombre, isBuiltin: m.isBuiltin })),
-                      };
-                    }}
-                    update={async (id, nombre) => {
-                      const r = await updateOpsComunicacionMessage(id, { nombre });
-                      const next = r.messages || [];
-                      setMessages(next);
-                      return { items: next.map((m) => ({ id: m.id, label: m.nombre, isBuiltin: m.isBuiltin })) };
-                    }}
-                    remove={async (id) => {
-                      const r = await deleteOpsComunicacionMessage(id);
-                      const next = r.messages || [];
-                      setMessages(next);
-                      setCuerpoOverride(null);
-                      return { items: next.map((m) => ({ id: m.id, label: m.nombre, isBuiltin: m.isBuiltin })) };
-                    }}
-                  />
                   {usesSchedule ? (
                     <div className="ops-com-schedule">
                       <div className="ops-com-field">
@@ -512,7 +439,7 @@ export function OpsComunicacionPage() {
                     value={cuerpoFinal}
                     onChange={(e) => {
                       setCuerpoOverride(e.target.value);
-                      if (!selectedMessage) setCuerpo(e.target.value);
+                      if (!tituloRow) setCuerpo(e.target.value);
                     }}
                     disabled={busy || titleBusy}
                     maxLength={8000}
@@ -523,7 +450,7 @@ export function OpsComunicacionPage() {
                     <button
                       type="button"
                       className="ops-com-save-model-btn"
-                      disabled={busy || titleBusy || !selectedMessage || !modeloDirty}
+                      disabled={busy || titleBusy || !tituloRow || !modeloDirty}
                       onClick={() => void onSaveModelo()}
                     >
                       {titleBusy ? "Guardando…" : "Guardar cambios"}
@@ -538,10 +465,10 @@ export function OpsComunicacionPage() {
                     </button>
                     <span className="ops-com-model-save__hint">
                       {mensajeLibre
-                        ? "Mensaje en blanco. Elegí un modelo o escribí el texto."
+                        ? "Mensaje en blanco. Escribí el texto o volvé a elegir el título."
                         : modeloDirty
-                          ? "Hay ediciones en el texto. Guardá para actualizar este modelo."
-                          : "El modelo coincide con el texto actual."}
+                          ? "Hay ediciones. Guardá para dejarlas en este título."
+                          : "El mensaje de este título."}
                     </span>
                   </div>
                 </div>

@@ -272,9 +272,11 @@ ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS bot_token TEXT NOT 
 CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion_titulos (
   id BIGSERIAL PRIMARY KEY,
   titulo TEXT NOT NULL,
+  cuerpo TEXT NOT NULL DEFAULT '',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_sgi_ops_com_titulos_lower ON sgi_ops_comunicacion_titulos (LOWER(titulo));
+ALTER TABLE sgi_ops_comunicacion_titulos ADD COLUMN IF NOT EXISTS cuerpo TEXT NOT NULL DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion_mensajes (
   id BIGSERIAL PRIMARY KEY,

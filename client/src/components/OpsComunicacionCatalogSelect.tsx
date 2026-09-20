@@ -23,7 +23,7 @@ type Props = {
 };
 
 function isFijo(item: OpsComCatalogItem): boolean {
-  return Boolean(item.isBuiltin) || /corte programado/i.test(item.label);
+  return Boolean(item.isBuiltin);
 }
 
 export function OpsComunicacionCatalogSelect({

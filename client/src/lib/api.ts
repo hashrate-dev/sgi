@@ -2521,6 +2521,7 @@ export type OpsComunicacionTelegramSettings = {
 export type OpsComunicacionTitle = {
   id: number;
   titulo: string;
+  cuerpo?: string;
   isBuiltin?: boolean;
 };
 
@@ -2554,9 +2555,9 @@ export function deleteOpsComunicacionTitle(id: number): Promise<{ ok: boolean; t
 
 export function updateOpsComunicacionTitle(
   id: number,
-  titulo: string
+  body: { titulo?: string; cuerpo?: string }
 ): Promise<{ ok: boolean; item: OpsComunicacionTitle | null; titles: OpsComunicacionTitle[] }> {
-  return api(`/api/ops-comunicacion/titulos/${id}`, { method: "PUT", body: JSON.stringify({ titulo }) });
+  return api(`/api/ops-comunicacion/titulos/${id}`, { method: "PUT", body: JSON.stringify(body) });
 }
 
 export function createOpsComunicacionMessage(body: { nombre: string; cuerpo: string }): Promise<{

@@ -455,6 +455,7 @@ INSERT OR IGNORE INTO sgi_ops_comunicacion_tg (id, enabled, chat_id, extra_chat_
 CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion_titulos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   titulo TEXT NOT NULL UNIQUE,
+  cuerpo TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion_mensajes (
@@ -466,6 +467,12 @@ CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion_mensajes (
 `);
   try {
     db.exec(`ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN bot_token TEXT NOT NULL DEFAULT ''`);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+  try {
+    db.exec(`ALTER TABLE sgi_ops_comunicacion_titulos ADD COLUMN cuerpo TEXT NOT NULL DEFAULT ''`);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     if (!msg.includes("duplicate column")) throw e;
