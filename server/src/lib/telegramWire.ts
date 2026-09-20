@@ -312,6 +312,21 @@ export async function getTelegramBotIdentity(
   };
 }
 
+export async function getTelegramPrivateUserLabel(
+  chatId: string,
+  tokenOverride?: string
+): Promise<{ name: string; username?: string } | null> {
+  const chat = normalizeTelegramChatId(chatId);
+  if (!/^\d{5,20}$/.test(chat)) return null;
+  const j = await telegramFetchJson("getChat", { chat_id: chat }, 8_000, tokenOverride);
+  if (!j.ok || !j.result || typeof j.result !== "object") return null;
+  const r = j.result as { first_name?: string; last_name?: string; username?: string; title?: string };
+  const name = [r.first_name, r.last_name].filter(Boolean).join(" ").trim() || String(r.title ?? "").trim() || String(r.username ?? "").trim();
+  const username = String(r.username ?? "").replace(/^@/, "").trim();
+  if (!name && !username) return null;
+  return username ? { name: name || username, username } : { name: name || chat };
+}
+
 function chatIdForApi(chat: string): string | number {
   return /^-?\d+$/.test(chat) ? Number(chat) : chat;
 }
@@ -521,19 +536,24 @@ function pickChatFromUpdate(u: Record<string, unknown>): { id: number; type?: st
 
 export async function listRecentTelegramPrivateChats(
   limit = 8,
-  tokenOverride?: string
+  tokenOverride?: string,
+  opts?: { privateOnly?: boolean }
 ): Promise<
   Array<{ chatId: string; name: string; username?: string }>
 > {
   await telegramFetchJson("deleteWebhook", { drop_pending_updates: false }, 12_000, tokenOverride).catch(() => undefined);
-  const j = await telegramFetchJson("getUpdates?limit=50", undefined, 12_000, tokenOverride);
+  const j = await telegramFetchJson("getUpdates?limit=100", undefined, 12_000, tokenOverride);
   if (!j.ok) throw new Error(j.description || "getUpdates falló");
   const rows = Array.isArray(j.result) ? (j.result as Record<string, unknown>[]) : [];
   const byId = new Map<string, { chatId: string; name: string; username?: string }>();
   for (const u of rows) {
     const chat = pickChatFromUpdate(u);
     if (!chat?.id) continue;
-    if (chat.type !== "private" && chat.type !== "group" && chat.type !== "supergroup") continue;
+    if (opts?.privateOnly) {
+      if (chat.type !== "private") continue;
+    } else if (chat.type !== "private" && chat.type !== "group" && chat.type !== "supergroup") {
+      continue;
+    }
     const chatId = String(chat.id);
     const name =
       chat.type === "private"
@@ -545,7 +565,7 @@ export async function listRecentTelegramPrivateChats(
       ...(chat.username ? { username: chat.username } : {}),
     });
   }
-  return [...byId.values()].slice(-Math.max(1, Math.min(20, limit))).reverse();
+  return [...byId.values()].slice(-Math.max(1, Math.min(50, limit))).reverse();
 }
 
 export async function notifyCryptoWireTelegram(

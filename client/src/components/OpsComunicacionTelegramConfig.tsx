@@ -4,6 +4,7 @@ import {
   getOpsComunicacionTelegram,
   putOpsComunicacionTelegram,
   testOpsComunicacionTelegram,
+  type OpsComunicacionTelegramRecipient,
   type OpsComunicacionTelegramSettings,
 } from "../lib/api";
 
@@ -16,9 +17,45 @@ type Props = {
 function channelLabel(s: OpsComunicacionTelegramSettings | null): string {
   if (!s) return "…";
   if (s.tokenConfigured) {
-    return s.botUsername ? `Telegram @${s.botUsername}` : "Telegram Bot API";
+    const n = s.recipients?.length || s.chatIds?.length || 0;
+    const bot = s.botUsername ? `@${s.botUsername}` : "Bot API";
+    return n ? `${bot} · ${n} chat${n === 1 ? "" : "s"} privado${n === 1 ? "" : "s"}` : bot;
   }
   return "Sin bot: pegá el token de BotFather abajo y Guardar";
+}
+
+function isPrivateUserId(raw: string): boolean {
+  return /^\d{5,20}$/.test(String(raw || "").trim());
+}
+
+function realName(name: string | undefined, chatId: string): string {
+  const t = String(name ?? "").trim();
+  if (t && t !== chatId) return t.slice(0, 80);
+  if (chatId === "1022374559") return "JL";
+  return "";
+}
+
+function mergeRecipients(
+  ...lists: OpsComunicacionTelegramRecipient[][]
+): OpsComunicacionTelegramRecipient[] {
+  const byId = new Map<string, OpsComunicacionTelegramRecipient>();
+  for (const list of lists) {
+    for (const r of list) {
+      const chatId = String(r.chatId || "").trim();
+      if (!isPrivateUserId(chatId) || (byId.size >= 250 && !byId.has(chatId))) continue;
+      const prev = byId.get(chatId);
+      const name = realName(r.name, chatId) || realName(prev?.name, chatId) || chatId;
+      const username = (r.username || prev?.username || "").replace(/^@/, "");
+      const poolUser = String(r.poolUser !== undefined ? r.poolUser : prev?.poolUser || "")
+        .trim()
+        .slice(0, 80);
+      const row: OpsComunicacionTelegramRecipient = { chatId, name };
+      if (username) row.username = username;
+      if (poolUser) row.poolUser = poolUser;
+      byId.set(chatId, row);
+    }
+  }
+  return [...byId.values()];
 }
 
 export function OpsComunicacionTelegramConfig({ canEdit, open, onClose }: Props) {
@@ -29,32 +66,54 @@ export function OpsComunicacionTelegramConfig({ canEdit, open, onClose }: Props)
   const [ok, setOk] = useState("");
   const [tg, setTg] = useState<OpsComunicacionTelegramSettings | null>(null);
   const [tgEnabled, setTgEnabled] = useState(false);
-  const [tgChatId, setTgChatId] = useState("");
+  const [recipients, setRecipients] = useState<OpsComunicacionTelegramRecipient[]>([]);
+  const [manualId, setManualId] = useState("");
+  const [manualName, setManualName] = useState("");
   const [tgBotToken, setTgBotToken] = useState("");
   const [tgSaving, setTgSaving] = useState(false);
   const [tgTesting, setTgTesting] = useState(false);
   const [tgDetecting, setTgDetecting] = useState(false);
-  const [tgChats, setTgChats] = useState<Array<{ chatId: string; name: string; username?: string }>>([]);
+  const [pending, setPending] = useState<OpsComunicacionTelegramRecipient[]>([]);
+
+  const applySettings = (r: OpsComunicacionTelegramSettings) => {
+    setTg(r);
+    setTgEnabled(Boolean(r.enabled));
+    setRecipients(mergeRecipients(r.recipients || (r.chatId ? [{ chatId: r.chatId, name: r.chatId }] : [])));
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
     setErr("");
     try {
       const tgRes = await getOpsComunicacionTelegram();
-      setTg(tgRes);
-      setTgEnabled(Boolean(tgRes.enabled));
-      setTgChatId(tgRes.chatId || "");
+      applySettings(tgRes);
+      const detected = await detectOpsComunicacionTelegramChats().catch(() => null);
+      const found = (detected?.chats || []).filter((c) => isPrivateUserId(c.chatId));
+      if (found.length) {
+        const next = mergeRecipients(
+          tgRes.recipients || (tgRes.chatId ? [{ chatId: tgRes.chatId, name: tgRes.chatId }] : []),
+          found
+        );
+        applySettings({ ...tgRes, recipients: next });
+        if (canEdit && JSON.stringify(next) !== JSON.stringify(tgRes.recipients || [])) {
+          await putOpsComunicacionTelegram({
+            enabled: Boolean(tgRes.enabled),
+            recipients: next,
+          }).then(applySettings).catch(() => undefined);
+        }
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : "No se pudo cargar Telegram.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [canEdit]);
 
   useEffect(() => {
     if (!open) return;
     setOk("");
     setErr("");
+    setPending([]);
     void load();
     const t = window.setTimeout(() => closeBtnRef.current?.focus(), 30);
     return () => window.clearTimeout(t);
@@ -74,28 +133,31 @@ export function OpsComunicacionTelegramConfig({ canEdit, open, onClose }: Props)
     };
   }, [open, onClose]);
 
+  const persist = async (next: OpsComunicacionTelegramRecipient[], enabled = tgEnabled) => {
+    const r = await putOpsComunicacionTelegram({
+      enabled,
+      recipients: next,
+      botToken: tgBotToken.trim() || undefined,
+    });
+    applySettings(r);
+    setTgBotToken("");
+    return r;
+  };
+
   const onSaveTelegram = async () => {
     if (!canEdit) return;
     setTgSaving(true);
     setErr("");
     setOk("");
     try {
-      const r = await putOpsComunicacionTelegram({
-        enabled: tgEnabled,
-        chatId: tgChatId,
-        botToken: tgBotToken.trim() || undefined,
-      });
-      setTg(r);
-      setTgEnabled(Boolean(r.enabled));
-      setTgChatId(r.chatId || "");
-      setTgBotToken("");
+      const r = await persist(recipients, tgEnabled);
       setOk(
         r.enabled
           ? r.readyToSend
-            ? "Telegram de Comunicación guardado. Ya podés enviar comunicados."
-            : "Guardado. Falta Chat ID o el token del bot."
+            ? `Listo. Cada aviso se manda aparte a ${r.recipients?.length || r.chatIds?.length || 0} chat(s) privado(s).`
+            : "Guardado. Falta el token del bot o al menos un cliente."
           : r.tokenConfigured
-            ? "Token guardado. Detectá chats, activá envíos y Guardar."
+            ? "Token guardado. Agregá clientes, activá envíos y Guardar."
             : "Avisos Telegram de Comunicación desactivados."
       );
     } catch (e) {
@@ -113,13 +175,13 @@ export function OpsComunicacionTelegramConfig({ canEdit, open, onClose }: Props)
     try {
       const r = await testOpsComunicacionTelegram({
         enabled: true,
-        chatId: tgChatId,
+        recipients,
         botToken: tgBotToken.trim() || undefined,
       });
-      setTg(r);
-      setTgEnabled(Boolean(r.enabled));
-      setTgChatId(r.chatId || tgChatId);
-      setOk("Prueba enviada. Revisá el chat del bot de Comunicación granja.");
+      applySettings(r);
+      setTgBotToken("");
+      const n = r.sentTo ?? r.recipients?.length ?? recipients.length;
+      setOk(`Prueba enviada a ${n} chat(s) privado(s). Cada uno la ve solo en su conversación con el bot.`);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Falló la prueba de Telegram.");
     } finally {
@@ -135,23 +197,31 @@ export function OpsComunicacionTelegramConfig({ canEdit, open, onClose }: Props)
     try {
       if (tgBotToken.trim()) {
         const saved = await putOpsComunicacionTelegram({
-          enabled: Boolean(tgEnabled && tgChatId.trim()),
-          chatId: tgChatId,
+          enabled: Boolean(tgEnabled && recipients.length),
+          recipients,
           botToken: tgBotToken.trim(),
         });
-        setTg(saved);
+        applySettings(saved);
         setTgBotToken("");
       }
       const r = await detectOpsComunicacionTelegramChats();
-      setTgChats(r.chats || []);
-      if (r.chats?.[0]?.chatId && !tgChatId.trim()) {
-        setTgChatId(r.chats[0].chatId);
+      const found = (r.chats || []).filter((c) => isPrivateUserId(c.chatId));
+      const known = new Set(recipients.map((x) => x.chatId));
+      const fresh = found.filter((c) => !known.has(c.chatId));
+      const next = mergeRecipients(recipients, found);
+      setRecipients(next);
+      setPending(fresh);
+      const saved = await persist(next, tgEnabled);
+      setPending([]);
+      if (fresh.length) {
+        setOk(
+          `Agregué ${fresh.length} chat(s) y actualicé los nombres. Ahora hay ${saved.recipients?.length || next.length}.`
+        );
+      } else if (found.length) {
+        setOk("Actualicé los nombres de Telegram en las pastillas. No había chats nuevos.");
+      } else {
+        setOk(r.hint || "Nadie nuevo: cada cliente abre el bot y manda /start, después Detectar chats.");
       }
-      setOk(
-        r.chats?.length
-          ? `Detecté ${r.chats.length} chat(s). Elegí uno o dejá el Chat ID cargado.`
-          : r.hint || "No hay chats todavía: abrí el bot de Comunicación y mandale /start."
-      );
     } catch (e) {
       setErr(e instanceof Error ? e.message : "No se pudieron detectar chats.");
     } finally {
@@ -159,7 +229,28 @@ export function OpsComunicacionTelegramConfig({ canEdit, open, onClose }: Props)
     }
   };
 
+  const onAddManual = () => {
+    const chatId = manualId.trim();
+    if (!isPrivateUserId(chatId)) {
+      setErr("El Chat ID tiene que ser el número positivo del chat privado (no un grupo ni un canal).");
+      setOk("");
+      return;
+    }
+    setErr("");
+    setRecipients((cur) => mergeRecipients(cur, [{ chatId, name: manualName.trim() || chatId }]));
+    setManualId("");
+    setManualName("");
+    setOk("Cliente agregado a la lista. Tocá Guardar Telegram para dejarlo fijo.");
+  };
+
+  const onRemove = (chatId: string) => {
+    setRecipients((cur) => cur.filter((x) => x.chatId !== chatId));
+    setOk("Quitado de la lista. Guardá Telegram para que no reciba más avisos.");
+  };
+
   if (!open) return null;
+
+  const botLink = tg?.botUsername ? `https://t.me/${tg.botUsername.replace(/^@/, "")}` : "";
 
   return (
     <div
@@ -181,7 +272,7 @@ export function OpsComunicacionTelegramConfig({ canEdit, open, onClose }: Props)
               Telegram · Comunicación granja
             </h2>
             <p className="crypto-news-medios__lead">
-              Bot de avisos operativos a clientes. Independiente del wire de noticias de mercado.
+              El bot escribe a cada cliente por separado. No hay canal ni lista de miembros a la vista.
             </p>
           </div>
           <button
@@ -222,46 +313,93 @@ export function OpsComunicacionTelegramConfig({ canEdit, open, onClose }: Props)
                       disabled={tgSaving || tgTesting || tgDetecting}
                       onChange={(e) => setTgEnabled(e.target.checked)}
                     />
-                    <span>Activar envíos de Comunicación granja por Telegram</span>
+                    <span>Activar envíos uno a uno por Telegram</span>
                   </label>
-                  <div className="crypto-news-tg-form__grid">
-                    <div className="crypto-news-tg-field">
-                      <label className="crypto-news-tg-field__label" htmlFor="ops-tg-token">
-                        Token del bot
-                      </label>
+                  <div className="ops-com-tg-field">
+                    <label className="crypto-news-tg-field__label" htmlFor="ops-tg-token">
+                      Token del bot
+                    </label>
+                    <input
+                      id="ops-tg-token"
+                      className="form-control"
+                      type="password"
+                      autoComplete="off"
+                      spellCheck={false}
+                      placeholder={tg?.tokenConfigured ? "Ya está cargado" : "123456789:AAH…"}
+                      value={tgBotToken}
+                      disabled={tgSaving || tgTesting || tgDetecting}
+                      onChange={(e) => setTgBotToken(e.target.value)}
+                    />
+                    <p className="crypto-news-tg-field__hint">
+                      {tg?.tokenConfigured
+                        ? "Dejalo vacío. Solo pegá un token nuevo si BotFather te dio otro."
+                        : "Copiá el API Token de @BotFather (Hashrate Operations)."}
+                    </p>
+                  </div>
+
+                  <div className="ops-com-tg-recip">
+                    <p className="crypto-news-tg-field__label">Clientes (chats privados)</p>
+                    <p className="crypto-news-tg-field__hint">
+                      Cada persona abre {botLink ? <a href={botLink} target="_blank" rel="noreferrer">el bot</a> : "el bot"}{" "}
+                      y manda /start. Después Detectar chats. Nadie ve a los demás ni cuántos hay.
+                    </p>
+                    {recipients.length ? (
+                      <ul className="ops-com-tg-recip__list">
+                        {recipients.map((c) => {
+                          const label = realName(c.name, c.chatId) || (c.username ? `@${c.username}` : "Cliente");
+                          return (
+                            <li key={c.chatId}>
+                              <span className="ops-com-tg-recip__pill">
+                                <strong className="ops-com-tg-recip__name">{label}</strong>
+                                <span className="ops-com-tg-recip__id">{c.chatId}</span>
+                              </span>
+                              <button
+                                type="button"
+                                className="ops-com-tg-recip__del"
+                                disabled={tgSaving || tgTesting || tgDetecting}
+                                onClick={() => onRemove(c.chatId)}
+                              >
+                                Quitar
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <p className="ops-com-tg-recip__empty">Todavía no hay clientes en la lista.</p>
+                    )}
+                    <div className="ops-com-tg-recip__add">
                       <input
-                        id="ops-tg-token"
                         className="form-control"
-                        type="password"
-                        autoComplete="off"
-                        spellCheck={false}
-                        placeholder={tg?.tokenConfigured ? "Ya está cargado" : "123456789:AAH…"}
-                        value={tgBotToken}
+                        placeholder="Nombre (opcional)"
+                        value={manualName}
                         disabled={tgSaving || tgTesting || tgDetecting}
-                        onChange={(e) => setTgBotToken(e.target.value)}
+                        onChange={(e) => setManualName(e.target.value)}
                       />
-                      <p className="crypto-news-tg-field__hint">
-                        {tg?.tokenConfigured
-                          ? "Dejalo vacío. Solo pegá un token nuevo si BotFather te dio otro."
-                          : "Copiá el API Token de @BotFather (Hashrate Operations)."}
-                      </p>
-                    </div>
-                    <div className="crypto-news-tg-field">
-                      <label className="crypto-news-tg-field__label" htmlFor="ops-tg-chat">
-                        Chat ID
-                      </label>
                       <input
-                        id="ops-tg-chat"
                         className="form-control"
                         inputMode="numeric"
-                        placeholder="123456789"
-                        value={tgChatId}
+                        placeholder="Chat ID (número)"
+                        value={manualId}
                         disabled={tgSaving || tgTesting || tgDetecting}
-                        onChange={(e) => setTgChatId(e.target.value.trim())}
+                        onChange={(e) => setManualId(e.target.value.trim())}
                       />
-                      <p className="crypto-news-tg-field__hint">Destino de los avisos. Detectar chats lo completa.</p>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-light"
+                        disabled={tgSaving || tgTesting || tgDetecting || !manualId.trim()}
+                        onClick={onAddManual}
+                      >
+                        Agregar
+                      </button>
                     </div>
+                    {pending.length ? (
+                      <p className="crypto-news-tg-field__hint">
+                        Nuevos detectados: {pending.map((p) => p.name || p.chatId).join(", ")}
+                      </p>
+                    ) : null}
                   </div>
+
                   <div className="crypto-news-tg-form__actions">
                     <button
                       type="button"
@@ -282,29 +420,12 @@ export function OpsComunicacionTelegramConfig({ canEdit, open, onClose }: Props)
                     <button
                       type="button"
                       className="btn btn-sm btn-outline-light"
-                      disabled={tgSaving || tgTesting || tgDetecting || !tgChatId}
+                      disabled={tgSaving || tgTesting || tgDetecting || recipients.length === 0}
                       onClick={() => void onTestTelegram()}
                     >
-                      {tgTesting ? "Enviando…" : "Enviar prueba"}
+                      {tgTesting ? "Enviando…" : "Enviar prueba a todos"}
                     </button>
                   </div>
-                  {tgChats.length > 0 ? (
-                    <div>
-                      <p className="crypto-news-tg-field__label">Chats detectados</p>
-                      <div className="crypto-news-tg__chats">
-                        {tgChats.map((c) => (
-                          <button
-                            key={c.chatId}
-                            type="button"
-                            className="btn btn-sm btn-outline-light"
-                            onClick={() => setTgChatId(c.chatId)}
-                          >
-                            {c.name} · {c.chatId}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
                 </div>
               ) : (
                 <p className="small text-muted mb-0">Solo lectura: no podés cambiar el bot.</p>

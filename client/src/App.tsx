@@ -19,6 +19,8 @@ import { GarantiasAndeClientesPage } from "./pages/GarantiasAndeClientesPage";
 import { ValoresGarantiasAsicPage } from "./pages/ValoresGarantiasAsicPage";
 import { CryptoNoticiasPage } from "./pages/CryptoNoticiasPage";
 import { OpsComunicacionPage } from "./pages/OpsComunicacionPage";
+import { OpsComunicacionBotUsersPage } from "./pages/OpsComunicacionBotUsersPage";
+import { OpsComunicacionCortesPage } from "./pages/OpsComunicacionCortesPage";
 import { GestionFinancieraHubPage } from "./pages/GestionFinancieraHubPage";
 import { ProveedoresHrsPage } from "./pages/ProveedoresHrsPage";
 import { ContabilidadGastosPage } from "./pages/ContabilidadGastosPage";
@@ -459,6 +461,8 @@ function App() {
             <Route path="/gestion-administrativa/valores-garantias-asic" element={<ValoresGarantiasAsicPage />} />
             <Route path="/gestion-administrativa/noticias" element={<CryptoNoticiasPage />} />
             <Route path="/gestion-administrativa/comunicacion" element={<OpsComunicacionPage />} />
+            <Route path="/gestion-administrativa/comunicacion/usuarios-bot" element={<OpsComunicacionBotUsersPage />} />
+            <Route path="/gestion-administrativa/comunicacion/cortes" element={<OpsComunicacionCortesPage />} />
             <Route path="/gestion-administrativa/exchange" element={<PruebaPage />} />
             <Route path="/gestion-administrativa/prueba" element={<Navigate to="/gestion-administrativa/exchange" replace />} />
             <Route path="/gestion-financiera" element={<GestionFinancieraHubPage />} />

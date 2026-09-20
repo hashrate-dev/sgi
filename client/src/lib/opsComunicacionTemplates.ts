@@ -48,16 +48,36 @@ export function formatOpsHorarioLine(from: string, to: string): string {
   return `•  ${a} hs a ${b} hs`;
 }
 
+export function formatOpsHorariosBlock(opts: {
+  horario1From: string;
+  horario1To: string;
+  horario2From: string;
+  horario2To: string;
+}): string {
+  const manana = formatOpsHorarioLine(opts.horario1From, opts.horario1To);
+  const tarde = formatOpsHorarioLine(opts.horario2From, opts.horario2To);
+  if (manana && tarde) {
+    return [
+      "Etapa mañana",
+      manana,
+      "",
+      "Etapa tarde",
+      tarde,
+      "",
+      "Entre ambas etapas el suministro se restablece un rato.",
+    ].join("\n");
+  }
+  if (manana) return ["Etapa mañana", manana].join("\n");
+  if (tarde) return ["Etapa tarde", tarde].join("\n");
+  return "";
+}
+
 export function fillOpsComunicacionMessage(
   plantilla: string,
   opts: { fecha: string; horario1From: string; horario1To: string; horario2From: string; horario2To: string }
 ): string {
   const fecha = formatOpsFechaEs(opts.fecha);
-  const lines = [
-    formatOpsHorarioLine(opts.horario1From, opts.horario1To),
-    formatOpsHorarioLine(opts.horario2From, opts.horario2To),
-  ].filter(Boolean);
-  const horarios = lines.join("\n");
+  const horarios = formatOpsHorariosBlock(opts);
   return String(plantilla || "")
     .replaceAll(OPS_COM_FECHA, fecha || OPS_COM_FECHA)
     .replaceAll(OPS_COM_HORARIOS, horarios || OPS_COM_HORARIOS);
@@ -72,11 +92,7 @@ export function plantillaFromFilledMessage(
   let out = String(filled || "").replace(/\r\n/g, "\n");
   if (!messageHasScheduleSlots(plantilla)) return out.trim();
   const fecha = formatOpsFechaEs(opts.fecha);
-  const lines = [
-    formatOpsHorarioLine(opts.horario1From, opts.horario1To),
-    formatOpsHorarioLine(opts.horario2From, opts.horario2To),
-  ].filter(Boolean);
-  const horarios = lines.join("\n");
+  const horarios = formatOpsHorariosBlock(opts);
   if (plantilla.includes(OPS_COM_FECHA) && fecha) out = out.replaceAll(fecha, OPS_COM_FECHA);
   if (plantilla.includes(OPS_COM_HORARIOS) && horarios) out = out.replaceAll(horarios, OPS_COM_HORARIOS);
   return out.trim();

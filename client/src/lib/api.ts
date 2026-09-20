@@ -2506,16 +2506,27 @@ export type OpsComunicacionItem = {
   sentAt: string;
   createdByEmail: string;
   createdAt: string;
+  corteNo?: number;
+  corteId?: string;
+};
+
+export type OpsComunicacionTelegramRecipient = {
+  chatId: string;
+  name: string;
+  username?: string;
+  poolUser?: string;
 };
 
 export type OpsComunicacionTelegramSettings = {
   enabled: boolean;
   chatId: string;
   chatIds?: string[];
+  recipients?: OpsComunicacionTelegramRecipient[];
   tokenConfigured: boolean;
   botUsername: string | null;
   defaultChatId: string | null;
   readyToSend: boolean;
+  sentTo?: number;
 };
 
 export type OpsComunicacionTitle = {
@@ -2536,6 +2547,8 @@ export function getOpsComunicacion(): Promise<{
   items: OpsComunicacionItem[];
   categories: Array<{ id: string; label: string }>;
   telegramHeader?: string;
+  telegramRecipientCount?: number;
+  telegramRecipients?: OpsComunicacionTelegramRecipient[];
   titles?: OpsComunicacionTitle[];
   messages?: OpsComunicacionMessage[];
 }> {
@@ -2593,8 +2606,69 @@ export function createOpsComunicacion(body: {
   categoria?: string;
   imageUrl?: string;
   sendNow?: boolean;
+  corteControl?: {
+    fecha?: string;
+    motivo?: string;
+    windows?: Array<{ from: string; to: string }>;
+  };
 }): Promise<{ ok: boolean; sentTo?: number; item: OpsComunicacionItem | null }> {
   return api("/api/ops-comunicacion", { method: "POST", body: JSON.stringify(body) });
+}
+
+export type OpsCorteWindow = {
+  id: number;
+  corteNo: number;
+  corteId: string;
+  etapa?: number;
+  etapaLabel?: string;
+  fecha: string;
+  motivo: string;
+  startAnnounced: string;
+  endAnnounced: string;
+  startActual: string;
+  endActual: string;
+  hoursAnnounced: number;
+  hoursActual: number;
+  deltaHours: number;
+  adjusted: boolean;
+  confirmed: boolean;
+  confirmedAt: string;
+  confirmedByEmail: string;
+  adjustmentNote: string;
+  sourceMessageId: number | null;
+  createdAt: string;
+};
+
+export type OpsCortesResponse = {
+  ok: boolean;
+  items: OpsCorteWindow[];
+  totals?: { ventanas: number; hoursAnnounced: number; hoursActual: number; deltaHours: number };
+};
+
+export function getOpsComunicacionCortes(): Promise<OpsCortesResponse> {
+  return api("/api/ops-comunicacion/cortes");
+}
+
+export function createOpsComunicacionCorte(body: {
+  fecha: string;
+  motivo: string;
+  from: string;
+  to: string;
+  etapa?: number;
+  note?: string;
+}): Promise<{ ok: boolean; items: OpsCorteWindow[] }> {
+  return api("/api/ops-comunicacion/cortes", { method: "POST", body: JSON.stringify(body) });
+}
+
+export function updateOpsComunicacionCorte(
+  id: number,
+  body: { startActual: string; endActual: string; confirmed?: boolean; adjustmentNote?: string; motivo?: string }
+): Promise<{ ok: boolean; items: OpsCorteWindow[] }> {
+  return api(`/api/ops-comunicacion/cortes/${id}`, { method: "PUT", body: JSON.stringify(body) });
+}
+
+export function deleteOpsComunicacionCorte(id: number): Promise<{ ok: boolean; items: OpsCorteWindow[] }> {
+  return api(`/api/ops-comunicacion/cortes/${id}`, { method: "DELETE" });
 }
 
 export function sendOpsComunicacionTelegram(id: number): Promise<{ ok: boolean; sentTo?: number }> {
@@ -2609,6 +2683,7 @@ export function putOpsComunicacionTelegram(body: {
   enabled: boolean;
   chatId?: string | null;
   botToken?: string | null;
+  recipients?: OpsComunicacionTelegramRecipient[];
 }): Promise<OpsComunicacionTelegramSettings & { ok: boolean }> {
   return apiTelegramOnce("/api/ops-comunicacion/telegram", { method: "POST", body: JSON.stringify(body) });
 }
@@ -2617,7 +2692,8 @@ export function testOpsComunicacionTelegram(body?: {
   enabled?: boolean;
   chatId?: string | null;
   botToken?: string | null;
-}): Promise<OpsComunicacionTelegramSettings & { ok: boolean; via: string }> {
+  recipients?: OpsComunicacionTelegramRecipient[];
+}): Promise<OpsComunicacionTelegramSettings & { ok: boolean; via: string; sentTo?: number }> {
   return apiTelegramOnce("/api/ops-comunicacion/telegram/test", {
     method: "POST",
     body: JSON.stringify(body ?? {}),

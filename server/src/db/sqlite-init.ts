@@ -464,6 +464,29 @@ CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion_mensajes (
   cuerpo TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion_cortes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  corte_date TEXT NOT NULL,
+  motivo TEXT NOT NULL DEFAULT '',
+  start_announced TEXT NOT NULL,
+  end_announced TEXT NOT NULL,
+  start_actual TEXT NOT NULL,
+  end_actual TEXT NOT NULL,
+  confirmed INTEGER NOT NULL DEFAULT 0,
+  confirmed_at TEXT,
+  confirmed_by_email TEXT NOT NULL DEFAULT '',
+  adjustment_note TEXT NOT NULL DEFAULT '',
+  source_message_id INTEGER,
+  corte_no INTEGER NOT NULL DEFAULT 0,
+  etapa INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_sgi_ops_com_cortes_date ON sgi_ops_comunicacion_cortes(corte_date DESC, id DESC);
+CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion_corte_seq (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  next_num INTEGER NOT NULL DEFAULT 0
+);
+INSERT OR IGNORE INTO sgi_ops_comunicacion_corte_seq (id, next_num) VALUES (1, 0);
 `);
   for (const col of [
     "bot_token TEXT NOT NULL DEFAULT ''",

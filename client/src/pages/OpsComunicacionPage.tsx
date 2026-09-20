@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { OpsComunicacionCatalogSelect } from "../components/OpsComunicacionCatalogSelect";
+import { OpsComunicacionShareBotModal } from "../components/OpsComunicacionShareBotModal";
 import { OpsComunicacionTelegramConfig } from "../components/OpsComunicacionTelegramConfig";
 import { OpsComunicacionTelegramPreview } from "../components/OpsComunicacionTelegramPreview";
 import { PageHeader } from "../components/PageHeader";
@@ -62,6 +63,7 @@ function OpsComPublishedStamp({ iso, compact }: { iso: string; compact?: boolean
 
 export function OpsComunicacionPage() {
   const { user, loading } = useAuth();
+  const navigate = useNavigate();
   const [items, setItems] = useState<OpsComunicacionItem[]>([]);
   const [categories, setCategories] = useState<Array<{ id: string; label: string }>>([]);
   const [tableLoading, setTableLoading] = useState(true);
@@ -70,6 +72,7 @@ export function OpsComunicacionPage() {
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
   const [configOpen, setConfigOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [histOpen, setHistOpen] = useState<OpsComunicacionItem | null>(null);
   const [heroMarkSrc, setHeroMarkSrc] = useState("/images/wp-uploads/cropped-favicoin-32x32.png");
@@ -92,6 +95,7 @@ export function OpsComunicacionPage() {
   const [copyBusy, setCopyBusy] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
   const [sendNow, setSendNow] = useState(true);
+  const [telegramRecipientCount, setTelegramRecipientCount] = useState(0);
 
   const canEdit = Boolean(user && canEditComunicacionModule(user));
   const tituloRow = titles.find((t) => String(t.id) === tituloId);
@@ -130,6 +134,7 @@ export function OpsComunicacionPage() {
       const header = (res.telegramHeader || DEFAULT_TG_HEADER).trim() || DEFAULT_TG_HEADER;
       setTelegramHeader(header);
       setHeaderDraft(header);
+      setTelegramRecipientCount(res.telegramRecipientCount || res.telegramRecipients?.length || 0);
       const nextTitles = res.titles || [];
       setTitles(nextTitles);
       setTituloId((cur) => {
@@ -219,10 +224,22 @@ export function OpsComunicacionPage() {
         categoria,
         imageUrl: imageUrl.trim(),
         sendNow,
+        ...(tituloEsCorte || usesSchedule
+          ? {
+              corteControl: {
+                fecha: fechaAviso,
+                motivo: tituloEsCorte ? "Reducción 23 kV ANDE · 10% potencia reservada" : titulo.trim(),
+                windows: [
+                  { from: horario1From, to: horario1To },
+                  { from: horario2From, to: horario2To },
+                ].filter((w) => w.from.trim() && w.to.trim()),
+              },
+            }
+          : {}),
       });
       setOk(
         sendNow
-          ? `Comunicado enviado a Telegram${r.sentTo ? ` (${r.sentTo} chat)` : ""}.`
+          ? `Comunicado enviado a Telegram${r.sentTo ? ` (${r.sentTo} chat${r.sentTo === 1 ? "" : "s"} privados)` : ""}.`
           : "Comunicado guardado. Todavía no se envió a Telegram."
       );
       setImageUrl("");
@@ -369,8 +386,8 @@ export function OpsComunicacionPage() {
               <div className="crypto-news-kicker">Bot Telegram · Operaciones Data Center</div>
               <h1 className="crypto-news-hero__title">Comunicación de Data Center</h1>
               <p className="crypto-news-hero__lead">
-                Avisos internos de operaciones (energía, mantenimiento, hashrate). No mezcla con el wire de noticias de
-                mercado.
+                Avisos internos de operaciones (energía, mantenimiento, hashrate). El bot los manda uno a uno, en
+                chat privado: los clientes no se ven entre sí.
               </p>
               </div>
             </div>
@@ -385,6 +402,27 @@ export function OpsComunicacionPage() {
                   {tableLoading ? "…" : items.filter((x) => x.telegramSent).length}
                 </div>
               </div>
+              <div className="crypto-news-stat">
+                <div className="crypto-news-stat__label">Chats bot</div>
+                <div className="crypto-news-stat__value">{tableLoading ? "…" : telegramRecipientCount}</div>
+              </div>
+              <button
+                type="button"
+                className="ops-com-users-btn"
+                onClick={() => navigate("/gestion-administrativa/comunicacion/cortes")}
+              >
+                Cortes
+              </button>
+              <button type="button" className="ops-com-users-btn" onClick={() => setShareOpen(true)}>
+                Compartir
+              </button>
+              <button
+                type="button"
+                className="ops-com-users-btn"
+                onClick={() => navigate("/gestion-administrativa/comunicacion/usuarios-bot")}
+              >
+                Usuarios del bot
+              </button>
               <button
                 type="button"
                 className="crypto-news-config-btn"
@@ -408,10 +446,7 @@ export function OpsComunicacionPage() {
           {canEdit ? (
             <form className="ops-com-form" onSubmit={onSubmit}>
               <fieldset className="ops-com-tg-copy">
-                <legend>Texto en Telegram</legend>
-                <p className="ops-com-tg-copy__hint">
-                  Primera y segunda línea del mensaje (⚡ encabezado e itálica). Se guardan para todos los envíos.
-                </p>
+
                 <div className="ops-com-form__row">
                   <div className="ops-com-field">
                     <label htmlFor="ops-tg-header">Encabezado</label>
@@ -537,7 +572,7 @@ export function OpsComunicacionPage() {
                         />
                       </div>
                       <div className="ops-com-field">
-                        <label htmlFor="ops-h1-from">Horario 1</label>
+                        <label htmlFor="ops-h1-from">Mañana (etapa 1)</label>
                         <div className="ops-com-title__row">
                           <input
                             id="ops-h1-from"
@@ -563,7 +598,10 @@ export function OpsComunicacionPage() {
                         </div>
                       </div>
                       <div className="ops-com-field">
-                        <label htmlFor="ops-h2-from">Horario 2</label>
+                        <label htmlFor="ops-h2-from">Tarde (etapa 2)</label>
+                        <p className="ops-com-tg-copy__hint" style={{ margin: "0 0 0.35rem" }}>
+                          Si hay dos horarios, en el medio se prende. Dejá tarde vacío si ese día es una sola etapa.
+                        </p>
                         <div className="ops-com-title__row">
                           <input
                             id="ops-h2-from"
@@ -651,7 +689,8 @@ export function OpsComunicacionPage() {
                     disabled={busy}
                     onChange={(e) => setSendNow(e.target.checked)}
                   />
-                  Enviar ahora a Telegram
+                  Enviar ahora a cada chat privado
+                  {telegramRecipientCount ? ` (${telegramRecipientCount})` : ""}
                 </label>
                 <div className="ops-com-actions__btns">
                   <button type="submit" className="btn btn-success" disabled={busy}>
@@ -671,7 +710,17 @@ export function OpsComunicacionPage() {
           ) : null}
         </section>
 
-        <OpsComunicacionTelegramConfig canEdit={canEdit} open={configOpen} onClose={() => setConfigOpen(false)} />
+        <OpsComunicacionShareBotModal open={shareOpen} onClose={() => setShareOpen(false)} markSrc={heroMarkSrc} />
+
+        <OpsComunicacionTelegramConfig
+          canEdit={canEdit}
+          open={configOpen}
+          onClose={() => {
+            setConfigOpen(false);
+            void load();
+          }}
+        />
+
         <OpsComunicacionTelegramPreview
           open={previewOpen}
           onClose={() => setPreviewOpen(false)}
@@ -710,7 +759,10 @@ export function OpsComunicacionPage() {
                     </svg>
                   </span>
                   <div>
-                    <h2 id="ops-hist-full-title">{histOpen.titulo}</h2>
+                    <h2 id="ops-hist-full-title">
+                      {histOpen.titulo}
+                      {histOpen.corteId ? <span className="ops-com-hist__corte-id">ID corte {histOpen.corteId}</span> : null}
+                    </h2>
                     <p className="ops-com-hist-modal__meta">
                       {histOpen.categoriaLabel}
                       {histOpen.telegramSent ? " · Enviado" : " · Pendiente"}
@@ -748,7 +800,10 @@ export function OpsComunicacionPage() {
                         />
                       </svg>
                     </span>
-                    <h3 className="crypto-news-card__title">{n.titulo}</h3>
+                    <h3 className="crypto-news-card__title">
+                      {n.titulo}
+                      {n.corteId ? <span className="ops-com-hist__corte-id">ID corte {n.corteId}</span> : null}
+                    </h3>
                   </div>
                   {n.cuerpo ? <p className="crypto-news-card__summary">{n.cuerpo}</p> : null}
                   <div className="crypto-news-card__actions">

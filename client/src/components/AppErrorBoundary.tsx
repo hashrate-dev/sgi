@@ -25,9 +25,7 @@ export class AppErrorBoundary extends Component<Props, State> {
         <div
           className="d-flex flex-column align-items-center justify-content-center min-vh-100 p-4"
           style={{
-            background: "#1f2937",
-            color: "#f9fafb",
-            fontFamily: "system-ui, sans-serif",
+            overflowX: "hidden",
           }}
         >
           <h1 className="h4 mb-3">Algo falló al cargar la vista</h1>

@@ -147,7 +147,7 @@ export const SGI_PERMISSION_SCREEN_MAP: readonly SgiPermissionScreenRow[] = [
     zone: "Gestión Administrativa",
     legacyModule: "comunicacion",
     title: "Comunicación granja — Telegram",
-    routes: ["/gestion-administrativa/comunicacion"],
+    routes: ["/gestion-administrativa/comunicacion", "/gestion-administrativa/comunicacion/usuarios-bot", "/gestion-administrativa/comunicacion/cortes"],
     accessNote: "Bot de Telegram para comunicar operaciones de la granja de minería (mantenimiento, energía, hashrate).",
     audience: ["staff", "lector"],
   },

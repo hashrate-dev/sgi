@@ -188,7 +188,7 @@ export const LECTOR_GRANT_PATH_PREFIXES: Record<LectorPermissionKey, readonly st
   setups: ["/asic/setup", "/equipos-asic/setup", "/asic/reparacion"],
   leads: [],
   noticias: ["/gestion-administrativa/noticias"],
-  comunicacion: ["/gestion-administrativa/comunicacion"],
+  comunicacion: ["/gestion-administrativa/comunicacion", "/gestion-administrativa/comunicacion/usuarios-bot", "/gestion-administrativa/comunicacion/cortes"],
   finanzas_contabilidad: ["/gestion-financiera/contabilidad", "/gestion-financiera/resumen-presupuesto", "/gestion-financiera/monitor-financiero"],
   finanzas_proveedores: ["/gestion-financiera/proveedores"],
   finanzas_asic_costos: ["/asic/cotizador-china-py"],
