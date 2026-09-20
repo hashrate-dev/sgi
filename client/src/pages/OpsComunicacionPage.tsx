@@ -101,6 +101,9 @@ export function OpsComunicacionPage() {
   const [telegramRecipientCount, setTelegramRecipientCount] = useState(0);
   const [cuerpoEn, setCuerpoEn] = useState("");
   const [translatingEn, setTranslatingEn] = useState(false);
+  const cuerpoEnSeq = useRef(0);
+  const pendingEs = useRef("");
+  const translatingLock = useRef(false);
 
   const canEdit = Boolean(user && canEditComunicacionModule(user));
   const tituloRow = titles.find((t) => String(t.id) === tituloId);
@@ -176,32 +179,43 @@ export function OpsComunicacionPage() {
   }, []);
 
   useEffect(() => {
-    const src = cuerpoDraft;
-    if (!src.trim()) {
+    pendingEs.current = cuerpoDraft;
+    if (!cuerpoDraft.trim()) {
+      cuerpoEnSeq.current += 1;
+      translatingLock.current = false;
       setCuerpoEn("");
       setTranslatingEn(false);
       return;
     }
-    let alive = true;
-    const t = window.setTimeout(() => {
-      setTranslatingEn(true);
-      void translateOpsComunicacion(src)
+    setTranslatingEn(true);
+    const kick = () => {
+      if (translatingLock.current) return;
+      const snapshot = pendingEs.current;
+      if (!snapshot.trim()) {
+        setTranslatingEn(false);
+        return;
+      }
+      translatingLock.current = true;
+      const seq = ++cuerpoEnSeq.current;
+      void translateOpsComunicacion(snapshot)
         .then((r) => {
-          if (!alive) return;
+          if (seq !== cuerpoEnSeq.current) return;
           setCuerpoEn(String(r.text || ""));
         })
         .catch(() => {
-          if (!alive) return;
-          setCuerpoEn("");
+          /* se deja el inglés anterior */
         })
         .finally(() => {
-          if (alive) setTranslatingEn(false);
+          translatingLock.current = false;
+          if (seq !== cuerpoEnSeq.current) return;
+          if (pendingEs.current !== snapshot && pendingEs.current.trim()) {
+            kick();
+            return;
+          }
+          setTranslatingEn(false);
         });
-    }, 450);
-    return () => {
-      alive = false;
-      window.clearTimeout(t);
     };
+    kick();
   }, [cuerpoDraft]);
 
   useEffect(() => {
@@ -687,7 +701,7 @@ export function OpsComunicacionPage() {
                     </div>
                     <div className="ops-com-body-split__pane">
                       <label htmlFor="ops-cuerpo-en" className="ops-com-body-split__label">
-                        Inglés{translatingEn ? " · traduciendo…" : ""}
+                        Inglés{translatingEn ? " · al escribir…" : ""}
                       </label>
                       <textarea
                         id="ops-cuerpo-en"
@@ -696,7 +710,7 @@ export function OpsComunicacionPage() {
                         readOnly
                         onKeyDown={(e) => e.stopPropagation()}
                         rows={14}
-                        placeholder="English translation appears here as you type."
+                        placeholder="Se traduce al inglés mientras escribís a la izquierda."
                       />
                     </div>
                   </div>

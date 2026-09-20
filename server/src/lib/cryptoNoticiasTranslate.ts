@@ -202,36 +202,26 @@ async function translateEsToEnChunk(text: string): Promise<string> {
   }
 }
 
-/** Español → inglés, conservando saltos de línea del comunicado. */
+/** Español → inglés, un solo viaje para ir al ritmo de la escritura. */
 export async function translateEsToEn(text: string): Promise<string> {
   const q = String(text || "").replace(/\r\n/g, "\n");
   if (!q.trim()) return "";
   try {
-    const lines = q.split("\n");
+    if (q.length <= 4500) return await translateEsToEnChunk(q);
+    const parts = q.split(/\n{2,}/);
     const out: string[] = [];
-    let buf: string[] = [];
-    const flush = async () => {
-      if (!buf.length) return;
-      const block = buf.join("\n");
-      out.push(await translateEsToEnChunk(block));
-      buf = [];
-    };
-    for (const line of lines) {
-      if (!line.trim()) {
-        await flush();
-        out.push("");
-        continue;
-      }
-      const next = buf.length ? `${buf.join("\n")}\n${line}` : line;
-      if (next.length > 850) {
-        await flush();
-        buf = [line];
+    let buf = "";
+    for (const p of parts) {
+      const next = buf ? `${buf}\n\n${p}` : p;
+      if (next.length > 4200) {
+        if (buf) out.push(await translateEsToEnChunk(buf));
+        buf = p;
       } else {
-        buf.push(line);
+        buf = next;
       }
     }
-    await flush();
-    return out.join("\n");
+    if (buf) out.push(await translateEsToEnChunk(buf));
+    return out.join("\n\n") || q;
   } catch (e) {
     console.error("[ops-comunicacion] translate EN", e instanceof Error ? e.message : e);
     return q;
