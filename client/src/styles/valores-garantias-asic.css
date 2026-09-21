@@ -306,6 +306,58 @@
   font-size: 0.82rem;
 }
 
+.vga-pdf-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 0.85rem;
+}
+
+.vga-pdf-toolbar__dest {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.vga-pdf-toolbar__dest label {
+  display: block;
+  margin: 0 0 0.28rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #4d6559;
+}
+
+.vga-pdf-toolbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.vga-pdf-toolbar__count {
+  font-size: 0.78rem;
+  color: #5b6d65;
+  font-weight: 600;
+}
+
+.vga-col-check {
+  width: 2.2rem;
+  text-align: center !important;
+  vertical-align: middle;
+}
+
+.vga-col-check input {
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: #1c4d3a;
+  cursor: pointer;
+}
+
+.vga-gridtable tbody tr.vga-row--selected td {
+  background: #ecfdf5;
+}
+
 .vga-sheet .fact-input {
   max-width: 260px;
   background: #fff;

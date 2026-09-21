@@ -15,6 +15,7 @@ import {
 import { canEditGarantiasModule } from "../lib/auth";
 import { sgiHome } from "../lib/marketplacePaths.js";
 import { canUserAccessNavPath } from "../lib/sgiNavigation";
+import { downloadGarantiasAsicClientePdf } from "../lib/generateGarantiasAsicClientePdf";
 import "../styles/facturacion.css";
 import "../styles/valores-garantias-asic.css";
 
@@ -63,6 +64,9 @@ export function ValoresGarantiasAsicPage() {
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
   const [search, setSearch] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
+  const [pdfDestinatario, setPdfDestinatario] = useState("");
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   const canEdit = Boolean(user && canEditGarantiasModule(user));
 
@@ -99,6 +103,12 @@ export function ValoresGarantiasAsicPage() {
     );
   }, [items, search]);
 
+  const selectedItems = useMemo(
+    () => items.filter((row) => selectedIds.has(row.id)),
+    [items, selectedIds]
+  );
+  const allVisibleSelected = filteredItems.length > 0 && filteredItems.every((row) => selectedIds.has(row.id));
+
   if (!loading && !user) return <Navigate to="/login" replace />;
   if (!loading && user && !canUserAccessNavPath(user, PATH)) {
     return <Navigate to={sgiHome()} replace />;
@@ -120,6 +130,50 @@ export function ValoresGarantiasAsicPage() {
     }
     if (!form.fecha.trim()) return "Elegí la fecha del valor.";
     return null;
+  };
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectVisible = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        for (const row of filteredItems) next.delete(row.id);
+      } else {
+        for (const row of filteredItems) next.add(row.id);
+      }
+      return next;
+    });
+  };
+
+  const downloadSelectedPdf = async () => {
+    if (selectedItems.length === 0) {
+      setErr("Seleccioná al menos un equipo con el tilde para armar el PDF.");
+      return;
+    }
+    setErr("");
+    setOk("");
+    setPdfBusy(true);
+    try {
+      await downloadGarantiasAsicClientePdf({
+        items: selectedItems,
+        destinatario: pdfDestinatario.trim(),
+      });
+      setOk(
+        `PDF generado con ${selectedItems.length} equipo${selectedItems.length === 1 ? "" : "s"} (garantía USD cliente).`
+      );
+    } catch (e2) {
+      setErr(e2 instanceof Error ? e2.message : "No se pudo generar el PDF.");
+    } finally {
+      setPdfBusy(false);
+    }
   };
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -411,10 +465,53 @@ export function ValoresGarantiasAsicPage() {
             Un registro vigente por marca + modelo + procesador. El consumo es el de esa máquina; los valores se
             actualizan con la fecha del momento.
           </p>
+          <div className="vga-pdf-toolbar">
+            <div className="vga-pdf-toolbar__dest">
+              <label htmlFor="vga-pdf-dest">Destinatario del PDF (opcional)</label>
+              <input
+                id="vga-pdf-dest"
+                type="text"
+                className="fact-input"
+                placeholder="Nombre del potencial cliente"
+                value={pdfDestinatario}
+                onChange={(e) => setPdfDestinatario(e.target.value)}
+                maxLength={160}
+                disabled={pdfBusy}
+              />
+            </div>
+            <div className="vga-pdf-toolbar__actions">
+              <span className="vga-pdf-toolbar__count">
+                {selectedIds.size > 0 ? `${selectedIds.size} marcado(s)` : "Sin selección"}
+              </span>
+              <button
+                type="button"
+                className="btn btn-sm btn-success"
+                disabled={pdfBusy || selectedIds.size === 0}
+                onClick={() => void downloadSelectedPdf()}
+                title={
+                  selectedIds.size === 0
+                    ? "Marcá uno o más equipos con el tilde"
+                    : "Descargar PDF con la garantía USD cliente de cada equipo"
+                }
+              >
+                <i className="bi bi-file-earmark-pdf me-1" aria-hidden />
+                {pdfBusy ? "Generando PDF…" : "Generar PDF garantías"}
+              </button>
+            </div>
+          </div>
           <div className="vga-frame">
             <table className="vga-gridtable">
               <thead>
                 <tr>
+                  <th className="vga-col-check">
+                    <input
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      onChange={toggleSelectVisible}
+                      disabled={tableLoading || filteredItems.length === 0}
+                      aria-label="Marcar todos los equipos visibles"
+                    />
+                  </th>
                   <th>Fecha</th>
                   <th>Marca</th>
                   <th>Modelo</th>
@@ -435,19 +532,27 @@ export function ValoresGarantiasAsicPage() {
               <tbody>
                 {tableLoading ? (
                   <tr>
-                    <td colSpan={canEdit ? 9 : 8} className="vga-empty">
+                    <td colSpan={canEdit ? 10 : 9} className="vga-empty">
                       Cargando registros…
                     </td>
                   </tr>
                 ) : filteredItems.length === 0 ? (
                   <tr>
-                    <td colSpan={canEdit ? 9 : 8} className="vga-empty">
+                    <td colSpan={canEdit ? 10 : 9} className="vga-empty">
                       No hay valores de garantía ASIC registrados.
                     </td>
                   </tr>
                 ) : (
                   filteredItems.map((row) => (
-                    <tr key={row.id}>
+                    <tr key={row.id} className={selectedIds.has(row.id) ? "vga-row--selected" : undefined}>
+                      <td className="vga-col-check">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(row.id)}
+                          onChange={() => toggleSelect(row.id)}
+                          aria-label={`Marcar ${row.marca} ${row.modelo}`}
+                        />
+                      </td>
                       <td className="vga-datecell">{formatDateShort(row.fecha)}</td>
                       <td>{row.marca}</td>
                       <td className="vga-model">{row.modelo}</td>
