@@ -462,8 +462,8 @@ export function buildMarketLeadRadar(
     path: pathFromP(cortoP),
     setup,
     why: radarWhy,
-    corto: leadPack(cortoP, cortoWhy, "próx. 48–72 h"),
-    mediano: leadPack(medP, medWhy, "próx. 1–3 semanas"),
-    largo: leadPack(largoP, largoWhy, "próx. 4–8 semanas"),
+    corto: leadPack(cortoP, cortoWhy, "48–72 h"),
+    mediano: leadPack(medP, medWhy, "1–3 sem."),
+    largo: leadPack(largoP, largoWhy, "4–8 sem."),
   };
 }

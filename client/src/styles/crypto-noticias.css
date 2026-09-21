@@ -940,6 +940,7 @@
   display: flex;
   flex-direction: column;
   min-height: 100%;
+  height: 100%;
   padding: 0.9rem 0.9rem 0.85rem;
   border-radius: 1.1rem;
   border: 1px solid color-mix(in srgb, var(--hz) 28%, rgba(255, 255, 255, 0.07));
@@ -1050,9 +1051,15 @@
 
 .crypto-news-sentiment__horizon-window {
   margin: 0.45rem 0 0.7rem;
+  min-height: 2.05rem;
   font-size: 0.68rem;
   color: var(--cn-muted);
   line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .crypto-news-sentiment__horizon-call {
@@ -1080,6 +1087,7 @@
   letter-spacing: 0.14em;
   line-height: 1;
   color: rgba(232, 238, 245, 0.88);
+  white-space: nowrap;
 }
 
 .crypto-news-sentiment__horizon-call.is-buy .crypto-news-sentiment__horizon-call-word {
@@ -1092,22 +1100,26 @@
 
 .crypto-news-sentiment__horizon-call-why {
   margin: 0;
+  min-height: 2.02rem;
   font-size: 0.72rem;
   line-height: 1.4;
   color: rgba(232, 238, 245, 0.62);
   max-width: none;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
 .crypto-news-sentiment__ahead {
   display: grid;
-  grid-template-columns: auto 1fr;
-  column-gap: 0.65rem;
+  grid-template-columns: 4.15rem minmax(0, 1fr);
+  column-gap: 0.55rem;
   row-gap: 0.28rem;
   align-items: center;
+  flex: 1 1 auto;
+  min-height: 8.15rem;
   margin: 0 0 0.75rem;
   padding: 0.65rem 0.7rem 0.7rem;
   border-radius: 0.85rem;
@@ -1163,16 +1175,22 @@
 }
 
 .crypto-news-sentiment__ahead-path {
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .crypto-news-sentiment__ahead-win {
   font-size: 0.65rem;
   color: var(--cn-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .crypto-news-sentiment__ahead-bar {
@@ -1203,11 +1221,13 @@
 .crypto-news-sentiment__ahead-why {
   grid-column: 1 / -1;
   margin: 0;
+  min-height: 1.84rem;
   font-size: 0.68rem;
   line-height: 1.35;
   color: rgba(232, 238, 245, 0.62);
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -1216,12 +1236,14 @@
   list-style: none;
   margin: auto 0 0;
   padding: 0;
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.35rem;
+  flex-shrink: 0;
 }
 
 .crypto-news-sentiment__horizon-mix li {
-  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 0.12rem;
@@ -1237,6 +1259,9 @@
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--cn-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .crypto-news-sentiment__horizon-mix-n {

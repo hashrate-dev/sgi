@@ -287,7 +287,7 @@ export function CryptoNoticiasSentimentPanel({ report, loading }: Props) {
                       </div>
                       <div className="crypto-news-sentiment__ahead-meta">
                         <span className="crypto-news-sentiment__ahead-path">{lead.path}</span>
-                        <span className="crypto-news-sentiment__ahead-win">{lead.window}</span>
+                        <span className="crypto-news-sentiment__ahead-win">próx. {lead.window}</span>
                       </div>
                       <div className="crypto-news-sentiment__ahead-bar" aria-hidden>
                         <span className="crypto-news-sentiment__ahead-fill" style={{ width: `${lead.pUp}%` }} />
