@@ -12,14 +12,13 @@ const TEXT = { r: 33, g: 37, b: 41 };
 const MUTED = { r: 108, g: 117, b: 125 };
 const LINE = { r: 222, g: 226, b: 230 };
 const ROW_ALT = { r: 248, g: 249, b: 250 };
-const TOTAL_BG = { r: 231, g: 240, b: 235 };
 
 const DEFAULT_LEGAL =
   "Los valores de garantía ANDE son referenciales y corresponden a la fianza en USD asociada a cada equipo para operar en Paraguay. No incluyen el precio de compra del minero, el hosting ni la instalación. Hashrate Space / HRS GROUP S.A. confirma el monto vigente al cerrar la operación; ANDE o un cambio de consumo pueden actualizar la cifra. Esta propuesta no constituye oferta firme ni reserva de stock.";
 
 export type GarantiaAsicPdfItem = Pick<
   ValorGarantiaAsicItem,
-  "id" | "marca" | "modelo" | "procesador" | "consumoW" | "montoClienteUsd"
+  "id" | "marca" | "modelo" | "procesador" | "montoClienteUsd"
 >;
 
 export type GarantiaAsicPdfOptions = {
@@ -34,11 +33,6 @@ function moneyUsd(n: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(Number.isFinite(n) ? n : 0);
-}
-
-function formatWatts(n: number): string {
-  if (!Number.isFinite(n) || n <= 0) return "—";
-  return `${new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 }).format(n)} W`;
 }
 
 function formatFechaLarga(d = new Date()): string {
@@ -129,27 +123,17 @@ export async function downloadGarantiasAsicClientePdf(opts: GarantiaAsicPdfOptio
     y += 5;
   }
 
-  y += 1;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.4);
-  doc.setTextColor(MUTED.r, MUTED.g, MUTED.b);
-  const intro =
-    "Incorporá tu ASIC con la garantía ANDE resuelta. Cada línea es el valor en USD de la fianza eléctrica del cliente para ese equipo en Paraguay — listo para operar, con el respaldo de Hashrate Space.";
-  const introLines = doc.splitTextToSize(intro, CONTENT_W);
-  doc.text(introLines, M, y);
-  y += introLines.length * 3.7 + 6;
+  y += 4;
 
   const col = {
     n: M,
     equipo: M + 10,
-    proc: M + 62,
-    cons: M + 118,
+    proc: M + 78,
     gar: PAGE_W - M,
   };
   const colW = {
-    equipo: 50,
-    proc: 54,
-    cons: 28,
+    equipo: 64,
+    proc: 72,
   };
 
   const drawHeader = () => {
@@ -161,7 +145,6 @@ export async function downloadGarantiasAsicClientePdf(opts: GarantiaAsicPdfOptio
     doc.text("#", col.n + 2, y);
     doc.text("Equipo", col.equipo, y);
     doc.text("Procesador / Hashrate", col.proc, y);
-    doc.text("Consumo", col.cons + colW.cons, y, { align: "right" });
     doc.text("Garantía ANDE USD", col.gar, y, { align: "right" });
     y += 6;
   };
@@ -169,7 +152,6 @@ export async function downloadGarantiasAsicClientePdf(opts: GarantiaAsicPdfOptio
   drawHeader();
 
   let rowIndex = 0;
-  let total = 0;
 
   const ensureSpace = (need: number) => {
     if (y + need < PAGE_H - 28) return;
@@ -181,9 +163,7 @@ export async function downloadGarantiasAsicClientePdf(opts: GarantiaAsicPdfOptio
   for (const item of items) {
     const equipo = equipoLabel(item);
     const proc = (item.procesador || "—").trim() || "—";
-    const cons = formatWatts(item.consumoW);
     const gar = Number(item.montoClienteUsd) || 0;
-    total += gar;
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8.5);
@@ -213,9 +193,6 @@ export async function downloadGarantiasAsicClientePdf(opts: GarantiaAsicPdfOptio
     doc.setTextColor(MUTED.r, MUTED.g, MUTED.b);
     doc.text(procLines, col.proc, y);
 
-    doc.setTextColor(TEXT.r, TEXT.g, TEXT.b);
-    doc.text(cons, col.cons + colW.cons, y, { align: "right" });
-
     doc.setFont("helvetica", "bold");
     doc.setTextColor(GREEN.r, GREEN.g, GREEN.b);
     doc.text(moneyUsd(gar), col.gar, y, { align: "right" });
@@ -226,21 +203,8 @@ export async function downloadGarantiasAsicClientePdf(opts: GarantiaAsicPdfOptio
     doc.line(M, y - 3.2, PAGE_W - M, y - 3.2);
   }
 
-  ensureSpace(16);
-  y += 1;
-  doc.setFillColor(TOTAL_BG.r, TOTAL_BG.g, TOTAL_BG.b);
-  doc.rect(M, y - 4, CONTENT_W, 9, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(GREEN.r, GREEN.g, GREEN.b);
-  doc.text(
-    `Total garantía ANDE · ${items.length} equipo${items.length === 1 ? "" : "s"}`,
-    M + 3,
-    y + 1.5
-  );
-  doc.text(moneyUsd(total), col.gar, y + 1.5, { align: "right" });
-  y += 12;
-
+  ensureSpace(14);
+  y += 2;
   doc.setDrawColor(GREEN.r, GREEN.g, GREEN.b);
   doc.setLineWidth(0.4);
   doc.line(M, y, PAGE_W - M, y);
@@ -249,18 +213,9 @@ export async function downloadGarantiasAsicClientePdf(opts: GarantiaAsicPdfOptio
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.2);
   const notaLines = doc.splitTextToSize(DEFAULT_LEGAL, CONTENT_W);
-  ensureSpace(notaLines.length * 3.2 + 16);
+  ensureSpace(notaLines.length * 3.2 + 12);
   doc.setTextColor(MUTED.r, MUTED.g, MUTED.b);
   doc.text(notaLines, M, y);
-  y += notaLines.length * 3.2 + 8;
-
-  doc.setFontSize(8);
-  doc.setTextColor(GREEN.r, GREEN.g, GREEN.b);
-  doc.setFont("helvetica", "bold");
-  const cta = "¿Listo para sumar estos equipos? Escribinos a sales@hashrate.space o por WhatsApp (+595) 993 358 387.";
-  const ctaLines = doc.splitTextToSize(cta, CONTENT_W);
-  ensureSpace(ctaLines.length * 3.6 + 12);
-  doc.text(ctaLines, M, y);
 
   const footerY = PAGE_H - 14;
   doc.setDrawColor(LINE.r, LINE.g, LINE.b);
