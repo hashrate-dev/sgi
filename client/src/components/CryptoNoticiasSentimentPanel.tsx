@@ -229,8 +229,25 @@ export function CryptoNoticiasSentimentPanel({ report, loading }: Props) {
 
       <div className="crypto-news-sentiment__grid">
         <CryptoNoticiasLivePrices />
-        <div className="crypto-news-sentiment__mid">
-          <div className="crypto-news-sentiment__horizons">
+        <div className="crypto-news-sentiment__chart-wrap">
+          {radar ? (
+            <div className={`crypto-news-sentiment__radar is-${radar.path === "SUBA" ? "up" : radar.path === "BAJA" ? "down" : "flat"}`}>
+              <div className="crypto-news-sentiment__radar-kicker">Adelanto · {radar.setup}</div>
+              <div className="crypto-news-sentiment__radar-main">
+                <span className="crypto-news-sentiment__radar-pct">{radar.pUp}%</span>
+                <span className="crypto-news-sentiment__radar-path">{radar.path}</span>
+              </div>
+              <p className="crypto-news-sentiment__radar-why">{radar.why}</p>
+            </div>
+          ) : null}
+          <div className="crypto-news-sentiment__chart-kicker">Sesgo por plazo</div>
+          <div className="crypto-news-sentiment__chart-canvas">
+            <canvas ref={canvasRef} />
+          </div>
+        </div>
+      </div>
+
+      <div className="crypto-news-sentiment__horizons">
             {horizons.map((h) => {
               const ht = scoreTone(h.score);
               const meterPct = Math.round(((h.score + 100) / 200) * 100);
@@ -309,24 +326,6 @@ export function CryptoNoticiasSentimentPanel({ report, loading }: Props) {
                 </article>
               );
             })}
-          </div>
-          <div className="crypto-news-sentiment__chart-wrap">
-            {radar ? (
-              <div className={`crypto-news-sentiment__radar is-${radar.path === "SUBA" ? "up" : radar.path === "BAJA" ? "down" : "flat"}`}>
-                <div className="crypto-news-sentiment__radar-kicker">Adelanto · {radar.setup}</div>
-                <div className="crypto-news-sentiment__radar-main">
-                  <span className="crypto-news-sentiment__radar-pct">{radar.pUp}%</span>
-                  <span className="crypto-news-sentiment__radar-path">{radar.path}</span>
-                </div>
-                <p className="crypto-news-sentiment__radar-why">{radar.why}</p>
-              </div>
-            ) : null}
-            <div className="crypto-news-sentiment__chart-kicker">Sesgo por plazo</div>
-            <div className="crypto-news-sentiment__chart-canvas">
-              <canvas ref={canvasRef} />
-            </div>
-          </div>
-        </div>
       </div>
 
       {(drivers.bullish.length > 0 || drivers.bearish.length > 0) && (

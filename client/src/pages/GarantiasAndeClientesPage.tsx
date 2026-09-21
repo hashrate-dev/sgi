@@ -569,11 +569,11 @@ export function GarantiasAndeClientesPage() {
                   <th>Fecha inicio</th>
                   <th>Cliente</th>
                   <th>Equipo</th>
-                  <th>Marca</th>
+                  <th className="vga-marca">Marca</th>
                   <th>Modelo</th>
                   <th>Procesador</th>
-                  <th className="vga-num">Monto USD (Cliente)</th>
-                  <th className="vga-num">Monto USD Hosting</th>
+                  <th className="vga-num vga-usd">Monto USD (Cliente)</th>
+                  <th className="vga-num vga-usd">Monto USD Hosting</th>
                   <th>Devolución</th>
                   {canEdit ? <th className="vga-num">Acciones</th> : null}
                 </tr>
@@ -609,15 +609,15 @@ export function GarantiasAndeClientesPage() {
                           {row.nombreEquipo || "—"}
                           <span className="vga-sn vga-sub">{row.numeroSerie || "—"}</span>
                         </td>
-                        <td>{row.marca}</td>
+                        <td className="vga-marca">{row.marca}</td>
                         <td className="vga-model">{row.modelo}</td>
                         <td className="vga-proc">{row.procesador}</td>
-                        <td className="vga-num">
+                        <td className="vga-num vga-usd">
                           <span className={`vga-amt vga-amt--c${isDevuelta ? " text-decoration-line-through" : ""}`}>
                             {formatUsd(row.montoUsd)}
                           </span>
                         </td>
-                        <td className="vga-num">
+                        <td className="vga-num vga-usd">
                           <span className={`vga-amt vga-amt--h${isDevuelta ? " text-decoration-line-through" : ""}`}>
                             {formatUsd(row.montoClienteUsd)}
                           </span>

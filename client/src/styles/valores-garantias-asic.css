@@ -365,6 +365,24 @@
   background: #f4faf6;
 }
 
+.vga-marca {
+  white-space: nowrap;
+  min-width: 7.4rem;
+  width: 8.5%;
+}
+
+.vga-usd {
+  width: 6.2%;
+  padding-left: 0.42rem !important;
+  padding-right: 0.42rem !important;
+}
+
+.vga-usd .vga-amt {
+  min-width: 0;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.74rem;
+}
+
 .vga-num {
   text-align: right !important;
   font-variant-numeric: tabular-nums;
