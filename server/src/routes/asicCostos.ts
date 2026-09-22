@@ -381,6 +381,106 @@ asicCostosRouter.post(
   }
 );
 
+asicCostosRouter.put(
+  "/asic/costos-equipos/:id",
+  requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("finanzas_asic_costos"),
+  async (req, res) => {
+    await ensureAsicCostosSchema();
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      return res.status(400).json({ error: { message: "Id inválido" } });
+    }
+    const parsed = AsicCostoPayloadSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: { message: "Datos inválidos para actualizar la cotización ASIC." } });
+    }
+    const d = parsed.data;
+    const info = await db
+      .prepare(
+        `UPDATE asic_costos_equipos SET
+          marca = ?, modelo = ?, procesador = ?, observaciones = ?,
+          precio_origen = ?, monto_usd = ?, coeficiente = ?, proveedor_py = ?,
+          margen_usd = ?, total_nacionalizado = ?, precio_venta = ?, pct_margen = ?
+         WHERE id = ?`
+      )
+      .run(
+        d.marca?.trim() || "",
+        d.modelo?.trim() || "",
+        d.procesador?.trim() || "",
+        d.observaciones?.trim() || "",
+        d.precioOrigen,
+        d.montoUsd,
+        d.coeficiente,
+        d.proveedorPy,
+        d.margenUsd,
+        d.totalNacionalizado,
+        d.precioVenta,
+        d.pctMargen,
+        id
+      );
+    if (info.changes === 0) {
+      return res.status(404).json({ error: { message: "Registro no encontrado" } });
+    }
+
+    const updated = (await db
+      .prepare(
+        `SELECT id, created_at, marca, modelo, procesador, observaciones, precio_origen, monto_usd, coeficiente, proveedor_py,
+                margen_usd, total_nacionalizado, precio_venta, pct_margen
+         FROM asic_costos_equipos
+         WHERE id = ?`
+      )
+      .get(id)) as AsicCostoRow | undefined;
+
+    let marketplaceSync: Awaited<ReturnType<typeof syncCotizadorPrecioToMarketplace>> | null = null;
+    try {
+      if (req.user) {
+        marketplaceSync = await syncCotizadorPrecioToMarketplace({
+          marca: d.marca?.trim() || "",
+          modelo: d.modelo?.trim() || "",
+          procesador: d.procesador?.trim() || "",
+          precioVenta: d.precioVenta,
+          user: req.user,
+        });
+      }
+    } catch (syncErr) {
+      console.warn("[PUT /asic/costos-equipos/:id] sync marketplace:", syncErr);
+      marketplaceSync = {
+        status: "skipped",
+        message: "Cotización actualizada; no se pudo sincronizar el precio de marketplace.",
+      };
+    }
+
+    let itemOut: ReturnType<typeof mapAsicCostoRow> | null = null;
+    if (updated) {
+      const raw = updated as unknown as Record<string, unknown>;
+      const mapped = mapAsicCostoRow(raw);
+      let mpRows: Awaited<ReturnType<typeof loadCotizadorMarketplaceCandidates>> = [];
+      try {
+        mpRows = await loadCotizadorMarketplaceCandidates();
+      } catch {
+        /* ignore */
+      }
+      const pub = cotizacionPrecioPublicadoEnMarketplace(
+        {
+          marca: mapped.marca,
+          modelo: mapped.modelo,
+          procesador: mapped.procesador,
+          precioVenta: mapped.precioVenta,
+        },
+        mpRows
+      );
+      itemOut = mapAsicCostoRow(raw, pub);
+    }
+
+    res.json({
+      ok: true,
+      item: itemOut,
+      marketplaceSync,
+    });
+  }
+);
+
 asicCostosRouter.post(
   "/asic/costos-equipos/sync-marketplace",
   requireRole("admin_a", "admin_b", "operador"),

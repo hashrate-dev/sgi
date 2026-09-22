@@ -3044,6 +3044,18 @@ button.fact-back {
   background: #ecfdf5;
 }
 
+.asic-cotizador-registros-table tbody tr.asic-cotizador-row--editing td {
+  background: #fffbeb;
+}
+
+.asic-cotizador-row-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
 /* Parámetros — campos de costo (precio, monto, coef., proveedor): tono rojo suave */
 .fact-panel-nuevo-documento .asic-cotizador-field-wrap--costo {
   background: linear-gradient(180deg, #fff1f2 0%, #ffe4e6 45%, #fff1f2 100%);

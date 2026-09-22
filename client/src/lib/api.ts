@@ -1478,6 +1478,28 @@ export function createAsicCostoEquipo(
   });
 }
 
+export function updateAsicCostoEquipo(
+  id: number,
+  body: AsicCostoEquipoPayload
+): Promise<{
+  ok: boolean;
+  item: AsicCostoEquipoItem | null;
+  marketplaceSync?: {
+    status: "updated" | "unchanged" | "no_match" | "ambiguous" | "skipped";
+    equipoId?: string;
+    codigoProducto?: string | null;
+    label?: string;
+    oldPrecio?: number;
+    newPrecio?: number;
+    message: string;
+  } | null;
+}> {
+  return api(`/api/asic/costos-equipos/${encodeURIComponent(String(id))}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
 export function deleteAsicCostoEquipo(id: number): Promise<void> {
   return api<void>(`/api/asic/costos-equipos/${encodeURIComponent(String(id))}`, {
     method: "DELETE",

@@ -1,7 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PageHeader } from "../components/PageHeader";
 import { AsicCotizadorCatalogSelect } from "../components/AsicCotizadorCatalogSelect";
-import { createAsicCostoEquipo, deleteAsicCostoEquipo, getAsicCostosEquipos, syncAsicCotizadorMarketplaceFromLatest, type AsicCostoEquipoItem } from "../lib/api";
+import {
+  createAsicCostoEquipo,
+  deleteAsicCostoEquipo,
+  getAsicCostosEquipos,
+  syncAsicCotizadorMarketplaceFromLatest,
+  updateAsicCostoEquipo,
+  type AsicCostoEquipoItem,
+} from "../lib/api";
 import { downloadAsicCotizacionPdf } from "../lib/generateAsicCotizacionPdf";
 import { AsicCotizadorEvolucionModal } from "../components/AsicCotizadorEvolucionModal";
 import { showToast } from "../components/ToastNotification";
@@ -87,6 +94,11 @@ function prioridadModeloCotizacion(modeloRaw: string): number {
   return 4;
 }
 
+function moneyToInput(n: number): string {
+  if (!Number.isFinite(n) || n <= 0) return "";
+  return String(Math.round(n));
+}
+
 export function AsicCotizadorChinaPyPage() {
   const [precioOrigen, setPrecioOrigen] = useState("");
   const [bloqueUsd, setBloqueUsd] = useState(String(DEFAULT_BLOQUE_USD));
@@ -100,6 +112,9 @@ export function AsicCotizadorChinaPyPage() {
   const [registrosLoading, setRegistrosLoading] = useState(false);
   const [registrosError, setRegistrosError] = useState("");
   const [eliminandoIds, setEliminandoIds] = useState<Set<number>>(() => new Set());
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [guardando, setGuardando] = useState(false);
+  const skipProcesadorClearRef = useRef(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
   const [pdfDestinatario, setPdfDestinatario] = useState("");
   const [pdfBusy, setPdfBusy] = useState(false);
@@ -110,6 +125,10 @@ export function AsicCotizadorChinaPyPage() {
   const [syncMarketplaceBusy, setSyncMarketplaceBusy] = useState(false);
 
   useEffect(() => {
+    if (skipProcesadorClearRef.current) {
+      skipProcesadorClearRef.current = false;
+      return;
+    }
     setProcesador("");
   }, [modelo]);
 
@@ -180,42 +199,80 @@ export function AsicCotizadorChinaPyPage() {
 
   async function generarYRegistrarPrecio(): Promise<void> {
     setRegistrosError("");
+    const payload = {
+      marca: marca.trim(),
+      modelo: modelo.trim(),
+      procesador: procesador.trim(),
+      observaciones: observaciones.trim(),
+      precioOrigen: parseMoney(precioOrigen),
+      montoUsd: parseMoney(bloqueUsd),
+      coeficiente: COEFICIENTE_FIJO,
+      proveedorPy: parseMoney(proveedorPy),
+      margenUsd: parseMoney(margen),
+      totalNacionalizado,
+      precioVenta,
+      pctMargen: Math.round(pctMargenSobrePvp),
+    };
+    setGuardando(true);
     try {
-      const resp = await createAsicCostoEquipo({
-        marca: marca.trim(),
-        modelo: modelo.trim(),
-        procesador: procesador.trim(),
-        observaciones: observaciones.trim(),
-        precioOrigen: parseMoney(precioOrigen),
-        montoUsd: parseMoney(bloqueUsd),
-        coeficiente: COEFICIENTE_FIJO,
-        proveedorPy: parseMoney(proveedorPy),
-        margenUsd: parseMoney(margen),
-        totalNacionalizado,
-        precioVenta,
-        pctMargen: Math.round(pctMargenSobrePvp),
-      });
+      const resp =
+        editingId != null
+          ? await updateAsicCostoEquipo(editingId, payload)
+          : await createAsicCostoEquipo(payload);
       if (resp.item) {
-        setRegistros((prev) => [resp.item!, ...prev]);
+        if (editingId != null) {
+          setRegistros((prev) => prev.map((r) => (r.id === editingId ? resp.item! : r)));
+          setEditingId(null);
+        } else {
+          setRegistros((prev) => [resp.item!, ...prev]);
+        }
         setObservaciones("");
       }
       const sync = resp.marketplaceSync;
+      const doneLabel = editingId != null ? "Cotización actualizada." : "Cotización registrada.";
       if (sync?.status === "updated") {
         showToast(sync.message, "success", "Cotizador ASIC");
       } else if (sync?.status === "unchanged") {
         showToast(sync.message, "info", "Cotizador ASIC");
       } else if (sync?.status === "ambiguous" || sync?.status === "no_match") {
-        showToast(
-          `Cotización registrada. ${sync.message}`,
-          "info",
-          "Cotizador ASIC"
-        );
+        showToast(`${doneLabel} ${sync.message}`, "info", "Cotizador ASIC");
       } else {
-        showToast("Cotización registrada.", "success", "Cotizador ASIC");
+        showToast(doneLabel, "success", "Cotizador ASIC");
       }
     } catch (e) {
-      setRegistrosError(e instanceof Error ? e.message : "No se pudo registrar la cotización.");
+      setRegistrosError(
+        e instanceof Error
+          ? e.message
+          : editingId != null
+            ? "No se pudo actualizar la cotización."
+            : "No se pudo registrar la cotización."
+      );
+    } finally {
+      setGuardando(false);
     }
+  }
+
+  function comenzarEdicion(item: AsicCostoEquipoItem): void {
+    const nextModelo = item.modelo || "";
+    if (nextModelo !== modelo) skipProcesadorClearRef.current = true;
+    setEditingId(item.id);
+    setMarca(item.marca || "");
+    setModelo(item.modelo || "");
+    setProcesador(item.procesador || "");
+    setObservaciones(item.observaciones || "");
+    setPrecioOrigen(moneyToInput(item.precioOrigen));
+    setBloqueUsd(moneyToInput(item.montoUsd) || String(DEFAULT_BLOQUE_USD));
+    setProveedorPy(moneyToInput(item.proveedorPy) || String(DEFAULT_PROVEEDOR_USD));
+    setMargen(moneyToInput(item.margenUsd));
+    setRegistrosError("");
+    window.requestAnimationFrame(() => {
+      document.getElementById("asic-cotizador-params")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  function cancelarEdicion(): void {
+    setEditingId(null);
+    setObservaciones("");
   }
 
   async function aplicarUltimosPreciosMarketplace(): Promise<void> {
@@ -329,6 +386,7 @@ export function AsicCotizadorChinaPyPage() {
       next.delete(item.id);
       return next;
     });
+    if (editingId === item.id) setEditingId(null);
     try {
       await deleteAsicCostoEquipo(item.id);
     } catch (e) {
@@ -473,8 +531,10 @@ export function AsicCotizadorChinaPyPage() {
           </div>
         </section>
 
-        <div className="fact-card fact-panel-nuevo-documento asic-cotizador-params-panel mb-4">
-          <div className="fact-panel-nuevo-documento-header">Parámetros de cotización</div>
+        <div className="fact-card fact-panel-nuevo-documento asic-cotizador-params-panel mb-4" id="asic-cotizador-params">
+          <div className="fact-panel-nuevo-documento-header">
+            {editingId != null ? "Editar cotización" : "Parámetros de cotización"}
+          </div>
           <div className="fact-card-body">
             <form
               onSubmit={(e) => {
@@ -629,10 +689,26 @@ export function AsicCotizadorChinaPyPage() {
                   </div>
                 </div>
               </div>
-              <div className="d-flex justify-content-end mt-3">
-                <button type="button" className="btn btn-success" onClick={() => void generarYRegistrarPrecio()}>
-                  <i className="bi bi-plus-circle me-1" />
-                  Generar precio y registrar
+              <div className="d-flex justify-content-end gap-2 mt-3">
+                {editingId != null ? (
+                  <button type="button" className="btn btn-outline-secondary" onClick={cancelarEdicion} disabled={guardando}>
+                    Cancelar
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="btn btn-success"
+                  onClick={() => void generarYRegistrarPrecio()}
+                  disabled={guardando}
+                >
+                  <i className={`bi ${editingId != null ? "bi-check2-circle" : "bi-plus-circle"} me-1`} />
+                  {guardando
+                    ? editingId != null
+                      ? "Guardando…"
+                      : "Registrando…"
+                    : editingId != null
+                      ? "Guardar cambios"
+                      : "Generar precio y registrar"}
                 </button>
               </div>
               {registrosError ? <div className="alert alert-danger py-2 mt-3 mb-0">{registrosError}</div> : null}
@@ -775,7 +851,15 @@ export function AsicCotizadorChinaPyPage() {
                           minute: "2-digit",
                         });
                         return (
-                          <tr key={r.id} className={selected ? "asic-cotizador-row--selected" : undefined}>
+                          <tr
+                            key={r.id}
+                            className={[
+                              selected ? "asic-cotizador-row--selected" : "",
+                              editingId === r.id ? "asic-cotizador-row--editing" : "",
+                            ]
+                              .filter(Boolean)
+                              .join(" ") || undefined}
+                          >
                             <td className="asic-cotizador-col-check text-center">
                               <input
                                 type="checkbox"
@@ -823,15 +907,26 @@ export function AsicCotizadorChinaPyPage() {
                               </span>
                             </td>
                             <td className="text-end">
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-outline-danger"
-                                title="Eliminar registro"
-                                onClick={() => void handleEliminarRegistro(r)}
-                                disabled={eliminandoIds.has(r.id)}
-                              >
-                                <i className="bi bi-trash" aria-hidden="true" />
-                              </button>
+                              <div className="asic-cotizador-row-actions">
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-outline-secondary"
+                                  title="Editar cotización"
+                                  onClick={() => comenzarEdicion(r)}
+                                  disabled={guardando || eliminandoIds.has(r.id)}
+                                >
+                                  <i className="bi bi-pencil" aria-hidden="true" />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-outline-danger"
+                                  title="Eliminar registro"
+                                  onClick={() => void handleEliminarRegistro(r)}
+                                  disabled={guardando || eliminandoIds.has(r.id)}
+                                >
+                                  <i className="bi bi-trash" aria-hidden="true" />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
