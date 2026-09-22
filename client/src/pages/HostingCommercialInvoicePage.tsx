@@ -88,13 +88,14 @@ function fieldsFromRecord(inv: CommercialInvoiceRecord): CommercialInvoiceFields
     goodsStatus: inv.goodsStatus ?? "Used / Usado",
     shipmentPurpose: inv.shipmentPurpose ?? "Shipment of used equipment / Envío de equipos usados",
     goodsOriginCountry: inv.goodsOriginCountry ?? "",
+    showHashrateLogo: Boolean(inv.showHashrateLogo),
     items: inv.items,
   };
 }
 
 export function HostingCommercialInvoicePage() {
   const { user } = useAuth();
-  const canOpen = canUserAccessNavPath(user, "/hosting/commercial-invoices");
+  const canOpen = canUserAccessNavPath(user, "/asic/commercial-invoices");
   const canEdit = canEditFacturacion(user);
   const [form, setForm] = useState<CommercialInvoiceFields>(() => recallCommercialInvoiceDraft() ?? defaultCommercialInvoiceFields());
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -390,13 +391,8 @@ export function HostingCommercialInvoicePage() {
       <div className="container">
         <PageHeader title="Commercial Invoice" />
         <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-          <div>
-            <h1 className="h4 mb-1">Commercial Invoice</h1>
-            <p className="text-muted small mb-0">
-              El número es automático: <code>IN00101</code>, <code>IN00102</code>… suma de a uno y no se reutiliza.
-            </p>
-          </div>
-          <Link to="/hosting" className="btn btn-outline-secondary btn-sm">
+          <h1 className="h4 mb-0">Commercial Invoice</h1>
+          <Link to="/asic" className="btn btn-outline-secondary btn-sm">
             Volver al hub
           </Link>
         </div>
@@ -425,6 +421,15 @@ export function HostingCommercialInvoicePage() {
             </div>
 
             <h2>Documento</h2>
+            <label className="ci-logo-tick">
+              <input
+                type="checkbox"
+                checked={form.showHashrateLogo}
+                disabled={!canEdit || busy}
+                onChange={(e) => set("showHashrateLogo", e.target.checked)}
+              />
+              Logo Hashrate (arriba a la izquierda)
+            </label>
             <div className="ci-grid ci-grid--3">
               <div>
                 <label className="fact-label">Fecha</label>

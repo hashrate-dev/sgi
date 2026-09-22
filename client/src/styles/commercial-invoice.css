@@ -409,8 +409,52 @@
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
 }
 
-.ci-paper__title {
+.ci-logo-tick {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.9rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ci-logo-tick input {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+  accent-color: #00a652;
+  cursor: pointer;
+}
+
+.ci-logo-tick input:disabled {
+  cursor: not-allowed;
+}
+
+.ci-paper__brand {
+  position: relative;
   margin: 0 0 2.4mm;
+}
+
+.ci-paper__brand--logo {
+  min-height: 13mm;
+  padding-left: 0;
+}
+
+.ci-paper__logo {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 12.5mm;
+  width: auto;
+  max-width: 46mm;
+  object-fit: contain;
+}
+
+.ci-paper__title {
+  margin: 0;
   text-align: center;
   font-size: 13.2pt;
   font-weight: 700;

@@ -25,7 +25,12 @@ export function CommercialInvoicePreview({
 
   return (
     <article className="ci-paper" aria-label="Vista previa Commercial Invoice">
-      <h1 className="ci-paper__title">COMMERCIAL INVOICE / FACTURA COMERCIAL</h1>
+      <header className={`ci-paper__brand${fields.showHashrateLogo ? " ci-paper__brand--logo" : ""}`}>
+        {fields.showHashrateLogo ? (
+          <img className="ci-paper__logo" src="/images/LOGO-HASHRATE.png" alt="Hashrate" />
+        ) : null}
+        <h1 className="ci-paper__title">COMMERCIAL INVOICE / FACTURA COMERCIAL</h1>
+      </header>
       <div className="ci-paper__title-rule" />
 
       <table className="ci-paper__meta">

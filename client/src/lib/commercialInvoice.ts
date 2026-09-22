@@ -49,6 +49,8 @@ export type CommercialInvoiceFields = {
   goodsStatus: string;
   shipmentPurpose: string;
   goodsOriginCountry: string;
+  /** Tilde: logo Hashrate arriba a la izquierda en vista previa y PDF. */
+  showHashrateLogo: boolean;
   items: CommercialInvoiceItem[];
 };
 
@@ -420,6 +422,7 @@ export function defaultCommercialInvoiceFields(): CommercialInvoiceFields {
     goodsStatus: "Used / Usado",
     shipmentPurpose: "Shipment of used equipment / Envío de equipos usados",
     goodsOriginCountry: "",
+    showHashrateLogo: false,
     items: [],
   };
 }
@@ -446,6 +449,7 @@ export function recallCommercialInvoiceDraft(): CommercialInvoiceFields | null {
       goodsStatus: parsed.goodsStatus ?? "Used / Usado",
       shipmentPurpose: parsed.shipmentPurpose ?? "Shipment of used equipment / Envío de equipos usados",
       goodsOriginCountry: parsed.goodsOriginCountry ?? "",
+      showHashrateLogo: Boolean(parsed.showHashrateLogo),
       items: Array.isArray(parsed.items) ? parsed.items.filter((it) => !isPlaceholderCommercialInvoiceItem(it as CommercialInvoiceItem)) : [],
     };
   } catch {

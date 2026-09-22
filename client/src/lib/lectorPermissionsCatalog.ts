@@ -175,6 +175,7 @@ export const LECTOR_GRANT_PATH_PREFIXES: Record<LectorPermissionKey, readonly st
     "/asic/billing",
     "/asic/history",
     "/asic/pending",
+    "/asic/commercial-invoices",
     "/facturacion-equipos",
     "/historial-equipos",
     "/pendientes-equipos",

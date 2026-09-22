@@ -173,16 +173,6 @@ export const SGI_PERMISSION_SCREEN_MAP: readonly SgiPermissionScreenRow[] = [
     audience: ["staff", "lector"],
   },
   {
-    id: "hosting-commercial-invoice",
-    zoneOrder: 20,
-    zone: "Hosting — Servicios de hosting",
-    legacyModule: "facturacion",
-    title: "Commercial Invoice (hosting)",
-    routes: ["/hosting/commercial-invoices"],
-    accessNote: "Invoice comercial internacional: formularios, ítems y PDF con numeración única.",
-    audience: ["staff", "lector"],
-  },
-  {
     id: "hosting-history",
     zoneOrder: 20,
     zone: "Hosting — Servicios de hosting",
@@ -281,6 +271,16 @@ export const SGI_PERMISSION_SCREEN_MAP: readonly SgiPermissionScreenRow[] = [
     title: "Emitir facturas de equipos ASIC",
     routes: ["/asic/billing"],
     accessNote: "Facturas, NC y recibos de venta de equipos.",
+    audience: ["staff", "lector"],
+  },
+  {
+    id: "hosting-commercial-invoice",
+    zoneOrder: 30,
+    zone: "Equipos ASIC — Minería corporativa",
+    legacyModule: "facturacion",
+    title: "Commercial Invoice (ASIC)",
+    routes: ["/asic/commercial-invoices", "/hosting/commercial-invoices"],
+    accessNote: "Invoice comercial internacional de equipos: formularios, ítems y PDF con numeración única.",
     audience: ["staff", "lector"],
   },
   {

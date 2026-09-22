@@ -475,7 +475,7 @@ function App() {
             <Route path="/hosting/exchange-operations" element={<HostingExchangeOperationsPage />} />
             <Route path="/hosting/tipo-cambio-historial" element={<HostingTipoCambioHistorialPage />} />
             <Route path="/hosting/billing" element={<FacturacionPage />} />
-            <Route path="/hosting/commercial-invoices" element={<HostingCommercialInvoicePage />} />
+            <Route path="/hosting/commercial-invoices" element={<Navigate to="/asic/commercial-invoices" replace />} />
             <Route path="/history" element={<HistorialPage />} />
             <Route path="/hosting/history" element={<HistorialPage sourceFilter="hosting" />} />
             <Route path="/hosting/pending" element={<PendientesPage />} />
@@ -490,6 +490,7 @@ function App() {
             <Route path="/asic/warranty-items/new" element={<GarantiaAndeItemNewPage />} />
             <Route path="/asic/warranties-history" element={<HistorialGarantiasPage />} />
             <Route path="/asic/billing" element={<FacturacionMineriaPage />} />
+            <Route path="/asic/commercial-invoices" element={<HostingCommercialInvoicePage />} />
             <Route path="/asic/history" element={<HistorialMineriaPage />} />
             <Route path="/asic/pending" element={<PendientesMineriaPage />} />
             <Route path="/clients" element={<ClientesHubPage />} />

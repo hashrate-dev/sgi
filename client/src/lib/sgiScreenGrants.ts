@@ -126,7 +126,6 @@ export function countSelectedScreens(
 
 export const HOSTING_HUB_SCREENS = [
   "hosting-billing",
-  "hosting-commercial-invoice",
   "hosting-history",
   "hosting-pending",
   "hosting-email-flow",
@@ -139,6 +138,7 @@ export const ASIC_HUB_SCREENS = [
   "asic-monitor-bajas",
   "asic-cotizador",
   "asic-billing",
+  "hosting-commercial-invoice",
   "asic-history",
   "asic-pending",
   "asic-setup",

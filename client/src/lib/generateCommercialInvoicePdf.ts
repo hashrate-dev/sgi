@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import type { CommercialInvoiceFields } from "./commercialInvoice";
+import { loadImageAsBase64 } from "./generateFacturaPdf";
 import {
   COMMERCIAL_INVOICE_DECLARATION_EN,
   COMMERCIAL_INVOICE_DECLARATION_ES,
@@ -26,6 +27,19 @@ function navy(doc: jsPDF) {
   doc.setTextColor(NAVY.r, NAVY.g, NAVY.b);
 }
 
+async function loadHashrateLogo(): Promise<string | undefined> {
+  const base = (import.meta.env.BASE_URL || "/").replace(/\/?$/, "/");
+  const candidates = [`${base}images/LOGO-HASHRATE.png`, `${base}images/wp-uploads/hashrate-LOGO.png`];
+  for (const url of candidates) {
+    try {
+      return await loadImageAsBase64(url);
+    } catch {
+      /* siguiente */
+    }
+  }
+  return undefined;
+}
+
 export async function downloadCommercialInvoicePdf(fields: CommercialInvoiceFields & { number: string }): Promise<void> {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const { total } = commercialInvoiceTotals(fields.items, 0);
@@ -35,8 +49,30 @@ export async function downloadCommercialInvoicePdf(fields: CommercialInvoiceFiel
   navy(doc);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
-  doc.text("COMMERCIAL INVOICE / FACTURA COMERCIAL", PAGE_W / 2, y, { align: "center" });
-  y += 3.2;
+  if (fields.showHashrateLogo) {
+    const logo = await loadHashrateLogo();
+    if (logo) {
+      const logoW = 42;
+      const logoH = 12;
+      try {
+        doc.addImage(logo, "PNG", M, y - 3, logoW, logoH);
+      } catch {
+        try {
+          doc.addImage(logo, "JPEG", M, y - 3, logoW, logoH);
+        } catch {
+          /* sin logo */
+        }
+      }
+      doc.text("COMMERCIAL INVOICE / FACTURA COMERCIAL", PAGE_W / 2, y + 4.2, { align: "center" });
+      y += logoH + 1.2;
+    } else {
+      doc.text("COMMERCIAL INVOICE / FACTURA COMERCIAL", PAGE_W / 2, y, { align: "center" });
+      y += 3.2;
+    }
+  } else {
+    doc.text("COMMERCIAL INVOICE / FACTURA COMERCIAL", PAGE_W / 2, y, { align: "center" });
+    y += 3.2;
+  }
   doc.setDrawColor(NAVY.r, NAVY.g, NAVY.b);
   doc.setLineWidth(0.55);
   doc.line(M, y, PAGE_W - M, y);

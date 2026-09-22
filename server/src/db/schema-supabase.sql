@@ -752,6 +752,7 @@ CREATE TABLE IF NOT EXISTS commercial_invoices (
   goods_status TEXT NOT NULL DEFAULT '',
   shipment_purpose TEXT NOT NULL DEFAULT '',
   goods_origin_country TEXT NOT NULL DEFAULT '',
+  show_hashrate_logo INTEGER NOT NULL DEFAULT 0,
   notes TEXT NOT NULL DEFAULT '',
   bank_details TEXT NOT NULL DEFAULT '',
   items_json TEXT NOT NULL DEFAULT '[]',

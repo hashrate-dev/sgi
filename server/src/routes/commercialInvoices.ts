@@ -60,6 +60,7 @@ async function ensureSchema(): Promise<void> {
           goods_status TEXT NOT NULL DEFAULT '',
           shipment_purpose TEXT NOT NULL DEFAULT '',
           goods_origin_country TEXT NOT NULL DEFAULT '',
+          show_hashrate_logo INTEGER NOT NULL DEFAULT 0,
           notes TEXT NOT NULL DEFAULT '',
           bank_details TEXT NOT NULL DEFAULT '',
           items_json TEXT NOT NULL DEFAULT '[]',
@@ -117,6 +118,7 @@ async function ensureSchema(): Promise<void> {
           goods_status TEXT NOT NULL DEFAULT '',
           shipment_purpose TEXT NOT NULL DEFAULT '',
           goods_origin_country TEXT NOT NULL DEFAULT '',
+          show_hashrate_logo INTEGER NOT NULL DEFAULT 0,
           notes TEXT NOT NULL DEFAULT '',
           bank_details TEXT NOT NULL DEFAULT '',
           items_json TEXT NOT NULL DEFAULT '[]',
@@ -156,6 +158,11 @@ async function ensureSchema(): Promise<void> {
   }
   try {
     await db.prepare("ALTER TABLE commercial_invoices ADD COLUMN goods_origin_country TEXT NOT NULL DEFAULT ''").run();
+  } catch {
+    /* ya existe */
+  }
+  try {
+    await db.prepare("ALTER TABLE commercial_invoices ADD COLUMN show_hashrate_logo INTEGER NOT NULL DEFAULT 0").run();
   } catch {
     /* ya existe */
   }
@@ -346,6 +353,7 @@ const FieldsSchema = z.object({
   goodsStatus: z.string().max(120).trim().optional().default(""),
   shipmentPurpose: z.string().max(400).trim().optional().default(""),
   goodsOriginCountry: z.string().max(80).trim().optional().default(""),
+  showHashrateLogo: z.boolean().optional().default(false),
   notes: z.string().max(4000).trim().optional().default(""),
   bankDetails: z.string().max(4000).trim().optional().default(""),
   taxLabel: z.string().max(80).trim().optional().default(""),
@@ -487,6 +495,7 @@ function mapRow(row: Record<string, unknown>) {
     goodsStatus: String(r.goods_status ?? ""),
     shipmentPurpose: String(r.shipment_purpose ?? ""),
     goodsOriginCountry: String(r.goods_origin_country ?? ""),
+    showHashrateLogo: Number(r.show_hashrate_logo ?? 0) === 1,
     notes: String(r.notes ?? ""),
     bankDetails: String(r.bank_details ?? ""),
     items,
@@ -503,7 +512,7 @@ const COLS = `id, number, seq_year, seq_num, number_suffix, invoice_date, due_da
   payment_method, incoterms, origin_country, destination_country,
   seller_name, seller_address, seller_city, seller_country, seller_tax_id, seller_email, seller_phone, seller_web,
   buyer_name, buyer_address, buyer_city, buyer_country, buyer_tax_id, buyer_email, buyer_phone,
-  goods_status, shipment_purpose, goods_origin_country,
+  goods_status, shipment_purpose, goods_origin_country, show_hashrate_logo,
   notes, bank_details, items_json, subtotal, tax_label, tax_amount, total, created_at, updated_at`;
 
 commercialInvoicesRouter.get(
@@ -797,17 +806,17 @@ commercialInvoicesRouter.post(
               payment_method, incoterms, origin_country, destination_country,
               seller_name, seller_address, seller_city, seller_country, seller_tax_id, seller_email, seller_phone, seller_web,
               buyer_name, buyer_address, buyer_city, buyer_country, buyer_tax_id, buyer_email, buyer_phone,
-              goods_status, shipment_purpose, goods_origin_country,
+              goods_status, shipment_purpose, goods_origin_country, show_hashrate_logo,
               notes, bank_details, items_json, subtotal, tax_label, tax_amount, total
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING ${COLS}`
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING ${COLS}`
           : `INSERT INTO commercial_invoices (
               number, seq_year, seq_num, number_suffix, invoice_date, due_date, currency, po_number, payment_terms,
               payment_method, incoterms, origin_country, destination_country,
               seller_name, seller_address, seller_city, seller_country, seller_tax_id, seller_email, seller_phone, seller_web,
               buyer_name, buyer_address, buyer_city, buyer_country, buyer_tax_id, buyer_email, buyer_phone,
-              goods_status, shipment_purpose, goods_origin_country,
+              goods_status, shipment_purpose, goods_origin_country, show_hashrate_logo,
               notes, bank_details, items_json, subtotal, tax_label, tax_amount, total
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING ${COLS}`;
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING ${COLS}`;
         const row = (await tx.prepare(returning).get(
           number,
           year,
@@ -840,6 +849,7 @@ commercialInvoicesRouter.post(
           inv.goodsStatus,
           inv.shipmentPurpose,
           inv.goodsOriginCountry,
+          inv.showHashrateLogo ? 1 : 0,
           inv.notes,
           inv.bankDetails,
           itemsJson,
@@ -891,7 +901,7 @@ commercialInvoicesRouter.put(
             payment_method = ?, incoterms = ?, origin_country = ?, destination_country = ?,
             seller_name = ?, seller_address = ?, seller_city = ?, seller_country = ?, seller_tax_id = ?, seller_email = ?, seller_phone = ?, seller_web = ?,
             buyer_name = ?, buyer_address = ?, buyer_city = ?, buyer_country = ?, buyer_tax_id = ?, buyer_email = ?, buyer_phone = ?,
-            goods_status = ?, shipment_purpose = ?, goods_origin_country = ?,
+            goods_status = ?, shipment_purpose = ?, goods_origin_country = ?, show_hashrate_logo = ?,
             notes = ?, bank_details = ?, items_json = ?, subtotal = ?, tax_label = ?, tax_amount = ?, total = ?,
             updated_at = ${updatedAtSql}
            WHERE id = ?`
@@ -926,6 +936,7 @@ commercialInvoicesRouter.put(
           inv.goodsStatus,
           inv.shipmentPurpose,
           inv.goodsOriginCountry,
+          inv.showHashrateLogo ? 1 : 0,
           inv.notes,
           inv.bankDetails,
           itemsJson,

@@ -25,6 +25,7 @@ const asicMenuItems: Array<{ to: string; icon: string; label: string; desc: stri
     desc: "Cotizador de equipos ASIC de China a Paraguay",
   },
   { to: "/asic/billing", icon: "bi-receipt", label: "Emitir comprobantes de pago ASIC", desc: "Emisión de comprobantes de pago y Notas de Crédito" },
+  { to: "/asic/commercial-invoices", icon: "bi-file-earmark-ruled", label: "Commercial Invoice", desc: "Invoice internacional editable: fechas, ítems, precios y numeración automática" },
   { to: "/asic/history", icon: "bi-clock-history", label: "Historial Venta de ASIC", desc: "Ver y gestionar comprobantes por Ventas de Equipos ASIC" },
   { to: "/asic/pending", icon: "bi-hourglass-split", label: "Pendientes de Cobro", desc: "Consulta de saldos ASIC (sin recibo en emisión)" },
   { to: "/asic/ande-warranty", icon: "bi-file-earmark-text", label: "Recibos Garantía ANDE", desc: "Emisión de recibos de garantía ANDE para equipos" },
