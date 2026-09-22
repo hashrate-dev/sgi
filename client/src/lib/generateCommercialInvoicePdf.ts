@@ -63,16 +63,11 @@ export async function downloadCommercialInvoicePdf(fields: CommercialInvoiceFiel
           /* sin logo */
         }
       }
-      doc.text("COMMERCIAL INVOICE / FACTURA COMERCIAL", PAGE_W / 2, y + 4.2, { align: "center" });
-      y += logoH + 1.2;
-    } else {
-      doc.text("COMMERCIAL INVOICE / FACTURA COMERCIAL", PAGE_W / 2, y, { align: "center" });
-      y += 3.2;
+      y += logoH + 12;
     }
-  } else {
-    doc.text("COMMERCIAL INVOICE / FACTURA COMERCIAL", PAGE_W / 2, y, { align: "center" });
-    y += 3.2;
   }
+  doc.text("COMMERCIAL INVOICE / FACTURA COMERCIAL", PAGE_W / 2, y, { align: "center" });
+  y += 3.2;
   doc.setDrawColor(NAVY.r, NAVY.g, NAVY.b);
   doc.setLineWidth(0.55);
   doc.line(M, y, PAGE_W - M, y);
