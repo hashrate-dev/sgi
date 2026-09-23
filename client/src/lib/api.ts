@@ -2393,6 +2393,51 @@ export function getCryptoNoticiasLivePrices(): Promise<{
   return api("/api/crypto-noticias/live-prices");
 }
 
+export type BtcTradeCheck = {
+  id: string;
+  label: string;
+  bias: "buy" | "sell" | "wait";
+  detail: string;
+};
+
+export type BtcTradeSignal = {
+  symbol: string;
+  interval: string;
+  price: number;
+  bias: "buy" | "sell" | "wait";
+  confidence: number;
+  buyVotes: number;
+  sellVotes: number;
+  waitVotes: number;
+  thesis: string;
+  action: string;
+  invalidation: number;
+  stop: number;
+  target1: number;
+  target2: number;
+  riskUsd: number;
+  reward1Usd: number;
+  rr1: number;
+  checks: BtcTradeCheck[];
+  ema25: number;
+  ema50: number;
+  ema200: number;
+  rsi: number;
+  macd: number;
+  macdSignal: number;
+  macdHist: number;
+  supertrend: number;
+  supertrendDir: 1 | -1;
+  zigzagLast: { kind: "high" | "low"; price: number };
+  updatedAt: string;
+  candleCount: number;
+};
+
+export function getBtcTradeSignal(params: { symbol: string; interval: string }): Promise<{ signal: BtcTradeSignal }> {
+  const q = new URLSearchParams({ symbol: params.symbol, interval: params.interval });
+  return api(`/api/crypto-noticias/trade-signal?${q.toString()}`);
+}
+
 export type CryptoNoticiaMedio = {
   id: number;
   feedKey: string;

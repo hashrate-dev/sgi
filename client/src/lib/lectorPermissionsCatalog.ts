@@ -188,7 +188,7 @@ export const LECTOR_GRANT_PATH_PREFIXES: Record<LectorPermissionKey, readonly st
   garantias: ["/asic/ande-warranty", "/asic/warranty-items", "/asic/warranties-history", "/equipos-asic", "/gestion-administrativa/garantias-ande-clientes", "/gestion-administrativa/valores-garantias-asic"],
   setups: ["/asic/setup", "/equipos-asic/setup", "/asic/reparacion"],
   leads: [],
-  noticias: ["/gestion-administrativa/noticias"],
+  noticias: ["/gestion-administrativa/noticias", "/gestion-administrativa/mercados"],
   comunicacion: ["/gestion-administrativa/comunicacion", "/gestion-administrativa/comunicacion/usuarios-bot", "/gestion-administrativa/comunicacion/cortes"],
   finanzas_contabilidad: ["/gestion-financiera/contabilidad", "/gestion-financiera/resumen-presupuesto", "/gestion-financiera/monitor-financiero"],
   finanzas_proveedores: ["/gestion-financiera/proveedores"],

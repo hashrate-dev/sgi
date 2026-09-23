@@ -18,6 +18,7 @@ import { FxExchangeClienteEditPage } from "./pages/FxExchangeClienteEditPage";
 import { GarantiasAndeClientesPage } from "./pages/GarantiasAndeClientesPage";
 import { ValoresGarantiasAsicPage } from "./pages/ValoresGarantiasAsicPage";
 import { CryptoNoticiasPage } from "./pages/CryptoNoticiasPage";
+import { MercadosTradingPage } from "./pages/MercadosTradingPage";
 import { OpsComunicacionPage } from "./pages/OpsComunicacionPage";
 import { OpsComunicacionBotUsersPage } from "./pages/OpsComunicacionBotUsersPage";
 import { OpsComunicacionCortesPage } from "./pages/OpsComunicacionCortesPage";
@@ -460,6 +461,7 @@ function App() {
             <Route path="/gestion-administrativa/garantias-ande-clientes" element={<GarantiasAndeClientesPage />} />
             <Route path="/gestion-administrativa/valores-garantias-asic" element={<ValoresGarantiasAsicPage />} />
             <Route path="/gestion-administrativa/noticias" element={<CryptoNoticiasPage />} />
+            <Route path="/gestion-administrativa/mercados" element={<MercadosTradingPage />} />
             <Route path="/gestion-administrativa/comunicacion" element={<OpsComunicacionPage />} />
             <Route path="/gestion-administrativa/comunicacion/usuarios-bot" element={<OpsComunicacionBotUsersPage />} />
             <Route path="/gestion-administrativa/comunicacion/cortes" element={<OpsComunicacionCortesPage />} />

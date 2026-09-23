@@ -40,6 +40,7 @@ const GA_HUB_SECTION_SCREENS = [
   "ga-garantias-ande-clientes",
   "ga-valores-garantias-asic",
   "ga-noticias",
+  "ga-mercados",
   "ga-comunicacion",
 ] as const;
 

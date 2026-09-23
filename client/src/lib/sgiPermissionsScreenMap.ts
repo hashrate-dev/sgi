@@ -142,6 +142,16 @@ export const SGI_PERMISSION_SCREEN_MAP: readonly SgiPermissionScreenRow[] = [
     audience: ["staff", "lector"],
   },
   {
+    id: "ga-mercados",
+    zoneOrder: 10,
+    zone: "Gestión Administrativa",
+    legacyModule: "noticias",
+    title: "TradingView+ — mercados BTC",
+    routes: ["/gestion-administrativa/mercados"],
+    accessNote: "Gráfico de velas en vivo, indicadores y herramientas de análisis de Bitcoin y alts minadas.",
+    audience: ["staff", "lector"],
+  },
+  {
     id: "ga-comunicacion",
     zoneOrder: 10,
     zone: "Gestión Administrativa",

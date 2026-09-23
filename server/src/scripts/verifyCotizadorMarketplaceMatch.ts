@@ -20,13 +20,20 @@ function runUnitCases() {
 
   assert(extractCotizadorModelKey("S21") === "s21", "modelo cotizador S21 → s21");
   assert(extractCotizadorModelKey("Antminer S21") === "s21", "Antminer S21 → s21");
-  assert(extractCotizadorModelKey("Antminer S21 Pro") === "s21", "Antminer S21 Pro → s21");
+  assert(extractCotizadorModelKey("Antminer S21 Pro") === "s21pro", "Antminer S21 Pro → s21pro");
   assert(extractCotizadorModelKey("L9") === "l9", "L9 → l9");
+  assert(extractCotizadorModelKey("Z15Pro") === "z15pro", "Z15Pro → z15pro");
+  assert(extractCotizadorModelKey("Antminer - Z15Pro") === "z15pro", "Antminer - Z15Pro → z15pro");
+  assert(extractCotizadorModelKey("Antminer Z15 Pro") === "z15pro", "Antminer Z15 Pro → z15pro");
 
   const hr = parseCotizadorHashrate("235 ths");
   assert(!!hr && hr.value === 235 && hr.unit === "ths", "235 ths parse");
   const hr2 = parseCotizadorHashrate("235 TH/s");
   assert(!!hr2 && hr2.value === 235 && hr2.unit === "ths", "235 TH/s parse compatible");
+  const hrZ = parseCotizadorHashrate("860 kSols");
+  assert(!!hrZ && hrZ.value === 860 && hrZ.unit === "ksol", "860 kSols parse");
+  const hrZ2 = parseCotizadorHashrate("860 kSol/s");
+  assert(!!hrZ2 && hrZ2.value === 860 && hrZ2.unit === "ksol", "860 kSol/s parse compatible");
 
   const cotiz = { marca: "Bitmain", modelo: "S21", procesador: "235 ths" };
   const eqOk: CotizadorMatchCandidate = {
@@ -68,6 +75,17 @@ function runUnitCases() {
   };
   assert(scoreCotizadorEquipoMatch(l9Cotiz, l9Eq) === 100, "L9 16.000 mhs ↔ 16.000 MH/s");
 
+  const z15Cotiz = { marca: "Bitmain", modelo: "Antminer - Z15Pro", procesador: "860 kSols" };
+  const z15Eq: CotizadorMatchCandidate = {
+    ...eqOk,
+    id: "7",
+    modelo: "Antminer Z15 Pro",
+    procesador: "860 KSols",
+  };
+  assert(scoreCotizadorEquipoMatch(z15Cotiz, z15Eq) === 100, "Z15Pro 860 kSols ↔ Antminer Z15 Pro 860 KSols");
+  const z15Plain = { ...z15Eq, id: "8", modelo: "Antminer Z15", procesador: "840 kSol/s" };
+  assert(scoreCotizadorEquipoMatch(z15Cotiz, z15Plain) == null, "Z15Pro no pisa Z15 840");
+
   console.log("\nTodos los tests unitarios pasaron.\n");
 }
 
@@ -92,6 +110,7 @@ async function runDryRunAgainstDb() {
       { marca: "Bitmain", modelo: "S21", procesador: "270 ths" },
       { marca: "Bitmain", modelo: "L9", procesador: "16.000 mhs" },
       { marca: "Bitmain", modelo: "S23", procesador: "305 ths" },
+      { marca: "Bitmain", modelo: "Antminer - Z15Pro", procesador: "860 kSols" },
       { marca: "Bitmain", modelo: "MODELO-INEXISTENTE-XYZ", procesador: "999 ths" },
     ];
 

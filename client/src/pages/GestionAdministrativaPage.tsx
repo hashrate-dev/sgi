@@ -68,6 +68,12 @@ const hubItems: readonly HubItem[] = [
     desc: "Sala de redacción: bot que captura e historializa cripto, BTC, alts, USA, Uruguay e inversiones",
   },
   {
+    to: "/gestion-administrativa/mercados",
+    icon: "bi-graph-up-arrow",
+    label: "TradingView+",
+    desc: "Monitor profesional BTC: velas en vivo, confluencia y señal de compra/venta",
+  },
+  {
     to: "/gestion-administrativa/comunicacion",
     icon: "bi-broadcast-pin",
     label: "Comunicación",

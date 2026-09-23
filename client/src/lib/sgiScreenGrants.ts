@@ -173,6 +173,7 @@ export function collectPathPrefixesFromScreenGrants(grants: readonly string[]): 
     grantsIncludeScreen(g, "ga-garantias-ande-clientes") ||
     grantsIncludeScreen(g, "ga-valores-garantias-asic") ||
     grantsIncludeScreen(g, "ga-noticias") ||
+    grantsIncludeScreen(g, "ga-mercados") ||
     grantsIncludeScreen(g, "ga-comunicacion");
   const seesFin =
     grantsIncludeScreen(g, "fin-proveedores") ||

@@ -19,6 +19,7 @@ import {
 } from "../lib/cryptoNoticiasBot.js";
 import { buildMarketSentimentReport } from "../lib/cryptoNoticiasSentiment.js";
 import { fetchLiveCoinQuotes } from "../lib/cryptoNoticiasLivePrices.js";
+import { buildTradeConfluence } from "../lib/btcTradeConfluence.js";
 import {
   mapPool,
   needsNewsTranslation,
@@ -1242,6 +1243,19 @@ cryptoNoticiasRouter.get("/crypto-noticias/live-prices", ...readMw, async (_req,
       fetchedAt: new Date().toISOString(),
       error: e instanceof Error ? e.message : "precios no disponibles",
     });
+  }
+});
+
+/** Confluencia operativa (EMA/ST/MACD/RSI/ZigZag) para el monitor TradingView+. */
+cryptoNoticiasRouter.get("/crypto-noticias/trade-signal", ...readMw, async (req, res, next) => {
+  try {
+    const symbol = String(req.query.symbol ?? "BTCUSDT");
+    const interval = String(req.query.interval ?? "60");
+    const signal = await buildTradeConfluence(symbol, interval);
+    res.json({ signal });
+  } catch (e) {
+    console.error("[crypto-noticias] trade-signal", e instanceof Error ? e.message : e);
+    res.status(503).json({ error: { message: e instanceof Error ? e.message : "Señal no disponible" } });
   }
 });
 

@@ -44,17 +44,14 @@ function norm(s: string): string {
     .replace(/\s+/g, " ");
 }
 
-/** Misma idea que marketplaceGarantiaQuote: clave de modelo (s21, l9, …). */
+/** Misma idea que marketplaceGarantiaQuote: clave de modelo (s21, z15pro, …). */
 export function extractCotizadorModelKey(text: string): string {
-  const stop = new Set([
+  const brandStop = new Set([
     "antminer",
     "bitmain",
     "microbt",
     "whatsminer",
     "canaan",
-    "pro",
-    "xp",
-    "hydro",
     "series",
     "rack",
     "antrack",
@@ -65,15 +62,23 @@ export function extractCotizadorModelKey(text: string): string {
     "mhs",
     "khs",
     "phs",
+    "ksol",
+    "ksols",
   ]);
+  const suffix = new Set(["pro", "plus", "xp", "hydro"]);
   const tokens = norm(text)
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .split(" ")
     .map((x) => x.trim())
     .filter(Boolean);
-  for (const tk of tokens) {
-    if (stop.has(tk)) continue;
-    if (/[a-z]*\d+[a-z]*/i.test(tk)) return tk;
+  for (let i = 0; i < tokens.length; i++) {
+    const tk = tokens[i]!;
+    if (brandStop.has(tk)) continue;
+    if (!/[a-z]*\d+[a-z]*/i.test(tk)) continue;
+    let key = tk;
+    const next = tokens[i + 1];
+    if (next && suffix.has(next) && !key.endsWith(next)) key = `${key}${next}`;
+    return key;
   }
   return "";
 }
@@ -81,12 +86,15 @@ export function extractCotizadorModelKey(text: string): string {
 export function parseCotizadorHashrate(text: string): { value: number; unit: string } | null {
   const m = String(text ?? "")
     .toLowerCase()
-    .match(/(\d+(?:[.,]\d+)?)\s*(th\/s|gh\/s|mh\/s|kh\/s|ph\/s|ths|ghs|mhs|khs|phs|ksol\/s|ks\/s)\b/i);
+    .replace(/,/g, ".")
+    .match(
+      /(\d+(?:\.\d+)?)\s*(th\/s|gh\/s|mh\/s|kh\/s|ph\/s|ths|ghs|mhs|khs|phs|ksol\/s|ksols|ksol|ks\/s|ks)\b/i
+    );
   if (!m) return null;
   const value = Number(String(m[1]).replace(",", "."));
   if (!Number.isFinite(value)) return null;
   let unit = String(m[2] ?? "").toLowerCase().replace("/", "");
-  if (unit === "ksols" || unit === "ks") unit = "ksol";
+  if (unit === "ksols" || unit === "ksol" || unit === "ks") unit = "ksol";
   return { value, unit };
 }
 
@@ -95,6 +103,8 @@ function normProcesadorLoose(text: string): string {
     .replace(/th\/s/g, "ths")
     .replace(/mh\/s/g, "mhs")
     .replace(/gh\/s/g, "ghs")
+    .replace(/ksol\/s/g, "ksol")
+    .replace(/ksols/g, "ksol")
     .replace(/,/g, ".")
     .replace(/\s+/g, "");
 }
