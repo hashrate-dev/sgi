@@ -8,6 +8,7 @@ import {
   type EquipoAsicVitrinaRow,
   type VitrinaAsicProduct,
 } from "./asicVitrinaMapper.js";
+import { marketplaceShelfImagePublicPath } from "./marketplaceShelfImage.js";
 import { normalizeMarketplaceImageSrc } from "./marketplaceImageSrc.js";
 
 /** En listado nunca enviamos base64 (multiplica el JSON y ralentiza parse + render). */
@@ -18,11 +19,13 @@ export function vitrinaListImageSrc(raw: string | null | undefined): string {
   return n;
 }
 
-/** Imagen de grilla: solo tarjeta (`mp_image_src`). La galería lleva logo Hashrate (ficha inventario). */
+/** Imagen de grilla: solo tarjeta (`mp_image_src`). Data URL → endpoint con ?v= para no servir foto vieja. */
 export function pickVitrinaListImageSrc(
-  row: Pick<EquipoAsicVitrinaRow, "mp_image_src" | "mp_gallery_json">
+  row: Pick<EquipoAsicVitrinaRow, "id" | "mp_image_src" | "mp_gallery_json">
 ): string {
-  return vitrinaListImageSrc(row.mp_image_src);
+  const direct = vitrinaListImageSrc(row.mp_image_src);
+  if (direct) return direct;
+  return marketplaceShelfImagePublicPath(row.id, row.mp_image_src);
 }
 
 /** Catálogo grilla: sin galería, sin partes hashrate, imagen solo por URL. */

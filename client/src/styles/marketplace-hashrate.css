@@ -1746,7 +1746,7 @@ button.market-link-hrs {
 }
 
 .market-shelf-grid--catalog-v2 .shelf-product__photo {
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
   padding: 0;
   filter: none;

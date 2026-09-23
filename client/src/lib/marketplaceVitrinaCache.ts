@@ -5,8 +5,8 @@ export type MarketplaceVitrinaPayload = {
   hidePricesForGuests: boolean;
 };
 
-const SESSION_KEY = "hrs_mp_vitrina_v4";
-const LOCAL_KEY = "hrs_mp_vitrina_ls_v4";
+const SESSION_KEY = "hrs_mp_vitrina_v5";
+const LOCAL_KEY = "hrs_mp_vitrina_ls_v5";
 /** Catálogo en sesión: revalidar en red sin bloquear la grilla. */
 const SESSION_TTL_MS = 5 * 60_000;
 /** Respaldo entre visitas (misma ventana / recarga). */

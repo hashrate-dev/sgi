@@ -334,7 +334,7 @@ function buildMarketplacePayload(form: EquipoFormState): {
 } {
   const vis = form.marketplaceVisible === true;
   const lines = form.marketplaceGalleryLines.split("\n").map((s) => s.trim()).filter(Boolean);
-  const galleryJson = vis && lines.length > 0 ? JSON.stringify(lines) : null;
+  const galleryJson = lines.length > 0 ? JSON.stringify(lines) : null;
   const detailTrim = form.marketplaceDetailRowsJson.trim();
   const detailJson = vis && detailTrim ? sanitizeDetailRowsForApi(form.marketplaceDetailRowsJson) : null;
   const consult = vis && form.marketplacePriceConsultMode === true && form.marketplaceOutOfStockMode !== true;
@@ -365,7 +365,7 @@ function buildMarketplacePayload(form: EquipoFormState): {
     marketplaceVisible: vis,
     marketplaceAlgo: null,
     marketplaceHashrateDisplay: null,
-    marketplaceImageSrc: vis ? (form.marketplaceImageSrc.trim() || null) : null,
+    marketplaceImageSrc: form.marketplaceImageSrc.trim() || null,
     marketplaceGalleryJson: galleryJson,
     marketplaceDetailRowsJson: detailJson,
     marketplaceYieldJson,
