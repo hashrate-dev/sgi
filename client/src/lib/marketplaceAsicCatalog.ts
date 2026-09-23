@@ -375,19 +375,10 @@ export function normalizeAsicCatalogProducts(products: AsicProduct[]): AsicProdu
 
 export function normalizeAsicProductImages(product: AsicProduct): AsicProduct {
   const imageSrc = normalizeMarketplaceImageSrc(product.imageSrc ?? "");
-  const shelfFb = normalizeMarketplaceImageSrc(
-    defaultAsicShelfImageSrc(product.brand, product.model)
+  // Inventario se muestra tal cual se cargó (logo Hashrate ya va en el archivo).
+  const gallerySrcs = capProductGalleryUrls(
+    dedupeGalleryUrls((product.gallerySrcs ?? []).map((g) => normalizeMarketplaceImageSrc(g)).filter(Boolean))
   );
-  let gallerySrcs = dedupeGalleryUrls(
-    (product.gallerySrcs ?? []).map((g) => normalizeMarketplaceImageSrc(g)).filter(Boolean)
-  );
-  if (gallerySrcs.length > 0 && shelfFb) {
-    gallerySrcs = gallerySrcs.filter((u) => u !== shelfFb);
-  }
-  // No quitar fotos de Inventario que coincidan con la de Tienda: en la ficha SGI
-  // la galería es la fuente de verdad (puede repetir la de tienda a propósito).
-  // El modal de marketplace ya deduplica al combinar tarjeta + galería.
-  gallerySrcs = capProductGalleryUrls(gallerySrcs);
   return {
     ...product,
     imageSrc,
@@ -431,7 +422,7 @@ export function marketplaceShelfImageApiUrl(productId: string): string {
   return `/api/marketplace/shelf-image/${encodeURIComponent(id)}`;
 }
 
-/** Orden: URL del listado → API shelf-image (foto en BD) → fallback local por modelo. */
+/** Grilla pública: solo «Tienda (sin logo)». Sin render de catálogo con marca Hashrate. */
 export function resolveShelfDisplayImageSrc(product: {
   id: string;
   imageSrc?: string;
@@ -440,9 +431,7 @@ export function resolveShelfDisplayImageSrc(product: {
 }): string {
   const explicit = normalizeMarketplaceImageSrc(product.imageSrc ?? "");
   if (explicit && !/^data:/i.test(explicit)) return explicit;
-  const api = marketplaceShelfImageApiUrl(product.id);
-  if (api) return api;
-  return normalizeMarketplaceImageSrc(defaultAsicShelfImageSrc(product.brand, product.model));
+  return marketplaceShelfImageApiUrl(product.id);
 }
 
 /** Fallback local si la API no responde (vacío: vitrina solo desde BD). */

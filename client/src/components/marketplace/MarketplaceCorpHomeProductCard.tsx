@@ -3,10 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import type { AsicProduct } from "../../lib/marketplaceAsicCatalog.js";
 import {
   asicProductIsOutOfStock,
-  defaultAsicShelfImageSrc,
   formatAsicProductPriceDisplay,
   marketplaceShelfImageApiUrl,
-  normalizeMarketplaceImageSrc,
   pickMarketplaceShelfSpecRows,
   resolveShelfDisplayImageSrc,
 } from "../../lib/marketplaceAsicCatalog.js";
@@ -38,12 +36,11 @@ export function MarketplaceCorpHomeProductCard({
     void navigate(to);
   };
 
-  const { primarySrc, fallbackSrc, apiSrc } = useMemo(() => {
-    const fb = normalizeMarketplaceImageSrc(defaultAsicShelfImageSrc(product.brand, product.model));
+  const { primarySrc, apiSrc } = useMemo(() => {
     const api = marketplaceShelfImageApiUrl(product.id);
     const primary = resolveShelfDisplayImageSrc(product);
-    return { primarySrc: primary, fallbackSrc: fb, apiSrc: api };
-  }, [product.id, product.imageSrc, product.brand, product.model]);
+    return { primarySrc: primary, apiSrc: api };
+  }, [product.id, product.imageSrc]);
 
   const [imgSrc, setImgSrc] = useState(() => primarySrc);
   const [imgBroken, setImgBroken] = useState(false);
@@ -74,10 +71,6 @@ export function MarketplaceCorpHomeProductCard({
                 onError={() => {
                   if (imgSrc !== apiSrc && apiSrc) {
                     setImgSrc(apiSrc);
-                    return;
-                  }
-                  if (fallbackSrc && imgSrc !== fallbackSrc) {
-                    setImgSrc(fallbackSrc);
                     return;
                   }
                   setImgBroken(true);

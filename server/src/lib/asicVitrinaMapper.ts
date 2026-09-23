@@ -6,7 +6,6 @@ import { isBitmainAntminerRandomXMinerBlob } from "./miningYieldEstimate.js";
 import {
   capProductGalleryUrls,
   dedupeGalleryUrls,
-  galleryFileKey,
   MARKETPLACE_PRODUCT_GALLERY_MAX,
   normalizeMarketplaceImageSrc,
 } from "./marketplaceImageSrc.js";
@@ -204,12 +203,6 @@ export function mapEquipoRowToVitrina(row: EquipoAsicVitrinaRow): VitrinaAsicPro
 
   /** Sin imagen principal en BD → cadena vacía (la tienda no muestra foto genérica). */
   const imageSrc = normalizeMarketplaceImageSrc(row.mp_image_src);
-  if (gallerySrcs && gallerySrcs.length > 0 && imageSrc) {
-    const mainKey = galleryFileKey(imageSrc);
-    // Quitar de galería solo duplicados exactos de la tarjeta (misma URL / mismo archivo).
-    const withoutMainDup = gallerySrcs.filter((u) => u !== imageSrc && galleryFileKey(u) !== mainKey);
-    gallerySrcs = withoutMainDup.length > 0 || gallerySrcs.length === 1 ? withoutMainDup : gallerySrcs;
-  }
   if (gallerySrcs && gallerySrcs.length > MARKETPLACE_PRODUCT_GALLERY_MAX) {
     gallerySrcs = capProductGalleryUrls(gallerySrcs);
   }

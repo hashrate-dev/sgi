@@ -44,28 +44,23 @@ function renderYieldLineParts(text: string): ReactNode {
 
 /**
  * URLs para miniaturas + hero.
- * - Tienda (marketplace): tarjeta + Inventario (dedupe de repeticiones exactas).
- * - Inventario SGI: todas las fotos de Inventario en orden (aunque una sea igual a Tienda).
+ * Inventario se usa tal cual (logo Hashrate ya está en el archivo).
+ * La foto de tarjeta «Tienda (sin logo)» no se mezcla acá.
  */
 function gallerySources(product: AsicProduct, inventoryMode: boolean): string[] {
-  const fb = defaultAsicShelfImageSrc(product.brand, product.model);
-  const fbUrl = fb ? normalizeMarketplaceImageSrc(fb) : "";
   const main = normalizeMarketplaceImageSrc(product.imageSrc ?? "");
-  const detailRaw = (product.gallerySrcs ?? [])
+  const detail = (product.gallerySrcs ?? [])
     .map((x) => normalizeMarketplaceImageSrc(String(x)))
     .filter(Boolean);
 
-  if (!inventoryMode) {
-    const combined = dedupeGalleryUrls([...(main ? [main] : []), ...detailRaw]);
-    if (combined.length > 0) return capProductModalThumbUrls(combined);
+  if (detail.length > 0) return capProductModalThumbUrls(dedupeGalleryUrls(detail));
+  if (main) return capProductModalThumbUrls([main]);
+  if (inventoryMode) {
+    const fb = defaultAsicShelfImageSrc(product.brand, product.model);
+    const fbUrl = fb ? normalizeMarketplaceImageSrc(fb) : "";
     return capProductModalThumbUrls(fbUrl ? [fbUrl] : []);
   }
-
-  // Ficha SGI: no dedupe por nombre de archivo vs Tienda — mostrar las N de Inventario.
-  const detail = dedupeGalleryUrls(detailRaw);
-  if (detail.length > 0) return capProductModalThumbUrls(detail);
-  if (main) return capProductModalThumbUrls([main]);
-  return capProductModalThumbUrls(fbUrl ? [fbUrl] : []);
+  return [];
 }
 
 export function AsicProductModal({
@@ -231,7 +226,8 @@ export function AsicProductModal({
         : t("modal.yield_foot_ref");
 
   const activeSrc =
-    visibleThumbs[Math.min(activeThumb, Math.max(visibleThumbs.length - 1, 0))] ?? shelfFallbackSrc;
+    visibleThumbs[Math.min(activeThumb, Math.max(visibleThumbs.length - 1, 0))] ??
+    (inventoryMode && !galleryLoading ? shelfFallbackSrc : "");
   const [heroSrc, setHeroSrc] = useState(activeSrc);
 
   useEffect(() => {

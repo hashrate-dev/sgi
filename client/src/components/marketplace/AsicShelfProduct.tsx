@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import type { AsicProduct } from "../../lib/marketplaceAsicCatalog.js";
 import {
-  defaultAsicShelfImageSrc,
   formatAsicProductPriceDisplay,
   marketplaceShelfImageApiUrl,
   asicProductIsOutOfStock,
   normalizeConsultPriceLabelForDisplay,
-  normalizeMarketplaceImageSrc,
   pickMarketplaceShelfSpecRows,
   resolveShelfDisplayImageSrc,
 } from "../../lib/marketplaceAsicCatalog.js";
@@ -39,12 +37,11 @@ export function AsicShelfProduct({
 }) {
   const { lang, t, tf } = useMarketplaceLang();
   const quoteLabel = addToQuoteLabel ?? t("catalog.add_short");
-  const { primarySrc, fallbackSrc, apiSrc } = useMemo(() => {
-    const fb = normalizeMarketplaceImageSrc(defaultAsicShelfImageSrc(product.brand, product.model));
+  const { primarySrc, apiSrc } = useMemo(() => {
     const api = marketplaceShelfImageApiUrl(product.id);
     const primary = resolveShelfDisplayImageSrc(product);
-    return { primarySrc: primary, fallbackSrc: fb, apiSrc: api };
-  }, [product.id, product.imageSrc, product.brand, product.model]);
+    return { primarySrc: primary, apiSrc: api };
+  }, [product.id, product.imageSrc]);
   const [imgSrc, setImgSrc] = useState(() => primarySrc);
   const [imgBroken, setImgBroken] = useState(false);
 
@@ -100,10 +97,6 @@ export function AsicShelfProduct({
                 onError={() => {
                   if (imgSrc !== apiSrc && apiSrc) {
                     setImgSrc(apiSrc);
-                    return;
-                  }
-                  if (fallbackSrc && imgSrc !== fallbackSrc) {
-                    setImgSrc(fallbackSrc);
                     return;
                   }
                   setImgBroken(true);
