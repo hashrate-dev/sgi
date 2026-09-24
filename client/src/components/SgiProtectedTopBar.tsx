@@ -3,7 +3,6 @@ import { Link as RouterLink, useLocation, useNavigate } from "react-router-dom";
 import { Box, Flex, Heading, Image as ChakraImage, Stack, Text } from "@chakra-ui/react";
 import { useAuth } from "../contexts/AuthContext";
 import { updateMyPassword } from "../lib/api";
-import { HOME_DASHBOARD_SHELL } from "../lib/sgiDashboardShell";
 import { isSgiDashboardPath, sgiHome } from "../lib/marketplacePaths.js";
 import { showToast } from "./ToastNotification";
 import { AppButton, AppInput, AppModal } from "./ui";
@@ -82,11 +81,7 @@ export function SgiProtectedTopBar({ onHeightChange }: SgiProtectedTopBarProps) 
         aria-label="Cabecera SGI"
         className="hrs-sgi-shell-header"
       >
-        <Box
-          w="100%"
-          {...HOME_DASHBOARD_SHELL}
-          className="hrs-sgi-shell-header__inner"
-        >
+        <Box w="100%" maxW="none" mx={0} className="hrs-sgi-shell-header__inner">
           <Flex
             className="hrs-sgi-shell-header__row"
             align="center"
@@ -128,7 +123,7 @@ export function SgiProtectedTopBar({ onHeightChange }: SgiProtectedTopBarProps) 
               minW={0}
               align="center"
               justify={{ base: "flex-start", lg: "flex-end" }}
-              gap={2}
+              gap={3}
               flexWrap="wrap"
               w={{ base: "100%", lg: "auto" }}
               ml={{ base: 0, lg: "auto" }}

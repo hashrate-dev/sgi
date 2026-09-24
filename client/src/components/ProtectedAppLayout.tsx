@@ -20,10 +20,15 @@ export function ProtectedAppLayout({ children }: { children?: ReactNode }) {
   const location = useLocation();
   const showAdminFooter = Boolean(user && canAccessSgiFromMarketplaceFooter(user));
   const isHomePage = isSgiDashboardPath(location.pathname);
+  const isMarketsPage = location.pathname.includes("/gestion-administrativa/mercados");
   const [sgiTopBarH, setSgiTopBarH] = useState(80);
   const onSgiTopBarHeight = useCallback((h: number) => {
     setSgiTopBarH((prev) => (Math.abs(prev - h) < 1 ? prev : h));
   }, []);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty("--sgi-topbar-h", `${sgiTopBarH}px`);
+  }, [sgiTopBarH]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -51,8 +56,8 @@ export function ProtectedAppLayout({ children }: { children?: ReactNode }) {
     <Box
       className={`sgi-protected-root${showAdminFooter ? " sgi-protected-root--admin-footer" : ""}${
         isHomePage ? " sgi-protected-root--home" : " sgi-protected-root--farm-bg"
-      }`}
-      pb={showAdminFooter ? { base: "140px", md: "120px" } : 0}
+      }${isMarketsPage ? " sgi-protected-root--markets" : ""}`}
+      pb={isMarketsPage ? 0 : showAdminFooter ? { base: "140px", md: "120px" } : 0}
       w="100%"
       maxW="100%"
       minH="100vh"
@@ -63,7 +68,7 @@ export function ProtectedAppLayout({ children }: { children?: ReactNode }) {
       backgroundPosition={isHomePage ? "center 35%" : "center"}
       backgroundRepeat="no-repeat"
       backgroundAttachment={{ base: "scroll", md: "fixed" }}
-      overflowX={isHomePage ? "visible" : "hidden"}
+      overflowX={isHomePage || isMarketsPage ? "visible" : "hidden"}
       position="relative"
     >
       <Box

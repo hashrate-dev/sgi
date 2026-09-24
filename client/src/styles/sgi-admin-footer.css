@@ -4,6 +4,13 @@
   min-height: 100vh;
   box-sizing: border-box;
   background-color: #f1f5f9;
+  --sgi-footer-h: 52px;
+}
+
+@media (max-width: 768px) {
+  .sgi-protected-root--admin-footer {
+    --sgi-footer-h: 96px;
+  }
 }
 
 .sgi-admin-fixed-footer {

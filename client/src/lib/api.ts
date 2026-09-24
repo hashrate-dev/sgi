@@ -2428,7 +2428,13 @@ export type BtcTradeSignal = {
   macdHist: number;
   supertrend: number;
   supertrendDir: 1 | -1;
+  psar: number;
+  psarDir: 1 | -1;
   zigzagLast: { kind: "high" | "low"; price: number };
+  rangeDayLow?: number;
+  rangeDayHigh?: number;
+  range52Low?: number;
+  range52High?: number;
   updatedAt: string;
   candleCount: number;
 };

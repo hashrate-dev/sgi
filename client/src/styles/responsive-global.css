@@ -159,8 +159,8 @@ html {
 
 @media (max-width: 899.98px) {
   .site-header--marketplace .site-header__inner {
-    padding-left: max(var(--mp-header-layout-pad, 0.9rem), var(--hrs-safe-left));
-    padding-right: max(var(--mp-header-layout-pad, 0.9rem), var(--hrs-safe-right));
+    padding-left: max(var(--sgi-header-pad-x), var(--hrs-safe-left));
+    padding-right: max(var(--sgi-header-pad-x), var(--hrs-safe-right));
   }
 
   .site-header--marketplace .site-logo-img {

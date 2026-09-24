@@ -95,9 +95,37 @@ body:has(.marketplace-asic-page)::after {
   margin: 0 !important;
 }
 
+html {
+  --sgi-header-pad-x: 1.25rem;
+  --hrs-header-brand-shift: 2cm;
+  --hrs-header-brand-left: calc(var(--sgi-header-pad-x) + var(--hrs-header-brand-shift));
+}
+
+@media (min-width: 768px) {
+  html {
+    --sgi-header-pad-x: 1.75rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  html {
+    --sgi-header-pad-x: 2.5rem;
+  }
+}
+
+@media (min-width: 1600px) {
+  html {
+    --sgi-header-pad-x: 3rem;
+  }
+}
+
 .hrs-sgi-shell-header__inner {
+  max-width: none !important;
+  width: 100% !important;
   padding-top: 0.75rem !important;
   padding-bottom: 0.75rem !important;
+  padding-left: var(--sgi-header-pad-x) !important;
+  padding-right: var(--sgi-header-pad-x) !important;
 }
 
 .hrs-sgi-shell-header__brand {
@@ -105,6 +133,7 @@ body:has(.marketplace-asic-page)::after {
   color: inherit !important;
   min-width: 0;
   flex-shrink: 0;
+  margin-left: var(--hrs-header-brand-shift);
 }
 
 .hrs-sgi-shell-header__logo {
@@ -264,6 +293,7 @@ body:has(.marketplace-asic-page)::after {
   /* Márgenes laterales del header alineados al SGI (solo cabecera, no el cuerpo) */
   --mp-header-layout-max: 1400px;
   --mp-header-layout-pad: 1.5rem;
+  --mp-header-side-gutter: max(0px, calc((100% - var(--mp-header-layout-max)) / 2));
 }
 
 @media (max-width: 1440px) {
@@ -320,19 +350,23 @@ body:has(.marketplace-asic-page)::after {
 
 .site-header--marketplace .site-header__inner {
   width: 100%;
-  max-width: var(--mp-header-layout-max);
-  margin-left: auto;
-  margin-right: auto;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
   padding-top: 0.75rem;
   padding-bottom: 0.75rem;
-  padding-left: max(var(--mp-header-layout-pad), env(safe-area-inset-left, 0px));
-  padding-right: max(var(--mp-header-layout-pad), env(safe-area-inset-right, 0px));
+  padding-left: max(var(--sgi-header-pad-x), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--sgi-header-pad-x), env(safe-area-inset-right, 0px));
   box-sizing: border-box;
 }
 
 .logo-link--main {
   flex: 1;
   min-width: 120px;
+}
+
+.site-header--marketplace .logo-link--main {
+  margin-left: var(--hrs-header-brand-shift);
 }
 
 .site-logo-img {

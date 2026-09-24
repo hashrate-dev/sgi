@@ -1,5 +1,5 @@
 /**
- * Confluencia operativa BTC (EMA 25/50/200 + Supertrend + MACD + RSI + ZigZag).
+ * Confluencia operativa BTC (EMA 25/50/200 + Supertrend + PSAR + MACD + RSI + ZigZag).
  * Señal de escritorio, no es consejo de inversión.
  */
 
@@ -40,7 +40,13 @@ export type TradeConfluence = {
   macdHist: number;
   supertrend: number;
   supertrendDir: 1 | -1;
+  psar: number;
+  psarDir: 1 | -1;
   zigzagLast: { kind: "high" | "low"; price: number };
+  rangeDayLow: number;
+  rangeDayHigh: number;
+  range52Low: number;
+  range52High: number;
   updatedAt: string;
   candleCount: number;
 };
@@ -50,11 +56,12 @@ type Candle = { t: number; o: number; h: number; l: number; c: number; v: number
 const UA = "Mozilla/5.0 (compatible; HashrateSGI-Desk/1.0; +https://hashrate.space)";
 const BINANCE_HOSTS = ["https://data-api.binance.vision", "https://api.binance.com", "https://api.binance.us"];
 
-const SYMBOLS = new Set(["BTCUSDT", "LTCUSDT", "DOGEUSDT", "ZECUSDT"]);
+const SYMBOLS = new Set(["BTCUSDT", "ETHUSDT", "LTCUSDT", "DOGEUSDT", "ZECUSDT", "SOLUSDT"]);
 const INTERVALS: Record<string, string> = {
   "1": "1m",
   "5": "5m",
   "15": "15m",
+  "30": "30m",
   "60": "1h",
   "240": "4h",
   D: "1d",
@@ -65,6 +72,7 @@ const ZZ_PCT: Record<string, number> = {
   "1m": 0.006,
   "5m": 0.01,
   "15m": 0.015,
+  "30m": 0.02,
   "1h": 0.025,
   "4h": 0.04,
   "1d": 0.06,
@@ -180,6 +188,60 @@ function supertrend(candles: Candle[], atrPeriod = 10, mult = 3): { line: number
   return { line, dir };
 }
 
+function parabolicSar(
+  candles: Candle[],
+  start = 0.02,
+  increment = 0.02,
+  maxAf = 0.2
+): { line: number[]; dir: number[] } {
+  const n = candles.length;
+  const line = new Array<number>(n).fill(NaN);
+  const dir = new Array<number>(n).fill(1);
+  if (n < 2) return { line, dir };
+
+  let up = candles[1]!.c >= candles[0]!.c;
+  let af = start;
+  let ep = up ? Math.max(candles[0]!.h, candles[1]!.h) : Math.min(candles[0]!.l, candles[1]!.l);
+  let sar = up ? candles[0]!.l : candles[0]!.h;
+  line[0] = sar;
+  dir[0] = up ? 1 : -1;
+
+  for (let i = 1; i < n; i++) {
+    const prev = candles[i - 1]!;
+    const cur = candles[i]!;
+    let next = sar + af * (ep - sar);
+    if (up) {
+      const floor = i >= 2 ? Math.min(prev.l, candles[i - 2]!.l) : prev.l;
+      next = Math.min(next, floor);
+      if (cur.l < next) {
+        up = false;
+        next = ep;
+        ep = cur.l;
+        af = start;
+      } else if (cur.h > ep) {
+        ep = cur.h;
+        af = Math.min(maxAf, af + increment);
+      }
+    } else {
+      const ceil = i >= 2 ? Math.max(prev.h, candles[i - 2]!.h) : prev.h;
+      next = Math.max(next, ceil);
+      if (cur.h > next) {
+        up = true;
+        next = ep;
+        ep = cur.h;
+        af = start;
+      } else if (cur.l < ep) {
+        ep = cur.l;
+        af = Math.min(maxAf, af + increment);
+      }
+    }
+    sar = next;
+    line[i] = sar;
+    dir[i] = up ? 1 : -1;
+  }
+  return { line, dir };
+}
+
 function zigzagLast(closes: number[], pct: number): { kind: "high" | "low"; price: number } {
   if (closes.length < 5) return { kind: "low", price: closes[closes.length - 1] ?? 0 };
   let kind: "high" | "low" = "low";
@@ -252,6 +314,49 @@ function money(n: number): string {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: n >= 100 ? 2 : 4 }).format(n);
 }
 
+async function fetchRangeStats(symbol: string): Promise<{
+  dayLow: number;
+  dayHigh: number;
+  w52Low: number;
+  w52High: number;
+}> {
+  let dayLow = NaN;
+  let dayHigh = NaN;
+  let w52Low = NaN;
+  let w52High = NaN;
+  try {
+    const raw = await fetchJson(`${BINANCE_HOSTS[0]}/api/v3/ticker/24hr?symbol=${symbol}`);
+    if (raw && typeof raw === "object") {
+      const o = raw as { lowPrice?: string; highPrice?: string };
+      dayLow = Number(o.lowPrice);
+      dayHigh = Number(o.highPrice);
+    }
+  } catch {
+    /* fallback below */
+  }
+  try {
+    const raw = await fetchJson(`${BINANCE_HOSTS[0]}/api/v3/klines?symbol=${symbol}&interval=1w&limit=52`);
+    if (Array.isArray(raw)) {
+      let lo = Infinity;
+      let hi = 0;
+      for (const row of raw) {
+        if (!Array.isArray(row) || row.length < 4) continue;
+        const h = Number(row[2]);
+        const l = Number(row[3]);
+        if (Number.isFinite(l) && l > 0) lo = Math.min(lo, l);
+        if (Number.isFinite(h) && h > 0) hi = Math.max(hi, h);
+      }
+      if (lo < Infinity && hi > 0) {
+        w52Low = lo;
+        w52High = hi;
+      }
+    }
+  } catch {
+    /* keep NaN */
+  }
+  return { dayLow, dayHigh, w52Low, w52High };
+}
+
 export async function buildTradeConfluence(symbolRaw: string, intervalRaw: string): Promise<TradeConfluence> {
   const symbol = normalizeTradePair(symbolRaw);
   const interval = normalizeTradeInterval(intervalRaw);
@@ -260,6 +365,7 @@ export async function buildTradeConfluence(symbolRaw: string, intervalRaw: strin
   if (hit && Date.now() - hit.at < CACHE_MS) return hit.data;
 
   const candles = await fetchKlines(symbol, interval);
+  const ranges = await fetchRangeStats(symbol);
   const closes = candles.map((c) => c.c);
   const price = closes[closes.length - 1]!;
   const ema25a = ema(closes, 25);
@@ -284,6 +390,9 @@ export async function buildTradeConfluence(symbolRaw: string, intervalRaw: strin
   const st = supertrend(candles, 10, 3);
   const supertrendLine = lastFinite(st.line);
   const supertrendDir = (lastFinite(st.dir) >= 0 ? 1 : -1) as 1 | -1;
+  const ps = parabolicSar(candles);
+  const psarLine = lastFinite(ps.line);
+  const psarDir = (lastFinite(ps.dir) >= 0 ? 1 : -1) as 1 | -1;
   const zz = zigzagLast(closes, ZZ_PCT[interval] ?? 0.025);
 
   const checks: TradeCheck[] = [];
@@ -316,6 +425,15 @@ export async function buildTradeConfluence(symbolRaw: string, intervalRaw: strin
         : `Bajista · línea ${money(supertrendLine)} (stop corto)`,
   });
   checks.push({
+    id: "psar",
+    label: "Parabolic SAR",
+    bias: psarDir === 1 ? "buy" : "sell",
+    detail:
+      psarDir === 1
+        ? `Puntos debajo del precio (${money(psarLine)}) — tendencia alcista`
+        : `Puntos encima del precio (${money(psarLine)}) — tendencia bajista`,
+  });
+  checks.push({
     id: "macd",
     label: "MACD 12/26/9",
     bias: macd > macdSignal && macdHist > 0 ? "buy" : macd < macdSignal && macdHist < 0 ? "sell" : "wait",
@@ -341,12 +459,12 @@ export async function buildTradeConfluence(symbolRaw: string, intervalRaw: strin
   }
   checks.push({ id: "rsi", label: "RSI 14", bias: rsiBias, detail: rsiDetail });
 
-  const zzBias: TradeBias = zz.kind === "low" ? "buy" : "sell";
+  const zzBias: TradeBias = "wait";
   checks.push({
     id: "zigzag",
-    label: "ZigZag",
+    label: "Swing ZigZag",
     bias: zzBias,
-    detail: zz.kind === "low" ? `Último swing low ${money(zz.price)}` : `Último swing high ${money(zz.price)}`,
+    detail: zz.kind === "low" ? `Soporte de swing ${money(zz.price)}` : `Resistencia de swing ${money(zz.price)}`,
   });
 
   const buyVotes = checks.filter((c) => c.bias === "buy").length;
@@ -355,30 +473,58 @@ export async function buildTradeConfluence(symbolRaw: string, intervalRaw: strin
   const n = checks.length;
 
   let bias: TradeBias = "wait";
-  if (buyVotes >= 5 && buyVotes - sellVotes >= 2) bias = "buy";
-  else if (sellVotes >= 5 && sellVotes - buyVotes >= 2) bias = "sell";
-  else if (buyVotes >= 4 && sellVotes <= 1) bias = "buy";
-  else if (sellVotes >= 4 && buyVotes <= 1) bias = "sell";
+  if (buyVotes >= 6 && buyVotes - sellVotes >= 2) bias = "buy";
+  else if (sellVotes >= 6 && sellVotes - buyVotes >= 2) bias = "sell";
+  else if (buyVotes >= 5 && sellVotes <= 1) bias = "buy";
+  else if (sellVotes >= 5 && buyVotes <= 1) bias = "sell";
 
-  const confidence = Math.round((Math.max(buyVotes, sellVotes) / n) * 100);
+  const confidence =
+    bias === "wait"
+      ? 0
+      : Math.round(((bias === "buy" ? buyVotes : sellVotes) / Math.max(1, n - waitVotes)) * 100);
 
-  const atrLast = lastFinite(rma(trueRange(candles), 14));
-  const buffer = Number.isFinite(atrLast) ? atrLast * 0.15 : price * 0.002;
-  let stop = bias === "buy" ? Math.min(supertrendLine, price - atrLast) : Math.max(supertrendLine, price + atrLast);
-  if (!Number.isFinite(stop) || stop <= 0) stop = bias === "buy" ? price * 0.985 : price * 1.015;
-  const riskUsd = Math.abs(price - stop);
-  const target1 = bias === "buy" ? price + riskUsd * 1.8 : price - riskUsd * 1.8;
-  const target2 = bias === "buy" ? price + riskUsd * 3 : price - riskUsd * 3;
-  const invalidation = stop + (bias === "buy" ? -buffer : buffer);
+  const atrRaw = lastFinite(rma(trueRange(candles), 14));
+  const atrSafe = Number.isFinite(atrRaw) && atrRaw > 0 ? atrRaw : price * 0.008;
+  const buffer = atrSafe * 0.15;
 
-  let thesis = "Confluencia incompleta: el book pide espera, no forzar.";
-  let action = "No entrar. Esperá cruce de EMA 25/50 alineado con Supertrend y MACD.";
+  let stop = price;
+  let target1 = price;
+  let target2 = price;
+  let invalidation = price;
+  let riskUsd = 0;
+
   if (bias === "buy") {
-    thesis = `Alcista ${buyVotes}/${n}: régimen sobre EMA200, Supertrend up y momentum a favor.`;
-    action = `Comprar en ${money(price)} solo si no pierde Supertrend. Stop ${money(stop)}. T1 ${money(target1)} · T2 ${money(target2)}.`;
+    const below = Number.isFinite(supertrendLine) ? Math.min(supertrendLine, price - atrSafe) : price - atrSafe;
+    stop = Math.min(below, price - Math.max(atrSafe * 0.35, price * 0.0015));
+    if (!(stop > 0 && stop < price)) stop = price - atrSafe;
+    riskUsd = price - stop;
+    target1 = price + riskUsd * 1.8;
+    target2 = price + riskUsd * 3;
+    invalidation = stop - buffer;
   } else if (bias === "sell") {
-    thesis = `Bajista ${sellVotes}/${n}: precio bajo EMA200 o momentum en contra.`;
-    action = `Vender / no perseguir largos en ${money(price)}. Stop ${money(stop)}. T1 ${money(target1)} · T2 ${money(target2)}.`;
+    const above = Number.isFinite(supertrendLine) ? Math.max(supertrendLine, price + atrSafe) : price + atrSafe;
+    stop = Math.max(above, price + Math.max(atrSafe * 0.35, price * 0.0015));
+    if (!(stop > price)) stop = price + atrSafe;
+    riskUsd = stop - price;
+    target1 = price - riskUsd * 1.8;
+    target2 = price - riskUsd * 3;
+    invalidation = stop + buffer;
+  }
+
+  const drivers = checks.filter((c) => c.bias === bias && bias !== "wait").map((c) => c.detail);
+  const riskPct = price > 0 && riskUsd > 0 ? (riskUsd / price) * 100 : 0;
+  let stopNote = "Sin stop operativo: no hay trade.";
+  if (bias === "buy") stopNote = `Invalida si cierra debajo de ${money(stop)} (Supertrend / ATR).`;
+  else if (bias === "sell") stopNote = `Invalida si cierra por encima de ${money(stop)} (Supertrend / ATR).`;
+
+  let thesis = "Sin mayoría de reglas: no hay entrada. Se opera solo con EMA200 + Supertrend + PSAR + EMA25/50 + MACD + RSI alineados.";
+  let action = "Quedarse fuera. No hay stop ni targets activos.";
+  if (bias === "buy") {
+    thesis = drivers.join(" · ");
+    action = `Largo a mercado en ${money(price)}. Riesgo 1R = ${money(riskUsd)} (${riskPct.toFixed(2)}%). ${stopNote}`;
+  } else if (bias === "sell") {
+    thesis = drivers.join(" · ");
+    action = `Corto a mercado en ${money(price)}. Riesgo 1R = ${money(riskUsd)} (${riskPct.toFixed(2)}%). ${stopNote}`;
   }
 
   const data: TradeConfluence = {
@@ -409,7 +555,13 @@ export async function buildTradeConfluence(symbolRaw: string, intervalRaw: strin
     macdHist,
     supertrend: supertrendLine,
     supertrendDir,
+    psar: psarLine,
+    psarDir,
     zigzagLast: zz,
+    rangeDayLow: ranges.dayLow,
+    rangeDayHigh: ranges.dayHigh,
+    range52Low: ranges.w52Low,
+    range52High: ranges.w52High,
     updatedAt: new Date().toISOString(),
     candleCount: candles.length,
   };
