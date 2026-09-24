@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
 import { createPortal } from "react-dom";
 import { Navigate } from "react-router-dom";
 import { MercadosNativeChart, type ChartDrawTool } from "../components/MercadosNativeChart";
+import { MercadosPaperDesk } from "../components/MercadosPaperDesk";
 import { DRAW_COLORS } from "../lib/mercadosDrawings";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
@@ -1329,6 +1330,13 @@ export function MercadosTradingPage() {
               confidence={signal?.confidence}
               buyVotes={signal?.buyVotes}
               sellVotes={signal?.sellVotes}
+            />
+
+            <MercadosPaperDesk
+              userId={user.id}
+              signal={signal}
+              pairLabel={`${active.label}/${active.quote}`}
+              binance={active.binance}
             />
 
           </aside>
