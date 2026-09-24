@@ -579,8 +579,9 @@ export function MercadosNativeChart({
     viewRef.current.count = count;
     const start = Math.max(0, end - count + 1);
     const plotW = w - padL - padR;
-    const cloudExtra = on.ichimoku !== false ? 26 : 0;
-    const barW = plotW / (count + cloudExtra);
+    const heatW = on.heatmap !== false ? 48 : 0;
+    const innerW = Math.max(40, plotW - heatW);
+    const barW = innerW / count;
     const xOf = (i: number) => padL + (i - start + 0.5) * barW;
     geomRef.current = { padL, padR, timeH, priceTop, priceBot, h, w, start, barW, minP: 0, span: 1 };
 
@@ -684,7 +685,9 @@ export function MercadosNativeChart({
       const heat = new Float64Array(count * bins);
       const peakBox = { v: 0 };
       for (let i = start; i <= end; i++) {
-        addCandleHeat(heat, i - start, bins, minP, span, candles[i]!, peakBox);
+        const c = candles[i];
+        if (!c) continue;
+        addCandleHeat(heat, i - start, bins, minP, span, c, peakBox);
       }
       if (peakBox.v > 0) {
         const cellH = (priceBot - priceTop) / bins;
@@ -739,7 +742,7 @@ export function MercadosNativeChart({
     const clipPrice = () => {
       ctx.save();
       ctx.beginPath();
-      ctx.rect(padL, priceTop, plotW, Math.max(0, priceBot - priceTop));
+      ctx.rect(padL, priceTop, innerW, Math.max(0, priceBot - priceTop));
       ctx.clip();
     };
 
@@ -1486,8 +1489,9 @@ export function MercadosNativeChart({
       const wrap = wrapRef.current;
       const n = Math.max(12, viewRef.current.count);
       const g = geomRef.current;
-      const w = (wrap?.clientWidth ?? 800) - g.padL - g.padR;
-      return w / n;
+      const heatW = onRef.current.heatmap !== false ? 48 : 0;
+      const w = (wrap?.clientWidth ?? 800) - g.padL - g.padR - heatW;
+      return Math.max(0.5, w / n);
     };
 
     const begin = (mode: "pan" | "zoomX" | "zoomY", e: PointerEvent) => {

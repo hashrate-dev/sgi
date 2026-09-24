@@ -571,6 +571,9 @@ export function MercadosTradingPage() {
   const [drawPulse, setDrawPulse] = useState<{ n: number; op: "undo" | "clear" }>({ n: 0, op: "undo" });
   const dockRef = useRef<HTMLDivElement>(null);
   const pairRef = useRef<HTMLDivElement>(null);
+  const pairBtnRef = useRef<HTMLButtonElement>(null);
+  const pairMenuRef = useRef<HTMLDivElement>(null);
+  const [pairMenuBox, setPairMenuBox] = useState<CSSProperties>({});
   const active = SYMBOLS.find((s) => s.id === symbol) ?? SYMBOLS[0];
 
   useEffect(() => {
@@ -582,7 +585,7 @@ export function MercadosTradingPage() {
     const onDoc = (e: MouseEvent) => {
       const t = e.target as Node;
       if (indOpen && !dockRef.current?.contains(t)) setIndOpen(false);
-      if (pairOpen && !pairRef.current?.contains(t)) setPairOpen(false);
+      if (pairOpen && !pairRef.current?.contains(t) && !pairMenuRef.current?.contains(t)) setPairOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
@@ -594,6 +597,31 @@ export function MercadosTradingPage() {
       window.removeEventListener("keydown", onKey);
     };
   }, [indOpen, pairOpen]);
+
+  useLayoutEffect(() => {
+    if (!pairOpen) return;
+    const place = () => {
+      const r = pairBtnRef.current?.getBoundingClientRect();
+      if (!r) return;
+      const width = Math.min(400, Math.max(320, window.innerWidth - 16));
+      let left = r.left;
+      left = Math.max(8, Math.min(left, window.innerWidth - width - 8));
+      setPairMenuBox({
+        position: "fixed",
+        top: r.bottom + 8,
+        left,
+        width,
+        zIndex: 6200,
+      });
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [pairOpen]);
 
   useEffect(() => {
     let dead = false;
@@ -859,6 +887,7 @@ export function MercadosTradingPage() {
             <div className="tv-markets-pairbar" ref={pairRef}>
               <button
                 type="button"
+                ref={pairBtnRef}
                 className={`tv-markets-pair${pairOpen ? " is-open" : ""}`}
                 aria-haspopup="listbox"
                 aria-expanded={pairOpen}
@@ -941,43 +970,52 @@ export function MercadosTradingPage() {
                   </div>
                 );
               })()}
-              {pairOpen ? (
-                <div className="tv-markets-pair__menu" role="listbox" aria-label="Pares">
-                  {SYMBOLS.map((s) => {
-                    const q = tapeQuotes[s.binance];
-                    const up = (q?.changePct ?? 0) >= 0;
-                    return (
-                      <button
-                        key={s.id}
-                        type="button"
-                        role="option"
-                        aria-selected={s.id === symbol}
-                        className={`tv-markets-pair__opt${s.id === symbol ? " is-on" : ""}`}
-                        onClick={() => {
-                          setSymbol(s.id);
-                          setPairOpen(false);
-                        }}
-                      >
-                        <span className="tv-markets-pair__opt-logo" aria-hidden>
-                          <img src={TAPE_LOGO(s.logo)} alt="" width={28} height={28} />
-                        </span>
-                        <span className="tv-markets-pair__opt-copy">
-                          <strong>
-                            {s.label}/{s.quote}
-                          </strong>
-                          <em>{s.name}</em>
-                        </span>
-                        <span className="tv-markets-pair__opt-px">
-                          {formatTapePrice(q?.last ?? 0)}
-                          <i className={up ? "is-up" : "is-down"}>
-                            {q && Number.isFinite(q.changePct) ? `${up ? "+" : ""}${q.changePct.toFixed(2)}%` : "—"}
-                          </i>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : null}
+              {pairOpen
+                ? createPortal(
+                    <div
+                      ref={pairMenuRef}
+                      className="tv-markets-pair__menu"
+                      role="listbox"
+                      aria-label="Pares"
+                      style={pairMenuBox}
+                    >
+                      {SYMBOLS.map((s) => {
+                        const q = tapeQuotes[s.binance];
+                        const up = (q?.changePct ?? 0) >= 0;
+                        return (
+                          <button
+                            key={s.id}
+                            type="button"
+                            role="option"
+                            aria-selected={s.id === symbol}
+                            className={`tv-markets-pair__opt${s.id === symbol ? " is-on" : ""}`}
+                            onClick={() => {
+                              setSymbol(s.id);
+                              setPairOpen(false);
+                            }}
+                          >
+                            <span className="tv-markets-pair__opt-logo" aria-hidden>
+                              <img src={TAPE_LOGO(s.logo)} alt="" width={32} height={32} />
+                            </span>
+                            <span className="tv-markets-pair__opt-copy">
+                              <strong>
+                                {s.label}/{s.quote}
+                              </strong>
+                              <em>{s.name}</em>
+                            </span>
+                            <span className="tv-markets-pair__opt-px">
+                              {formatTapePrice(q?.last ?? 0)}
+                              <i className={up ? "is-up" : "is-down"}>
+                                {q && Number.isFinite(q.changePct) ? `${up ? "+" : ""}${q.changePct.toFixed(2)}%` : "—"}
+                              </i>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>,
+                    document.body,
+                  )
+                : null}
             </div>
             <div className="tv-markets-chart__stage">
             <MercadosNativeChart
@@ -1017,65 +1055,6 @@ export function MercadosTradingPage() {
                   )}
                 </button>
               ))}
-              <span className="tv-markets-dock__sep" aria-hidden />
-              {DRAW_TOOLS.map((tool) => (
-                <button
-                  key={tool.id}
-                  type="button"
-                  className={`tv-markets-dock__tool${drawTool === tool.id ? " is-on" : ""}`}
-                  title={tool.title}
-                  aria-label={tool.title}
-                  aria-pressed={drawTool === tool.id}
-                  onClick={() => setDrawTool(tool.id)}
-                >
-                  <DrawGlyph kind={tool.id} />
-                </button>
-              ))}
-              <div className="tv-markets-dock__colors" role="group" aria-label="Color de dibujo">
-                {DRAW_COLORS.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    className={`tv-markets-dock__swatch${drawColor.toLowerCase() === c.toLowerCase() ? " is-on" : ""}`}
-                    style={{ background: c }}
-                    title={`Color ${c}`}
-                    aria-label={`Color ${c}`}
-                    aria-pressed={drawColor.toLowerCase() === c.toLowerCase()}
-                    onClick={() => setDrawColor(c)}
-                  />
-                ))}
-                <label className="tv-markets-dock__swatch-custom" title="Color personalizado">
-                  <input
-                    type="color"
-                    value={drawColor}
-                    aria-label="Color personalizado"
-                    onChange={(e) => setDrawColor(e.target.value)}
-                  />
-                </label>
-              </div>
-              <button
-                type="button"
-                className="tv-markets-dock__tool"
-                title="Deshacer / eliminar dibujo seleccionado"
-                aria-label="Deshacer / eliminar dibujo seleccionado"
-                onClick={() => setDrawPulse((s) => ({ n: s.n + 1, op: "undo" }))}
-              >
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-                  <path d="M5 7 H12.2 A3.2 3.2 0 0 1 12.2 13.4 H8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                  <path d="M5 7 L7.6 4.6 M5 7 L7.6 9.4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className="tv-markets-dock__tool"
-                title="Borrar todos los dibujos"
-                aria-label="Borrar todos los dibujos"
-                onClick={() => setDrawPulse((s) => ({ n: s.n + 1, op: "clear" }))}
-              >
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-                  <path d="M4 5.5 H14 M7 5.5 V4.2 H11 V5.5 M6 5.5 L6.6 14 H11.4 L12 5.5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-                </svg>
-              </button>
               <span className="tv-markets-dock__sep" aria-hidden />
               <div className="tv-markets-dock__ind-wrap">
               <button
@@ -1145,6 +1124,65 @@ export function MercadosTradingPage() {
                 </div>
               ) : null}
               </div>
+              <span className="tv-markets-dock__sep" aria-hidden />
+              {DRAW_TOOLS.map((tool) => (
+                <button
+                  key={tool.id}
+                  type="button"
+                  className={`tv-markets-dock__tool${drawTool === tool.id ? " is-on" : ""}`}
+                  title={tool.title}
+                  aria-label={tool.title}
+                  aria-pressed={drawTool === tool.id}
+                  onClick={() => setDrawTool(tool.id)}
+                >
+                  <DrawGlyph kind={tool.id} />
+                </button>
+              ))}
+              <div className="tv-markets-dock__colors" role="group" aria-label="Color de dibujo">
+                {DRAW_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    className={`tv-markets-dock__swatch${drawColor.toLowerCase() === c.toLowerCase() ? " is-on" : ""}`}
+                    style={{ background: c }}
+                    title={`Color ${c}`}
+                    aria-label={`Color ${c}`}
+                    aria-pressed={drawColor.toLowerCase() === c.toLowerCase()}
+                    onClick={() => setDrawColor(c)}
+                  />
+                ))}
+                <label className="tv-markets-dock__swatch-custom" title="Color personalizado">
+                  <input
+                    type="color"
+                    value={drawColor}
+                    aria-label="Color personalizado"
+                    onChange={(e) => setDrawColor(e.target.value)}
+                  />
+                </label>
+              </div>
+              <button
+                type="button"
+                className="tv-markets-dock__tool"
+                title="Deshacer / eliminar dibujo seleccionado"
+                aria-label="Deshacer / eliminar dibujo seleccionado"
+                onClick={() => setDrawPulse((s) => ({ n: s.n + 1, op: "undo" }))}
+              >
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+                  <path d="M5 7 H12.2 A3.2 3.2 0 0 1 12.2 13.4 H8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  <path d="M5 7 L7.6 4.6 M5 7 L7.6 9.4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="tv-markets-dock__tool"
+                title="Borrar todos los dibujos"
+                aria-label="Borrar todos los dibujos"
+                onClick={() => setDrawPulse((s) => ({ n: s.n + 1, op: "clear" }))}
+              >
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+                  <path d="M4 5.5 H14 M7 5.5 V4.2 H11 V5.5 M6 5.5 L6.6 14 H11.4 L12 5.5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                </svg>
+              </button>
             </div>
             </div>
           </div>
