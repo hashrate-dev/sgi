@@ -2431,6 +2431,13 @@ export type BtcTradeSignal = {
   psar: number;
   psarDir: 1 | -1;
   zigzagLast: { kind: "high" | "low"; price: number };
+  ichiCloud?: "above" | "inside" | "below";
+  ichiTenkan?: number;
+  ichiKijun?: number;
+  bbMid?: number;
+  bbPctB?: number;
+  volRatio?: number;
+  guide?: string;
   rangeDayLow?: number;
   rangeDayHigh?: number;
   range52Low?: number;

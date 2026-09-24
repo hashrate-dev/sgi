@@ -223,6 +223,143 @@ export function macdSeries(closes: number[]): { macd: number[]; signal: number[]
   return { macd, signal, hist };
 }
 
+export function priceToBin(px: number, minP: number, span: number, bins: number): number {
+  if (!(span > 0) || bins <= 0) return 0;
+  const t = (px - minP) / span;
+  return Math.max(0, Math.min(bins - 1, Math.floor(t * bins)));
+}
+
+/** Spread volume across price bins with a triangle peaked at the range mid. */
+export function addHeatRange(
+  heat: Float64Array,
+  col: number,
+  bins: number,
+  minP: number,
+  span: number,
+  lo: number,
+  hi: number,
+  vol: number,
+  peak: { v: number },
+) {
+  if (!(vol > 0) || !Number.isFinite(lo) || !Number.isFinite(hi)) return;
+  let b0 = priceToBin(Math.min(lo, hi), minP, span, bins);
+  let b1 = priceToBin(Math.max(lo, hi), minP, span, bins);
+  const n = b1 - b0 + 1;
+  const mid = (b0 + b1) / 2;
+  const half = Math.max(0.5, (n - 1) / 2);
+  let wsum = 0;
+  const weights = new Array<number>(n);
+  for (let i = 0; i < n; i++) {
+    const w = 0.2 + 0.8 * (1 - Math.abs(b0 + i - mid) / half);
+    weights[i] = w;
+    wsum += w;
+  }
+  if (!(wsum > 0)) return;
+  for (let i = 0; i < n; i++) {
+    const idx = col * bins + (b0 + i);
+    const next = heat[idx]! + vol * (weights[i]! / wsum);
+    heat[idx] = next;
+    if (next > peak.v) peak.v = next;
+  }
+}
+
+/**
+ * Reconstruct volume-at-price from OHLC: most volume in the body, less in wicks, extra at close.
+ * That matches each timeframe's candle instead of painting a flat strip from high to low.
+ */
+export function addCandleHeat(
+  heat: Float64Array,
+  col: number,
+  bins: number,
+  minP: number,
+  span: number,
+  c: { o: number; h: number; l: number; c: number; v: number },
+  peak: { v: number },
+) {
+  const vol = Math.max(0, c.v);
+  if (!(vol > 0)) return;
+  const bodyLo = Math.min(c.o, c.c);
+  const bodyHi = Math.max(c.o, c.c);
+  addHeatRange(heat, col, bins, minP, span, c.l, bodyLo, vol * 0.15, peak);
+  addHeatRange(heat, col, bins, minP, span, bodyLo, bodyHi, vol * 0.7, peak);
+  addHeatRange(heat, col, bins, minP, span, bodyHi, c.h, vol * 0.15, peak);
+  addHeatRange(heat, col, bins, minP, span, c.c, c.c, vol * 0.12, peak);
+}
+
+function donchianMid(candles: MarketCandle[], i: number, period: number): number {
+  const from = i - period + 1;
+  if (from < 0) return NaN;
+  let hi = -Infinity;
+  let lo = Infinity;
+  for (let j = from; j <= i; j++) {
+    hi = Math.max(hi, candles[j]!.h);
+    lo = Math.min(lo, candles[j]!.l);
+  }
+  if (!(hi > 0) || !(lo > 0) || !Number.isFinite(hi) || !Number.isFinite(lo)) return NaN;
+  return (hi + lo) / 2;
+}
+
+export type IchimokuSeries = {
+  tenkan: number[];
+  kijun: number[];
+  spanA: number[];
+  spanB: number[];
+  chikou: number[];
+  disp: number;
+};
+
+/** Ichimoku 9 / 26 / 52 with Senkou plotted `disp` bars ahead and Chikou `disp` bars back. */
+export function ichimokuCloud(
+  candles: MarketCandle[],
+  tenkanP = 9,
+  kijunP = 26,
+  senkouP = 52,
+  disp = 26,
+): IchimokuSeries {
+  const n = candles.length;
+  const tenkan = new Array<number>(n).fill(NaN);
+  const kijun = new Array<number>(n).fill(NaN);
+  const spanA = new Array<number>(n + disp).fill(NaN);
+  const spanB = new Array<number>(n + disp).fill(NaN);
+  const chikou = new Array<number>(n).fill(NaN);
+  for (let i = 0; i < n; i++) {
+    tenkan[i] = donchianMid(candles, i, tenkanP);
+    kijun[i] = donchianMid(candles, i, kijunP);
+    const a = Number.isFinite(tenkan[i]) && Number.isFinite(kijun[i]) ? (tenkan[i]! + kijun[i]!) / 2 : NaN;
+    const b = donchianMid(candles, i, senkouP);
+    if (Number.isFinite(a)) spanA[i + disp] = a;
+    if (Number.isFinite(b)) spanB[i + disp] = b;
+    if (i - disp >= 0) chikou[i - disp] = candles[i]!.c;
+  }
+  return { tenkan, kijun, spanA, spanB, chikou, disp };
+}
+
+export type BollingerSeries = { mid: number[]; upper: number[]; lower: number[] };
+
+/** Bollinger 20, 2σ (stdev poblacional, como TradingView). */
+export function bollingerBands(closes: number[], period = 20, mult = 2): BollingerSeries {
+  const n = closes.length;
+  const mid = new Array<number>(n).fill(NaN);
+  const upper = new Array<number>(n).fill(NaN);
+  const lower = new Array<number>(n).fill(NaN);
+  if (n < period) return { mid, upper, lower };
+  for (let i = period - 1; i < n; i++) {
+    let sum = 0;
+    for (let j = i - period + 1; j <= i; j++) sum += closes[j]!;
+    const mean = sum / period;
+    let acc = 0;
+    for (let j = i - period + 1; j <= i; j++) {
+      const d = closes[j]! - mean;
+      acc += d * d;
+    }
+    const sd = Math.sqrt(acc / period);
+    mid[i] = mean;
+    upper[i] = mean + mult * sd;
+    lower[i] = mean - mult * sd;
+  }
+  return { mid, upper, lower };
+}
+
 export const ZZ_PCT: Record<string, number> = {
   "1s": 0.0012,
   "1m": 0.006,

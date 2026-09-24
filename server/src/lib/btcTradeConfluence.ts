@@ -1,6 +1,6 @@
 /**
- * Confluencia operativa BTC (EMA 25/50/200 + Supertrend + PSAR + MACD + RSI + ZigZag).
- * Señal de escritorio, no es consejo de inversión.
+ * Confluencia operativa: régimen (EMA200 + Supertrend + Ichimoku) + gatillos (MACD, PSAR, EMA 25/50)
+ * + filtros (RSI, Bollinger, volumen, ZigZag). Señal de escritorio, no es consejo de inversión.
  */
 
 export type TradeBias = "buy" | "sell" | "wait";
@@ -43,6 +43,13 @@ export type TradeConfluence = {
   psar: number;
   psarDir: 1 | -1;
   zigzagLast: { kind: "high" | "low"; price: number };
+  ichiCloud?: "above" | "inside" | "below";
+  ichiTenkan?: number;
+  ichiKijun?: number;
+  bbMid?: number;
+  bbPctB?: number;
+  volRatio?: number;
+  guide?: string;
   rangeDayLow: number;
   rangeDayHigh: number;
   range52Low: number;
@@ -58,6 +65,8 @@ const BINANCE_HOSTS = ["https://data-api.binance.vision", "https://api.binance.c
 
 const SYMBOLS = new Set(["BTCUSDT", "ETHUSDT", "LTCUSDT", "DOGEUSDT", "ZECUSDT", "SOLUSDT"]);
 const INTERVALS: Record<string, string> = {
+  LIVE: "1s",
+  "1s": "1s",
   "1": "1m",
   "5": "5m",
   "15": "15m",
@@ -69,6 +78,7 @@ const INTERVALS: Record<string, string> = {
 };
 
 const ZZ_PCT: Record<string, number> = {
+  "1s": 0.0012,
   "1m": 0.006,
   "5m": 0.01,
   "15m": 0.015,
@@ -268,6 +278,92 @@ function zigzagLast(closes: number[], pct: number): { kind: "high" | "low"; pric
   return { kind, price: pivot };
 }
 
+function midHL(candles: Candle[], i: number, period: number): number {
+  const from = i - period + 1;
+  if (from < 0) return NaN;
+  let hi = -Infinity;
+  let lo = Infinity;
+  for (let j = from; j <= i; j++) {
+    hi = Math.max(hi, candles[j]!.h);
+    lo = Math.min(lo, candles[j]!.l);
+  }
+  return (hi + lo) / 2;
+}
+
+function ichimokuNow(candles: Candle[]): {
+  tenkan: number;
+  kijun: number;
+  cloudTop: number;
+  cloudBot: number;
+  pos: "above" | "inside" | "below";
+} {
+  const n = candles.length - 1;
+  const disp = 26;
+  const tenkan = midHL(candles, n, 9);
+  const kijun = midHL(candles, n, 26);
+  const src = n - disp;
+  const spanA = src >= 0 ? (midHL(candles, src, 9) + midHL(candles, src, 26)) / 2 : NaN;
+  const spanB = src >= 0 ? midHL(candles, src, 52) : NaN;
+  const cloudTop = Math.max(spanA, spanB);
+  const cloudBot = Math.min(spanA, spanB);
+  const price = candles[n]!.c;
+  let pos: "above" | "inside" | "below" = "inside";
+  if (Number.isFinite(cloudTop) && Number.isFinite(cloudBot)) {
+    if (price > cloudTop) pos = "above";
+    else if (price < cloudBot) pos = "below";
+  }
+  return { tenkan, kijun, cloudTop, cloudBot, pos };
+}
+
+function bollingerNow(closes: number[], period = 20, mult = 2): { mid: number; upper: number; lower: number; pctB: number; width: number } {
+  const n = closes.length;
+  if (n < period) return { mid: NaN, upper: NaN, lower: NaN, pctB: NaN, width: NaN };
+  const slice = closes.slice(n - period);
+  const mid = slice.reduce((a, b) => a + b, 0) / period;
+  const variance = slice.reduce((a, b) => a + (b - mid) * (b - mid), 0) / period;
+  const sd = Math.sqrt(variance);
+  const upper = mid + mult * sd;
+  const lower = mid - mult * sd;
+  const last = closes[n - 1]!;
+  const span = upper - lower;
+  return {
+    mid,
+    upper,
+    lower,
+    pctB: span > 0 ? (last - lower) / span : 0.5,
+    width: mid > 0 ? span / mid : NaN,
+  };
+}
+
+function smaLast(values: number[], period: number): number {
+  if (values.length < period) return NaN;
+  let s = 0;
+  for (let i = values.length - period; i < values.length; i++) s += values[i]!;
+  return s / period;
+}
+
+function lastJerry(closes: number[]): TradeBias | "early" | "none" {
+  const ema12 = ema(closes, 12);
+  const ema26 = ema(closes, 26);
+  const macd = ema12.map((v, i) => v - (ema26[i] ?? NaN));
+  const signal = ema(
+    macd.map((v) => (Number.isFinite(v) ? v : 0)),
+    9
+  );
+  const hist = macd.map((v, i) => v - (signal[i] ?? NaN));
+  const from = Math.max(2, hist.length - 8);
+  for (let i = hist.length - 1; i >= from; i--) {
+    const h = hist[i]!;
+    const p = hist[i - 1]!;
+    const q = hist[i - 2]!;
+    if (![h, p, q].every((x) => Number.isFinite(x))) continue;
+    if (p <= 0 && h > 0) return "buy";
+    if (p >= 0 && h < 0) return "sell";
+    if (h < 0 && p < 0 && h > p && p <= q) return "early";
+  }
+  return "none";
+}
+
 async function fetchJson(url: string, timeoutMs = 9000): Promise<unknown> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -285,9 +381,11 @@ async function fetchJson(url: string, timeoutMs = 9000): Promise<unknown> {
 
 async function fetchKlines(symbol: string, interval: string): Promise<Candle[]> {
   let last: Error | null = null;
+  const limit = interval === "1s" ? 1000 : 500;
+  const minN = interval === "1s" ? 220 : 200;
   for (const host of BINANCE_HOSTS) {
     try {
-      const raw = await fetchJson(`${host}/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=400`);
+      const raw = await fetchJson(`${host}/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
       if (!Array.isArray(raw)) throw new Error("klines inválidas");
       const candles: Candle[] = [];
       for (const row of raw) {
@@ -301,7 +399,7 @@ async function fetchKlines(symbol: string, interval: string): Promise<Candle[]> 
         if (![o, h, l, c].every((n) => Number.isFinite(n) && n > 0)) continue;
         candles.push({ t, o, h, l, c, v });
       }
-      if (candles.length < 220) throw new Error("serie insuficiente");
+      if (candles.length < minN) throw new Error("serie insuficiente");
       return candles;
     } catch (e) {
       last = e instanceof Error ? e : new Error(String(e));
@@ -394,6 +492,15 @@ export async function buildTradeConfluence(symbolRaw: string, intervalRaw: strin
   const psarLine = lastFinite(ps.line);
   const psarDir = (lastFinite(ps.dir) >= 0 ? 1 : -1) as 1 | -1;
   const zz = zigzagLast(closes, ZZ_PCT[interval] ?? 0.025);
+  const ichi = ichimokuNow(candles);
+  const bb = bollingerNow(closes);
+  const vols = candles.map((c) => c.v);
+  const volAvg = smaLast(vols, 20);
+  const volNow = vols[vols.length - 1] ?? 0;
+  const volRatio = volAvg > 0 ? volNow / volAvg : 1;
+  const jerry = lastJerry(closes);
+  const lastCandle = candles[candles.length - 1]!;
+  const candleUp = lastCandle.c >= lastCandle.o;
 
   const checks: TradeCheck[] = [];
 
@@ -401,19 +508,7 @@ export async function buildTradeConfluence(symbolRaw: string, intervalRaw: strin
     id: "ema200",
     label: "Régimen EMA 200",
     bias: price > ema200 ? "buy" : "sell",
-    detail: price > ema200 ? `Precio sobre EMA200 (${money(ema200)}) — sesgo alcista` : `Precio bajo EMA200 (${money(ema200)}) — sesgo bajista`,
-  });
-  checks.push({
-    id: "ema-cross",
-    label: "EMA 25 vs 50",
-    bias: ema25 > ema50 ? "buy" : "sell",
-    detail: ema25 > ema50 ? "EMA25 sobre EMA50 — momentum corto alcista" : "EMA25 bajo EMA50 — momentum corto bajista",
-  });
-  checks.push({
-    id: "ema-slope",
-    label: "Pendiente EMA 25",
-    bias: ema25 > ema25Prev ? "buy" : "sell",
-    detail: ema25 > ema25Prev ? "EMA25 subiendo" : "EMA25 bajando",
+    detail: price > ema200 ? `Precio sobre EMA200 (${money(ema200)}) — solo buscar largos` : `Precio bajo EMA200 (${money(ema200)}) — solo buscar cortos`,
   });
   checks.push({
     id: "supertrend",
@@ -424,20 +519,73 @@ export async function buildTradeConfluence(symbolRaw: string, intervalRaw: strin
         ? `Alcista · línea ${money(supertrendLine)} (stop largo)`
         : `Bajista · línea ${money(supertrendLine)} (stop corto)`,
   });
+  let ichiBias: TradeBias = "wait";
+  let ichiDetail = "Nube sin lectura";
+  if (ichi.pos === "above" && ichi.tenkan >= ichi.kijun) {
+    ichiBias = "buy";
+    ichiDetail = `Precio sobre la nube · Tenkan ${money(ichi.tenkan)} > Kijun ${money(ichi.kijun)}`;
+  } else if (ichi.pos === "below" && ichi.tenkan <= ichi.kijun) {
+    ichiBias = "sell";
+    ichiDetail = `Precio bajo la nube · Tenkan ${money(ichi.tenkan)} < Kijun ${money(ichi.kijun)}`;
+  } else if (ichi.pos === "inside") {
+    ichiDetail = "Precio dentro de la nube — mercado en equilibrio, no forzar entrada";
+  } else if (ichi.pos === "above") {
+    ichiBias = "buy";
+    ichiDetail = "Precio sobre la nube, Tenkan/Kijun aún no alineados";
+  } else {
+    ichiBias = "sell";
+    ichiDetail = "Precio bajo la nube, Tenkan/Kijun aún no alineados";
+  }
+  checks.push({ id: "ichimoku", label: "Nube de Ichimoku", bias: ichiBias, detail: ichiDetail });
+
+  checks.push({
+    id: "ema-cross",
+    label: "EMA 25 vs 50",
+    bias: ema25 > ema50 ? "buy" : "sell",
+    detail: ema25 > ema50 ? "EMA25 sobre EMA50 — gatillo corto alcista" : "EMA25 bajo EMA50 — gatillo corto bajista",
+  });
+  checks.push({
+    id: "ema-slope",
+    label: "Pendiente EMA 25",
+    bias: ema25 > ema25Prev ? "buy" : "sell",
+    detail: ema25 > ema25Prev ? "EMA25 subiendo" : "EMA25 bajando",
+  });
   checks.push({
     id: "psar",
     label: "Parabolic SAR",
     bias: psarDir === 1 ? "buy" : "sell",
     detail:
       psarDir === 1
-        ? `Puntos debajo del precio (${money(psarLine)}) — tendencia alcista`
-        : `Puntos encima del precio (${money(psarLine)}) — tendencia bajista`,
+        ? `Puntos debajo (${money(psarLine)}) — seguir largos`
+        : `Puntos encima (${money(psarLine)}) — seguir cortos`,
   });
+
+  const macdRaw: TradeBias =
+    macd > macdSignal && macdHist > 0 ? "buy" : macd < macdSignal && macdHist < 0 ? "sell" : "wait";
+  let macdBias: TradeBias = macdRaw;
+  let macdDetail = `Hist ${macdHist >= 0 ? "+" : ""}${macdHist.toFixed(2)} · MACD ${macd.toFixed(2)} vs señal ${macdSignal.toFixed(2)}`;
+  if (price > ema200 && macdRaw === "sell") {
+    macdBias = "wait";
+    macdDetail = "Cruce bajista ignorado: régimen EMA200 alcista — no cortar contra tendencia";
+  } else if (price < ema200 && macdRaw === "buy") {
+    macdBias = "wait";
+    macdDetail = "Cruce alcista ignorado: régimen EMA200 bajista — no comprar contra tendencia";
+  }
+  checks.push({ id: "macd", label: "MACD 12/26/9", bias: macdBias, detail: macdDetail });
+
+  const jerryBias: TradeBias = jerry === "buy" || jerry === "early" ? "buy" : jerry === "sell" ? "sell" : "wait";
   checks.push({
-    id: "macd",
-    label: "MACD 12/26/9",
-    bias: macd > macdSignal && macdHist > 0 ? "buy" : macd < macdSignal && macdHist < 0 ? "sell" : "wait",
-    detail: `Hist ${macdHist >= 0 ? "+" : ""}${macdHist.toFixed(2)} · MACD ${macd.toFixed(2)} vs señal ${macdSignal.toFixed(2)}`,
+    id: "jerry",
+    label: "Jerry Buy/Sell",
+    bias: jerryBias,
+    detail:
+      jerry === "buy"
+        ? "Jerry BUY reciente — histograma cruzó a positivo"
+        : jerry === "early"
+          ? "Jerry EARLY — histograma recortando caída, anticipo de largo"
+          : jerry === "sell"
+            ? "Jerry SELL reciente — histograma cruzó a negativo"
+            : "Sin cruce Jerry en las últimas velas",
   });
 
   let rsiBias: TradeBias = "wait";
@@ -450,38 +598,97 @@ export async function buildTradeConfluence(symbolRaw: string, intervalRaw: strin
     rsiDetail = `RSI ${rsi.toFixed(1)} sobrecompra — zona de recorte`;
   } else if (rsi >= 48 && rsi <= 68 && ema25 > ema50) {
     rsiBias = "buy";
-    rsiDetail = `RSI ${rsi.toFixed(1)} en rango sano de tendencia alcista`;
+    rsiDetail = `RSI ${rsi.toFixed(1)} sano en tendencia alcista`;
   } else if (rsi >= 32 && rsi <= 52 && ema25 < ema50) {
     rsiBias = "sell";
-    rsiDetail = `RSI ${rsi.toFixed(1)} en rango sano de tendencia bajista`;
+    rsiDetail = `RSI ${rsi.toFixed(1)} sano en tendencia bajista`;
   } else {
     rsiDetail = `RSI ${rsi.toFixed(1)} mixto — no fuerza la entrada`;
   }
   checks.push({ id: "rsi", label: "RSI 14", bias: rsiBias, detail: rsiDetail });
 
-  const zzBias: TradeBias = "wait";
+  const squeeze = Number.isFinite(bb.width) && bb.width < 0.012;
+  let bbBias: TradeBias = "wait";
+  let bbDetail = "Bollinger sin lectura";
+  if (squeeze) {
+    bbDetail = `Bandas comprimidas (${(bb.width * 100).toFixed(2)}%) — esperar expansión antes de entrar`;
+  } else if (bb.pctB <= 0.05) {
+    bbBias = "buy";
+    bbDetail = `%B ${bb.pctB.toFixed(2)} en banda inferior — posible rebote`;
+  } else if (bb.pctB >= 0.95) {
+    bbBias = "sell";
+    bbDetail = `%B ${bb.pctB.toFixed(2)} en banda superior — posible recorte`;
+  } else if (price >= bb.mid) {
+    bbBias = "buy";
+    bbDetail = `Precio sobre media BB ${money(bb.mid)} · %B ${bb.pctB.toFixed(2)}`;
+  } else {
+    bbBias = "sell";
+    bbDetail = `Precio bajo media BB ${money(bb.mid)} · %B ${bb.pctB.toFixed(2)}`;
+  }
+  checks.push({ id: "bollinger", label: "Bandas de Bollinger", bias: bbBias, detail: bbDetail });
+
+  let volBias: TradeBias = "wait";
+  let volDetail = `Volumen ${volRatio.toFixed(2)}× vs media 20`;
+  if (volRatio >= 1.15) {
+    volBias = candleUp ? "buy" : "sell";
+    volDetail = `Volumen alto (${volRatio.toFixed(2)}×) confirma la vela ${candleUp ? "alcista" : "bajista"}`;
+  } else {
+    volDetail = `Volumen flojo (${volRatio.toFixed(2)}×) — no confirma el movimiento`;
+  }
+  checks.push({ id: "volume", label: "Volumen 20", bias: volBias, detail: volDetail });
+
   checks.push({
     id: "zigzag",
     label: "Swing ZigZag",
-    bias: zzBias,
-    detail: zz.kind === "low" ? `Soporte de swing ${money(zz.price)}` : `Resistencia de swing ${money(zz.price)}`,
+    bias: zz.kind === "low" ? "buy" : "sell",
+    detail: zz.kind === "low" ? `Último swing LOW ${money(zz.price)} — sesgo de soporte` : `Último swing HIGH ${money(zz.price)} — sesgo de techo`,
   });
 
   const buyVotes = checks.filter((c) => c.bias === "buy").length;
   const sellVotes = checks.filter((c) => c.bias === "sell").length;
   const waitVotes = checks.filter((c) => c.bias === "wait").length;
-  const n = checks.length;
+
+  const regimeIds = new Set(["ema200", "supertrend", "ichimoku"]);
+  const triggerIds = new Set(["ema-cross", "ema-slope", "psar", "macd", "jerry"]);
+  const regimeBuy = checks.filter((c) => regimeIds.has(c.id) && c.bias === "buy").length;
+  const regimeSell = checks.filter((c) => regimeIds.has(c.id) && c.bias === "sell").length;
+  const trigBuy = checks.filter((c) => triggerIds.has(c.id) && c.bias === "buy").length;
+  const trigSell = checks.filter((c) => triggerIds.has(c.id) && c.bias === "sell").length;
+
+  let regime: TradeBias = "wait";
+  if (regimeBuy >= 2 && regimeBuy > regimeSell) regime = "buy";
+  else if (regimeSell >= 2 && regimeSell > regimeBuy) regime = "sell";
 
   let bias: TradeBias = "wait";
-  if (buyVotes >= 6 && buyVotes - sellVotes >= 2) bias = "buy";
-  else if (sellVotes >= 6 && sellVotes - buyVotes >= 2) bias = "sell";
-  else if (buyVotes >= 5 && sellVotes <= 1) bias = "buy";
-  else if (sellVotes >= 5 && buyVotes <= 1) bias = "sell";
+  let guide = "Esperar. No hay mayoría de régimen (EMA200 + Supertrend + Ichimoku).";
+  const rsiVetoBuy = rsi > 78;
+  const rsiVetoSell = rsi < 22;
 
+  if (squeeze) {
+    guide = "Bandas de Bollinger comprimidas: no operar hasta que se expandan con el régimen.";
+  } else if (regime === "wait") {
+    guide = `Régimen mixto (${regimeBuy} alcistas vs ${regimeSell} bajistas en EMA200/ST/nube). Quedarse fuera.`;
+  } else if (regime === "buy" && rsiVetoBuy) {
+    guide = `Régimen alcista pero RSI ${rsi.toFixed(1)} extremo: no perseguir. Esperar recorte a EMA25/50.`;
+  } else if (regime === "sell" && rsiVetoSell) {
+    guide = `Régimen bajista pero RSI ${rsi.toFixed(1)} extremo: no vender el suelo. Esperar rebote.`;
+  } else if (regime === "buy" && trigBuy < 2) {
+    guide = "Sesgo ALCISTA (precio sobre régimen). Esperar gatillo: cruce MACD+ o PSAR debajo o EMA25>50.";
+  } else if (regime === "sell" && trigSell < 2) {
+    guide = "Sesgo BAJISTA (precio bajo régimen). Esperar gatillo: cruce MACD− o PSAR arriba o EMA25<50.";
+  } else if (regime === "buy") {
+    bias = "buy";
+    guide = "COMPRAR. Régimen alcista y gatillos alineados. Stop bajo Supertrend/ATR. No abrir cortos.";
+  } else {
+    bias = "sell";
+    guide = "VENDER. Régimen bajista y gatillos alineados. Stop sobre Supertrend/ATR. No abrir largos.";
+  }
+
+  const decisive = checks.filter((c) => c.bias === "buy" || c.bias === "sell").length;
   const confidence =
     bias === "wait"
-      ? 0
-      : Math.round(((bias === "buy" ? buyVotes : sellVotes) / Math.max(1, n - waitVotes)) * 100);
+      ? Math.round((Math.max(regimeBuy, regimeSell) / 3) * 40)
+      : Math.round(((bias === "buy" ? buyVotes : sellVotes) / Math.max(1, decisive)) * 100);
 
   const atrRaw = lastFinite(rma(trueRange(candles), 14));
   const atrSafe = Number.isFinite(atrRaw) && atrRaw > 0 ? atrRaw : price * 0.008;
@@ -517,13 +724,13 @@ export async function buildTradeConfluence(symbolRaw: string, intervalRaw: strin
   if (bias === "buy") stopNote = `Invalida si cierra debajo de ${money(stop)} (Supertrend / ATR).`;
   else if (bias === "sell") stopNote = `Invalida si cierra por encima de ${money(stop)} (Supertrend / ATR).`;
 
-  let thesis = "Sin mayoría de reglas: no hay entrada. Se opera solo con EMA200 + Supertrend + PSAR + EMA25/50 + MACD + RSI alineados.";
-  let action = "Quedarse fuera. No hay stop ni targets activos.";
+  let thesis = guide;
+  let action = guide;
   if (bias === "buy") {
-    thesis = drivers.join(" · ");
+    thesis = `${guide} ${drivers.slice(0, 2).join(" · ")}`;
     action = `Largo a mercado en ${money(price)}. Riesgo 1R = ${money(riskUsd)} (${riskPct.toFixed(2)}%). ${stopNote}`;
   } else if (bias === "sell") {
-    thesis = drivers.join(" · ");
+    thesis = `${guide} ${drivers.slice(0, 2).join(" · ")}`;
     action = `Corto a mercado en ${money(price)}. Riesgo 1R = ${money(riskUsd)} (${riskPct.toFixed(2)}%). ${stopNote}`;
   }
 
@@ -558,6 +765,13 @@ export async function buildTradeConfluence(symbolRaw: string, intervalRaw: strin
     psar: psarLine,
     psarDir,
     zigzagLast: zz,
+    ichiCloud: ichi.pos,
+    ichiTenkan: ichi.tenkan,
+    ichiKijun: ichi.kijun,
+    bbMid: bb.mid,
+    bbPctB: bb.pctB,
+    volRatio,
+    guide,
     rangeDayLow: ranges.dayLow,
     rangeDayHigh: ranges.dayHigh,
     range52Low: ranges.w52Low,

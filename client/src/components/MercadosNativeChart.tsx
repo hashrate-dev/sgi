@@ -8,8 +8,22 @@ import {
   supertrend,
   zigzagPivots,
   ZZ_PCT,
+  addCandleHeat,
+  ichimokuCloud,
+  bollingerBands,
   type MarketCandle,
 } from "../lib/mercadosChartMath";
+import {
+  FIB_LEVELS,
+  distToPoly,
+  distToSeg,
+  fracIndex,
+  hexToRgba,
+  timeAtIndex,
+  type ChartDrawTool,
+  type ChartDrawing,
+  type ChartPoint,
+} from "../lib/mercadosDrawings";
 
 const HOSTS = ["https://data-api.binance.vision", "https://api.binance.com", "https://api.binance.us"];
 
@@ -24,8 +38,47 @@ const TF: Record<string, string> = {
   D: "1d",
 };
 
+const TF_MS: Record<string, number> = {
+  "1s": 1_000,
+  "1m": 60_000,
+  "5m": 300_000,
+  "15m": 900_000,
+  "30m": 1_800_000,
+  "1h": 3_600_000,
+  "4h": 14_400_000,
+  "1d": 86_400_000,
+};
+
+function expectedBarMs(interval: string): number {
+  return TF_MS[TF[interval] ?? ""] ?? 0;
+}
+
+function typicalBarMs(rows: MarketCandle[]): number {
+  if (rows.length < 2) return 0;
+  const dts: number[] = [];
+  const from = Math.max(1, rows.length - 48);
+  for (let i = from; i < rows.length; i++) {
+    const d = rows[i]!.t - rows[i - 1]!.t;
+    if (d > 0) dts.push(d);
+  }
+  if (!dts.length) return 0;
+  dts.sort((a, b) => a - b);
+  return dts[Math.floor(dts.length / 2)]!;
+}
+
+function snapshotMatchesTf(rows: MarketCandle[], interval: string): boolean {
+  const expect = expectedBarMs(interval);
+  if (expect <= 0 || rows.length < 2) return rows.length >= 2;
+  const dt = typicalBarMs(rows);
+  if (dt <= 0) return false;
+  const ratio = dt > expect ? dt / expect : expect / dt;
+  return ratio < 1.8;
+}
+
 const WS_KLINE = (symbol: string, tf: string) =>
   `wss://stream.binance.com:9443/ws/${symbol.toLowerCase()}@kline_${tf}`;
+
+export type { ChartDrawTool };
 
 type Studies = Record<string, boolean>;
 
@@ -33,7 +86,27 @@ type Props = {
   binance: string;
   interval: string;
   studyOn: Studies;
+  drawTool?: ChartDrawTool;
+  drawColor?: string;
+  drawPulse?: { n: number; op: "undo" | "clear" };
 };
+
+function fmtOsc(n: number): string {
+  if (!Number.isFinite(n)) return "—";
+  const a = Math.abs(n);
+  if (a >= 100) return n.toFixed(2);
+  if (a >= 10) return n.toFixed(2);
+  if (a >= 1) return n.toFixed(3);
+  return n.toFixed(4);
+}
+
+function lastFiniteAt(arr: number[], i: number): number {
+  for (let k = i; k >= 0; k--) {
+    const v = arr[k];
+    if (Number.isFinite(v)) return v!;
+  }
+  return NaN;
+}
 
 function fmtPx(n: number): string {
   if (!Number.isFinite(n)) return "";
@@ -64,9 +137,47 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath();
 }
 
+function barStep(rows: MarketCandle[]): number {
+  if (rows.length < 2) return 0;
+  return Math.max(1, rows[rows.length - 1]!.t - rows[rows.length - 2]!.t);
+}
+
+function mergeCandleSnapshot(prev: MarketCandle[], snap: MarketCandle[]): MarketCandle[] {
+  if (snap.length < 2) return prev;
+  if (prev.length < 2) return snap;
+  const dPrev = typicalBarMs(prev);
+  const dSnap = typicalBarMs(snap);
+  if (dPrev > 0 && dSnap > 0) {
+    const ratio = dSnap > dPrev ? dSnap / dPrev : dPrev / dSnap;
+    if (ratio >= 2.5) return prev;
+  }
+  if (prev.length >= 220 && snap.length < 220 && dSnap > 0 && dPrev > 0 && dSnap <= dPrev * 1.8) return prev;
+  if (prev.length >= 80 && snap.length < Math.floor(prev.length * 0.55) && dSnap > 0 && dPrev > 0 && Math.abs(dSnap - dPrev) < dPrev * 0.5)
+    return prev;
+  const lastPrev = prev[prev.length - 1]!;
+  const lastSnap = snap[snap.length - 1]!;
+  let out = snap;
+  if (lastPrev.t > lastSnap.t) {
+    out = snap.concat(prev.filter((c) => c.t > lastSnap.t));
+  } else if (lastPrev.t === lastSnap.t) {
+    out = snap.slice();
+    out[out.length - 1] = {
+      t: lastSnap.t,
+      o: lastSnap.o,
+      h: Math.max(lastSnap.h, lastPrev.h),
+      l: Math.min(lastSnap.l, lastPrev.l),
+      c: lastPrev.c,
+      v: Math.max(lastSnap.v, lastPrev.v),
+    };
+  }
+  return out;
+}
+
 async function fetchCandles(binance: string, interval: string): Promise<MarketCandle[]> {
+  const live = interval === "LIVE";
   const tf = TF[interval] ?? "1h";
-  const limit = interval === "LIVE" ? 1000 : 500;
+  const limit = live ? 1000 : 500;
+  const minN = live ? 220 : 40;
   for (const host of HOSTS) {
     try {
       const res = await fetch(`${host}/api/v3/klines?symbol=${binance}&interval=${tf}&limit=${limit}`);
@@ -85,16 +196,22 @@ async function fetchCandles(binance: string, interval: string): Promise<MarketCa
         if (![o, h, l, c].every((n) => Number.isFinite(n) && n > 0)) continue;
         next.push({ t, o, h, l, c, v: Number.isFinite(v) ? v : 0 });
       }
-      if (next.length >= 40) return next;
+      if (next.length >= minN && snapshotMatchesTf(next, interval)) return next;
     } catch {
       /* next host */
     }
   }
-  if (interval === "LIVE") return fetchCandles(binance, "1");
   return [];
 }
 
-export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
+export function MercadosNativeChart({
+  binance,
+  interval,
+  studyOn,
+  drawTool = "cursor",
+  drawColor = "#f5c542",
+  drawPulse,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const candlesRef = useRef<MarketCandle[]>([]);
@@ -110,65 +227,134 @@ export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
     max: number;
   } | null>(null);
   const hoverRef = useRef<number | null>(null);
-  const geomRef = useRef({ padL: 56, padR: 78, timeH: 32, priceTop: 10, priceBot: 0, h: 0, w: 0 });
+  const geomRef = useRef({
+    padL: 56,
+    padR: 78,
+    timeH: 32,
+    priceTop: 10,
+    priceBot: 0,
+    h: 0,
+    w: 0,
+    start: 0,
+    barW: 1,
+    minP: 0,
+    span: 1,
+  });
   const axisYRef = useRef<HTMLDivElement>(null);
   const axisXRef = useRef<HTMLDivElement>(null);
   const onRef = useRef(studyOn);
   onRef.current = studyOn;
   const intervalRef = useRef(interval);
   intervalRef.current = interval;
+  const paintGen = useRef(0);
+  const drawToolRef = useRef<ChartDrawTool>(drawTool);
+  drawToolRef.current = drawTool;
+  const drawColorRef = useRef(drawColor);
+  drawColorRef.current = drawColor;
+  const pairRef = useRef(binance);
+  pairRef.current = binance;
+  const drawingsByPair = useRef<Record<string, ChartDrawing[]>>({});
+  const draftRef = useRef<ChartDrawing | null>(null);
+  const selectedIdRef = useRef<string | null>(null);
+  const deleteHitsRef = useRef<Array<{ x: number; y: number; r: number; id: string }>>([]);
+  const downRef = useRef<{ x: number; y: number; tool: ChartDrawTool } | null>(null);
+
+  const drawingsOf = () => {
+    const k = pairRef.current;
+    if (!drawingsByPair.current[k]) drawingsByPair.current[k] = [];
+    return drawingsByPair.current[k]!;
+  };
+
+  const toXy = (pt: ChartPoint) => {
+    const g = geomRef.current;
+    const i = fracIndex(candlesRef.current, pt.t);
+    return {
+      x: g.padL + (i - g.start + 0.5) * g.barW,
+      y: g.priceTop + (1 - (pt.p - g.minP) / Math.max(1e-12, g.span)) * (g.priceBot - g.priceTop),
+    };
+  };
+
+  const fromEvent = (e: PointerEvent): ChartPoint | null => {
+    const wrap = wrapRef.current;
+    const g = geomRef.current;
+    const candles = candlesRef.current;
+    if (!wrap || candles.length < 2) return null;
+    const rect = wrap.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    if (y < g.priceTop - 4 || y > g.priceBot + 4) return null;
+    const i = g.start + (x - g.padL) / Math.max(0.001, g.barW) - 0.5;
+    const p = g.minP + (1 - (y - g.priceTop) / Math.max(1, g.priceBot - g.priceTop)) * g.span;
+    return { t: timeAtIndex(candles, i), p };
+  };
 
   const studiesKey = useMemo(() => JSON.stringify(studyOn), [studyOn]);
 
+  const requestPaint = () => {
+    const id = ++paintGen.current;
+    requestAnimationFrame(() => {
+      if (id !== paintGen.current) return;
+      paint();
+    });
+  };
+
   useEffect(() => {
     let dead = false;
+    let seq = 0;
     const live = interval === "LIVE";
+    const binanceTf = TF[interval] ?? "1h";
+    candlesRef.current = [];
+    hoverRef.current = null;
     viewRef.current.count = live ? 180 : 120;
     viewRef.current.follow = true;
     scaleRef.current.auto = true;
+    requestPaint();
 
     const applyRows = (rows: MarketCandle[]) => {
       if (dead || rows.length < 2) return;
+      if (!snapshotMatchesTf(rows, interval)) return;
       const prev = candlesRef.current;
-      candlesRef.current = rows;
+      const next = mergeCandleSnapshot(prev, rows);
+      if (next.length < 2) return;
+      candlesRef.current = next;
       const v = viewRef.current;
       if (v.follow || prev.length === 0) {
-        v.end = Math.max(0, rows.length - 1);
+        v.end = Math.max(0, next.length - 1);
         v.follow = true;
       } else {
-        v.end = Math.min(v.end, Math.max(0, rows.length - 1));
+        v.end = Math.min(v.end, Math.max(0, next.length - 1));
       }
-      paint();
+      requestPaint();
     };
 
     const upsert = (c: MarketCandle) => {
       if (dead) return;
       const rows = candlesRef.current.slice();
       const last = rows[rows.length - 1];
+      const expect = expectedBarMs(interval);
       if (last && last.t === c.t) rows[rows.length - 1] = c;
       else if (!last || c.t > last.t) {
+        if (last && expect > 0 && c.t - last.t < expect * 0.45) return;
         rows.push(c);
         if (rows.length > 1200) rows.splice(0, rows.length - 1000);
       } else return;
       candlesRef.current = rows;
       if (viewRef.current.follow) viewRef.current.end = rows.length - 1;
-      paint();
+      requestPaint();
     };
 
     const pull = async () => {
+      const my = ++seq;
       const rows = await fetchCandles(binance, interval);
+      if (dead || my !== seq) return;
       applyRows(rows);
     };
 
     let ws: WebSocket | null = null;
     void pull().then(() => {
-      if (dead || !live) return;
-      const rows = candlesRef.current;
-      const dt = rows.length >= 2 ? rows[rows.length - 1]!.t - rows[rows.length - 2]!.t : 60_000;
-      const streamTf = dt <= 2500 ? "1s" : "1m";
+      if (dead) return;
       try {
-        if (dead) return;
-        ws = new WebSocket(WS_KLINE(binance, streamTf));
+        ws = new WebSocket(WS_KLINE(binance, binanceTf));
         if (dead) {
           ws.close();
           ws = null;
@@ -197,7 +383,7 @@ export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
         /* REST polling already running */
       }
     });
-    const pollMs = live ? 4000 : 15000;
+    const pollMs = live ? 12000 : 15000;
     const t = window.setInterval(() => void pull(), pollMs);
 
     return () => {
@@ -211,9 +397,37 @@ export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
   }, [binance, interval]);
 
   useEffect(() => {
-    paint();
+    requestPaint();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studiesKey]);
+
+  useEffect(() => {
+    if (!drawPulse || drawPulse.n <= 0) return;
+    if (drawPulse.op === "clear") drawingsByPair.current[pairRef.current] = [];
+    else {
+      const list = drawingsOf();
+      const sel = selectedIdRef.current;
+      const idx = sel ? list.findIndex((d) => d.id === sel) : -1;
+      if (idx >= 0) list.splice(idx, 1);
+      else list.pop();
+    }
+    selectedIdRef.current = null;
+    draftRef.current = null;
+    requestPaint();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawPulse?.n]);
+
+  useEffect(() => {
+    drawColorRef.current = drawColor;
+    if (draftRef.current) draftRef.current.color = drawColor;
+    const sel = selectedIdRef.current;
+    if (sel) {
+      const d = drawingsOf().find((x) => x.id === sel);
+      if (d) d.color = drawColor;
+    }
+    requestPaint();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawColor]);
 
   function layout() {
     const canvas = canvasRef.current;
@@ -232,6 +446,8 @@ export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const tool = drawToolRef.current;
+    canvas.style.cursor = tool === "cursor" ? "crosshair" : tool === "eraser" ? "cell" : "crosshair";
     return { ctx, w, h };
   }
 
@@ -252,7 +468,7 @@ export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
     }
 
     const oscN = (on.rsi !== false ? 1 : 0) + (on.macd !== false ? 1 : 0);
-    const oscH = oscN ? Math.min(118, h * 0.16) : 0;
+    const oscH = oscN ? Math.min(132, h * 0.18) : 0;
     const padR = 78;
     const padL = 56;
     const padT = 10;
@@ -270,9 +486,10 @@ export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
     viewRef.current.count = count;
     const start = Math.max(0, end - count + 1);
     const plotW = w - padL - padR;
-    const barW = plotW / count;
+    const cloudExtra = on.ichimoku !== false ? 26 : 0;
+    const barW = plotW / (count + cloudExtra);
     const xOf = (i: number) => padL + (i - start + 0.5) * barW;
-    geomRef.current = { padL, padR, timeH, priceTop, priceBot, h, w };
+    geomRef.current = { padL, padR, timeH, priceTop, priceBot, h, w, start, barW, minP: 0, span: 1 };
 
     let minP = Infinity;
     let maxP = -Infinity;
@@ -284,26 +501,33 @@ export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
       maxV = Math.max(maxV, c.v);
     }
     const closes = candles.map((c) => c.c);
-    if (on.ema25 !== false) {
-      const s = emaSeries(closes, 25);
-      for (let i = start; i <= end; i++) if (Number.isFinite(s[i])) {
-        minP = Math.min(minP, s[i]!);
-        maxP = Math.max(maxP, s[i]!);
+    const ichi = on.ichimoku !== false ? ichimokuCloud(candles) : null;
+    const bb = on.bollinger !== false ? bollingerBands(closes) : null;
+    const fit = (series: number[] | undefined, from: number, to: number) => {
+      if (!series) return;
+      const last = Math.min(to, series.length - 1);
+      for (let i = from; i <= last; i++) {
+        const v = series[i];
+        if (Number.isFinite(v)) {
+          minP = Math.min(minP, v!);
+          maxP = Math.max(maxP, v!);
+        }
       }
+    };
+    if (on.ema25 !== false) fit(emaSeries(closes, 25), start, end);
+    if (on.ema50 !== false) fit(emaSeries(closes, 50), start, end);
+    if (on.ema200 !== false) fit(emaSeries(closes, 200), start, end);
+    if (bb) {
+      fit(bb.upper, start, end);
+      fit(bb.lower, start, end);
     }
-    if (on.ema50 !== false) {
-      const s = emaSeries(closes, 50);
-      for (let i = start; i <= end; i++) if (Number.isFinite(s[i])) {
-        minP = Math.min(minP, s[i]!);
-        maxP = Math.max(maxP, s[i]!);
-      }
-    }
-    if (on.ema200 !== false) {
-      const s = emaSeries(closes, 200);
-      for (let i = start; i <= end; i++) if (Number.isFinite(s[i])) {
-        minP = Math.min(minP, s[i]!);
-        maxP = Math.max(maxP, s[i]!);
-      }
+    if (ichi) {
+      const cloudTo = Math.min(end + ichi.disp, ichi.spanA.length - 1);
+      fit(ichi.tenkan, start, end);
+      fit(ichi.kijun, start, end);
+      fit(ichi.spanA, start, cloudTo);
+      fit(ichi.spanB, start, cloudTo);
+      fit(ichi.chikou, start, end);
     }
     const pad = (maxP - minP) * 0.08 || 1;
     minP -= pad;
@@ -321,6 +545,8 @@ export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
     }
     const span = maxP - minP || 1;
     const yOf = (px: number) => priceTop + (1 - (px - minP) / span) * (priceBot - priceTop);
+    geomRef.current.minP = minP;
+    geomRef.current.span = span;
 
     ctx.fillStyle = "#101614";
     ctx.fillRect(w - padR, 0, padR, h - timeH);
@@ -363,40 +589,17 @@ export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
     if (on.heatmap !== false) {
       const bins = Math.max(28, Math.min(72, Math.floor((priceBot - priceTop) / 5)));
       const heat = new Float64Array(count * bins);
-      let peak = 0;
+      const peakBox = { v: 0 };
       for (let i = start; i <= end; i++) {
-        const c = candles[i]!;
-        const vol = Math.max(0, c.v);
-        if (vol <= 0) continue;
-        const lo = Math.min(c.l, c.h);
-        const hi = Math.max(c.l, c.h);
-        let b0 = Math.floor(((lo - minP) / span) * bins);
-        let b1 = Math.floor(((hi - minP) / span) * bins);
-        b0 = Math.max(0, Math.min(bins - 1, b0));
-        b1 = Math.max(0, Math.min(bins - 1, b1));
-        if (b1 < b0) {
-          const t = b0;
-          b0 = b1;
-          b1 = t;
-        }
-        const n = b1 - b0 + 1;
-        const share = vol / n;
-        const col = i - start;
-        for (let b = b0; b <= b1; b++) {
-          const closeBin = Math.floor(((c.c - minP) / span) * bins);
-          const wgt = b === Math.max(0, Math.min(bins - 1, closeBin)) ? 1.35 : 1;
-          const v = heat[col * bins + b]! + share * wgt;
-          heat[col * bins + b] = v;
-          if (v > peak) peak = v;
-        }
+        addCandleHeat(heat, i - start, bins, minP, span, candles[i]!, peakBox);
       }
-      if (peak > 0) {
+      if (peakBox.v > 0) {
         const cellH = (priceBot - priceTop) / bins;
         const cellW = Math.max(1, barW);
         for (let col = 0; col < count; col++) {
           const x = padL + col * barW;
           for (let b = 0; b < bins; b++) {
-            const t = heat[col * bins + b]! / peak;
+            const t = heat[col * bins + b]! / peakBox.v;
             if (t < 0.04) continue;
             const y = priceBot - (b + 1) * cellH;
             const a = 0.08 + t * 0.42;
@@ -440,6 +643,34 @@ export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
       }
     }
 
+    const clipPrice = () => {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(padL, priceTop, plotW, Math.max(0, priceBot - priceTop));
+      ctx.clip();
+    };
+
+    if (ichi) {
+      clipPrice();
+      const cloudTo = Math.min(end + ichi.disp, ichi.spanA.length - 1);
+      for (let i = start; i < cloudTo; i++) {
+        const a0 = ichi.spanA[i];
+        const a1 = ichi.spanA[i + 1];
+        const b0 = ichi.spanB[i];
+        const b1 = ichi.spanB[i + 1];
+        if (![a0, a1, b0, b1].every((v) => Number.isFinite(v))) continue;
+        ctx.beginPath();
+        ctx.moveTo(xOf(i), yOf(a0!));
+        ctx.lineTo(xOf(i + 1), yOf(a1!));
+        ctx.lineTo(xOf(i + 1), yOf(b1!));
+        ctx.lineTo(xOf(i), yOf(b0!));
+        ctx.closePath();
+        ctx.fillStyle = a0! >= b0! ? "rgba(38,166,154,0.22)" : "rgba(239,83,80,0.18)";
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
     for (let i = start; i <= end; i++) {
       const c = candles[i]!;
       const x = xOf(i);
@@ -465,12 +696,13 @@ export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
       ctx.fillRect(x - bw / 2, bodyTop, bw, Math.max(1, bodyBot - bodyTop));
     }
 
-    const drawLine = (series: number[], color: string, width = 1.4) => {
+    const drawLine = (series: number[], color: string, width = 1.4, from = start, to = end) => {
       ctx.beginPath();
       let started = false;
       ctx.strokeStyle = color;
       ctx.lineWidth = width;
-      for (let i = start; i <= end; i++) {
+      const last = Math.min(to, series.length - 1);
+      for (let i = from; i <= last; i++) {
         const v = series[i];
         if (!Number.isFinite(v)) {
           started = false;
@@ -485,6 +717,39 @@ export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
       }
       ctx.stroke();
     };
+
+    if (bb) {
+      clipPrice();
+      ctx.beginPath();
+      let started = false;
+      for (let i = start; i <= end; i++) {
+        const v = bb.upper[i];
+        if (!Number.isFinite(v)) {
+          started = false;
+          continue;
+        }
+        const x = xOf(i);
+        const y = yOf(v!);
+        if (!started) {
+          ctx.moveTo(x, y);
+          started = true;
+        } else ctx.lineTo(x, y);
+      }
+      for (let i = end; i >= start; i--) {
+        const v = bb.lower[i];
+        if (!Number.isFinite(v)) continue;
+        ctx.lineTo(xOf(i), yOf(v!));
+      }
+      ctx.closePath();
+      ctx.fillStyle = "rgba(91,156,246,0.14)";
+      ctx.fill();
+      ctx.restore();
+      drawLine(bb.upper, "rgba(91,156,246,0.95)", 1.15);
+      drawLine(bb.lower, "rgba(91,156,246,0.95)", 1.15);
+      ctx.setLineDash([5, 4]);
+      drawLine(bb.mid, "#5b9cf6", 1.2);
+      ctx.setLineDash([]);
+    }
 
     if (on.ema25 !== false) drawLine(emaSeries(closes, 25), "#F5C542");
     if (on.ema50 !== false) drawLine(emaSeries(closes, 50), "#26C6DA");
@@ -545,6 +810,19 @@ export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
       ctx.stroke();
     }
 
+    if (ichi) {
+      clipPrice();
+      const cloudTo = Math.min(end + ichi.disp, ichi.spanA.length - 1);
+      ctx.setLineDash([4, 3]);
+      drawLine(ichi.spanA, "rgba(38,166,154,0.9)", 1.05, start, cloudTo);
+      drawLine(ichi.spanB, "rgba(239,83,80,0.9)", 1.05, start, cloudTo);
+      ctx.setLineDash([]);
+      drawLine(ichi.tenkan, "#4FC3F7", 1.45, start, end);
+      drawLine(ichi.kijun, "#EC407A", 1.45, start, end);
+      drawLine(ichi.chikou, "#9CCC65", 1.2, start, end);
+      ctx.restore();
+    }
+
     if (on.jerry !== false) {
       const marks = jerryMarks(
         closes,
@@ -569,6 +847,198 @@ export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
         ctx.fillText(label, x, y + 0.5);
       }
     }
+
+    const paintOneDrawing = (d: ChartDrawing, ghost = false, selected = false) => {
+      const a = { x: xOf(fracIndex(candles, d.a.t)), y: yOf(d.a.p) };
+      const b = { x: xOf(fracIndex(candles, d.b.t)), y: yOf(d.b.p) };
+      ctx.globalAlpha = ghost ? 0.7 : 1;
+      ctx.strokeStyle = d.color;
+      ctx.fillStyle = d.color;
+      ctx.lineWidth = selected ? 2.15 : 1.35;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.setLineDash([]);
+      if (d.kind === "hline") {
+        ctx.beginPath();
+        ctx.moveTo(padL, a.y);
+        ctx.lineTo(w - padR, a.y);
+        ctx.stroke();
+        ctx.font = "700 10px ui-sans-serif, system-ui, sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "bottom";
+        ctx.fillText(fmtPx(d.a.p), padL + 6, a.y - 2);
+      } else if (d.kind === "vline") {
+        ctx.beginPath();
+        ctx.moveTo(a.x, priceTop);
+        ctx.lineTo(a.x, priceBot);
+        ctx.stroke();
+      } else if (d.kind === "rect") {
+        const x = Math.min(a.x, b.x);
+        const y = Math.min(a.y, b.y);
+        const rw = Math.abs(b.x - a.x);
+        const rh = Math.abs(b.y - a.y);
+        ctx.fillStyle = hexToRgba(d.color, 0.12);
+        ctx.fillRect(x, y, rw, rh);
+        ctx.strokeStyle = d.color;
+        ctx.strokeRect(x, y, rw, rh);
+      } else if (d.kind === "ruler") {
+        const x = Math.min(a.x, b.x);
+        const y = Math.min(a.y, b.y);
+        const rw = Math.max(2, Math.abs(b.x - a.x));
+        const rh = Math.max(2, Math.abs(b.y - a.y));
+        const up = d.b.p >= d.a.p;
+        const tone = up ? "#26a69a" : "#ef5350";
+        ctx.fillStyle = up ? "rgba(38,166,154,0.16)" : "rgba(239,83,80,0.16)";
+        ctx.fillRect(x, y, rw, rh);
+        ctx.setLineDash([4, 3]);
+        ctx.strokeStyle = tone;
+        ctx.strokeRect(x, y, rw, rh);
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+        const pct = d.a.p ? ((d.b.p - d.a.p) / Math.abs(d.a.p)) * 100 : 0;
+        const dp = d.b.p - d.a.p;
+        const bars = Math.max(1, Math.round(Math.abs(fracIndex(candles, d.b.t) - fracIndex(candles, d.a.t))));
+        const pctTxt = `${pct >= 0 ? "+" : ""}${pct.toFixed(Math.abs(pct) >= 10 ? 2 : 3)}%`;
+        const pxTxt = `${dp >= 0 ? "+" : "−"}${fmtPx(Math.abs(dp))}`;
+        const barTxt = `${bars} vela${bars === 1 ? "" : "s"}`;
+        ctx.font = "800 12px ui-sans-serif, system-ui, sans-serif";
+        const w1 = ctx.measureText(pctTxt).width;
+        ctx.font = "700 10px ui-sans-serif, system-ui, sans-serif";
+        const boxW = Math.max(w1, ctx.measureText(pxTxt).width, ctx.measureText(barTxt).width) + 16;
+        const boxH = 42;
+        let bx = x + rw / 2 - boxW / 2;
+        let by = y + rh / 2 - boxH / 2;
+        bx = Math.max(padL + 4, Math.min(w - padR - boxW - 4, bx));
+        by = Math.max(priceTop + 4, Math.min(priceBot - boxH - 4, by));
+        ctx.fillStyle = "rgba(12, 16, 28, 0.92)";
+        roundRect(ctx, bx, by, boxW, boxH, 5);
+        ctx.fill();
+        ctx.strokeStyle = tone;
+        ctx.lineWidth = 1.2;
+        roundRect(ctx, bx, by, boxW, boxH, 5);
+        ctx.stroke();
+        ctx.fillStyle = tone;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.font = "800 12px ui-sans-serif, system-ui, sans-serif";
+        ctx.fillText(pctTxt, bx + boxW / 2, by + 11);
+        ctx.font = "700 10px ui-sans-serif, system-ui, sans-serif";
+        ctx.fillStyle = "#d1d4dc";
+        ctx.fillText(pxTxt, bx + boxW / 2, by + 24);
+        ctx.fillStyle = "#868993";
+        ctx.fillText(barTxt, bx + boxW / 2, by + 35);
+      } else if (d.kind === "fib") {
+        const lo = Math.min(d.a.p, d.b.p);
+        const hi = Math.max(d.a.p, d.b.p);
+        const x0 = Math.min(a.x, b.x);
+        const x1 = Math.max(a.x, b.x);
+        for (const lv of FIB_LEVELS) {
+          const p = hi - (hi - lo) * lv.r;
+          const y = yOf(p);
+          ctx.strokeStyle = lv.r === 0.5 || lv.r === 0.618 ? d.color : hexToRgba(d.color, 0.55);
+          ctx.setLineDash(lv.r === 0 || lv.r === 1 ? [] : [4, 3]);
+          ctx.beginPath();
+          ctx.moveTo(x0, y);
+          ctx.lineTo(Math.max(x1, x0 + 80), y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = d.color;
+          ctx.font = "700 9px ui-sans-serif, system-ui, sans-serif";
+          ctx.textAlign = "left";
+          ctx.textBaseline = "bottom";
+          ctx.fillText(`${lv.label}  ${fmtPx(p)}`, x0 + 4, y - 1);
+        }
+      } else if (d.kind === "pencil" && d.pts && d.pts.length > 1) {
+        ctx.beginPath();
+        d.pts.forEach((pt, n) => {
+          const q = { x: xOf(fracIndex(candles, pt.t)), y: yOf(pt.p) };
+          if (n === 0) ctx.moveTo(q.x, q.y);
+          else ctx.lineTo(q.x, q.y);
+        });
+        ctx.stroke();
+      } else if (d.kind === "ray") {
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        let tMax = 1;
+        if (Math.abs(dx) + Math.abs(dy) > 0.2) {
+          const ts: number[] = [];
+          if (dx > 0) ts.push((w - padR - a.x) / dx);
+          if (dx < 0) ts.push((padL - a.x) / dx);
+          if (dy > 0) ts.push((priceBot - a.y) / dy);
+          if (dy < 0) ts.push((priceTop - a.y) / dy);
+          tMax = Math.max(1, ...ts.filter((t) => t > 0));
+        }
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(a.x + dx * tMax, a.y + dy * tMax);
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    };
+
+    clipPrice();
+    const selId = selectedIdRef.current;
+    for (const d of drawingsOf()) paintOneDrawing(d, false, d.id === selId);
+    if (draftRef.current) paintOneDrawing(draftRef.current, true);
+    ctx.restore();
+
+    const deleteHits: Array<{ x: number; y: number; r: number; id: string }> = [];
+    const usedBadges: Array<{ x: number; y: number }> = [];
+    const placeBadge = (x: number, y: number) => {
+      let px = Math.max(padL + 12, Math.min(w - padR - 12, x));
+      let py = Math.max(priceTop + 12, Math.min(priceBot - 12, y));
+      for (let n = 0; n < 10; n++) {
+        if (!usedBadges.some((u) => Math.hypot(u.x - px, u.y - py) < 15)) break;
+        py = Math.max(priceTop + 12, py - 15);
+      }
+      usedBadges.push({ x: px, y: py });
+      return { x: px, y: py };
+    };
+    ctx.globalAlpha = 1;
+    for (const d of drawingsOf()) {
+      const a = { x: xOf(fracIndex(candles, d.a.t)), y: yOf(d.a.p) };
+      const b = { x: xOf(fracIndex(candles, d.b.t)), y: yOf(d.b.p) };
+      let hx = Math.max(a.x, b.x);
+      let hy = Math.min(a.y, b.y);
+      if (d.kind === "hline") {
+        hx = w - padR - 14;
+        hy = a.y;
+      } else if (d.kind === "vline") {
+        hx = a.x;
+        hy = priceTop + 14;
+      } else if (d.kind === "pencil" && d.pts && d.pts.length) {
+        const last = d.pts[d.pts.length - 1]!;
+        hx = xOf(fracIndex(candles, last.t));
+        hy = yOf(last.p);
+      }
+      const p = placeBadge(hx, hy);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 7.5, 0, Math.PI * 2);
+      ctx.fillStyle = "#ef5350";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.92)";
+      ctx.lineWidth = 1.15;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(p.x - 3.1, p.y - 3.1);
+      ctx.lineTo(p.x + 3.1, p.y + 3.1);
+      ctx.moveTo(p.x + 3.1, p.y - 3.1);
+      ctx.lineTo(p.x - 3.1, p.y + 3.1);
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 1.7;
+      ctx.lineCap = "round";
+      ctx.stroke();
+      deleteHits.push({ x: p.x, y: p.y, r: 13, id: d.id });
+    }
+    deleteHitsRef.current = deleteHits;
 
     {
       const lastC = candles[candles.length - 1]!;
@@ -634,8 +1104,23 @@ export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
     }
 
     let oscTop = priceBot + 6;
-    if (on.macd !== false) {
-      const macd = macdSeries(closes);
+    const macd = on.macd !== false ? macdSeries(closes) : null;
+    const rsi = on.rsi !== false ? rsiWilder(closes, 14) : null;
+    const readI = hoverRef.current != null && hoverRef.current >= start && hoverRef.current <= end ? hoverRef.current : end;
+
+    const paintOscTag = (y: number, bg: string, fg: string, text: string) => {
+      const yy = Math.min(oscTop + oscH - 8, Math.max(oscTop + 8, y));
+      roundRect(ctx, w - padR + 2, yy - 8, padR - 6, 16, 3);
+      ctx.fillStyle = bg;
+      ctx.fill();
+      ctx.fillStyle = fg;
+      ctx.font = "700 10px ui-sans-serif, system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, w - padR + (padR - 6) / 2 + 2, yy + 0.5);
+    };
+
+    if (macd) {
       let mn = 0;
       let mx = 0;
       for (let i = start; i <= end; i++) {
@@ -688,16 +1173,47 @@ export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
       };
       strokeOsc(macd.macd, "#26C6DA");
       strokeOsc(macd.signal, "#F5C542");
-      ctx.fillStyle = "#8b919c";
-      ctx.font = "10px ui-sans-serif, system-ui, sans-serif";
+      const mLine = lastFiniteAt(macd.macd, readI);
+      const mSig = lastFiniteAt(macd.signal, readI);
+      const mHist = lastFiniteAt(macd.hist, readI);
+      ctx.fillStyle = "rgba(10,16,14,0.82)";
+      ctx.fillRect(padL, oscTop, plotW, 18);
       ctx.textAlign = "left";
-      ctx.textBaseline = "top";
-      ctx.fillText("MACD", padL + 4, oscTop + 3);
+      ctx.textBaseline = "middle";
+      ctx.font = "700 10px ui-sans-serif, system-ui, sans-serif";
+      let lx = padL + 8;
+      const yLeg = oscTop + 9;
+      ctx.fillStyle = "#8b919c";
+      ctx.fillText("MACD 12,26,9", lx, yLeg);
+      lx += ctx.measureText("MACD 12,26,9").width + 16;
+      const stamp = (label: string, value: string, color: string) => {
+        ctx.font = "700 10px ui-sans-serif, system-ui, sans-serif";
+        ctx.fillStyle = "#8b919c";
+        ctx.fillText(label, lx, yLeg);
+        lx += ctx.measureText(label).width + 5;
+        ctx.fillStyle = color;
+        ctx.font = "800 11px ui-sans-serif, system-ui, sans-serif";
+        ctx.fillText(value, lx, yLeg);
+        lx += ctx.measureText(value).width + 14;
+      };
+      stamp("MACD", fmtOsc(mLine), "#26C6DA");
+      stamp("Signal", fmtOsc(mSig), "#F5C542");
+      stamp("Hist", fmtOsc(mHist), mHist >= 0 ? "#26a69a" : "#ef5350");
+      ctx.fillStyle = "#8b919c";
+      ctx.font = "600 9px ui-sans-serif, system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText("0", w - padR + 8, yM(0));
+      if (Number.isFinite(mLine)) paintOscTag(yM(mLine), "rgba(38,198,218,0.95)", "#041016", fmtOsc(mLine));
+      if (Number.isFinite(mSig) && Math.abs(yM(mSig) - yM(mLine)) > 14) {
+        paintOscTag(yM(mSig), "rgba(245,197,66,0.95)", "#1a1404", fmtOsc(mSig));
+      }
+      if (Number.isFinite(mHist)) {
+        paintOscTag(yM(mHist), mHist >= 0 ? "rgba(38,166,154,0.95)" : "rgba(239,83,80,0.95)", "#fff", fmtOsc(mHist));
+      }
       oscTop += oscH + gap;
     }
 
-    if (on.rsi !== false) {
-      const rsi = rsiWilder(closes, 14);
+    if (rsi) {
       const yR = (v: number) => oscTop + (1 - v / 100) * oscH;
       ctx.fillStyle = "rgba(255,255,255,0.03)";
       ctx.fillRect(padL, oscTop, plotW, oscH);
@@ -728,11 +1244,36 @@ export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
         } else ctx.lineTo(x, y);
       }
       ctx.stroke();
-      ctx.fillStyle = "#8b919c";
-      ctx.font = "10px ui-sans-serif, system-ui, sans-serif";
+      const rNow = lastFiniteAt(rsi, readI);
+      const rZone = rNow >= 70 ? "Sobrecompra" : rNow <= 30 ? "Sobreventa" : "Neutro";
+      ctx.fillStyle = "rgba(10,16,14,0.82)";
+      ctx.fillRect(padL, oscTop, plotW, 18);
       ctx.textAlign = "left";
-      ctx.textBaseline = "top";
-      ctx.fillText("RSI", padL + 4, oscTop + 3);
+      ctx.textBaseline = "middle";
+      ctx.font = "700 10px ui-sans-serif, system-ui, sans-serif";
+      const yLegR = oscTop + 9;
+      ctx.fillStyle = "#8b919c";
+      ctx.fillText("RSI 14", padL + 8, yLegR);
+      ctx.font = "800 12px ui-sans-serif, system-ui, sans-serif";
+      ctx.fillStyle = rNow >= 70 ? "#ef5350" : rNow <= 30 ? "#26a69a" : "#ce93d8";
+      ctx.fillText(Number.isFinite(rNow) ? rNow.toFixed(1) : "—", padL + 58, yLegR);
+      ctx.font = "700 10px ui-sans-serif, system-ui, sans-serif";
+      ctx.fillStyle = "#8b919c";
+      ctx.fillText(rZone, padL + 108, yLegR);
+      ctx.fillStyle = "rgba(171,71,188,0.85)";
+      ctx.font = "700 9px ui-sans-serif, system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText("70", w - padR + 8, yR(70));
+      ctx.fillText("50", w - padR + 8, yR(50));
+      ctx.fillText("30", w - padR + 8, yR(30));
+      if (Number.isFinite(rNow)) {
+        paintOscTag(
+          yR(rNow),
+          rNow >= 70 ? "rgba(239,83,80,0.95)" : rNow <= 30 ? "rgba(38,166,154,0.95)" : "rgba(171,71,188,0.95)",
+          "#fff",
+          rNow.toFixed(1),
+        );
+      }
     }
 
     ctx.fillStyle = "#101614";
@@ -792,7 +1333,8 @@ export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
       ctx.strokeStyle = "rgba(232,238,245,0.18)";
       ctx.stroke();
       ctx.fillStyle = "rgba(10,16,14,0.88)";
-      roundRect(ctx, padL + 6, priceTop + 6, 210, 52, 6);
+      const extra = (macd ? 18 : 0) + (rsi ? 18 : 0);
+      roundRect(ctx, padL + 6, priceTop + 6, 268, 52 + extra, 6);
       ctx.fill();
       ctx.fillStyle = "#e8eef5";
       ctx.font = "12px ui-sans-serif, system-ui, sans-serif";
@@ -801,6 +1343,26 @@ export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
       ctx.fillText(fmtTime(c.t, intervalRef.current), padL + 14, priceTop + 12);
       ctx.fillStyle = c.c >= c.o ? "#26a69a" : "#ef5350";
       ctx.fillText(`O ${fmtPx(c.o)}  H ${fmtPx(c.h)}  L ${fmtPx(c.l)}  C ${fmtPx(c.c)}`, padL + 14, priceTop + 32);
+      let ty = priceTop + 50;
+      if (macd) {
+        const ml = lastFiniteAt(macd.macd, hover);
+        const sg = lastFiniteAt(macd.signal, hover);
+        const hs = lastFiniteAt(macd.hist, hover);
+        ctx.fillStyle = "#8b919c";
+        ctx.fillText("MACD", padL + 14, ty);
+        ctx.fillStyle = "#26C6DA";
+        ctx.fillText(fmtOsc(ml), padL + 58, ty);
+        ctx.fillStyle = "#F5C542";
+        ctx.fillText(fmtOsc(sg), padL + 118, ty);
+        ctx.fillStyle = hs >= 0 ? "#26a69a" : "#ef5350";
+        ctx.fillText(fmtOsc(hs), padL + 178, ty);
+        ty += 18;
+      }
+      if (rsi) {
+        const rv = lastFiniteAt(rsi, hover);
+        ctx.fillStyle = "#ce93d8";
+        ctx.fillText(`RSI ${Number.isFinite(rv) ? rv.toFixed(1) : "—"}`, padL + 14, ty);
+      }
     }
   }
 
@@ -885,6 +1447,23 @@ export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
     const end = (e: PointerEvent) => {
       const el = e.currentTarget as HTMLElement;
       if (el.hasPointerCapture?.(e.pointerId)) el.releasePointerCapture(e.pointerId);
+      const draft = draftRef.current;
+      const tool = drawToolRef.current;
+      if (draft && tool !== "cursor" && tool !== "eraser") {
+        const pt = fromEvent(e) ?? draft.b;
+        draft.b = pt;
+        if (draft.kind === "pencil") {
+          if ((draft.pts?.length ?? 0) > 1) {
+            drawingsOf().push(draft);
+            selectedIdRef.current = draft.id;
+          }
+        } else {
+          drawingsOf().push(draft);
+          selectedIdRef.current = draft.id;
+        }
+        draftRef.current = null;
+        paint();
+      }
       dragRef.current = null;
     };
 
@@ -910,7 +1489,137 @@ export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
       paint();
     };
 
-    const onCanvasDown = (e: PointerEvent) => begin("pan", e);
+    const hitDrawingAt = (x: number, y: number) => {
+      const list = drawingsOf();
+      const g = geomRef.current;
+      let best = -1;
+      let dist = 11;
+      for (let idx = 0; idx < list.length; idx++) {
+        const d = list[idx]!;
+        const a = toXy(d.a);
+        const b = toXy(d.b);
+        let dd = distToSeg(x, y, a.x, a.y, b.x, b.y);
+        if (d.kind === "hline") dd = Math.abs(y - a.y);
+        else if (d.kind === "vline") dd = Math.abs(x - a.x);
+        else if (d.kind === "pencil" && d.pts && d.pts.length > 1) dd = distToPoly(x, y, d.pts.map(toXy));
+        else if (d.kind === "rect" || d.kind === "ruler") {
+          const x0 = Math.min(a.x, b.x);
+          const x1 = Math.max(a.x, b.x);
+          const y0 = Math.min(a.y, b.y);
+          const y1 = Math.max(a.y, b.y);
+          const inside = x >= x0 && x <= x1 && y >= y0 && y <= y1;
+          dd = inside
+            ? 0
+            : Math.min(
+                distToSeg(x, y, a.x, a.y, b.x, a.y),
+                distToSeg(x, y, b.x, a.y, b.x, b.y),
+                distToSeg(x, y, b.x, b.y, a.x, b.y),
+                distToSeg(x, y, a.x, b.y, a.x, a.y),
+              );
+        } else if (d.kind === "fib") {
+          const lo = Math.min(d.a.p, d.b.p);
+          const hi = Math.max(d.a.p, d.b.p);
+          const x0 = Math.min(a.x, b.x) - 4;
+          const x1 = Math.max(a.x, b.x) + 84;
+          dd = Infinity;
+          for (const lv of FIB_LEVELS) {
+            const p = hi - (hi - lo) * lv.r;
+            const yy = g.priceTop + (1 - (p - g.minP) / Math.max(1e-12, g.span)) * (g.priceBot - g.priceTop);
+            if (x >= x0 && x <= x1) dd = Math.min(dd, Math.abs(y - yy));
+          }
+        }
+        if (dd < dist) {
+          dist = dd;
+          best = idx;
+        }
+      }
+      return best;
+    };
+
+    const eraseAt = (e: PointerEvent) => {
+      const wrap = wrapRef.current;
+      if (!wrap) return;
+      const rect = wrap.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const list = drawingsOf();
+      const best = hitDrawingAt(x, y);
+      if (best >= 0) {
+        if (selectedIdRef.current === list[best]!.id) selectedIdRef.current = null;
+        list.splice(best, 1);
+      }
+    };
+
+    const onCanvasDown = (e: PointerEvent) => {
+      const tool = drawToolRef.current;
+      downRef.current = { x: e.clientX, y: e.clientY, tool };
+      const wrap = wrapRef.current;
+      if (wrap) {
+        const rect = wrap.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const hits = deleteHitsRef.current;
+        let hitId: string | null = null;
+        let bestD = 99;
+        for (let i = hits.length - 1; i >= 0; i--) {
+          const badge = hits[i]!;
+          const dd = Math.hypot(x - badge.x, y - badge.y);
+          if (dd <= badge.r && dd <= bestD) {
+            bestD = dd;
+            hitId = badge.id;
+          }
+        }
+        if (hitId) {
+          const list = drawingsOf();
+          const i = list.findIndex((d) => d.id === hitId);
+          if (i >= 0) list.splice(i, 1);
+          if (selectedIdRef.current === hitId) selectedIdRef.current = null;
+          paint();
+          return;
+        }
+      }
+      if (tool === "cursor") {
+        if (wrap) {
+          const rect = wrap.getBoundingClientRect();
+          const hit = hitDrawingAt(e.clientX - rect.left, e.clientY - rect.top);
+          if (hit >= 0) {
+            selectedIdRef.current = drawingsOf()[hit]!.id;
+            paint();
+            return;
+          }
+        }
+        selectedIdRef.current = null;
+        begin("pan", e);
+        return;
+      }
+      if (tool === "eraser") {
+        eraseAt(e);
+        paint();
+        return;
+      }
+      const pt = fromEvent(e);
+      if (!pt) return;
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      const color = drawColorRef.current;
+      selectedIdRef.current = null;
+      if (tool === "hline" || tool === "vline") {
+        const row = { id: String(Date.now()), kind: tool, a: pt, b: pt, color };
+        drawingsOf().push(row);
+        selectedIdRef.current = row.id;
+        draftRef.current = null;
+        paint();
+        return;
+      }
+      draftRef.current = {
+        id: String(Date.now()),
+        kind: tool,
+        a: pt,
+        b: pt,
+        pts: tool === "pencil" ? [pt] : undefined,
+        color,
+      };
+      paint();
+    };
     const onYDown = (e: PointerEvent) => {
       e.stopPropagation();
       begin("zoomY", e);
@@ -920,6 +1629,28 @@ export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
       begin("zoomX", e);
     };
     const onCanvasMove = (e: PointerEvent) => {
+      const draft = draftRef.current;
+      if (draft) {
+        const pt = fromEvent(e);
+        if (pt) {
+          draft.b = pt;
+          if (draft.kind === "pencil") {
+            const last = draft.pts?.[draft.pts.length - 1];
+            if (last) {
+              const A = toXy(last);
+              const B = toXy(pt);
+              if (Math.hypot(A.x - B.x, A.y - B.y) >= 2.5) (draft.pts ??= []).push(pt);
+            } else (draft.pts ??= []).push(pt);
+          }
+          paint();
+        }
+        return;
+      }
+      if (drawToolRef.current === "eraser" && downRef.current?.tool === "eraser") {
+        eraseAt(e);
+        paint();
+        return;
+      }
       const wrap = wrapRef.current;
       if (wrap && !dragRef.current) {
         const rect = wrap.getBoundingClientRect();
@@ -931,6 +1662,9 @@ export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
         const i = start + Math.floor(((x - g.padL) / plotW) * count);
         hoverRef.current = Math.max(start, Math.min(end, i));
         paint();
+        const y = e.clientY - rect.top;
+        const overX = deleteHitsRef.current.some((b) => Math.hypot(x - b.x, y - b.y) <= b.r);
+        if (overX && canvasRef.current) canvasRef.current.style.cursor = "pointer";
       }
       move(e);
     };
@@ -955,6 +1689,28 @@ export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
       hoverRef.current = null;
       paint();
     };
+    const onEsc = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      const typing =
+        t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
+      if (e.key === "Escape") {
+        draftRef.current = null;
+        selectedIdRef.current = null;
+        paint();
+        return;
+      }
+      if (typing) return;
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      e.preventDefault();
+      const list = drawingsOf();
+      const sel = selectedIdRef.current;
+      const idx = sel ? list.findIndex((d) => d.id === sel) : -1;
+      if (idx >= 0) list.splice(idx, 1);
+      else list.pop();
+      selectedIdRef.current = null;
+      draftRef.current = null;
+      paint();
+    };
 
     canvas.addEventListener("pointerdown", onCanvasDown);
     canvas.addEventListener("pointermove", onCanvasMove);
@@ -962,6 +1718,7 @@ export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
     canvas.addEventListener("pointercancel", end);
     canvas.addEventListener("wheel", onCanvasWheel, { passive: false });
     canvas.addEventListener("pointerleave", onLeave);
+    window.addEventListener("keydown", onEsc);
     axisY.addEventListener("pointerdown", onYDown);
     axisY.addEventListener("pointermove", move);
     axisY.addEventListener("pointerup", end);
@@ -981,6 +1738,7 @@ export function MercadosNativeChart({ binance, interval, studyOn }: Props) {
       canvas.removeEventListener("pointercancel", end);
       canvas.removeEventListener("wheel", onCanvasWheel);
       canvas.removeEventListener("pointerleave", onLeave);
+      window.removeEventListener("keydown", onEsc);
       axisY.removeEventListener("pointerdown", onYDown);
       axisY.removeEventListener("pointermove", move);
       axisY.removeEventListener("pointerup", end);

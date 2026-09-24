@@ -132,6 +132,20 @@ html:has(.tv-markets-page) #root {
   box-shadow: inset 0 -1px 0 rgba(110, 231, 183, 0.18);
 }
 
+.tv-markets-hud__cell--action.is-buy strong,
+.tv-markets-hud__cell--action.is-buy em {
+  color: #26a69a;
+}
+
+.tv-markets-hud__cell--action.is-sell strong,
+.tv-markets-hud__cell--action.is-sell em {
+  color: #ef5350;
+}
+
+.tv-markets-hud__cell--action.is-wait strong {
+  color: #f5c542;
+}
+
 .tv-markets-hud__cell.is-down {
   box-shadow: inset 0 -1px 0 rgba(252, 165, 165, 0.16);
 }
@@ -500,10 +514,116 @@ body > .tv-markets-tape.hrs-card,
   z-index: 40;
   display: flex;
   align-items: center;
-  min-height: 52px;
-  padding: 6px 10px 6px 12px;
+  min-height: 56px;
+  padding: 4px 8px 4px 10px;
   border-bottom: 1px solid var(--tv-line);
   background: #0a100e;
+  gap: 2px;
+}
+
+.tv-markets-pairstats {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #1a1a1a #050505;
+}
+
+.tv-markets-pairstats::-webkit-scrollbar {
+  height: 6px;
+}
+
+.tv-markets-pairstats::-webkit-scrollbar-track {
+  background: #050505;
+}
+
+.tv-markets-pairstats::-webkit-scrollbar-thumb {
+  background: #1a1a1a;
+  border-radius: 6px;
+}
+
+.tv-markets-pairstats__cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.08rem;
+  padding: 2px 12px;
+  border-left: 1px solid rgba(232, 238, 245, 0.08);
+  white-space: nowrap;
+  min-width: max-content;
+}
+
+.tv-markets-pairstats__cell span {
+  font-size: 0.62rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(232, 238, 245, 0.42);
+  line-height: 1;
+}
+
+.tv-markets-pairstats__cell strong {
+  font-size: 0.86rem;
+  font-weight: 730;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  color: #e8eef5;
+  line-height: 1.2;
+}
+
+.tv-markets-pairstats__cell em {
+  font-style: normal;
+  font-size: 0.68rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgba(232, 238, 245, 0.5);
+}
+
+.tv-markets-pairstats__cell--px strong {
+  font-size: 1.02rem;
+}
+
+.tv-markets-pairstats__cell.is-up em,
+.tv-markets-pairstats__cell.is-up strong {
+  color: #26a69a;
+}
+
+.tv-markets-pairstats__cell.is-down em,
+.tv-markets-pairstats__cell.is-down strong {
+  color: #ef5350;
+}
+
+.tv-markets-pairstats__sep {
+  color: rgba(232, 238, 245, 0.35);
+  font-weight: 500;
+}
+
+.tv-markets-pairstats__cell--range {
+  min-width: 140px;
+}
+
+.tv-markets-pairstats__track {
+  position: relative;
+  height: 4px;
+  margin: 4px 0 2px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #ef5350 0%, #f5c542 48%, #26a69a 100%);
+  opacity: 0.85;
+}
+
+.tv-markets-pairstats__track i {
+  position: absolute;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(10, 16, 14, 0.9);
+  transform: translateY(-50%);
 }
 
 .tv-markets-pair {
@@ -784,6 +904,77 @@ body > .tv-markets-tape.hrs-card,
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   pointer-events: auto;
   overflow: visible;
+}
+
+.tv-markets-dock__sep {
+  display: block;
+  flex: 0 0 auto;
+  height: 1px;
+  margin: 6px 10px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.tv-markets-dock__tool {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: #d1d4dc;
+  cursor: pointer;
+  width: 100%;
+  min-height: 30px;
+  padding: 5px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tv-markets-dock__tool:hover,
+.tv-markets-dock__tool.is-on {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.tv-markets-dock__tool.is-on {
+  color: #f5c542;
+}
+
+.tv-markets-dock__colors {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px 4px;
+  padding: 6px 9px 4px;
+  justify-items: center;
+}
+
+.tv-markets-dock__swatch {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  padding: 0;
+  cursor: pointer;
+}
+
+.tv-markets-dock__swatch.is-on {
+  box-shadow: 0 0 0 2px #131722, 0 0 0 3.5px #fff;
+}
+
+.tv-markets-dock__swatch-custom {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+  margin-top: 2px;
+  cursor: pointer;
+}
+
+.tv-markets-dock__swatch-custom input {
+  width: 22px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
 }
 
 .tv-markets-dock__btn,

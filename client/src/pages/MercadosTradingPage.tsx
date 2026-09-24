@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Navigate } from "react-router-dom";
-import { MercadosNativeChart } from "../components/MercadosNativeChart";
+import { MercadosNativeChart, type ChartDrawTool } from "../components/MercadosNativeChart";
+import { DRAW_COLORS } from "../lib/mercadosDrawings";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
 import { getBtcTradeSignal, type BtcTradeSignal } from "../lib/api";
@@ -26,13 +27,78 @@ const TAPE_LOGO = (slug: string) =>
 
 const TAPE_HOSTS = ["https://data-api.binance.vision", "https://api.binance.com", "https://api.binance.us"];
 
-type TapeQuote = { last: number; changePct: number };
+type TapeQuote = {
+  last: number;
+  change: number;
+  changePct: number;
+  high: number;
+  low: number;
+  open: number;
+  volume: number;
+  quoteVolume: number;
+  vwap: number;
+  trades: number;
+  bid: number;
+  ask: number;
+};
 
 function formatTapePrice(n: number): string {
   if (!Number.isFinite(n) || n <= 0) return "—";
   if (n >= 1000) return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   if (n >= 1) return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
   return n.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 6 });
+}
+
+function compactQty(n: number): string {
+  if (!Number.isFinite(n) || n < 0) return "—";
+  if (n >= 1e9) return `${(n / 1e9).toFixed(2)}B`;
+  if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
+  if (n >= 1e3) return `${(n / 1e3).toFixed(2)}K`;
+  if (n >= 100) return n.toFixed(1);
+  return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+}
+
+function mergeTapeQuote(prev: TapeQuote | undefined, next: TapeQuote): TapeQuote {
+  const out: TapeQuote = prev
+    ? { ...prev }
+    : {
+        last: NaN,
+        change: NaN,
+        changePct: NaN,
+        high: NaN,
+        low: NaN,
+        open: NaN,
+        volume: NaN,
+        quoteVolume: NaN,
+        vwap: NaN,
+        trades: NaN,
+        bid: NaN,
+        ask: NaN,
+      };
+  (Object.keys(next) as (keyof TapeQuote)[]).forEach((k) => {
+    const v = next[k];
+    if (typeof v === "number" && Number.isFinite(v)) out[k] = v;
+  });
+  return out;
+}
+
+function parseTickerRow(o: Record<string, unknown>): TapeQuote | null {
+  const last = Number(o.lastPrice ?? o.c);
+  if (!Number.isFinite(last) || last <= 0) return null;
+  return {
+    last,
+    change: Number(o.priceChange ?? o.p),
+    changePct: Number(o.priceChangePercent ?? o.P),
+    high: Number(o.highPrice ?? o.h),
+    low: Number(o.lowPrice ?? o.l),
+    open: Number(o.openPrice ?? o.o),
+    volume: Number(o.volume ?? o.v),
+    quoteVolume: Number(o.quoteVolume ?? o.q),
+    vwap: Number(o.weightedAvgPrice ?? o.w),
+    trades: Number(o.count ?? o.n),
+    bid: Number(o.bidPrice ?? o.b),
+    ask: Number(o.askPrice ?? o.a),
+  };
 }
 
 async function fetchTapeQuotes(): Promise<Record<string, TapeQuote>> {
@@ -47,9 +113,10 @@ async function fetchTapeQuotes(): Promise<Record<string, TapeQuote>> {
       const out: Record<string, TapeQuote> = {};
       for (const row of raw) {
         if (!row || typeof row !== "object") continue;
-        const o = row as { symbol?: string; lastPrice?: string; priceChangePercent?: string };
-        if (!o.symbol) continue;
-        out[o.symbol] = { last: Number(o.lastPrice), changePct: Number(o.priceChangePercent) };
+        const o = row as Record<string, unknown>;
+        if (typeof o.symbol !== "string") continue;
+        const q = parseTickerRow(o);
+        if (q) out[o.symbol] = q;
       }
       return out;
     } catch (e) {
@@ -77,10 +144,12 @@ const CHART_STUDIES = [
   { key: "supertrend", label: "Supertrend", hint: "Sesgo y stop", group: "Tendencia" },
   { key: "psar", label: "Parabolic SAR", hint: "Puntos 0.02 / 0.02 / 0.2", group: "Tendencia" },
   { key: "zigzag", label: "ZigZag", hint: "Swings high/low", group: "Tendencia" },
+  { key: "ichimoku", label: "Nube de Ichimoku", hint: "Tenkan 9 · Kijun 26 · Senkou 52", group: "Tendencia" },
+  { key: "bollinger", label: "Bandas de Bollinger", hint: "SMA 20 · 2σ", group: "Volumen" },
   { key: "macd", label: "MACD", hint: "Histograma 12/26/9", group: "Momentum" },
   { key: "rsi", label: "RSI", hint: "Sobrecompra / venta", group: "Momentum" },
   { key: "jerry", label: "Jerry Buy Sell", hint: "EARLY · BUY · SELL en cada vela", group: "Señales" },
-  { key: "heatmap", label: "Mapa de calor", hint: "Volumen por precio en la vista actual", group: "Volumen" },
+  { key: "heatmap", label: "Mapa de calor", hint: "Volumen en cuerpo/mechas de cada vela", group: "Volumen" },
 ] as const;
 
 function StudyGlyph({ kind }: { kind: (typeof CHART_STUDIES)[number]["key"] }) {
@@ -122,6 +191,24 @@ function StudyGlyph({ kind }: { kind: (typeof CHART_STUDIES)[number]["key"] }) {
         <circle cx="10" cy="8.5" r="1.35" fill="#F5C542" />
         <circle cx="13" cy="6" r="1.35" fill="#F5C542" />
         <circle cx="15.5" cy="4.2" r="1.2" fill="#26C6DA" />
+      </svg>
+    );
+  }
+  if (kind === "ichimoku") {
+    return (
+      <svg {...common}>
+        <path d="M2 12 L6 9 L10 11 L16 6 L16 14 L2 14 Z" fill="rgba(38,166,154,0.35)" />
+        <path d="M2 8 L7 11 L11 7 L16 10 L16 14 L2 14 Z" fill="rgba(239,83,80,0.28)" />
+        <path d="M2 10c4-4 6 2 8 0s4-4 6-1" stroke="#4FC3F7" strokeWidth="1.2" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (kind === "bollinger") {
+    return (
+      <svg {...common}>
+        <path d="M2 5c4 2 6-2 8 0s4 3 6 0" stroke="#5b9cf6" strokeWidth="1.3" strokeLinecap="round" />
+        <path d="M2 9c4 1.5 6-1 8 0s4 2 6 0" stroke="#5b9cf6" strokeWidth="1.2" strokeDasharray="2 2" strokeLinecap="round" />
+        <path d="M2 13c4 2 6-2 8 0s4 3 6 0" stroke="#5b9cf6" strokeWidth="1.3" strokeLinecap="round" />
       </svg>
     );
   }
@@ -198,6 +285,96 @@ function biasCopy(bias: BtcTradeSignal["bias"]): { title: string; kicker: string
   return { title: "ESPERAR", kicker: "Sin alineación suficiente" };
 }
 
+const DRAW_TOOLS: Array<{ id: ChartDrawTool; title: string }> = [
+  { id: "cursor", title: "Cursor" },
+  { id: "trend", title: "Línea de tendencia" },
+  { id: "hline", title: "Línea horizontal" },
+  { id: "vline", title: "Línea vertical" },
+  { id: "ray", title: "Rayo" },
+  { id: "rect", title: "Rectángulo" },
+  { id: "fib", title: "Fibonacci" },
+  { id: "ruler", title: "Regla (% subida / bajada)" },
+  { id: "pencil", title: "Lápiz" },
+  { id: "eraser", title: "Borrar dibujo (clic sobre la herramienta)" },
+];
+
+function DrawGlyph({ kind }: { kind: ChartDrawTool }) {
+  const p = { width: 18, height: 18, viewBox: "0 0 18 18", fill: "none", "aria-hidden": true as const };
+  if (kind === "cursor") {
+    return (
+      <svg {...p}>
+        <path d="M4 3 L4 14 L7.2 11.2 L9.2 16 L11 15.2 L9 10.4 L13.5 10.4 Z" fill="currentColor" />
+      </svg>
+    );
+  }
+  if (kind === "trend") {
+    return (
+      <svg {...p}>
+        <path d="M3 14 L15 4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+        <circle cx="3" cy="14" r="1.4" fill="currentColor" />
+        <circle cx="15" cy="4" r="1.4" fill="currentColor" />
+      </svg>
+    );
+  }
+  if (kind === "hline") {
+    return (
+      <svg {...p}>
+        <path d="M2 9 H16" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (kind === "vline") {
+    return (
+      <svg {...p}>
+        <path d="M9 2 V16" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (kind === "ray") {
+    return (
+      <svg {...p}>
+        <path d="M3 13 L16 5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+        <circle cx="3" cy="13" r="1.4" fill="currentColor" />
+      </svg>
+    );
+  }
+  if (kind === "rect") {
+    return (
+      <svg {...p}>
+        <rect x="3.5" y="4.5" width="11" height="9" rx="1.2" stroke="currentColor" strokeWidth="1.5" />
+      </svg>
+    );
+  }
+  if (kind === "fib") {
+    return (
+      <svg {...p}>
+        <path d="M3 4 H15 M3 7.2 H15 M3 10.5 H15 M3 14 H15" stroke="currentColor" strokeWidth="1.3" />
+      </svg>
+    );
+  }
+  if (kind === "pencil") {
+    return (
+      <svg {...p}>
+        <path d="M11.5 3.2 L14.8 6.5 L7 14.3 H3.7 V11 Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (kind === "ruler") {
+    return (
+      <svg {...p}>
+        <rect x="3.2" y="4.4" width="11.6" height="9.2" rx="1.2" stroke="currentColor" strokeWidth="1.4" strokeDasharray="2.2 1.6" />
+        <path d="M6.2 13.6 L11.8 4.4" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
+        <path d="M4.8 7.4 h2.4 M4.8 10.6 h3.8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...p}>
+      <path d="M5 5 L13 13 M13 5 L5 13" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function MercadosTradingPage() {
   const { user } = useAuth();
   const canOpen = canUserAccessNavPath(user, PATH);
@@ -212,6 +389,9 @@ export function MercadosTradingPage() {
   const [studyOn, setStudyOn] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(CHART_STUDIES.map((s) => [s.key, true]))
   );
+  const [drawTool, setDrawTool] = useState<ChartDrawTool>("cursor");
+  const [drawColor, setDrawColor] = useState(DRAW_COLORS[0]!);
+  const [drawPulse, setDrawPulse] = useState<{ n: number; op: "undo" | "clear" }>({ n: 0, op: "undo" });
   const dockRef = useRef<HTMLDivElement>(null);
   const pairRef = useRef<HTMLDivElement>(null);
   const active = SYMBOLS.find((s) => s.id === symbol) ?? SYMBOLS[0];
@@ -257,12 +437,34 @@ export function MercadosTradingPage() {
   }, []);
 
   useEffect(() => {
+    const stream = `${active.binance.toLowerCase()}@ticker`;
+    const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${stream}`);
+    ws.onmessage = (ev) => {
+      try {
+        const raw: unknown = JSON.parse(String(ev.data));
+        if (!raw || typeof raw !== "object") return;
+        const q = parseTickerRow(raw as Record<string, unknown>);
+        if (!q) return;
+        setTapeQuotes((prev) => ({
+          ...prev,
+          [active.binance]: mergeTapeQuote(prev[active.binance], q),
+        }));
+      } catch {
+        /* ticker WS opcional */
+      }
+    };
+    return () => {
+      ws.close();
+    };
+  }, [active.binance]);
+
+  useEffect(() => {
     let dead = false;
     const load = async () => {
       try {
         const r = await getBtcTradeSignal({
           symbol: active.binance,
-          interval: interval === "LIVE" ? "1" : interval,
+          interval: interval === "LIVE" ? "1s" : interval,
         });
         if (dead) return;
         setSignal(r.signal);
@@ -341,6 +543,13 @@ export function MercadosTradingPage() {
             <span>{active.label}/{active.quote}</span>
             <strong>{signal ? usd(signal.price) : "—"}</strong>
           </div>
+          <div className={`tv-markets-hud__cell tv-markets-hud__cell--action is-${signal?.bias ?? "wait"}`}>
+            <span>Qué hacer</span>
+            <strong>
+              {signal ? (signal.bias === "buy" ? "COMPRAR" : signal.bias === "sell" ? "VENDER" : "ESPERAR") : "—"}
+            </strong>
+            <em>{signal ? `${signal.buyVotes} vs ${signal.sellVotes} · ${signal.confidence}%` : ""}</em>
+          </div>
           <div className={`tv-markets-hud__cell${signal && signal.price >= signal.ema25 ? " is-up" : " is-down"}`}>
             <span>EMA 25</span>
             <strong>{signal ? fmtPx(signal.ema25) : "—"}</strong>
@@ -378,16 +587,53 @@ export function MercadosTradingPage() {
             </em>
           </div>
           <div className={`tv-markets-hud__cell${signal && signal.macdHist >= 0 ? " is-up" : " is-down"}`}>
-            <span>MACD hist</span>
-            <strong>{signal ? `${signal.macdHist >= 0 ? "+" : ""}${signal.macdHist.toFixed(2)}` : "—"}</strong>
-            <em>{signal ? (signal.macdHist >= 0 ? "Momentum +" : "Momentum −") : ""}</em>
+            <span>MACD 12/26/9</span>
+            <strong>
+              {signal
+                ? `${signal.macdHist >= 0 ? "+" : ""}${signal.macdHist.toFixed(2)}`
+                : "—"}
+            </strong>
+            <em>
+              {signal
+                ? `MACD ${signal.macd.toFixed(2)} · Sig ${signal.macdSignal.toFixed(2)}`
+                : ""}
+            </em>
           </div>
-          <div className="tv-markets-hud__cell">
+          <div className={`tv-markets-hud__cell${signal?.zigzagLast.kind === "low" ? " is-up" : " is-down"}`}>
             <span>ZigZag</span>
             <strong>
               {signal ? (signal.zigzagLast.kind === "low" ? "LOW" : "HIGH") : "—"}
             </strong>
             <em>{signal ? fmtPx(signal.zigzagLast.price) : ""}</em>
+          </div>
+          <div
+            className={`tv-markets-hud__cell${
+              signal?.ichiCloud === "above" ? " is-up" : signal?.ichiCloud === "below" ? " is-down" : ""
+            }`}
+          >
+            <span>Ichimoku</span>
+            <strong>
+              {signal?.ichiCloud === "above" ? "SOBRE NUBE" : signal?.ichiCloud === "below" ? "BAJO NUBE" : signal ? "EN NUBE" : "—"}
+            </strong>
+            <em>
+              {signal && Number.isFinite(signal.ichiTenkan ?? NaN)
+                ? `T ${fmtPx(signal.ichiTenkan!)} · K ${fmtPx(signal.ichiKijun ?? NaN)}`
+                : ""}
+            </em>
+          </div>
+          <div
+            className={`tv-markets-hud__cell${
+              signal && (signal.bbPctB ?? 0.5) >= 0.5 ? " is-up" : " is-down"
+            }`}
+          >
+            <span>Bollinger</span>
+            <strong>{signal && Number.isFinite(signal.bbPctB ?? NaN) ? `%B ${(signal.bbPctB! * 100).toFixed(0)}` : "—"}</strong>
+            <em>{signal && Number.isFinite(signal.bbMid ?? NaN) ? `Media ${fmtPx(signal.bbMid!)}` : ""}</em>
+          </div>
+          <div className={`tv-markets-hud__cell${signal && (signal.volRatio ?? 1) >= 1.15 ? " is-up" : ""}`}>
+            <span>Volumen</span>
+            <strong>{signal && Number.isFinite(signal.volRatio ?? NaN) ? `${signal.volRatio!.toFixed(2)}×` : "—"}</strong>
+            <em>{signal && (signal.volRatio ?? 0) >= 1.15 ? "Confirma" : signal ? "Flojo" : ""}</em>
           </div>
         </section>
 
@@ -413,6 +659,71 @@ export function MercadosTradingPage() {
                   <path d="M2.2 4.2 L6 8 L9.8 4.2" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
+              {(() => {
+                const q = tapeQuotes[active.binance];
+                const up = (q?.changePct ?? 0) >= 0;
+                const range = q && q.high > q.low ? q.high - q.low : 0;
+                const pos = q && range > 0 ? Math.max(0, Math.min(1, (q.last - q.low) / range)) : 0.5;
+                const ampPct = q && q.low > 0 ? ((q.high - q.low) / q.low) * 100 : NaN;
+                const spread = q && q.ask > 0 && q.bid > 0 ? q.ask - q.bid : NaN;
+                const mid = q && q.ask > 0 && q.bid > 0 ? (q.ask + q.bid) / 2 : NaN;
+                const spreadBps =
+                  Number.isFinite(spread) && Number.isFinite(mid) && mid > 0 ? (spread / mid) * 10000 : NaN;
+                return (
+                  <div className="tv-markets-pairstats" aria-label="Datos de mercado 24h">
+                    <div className={`tv-markets-pairstats__cell tv-markets-pairstats__cell--px${up ? " is-up" : " is-down"}`}>
+                      <span>Último</span>
+                      <strong>{formatTapePrice(q?.last ?? 0)}</strong>
+                      <em>
+                        {q && Number.isFinite(q.changePct)
+                          ? `${up ? "+" : ""}${formatTapePrice(Math.abs(q.change))}  ${up ? "+" : ""}${q.changePct.toFixed(2)}%`
+                          : "—"}
+                      </em>
+                    </div>
+                    <div className="tv-markets-pairstats__cell">
+                      <span>24h Máx</span>
+                      <strong>{formatTapePrice(q?.high ?? 0)}</strong>
+                    </div>
+                    <div className="tv-markets-pairstats__cell">
+                      <span>24h Mín</span>
+                      <strong>{formatTapePrice(q?.low ?? 0)}</strong>
+                    </div>
+                    <div className="tv-markets-pairstats__cell tv-markets-pairstats__cell--range">
+                      <span>Rango 24h {Number.isFinite(ampPct) ? `${ampPct.toFixed(2)}%` : ""}</span>
+                      <div className="tv-markets-pairstats__track" title="Posición del precio en el rango 24h">
+                        <i style={{ left: `${pos * 100}%` }} />
+                      </div>
+                      <em>
+                        {formatTapePrice(q?.low ?? 0)} → {formatTapePrice(q?.high ?? 0)}
+                      </em>
+                    </div>
+                    <div className="tv-markets-pairstats__cell">
+                      <span>Vol 24h ({active.label})</span>
+                      <strong>{compactQty(q?.volume ?? NaN)}</strong>
+                    </div>
+                    <div className="tv-markets-pairstats__cell">
+                      <span>Vol 24h ({active.quote})</span>
+                      <strong>{compactQty(q?.quoteVolume ?? NaN)}</strong>
+                    </div>
+                    <div className="tv-markets-pairstats__cell">
+                      <span>VWAP 24h</span>
+                      <strong>{formatTapePrice(q?.vwap ?? 0)}</strong>
+                    </div>
+                    <div className="tv-markets-pairstats__cell">
+                      <span>Bid / Ask</span>
+                      <strong>
+                        {formatTapePrice(q?.bid ?? 0)} <span className="tv-markets-pairstats__sep">/</span>{" "}
+                        {formatTapePrice(q?.ask ?? 0)}
+                      </strong>
+                      <em>{Number.isFinite(spreadBps) ? `Spread ${spreadBps.toFixed(2)} bps` : "—"}</em>
+                    </div>
+                    <div className="tv-markets-pairstats__cell">
+                      <span>Trades 24h</span>
+                      <strong>{compactQty(q?.trades ?? NaN)}</strong>
+                    </div>
+                  </div>
+                );
+              })()}
               {pairOpen ? (
                 <div className="tv-markets-pair__menu" role="listbox" aria-label="Pares">
                   {SYMBOLS.map((s) => {
@@ -450,7 +761,14 @@ export function MercadosTradingPage() {
               ) : null}
             </div>
             <div className="tv-markets-chart__stage">
-            <MercadosNativeChart binance={active.binance} interval={interval} studyOn={studyOn} />
+            <MercadosNativeChart
+              binance={active.binance}
+              interval={interval}
+              studyOn={studyOn}
+              drawTool={drawTool}
+              drawColor={drawColor}
+              drawPulse={drawPulse}
+            />
             {pairOpen || indOpen ? (
               <button
                 type="button"
@@ -480,6 +798,65 @@ export function MercadosTradingPage() {
                   )}
                 </button>
               ))}
+              <span className="tv-markets-dock__sep" aria-hidden />
+              {DRAW_TOOLS.map((tool) => (
+                <button
+                  key={tool.id}
+                  type="button"
+                  className={`tv-markets-dock__tool${drawTool === tool.id ? " is-on" : ""}`}
+                  title={tool.title}
+                  aria-label={tool.title}
+                  aria-pressed={drawTool === tool.id}
+                  onClick={() => setDrawTool(tool.id)}
+                >
+                  <DrawGlyph kind={tool.id} />
+                </button>
+              ))}
+              <div className="tv-markets-dock__colors" role="group" aria-label="Color de dibujo">
+                {DRAW_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    className={`tv-markets-dock__swatch${drawColor.toLowerCase() === c.toLowerCase() ? " is-on" : ""}`}
+                    style={{ background: c }}
+                    title={`Color ${c}`}
+                    aria-label={`Color ${c}`}
+                    aria-pressed={drawColor.toLowerCase() === c.toLowerCase()}
+                    onClick={() => setDrawColor(c)}
+                  />
+                ))}
+                <label className="tv-markets-dock__swatch-custom" title="Color personalizado">
+                  <input
+                    type="color"
+                    value={drawColor}
+                    aria-label="Color personalizado"
+                    onChange={(e) => setDrawColor(e.target.value)}
+                  />
+                </label>
+              </div>
+              <button
+                type="button"
+                className="tv-markets-dock__tool"
+                title="Deshacer / eliminar dibujo seleccionado"
+                aria-label="Deshacer / eliminar dibujo seleccionado"
+                onClick={() => setDrawPulse((s) => ({ n: s.n + 1, op: "undo" }))}
+              >
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+                  <path d="M5 7 H12.2 A3.2 3.2 0 0 1 12.2 13.4 H8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  <path d="M5 7 L7.6 4.6 M5 7 L7.6 9.4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="tv-markets-dock__tool"
+                title="Borrar todos los dibujos"
+                aria-label="Borrar todos los dibujos"
+                onClick={() => setDrawPulse((s) => ({ n: s.n + 1, op: "clear" }))}
+              >
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+                  <path d="M4 5.5 H14 M7 5.5 V4.2 H11 V5.5 M6 5.5 L6.6 14 H11.4 L12 5.5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                </svg>
+              </button>
               <span className="tv-markets-dock__sep" aria-hidden />
               <div className="tv-markets-dock__ind-wrap">
               <button
@@ -631,7 +1008,8 @@ export function MercadosTradingPage() {
                 </div>
                 <div className="tv-desk-level">
                   <span>Plan</span>
-                  <strong>Sin setup</strong>
+                  <strong>Esperar</strong>
+                  <em>{signal.guide ?? "Sin setup"}</em>
                 </div>
               </div>
             ) : null}
