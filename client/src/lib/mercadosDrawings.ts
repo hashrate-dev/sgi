@@ -34,9 +34,12 @@ export type ChartDrawing = {
   b: ChartPoint;
   pts?: ChartPoint[];
   color: string;
+  width?: number;
+  dash?: LineDash;
 };
 
 export type EmaKey = "ema25" | "ema50" | "ema200";
+export type StudyLineKey = EmaKey | "bb";
 export type LineDash = "solid" | "dash" | "dot";
 export type EmaLineStyle = { color: string; width: number; dash: LineDash };
 
@@ -46,10 +49,33 @@ export const DEFAULT_EMA_STYLE: Record<EmaKey, EmaLineStyle> = {
   ema200: { color: "#EF5350", width: 1.6, dash: "solid" },
 };
 
+export const DEFAULT_STUDY_STYLE: Record<StudyLineKey, EmaLineStyle> = {
+  ...DEFAULT_EMA_STYLE,
+  bb: { color: "#5b9cf6", width: 1.25, dash: "dash" },
+};
+
 export const EMA_LABEL: Record<EmaKey, string> = {
   ema25: "EMA 25",
   ema50: "EMA 50",
   ema200: "EMA 200",
+};
+
+export const STUDY_LINE_LABEL: Record<StudyLineKey, string> = {
+  ema25: "EMA 25",
+  ema50: "EMA 50",
+  ema200: "EMA 200",
+  bb: "Bandas de Bollinger",
+};
+
+export const DRAWING_KIND_LABEL: Record<ChartDrawing["kind"], string> = {
+  trend: "Línea de tendencia",
+  hline: "Línea horizontal",
+  vline: "Línea vertical",
+  ray: "Rayo",
+  rect: "Rectángulo",
+  fib: "Fibonacci",
+  ruler: "Regla",
+  pencil: "Lápiz",
 };
 
 export function dashArray(dash: LineDash): number[] {

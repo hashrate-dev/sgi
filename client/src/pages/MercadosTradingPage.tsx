@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Navigate } from "react-router-dom";
 import { MercadosNativeChart, type ChartDrawTool } from "../components/MercadosNativeChart";
 import { DRAW_COLORS } from "../lib/mercadosDrawings";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
-import { getBtcTradeSignal, type BtcTradeSignal } from "../lib/api";
+import { getBtcTradeSignal, type BtcTradeCheck, type BtcTradeSignal } from "../lib/api";
 import { sgiHome } from "../lib/marketplacePaths.js";
 import { canUserAccessNavPath } from "../lib/sgiNavigation";
 import "../styles/facturacion.css";
@@ -279,6 +279,183 @@ function rangePct(price: number, lo: number, hi: number): number {
   return Math.min(100, Math.max(0, ((price - lo) / (hi - lo)) * 100));
 }
 
+function BiasGlyph({ bias, size = 22 }: { bias?: "buy" | "sell" | "wait"; size?: number }) {
+  const p = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", "aria-hidden": true as const };
+  if (bias === "buy") {
+    return (
+      <svg {...p}>
+        <circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.16" />
+        <path d="M12 5.5 L19 14.2 H15.1 V18.5 H8.9 V14.2 H5 Z" fill="currentColor" />
+      </svg>
+    );
+  }
+  if (bias === "sell") {
+    return (
+      <svg {...p}>
+        <circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.16" />
+        <path d="M12 18.5 L19 9.8 H15.1 V5.5 H8.9 V9.8 H5 Z" fill="currentColor" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...p}>
+      <circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.16" />
+      <rect x="8" y="7.2" width="2.6" height="9.6" rx="0.7" fill="currentColor" />
+      <rect x="13.4" y="7.2" width="2.6" height="9.6" rx="0.7" fill="currentColor" />
+    </svg>
+  );
+}
+
+function HudLab({ icon, children }: { icon: ReactNode; children: ReactNode }) {
+  return (
+    <>
+      <span className="tv-markets-hud__lab">{children}</span>
+      <span className="tv-markets-hud__ico" aria-hidden>
+        {icon}
+      </span>
+    </>
+  );
+}
+
+function HudTip({ check, title, detail }: { check?: BtcTradeCheck; title?: string; detail?: string }) {
+  const anchorRef = useRef<HTMLSpanElement>(null);
+  const tipRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [box, setBox] = useState<CSSProperties>({});
+  const label = check?.label ?? title;
+  const body = check?.detail ?? detail;
+  const bias = check?.bias ?? "wait";
+  const tag = bias === "buy" ? "ALCISTA" : bias === "sell" ? "BAJISTA" : "NEUTRO";
+  const tipId = check?.id ?? title ?? "hud";
+
+  useLayoutEffect(() => {
+    const cell = anchorRef.current?.parentElement;
+    if (!cell) return;
+    cell.classList.add("is-tip");
+    cell.style.cursor = "pointer";
+    const place = () => {
+      const r = cell.getBoundingClientRect();
+      const width = Math.min(280, Math.max(200, window.innerWidth - 16));
+      let left = r.left + r.width / 2 - width / 2;
+      left = Math.max(8, Math.min(left, window.innerWidth - width - 8));
+      setBox({
+        position: "fixed",
+        top: r.bottom + 8,
+        left,
+        width,
+        zIndex: 5000,
+      });
+    };
+    const onCellClick = (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      place();
+      setOpen((was) => {
+        const next = !was;
+        if (next) window.dispatchEvent(new CustomEvent("tv-hud-tip-open", { detail: tipId }));
+        return next;
+      });
+    };
+    const onPeerOpen = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      if (id !== tipId) setOpen(false);
+    };
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as Node | null;
+      if (!t) return;
+      if (cell.contains(t)) return;
+      if (tipRef.current?.contains(t)) return;
+      setOpen(false);
+    };
+    cell.addEventListener("click", onCellClick);
+    window.addEventListener("tv-hud-tip-open", onPeerOpen);
+    document.addEventListener("mousedown", onDoc);
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      cell.classList.remove("is-tip");
+      cell.removeEventListener("click", onCellClick);
+      window.removeEventListener("tv-hud-tip-open", onPeerOpen);
+      document.removeEventListener("mousedown", onDoc);
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [tipId]);
+
+  if (!label && !body) return <span ref={anchorRef} className="tv-markets-hud__tip-anchor" aria-hidden />;
+
+  return (
+    <>
+      <span ref={anchorRef} className="tv-markets-hud__tip-anchor" aria-hidden />
+      {open
+        ? createPortal(
+            <div ref={tipRef} className={`tv-markets-hud__tip is-${bias} is-open`} role="dialog" style={box}>
+              {check ? <span className="tv-markets-hud__tip-tag">{tag}</span> : null}
+              {label ? <strong>{label}</strong> : null}
+              {body ? <em>{body}</em> : null}
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
+  );
+}
+
+function BiasClock({
+  bias,
+  confidence,
+  buyVotes,
+  sellVotes,
+}: {
+  bias?: "buy" | "sell" | "wait";
+  confidence?: number;
+  buyVotes?: number;
+  sellVotes?: number;
+}) {
+  const conf = Math.max(0, Math.min(100, confidence ?? 0));
+  let pct = 50;
+  if (bias === "buy") pct = 50 + (20 + conf * 0.3);
+  else if (bias === "sell") pct = 50 - (20 + conf * 0.3);
+  else {
+    const delta = (buyVotes ?? 0) - (sellVotes ?? 0);
+    pct = 50 + Math.max(-12, Math.min(12, delta * 3));
+  }
+  pct = Math.max(6, Math.min(94, pct));
+  const angle = -90 + (pct / 100) * 180;
+  const title = bias === "buy" ? "COMPRAR" : bias === "sell" ? "VENDER" : "ESPERAR";
+  return (
+    <div className={`tv-desk-clock tv-desk-clock--${bias ?? "wait"} hrs-card sgi-glass-panel`} aria-label={`Señal: ${title}`}>
+      <h2>Señal</h2>
+      <div className="tv-desk-clock__face" aria-hidden>
+        <svg viewBox="0 0 200 118">
+          <defs>
+            <linearGradient id="tv-clock-arc" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#ef5350" />
+              <stop offset="50%" stopColor="#f5c542" />
+              <stop offset="100%" stopColor="#26a69a" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M18 108 A 82 82 0 0 1 182 108"
+            fill="none"
+            stroke="url(#tv-clock-arc)"
+            strokeWidth="10"
+            strokeLinecap="round"
+          />
+          <g transform={`rotate(${angle} 100 108)`}>
+            <line x1="100" y1="108" x2="100" y2="38" stroke="#e8eef5" strokeWidth="3.2" strokeLinecap="round" />
+            <circle cx="100" cy="108" r="6" fill="#e8eef5" />
+          </g>
+        </svg>
+        <span className="tv-desk-clock__sell">Vender</span>
+        <span className="tv-desk-clock__wait">Esperar</span>
+        <span className="tv-desk-clock__buy">Comprar</span>
+      </div>
+      <strong>{title}</strong>
+    </div>
+  );
+}
+
 function biasCopy(bias: BtcTradeSignal["bias"]): { title: string; kicker: string } {
   if (bias === "buy") return { title: "COMPRAR", kicker: "Confluencia alcista" };
   if (bias === "sell") return { title: "VENDER", kicker: "Confluencia bajista" };
@@ -491,6 +668,7 @@ export function MercadosTradingPage() {
 
   const copy = signal ? biasCopy(signal.bias) : { title: "…", kicker: "Calculando confluencia" };
   const studiesOnCount = CHART_STUDIES.filter((s) => studyOn[s.key] !== false).length;
+  const ck = (id: string) => signal?.checks?.find((c) => c.id === id);
 
   return (
     <div className="fact-page tv-markets-page">
@@ -540,100 +718,139 @@ export function MercadosTradingPage() {
 
         <section className="tv-markets-hud" aria-label="Monitor de indicadores">
           <div className="tv-markets-hud__pair">
-            <span>{active.label}/{active.quote}</span>
+            <HudLab
+              icon={
+                <svg width="28" height="28" viewBox="0 0 18 18" fill="none" aria-hidden>
+                  <circle cx="9" cy="9" r="6.5" stroke="#26a69a" strokeWidth="1.5" />
+                  <path d="M9 5.2 V9 L11.6 11" stroke="#26a69a" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              }
+            >
+              {active.label}/{active.quote}
+            </HudLab>
             <strong>{signal ? usd(signal.price) : "—"}</strong>
+            <HudTip title={copy.kicker} detail={signal?.guide ?? signal?.thesis} />
           </div>
           <div className={`tv-markets-hud__cell tv-markets-hud__cell--action is-${signal?.bias ?? "wait"}`}>
-            <span>Qué hacer</span>
+            <HudLab icon={<BiasGlyph bias={signal?.bias ?? "wait"} size={22} />}>Qué hacer</HudLab>
             <strong>
               {signal ? (signal.bias === "buy" ? "COMPRAR" : signal.bias === "sell" ? "VENDER" : "ESPERAR") : "—"}
             </strong>
             <em>{signal ? `${signal.buyVotes} vs ${signal.sellVotes} · ${signal.confidence}%` : ""}</em>
+            <HudTip
+              check={
+                signal
+                  ? {
+                      id: "guide",
+                      label: copy.title,
+                      bias: signal.bias,
+                      detail: [signal.thesis, ck("jerry")?.detail].filter(Boolean).join(" · "),
+                    }
+                  : undefined
+              }
+            />
           </div>
           <div className={`tv-markets-hud__cell${signal && signal.price >= signal.ema25 ? " is-up" : " is-down"}`}>
-            <span>EMA 25</span>
+            <HudLab icon={<StudyGlyph kind="ema25" />}>EMA 25</HudLab>
             <strong>{signal ? fmtPx(signal.ema25) : "—"}</strong>
             <em>{signal ? distPct(signal.price, signal.ema25) : ""}</em>
+            <HudTip check={ck("ema-slope")} />
           </div>
           <div className={`tv-markets-hud__cell${signal && signal.price >= signal.ema50 ? " is-up" : " is-down"}`}>
-            <span>EMA 50</span>
+            <HudLab icon={<StudyGlyph kind="ema50" />}>EMA 50</HudLab>
             <strong>{signal ? fmtPx(signal.ema50) : "—"}</strong>
             <em>{signal ? distPct(signal.price, signal.ema50) : ""}</em>
+            <HudTip check={ck("ema-cross")} />
           </div>
           <div className={`tv-markets-hud__cell${signal && signal.price >= signal.ema200 ? " is-up" : " is-down"}`}>
-            <span>EMA 200</span>
+            <HudLab icon={<StudyGlyph kind="ema200" />}>EMA 200</HudLab>
             <strong>{signal ? fmtPx(signal.ema200) : "—"}</strong>
             <em>{signal ? distPct(signal.price, signal.ema200) : ""}</em>
+            <HudTip check={ck("ema200")} />
           </div>
           <div className={`tv-markets-hud__cell${signal?.supertrendDir === 1 ? " is-up" : " is-down"}`}>
-            <span>Supertrend</span>
+            <HudLab icon={<StudyGlyph kind="supertrend" />}>Supertrend</HudLab>
             <strong>{signal ? (signal.supertrendDir === 1 ? "ALCISTA" : "BAJISTA") : "—"}</strong>
             <em>{signal ? fmtPx(signal.supertrend) : ""}</em>
+            <HudTip check={ck("supertrend")} />
           </div>
           <div className={`tv-markets-hud__cell${signal?.psarDir === 1 ? " is-up" : " is-down"}`}>
-            <span>PSAR</span>
+            <HudLab icon={<StudyGlyph kind="psar" />}>PSAR</HudLab>
             <strong>{signal ? (signal.psarDir === 1 ? "ALCISTA" : "BAJISTA") : "—"}</strong>
             <em>{signal ? fmtPx(signal.psar) : ""}</em>
+            <HudTip check={ck("psar")} />
           </div>
           <div
             className={`tv-markets-hud__cell${
               signal && signal.rsi >= 70 ? " is-down" : signal && signal.rsi <= 30 ? " is-up" : ""
             }`}
           >
-            <span>RSI 14</span>
+            <HudLab icon={<StudyGlyph kind="rsi" />}>RSI 14</HudLab>
             <strong>{signal ? signal.rsi.toFixed(1) : "—"}</strong>
             <em>
               {signal ? (signal.rsi >= 70 ? "Sobrecompra" : signal.rsi <= 30 ? "Sobreventa" : "Neutro") : ""}
             </em>
+            <HudTip check={ck("rsi")} />
           </div>
           <div className={`tv-markets-hud__cell${signal && signal.macdHist >= 0 ? " is-up" : " is-down"}`}>
-            <span>MACD 12/26/9</span>
+            <HudLab icon={<StudyGlyph kind="macd" />}>MACD 12/26/9</HudLab>
             <strong>
               {signal
                 ? `${signal.macdHist >= 0 ? "+" : ""}${signal.macdHist.toFixed(2)}`
                 : "—"}
             </strong>
-            <em>
-              {signal
-                ? `MACD ${signal.macd.toFixed(2)} · Sig ${signal.macdSignal.toFixed(2)}`
-                : ""}
+            <em className="tv-markets-hud__stack">
+              {signal ? (
+                <>
+                  <span>MACD {signal.macd.toFixed(2)}</span>
+                  <span>Sig {signal.macdSignal.toFixed(2)}</span>
+                </>
+              ) : null}
             </em>
+            <HudTip check={ck("macd")} />
           </div>
           <div className={`tv-markets-hud__cell${signal?.zigzagLast.kind === "low" ? " is-up" : " is-down"}`}>
-            <span>ZigZag</span>
+            <HudLab icon={<StudyGlyph kind="zigzag" />}>ZigZag</HudLab>
             <strong>
               {signal ? (signal.zigzagLast.kind === "low" ? "LOW" : "HIGH") : "—"}
             </strong>
             <em>{signal ? fmtPx(signal.zigzagLast.price) : ""}</em>
+            <HudTip check={ck("zigzag")} />
           </div>
           <div
             className={`tv-markets-hud__cell${
               signal?.ichiCloud === "above" ? " is-up" : signal?.ichiCloud === "below" ? " is-down" : ""
             }`}
           >
-            <span>Ichimoku</span>
+            <HudLab icon={<StudyGlyph kind="ichimoku" />}>Ichimoku</HudLab>
             <strong>
               {signal?.ichiCloud === "above" ? "SOBRE NUBE" : signal?.ichiCloud === "below" ? "BAJO NUBE" : signal ? "EN NUBE" : "—"}
             </strong>
-            <em>
-              {signal && Number.isFinite(signal.ichiTenkan ?? NaN)
-                ? `T ${fmtPx(signal.ichiTenkan!)} · K ${fmtPx(signal.ichiKijun ?? NaN)}`
-                : ""}
+            <em className="tv-markets-hud__stack">
+              {signal && Number.isFinite(signal.ichiTenkan ?? NaN) ? (
+                <>
+                  <span>T {fmtPx(signal.ichiTenkan!)}</span>
+                  <span>K {fmtPx(signal.ichiKijun ?? NaN)}</span>
+                </>
+              ) : null}
             </em>
+            <HudTip check={ck("ichimoku")} />
           </div>
           <div
             className={`tv-markets-hud__cell${
               signal && (signal.bbPctB ?? 0.5) >= 0.5 ? " is-up" : " is-down"
             }`}
           >
-            <span>Bollinger</span>
+            <HudLab icon={<StudyGlyph kind="bollinger" />}>Bollinger</HudLab>
             <strong>{signal && Number.isFinite(signal.bbPctB ?? NaN) ? `%B ${(signal.bbPctB! * 100).toFixed(0)}` : "—"}</strong>
             <em>{signal && Number.isFinite(signal.bbMid ?? NaN) ? `Media ${fmtPx(signal.bbMid!)}` : ""}</em>
+            <HudTip check={ck("bollinger")} />
           </div>
           <div className={`tv-markets-hud__cell${signal && (signal.volRatio ?? 1) >= 1.15 ? " is-up" : ""}`}>
-            <span>Volumen</span>
+            <HudLab icon={<StudyGlyph kind="heatmap" />}>Volumen</HudLab>
             <strong>{signal && Number.isFinite(signal.volRatio ?? NaN) ? `${signal.volRatio!.toFixed(2)}×` : "—"}</strong>
             <em>{signal && (signal.volRatio ?? 0) >= 1.15 ? "Confirma" : signal ? "Flojo" : ""}</em>
+            <HudTip check={ck("volume")} />
           </div>
         </section>
 
@@ -741,7 +958,9 @@ export function MercadosTradingPage() {
                           setPairOpen(false);
                         }}
                       >
-                        <img src={TAPE_LOGO(s.logo)} alt="" width={22} height={22} />
+                        <span className="tv-markets-pair__opt-logo" aria-hidden>
+                          <img src={TAPE_LOGO(s.logo)} alt="" width={28} height={28} />
+                        </span>
                         <span className="tv-markets-pair__opt-copy">
                           <strong>
                             {s.label}/{s.quote}
@@ -932,43 +1151,58 @@ export function MercadosTradingPage() {
 
           <aside className="tv-markets-rail">
             <div className={`tv-desk-signal tv-desk-signal--${signal?.bias ?? "wait"} hrs-card sgi-glass-panel`}>
-              <div className="tv-desk-signal__top">
-                <span className="tv-desk-signal__badge">{copy.kicker}</span>
-                <span className="tv-desk-signal__live">
-                  <i aria-hidden />
-                  {signalLoading && !signal ? "Leyendo" : "Live"}
+              <div className="tv-desk-signal__lead">
+                <div className="tv-desk-signal__call">
+                  <span className="tv-desk-signal__badge">{copy.kicker}</span>
+                  <div className="tv-desk-signal__title">{signalLoading && !signal ? "LEYENDO…" : copy.title}</div>
+                  <div className="tv-desk-signal__price">{signal ? usd(signal.price) : "—"}</div>
+                </div>
+                <span className="tv-desk-signal__icon" title={copy.title} aria-hidden>
+                  <BiasGlyph bias={signal?.bias ?? "wait"} size={26} />
                 </span>
               </div>
-              <div className="tv-desk-signal__title">{signalLoading && !signal ? "LEYENDO…" : copy.title}</div>
-              <div className="tv-desk-signal__price">{signal ? usd(signal.price) : "—"}</div>
 
-              <div className="tv-desk-votes" aria-label="Votos de confluencia">
-                <div className="tv-desk-votes__item is-buy">
-                  <strong>{signal?.buyVotes ?? 0}</strong>
-                  <span>Alcistas</span>
-                </div>
-                <div className="tv-desk-votes__item is-sell">
-                  <strong>{signal?.sellVotes ?? 0}</strong>
-                  <span>Bajistas</span>
-                </div>
-                <div className="tv-desk-votes__item is-wait">
-                  <strong>{signal?.waitVotes ?? 0}</strong>
-                  <span>Neutros</span>
-                </div>
-              </div>
+              {signalErr ? (
+                <p className="tv-desk-signal__hint">{signalErr}</p>
+              ) : signal ? (
+                <>
+                  {signal.bias !== "wait" ? (
+                    <div className="tv-desk-signal__facts">
+                      <div>
+                        <span>Stop</span>
+                        <strong>{usd(signal.stop)}</strong>
+                      </div>
+                      <div>
+                        <span>Riesgo 1R</span>
+                        <strong>
+                          {usd(signal.riskUsd)}
+                          {signal.price > 0 ? <em>{((signal.riskUsd / signal.price) * 100).toFixed(1)}%</em> : null}
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Invalida</span>
+                        <strong>{usd(signal.invalidation)}</strong>
+                      </div>
+                    </div>
+                  ) : null}
+                  <p className="tv-desk-signal__hint">
+                    {(signal.guide ?? signal.thesis ?? "").replace(/^(COMPRAR|VENDER)\.\s*/i, "") || "Calculando…"}
+                  </p>
+                </>
+              ) : (
+                <p className="tv-desk-signal__hint">Calculando…</p>
+              )}
 
               <div className="tv-desk-signal__conf-wrap">
                 <div className="tv-desk-signal__conf-row">
                   <span>Alineación</span>
                   <strong>{signal ? `${signal.confidence}%` : "—"}</strong>
+                  <em>{signal ? `${signal.buyVotes}↑ ${signal.sellVotes}↓ ${signal.waitVotes}○` : ""}</em>
                 </div>
                 <div className="tv-desk-signal__conf">
                   <div className="tv-desk-signal__conf-bar" style={{ width: `${signal?.confidence ?? 0}%` }} />
                 </div>
               </div>
-
-              <p className="tv-desk-signal__thesis">{signalErr || signal?.thesis || "Calculando…"}</p>
-              {signal?.action ? <p className="tv-desk-signal__action">{signal.action}</p> : null}
             </div>
 
             {signal && signal.bias !== "wait" ? (
@@ -1052,25 +1286,13 @@ export function MercadosTradingPage() {
               </div>
             ) : null}
 
-            <div className="tv-desk-checks hrs-card sgi-glass-panel">
-              <h2>
-                Checklist
-                <em>{signal?.checks?.length ? `${signal.checks.length} lecturas` : ""}</em>
-              </h2>
-              <ul>
-                {(signal?.checks ?? []).map((c) => (
-                  <li key={c.id} className={`tv-desk-check tv-desk-check--${c.bias}`}>
-                    <span className="tv-desk-check__tag">
-                      {c.bias === "buy" ? "ALCISTA" : c.bias === "sell" ? "BAJISTA" : "NEUTRO"}
-                    </span>
-                    <div>
-                      <strong>{c.label}</strong>
-                      <em>{c.detail}</em>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <BiasClock
+              bias={signal?.bias}
+              confidence={signal?.confidence}
+              buyVotes={signal?.buyVotes}
+              sellVotes={signal?.sellVotes}
+            />
+
           </aside>
         </div>
       </div>

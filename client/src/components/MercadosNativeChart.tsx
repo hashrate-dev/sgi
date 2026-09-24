@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   emaSeries,
   jerryMarks,
@@ -14,7 +14,12 @@ import {
   type MarketCandle,
 } from "../lib/mercadosChartMath";
 import {
+  DRAW_COLORS,
+  DRAWING_KIND_LABEL,
+  DEFAULT_STUDY_STYLE,
   FIB_LEVELS,
+  STUDY_LINE_LABEL,
+  dashArray,
   distToPoly,
   distToSeg,
   fracIndex,
@@ -23,6 +28,9 @@ import {
   type ChartDrawTool,
   type ChartDrawing,
   type ChartPoint,
+  type EmaLineStyle,
+  type LineDash,
+  type StudyLineKey,
 } from "../lib/mercadosDrawings";
 
 const HOSTS = ["https://data-api.binance.vision", "https://api.binance.com", "https://api.binance.us"];
@@ -258,6 +266,21 @@ export function MercadosNativeChart({
   const selectedIdRef = useRef<string | null>(null);
   const deleteHitsRef = useRef<Array<{ x: number; y: number; r: number; id: string }>>([]);
   const downRef = useRef<{ x: number; y: number; tool: ChartDrawTool } | null>(null);
+  const studyStyleRef = useRef<Record<StudyLineKey, EmaLineStyle>>({
+    ema25: { ...DEFAULT_STUDY_STYLE.ema25 },
+    ema50: { ...DEFAULT_STUDY_STYLE.ema50 },
+    ema200: { ...DEFAULT_STUDY_STYLE.ema200 },
+    bb: { ...DEFAULT_STUDY_STYLE.bb },
+  });
+  const hoverEditRef = useRef<{ type: "study"; key: StudyLineKey } | { type: "drawing"; id: string } | null>(null);
+  const [edit, setEdit] = useState<{
+    type: "study" | "drawing";
+    key: string;
+    title: string;
+    color: string;
+    width: number;
+    dash: LineDash;
+  } | null>(null);
 
   const drawingsOf = () => {
     const k = pairRef.current;
@@ -286,6 +309,76 @@ export function MercadosNativeChart({
     const i = g.start + (x - g.padL) / Math.max(0.001, g.barW) - 0.5;
     const p = g.minP + (1 - (y - g.priceTop) / Math.max(1, g.priceBot - g.priceTop)) * g.span;
     return { t: timeAtIndex(candles, i), p };
+  };
+
+  const distToSeries = (x: number, y: number, series: number[]) => {
+    const g = geomRef.current;
+    const { end } = viewRef.current;
+    const start = g.start;
+    const last = Math.min(end, series.length - 1);
+    const yOf = (px: number) =>
+      g.priceTop + (1 - (px - g.minP) / Math.max(1e-12, g.span)) * (g.priceBot - g.priceTop);
+    const xOf = (i: number) => g.padL + (i - start + 0.5) * g.barW;
+    let best = Infinity;
+    for (let i = start; i < last; i++) {
+      const a = series[i];
+      const b = series[i + 1];
+      if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+      best = Math.min(best, distToSeg(x, y, xOf(i), yOf(a!), xOf(i + 1), yOf(b!)));
+    }
+    return best;
+  };
+
+  const pickHoverTarget = (x: number, y: number) => {
+    const candles = candlesRef.current;
+    const on = onRef.current;
+    const g = geomRef.current;
+    if (candles.length < 2 || y < g.priceTop - 6 || y > g.priceBot + 6) return null;
+    const closes = candles.map((c) => c.c);
+    let best: { type: "study"; key: StudyLineKey } | { type: "drawing"; id: string } | null = null;
+    let dist = 8;
+    const consider = (d: number, next: NonNullable<typeof best>) => {
+      if (d < dist) {
+        dist = d;
+        best = next;
+      }
+    };
+    if (on.ema25 !== false) consider(distToSeries(x, y, emaSeries(closes, 25)), { type: "study", key: "ema25" });
+    if (on.ema50 !== false) consider(distToSeries(x, y, emaSeries(closes, 50)), { type: "study", key: "ema50" });
+    if (on.ema200 !== false) consider(distToSeries(x, y, emaSeries(closes, 200)), { type: "study", key: "ema200" });
+    if (on.bollinger !== false) {
+      const bb = bollingerBands(closes);
+      consider(Math.min(distToSeries(x, y, bb.upper), distToSeries(x, y, bb.mid), distToSeries(x, y, bb.lower)), {
+        type: "study",
+        key: "bb",
+      });
+    }
+    const list = drawingsOf();
+    for (const d of list) {
+      const a = toXy(d.a);
+      const b = toXy(d.b);
+      let dd = distToSeg(x, y, a.x, a.y, b.x, b.y);
+      if (d.kind === "hline") dd = Math.abs(y - a.y);
+      else if (d.kind === "vline") dd = Math.abs(x - a.x);
+      else if (d.kind === "pencil" && d.pts && d.pts.length > 1) dd = distToPoly(x, y, d.pts.map(toXy));
+      else if (d.kind === "rect" || d.kind === "ruler") {
+        const x0 = Math.min(a.x, b.x);
+        const x1 = Math.max(a.x, b.x);
+        const y0 = Math.min(a.y, b.y);
+        const y1 = Math.max(a.y, b.y);
+        const inside = x >= x0 && x <= x1 && y >= y0 && y <= y1;
+        dd = inside
+          ? 0
+          : Math.min(
+              distToSeg(x, y, a.x, a.y, b.x, a.y),
+              distToSeg(x, y, b.x, a.y, b.x, b.y),
+              distToSeg(x, y, b.x, b.y, a.x, b.y),
+              distToSeg(x, y, a.x, b.y, a.x, a.y),
+            );
+      }
+      consider(dd, { type: "drawing", id: d.id });
+    }
+    return best;
   };
 
   const studiesKey = useMemo(() => JSON.stringify(studyOn), [studyOn]);
@@ -696,11 +789,13 @@ export function MercadosNativeChart({
       ctx.fillRect(x - bw / 2, bodyTop, bw, Math.max(1, bodyBot - bodyTop));
     }
 
-    const drawLine = (series: number[], color: string, width = 1.4, from = start, to = end) => {
+    const st = studyStyleRef.current;
+    const drawLine = (series: number[], color: string, width = 1.4, from = start, to = end, dash: LineDash = "solid") => {
       ctx.beginPath();
       let started = false;
       ctx.strokeStyle = color;
       ctx.lineWidth = width;
+      ctx.setLineDash(dashArray(dash));
       const last = Math.min(to, series.length - 1);
       for (let i = from; i <= last; i++) {
         const v = series[i];
@@ -716,6 +811,7 @@ export function MercadosNativeChart({
         } else ctx.lineTo(x, y);
       }
       ctx.stroke();
+      ctx.setLineDash([]);
     };
 
     if (bb) {
@@ -741,19 +837,19 @@ export function MercadosNativeChart({
         ctx.lineTo(xOf(i), yOf(v!));
       }
       ctx.closePath();
-      ctx.fillStyle = "rgba(91,156,246,0.14)";
+      ctx.fillStyle = hexToRgba(st.bb.color, 0.14);
       ctx.fill();
       ctx.restore();
-      drawLine(bb.upper, "rgba(91,156,246,0.95)", 1.15);
-      drawLine(bb.lower, "rgba(91,156,246,0.95)", 1.15);
-      ctx.setLineDash([5, 4]);
-      drawLine(bb.mid, "#5b9cf6", 1.2);
+      drawLine(bb.upper, hexToRgba(st.bb.color, 0.95), st.bb.width, start, end, st.bb.dash);
+      drawLine(bb.lower, hexToRgba(st.bb.color, 0.95), st.bb.width, start, end, st.bb.dash);
+      ctx.setLineDash(st.bb.dash === "solid" ? [5, 4] : dashArray(st.bb.dash));
+      drawLine(bb.mid, st.bb.color, Math.max(1, st.bb.width + 0.1));
       ctx.setLineDash([]);
     }
 
-    if (on.ema25 !== false) drawLine(emaSeries(closes, 25), "#F5C542");
-    if (on.ema50 !== false) drawLine(emaSeries(closes, 50), "#26C6DA");
-    if (on.ema200 !== false) drawLine(emaSeries(closes, 200), "#EF5350");
+    if (on.ema25 !== false) drawLine(emaSeries(closes, 25), st.ema25.color, st.ema25.width, start, end, st.ema25.dash);
+    if (on.ema50 !== false) drawLine(emaSeries(closes, 50), st.ema50.color, st.ema50.width, start, end, st.ema50.dash);
+    if (on.ema200 !== false) drawLine(emaSeries(closes, 200), st.ema200.color, st.ema200.width, start, end, st.ema200.dash);
     if (on.supertrend !== false) {
       const st = supertrend(candles);
       ctx.beginPath();
@@ -854,10 +950,10 @@ export function MercadosNativeChart({
       ctx.globalAlpha = ghost ? 0.7 : 1;
       ctx.strokeStyle = d.color;
       ctx.fillStyle = d.color;
-      ctx.lineWidth = selected ? 2.15 : 1.35;
+      ctx.lineWidth = selected ? Math.max(2.15, (d.width ?? 1.35) + 0.6) : (d.width ?? 1.35);
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
-      ctx.setLineDash([]);
+      ctx.setLineDash(dashArray(d.dash ?? "solid"));
       if (d.kind === "hline") {
         ctx.beginPath();
         ctx.moveTo(padL, a.y);
@@ -1364,6 +1460,12 @@ export function MercadosNativeChart({
         ctx.fillText(`RSI ${Number.isFinite(rv) ? rv.toFixed(1) : "—"}`, padL + 14, ty);
       }
     }
+    const canvas = canvasRef.current;
+    if (canvas) {
+      if (hoverEditRef.current) canvas.style.cursor = "pointer";
+      else if (drawToolRef.current === "eraser") canvas.style.cursor = "cell";
+      else canvas.style.cursor = "crosshair";
+    }
   }
 
   useEffect(() => {
@@ -1390,6 +1492,7 @@ export function MercadosNativeChart({
 
     const begin = (mode: "pan" | "zoomX" | "zoomY", e: PointerEvent) => {
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      if (mode === "pan") scaleRef.current.auto = false;
       dragRef.current = {
         mode,
         x: e.clientX,
@@ -1440,6 +1543,13 @@ export function MercadosNativeChart({
         const next = Math.max(count - 1, Math.min(rows - 1, drag.end + shift));
         viewRef.current.end = next;
         viewRef.current.follow = next >= rows - 2;
+        const plotH = Math.max(1, g.priceBot - g.priceTop);
+        const span = Math.max(1e-8, drag.max - drag.min);
+        const dPrice = ((e.clientY - drag.y) / plotH) * span;
+        scaleRef.current.auto = false;
+        scaleRef.current.min = drag.min + dPrice;
+        scaleRef.current.max = drag.max + dPrice;
+        wrap?.classList.add("is-panning");
       }
       paint();
     };
@@ -1447,6 +1557,47 @@ export function MercadosNativeChart({
     const end = (e: PointerEvent) => {
       const el = e.currentTarget as HTMLElement;
       if (el.hasPointerCapture?.(e.pointerId)) el.releasePointerCapture(e.pointerId);
+      wrapRef.current?.classList.remove("is-panning");
+      if (canvasRef.current) canvasRef.current.style.cursor = "";
+      const drag = dragRef.current;
+      const down = downRef.current;
+      if (drag?.mode === "pan" && down?.tool === "cursor") {
+        const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+        if (moved < 6) {
+          const wrap = wrapRef.current;
+          if (wrap) {
+            const rect = wrap.getBoundingClientRect();
+            const pick = pickHoverTarget(e.clientX - rect.left, e.clientY - rect.top);
+            if (pick) {
+              if (pick.type === "study") {
+                const st = studyStyleRef.current[pick.key];
+                setEdit({
+                  type: "study",
+                  key: pick.key,
+                  title: STUDY_LINE_LABEL[pick.key],
+                  color: st.color,
+                  width: st.width,
+                  dash: st.dash,
+                });
+              } else {
+                const d = drawingsOf().find((row) => row.id === pick.id);
+                if (d) {
+                  selectedIdRef.current = d.id;
+                  setEdit({
+                    type: "drawing",
+                    key: d.id,
+                    title: DRAWING_KIND_LABEL[d.kind],
+                    color: d.color,
+                    width: d.width ?? 1.35,
+                    dash: d.dash ?? "solid",
+                  });
+                  paint();
+                }
+              }
+            }
+          }
+        }
+      }
       const draft = draftRef.current;
       const tool = drawToolRef.current;
       if (draft && tool !== "cursor" && tool !== "eraser") {
@@ -1579,17 +1730,9 @@ export function MercadosNativeChart({
         }
       }
       if (tool === "cursor") {
-        if (wrap) {
-          const rect = wrap.getBoundingClientRect();
-          const hit = hitDrawingAt(e.clientX - rect.left, e.clientY - rect.top);
-          if (hit >= 0) {
-            selectedIdRef.current = drawingsOf()[hit]!.id;
-            paint();
-            return;
-          }
-        }
         selectedIdRef.current = null;
         begin("pan", e);
+        wrap?.classList.add("is-panning");
         return;
       }
       if (tool === "eraser") {
@@ -1661,10 +1804,11 @@ export function MercadosNativeChart({
         const plotW = wrap.clientWidth - g.padL - g.padR;
         const i = start + Math.floor(((x - g.padL) / plotW) * count);
         hoverRef.current = Math.max(start, Math.min(end, i));
-        paint();
         const y = e.clientY - rect.top;
         const overX = deleteHitsRef.current.some((b) => Math.hypot(x - b.x, y - b.y) <= b.r);
-        if (overX && canvasRef.current) canvasRef.current.style.cursor = "pointer";
+        hoverEditRef.current = overX ? null : pickHoverTarget(x, y);
+        paint();
+        if ((overX || hoverEditRef.current) && canvasRef.current) canvasRef.current.style.cursor = "pointer";
       }
       move(e);
     };
@@ -1767,6 +1911,109 @@ export function MercadosNativeChart({
         className="tv-markets-axis tv-markets-axis--x"
         title="Arrastrar para zoom horizontal"
       />
+      {edit ? (
+        <div
+          className="tv-markets-edit"
+          role="presentation"
+          onMouseDown={(ev) => {
+            if (ev.target === ev.currentTarget) setEdit(null);
+          }}
+        >
+          <div className="tv-markets-edit__card" role="dialog" aria-labelledby="tv-markets-edit-title">
+            <h3 id="tv-markets-edit-title">{edit.title}</h3>
+            <p>Color, grosor y tipo de línea</p>
+            <div className="tv-markets-edit__swatches" role="group" aria-label="Color">
+              {DRAW_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className={`tv-markets-edit__swatch${edit.color.toLowerCase() === c.toLowerCase() ? " is-on" : ""}`}
+                  style={{ background: c }}
+                  aria-label={c}
+                  onClick={() => setEdit({ ...edit, color: c })}
+                />
+              ))}
+              <input
+                type="color"
+                value={edit.color}
+                aria-label="Color personalizado"
+                onChange={(ev) => setEdit({ ...edit, color: ev.target.value })}
+              />
+            </div>
+            <label className="tv-markets-edit__row">
+              Grosor
+              <input
+                type="range"
+                min={1}
+                max={6}
+                step={0.1}
+                value={edit.width}
+                onChange={(ev) => setEdit({ ...edit, width: Number(ev.target.value) })}
+              />
+              <em>{edit.width.toFixed(1)}</em>
+            </label>
+            <div className="tv-markets-edit__dashes" role="group" aria-label="Tipo de línea">
+              {(["solid", "dash", "dot"] as LineDash[]).map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  className={edit.dash === d ? "is-on" : ""}
+                  onClick={() => setEdit({ ...edit, dash: d })}
+                >
+                  {d === "solid" ? "Sólida" : d === "dash" ? "Trazos" : "Puntos"}
+                </button>
+              ))}
+            </div>
+            <div className="tv-markets-edit__actions">
+              {edit.type === "drawing" ? (
+                <button
+                  type="button"
+                  className="tv-markets-edit__danger"
+                  onClick={() => {
+                    const list = drawingsOf();
+                    const i = list.findIndex((d) => d.id === edit.key);
+                    if (i >= 0) list.splice(i, 1);
+                    selectedIdRef.current = null;
+                    setEdit(null);
+                    requestPaint();
+                  }}
+                >
+                  Eliminar
+                </button>
+              ) : (
+                <span />
+              )}
+              <button type="button" onClick={() => setEdit(null)}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="tv-markets-edit__ok"
+                onClick={() => {
+                  if (edit.type === "study") {
+                    studyStyleRef.current[edit.key as StudyLineKey] = {
+                      color: edit.color,
+                      width: edit.width,
+                      dash: edit.dash,
+                    };
+                  } else {
+                    const d = drawingsOf().find((row) => row.id === edit.key);
+                    if (d) {
+                      d.color = edit.color;
+                      d.width = edit.width;
+                      d.dash = edit.dash;
+                    }
+                  }
+                  setEdit(null);
+                  requestPaint();
+                }}
+              >
+                Aplicar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
