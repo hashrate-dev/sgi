@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Navigate } from "react-router-dom";
+import { MercadosNativeChart } from "../components/MercadosNativeChart";
 import { PageHeader } from "../components/PageHeader";
-import { TradingViewEmbed } from "../components/TradingViewEmbed";
 import { useAuth } from "../contexts/AuthContext";
 import { getBtcTradeSignal, type BtcTradeSignal } from "../lib/api";
 import { sgiHome } from "../lib/marketplacePaths.js";
@@ -60,6 +60,7 @@ async function fetchTapeQuotes(): Promise<Record<string, TapeQuote>> {
 }
 
 const INTERVALS = [
+  { id: "LIVE", label: "LIVE" },
   { id: "1", label: "1m" },
   { id: "5", label: "5m" },
   { id: "15", label: "15m" },
@@ -70,16 +71,16 @@ const INTERVALS = [
 ] as const;
 
 const CHART_STUDIES = [
-  { key: "ema25", label: "EMA 25", hint: "Media rápida", spec: { id: "MAExp@tv-basicstudies", inputs: { length: 25, source: "close" }, styles: { "plot.color": "#F5C542" } } },
-  { key: "ema50", label: "EMA 50", hint: "Media intermedia", spec: { id: "MAExp@tv-basicstudies", inputs: { length: 50, source: "close" }, styles: { "plot.color": "#26C6DA" } } },
-  { key: "ema200", label: "EMA 200", hint: "Régimen / tendencia", spec: { id: "MAExp@tv-basicstudies", inputs: { length: 200, source: "close" }, styles: { "plot.color": "#EF5350" } } },
-  { key: "supertrend", label: "Supertrend", hint: "Sesgo y stop", spec: { id: "STD;Supertrend" } },
-  { key: "psar", label: "Parabolic SAR", hint: "Puntos 0.02 / 0.02 / 0.2", spec: { id: "PSAR@tv-basicstudies", inputs: { start: 0.02, increment: 0.02, maximum: 0.2 } } },
-  { key: "macd", label: "MACD", hint: "Histograma y cruce 12/26/9", spec: { id: "MACD@tv-basicstudies" } },
-  { key: "rsi", label: "RSI", hint: "Sobrecompra / venta", spec: { id: "RSI@tv-basicstudies" } },
-  { key: "zigzag", label: "ZigZag", hint: "Swings high/low", spec: { id: "STD;Zig_Zag" } },
-  { key: "div", label: "Divergencias MACD", hint: "Comparar extremos de precio vs MACD" },
-  { key: "jerry", label: "Jerry Buy Sell", hint: "Early buy / buy / sell vs línea cero" },
+  { key: "ema25", label: "EMA 25", hint: "Media rápida", group: "Tendencia" },
+  { key: "ema50", label: "EMA 50", hint: "Media intermedia", group: "Tendencia" },
+  { key: "ema200", label: "EMA 200", hint: "Régimen / tendencia", group: "Tendencia" },
+  { key: "supertrend", label: "Supertrend", hint: "Sesgo y stop", group: "Tendencia" },
+  { key: "psar", label: "Parabolic SAR", hint: "Puntos 0.02 / 0.02 / 0.2", group: "Tendencia" },
+  { key: "zigzag", label: "ZigZag", hint: "Swings high/low", group: "Tendencia" },
+  { key: "macd", label: "MACD", hint: "Histograma 12/26/9", group: "Momentum" },
+  { key: "rsi", label: "RSI", hint: "Sobrecompra / venta", group: "Momentum" },
+  { key: "jerry", label: "Jerry Buy Sell", hint: "EARLY · BUY · SELL en cada vela", group: "Señales" },
+  { key: "heatmap", label: "Mapa de calor", hint: "Volumen por precio en la vista actual", group: "Volumen" },
 ] as const;
 
 function StudyGlyph({ kind }: { kind: (typeof CHART_STUDIES)[number]["key"] }) {
@@ -140,20 +141,20 @@ function StudyGlyph({ kind }: { kind: (typeof CHART_STUDIES)[number]["key"] }) {
       </svg>
     );
   }
-  if (kind === "div") {
-    return (
-      <svg {...common}>
-        <path d="M3 13 L8 8" stroke="#26a69a" strokeWidth="1.5" />
-        <path d="M3 7 L8 11" stroke="#ef5350" strokeWidth="1.5" />
-        <path d="M10 12 L15 7 L15 10 H18" stroke="#26a69a" strokeWidth="1.4" fill="none" strokeLinejoin="round" />
-      </svg>
-    );
-  }
   if (kind === "jerry") {
     return (
       <svg {...common}>
         <path d="M4 12 L9 7 L9 10 H14 V14 H9 L9 17 Z" fill="#26a69a" />
         <path d="M14 6 L14 9 H9 V13 H14 L14 16 L20 11 Z" fill="#ef5350" />
+      </svg>
+    );
+  }
+  if (kind === "heatmap") {
+    return (
+      <svg {...common}>
+        <rect x="2" y="10" width="4" height="6" rx="0.6" fill="#0ea5e9" />
+        <rect x="7" y="6" width="4" height="10" rx="0.6" fill="#eab308" />
+        <rect x="12" y="3" width="4" height="13" rx="0.6" fill="#ef4444" />
       </svg>
     );
   }
@@ -186,17 +187,15 @@ function usd(n: number): string {
   }).format(n);
 }
 
+function rangePct(price: number, lo: number, hi: number): number {
+  if (![price, lo, hi].every((n) => Number.isFinite(n)) || hi <= lo) return 50;
+  return Math.min(100, Math.max(0, ((price - lo) / (hi - lo)) * 100));
+}
+
 function biasCopy(bias: BtcTradeSignal["bias"]): { title: string; kicker: string } {
   if (bias === "buy") return { title: "COMPRAR", kicker: "Confluencia alcista" };
   if (bias === "sell") return { title: "VENDER", kicker: "Confluencia bajista" };
   return { title: "ESPERAR", kicker: "Sin alineación suficiente" };
-}
-
-type ChartStudy = (typeof CHART_STUDIES)[number];
-type ChartStudyWithSpec = Extract<ChartStudy, { spec: unknown }>;
-
-function isChartStudyWithSpec(s: ChartStudy): s is ChartStudyWithSpec {
-  return "spec" in s && s.spec != null;
 }
 
 export function MercadosTradingPage() {
@@ -211,7 +210,7 @@ export function MercadosTradingPage() {
   const [indOpen, setIndOpen] = useState(false);
   const [pairOpen, setPairOpen] = useState(false);
   const [studyOn, setStudyOn] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(CHART_STUDIES.map((s) => [s.key, s.key !== "jerry"]))
+    Object.fromEntries(CHART_STUDIES.map((s) => [s.key, true]))
   );
   const dockRef = useRef<HTMLDivElement>(null);
   const pairRef = useRef<HTMLDivElement>(null);
@@ -261,7 +260,10 @@ export function MercadosTradingPage() {
     let dead = false;
     const load = async () => {
       try {
-        const r = await getBtcTradeSignal({ symbol: active.binance, interval });
+        const r = await getBtcTradeSignal({
+          symbol: active.binance,
+          interval: interval === "LIVE" ? "1" : interval,
+        });
         if (dead) return;
         setSignal(r.signal);
         setSignalErr("");
@@ -281,76 +283,15 @@ export function MercadosTradingPage() {
     };
   }, [active.binance, interval]);
 
-  const chartConfig = useMemo(
-    () => ({
-      symbol,
-      interval,
-      timezone: "Etc/UTC",
-      theme: "dark",
-      colorTheme: "dark",
-      style: "1",
-      locale: "es",
-      allow_symbol_change: false,
-      calendar: false,
-      details: false,
-      hide_side_toolbar: false,
-      hide_top_toolbar: true,
-      hide_legend: false,
-      hide_volume: false,
-      hotlist: false,
-      save_image: true,
-      withdateranges: false,
-      studies: (() => {
-        const enabled = CHART_STUDIES.filter(isChartStudyWithSpec).filter((s) => studyOn[s.key] !== false);
-        const rsi = enabled.filter((s) => s.key === "rsi");
-        const macd = enabled.filter((s) => s.key === "macd");
-        const rest = enabled.filter((s) => s.key !== "rsi" && s.key !== "macd");
-        const overlaySlots = Math.max(0, 5 - rsi.length - macd.length);
-        return [...rest.slice(0, overlaySlots), ...macd, ...rsi].map((s) => s.spec);
-      })(),
-      backgroundColor: "#0a100e",
-      gridColor: "rgba(61, 186, 154, 0.07)",
-      autosize: true,
-      support_host: "https://www.tradingview.com",
-      overrides: {
-        "paneProperties.background": "#0a100e",
-        "paneProperties.backgroundType": "solid",
-        "paneProperties.vertGridProperties.color": "rgba(61,186,154,0.08)",
-        "paneProperties.horzGridProperties.color": "rgba(61,186,154,0.08)",
-        "scalesProperties.textColor": "#c5d0c8",
-        "mainSeriesProperties.candleStyle.upColor": "#26a69a",
-        "mainSeriesProperties.candleStyle.downColor": "#ef5350",
-        "mainSeriesProperties.candleStyle.borderUpColor": "#26a69a",
-        "mainSeriesProperties.candleStyle.borderDownColor": "#ef5350",
-        "mainSeriesProperties.candleStyle.wickUpColor": "#26a69a",
-        "mainSeriesProperties.candleStyle.wickDownColor": "#ef5350",
-      },
-    }),
-    [interval, symbol, studyOn]
-  );
-
   if (!user || !canOpen) {
     return <Navigate to={sgiHome()} replace />;
   }
 
   const copy = signal ? biasCopy(signal.bias) : { title: "…", kicker: "Calculando confluencia" };
+  const studiesOnCount = CHART_STUDIES.filter((s) => studyOn[s.key] !== false).length;
 
   return (
     <div className="fact-page tv-markets-page">
-      {pairOpen || indOpen
-        ? createPortal(
-            <button
-              type="button"
-              className="tv-markets-menu-scrim"
-              aria-label="Cerrar menú"
-              onMouseDown={() => {
-                setPairOpen(false);
-                setIndOpen(false);
-              }}
-            />,
-            document.body,
-          )
-        : null}
       {createPortal(
         <div className="tv-markets-tape hrs-card hrs-card--rect sgi-glass-panel">
           <div className="tv-markets-tape__viewport">
@@ -509,23 +450,38 @@ export function MercadosTradingPage() {
               ) : null}
             </div>
             <div className="tv-markets-chart__stage">
-            <TradingViewEmbed
-              scriptSrc="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js"
-              config={chartConfig}
-              className="tv-markets-chart__embed"
-            />
+            <MercadosNativeChart binance={active.binance} interval={interval} studyOn={studyOn} />
+            {pairOpen || indOpen ? (
+              <button
+                type="button"
+                className="tv-markets-menu-scrim"
+                aria-label="Cerrar menú"
+                onMouseDown={() => {
+                  setPairOpen(false);
+                  setIndOpen(false);
+                }}
+              />
+            ) : null}
             <div className="tv-markets-dock" role="toolbar" aria-label="Temporalidad e indicadores" ref={dockRef}>
               {INTERVALS.map((it) => (
                 <button
                   key={it.id}
                   type="button"
-                  className={`tv-markets-dock__btn${it.id === interval ? " is-on" : ""}`}
+                  className={`tv-markets-dock__btn${it.id === interval ? " is-on" : ""}${it.id === "LIVE" ? " is-live" : ""}`}
                   onClick={() => setInterval(it.id)}
                 >
-                  {it.label}
+                  {it.id === "LIVE" ? (
+                    <>
+                      <span className="tv-markets-dock__live-dot" aria-hidden />
+                      LIVE
+                    </>
+                  ) : (
+                    it.label
+                  )}
                 </button>
               ))}
               <span className="tv-markets-dock__sep" aria-hidden />
+              <div className="tv-markets-dock__ind-wrap">
               <button
                 type="button"
                 className={`tv-markets-dock__ind${indOpen ? " is-on" : ""}`}
@@ -554,7 +510,15 @@ export function MercadosTradingPage() {
                 </svg>
               </button>
               {indOpen ? (
-                <div className="tv-markets-ind-menu" role="menu" aria-label="Indicadores del gráfico">
+                <div
+                  className="tv-markets-ind-menu"
+                  role="menu"
+                  aria-label="Indicadores del gráfico"
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
+                  <div className="tv-markets-ind-menu__head">
+                    Indicadores Activos: {studiesOnCount}/{CHART_STUDIES.length}
+                  </div>
                   {CHART_STUDIES.map((s) => {
                     const on = studyOn[s.key] !== false;
                     return (
@@ -564,9 +528,13 @@ export function MercadosTradingPage() {
                         role="menuitemcheckbox"
                         aria-checked={on}
                         className={`tv-markets-ind-menu__item${on ? " is-on" : ""}`}
-                        onClick={() => setStudyOn((prev) => ({ ...prev, [s.key]: !on }))}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setStudyOn((prev) => ({ ...prev, [s.key]: prev[s.key] === false }));
+                        }}
                       >
-                        <span className="tv-markets-ind-menu__dot" aria-hidden />
                         <span className="tv-markets-ind-menu__ico" aria-hidden>
                           <StudyGlyph kind={s.key} />
                         </span>
@@ -574,66 +542,94 @@ export function MercadosTradingPage() {
                           <strong>{s.label}</strong>
                           <em>{s.hint}</em>
                         </span>
+                        <span className={`tv-markets-ind-menu__status${on ? " is-on" : ""}`} aria-hidden />
                       </button>
                     );
                   })}
                 </div>
               ) : null}
+              </div>
             </div>
             </div>
           </div>
 
           <aside className="tv-markets-rail">
             <div className={`tv-desk-signal tv-desk-signal--${signal?.bias ?? "wait"} hrs-card sgi-glass-panel`}>
-              <div className="tv-desk-signal__kicker">{copy.kicker}</div>
+              <div className="tv-desk-signal__top">
+                <span className="tv-desk-signal__badge">{copy.kicker}</span>
+                <span className="tv-desk-signal__live">
+                  <i aria-hidden />
+                  {signalLoading && !signal ? "Leyendo" : "Live"}
+                </span>
+              </div>
               <div className="tv-desk-signal__title">{signalLoading && !signal ? "LEYENDO…" : copy.title}</div>
               <div className="tv-desk-signal__price">{signal ? usd(signal.price) : "—"}</div>
-              <div className="tv-desk-signal__conf">
-                <div className="tv-desk-signal__conf-bar" style={{ width: `${signal?.confidence ?? 0}%` }} />
+
+              <div className="tv-desk-votes" aria-label="Votos de confluencia">
+                <div className="tv-desk-votes__item is-buy">
+                  <strong>{signal?.buyVotes ?? 0}</strong>
+                  <span>Alcistas</span>
+                </div>
+                <div className="tv-desk-votes__item is-sell">
+                  <strong>{signal?.sellVotes ?? 0}</strong>
+                  <span>Bajistas</span>
+                </div>
+                <div className="tv-desk-votes__item is-wait">
+                  <strong>{signal?.waitVotes ?? 0}</strong>
+                  <span>Neutros</span>
+                </div>
               </div>
-              <div className="tv-desk-signal__meta">
-                {signal
-                  ? `${signal.buyVotes} alcistas · ${signal.sellVotes} bajistas · ${signal.waitVotes} neutros · ${signal.confidence}% alineación`
-                  : "Esperando velas de Binance"}
+
+              <div className="tv-desk-signal__conf-wrap">
+                <div className="tv-desk-signal__conf-row">
+                  <span>Alineación</span>
+                  <strong>{signal ? `${signal.confidence}%` : "—"}</strong>
+                </div>
+                <div className="tv-desk-signal__conf">
+                  <div className="tv-desk-signal__conf-bar" style={{ width: `${signal?.confidence ?? 0}%` }} />
+                </div>
               </div>
+
               <p className="tv-desk-signal__thesis">{signalErr || signal?.thesis || "Calculando…"}</p>
-              <p className="tv-desk-signal__action">{signal?.action}</p>
+              {signal?.action ? <p className="tv-desk-signal__action">{signal.action}</p> : null}
             </div>
 
             {signal && signal.bias !== "wait" ? (
               <div className={`tv-desk-levels tv-desk-levels--${signal.bias} hrs-card sgi-glass-panel`}>
-                <div>
+                <div className="tv-desk-level">
                   <span>{signal.bias === "buy" ? "Largo · entrada" : "Corto · entrada"}</span>
                   <strong>{usd(signal.price)}</strong>
                 </div>
-                <div>
+                <div className="tv-desk-level">
                   <span>{signal.bias === "buy" ? "Stop debajo" : "Stop arriba"}</span>
                   <strong>{usd(signal.stop)}</strong>
+                  <em>{signal.riskUsd ? `Riesgo ${usd(signal.riskUsd)}` : ""}</em>
                 </div>
-                <div>
-                  <span>{signal.bias === "buy" ? "T1 arriba" : "T1 abajo"} · {signal.rr1.toFixed(1)}R</span>
+                <div className="tv-desk-level">
+                  <span>{signal.bias === "buy" ? "T1 arriba" : "T1 abajo"}</span>
                   <strong>{usd(signal.target1)}</strong>
+                  <em>{signal.rr1.toFixed(1)}R</em>
                 </div>
-                <div>
+                <div className="tv-desk-level">
                   <span>{signal.bias === "buy" ? "T2 arriba" : "T2 abajo"}</span>
                   <strong>{usd(signal.target2)}</strong>
                 </div>
               </div>
             ) : signal ? (
               <div className="tv-desk-levels tv-desk-levels--wait hrs-card sgi-glass-panel">
-                <div>
+                <div className="tv-desk-level">
                   <span>Precio</span>
                   <strong>{usd(signal.price)}</strong>
                 </div>
-                <div>
+                <div className="tv-desk-level">
                   <span>Supertrend</span>
                   <strong>{usd(signal.supertrend)}</strong>
                 </div>
-                <div>
+                <div className="tv-desk-level">
                   <span>EMA 200</span>
                   <strong>{usd(signal.ema200)}</strong>
                 </div>
-                <div>
+                <div className="tv-desk-level">
                   <span>Plan</span>
                   <strong>Sin setup</strong>
                 </div>
@@ -644,26 +640,45 @@ export function MercadosTradingPage() {
               <div className="tv-desk-ranges hrs-card sgi-glass-panel">
                 <h2>Rangos</h2>
                 <div className="tv-desk-range">
-                  <span>Rango del día</span>
-                  <strong>
-                    {usd(signal.rangeDayLow ?? NaN)}
-                    <em>→</em>
-                    {usd(signal.rangeDayHigh ?? NaN)}
-                  </strong>
+                  <div className="tv-desk-range__head">
+                    <span>Rango del día</span>
+                    <strong>
+                      {usd(signal.rangeDayLow ?? NaN)}
+                      <em>→</em>
+                      {usd(signal.rangeDayHigh ?? NaN)}
+                    </strong>
+                  </div>
+                  <div className="tv-desk-range__track" aria-hidden>
+                    <i
+                      className="tv-desk-range__dot"
+                      style={{ left: `${rangePct(signal.price, signal.rangeDayLow, signal.rangeDayHigh)}%` }}
+                    />
+                  </div>
                 </div>
                 <div className="tv-desk-range">
-                  <span>Rango 52 semanas</span>
-                  <strong>
-                    {usd(signal.range52Low ?? NaN)}
-                    <em>→</em>
-                    {usd(signal.range52High ?? NaN)}
-                  </strong>
+                  <div className="tv-desk-range__head">
+                    <span>Rango 52 semanas</span>
+                    <strong>
+                      {usd(signal.range52Low ?? NaN)}
+                      <em>→</em>
+                      {usd(signal.range52High ?? NaN)}
+                    </strong>
+                  </div>
+                  <div className="tv-desk-range__track is-wide" aria-hidden>
+                    <i
+                      className="tv-desk-range__dot"
+                      style={{ left: `${rangePct(signal.price, signal.range52Low, signal.range52High)}%` }}
+                    />
+                  </div>
                 </div>
               </div>
             ) : null}
 
             <div className="tv-desk-checks hrs-card sgi-glass-panel">
-              <h2>Checklist de confluencia</h2>
+              <h2>
+                Checklist
+                <em>{signal?.checks?.length ? `${signal.checks.length} lecturas` : ""}</em>
+              </h2>
               <ul>
                 {(signal?.checks ?? []).map((c) => (
                   <li key={c.id} className={`tv-desk-check tv-desk-check--${c.bias}`}>
