@@ -1301,7 +1301,7 @@ export function MercadosTradingPage() {
                   <div className="tv-desk-range__track" aria-hidden>
                     <i
                       className="tv-desk-range__dot"
-                      style={{ left: `${rangePct(signal.price, signal.rangeDayLow, signal.rangeDayHigh)}%` }}
+                      style={{ left: `${rangePct(signal.price, signal.rangeDayLow ?? NaN, signal.rangeDayHigh ?? NaN)}%` }}
                     />
                   </div>
                 </div>
@@ -1317,7 +1317,7 @@ export function MercadosTradingPage() {
                   <div className="tv-desk-range__track is-wide" aria-hidden>
                     <i
                       className="tv-desk-range__dot"
-                      style={{ left: `${rangePct(signal.price, signal.range52Low, signal.range52High)}%` }}
+                      style={{ left: `${rangePct(signal.price, signal.range52Low ?? NaN, signal.range52High ?? NaN)}%` }}
                     />
                   </div>
                 </div>

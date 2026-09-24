@@ -145,11 +145,6 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath();
 }
 
-function barStep(rows: MarketCandle[]): number {
-  if (rows.length < 2) return 0;
-  return Math.max(1, rows[rows.length - 1]!.t - rows[rows.length - 2]!.t);
-}
-
 function mergeCandleSnapshot(prev: MarketCandle[], snap: MarketCandle[]): MarketCandle[] {
   if (snap.length < 2) return prev;
   if (prev.length < 2) return snap;
@@ -329,15 +324,19 @@ export function MercadosNativeChart({
     return best;
   };
 
-  const pickHoverTarget = (x: number, y: number) => {
+  const pickHoverTarget = (
+    x: number,
+    y: number,
+  ): { type: "study"; key: StudyLineKey } | { type: "drawing"; id: string } | null => {
     const candles = candlesRef.current;
     const on = onRef.current;
     const g = geomRef.current;
     if (candles.length < 2 || y < g.priceTop - 6 || y > g.priceBot + 6) return null;
     const closes = candles.map((c) => c.c);
-    let best: { type: "study"; key: StudyLineKey } | { type: "drawing"; id: string } | null = null;
+    type HoverPick = { type: "study"; key: StudyLineKey } | { type: "drawing"; id: string };
+    let best: HoverPick | null = null;
     let dist = 8;
-    const consider = (d: number, next: NonNullable<typeof best>) => {
+    const consider = (d: number, next: HoverPick) => {
       if (d < dist) {
         dist = d;
         best = next;
