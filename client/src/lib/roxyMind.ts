@@ -202,3 +202,58 @@ export function pickFreshFact(
   if (!pool.length) return null;
   return pool[Math.abs(salt) % pool.length]!;
 }
+
+export function roxyQuietGapMs(patience = 50, discipline = 50, afterStop = false): number {
+  let ms = 8 * 60_000;
+  ms += Math.max(0, patience - 48) * 14_000;
+  ms += Math.max(0, discipline - 48) * 10_000;
+  if (afterStop) ms += 10 * 60_000;
+  return Math.min(30 * 60_000, Math.max(4 * 60_000, ms));
+}
+
+export function roxyMaySpeak(opts: {
+  quietUntil?: number;
+  lastTalkKey?: string;
+  lastNoteAt?: number;
+  sceneKey: string;
+  hasEvents: boolean;
+  now: number;
+}): boolean {
+  if (opts.hasEvents) return true;
+  if ((opts.quietUntil ?? 0) > opts.now) return false;
+  if ((opts.lastTalkKey ?? "") === opts.sceneKey) return false;
+  if (opts.lastNoteAt && opts.now - opts.lastNoteAt < 5 * 60_000) return false;
+  return true;
+}
+
+export function roxySceneKey(input: {
+  armed: boolean;
+  universe: string;
+  opsUsed: number;
+  maxOps: number;
+  positions: { id: string; t1Done: boolean }[];
+  lead?: { symbol: string; bias: string; confidence: number };
+  interval?: string;
+}): string {
+  return [
+    input.armed ? "on" : "off",
+    input.universe,
+    `${input.opsUsed}/${input.maxOps}`,
+    input.positions.map((p) => `${p.id}:${p.t1Done ? "t1" : "op"}`).join(",") || "-",
+    input.lead ? `${input.lead.symbol}:${input.lead.bias}:${Math.round(input.lead.confidence / 10)}` : "x",
+    input.interval || "",
+  ].join("|");
+}
+
+export function markRoxySpoke(
+  mind: { quietUntil?: number; lastTalkKey?: string; patience?: number; discipline?: number },
+  sceneKey: string,
+  events: { kind: string; reason?: string; pnl?: number }[],
+  now: number,
+): void {
+  mind.lastTalkKey = sceneKey;
+  const afterStop = events.some(
+    (e) => e.kind === "close" && (e.reason === "stop" || (e.pnl ?? 0) < 0),
+  );
+  mind.quietUntil = now + roxyQuietGapMs(mind.patience ?? 50, mind.discipline ?? 50, afterStop);
+}

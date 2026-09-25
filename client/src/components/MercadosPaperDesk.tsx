@@ -11,7 +11,6 @@ import {
   clampPaperT1Pct,
   composePaperMode,
   loadPaperBook,
-  narratePaper,
   paperAtDayCap,
   paperAtOpsCap,
   paperDirOf,
@@ -273,8 +272,8 @@ function AgentOpinion({
       hushRoxy();
       return;
     }
-    const line = current.body?.trim() || current.title;
-    if (!line) return;
+    const line = (current.body || "").trim();
+    if (!line || current.title === "Silencio") return;
     speakRoxy(line);
   }, [muted, current.id, current.title, current.body]);
 
@@ -282,14 +281,17 @@ function AgentOpinion({
   const newer = i > 0;
   const when = fmtStamp(current.at);
   const text = isLive ? shown : current.body;
-  const chunks = (text || " ").split(/\n+/).filter((p) => p.length > 0);
+  const silent = !String(current.body || "").trim();
+  const chunks = silent
+    ? ["En silencio. Si no hay nada nuevo que hacer, no hablo."]
+    : (text || "").split(/\n+/).filter((p) => p.length > 0);
 
   return (
     <blockquote className={`tv-paper-opine tv-paper-opine--${current.tone}`}>
-      <RoxyFace talking={voicing || (isLive && !done && !muted)} />
+      <RoxyFace talking={Boolean(!silent && (voicing || (isLive && !done && !muted)))} />
       <div className="tv-paper-opine__ident">
         <p className="tv-paper-opine__kicker">Opinión de {ROXY}</p>
-        <p className="tv-paper-opine__title">{current.title}</p>
+        <p className="tv-paper-opine__title">{silent ? "Silencio" : current.title}</p>
       </div>
       <div className="tv-paper-opine__tools">
         <p className="tv-paper-opine__meta">
@@ -570,8 +572,14 @@ export function MercadosPaperDesk({
   const ledger = useMemo(() => splitPaperTrades(book), [book]);
   const liveTalk = useMemo(() => {
     if (book.notes[0]) return book.notes[0];
-    return narratePaper(book, sigs, [], tag);
-  }, [book, sigs, pairs]);
+    return {
+      at: Date.now(),
+      tone: "idle" as const,
+      title: "Silencio",
+      body: "",
+      fingerprint: "hush",
+    };
+  }, [book.notes]);
   const alert = useMemo(() => paperEntryAlert(book, sigs), [book, sigs]);
   const prep = useMemo(() => paperPrepProcess(book, sigs), [book, sigs]);
 

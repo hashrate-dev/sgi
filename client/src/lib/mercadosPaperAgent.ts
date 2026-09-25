@@ -3,8 +3,11 @@ import {
   hydrateRoxyFacts,
   hydrateRoxySaid,
   ingestTapeFacts,
+  markRoxySpoke,
   pickFreshFact,
   rememberRoxySaid,
+  roxyMaySpeak,
+  roxySceneKey,
   roxyTooClose,
   type RoxyFact,
 } from "./roxyMind";
@@ -181,6 +184,8 @@ export type PaperMind = {
   facts: RoxyFact[];
   newsAt: number;
   coffee: number;
+  quietUntil: number;
+  lastTalkKey: string;
 };
 
 export type PaperBook = {
@@ -274,18 +279,20 @@ export function paperStyleOf(book: Pick<PaperBook, "style"> | { style?: unknown 
 type ScalpBand = "ultra" | "fast" | "mid" | "hour" | "context";
 
 function scalpBand(interval: string): ScalpBand {
-  if (interval === "1s" || interval === "LIVE" || interval === "1") return "ultra";
-  if (interval === "5") return "fast";
-  if (interval === "15" || interval === "30") return "mid";
-  if (interval === "60") return "hour";
+  const iv = chartInterval(interval);
+  if (iv === "1s" || iv === "LIVE" || iv === "1") return "ultra";
+  if (iv === "5") return "fast";
+  if (iv === "15" || iv === "30") return "mid";
+  if (iv === "60") return "hour";
   return "context";
 }
 
 function paperAllowsOpen(interval: string, style: PaperStyle): boolean {
+  const iv = chartInterval(interval);
   if (style === "swing") {
-    return interval === "15" || interval === "30" || interval === "60" || interval === "240" || interval === "D";
+    return iv === "15" || iv === "30" || iv === "60" || iv === "240" || iv === "D";
   }
-  return scalpBand(interval) !== "context";
+  return scalpBand(iv) !== "context";
 }
 
 function entryPlan(sig: BtcTradeSignal, side: "long" | "short", style: PaperStyle): { stop: number; t1: number; t2: number } {
@@ -380,6 +387,8 @@ export function emptyRoxyMind(): PaperMind {
     facts: [],
     newsAt: 0,
     coffee: 0,
+    quietUntil: 0,
+    lastTalkKey: "",
   };
 }
 
@@ -432,6 +441,8 @@ export function hydrateRoxyMind(raw: unknown): PaperMind {
     facts: hydrateRoxyFacts((src as { facts?: unknown }).facts),
     newsAt: Number((src as { newsAt?: unknown }).newsAt) || 0,
     coffee: Math.max(0, Math.floor(Number((src as { coffee?: unknown }).coffee) || 0)),
+    quietUntil: Number((src as { quietUntil?: unknown }).quietUntil) || 0,
+    lastTalkKey: String((src as { lastTalkKey?: unknown }).lastTalkKey || ""),
   };
 }
 
@@ -549,6 +560,10 @@ function applyRoxyLearn(book: PaperBook, events: PaperEvent[], now: number): voi
       }
     }
   }
+  const afterStop = events.some(
+    (ev) => ev.kind === "close" && (ev.reason === "stop" || (ev.pnl ?? 0) < 0),
+  );
+  mind.quietUntil = now + (afterStop ? 18 * 60_000 : 6 * 60_000);
 }
 
 export function roxyAllowsEntry(book: PaperBook, symbol: string, confidence: number, now = Date.now()): boolean {
@@ -581,9 +596,24 @@ export function normalizePaperMode(raw: unknown): PaperMode {
   return "all";
 }
 
+function chartInterval(interval: string): string {
+  const x = String(interval || "").trim();
+  const map: Record<string, string> = {
+    LIVE: "1s",
+    "1m": "1",
+    "5m": "5",
+    "15m": "15",
+    "30m": "30",
+    "1h": "60",
+    "4h": "240",
+    "1d": "D",
+    "1D": "D",
+  };
+  return map[x] ?? x;
+}
+
 export function normalizePaperRunInterval(raw: unknown): string {
-  const iv = String(raw ?? "").trim();
-  if (iv === "LIVE") return "1s";
+  const iv = chartInterval(String(raw ?? "").trim());
   if (iv === "1s" || iv === "1" || iv === "5" || iv === "15" || iv === "30" || iv === "60" || iv === "240" || iv === "D") {
     return iv;
   }
@@ -1058,8 +1088,9 @@ export function splitPaperTrades(book: PaperBook): { open: PaperTrade[]; closed:
 }
 
 function neededConfirm(interval: string, style: PaperStyle = "intraday"): number {
+  const iv = chartInterval(interval);
   if (style === "swing") {
-    if (interval === "240" || interval === "D") return 1;
+    if (iv === "240" || iv === "D") return 1;
     return 2;
   }
   const b = scalpBand(interval);
@@ -1428,12 +1459,19 @@ function ivTalk(iv: string): string {
     "1s": "1 segundo",
     LIVE: "tiempo real",
     "1": "1 minuto",
+    "1m": "1 minuto",
     "5": "5 minutos",
+    "5m": "5 minutos",
     "15": "15 minutos",
+    "15m": "15 minutos",
     "30": "30 minutos",
+    "30m": "30 minutos",
     "60": "1 hora",
+    "1h": "1 hora",
     "240": "4 horas",
+    "4h": "4 horas",
     D: "1 día",
+    "1d": "1 día",
   };
   return m[iv] ?? (iv || "este gráfico");
 }
@@ -1703,6 +1741,7 @@ function reasonTalk(reason: string): string {
 }
 
 export function pushPaperNote(book: PaperBook, note: Omit<PaperNote, "id">): PaperBook {
+  if (!note.body.trim()) return book;
   const last = book.notes[0];
   if (last && roxyTooClose(last.body, note.body)) {
     return book;
@@ -1765,20 +1804,50 @@ export function narratePaper(
   tag: (symbol: string) => string,
 ): Omit<PaperNote, "id"> {
   const at = Date.now();
+  const hush = (sceneKey: string): Omit<PaperNote, "id"> => ({
+    at,
+    tone: "idle",
+    title: "Silencio",
+    body: "",
+    fingerprint: `hush/${sceneKey}`,
+  });
+  const focused =
+    book.universe === "ALL"
+      ? signals
+      : signals.filter((s) => s.symbol === book.universe || book.positions.some((p) => p.symbol === s.symbol));
+  const view = focused.length ? focused : signals;
+  const lead = [...view].sort((a, b) => b.confidence - a.confidence)[0];
+  const sceneKey = roxySceneKey({
+    armed: book.armed,
+    universe: book.universe,
+    opsUsed: book.opsUsed,
+    maxOps: book.maxOps,
+    positions: book.positions,
+    lead,
+    interval: lead?.interval || book.runInterval,
+  });
+  if (
+    !roxyMaySpeak({
+      quietUntil: book.mind?.quietUntil,
+      lastTalkKey: book.mind?.lastTalkKey,
+      lastNoteAt: book.notes[0]?.at,
+      sceneKey,
+      hasEvents: events.length > 0,
+      now: at,
+    })
+  ) {
+    if (book.mind) book.mind.lastTalkKey = sceneKey;
+    return hush(sceneKey);
+  }
+
   const beat = Math.floor(at / 18_000);
   const left = paperOpsLeft(book);
   const atCap = paperAtOpsCap(book);
   const minC = paperMinConfOf(book);
   const risk = clampPaperRiskPct(book.riskPct ?? 1);
   const t1p = clampPaperT1Pct(book.t1Pct ?? 50);
-  const focused =
-    book.universe === "ALL"
-      ? signals
-      : signals.filter((s) => s.symbol === book.universe || book.positions.some((p) => p.symbol === s.symbol));
-  const view = focused.length ? focused : signals;
   const buys = [...view.filter((s) => s.bias === "buy")].sort((a, b) => b.confidence - a.confidence);
   const sells = [...view.filter((s) => s.bias === "sell")].sort((a, b) => b.confidence - a.confidence);
-  const lead = [...view].sort((a, b) => b.confidence - a.confidence)[0];
   const hot = buys[0] ?? sells[0] ?? lead;
   const rawIv = view[0]?.interval || book.runInterval || "";
   const iv = ivTalk(rawIv);
@@ -1979,11 +2048,8 @@ export function narratePaper(
   }
 
   const news = nws();
-  if (news) paras.push(news);
-
-  if (voiceHash(seed + "|life") % 9 === 0 && !events.length) {
-    const aside = lifeAside(at, seed, recent);
-    if (aside) paras.push(aside);
+  if (news && (events.length || tone === "watch" || tone === "open" || tone === "close" || tone === "adjust")) {
+    paras.push(news);
   }
 
   const last = book.notes[0];
@@ -2007,5 +2073,6 @@ export function narratePaper(
     String(book.mind?.said?.length ?? 0),
   ].join("/");
 
+  if (book.mind) markRoxySpoke(book.mind, sceneKey, events, at);
   return { at, tone, title, body, fingerprint };
 }

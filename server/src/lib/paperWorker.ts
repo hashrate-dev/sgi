@@ -8,6 +8,7 @@ import {
 } from "./mercadosPaperAgent.js";
 import { listArmedPaperBooks, saveUserPaperBook } from "./paperBookStore.js";
 import { rememberSgiNewsOnBook } from "./roxyNews.js";
+import { markRoxySpoke, roxyMaySpeak, roxySceneKey } from "./roxyMind.js";
 
 export const PAPER_SYMBOLS = ["BTCUSDT", "ETHUSDT", "LTCUSDT", "DOGEUSDT", "ZECUSDT", "SOLUSDT"] as const;
 
@@ -45,8 +46,51 @@ export async function tickArmedPaperBook(book: PaperBook): Promise<PaperBook> {
   if (!signals.length) return book;
   const { book: ticked, events } = tickPaperMany({ ...book, runInterval: iv }, signals);
   const withNews = await rememberSgiNewsOnBook(ticked, symbols);
+  const now = Date.now();
+  const lead = [...signals].sort((a, b) => b.confidence - a.confidence)[0];
+  const sceneKey = roxySceneKey({
+    armed: withNews.armed,
+    universe: withNews.universe,
+    opsUsed: withNews.opsUsed,
+    maxOps: withNews.maxOps,
+    positions: withNews.positions,
+    lead,
+    interval: lead?.interval || withNews.runInterval,
+  });
+  if (!withNews.mind) {
+    withNews.mind = {
+      said: [],
+      facts: [],
+      newsAt: 0,
+      coffee: 0,
+      quietUntil: 0,
+      lastTalkKey: "",
+      lastStopAt: 0,
+      revengeUntil: 0,
+      lastStopSymbol: "",
+    };
+  }
+  if (
+    !roxyMaySpeak({
+      quietUntil: withNews.mind.quietUntil,
+      lastTalkKey: withNews.mind.lastTalkKey,
+      lastNoteAt: withNews.notes[0]?.at,
+      sceneKey,
+      hasEvents: events.length > 0,
+      now,
+    })
+  ) {
+    withNews.mind.lastTalkKey = sceneKey;
+    return withNews;
+  }
   const spoken = narratePaper(withNews, signals, events, pairTag);
-  return pushPaperNote(withNews, spoken);
+  if (!spoken.body.trim()) {
+    withNews.mind.lastTalkKey = sceneKey;
+    return withNews;
+  }
+  const next = pushPaperNote(withNews, spoken);
+  markRoxySpoke(next.mind, sceneKey, events, now);
+  return next;
 }
 
 let running = false;
