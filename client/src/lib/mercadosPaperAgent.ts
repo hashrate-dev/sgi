@@ -1,9 +1,11 @@
 import type { BtcTradeSignal } from "./api";
 
 const FEE = 0.0004;
-const RISK_PCT = 0.01;
 const MIN_CONF = 58;
 const CASH_CAP = 0.92;
+const DEFAULT_RISK_PCT = 1;
+const DEFAULT_SIZE_PCT = 25;
+const DEFAULT_T1_PCT = 50;
 const HIST = 72;
 const FILLS = 48;
 const TRADES = 200;
@@ -83,6 +85,7 @@ export type PaperTrade = {
   venue: PaperVenue;
 };
 
+export type PaperStyle = "auto" | "intraday" | "swing";
 export type PaperUniverse = "ALL" | string;
 
 export type PaperNoteTone = "idle" | "watch" | "open" | "hold" | "adjust" | "close" | "cap" | "pause";
@@ -107,6 +110,11 @@ export type PaperBook = {
   mode: PaperMode;
   leverage: PaperLev;
   runInterval: string;
+  riskPct: number;
+  sizePct: number;
+  minConf: number;
+  t1Pct: number;
+  style: PaperStyle;
   confirms: Record<string, { fire: "buy" | "sell" | "wait"; n: number }>;
   positions: PaperPosition[];
   trades: PaperTrade[];
@@ -128,6 +136,39 @@ export function clampPaperLev(n: number): PaperLev {
   if (n >= 3) return 3;
   if (n >= 2) return 2;
   return 1;
+}
+
+export function clampPaperRiskPct(n: number): number {
+  if (!Number.isFinite(n)) return DEFAULT_RISK_PCT;
+  return Math.round(Math.max(0.25, Math.min(5, n)) * 4) / 4;
+}
+
+export function clampPaperSizePct(n: number): number {
+  if (!Number.isFinite(n)) return DEFAULT_SIZE_PCT;
+  return Math.round(Math.max(5, Math.min(100, n)));
+}
+
+export function clampPaperMinConf(n: number): number {
+  if (!Number.isFinite(n)) return MIN_CONF;
+  return Math.round(Math.max(50, Math.min(85, n)));
+}
+
+export function clampPaperT1Pct(n: number): number {
+  if (!Number.isFinite(n)) return DEFAULT_T1_PCT;
+  return Math.round(Math.max(25, Math.min(75, n)));
+}
+
+export function paperMinConfOf(book: PaperBook): number {
+  return clampPaperMinConf(book.minConf ?? MIN_CONF);
+}
+
+export function normalizePaperStyle(raw: unknown): PaperStyle {
+  if (raw === "swing" || raw === "intraday" || raw === "auto") return raw;
+  return "auto";
+}
+
+export function paperStyleOf(book: Pick<PaperBook, "style"> | { style?: unknown }): PaperStyle {
+  return normalizePaperStyle(book.style);
 }
 
 export function normalizePaperMode(raw: unknown): PaperMode {
@@ -178,6 +219,11 @@ export function emptyPaperBook(
     mode: md,
     leverage: paperEffectiveLev(md, leverage),
     runInterval: "60",
+    riskPct: DEFAULT_RISK_PCT,
+    sizePct: DEFAULT_SIZE_PCT,
+    minConf: MIN_CONF,
+    t1Pct: DEFAULT_T1_PCT,
+    style: "auto" as PaperStyle,
     confirms: {},
     positions: [],
     trades: [],
@@ -320,6 +366,11 @@ export function hydratePaperBook(parsed: Partial<PaperBook> & { v?: number }): P
     mode,
     leverage: paperEffectiveLev(mode, parsed.leverage ?? 1),
     runInterval: normalizePaperRunInterval(parsed.runInterval),
+    riskPct: clampPaperRiskPct(parsed.riskPct ?? DEFAULT_RISK_PCT),
+    sizePct: clampPaperSizePct(parsed.sizePct ?? DEFAULT_SIZE_PCT),
+    minConf: clampPaperMinConf(parsed.minConf ?? MIN_CONF),
+    t1Pct: clampPaperT1Pct(parsed.t1Pct ?? DEFAULT_T1_PCT),
+    style: normalizePaperStyle(parsed.style),
     maxOps: clampPaperMaxOps(parsed.maxOps ?? DEFAULT_MAX_OPS),
     opsUsed,
     positions: positionsHydrated,
@@ -398,7 +449,7 @@ export function paperEntryAlert(book: PaperBook, signals: BtcTradeSignal[]): Pap
     const confPart = (Math.min(n, need) / need) * 100;
     let s = align * 0.62 + confPart * 0.38;
     if (sig.bias !== side) s *= 0.32;
-    if (align < MIN_CONF) s = Math.min(s, 50);
+    if (align < paperMinConfOf(book)) s = Math.min(s, 50);
     if (side === "buy" && sig.rsi >= 76) s = Math.min(s, 38);
     if (side === "sell" && sig.rsi <= 24) s = Math.min(s, 38);
     return Math.round(Math.max(0, Math.min(100, s)));
@@ -476,6 +527,71 @@ export function paperEntryAlert(book: PaperBook, signals: BtcTradeSignal[]): Pap
   return best;
 }
 
+export type PaperPrep = {
+  pct: number;
+  stage: string;
+  symbol: string;
+  intent: "buy" | "sell" | "none" | "hold";
+};
+
+export function paperPrepProcess(book: PaperBook, signals: BtcTradeSignal[]): PaperPrep {
+  const mode = normalizePaperMode(book.mode);
+  const minC = paperMinConfOf(book);
+  const style = paperStyleOf(book);
+  const view =
+    book.universe === "ALL"
+      ? signals
+      : signals.filter((s) => s.symbol === book.universe || book.positions.some((p) => p.symbol === s.symbol));
+
+  if (!book.armed) return { pct: 0, stage: "Pausada · no prepara", symbol: "", intent: "none" };
+  if (paperAtOpsCap(book) && !book.positions.length) {
+    return { pct: 0, stage: "Tope · no hay próxima op", symbol: "", intent: "none" };
+  }
+  if (book.positions.length) {
+    const p = book.positions[0]!;
+    return {
+      pct: 100,
+      stage: p.t1Done ? `Gestionando ${p.symbol.replace("USDT", "")} · T1 hecho, corre a T2` : `En operación ${p.symbol.replace("USDT", "")} · stop y T1 activos`,
+      symbol: p.symbol,
+      intent: "hold",
+    };
+  }
+  if (!view.length) return { pct: 1, stage: "Esperando lectura", symbol: "", intent: "none" };
+
+  let best = { pct: 1, symbol: "", intent: "none" as "buy" | "sell" | "none", stage: "Mirando el tablero" };
+  for (const sig of view) {
+    const side: "buy" | "sell" | null = sig.bias === "buy" || sig.bias === "sell" ? sig.bias : null;
+    if (!side) continue;
+    if (!paperAllowsSide(mode, side === "buy" ? "long" : "short")) continue;
+    const need = Math.max(1, neededConfirm(sig.interval, style));
+    const c = book.confirms[sig.symbol];
+    const n = c && c.fire === side ? c.n : 0;
+    const align = Math.max(0, Math.min(1, sig.confidence / minC));
+    const confs = Math.max(0, Math.min(1, n / need));
+    const rsiOk = side === "buy" ? sig.rsi < 76 : sig.rsi > 24;
+    const cloudOk = side === "buy" ? sig.ichiCloud !== "below" : sig.ichiCloud !== "above";
+    const volOk = !Number.isFinite(sig.volRatio) || (sig.volRatio ?? 1) >= 0.82;
+    const filters = (rsiOk ? 0.34 : 0) + (cloudOk ? 0.34 : 0) + (volOk ? 0.32 : 0);
+    let pct = Math.round(align * 42 + confs * 40 + filters * 18);
+    if (!rsiOk || !cloudOk) pct = Math.min(pct, 72);
+    if (align >= 1 && confs >= 1 && rsiOk && cloudOk && volOk) pct = 100;
+    pct = Math.max(1, Math.min(100, pct));
+    if (pct > best.pct) {
+      let stage = "Leyendo mercado";
+      if (pct >= 100) stage = `Lista · ${side === "buy" ? "compra" : "venta"} ${sig.symbol.replace("USDT", "")}`;
+      else if (pct >= 82) stage = "Filtros finales · un paso de ejecutar";
+      else if (pct >= 61) stage = `Confirmando velas ${Math.min(n, need)}/${need}`;
+      else if (pct >= 41) stage = `Alineación ${sig.confidence.toFixed(0)}% (piso ${minC}%)`;
+      else if (pct >= 21) stage = `Armando sesgo de ${side === "buy" ? "compra" : "venta"}`;
+      best = { pct, symbol: sig.symbol, intent: side, stage };
+    }
+  }
+  if (best.intent === "none") {
+    return { pct: Math.max(1, Math.min(18, view.length ? 8 : 1)), stage: "Sin sesgo limpio · espera", symbol: "", intent: "none" };
+  }
+  return best;
+}
+
 export function splitPaperTrades(book: PaperBook): { open: PaperTrade[]; closed: PaperTrade[] } {
   const open: PaperTrade[] = [];
   const closed: PaperTrade[] = [];
@@ -488,10 +604,16 @@ export function splitPaperTrades(book: PaperBook): { open: PaperTrade[]; closed:
   return { open, closed };
 }
 
-function neededConfirm(interval: string): number {
-  if (interval === "1s" || interval === "LIVE" || interval === "1") return 3;
-  if (interval === "5" || interval === "15") return 2;
-  return 1;
+function neededConfirm(interval: string, style: PaperStyle = "auto"): number {
+  let n = 1;
+  if (interval === "1s" || interval === "LIVE" || interval === "1") n = 3;
+  else if (interval === "5" || interval === "15") n = 2;
+  if (style === "swing") n += 1;
+  return n;
+}
+
+function isFastInterval(interval: string): boolean {
+  return interval === "1s" || interval === "LIVE" || interval === "1" || interval === "5";
 }
 
 function pushFill(book: PaperBook, fill: Omit<PaperFill, "id">): void {
@@ -524,26 +646,32 @@ function markHist(book: PaperBook, marks: Record<string, number>): void {
   if (eq > book.peakUsd) book.peakUsd = eq;
 }
 
-function canEnter(sig: BtcTradeSignal, side: "long" | "short"): boolean {
-  if (sig.confidence < MIN_CONF) return false;
+function canEnter(sig: BtcTradeSignal, side: "long" | "short", book: PaperBook): boolean {
+  const minConf = paperMinConfOf(book);
+  const style = paperStyleOf(book);
+  if (sig.confidence < minConf) return false;
+  if (style === "swing" && isFastInterval(sig.interval) && sig.confidence < Math.min(85, minConf + 12)) return false;
   if (side === "long" && sig.rsi >= 76) return false;
   if (side === "short" && sig.rsi <= 24) return false;
   if (side === "long" && sig.ichiCloud === "below") return false;
   if (side === "short" && sig.ichiCloud === "above") return false;
   if (Number.isFinite(sig.volRatio) && (sig.volRatio ?? 1) < 0.82) return false;
   const dist = Math.abs(sig.price - sig.stop);
-  if (!(dist > 0) || dist / sig.price < 0.0015) return false;
+  const minStop = style === "swing" && !isFastInterval(sig.interval) ? 0.003 : 0.0015;
+  if (!(dist > 0) || dist / sig.price < minStop) return false;
   return true;
 }
 
 function sizeQty(book: PaperBook, sig: BtcTradeSignal, side: "long" | "short", marks: Record<string, number>): number {
   const lev = paperEffectiveLev(book.mode ?? "all", book.leverage ?? 1);
   const eq = Math.max(1, paperEquity(book, { ...marks, [sig.symbol]: sig.price }));
-  const riskUsd = eq * RISK_PCT;
   const dist = Math.abs(sig.price - sig.stop);
-  let qty = riskUsd / dist;
+  if (!(dist > 0)) return 0;
+  const riskUsd = eq * (clampPaperRiskPct(book.riskPct ?? DEFAULT_RISK_PCT) / 100);
+  const qtyRisk = riskUsd / dist;
+  const qtySize = (eq * (clampPaperSizePct(book.sizePct ?? DEFAULT_SIZE_PCT) / 100) * lev) / sig.price;
   const maxQty = (book.cashUsd * CASH_CAP * lev) / sig.price;
-  qty = Math.min(qty, maxQty);
+  const qty = Math.min(qtyRisk, qtySize, maxQty);
   if (!(qty > 0) || qty * sig.price < 25) return 0;
   return side === "long" ? qty : -qty;
 }
@@ -665,7 +793,8 @@ export function tickPaper(
       closeTrade(next, pos, now, px, "t2", pnl);
       dropPos();
     } else if (hitT1) {
-      const part = pos.qty * 0.5;
+      const t1Frac = clampPaperT1Pct(next.t1Pct ?? DEFAULT_T1_PCT) / 100;
+      const part = pos.qty * t1Frac;
       const pnl = applyCloseQty(next, pos, part, px);
       pos.qty -= part;
       pos.t1Done = true;
@@ -727,7 +856,7 @@ export function tickPaper(
   const lev = paperEffectiveLev(mode, next.leverage ?? 1);
   if (next.armed && underCap && !hasPos && (fire === "buy" || fire === "sell") && n >= neededConfirm(sig.interval)) {
     const side = fire === "buy" ? "long" : "short";
-    if (paperAllowsSide(mode, side) && canEnter(sig, side)) {
+    if (paperAllowsSide(mode, side) && canEnter(sig, side, next)) {
       const marks = { ...(opts?.marks ?? {}), [sig.symbol]: px };
       const qty = sizeQty(next, sig, side, marks);
       if (qty !== 0) {
@@ -825,61 +954,94 @@ function say(seed: string, lines: string[]): string {
   return lines[voiceHash(seed) % lines.length]!;
 }
 
+type RoxyMood = "real" | "dry" | "fun";
+
+function moodOf(seed: string): RoxyMood {
+  const r = voiceHash(seed + "|mood") % 10;
+  if (r <= 1) return "fun";
+  if (r <= 4) return "dry";
+  return "real";
+}
+
+function speak(
+  seed: string,
+  pack: { real: string[]; dry?: string[]; fun?: string[] },
+  avoid?: string,
+): string {
+  const trySeed = (s: string) => {
+    const mood = moodOf(s);
+    const bank = (mood === "fun" && pack.fun?.length ? pack.fun : mood === "dry" && pack.dry?.length ? pack.dry : pack.real);
+    return bank[voiceHash(s + mood) % bank.length]!;
+  };
+  const head = (avoid ?? "").slice(0, 40);
+  let s = seed;
+  for (let i = 0; i < 8; i++) {
+    const t = trySeed(s);
+    if (!head || !t.startsWith(head)) return t;
+    s = `${seed}~${i}`;
+  }
+  return trySeed(s);
+}
+
 function cloudTalk(seed: string, c: BtcTradeSignal["ichiCloud"]): string {
   if (c === "above") {
-    return say(seed + "c", [
-      "precio arriba de la nube: el piso al menos tiene educación",
-      "sobre la nube, que no es lo mismo que sobre una alfombra roja",
-      "la nube nos sostiene; yo no me confío, pero tampoco me hago la ciega",
-    ]);
+    return speak(seed + "c", {
+      real: ["precio sobre la nube: el régimen sigue alcista", "arriba de la nube, el piso técnico aguanta"],
+      dry: ["sobre la nube, que no es lo mismo que sobre una alfombra roja", "la nube nos sostiene; yo no mando flores todavía"],
+      fun: ["la nube nos hace de colchón. Linda, pero no es un all-inclusive"],
+    });
   }
   if (c === "below") {
-    return say(seed + "c", [
-      "debajo de la nube: el techo nos está mirando feo",
-      "nube arriba, ánimo abajo. Clásico",
-      "estamos debajo; si alguien grita 'rebote mágico', yo me tapo los oídos",
-    ]);
+    return speak(seed + "c", {
+      real: ["debajo de la nube: el régimen es bajista", "nube arriba, presión vendedora vigente"],
+      dry: ["debajo de la nube el techo nos mira feo", "si alguien grita rebote mágico, me tapo los oídos"],
+      fun: ["la nube nos dejó en seen. Clásico"],
+    });
   }
   if (c === "inside") {
-    return say(seed + "c", [
-      "metidos en la nube, esa niebla donde todo el mundo se vuelve experto",
-      "dentro de la nube: zona de 'a ver qué pasa', mi deporte menos favorito",
-      "la nube nos tragó. Mientras no salga, yo no firmo cheques",
-    ]);
+    return speak(seed + "c", {
+      real: ["dentro de la nube: zona de duda, no hay régimen limpio", "nube adentro, espero que elija un lado"],
+      dry: ["metidos en la niebla donde todo el mundo se vuelve experto", "la nube nos tragó; yo no firmo cheques en la bruma"],
+      fun: ["estamos en la nube como en un ascensor con música rara: nadie habla y todos miran el precio"],
+    });
   }
-  return "la nube está en modo misterio";
+  return "la nube no está clara";
 }
 
 function rsiTalk(seed: string, rsi: number): string {
   const n = rsi.toFixed(0);
   if (rsi >= 76) {
-    return say(seed + "r", [
-      `RSI ${n}: ya está en modo selfie. Perseguir esto es pagarle el café al vendedor`,
-      `RSI ${n}, estiradísimo. Si compro ahora, mañana me escribo una carta de disculpas`,
-    ]);
+    return speak(seed + "r", {
+      real: [`RSI ${n}: sobrecompra. Perseguir acá rompe el plan de riesgo`],
+      dry: [`RSI ${n} en modo selfie. Comprar ahora es pagarle el café al vendedor`],
+      fun: [`RSI ${n}. Si esto fuera una fiesta, ya estarían sacando las sillas`],
+    });
   }
   if (rsi >= 68) {
-    return say(seed + "r", [
-      `RSI ${n}: hay fuerza, y también hay gente llegando tarde a la fiesta`,
-      `RSI ${n}, momentum de verdad, no de PowerPoint. Aun así no corro`,
-    ]);
+    return speak(seed + "r", {
+      real: [`RSI ${n}: momentum alcista, cerca de saturarse`],
+      dry: [`RSI ${n}, hay fuerza y también gente llegando tarde`],
+      fun: [`RSI ${n}: el globo está lindo, yo no le pongo más aire con los dientes`],
+    });
   }
   if (rsi <= 24) {
-    return say(seed + "r", [
-      `RSI ${n}: el piso está haciendo teatro. Vender más acá es patear a un caído`,
-      `RSI ${n}, oversold de manual. Los héroes entran acá; yo espero que deje de sangrar`,
-    ]);
+    return speak(seed + "r", {
+      real: [`RSI ${n}: sobreventa extrema. No vendo más acá`],
+      dry: [`RSI ${n}. Vender más es patear a un caído`],
+      fun: [`RSI ${n}: el piso está haciendo teatro. Yo no aplaudo todavía`],
+    });
   }
   if (rsi <= 32) {
-    return say(seed + "r", [
-      `RSI ${n}: hay presión vendedora, no pánico de película`,
-      `RSI ${n}, el mercado está de mal humor. Lo respeto`,
-    ]);
+    return speak(seed + "r", {
+      real: [`RSI ${n}: hay presión vendedora`],
+      dry: [`RSI ${n}, el mercado está de mal humor. Lo respeto`],
+    });
   }
-  return say(seed + "r", [
-    `RSI ${n}, zona civilizada. Ni euforia ni funeral`,
-    `RSI ${n}: equilibrado, aburrido, exactamente como me gusta para pensar`,
-  ]);
+  return speak(seed + "r", {
+    real: [`RSI ${n}: zona neutral, sirve para pensar`],
+    dry: [`RSI ${n}, equilibrado y aburrido. Perfecto`],
+    fun: [`RSI ${n}: ni euforia ni funeral. Hasta el oscilador se portó`],
+  });
 }
 
 function reasonTalk(reason: string): string {
@@ -912,9 +1074,12 @@ export function narratePaper(
   tag: (symbol: string) => string,
 ): Omit<PaperNote, "id"> {
   const at = Date.now();
-  const beat = Math.floor(at / 80_000);
+  const beat = Math.floor(at / 45_000);
   const left = paperOpsLeft(book);
   const atCap = paperAtOpsCap(book);
+  const minC = paperMinConfOf(book);
+  const risk = clampPaperRiskPct(book.riskPct ?? 1);
+  const t1p = clampPaperT1Pct(book.t1Pct ?? 50);
   const focused =
     book.universe === "ALL"
       ? signals
@@ -925,7 +1090,8 @@ export function narratePaper(
   const waits = view.filter((s) => s.bias === "wait");
   const lead = [...view].sort((a, b) => b.confidence - a.confidence)[0];
   const iv = ivTalk(view[0]?.interval ?? "");
-  const seed = `${beat}|${book.universe}|${lead?.symbol ?? ""}|${lead?.bias ?? "x"}|${book.armed ? 1 : 0}|${book.positions.length}`;
+  const lastHead = (book.notes[0]?.title ?? "") + (book.notes[0]?.body ?? "").slice(0, 24);
+  const seed = `${beat}|${book.universe}|${lead?.symbol ?? ""}|${lead?.bias ?? "x"}|${Math.round((lead?.confidence ?? 0) / 3)}|${book.armed ? 1 : 0}|${book.positions.length}`;
   const paras: string[] = [];
   const planName = lead ? tag(lead.symbol) : "el mercado";
 
@@ -933,40 +1099,57 @@ export function narratePaper(
     const name = tag(ev.symbol);
     if (ev.kind === "open") {
       paras.push(
-        say(seed + ev.symbol + "o", [
-          `Listo: entré ${ev.side === "long" ? "larga" : "corta"} en ${name} a ${usdTalk(ev.price)}. No fue un capricho; riesgo 1% y el mapa (stop, T1, T2) ya está clavado.`,
-          `Abrí ${name}. Si alguien esperaba un discurso motivacional, mal: esto es ejecución. Precio ${usdTalk(ev.price)}, yo adentro, drama afuera.`,
-          `${name} me convenció lo justo. Entro, marco el stop y me callo. El mercado ya habló de más.`,
-        ]),
+        speak(seed + ev.symbol + "o", {
+          real: [
+            `Entré ${ev.side === "long" ? "larga" : "corta"} en ${name} a ${usdTalk(ev.price)}. Riesgo ${risk}% del equity, stop/T1/T2 marcados. El plan es no tocar el tamaño.`,
+          ],
+          dry: [
+            `Abrí ${name} a ${usdTalk(ev.price)}. No hay discurso: hay mapa. Si corre, T1 ${t1p}% y el resto a T2.`,
+          ],
+          fun: [
+            `${name} me convención lo justo y yo ya estoy adentro a ${usdTalk(ev.price)}. El stop hace de adulto responsable; yo hago de Roxy.`,
+          ],
+        }),
       );
     } else if (ev.kind === "scale") {
       paras.push(
-        say(seed + ev.symbol + "sc", [
-          `T1 en ${name}: cobré la mitad y el stop se mudó a la entrada. El resto puede lucirse o irse; yo ya no regalo esa plata.`,
-          `${name} me pagó un adelanto. Saqué 50%, puse el stop en casa y ahora el trade trabaja para no volverme loca.`,
-        ]),
+        speak(seed + ev.symbol + "sc", {
+          real: [`T1 en ${name}: cerré ${t1p}% y el stop pasó a la entrada. El resto puede ir a T2 o no; el riesgo ya no es el de arranque.`],
+          dry: [`${name} me pagó un adelanto. Saqué ${t1p}%, stop en casa. Ahora el trade trabaja y yo no le mando memes.`],
+          fun: [`T1 cobrado en ${name}. Mitad en el bolsillo, ego en la jaula. El resto que se luzca si quiere.`],
+        }),
       );
     } else {
       const pnl = ev.pnl ?? 0;
       const signed = `${pnl >= 0 ? "+" : ""}${usdTalk(pnl)}`;
       paras.push(
-        say(seed + ev.symbol + "cl", [
-          `Cerré ${name} por ${reasonTalk(ev.reason)} a ${usdTalk(ev.price)} (${signed}). Fin del capítulo. No voy a perseguir el mismo chiste.`,
-          `${name} se acabó: ${reasonTalk(ev.reason)}, ${signed}. Respiro. El siguiente trade se gana esperando, no insistiendo.`,
-        ]),
+        speak(seed + ev.symbol + "cl", {
+          real: [`Cerré ${name} por ${reasonTalk(ev.reason)} a ${usdTalk(ev.price)} (${signed}). No persigo el mismo movimiento.`],
+          dry: [`${name} se acabó: ${reasonTalk(ev.reason)}, ${signed}. Siguiente idea, no la misma con otro nombre.`],
+          fun: [`Cortina para ${name} (${signed}). Aplausos cortos. El bis está prohibido por reglamento interno.`],
+        }),
       );
     }
   }
 
   let tone: PaperNoteTone = "idle";
-  let title = say(seed + "t0", ["Mirando el circo", "El mercado se hace el interesante", "Estoy leyendo el cuarto"]);
+  let title = speak(
+    seed + "t0",
+    {
+      real: ["Leyendo el flujo", "Confluencia en curso", "Estoy en el mapa"],
+      dry: ["El mercado se hace el interesante", "Ruido con corbata", "Otra función de velas"],
+      fun: ["Café y velas, mi deporte", "Hoy el gráfico tiene opiniones", "Estoy de turno, el precio también"],
+    },
+    lastHead,
+  );
 
   if (!view.length) {
     paras.push(
-      say(seed + "empty", [
-        "Todavía no me llega una lectura. Puedo inventar una opinión, claro. Prefiero no.",
-        "Pantalla en blanco, cerebro en standby. En cuanto haya confluencia, hablo.",
-      ]),
+      speak(seed + "empty", {
+        real: ["Todavía no hay confluencia fresca. Cuando llegue, armo el plan; no invento sesgo."],
+        dry: ["Pantalla en blanco. Puedo opinar igual, pero sería fanfic."],
+        fun: ["Cero velas, cero drama. Hasta yo me aburro con dignidad."],
+      }),
     );
   } else if (book.universe === "ALL") {
     const board =
@@ -975,62 +1158,92 @@ export function narratePaper(
             buys.length ? `Compra: ${buys.map((s) => `${tag(s.symbol)} ${s.confidence.toFixed(0)}%`).join(", ")}.` : "",
             sells.length ? `Venta: ${sells.map((s) => `${tag(s.symbol)} ${s.confidence.toFixed(0)}%`).join(", ")}.` : "",
             waits.length
-              ? say(seed + "w", [
-                  `${waits.map((s) => tag(s.symbol)).join(", ")} están en modo «después te llamo».`,
-                  `El resto bosteza: ${waits.map((s) => tag(s.symbol)).join(", ")}.`,
-                ])
+              ? speak(seed + "w", {
+                  real: [`En espera: ${waits.map((s) => tag(s.symbol)).join(", ")}.`],
+                  dry: [`${waits.map((s) => tag(s.symbol)).join(", ")} están en modo «después te llamo».`],
+                  fun: [`${waits.map((s) => tag(s.symbol)).join(", ")} hoy eligieron el sofá. Los respeto.`],
+                })
               : "",
           ]
             .filter(Boolean)
             .join(" ")
-        : say(seed + "none", [
-            `En ${iv} ninguna se anima a un COMPRAR o VENDER limpio. Qué talento para no decidir.`,
-            `Seis pares y cero convicción. Hoy el mercado está ensayando, no estrenando.`,
-            `Nada limpio. Si esto fuera una cita, yo ya estaría pidiendo la cuenta.`,
-          ]);
-    paras.push(say(seed + "all", [`Tablero de ${iv}. ${board}`, `Estoy recorriendo las seis en ${iv}. ${board}`]));
+        : speak(seed + "none", {
+            real: [`En ${iv} no hay COMPRAR/VENDER limpio. El plan es no inventar entradas.`],
+            dry: [`Seis pares y cero convicción. Hoy ensayan, no estrenan.`],
+            fun: [`Nada limpio. Si esto fuera una cita, ya estaría pidiendo la cuenta con sonrisa educada.`],
+          });
+    paras.push(
+      speak(seed + "all", {
+        real: [`Tablero de ${iv}. ${board}`],
+        dry: [`Recorro las seis en ${iv}. ${board}`],
+        fun: [`Pasé lista en ${iv}. ${board}`],
+      }),
+    );
     if (lead && (lead.bias === "buy" || lead.bias === "sell")) {
+      const dir = lead.bias === "buy" ? "compra" : "venta";
       paras.push(
-        say(seed + "lead", [
-          `La que más ruido hace es ${tag(lead.symbol)} (${lead.confidence.toFixed(0)}%): ${cloudTalk(seed, lead.ichiCloud)}. ${rsiTalk(seed, lead.rsi)}. Supertrend ${lead.supertrendDir === 1 ? "alcista" : "bajista"}.`,
-          `${tag(lead.symbol)} se cree protagonista al ${lead.confidence.toFixed(0)}%. ${cloudTalk(seed, lead.ichiCloud)}. ${rsiTalk(seed, lead.rsi)}. Yo la miro de reojo, no le firmo un contrato.`,
-        ]),
+        speak(seed + "lead", {
+          real: [
+            `Candidata: ${tag(lead.symbol)} (${dir}, ${lead.confidence.toFixed(0)}%). ${cloudTalk(seed, lead.ichiCloud)}. ${rsiTalk(seed, lead.rsi)}. Supertrend ${lead.supertrendDir === 1 ? "alcista" : "bajista"}. Plan: confirmar en ${iv} y no adelantarme.`,
+          ],
+          dry: [
+            `${tag(lead.symbol)} se cree protagonista al ${lead.confidence.toFixed(0)}%. ${cloudTalk(seed, lead.ichiCloud)}. ${rsiTalk(seed, lead.rsi)}. Yo la miro; contrato no hay.`,
+          ],
+          fun: [
+            `${tag(lead.symbol)} al ${lead.confidence.toFixed(0)}% me guiña. Yo le pido que se quede quieta dos velas más. ${cloudTalk(seed, lead.ichiCloud)}.`,
+          ],
+        }),
       );
     }
   } else {
     const s = view.find((x) => x.symbol === book.universe) ?? view[0];
     if (s) {
       const name = tag(s.symbol);
-      const need = neededConfirm(s.interval);
+      const need = neededConfirm(s.interval, paperStyleOf(book));
       const conf = book.confirms[s.symbol];
       const mood =
         s.bias === "buy"
-          ? say(seed + "mb", ["olor a compra, no a desfile", "sesgo comprador, todavía no es un sí", "el lado largo se está acomodando"])
+          ? speak(seed + "mb", {
+              real: ["sesgo de compra, todavía no es entrada"],
+              dry: ["olor a compra, no a desfile"],
+              fun: ["el lado largo se acomoda la corbata"],
+            })
           : s.bias === "sell"
-            ? say(seed + "ms", ["cara de venta, no de funeral", "el lado corto levanta la mano", "presión bajista, sin teatralidad"])
-            : say(seed + "mw", ["ni compra ni venta: el clásico «después vemos»", "el par se hace el misterioso", "cero disparo, mucha pose"]);
+            ? speak(seed + "ms", {
+                real: ["sesgo de venta, sin disparar todavía"],
+                dry: ["cara de venta, no de funeral"],
+                fun: ["el lado corto levantó la mano como en el colegio"],
+              })
+            : speak(seed + "mw", {
+                real: ["sin sesgo limpio: espera"],
+                dry: ["el par se hace el misterioso"],
+                fun: ["ni compra ni venta: el clásico «después vemos»"],
+              });
       paras.push(
-        `${name} en ${ivTalk(s.interval)}: ${mood}. Alineación ${s.confidence.toFixed(0)}%. ${cloudTalk(seed, s.ichiCloud)}. ${rsiTalk(seed, s.rsi)}. Supertrend ${s.supertrendDir === 1 ? "alcista" : "bajista"}.`,
+        `${name} en ${ivTalk(s.interval)}: ${mood}. Alineación ${s.confidence.toFixed(0)}% (piso ${minC}%). ${cloudTalk(seed, s.ichiCloud)}. ${rsiTalk(seed, s.rsi)}. Supertrend ${s.supertrendDir === 1 ? "alcista" : "bajista"}.`,
       );
       if (s.bias !== "wait" && conf) {
         if (conf.fire !== s.bias) {
           paras.push(
-            say(seed + "flip", [
-              "El sesgo cambió de camiseta. Reinicio el conteo. No persigo traiciones.",
-              "Acaba de girar. Gracias por el show: yo vuelvo a contar desde cero.",
-            ]),
+            speak(seed + "flip", {
+              real: ["El sesgo giró. Reinicio confirmaciones. No persigo el giro."],
+              dry: ["Cambió de camiseta. Yo vuelvo a contar desde cero."],
+              fun: ["Acaba de girar. Gracias por el plot twist; no compro la secuela en preventa."],
+            }),
           );
         } else {
           paras.push(
             conf.n >= need
-              ? say(seed + "ripe", [
-                  `Confirmaciones ${Math.min(conf.n, need)}/${need}. Está maduro. Si las reglas me dejan, actúo; si no, me muerdo la lengua.`,
-                  `${Math.min(conf.n, need)} de ${need}: ya no es un capricho. Ahora es decisión.`,
-                ])
-              : say(seed + "waitc", [
-                  `Llevo ${Math.min(conf.n, need)} de ${need} confirmaciones. Me falta que se sostenga, no que me convenzan con un candle heroico.`,
-                  `${Math.min(conf.n, need)}/${need}. Todavía puede ser un amague. Yo no aprieto por aburrimiento.`,
-                ]),
+              ? speak(seed + "ripe", {
+                  real: [`Confirmaciones ${Math.min(conf.n, need)}/${need}. Está maduro: si riesgo y tope dan, ejecuto.`],
+                  dry: [`${Math.min(conf.n, need)} de ${need}: ya no es capricho. Es decisión.`],
+                  fun: [`${Math.min(conf.n, need)}/${need}. El semáforo dejó de parpadear. Ahora sí o ahora no, sin poesía.`],
+                })
+              : speak(seed + "waitc", {
+                  real: [`Llevo ${Math.min(conf.n, need)} de ${need} confirmaciones en ${iv}. Falta que se sostenga.`],
+                  dry: [`${Math.min(conf.n, need)}/${need}. Puede ser amague. No aprieto por aburrimiento.`],
+                  fun: [`${Math.min(conf.n, need)}/${need}. Una vela heroica no me convence; quiero que se quede a dormir.`],
+                }),
           );
         }
       }
@@ -1044,60 +1257,89 @@ export function narratePaper(
     const name = tag(pos.symbol);
     const uTxt = `${u >= 0 ? "+" : ""}${usdTalk(u)}`;
     paras.push(
-      say(seed + pos.id, [
-        `${name} sigue ${pos.side === "long" ? "larga" : "corta"} desde ${usdTalk(pos.entry)}, ahora ${usdTalk(px)} (${uTxt}). Stop ${usdTalk(pos.stop)}${pos.t1Done ? ". T1 ya cobrado; el resto vive de prestado." : `; T1 en ${usdTalk(pos.t1)}, sin adelantarme.`} Plan: no agrando, no promedio, no rezo.`,
-        `Gestión de ${name}: ${uTxt} flotando. El stop es la niñera. ${pos.t1Done ? "Ya saqué mitad." : `Si llega a ${usdTalk(pos.t1)}, cobro 50% y me pongo cómoda.`}`,
-      ]),
+      speak(seed + pos.id, {
+        real: [
+          `${name} sigue ${pos.side === "long" ? "larga" : "corta"} desde ${usdTalk(pos.entry)}, ahora ${usdTalk(px)} (${uTxt}). Stop ${usdTalk(pos.stop)}${pos.t1Done ? `. T1 (${t1p}%) ya cobrado.` : `; T1 ${usdTalk(pos.t1)}.`} Plan: no agrando ni promedio.`,
+        ],
+        dry: [
+          `Gestión de ${name}: ${uTxt}. El stop es la niñera. ${pos.t1Done ? "Ya saqué T1." : `Si llega a ${usdTalk(pos.t1)}, cobro ${t1p}% y dejo correr.`}`,
+        ],
+        fun: [
+          `${name} está en la oficina (${uTxt}). Yo no le mando «¿llegamos?». Stop y T1 tienen el chat abierto.`,
+        ],
+      }),
     );
   }
 
-  const readyBuy = buys.find((s) => s.confidence >= MIN_CONF);
+  const readyBuy = buys.find((s) => s.confidence >= minC);
 
   if (!book.armed) {
     tone = "pause";
-    title = say(seed + "tp", ["Me dejaron el mute", "OFF: yo miro, no gasto", "Pausa con palomitas"]);
+    title = speak(seed + "tp", {
+      real: ["Pausa operativa", "OFF: solo lectura"],
+      dry: ["Me dejaron el mute"],
+      fun: ["Pausa con palomitas"],
+    });
     paras.push(
-      say(seed + "off", [
-        "Estoy en OFF. Puedo opinar, no puedo disparar. Si hay algo abierto, lo cuido; si no, soy comentarista paga en palomitas.",
-        "Me apagaron. Perfecto: así no firmo locuras. El plan es mirar y morderse la lengua.",
-      ]),
+      speak(seed + "off", {
+        real: ["Estoy en OFF. No abro. Si hay algo abierto, lo cuido hasta el stop o el objetivo."],
+        dry: ["Me apagaron. Plan: mirar y no firmar locuras."],
+        fun: ["OFF. Soy crítica de cine con el gráfico: opino, no cobro entrada."],
+      }),
     );
   } else if (atCap && !book.positions.length) {
     tone = "cap";
-    title = say(seed + "tc", ["Cupo lleno, show cerrado", "Tope: me quedé afuera", "Sin fichas, con opinión"]);
+    title = speak(seed + "tc", {
+      real: ["Tope alcanzado"],
+      dry: ["Cupo lleno, show cerrado"],
+      fun: ["Sin fichas, con opiniones"],
+    });
     paras.push(
-      say(seed + "cap0", [
-        `Gasté las ${book.maxOps} operaciones. Sigo teniendo opiniones (gratis, abundantes). Entradas: cero hasta que subas el tope o reinicies.`,
-        "Tope alcanzado. El mercado puede hacer lo que quiera; yo ya jugué mi mano.",
-      ]),
+      speak(seed + "cap0", {
+        real: [`Usé las ${book.maxOps} operaciones. Sigo leyendo; no entro hasta que subas el tope o reinicies.`],
+        dry: ["Tope lleno. El mercado puede lucirse; yo ya jugué mi mano."],
+        fun: [`${book.maxOps} de ${book.maxOps}. Catálogo de opiniones, inventario de tiros: cero.`],
+      }),
     );
   } else if (atCap) {
     tone = "cap";
-    title = say(seed + "tg", ["Solo hago de niñera", "Sin entradas nuevas", "Gestiono, no invento"]);
-    paras.push("El cupo está lleno. Plan: cuidar lo abierto, respetar el stop y fingir que no veo oportunidades de último minuto.");
+    title = speak(seed + "tg", { real: ["Solo gestiono"], dry: ["Sin entradas nuevas"], fun: ["Niñera de stop"] });
+    paras.push(
+      speak(seed + "cap1", {
+        real: ["El cupo está lleno. Plan: stop, T1 y T2. Nada de una más."],
+        dry: ["Tope completo. Las oportunidades de último minuto se quedan en el pasillo."],
+      }),
+    );
   } else if (events.some((e) => e.kind === "open")) {
     tone = "open";
-    title = say(seed + "to", ["Ya está, entré", "Operación en curso", "Dejé de mirar: ejecuté"]);
+    title = speak(seed + "to", { real: ["Operación abierta"], dry: ["Ejecuté, ahora el plan"], fun: ["Ya está, entré"] });
     paras.push(
-      say(seed + "po", [
-        "Plan ahora: no toco el stop en contra, no agrego porque va. Si corre, T1 al 50% y el resto a T2. Si se da vuelta, el stop habla por mí.",
-        "Autonomía de verdad: la orden ya voló. Yo me siento, el plan trabaja. Interferir ahora sería vanidad.",
-      ]),
+      speak(seed + "po", {
+        real: [`Plan: no muevo el stop en contra. Si corre, T1 ${t1p}% y el resto a T2. Si se da vuelta, el stop cierra.`],
+        dry: ["La orden ya voló. Interferir ahora sería vanidad."],
+        fun: ["Adentro. El aburrimiento, de ahora en más, es parte del trabajo."],
+      }),
     );
   } else if (events.some((e) => e.kind === "scale")) {
     tone = "adjust";
-    title = say(seed + "ta", ["Me pagué el nervio", "T1 hecho, ego en jaula", "Ahora sí puedo ser paciente"]);
-    paras.push("El trade ya se autofinanció. Dejo el resto con stop en entrada. Si el sesgo se da vuelta con confirmación, salgo sin drama.");
+    title = speak(seed + "ta", { real: ["T1 ejecutado"], dry: ["Me pagué el nervio"], fun: ["T1 hecho, ego en jaula"] });
+    paras.push(
+      speak(seed + "ps", {
+        real: ["El trade se autofinanció. Resto con stop en entrada. Si el sesgo gira con confirmación, salgo."],
+        fun: ["Ya cobré adelanto. El resto puede lucirse; yo no le mando stickers."],
+      }),
+    );
   } else if (events.some((e) => e.kind === "close")) {
     tone = "close";
-    title = say(seed + "tx", ["Cerré y respiro", "Capítulo cerrado", "Plata contada, ego a dieta"]);
+    title = speak(seed + "tx", { real: ["Cerrado, a esperar"], dry: ["Capítulo cerrado"], fun: ["Plata contada, ego a dieta"] });
     paras.push(
       left > 0
-        ? say(seed + "pc", [
-            `Quedan ${left} tiro${left === 1 ? "" : "s"} en el tope. No reingreso al mismo movimiento. Quiero 58%+, confirmación en ${iv}, y que no sea un RSI de revista.`,
-            `Cerrado. Me quedan ${left}. Plan: paciencia agresiva. Si el mercado insiste con ruido, yo insisto con no hacer nada.`,
-          ])
-        : "Tope seco. Aplausos, palomitas, y nada de una más.",
+        ? speak(seed + "pc", {
+            real: [`Quedan ${left} en el tope. No reingreso al mismo movimiento. Piso ${minC}% y confirmación en ${iv}.`],
+            dry: [`Cerrado. Me quedan ${left}. Si hay ruido, yo hay paciencia.`],
+            fun: [`Listo. ${left} tiro${left === 1 ? "" : "s"} guardados. El bis está prohibido.`],
+          })
+        : speak(seed + "pc0", { real: ["Tope seco. Nada de una más."] }),
     );
   } else if (book.positions.length) {
     tone = "hold";
@@ -1116,41 +1358,55 @@ export function narratePaper(
     tone = "watch";
     const hot = readyBuy ?? buys[0] ?? sells[0]!;
     const goingBuy = hot.bias === "buy";
-    title = say(seed + "tw", [
-      goingBuy ? "Huele a compra. No corro" : "Huele a venta. Tampoco corro",
-      goingBuy ? `${tag(hot.symbol)} me guiña. Yo cuento` : `${tag(hot.symbol)} quiere corto. Yo freno`,
-      "Hay sesgo. Hay orgullo. Falta el clic",
-    ]);
+    title = speak(seed + "tw", {
+      real: [goingBuy ? "Sesgo de compra, espero" : "Sesgo de venta, espero"],
+      dry: [goingBuy ? "Huele a compra. No corro" : "Huele a venta. Tampoco corro"],
+      fun: ["Hay sesgo. Hay orgullo. Falta el clic"],
+    });
     paras.push(
-      say(seed + "pw", [
-        goingBuy
-          ? `Pienso comprar ${tag(hot.symbol)} si se confirma en ${iv} y no se desarma. Alineación ${hot.confidence.toFixed(0)}% (piso ${MIN_CONF}). Si el RSI se pone ridículo o la nube nos escupe, cancelo sin avisarle al ego.`
-          : `Pienso ir corta en ${tag(hot.symbol)} con las mismas reglas: confirmación, ${MIN_CONF}%+, stop primero. No vendo porque se ve feo. Se ve feo todo el día.`,
-        `Autonomía: ${planName} es mi candidata, el resto es ruido de pasillo. No opero las seis por deporte. Una lectura limpia o nada.`,
-      ]),
+      speak(seed + "pw", {
+        real: [
+          goingBuy
+            ? `Plan: comprar ${tag(hot.symbol)} si se confirma en ${iv} y no se desarma. Alineación ${hot.confidence.toFixed(0)}% (piso ${minC}%). Si RSI se estira o la nube falla, cancelo.`
+            : `Plan: corto en ${tag(hot.symbol)} con confirmación, ${minC}%+ y stop primero. No vendo porque «se ve feo».`,
+        ],
+        dry: [`${planName} es la candidata. El resto es pasillo. Una lectura limpia o nada.`],
+        fun: [
+          goingBuy
+            ? `${tag(hot.symbol)} me guiña al ${hot.confidence.toFixed(0)}%. Confirmación en ${iv} o no hay cita.`
+            : `${tag(hot.symbol)} quiere corto. Yo freno, cuento hasta ${minC} y recién hablo.`,
+        ],
+      }),
     );
   } else {
     tone = "idle";
-    title = say(seed + "ti", ["Hoy no firmo locuras", "Sin disparo, con criterio", "El plan es no tener plan de entrada"]);
+    title = speak(seed + "ti", {
+      real: ["Sin disparo"],
+      dry: ["Hoy no firmo locuras"],
+      fun: ["El plan es no tener plan de entrada"],
+    });
     paras.push(
-      say(seed + "pi", [
-        `Nada que merezca una orden. ${planName} no me convence. Prefiero quedar como aburrida que como arrepentida.`,
-        `El mercado está moviendo las cejas y llamándolo tendencia. Yo no pico. En ${iv} quiero un COMPRAR/VENDER limpio o me quedo con las manos en los bolsillos.`,
-      ]),
+      speak(seed + "pi", {
+        real: [`Nada que merezca orden. ${planName} no llega a ${minC}% limpio. Prefiero no operar.`],
+        dry: [`En ${iv} quiero COMPRAR/VENDER limpio o me quedo quieta.`],
+        fun: [`El mercado mueve las cejas y le dice tendencia. Yo no pico.`],
+      }),
     );
   }
 
   if (book.armed && !atCap && !events.length) {
     paras.push(
       book.opsUsed === 0
-        ? say(seed + "ops0", [
-            `Tope intacto: ${book.maxOps} operaciones si el mercado se porta. Mientras, yo decido sola: no hay entra que se va.`,
-            `Tengo ${book.maxOps} tiros. Los gasto como si fueran míos, porque lo son.`,
-          ])
-        : say(seed + "opsn", [
-            `Voy ${book.opsUsed}/${book.maxOps}. Me quedan ${left}. No las gasto en un amague de ${planName}.`,
-            `${left} operación${left === 1 ? "" : "es"} en el bolsillo. Autonomía: si no está limpio, no está.`,
-          ]),
+        ? speak(seed + "ops0", {
+            real: [`Tope ${book.maxOps} intacto. Riesgo ${risk}% por trade. Solo si la lectura está limpia.`],
+            dry: [`Tengo ${book.maxOps} tiros. Los gasto como si fueran míos.`],
+            fun: [`${book.maxOps} fichas. No las tiro porque alguien gritó «se va».`],
+          })
+        : speak(seed + "opsn", {
+            real: [`Voy ${book.opsUsed}/${book.maxOps}. Quedan ${left}. No las gasto en un amague de ${planName}.`],
+            dry: [`${left} en el bolsillo. Si no está limpio, no está.`],
+            fun: [`${left} tiro${left === 1 ? "" : "s"} y un criterio que no se negocia ni con café.`],
+          }),
     );
   }
 
@@ -1165,6 +1421,7 @@ export function narratePaper(
     book.positions.map((p) => `${p.id}:${p.t1Done ? "t1" : "open"}`).join(","),
     view.map((s) => `${s.symbol}:${s.bias}:${Math.round(s.confidence / 5) * 5}`).join("|"),
     events.map((e) => e.kind + e.symbol).join(","),
+    moodOf(seed),
   ].join("/");
 
   return { at, tone, title, body, fingerprint };

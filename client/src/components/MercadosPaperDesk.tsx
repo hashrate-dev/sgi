@@ -7,6 +7,7 @@ import {
   narratePaper,
   paperAtOpsCap,
   paperEntryAlert,
+  paperPrepProcess,
   paperEquity,
   paperOpsLeft,
   savePaperBook,
@@ -67,6 +68,38 @@ function exitLabel(reason: string | null): string {
   if (reason === "t1") return "T1";
   if (reason === "flip") return "Sesgo";
   return reason || "Cierre";
+}
+
+function PrepMeter({ target, stage, intent }: { target: number; stage: string; intent: string }) {
+  const [pct, setPct] = useState(1);
+  const pctRef = useRef(1);
+  useEffect(() => {
+    const goal = Math.max(0, Math.min(100, Math.round(target)));
+    const id = window.setInterval(() => {
+      const cur = pctRef.current;
+      if (cur === goal) return;
+      const next = cur < goal ? cur + 1 : cur - 1;
+      pctRef.current = next;
+      setPct(next);
+    }, 38);
+    return () => window.clearInterval(id);
+  }, [target]);
+  const tone = intent === "hold" || pct >= 100 ? "go" : pct >= 62 ? "mid" : "low";
+  return (
+    <div className={`tv-paper-prep tv-paper-prep--${tone}`} role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Preparación de la próxima operación">
+      <div className="tv-paper-prep__top">
+        <span>Preparación próxima op</span>
+        <b>
+          {pct}
+          <small>%</small>
+        </b>
+      </div>
+      <div className="tv-paper-prep__track">
+        <i style={{ width: `${Math.max(pct, 1)}%` }} />
+      </div>
+      <em>{stage}</em>
+    </div>
+  );
 }
 
 function Spark({ values }: { values: number[] }) {
@@ -434,6 +467,7 @@ export function MercadosPaperDesk({
   const ledger = useMemo(() => splitPaperTrades(book), [book]);
   const liveTalk = useMemo(() => narratePaper(book, sigs, [], tag), [book, sigs, pairs]);
   const alert = useMemo(() => paperEntryAlert(book, sigs), [book, sigs]);
+  const prep = useMemo(() => paperPrepProcess(book, sigs), [book, sigs]);
 
   const status = useMemo(() => {
     if (!book.armed) return "PAUSA";
@@ -526,6 +560,8 @@ export function MercadosPaperDesk({
             </div>
             <b className="tv-paper-alert__score">{alert.score}</b>
           </div>
+
+          <PrepMeter target={prep.pct} stage={prep.stage} intent={prep.intent} />
 
           <AgentOpinion notes={book.notes} live={liveTalk} />
 
