@@ -608,6 +608,7 @@ export function MercadosTradingPage() {
   const [foldClock, setFoldClock] = useState(false);
   const [drawPulse, setDrawPulse] = useState<{ n: number; op: "undo" | "clear" }>({ n: 0, op: "undo" });
   const [boardFs, setBoardFs] = useState(false);
+  const [dockHid, setDockHid] = useState(false);
   const dockRef = useRef<HTMLDivElement>(null);
   const pairRef = useRef<HTMLDivElement>(null);
   const pairBtnRef = useRef<HTMLButtonElement>(null);
@@ -621,6 +622,7 @@ export function MercadosTradingPage() {
       const on = Boolean(document.fullscreenElement) || root.classList.contains("hrs-mercados-fs");
       root.classList.toggle("hrs-mercados-fs", on);
       setBoardFs(on);
+      if (!on) setDockHid(false);
     };
     const onFs = () => {
       if (!document.fullscreenElement) root.classList.remove("hrs-mercados-fs");
@@ -1155,6 +1157,7 @@ export function MercadosTradingPage() {
               drawTool={drawTool}
               drawColor={drawColor}
               drawPulse={drawPulse}
+              gutterLeft={boardFs && dockHid ? 8 : 56}
             />
             {pairOpen || indOpen || colorOpen ? (
               <button
@@ -1168,7 +1171,28 @@ export function MercadosTradingPage() {
                 }}
               />
             ) : null}
-            <div className="tv-markets-dock" role="toolbar" aria-label="Temporalidad e indicadores" ref={dockRef}>
+            {boardFs ? (
+              <button
+                type="button"
+                className={`tv-markets-dock-toggle${dockHid ? " is-hid" : ""}`}
+                title={dockHid ? "Mostrar barra de herramientas" : "Esconder barra de herramientas"}
+                aria-pressed={!dockHid}
+                aria-label={dockHid ? "Mostrar barra de herramientas" : "Esconder barra de herramientas"}
+                onClick={() => {
+                  setDockHid((v) => !v);
+                  setIndOpen(false);
+                  setColorOpen(false);
+                }}
+              >
+                {dockHid ? "›" : "‹"}
+              </button>
+            ) : null}
+            <div
+              className={`tv-markets-dock${boardFs && dockHid ? " is-hid" : ""}`}
+              role="toolbar"
+              aria-label="Temporalidad e indicadores"
+              ref={dockRef}
+            >
               {INTERVALS.map((it) => (
                 <button
                   key={it.id}

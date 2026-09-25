@@ -97,6 +97,7 @@ type Props = {
   drawTool?: ChartDrawTool;
   drawColor?: string;
   drawPulse?: { n: number; op: "undo" | "clear" };
+  gutterLeft?: number;
 };
 
 function fmtOsc(n: number): string {
@@ -214,6 +215,7 @@ export function MercadosNativeChart({
   drawTool = "cursor",
   drawColor = "#f5c542",
   drawPulse,
+  gutterLeft = 56,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -249,6 +251,8 @@ export function MercadosNativeChart({
   onRef.current = studyOn;
   const intervalRef = useRef(interval);
   intervalRef.current = interval;
+  const gutterLeftRef = useRef(gutterLeft);
+  gutterLeftRef.current = gutterLeft;
   const paintGen = useRef(0);
   const drawToolRef = useRef<ChartDrawTool>(drawTool);
   drawToolRef.current = drawTool;
@@ -562,7 +566,7 @@ export function MercadosNativeChart({
     const oscN = (on.rsi !== false ? 1 : 0) + (on.macd !== false ? 1 : 0);
     const oscH = oscN ? Math.min(132, h * 0.18) : 0;
     const padR = 78;
-    const padL = 56;
+    const padL = Math.max(4, gutterLeftRef.current);
     const padT = 10;
     const timeH = 32;
     const gap = oscN ? 8 : 0;
@@ -1494,6 +1498,10 @@ export function MercadosNativeChart({
     ro.observe(wrap);
     return () => ro.disconnect();
   }, []);
+
+  useEffect(() => {
+    paint();
+  }, [gutterLeft]);
 
   useEffect(() => {
     const canvas = canvasRef.current;

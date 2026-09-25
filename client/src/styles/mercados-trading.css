@@ -1122,6 +1122,42 @@ body > .tv-markets-tape.hrs-card,
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   pointer-events: auto;
   overflow: visible;
+  transition: transform 0.22s ease;
+}
+
+html.hrs-mercados-fs .tv-markets-dock.is-hid {
+  transform: translateX(-100%);
+  pointer-events: none;
+}
+
+.tv-markets-dock-toggle {
+  appearance: none;
+  position: absolute;
+  left: 52px;
+  top: 50%;
+  z-index: 46;
+  width: 16px;
+  height: 52px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-left: 0;
+  border-radius: 0 8px 8px 0;
+  background: #131722;
+  color: rgba(232, 238, 245, 0.78);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.tv-markets-dock-toggle.is-hid {
+  left: 0;
+}
+
+.tv-markets-dock-toggle:hover {
+  color: #9ef0c9;
+  border-color: rgba(110, 231, 183, 0.35);
 }
 
 .tv-markets-dock__sep {
