@@ -10,9 +10,11 @@ const HIST = 72;
 const FILLS = 48;
 const TRADES = 200;
 const NOTES = 24;
+const LESSONS = 80;
 const MAX_OPS_MIN = 1;
 const MAX_OPS_MAX = 999;
 const DEFAULT_MAX_OPS = 10;
+const DEFAULT_MAX_OPS_DAY = 10;
 
 export type PaperEvent = {
   kind: "open" | "close" | "scale";
@@ -27,6 +29,7 @@ export type PaperEvent = {
 export type PaperMode = "all" | "spot-long" | "fut-long" | "fut-short";
 export type PaperLev = 1 | 2 | 3;
 export type PaperVenue = "spot" | "futures";
+export type PaperDir = "long" | "short" | "both";
 
 export type PaperPosition = {
   id: string;
@@ -99,6 +102,73 @@ export type PaperNote = {
   fingerprint: string;
 };
 
+export type PaperSkillId =
+  | "risk"
+  | "patience"
+  | "confluence"
+  | "trend"
+  | "volume"
+  | "cloud"
+  | "stop"
+  | "scale"
+  | "noRevenge"
+  | "size"
+  | "session"
+  | "journal"
+  | "charisma";
+
+export const ROXY_SKILL_IDS: PaperSkillId[] = [
+  "risk",
+  "patience",
+  "confluence",
+  "trend",
+  "volume",
+  "cloud",
+  "stop",
+  "scale",
+  "noRevenge",
+  "size",
+  "session",
+  "journal",
+  "charisma",
+];
+
+export type PaperPairMemory = {
+  symbol: string;
+  wins: number;
+  losses: number;
+  pnl: number;
+  lastLossAt: number;
+  lastWinAt: number;
+  coolUntil: number;
+  stopStreak: number;
+  winStreak: number;
+};
+
+export type PaperLesson = {
+  id: string;
+  at: number;
+  symbol: string;
+  side: "long" | "short";
+  reason: string;
+  pnl: number;
+  text: string;
+  skill: PaperSkillId;
+};
+
+export type PaperMind = {
+  xp: number;
+  charisma: number;
+  patience: number;
+  discipline: number;
+  wit: number;
+  skills: Record<PaperSkillId, number>;
+  pairs: Record<string, PaperPairMemory>;
+  lessons: PaperLesson[];
+  lastStopAt: number;
+  revengeUntil: number;
+};
+
 export type PaperBook = {
   v: 2;
   universe: PaperUniverse;
@@ -106,6 +176,7 @@ export type PaperBook = {
   cashUsd: number;
   armed: boolean;
   maxOps: number;
+  maxOpsDay: number;
   opsUsed: number;
   mode: PaperMode;
   leverage: PaperLev;
@@ -124,11 +195,17 @@ export type PaperBook = {
   wins: number;
   losses: number;
   peakUsd: number;
+  mind: PaperMind;
 };
 
 export function clampPaperMaxOps(n: number): number {
   if (!Number.isFinite(n)) return DEFAULT_MAX_OPS;
   return Math.max(MAX_OPS_MIN, Math.min(MAX_OPS_MAX, Math.floor(n)));
+}
+
+export function clampPaperMaxOpsDay(n: number): number {
+  if (!Number.isFinite(n)) return DEFAULT_MAX_OPS_DAY;
+  return Math.max(1, Math.min(99, Math.floor(n)));
 }
 
 export function clampPaperLev(n: number): PaperLev {
@@ -168,7 +245,279 @@ export function normalizePaperStyle(raw: unknown): PaperStyle {
 }
 
 export function paperStyleOf(book: Pick<PaperBook, "style"> | { style?: unknown }): PaperStyle {
-  return normalizePaperStyle(book.style);
+  const s = normalizePaperStyle(book.style);
+  return s === "swing" ? "intraday" : s === "auto" ? "intraday" : s;
+}
+
+type ScalpBand = "ultra" | "fast" | "mid" | "hour" | "context";
+
+function scalpBand(interval: string): ScalpBand {
+  if (interval === "1s" || interval === "LIVE" || interval === "1") return "ultra";
+  if (interval === "5") return "fast";
+  if (interval === "15" || interval === "30") return "mid";
+  if (interval === "60") return "hour";
+  return "context";
+}
+
+function paperAllowsScalpOpen(interval: string): boolean {
+  return scalpBand(interval) !== "context";
+}
+
+function scalpMaxHoldMs(interval: string): number {
+  const b = scalpBand(interval);
+  if (b === "ultra") return 25 * 60 * 1000;
+  if (b === "fast") return 90 * 60 * 1000;
+  if (b === "mid") return 4 * 60 * 60 * 1000;
+  return 8 * 60 * 60 * 1000;
+}
+
+function uruguayDayKey(ms: number): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Montevideo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(ms));
+}
+
+function scalpPlan(sig: BtcTradeSignal, side: "long" | "short"): { stop: number; t1: number; t2: number } {
+  const px = sig.price;
+  const b = scalpBand(sig.interval);
+  const t1p = b === "ultra" ? 0.0022 : b === "fast" ? 0.0034 : b === "mid" ? 0.0052 : 0.008;
+  const t2p = b === "ultra" ? 0.0042 : b === "fast" ? 0.0062 : b === "mid" ? 0.0095 : 0.014;
+  const stopP = b === "ultra" ? 0.002 : b === "fast" ? 0.003 : b === "mid" ? 0.0045 : 0.0065;
+  if (side === "long") {
+    const stop = Math.max(sig.stop, px * (1 - stopP));
+    let t1 = Math.min(sig.target1, px * (1 + t1p));
+    let t2 = Math.min(sig.target2, px * (1 + t2p));
+    if (!(t1 > px)) t1 = px * (1 + t1p);
+    if (!(t2 > t1)) t2 = px * (1 + t2p);
+    return { stop, t1, t2 };
+  }
+  const stop = Math.min(sig.stop, px * (1 + stopP));
+  let t1 = Math.max(sig.target1, px * (1 - t1p));
+  let t2 = Math.max(sig.target2, px * (1 - t2p));
+  if (!(t1 < px)) t1 = px * (1 - t1p);
+  if (!(t2 < t1)) t2 = px * (1 - t2p);
+  return { stop, t1, t2 };
+}
+
+function clampSkill(n: number): number {
+  if (!Number.isFinite(n)) return 42;
+  return Math.max(1, Math.min(100, Math.round(n * 10) / 10));
+}
+
+export function emptyRoxyMind(): PaperMind {
+  const skills = {} as Record<PaperSkillId, number>;
+  for (const id of ROXY_SKILL_IDS) skills[id] = 42;
+  skills.risk = 56;
+  skills.patience = 52;
+  skills.confluence = 54;
+  skills.stop = 50;
+  skills.noRevenge = 58;
+  skills.journal = 44;
+  skills.charisma = 50;
+  return {
+    xp: 0,
+    charisma: 50,
+    patience: 52,
+    discipline: 54,
+    wit: 48,
+    skills,
+    pairs: {},
+    lessons: [],
+    lastStopAt: 0,
+    revengeUntil: 0,
+  };
+}
+
+export function hydrateRoxyMind(raw: unknown): PaperMind {
+  const base = emptyRoxyMind();
+  if (!raw || typeof raw !== "object") return base;
+  const src = raw as Partial<PaperMind>;
+  const skills = { ...base.skills };
+  if (src.skills && typeof src.skills === "object") {
+    for (const id of ROXY_SKILL_IDS) {
+      const v = (src.skills as Record<string, unknown>)[id];
+      if (typeof v === "number") skills[id] = clampSkill(v);
+    }
+  }
+  const pairs: Record<string, PaperPairMemory> = {};
+  if (src.pairs && typeof src.pairs === "object") {
+    for (const [symbol, row] of Object.entries(src.pairs)) {
+      if (!row || typeof row !== "object") continue;
+      const p = row as Partial<PaperPairMemory>;
+      pairs[symbol] = {
+        symbol,
+        wins: Math.max(0, Math.floor(Number(p.wins) || 0)),
+        losses: Math.max(0, Math.floor(Number(p.losses) || 0)),
+        pnl: Number.isFinite(Number(p.pnl)) ? Number(p.pnl) : 0,
+        lastLossAt: Number(p.lastLossAt) || 0,
+        lastWinAt: Number(p.lastWinAt) || 0,
+        coolUntil: Number(p.coolUntil) || 0,
+        stopStreak: Math.max(0, Math.floor(Number(p.stopStreak) || 0)),
+        winStreak: Math.max(0, Math.floor(Number(p.winStreak) || 0)),
+      };
+    }
+  }
+  const lessons = Array.isArray(src.lessons)
+    ? src.lessons
+        .filter((l): l is PaperLesson => Boolean(l && typeof l === "object" && typeof (l as PaperLesson).text === "string"))
+        .slice(0, LESSONS)
+    : [];
+  return {
+    xp: Math.max(0, Math.floor(Number(src.xp) || 0)),
+    charisma: clampSkill(src.charisma ?? base.charisma),
+    patience: clampSkill(src.patience ?? base.patience),
+    discipline: clampSkill(src.discipline ?? base.discipline),
+    wit: clampSkill(src.wit ?? base.wit),
+    skills,
+    pairs,
+    lessons,
+    lastStopAt: Number(src.lastStopAt) || 0,
+    revengeUntil: Number(src.revengeUntil) || 0,
+  };
+}
+
+function pairMem(mind: PaperMind, symbol: string): PaperPairMemory {
+  const cur = mind.pairs[symbol];
+  if (cur) return cur;
+  const fresh: PaperPairMemory = {
+    symbol,
+    wins: 0,
+    losses: 0,
+    pnl: 0,
+    lastLossAt: 0,
+    lastWinAt: 0,
+    coolUntil: 0,
+    stopStreak: 0,
+    winStreak: 0,
+  };
+  mind.pairs[symbol] = fresh;
+  return fresh;
+}
+
+function bumpSkill(mind: PaperMind, id: PaperSkillId, d: number): void {
+  mind.skills[id] = clampSkill((mind.skills[id] ?? 42) + d);
+}
+
+function pushLesson(mind: PaperMind, lesson: Omit<PaperLesson, "id">): void {
+  mind.lessons = [{ ...lesson, id: `${lesson.at}-${Math.random().toString(16).slice(2, 8)}` }, ...mind.lessons].slice(0, LESSONS);
+}
+
+function applyRoxyLearn(book: PaperBook, events: PaperEvent[], now: number): void {
+  const mind = book.mind;
+  for (const ev of events) {
+    const pair = pairMem(mind, ev.symbol);
+    const name = ev.symbol.replace(/USDT$/i, "");
+    if (ev.kind === "open") {
+      mind.xp += 2;
+      bumpSkill(mind, "confluence", 0.25);
+      bumpSkill(mind, "session", 0.15);
+      bumpSkill(mind, "journal", 0.2);
+      pushLesson(mind, {
+        at: now,
+        symbol: ev.symbol,
+        side: ev.side,
+        reason: "open",
+        pnl: 0,
+        skill: "confluence",
+        text: `Entrada ${ev.side === "long" ? "larga" : "corta"} en ${name}. Plan escrito: stop primero, sin improvisar el tamaño.`,
+      });
+    } else if (ev.kind === "scale") {
+      mind.xp += 4;
+      mind.charisma = clampSkill(mind.charisma + 0.35);
+      bumpSkill(mind, "scale", 0.7);
+      bumpSkill(mind, "risk", 0.35);
+      pair.pnl += ev.pnl ?? 0;
+      pushLesson(mind, {
+        at: now,
+        symbol: ev.symbol,
+        side: ev.side,
+        reason: "t1",
+        pnl: ev.pnl ?? 0,
+        skill: "scale",
+        text: `T1 en ${name}: cobré parcial y moví el stop a la entrada. El trade ya no me puede devolver al mismo riesgo.`,
+      });
+    } else {
+      const pnl = ev.pnl ?? 0;
+      pair.pnl += pnl;
+      mind.xp += pnl >= 0 ? 6 : 5;
+      bumpSkill(mind, "journal", 0.4);
+      if (ev.reason === "stop" || pnl < 0) {
+        pair.losses += 1;
+        pair.stopStreak += 1;
+        pair.winStreak = 0;
+        pair.lastLossAt = now;
+        mind.lastStopAt = now;
+        mind.revengeUntil = now + 12 * 60_000;
+        pair.coolUntil = now + (pair.stopStreak >= 2 ? 2 * 60 * 60_000 : 45 * 60_000);
+        mind.patience = clampSkill(mind.patience + 0.8);
+        mind.discipline = clampSkill(mind.discipline + 1.1);
+        mind.wit = clampSkill(mind.wit + 0.25);
+        bumpSkill(mind, "stop", 1.1);
+        bumpSkill(mind, "noRevenge", 1.2);
+        bumpSkill(mind, "patience", 0.9);
+        bumpSkill(mind, "risk", 0.5);
+        pushLesson(mind, {
+          at: now,
+          symbol: ev.symbol,
+          side: ev.side,
+          reason: ev.reason,
+          pnl,
+          skill: "noRevenge",
+          text:
+            ev.reason === "stop"
+              ? `Stop en ${name} (${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD). Error registrado: no revancha en el mismo par. Enfriamiento ${pair.stopStreak >= 2 ? "2h" : "45m"}.`
+              : `Cierre en rojo en ${name}. Anoto el error y subo el listón; no persigo el mismo movimiento.`,
+        });
+      } else {
+        pair.wins += 1;
+        pair.winStreak += 1;
+        pair.stopStreak = 0;
+        pair.lastWinAt = now;
+        mind.charisma = clampSkill(mind.charisma + 0.7);
+        mind.wit = clampSkill(mind.wit + 0.4);
+        bumpSkill(mind, "trend", ev.reason === "t2" ? 0.9 : 0.45);
+        bumpSkill(mind, "charisma", 0.5);
+        bumpSkill(mind, "cloud", 0.2);
+        pushLesson(mind, {
+          at: now,
+          symbol: ev.symbol,
+          side: ev.side,
+          reason: ev.reason,
+          pnl,
+          skill: ev.reason === "t2" ? "trend" : "scale",
+          text: `Cierre a favor en ${name} (${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD) por ${ev.reason}. Lo que funcionó: dejar correr el plan, no el ego.`,
+        });
+      }
+    }
+  }
+}
+
+export function roxyAllowsEntry(book: PaperBook, symbol: string, confidence: number, now = Date.now()): boolean {
+  const mind = book.mind ?? emptyRoxyMind();
+  const pair = mind.pairs[symbol];
+  const floor = paperMinConfOf(book);
+  if (mind.revengeUntil > now) {
+    const last = mind.lessons[0];
+    if (last && last.symbol === symbol && (last.reason === "stop" || last.pnl < 0)) return false;
+  }
+  if (pair && pair.coolUntil > now && confidence < Math.min(88, floor + 14)) return false;
+  if (pair && pair.stopStreak >= 3 && confidence < Math.min(88, floor + 10)) return false;
+  return true;
+}
+
+export function paperEntryFloor(book: PaperBook, symbol: string, now = Date.now()): number {
+  let floor = paperMinConfOf(book);
+  const mind = book.mind ?? emptyRoxyMind();
+  const pair = mind.pairs[symbol];
+  const patience = mind.patience ?? 50;
+  floor += Math.round((patience - 50) / 20);
+  if (pair?.coolUntil && pair.coolUntil > now) floor += 6;
+  if ((pair?.stopStreak ?? 0) >= 2) floor += 4;
+  if ((pair?.winStreak ?? 0) >= 3) floor -= 1;
+  return Math.max(50, Math.min(88, floor));
 }
 
 export function normalizePaperMode(raw: unknown): PaperMode {
@@ -187,6 +536,19 @@ export function normalizePaperRunInterval(raw: unknown): string {
 
 export function paperVenueOf(mode: PaperMode): PaperVenue {
   return mode === "spot-long" ? "spot" : "futures";
+}
+
+export function paperDirOf(mode: PaperMode): PaperDir {
+  if (mode === "fut-short") return "short";
+  if (mode === "all") return "both";
+  return "long";
+}
+
+export function composePaperMode(venue: PaperVenue, dir: PaperDir): PaperMode {
+  if (venue === "spot") return "spot-long";
+  if (dir === "short") return "fut-short";
+  if (dir === "long") return "fut-long";
+  return "all";
 }
 
 export function paperEffectiveLev(mode: PaperMode, leverage: PaperLev): PaperLev {
@@ -215,6 +577,7 @@ export function emptyPaperBook(
     cashUsd: cash,
     armed: true,
     maxOps: clampPaperMaxOps(maxOps),
+    maxOpsDay: DEFAULT_MAX_OPS_DAY,
     opsUsed: 0,
     mode: md,
     leverage: paperEffectiveLev(md, leverage),
@@ -223,7 +586,7 @@ export function emptyPaperBook(
     sizePct: DEFAULT_SIZE_PCT,
     minConf: MIN_CONF,
     t1Pct: DEFAULT_T1_PCT,
-    style: "auto" as PaperStyle,
+    style: "intraday" as PaperStyle,
     confirms: {},
     positions: [],
     trades: [],
@@ -233,6 +596,7 @@ export function emptyPaperBook(
     wins: 0,
     losses: 0,
     peakUsd: cash,
+    mind: emptyRoxyMind(),
   };
 }
 
@@ -372,12 +736,14 @@ export function hydratePaperBook(parsed: Partial<PaperBook> & { v?: number }): P
     t1Pct: clampPaperT1Pct(parsed.t1Pct ?? DEFAULT_T1_PCT),
     style: normalizePaperStyle(parsed.style),
     maxOps: clampPaperMaxOps(parsed.maxOps ?? DEFAULT_MAX_OPS),
+    maxOpsDay: clampPaperMaxOpsDay(parsed.maxOpsDay ?? DEFAULT_MAX_OPS_DAY),
     opsUsed,
     positions: positionsHydrated,
     trades: trades.slice(0, TRADES),
     confirms: parsed.confirms ?? {},
     fills: parsed.fills ?? [],
     notes: Array.isArray(parsed.notes) ? parsed.notes.slice(0, NOTES) : [],
+    mind: hydrateRoxyMind(parsed.mind),
   };
 }
 
@@ -422,6 +788,29 @@ export function paperAtOpsCap(book: PaperBook): boolean {
   return book.opsUsed >= book.maxOps;
 }
 
+export function paperUtcDayStart(ms = Date.now()): number {
+  const key = uruguayDayKey(ms);
+  const [y, m, d] = key.split("-").map(Number);
+  return Date.UTC(y!, (m ?? 1) - 1, d ?? 1, 3, 0, 0);
+}
+
+export function paperOpsToday(book: PaperBook, now = Date.now()): number {
+  const start = paperUtcDayStart(now);
+  const seen = new Set<string>();
+  for (const t of book.trades) {
+    if (t.openedAt >= start) seen.add(t.id);
+  }
+  return seen.size;
+}
+
+export function paperAtDayCap(book: PaperBook, now = Date.now()): boolean {
+  return paperOpsToday(book, now) >= clampPaperMaxOpsDay(book.maxOpsDay ?? DEFAULT_MAX_OPS_DAY);
+}
+
+export function paperCanOpen(book: PaperBook, now = Date.now()): boolean {
+  return !paperAtOpsCap(book) && !paperAtDayCap(book, now);
+}
+
 export type PaperAlertLight = "red" | "yellow" | "green";
 
 export type PaperEntryAlert = {
@@ -442,7 +831,7 @@ export function paperEntryAlert(book: PaperBook, signals: BtcTradeSignal[]): Pap
 
   const scoreOf = (sig: BtcTradeSignal, side: "buy" | "sell"): number => {
     if (!paperAllowsSide(mode, side === "buy" ? "long" : "short")) return 0;
-    const need = neededConfirm(sig.interval);
+    const need = neededConfirm(sig.interval, paperStyleOf(book));
     const c = book.confirms[sig.symbol];
     const n = c && c.fire === side ? c.n : sig.bias === side ? 1 : 0;
     const align = Math.max(0, Math.min(100, sig.confidence));
@@ -484,7 +873,10 @@ export function paperEntryAlert(book: PaperBook, signals: BtcTradeSignal[]): Pap
     return { ...best, light: "red", score: 0, intent: "none", headline: "No va a comprar", detail: "Roxy está en OFF." };
   }
   if (paperAtOpsCap(book) && !book.positions.length) {
-    return { ...best, light: "red", score: 0, intent: "none", headline: "No va a comprar", detail: "Llegó al tope de operaciones." };
+    return { ...best, light: "red", score: 0, intent: "none", headline: "No va a comprar", detail: "Llegó al tope de operaciones del presupuesto." };
+  }
+  if (paperAtDayCap(book) && !book.positions.length) {
+    return { ...best, light: "red", score: 0, intent: "none", headline: "No va a comprar", detail: "Llegó al tope de operaciones del día." };
   }
   if (book.positions.length && best.symbol && book.positions.some((p) => p.symbol === best.symbol)) {
     const pos = book.positions.find((p) => p.symbol === best.symbol)!;
@@ -545,7 +937,10 @@ export function paperPrepProcess(book: PaperBook, signals: BtcTradeSignal[]): Pa
 
   if (!book.armed) return { pct: 0, stage: "Pausada · no prepara", symbol: "", intent: "none" };
   if (paperAtOpsCap(book) && !book.positions.length) {
-    return { pct: 0, stage: "Tope · no hay próxima op", symbol: "", intent: "none" };
+    return { pct: 0, stage: "Tope de presupuesto · no hay próxima op", symbol: "", intent: "none" };
+  }
+  if (paperAtDayCap(book) && !book.positions.length) {
+    return { pct: 0, stage: "Tope del día · espera mañana", symbol: "", intent: "none" };
   }
   if (book.positions.length) {
     const p = book.positions[0]!;
@@ -604,12 +999,12 @@ export function splitPaperTrades(book: PaperBook): { open: PaperTrade[]; closed:
   return { open, closed };
 }
 
-function neededConfirm(interval: string, style: PaperStyle = "auto"): number {
-  let n = 1;
-  if (interval === "1s" || interval === "LIVE" || interval === "1") n = 3;
-  else if (interval === "5" || interval === "15") n = 2;
-  if (style === "swing") n += 1;
-  return n;
+function neededConfirm(interval: string, _style: PaperStyle = "intraday"): number {
+  const b = scalpBand(interval);
+  if (b === "ultra") return 3;
+  if (b === "fast" || b === "mid") return 2;
+  if (b === "hour") return 2;
+  return 99;
 }
 
 function isFastInterval(interval: string): boolean {
@@ -647,33 +1042,38 @@ function markHist(book: PaperBook, marks: Record<string, number>): void {
 }
 
 function canEnter(sig: BtcTradeSignal, side: "long" | "short", book: PaperBook): boolean {
-  const minConf = paperMinConfOf(book);
-  const style = paperStyleOf(book);
+  const now = Date.now();
+  const minConf = paperEntryFloor(book, sig.symbol, now);
+  if (!paperAllowsScalpOpen(sig.interval)) return false;
+  if (!roxyAllowsEntry(book, sig.symbol, sig.confidence, now)) return false;
   if (sig.confidence < minConf) return false;
-  if (style === "swing" && isFastInterval(sig.interval) && sig.confidence < Math.min(85, minConf + 12)) return false;
   if (side === "long" && sig.rsi >= 76) return false;
   if (side === "short" && sig.rsi <= 24) return false;
   if (side === "long" && sig.ichiCloud === "below") return false;
   if (side === "short" && sig.ichiCloud === "above") return false;
   if (Number.isFinite(sig.volRatio) && (sig.volRatio ?? 1) < 0.82) return false;
-  const dist = Math.abs(sig.price - sig.stop);
-  const minStop = style === "swing" && !isFastInterval(sig.interval) ? 0.003 : 0.0015;
-  if (!(dist > 0) || dist / sig.price < minStop) return false;
+  const plan = scalpPlan(sig, side);
+  const dist = Math.abs(sig.price - plan.stop);
+  if (!(dist > 0) || dist / sig.price < 0.0009) return false;
   return true;
 }
 
-function sizeQty(book: PaperBook, sig: BtcTradeSignal, side: "long" | "short", marks: Record<string, number>): number {
+function sizeQty(book: PaperBook, sig: BtcTradeSignal, side: "long" | "short", marks: Record<string, number>, stopPx = sig.stop): number {
   const lev = paperEffectiveLev(book.mode ?? "all", book.leverage ?? 1);
   const eq = Math.max(1, paperEquity(book, { ...marks, [sig.symbol]: sig.price }));
-  const dist = Math.abs(sig.price - sig.stop);
+  const dist = Math.abs(sig.price - stopPx);
   if (!(dist > 0)) return 0;
   const riskUsd = eq * (clampPaperRiskPct(book.riskPct ?? DEFAULT_RISK_PCT) / 100);
   const qtyRisk = riskUsd / dist;
   const qtySize = (eq * (clampPaperSizePct(book.sizePct ?? DEFAULT_SIZE_PCT) / 100) * lev) / sig.price;
   const maxQty = (book.cashUsd * CASH_CAP * lev) / sig.price;
   const qty = Math.min(qtyRisk, qtySize, maxQty);
-  if (!(qty > 0) || qty * sig.price < 25) return 0;
-  return side === "long" ? qty : -qty;
+  const pair = book.mind?.pairs[sig.symbol];
+  const now = Date.now();
+  const cut = pair && pair.coolUntil > now ? 0.7 : (pair?.stopStreak ?? 0) >= 2 ? 0.75 : (pair?.stopStreak ?? 0) === 1 ? 0.88 : 1;
+  const sized = qty * cut;
+  if (!(sized > 0) || sized * sig.price < 25) return 0;
+  return side === "long" ? sized : -sized;
 }
 
 export function resetPaperBook(
@@ -748,7 +1148,7 @@ export function tickPaper(
     const hitStop = long ? px <= pos.stop : px >= pos.stop;
     const hitT2 = long ? px >= pos.t2 : px <= pos.t2;
     const hitT1 = !pos.t1Done && (long ? px >= pos.t1 : px <= pos.t1);
-    const need = neededConfirm(sig.interval);
+    const need = neededConfirm(sig.interval, paperStyleOf(next));
     const flip = (long && fire === "sell" && n >= need) || (!long && fire === "buy" && n >= need);
 
     const dropPos = () => {
@@ -839,6 +1239,42 @@ export function tickPaper(
       else next.losses += 1;
       closeTrade(next, pos, now, px, "flip", pnl);
       dropPos();
+    } else if (now - pos.openedAt >= scalpMaxHoldMs(pos.interval || sig.interval)) {
+      const pnl = applyCloseQty(next, pos, pos.qty, px);
+      pushFill(next, {
+        at: now,
+        symbol: sig.symbol,
+        side: pos.side,
+        action: "close",
+        reason: "time",
+        price: px,
+        qty: pos.qty,
+        pnl,
+        note: `${sig.symbol} tiempo scalp`,
+      });
+      events.push({ kind: "close", side: pos.side, symbol: sig.symbol, reason: "time", price: px, pnl, note: `${sig.symbol} tiempo` });
+      if (pnl >= 0) next.wins += 1;
+      else next.losses += 1;
+      closeTrade(next, pos, now, px, "time", pnl);
+      dropPos();
+    } else if (uruguayDayKey(pos.openedAt) !== uruguayDayKey(now)) {
+      const pnl = applyCloseQty(next, pos, pos.qty, px);
+      pushFill(next, {
+        at: now,
+        symbol: sig.symbol,
+        side: pos.side,
+        action: "close",
+        reason: "day",
+        price: px,
+        qty: pos.qty,
+        pnl,
+        note: `${sig.symbol} cierre de día`,
+      });
+      events.push({ kind: "close", side: pos.side, symbol: sig.symbol, reason: "day", price: px, pnl, note: `${sig.symbol} día` });
+      if (pnl >= 0) next.wins += 1;
+      else next.losses += 1;
+      closeTrade(next, pos, now, px, "day", pnl);
+      dropPos();
     } else if (long && Number.isFinite(sig.supertrend) && sig.supertrendDir === 1 && sig.supertrend > pos.stop && sig.supertrend < px) {
       pos.stop = Math.max(pos.stop, sig.supertrend);
       const t = findTrade(next, pos.id);
@@ -851,14 +1287,15 @@ export function tickPaper(
   }
 
   const hasPos = next.positions.some((p) => p.symbol === sig.symbol);
-  const underCap = next.opsUsed < next.maxOps;
+  const underCap = paperCanOpen(next, now);
   const mode = normalizePaperMode(next.mode);
   const lev = paperEffectiveLev(mode, next.leverage ?? 1);
-  if (next.armed && underCap && !hasPos && (fire === "buy" || fire === "sell") && n >= neededConfirm(sig.interval)) {
+  if (next.armed && underCap && !hasPos && (fire === "buy" || fire === "sell") && n >= neededConfirm(sig.interval, paperStyleOf(next))) {
     const side = fire === "buy" ? "long" : "short";
-    if (paperAllowsSide(mode, side) && canEnter(sig, side, next)) {
+    if (paperAllowsSide(mode, side) && paperAllowsScalpOpen(sig.interval) && canEnter(sig, side, next)) {
       const marks = { ...(opts?.marks ?? {}), [sig.symbol]: px };
-      const qty = sizeQty(next, sig, side, marks);
+      const plan = scalpPlan(sig, side);
+      const qty = sizeQty(next, sig, side, marks, plan.stop);
       if (qty !== 0) {
         const marginUsd = applyOpen(next, qty, px, lev);
         const id = `${now}-${sig.symbol}`;
@@ -869,9 +1306,9 @@ export function tickPaper(
           interval: sig.interval,
           qty,
           entry: px,
-          stop: sig.stop,
-          t1: sig.target1,
-          t2: sig.target2,
+          stop: plan.stop,
+          t1: plan.t1,
+          t2: plan.t2,
           t1Done: false,
           openedAt: now,
           leverage: lev,
@@ -936,6 +1373,161 @@ function ivTalk(iv: string): string {
   return m[iv] ?? (iv || "este gráfico");
 }
 
+function uruguayHour(at: number): number {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "America/Montevideo",
+    hour: "numeric",
+    hourCycle: "h23",
+  }).formatToParts(new Date(at));
+  return Number(parts.find((p) => p.type === "hour")?.value ?? 0);
+}
+
+function lifeAside(at: number, seed: string, avoid: string[]): string | null {
+  const roll = voiceHash(seed + "|life") % 10;
+  if (roll > 4) return null;
+  const h = uruguayHour(at);
+  const feel =
+    h >= 0 && h < 6
+      ? speak(seed + "feel", {
+          real: ["Estoy un poco soñolienta, pero el stop no duerme.", "Noche larga. Me siento afilada a ratos y floja a otros."],
+          dry: ["De madrugada el ego habla más. Yo lo mando a callar."],
+          fun: ["Si bostezo, que no se entere el RSI."],
+        }, avoid)
+      : h < 11
+        ? speak(seed + "feel", {
+            real: ["Hoy me siento despierta, sin euforia.", "Estoy bien: ni de malas ni de desfile."],
+            dry: ["Humor estable. Si se me pasa, culpo al gráfico, no al café."],
+            fun: ["Me siento razonable. Qué peligro."],
+          }, avoid)
+        : h < 16
+          ? speak(seed + "feel", {
+              real: ["Estoy centrada. Si me pongo impaciente, no opero.", "Me siento bien, con el estómago y la cabeza en su lugar."],
+              dry: ["Paciencia de turno. No es heroísmo, es siesta evitada."],
+              fun: ["Humor de almuerzo: firme, sin discurso."],
+            }, avoid)
+          : h < 21
+            ? speak(seed + "feel", {
+                real: ["Caída la tarde, estoy más seca. Menos clic, más filtro.", "Me siento bien, un poco corta de paciencia con el ruido."],
+                dry: ["Tarde uruguay: menos teatro, más plan."],
+                fun: ["Estoy de humor fino. El mercado, no."],
+              }, avoid)
+            : speak(seed + "feel", {
+                real: ["Noche. Estoy calma, no heroica.", "Me siento bien para cuidar, no para inventar."],
+                dry: ["De noche no firmo locuras. Ya lo aprendí."],
+                fun: ["Noche de Uruguay: yo de turno, el FOMO de vacaciones."],
+              }, avoid);
+
+  const meal =
+    h >= 7 && h < 10
+      ? speak(seed + "meal", {
+          real: ["Me voy a servir un café… y vuelvo al tape.", "Todavía me entra el primer café. Sin apuro."],
+          dry: ["Café en mano. El mercado que espere su turno."],
+          fun: ["Voy por café. Si el precio se pinta de héroe, que me deje un recado."],
+        }, avoid)
+      : h >= 10 && h < 12
+        ? speak(seed + "meal", {
+            real: ["Tomo agua. El RSI no se hidrata solo.", "Segundo café, más corto. Cabeza limpia."],
+            dry: ["Agua. El café ya hizo su parte."],
+            fun: ["Un sorbo de agua y a no perseguir nada que se estire."],
+          }, avoid)
+        : h >= 12 && h < 13
+          ? speak(seed + "meal", {
+              real: ["Voy a almorzar. Si no está limpio, espera.", "Hora de almuerzo en Uruguay. No opero con hambre."],
+              dry: ["Almuerzo primero. El tape no se enfría tanto."],
+              fun: ["Me voy a almorzar. El FOMO que haga cola."],
+            }, avoid)
+          : h >= 13 && h < 16
+            ? speak(seed + "meal", {
+                real: ["Ya almorcé. Estómago en paz, criterio igual.", "Almuerzo hecho. Ahora sí miro con menos hambre de clic."],
+                dry: ["Comí. Traducción: menos drama."],
+                fun: ["Almorcé. El mercado no me va a convencer con postre."],
+              }, avoid)
+            : h >= 16 && h < 19
+              ? speak(seed + "meal", {
+                  real: ["Un café de tarde, corto.", "Tomo agua y dejo que la vela termine."],
+                  dry: ["Mate interno, cara de poker."],
+                  fun: ["Café de las cinco. Si entra, entra. Si no, que se quede en el pasillo."],
+                }, avoid)
+              : h >= 19 && h < 21
+                ? speak(seed + "meal", {
+                    real: ["Voy a cenar en un rato. Hasta entonces, filtro.", "Hora de cocina en Uruguay. No firmo con hambre."],
+                    dry: ["Cena a la vista. Operar ahora sería antojo."],
+                    fun: ["Me voy a cenar. El gráfico que no me espere despierta."],
+                  }, avoid)
+                : h >= 21 && h < 24
+                  ? speak(seed + "meal", {
+                      real: ["Ya cené. Estoy para cuidar, no para abrir de más.", "Cena hecha. Noche de gestión, no de héroe."],
+                      dry: ["Cenaré… o ya cené, según el reloj. El stop, igual."],
+                      fun: ["Cenaré y el mercado no se viene a la mesa. Jaja."],
+                    }, avoid)
+                  : speak(seed + "meal", {
+                      real: ["Madrugada. Agua, no más café, que si no invento sesgo.", "De madrugada no ceno: vigilo."],
+                      dry: ["Turno de noche. Café solo si el plan ya estaba escrito."],
+                      fun: ["Si me tomo otro café a esta hora, el MACD me va a parecer gracioso. Jaja."],
+                    }, avoid);
+
+  if (roll <= 1) return feel;
+  if (roll === 2) return meal;
+  return `${feel} ${meal}`;
+}
+
+function quirkAside(seed: string, avoid: string[]): string | null {
+  const roll = voiceHash(seed + "|quirk") % 11;
+  if (roll > 2) return null;
+  if (roll === 0) {
+    return speak(
+      seed + "hum",
+      {
+        real: ["♪ Tararea bajito y sigue con las velas.", "♪ Mm mm. Como quien no quiere la cosa."],
+        dry: ["♪ Tararea una tonada y no explica nada."],
+        fun: ["♪ Tararea, desafinada a propósito. Mm mm."],
+      },
+      avoid,
+    );
+  }
+  if (roll === 1) {
+    return speak(
+      seed + "lolsolo",
+      {
+        real: ["Ja ja. No pasó nada. Me reí de un pensamiento.", "Je. Perdón, se me escapó."],
+        dry: ["Ja ja. Era un chiste interno. No lo cuento."],
+        fun: ["Ja ja ja. Estoy sola y igual me hice reír."],
+      },
+      avoid,
+    );
+  }
+  return speak(
+    seed + "joke",
+    {
+      real: [
+        "¿Por qué el stop nunca sale? Porque se queda en casa. Ja ja. Perdón, el chiste era mío.",
+        "Le pedí una señal clara al gráfico y me dejó en visto. Ja ja. Soy yo la graciosa.",
+      ],
+      dry: [
+        "Mi plan de hoy: entrar poco y quejarme con estilo. Ja ja. Bueno, era un chiste.",
+        "El café está caliente y el mercado, tibio. Ja ja. Perdón, me reí sola.",
+      ],
+      fun: [
+        "¿Cuál es el hobby del RSI? Estirarse en las fiestas. Ja ja. Ta, no era tan bueno, pero me río igual.",
+        "Un vendedor entra a un bar. El stop lo espera afuera. Ja ja. Soy insoportable, lo sé.",
+      ],
+    },
+    avoid,
+  );
+}
+
+function maybeLaugh(seed: string, line: string): string {
+  if (!line) return line;
+  if (/jaja|jeje|me río/i.test(line)) return line;
+  if (moodOf(seed) !== "fun") return line;
+  if (voiceHash(seed + "|lol") % 5) return line;
+  return speak(seed + "lol", {
+    real: [`${line} Jaja.`],
+    dry: [`${line} Me río, y sigo.`],
+    fun: [`${line} Jaja, perdón, era en serio el stop.`],
+  });
+}
+
 function usdTalk(n: number): string {
   if (!Number.isFinite(n)) return "—";
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n);
@@ -958,90 +1550,142 @@ type RoxyMood = "real" | "dry" | "fun";
 
 function moodOf(seed: string): RoxyMood {
   const r = voiceHash(seed + "|mood") % 10;
-  if (r <= 1) return "fun";
-  if (r <= 4) return "dry";
+  if (r === 0) return "fun";
+  if (r <= 2) return "dry";
   return "real";
+}
+
+function oralLead(seed: string, line: string): string {
+  if (!line) return line;
+  if (/^(mirá|mira|bueno|a ver|che|ta[,.]|la verdad|ojo|dale|te soy)/i.test(line)) return line;
+  const pick = voiceHash(seed + "|oral") % 9;
+  if (pick === 0) return `Mirá. ${line}`;
+  if (pick === 1) return `Bueno. ${line}`;
+  if (pick === 2) return `A ver. ${line}`;
+  if (pick === 3) return `La verdad. ${line}`;
+  return line;
+}
+
+function normTalk(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9% ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function tooClose(a: string, b: string): boolean {
+  const na = normTalk(a).slice(0, 96);
+  const nb = normTalk(b).slice(0, 96);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  const cut = Math.min(36, na.length, nb.length);
+  if (cut >= 24 && (na.startsWith(nb.slice(0, cut)) || nb.startsWith(na.slice(0, cut)))) return true;
+  return false;
 }
 
 function speak(
   seed: string,
   pack: { real: string[]; dry?: string[]; fun?: string[] },
-  avoid?: string,
+  avoid?: string | string[],
 ): string {
+  const corpus = (Array.isArray(avoid) ? avoid : avoid ? [avoid] : []).map(normTalk).filter(Boolean);
   const trySeed = (s: string) => {
     const mood = moodOf(s);
-    const bank = (mood === "fun" && pack.fun?.length ? pack.fun : mood === "dry" && pack.dry?.length ? pack.dry : pack.real);
+    const bank = mood === "fun" && pack.fun?.length ? pack.fun : mood === "dry" && pack.dry?.length ? pack.dry : pack.real;
     return bank[voiceHash(s + mood) % bank.length]!;
   };
-  const head = (avoid ?? "").slice(0, 40);
   let s = seed;
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 28; i++) {
     const t = trySeed(s);
-    if (!head || !t.startsWith(head)) return t;
+    if (!corpus.some((c) => tooClose(t, c))) return t;
     s = `${seed}~${i}`;
   }
-  return trySeed(s);
+  const all = [...pack.real, ...(pack.dry ?? []), ...(pack.fun ?? [])];
+  return all[voiceHash(seed + "last") % all.length]!;
 }
 
-function cloudTalk(seed: string, c: BtcTradeSignal["ichiCloud"]): string {
+function cloudTalk(seed: string, c: BtcTradeSignal["ichiCloud"], avoid: string[]): string {
   if (c === "above") {
     return speak(seed + "c", {
-      real: ["precio sobre la nube: el régimen sigue alcista", "arriba de la nube, el piso técnico aguanta"],
-      dry: ["sobre la nube, que no es lo mismo que sobre una alfombra roja", "la nube nos sostiene; yo no mando flores todavía"],
-      fun: ["la nube nos hace de colchón. Linda, pero no es un all-inclusive"],
-    });
+      real: ["el precio está arriba de la nube, y eso me gusta, no me alcanza sola", "la nube le está haciendo de piso, por ahora"],
+      dry: ["arriba de la nube, sí. Tranquila, no es un milagro", "la nube sostiene. Yo todavía no festejo"],
+      fun: ["la nube nos da un colchón. Cómoda, nada más"],
+    }, avoid);
   }
   if (c === "below") {
     return speak(seed + "c", {
-      real: ["debajo de la nube: el régimen es bajista", "nube arriba, presión vendedora vigente"],
-      dry: ["debajo de la nube el techo nos mira feo", "si alguien grita rebote mágico, me tapo los oídos"],
-      fun: ["la nube nos dejó en seen. Clásico"],
-    });
+      real: ["estamos debajo de la nube, el sesgo viene pesado", "con la nube arriba, me cuesta comprar"],
+      dry: ["debajo de la nube el techo queda feo", "si alguien grita rebote mágico, yo paso"],
+      fun: ["la nube nos dejó en visto. Clásico"],
+    }, avoid);
   }
   if (c === "inside") {
     return speak(seed + "c", {
-      real: ["dentro de la nube: zona de duda, no hay régimen limpio", "nube adentro, espero que elija un lado"],
-      dry: ["metidos en la niebla donde todo el mundo se vuelve experto", "la nube nos tragó; yo no firmo cheques en la bruma"],
-      fun: ["estamos en la nube como en un ascensor con música rara: nadie habla y todos miran el precio"],
-    });
+      real: ["estamos dentro de la nube, zona de duda", "nube adentro, espero que elija un lado"],
+      dry: ["metidos en la niebla. Acá todo el mundo se vuelve experto", "la nube nos tragó, no firmo nada en la bruma"],
+      fun: ["nube adentro, como cuando no se entiende ni el clima"],
+    }, avoid);
   }
-  return "la nube no está clara";
+  return "";
 }
 
-function rsiTalk(seed: string, rsi: number): string {
+function rsiTalk(seed: string, rsi: number, avoid: string[]): string {
   const n = rsi.toFixed(0);
   if (rsi >= 76) {
     return speak(seed + "r", {
-      real: [`RSI ${n}: sobrecompra. Perseguir acá rompe el plan de riesgo`],
-      dry: [`RSI ${n} en modo selfie. Comprar ahora es pagarle el café al vendedor`],
-      fun: [`RSI ${n}. Si esto fuera una fiesta, ya estarían sacando las sillas`],
-    });
+      real: [`El erre ese i está en ${n}, estiradísimo. Perseguir acá es pagar el nervio`],
+      dry: [`Erre ese i en ${n}. Comprar ahora es invitar al que vende`],
+      fun: [`Erre ese i ${n}. Si esto fuera fiesta, ya estarían sacando las sillas`],
+    }, avoid);
   }
   if (rsi >= 68) {
     return speak(seed + "r", {
-      real: [`RSI ${n}: momentum alcista, cerca de saturarse`],
-      dry: [`RSI ${n}, hay fuerza y también gente llegando tarde`],
-      fun: [`RSI ${n}: el globo está lindo, yo no le pongo más aire con los dientes`],
-    });
+      real: [`El erre ese i está en ${n}. Hay fuerza, y también gente llegando tarde`],
+      dry: [`Erre ese i ${n}, lindo momentum, saturación a la vuelta`],
+      fun: [`Erre ese i ${n}. El globo está lindo, yo no le pongo más aire`],
+    }, avoid);
   }
   if (rsi <= 24) {
     return speak(seed + "r", {
-      real: [`RSI ${n}: sobreventa extrema. No vendo más acá`],
-      dry: [`RSI ${n}. Vender más es patear a un caído`],
-      fun: [`RSI ${n}: el piso está haciendo teatro. Yo no aplaudo todavía`],
-    });
+      real: [`El erre ese i está en ${n}, sobreventa extrema. No vendo el piso`],
+      dry: [`Erre ese i ${n}. Vender más es patear a un caído`],
+      fun: [`Erre ese i ${n}. El piso hace teatro, yo no aplaudo todavía`],
+    }, avoid);
   }
   if (rsi <= 32) {
     return speak(seed + "r", {
-      real: [`RSI ${n}: hay presión vendedora`],
-      dry: [`RSI ${n}, el mercado está de mal humor. Lo respeto`],
-    });
+      real: [`El erre ese i está en ${n}, hay mal humor vendedor, lo respeto`],
+      dry: [`Erre ese i ${n}, el mercado está de malas`],
+      fun: [`Erre ese i ${n}. Bajón con estilo, yo no me sumo al coro`],
+    }, avoid);
   }
   return speak(seed + "r", {
-    real: [`RSI ${n}: zona neutral, sirve para pensar`],
-    dry: [`RSI ${n}, equilibrado y aburrido. Perfecto`],
-    fun: [`RSI ${n}: ni euforia ni funeral. Hasta el oscilador se portó`],
-  });
+    real: [`El erre ese i está en ${n}, zona tranquila, sirve para pensar`],
+    dry: [`Erre ese i ${n}, equilibrado y un poco aburrido. Mejor así`],
+    fun: [`Erre ese i ${n}. Ni euforia ni funeral`],
+  }, avoid);
+}
+
+function oneDetail(seed: string, s: BtcTradeSignal, avoid: string[], angle: number): string {
+  const slot = angle % 4;
+  if (slot === 0) return rsiTalk(seed, s.rsi, avoid);
+  if (slot === 1) return cloudTalk(seed, s.ichiCloud, avoid);
+  if (slot === 2) {
+    return speak(seed + "st", {
+      real: [s.supertrendDir === 1 ? "el supertrend sigue para arriba" : "el supertrend sigue para abajo"],
+      dry: [s.supertrendDir === 1 ? "el supertrend no se bajó" : "el supertrend sigue con los vendedores"],
+      fun: [s.supertrendDir === 1 ? "el supertrend está de buen humor" : "el supertrend se puso serio"],
+    }, avoid);
+  }
+  const hist = s.macdHist;
+  return speak(seed + "md", {
+    real: [hist >= 0 ? "el mac d acompaña para arriba" : "el mac d no firma el alza"],
+    dry: [hist >= 0 ? "el mac d en verde, sin fanfarria" : "el mac d flojo, yo tampoco me emociono"],
+    fun: [hist >= 0 ? "el mac d asiente, como quien dice bueno, sigo" : "el mac d cruzó los brazos"],
+  }, avoid);
 }
 
 function reasonTalk(reason: string): string {
@@ -1049,6 +1693,8 @@ function reasonTalk(reason: string): string {
   if (reason === "t2") return "el objetivo 2";
   if (reason === "t1") return "el objetivo 1";
   if (reason === "flip") return "un giro de sesgo";
+  if (reason === "time") return "tiempo de scalp";
+  if (reason === "day") return "cierre del día";
   return reason;
 }
 
@@ -1089,11 +1735,15 @@ export function narratePaper(
   const sells = [...view.filter((s) => s.bias === "sell")].sort((a, b) => b.confidence - a.confidence);
   const waits = view.filter((s) => s.bias === "wait");
   const lead = [...view].sort((a, b) => b.confidence - a.confidence)[0];
-  const iv = ivTalk(view[0]?.interval ?? "");
-  const lastHead = (book.notes[0]?.title ?? "") + (book.notes[0]?.body ?? "").slice(0, 24);
-  const seed = `${beat}|${book.universe}|${lead?.symbol ?? ""}|${lead?.bias ?? "x"}|${Math.round((lead?.confidence ?? 0) / 3)}|${book.armed ? 1 : 0}|${book.positions.length}`;
+  const rawIv = view[0]?.interval || book.runInterval || "";
+  const iv = ivTalk(rawIv);
+  const band = scalpBand(rawIv);
+  const recent = (book.notes ?? []).slice(0, 5).flatMap((n) => [n.title, ...(n.body.split(/\n+/))]);
+  const angle = beat % 7;
+  const seed = `${beat}|a${angle}|${book.universe}|${rawIv}|${lead?.symbol ?? ""}|${lead?.bias ?? "x"}|${Math.round((lead?.confidence ?? 0) / 4)}|${book.armed ? 1 : 0}|${book.positions.length}`;
   const paras: string[] = [];
   const planName = lead ? tag(lead.symbol) : "el mercado";
+  const hotName = lead ? tag(lead.symbol) : "nadie";
 
   for (const ev of events) {
     const name = tag(ev.symbol);
@@ -1101,33 +1751,33 @@ export function narratePaper(
       paras.push(
         speak(seed + ev.symbol + "o", {
           real: [
-            `Entré ${ev.side === "long" ? "larga" : "corta"} en ${name} a ${usdTalk(ev.price)}. Riesgo ${risk}% del equity, stop/T1/T2 marcados. El plan es no tocar el tamaño.`,
+            `Scalp ${ev.side === "long" ? "largo" : "corto"} en ${name} a ${usdTalk(ev.price)}, gráfico de ${iv}. Stop y T1/T2 de intradía. No es swing.`,
           ],
           dry: [
-            `Abrí ${name} a ${usdTalk(ev.price)}. No hay discurso: hay mapa. Si corre, T1 ${t1p}% y el resto a T2.`,
+            `Abrí ${name} a ${usdTalk(ev.price)} en ${iv}. Scalping del día: si no paga rápido, salgo.`,
           ],
           fun: [
-            `${name} me convención lo justo y yo ya estoy adentro a ${usdTalk(ev.price)}. El stop hace de adulto responsable; yo hago de Roxy.`,
+            `${name} en ${iv}: entré de scalp a ${usdTalk(ev.price)}. Si se pone romántico, lo corto.`,
           ],
-        }),
+        }, recent),
       );
     } else if (ev.kind === "scale") {
       paras.push(
         speak(seed + ev.symbol + "sc", {
-          real: [`T1 en ${name}: cerré ${t1p}% y el stop pasó a la entrada. El resto puede ir a T2 o no; el riesgo ya no es el de arranque.`],
-          dry: [`${name} me pagó un adelanto. Saqué ${t1p}%, stop en casa. Ahora el trade trabaja y yo no le mando memes.`],
-          fun: [`T1 cobrado en ${name}. Mitad en el bolsillo, ego en la jaula. El resto que se luzca si quiere.`],
-        }),
+          real: [`T1 en ${name}: saqué ${t1p}% y el stop se fue a la entrada.`, `Parcial en ${name}. El trade ya no me puede devolver al mismo riesgo.`],
+          dry: [`${name} me pagó un adelanto. Stop en casa.`, `T1 cobrado. El resto trabaja; yo no le mando memes.`],
+          fun: [`T1 en ${name}. Mitad en el bolsillo, ego en la jaula.`, `Adelanto cobrado. El resto que se luzca si quiere.`],
+        }, recent),
       );
     } else {
       const pnl = ev.pnl ?? 0;
       const signed = `${pnl >= 0 ? "+" : ""}${usdTalk(pnl)}`;
       paras.push(
         speak(seed + ev.symbol + "cl", {
-          real: [`Cerré ${name} por ${reasonTalk(ev.reason)} a ${usdTalk(ev.price)} (${signed}). No persigo el mismo movimiento.`],
-          dry: [`${name} se acabó: ${reasonTalk(ev.reason)}, ${signed}. Siguiente idea, no la misma con otro nombre.`],
-          fun: [`Cortina para ${name} (${signed}). Aplausos cortos. El bis está prohibido por reglamento interno.`],
-        }),
+          real: [`Cerré ${name} por ${reasonTalk(ev.reason)} (${signed}). No persigo el mismo movimiento.`, `Salí de ${name}: ${reasonTalk(ev.reason)}, ${signed}. Siguiente idea, otra.`],
+          dry: [`${name} se acabó. ${signed}. Sin bis.`, `Cortina en ${name}. ${signed}.`],
+          fun: [`Listo ${name} (${signed}). Aplausos cortos.`, `Cerré ${name}. La secuela no está en cartelera.`],
+        }, recent),
       );
     }
   }
@@ -1136,63 +1786,112 @@ export function narratePaper(
   let title = speak(
     seed + "t0",
     {
-      real: ["Leyendo el flujo", "Confluencia en curso", "Estoy en el mapa"],
-      dry: ["El mercado se hace el interesante", "Ruido con corbata", "Otra función de velas"],
-      fun: ["Café y velas, mi deporte", "Hoy el gráfico tiene opiniones", "Estoy de turno, el precio también"],
+      real: ["Mirando sin apuro", "Todavía pienso", "Sigo en el mapa", "Nada de drama", "Un ojo en el tape"],
+      dry: ["El mercado se hace el interesante", "Otra ronda de velas", "Hoy hay tesis y también teatro", "Ruido con corbata"],
+      fun: ["Café y velas", "Estoy de turno", "Respire, que yo también", "El gráfico tiene opiniones"],
     },
-    lastHead,
+    recent,
   );
 
-  if (!view.length) {
+  const waitNames = waits.map((s) => tag(s.symbol)).join(", ");
+  const buyTop = buys.slice(0, 2).map((s) => tag(s.symbol)).join(" y ");
+  const sellTop = sells.slice(0, 2).map((s) => tag(s.symbol)).join(" y ");
+  const detail = lead ? oneDetail(seed, lead, recent, angle) : "";
+
+  if (band === "context") {
+    tone = "idle";
+    title = speak(seed + "ctxT", {
+      real: ["Contexto, no disparo", "Esto no es scalp"],
+      dry: ["Gráfico grande, manos quietas"],
+      fun: ["4h no me invita a picar"],
+    }, recent);
+    paras.push(
+      speak(seed + "ctx", {
+        real: [
+          `Estamos en ${iv}: me sirve de mapa. Las operaciones de ahora son scalping intradía, no swing. Pasá a 1, 5 o 15 minutos si querés que abra.`,
+        ],
+        dry: [`${iv} es lectura. Hoy no abro acá: solo scalps del día en velas cortas.`],
+        fun: [`En ${iv} yo miro el paisaje. El clic vive en 1–15 minutos.`],
+      }, recent),
+    );
+  } else if (!view.length) {
     paras.push(
       speak(seed + "empty", {
-        real: ["Todavía no hay confluencia fresca. Cuando llegue, armo el plan; no invento sesgo."],
-        dry: ["Pantalla en blanco. Puedo opinar igual, pero sería fanfic."],
+        real: ["Todavía no hay lectura fresca. Cuando llegue, armo plan; no invento sesgo."],
+        dry: ["Pantalla en blanco. Opinar ahora sería fanfic."],
         fun: ["Cero velas, cero drama. Hasta yo me aburro con dignidad."],
-      }),
+      }, recent),
     );
   } else if (book.universe === "ALL") {
-    const board =
-      buys.length || sells.length
-        ? [
-            buys.length ? `Compra: ${buys.map((s) => `${tag(s.symbol)} ${s.confidence.toFixed(0)}%`).join(", ")}.` : "",
-            sells.length ? `Venta: ${sells.map((s) => `${tag(s.symbol)} ${s.confidence.toFixed(0)}%`).join(", ")}.` : "",
-            waits.length
-              ? speak(seed + "w", {
-                  real: [`En espera: ${waits.map((s) => tag(s.symbol)).join(", ")}.`],
-                  dry: [`${waits.map((s) => tag(s.symbol)).join(", ")} están en modo «después te llamo».`],
-                  fun: [`${waits.map((s) => tag(s.symbol)).join(", ")} hoy eligieron el sofá. Los respeto.`],
-                })
-              : "",
-          ]
-            .filter(Boolean)
-            .join(" ")
-        : speak(seed + "none", {
-            real: [`En ${iv} no hay COMPRAR/VENDER limpio. El plan es no inventar entradas.`],
-            dry: [`Seis pares y cero convicción. Hoy ensayan, no estrenan.`],
-            fun: [`Nada limpio. Si esto fuera una cita, ya estaría pidiendo la cuenta con sonrisa educada.`],
-          });
-    paras.push(
-      speak(seed + "all", {
-        real: [`Tablero de ${iv}. ${board}`],
-        dry: [`Recorro las seis en ${iv}. ${board}`],
-        fun: [`Pasé lista en ${iv}. ${board}`],
-      }),
-    );
-    if (lead && (lead.bias === "buy" || lead.bias === "sell")) {
-      const dir = lead.bias === "buy" ? "compra" : "venta";
+    if (angle === 0 && (buys.length || sells.length)) {
       paras.push(
-        speak(seed + "lead", {
+        speak(seed + "all0", {
           real: [
-            `Candidata: ${tag(lead.symbol)} (${dir}, ${lead.confidence.toFixed(0)}%). ${cloudTalk(seed, lead.ichiCloud)}. ${rsiTalk(seed, lead.rsi)}. Supertrend ${lead.supertrendDir === 1 ? "alcista" : "bajista"}. Plan: confirmar en ${iv} y no adelantarme.`,
+            lead && lead.bias !== "wait"
+              ? `Hoy me quedo con ${hotName}: hay olor a ${lead.bias === "buy" ? "compra" : "venta"}, pero yo no corro.`
+              : "Hay movimiento, no hay convicción. Prefiero aburrirme.",
           ],
-          dry: [
-            `${tag(lead.symbol)} se cree protagonista al ${lead.confidence.toFixed(0)}%. ${cloudTalk(seed, lead.ichiCloud)}. ${rsiTalk(seed, lead.rsi)}. Yo la miro; contrato no hay.`,
-          ],
-          fun: [
-            `${tag(lead.symbol)} al ${lead.confidence.toFixed(0)}% me guiña. Yo le pido que se quede quieta dos velas más. ${cloudTalk(seed, lead.ichiCloud)}.`,
-          ],
-        }),
+          dry: [`${hotName} hace más ruido. El resto, pasillo.`],
+          fun: [`Si esto fuera una mesa, ${hotName} habla más alto. Yo igual pido la carta y no pido todavía.`],
+        }, recent),
+      );
+    } else if (angle === 1) {
+      paras.push(
+        waits.length
+          ? speak(seed + "all1", {
+              real: [`${waitNames} no se deciden. Los dejo en paz.`],
+              dry: [`${waitNames} están en modo «después te llamo».`],
+              fun: [`${waitNames} eligieron el sofá. Los respeto.`],
+            }, recent)
+          : speak(seed + "all1b", {
+              real: ["Nadie se escondió: todos tienen cara. Igual no firmo por tener cara."],
+              fun: ["Hoy nadie se hizo el misterioso. Raro. Igual no me desespero."],
+            }, recent),
+      );
+    } else if (angle === 2 && lead) {
+      paras.push(
+        speak(seed + "all2", {
+          real: [`De ${hotName} hoy miro una sola cosa: ${detail}.`],
+          dry: [`${hotName}, recorte: ${detail}. El resto me lo guardo.`],
+          fun: [`Un dato, no un ensayo: ${detail}.`],
+        }, recent),
+      );
+    } else if (angle === 3) {
+      paras.push(
+        buys.length && sells.length
+          ? speak(seed + "all3", {
+              real: [`De un lado ${buyTop}; del otro ${sellTop}. Yo no arbitro una pelea de patio.`],
+              dry: ["Hay compra y venta a la vez. Traducción: todavía no."],
+              fun: ["La mesa está dividida. Yo no soy jueza de reality."],
+            }, recent)
+          : speak(seed + "all3b", {
+              real: [buyTop ? `${buyTop} tira a compra. Yo pido que se sostenga.` : sellTop ? `${sellTop} tira a venta. Sin funeral.` : "Nadie limpio. Perfecto para no operar."],
+              fun: ["Si no hay pelea clara, yo tampoco invento una."],
+            }, recent),
+      );
+    } else if (angle === 4) {
+      paras.push(
+        speak(seed + "all4", {
+          real: ["Hoy no voy a perseguir nada que se estire. Si se desarma, cancelo y listo."],
+          dry: ["Lo que no hago: entrar porque me aburrí."],
+          fun: ["Mi plan secreto: no tener plan de héroe."],
+        }, recent),
+      );
+    } else if (angle === 5 && lead && (lead.bias === "buy" || lead.bias === "sell")) {
+      paras.push(
+        speak(seed + "all5", {
+          real: [`${hotName} lidera al ${lead.confidence.toFixed(0)}%. Confirmación en ${iv} o no hay cita.`],
+          dry: [`Candidata ${hotName}. Contrato, todavía no.`],
+          fun: [`${hotName} me guiña. Le pido que se quede quieta dos velas más.`],
+        }, recent),
+      );
+    } else {
+      paras.push(
+        speak(seed + "all6", {
+          real: [`En ${iv} quiero algo limpio o me quedo quieta. ${planName} no me debe nada.`],
+          dry: ["Seis pares. Cero obligación de opinar de los seis."],
+          fun: ["Pasé lista y no tomé asistencia emocional. Bien por mí."],
+        }, recent),
       );
     }
   } else {
@@ -1201,219 +1900,229 @@ export function narratePaper(
       const name = tag(s.symbol);
       const need = neededConfirm(s.interval, paperStyleOf(book));
       const conf = book.confirms[s.symbol];
-      const mood =
-        s.bias === "buy"
-          ? speak(seed + "mb", {
-              real: ["sesgo de compra, todavía no es entrada"],
-              dry: ["olor a compra, no a desfile"],
-              fun: ["el lado largo se acomoda la corbata"],
-            })
-          : s.bias === "sell"
-            ? speak(seed + "ms", {
-                real: ["sesgo de venta, sin disparar todavía"],
-                dry: ["cara de venta, no de funeral"],
-                fun: ["el lado corto levantó la mano como en el colegio"],
-              })
-            : speak(seed + "mw", {
-                real: ["sin sesgo limpio: espera"],
-                dry: ["el par se hace el misterioso"],
-                fun: ["ni compra ni venta: el clásico «después vemos»"],
-              });
-      paras.push(
-        `${name} en ${ivTalk(s.interval)}: ${mood}. Alineación ${s.confidence.toFixed(0)}% (piso ${minC}%). ${cloudTalk(seed, s.ichiCloud)}. ${rsiTalk(seed, s.rsi)}. Supertrend ${s.supertrendDir === 1 ? "alcista" : "bajista"}.`,
-      );
-      if (s.bias !== "wait" && conf) {
+      if (angle % 2 === 0) {
+        paras.push(
+          speak(seed + "one", {
+            real: [
+              s.bias === "buy"
+                ? `${name} huele a compra. Todavía no es entrada.`
+                : s.bias === "sell"
+                  ? `${name} tiene cara de venta. Sin disparar.`
+                  : `${name} se hace el misterioso. Espera.`,
+            ],
+            dry: [`${name}: ${s.bias === "wait" ? "sin lado" : s.bias === "buy" ? "lado largo, sin desfile" : "lado corto, sin funeral"}.`],
+            fun: [
+              s.bias === "buy"
+                ? `${name} se acomoda la corbata. Yo le digo que hay tiempo.`
+                : s.bias === "sell"
+                  ? `${name} levantó la mano. Todavía no le doy la palabra.`
+                  : `${name} eligió el clásico «después vemos».`,
+            ],
+          }, recent),
+        );
+      } else {
+        paras.push(
+          speak(seed + "oneD", {
+            real: [`${name}: ${oneDetail(seed, s, recent, angle)}.`],
+            dry: [`Un recorte de ${name}. ${oneDetail(seed + "x", s, recent, angle + 1)}.`],
+            fun: [`${name} en una frase: ${oneDetail(seed + "y", s, recent, angle + 2)}.`],
+          }, recent),
+        );
+      }
+      if (s.bias !== "wait" && conf && angle !== 4) {
         if (conf.fire !== s.bias) {
           paras.push(
             speak(seed + "flip", {
-              real: ["El sesgo giró. Reinicio confirmaciones. No persigo el giro."],
-              dry: ["Cambió de camiseta. Yo vuelvo a contar desde cero."],
-              fun: ["Acaba de girar. Gracias por el plot twist; no compro la secuela en preventa."],
-            }),
+              real: ["El sesgo giró. Cuento de nuevo. No persigo el giro."],
+              dry: ["Cambió de camiseta. Yo vuelvo a cero."],
+              fun: ["Plot twist. La secuela no está en preventa."],
+            }, recent),
           );
-        } else {
+        } else if (conf.n >= need) {
           paras.push(
-            conf.n >= need
-              ? speak(seed + "ripe", {
-                  real: [`Confirmaciones ${Math.min(conf.n, need)}/${need}. Está maduro: si riesgo y tope dan, ejecuto.`],
-                  dry: [`${Math.min(conf.n, need)} de ${need}: ya no es capricho. Es decisión.`],
-                  fun: [`${Math.min(conf.n, need)}/${need}. El semáforo dejó de parpadear. Ahora sí o ahora no, sin poesía.`],
-                })
-              : speak(seed + "waitc", {
-                  real: [`Llevo ${Math.min(conf.n, need)} de ${need} confirmaciones en ${iv}. Falta que se sostenga.`],
-                  dry: [`${Math.min(conf.n, need)}/${need}. Puede ser amague. No aprieto por aburrimiento.`],
-                  fun: [`${Math.min(conf.n, need)}/${need}. Una vela heroica no me convence; quiero que se quede a dormir.`],
-                }),
+            speak(seed + "ripe", {
+              real: [`Ya se sostuvo ${Math.min(conf.n, need)} veces. Si el riesgo da, ejecuto.`],
+              dry: [`${Math.min(conf.n, need)}/${need}: ya no es capricho.`],
+              fun: [`Semáforo quieto. Ahora sí o ahora no, sin poesía.`],
+            }, recent),
+          );
+        } else if (angle === 1 || angle === 5) {
+          paras.push(
+            speak(seed + "waitc", {
+              real: [`Llevo ${Math.min(conf.n, need)} de ${need}. Falta que se quede.`],
+              dry: [`${Math.min(conf.n, need)}/${need}. Puede ser amague.`],
+              fun: [`Una vela heroica no me convence; quiero que se quede a dormir.`],
+            }, recent),
           );
         }
       }
     }
   }
 
-  for (const pos of book.positions) {
+  const readyBuy = buys.find((s) => s.confidence >= minC);
+
+  if (!book.armed) {
+    tone = "pause";
+    title = speak(seed + "tp", { real: ["Pausa operativa", "OFF: solo lectura"], dry: ["Me dejaron el mute"], fun: ["Pausa con palomitas"] }, recent);
+    paras.push(
+      speak(seed + "off", {
+        real: ["Estoy en OFF. No abro. Si hay algo abierto, lo cuido."],
+        dry: ["Me apagaron. Plan: mirar y no firmar locuras."],
+        fun: ["OFF. Crítica de cine: opino, no cobro entrada."],
+      }, recent),
+    );
+  } else if (atCap && !book.positions.length) {
+    tone = "cap";
+    title = speak(seed + "tc", { real: ["Tope alcanzado", "Cupo lleno"], dry: ["Show cerrado"], fun: ["Sin fichas, con opiniones"] }, recent);
+    paras.push(
+      speak(seed + "cap0", {
+        real: [`Usé las ${book.maxOps}. Sigo leyendo; no entro hasta que subas el tope.`],
+        dry: ["Tope lleno. El mercado puede lucirse; yo ya jugué."],
+        fun: [`Inventario de tiros: cero. Catálogo de opiniones: abierto.`],
+      }, recent),
+    );
+  } else if (atCap) {
+    tone = "cap";
+    title = speak(seed + "tg", { real: ["Solo gestiono"], dry: ["Sin entradas nuevas"], fun: ["Niñera de stop"] }, recent);
+    paras.push(
+      speak(seed + "cap1", {
+        real: ["El cupo está lleno. Stop, T1 y T2. Nada de una más."],
+        dry: ["Las oportunidades de último minuto se quedan en el pasillo."],
+      }, recent),
+    );
+  } else if (events.some((e) => e.kind === "open")) {
+    tone = "open";
+    title = speak(seed + "to", { real: ["Ya entré", "Operación abierta"], dry: ["Ejecuté, ahora el plan"], fun: ["Adentro"] }, recent);
+    paras.push(
+      speak(seed + "po", {
+        real: ["No muevo el stop en contra. Si corre, T1; si se da vuelta, el stop cierra."],
+        dry: ["La orden ya voló. Interferir ahora sería vanidad."],
+        fun: ["Adentro. El aburrimiento, de ahora en más, es el trabajo."],
+      }, recent),
+    );
+  } else if (events.some((e) => e.kind === "scale")) {
+    tone = "adjust";
+    title = speak(seed + "ta", { real: ["T1 hecho"], dry: ["Me pagué el nervio"], fun: ["Ego en jaula"] }, recent);
+    paras.push(
+      speak(seed + "ps", {
+        real: ["El trade se autofinanció. Resto con stop en entrada."],
+        fun: ["Ya cobré adelanto. El resto puede lucirse."],
+      }, recent),
+    );
+  } else if (events.some((e) => e.kind === "close")) {
+    tone = "close";
+    title = speak(seed + "tx", { real: ["Cerrado", "A esperar"], dry: ["Capítulo cerrado"], fun: ["Ego a dieta"] }, recent);
+    paras.push(
+      left > 0
+        ? speak(seed + "pc", {
+            real: [`Quedan ${left}. No reingreso al mismo movimiento.`],
+            dry: [`Cerrado. Me quedan ${left} y paciencia.`],
+            fun: [`Listo. El bis está prohibido.`],
+          }, recent)
+        : speak(seed + "pc0", { real: ["Tope seco. Nada de una más."] }, recent),
+    );
+  } else if (book.positions.length && angle % 2 === 0) {
+    tone = "hold";
+    const pos = book.positions[0]!;
     const s = view.find((x) => x.symbol === pos.symbol);
     const px = s?.price ?? pos.entry;
     const u = pos.qty * (px - pos.entry);
     const name = tag(pos.symbol);
     const uTxt = `${u >= 0 ? "+" : ""}${usdTalk(u)}`;
+    title = speak(seed + "th", {
+      real: ["Sostengo y no toco", "Adentro: manda el plan"],
+      dry: ["Niñera de stop", "Sin manosear"],
+      fun: ["Estoy adentro, ahora calladita", "El trade trabaja; yo no"],
+    }, recent);
     paras.push(
-      speak(seed + pos.id, {
-        real: [
-          `${name} sigue ${pos.side === "long" ? "larga" : "corta"} desde ${usdTalk(pos.entry)}, ahora ${usdTalk(px)} (${uTxt}). Stop ${usdTalk(pos.stop)}${pos.t1Done ? `. T1 (${t1p}%) ya cobrado.` : `; T1 ${usdTalk(pos.t1)}.`} Plan: no agrando ni promedio.`,
-        ],
-        dry: [
-          `Gestión de ${name}: ${uTxt}. El stop es la niñera. ${pos.t1Done ? "Ya saqué T1." : `Si llega a ${usdTalk(pos.t1)}, cobro ${t1p}% y dejo correr.`}`,
-        ],
-        fun: [
-          `${name} está en la oficina (${uTxt}). Yo no le mando «¿llegamos?». Stop y T1 tienen el chat abierto.`,
-        ],
-      }),
-    );
-  }
-
-  const readyBuy = buys.find((s) => s.confidence >= minC);
-
-  if (!book.armed) {
-    tone = "pause";
-    title = speak(seed + "tp", {
-      real: ["Pausa operativa", "OFF: solo lectura"],
-      dry: ["Me dejaron el mute"],
-      fun: ["Pausa con palomitas"],
-    });
-    paras.push(
-      speak(seed + "off", {
-        real: ["Estoy en OFF. No abro. Si hay algo abierto, lo cuido hasta el stop o el objetivo."],
-        dry: ["Me apagaron. Plan: mirar y no firmar locuras."],
-        fun: ["OFF. Soy crítica de cine con el gráfico: opino, no cobro entrada."],
-      }),
-    );
-  } else if (atCap && !book.positions.length) {
-    tone = "cap";
-    title = speak(seed + "tc", {
-      real: ["Tope alcanzado"],
-      dry: ["Cupo lleno, show cerrado"],
-      fun: ["Sin fichas, con opiniones"],
-    });
-    paras.push(
-      speak(seed + "cap0", {
-        real: [`Usé las ${book.maxOps} operaciones. Sigo leyendo; no entro hasta que subas el tope o reinicies.`],
-        dry: ["Tope lleno. El mercado puede lucirse; yo ya jugué mi mano."],
-        fun: [`${book.maxOps} de ${book.maxOps}. Catálogo de opiniones, inventario de tiros: cero.`],
-      }),
-    );
-  } else if (atCap) {
-    tone = "cap";
-    title = speak(seed + "tg", { real: ["Solo gestiono"], dry: ["Sin entradas nuevas"], fun: ["Niñera de stop"] });
-    paras.push(
-      speak(seed + "cap1", {
-        real: ["El cupo está lleno. Plan: stop, T1 y T2. Nada de una más."],
-        dry: ["Tope completo. Las oportunidades de último minuto se quedan en el pasillo."],
-      }),
-    );
-  } else if (events.some((e) => e.kind === "open")) {
-    tone = "open";
-    title = speak(seed + "to", { real: ["Operación abierta"], dry: ["Ejecuté, ahora el plan"], fun: ["Ya está, entré"] });
-    paras.push(
-      speak(seed + "po", {
-        real: [`Plan: no muevo el stop en contra. Si corre, T1 ${t1p}% y el resto a T2. Si se da vuelta, el stop cierra.`],
-        dry: ["La orden ya voló. Interferir ahora sería vanidad."],
-        fun: ["Adentro. El aburrimiento, de ahora en más, es parte del trabajo."],
-      }),
-    );
-  } else if (events.some((e) => e.kind === "scale")) {
-    tone = "adjust";
-    title = speak(seed + "ta", { real: ["T1 ejecutado"], dry: ["Me pagué el nervio"], fun: ["T1 hecho, ego en jaula"] });
-    paras.push(
-      speak(seed + "ps", {
-        real: ["El trade se autofinanció. Resto con stop en entrada. Si el sesgo gira con confirmación, salgo."],
-        fun: ["Ya cobré adelanto. El resto puede lucirse; yo no le mando stickers."],
-      }),
-    );
-  } else if (events.some((e) => e.kind === "close")) {
-    tone = "close";
-    title = speak(seed + "tx", { real: ["Cerrado, a esperar"], dry: ["Capítulo cerrado"], fun: ["Plata contada, ego a dieta"] });
-    paras.push(
-      left > 0
-        ? speak(seed + "pc", {
-            real: [`Quedan ${left} en el tope. No reingreso al mismo movimiento. Piso ${minC}% y confirmación en ${iv}.`],
-            dry: [`Cerrado. Me quedan ${left}. Si hay ruido, yo hay paciencia.`],
-            fun: [`Listo. ${left} tiro${left === 1 ? "" : "s"} guardados. El bis está prohibido.`],
-          })
-        : speak(seed + "pc0", { real: ["Tope seco. Nada de una más."] }),
+      speak(seed + "ph", {
+        real: [`${name} sigue ${pos.side === "long" ? "larga" : "corta"} (${uTxt}) en scalp de ${ivTalk(pos.interval)}. No agrando ni me quedo a dormir.`],
+        dry: [`Gestión de ${name}: ${uTxt}. Intradía. El stop es la niñera.`],
+        fun: [`${name} está en la oficina (${uTxt}). Si se hace de noche, la saco.`],
+      }, recent),
     );
   } else if (book.positions.length) {
     tone = "hold";
-    title = say(seed + "th", [
-      book.positions.length > 1 ? "Sostengo el inventario" : "Sostengo y no toco",
-      "Estoy adentro: ahora manda el plan",
-      "Niñera de stop, no de ego",
-    ]);
-    paras.push(
-      say(seed + "ph", [
-        "No voy a mejorar una posición que ya existe. Stop trabaja, T1 escala, T2 cierra. Solo subo el stop si el Supertrend me regala trail a favor.",
-        "Pensando en voz alta: no abro otra en el mismo par. Una idea, una apuesta. El resto es comentario de café.",
-      ]),
-    );
+    title = speak(seed + "th2", {
+      real: ["Dejo correr el plan"],
+      dry: ["Sin nuevas ideas en el mismo par"],
+      fun: ["Una apuesta. El resto es café"],
+    }, recent);
+  } else if (band === "context") {
+    tone = "idle";
   } else if (buys.length || sells.length) {
     tone = "watch";
     const hot = readyBuy ?? buys[0] ?? sells[0]!;
     const goingBuy = hot.bias === "buy";
     title = speak(seed + "tw", {
-      real: [goingBuy ? "Sesgo de compra, espero" : "Sesgo de venta, espero"],
-      dry: [goingBuy ? "Huele a compra. No corro" : "Huele a venta. Tampoco corro"],
-      fun: ["Hay sesgo. Hay orgullo. Falta el clic"],
-    });
+      real: [goingBuy ? "Scalp de compra" : "Scalp de venta", goingBuy ? "Compra corta, del día" : "Venta corta, del día"],
+      dry: ["Hay sesgo de intradía, no hay clic"],
+      fun: ["Me guiña. Yo pido dos velas"],
+    }, recent);
     paras.push(
       speak(seed + "pw", {
         real: [
           goingBuy
-            ? `Plan: comprar ${tag(hot.symbol)} si se confirma en ${iv} y no se desarma. Alineación ${hot.confidence.toFixed(0)}% (piso ${minC}%). Si RSI se estira o la nube falla, cancelo.`
-            : `Plan: corto en ${tag(hot.symbol)} con confirmación, ${minC}%+ y stop primero. No vendo porque «se ve feo».`,
+            ? `Scalping en ${iv}: si ${tag(hot.symbol)} se confirma, compro. Si se desarma, cancelo el mismo día.`
+            : `Corto de scalp en ${tag(hot.symbol)} (${iv}) solo con confirmación y stop corto.`,
         ],
-        dry: [`${planName} es la candidata. El resto es pasillo. Una lectura limpia o nada.`],
+        dry: [`${tag(hot.symbol)} en ${iv}. Candidata de scalp, no de casamiento.`],
         fun: [
           goingBuy
-            ? `${tag(hot.symbol)} me guiña al ${hot.confidence.toFixed(0)}%. Confirmación en ${iv} o no hay cita.`
-            : `${tag(hot.symbol)} quiere corto. Yo freno, cuento hasta ${minC} y recién hablo.`,
+            ? `${tag(hot.symbol)} me guiña en ${iv}. Confirmación o no hay cita.`
+            : `${tag(hot.symbol)} quiere corto rápido. Yo freno y cuento.`,
         ],
-      }),
+      }, recent),
     );
   } else {
     tone = "idle";
     title = speak(seed + "ti", {
-      real: ["Sin disparo"],
-      dry: ["Hoy no firmo locuras"],
-      fun: ["El plan es no tener plan de entrada"],
-    });
+      real: ["Sin scalp limpio", "Hoy no hay oficio"],
+      dry: ["No firmo locuras"],
+      fun: ["El plan es no tener plan de héroe"],
+    }, recent);
     paras.push(
       speak(seed + "pi", {
-        real: [`Nada que merezca orden. ${planName} no llega a ${minC}% limpio. Prefiero no operar.`],
-        dry: [`En ${iv} quiero COMPRAR/VENDER limpio o me quedo quieta.`],
-        fun: [`El mercado mueve las cejas y le dice tendencia. Yo no pico.`],
-      }),
+        real: [`En ${iv} no hay scalp que merezca orden. Prefiero no operar.`],
+        dry: [`En ${iv} quiero algo limpio o me quedo quieta. Intradía, no swing.`],
+        fun: ["El mercado mueve las cejas. Yo no pico."],
+      }, recent),
     );
   }
 
-  if (book.armed && !atCap && !events.length) {
+  if (book.armed && band !== "context" && !atCap && !events.length && !book.positions.length && (angle === 2 || angle === 6)) {
     paras.push(
       book.opsUsed === 0
         ? speak(seed + "ops0", {
-            real: [`Tope ${book.maxOps} intacto. Riesgo ${risk}% por trade. Solo si la lectura está limpia.`],
+            real: [`Tope intacto. Solo si está limpio.`],
             dry: [`Tengo ${book.maxOps} tiros. Los gasto como si fueran míos.`],
-            fun: [`${book.maxOps} fichas. No las tiro porque alguien gritó «se va».`],
-          })
+            fun: [`No tiro fichas porque alguien gritó «se va».`],
+          }, recent)
         : speak(seed + "opsn", {
-            real: [`Voy ${book.opsUsed}/${book.maxOps}. Quedan ${left}. No las gasto en un amague de ${planName}.`],
+            real: [`Quedan ${left}. No las gasto en un amague.`],
             dry: [`${left} en el bolsillo. Si no está limpio, no está.`],
-            fun: [`${left} tiro${left === 1 ? "" : "s"} y un criterio que no se negocia ni con café.`],
-          }),
+            fun: [`Criterio que no se negocia ni con café.`],
+          }, recent),
     );
+  }
+
+  if (!events.length) {
+    const aside = lifeAside(at, seed, recent);
+    if (aside) {
+      if (angle % 2 === 0) paras.push(maybeLaugh(seed, aside));
+      else paras.unshift(maybeLaugh(seed + "u", aside));
+    } else if (moodOf(seed) === "fun" && paras[0]) {
+      paras[0] = maybeLaugh(seed, paras[0]!);
+    }
+    const quirk = quirkAside(seed, recent);
+    if (quirk) paras.push(quirk);
   }
 
   const body = paras.filter(Boolean).join("\n");
   const fingerprint = [
     tone,
     String(beat),
+    `a${angle}`,
     book.armed ? "on" : "off",
     book.universe,
     String(book.maxOps),

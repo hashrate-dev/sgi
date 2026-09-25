@@ -2318,6 +2318,27 @@ body > .tv-markets-tape.hrs-card,
   color: #6ee7b7;
 }
 
+.tv-paper__voice {
+  appearance: none;
+  flex: none;
+  border: 1px solid rgba(244, 114, 182, 0.35);
+  background: rgba(244, 114, 182, 0.14);
+  color: #f9a8d4;
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.tv-paper__voice.is-muted {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--tv-muted);
+}
+
 .tv-paper__uni {
   display: flex;
   flex-wrap: wrap;
@@ -2760,7 +2781,8 @@ body > .tv-markets-tape.hrs-card,
   width: 100%;
   height: 100%;
   transform-origin: 50% 70%;
-  animation: roxy-head 9s ease-in-out infinite;
+  transition: transform 1.05s cubic-bezier(0.33, 0.12, 0.25, 1);
+  will-change: transform;
 }
 
 .tv-paper-opine__photo {
@@ -2770,7 +2792,7 @@ body > .tv-markets-tape.hrs-card,
   margin: -3% 0 0 -4%;
   object-fit: cover;
   object-position: center 16%;
-  animation: roxy-look 11s ease-in-out infinite, roxy-smile 11s ease-in-out infinite;
+  transition: object-position 1.2s ease;
 }
 
 .tv-paper-opine__lid {
@@ -2793,6 +2815,29 @@ body > .tv-markets-tape.hrs-card,
 .tv-paper-opine__lid--r {
   left: 53%;
   animation-delay: 0.03s;
+}
+
+.tv-paper-opine__mouth {
+  position: absolute;
+  left: 36%;
+  top: 66%;
+  width: 28%;
+  height: 11%;
+  border-radius: 40% 40% 55% 70%;
+  background: radial-gradient(ellipse at 50% 35%, rgba(90, 28, 38, 0.08), rgba(40, 12, 18, 0.02));
+  transform: scaleY(0.12) scaleX(0.92);
+  transform-origin: 50% 20%;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.tv-paper-opine__face.is-talk .tv-paper-opine__mouth {
+  opacity: 1;
+  animation: roxy-talk 0.28s ease-in-out infinite;
+}
+
+.tv-paper-opine__face.is-talk .tv-paper-opine__head {
+  animation: roxy-nod 2.4s ease-in-out infinite;
 }
 
 @keyframes roxy-head {
@@ -2843,11 +2888,44 @@ body > .tv-markets-tape.hrs-card,
   }
 }
 
+@keyframes roxy-talk {
+  0%,
+  100% {
+    transform: scaleY(0.18) scaleX(0.9);
+    opacity: 0.55;
+  }
+  22% {
+    transform: scaleY(0.95) scaleX(1.08);
+    opacity: 0.85;
+  }
+  48% {
+    transform: scaleY(0.28) scaleX(0.96);
+    opacity: 0.5;
+  }
+  71% {
+    transform: scaleY(0.78) scaleX(1.12);
+    opacity: 0.8;
+  }
+}
+
+@keyframes roxy-nod {
+  0%,
+  100% {
+    margin-top: 0;
+  }
+  40% {
+    margin-top: 1px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tv-paper-opine__head,
   .tv-paper-opine__photo,
-  .tv-paper-opine__lid {
+  .tv-paper-opine__lid,
+  .tv-paper-opine__mouth,
+  .tv-paper-opine__face.is-talk .tv-paper-opine__head {
     animation: none;
+    transition: none;
   }
 }
 

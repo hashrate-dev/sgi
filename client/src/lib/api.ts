@@ -2460,6 +2460,14 @@ export function putPaperBook(body: {
   armed?: boolean;
   universe?: string;
   maxOps?: number;
+  maxOpsDay?: number;
+  mode?: import("./mercadosPaperAgent").PaperMode;
+  leverage?: import("./mercadosPaperAgent").PaperLev;
+  riskPct?: number;
+  sizePct?: number;
+  minConf?: number;
+  t1Pct?: number;
+  style?: import("./mercadosPaperAgent").PaperStyle;
   runInterval?: string;
   reset?: { fund: number; maxOps?: number };
 }): Promise<{ book: import("./mercadosPaperAgent").PaperBook; server: boolean }> {

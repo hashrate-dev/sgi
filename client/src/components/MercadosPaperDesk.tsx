@@ -2,24 +2,41 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { BtcTradeSignal } from "../lib/api";
 import { getBtcTradeSignal, getPaperBook, putPaperBook } from "../lib/api";
 import {
+  clampPaperLev,
   clampPaperMaxOps,
+  clampPaperMaxOpsDay,
+  clampPaperMinConf,
+  clampPaperRiskPct,
+  clampPaperSizePct,
+  clampPaperT1Pct,
+  composePaperMode,
   loadPaperBook,
   narratePaper,
+  paperAtDayCap,
   paperAtOpsCap,
+  paperDirOf,
+  paperEffectiveLev,
   paperEntryAlert,
   paperPrepProcess,
   paperEquity,
   paperOpsLeft,
+  paperOpsToday,
+  paperVenueOf,
   savePaperBook,
   splitPaperTrades,
   type PaperBook,
+  type PaperDir,
+  type PaperLev,
   type PaperNote,
+  type PaperStyle,
   type PaperTrade,
   type PaperUniverse,
+  type PaperVenue,
 } from "../lib/mercadosPaperAgent";
 import { showToast } from "./ToastNotification";
 import { playMarketplaceCartItemAddedSound, playMarketplaceCartItemRemovedSound } from "../lib/marketplaceCartSound";
 import { playRoxyTypeTick } from "../lib/roxyTypeSound";
+import { hushRoxy, isRoxyMuted, setRoxyMuted, speakRoxy, subscribeRoxySpeech } from "../lib/roxyVoice";
 
 export type PaperPairOpt = { binance: string; label: string };
 
@@ -67,6 +84,8 @@ function exitLabel(reason: string | null): string {
   if (reason === "t2") return "T2";
   if (reason === "t1") return "T1";
   if (reason === "flip") return "Sesgo";
+  if (reason === "time") return "Tiempo";
+  if (reason === "day") return "Cierre del día";
   return reason || "Cierre";
 }
 
@@ -124,6 +143,63 @@ function Spark({ values }: { values: number[] }) {
   );
 }
 
+function CfgBtn({
+  on,
+  children,
+  onClick,
+  disabled,
+}: {
+  on: boolean;
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button type="button" className={on ? "is-on" : ""} disabled={disabled} onClick={onClick}>
+      {children}
+    </button>
+  );
+}
+
+function RoxyFace({ talking }: { talking: boolean }) {
+  const [pose, setPose] = useState({ rot: -1.2, x: 0, y: 0, lookX: 50, lookY: 16 });
+  useEffect(() => {
+    let t = 0;
+    const wander = () => {
+      setPose({
+        rot: Math.round((Math.random() * 14 - 7) * 10) / 10,
+        x: Math.round((Math.random() * 5.2 - 2.6) * 10) / 10,
+        y: Math.round((Math.random() * 3.4 - 1.7) * 10) / 10,
+        lookX: 46 + Math.random() * 10,
+        lookY: 12 + Math.random() * 10,
+      });
+      t = window.setTimeout(wander, 900 + Math.random() * 2600);
+    };
+    wander();
+    return () => window.clearTimeout(t);
+  }, []);
+  return (
+    <div className={`tv-paper-opine__face${talking ? " is-talk" : ""}`}>
+      <div
+        className="tv-paper-opine__head"
+        style={{ transform: `translate3d(${pose.x}px, ${pose.y}px, 0) rotate(${pose.rot}deg)` }}
+      >
+        <img
+          className="tv-paper-opine__photo"
+          src="/images/paper-agent-avatar.png"
+          alt={ROXY}
+          width={48}
+          height={48}
+          style={{ objectPosition: `${pose.lookX}% ${pose.lookY}%` }}
+        />
+        <span className="tv-paper-opine__lid tv-paper-opine__lid--l" aria-hidden />
+        <span className="tv-paper-opine__lid tv-paper-opine__lid--r" aria-hidden />
+        <span className="tv-paper-opine__mouth" aria-hidden />
+      </div>
+    </div>
+  );
+}
+
 function pairTag(pairs: PaperPairOpt[], symbol: string): string {
   return pairs.find((p) => p.binance === symbol)?.label.replace("/USDT", "") ?? symbol.replace("USDT", "");
 }
@@ -131,9 +207,11 @@ function pairTag(pairs: PaperPairOpt[], symbol: string): string {
 function AgentOpinion({
   notes,
   live,
+  muted,
 }: {
   notes: PaperNote[];
   live: Omit<PaperNote, "id">;
+  muted: boolean;
 }) {
   const feed = useMemo(() => {
     if (!notes.length) return [{ ...live, id: "live" } as PaperNote];
@@ -144,6 +222,9 @@ function AgentOpinion({
   const latestId = feed[0]?.id;
   const [shown, setShown] = useState("");
   const [done, setDone] = useState(false);
+  const [voicing, setVoicing] = useState(false);
+
+  useEffect(() => subscribeRoxySpeech(setVoicing), []);
 
   useEffect(() => {
     setI(0);
@@ -170,11 +251,13 @@ function AgentOpinion({
     let raf = 0;
     const tick = (t: number) => {
       if (!last) last = t;
+      const ch = body[n] ?? "";
+      const wait = ch === "\n" ? 420 : ch === "…" ? 380 : /[.!?]/.test(ch) ? 260 : /[,;:—]/.test(ch) ? 140 : 28;
       const elapsed = t - last;
-      if (elapsed >= 28) {
+      if (elapsed >= wait) {
         const from = n;
         n = Math.min(body.length, n + 1);
-        if (n > from) playRoxyTypeTick(body[from] ?? "");
+        if (n > from && !muted) playRoxyTypeTick(body[from] ?? "");
         setShown(body.slice(0, n));
         last = t;
       }
@@ -183,7 +266,18 @@ function AgentOpinion({
     };
     raf = window.requestAnimationFrame(tick);
     return () => window.cancelAnimationFrame(raf);
-  }, [isLive, current.id, current.body]);
+  }, [isLive, current.id, current.body, muted]);
+
+  useEffect(() => {
+    if (muted) {
+      hushRoxy();
+      return;
+    }
+    const line = current.body?.trim() || current.title;
+    if (!line) return;
+    speakRoxy(line);
+    return () => hushRoxy();
+  }, [muted, current.id, current.title, current.body]);
 
   const older = i < feed.length - 1;
   const newer = i > 0;
@@ -193,13 +287,7 @@ function AgentOpinion({
 
   return (
     <blockquote className={`tv-paper-opine tv-paper-opine--${current.tone}`}>
-      <div className="tv-paper-opine__face">
-        <div className="tv-paper-opine__head">
-          <img className="tv-paper-opine__photo" src="/images/paper-agent-avatar.png" alt={ROXY} width={48} height={48} />
-          <span className="tv-paper-opine__lid tv-paper-opine__lid--l" aria-hidden />
-          <span className="tv-paper-opine__lid tv-paper-opine__lid--r" aria-hidden />
-        </div>
-      </div>
+      <RoxyFace talking={voicing || (isLive && !done && !muted)} />
       <div className="tv-paper-opine__ident">
         <p className="tv-paper-opine__kicker">Opinión de {ROXY}</p>
         <p className="tv-paper-opine__title">{current.title}</p>
@@ -339,14 +427,19 @@ export function MercadosPaperDesk({
   pairs: PaperPairOpt[];
 }) {
   const [open, setOpen] = useState(false);
+  const [cfgOpen, setCfgOpen] = useState(false);
+  const [muted, setMuted] = useState(() => isRoxyMuted());
   const [book, setBook] = useState<PaperBook>(() => loadPaperBook(userId));
   const [fund, setFund] = useState(() => String(Math.round(loadPaperBook(userId).initialUsd)));
   const [cap, setCap] = useState(() => String(loadPaperBook(userId).maxOps));
+  const [dayCap, setDayCap] = useState(() => String(loadPaperBook(userId).maxOpsDay));
   const [marks, setMarks] = useState<Record<string, number>>({});
   const [sigs, setSigs] = useState<BtcTradeSignal[]>([]);
   const [nowTick, setNowTick] = useState(Date.now());
   const bookRef = useRef(book);
   bookRef.current = book;
+  const mutedRef = useRef(muted);
+  mutedRef.current = muted;
   const iv = interval === "LIVE" ? "1s" : interval;
   const tag = (symbol: string) => pairTag(pairs, symbol);
   const hydrated = useRef(false);
@@ -362,6 +455,7 @@ export function MercadosPaperDesk({
           setBook(remote.book);
           setFund(String(Math.round(remote.book.initialUsd)));
           setCap(String(remote.book.maxOps));
+          setDayCap(String(remote.book.maxOpsDay));
           savePaperBook(userId, remote.book);
         } else {
           const local = loadPaperBook(userId);
@@ -371,6 +465,7 @@ export function MercadosPaperDesk({
           setBook(saved.book);
           setFund(String(Math.round(saved.book.initialUsd)));
           setCap(String(saved.book.maxOps));
+          setDayCap(String(saved.book.maxOpsDay));
           savePaperBook(userId, saved.book);
         }
       } catch {
@@ -379,6 +474,7 @@ export function MercadosPaperDesk({
         setBook(b);
         setFund(String(Math.round(b.initialUsd)));
         setCap(String(b.maxOps));
+        setDayCap(String(b.maxOpsDay));
       } finally {
         hydrated.current = true;
       }
@@ -432,10 +528,18 @@ export function MercadosPaperDesk({
           if (ev.action === "open") {
             playMarketplaceCartItemAddedSound();
             showToast(`${ev.note || ev.action} ${name} @ ${usd(ev.price)}`, "success", ROXY);
+            if (!mutedRef.current) speakRoxy(`Abrí ${name} a ${usd(ev.price)}`);
           } else if (ev.action === "close" || ev.action === "scale") {
             playMarketplaceCartItemRemovedSound();
             const pnl = ev.pnl ?? 0;
             showToast(`${name} ${pnl >= 0 ? "+" : ""}${usd(pnl)}`, pnl >= 0 ? "success" : "warning", ROXY);
+            if (!mutedRef.current) {
+              speakRoxy(
+                ev.action === "scale"
+                  ? `T1 en ${name}. ${pnl >= 0 ? "En verde" : "En rojo"} ${usd(pnl)}`
+                  : `Cerré ${name}. ${pnl >= 0 ? "Ganancia" : "Pérdida"} ${usd(pnl)}`,
+              );
+            }
           }
         }
       }
@@ -488,8 +592,38 @@ export function MercadosPaperDesk({
         savePaperBook(userId, r.book);
         setFund(String(Math.round(r.book.initialUsd)));
         setCap(String(r.book.maxOps));
+        setDayCap(String(r.book.maxOpsDay));
       })
       .catch(() => undefined);
+  };
+
+  const venue = paperVenueOf(book.mode);
+  const dir = paperDirOf(book.mode);
+  const lev = paperEffectiveLev(book.mode, book.leverage);
+  const dayUsed = paperOpsToday(book);
+  const dayHit = paperAtDayCap(book);
+  const style = (book.style ?? "auto") as PaperStyle;
+
+  const setVenue = (nextVenue: PaperVenue) => {
+    if (nextVenue === "spot") {
+      const mode = composePaperMode("spot", "long");
+      persistPatch({ mode, leverage: 1 }, { ...book, mode, leverage: 1 });
+      return;
+    }
+    const nextLev = (lev < 2 ? 2 : lev) as PaperLev;
+    const mode = composePaperMode("futures", dir === "short" || dir === "both" ? dir : "both");
+    persistPatch({ mode, leverage: nextLev }, { ...book, mode, leverage: nextLev });
+  };
+
+  const setDir = (nextDir: PaperDir) => {
+    if (venue === "spot") return;
+    const mode = composePaperMode("futures", nextDir);
+    persistPatch({ mode }, { ...book, mode });
+  };
+
+  const setLev = (nextLev: PaperLev) => {
+    if (venue === "spot") return;
+    persistPatch({ leverage: nextLev }, { ...book, leverage: nextLev });
   };
 
   const setUniverse = (universe: PaperUniverse) => {
@@ -504,6 +638,18 @@ export function MercadosPaperDesk({
     showToast(`Tope en ${n} operaciones`, "info", ROXY);
   };
 
+  const applyDayCap = () => {
+    const n = clampPaperMaxOpsDay(Number(dayCap));
+    setDayCap(String(n));
+    if (n === book.maxOpsDay) return;
+    persistPatch({ maxOpsDay: n }, { ...book, maxOpsDay: n });
+    showToast(`Máximo ${n} operaciones por día`, "info", ROXY);
+  };
+
+  const modeHint =
+    venue === "spot" ? "Spot Long" : `Fut x${lev} · ${dir === "both" ? "L+S" : dir === "short" ? "Short" : "Long"}`;
+  const dayLeft = Math.max(0, clampPaperMaxOpsDay(book.maxOpsDay) - dayUsed);
+
   return (
     <div className={`tv-paper hrs-card sgi-glass-panel${posN ? " tv-paper--multi" : ""}${open ? " is-open" : ""}`}>
       <div className="tv-paper__head">
@@ -517,6 +663,21 @@ export function MercadosPaperDesk({
           </span>
           <strong className={ret >= 0 ? "is-up" : "is-down"}>{usd(eq)}</strong>
           <i className={`tv-paper__chev${open ? " is-open" : ""}`} aria-hidden />
+        </button>
+        <button
+          type="button"
+          className={`tv-paper__voice${muted ? " is-muted" : ""}`}
+          title={muted ? "Roxy está muda" : "Roxy habla"}
+          aria-pressed={!muted}
+          aria-label={muted ? "Activar voz de Roxy" : "Dejar muda a Roxy"}
+          onClick={() => {
+            const next = !muted;
+            setMuted(next);
+            setRoxyMuted(next);
+            if (next) hushRoxy();
+          }}
+        >
+          {muted ? "Muda" : "Voz"}
         </button>
         {open ? (
           <button
@@ -563,12 +724,12 @@ export function MercadosPaperDesk({
 
           <PrepMeter target={prep.pct} stage={prep.stage} intent={prep.intent} />
 
-          <AgentOpinion notes={book.notes} live={liveTalk} />
+          <AgentOpinion notes={book.notes} live={liveTalk} muted={muted || !open} />
 
           <div className="tv-paper__acct">
             <div className="tv-paper__eq">
               <strong className={ret >= 0 ? "is-up" : "is-down"}>{usd(eq)}</strong>
-              <span className={ret >= 0 ? "is-up" : "is-down"}>
+              <span className={ret >= 0 ? "is-up" : "is-down"} title="Resultado vs el fondeo inicial">
                 {ret >= 0 ? "+" : ""}
                 {ret.toFixed(2)}%
               </span>
@@ -584,8 +745,10 @@ export function MercadosPaperDesk({
                 <strong>{tradesN ? `${wr.toFixed(0)}%` : "—"}</strong>
               </div>
               <div>
-                <span>DD</span>
-                <strong className={dd < 0 ? "is-down" : ""}>{dd.toFixed(1)}%</strong>
+                <span title="Caída desde el máximo de la cuenta">Caída</span>
+                <strong className={dd < 0 ? "is-down" : ""}>
+                  {dd >= 0 ? "0.00%" : `${dd.toFixed(2)}%`}
+                </strong>
               </div>
               <div>
                 <span>Tope</span>

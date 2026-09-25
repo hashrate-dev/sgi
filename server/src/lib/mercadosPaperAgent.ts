@@ -3,9 +3,11 @@ import type { TradeConfluence } from "./btcTradeConfluence.js";
 type BtcTradeSignal = TradeConfluence;
 
 const FEE = 0.0004;
-const RISK_PCT = 0.01;
 const MIN_CONF = 58;
 const CASH_CAP = 0.92;
+const DEFAULT_RISK_PCT = 1;
+const DEFAULT_SIZE_PCT = 25;
+const DEFAULT_T1_PCT = 50;
 const HIST = 72;
 const FILLS = 48;
 const TRADES = 200;
@@ -13,6 +15,7 @@ const NOTES = 24;
 const MAX_OPS_MIN = 1;
 const MAX_OPS_MAX = 999;
 const DEFAULT_MAX_OPS = 10;
+const DEFAULT_MAX_OPS_DAY = 10;
 
 export type PaperEvent = {
   kind: "open" | "close" | "scale";
@@ -27,6 +30,8 @@ export type PaperEvent = {
 export type PaperMode = "all" | "spot-long" | "fut-long" | "fut-short";
 export type PaperLev = 1 | 2 | 3;
 export type PaperVenue = "spot" | "futures";
+export type PaperDir = "long" | "short" | "both";
+export type PaperStyle = "auto" | "intraday" | "swing";
 
 export type PaperPosition = {
   id: string;
@@ -105,10 +110,16 @@ export type PaperBook = {
   cashUsd: number;
   armed: boolean;
   maxOps: number;
+  maxOpsDay: number;
   opsUsed: number;
   mode: PaperMode;
   leverage: PaperLev;
   runInterval: string;
+  riskPct: number;
+  sizePct: number;
+  minConf: number;
+  t1Pct: number;
+  style: PaperStyle;
   confirms: Record<string, { fire: "buy" | "sell" | "wait"; n: number }>;
   positions: PaperPosition[];
   trades: PaperTrade[];
@@ -125,11 +136,103 @@ export function clampPaperMaxOps(n: number): number {
   return Math.max(MAX_OPS_MIN, Math.min(MAX_OPS_MAX, Math.floor(n)));
 }
 
+export function clampPaperMaxOpsDay(n: number): number {
+  if (!Number.isFinite(n)) return DEFAULT_MAX_OPS_DAY;
+  return Math.max(1, Math.min(99, Math.floor(n)));
+}
+
 export function clampPaperLev(n: number): PaperLev {
   if (!Number.isFinite(n)) return 1;
   if (n >= 3) return 3;
   if (n >= 2) return 2;
   return 1;
+}
+
+export function clampPaperRiskPct(n: number): number {
+  if (!Number.isFinite(n)) return DEFAULT_RISK_PCT;
+  return Math.round(Math.max(0.25, Math.min(5, n)) * 4) / 4;
+}
+
+export function clampPaperSizePct(n: number): number {
+  if (!Number.isFinite(n)) return DEFAULT_SIZE_PCT;
+  return Math.round(Math.max(5, Math.min(100, n)));
+}
+
+export function clampPaperMinConf(n: number): number {
+  if (!Number.isFinite(n)) return MIN_CONF;
+  return Math.round(Math.max(50, Math.min(85, n)));
+}
+
+export function clampPaperT1Pct(n: number): number {
+  if (!Number.isFinite(n)) return DEFAULT_T1_PCT;
+  return Math.round(Math.max(25, Math.min(75, n)));
+}
+
+export function paperMinConfOf(book: PaperBook): number {
+  return clampPaperMinConf(book.minConf ?? MIN_CONF);
+}
+
+export function normalizePaperStyle(raw: unknown): PaperStyle {
+  if (raw === "swing" || raw === "intraday" || raw === "auto") return raw;
+  return "auto";
+}
+
+export function paperStyleOf(book: Pick<PaperBook, "style"> | { style?: unknown }): PaperStyle {
+  const s = normalizePaperStyle(book.style);
+  return s === "swing" ? "intraday" : s === "auto" ? "intraday" : s;
+}
+
+type ScalpBand = "ultra" | "fast" | "mid" | "hour" | "context";
+
+function scalpBand(interval: string): ScalpBand {
+  if (interval === "1s" || interval === "LIVE" || interval === "1") return "ultra";
+  if (interval === "5") return "fast";
+  if (interval === "15" || interval === "30") return "mid";
+  if (interval === "60") return "hour";
+  return "context";
+}
+
+function paperAllowsScalpOpen(interval: string): boolean {
+  return scalpBand(interval) !== "context";
+}
+
+function scalpMaxHoldMs(interval: string): number {
+  const b = scalpBand(interval);
+  if (b === "ultra") return 25 * 60 * 1000;
+  if (b === "fast") return 90 * 60 * 1000;
+  if (b === "mid") return 4 * 60 * 60 * 1000;
+  return 8 * 60 * 60 * 1000;
+}
+
+function uruguayDayKey(ms: number): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Montevideo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(ms));
+}
+
+function scalpPlan(sig: BtcTradeSignal, side: "long" | "short"): { stop: number; t1: number; t2: number } {
+  const px = sig.price;
+  const b = scalpBand(sig.interval);
+  const t1p = b === "ultra" ? 0.0022 : b === "fast" ? 0.0034 : b === "mid" ? 0.0052 : 0.008;
+  const t2p = b === "ultra" ? 0.0042 : b === "fast" ? 0.0062 : b === "mid" ? 0.0095 : 0.014;
+  const stopP = b === "ultra" ? 0.002 : b === "fast" ? 0.003 : b === "mid" ? 0.0045 : 0.0065;
+  if (side === "long") {
+    const stop = Math.max(sig.stop, px * (1 - stopP));
+    let t1 = Math.min(sig.target1, px * (1 + t1p));
+    let t2 = Math.min(sig.target2, px * (1 + t2p));
+    if (!(t1 > px)) t1 = px * (1 + t1p);
+    if (!(t2 > t1)) t2 = px * (1 + t2p);
+    return { stop, t1, t2 };
+  }
+  const stop = Math.min(sig.stop, px * (1 + stopP));
+  let t1 = Math.max(sig.target1, px * (1 - t1p));
+  let t2 = Math.max(sig.target2, px * (1 - t2p));
+  if (!(t1 < px)) t1 = px * (1 - t1p);
+  if (!(t2 < t1)) t2 = px * (1 - t2p);
+  return { stop, t1, t2 };
 }
 
 export function normalizePaperMode(raw: unknown): PaperMode {
@@ -148,6 +251,19 @@ export function normalizePaperRunInterval(raw: unknown): string {
 
 export function paperVenueOf(mode: PaperMode): PaperVenue {
   return mode === "spot-long" ? "spot" : "futures";
+}
+
+export function paperDirOf(mode: PaperMode): PaperDir {
+  if (mode === "fut-short") return "short";
+  if (mode === "all") return "both";
+  return "long";
+}
+
+export function composePaperMode(venue: PaperVenue, dir: PaperDir): PaperMode {
+  if (venue === "spot") return "spot-long";
+  if (dir === "short") return "fut-short";
+  if (dir === "long") return "fut-long";
+  return "all";
 }
 
 export function paperEffectiveLev(mode: PaperMode, leverage: PaperLev): PaperLev {
@@ -176,10 +292,16 @@ export function emptyPaperBook(
     cashUsd: cash,
     armed: true,
     maxOps: clampPaperMaxOps(maxOps),
+    maxOpsDay: DEFAULT_MAX_OPS_DAY,
     opsUsed: 0,
     mode: md,
     leverage: paperEffectiveLev(md, leverage),
     runInterval: "60",
+    riskPct: DEFAULT_RISK_PCT,
+    sizePct: DEFAULT_SIZE_PCT,
+    minConf: MIN_CONF,
+    t1Pct: DEFAULT_T1_PCT,
+    style: "intraday" as PaperStyle,
     confirms: {},
     positions: [],
     trades: [],
@@ -323,7 +445,13 @@ export function hydratePaperBook(parsed: Partial<PaperBook> & { v?: number }): P
     mode,
     leverage: paperEffectiveLev(mode, parsed.leverage ?? 1),
     runInterval: normalizePaperRunInterval(parsed.runInterval),
+    riskPct: clampPaperRiskPct(parsed.riskPct ?? DEFAULT_RISK_PCT),
+    sizePct: clampPaperSizePct(parsed.sizePct ?? DEFAULT_SIZE_PCT),
+    minConf: clampPaperMinConf(parsed.minConf ?? MIN_CONF),
+    t1Pct: clampPaperT1Pct(parsed.t1Pct ?? DEFAULT_T1_PCT),
+    style: normalizePaperStyle(parsed.style),
     maxOps: clampPaperMaxOps(parsed.maxOps ?? DEFAULT_MAX_OPS),
+    maxOpsDay: clampPaperMaxOpsDay(parsed.maxOpsDay ?? DEFAULT_MAX_OPS_DAY),
     opsUsed,
     positions: positionsHydrated,
     trades: trades.slice(0, TRADES),
@@ -374,6 +502,29 @@ export function paperOpsLeft(book: PaperBook): number {
 
 export function paperAtOpsCap(book: PaperBook): boolean {
   return book.opsUsed >= book.maxOps;
+}
+
+export function paperUtcDayStart(ms = Date.now()): number {
+  const key = uruguayDayKey(ms);
+  const [y, m, d] = key.split("-").map(Number);
+  return Date.UTC(y!, (m ?? 1) - 1, d ?? 1, 3, 0, 0);
+}
+
+export function paperOpsToday(book: PaperBook, now = Date.now()): number {
+  const start = paperUtcDayStart(now);
+  const seen = new Set<string>();
+  for (const t of book.trades) {
+    if (t.openedAt >= start) seen.add(t.id);
+  }
+  return seen.size;
+}
+
+export function paperAtDayCap(book: PaperBook, now = Date.now()): boolean {
+  return paperOpsToday(book, now) >= clampPaperMaxOpsDay(book.maxOpsDay ?? DEFAULT_MAX_OPS_DAY);
+}
+
+export function paperCanOpen(book: PaperBook, now = Date.now()): boolean {
+  return !paperAtOpsCap(book) && !paperAtDayCap(book, now);
 }
 
 export type PaperAlertLight = "red" | "yellow" | "green";
@@ -438,7 +589,10 @@ export function paperEntryAlert(book: PaperBook, signals: BtcTradeSignal[]): Pap
     return { ...best, light: "red", score: 0, intent: "none", headline: "No va a comprar", detail: "Roxy está en OFF." };
   }
   if (paperAtOpsCap(book) && !book.positions.length) {
-    return { ...best, light: "red", score: 0, intent: "none", headline: "No va a comprar", detail: "Llegó al tope de operaciones." };
+    return { ...best, light: "red", score: 0, intent: "none", headline: "No va a comprar", detail: "Llegó al tope de operaciones del presupuesto." };
+  }
+  if (paperAtDayCap(book) && !book.positions.length) {
+    return { ...best, light: "red", score: 0, intent: "none", headline: "No va a comprar", detail: "Llegó al tope de operaciones del día." };
   }
   if (book.positions.length && best.symbol && book.positions.some((p) => p.symbol === best.symbol)) {
     const pos = book.positions.find((p) => p.symbol === best.symbol)!;
@@ -493,10 +647,15 @@ export function splitPaperTrades(book: PaperBook): { open: PaperTrade[]; closed:
   return { open, closed };
 }
 
-function neededConfirm(interval: string): number {
-  if (interval === "1s" || interval === "LIVE" || interval === "1") return 3;
-  if (interval === "5" || interval === "15") return 2;
-  return 1;
+function neededConfirm(interval: string, _style: PaperStyle = "intraday"): number {
+  const b = scalpBand(interval);
+  if (b === "ultra") return 3;
+  if (b === "fast" || b === "mid" || b === "hour") return 2;
+  return 99;
+}
+
+function isFastInterval(interval: string): boolean {
+  return interval === "1s" || interval === "LIVE" || interval === "1" || interval === "5";
 }
 
 function pushFill(book: PaperBook, fill: Omit<PaperFill, "id">): void {
@@ -529,26 +688,31 @@ function markHist(book: PaperBook, marks: Record<string, number>): void {
   if (eq > book.peakUsd) book.peakUsd = eq;
 }
 
-function canEnter(sig: BtcTradeSignal, side: "long" | "short"): boolean {
-  if (sig.confidence < MIN_CONF) return false;
+function canEnter(sig: BtcTradeSignal, side: "long" | "short", book: PaperBook): boolean {
+  const minConf = paperMinConfOf(book);
+  if (!paperAllowsScalpOpen(sig.interval)) return false;
+  if (sig.confidence < minConf) return false;
   if (side === "long" && sig.rsi >= 76) return false;
   if (side === "short" && sig.rsi <= 24) return false;
   if (side === "long" && sig.ichiCloud === "below") return false;
   if (side === "short" && sig.ichiCloud === "above") return false;
   if (Number.isFinite(sig.volRatio) && (sig.volRatio ?? 1) < 0.82) return false;
-  const dist = Math.abs(sig.price - sig.stop);
-  if (!(dist > 0) || dist / sig.price < 0.0015) return false;
+  const plan = scalpPlan(sig, side);
+  const dist = Math.abs(sig.price - plan.stop);
+  if (!(dist > 0) || dist / sig.price < 0.0009) return false;
   return true;
 }
 
-function sizeQty(book: PaperBook, sig: BtcTradeSignal, side: "long" | "short", marks: Record<string, number>): number {
+function sizeQty(book: PaperBook, sig: BtcTradeSignal, side: "long" | "short", marks: Record<string, number>, stopPx = sig.stop): number {
   const lev = paperEffectiveLev(book.mode ?? "all", book.leverage ?? 1);
   const eq = Math.max(1, paperEquity(book, { ...marks, [sig.symbol]: sig.price }));
-  const riskUsd = eq * RISK_PCT;
-  const dist = Math.abs(sig.price - sig.stop);
-  let qty = riskUsd / dist;
+  const dist = Math.abs(sig.price - stopPx);
+  if (!(dist > 0)) return 0;
+  const riskUsd = eq * (clampPaperRiskPct(book.riskPct ?? DEFAULT_RISK_PCT) / 100);
+  const qtyRisk = riskUsd / dist;
+  const qtySize = (eq * (clampPaperSizePct(book.sizePct ?? DEFAULT_SIZE_PCT) / 100) * lev) / sig.price;
   const maxQty = (book.cashUsd * CASH_CAP * lev) / sig.price;
-  qty = Math.min(qty, maxQty);
+  const qty = Math.min(qtyRisk, qtySize, maxQty);
   if (!(qty > 0) || qty * sig.price < 25) return 0;
   return side === "long" ? qty : -qty;
 }
@@ -625,7 +789,7 @@ export function tickPaper(
     const hitStop = long ? px <= pos.stop : px >= pos.stop;
     const hitT2 = long ? px >= pos.t2 : px <= pos.t2;
     const hitT1 = !pos.t1Done && (long ? px >= pos.t1 : px <= pos.t1);
-    const need = neededConfirm(sig.interval);
+    const need = neededConfirm(sig.interval, paperStyleOf(next));
     const flip = (long && fire === "sell" && n >= need) || (!long && fire === "buy" && n >= need);
 
     const dropPos = () => {
@@ -670,7 +834,8 @@ export function tickPaper(
       closeTrade(next, pos, now, px, "t2", pnl);
       dropPos();
     } else if (hitT1) {
-      const part = pos.qty * 0.5;
+      const t1Frac = clampPaperT1Pct(next.t1Pct ?? DEFAULT_T1_PCT) / 100;
+      const part = pos.qty * t1Frac;
       const pnl = applyCloseQty(next, pos, part, px);
       pos.qty -= part;
       pos.t1Done = true;
@@ -715,6 +880,42 @@ export function tickPaper(
       else next.losses += 1;
       closeTrade(next, pos, now, px, "flip", pnl);
       dropPos();
+    } else if (now - pos.openedAt >= scalpMaxHoldMs(pos.interval || sig.interval)) {
+      const pnl = applyCloseQty(next, pos, pos.qty, px);
+      pushFill(next, {
+        at: now,
+        symbol: sig.symbol,
+        side: pos.side,
+        action: "close",
+        reason: "time",
+        price: px,
+        qty: pos.qty,
+        pnl,
+        note: `${sig.symbol} tiempo scalp`,
+      });
+      events.push({ kind: "close", side: pos.side, symbol: sig.symbol, reason: "time", price: px, pnl, note: `${sig.symbol} tiempo` });
+      if (pnl >= 0) next.wins += 1;
+      else next.losses += 1;
+      closeTrade(next, pos, now, px, "time", pnl);
+      dropPos();
+    } else if (uruguayDayKey(pos.openedAt) !== uruguayDayKey(now)) {
+      const pnl = applyCloseQty(next, pos, pos.qty, px);
+      pushFill(next, {
+        at: now,
+        symbol: sig.symbol,
+        side: pos.side,
+        action: "close",
+        reason: "day",
+        price: px,
+        qty: pos.qty,
+        pnl,
+        note: `${sig.symbol} cierre de día`,
+      });
+      events.push({ kind: "close", side: pos.side, symbol: sig.symbol, reason: "day", price: px, pnl, note: `${sig.symbol} día` });
+      if (pnl >= 0) next.wins += 1;
+      else next.losses += 1;
+      closeTrade(next, pos, now, px, "day", pnl);
+      dropPos();
     } else if (long && Number.isFinite(sig.supertrend) && sig.supertrendDir === 1 && sig.supertrend > pos.stop && sig.supertrend < px) {
       pos.stop = Math.max(pos.stop, sig.supertrend);
       const t = findTrade(next, pos.id);
@@ -727,14 +928,15 @@ export function tickPaper(
   }
 
   const hasPos = next.positions.some((p) => p.symbol === sig.symbol);
-  const underCap = next.opsUsed < next.maxOps;
+  const underCap = paperCanOpen(next, now);
   const mode = normalizePaperMode(next.mode);
   const lev = paperEffectiveLev(mode, next.leverage ?? 1);
-  if (next.armed && underCap && !hasPos && (fire === "buy" || fire === "sell") && n >= neededConfirm(sig.interval)) {
+  if (next.armed && underCap && !hasPos && (fire === "buy" || fire === "sell") && n >= neededConfirm(sig.interval, paperStyleOf(next))) {
     const side = fire === "buy" ? "long" : "short";
-    if (paperAllowsSide(mode, side) && canEnter(sig, side)) {
+    if (paperAllowsSide(mode, side) && paperAllowsScalpOpen(sig.interval) && canEnter(sig, side, next)) {
       const marks = { ...(opts?.marks ?? {}), [sig.symbol]: px };
-      const qty = sizeQty(next, sig, side, marks);
+      const plan = scalpPlan(sig, side);
+      const qty = sizeQty(next, sig, side, marks, plan.stop);
       if (qty !== 0) {
         const marginUsd = applyOpen(next, qty, px, lev);
         const id = `${now}-${sig.symbol}`;
@@ -745,9 +947,9 @@ export function tickPaper(
           interval: sig.interval,
           qty,
           entry: px,
-          stop: sig.stop,
-          t1: sig.target1,
-          t2: sig.target2,
+          stop: plan.stop,
+          t1: plan.t1,
+          t2: plan.t2,
           t1Done: false,
           openedAt: now,
           leverage: lev,
