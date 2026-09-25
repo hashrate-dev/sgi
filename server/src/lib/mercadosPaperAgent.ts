@@ -1,4 +1,5 @@
 import type { TradeConfluence } from "./btcTradeConfluence.js";
+import { rankRoxyBallots, roxyBallotOpenKey } from "./roxyBallot.js";
 import {
   hydrateRoxyFacts,
   hydrateRoxySaid,
@@ -7,6 +8,8 @@ import {
   pickFreshFact,
   rememberRoxySaid,
   roxyMaySpeak,
+  roxyNewsBlocksSide,
+  roxyNewsConfBump,
   roxySceneKey,
   roxyTooClose,
   type RoxyFact,
@@ -794,7 +797,8 @@ function canEnter(sig: BtcTradeSignal, side: "long" | "short", book: PaperBook):
   const now = Date.now();
   if (!paperAllowsOpen(sig.interval, style)) return false;
   if ((book.mind?.revengeUntil ?? 0) > now && book.mind?.lastStopSymbol === sig.symbol) return false;
-  if (sig.confidence < minConf) return false;
+  if (roxyNewsBlocksSide(book.mind?.facts, sig.symbol, side, now)) return false;
+  if (sig.confidence < minConf + roxyNewsConfBump(book.mind?.facts, sig.symbol, side, now)) return false;
   if (side === "long" && sig.rsi >= 76) return false;
   if (side === "short" && sig.rsi <= 24) return false;
   if (side === "long" && sig.ichiCloud === "below") return false;
@@ -867,7 +871,7 @@ function closeTrade(book: PaperBook, pos: PaperPosition, at: number, price: numb
 export function tickPaper(
   book: PaperBook,
   sig: BtcTradeSignal,
-  opts?: { skipHist?: boolean; marks?: Record<string, number> },
+  opts?: { skipHist?: boolean; marks?: Record<string, number>; openKey?: string | null },
 ): { book: PaperBook; events: PaperEvent[] } {
   const events: PaperEvent[] = [];
   if (!shouldTick(book, sig.symbol)) return { book, events };
@@ -1037,7 +1041,8 @@ export function tickPaper(
   const lev = paperEffectiveLev(mode, next.leverage ?? 1);
   if (next.armed && underCap && !hasPos && (fire === "buy" || fire === "sell") && n >= neededConfirm(sig.interval, paperStyleOf(next))) {
     const side = fire === "buy" ? "long" : "short";
-    if (paperAllowsSide(mode, side) && paperAllowsOpen(sig.interval, paperStyleOf(next)) && canEnter(sig, side, next)) {
+    const voteOk = opts?.openKey === undefined || opts.openKey === `${sig.symbol}:${side}`;
+    if (voteOk && paperAllowsSide(mode, side) && paperAllowsOpen(sig.interval, paperStyleOf(next)) && canEnter(sig, side, next)) {
       const marks = { ...(opts?.marks ?? {}), [sig.symbol]: px };
       const plan = entryPlan(sig, side, paperStyleOf(next));
       const qty = sizeQty(next, sig, side, marks, plan.stop);
@@ -1092,10 +1097,18 @@ export function tickPaper(
 export function tickPaperMany(book: PaperBook, signals: BtcTradeSignal[]): { book: PaperBook; events: PaperEvent[] } {
   const marks: Record<string, number> = {};
   for (const s of signals) marks[s.symbol] = s.price;
+  const ballots = rankRoxyBallots(signals, book.mind?.facts);
+  let openKey: string | null = roxyBallotOpenKey(ballots);
+  if (openKey) {
+    const [sym, side] = openKey.split(":") as [string, "long" | "short"];
+    const sig = signals.find((s) => s.symbol === sym);
+    const mode = normalizePaperMode(book.mode);
+    if (!sig || !paperAllowsSide(mode, side) || !canEnter(sig, side, book)) openKey = null;
+  }
   let cur = book;
   const events: PaperEvent[] = [];
   for (const sig of signals) {
-    const r = tickPaper(cur, sig, { skipHist: true, marks });
+    const r = tickPaper(cur, sig, { skipHist: true, marks, openKey: openKey ?? "" });
     cur = r.book;
     events.push(...r.events);
   }

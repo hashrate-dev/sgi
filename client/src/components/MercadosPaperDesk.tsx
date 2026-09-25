@@ -22,6 +22,7 @@ import {
   paperOpsToday,
   paperStyleOf,
   paperVenueOf,
+  resetPaperBook,
   roxyLiveDesk,
   savePaperBook,
   splitPaperTrades,
@@ -33,7 +34,7 @@ import {
   type PaperUniverse,
   type PaperVenue,
 } from "../lib/mercadosPaperAgent";
-import { showToast } from "./ToastNotification";
+import { rankRoxyBallots, type RoxyCoinBallot } from "../lib/roxyBallot";
 import { AppModal } from "./ui";
 import { playMarketplaceCartItemAddedSound, playMarketplaceCartItemRemovedSound } from "../lib/marketplaceCartSound";
 import { playRoxyTypeTick } from "../lib/roxyTypeSound";
@@ -467,7 +468,102 @@ function TradeCard({
   );
 }
 
+function LiveIcon({ kind }: { kind: "do" | "see" | "think" | "news" | "chart" }) {
+  if (kind === "do") {
+    return (
+      <svg viewBox="0 0 32 32" aria-hidden>
+        <circle className="tv-paper-live__ring" cx="16" cy="16" r="11" />
+        <circle className="tv-paper-live__core" cx="16" cy="16" r="3.2" />
+        <path d="M16 5.5v3.2M16 23.3v3.2M5.5 16h3.2M23.3 16h3.2" />
+      </svg>
+    );
+  }
+  if (kind === "see") {
+    return (
+      <svg viewBox="0 0 32 32" aria-hidden>
+        <path d="M4 16s5.2-8 12-8 12 8 12 8-5.2 8-12 8S4 16 4 16Z" />
+        <circle cx="16" cy="16" r="3.4" />
+      </svg>
+    );
+  }
+  if (kind === "think") {
+    return (
+      <svg viewBox="0 0 32 32" aria-hidden>
+        <path d="M11.2 21.5c-2.6-1.2-4.4-3.8-4.4-6.8A7.2 7.2 0 0 1 16 7.6a7.2 7.2 0 0 1 9.2 7.1c0 3-1.8 5.6-4.4 6.8" />
+        <path d="M12.5 22.4h7v3.1c0 .8-.7 1.5-1.5 1.5h-4c-.8 0-1.5-.7-1.5-1.5Z" />
+        <path d="M16 11.2v4.2M13.6 13.8 16 16l2.4-2.2" />
+      </svg>
+    );
+  }
+  if (kind === "chart") {
+    return (
+      <svg viewBox="0 0 32 32" aria-hidden>
+        <path d="M5 24 V10 M5 24 H27" />
+        <path d="M8 20 V16 M12 18 V11 M16 19 V14 M20 17 V9 M24 18 V13" />
+        <path d="M6 12 H26 M6 15.5 H26 M6 19 H26" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 32 32" aria-hidden>
+      <path d="M7 21.5V10.8L16 7.2l9 3.6v10.7L16 25.1Z" />
+      <path d="M16 12.2v8.4M11.4 14.4h9.2" />
+    </svg>
+  );
+}
+
+function RoxyVoteBoard({ ballots }: { ballots: RoxyCoinBallot[] }) {
+  const lead = ballots.find((b) => b.lead);
+  return (
+    <section className="tv-paper-vote" aria-label="Votación de Roxy">
+      <header>
+        <span>Votación</span>
+        <em>
+          {lead && lead.pick !== "wait"
+            ? `Gana ${lead.name} ${lead.pick === "long" ? "LARGO" : "CORTO"}`
+            : "Sin mayoría aún"}
+        </em>
+      </header>
+      <ul>
+        {ballots.map((b) => {
+          const longPct = Math.max(b.long.score, 0) + Math.max(b.short.score, 0);
+          const longW = longPct > 0 ? (Math.max(b.long.score, 0) / longPct) * 100 : 50;
+          const pickTools = b.pick === "long" ? b.long.tools : b.pick === "short" ? b.short.tools : [];
+          return (
+            <li key={b.symbol} className={b.lead ? "is-lead" : b.pick === "wait" ? "is-wait" : ""}>
+              <div className="tv-paper-vote__row">
+                <b>{b.name}</b>
+                <span className={`tv-paper-vote__pick is-${b.pick}`}>
+                  {b.pick === "long" ? "Largo" : b.pick === "short" ? "Corto" : "Empate"}
+                </span>
+                <em>
+                  {b.long.score.toFixed(1)} / {b.short.score.toFixed(1)}
+                </em>
+              </div>
+              <div className="tv-paper-vote__bar" aria-hidden>
+                <i style={{ width: `${longW}%` }} />
+              </div>
+              {b.lead && pickTools.length ? (
+                <p className="tv-paper-vote__yes">
+                  A favor: {pickTools.slice(0, 6).map((t) => t.label.replace(/Bandas de /i, "").replace(/Nube de /i, "")).join(" · ")}
+                </p>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 function RoxyLiveBoard({ live }: { live: ReturnType<typeof roxyLiveDesk> }) {
+  const cards = [
+    { kind: "do" as const, label: "Haciendo", text: live.doing },
+    { kind: "see" as const, label: "Viendo", text: live.seeing },
+    { kind: "think" as const, label: "Pensando", text: live.thinking },
+    { kind: "chart" as const, label: "Gráfico", text: live.chart },
+    { kind: "news" as const, label: "Noticias", text: live.news },
+  ];
   return (
     <section className="tv-paper-live" aria-label="Qué está haciendo Roxy ahora">
       <header>
@@ -475,52 +571,42 @@ function RoxyLiveBoard({ live }: { live: ReturnType<typeof roxyLiveDesk> }) {
         <em>{live.tf}</em>
       </header>
       <div className="tv-paper-live__grid">
-        <article>
-          <span>Haciendo</span>
-          <strong>{live.doing}</strong>
-        </article>
-        <article>
-          <span>Viendo</span>
-          <strong>{live.seeing}</strong>
-        </article>
-        <article>
-          <span>Pensando</span>
-          <strong>{live.thinking}</strong>
-        </article>
-        <article>
-          <span>Noticias</span>
-          <strong>{live.news}</strong>
-        </article>
+        {cards.map((c) => (
+          <article key={c.kind} className={`tv-paper-live__card tv-paper-live__card--${c.kind}`}>
+            <i className="tv-paper-live__ico" aria-hidden>
+              <LiveIcon kind={c.kind} />
+            </i>
+            <div className="tv-paper-live__copy">
+              <span>{c.label}</span>
+              <strong title={c.text}>{c.text}</strong>
+            </div>
+          </article>
+        ))}
       </div>
       {live.rows.length ? (
-        <ul className="tv-paper-live__tape">
+        <ul className="tv-paper-scan">
           {live.rows.map((r) => (
-            <li key={r.symbol} className={r.hot ? "is-hot" : ""}>
-              <b>{r.name}</b>
-              <em
-                className={`tv-paper-live__bias tv-paper-live__bias--${r.bias}`}
-                title={r.bias === "buy" ? "Compra" : r.bias === "sell" ? "Venta" : "Espera"}
-                aria-label={r.bias === "buy" ? "Compra" : r.bias === "sell" ? "Venta" : "Espera"}
-              >
-                {r.bias === "buy" ? (
-                  <svg viewBox="0 0 12 12" aria-hidden>
-                    <path d="M6 1.6 11 10H1L6 1.6Z" />
-                  </svg>
-                ) : r.bias === "sell" ? (
-                  <svg viewBox="0 0 12 12" aria-hidden>
-                    <path d="M6 10.4 1 2h10L6 10.4Z" />
-                  </svg>
-                ) : (
-                  <svg viewBox="0 0 12 12" aria-hidden>
-                    <rect x="2.2" y="5.1" width="7.6" height="1.8" rx="0.7" />
-                  </svg>
-                )}
-              </em>
-              <span>{r.confidence.toFixed(0)}%</span>
-              <span>RSI {r.rsi.toFixed(0)}</span>
-              <span>{r.st}</span>
-              <span className="tv-paper-live__cloud">{r.cloud}</span>
-              <span className="tv-paper-live__conf">{r.confirm}</span>
+            <li key={r.symbol} className={`tv-paper-scan__card is-${r.bias}${r.hot ? " is-hot" : ""}`}>
+              <header className="tv-paper-scan__head">
+                <div className="tv-paper-scan__who">
+                  <b>{r.name}</b>
+                  <span className={`tv-paper-scan__side is-${r.bias}`}>
+                    {r.bias === "buy" ? "Compra" : r.bias === "sell" ? "Venta" : "Espera"}
+                  </span>
+                </div>
+                <div className="tv-paper-scan__score">
+                  <strong>{r.confidence.toFixed(0)}</strong>
+                  <small>{r.confirm}</small>
+                </div>
+              </header>
+              <ul className="tv-paper-scan__inds" aria-label={`Indicadores ${r.name}`}>
+                {r.chips.map((ch) => (
+                  <li key={ch.id} className={`is-${ch.tone}`} title={ch.label}>
+                    <i aria-hidden />
+                    <span>{ch.label}</span>
+                  </li>
+                ))}
+              </ul>
             </li>
           ))}
         </ul>
@@ -555,6 +641,7 @@ export function MercadosPaperDesk({
   bookRef.current = book;
   const mutedRef = useRef(muted);
   mutedRef.current = muted;
+  const inflightRef = useRef(0);
   const iv = interval === "LIVE" ? "1s" : interval;
   const tag = (symbol: string) => pairTag(pairs, symbol);
   const hydrated = useRef(false);
@@ -631,7 +718,7 @@ export function MercadosPaperDesk({
           : Promise.resolve([] as PromiseSettledResult<{ signal: BtcTradeSignal }>[]),
       ]);
       if (cancelled) return;
-      if (remote.book) {
+      if (remote.book && inflightRef.current === 0) {
         const prev = bookRef.current;
         setBook(remote.book);
         savePaperBook(userId, remote.book);
@@ -705,6 +792,7 @@ export function MercadosPaperDesk({
   const alert = useMemo(() => paperEntryAlert(book, sigs), [book, sigs]);
   const prep = useMemo(() => paperPrepProcess(book, sigs), [book, sigs]);
   const liveDesk = useMemo(() => roxyLiveDesk(book, sigs, nowTick), [book, sigs, nowTick]);
+  const ballots = useMemo(() => rankRoxyBallots(sigs, book.mind?.facts), [sigs, book.mind?.facts]);
 
   const status = useMemo(() => {
     if (!book.armed) return "PAUSA";
@@ -715,19 +803,29 @@ export function MercadosPaperDesk({
   }, [book.armed, book.positions, posN, atCap]);
 
   const persistPatch = (patch: Parameters<typeof putPaperBook>[0], fallback?: PaperBook) => {
+    inflightRef.current += 1;
     if (fallback) {
       setBook(fallback);
       savePaperBook(userId, fallback);
+      bookRef.current = fallback;
+      setFund(String(Math.round(fallback.initialUsd)));
+      setCap(String(fallback.maxOps));
+      setDayCap(String(fallback.maxOpsDay));
     }
     void putPaperBook(patch)
       .then((r) => {
+        if (inflightRef.current > 1) return;
         setBook(r.book);
         savePaperBook(userId, r.book);
+        bookRef.current = r.book;
         setFund(String(Math.round(r.book.initialUsd)));
         setCap(String(r.book.maxOps));
         setDayCap(String(r.book.maxOpsDay));
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        inflightRef.current = Math.max(0, inflightRef.current - 1);
+      });
   };
 
   const venue = paperVenueOf(book.mode);
@@ -780,10 +878,28 @@ export function MercadosPaperDesk({
     showToast(`Máximo ${n} operaciones por día`, "info", ROXY);
   };
 
-  const modeHint =
-    `${style === "swing" ? "Swing" : "Scalp"} · ` +
-    (venue === "spot" ? "Spot Long" : `Fut x${lev} · ${dir === "both" ? "L+S" : dir === "short" ? "Short" : "Long"}`);
+  const restartAccount = () => {
+    const n = Number(fund);
+    if (!Number.isFinite(n) || n < 100) return;
+    const maxOps = clampPaperMaxOps(Number(cap) || book.maxOps);
+    const next = resetPaperBook(n, book.universe, maxOps, book.mode, book.leverage);
+    next.armed = book.armed;
+    next.runInterval = book.runInterval;
+    next.riskPct = book.riskPct;
+    next.sizePct = book.sizePct;
+    next.minConf = book.minConf;
+    next.t1Pct = book.t1Pct;
+    next.style = book.style;
+    next.swingDays = book.swingDays;
+    next.maxOpsDay = clampPaperMaxOpsDay(Number(dayCap) || book.maxOpsDay);
+    next.mind = book.mind;
+    persistPatch({ reset: { fund: n, maxOps }, maxOpsDay: next.maxOpsDay }, next);
+    showToast(`Cuenta paper en ${usd(n)} · tope ${maxOps}`, "info", ROXY);
+  };
+
   const dayLeft = Math.max(0, clampPaperMaxOpsDay(book.maxOpsDay) - dayUsed);
+  const dirHint = dir === "both" ? "Long y short" : dir === "short" ? "Short" : "Long";
+  const venueHint = venue === "spot" ? "Spot" : `Fut ×${lev}`;
 
   return (
     <div className={`tv-paper hrs-card sgi-glass-panel${posN ? " tv-paper--multi" : ""}${open ? " is-open" : ""}`}>
@@ -791,10 +907,22 @@ export function MercadosPaperDesk({
         <button type="button" className="tv-paper__toggle" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
           <span>
             {ROXY}
-            <em>
-              {book.armed ? "24/7 en servidor" : "Pausada"} · {modeHint} · {book.universe === "ALL" ? "Todas" : tag(book.universe)} ·{" "}
-              {book.opsUsed}/{book.maxOps} ops
-              {dayHit ? " · tope del día" : ""}
+            <em className="tv-paper__pills" aria-label="Cómo opera Roxy">
+              <i className={book.armed ? "is-live" : "is-off"} title={book.armed ? "Sigue operando en el servidor si cierras esta pantalla" : "Roxy está pausada"}>
+                {book.armed ? "En vivo" : "Pausada"}
+              </i>
+              <i title="Estilo">{style === "swing" ? "Swing" : "Scalp"}</i>
+              <i title="Mercado">{venueHint}</i>
+              <i title="Dirección">{dirHint}</i>
+              <i title="Universo">{book.universe === "ALL" ? "Todas" : tag(book.universe)}</i>
+              <i className={atCap ? "is-warn" : ""} title="Operaciones usadas / tope de la cuenta">
+                {book.opsUsed}/{book.maxOps}
+              </i>
+              {dayHit ? (
+                <i className="is-warn" title="Llegó al máximo de operaciones de hoy">
+                  Tope día
+                </i>
+              ) : null}
             </em>
           </span>
           <strong className={ret >= 0 ? "is-up" : "is-down"}>{usd(eq)}</strong>
@@ -842,6 +970,8 @@ export function MercadosPaperDesk({
       </div>
       {open ? (
         <>
+          <AgentOpinion notes={book.notes} live={liveTalk} muted={muted || !open} />
+
           <div className="tv-paper__uni" role="group" aria-label={`Moneda de ${ROXY}`}>
             <button type="button" className={book.universe === "ALL" ? "is-on" : ""} onClick={() => setUniverse("ALL")}>
               Todas
@@ -978,7 +1108,15 @@ export function MercadosPaperDesk({
                     max={99}
                     step={1}
                     value={dayCap}
-                    onChange={(e) => setDayCap(e.target.value)}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setDayCap(raw);
+                      const n = Number(raw);
+                      if (!Number.isFinite(n) || n < 1) return;
+                      const maxOpsDay = clampPaperMaxOpsDay(n);
+                      if (maxOpsDay === book.maxOpsDay) return;
+                      persistPatch({ maxOpsDay }, { ...book, maxOpsDay });
+                    }}
                     onBlur={applyDayCap}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
@@ -1014,9 +1152,9 @@ export function MercadosPaperDesk({
 
           <PrepMeter target={prep.pct} stage={prep.stage} intent={prep.intent} />
 
-          <RoxyLiveBoard live={liveDesk} />
+          <RoxyVoteBoard ballots={ballots} />
 
-          <AgentOpinion notes={book.notes} live={liveTalk} muted={muted || !open} />
+          <RoxyLiveBoard live={liveDesk} />
 
           <div className="tv-paper__acct">
             <div className="tv-paper__eq">
@@ -1063,7 +1201,15 @@ export function MercadosPaperDesk({
                   max={999}
                   step={1}
                   value={cap}
-                  onChange={(e) => setCap(e.target.value)}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setCap(raw);
+                    const n = Number(raw);
+                    if (!Number.isFinite(n) || n < 1) return;
+                    const maxOps = clampPaperMaxOps(n);
+                    if (maxOps === book.maxOps) return;
+                    persistPatch({ maxOps }, { ...book, maxOps });
+                  }}
                   onBlur={applyCap}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
@@ -1073,17 +1219,7 @@ export function MercadosPaperDesk({
                   }}
                 />
               </label>
-              <button
-                type="button"
-                onClick={() => {
-                  const n = Number(fund);
-                  if (!Number.isFinite(n) || n < 100) return;
-                  const maxOps = clampPaperMaxOps(Number(cap) || book.maxOps);
-                  persistPatch({ reset: { fund: n, maxOps } });
-                  setCap(String(maxOps));
-                  showToast(`Cuenta paper en ${usd(n)} · tope ${maxOps}`, "info", ROXY);
-                }}
-              >
+              <button type="button" onClick={restartAccount}>
                 Reiniciar
               </button>
             </div>

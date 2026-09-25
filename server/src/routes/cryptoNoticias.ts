@@ -48,7 +48,7 @@ let schemaEnsured = false;
 let ingestInFlight: Promise<{ inserted: number; scanned: number; feedErrors: number }> | null = null;
 let lastIngestAtMs = 0;
 
-const MIN_AUTO_INGEST_MS = 15 * 60 * 1000;
+const MIN_AUTO_INGEST_MS = 2 * 60 * 1000;
 const TOPIC_SET = new Set<string>(Object.keys(CRYPTO_TOPIC_LABELS));
 
 type NewsLang = "en" | NewsTranslateLang;
@@ -1136,7 +1136,7 @@ async function warmRecentTranslations(limit: number, langs: NewsTranslateLang[] 
   }
 }
 
-function kickIngest(): Promise<{ inserted: number; scanned: number; feedErrors: number }> {
+export function kickIngest(): Promise<{ inserted: number; scanned: number; feedErrors: number }> {
   if (!ingestInFlight) {
     ingestInFlight = runIngest()
       .catch((e) => {

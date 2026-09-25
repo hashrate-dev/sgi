@@ -51,7 +51,7 @@
   "crons": [
     {
       "path": "/api/crypto-noticias/cron-ingest",
-      "schedule": "0 * * * *"
+      "schedule": "*/2 * * * *"
     },
     {
       "path": "/api/ops-comunicacion/cron-flush",

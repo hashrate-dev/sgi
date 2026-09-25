@@ -741,12 +741,13 @@ export function MercadosNativeChart({
     const clipPrice = () => {
       ctx.save();
       ctx.beginPath();
-      ctx.rect(padL, priceTop, innerW, Math.max(0, priceBot - priceTop));
+      ctx.rect(padL, priceTop, plotW, Math.max(0, priceBot - priceTop));
       ctx.clip();
     };
 
+    clipPrice();
+
     if (ichi) {
-      clipPrice();
       const cloudTo = Math.min(end + ichi.disp, ichi.spanA.length - 1);
       for (let i = start; i < cloudTo; i++) {
         const a0 = ichi.spanA[i];
@@ -763,7 +764,6 @@ export function MercadosNativeChart({
         ctx.fillStyle = a0! >= b0! ? "rgba(38,166,154,0.22)" : "rgba(239,83,80,0.18)";
         ctx.fill();
       }
-      ctx.restore();
     }
 
     for (let i = start; i <= end; i++) {
@@ -817,7 +817,6 @@ export function MercadosNativeChart({
     };
 
     if (bb) {
-      clipPrice();
       ctx.beginPath();
       let started = false;
       for (let i = start; i <= end; i++) {
@@ -841,7 +840,6 @@ export function MercadosNativeChart({
       ctx.closePath();
       ctx.fillStyle = hexToRgba(st.bb.color, 0.14);
       ctx.fill();
-      ctx.restore();
       drawLine(bb.upper, hexToRgba(st.bb.color, 0.95), st.bb.width, start, end, st.bb.dash);
       drawLine(bb.lower, hexToRgba(st.bb.color, 0.95), st.bb.width, start, end, st.bb.dash);
       ctx.setLineDash(st.bb.dash === "solid" ? [5, 4] : dashArray(st.bb.dash));
@@ -909,7 +907,6 @@ export function MercadosNativeChart({
     }
 
     if (ichi) {
-      clipPrice();
       const cloudTo = Math.min(end + ichi.disp, ichi.spanA.length - 1);
       ctx.setLineDash([4, 3]);
       drawLine(ichi.spanA, "rgba(38,166,154,0.9)", 1.05, start, cloudTo);
@@ -918,7 +915,6 @@ export function MercadosNativeChart({
       drawLine(ichi.tenkan, "#4FC3F7", 1.45, start, end);
       drawLine(ichi.kijun, "#EC407A", 1.45, start, end);
       drawLine(ichi.chikou, "#9CCC65", 1.2, start, end);
-      ctx.restore();
     }
 
     if (on.jerry !== false) {
@@ -937,7 +933,8 @@ export function MercadosNativeChart({
         const label = m.kind === "early" ? "▲ EARLY" : m.kind === "buy" ? "▲ BUY" : "▼ SELL";
         const tw = ctx.measureText(label).width + 10;
         const th = 14;
-        const y = buyish ? yOf(m.price) + 16 : yOf(m.price) - 16;
+        const yRaw = buyish ? yOf(m.price) + 16 : yOf(m.price) - 16;
+        const y = Math.min(priceBot - 8, Math.max(priceTop + 8, yRaw));
         ctx.fillStyle = m.kind === "early" ? "rgba(165,214,84,0.92)" : buyish ? "rgba(38,166,154,0.92)" : "rgba(239,83,80,0.92)";
         roundRect(ctx, x - tw / 2, y - th / 2, tw, th, 3);
         ctx.fill();
@@ -1082,11 +1079,21 @@ export function MercadosNativeChart({
       ctx.globalAlpha = 1;
     };
 
-    clipPrice();
     const selId = selectedIdRef.current;
     for (const d of drawingsOf()) paintOneDrawing(d, false, d.id === selId);
     if (draftRef.current) paintOneDrawing(draftRef.current, true);
     ctx.restore();
+
+    if (oscN) {
+      ctx.fillStyle = "#0a100e";
+      ctx.fillRect(0, priceBot, w, Math.max(0, h - timeH - priceBot));
+      ctx.strokeStyle = "rgba(232, 238, 245, 0.12)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, priceBot + 0.5);
+      ctx.lineTo(w, priceBot + 0.5);
+      ctx.stroke();
+    }
 
     const deleteHits: Array<{ x: number; y: number; r: number; id: string }> = [];
     const usedBadges: Array<{ x: number; y: number }> = [];
@@ -1233,7 +1240,11 @@ export function MercadosNativeChart({
       }
       const sp = mx - mn || 1;
       const yM = (v: number) => oscTop + (1 - (v - mn) / sp) * oscH;
-      ctx.fillStyle = "rgba(255,255,255,0.03)";
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(padL, oscTop, plotW, oscH);
+      ctx.clip();
+      ctx.fillStyle = "#0c1210";
       ctx.fillRect(padL, oscTop, plotW, oscH);
       ctx.strokeStyle = "rgba(139,145,156,0.35)";
       ctx.beginPath();
@@ -1271,6 +1282,7 @@ export function MercadosNativeChart({
       };
       strokeOsc(macd.macd, "#26C6DA");
       strokeOsc(macd.signal, "#F5C542");
+      ctx.restore();
       const mLine = lastFiniteAt(macd.macd, readI);
       const mSig = lastFiniteAt(macd.signal, readI);
       const mHist = lastFiniteAt(macd.hist, readI);
@@ -1313,7 +1325,11 @@ export function MercadosNativeChart({
 
     if (rsi) {
       const yR = (v: number) => oscTop + (1 - v / 100) * oscH;
-      ctx.fillStyle = "rgba(255,255,255,0.03)";
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(padL, oscTop, plotW, oscH);
+      ctx.clip();
+      ctx.fillStyle = "#0c1210";
       ctx.fillRect(padL, oscTop, plotW, oscH);
       ctx.strokeStyle = "rgba(171,71,188,0.25)";
       ctx.setLineDash([4, 4]);
@@ -1342,6 +1358,7 @@ export function MercadosNativeChart({
         } else ctx.lineTo(x, y);
       }
       ctx.stroke();
+      ctx.restore();
       const rNow = lastFiniteAt(rsi, readI);
       const rZone = rNow >= 70 ? "Sobrecompra" : rNow <= 30 ? "Sobreventa" : "Neutro";
       ctx.fillStyle = "rgba(10,16,14,0.82)";
@@ -1424,7 +1441,7 @@ export function MercadosNativeChart({
       ctx.lineTo(x, priceBot);
       ctx.stroke();
       ctx.setLineDash([]);
-      const y = yOf(c.c);
+      const y = Math.min(priceBot, Math.max(priceTop, yOf(c.c)));
       ctx.beginPath();
       ctx.moveTo(padL, y);
       ctx.lineTo(w - padR, y);

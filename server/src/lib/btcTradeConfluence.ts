@@ -278,6 +278,99 @@ function zigzagLast(closes: number[], pct: number): { kind: "high" | "low"; pric
   return { kind, price: pivot };
 }
 
+function zigzagPivots(candles: Candle[], pct: number): Array<{ i: number; price: number }> {
+  if (candles.length < 3) return [];
+  const pts: Array<{ i: number; price: number }> = [];
+  let dir: 1 | -1 = 1;
+  let extI = 0;
+  let ext = candles[0]!.h;
+  pts.push({ i: 0, price: candles[0]!.l });
+  for (let i = 1; i < candles.length; i++) {
+    const c = candles[i]!;
+    if (dir === 1) {
+      if (c.h >= ext) {
+        ext = c.h;
+        extI = i;
+      }
+      if ((ext - c.l) / ext >= pct) {
+        pts.push({ i: extI, price: ext });
+        dir = -1;
+        ext = c.l;
+        extI = i;
+      }
+    } else {
+      if (c.l <= ext) {
+        ext = c.l;
+        extI = i;
+      }
+      if ((c.h - ext) / ext >= pct) {
+        pts.push({ i: extI, price: ext });
+        dir = 1;
+        ext = c.h;
+        extI = i;
+      }
+    }
+  }
+  pts.push({ i: extI, price: ext });
+  return pts;
+}
+
+function fibNow(candles: Candle[], pct: number, price: number): { bias: TradeBias; detail: string } {
+  const z = zigzagPivots(candles, pct);
+  if (z.length < 2) return { bias: "wait", detail: "Fibonacci: sin swing suficiente" };
+  const a = z[z.length - 2]!;
+  const b = z[z.length - 1]!;
+  const lo = Math.min(a.price, b.price);
+  const hi = Math.max(a.price, b.price);
+  const span = hi - lo;
+  if (!(span > 0)) return { bias: "wait", detail: "Fibonacci plano" };
+  const retr = (price - lo) / span;
+  const up = b.price > a.price;
+  if (up) {
+    if (retr > 0.86) return { bias: "wait", detail: `Fib ${retr.toFixed(2)} en el techo — no perseguir` };
+    if (retr >= 0.35 && retr <= 0.72) {
+      return { bias: "buy", detail: `Fib ${retr.toFixed(2)} en zona 0.382–0.618 del impulso alcista` };
+    }
+    return { bias: retr < 0.35 ? "buy" : "wait", detail: `Fib impulso alcista · retr ${retr.toFixed(2)}` };
+  }
+  if (retr < 0.14) return { bias: "wait", detail: `Fib ${retr.toFixed(2)} en el piso — no vender el suelo` };
+  if (retr >= 0.28 && retr <= 0.65) {
+    return { bias: "sell", detail: `Fib ${retr.toFixed(2)} en zona de retroceso bajista` };
+  }
+  return { bias: retr > 0.65 ? "sell" : "wait", detail: `Fib impulso bajista · retr ${retr.toFixed(2)}` };
+}
+
+function rsiDivNow(candles: Candle[], rsi: number[], pct: number): { bias: TradeBias; detail: string } {
+  const z = zigzagPivots(candles, pct);
+  const highs: Array<{ i: number; price: number }> = [];
+  const lows: Array<{ i: number; price: number }> = [];
+  for (const p of z) {
+    const c = candles[p.i];
+    if (!c) continue;
+    if (Math.abs(p.price - c.h) <= Math.abs(p.price - c.l)) highs.push(p);
+    else lows.push(p);
+  }
+  if (lows.length >= 2) {
+    const a = lows[lows.length - 2]!;
+    const b = lows[lows.length - 1]!;
+    const ra = rsi[a.i];
+    const rb = rsi[b.i];
+    if (Number.isFinite(ra) && Number.isFinite(rb) && b.price < a.price && (rb as number) > (ra as number) + 1.2) {
+      return { bias: "buy", detail: `Divergencia alcista RSI (${(ra as number).toFixed(0)} → ${(rb as number).toFixed(0)}) con mínimo más bajo` };
+    }
+  }
+  if (highs.length >= 2) {
+    const a = highs[highs.length - 2]!;
+    const b = highs[highs.length - 1]!;
+    const ra = rsi[a.i];
+    const rb = rsi[b.i];
+    if (Number.isFinite(ra) && Number.isFinite(rb) && b.price > a.price && (rb as number) < (ra as number) - 1.2) {
+      return { bias: "sell", detail: `Divergencia bajista RSI (${(ra as number).toFixed(0)} → ${(rb as number).toFixed(0)}) con máximo más alto` };
+    }
+  }
+  return { bias: "wait", detail: "Sin divergencia RSI en los últimos swings" };
+}
+
 function midHL(candles: Candle[], i: number, period: number): number {
   const from = i - period + 1;
   if (from < 0) return NaN;
@@ -644,12 +737,18 @@ export async function buildTradeConfluence(symbolRaw: string, intervalRaw: strin
     detail: zz.kind === "low" ? `Último swing LOW ${money(zz.price)} — sesgo de soporte` : `Último swing HIGH ${money(zz.price)} — sesgo de techo`,
   });
 
+  const zzPct = ZZ_PCT[interval] ?? 0.025;
+  const fib = fibNow(candles, zzPct, price);
+  checks.push({ id: "fib", label: "Fibonacci", bias: fib.bias, detail: fib.detail });
+  const div = rsiDivNow(candles, rsiA, zzPct);
+  checks.push({ id: "divergence", label: "Divergencia RSI", bias: div.bias, detail: div.detail });
+
   const buyVotes = checks.filter((c) => c.bias === "buy").length;
   const sellVotes = checks.filter((c) => c.bias === "sell").length;
   const waitVotes = checks.filter((c) => c.bias === "wait").length;
 
   const regimeIds = new Set(["ema200", "supertrend", "ichimoku"]);
-  const triggerIds = new Set(["ema-cross", "ema-slope", "psar", "macd", "jerry"]);
+  const triggerIds = new Set(["ema-cross", "ema-slope", "psar", "macd", "jerry", "fib", "divergence"]);
   const regimeBuy = checks.filter((c) => regimeIds.has(c.id) && c.bias === "buy").length;
   const regimeSell = checks.filter((c) => regimeIds.has(c.id) && c.bias === "sell").length;
   const trigBuy = checks.filter((c) => triggerIds.has(c.id) && c.bias === "buy").length;

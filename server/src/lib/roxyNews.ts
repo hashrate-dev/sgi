@@ -79,14 +79,18 @@ export async function readSgiCryptoNews(symbols: string[], limit = 24): Promise<
   for (const row of rows) {
     const url = String(row.url ?? row.URL ?? "").trim();
     if (!url || seen.has(url)) continue;
-    const published = Date.parse(String(row.published_at ?? row.PUBLISHED_AT ?? ""));
+    const publishedRaw = Date.parse(String(row.published_at ?? row.PUBLISHED_AT ?? ""));
+    const fetchedRaw = Date.parse(String(row.fetched_at ?? row.FETCHED_AT ?? ""));
+    const published = Number.isFinite(publishedRaw) ? publishedRaw : fetchedRaw;
     if (!Number.isFinite(published) || published < cutoff) continue;
-    const title = stripHtml(String(row.title_es || row.TITLE_ES || row.title || row.TITLE || ""));
+    const title = stripHtml(
+      String(row.title_es || row.TITLE_ES || row.title || row.TITLE || ""),
+    );
     if (title.length < 12) continue;
+    const summary = stripHtml(String(row.summary_es || row.SUMMARY_ES || row.summary || row.SUMMARY || ""));
     const topics = parseTopics(row.topics_json ?? row.TOPICS_JSON);
-    const symbol = coinOf(title, topics);
+    const symbol = coinOf(`${title} ${summary}`, topics);
     if (symbol && want.size && !want.has(symbol)) continue;
-    if (!symbol && want.size && want.size <= 2) continue;
     seen.add(url);
     out.push({
       url: url.slice(0, 2000),
@@ -109,7 +113,7 @@ export async function rememberSgiNewsOnBook<T extends { mind?: Record<string, un
   const prev = book.mind && typeof book.mind === "object" ? book.mind : {};
   const newsAt = Number(prev.newsAt) || 0;
   const facts0 = pruneRoxyNewsFacts(hydrateRoxyFacts(prev.facts), now);
-  if (now - newsAt < 15 * 60_000 && facts0.some((f) => f.kind === "news")) {
+  if (now - newsAt < 2 * 60_000 && facts0.some((f) => f.kind === "news")) {
     return {
       ...book,
       mind: { ...prev, facts: facts0 },

@@ -9,6 +9,20 @@ import {
 import { listArmedPaperBooks, saveUserPaperBook } from "./paperBookStore.js";
 import { rememberSgiNewsOnBook } from "./roxyNews.js";
 import { markRoxySpoke, roxyMaySpeak, roxySceneKey } from "./roxyMind.js";
+import { kickIngest } from "../routes/cryptoNoticias.js";
+
+let lastNewsKickMs = 0;
+
+async function keepSgiNewsHot(): Promise<void> {
+  const now = Date.now();
+  if (now - lastNewsKickMs < 90_000) return;
+  lastNewsKickMs = now;
+  try {
+    await kickIngest();
+  } catch (e) {
+    console.error("[sgi-noticias] ingest", e instanceof Error ? e.message : e);
+  }
+}
 
 export const PAPER_SYMBOLS = ["BTCUSDT", "ETHUSDT", "LTCUSDT", "DOGEUSDT", "ZECUSDT", "SOLUSDT"] as const;
 
@@ -44,8 +58,9 @@ export async function tickArmedPaperBook(book: PaperBook): Promise<PaperBook> {
     )
   ).filter((s): s is NonNullable<typeof s> => Boolean(s));
   if (!signals.length) return book;
-  const { book: ticked, events } = tickPaperMany({ ...book, runInterval: iv }, signals);
-  const withNews = await rememberSgiNewsOnBook(ticked, symbols);
+  const primed = await rememberSgiNewsOnBook({ ...book, runInterval: iv }, symbols);
+  const { book: ticked, events } = tickPaperMany(primed, signals);
+  const withNews = ticked;
   const now = Date.now();
   const lead = [...signals].sort((a, b) => b.confidence - a.confidence)[0];
   const sceneKey = roxySceneKey({
@@ -104,6 +119,7 @@ export async function runArmedPaperAgents(): Promise<{
   if (running) return { ok: true, users: 0, ticked: 0, failed: 0 };
   running = true;
   try {
+    await keepSgiNewsHot();
     const rows = await listArmedPaperBooks();
     let ticked = 0;
     let failed = 0;
@@ -132,4 +148,7 @@ export function startPaperAgentScheduler(): void {
   setInterval(() => {
     void runArmedPaperAgents().catch(() => undefined);
   }, 60_000);
+  setInterval(() => {
+    void keepSgiNewsHot().catch(() => undefined);
+  }, 120_000);
 }

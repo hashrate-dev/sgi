@@ -257,3 +257,56 @@ export function markRoxySpoke(
   );
   mind.quietUntil = now + roxyQuietGapMs(mind.patience ?? 50, mind.discipline ?? 50, afterStop);
 }
+
+const NEWS_BULL =
+  /\b(etf|aprob|approv|rally|surge|inflow|adopci|partnership|alianza|ath|halving|institucion|bullish|alcista|record)\b/i;
+const NEWS_BEAR =
+  /\b(hack|exploit|breach|ban\b|prohib|lawsuit|demanda|sec\b|fraud|estafa|crash|dump|collapse|derrumbe|desplome|sell[- ]?off|liquidaci|outflow|bearish|bajista|bankrupt|default|scam|ponzi)\b/i;
+
+/** Sesgo de titulares 24 h para el par: negativo = contra longs, positivo = contra shorts. */
+export function roxyNewsTiltScore(facts: RoxyFact[] | undefined, symbol: string, now = Date.now()): number {
+  if (!facts?.length) return 0;
+  const cutoff = now - ROXY_NEWS_MAX_AGE_MS;
+  let score = 0;
+  let hits = 0;
+  for (const f of facts) {
+    if (f.kind !== "news") continue;
+    if (Number(f.at) < cutoff) continue;
+    if (f.symbol && f.symbol !== symbol) continue;
+    const w = f.symbol === symbol ? 1 : 0.4;
+    const t = f.text || "";
+    if (NEWS_BEAR.test(t)) {
+      score -= w;
+      hits += 1;
+    }
+    if (NEWS_BULL.test(t)) {
+      score += w;
+      hits += 1;
+    }
+  }
+  return hits ? score : 0;
+}
+
+export function roxyNewsBlocksSide(
+  facts: RoxyFact[] | undefined,
+  symbol: string,
+  side: "long" | "short",
+  now = Date.now(),
+): boolean {
+  const s = roxyNewsTiltScore(facts, symbol, now);
+  if (side === "long" && s <= -2.2) return true;
+  if (side === "short" && s >= 2.2) return true;
+  return false;
+}
+
+export function roxyNewsConfBump(
+  facts: RoxyFact[] | undefined,
+  symbol: string,
+  side: "long" | "short",
+  now = Date.now(),
+): number {
+  const s = roxyNewsTiltScore(facts, symbol, now);
+  if (side === "long" && s < -0.6) return 6;
+  if (side === "short" && s > 0.6) return 6;
+  return 0;
+}

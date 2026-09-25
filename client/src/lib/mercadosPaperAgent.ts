@@ -1,4 +1,5 @@
 import type { BtcTradeSignal } from "./api";
+import { rankRoxyBallots, roxyBallotOpenKey } from "./roxyBallot";
 import {
   hydrateRoxyFacts,
   hydrateRoxySaid,
@@ -7,6 +8,8 @@ import {
   pickFreshFact,
   rememberRoxySaid,
   roxyMaySpeak,
+  roxyNewsBlocksSide,
+  roxyNewsConfBump,
   roxySceneKey,
   roxyTooClose,
   type RoxyFact,
@@ -905,29 +908,28 @@ export type PaperEntryAlert = {
   symbol: string;
 };
 
+export function paperViewSignals(book: PaperBook, signals: BtcTradeSignal[]): BtcTradeSignal[] {
+  if (book.universe === "ALL") return signals;
+  return signals.filter((s) => s.symbol === book.universe || book.positions.some((p) => p.symbol === s.symbol));
+}
+
+export function roxyVotedTrade(
+  book: PaperBook,
+  signals: BtcTradeSignal[],
+): { sig: BtcTradeSignal; side: "long" | "short"; name: string } | null {
+  const view = paperViewSignals(book, signals);
+  const ballots = rankRoxyBallots(view, book.mind?.facts);
+  const lead = ballots.find((b) => b.lead && b.pick !== "wait");
+  if (!lead || lead.pick === "wait") return null;
+  const sig = view.find((s) => s.symbol === lead.symbol);
+  if (!sig) return null;
+  if (!paperAllowsSide(normalizePaperMode(book.mode), lead.pick)) return null;
+  return { sig, side: lead.pick, name: lead.name };
+}
+
 export function paperEntryAlert(book: PaperBook, signals: BtcTradeSignal[]): PaperEntryAlert {
-  const mode = normalizePaperMode(book.mode);
-  const view =
-    book.universe === "ALL"
-      ? signals
-      : signals.filter((s) => s.symbol === book.universe || book.positions.some((p) => p.symbol === s.symbol));
-
-  const scoreOf = (sig: BtcTradeSignal, side: "buy" | "sell"): number => {
-    if (!paperAllowsSide(mode, side === "buy" ? "long" : "short")) return 0;
-    const need = neededConfirm(sig.interval, paperStyleOf(book));
-    const c = book.confirms[sig.symbol];
-    const n = c && c.fire === side ? c.n : sig.bias === side ? 1 : 0;
-    const align = Math.max(0, Math.min(100, sig.confidence));
-    const confPart = (Math.min(n, need) / need) * 100;
-    let s = align * 0.62 + confPart * 0.38;
-    if (sig.bias !== side) s *= 0.32;
-    if (align < paperMinConfOf(book)) s = Math.min(s, 50);
-    if (side === "buy" && sig.rsi >= 76) s = Math.min(s, 38);
-    if (side === "sell" && sig.rsi <= 24) s = Math.min(s, 38);
-    return Math.round(Math.max(0, Math.min(100, s)));
-  };
-
-  let best: PaperEntryAlert = {
+  const voted = roxyVotedTrade(book, signals);
+  const idle: PaperEntryAlert = {
     light: "red",
     score: 0,
     intent: "none",
@@ -936,70 +938,74 @@ export function paperEntryAlert(book: PaperBook, signals: BtcTradeSignal[]): Pap
     symbol: "",
   };
 
-  for (const sig of view) {
-    const buy = scoreOf(sig, "buy");
-    const sell = scoreOf(sig, "sell");
-    const pick = buy >= sell ? ({ intent: "buy" as const, score: buy }) : ({ intent: "sell" as const, score: sell });
-    if (pick.score > best.score) {
-      best = {
-        light: pick.score >= 80 ? "green" : pick.score >= 55 ? "yellow" : "red",
-        score: pick.score,
-        intent: pick.intent,
-        headline: "",
-        detail: "",
-        symbol: sig.symbol,
-      };
-    }
-  }
-
   if (!book.armed) {
-    return { ...best, light: "red", score: 0, intent: "none", headline: "No va a comprar", detail: "Roxy está en OFF." };
+    return { ...idle, headline: "No va a comprar", detail: "Roxy está en OFF." };
   }
   if (paperAtOpsCap(book) && !book.positions.length) {
-    return { ...best, light: "red", score: 0, intent: "none", headline: "No va a comprar", detail: "Llegó al tope de operaciones del presupuesto." };
+    return { ...idle, detail: "Llegó al tope de operaciones del presupuesto." };
   }
   if (paperAtDayCap(book) && !book.positions.length) {
-    return { ...best, light: "red", score: 0, intent: "none", headline: "No va a comprar", detail: "Llegó al tope de operaciones del día." };
+    return { ...idle, detail: "Llegó al tope de operaciones del día." };
   }
-  if (book.positions.length && best.symbol && book.positions.some((p) => p.symbol === best.symbol)) {
-    const pos = book.positions.find((p) => p.symbol === best.symbol)!;
+  if (!voted) {
+    return { ...idle, detail: "La votación aún no elige un par." };
+  }
+
+  const sig = voted.sig;
+  const side = voted.side === "long" ? "buy" : "sell";
+  const need = neededConfirm(sig.interval, paperStyleOf(book));
+  const c = book.confirms[sig.symbol];
+  const n = c && c.fire === side ? c.n : sig.bias === side ? 1 : 0;
+  const align = Math.max(0, Math.min(100, sig.confidence));
+  const confPart = (Math.min(n, need) / need) * 100;
+  let score = align * 0.5 + confPart * 0.28 + Math.min(40, Math.max(voted.side === "long" ? 18 : 18, 12));
+  const tally = voted.side === "long" ? 22 : 22;
+  score = align * 0.55 + confPart * 0.45;
+  if (sig.bias !== side) score *= 0.55;
+  if (align < paperMinConfOf(book)) score = Math.min(score, 58);
+  if (side === "buy" && sig.rsi >= 76) score = Math.min(score, 38);
+  if (side === "sell" && sig.rsi <= 24) score = Math.min(score, 38);
+  score = Math.round(Math.max(0, Math.min(100, score)));
+
+  if (book.positions.some((p) => p.symbol === sig.symbol)) {
+    const pos = book.positions.find((p) => p.symbol === sig.symbol)!;
     return {
-      ...best,
       light: "yellow",
+      score,
+      intent: pos.side === "long" ? "buy" : "sell",
       headline: pos.side === "long" ? "Ya compró · gestiona" : "Ya vendió · gestiona",
-      detail: "No abre otra en este par hasta cerrar.",
+      detail: `${voted.name}: no abre otra hasta cerrar.`,
+      symbol: sig.symbol,
     };
   }
 
-  const name = best.symbol.replace("USDT", "");
-  if (best.intent === "buy") {
-    if (best.score >= 80) {
-      best.headline = "Por comprar";
-      best.detail = `${name}: alineación y confirmación listas. Indicador ${best.score}.`;
-    } else if (best.score >= 55) {
-      best.headline = "Casi compra";
-      best.detail = `${name}: se está armando. Todavía no entra. Indicador ${best.score}.`;
-    } else {
-      best.headline = "No va a comprar";
-      best.detail = `${name}: no hay disparo de compra. Indicador ${best.score}.`;
+  const name = voted.name;
+  const intent = side;
+  let headline = "No va a comprar";
+  let detail = `${name}: gana la votación, todavía sin disparo. Indicador ${score}.`;
+  if (intent === "buy") {
+    if (score >= 80) {
+      headline = "Por comprar";
+      detail = `${name}: gana la votación (largo). Indicador ${score}.`;
+    } else if (score >= 55) {
+      headline = "Casi compra";
+      detail = `${name}: gana la votación, armando velas. Indicador ${score}.`;
     }
-  } else if (best.intent === "sell") {
-    if (best.score >= 80) {
-      best.headline = "Por vender";
-      best.detail = `${name}: sesgo de venta maduro. Indicador ${best.score}.`;
-    } else if (best.score >= 55) {
-      best.headline = "Casi vende";
-      best.detail = `${name}: se arma venta, aún no. Indicador ${best.score}.`;
-    } else {
-      best.headline = "No va a comprar";
-      best.detail = `Tampoco vende con fuerza. Indicador ${best.score}.`;
-    }
-  } else {
-    best.headline = "No va a comprar";
-    best.detail = "Sin sesgo de entrada.";
+  } else if (score >= 80) {
+    headline = "Por vender";
+    detail = `${name}: gana la votación (corto). Indicador ${score}.`;
+  } else if (score >= 55) {
+    headline = "Casi vende";
+    detail = `${name}: gana la votación, armando venta. Indicador ${score}.`;
   }
-  best.light = best.score >= 80 ? "green" : best.score >= 55 ? "yellow" : "red";
-  return best;
+  return {
+    light: score >= 80 ? "green" : score >= 55 ? "yellow" : "red",
+    score,
+    intent,
+    headline,
+    detail,
+    symbol: sig.symbol,
+  };
 }
 
 export type PaperPrep = {
@@ -1085,39 +1091,66 @@ function ivShort(iv: string): string {
   return m[x] ?? (iv || "—");
 }
 
-function cloudEs(c?: string, long = false): string {
-  if (c === "above") return long ? "sobre la nube" : "sobre";
-  if (c === "below") return long ? "bajo la nube" : "bajo";
-  if (c === "inside") return long ? "en la nube" : "dentro";
-  return long ? "nube n/d" : "nube —";
+function cloudEs(c?: string): string {
+  if (c === "above") return "sobre";
+  if (c === "below") return "bajo";
+  if (c === "inside") return "dentro";
+  return "nube —";
 }
 
-function agoEs(at: number, now: number): string {
-  const s = Math.max(0, Math.floor((now - at) / 1000));
-  if (s < 45) return "ahora";
-  if (s < 3600) return `hace ${Math.floor(s / 60)} min`;
-  if (s < 86400) return `hace ${Math.floor(s / 3600)} h`;
-  return `hace ${Math.floor(s / 86400)} d`;
-}
+export type RoxyLiveChip = {
+  id: string;
+  label: string;
+  tone: "buy" | "sell" | "wait";
+};
 
 export type RoxyLiveRow = {
   symbol: string;
   name: string;
   bias: "buy" | "sell" | "wait";
   confidence: number;
-  rsi: number;
-  st: string;
-  cloud: string;
   confirm: string;
   price: number;
   hot: boolean;
+  chips: RoxyLiveChip[];
 };
+
+function liveChipsOf(s: BtcTradeSignal): RoxyLiveChip[] {
+  const ck = (id: string) => s.checks?.find((c) => c.id === id);
+  const tone = (id: string, fallback: RoxyLiveChip["tone"]): RoxyLiveChip["tone"] => {
+    const b = ck(id)?.bias;
+    return b === "buy" || b === "sell" || b === "wait" ? b : fallback;
+  };
+  const ema200Tone: RoxyLiveChip["tone"] = Number.isFinite(s.ema200) ? (s.price > s.ema200 ? "buy" : "sell") : "wait";
+  const emaCrossTone: RoxyLiveChip["tone"] = s.ema25 > s.ema50 ? "buy" : "sell";
+  const macdTone: RoxyLiveChip["tone"] = s.macdHist > 0 ? "buy" : s.macdHist < 0 ? "sell" : "wait";
+  const stTone: RoxyLiveChip["tone"] = s.supertrendDir === 1 ? "buy" : "sell";
+  const psarTone: RoxyLiveChip["tone"] = s.psarDir === 1 ? "buy" : "sell";
+  const rsiTone: RoxyLiveChip["tone"] = s.rsi <= 32 ? "buy" : s.rsi >= 72 ? "sell" : tone("rsi", "wait");
+  const vol = Number.isFinite(s.volRatio) ? s.volRatio! : 1;
+  return [
+    { id: "rsi", label: `RSI ${s.rsi.toFixed(0)}`, tone: rsiTone },
+    { id: "macd", label: "MACD", tone: tone("macd", macdTone) },
+    { id: "supertrend", label: "SuperT", tone: tone("supertrend", stTone) },
+    { id: "ema200", label: "EMA 200", tone: tone("ema200", ema200Tone) },
+    { id: "ema-cross", label: "EMA 25/50", tone: tone("ema-cross", emaCrossTone) },
+    { id: "ichimoku", label: "Ichimoku", tone: tone("ichimoku", s.ichiCloud === "above" ? "buy" : s.ichiCloud === "below" ? "sell" : "wait") },
+    { id: "fib", label: "Fib", tone: tone("fib", "wait") },
+    { id: "divergence", label: "Diverg.", tone: tone("divergence", "wait") },
+    { id: "psar", label: "PSAR", tone: tone("psar", psarTone) },
+    { id: "jerry", label: "Jerry", tone: tone("jerry", "wait") },
+    { id: "bollinger", label: "Bollinger", tone: tone("bollinger", "wait") },
+    { id: "volume", label: "Volumen", tone: tone("volume", vol >= 1.15 ? (s.bias === "sell" ? "sell" : "buy") : "wait") },
+    { id: "zigzag", label: "ZigZag", tone: tone("zigzag", s.zigzagLast?.kind === "low" ? "buy" : "sell") },
+  ];
+}
 
 export type RoxyLiveDesk = {
   doing: string;
   seeing: string;
   thinking: string;
   news: string;
+  chart: string;
   tf: string;
   rows: RoxyLiveRow[];
 };
@@ -1130,6 +1163,8 @@ export function roxyLiveDesk(book: PaperBook, signals: BtcTradeSignal[], now = D
       ? signals
       : signals.filter((s) => s.symbol === book.universe || book.positions.some((p) => p.symbol === s.symbol));
   const ranked = [...view].sort((a, b) => b.confidence - a.confidence);
+  const ballots = rankRoxyBallots(view, book.mind?.facts);
+  const voteLead = ballots.find((b) => b.lead);
   const tf = ivShort(ranked[0]?.interval || book.runInterval || "");
   const rows: RoxyLiveRow[] = ranked.map((s) => {
     const need = neededConfirm(s.interval, style);
@@ -1140,91 +1175,96 @@ export function roxyLiveDesk(book: PaperBook, signals: BtcTradeSignal[], now = D
       name: s.symbol.replace(/USDT$/i, ""),
       bias: s.bias,
       confidence: s.confidence,
-      rsi: s.rsi,
-      st: s.supertrendDir === 1 ? "ST ↑" : "ST ↓",
-      cloud: cloudEs(s.ichiCloud),
       confirm: s.bias === "wait" ? "sin disparo" : `${n}/${need} velas`,
       price: s.price,
       hot: false,
+      chips: liveChipsOf(s),
     };
   });
-  const focus = ranked.length ? ranked[Math.floor(now / 7000) % ranked.length]! : null;
+  const focus =
+    (voteLead && view.find((s) => s.symbol === voteLead.symbol)) || ranked[0] || null;
   if (focus) {
     const row = rows.find((r) => r.symbol === focus.symbol);
     if (row) row.hot = true;
   }
 
-  let doing = `Recorro ${view.length || 0} pares en ${tf}`;
-  if (!book.armed) doing = "Pausada: leo tape y noticias, no disparo";
-  else if (paperAtOpsCap(book) && !book.positions.length) doing = "Tope del presupuesto: observo, no abro";
-  else if (paperAtDayCap(book) && !book.positions.length) doing = "Tope del día: dejo el libro cerrado";
+  let doing = `${view.length || 0} pares · ${tf}`;
+  if (!book.armed) doing = "Pausada · no disparo";
+  else if (paperAtOpsCap(book) && !book.positions.length) doing = "Tope · solo observo";
+  else if (paperAtDayCap(book) && !book.positions.length) doing = "Tope del día";
   else if (book.positions.length) {
     const p = book.positions[0]!;
     doing = p.t1Done
-      ? `Gestiono ${p.symbol.replace(/USDT$/i, "")}: T1 cobrado, trail a T2`
-      : `En operación ${p.symbol.replace(/USDT$/i, "")}: vigilo stop y T1`;
+      ? `${p.symbol.replace(/USDT$/i, "")} · trail a T2`
+      : `${p.symbol.replace(/USDT$/i, "")} · stop y T1`;
+  } else if (voteLead && voteLead.pick !== "wait") {
+    doing = `Voto ${voteLead.name} ${voteLead.pick === "long" ? "LARGO" : "CORTO"}`;
   } else if ((book.mind?.revengeUntil ?? 0) > now && book.mind?.pairs) {
     const cooled = Object.values(book.mind.pairs).find((p) => p.coolUntil > now);
-    if (cooled) doing = `Enfriamiento en ${cooled.symbol.replace(/USDT$/i, "")}: no revancha`;
+    if (cooled) doing = `${cooled.symbol.replace(/USDT$/i, "")} · sin revancha`;
   }
 
-  const seeing = focus
-    ? `${focus.symbol.replace(/USDT$/i, "")} ${ivShort(focus.interval)} · ${
-        focus.bias === "buy" ? "compra" : focus.bias === "sell" ? "venta" : "espera"
-      } ${focus.confidence.toFixed(0)}% · RSI ${focus.rsi.toFixed(0)} · ${
-        focus.supertrendDir === 1 ? "Supertrend alcista" : "Supertrend bajista"
-      } · ${cloudEs(focus.ichiCloud, true)}`
-    : "Todavía no me llega una vela con confluencia";
+  const seeing = voteLead
+    ? `${voteLead.name} · ${voteLead.pick === "long" ? "largo" : "corto"} ${
+        (voteLead.pick === "long" ? voteLead.long.score : voteLead.short.score).toFixed(1)
+      } pts · ${voteLead.pick === "long" ? voteLead.long.yes : voteLead.short.yes} a favor`
+    : focus
+      ? `${focus.symbol.replace(/USDT$/i, "")} ${ivShort(focus.interval)} · ${
+          focus.bias === "buy" ? "compra" : focus.bias === "sell" ? "venta" : "espera"
+        } ${focus.confidence.toFixed(0)}% · RSI ${focus.rsi.toFixed(0)}`
+      : "Sin lectura aún";
 
-  const thoughts: string[] = [];
-  if (focus) {
-    thoughts.push(
-      focus.thesis
-        ? `Sobre ${focus.symbol.replace(/USDT$/i, "")}: ${focus.thesis.slice(0, 140)}`
-        : `Piso de alineación ${minC}%. ${focus.symbol.replace(/USDT$/i, "")} está en ${focus.confidence.toFixed(0)}%.`,
-    );
-    if (focus.bias === "buy" && focus.rsi >= 76) thoughts.push("RSI comprador extremo: no persigo el último empujón.");
-    if (focus.bias === "sell" && focus.rsi <= 24) thoughts.push("RSI vendedor extremo: no vendo el pánico.");
-    if (focus.bias === "buy" && focus.ichiCloud === "below") thoughts.push("Bajo la nube no compro. Primero el régimen.");
-    if (focus.bias === "sell" && focus.ichiCloud === "above") thoughts.push("Sobre la nube no corto. No peleo el tape.");
-    if (Number.isFinite(focus.volRatio) && (focus.volRatio ?? 1) < 0.82) {
-      thoughts.push("Volumen flojo: la idea puede ser un amague.");
-    }
+  const name = focus ? focus.symbol.replace(/USDT$/i, "") : "";
+  let thinking = "Espero un disparo limpio";
+  if (book.positions.length) {
+    const p = book.positions[0]!;
+    thinking = `No toco ${p.symbol.replace(/USDT$/i, "")}`;
+  } else if (focus) {
     const need = neededConfirm(focus.interval, style);
     const c = book.confirms[focus.symbol];
     const n = c && c.fire === focus.bias ? Math.min(c.n, need) : 0;
-    if (focus.bias !== "wait") {
-      thoughts.push(
-        n >= need
-          ? `Confirmaciones ${n}/${need}: maduro. Si el riesgo da, el siguiente paso es la orden.`
-          : `Cuento velas ${n}/${need}. Si se desarma, cancelo.`,
-      );
-    }
-    const failed = (focus.checks ?? []).filter((ch) => ch.bias !== focus.bias).slice(0, 2);
-    for (const ch of failed) {
-      const bit = (ch.detail || ch.label).slice(0, 110);
-      thoughts.push(`Filtro: ${ch.label}${bit && bit !== ch.label ? ` · ${bit}` : ""}`);
-    }
-    if (focus.guide) thoughts.push(focus.guide.slice(0, 140));
+    if (focus.bias === "buy" && focus.rsi >= 76) thinking = `${name} · RSI alto, no persigo`;
+    else if (focus.bias === "sell" && focus.rsi <= 24) thinking = `${name} · RSI bajo, no persigo`;
+    else if (focus.bias === "buy" && focus.ichiCloud === "below") thinking = `${name} · nube en contra`;
+    else if (focus.bias === "sell" && focus.ichiCloud === "above") thinking = `${name} · nube en contra`;
+    else if (Number.isFinite(focus.volRatio) && (focus.volRatio ?? 1) < 0.82) thinking = `${name} · volumen flojo`;
+    else if (focus.bias !== "wait" && n < need) thinking = `${name} · velas ${n}/${need}`;
+    else if (focus.bias !== "wait" && n >= need) thinking = `${name} · listo si el riesgo da`;
+    else thinking = `${name} · ${focus.confidence.toFixed(0)}% vs piso ${minC}%`;
   }
-  if (book.positions.length) {
-    const p = book.positions[0]!;
-    thoughts.push(
-      `No agrando ni promedio ${p.symbol.replace(/USDT$/i, "")}. Stop ${p.stop.toFixed(2)}, T1 ${p.t1.toFixed(2)}.`,
-    );
-  }
-  if (!thoughts.length) thoughts.push("Sin tesis todavía. Prefiero esperar a un COMPRAR/VENDER limpio.");
-  const thinking = thoughts[Math.floor(now / 5500) % thoughts.length]!;
 
   const newsFacts = (book.mind?.facts ?? []).filter((f) => f.kind === "news").sort((a, b) => b.at - a.at);
-  const newsHit = newsFacts[Math.floor(now / 9000) % Math.max(1, newsFacts.length)];
-  const news = newsHit
-    ? `${newsHit.symbol ? newsHit.symbol.replace(/USDT$/i, "") + " · " : ""}${newsHit.text.slice(0, 160)}${
-        newsHit.at ? ` (${agoEs(newsHit.at, now)})` : ""
-      }`
-    : "Sin titular fresco de las últimas 24 h en el desk de Noticias.";
+  const newsHit = newsFacts[0];
+  let news = "Sin titular 24h";
+  if (newsHit) {
+    const who = newsHit.symbol ? `${newsHit.symbol.replace(/USDT$/i, "")}: ` : "";
+    const t = newsHit.text
+      .replace(/\s*\([^)]{2,80}\)\s*$/, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    news = `${who}${t}`;
+  }
 
-  return { doing, seeing, thinking, news, tf, rows };
+  const work = focus ?? view[0] ?? null;
+  let chart = "Sin velas";
+  if (work) {
+    const coin = work.symbol.replace(/USDT$/i, "");
+    const ck = (id: string) => work.checks?.find((c) => c.id === id);
+    const acts = [
+      `Velas · ${coin}`,
+      `Fibonacci · ${coin}`,
+      `RSI 14 · ${coin} · ${work.rsi.toFixed(0)}`,
+      `MACD · ${coin}`,
+    ];
+    if (ck("divergence") && ck("divergence")!.bias !== "wait") acts.push(`Divergencia · ${coin}`);
+    if (ck("ichimoku")) acts.push(`Ichimoku · ${coin}`);
+    if (ck("supertrend")) acts.push(`Supertrend · ${coin}`);
+    if (ck("jerry") && ck("jerry")!.bias !== "wait") acts.push(`Jerry · ${coin}`);
+    if (ck("zigzag")) acts.push(`ZigZag · ${coin}`);
+    chart = acts[Math.floor(now / 5000) % acts.length]!;
+  }
+
+  return { doing, seeing, thinking, news, chart, tf, rows };
 }
 
 export function splitPaperTrades(book: PaperBook): { open: PaperTrade[]; closed: PaperTrade[] } {
@@ -1287,7 +1327,8 @@ function canEnter(sig: BtcTradeSignal, side: "long" | "short", book: PaperBook):
   const style = paperStyleOf(book);
   if (!paperAllowsOpen(sig.interval, style)) return false;
   if (!roxyAllowsEntry(book, sig.symbol, sig.confidence, now)) return false;
-  if (sig.confidence < minConf) return false;
+  if (roxyNewsBlocksSide(book.mind?.facts, sig.symbol, side, now)) return false;
+  if (sig.confidence < minConf + roxyNewsConfBump(book.mind?.facts, sig.symbol, side, now)) return false;
   if (side === "long" && sig.rsi >= 76) return false;
   if (side === "short" && sig.rsi <= 24) return false;
   if (side === "long" && sig.ichiCloud === "below") return false;
@@ -1364,7 +1405,7 @@ function closeTrade(book: PaperBook, pos: PaperPosition, at: number, price: numb
 export function tickPaper(
   book: PaperBook,
   sig: BtcTradeSignal,
-  opts?: { skipHist?: boolean; marks?: Record<string, number> },
+  opts?: { skipHist?: boolean; marks?: Record<string, number>; openKey?: string | null },
 ): { book: PaperBook; events: PaperEvent[] } {
   const events: PaperEvent[] = [];
   if (!shouldTick(book, sig.symbol)) return { book, events };
@@ -1534,7 +1575,8 @@ export function tickPaper(
   const lev = paperEffectiveLev(mode, next.leverage ?? 1);
   if (next.armed && underCap && !hasPos && (fire === "buy" || fire === "sell") && n >= neededConfirm(sig.interval, paperStyleOf(next))) {
     const side = fire === "buy" ? "long" : "short";
-    if (paperAllowsSide(mode, side) && paperAllowsOpen(sig.interval, paperStyleOf(next)) && canEnter(sig, side, next)) {
+    const voteOk = opts?.openKey === undefined || opts.openKey === `${sig.symbol}:${side}`;
+    if (voteOk && paperAllowsSide(mode, side) && paperAllowsOpen(sig.interval, paperStyleOf(next)) && canEnter(sig, side, next)) {
       const marks = { ...(opts?.marks ?? {}), [sig.symbol]: px };
       const plan = entryPlan(sig, side, paperStyleOf(next));
       const qty = sizeQty(next, sig, side, marks, plan.stop);
@@ -1593,10 +1635,18 @@ export function tickPaper(
 export function tickPaperMany(book: PaperBook, signals: BtcTradeSignal[]): { book: PaperBook; events: PaperEvent[] } {
   const marks: Record<string, number> = {};
   for (const s of signals) marks[s.symbol] = s.price;
+  const ballots = rankRoxyBallots(signals, book.mind?.facts);
+  let openKey = roxyBallotOpenKey(ballots);
+  if (openKey) {
+    const [sym, side] = openKey.split(":") as [string, "long" | "short"];
+    const sig = signals.find((s) => s.symbol === sym);
+    const mode = normalizePaperMode(book.mode);
+    if (!sig || !paperAllowsSide(mode, side) || !canEnter(sig, side, book)) openKey = null;
+  }
   let cur = book;
   const events: PaperEvent[] = [];
   for (const sig of signals) {
-    const r = tickPaper(cur, sig, { skipHist: true, marks });
+    const r = tickPaper(cur, sig, { skipHist: true, marks, openKey: openKey ?? "" });
     cur = r.book;
     events.push(...r.events);
   }
