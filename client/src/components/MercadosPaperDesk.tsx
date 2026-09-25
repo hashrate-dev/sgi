@@ -45,6 +45,36 @@ export type PaperPairOpt = { binance: string; label: string };
 
 const ROXY = "Roxy";
 
+function roxyAnalyzeMood(now: number): { title: string; body: string } {
+  const pack = [
+    {
+      title: "Analizando",
+      body: [
+        "Estoy con el mercado en la palma, como quien elige un vestido: lo miro de frente, de perfil… y no me lo pongo solo porque brilla.",
+        "Hay ruido, hay ego, hay velas que se creen protagonistas. Yo recorro todo con calma: votos, noticias, el pulso de cada par.",
+        "Si algo me guiña de verdad, lo voy a notar. Si es solo coqueteo barato del precio, sonrío y sigo. Hashrate merece criterio, no prisa.",
+      ].join("\n"),
+    },
+    {
+      title: "Enfoque",
+      body: [
+        "Shh. No desaparecí: me enfoqué. Cuando pienso, hasta el café se queda quieto.",
+        "Estoy pesando si esto es una entrada con clase o un capricho disfrazado de oportunidad. Hay una diferencia, y se siente en el estómago.",
+        "Un segundo bien pensado vale más que diez clics nerviosos. Déjenme terminar la frase en la cabeza; si merezco entrar, entro. Si no, paso con el taconcito bien puesto.",
+      ].join("\n"),
+    },
+    {
+      title: "De turno",
+      body: [
+        "Un poquito cansada, sí. Los ojos ya pidieron agua y el tape no trae flores. Da igual: vine a trabajar duro para Hashrate.",
+        "Me acomodo el humor, me pongo el stop como perfume, y sigo. El mercado puede estar pesado; yo más, pero con gracia.",
+        "Que se note que hay una mujer al mando: curiosa, un poco pícara, elegante… y nada de dormirme en la ronda.",
+      ].join("\n"),
+    },
+  ] as const;
+  return pack[Math.floor(now / 28_000) % pack.length]!;
+}
+
 function usd(n: number): string {
   if (!Number.isFinite(n)) return "—";
   return new Intl.NumberFormat("en-US", {
@@ -212,10 +242,12 @@ function AgentOpinion({
   notes,
   live,
   muted,
+  now,
 }: {
   notes: PaperNote[];
   live: Omit<PaperNote, "id">;
   muted: boolean;
+  now: number;
 }) {
   const feed = useMemo(() => {
     if (notes.length) return notes;
@@ -235,16 +267,22 @@ function AgentOpinion({
 
   const current = feed[i] ?? feed[0]!;
   const isLive = i === 0;
+  const hush =
+    !String(current.body || "").trim() ||
+    current.title === "Silencio" ||
+    current.fingerprint.startsWith("hush/");
+  const mood = roxyAnalyzeMood(now);
+  const shownNote = hush ? { ...current, title: mood.title, body: mood.body } : current;
 
   useEffect(() => {
     if (!isLive) {
-      setShown(current.body);
+      setShown(shownNote.body);
       setDone(true);
       return;
     }
     setShown("");
     setDone(false);
-    const body = current.body;
+    const body = shownNote.body;
     if (!body) {
       setDone(true);
       return;
@@ -269,33 +307,31 @@ function AgentOpinion({
     };
     raf = window.requestAnimationFrame(tick);
     return () => window.cancelAnimationFrame(raf);
-  }, [isLive, current.id, current.body, muted]);
+  }, [isLive, current.id, shownNote.body, muted]);
 
   useEffect(() => {
     if (muted) {
       hushRoxy();
       return;
     }
-    const line = (current.body || "").trim();
-    if (!line || current.title === "Silencio") return;
+    if (hush) return;
+    const line = (shownNote.body || "").trim();
+    if (!line) return;
     speakRoxy(line);
-  }, [muted, current.id, current.title, current.body]);
+  }, [muted, hush, current.id, shownNote.body]);
 
   const older = i < feed.length - 1;
   const newer = i > 0;
   const when = fmtStamp(current.at);
-  const text = isLive ? shown : current.body;
-  const silent = !String(current.body || "").trim();
-  const chunks = silent
-    ? ["En silencio. Si no hay nada nuevo que hacer, no hablo."]
-    : (text || "").split(/\n+/).filter((p) => p.length > 0);
+  const text = isLive ? shown : shownNote.body;
+  const chunks = (text || "").split(/\n+/).filter((p) => p.length > 0);
 
   return (
     <blockquote className={`tv-paper-opine tv-paper-opine--${current.tone}`}>
-      <RoxyFace talking={Boolean(!silent && (voicing || (isLive && !done && !muted)))} />
+      <RoxyFace talking={Boolean(voicing || (isLive && !done && !muted))} />
       <div className="tv-paper-opine__ident">
         <p className="tv-paper-opine__kicker">Opinión de {ROXY}</p>
-        <p className="tv-paper-opine__title">{silent ? "Silencio" : current.title}</p>
+        <p className="tv-paper-opine__title">{shownNote.title}</p>
       </div>
       <div className="tv-paper-opine__tools">
         <p className="tv-paper-opine__meta">
@@ -1063,7 +1099,7 @@ export function MercadosPaperDesk({
       </div>
       {open ? (
         <>
-          <AgentOpinion notes={book.notes} live={liveTalk} muted={muted || !open} />
+          <AgentOpinion notes={book.notes} live={liveTalk} muted={muted || !open} now={nowTick} />
 
           <div className="tv-paper__uni" role="group" aria-label={`Moneda de ${ROXY}`}>
             <button type="button" className={book.universe === "ALL" ? "is-on" : ""} onClick={() => setUniverse("ALL")}>

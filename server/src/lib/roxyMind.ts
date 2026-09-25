@@ -46,6 +46,12 @@ export function roxyDayKey(ms: number): string {
   }).format(new Date(ms));
 }
 
+/** Titulares del día (Uruguay), no del día anterior. */
+export function isRoxyNewsToday(ms: number, now = Date.now()): boolean {
+  if (!Number.isFinite(ms) || ms <= 0) return false;
+  return roxyDayKey(ms) === roxyDayKey(now);
+}
+
 export function normRoxyTalk(s: string): string {
   return s
     .toLowerCase()
@@ -140,21 +146,19 @@ export function ingestTapeFacts(facts: RoxyFact[], snaps: TapeSnap[], now: numbe
 }
 
 export function pruneRoxyNewsFacts(facts: RoxyFact[], now = Date.now()): RoxyFact[] {
-  const cutoff = now - ROXY_NEWS_MAX_AGE_MS;
   return facts.filter((f) => {
     if (f.kind !== "news" && f.kind !== "coin") return true;
-    return Number(f.at) >= cutoff;
+    return isRoxyNewsToday(Number(f.at), now);
   });
 }
 
 export function ingestNewsFacts(facts: RoxyFact[], hits: RoxyNewsHit[], now: number): RoxyFact[] {
-  const cutoff = now - ROXY_NEWS_MAX_AGE_MS;
   let next = pruneRoxyNewsFacts(facts, now);
   for (const h of hits) {
-    const at = Number(h.at) || 0;
-    if (!at || at < cutoff) continue;
+    const at = Number(h.at) || now;
+    if (!isRoxyNewsToday(at, now)) continue;
     const title = h.title.replace(/\s+/g, " ").trim().slice(0, 180);
-    if (title.length < 12) continue;
+    if (title.length < 8) continue;
     next = pushRoxyFact(next, {
       at: h.at || now,
       kind: "news",
@@ -185,7 +189,7 @@ export function pickFreshFact(
   const want = new Set(symbols);
   const pool = facts.filter((f) => {
     if (kind !== "any" && f.kind !== kind) return false;
-    if ((f.kind === "news" || f.kind === "coin") && Number(f.at) < Date.now() - ROXY_NEWS_MAX_AGE_MS) return false;
+    if ((f.kind === "news" || f.kind === "coin") && !isRoxyNewsToday(Number(f.at))) return false;
     if (want.size && f.symbol && !want.has(f.symbol)) return false;
     const blob = normRoxyTalk(f.text);
     if (
@@ -266,12 +270,11 @@ const NEWS_BEAR =
 /** Sesgo de titulares 24 h para el par: negativo = contra longs, positivo = contra shorts. */
 export function roxyNewsTiltScore(facts: RoxyFact[] | undefined, symbol: string, now = Date.now()): number {
   if (!facts?.length) return 0;
-  const cutoff = now - ROXY_NEWS_MAX_AGE_MS;
   let score = 0;
   let hits = 0;
   for (const f of facts) {
     if (f.kind !== "news") continue;
-    if (Number(f.at) < cutoff) continue;
+    if (!isRoxyNewsToday(Number(f.at), now)) continue;
     if (f.symbol && f.symbol !== symbol) continue;
     const w = f.symbol === symbol ? 1 : 0.4;
     const t = f.text || "";
