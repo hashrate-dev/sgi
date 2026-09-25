@@ -295,27 +295,44 @@ function paperAllowsOpen(interval: string, style: PaperStyle): boolean {
   return scalpBand(iv) !== "context";
 }
 
-function entryPlan(sig: BtcTradeSignal, side: "long" | "short", style: PaperStyle): { stop: number; t1: number; t2: number } {
-  if (style !== "swing") return scalpPlan(sig, side);
+function placePlan(
+  sig: BtcTradeSignal,
+  side: "long" | "short",
+  stopP: number,
+  t1R: number,
+  t2R: number,
+): { stop: number; t1: number; t2: number } {
   const px = sig.price;
-  const b = scalpBand(sig.interval);
-  const t1p = b === "context" ? 0.028 : b === "hour" ? 0.018 : 0.012;
-  const t2p = b === "context" ? 0.05 : b === "hour" ? 0.032 : 0.022;
-  const stopP = b === "context" ? 0.018 : b === "hour" ? 0.012 : 0.008;
   if (side === "long") {
-    const stop = Math.max(sig.stop, px * (1 - stopP));
-    let t1 = Math.min(sig.target1, px * (1 + t1p));
-    let t2 = Math.min(sig.target2, px * (1 + t2p));
-    if (!(t1 > px)) t1 = px * (1 + t1p);
-    if (!(t2 > t1)) t2 = px * (1 + t2p);
+    const floor = px * (1 - stopP);
+    const raw = Number.isFinite(sig.stop) && sig.stop < px ? sig.stop : floor;
+    const stop = Math.min(raw, floor);
+    const risk = Math.max(px - stop, px * stopP);
+    const t1Need = px + risk * t1R;
+    const t2Need = px + risk * t2R;
+    const t1 = Number.isFinite(sig.target1) && sig.target1 > t1Need ? sig.target1 : t1Need;
+    const t2 = Number.isFinite(sig.target2) && sig.target2 > Math.max(t2Need, t1) ? sig.target2 : Math.max(t2Need, t1 + risk * 0.6);
     return { stop, t1, t2 };
   }
-  const stop = Math.min(sig.stop, px * (1 + stopP));
-  let t1 = Math.max(sig.target1, px * (1 - t1p));
-  let t2 = Math.max(sig.target2, px * (1 - t2p));
-  if (!(t1 < px)) t1 = px * (1 - t1p);
-  if (!(t2 < t1)) t2 = px * (1 - t2p);
+  const ceil = px * (1 + stopP);
+  const raw = Number.isFinite(sig.stop) && sig.stop > px ? sig.stop : ceil;
+  const stop = Math.max(raw, ceil);
+  const risk = Math.max(stop - px, px * stopP);
+  const t1Need = px - risk * t1R;
+  const t2Need = px - risk * t2R;
+  const t1 = Number.isFinite(sig.target1) && sig.target1 < t1Need ? sig.target1 : t1Need;
+  const t2 = Number.isFinite(sig.target2) && sig.target2 < Math.min(t2Need, t1) ? sig.target2 : Math.min(t2Need, t1 - risk * 0.6);
   return { stop, t1, t2 };
+}
+
+function entryPlan(sig: BtcTradeSignal, side: "long" | "short", style: PaperStyle): { stop: number; t1: number; t2: number } {
+  const b = scalpBand(sig.interval);
+  if (style === "swing") {
+    const stopP = b === "context" ? 0.024 : b === "hour" ? 0.018 : 0.012;
+    return placePlan(sig, side, stopP, 1.8, 3.2);
+  }
+  const stopP = b === "ultra" ? 0.0048 : b === "fast" ? 0.007 : b === "mid" ? 0.01 : 0.014;
+  return placePlan(sig, side, stopP, 1.6, 2.7);
 }
 
 function scalpMaxHoldMs(interval: string): number {
@@ -333,28 +350,6 @@ function uruguayDayKey(ms: number): string {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date(ms));
-}
-
-function scalpPlan(sig: BtcTradeSignal, side: "long" | "short"): { stop: number; t1: number; t2: number } {
-  const px = sig.price;
-  const b = scalpBand(sig.interval);
-  const t1p = b === "ultra" ? 0.0022 : b === "fast" ? 0.0034 : b === "mid" ? 0.0052 : 0.008;
-  const t2p = b === "ultra" ? 0.0042 : b === "fast" ? 0.0062 : b === "mid" ? 0.0095 : 0.014;
-  const stopP = b === "ultra" ? 0.002 : b === "fast" ? 0.003 : b === "mid" ? 0.0045 : 0.0065;
-  if (side === "long") {
-    const stop = Math.max(sig.stop, px * (1 - stopP));
-    let t1 = Math.min(sig.target1, px * (1 + t1p));
-    let t2 = Math.min(sig.target2, px * (1 + t2p));
-    if (!(t1 > px)) t1 = px * (1 + t1p);
-    if (!(t2 > t1)) t2 = px * (1 + t2p);
-    return { stop, t1, t2 };
-  }
-  const stop = Math.min(sig.stop, px * (1 + stopP));
-  let t1 = Math.max(sig.target1, px * (1 - t1p));
-  let t2 = Math.max(sig.target2, px * (1 - t2p));
-  if (!(t1 < px)) t1 = px * (1 - t1p);
-  if (!(t2 < t1)) t2 = px * (1 - t2p);
-  return { stop, t1, t2 };
 }
 
 function clampSkill(n: number): number {
@@ -1075,6 +1070,163 @@ export function paperPrepProcess(book: PaperBook, signals: BtcTradeSignal[]): Pa
   return best;
 }
 
+function ivShort(iv: string): string {
+  const x = chartInterval(iv);
+  const m: Record<string, string> = {
+    "1s": "1s",
+    "1": "1m",
+    "5": "5m",
+    "15": "15m",
+    "30": "30m",
+    "60": "1h",
+    "240": "4h",
+    D: "1D",
+  };
+  return m[x] ?? (iv || "—");
+}
+
+function cloudEs(c?: string, long = false): string {
+  if (c === "above") return long ? "sobre la nube" : "sobre";
+  if (c === "below") return long ? "bajo la nube" : "bajo";
+  if (c === "inside") return long ? "en la nube" : "dentro";
+  return long ? "nube n/d" : "nube —";
+}
+
+function agoEs(at: number, now: number): string {
+  const s = Math.max(0, Math.floor((now - at) / 1000));
+  if (s < 45) return "ahora";
+  if (s < 3600) return `hace ${Math.floor(s / 60)} min`;
+  if (s < 86400) return `hace ${Math.floor(s / 3600)} h`;
+  return `hace ${Math.floor(s / 86400)} d`;
+}
+
+export type RoxyLiveRow = {
+  symbol: string;
+  name: string;
+  bias: "buy" | "sell" | "wait";
+  confidence: number;
+  rsi: number;
+  st: string;
+  cloud: string;
+  confirm: string;
+  price: number;
+  hot: boolean;
+};
+
+export type RoxyLiveDesk = {
+  doing: string;
+  seeing: string;
+  thinking: string;
+  news: string;
+  tf: string;
+  rows: RoxyLiveRow[];
+};
+
+export function roxyLiveDesk(book: PaperBook, signals: BtcTradeSignal[], now = Date.now()): RoxyLiveDesk {
+  const style = paperStyleOf(book);
+  const minC = paperMinConfOf(book);
+  const view =
+    book.universe === "ALL"
+      ? signals
+      : signals.filter((s) => s.symbol === book.universe || book.positions.some((p) => p.symbol === s.symbol));
+  const ranked = [...view].sort((a, b) => b.confidence - a.confidence);
+  const tf = ivShort(ranked[0]?.interval || book.runInterval || "");
+  const rows: RoxyLiveRow[] = ranked.map((s) => {
+    const need = neededConfirm(s.interval, style);
+    const c = book.confirms[s.symbol];
+    const n = c && (c.fire === "buy" || c.fire === "sell") && c.fire === s.bias ? Math.min(c.n, need) : 0;
+    return {
+      symbol: s.symbol,
+      name: s.symbol.replace(/USDT$/i, ""),
+      bias: s.bias,
+      confidence: s.confidence,
+      rsi: s.rsi,
+      st: s.supertrendDir === 1 ? "ST ↑" : "ST ↓",
+      cloud: cloudEs(s.ichiCloud),
+      confirm: s.bias === "wait" ? "sin disparo" : `${n}/${need} velas`,
+      price: s.price,
+      hot: false,
+    };
+  });
+  const focus = ranked.length ? ranked[Math.floor(now / 7000) % ranked.length]! : null;
+  if (focus) {
+    const row = rows.find((r) => r.symbol === focus.symbol);
+    if (row) row.hot = true;
+  }
+
+  let doing = `Recorro ${view.length || 0} pares en ${tf}`;
+  if (!book.armed) doing = "Pausada: leo tape y noticias, no disparo";
+  else if (paperAtOpsCap(book) && !book.positions.length) doing = "Tope del presupuesto: observo, no abro";
+  else if (paperAtDayCap(book) && !book.positions.length) doing = "Tope del día: dejo el libro cerrado";
+  else if (book.positions.length) {
+    const p = book.positions[0]!;
+    doing = p.t1Done
+      ? `Gestiono ${p.symbol.replace(/USDT$/i, "")}: T1 cobrado, trail a T2`
+      : `En operación ${p.symbol.replace(/USDT$/i, "")}: vigilo stop y T1`;
+  } else if ((book.mind?.revengeUntil ?? 0) > now && book.mind?.pairs) {
+    const cooled = Object.values(book.mind.pairs).find((p) => p.coolUntil > now);
+    if (cooled) doing = `Enfriamiento en ${cooled.symbol.replace(/USDT$/i, "")}: no revancha`;
+  }
+
+  const seeing = focus
+    ? `${focus.symbol.replace(/USDT$/i, "")} ${ivShort(focus.interval)} · ${
+        focus.bias === "buy" ? "compra" : focus.bias === "sell" ? "venta" : "espera"
+      } ${focus.confidence.toFixed(0)}% · RSI ${focus.rsi.toFixed(0)} · ${
+        focus.supertrendDir === 1 ? "Supertrend alcista" : "Supertrend bajista"
+      } · ${cloudEs(focus.ichiCloud, true)}`
+    : "Todavía no me llega una vela con confluencia";
+
+  const thoughts: string[] = [];
+  if (focus) {
+    thoughts.push(
+      focus.thesis
+        ? `Sobre ${focus.symbol.replace(/USDT$/i, "")}: ${focus.thesis.slice(0, 140)}`
+        : `Piso de alineación ${minC}%. ${focus.symbol.replace(/USDT$/i, "")} está en ${focus.confidence.toFixed(0)}%.`,
+    );
+    if (focus.bias === "buy" && focus.rsi >= 76) thoughts.push("RSI comprador extremo: no persigo el último empujón.");
+    if (focus.bias === "sell" && focus.rsi <= 24) thoughts.push("RSI vendedor extremo: no vendo el pánico.");
+    if (focus.bias === "buy" && focus.ichiCloud === "below") thoughts.push("Bajo la nube no compro. Primero el régimen.");
+    if (focus.bias === "sell" && focus.ichiCloud === "above") thoughts.push("Sobre la nube no corto. No peleo el tape.");
+    if (Number.isFinite(focus.volRatio) && (focus.volRatio ?? 1) < 0.82) {
+      thoughts.push("Volumen flojo: la idea puede ser un amague.");
+    }
+    const need = neededConfirm(focus.interval, style);
+    const c = book.confirms[focus.symbol];
+    const n = c && c.fire === focus.bias ? Math.min(c.n, need) : 0;
+    if (focus.bias !== "wait") {
+      thoughts.push(
+        n >= need
+          ? `Confirmaciones ${n}/${need}: maduro. Si el riesgo da, el siguiente paso es la orden.`
+          : `Cuento velas ${n}/${need}. Si se desarma, cancelo.`,
+      );
+    }
+    const failed = (focus.checks ?? []).filter((ch) => ch.bias !== focus.bias).slice(0, 2);
+    for (const ch of failed) {
+      const bit = (ch.detail || ch.label).slice(0, 110);
+      thoughts.push(`Filtro: ${ch.label}${bit && bit !== ch.label ? ` · ${bit}` : ""}`);
+    }
+    if (focus.guide) thoughts.push(focus.guide.slice(0, 140));
+  }
+  if (book.positions.length) {
+    const p = book.positions[0]!;
+    thoughts.push(
+      `No agrando ni promedio ${p.symbol.replace(/USDT$/i, "")}. Stop ${p.stop.toFixed(2)}, T1 ${p.t1.toFixed(2)}.`,
+    );
+  }
+  if (!thoughts.length) thoughts.push("Sin tesis todavía. Prefiero esperar a un COMPRAR/VENDER limpio.");
+  const thinking = thoughts[Math.floor(now / 5500) % thoughts.length]!;
+
+  const newsFacts = (book.mind?.facts ?? []).filter((f) => f.kind === "news").sort((a, b) => b.at - a.at);
+  const newsHit = newsFacts[Math.floor(now / 9000) % Math.max(1, newsFacts.length)];
+  const news = newsHit
+    ? `${newsHit.symbol ? newsHit.symbol.replace(/USDT$/i, "") + " · " : ""}${newsHit.text.slice(0, 160)}${
+        newsHit.at ? ` (${agoEs(newsHit.at, now)})` : ""
+      }`
+    : "Sin titular fresco de las últimas 24 h en el desk de Noticias.";
+
+  return { doing, seeing, thinking, news, tf, rows };
+}
+
 export function splitPaperTrades(book: PaperBook): { open: PaperTrade[]; closed: PaperTrade[] } {
   const open: PaperTrade[] = [];
   const closed: PaperTrade[] = [];
@@ -1143,7 +1295,7 @@ function canEnter(sig: BtcTradeSignal, side: "long" | "short", book: PaperBook):
   if (Number.isFinite(sig.volRatio) && (sig.volRatio ?? 1) < 0.82) return false;
   const plan = entryPlan(sig, side, style);
   const dist = Math.abs(sig.price - plan.stop);
-  const minStop = style === "swing" ? 0.003 : 0.0009;
+  const minStop = style === "swing" ? 0.006 : 0.004;
   if (!(dist > 0) || dist / sig.price < minStop) return false;
   return true;
 }
@@ -1365,11 +1517,11 @@ export function tickPaper(
       else next.losses += 1;
       closeTrade(next, pos, now, px, "day", pnl);
       dropPos();
-    } else if (long && Number.isFinite(sig.supertrend) && sig.supertrendDir === 1 && sig.supertrend > pos.stop && sig.supertrend < px) {
+    } else if (pos.t1Done && long && Number.isFinite(sig.supertrend) && sig.supertrendDir === 1 && sig.supertrend > pos.stop && sig.supertrend < px) {
       pos.stop = Math.max(pos.stop, sig.supertrend);
       const t = findTrade(next, pos.id);
       if (t) t.stop = pos.stop;
-    } else if (!long && Number.isFinite(sig.supertrend) && sig.supertrendDir === -1 && sig.supertrend < pos.stop && sig.supertrend > px) {
+    } else if (pos.t1Done && !long && Number.isFinite(sig.supertrend) && sig.supertrendDir === -1 && sig.supertrend < pos.stop && sig.supertrend > px) {
       pos.stop = Math.min(pos.stop, sig.supertrend);
       const t = findTrade(next, pos.id);
       if (t) t.stop = pos.stop;

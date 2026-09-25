@@ -249,27 +249,44 @@ function paperAllowsOpen(interval: string, style: PaperStyle): boolean {
   return scalpBand(iv) !== "context";
 }
 
-function entryPlan(sig: BtcTradeSignal, side: "long" | "short", style: PaperStyle): { stop: number; t1: number; t2: number } {
-  if (style !== "swing") return scalpPlan(sig, side);
+function placePlan(
+  sig: BtcTradeSignal,
+  side: "long" | "short",
+  stopP: number,
+  t1R: number,
+  t2R: number,
+): { stop: number; t1: number; t2: number } {
   const px = sig.price;
-  const b = scalpBand(sig.interval);
-  const t1p = b === "context" ? 0.028 : b === "hour" ? 0.018 : 0.012;
-  const t2p = b === "context" ? 0.05 : b === "hour" ? 0.032 : 0.022;
-  const stopP = b === "context" ? 0.018 : b === "hour" ? 0.012 : 0.008;
   if (side === "long") {
-    const stop = Math.max(sig.stop, px * (1 - stopP));
-    let t1 = Math.min(sig.target1, px * (1 + t1p));
-    let t2 = Math.min(sig.target2, px * (1 + t2p));
-    if (!(t1 > px)) t1 = px * (1 + t1p);
-    if (!(t2 > t1)) t2 = px * (1 + t2p);
+    const floor = px * (1 - stopP);
+    const raw = Number.isFinite(sig.stop) && sig.stop < px ? sig.stop : floor;
+    const stop = Math.min(raw, floor);
+    const risk = Math.max(px - stop, px * stopP);
+    const t1Need = px + risk * t1R;
+    const t2Need = px + risk * t2R;
+    const t1 = Number.isFinite(sig.target1) && sig.target1 > t1Need ? sig.target1 : t1Need;
+    const t2 = Number.isFinite(sig.target2) && sig.target2 > Math.max(t2Need, t1) ? sig.target2 : Math.max(t2Need, t1 + risk * 0.6);
     return { stop, t1, t2 };
   }
-  const stop = Math.min(sig.stop, px * (1 + stopP));
-  let t1 = Math.max(sig.target1, px * (1 - t1p));
-  let t2 = Math.max(sig.target2, px * (1 - t2p));
-  if (!(t1 < px)) t1 = px * (1 - t1p);
-  if (!(t2 < t1)) t2 = px * (1 - t2p);
+  const ceil = px * (1 + stopP);
+  const raw = Number.isFinite(sig.stop) && sig.stop > px ? sig.stop : ceil;
+  const stop = Math.max(raw, ceil);
+  const risk = Math.max(stop - px, px * stopP);
+  const t1Need = px - risk * t1R;
+  const t2Need = px - risk * t2R;
+  const t1 = Number.isFinite(sig.target1) && sig.target1 < t1Need ? sig.target1 : t1Need;
+  const t2 = Number.isFinite(sig.target2) && sig.target2 < Math.min(t2Need, t1) ? sig.target2 : Math.min(t2Need, t1 - risk * 0.6);
   return { stop, t1, t2 };
+}
+
+function entryPlan(sig: BtcTradeSignal, side: "long" | "short", style: PaperStyle): { stop: number; t1: number; t2: number } {
+  const b = scalpBand(sig.interval);
+  if (style === "swing") {
+    const stopP = b === "context" ? 0.024 : b === "hour" ? 0.018 : 0.012;
+    return placePlan(sig, side, stopP, 1.8, 3.2);
+  }
+  const stopP = b === "ultra" ? 0.0048 : b === "fast" ? 0.007 : b === "mid" ? 0.01 : 0.014;
+  return placePlan(sig, side, stopP, 1.6, 2.7);
 }
 
 function scalpMaxHoldMs(interval: string): number {
@@ -289,29 +306,7 @@ function uruguayDayKey(ms: number): string {
   }).format(new Date(ms));
 }
 
-function scalpPlan(sig: BtcTradeSignal, side: "long" | "short"): { stop: number; t1: number; t2: number } {
-  const px = sig.price;
-  const b = scalpBand(sig.interval);
-  const t1p = b === "ultra" ? 0.0022 : b === "fast" ? 0.0034 : b === "mid" ? 0.0052 : 0.008;
-  const t2p = b === "ultra" ? 0.0042 : b === "fast" ? 0.0062 : b === "mid" ? 0.0095 : 0.014;
-  const stopP = b === "ultra" ? 0.002 : b === "fast" ? 0.003 : b === "mid" ? 0.0045 : 0.0065;
-  if (side === "long") {
-    const stop = Math.max(sig.stop, px * (1 - stopP));
-    let t1 = Math.min(sig.target1, px * (1 + t1p));
-    let t2 = Math.min(sig.target2, px * (1 + t2p));
-    if (!(t1 > px)) t1 = px * (1 + t1p);
-    if (!(t2 > t1)) t2 = px * (1 + t2p);
-    return { stop, t1, t2 };
-  }
-  const stop = Math.min(sig.stop, px * (1 + stopP));
-  let t1 = Math.max(sig.target1, px * (1 - t1p));
-  let t2 = Math.max(sig.target2, px * (1 - t2p));
-  if (!(t1 < px)) t1 = px * (1 - t1p);
-  if (!(t2 < t1)) t2 = px * (1 - t2p);
-  return { stop, t1, t2 };
-}
-
-export function normalizePaperMode(raw: unknown): PaperMode {
+function normalizePaperMode(raw: unknown): PaperMode {
   if (raw === "spot-long" || raw === "fut-long" || raw === "fut-short" || raw === "all") return raw;
   return "all";
 }
@@ -807,7 +802,7 @@ function canEnter(sig: BtcTradeSignal, side: "long" | "short", book: PaperBook):
   if (Number.isFinite(sig.volRatio) && (sig.volRatio ?? 1) < 0.82) return false;
   const plan = entryPlan(sig, side, style);
   const dist = Math.abs(sig.price - plan.stop);
-  const minStop = style === "swing" ? 0.003 : 0.0009;
+  const minStop = style === "swing" ? 0.006 : 0.004;
   if (!(dist > 0) || dist / sig.price < minStop) return false;
   return true;
 }
@@ -1025,11 +1020,11 @@ export function tickPaper(
       else next.losses += 1;
       closeTrade(next, pos, now, px, "day", pnl);
       dropPos();
-    } else if (long && Number.isFinite(sig.supertrend) && sig.supertrendDir === 1 && sig.supertrend > pos.stop && sig.supertrend < px) {
+    } else if (pos.t1Done && long && Number.isFinite(sig.supertrend) && sig.supertrendDir === 1 && sig.supertrend > pos.stop && sig.supertrend < px) {
       pos.stop = Math.max(pos.stop, sig.supertrend);
       const t = findTrade(next, pos.id);
       if (t) t.stop = pos.stop;
-    } else if (!long && Number.isFinite(sig.supertrend) && sig.supertrendDir === -1 && sig.supertrend < pos.stop && sig.supertrend > px) {
+    } else if (pos.t1Done && !long && Number.isFinite(sig.supertrend) && sig.supertrendDir === -1 && sig.supertrend < pos.stop && sig.supertrend > px) {
       pos.stop = Math.min(pos.stop, sig.supertrend);
       const t = findTrade(next, pos.id);
       if (t) t.stop = pos.stop;

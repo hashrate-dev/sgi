@@ -22,6 +22,7 @@ import {
   paperOpsToday,
   paperStyleOf,
   paperVenueOf,
+  roxyLiveDesk,
   savePaperBook,
   splitPaperTrades,
   type PaperBook,
@@ -33,6 +34,7 @@ import {
   type PaperVenue,
 } from "../lib/mercadosPaperAgent";
 import { showToast } from "./ToastNotification";
+import { AppModal } from "./ui";
 import { playMarketplaceCartItemAddedSound, playMarketplaceCartItemRemovedSound } from "../lib/marketplaceCartSound";
 import { playRoxyTypeTick } from "../lib/roxyTypeSound";
 import { hushRoxy, isRoxyMuted, setRoxyMuted, speakRoxy, subscribeRoxySpeech } from "../lib/roxyVoice";
@@ -338,6 +340,53 @@ function AgentOpinion({
   );
 }
 
+function tradePnlOf(trade: PaperTrade, mark?: number): number {
+  if (trade.status !== "open") return trade.realizedPnl;
+  const px = mark ?? trade.entry;
+  return trade.qtyLeft * (px - trade.entry) + trade.realizedPnl;
+}
+
+function TradeRow({
+  trade,
+  tag,
+  mark,
+}: {
+  trade: PaperTrade;
+  tag: string;
+  mark?: number;
+}) {
+  const open = trade.status === "open";
+  const pnl = tradePnlOf(trade, mark);
+  const why = open ? "Abierta" : exitLabel(trade.exitReason);
+  let note = open
+    ? `Marca ${usd(mark ?? trade.entry)} · stop ${usd(trade.stop)}`
+    : `Entró ${usd(trade.entry)} · salió ${usd(trade.exit ?? 0)}`;
+  if (!open && Number.isFinite(mark) && mark != null && trade.exit != null) {
+    const after = trade.side === "long" ? mark > trade.exit : mark < trade.exit;
+    if (after && trade.exitReason === "stop") {
+      note =
+        trade.side === "long"
+          ? `${note} · ahora ${usd(mark)} (subió después del stop; esa subida no entra en el P&L)`
+          : `${note} · ahora ${usd(mark)} (bajó después del stop; esa baja no entra en el P&L)`;
+    } else {
+      note = `${note} · ahora ${usd(mark)}`;
+    }
+  }
+  return (
+    <article className={`tv-paper-row tv-paper-row--${trade.side}${open ? " is-open" : " is-closed"}`}>
+      <b>
+        {tag} · {trade.side === "long" ? "Largo" : "Corto"}
+      </b>
+      <em>{why}</em>
+      <span className={pnl >= 0 ? "is-up" : "is-down"}>
+        {pnl >= 0 ? "+" : ""}
+        {usd(pnl)}
+      </span>
+      <p>{note}</p>
+    </article>
+  );
+}
+
 function TradeCard({
   trade,
   tag,
@@ -418,6 +467,70 @@ function TradeCard({
   );
 }
 
+function RoxyLiveBoard({ live }: { live: ReturnType<typeof roxyLiveDesk> }) {
+  return (
+    <section className="tv-paper-live" aria-label="Qué está haciendo Roxy ahora">
+      <header>
+        <span>Ahora mismo</span>
+        <em>{live.tf}</em>
+      </header>
+      <div className="tv-paper-live__grid">
+        <article>
+          <span>Haciendo</span>
+          <strong>{live.doing}</strong>
+        </article>
+        <article>
+          <span>Viendo</span>
+          <strong>{live.seeing}</strong>
+        </article>
+        <article>
+          <span>Pensando</span>
+          <strong>{live.thinking}</strong>
+        </article>
+        <article>
+          <span>Noticias</span>
+          <strong>{live.news}</strong>
+        </article>
+      </div>
+      {live.rows.length ? (
+        <ul className="tv-paper-live__tape">
+          {live.rows.map((r) => (
+            <li key={r.symbol} className={r.hot ? "is-hot" : ""}>
+              <b>{r.name}</b>
+              <em
+                className={`tv-paper-live__bias tv-paper-live__bias--${r.bias}`}
+                title={r.bias === "buy" ? "Compra" : r.bias === "sell" ? "Venta" : "Espera"}
+                aria-label={r.bias === "buy" ? "Compra" : r.bias === "sell" ? "Venta" : "Espera"}
+              >
+                {r.bias === "buy" ? (
+                  <svg viewBox="0 0 12 12" aria-hidden>
+                    <path d="M6 1.6 11 10H1L6 1.6Z" />
+                  </svg>
+                ) : r.bias === "sell" ? (
+                  <svg viewBox="0 0 12 12" aria-hidden>
+                    <path d="M6 10.4 1 2h10L6 10.4Z" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 12 12" aria-hidden>
+                    <rect x="2.2" y="5.1" width="7.6" height="1.8" rx="0.7" />
+                  </svg>
+                )}
+              </em>
+              <span>{r.confidence.toFixed(0)}%</span>
+              <span>RSI {r.rsi.toFixed(0)}</span>
+              <span>{r.st}</span>
+              <span className="tv-paper-live__cloud">{r.cloud}</span>
+              <span className="tv-paper-live__conf">{r.confirm}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="tv-paper-live__empty">Esperando lecturas de confluencia…</p>
+      )}
+    </section>
+  );
+}
+
 export function MercadosPaperDesk({
   userId,
   interval,
@@ -437,6 +550,7 @@ export function MercadosPaperDesk({
   const [marks, setMarks] = useState<Record<string, number>>({});
   const [sigs, setSigs] = useState<BtcTradeSignal[]>([]);
   const [nowTick, setNowTick] = useState(Date.now());
+  const [movesOpen, setMovesOpen] = useState(false);
   const bookRef = useRef(book);
   bookRef.current = book;
   const mutedRef = useRef(muted);
@@ -570,6 +684,14 @@ export function MercadosPaperDesk({
   const atCap = paperAtOpsCap(book);
   const left = paperOpsLeft(book);
   const ledger = useMemo(() => splitPaperTrades(book), [book]);
+  const previewOps = useMemo(() => {
+    return [
+      ...ledger.open.map((t) => ({ t, at: t.openedAt })),
+      ...ledger.closed.map((t) => ({ t, at: t.closedAt ?? t.openedAt })),
+    ]
+      .sort((a, b) => b.at - a.at)
+      .slice(0, 4);
+  }, [ledger]);
   const liveTalk = useMemo(() => {
     if (book.notes[0]) return book.notes[0];
     return {
@@ -582,6 +704,7 @@ export function MercadosPaperDesk({
   }, [book.notes]);
   const alert = useMemo(() => paperEntryAlert(book, sigs), [book, sigs]);
   const prep = useMemo(() => paperPrepProcess(book, sigs), [book, sigs]);
+  const liveDesk = useMemo(() => roxyLiveDesk(book, sigs, nowTick), [book, sigs, nowTick]);
 
   const status = useMemo(() => {
     if (!book.armed) return "PAUSA";
@@ -891,6 +1014,8 @@ export function MercadosPaperDesk({
 
           <PrepMeter target={prep.pct} stage={prep.stage} intent={prep.intent} />
 
+          <RoxyLiveBoard live={liveDesk} />
+
           <AgentOpinion notes={book.notes} live={liveTalk} muted={muted || !open} />
 
           <div className="tv-paper__acct">
@@ -978,13 +1103,19 @@ export function MercadosPaperDesk({
                 {ledger.open.length} abiertas · {ledger.closed.length} cerradas
               </span>
             </header>
-            {ledger.open.length ? (
-              <div className="tv-paper-ledger__block">
-                <h4>Abiertas</h4>
-                {ledger.open.map((t) => (
-                  <TradeCard key={t.id} trade={t} tag={tag(t.symbol)} mark={marks[t.symbol]} now={nowTick} />
-                ))}
-              </div>
+            {previewOps.length ? (
+              <>
+                <ul className="tv-paper-ledger__preview">
+                  {previewOps.map(({ t }) => (
+                    <li key={t.id}>
+                      <TradeRow trade={t} tag={tag(t.symbol)} mark={marks[t.symbol]} />
+                    </li>
+                  ))}
+                </ul>
+                <button type="button" className="tv-paper-ledger__more" onClick={() => setMovesOpen(true)}>
+                  Ver todos los movimientos
+                </button>
+              </>
             ) : (
               <p className="tv-paper__pos is-flat">
                 {atCap
@@ -992,19 +1123,40 @@ export function MercadosPaperDesk({
                   : `Sin posición · espera COMPRAR/VENDER con alineación ≥ 58%${book.universe === "ALL" ? " en cualquier moneda" : ` en ${uniLabel}`}.`}
               </p>
             )}
-            {ledger.closed.length ? (
-              <div className="tv-paper-ledger__block">
-                <h4>Cerradas</h4>
-                <div className="tv-paper-ledger__closed">
-                  {ledger.closed.map((t) => (
-                    <TradeCard key={t.id} trade={t} tag={tag(t.symbol)} now={nowTick} />
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <p className="tv-paper-ledger__empty">Todavía no hay cierres en esta cuenta.</p>
-            )}
           </section>
+
+          <AppModal
+            open={movesOpen}
+            onOpenChange={setMovesOpen}
+            title={`Movimientos de ${ROXY}`}
+            description={`${ledger.open.length} abiertas · ${ledger.closed.length} cerradas`}
+            size="lg"
+            contentMaxW="min(100%, 520px)"
+            variant="nicehash_watcher"
+            contentClassName="tv-paper-moves-modal"
+            blurBackdrop
+          >
+            <div className="tv-paper-moves">
+              {ledger.open.length ? (
+                <section className="tv-paper-moves__block">
+                  <h4>Abiertas</h4>
+                  {ledger.open.map((t) => (
+                    <TradeCard key={t.id} trade={t} tag={tag(t.symbol)} mark={marks[t.symbol]} now={nowTick} />
+                  ))}
+                </section>
+              ) : null}
+              {ledger.closed.length ? (
+                <section className="tv-paper-moves__block">
+                  <h4>Cerradas</h4>
+                  {ledger.closed.map((t) => (
+                    <TradeCard key={t.id} trade={t} tag={tag(t.symbol)} mark={marks[t.symbol]} now={nowTick} />
+                  ))}
+                </section>
+              ) : (
+                <p className="tv-paper-moves__empty">Todavía no hay cierres en esta cuenta.</p>
+              )}
+            </div>
+          </AppModal>
         </>
       ) : null}
     </div>
