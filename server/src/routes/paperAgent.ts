@@ -9,6 +9,7 @@ import {
   clampPaperRiskPct,
   clampPaperSizePct,
   clampPaperT1Pct,
+  clampPaperSwingDays,
   composePaperMode,
   emptyPaperBook,
   hydratePaperBook,
@@ -69,6 +70,7 @@ paperAgentRouter.put("/paper/book", ...writeMw, async (req, res, next) => {
       minConf?: unknown;
       t1Pct?: unknown;
       style?: unknown;
+      swingDays?: unknown;
       runInterval?: unknown;
       reset?: { fund?: unknown; maxOps?: unknown };
     };
@@ -92,6 +94,7 @@ paperAgentRouter.put("/paper/book", ...writeMw, async (req, res, next) => {
         minConf: book.minConf,
         t1Pct: book.t1Pct,
         style: book.style,
+        swingDays: (book as PaperBook & { swingDays?: number }).swingDays,
         maxOpsDay: book.maxOpsDay,
         mind: (book as PaperBook & { mind?: unknown }).mind,
       };
@@ -103,6 +106,7 @@ paperAgentRouter.put("/paper/book", ...writeMw, async (req, res, next) => {
       book.minConf = keep.minConf;
       book.t1Pct = keep.t1Pct;
       book.style = keep.style;
+      book.swingDays = clampPaperSwingDays(Number(keep.swingDays));
       book.maxOpsDay = keep.maxOpsDay;
       if (keep.mind) (book as PaperBook & { mind?: unknown }).mind = keep.mind;
       book = pushPaperNote(book, {
@@ -149,6 +153,9 @@ paperAgentRouter.put("/paper/book", ...writeMw, async (req, res, next) => {
     }
     if (body.style != null) {
       book = { ...book, style: normalizePaperStyle(body.style) };
+    }
+    if (body.swingDays != null) {
+      book = { ...book, swingDays: clampPaperSwingDays(Number(body.swingDays)) };
     }
     if (body.runInterval != null) {
       book = { ...book, runInterval: normalizePaperRunInterval(body.runInterval) };

@@ -2468,6 +2468,7 @@ export function putPaperBook(body: {
   minConf?: number;
   t1Pct?: number;
   style?: import("./mercadosPaperAgent").PaperStyle;
+  swingDays?: import("./mercadosPaperAgent").PaperSwingDays;
   runInterval?: string;
   reset?: { fund: number; maxOps?: number };
 }): Promise<{ book: import("./mercadosPaperAgent").PaperBook; server: boolean }> {

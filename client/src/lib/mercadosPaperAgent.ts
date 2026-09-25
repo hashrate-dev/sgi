@@ -89,6 +89,7 @@ export type PaperTrade = {
 };
 
 export type PaperStyle = "auto" | "intraday" | "swing";
+export type PaperSwingDays = 1 | 2 | 3;
 export type PaperUniverse = "ALL" | string;
 
 export type PaperNoteTone = "idle" | "watch" | "open" | "hold" | "adjust" | "close" | "cap" | "pause";
@@ -186,6 +187,7 @@ export type PaperBook = {
   minConf: number;
   t1Pct: number;
   style: PaperStyle;
+  swingDays: PaperSwingDays;
   confirms: Record<string, { fire: "buy" | "sell" | "wait"; n: number }>;
   positions: PaperPosition[];
   trades: PaperTrade[];
@@ -235,6 +237,13 @@ export function clampPaperT1Pct(n: number): number {
   return Math.round(Math.max(25, Math.min(75, n)));
 }
 
+export function clampPaperSwingDays(n: number): PaperSwingDays {
+  if (!Number.isFinite(n)) return 2;
+  if (n >= 3) return 3;
+  if (n <= 1) return 1;
+  return 2;
+}
+
 export function paperMinConfOf(book: PaperBook): number {
   return clampPaperMinConf(book.minConf ?? MIN_CONF);
 }
@@ -246,7 +255,7 @@ export function normalizePaperStyle(raw: unknown): PaperStyle {
 
 export function paperStyleOf(book: Pick<PaperBook, "style"> | { style?: unknown }): PaperStyle {
   const s = normalizePaperStyle(book.style);
-  return s === "swing" ? "intraday" : s === "auto" ? "intraday" : s;
+  return s === "auto" ? "intraday" : s;
 }
 
 type ScalpBand = "ultra" | "fast" | "mid" | "hour" | "context";
@@ -259,8 +268,34 @@ function scalpBand(interval: string): ScalpBand {
   return "context";
 }
 
-function paperAllowsScalpOpen(interval: string): boolean {
+function paperAllowsOpen(interval: string, style: PaperStyle): boolean {
+  if (style === "swing") {
+    return interval === "15" || interval === "30" || interval === "60" || interval === "240" || interval === "D";
+  }
   return scalpBand(interval) !== "context";
+}
+
+function entryPlan(sig: BtcTradeSignal, side: "long" | "short", style: PaperStyle): { stop: number; t1: number; t2: number } {
+  if (style !== "swing") return scalpPlan(sig, side);
+  const px = sig.price;
+  const b = scalpBand(sig.interval);
+  const t1p = b === "context" ? 0.028 : b === "hour" ? 0.018 : 0.012;
+  const t2p = b === "context" ? 0.05 : b === "hour" ? 0.032 : 0.022;
+  const stopP = b === "context" ? 0.018 : b === "hour" ? 0.012 : 0.008;
+  if (side === "long") {
+    const stop = Math.max(sig.stop, px * (1 - stopP));
+    let t1 = Math.min(sig.target1, px * (1 + t1p));
+    let t2 = Math.min(sig.target2, px * (1 + t2p));
+    if (!(t1 > px)) t1 = px * (1 + t1p);
+    if (!(t2 > t1)) t2 = px * (1 + t2p);
+    return { stop, t1, t2 };
+  }
+  const stop = Math.min(sig.stop, px * (1 + stopP));
+  let t1 = Math.max(sig.target1, px * (1 - t1p));
+  let t2 = Math.max(sig.target2, px * (1 - t2p));
+  if (!(t1 < px)) t1 = px * (1 - t1p);
+  if (!(t2 < t1)) t2 = px * (1 - t2p);
+  return { stop, t1, t2 };
 }
 
 function scalpMaxHoldMs(interval: string): number {
@@ -587,6 +622,7 @@ export function emptyPaperBook(
     minConf: MIN_CONF,
     t1Pct: DEFAULT_T1_PCT,
     style: "intraday" as PaperStyle,
+    swingDays: 2 as PaperSwingDays,
     confirms: {},
     positions: [],
     trades: [],
@@ -735,6 +771,7 @@ export function hydratePaperBook(parsed: Partial<PaperBook> & { v?: number }): P
     minConf: clampPaperMinConf(parsed.minConf ?? MIN_CONF),
     t1Pct: clampPaperT1Pct(parsed.t1Pct ?? DEFAULT_T1_PCT),
     style: normalizePaperStyle(parsed.style),
+    swingDays: clampPaperSwingDays((parsed as { swingDays?: unknown }).swingDays as number),
     maxOps: clampPaperMaxOps(parsed.maxOps ?? DEFAULT_MAX_OPS),
     maxOpsDay: clampPaperMaxOpsDay(parsed.maxOpsDay ?? DEFAULT_MAX_OPS_DAY),
     opsUsed,
@@ -999,11 +1036,14 @@ export function splitPaperTrades(book: PaperBook): { open: PaperTrade[]; closed:
   return { open, closed };
 }
 
-function neededConfirm(interval: string, _style: PaperStyle = "intraday"): number {
+function neededConfirm(interval: string, style: PaperStyle = "intraday"): number {
+  if (style === "swing") {
+    if (interval === "240" || interval === "D") return 1;
+    return 2;
+  }
   const b = scalpBand(interval);
   if (b === "ultra") return 3;
-  if (b === "fast" || b === "mid") return 2;
-  if (b === "hour") return 2;
+  if (b === "fast" || b === "mid" || b === "hour") return 2;
   return 99;
 }
 
@@ -1040,7 +1080,8 @@ function markHist(book: PaperBook, marks: Record<string, number>): void {
 function canEnter(sig: BtcTradeSignal, side: "long" | "short", book: PaperBook): boolean {
   const now = Date.now();
   const minConf = paperEntryFloor(book, sig.symbol, now);
-  if (!paperAllowsScalpOpen(sig.interval)) return false;
+  const style = paperStyleOf(book);
+  if (!paperAllowsOpen(sig.interval, style)) return false;
   if (!roxyAllowsEntry(book, sig.symbol, sig.confidence, now)) return false;
   if (sig.confidence < minConf) return false;
   if (side === "long" && sig.rsi >= 76) return false;
@@ -1048,9 +1089,10 @@ function canEnter(sig: BtcTradeSignal, side: "long" | "short", book: PaperBook):
   if (side === "long" && sig.ichiCloud === "below") return false;
   if (side === "short" && sig.ichiCloud === "above") return false;
   if (Number.isFinite(sig.volRatio) && (sig.volRatio ?? 1) < 0.82) return false;
-  const plan = scalpPlan(sig, side);
+  const plan = entryPlan(sig, side, style);
   const dist = Math.abs(sig.price - plan.stop);
-  if (!(dist > 0) || dist / sig.price < 0.0009) return false;
+  const minStop = style === "swing" ? 0.003 : 0.0009;
+  if (!(dist > 0) || dist / sig.price < minStop) return false;
   return true;
 }
 
@@ -1235,7 +1277,7 @@ export function tickPaper(
       else next.losses += 1;
       closeTrade(next, pos, now, px, "flip", pnl);
       dropPos();
-    } else if (now - pos.openedAt >= scalpMaxHoldMs(pos.interval || sig.interval)) {
+    } else if (paperStyleOf(next) !== "swing" && now - pos.openedAt >= scalpMaxHoldMs(pos.interval || sig.interval)) {
       const pnl = applyCloseQty(next, pos, pos.qty, px);
       pushFill(next, {
         at: now,
@@ -1253,7 +1295,7 @@ export function tickPaper(
       else next.losses += 1;
       closeTrade(next, pos, now, px, "time", pnl);
       dropPos();
-    } else if (uruguayDayKey(pos.openedAt) !== uruguayDayKey(now)) {
+    } else if (paperStyleOf(next) !== "swing" && uruguayDayKey(pos.openedAt) !== uruguayDayKey(now)) {
       const pnl = applyCloseQty(next, pos, pos.qty, px);
       pushFill(next, {
         at: now,
@@ -1288,9 +1330,9 @@ export function tickPaper(
   const lev = paperEffectiveLev(mode, next.leverage ?? 1);
   if (next.armed && underCap && !hasPos && (fire === "buy" || fire === "sell") && n >= neededConfirm(sig.interval, paperStyleOf(next))) {
     const side = fire === "buy" ? "long" : "short";
-    if (paperAllowsSide(mode, side) && paperAllowsScalpOpen(sig.interval) && canEnter(sig, side, next)) {
+    if (paperAllowsSide(mode, side) && paperAllowsOpen(sig.interval, paperStyleOf(next)) && canEnter(sig, side, next)) {
       const marks = { ...(opts?.marks ?? {}), [sig.symbol]: px };
-      const plan = scalpPlan(sig, side);
+      const plan = entryPlan(sig, side, paperStyleOf(next));
       const qty = sizeQty(next, sig, side, marks, plan.stop);
       if (qty !== 0) {
         const marginUsd = applyOpen(next, qty, px, lev);
@@ -1691,6 +1733,7 @@ function reasonTalk(reason: string): string {
   if (reason === "flip") return "un giro de sesgo";
   if (reason === "time") return "tiempo de scalp";
   if (reason === "day") return "cierre del día";
+  if (reason === "swing") return "cierre de swing";
   return reason;
 }
 
@@ -1734,6 +1777,7 @@ export function narratePaper(
   const rawIv = view[0]?.interval || book.runInterval || "";
   const iv = ivTalk(rawIv);
   const band = scalpBand(rawIv);
+  const tradeStyle = paperStyleOf(book);
   const recent = (book.notes ?? []).slice(0, 5).flatMap((n) => [n.title, ...(n.body.split(/\n+/))]);
   const angle = beat % 7;
   const seed = `${beat}|a${angle}|${book.universe}|${rawIv}|${lead?.symbol ?? ""}|${lead?.bias ?? "x"}|${Math.round((lead?.confidence ?? 0) / 4)}|${book.armed ? 1 : 0}|${book.positions.length}`;
@@ -1747,13 +1791,19 @@ export function narratePaper(
       paras.push(
         speak(seed + ev.symbol + "o", {
           real: [
-            `Scalp ${ev.side === "long" ? "largo" : "corto"} en ${name} a ${usdTalk(ev.price)}, gráfico de ${iv}. Stop y T1/T2 de intradía. No es swing.`,
+            tradeStyle === "swing"
+              ? `Swing ${ev.side === "long" ? "largo" : "corto"} en ${name} a ${usdTalk(ev.price)}, gráfico de ${iv}. Cierro por stop, objetivo o giro; no por el calendario.`
+              : `Scalp ${ev.side === "long" ? "largo" : "corto"} en ${name} a ${usdTalk(ev.price)}, gráfico de ${iv}. Stop y objetivos de intradía.`,
           ],
           dry: [
-            `Abrí ${name} a ${usdTalk(ev.price)} en ${iv}. Scalping del día: si no paga rápido, salgo.`,
+            tradeStyle === "swing"
+              ? `Abrí ${name} a ${usdTalk(ev.price)} en ${iv}. Swing: dejo correr el plan.`
+              : `Abrí ${name} a ${usdTalk(ev.price)} en ${iv}. Scalping del día: si no paga rápido, salgo.`,
           ],
           fun: [
-            `${name} en ${iv}: entré de scalp a ${usdTalk(ev.price)}. Si se pone romántico, lo corto.`,
+            tradeStyle === "swing"
+              ? `${name} en ${iv}: swing a ${usdTalk(ev.price)}. No la saco porque se hizo de noche.`
+              : `${name} en ${iv}: entré de scalp a ${usdTalk(ev.price)}. Si se pone romántico, lo corto.`,
           ],
         }, recent),
       );
@@ -1794,7 +1844,21 @@ export function narratePaper(
   const sellTop = sells.slice(0, 2).map((s) => tag(s.symbol)).join(" y ");
   const detail = lead ? oneDetail(seed, lead, recent, angle) : "";
 
-  if (band === "context") {
+  if (tradeStyle === "swing" && !paperAllowsOpen(rawIv, "swing")) {
+    tone = "idle";
+    title = speak(seed + "swTf", {
+      real: ["Swing, otro gráfico", "Esta vela es chica para swing"],
+      dry: ["Acá no hago swing"],
+      fun: ["Esto es para picar, no para dormir"],
+    }, recent);
+    paras.push(
+      speak(seed + "swTfB", {
+        real: [`Estoy en modo swing. En ${iv} no abro: pasá a 15 minutos, 1 hora, 4 horas o diario.`],
+        dry: [`Swing no se opera en ${iv}. Subí de temporalidad.`],
+        fun: [`En ${iv} me pongo nerviosa. Para swing quiero velas más gordas.`],
+      }, recent),
+    );
+  } else if (tradeStyle !== "swing" && band === "context") {
     tone = "idle";
     title = speak(seed + "ctxT", {
       real: ["Contexto, no disparo", "Esto no es scalp"],
@@ -2044,7 +2108,7 @@ export function narratePaper(
       dry: ["Sin nuevas ideas en el mismo par"],
       fun: ["Una apuesta. El resto es café"],
     }, recent);
-  } else if (band === "context") {
+  } else if (tradeStyle !== "swing" && band === "context") {
     tone = "idle";
   } else if (buys.length || sells.length) {
     tone = "watch";
@@ -2086,7 +2150,7 @@ export function narratePaper(
     );
   }
 
-  if (book.armed && band !== "context" && !atCap && !events.length && !book.positions.length && (angle === 2 || angle === 6)) {
+  if (book.armed && paperAllowsOpen(rawIv, tradeStyle) && !atCap && !events.length && !book.positions.length && (angle === 2 || angle === 6)) {
     paras.push(
       book.opsUsed === 0
         ? speak(seed + "ops0", {

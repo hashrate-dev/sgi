@@ -21,6 +21,7 @@ import {
   paperEquity,
   paperOpsLeft,
   paperOpsToday,
+  paperStyleOf,
   paperVenueOf,
   savePaperBook,
   splitPaperTrades,
@@ -28,7 +29,6 @@ import {
   type PaperDir,
   type PaperLev,
   type PaperNote,
-  type PaperStyle,
   type PaperTrade,
   type PaperUniverse,
   type PaperVenue,
@@ -86,6 +86,7 @@ function exitLabel(reason: string | null): string {
   if (reason === "flip") return "Sesgo";
   if (reason === "time") return "Tiempo";
   if (reason === "day") return "Cierre del día";
+  if (reason === "swing") return "Swing";
   return reason || "Cierre";
 }
 
@@ -602,7 +603,7 @@ export function MercadosPaperDesk({
   const lev = paperEffectiveLev(book.mode, book.leverage);
   const dayUsed = paperOpsToday(book);
   const dayHit = paperAtDayCap(book);
-  const style = (book.style ?? "auto") as PaperStyle;
+  const style = paperStyleOf(book);
 
   const setVenue = (nextVenue: PaperVenue) => {
     if (nextVenue === "spot") {
@@ -648,7 +649,8 @@ export function MercadosPaperDesk({
   };
 
   const modeHint =
-    venue === "spot" ? "Spot Long" : `Fut x${lev} · ${dir === "both" ? "L+S" : dir === "short" ? "Short" : "Long"}`;
+    `${style === "swing" ? "Swing" : "Scalp"} · ` +
+    (venue === "spot" ? "Spot Long" : `Fut x${lev} · ${dir === "both" ? "L+S" : dir === "short" ? "Short" : "Long"}`);
   const dayLeft = Math.max(0, clampPaperMaxOpsDay(book.maxOpsDay) - dayUsed);
 
   return (
@@ -818,18 +820,21 @@ export function MercadosPaperDesk({
                   ))}
                 </div>
               </div>
-              <div className="tv-paper-cfg__row">
-                <span>Estilo</span>
+              <div className="tv-paper-cfg__row tv-paper-cfg__row--wide">
+                <span>Operar</span>
                 <div>
-                  {(["intraday", "auto"] as PaperStyle[]).map((s) => (
-                    <CfgBtn
-                      key={s}
-                      on={style === s}
-                      onClick={() => persistPatch({ style: s }, { ...book, style: s })}
-                    >
-                      {s === "intraday" ? "Intradía" : "Auto"}
-                    </CfgBtn>
-                  ))}
+                  <CfgBtn
+                    on={style === "intraday"}
+                    onClick={() => persistPatch({ style: "intraday" }, { ...book, style: "intraday" })}
+                  >
+                    Scalping intradía
+                  </CfgBtn>
+                  <CfgBtn
+                    on={style === "swing"}
+                    onClick={() => persistPatch({ style: "swing" }, { ...book, style: "swing" })}
+                  >
+                    Swing trading
+                  </CfgBtn>
                 </div>
               </div>
               <div className="tv-paper-cfg__row">
@@ -853,7 +858,11 @@ export function MercadosPaperDesk({
                 </label>
               </div>
               <p>
-                Spot solo long, sin apalancar. Short únicamente en futuros. Hoy: {dayUsed} usadas, {dayLeft} libres.
+                Spot solo long, sin apalancar. Short únicamente en futuros.{" "}
+                {style === "swing"
+                  ? "Swing: cierra por stop, objetivo o giro de sesgo; no por calendario."
+                  : "Scalping: cierra el mismo día, velas de 1s a 1h."}{" "}
+                Hoy: {dayUsed} usadas, {dayLeft} libres.
               </p>
             </div>
           ) : null}
