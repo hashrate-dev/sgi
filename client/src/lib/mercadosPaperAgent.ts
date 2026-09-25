@@ -213,20 +213,21 @@ function migrateV1(userId: number): PaperBook | null {
         peakUsd?: number;
       };
       if (!parsed || !Number.isFinite(parsed.cashUsd)) continue;
+      const cash = Number(parsed.cashUsd);
       const pos = parsed.position ?? null;
       const trades = pos ? [tradeFromPosition(pos)] : [];
       return {
-        ...emptyPaperBook(parsed.initialUsd ?? parsed.cashUsd, pos?.symbol ?? "ALL"),
-        cashUsd: parsed.cashUsd,
+        ...emptyPaperBook(parsed.initialUsd ?? cash, pos?.symbol ?? "ALL"),
+        cashUsd: cash,
         armed: parsed.armed !== false,
         opsUsed: pos ? 1 : 0,
         positions: pos ? [pos] : [],
         trades,
         fills: (parsed.fills ?? []).map((f) => ({ ...f, symbol: f.symbol || pos?.symbol || "" })),
-        equityHist: parsed.equityHist ?? [parsed.cashUsd],
+        equityHist: parsed.equityHist ?? [cash],
         wins: parsed.wins ?? 0,
         losses: parsed.losses ?? 0,
-        peakUsd: parsed.peakUsd ?? parsed.cashUsd,
+        peakUsd: parsed.peakUsd ?? cash,
       };
     }
   } catch {

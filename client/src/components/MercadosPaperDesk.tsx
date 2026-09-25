@@ -52,6 +52,15 @@ function fmtDur(from: number, to: number): string {
   return `${sec}s`;
 }
 
+function Stamp({ at }: { at: number }) {
+  const s = fmtStamp(at);
+  return (
+    <time className="tv-paper__stamp" dateTime={s.iso}>
+      {s.date} <span>{s.time}</span>
+    </time>
+  );
+}
+
 function exitLabel(reason: string | null): string {
   if (reason === "stop") return "Stop";
   if (reason === "t2") return "T2";
