@@ -36,6 +36,7 @@ import {
 } from "../lib/mercadosPaperAgent";
 import { rankRoxyBallots, type RoxyCoinBallot } from "../lib/roxyBallot";
 import { AppModal } from "./ui";
+import { showToast } from "./ToastNotification";
 import { playMarketplaceCartItemAddedSound, playMarketplaceCartItemRemovedSound } from "../lib/marketplaceCartSound";
 import { playRoxyTypeTick } from "../lib/roxyTypeSound";
 import { hushRoxy, isRoxyMuted, setRoxyMuted, speakRoxy, subscribeRoxySpeech } from "../lib/roxyVoice";

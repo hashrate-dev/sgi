@@ -958,9 +958,7 @@ export function paperEntryAlert(book: PaperBook, signals: BtcTradeSignal[]): Pap
   const n = c && c.fire === side ? c.n : sig.bias === side ? 1 : 0;
   const align = Math.max(0, Math.min(100, sig.confidence));
   const confPart = (Math.min(n, need) / need) * 100;
-  let score = align * 0.5 + confPart * 0.28 + Math.min(40, Math.max(voted.side === "long" ? 18 : 18, 12));
-  const tally = voted.side === "long" ? 22 : 22;
-  score = align * 0.55 + confPart * 0.45;
+  let score = align * 0.55 + confPart * 0.45;
   if (sig.bias !== side) score *= 0.55;
   if (align < paperMinConfOf(book)) score = Math.min(score, 58);
   if (side === "buy" && sig.rsi >= 76) score = Math.min(score, 38);
@@ -1089,13 +1087,6 @@ function ivShort(iv: string): string {
     D: "1D",
   };
   return m[x] ?? (iv || "—");
-}
-
-function cloudEs(c?: string): string {
-  if (c === "above") return "sobre";
-  if (c === "below") return "bajo";
-  if (c === "inside") return "dentro";
-  return "nube —";
 }
 
 export type RoxyLiveChip = {
