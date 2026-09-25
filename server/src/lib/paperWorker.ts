@@ -7,6 +7,7 @@ import {
   type PaperBook,
 } from "./mercadosPaperAgent.js";
 import { listArmedPaperBooks, saveUserPaperBook } from "./paperBookStore.js";
+import { rememberSgiNewsOnBook } from "./roxyNews.js";
 
 export const PAPER_SYMBOLS = ["BTCUSDT", "ETHUSDT", "LTCUSDT", "DOGEUSDT", "ZECUSDT", "SOLUSDT"] as const;
 
@@ -43,8 +44,9 @@ export async function tickArmedPaperBook(book: PaperBook): Promise<PaperBook> {
   ).filter((s): s is NonNullable<typeof s> => Boolean(s));
   if (!signals.length) return book;
   const { book: ticked, events } = tickPaperMany({ ...book, runInterval: iv }, signals);
-  const spoken = narratePaper(ticked, signals, events, pairTag);
-  return pushPaperNote(ticked, spoken);
+  const withNews = await rememberSgiNewsOnBook(ticked, symbols);
+  const spoken = narratePaper(withNews, signals, events, pairTag);
+  return pushPaperNote(withNews, spoken);
 }
 
 let running = false;

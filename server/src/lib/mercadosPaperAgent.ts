@@ -1,4 +1,13 @@
 import type { TradeConfluence } from "./btcTradeConfluence.js";
+import {
+  hydrateRoxyFacts,
+  hydrateRoxySaid,
+  ingestTapeFacts,
+  pickFreshFact,
+  rememberRoxySaid,
+  roxyTooClose,
+  type RoxyFact,
+} from "./roxyMind.js";
 
 type BtcTradeSignal = TradeConfluence;
 
@@ -131,6 +140,12 @@ export type PaperBook = {
   wins: number;
   losses: number;
   peakUsd: number;
+  mind: {
+    said: string[];
+    facts: RoxyFact[];
+    newsAt: number;
+    coffee: number;
+  };
 };
 
 export function clampPaperMaxOps(n: number): number {
@@ -347,6 +362,7 @@ export function emptyPaperBook(
     wins: 0,
     losses: 0,
     peakUsd: cash,
+    mind: { said: [], facts: [], newsAt: 0, coffee: 0 },
   };
 }
 
@@ -495,6 +511,17 @@ export function hydratePaperBook(parsed: Partial<PaperBook> & { v?: number }): P
     confirms: parsed.confirms ?? {},
     fills: parsed.fills ?? [],
     notes: Array.isArray(parsed.notes) ? parsed.notes.slice(0, NOTES) : [],
+    mind: (() => {
+      const src = (parsed as { mind?: Record<string, unknown> }).mind;
+      const prev = src && typeof src === "object" ? src : {};
+      return {
+        ...prev,
+        said: hydrateRoxySaid(prev.said),
+        facts: hydrateRoxyFacts(prev.facts),
+        newsAt: Number(prev.newsAt) || 0,
+        coffee: Math.max(0, Math.floor(Number(prev.coffee) || 0)),
+      };
+    })(),
   };
 }
 
@@ -1035,6 +1062,8 @@ export function tickPaperMany(book: PaperBook, signals: BtcTradeSignal[]): { boo
     events.push(...r.events);
   }
   markHist(cur, marks);
+  if (!cur.mind) cur.mind = { said: [], facts: [], newsAt: 0, coffee: 0 };
+  cur.mind.facts = ingestTapeFacts(cur.mind.facts ?? [], signals, Date.now());
   return { book: cur, events };
 }
 
@@ -1067,8 +1096,13 @@ function voiceHash(seed: string): number {
   return h >>> 0;
 }
 
-function say(seed: string, lines: string[]): string {
-  return lines[voiceHash(seed) % lines.length]!;
+function say(seed: string, lines: string[], avoid: string[] = []): string {
+  if (!lines.length) return "";
+  for (let i = 0; i < lines.length * 4; i++) {
+    const t = lines[voiceHash(seed + String(i)) % lines.length]!;
+    if (!avoid.some((a) => roxyTooClose(a, t))) return t;
+  }
+  return lines.find((t) => !avoid.some((a) => roxyTooClose(a, t))) ?? "";
 }
 
 function cloudTalk(seed: string, c: BtcTradeSignal["ichiCloud"]): string {
@@ -1148,7 +1182,10 @@ export function pushPaperNote(book: PaperBook, note: Omit<PaperNote, "id">): Pap
     ...note,
     id: `${note.at}-${Math.random().toString(16).slice(2, 8)}`,
   };
-  return { ...book, notes: [full, ...(book.notes ?? [])].slice(0, NOTES) };
+  const mind = book.mind ?? { said: [], facts: [], newsAt: 0, coffee: 0 };
+  mind.said = rememberRoxySaid(mind.said ?? [], [note.title, ...note.body.split(/\n+/)]);
+  if (/caf[eé]/i.test(`${note.title} ${note.body}`)) mind.coffee = (mind.coffee ?? 0) + 1;
+  return { ...book, mind, notes: [full, ...(book.notes ?? [])].slice(0, NOTES) };
 }
 
 export function narratePaper(
@@ -1158,7 +1195,7 @@ export function narratePaper(
   tag: (symbol: string) => string,
 ): Omit<PaperNote, "id"> {
   const at = Date.now();
-  const beat = Math.floor(at / 80_000);
+  const beat = Math.floor(at / 12_000);
   const left = paperOpsLeft(book);
   const atCap = paperAtOpsCap(book);
   const focused =
@@ -1171,7 +1208,11 @@ export function narratePaper(
   const waits = view.filter((s) => s.bias === "wait");
   const lead = [...view].sort((a, b) => b.confidence - a.confidence)[0];
   const iv = ivTalk(view[0]?.interval ?? "");
-  const seed = `${beat}|${book.universe}|${lead?.symbol ?? ""}|${lead?.bias ?? "x"}|${book.armed ? 1 : 0}|${book.positions.length}`;
+  const recent = [
+    ...(book.mind?.said ?? []),
+    ...(book.notes ?? []).slice(0, 12).flatMap((n) => [n.title, ...n.body.split(/\n+/)]),
+  ];
+  const seed = `${beat}|s${recent.length}|${book.universe}|${lead?.symbol ?? ""}|${lead?.bias ?? "x"}|${book.armed ? 1 : 0}|${book.positions.length}`;
   const paras: string[] = [];
   const planName = lead ? tag(lead.symbol) : "el mercado";
 
@@ -1400,6 +1441,24 @@ export function narratePaper(
     );
   }
 
+  if (!events.length) {
+    const wantSyms = book.universe === "ALL" ? view.map((s) => s.symbol) : [book.universe];
+    const newsFact = pickFreshFact(book.mind?.facts ?? [], "news", wantSyms, recent, voiceHash(seed + "news"));
+    if (newsFact) {
+      paras.push(
+        say(
+          seed + "news",
+          [
+            `Miré Noticias del SGI. ${newsFact.symbol ? tag(newsFact.symbol) : "Cripto"}: ${newsFact.text}. Lo guardo. Un titular no es una orden.`,
+            `Del desk de noticias: ${newsFact.text}. Queda en mi memoria.`,
+            `Wire interno: ${newsFact.text}. Lo archivo y sigo con el tape.`,
+          ],
+          recent,
+        ),
+      );
+    }
+  }
+
   const body = paras.filter(Boolean).join("\n");
   const fingerprint = [
     tone,
@@ -1411,6 +1470,8 @@ export function narratePaper(
     book.positions.map((p) => `${p.id}:${p.t1Done ? "t1" : "open"}`).join(","),
     view.map((s) => `${s.symbol}:${s.bias}:${Math.round(s.confidence / 5) * 5}`).join("|"),
     events.map((e) => e.kind + e.symbol).join(","),
+    String(book.mind?.newsAt ?? 0),
+    String(book.mind?.said?.length ?? 0),
   ].join("/");
 
   return { at, tone, title, body, fingerprint };

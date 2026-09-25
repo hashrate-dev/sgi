@@ -26,6 +26,7 @@ import {
 } from "../lib/mercadosPaperAgent.js";
 import { loadOrCreatePaperBook, loadUserPaperBook, saveUserPaperBook } from "../lib/paperBookStore.js";
 import { PAPER_SYMBOLS, runArmedPaperAgents } from "../lib/paperWorker.js";
+import { rememberSgiNewsOnBook } from "../lib/roxyNews.js";
 
 export const paperAgentRouter = Router();
 
@@ -48,7 +49,16 @@ function isUniverse(raw: unknown): raw is PaperUniverse {
 
 paperAgentRouter.get("/paper/book", ...readMw, async (req, res, next) => {
   try {
-    const book = await loadUserPaperBook(req.user!.id);
+    let book = await loadUserPaperBook(req.user!.id);
+    if (book) {
+      const symbols =
+        book.universe === "ALL" ? [...PAPER_SYMBOLS] : [book.universe, ...book.positions.map((p) => p.symbol)];
+      const next = await rememberSgiNewsOnBook(book, symbols);
+      if (next !== book) {
+        await saveUserPaperBook(req.user!.id, next);
+        book = next;
+      }
+    }
     res.json({ book, server: true });
   } catch (e) {
     next(e);

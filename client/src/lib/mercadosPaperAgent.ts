@@ -1,4 +1,12 @@
 import type { BtcTradeSignal } from "./api";
+import {
+  hydrateRoxyFacts,
+  hydrateRoxySaid,
+  ingestTapeFacts,
+  pickFreshFact,
+  rememberRoxySaid,
+  type RoxyFact,
+} from "./roxyMind";
 
 const FEE = 0.0004;
 const MIN_CONF = 58;
@@ -168,6 +176,10 @@ export type PaperMind = {
   lessons: PaperLesson[];
   lastStopAt: number;
   revengeUntil: number;
+  said: string[];
+  facts: RoxyFact[];
+  newsAt: number;
+  coffee: number;
 };
 
 export type PaperBook = {
@@ -363,6 +375,10 @@ export function emptyRoxyMind(): PaperMind {
     lessons: [],
     lastStopAt: 0,
     revengeUntil: 0,
+    said: [],
+    facts: [],
+    newsAt: 0,
+    coffee: 0,
   };
 }
 
@@ -411,6 +427,10 @@ export function hydrateRoxyMind(raw: unknown): PaperMind {
     lessons,
     lastStopAt: Number(src.lastStopAt) || 0,
     revengeUntil: Number(src.revengeUntil) || 0,
+    said: hydrateRoxySaid((src as { said?: unknown }).said),
+    facts: hydrateRoxyFacts((src as { facts?: unknown }).facts),
+    newsAt: Number((src as { newsAt?: unknown }).newsAt) || 0,
+    coffee: Math.max(0, Math.floor(Number((src as { coffee?: unknown }).coffee) || 0)),
   };
 }
 
@@ -1397,6 +1417,8 @@ export function tickPaperMany(book: PaperBook, signals: BtcTradeSignal[]): { boo
     events.push(...r.events);
   }
   markHist(cur, marks);
+  if (!cur.mind) cur.mind = emptyRoxyMind();
+  cur.mind.facts = ingestTapeFacts(cur.mind.facts ?? [], signals, Date.now());
   return { book: cur, events };
 }
 
@@ -1425,8 +1447,22 @@ function uruguayHour(at: number): number {
 }
 
 function lifeAside(at: number, seed: string, avoid: string[]): string | null {
-  const roll = voiceHash(seed + "|life") % 10;
-  if (roll > 4) return null;
+  const roll = voiceHash(seed + "|life") % 12;
+  if (roll > 6) return null;
+  if (roll === 0) {
+    return speak(seed + "cough", {
+      real: ["Cof, cof. Perdón.", "Cof. Se me atravesó el aire acondicionado."],
+      dry: ["Cof. Sigo."],
+      fun: ["Cof, cof. No es el RSI, soy yo."],
+    }, avoid);
+  }
+  if (roll === 1) {
+    return speak(seed + "cafe", {
+      real: ["Qué rico este café.", "Mmm, café. Me acomoda la cabeza."],
+      dry: ["Café a mano. El resto, filtro."],
+      fun: ["Qué rico café. Si el mercado se porta, le invito otro."],
+    }, avoid);
+  }
   const h = uruguayHour(at);
   const feel =
     h >= 0 && h < 6
@@ -1642,7 +1678,9 @@ function speak(
     s = `${seed}~${i}`;
   }
   const all = [...pack.real, ...(pack.dry ?? []), ...(pack.fun ?? [])];
-  return all[voiceHash(seed + "last") % all.length]!;
+  const leftover = all.filter((t) => !corpus.some((c) => tooClose(t, c)));
+  if (leftover.length) return leftover[voiceHash(seed + "fresh") % leftover.length]!;
+  return "";
 }
 
 function cloudTalk(seed: string, c: BtcTradeSignal["ichiCloud"], avoid: string[]): string {
@@ -1749,7 +1787,10 @@ export function pushPaperNote(book: PaperBook, note: Omit<PaperNote, "id">): Pap
     ...note,
     id: `${note.at}-${Math.random().toString(16).slice(2, 8)}`,
   };
-  return { ...book, notes: [full, ...(book.notes ?? [])].slice(0, NOTES) };
+  const mind = book.mind ?? emptyRoxyMind();
+  mind.said = rememberRoxySaid(mind.said ?? [], [note.title, ...note.body.split(/\n+/)]);
+  if (/caf[eé]/i.test(`${note.title} ${note.body}`)) mind.coffee = (mind.coffee ?? 0) + 1;
+  return { ...book, mind, notes: [full, ...(book.notes ?? [])].slice(0, NOTES) };
 }
 
 export function narratePaper(
@@ -1759,7 +1800,7 @@ export function narratePaper(
   tag: (symbol: string) => string,
 ): Omit<PaperNote, "id"> {
   const at = Date.now();
-  const beat = Math.floor(at / 45_000);
+  const beat = Math.floor(at / 12_000);
   const left = paperOpsLeft(book);
   const atCap = paperAtOpsCap(book);
   const minC = paperMinConfOf(book);
@@ -1778,9 +1819,12 @@ export function narratePaper(
   const iv = ivTalk(rawIv);
   const band = scalpBand(rawIv);
   const tradeStyle = paperStyleOf(book);
-  const recent = (book.notes ?? []).slice(0, 5).flatMap((n) => [n.title, ...(n.body.split(/\n+/))]);
+  const recent = [
+    ...(book.mind?.said ?? []),
+    ...(book.notes ?? []).slice(0, 12).flatMap((n) => [n.title, ...(n.body.split(/\n+/))]),
+  ];
   const angle = beat % 7;
-  const seed = `${beat}|a${angle}|${book.universe}|${rawIv}|${lead?.symbol ?? ""}|${lead?.bias ?? "x"}|${Math.round((lead?.confidence ?? 0) / 4)}|${book.armed ? 1 : 0}|${book.positions.length}`;
+  const seed = `${beat}|a${angle}|s${book.mind?.said?.length ?? 0}|n${book.mind?.facts?.length ?? 0}|${book.universe}|${rawIv}|${lead?.symbol ?? ""}|${lead?.bias ?? "x"}|${Math.round((lead?.confidence ?? 0) / 4)}|${book.armed ? 1 : 0}|${book.positions.length}`;
   const paras: string[] = [];
   const planName = lead ? tag(lead.symbol) : "el mercado";
   const hotName = lead ? tag(lead.symbol) : "nadie";
@@ -1861,9 +1905,9 @@ export function narratePaper(
   } else if (tradeStyle !== "swing" && band === "context") {
     tone = "idle";
     title = speak(seed + "ctxT", {
-      real: ["Contexto, no disparo", "Esto no es scalp"],
-      dry: ["Gráfico grande, manos quietas"],
-      fun: ["4h no me invita a picar"],
+      real: ["Mapa, no disparo", "Esto es lectura de contexto", "Velas grandes, yo en modo mapa"],
+      dry: ["Gráfico grande, manos quietas", "Acá miro, no pico"],
+      fun: ["4h no me invita a picar", "Esto es paisaje, no oficina de clic"],
     }, recent);
     paras.push(
       speak(seed + "ctx", {
@@ -2176,6 +2220,29 @@ export function narratePaper(
     }
     const quirk = quirkAside(seed, recent);
     if (quirk) paras.push(quirk);
+    const wantSyms = book.universe === "ALL" ? view.map((s) => s.symbol) : [book.universe];
+    const newsFact = pickFreshFact(book.mind?.facts ?? [], "news", wantSyms, recent, voiceHash(seed + "news"));
+    if (newsFact) {
+      const nline = speak(seed + "news", {
+        real: [
+          `Miré Noticias del SGI. ${newsFact.symbol ? tag(newsFact.symbol) : "Cripto"}: ${newsFact.text}. Lo guardo. Un titular no es una orden.`,
+          `Del desk de noticias: ${newsFact.text}. Queda en mi memoria.`,
+        ],
+        dry: [`Wire SGI: ${newsFact.text}. Anotado.`],
+        fun: [`Leí el mural de noticias. ${newsFact.text}. Archivo, no me desespero.`],
+      }, recent);
+      if (nline) paras.push(nline);
+    } else {
+      const tape = pickFreshFact(book.mind?.facts ?? [], "tape", wantSyms, recent, voiceHash(seed + "mem"));
+      if (tape) {
+        const tline = speak(seed + "mem", {
+          real: [`Me acuerdo de ${tape.text}`, `Anoto lo que veo: ${tape.text}`],
+          dry: [`Memoria de tape: ${tape.text}`],
+          fun: [`Esto ya lo vi: ${tape.text}. No me hago la amnésica.`],
+        }, recent);
+        if (tline) paras.push(tline);
+      }
+    }
   }
 
   if (paras[0] && !events.length) paras[0] = oralLead(seed, paras[0]);
@@ -2196,6 +2263,8 @@ export function narratePaper(
     view.map((s) => `${s.symbol}:${s.bias}:${Math.round(s.confidence / 5) * 5}`).join("|"),
     events.map((e) => e.kind + e.symbol).join(","),
     moodOf(seed),
+    String(book.mind?.newsAt ?? 0),
+    String(book.mind?.said?.length ?? 0),
   ].join("/");
 
   return { at, tone, title, body, fingerprint };

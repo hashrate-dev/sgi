@@ -1,0 +1,175 @@
+export const ROXY_FACTS_CAP = 140;
+export const ROXY_SAID_CAP = 56;
+
+export type RoxyFactKind = "tape" | "news" | "coin";
+
+export type RoxyFact = {
+  id: string;
+  at: number;
+  kind: RoxyFactKind;
+  symbol: string;
+  key: string;
+  text: string;
+};
+
+export type RoxyNewsHit = {
+  url: string;
+  title: string;
+  summary: string;
+  source: string;
+  symbol: string;
+  at: number;
+};
+
+type TapeSnap = {
+  symbol: string;
+  interval?: string;
+  bias?: string;
+  rsi?: number;
+  ichiCloud?: string;
+  confidence?: number;
+  price?: number;
+};
+
+function rid(at: number): string {
+  return `${at}-${Math.random().toString(16).slice(2, 8)}`;
+}
+
+export function roxyDayKey(ms: number): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Montevideo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(ms));
+}
+
+export function normRoxyTalk(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9% ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function roxyTooClose(a: string, b: string): boolean {
+  const na = normRoxyTalk(a).slice(0, 110);
+  const nb = normRoxyTalk(b).slice(0, 110);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  const cut = Math.min(40, na.length, nb.length);
+  if (cut >= 28 && (na.startsWith(nb.slice(0, cut)) || nb.startsWith(na.slice(0, cut)))) return true;
+  return false;
+}
+
+export function pushRoxyFact(facts: RoxyFact[], fact: Omit<RoxyFact, "id">): RoxyFact[] {
+  const hit = facts.find((f) => f.key === fact.key);
+  if (hit) {
+    return facts.map((f) => (f.key === fact.key ? { ...f, at: fact.at, text: fact.text, symbol: fact.symbol } : f));
+  }
+  return [{ ...fact, id: rid(fact.at) }, ...facts].slice(0, ROXY_FACTS_CAP);
+}
+
+export function rememberRoxySaid(said: string[], lines: string[]): string[] {
+  let next = said.slice();
+  for (const line of lines) {
+    const n = normRoxyTalk(line);
+    if (n.length < 10) continue;
+    if (next.some((x) => roxyTooClose(x, n))) continue;
+    next = [n, ...next];
+  }
+  return next.slice(0, ROXY_SAID_CAP);
+}
+
+export function hydrateRoxyFacts(raw: unknown): RoxyFact[] {
+  if (!Array.isArray(raw)) return [];
+  const out: RoxyFact[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== "object") continue;
+    const r = row as Partial<RoxyFact>;
+    if (typeof r.text !== "string" || typeof r.key !== "string") continue;
+    if (r.kind !== "tape" && r.kind !== "news" && r.kind !== "coin") continue;
+    out.push({
+      id: String(r.id || rid(Number(r.at) || Date.now())),
+      at: Number(r.at) || 0,
+      kind: r.kind,
+      symbol: String(r.symbol || ""),
+      key: r.key.slice(0, 240),
+      text: r.text.slice(0, 320),
+    });
+  }
+  return out.slice(0, ROXY_FACTS_CAP);
+}
+
+export function hydrateRoxySaid(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((x): x is string => typeof x === "string" && x.length > 4).slice(0, ROXY_SAID_CAP);
+}
+
+export function ingestTapeFacts(facts: RoxyFact[], snaps: TapeSnap[], now: number): RoxyFact[] {
+  let next = facts;
+  const day = roxyDayKey(now);
+  for (const s of snaps) {
+    if (!s.symbol) continue;
+    const name = s.symbol.replace(/USDT$/i, "");
+    const rsi = Number.isFinite(s.rsi) ? Math.round(Number(s.rsi)) : 0;
+    const rsiB = Math.round(rsi / 8) * 8;
+    const cloud = s.ichiCloud || "na";
+    const bias = s.bias || "wait";
+    const conf = Number.isFinite(s.confidence) ? Math.round(Number(s.confidence)) : 0;
+    const key = `tape:${s.symbol}:${day}:${bias}:${cloud}:${rsiB}`;
+    next = pushRoxyFact(next, {
+      at: now,
+      kind: "tape",
+      symbol: s.symbol,
+      key,
+      text: `${name} ${s.interval || ""}: sesgo ${bias}, RSI ${rsi}, nube ${cloud}, conf ${conf}%.`.replace(/\s+/g, " ").trim(),
+    });
+  }
+  return next;
+}
+
+export function ingestNewsFacts(facts: RoxyFact[], hits: RoxyNewsHit[], now: number): RoxyFact[] {
+  let next = facts;
+  for (const h of hits) {
+    const title = h.title.replace(/\s+/g, " ").trim().slice(0, 180);
+    if (title.length < 12) continue;
+    next = pushRoxyFact(next, {
+      at: h.at || now,
+      kind: "news",
+      symbol: h.symbol,
+      key: `news:${h.url.slice(0, 200)}`,
+      text: `${title}${h.source ? ` (${h.source})` : ""}`,
+    });
+    if (h.symbol) {
+      next = pushRoxyFact(next, {
+        at: h.at || now,
+        kind: "coin",
+        symbol: h.symbol,
+        key: `coin:${h.symbol}:${roxyDayKey(h.at || now)}:${title.slice(0, 48)}`,
+        text: `${h.symbol.replace(/USDT$/i, "")} en el wire: ${title}`,
+      });
+    }
+  }
+  return next;
+}
+
+export function pickFreshFact(
+  facts: RoxyFact[],
+  kind: RoxyFactKind | "any",
+  symbols: string[],
+  avoid: string[],
+  salt: number,
+): RoxyFact | null {
+  const want = new Set(symbols);
+  const pool = facts.filter((f) => {
+    if (kind !== "any" && f.kind !== kind) return false;
+    if (want.size && f.symbol && !want.has(f.symbol)) return false;
+    if (avoid.some((a) => roxyTooClose(a, f.text))) return false;
+    return true;
+  });
+  if (!pool.length) return null;
+  return pool[Math.abs(salt) % pool.length]!;
+}

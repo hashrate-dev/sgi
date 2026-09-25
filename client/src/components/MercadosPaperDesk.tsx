@@ -570,7 +570,16 @@ export function MercadosPaperDesk({
   const atCap = paperAtOpsCap(book);
   const left = paperOpsLeft(book);
   const ledger = useMemo(() => splitPaperTrades(book), [book]);
-  const liveTalk = useMemo(() => narratePaper(book, sigs, [], tag), [book, sigs, pairs]);
+  const liveTalk = useMemo(() => {
+    const spoken = narratePaper(book, sigs, [], tag);
+    const last = book.notes[0];
+    if (!last) return spoken;
+    if (Date.now() - last.at < 70_000) return last;
+    const a = spoken.body.replace(/\s+/g, " ").slice(0, 96).toLowerCase();
+    const b = last.body.replace(/\s+/g, " ").slice(0, 96).toLowerCase();
+    if (a && a === b) return last;
+    return spoken;
+  }, [book, sigs, pairs]);
   const alert = useMemo(() => paperEntryAlert(book, sigs), [book, sigs]);
   const prep = useMemo(() => paperPrepProcess(book, sigs), [book, sigs]);
 

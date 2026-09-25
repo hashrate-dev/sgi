@@ -5,6 +5,7 @@ let speakGen = 0;
 let pauseTimer = 0;
 let lastSaid = "";
 let lastSaidAt = 0;
+const recentSaid: string[] = [];
 
 function mutedNow(): boolean {
   try {
@@ -202,9 +203,11 @@ function splitForSpeech(raw: string): SpeakBit[] {
     .filter((x) => x.length > 1);
   chunks.forEach((chunk, i) => {
     const hum = /♪|tararea|\bmm mm\b|\bnana\b/i.test(chunk);
+    const cough = /cof|tose/i.test(chunk);
     const laugh = /ja ja|je\b|me río|me rei|me reí/i.test(chunk);
     const breath = /^(mirá|mira|bueno|a ver|che|ta,|la verdad|ojo|dale)\b/i.test(chunk);
     if (hum) bits.push({ kind: "hum" });
+    if (cough) bits.push({ kind: "pause", ms: 220 });
     const spoken = chunk.replace(/♪/g, "").replace(/tararea bajito\.?/i, "").replace(/\s+/g, " ").trim();
     if (spoken.length > 1 && !/^mm+$/i.test(spoken)) {
       bits.push({
@@ -230,9 +233,15 @@ export function speakRoxy(text: string): void {
   const said = toSpokenRoxy(text);
   if (said.length < 2) return;
   const now = Date.now();
-  if (said === lastSaid && now - lastSaidAt < 12_000) return;
+  const key = said.slice(0, 120).toLowerCase();
+  if (key && recentSaid.some((x) => x === key) && now - lastSaidAt < 180_000) return;
+  if (said === lastSaid && now - lastSaidAt < 90_000) return;
   lastSaid = said;
   lastSaidAt = now;
+  if (key) {
+    recentSaid.unshift(key);
+    if (recentSaid.length > 10) recentSaid.length = 10;
+  }
   hushRoxy();
   const gen = speakGen;
   const bits = splitForSpeech(said);
