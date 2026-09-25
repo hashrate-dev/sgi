@@ -2339,6 +2339,100 @@ body > .tv-markets-tape.hrs-card,
   color: var(--tv-muted);
 }
 
+.tv-paper__cfg {
+  appearance: none;
+  flex: none;
+  border: 1px solid rgba(125, 211, 252, 0.32);
+  background: rgba(14, 116, 144, 0.16);
+  color: #7dd3fc;
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.tv-paper__cfg.is-on {
+  border-color: rgba(110, 231, 183, 0.4);
+  background: rgba(38, 166, 154, 0.16);
+  color: #6ee7b7;
+}
+
+.tv-paper-cfg {
+  display: flex;
+  flex-direction: column;
+  gap: 0.38rem;
+  padding: 0.5rem 0.55rem;
+  border-radius: 10px;
+  border: 1px solid rgba(125, 211, 252, 0.18);
+  background: rgba(6, 20, 28, 0.55);
+}
+
+.tv-paper-cfg__row {
+  display: grid;
+  grid-template-columns: 7.2rem minmax(0, 1fr);
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.tv-paper-cfg__row > span {
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tv-muted);
+}
+
+.tv-paper-cfg__row > div,
+.tv-paper-cfg__row > label {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.28rem;
+}
+
+.tv-paper-cfg button {
+  appearance: none;
+  border: 1px solid rgba(110, 231, 183, 0.18);
+  background: rgba(6, 24, 18, 0.45);
+  color: var(--tv-muted);
+  font: inherit;
+  font-size: 0.62rem;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  padding: 0.16rem 0.4rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.tv-paper-cfg button.is-on {
+  border-color: rgba(110, 231, 183, 0.45);
+  background: rgba(38, 166, 154, 0.2);
+  color: #a7f3d0;
+}
+
+.tv-paper-cfg button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.tv-paper-cfg input {
+  width: 4.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.28);
+  color: inherit;
+  font: inherit;
+  font-size: 0.72rem;
+  padding: 0.18rem 0.32rem;
+  border-radius: 8px;
+}
+
+.tv-paper-cfg > p {
+  margin: 0.1rem 0 0;
+  font-size: 0.62rem;
+  color: var(--tv-muted);
+}
+
 .tv-paper__uni {
   display: flex;
   flex-wrap: wrap;

@@ -1007,10 +1007,6 @@ function neededConfirm(interval: string, _style: PaperStyle = "intraday"): numbe
   return 99;
 }
 
-function isFastInterval(interval: string): boolean {
-  return interval === "1s" || interval === "LIVE" || interval === "1" || interval === "5";
-}
-
 function pushFill(book: PaperBook, fill: Omit<PaperFill, "id">): void {
   book.fills = [{ ...fill, id: `${fill.at}-${Math.random().toString(16).slice(2, 8)}` }, ...book.fills].slice(0, FILLS);
 }
@@ -1340,6 +1336,10 @@ export function tickPaper(
     }
   }
 
+  if (events.length) {
+    if (!next.mind) next.mind = emptyRoxyMind();
+    applyRoxyLearn(next, events, now);
+  }
   if (!opts?.skipHist) markHist(next, { ...(opts?.marks ?? {}), [sig.symbol]: px });
   return { book: next, events };
 }
@@ -1540,10 +1540,6 @@ function voiceHash(seed: string): number {
     h = Math.imul(h, 16777619);
   }
   return h >>> 0;
-}
-
-function say(seed: string, lines: string[]): string {
-  return lines[voiceHash(seed) % lines.length]!;
 }
 
 type RoxyMood = "real" | "dry" | "fun";
@@ -2116,6 +2112,11 @@ export function narratePaper(
     }
     const quirk = quirkAside(seed, recent);
     if (quirk) paras.push(quirk);
+  }
+
+  if (paras[0] && !events.length) paras[0] = oralLead(seed, paras[0]);
+  if (risk > 0 && paras[0] && events.some((e) => e.kind === "open")) {
+    paras[0] = `${paras[0]} Riesgo ${risk}% del equity.`;
   }
 
   const body = paras.filter(Boolean).join("\n");

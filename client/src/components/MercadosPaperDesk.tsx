@@ -623,7 +623,8 @@ export function MercadosPaperDesk({
 
   const setLev = (nextLev: PaperLev) => {
     if (venue === "spot") return;
-    persistPatch({ leverage: nextLev }, { ...book, leverage: nextLev });
+    const leverage = clampPaperLev(nextLev);
+    persistPatch({ leverage }, { ...book, leverage });
   };
 
   const setUniverse = (universe: PaperUniverse) => {
@@ -657,8 +658,9 @@ export function MercadosPaperDesk({
           <span>
             {ROXY}
             <em>
-              {book.armed ? "24/7 en servidor" : "Pausada"} · {book.universe === "ALL" ? "Todas" : tag(book.universe)} ·{" "}
+              {book.armed ? "24/7 en servidor" : "Pausada"} · {modeHint} · {book.universe === "ALL" ? "Todas" : tag(book.universe)} ·{" "}
               {book.opsUsed}/{book.maxOps} ops
+              {dayHit ? " · tope del día" : ""}
             </em>
           </span>
           <strong className={ret >= 0 ? "is-up" : "is-down"}>{usd(eq)}</strong>
@@ -678,6 +680,19 @@ export function MercadosPaperDesk({
           }}
         >
           {muted ? "Muda" : "Voz"}
+        </button>
+        <button
+          type="button"
+          className={`tv-paper__cfg${cfgOpen ? " is-on" : ""}`}
+          title="Configurar a Roxy"
+          aria-pressed={cfgOpen}
+          aria-label="Configuración de Roxy"
+          onClick={() => {
+            setCfgOpen((v) => !v);
+            setOpen(true);
+          }}
+        >
+          Cfg
         </button>
         {open ? (
           <button
@@ -708,6 +723,140 @@ export function MercadosPaperDesk({
               </button>
             ))}
           </div>
+
+          {cfgOpen ? (
+            <div className="tv-paper-cfg" role="form" aria-label="Configuración de Roxy">
+              <div className="tv-paper-cfg__row">
+                <span>Tipo</span>
+                <div>
+                  <CfgBtn on={venue === "spot"} onClick={() => setVenue("spot")}>
+                    Spot
+                  </CfgBtn>
+                  <CfgBtn on={venue === "futures"} onClick={() => setVenue("futures")}>
+                    Futuro
+                  </CfgBtn>
+                </div>
+              </div>
+              <div className="tv-paper-cfg__row">
+                <span>Apalancamiento</span>
+                <div>
+                  <CfgBtn on={lev === 2} disabled={venue === "spot"} onClick={() => setLev(2)}>
+                    x2
+                  </CfgBtn>
+                  <CfgBtn on={lev === 3} disabled={venue === "spot"} onClick={() => setLev(3)}>
+                    x3
+                  </CfgBtn>
+                </div>
+              </div>
+              <div className="tv-paper-cfg__row">
+                <span>Dirección</span>
+                <div>
+                  <CfgBtn on={dir === "long"} onClick={() => setDir("long")}>
+                    Long
+                  </CfgBtn>
+                  <CfgBtn on={dir === "short"} disabled={venue === "spot"} onClick={() => setDir("short")}>
+                    Short
+                  </CfgBtn>
+                  <CfgBtn on={dir === "both"} disabled={venue === "spot"} onClick={() => setDir("both")}>
+                    Ambos
+                  </CfgBtn>
+                </div>
+              </div>
+              <div className="tv-paper-cfg__row">
+                <span>Riesgo %</span>
+                <div>
+                  {([0.5, 1, 2, 3, 5] as const).map((n) => (
+                    <CfgBtn
+                      key={n}
+                      on={clampPaperRiskPct(book.riskPct) === n}
+                      onClick={() => persistPatch({ riskPct: n }, { ...book, riskPct: n })}
+                    >
+                      {n}
+                    </CfgBtn>
+                  ))}
+                </div>
+              </div>
+              <div className="tv-paper-cfg__row">
+                <span>Tamaño %</span>
+                <div>
+                  {([10, 25, 50, 75] as const).map((n) => (
+                    <CfgBtn
+                      key={n}
+                      on={clampPaperSizePct(book.sizePct) === n}
+                      onClick={() => persistPatch({ sizePct: n }, { ...book, sizePct: n })}
+                    >
+                      {n}
+                    </CfgBtn>
+                  ))}
+                </div>
+              </div>
+              <div className="tv-paper-cfg__row">
+                <span>Mín. alineación</span>
+                <div>
+                  {([50, 58, 65, 75] as const).map((n) => (
+                    <CfgBtn
+                      key={n}
+                      on={clampPaperMinConf(book.minConf) === n}
+                      onClick={() => persistPatch({ minConf: n }, { ...book, minConf: n })}
+                    >
+                      {n}
+                    </CfgBtn>
+                  ))}
+                </div>
+              </div>
+              <div className="tv-paper-cfg__row">
+                <span>T1 %</span>
+                <div>
+                  {([25, 50, 75] as const).map((n) => (
+                    <CfgBtn
+                      key={n}
+                      on={clampPaperT1Pct(book.t1Pct) === n}
+                      onClick={() => persistPatch({ t1Pct: n }, { ...book, t1Pct: n })}
+                    >
+                      {n}
+                    </CfgBtn>
+                  ))}
+                </div>
+              </div>
+              <div className="tv-paper-cfg__row">
+                <span>Estilo</span>
+                <div>
+                  {(["intraday", "auto"] as PaperStyle[]).map((s) => (
+                    <CfgBtn
+                      key={s}
+                      on={style === s}
+                      onClick={() => persistPatch({ style: s }, { ...book, style: s })}
+                    >
+                      {s === "intraday" ? "Intradía" : "Auto"}
+                    </CfgBtn>
+                  ))}
+                </div>
+              </div>
+              <div className="tv-paper-cfg__row">
+                <span>Ops / día</span>
+                <label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={99}
+                    step={1}
+                    value={dayCap}
+                    onChange={(e) => setDayCap(e.target.value)}
+                    onBlur={applyDayCap}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        applyDayCap();
+                      }
+                    }}
+                  />
+                </label>
+              </div>
+              <p>
+                Spot solo long, sin apalancar. Short únicamente en futuros. Hoy: {dayUsed} usadas, {dayLeft} libres.
+              </p>
+            </div>
+          ) : null}
 
           <div className={`tv-paper-alert tv-paper-alert--${alert.light}`} role="status">
             <div className="tv-paper-alert__lights" aria-hidden>
@@ -796,9 +945,11 @@ export function MercadosPaperDesk({
               </button>
             </div>
             <p className="tv-paper__capline">
-              {atCap
-                ? "Tope completo: no abre más; solo cierra o gestiona lo que ya está abierto."
-                : `Puede abrir ${left} operación${left === 1 ? "" : "es"} más en esta cuenta.`}
+              {dayHit
+                ? "Tope del día: no abre más hasta mañana (horario Uruguay)."
+                : atCap
+                  ? "Tope completo: no abre más; solo cierra o gestiona lo que ya está abierto."
+                  : `Puede abrir ${left} más en la cuenta · ${dayLeft} hoy.`}
             </p>
           </div>
 
