@@ -683,10 +683,12 @@ export function MercadosPaperDesk({
   userId,
   interval,
   pairs,
+  expand = false,
 }: {
   userId: number;
   interval: string;
   pairs: PaperPairOpt[];
+  expand?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [cfgOpen, setCfgOpen] = useState(false);
@@ -707,6 +709,10 @@ export function MercadosPaperDesk({
   const iv = interval === "LIVE" ? "1s" : interval;
   const tag = (symbol: string) => pairTag(pairs, symbol);
   const hydrated = useRef(false);
+
+  useEffect(() => {
+    if (expand) setOpen(true);
+  }, [expand]);
 
   useEffect(() => {
     let cancelled = false;

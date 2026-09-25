@@ -623,6 +623,11 @@ export function MercadosTradingPage() {
       root.classList.toggle("hrs-mercados-fs", on);
       setBoardFs(on);
       if (!on) setDockHid(false);
+      if (on) {
+        setFoldSignal(true);
+        setFoldLevels(true);
+        setFoldClock(true);
+      }
     };
     const onFs = () => {
       if (!document.fullscreenElement) root.classList.remove("hrs-mercados-fs");
@@ -657,6 +662,9 @@ export function MercadosTradingPage() {
     const goOn = async () => {
       root.classList.add("hrs-mercados-fs");
       setBoardFs(true);
+      setFoldSignal(true);
+      setFoldLevels(true);
+      setFoldClock(true);
       const req =
         root.requestFullscreen?.bind(root) ??
         (root as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }).webkitRequestFullscreen?.bind(root);
@@ -1523,6 +1531,7 @@ export function MercadosTradingPage() {
               userId={user.id}
               interval={interval === "LIVE" ? "1s" : interval}
               pairs={PAPER_PAIRS}
+              expand={boardFs}
             />
 
           </aside>
