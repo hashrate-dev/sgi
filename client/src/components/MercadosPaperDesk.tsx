@@ -54,6 +54,7 @@ export function MercadosPaperDesk({
   binance: string;
 }) {
   const symbol = binance;
+  const [open, setOpen] = useState(false);
   const [book, setBook] = useState<PaperBook>(() => loadPaperBook(userId, symbol));
   const [fund, setFund] = useState(() => String(Math.round(loadPaperBook(userId, symbol).initialUsd)));
   const bookRef = useRef(book);
@@ -111,12 +112,21 @@ export function MercadosPaperDesk({
   }, [book.armed, book.lastFire, pos]);
 
   return (
-    <div className={`tv-paper hrs-card sgi-glass-panel tv-paper--${pos?.side ?? "flat"}`}>
-      <div className="tv-paper__top">
-        <h2>
+    <div className={`tv-paper hrs-card sgi-glass-panel tv-paper--${pos?.side ?? "flat"}${open ? " is-open" : ""}`}>
+      <button type="button" className="tv-paper__toggle" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+        <span>
           Agente paper
           <em>Simulación</em>
-        </h2>
+        </span>
+        <strong className={ret >= 0 ? "is-up" : "is-down"}>{usd(eq)}</strong>
+        <i className={`tv-paper__chev${open ? " is-open" : ""}`} aria-hidden />
+      </button>
+      {open ? (
+        <>
+      <div className="tv-paper__top">
+        <p className="tv-paper__disc">
+          Opera {pairLabel} con la confluencia del escritorio. 1% de riesgo, stop ATR, T1 50% y T2. No es dinero real.
+        </p>
         <button
           type="button"
           className={`tv-paper__arm${book.armed ? " is-on" : ""}`}
@@ -129,9 +139,6 @@ export function MercadosPaperDesk({
           {book.armed ? "ON" : "OFF"}
         </button>
       </div>
-      <p className="tv-paper__disc">
-        Opera {pairLabel} con la confluencia del escritorio. 1% de riesgo, stop ATR, T1 50% y T2. No es dinero real.
-      </p>
       <div className="tv-paper__eq">
         <strong className={ret >= 0 ? "is-up" : "is-down"}>{usd(eq)}</strong>
         <span className={ret >= 0 ? "is-up" : "is-down"}>
@@ -215,6 +222,8 @@ export function MercadosPaperDesk({
             </li>
           ))}
         </ul>
+      ) : null}
+        </>
       ) : null}
     </div>
   );

@@ -1191,14 +1191,16 @@ export function MercadosTradingPage() {
           <aside className="tv-markets-rail">
             <div className={`tv-desk-signal tv-desk-signal--${signal?.bias ?? "wait"} hrs-card sgi-glass-panel`}>
               <div className="tv-desk-signal__lead">
-                <div className="tv-desk-signal__call">
-                  <span className="tv-desk-signal__badge">{copy.kicker}</span>
-                  <div className="tv-desk-signal__title">{signalLoading && !signal ? "LEYENDO…" : copy.title}</div>
-                  <div className="tv-desk-signal__price">{signal ? usd(signal.price) : "—"}</div>
+                <span className="tv-desk-signal__badge">{copy.kicker}</span>
+                <div className="tv-desk-signal__lead-row">
+                  <div className="tv-desk-signal__call">
+                    <div className="tv-desk-signal__title">{signalLoading && !signal ? "LEYENDO…" : copy.title}</div>
+                    <div className="tv-desk-signal__price">{signal ? usd(signal.price) : "—"}</div>
+                  </div>
+                  <span className="tv-desk-signal__icon" title={copy.title} aria-hidden>
+                    <BiasGlyph bias={signal?.bias ?? "wait"} size={26} />
+                  </span>
                 </div>
-                <span className="tv-desk-signal__icon" title={copy.title} aria-hidden>
-                  <BiasGlyph bias={signal?.bias ?? "wait"} size={26} />
-                </span>
               </div>
 
               {signalErr ? (
