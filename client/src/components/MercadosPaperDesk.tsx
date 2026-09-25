@@ -556,6 +556,96 @@ function RoxyVoteBoard({ ballots }: { ballots: RoxyCoinBallot[] }) {
   );
 }
 
+type RoxyScanRow = ReturnType<typeof roxyLiveDesk>["rows"][number];
+
+function ScanCoinCard({ r }: { r: RoxyScanRow }) {
+  return (
+    <li className={`tv-paper-scan__card is-${r.bias}${r.hot ? " is-hot" : ""}`}>
+      <header className="tv-paper-scan__head">
+        <div className="tv-paper-scan__who">
+          <b>{r.name}</b>
+          <span className={`tv-paper-scan__side is-${r.bias}`}>
+            {r.bias === "buy" ? "Compra" : r.bias === "sell" ? "Venta" : "Espera"}
+          </span>
+        </div>
+        <div className="tv-paper-scan__score">
+          <strong>{r.confidence.toFixed(0)}</strong>
+          <small>{r.confirm}</small>
+        </div>
+      </header>
+      <ul className="tv-paper-scan__inds" aria-label={`Indicadores ${r.name}`}>
+        {r.chips.map((ch) => (
+          <li key={ch.id} className={`is-${ch.tone}`} title={ch.label}>
+            <i aria-hidden />
+            <span>{ch.label}</span>
+          </li>
+        ))}
+      </ul>
+    </li>
+  );
+}
+
+function RoxyScanRail({ rows }: { rows: RoxyScanRow[] }) {
+  const VIS = 3;
+  const n = rows.length;
+  const maxI = Math.max(0, n - VIS);
+  const [i, setI] = useState(0);
+
+  useEffect(() => {
+    setI((x) => Math.min(x, maxI));
+  }, [maxI]);
+
+  if (!n) return <p className="tv-paper-live__empty">Esperando lecturas de confluencia…</p>;
+
+  const step = (d: number) => setI((x) => Math.max(0, Math.min(maxI, x + d)));
+  const shown = rows.slice(i, i + VIS);
+  const canUp = i > 0;
+  const canDown = i < maxI;
+
+  return (
+    <div className="tv-paper-scan-rail">
+      {n > VIS ? (
+        <button
+          type="button"
+          className="tv-paper-scan-nav tv-paper-scan-nav--up"
+          disabled={!canUp}
+          onClick={() => step(-1)}
+          aria-label="Subir"
+          title="Subir"
+        >
+          ▲
+        </button>
+      ) : null}
+      <div
+        className="tv-paper-scan-view"
+        onWheel={(e) => {
+          if (n <= VIS) return;
+          if (Math.abs(e.deltaY) < 10) return;
+          step(e.deltaY > 0 ? 1 : -1);
+        }}
+      >
+        <ul className="tv-paper-scan" aria-live="polite">
+          {shown.map((r) => (
+            <ScanCoinCard key={r.symbol} r={r} />
+          ))}
+        </ul>
+      </div>
+      {n > VIS ? (
+        <button
+          type="button"
+          className="tv-paper-scan-nav tv-paper-scan-nav--down"
+          disabled={!canDown}
+          onClick={() => step(1)}
+          aria-label="Bajar"
+          title="Bajar"
+        >
+          ▼ <small>{i + 1}–{Math.min(i + VIS, n)}/{n}</small>
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 function RoxyLiveBoard({ live }: { live: ReturnType<typeof roxyLiveDesk> }) {
   const cards = [
     { kind: "do" as const, label: "Haciendo", text: live.doing },
@@ -583,36 +673,7 @@ function RoxyLiveBoard({ live }: { live: ReturnType<typeof roxyLiveDesk> }) {
           </article>
         ))}
       </div>
-      {live.rows.length ? (
-        <ul className="tv-paper-scan">
-          {live.rows.map((r) => (
-            <li key={r.symbol} className={`tv-paper-scan__card is-${r.bias}${r.hot ? " is-hot" : ""}`}>
-              <header className="tv-paper-scan__head">
-                <div className="tv-paper-scan__who">
-                  <b>{r.name}</b>
-                  <span className={`tv-paper-scan__side is-${r.bias}`}>
-                    {r.bias === "buy" ? "Compra" : r.bias === "sell" ? "Venta" : "Espera"}
-                  </span>
-                </div>
-                <div className="tv-paper-scan__score">
-                  <strong>{r.confidence.toFixed(0)}</strong>
-                  <small>{r.confirm}</small>
-                </div>
-              </header>
-              <ul className="tv-paper-scan__inds" aria-label={`Indicadores ${r.name}`}>
-                {r.chips.map((ch) => (
-                  <li key={ch.id} className={`is-${ch.tone}`} title={ch.label}>
-                    <i aria-hidden />
-                    <span>{ch.label}</span>
-                  </li>
-                ))}
-              </ul>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="tv-paper-live__empty">Esperando lecturas de confluencia…</p>
-      )}
+      {live.rows.length ? <RoxyScanRail rows={live.rows} /> : <p className="tv-paper-live__empty">Esperando lecturas de confluencia…</p>}
     </section>
   );
 }
@@ -941,7 +1002,17 @@ export function MercadosPaperDesk({
             if (next) hushRoxy();
           }}
         >
-          {muted ? "Muda" : "Voz"}
+          {muted ? (
+            <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden>
+              <path d="M3.2 8.2 H6.1 L10.4 4.6 V15.4 L6.1 11.8 H3.2 Z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+              <path d="M12.6 8.2 L16.6 12.2 M16.6 8.2 L12.6 12.2" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden>
+              <path d="M3.2 8.2 H6.1 L10.4 4.6 V15.4 L6.1 11.8 H3.2 Z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+              <path d="M12.8 7.2 A4.2 4.2 0 0 1 12.8 12.8 M14.8 5.4 A7 7 0 0 1 14.8 14.6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          )}
         </button>
         <button
           type="button"
@@ -954,17 +1025,32 @@ export function MercadosPaperDesk({
             setOpen(true);
           }}
         >
-          Cfg
+          <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden>
+            <circle cx="10" cy="10" r="2.2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+            <path
+              d="M10 3.2 V4.8 M10 15.2 V16.8 M3.2 10 H4.8 M15.2 10 H16.8 M5.2 5.2 L6.4 6.4 M13.6 13.6 L14.8 14.8 M14.8 5.2 L13.6 6.4 M6.4 13.6 L5.2 14.8"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+          </svg>
         </button>
         {open ? (
           <button
             type="button"
             className={`tv-paper__arm${book.armed ? " is-on" : ""}`}
+            title={book.armed ? "Roxy está encendida" : "Roxy está apagada"}
+            aria-pressed={book.armed}
+            aria-label={book.armed ? "Apagar a Roxy" : "Encender a Roxy"}
             onClick={() => {
               persistPatch({ armed: !book.armed }, { ...book, armed: !book.armed });
             }}
           >
-            {book.armed ? "ON" : "OFF"}
+            <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden>
+              <path d="M10 3.4 V10" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+              <path d="M6.2 5.6 A5.6 5.6 0 1 0 13.8 5.6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
           </button>
         ) : null}
       </div>

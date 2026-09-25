@@ -88,15 +88,27 @@ function tallySide(sig: SignalLike, side: RoxyVoteSide, facts: RoxyFact[] | unde
   return { score, yes, tools: tools.slice(0, 8) };
 }
 
+export type RoxyVoteGate = { long: boolean; short: boolean };
+
+function pickSide(long: RoxySideTally, short: RoxySideTally, gate?: RoxyVoteGate): RoxyVoteSide | "wait" {
+  const allowL = gate?.long !== false;
+  const allowS = gate?.short !== false;
+  const longOk = allowL && long.yes >= 3 && long.score >= 1.4;
+  const shortOk = allowS && short.yes >= 3 && short.score >= 1.4;
+  if (allowL && !allowS) return longOk ? "long" : "wait";
+  if (allowS && !allowL) return shortOk ? "short" : "wait";
+  if (longOk && long.score >= short.score + 0.55) return "long";
+  if (shortOk && short.score >= long.score + 0.55) return "short";
+  return "wait";
+}
+
 /** Una papeleta por moneda: largo vs corto. `lead` marca la operación ganadora del universo. */
-export function rankRoxyBallots(signals: SignalLike[], facts?: RoxyFact[]): RoxyCoinBallot[] {
+export function rankRoxyBallots(signals: SignalLike[], facts?: RoxyFact[], gate?: RoxyVoteGate): RoxyCoinBallot[] {
   const rows: RoxyCoinBallot[] = signals.map((sig) => {
     const long = tallySide(sig, "long", facts);
     const short = tallySide(sig, "short", facts);
     const margin = Math.abs(long.score - short.score);
-    let pick: RoxyVoteSide | "wait" = "wait";
-    if (long.score >= 2.2 && long.score >= short.score + 1.15 && long.yes >= 4) pick = "long";
-    else if (short.score >= 2.2 && short.score >= long.score + 1.15 && short.yes >= 4) pick = "short";
+    const pick = pickSide(long, short, gate);
     return {
       symbol: sig.symbol,
       name: sig.symbol.replace(/USDT$/i, ""),
@@ -134,4 +146,14 @@ export function roxyBallotOpenKey(ballots: RoxyCoinBallot[]): string | null {
   const lead = ballots.find((b) => b.lead && b.pick !== "wait");
   if (!lead || lead.pick === "wait") return null;
   return `${lead.symbol}:${lead.pick}`;
+}
+
+export function parseRoxyOpenKey(key: string | null | undefined): { symbol: string; side: RoxyVoteSide } | null {
+  if (!key) return null;
+  const i = key.lastIndexOf(":");
+  if (i < 1) return null;
+  const symbol = key.slice(0, i);
+  const side = key.slice(i + 1);
+  if (side !== "long" && side !== "short") return null;
+  return { symbol, side };
 }

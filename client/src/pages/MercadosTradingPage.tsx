@@ -607,12 +607,66 @@ export function MercadosTradingPage() {
   const [foldLevels, setFoldLevels] = useState(false);
   const [foldClock, setFoldClock] = useState(false);
   const [drawPulse, setDrawPulse] = useState<{ n: number; op: "undo" | "clear" }>({ n: 0, op: "undo" });
+  const [boardFs, setBoardFs] = useState(false);
   const dockRef = useRef<HTMLDivElement>(null);
   const pairRef = useRef<HTMLDivElement>(null);
   const pairBtnRef = useRef<HTMLButtonElement>(null);
   const pairMenuRef = useRef<HTMLDivElement>(null);
   const [pairMenuBox, setPairMenuBox] = useState<CSSProperties>({});
   const active = SYMBOLS.find((s) => s.id === symbol) ?? SYMBOLS[0];
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const sync = () => {
+      const on = Boolean(document.fullscreenElement) || root.classList.contains("hrs-mercados-fs");
+      root.classList.toggle("hrs-mercados-fs", on);
+      setBoardFs(on);
+    };
+    const onFs = () => {
+      if (!document.fullscreenElement) root.classList.remove("hrs-mercados-fs");
+      sync();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (document.fullscreenElement) return;
+      if (!root.classList.contains("hrs-mercados-fs")) return;
+      root.classList.remove("hrs-mercados-fs");
+      setBoardFs(false);
+    };
+    document.addEventListener("fullscreenchange", onFs);
+    document.addEventListener("webkitfullscreenchange", onFs);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFs);
+      document.removeEventListener("webkitfullscreenchange", onFs);
+      window.removeEventListener("keydown", onKey);
+      root.classList.remove("hrs-mercados-fs");
+      if (document.fullscreenElement) void document.exitFullscreen();
+    };
+  }, []);
+
+  const toggleBoardFs = () => {
+    const root = document.documentElement;
+    const goOff = () => {
+      root.classList.remove("hrs-mercados-fs");
+      setBoardFs(false);
+      if (document.fullscreenElement) void document.exitFullscreen();
+    };
+    const goOn = async () => {
+      root.classList.add("hrs-mercados-fs");
+      setBoardFs(true);
+      const req =
+        root.requestFullscreen?.bind(root) ??
+        (root as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }).webkitRequestFullscreen?.bind(root);
+      try {
+        if (req) await req();
+      } catch {
+        /* queda el modo app a pantalla completa, sin API del navegador */
+      }
+    };
+    if (document.fullscreenElement || root.classList.contains("hrs-mercados-fs")) goOff();
+    else void goOn();
+  };
 
   useEffect(() => {
     if (!indOpen && !pairOpen && !colorOpen) return;
@@ -739,7 +793,7 @@ export function MercadosTradingPage() {
   const ck = (id: string) => signal?.checks?.find((c) => c.id === id);
 
   return (
-    <div className="fact-page tv-markets-page">
+    <div className={`fact-page tv-markets-page${boardFs ? " is-board-fs" : ""}`}>
       {createPortal(
         <div className="tv-markets-tape hrs-card hrs-card--rect sgi-glass-panel">
           <div className="tv-markets-tape__viewport">
@@ -1028,6 +1082,24 @@ export function MercadosTradingPage() {
                   </div>
                 );
               })()}
+              <button
+                type="button"
+                className={`tv-markets-fs${boardFs ? " is-on" : ""}`}
+                title={boardFs ? "Salir de pantalla completa (Esc)" : "Pantalla completa"}
+                aria-pressed={boardFs}
+                aria-label={boardFs ? "Salir de pantalla completa" : "Pantalla completa"}
+                onClick={toggleBoardFs}
+              >
+                {boardFs ? (
+                  <svg width="16" height="16" viewBox="0 0 18 18" fill="none" aria-hidden>
+                    <path d="M6 3 V6 H3 M12 3 V6 H15 M6 15 V12 H3 M12 15 V12 H15" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 18 18" fill="none" aria-hidden>
+                    <path d="M3 7 V3 H7 M11 3 H15 V7 M15 11 V15 H11 M7 15 H3 V11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </button>
               {pairOpen
                 ? createPortal(
                     <div
@@ -1237,6 +1309,25 @@ export function MercadosTradingPage() {
                   </div>
                 ) : null}
               </div>
+              <span className="tv-markets-dock__sep" aria-hidden />
+              <button
+                type="button"
+                className={`tv-markets-dock__tool${boardFs ? " is-on" : ""}`}
+                title={boardFs ? "Salir de pantalla completa (Esc)" : "Pantalla completa"}
+                aria-pressed={boardFs}
+                aria-label={boardFs ? "Salir de pantalla completa" : "Pantalla completa"}
+                onClick={toggleBoardFs}
+              >
+                {boardFs ? (
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+                    <path d="M6 3 V6 H3 M12 3 V6 H15 M6 15 V12 H3 M12 15 V12 H15" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+                    <path d="M3 7 V3 H7 M11 3 H15 V7 M15 11 V15 H11 M7 15 H3 V11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </button>
               <button
                 type="button"
                 className="tv-markets-dock__tool"
