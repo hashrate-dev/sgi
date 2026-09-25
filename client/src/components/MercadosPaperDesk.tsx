@@ -50,25 +50,49 @@ function roxyAnalyzeMood(now: number): { title: string; body: string } {
     {
       title: "Analizando",
       body: [
-        "Estoy con el mercado en la palma, como quien elige un vestido: lo miro de frente, de perfil… y no me lo pongo solo porque brilla.",
-        "Hay ruido, hay ego, hay velas que se creen protagonistas. Yo recorro todo con calma: votos, noticias, el pulso de cada par.",
-        "Si algo me guiña de verdad, lo voy a notar. Si es solo coqueteo barato del precio, sonrío y sigo. Hashrate merece criterio, no prisa.",
+        "Estoy analizando el mercado. Recorro cada par: tendencia, RSI, MACD, volumen… a ver cómo está todo de verdad.",
+        "También leo las noticias de cripto del día. Quiero ver si el gráfico y el titular van para el mismo lado.",
+        "Si no encaja, no me apuro. Prefiero entender bien antes de opinar o de operar.",
+      ].join("\n"),
+    },
+    {
+      title: "Analizando",
+      body: [
+        "Estoy viendo cómo está el tablero: quién empuja, quién se queda, y si hay setup o solo ruido.",
+        "Cruzo el técnico con lo que salió hoy en el mercado. Una vela linda no alcanza si la noticia contradice.",
+        "Cuando tenga algo claro, hablo. Ahora estoy en eso.",
       ].join("\n"),
     },
     {
       title: "Enfoque",
       body: [
-        "Shh. No desaparecí: me enfoqué. Cuando pienso, hasta el café se queda quieto.",
-        "Estoy pesando si esto es una entrada con clase o un capricho disfrazado de oportunidad. Hay una diferencia, y se siente en el estómago.",
-        "Un segundo bien pensado vale más que diez clics nerviosos. Déjenme terminar la frase en la cabeza; si merezco entrar, entro. Si no, paso con el taconcito bien puesto.",
+        "Shh. No desaparecí: me enfoqué. Estoy pensando el escenario, no comentando por comentar.",
+        "Estoy cruzando indicadores, stop e invalidación con las noticias. Si el setup no está limpio, no opero.",
+        "Déjenme un minuto. Acá se decide si hay trade o paso.",
+      ].join("\n"),
+    },
+    {
+      title: "Enfoque",
+      body: [
+        "Necesito concentrarme. Una idea de trade se arma en la cabeza, no en voz alta.",
+        "Estoy pesando riesgo, sesgo y si el técnico aguanta. Eso no se improvisa.",
+        "Ya vuelvo: o con una lectura clara, o sin forzar nada.",
       ].join("\n"),
     },
     {
       title: "De turno",
       body: [
-        "Un poquito cansada, sí. Los ojos ya pidieron agua y el tape no trae flores. Da igual: vine a trabajar duro para Hashrate.",
-        "Me acomodo el humor, me pongo el stop como perfume, y sigo. El mercado puede estar pesado; yo más, pero con gracia.",
-        "Que se note que hay una mujer al mando: curiosa, un poco pícara, elegante… y nada de dormirme en la ronda.",
+        "Un poco cansada, sí. Igual sigo en el desk: Hashrate me tiene acá para leer el mercado y operar con cabeza.",
+        "Reviso gráficos y noticias aunque el día se haga largo. El trabajo es este.",
+        "Cansada no es desconectada. Si hay que esperar, espero. Si hay que trabajar, trabajo.",
+      ].join("\n"),
+    },
+    {
+      title: "De turno",
+      body: [
+        "El café ya no hace milagros y igual estoy acá, mirando velas y titulares.",
+        "Un poco pesada, pero Hashrate no se opera sola. Sigo el técnico, sigo las noticias.",
+        "No me duermo en la ronda. Estoy en el mercado.",
       ].join("\n"),
     },
   ] as const;
