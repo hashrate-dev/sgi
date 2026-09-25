@@ -306,7 +306,7 @@ function uruguayDayKey(ms: number): string {
   }).format(new Date(ms));
 }
 
-function normalizePaperMode(raw: unknown): PaperMode {
+export function normalizePaperMode(raw: unknown): PaperMode {
   if (raw === "spot-long" || raw === "fut-long" || raw === "fut-short" || raw === "all") return raw;
   return "all";
 }
