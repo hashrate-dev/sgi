@@ -3,6 +3,7 @@ import { env } from "./config/env.js";
 import { dbType, initDb } from "./db.js";
 import { runSeedVitrinaEquipos } from "./db/seedVitrinaEquipos.js";
 import { startOpsComunicacionScheduler } from "./routes/opsComunicacion.js";
+import { startPaperAgentScheduler } from "./lib/paperWorker.js";
 
 async function main() {
   try {
@@ -20,6 +21,7 @@ async function main() {
       // eslint-disable-next-line no-console
       console.log(`API listening on http://${host}:${env.PORT}`);
       startOpsComunicacionScheduler();
+      startPaperAgentScheduler();
       if (env.NODE_ENV === "production" && env.CORS_ORIGIN) {
         // eslint-disable-next-line no-console
         console.log(`CORS allowed origin: ${env.CORS_ORIGIN}`);

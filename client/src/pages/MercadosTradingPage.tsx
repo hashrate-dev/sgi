@@ -23,6 +23,8 @@ const SYMBOLS = [
   { id: "BINANCE:SOLUSDT", binance: "SOLUSDT", label: "SOL", name: "Solana", quote: "USDT", logo: "sol" },
 ] as const;
 
+const PAPER_PAIRS = SYMBOLS.map((s) => ({ binance: s.binance, label: `${s.label}/${s.quote}` }));
+
 const TAPE_LOGO = (slug: string) =>
   `https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/32/color/${slug}.png`;
 
@@ -402,6 +404,38 @@ function HudTip({ check, title, detail }: { check?: BtcTradeCheck; title?: strin
   );
 }
 
+function DeskFold({
+  title,
+  summary,
+  value,
+  open,
+  onToggle,
+  className,
+  children,
+}: {
+  title: string;
+  summary?: string;
+  value?: string;
+  open: boolean;
+  onToggle: () => void;
+  className: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className={`${className}${open ? " is-open" : ""}`}>
+      <button type="button" className="tv-desk-fold" onClick={onToggle} aria-expanded={open}>
+        <span>
+          {title}
+          {summary ? <em>{summary}</em> : null}
+        </span>
+        {value ? <strong>{value}</strong> : null}
+        <i className={`tv-paper__chev${open ? " is-open" : ""}`} aria-hidden />
+      </button>
+      {open ? children : null}
+    </div>
+  );
+}
+
 function BiasClock({
   bias,
   confidence,
@@ -425,8 +459,7 @@ function BiasClock({
   const angle = -90 + (pct / 100) * 180;
   const title = bias === "buy" ? "COMPRAR" : bias === "sell" ? "VENDER" : "ESPERAR";
   return (
-    <div className={`tv-desk-clock tv-desk-clock--${bias ?? "wait"} hrs-card sgi-glass-panel`} aria-label={`Señal: ${title}`}>
-      <h2>Señal</h2>
+    <div className={`tv-desk-clock__inner tv-desk-clock--${bias ?? "wait"}`} aria-label={`Señal: ${title}`}>
       <div className="tv-desk-clock__face" aria-hidden>
         <svg viewBox="0 0 200 118">
           <defs>
@@ -563,12 +596,16 @@ export function MercadosTradingPage() {
   const [signalLoading, setSignalLoading] = useState(true);
   const [tapeQuotes, setTapeQuotes] = useState<Record<string, TapeQuote>>({});
   const [indOpen, setIndOpen] = useState(false);
+  const [colorOpen, setColorOpen] = useState(false);
   const [pairOpen, setPairOpen] = useState(false);
   const [studyOn, setStudyOn] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(CHART_STUDIES.map((s) => [s.key, true]))
   );
   const [drawTool, setDrawTool] = useState<ChartDrawTool>("cursor");
   const [drawColor, setDrawColor] = useState(DRAW_COLORS[0]!);
+  const [foldSignal, setFoldSignal] = useState(false);
+  const [foldLevels, setFoldLevels] = useState(false);
+  const [foldClock, setFoldClock] = useState(false);
   const [drawPulse, setDrawPulse] = useState<{ n: number; op: "undo" | "clear" }>({ n: 0, op: "undo" });
   const dockRef = useRef<HTMLDivElement>(null);
   const pairRef = useRef<HTMLDivElement>(null);
@@ -578,14 +615,16 @@ export function MercadosTradingPage() {
   const active = SYMBOLS.find((s) => s.id === symbol) ?? SYMBOLS[0];
 
   useEffect(() => {
-    if (!indOpen && !pairOpen) return;
+    if (!indOpen && !pairOpen && !colorOpen) return;
     const close = () => {
       setIndOpen(false);
       setPairOpen(false);
+      setColorOpen(false);
     };
     const onDoc = (e: MouseEvent) => {
       const t = e.target as Node;
       if (indOpen && !dockRef.current?.contains(t)) setIndOpen(false);
+      if (colorOpen && !dockRef.current?.contains(t)) setColorOpen(false);
       if (pairOpen && !pairRef.current?.contains(t) && !pairMenuRef.current?.contains(t)) setPairOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
@@ -597,7 +636,7 @@ export function MercadosTradingPage() {
       document.removeEventListener("mousedown", onDoc);
       window.removeEventListener("keydown", onKey);
     };
-  }, [indOpen, pairOpen]);
+  }, [indOpen, pairOpen, colorOpen]);
 
   useLayoutEffect(() => {
     if (!pairOpen) return;
@@ -944,6 +983,24 @@ export function MercadosTradingPage() {
                         {formatTapePrice(q?.low ?? 0)} → {formatTapePrice(q?.high ?? 0)}
                       </em>
                     </div>
+                    {(() => {
+                      const lo = signal?.range52Low ?? NaN;
+                      const hi = signal?.range52High ?? NaN;
+                      const px = signal?.price ?? q?.last ?? NaN;
+                      const pos52 = rangePct(px, lo, hi);
+                      const amp52 = lo > 0 && hi > lo ? ((hi - lo) / lo) * 100 : NaN;
+                      return (
+                        <div className="tv-markets-pairstats__cell tv-markets-pairstats__cell--range">
+                          <span>Rango 52 sem {Number.isFinite(amp52) ? `${amp52.toFixed(1)}%` : ""}</span>
+                          <div className="tv-markets-pairstats__track" title="Posición del precio en el rango de 52 semanas">
+                            <i style={{ left: `${pos52}%` }} />
+                          </div>
+                          <em>
+                            {formatTapePrice(lo)} → {formatTapePrice(hi)}
+                          </em>
+                        </div>
+                      );
+                    })()}
                     <div className="tv-markets-pairstats__cell">
                       <span>Vol 24h ({active.label})</span>
                       <strong>{compactQty(q?.volume ?? NaN)}</strong>
@@ -1027,7 +1084,7 @@ export function MercadosTradingPage() {
               drawColor={drawColor}
               drawPulse={drawPulse}
             />
-            {pairOpen || indOpen ? (
+            {pairOpen || indOpen || colorOpen ? (
               <button
                 type="button"
                 className="tv-markets-menu-scrim"
@@ -1035,6 +1092,7 @@ export function MercadosTradingPage() {
                 onMouseDown={() => {
                   setPairOpen(false);
                   setIndOpen(false);
+                  setColorOpen(false);
                 }}
               />
             ) : null}
@@ -1139,27 +1197,45 @@ export function MercadosTradingPage() {
                   <DrawGlyph kind={tool.id} />
                 </button>
               ))}
-              <div className="tv-markets-dock__colors" role="group" aria-label="Color de dibujo">
-                {DRAW_COLORS.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    className={`tv-markets-dock__swatch${drawColor.toLowerCase() === c.toLowerCase() ? " is-on" : ""}`}
-                    style={{ background: c }}
-                    title={`Color ${c}`}
-                    aria-label={`Color ${c}`}
-                    aria-pressed={drawColor.toLowerCase() === c.toLowerCase()}
-                    onClick={() => setDrawColor(c)}
-                  />
-                ))}
-                <label className="tv-markets-dock__swatch-custom" title="Color personalizado">
-                  <input
-                    type="color"
-                    value={drawColor}
-                    aria-label="Color personalizado"
-                    onChange={(e) => setDrawColor(e.target.value)}
-                  />
-                </label>
+              <div className="tv-markets-dock__colors">
+                <button
+                  type="button"
+                  className={`tv-markets-dock__swatch is-on${colorOpen ? " is-open" : ""}`}
+                  style={{ background: drawColor }}
+                  title="Color de dibujo"
+                  aria-label="Color de dibujo"
+                  aria-expanded={colorOpen}
+                  aria-haspopup="true"
+                  onClick={() => setColorOpen((v) => !v)}
+                />
+                {colorOpen ? (
+                  <div className="tv-markets-dock__palette" role="menu" aria-label="Elegir color">
+                    {DRAW_COLORS.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        role="menuitemradio"
+                        className={`tv-markets-dock__swatch${drawColor.toLowerCase() === c.toLowerCase() ? " is-on" : ""}`}
+                        style={{ background: c }}
+                        title={`Color ${c}`}
+                        aria-label={`Color ${c}`}
+                        aria-checked={drawColor.toLowerCase() === c.toLowerCase()}
+                        onClick={() => {
+                          setDrawColor(c);
+                          setColorOpen(false);
+                        }}
+                      />
+                    ))}
+                    <label className="tv-markets-dock__swatch-custom" title="Color personalizado">
+                      <input
+                        type="color"
+                        value={drawColor}
+                        aria-label="Color personalizado"
+                        onChange={(e) => setDrawColor(e.target.value)}
+                      />
+                    </label>
+                  </div>
+                ) : null}
               </div>
               <button
                 type="button"
@@ -1189,7 +1265,14 @@ export function MercadosTradingPage() {
           </div>
 
           <aside className="tv-markets-rail">
-            <div className={`tv-desk-signal tv-desk-signal--${signal?.bias ?? "wait"} hrs-card sgi-glass-panel`}>
+            <DeskFold
+              className={`tv-desk-signal tv-desk-signal--${signal?.bias ?? "wait"} hrs-card sgi-glass-panel`}
+              title={signalLoading && !signal ? "Leyendo…" : copy.title}
+              summary={copy.kicker}
+              value={signal ? usd(signal.price) : undefined}
+              open={foldSignal}
+              onToggle={() => setFoldSignal((v) => !v)}
+            >
               <div className="tv-desk-signal__lead">
                 <span className="tv-desk-signal__badge">{copy.kicker}</span>
                 <div className="tv-desk-signal__lead-row">
@@ -1244,10 +1327,17 @@ export function MercadosTradingPage() {
                   <div className="tv-desk-signal__conf-bar" style={{ width: `${signal?.confidence ?? 0}%` }} />
                 </div>
               </div>
-            </div>
+            </DeskFold>
 
             {signal && signal.bias !== "wait" ? (
-              <div className={`tv-desk-levels tv-desk-levels--${signal.bias} hrs-card sgi-glass-panel`}>
+              <DeskFold
+                className={`tv-desk-levels tv-desk-levels--${signal.bias} hrs-card sgi-glass-panel`}
+                title="Plan"
+                summary={signal.bias === "buy" ? "Largo" : "Corto"}
+                value={usd(signal.price)}
+                open={foldLevels}
+                onToggle={() => setFoldLevels((v) => !v)}
+              >
                 <div className="tv-desk-level">
                   <span>{signal.bias === "buy" ? "Largo · entrada" : "Corto · entrada"}</span>
                   <strong>{usd(signal.price)}</strong>
@@ -1266,9 +1356,16 @@ export function MercadosTradingPage() {
                   <span>{signal.bias === "buy" ? "T2 arriba" : "T2 abajo"}</span>
                   <strong>{usd(signal.target2)}</strong>
                 </div>
-              </div>
+              </DeskFold>
             ) : signal ? (
-              <div className="tv-desk-levels tv-desk-levels--wait hrs-card sgi-glass-panel">
+              <DeskFold
+                className="tv-desk-levels tv-desk-levels--wait hrs-card sgi-glass-panel"
+                title="Plan"
+                summary="Esperar"
+                value={usd(signal.price)}
+                open={foldLevels}
+                onToggle={() => setFoldLevels((v) => !v)}
+              >
                 <div className="tv-desk-level">
                   <span>Precio</span>
                   <strong>{usd(signal.price)}</strong>
@@ -1286,59 +1383,31 @@ export function MercadosTradingPage() {
                   <strong>Esperar</strong>
                   <em>{signal.guide ?? "Sin setup"}</em>
                 </div>
-              </div>
+              </DeskFold>
             ) : null}
 
-            {signal ? (
-              <div className="tv-desk-ranges hrs-card sgi-glass-panel">
-                <h2>Rangos</h2>
-                <div className="tv-desk-range">
-                  <div className="tv-desk-range__head">
-                    <span>Rango del día</span>
-                    <strong>
-                      {usd(signal.rangeDayLow ?? NaN)}
-                      <em>→</em>
-                      {usd(signal.rangeDayHigh ?? NaN)}
-                    </strong>
-                  </div>
-                  <div className="tv-desk-range__track" aria-hidden>
-                    <i
-                      className="tv-desk-range__dot"
-                      style={{ left: `${rangePct(signal.price, signal.rangeDayLow ?? NaN, signal.rangeDayHigh ?? NaN)}%` }}
-                    />
-                  </div>
-                </div>
-                <div className="tv-desk-range">
-                  <div className="tv-desk-range__head">
-                    <span>Rango 52 semanas</span>
-                    <strong>
-                      {usd(signal.range52Low ?? NaN)}
-                      <em>→</em>
-                      {usd(signal.range52High ?? NaN)}
-                    </strong>
-                  </div>
-                  <div className="tv-desk-range__track is-wide" aria-hidden>
-                    <i
-                      className="tv-desk-range__dot"
-                      style={{ left: `${rangePct(signal.price, signal.range52Low ?? NaN, signal.range52High ?? NaN)}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
-            <BiasClock
-              bias={signal?.bias}
-              confidence={signal?.confidence}
-              buyVotes={signal?.buyVotes}
-              sellVotes={signal?.sellVotes}
-            />
+            <DeskFold
+              className={`tv-desk-clock hrs-card sgi-glass-panel tv-desk-clock--${signal?.bias ?? "wait"}`}
+              title="Señal"
+              summary={
+                signal?.bias === "buy" ? "Comprar" : signal?.bias === "sell" ? "Vender" : "Esperar"
+              }
+              value={signal ? `${signal.confidence}%` : undefined}
+              open={foldClock}
+              onToggle={() => setFoldClock((v) => !v)}
+            >
+              <BiasClock
+                bias={signal?.bias}
+                confidence={signal?.confidence}
+                buyVotes={signal?.buyVotes}
+                sellVotes={signal?.sellVotes}
+              />
+            </DeskFold>
 
             <MercadosPaperDesk
               userId={user.id}
-              signal={signal}
-              pairLabel={`${active.label}/${active.quote}`}
-              binance={active.binance}
+              interval={interval === "LIVE" ? "1s" : interval}
+              pairs={PAPER_PAIRS}
             />
 
           </aside>

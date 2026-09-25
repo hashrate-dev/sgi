@@ -16,6 +16,7 @@ import { garantiasAndeClientesRouter } from "./routes/garantiasAndeClientes.js";
 import { valoresGarantiasAsicRouter } from "./routes/valoresGarantiasAsic.js";
 import { cryptoNoticiasRouter } from "./routes/cryptoNoticias.js";
 import { opsComunicacionRouter, opsComunicacionCronHandler } from "./routes/opsComunicacion.js";
+import { paperAgentRouter, paperAgentCronHandler } from "./routes/paperAgent.js";
 import { reparacionTiposRouter } from "./routes/reparacionTipos.js";
 import { transporteFleteTiposRouter } from "./routes/transporteFleteTipos.js";
 import { setupsRouter } from "./routes/setups.js";
@@ -154,6 +155,9 @@ export function createApp() {
   app.use("/api", cryptoNoticiasRouter);
   app.get("/api/ops-comunicacion/cron-flush", opsComunicacionCronHandler);
   app.post("/api/ops-comunicacion/cron-flush", opsComunicacionCronHandler);
+  app.get("/api/paper/cron-tick", paperAgentCronHandler);
+  app.post("/api/paper/cron-tick", paperAgentCronHandler);
+  app.use("/api", paperAgentRouter);
   app.use("/api", requireAuth, opsComunicacionRouter);
   app.use("/api", requireAuth, setupsRouter);
   app.use("/api", requireAuth, reparacionTiposRouter);

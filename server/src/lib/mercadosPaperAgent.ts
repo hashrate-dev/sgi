@@ -1,4 +1,6 @@
-import type { BtcTradeSignal } from "./api";
+import type { TradeConfluence } from "./btcTradeConfluence.js";
+
+type BtcTradeSignal = TradeConfluence;
 
 const FEE = 0.0004;
 const RISK_PCT = 0.01;
@@ -196,6 +198,7 @@ export function paperStorageKey(userId: number): string {
 
 function migrateV1(userId: number): PaperBook | null {
   try {
+    if (typeof localStorage === "undefined") return null;
     const prefix = `hrs_paper_v1_${userId}_`;
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
@@ -213,20 +216,21 @@ function migrateV1(userId: number): PaperBook | null {
         peakUsd?: number;
       };
       if (!parsed || !Number.isFinite(parsed.cashUsd)) continue;
+      const cash = Number(parsed.cashUsd);
       const pos = parsed.position ?? null;
       const trades = pos ? [tradeFromPosition(pos)] : [];
       return {
-        ...emptyPaperBook(parsed.initialUsd ?? parsed.cashUsd, pos?.symbol ?? "ALL"),
-        cashUsd: parsed.cashUsd,
+        ...emptyPaperBook(parsed.initialUsd ?? cash, pos?.symbol ?? "ALL"),
+        cashUsd: cash,
         armed: parsed.armed !== false,
         opsUsed: pos ? 1 : 0,
         positions: pos ? [pos] : [],
         trades,
         fills: (parsed.fills ?? []).map((f) => ({ ...f, symbol: f.symbol || pos?.symbol || "" })),
-        equityHist: parsed.equityHist ?? [parsed.cashUsd],
+        equityHist: parsed.equityHist ?? [cash],
         wins: parsed.wins ?? 0,
         losses: parsed.losses ?? 0,
-        peakUsd: parsed.peakUsd ?? parsed.cashUsd,
+        peakUsd: parsed.peakUsd ?? cash,
       };
     }
   } catch {
@@ -331,6 +335,7 @@ export function hydratePaperBook(parsed: Partial<PaperBook> & { v?: number }): P
 
 export function loadPaperBook(userId: number): PaperBook {
   try {
+    if (typeof localStorage === "undefined") return emptyPaperBook();
     const raw = localStorage.getItem(paperStorageKey(userId));
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<PaperBook> & { v?: number };
@@ -345,6 +350,7 @@ export function loadPaperBook(userId: number): PaperBook {
 
 export function savePaperBook(userId: number, book: PaperBook): void {
   try {
+    if (typeof localStorage === "undefined") return;
     localStorage.setItem(paperStorageKey(userId), JSON.stringify(book));
   } catch {
     /* quota */

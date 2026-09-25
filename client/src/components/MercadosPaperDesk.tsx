@@ -1,15 +1,28 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { BtcTradeSignal } from "../lib/api";
+import { getBtcTradeSignal, getPaperBook, putPaperBook } from "../lib/api";
 import {
+  clampPaperMaxOps,
   loadPaperBook,
+  narratePaper,
+  paperAtOpsCap,
+  paperEntryAlert,
   paperEquity,
-  resetPaperBook,
+  paperOpsLeft,
   savePaperBook,
-  tickPaper,
+  splitPaperTrades,
   type PaperBook,
+  type PaperNote,
+  type PaperTrade,
+  type PaperUniverse,
 } from "../lib/mercadosPaperAgent";
 import { showToast } from "./ToastNotification";
 import { playMarketplaceCartItemAddedSound, playMarketplaceCartItemRemovedSound } from "../lib/marketplaceCartSound";
+import { playRoxyTypeTick } from "../lib/roxyTypeSound";
+
+export type PaperPairOpt = { binance: string; label: string };
+
+const ROXY = "Roxy";
 
 function usd(n: number): string {
   if (!Number.isFinite(n)) return "—";
@@ -18,6 +31,33 @@ function usd(n: number): string {
     currency: "USD",
     maximumFractionDigits: 2,
   }).format(n);
+}
+
+function fmtStamp(ms: number): { date: string; time: string; iso: string } {
+  const d = new Date(ms);
+  return {
+    date: d.toLocaleDateString("es-PY", { day: "2-digit", month: "2-digit", year: "numeric" }),
+    time: d.toLocaleTimeString("es-PY", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }),
+    iso: d.toISOString(),
+  };
+}
+
+function fmtDur(from: number, to: number): string {
+  const s = Math.max(0, Math.floor((to - from) / 1000));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}h ${m}m ${sec}s`;
+  if (m > 0) return `${m}m ${sec}s`;
+  return `${sec}s`;
+}
+
+function exitLabel(reason: string | null): string {
+  if (reason === "stop") return "Stop";
+  if (reason === "t2") return "T2";
+  if (reason === "t1") return "T1";
+  if (reason === "flip") return "Sesgo";
+  return reason || "Cierre";
 }
 
 function Spark({ values }: { values: number[] }) {
@@ -42,187 +82,552 @@ function Spark({ values }: { values: number[] }) {
   );
 }
 
+function pairTag(pairs: PaperPairOpt[], symbol: string): string {
+  return pairs.find((p) => p.binance === symbol)?.label.replace("/USDT", "") ?? symbol.replace("USDT", "");
+}
+
+function AgentOpinion({
+  notes,
+  live,
+}: {
+  notes: PaperNote[];
+  live: Omit<PaperNote, "id">;
+}) {
+  const feed = useMemo(() => {
+    if (!notes.length) return [{ ...live, id: "live" } as PaperNote];
+    if (notes[0]!.fingerprint === live.fingerprint) return notes;
+    return [{ ...live, id: "live" } as PaperNote, ...notes];
+  }, [notes, live]);
+  const [i, setI] = useState(0);
+  const latestId = feed[0]?.id;
+  const [shown, setShown] = useState("");
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    setI(0);
+  }, [latestId]);
+
+  const current = feed[i] ?? feed[0]!;
+  const isLive = i === 0;
+
+  useEffect(() => {
+    if (!isLive) {
+      setShown(current.body);
+      setDone(true);
+      return;
+    }
+    setShown("");
+    setDone(false);
+    const body = current.body;
+    if (!body) {
+      setDone(true);
+      return;
+    }
+    let n = 0;
+    let last = 0;
+    let raf = 0;
+    const tick = (t: number) => {
+      if (!last) last = t;
+      const elapsed = t - last;
+      if (elapsed >= 28) {
+        const from = n;
+        n = Math.min(body.length, n + 1);
+        if (n > from) playRoxyTypeTick(body[from] ?? "");
+        setShown(body.slice(0, n));
+        last = t;
+      }
+      if (n < body.length) raf = window.requestAnimationFrame(tick);
+      else setDone(true);
+    };
+    raf = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(raf);
+  }, [isLive, current.id, current.body]);
+
+  const older = i < feed.length - 1;
+  const newer = i > 0;
+  const when = fmtStamp(current.at);
+  const text = isLive ? shown : current.body;
+  const chunks = (text || " ").split(/\n+/).filter((p) => p.length > 0);
+
+  return (
+    <blockquote className={`tv-paper-opine tv-paper-opine--${current.tone}`}>
+      <div className="tv-paper-opine__face">
+        <div className="tv-paper-opine__head">
+          <img className="tv-paper-opine__photo" src="/images/paper-agent-avatar.png" alt={ROXY} width={48} height={48} />
+          <span className="tv-paper-opine__lid tv-paper-opine__lid--l" aria-hidden />
+          <span className="tv-paper-opine__lid tv-paper-opine__lid--r" aria-hidden />
+        </div>
+      </div>
+      <div className="tv-paper-opine__ident">
+        <p className="tv-paper-opine__kicker">Opinión de {ROXY}</p>
+        <p className="tv-paper-opine__title">{current.title}</p>
+      </div>
+      <div className="tv-paper-opine__tools">
+        <p className="tv-paper-opine__meta">
+          {i === 0 ? "Ahora" : "Antes"} · {when.time}
+          {feed.length > 1 ? ` · ${i + 1}/${feed.length}` : ""}
+        </p>
+        <div className="tv-paper-opine__nav">
+          <button
+            type="button"
+            className="tv-paper-opine__arrow"
+            disabled={!older}
+            aria-label="Comentario anterior"
+            onClick={() => setI((v) => Math.min(feed.length - 1, v + 1))}
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            className="tv-paper-opine__arrow"
+            disabled={!newer}
+            aria-label="Comentario siguiente"
+            onClick={() => setI((v) => Math.max(0, v - 1))}
+          >
+            ›
+          </button>
+        </div>
+      </div>
+      <div className="tv-paper-opine__stage">
+        {i > 0 ? <div className="tv-paper-opine__peek" aria-hidden /> : null}
+        <div key={current.id} className={`tv-paper-opine__slide${i === 0 ? " is-now" : " is-past"}`}>
+          <div className="tv-paper-opine__body">
+            {chunks.map((para, pi) => (
+              <p key={pi}>
+                {para}
+                {isLive && pi === chunks.length - 1 ? (
+                  <i className={`tv-paper-opine__caret${done ? " is-done" : ""}`} aria-hidden />
+                ) : null}
+              </p>
+            ))}
+          </div>
+        </div>
+      </div>
+    </blockquote>
+  );
+}
+
+function TradeCard({
+  trade,
+  tag,
+  mark,
+  now,
+}: {
+  trade: PaperTrade;
+  tag: string;
+  mark?: number;
+  now: number;
+}) {
+  const open = trade.status === "open";
+  const px = mark ?? trade.entry;
+  const live = open ? trade.qtyLeft * (px - trade.entry) : 0;
+  const pnl = open ? live + trade.realizedPnl : trade.realizedPnl;
+  const end = trade.closedAt ?? now;
+  return (
+    <article className={`tv-paper-op tv-paper-op--${trade.side}${open ? " is-open" : " is-closed"}`}>
+      <header>
+        <strong>
+          {tag} · {trade.side === "long" ? "Largo" : "Corto"}
+        </strong>
+        <em className={open ? "is-live" : ""}>{open ? "Abierta" : "Cerrada"}</em>
+        <span className={pnl >= 0 ? "is-up" : "is-down"}>
+          {pnl >= 0 ? "+" : ""}
+          {usd(pnl)}
+        </span>
+      </header>
+      <ol className="tv-paper-op__line" aria-label="Línea de tiempo">
+        <li>
+          <i />
+          <div>
+            <small>Apertura</small>
+            <Stamp at={trade.openedAt} />
+            <p>
+              Entrada {usd(trade.entry)} · {Math.abs(trade.qty).toFixed(6)} · Stop {usd(trade.stop)}
+            </p>
+          </div>
+        </li>
+        {trade.t1Done && trade.t1At ? (
+          <li>
+            <i />
+            <div>
+              <small>T1 · 50%</small>
+              <Stamp at={trade.t1At} />
+              <p>
+                {usd(trade.t1Price ?? trade.t1)}
+                {trade.t1Pnl != null ? ` · ${trade.t1Pnl >= 0 ? "+" : ""}${usd(trade.t1Pnl)}` : ""} · stop a BE
+              </p>
+            </div>
+          </li>
+        ) : null}
+        {open ? (
+          <li className="is-now">
+            <i />
+            <div>
+              <small>Ahora</small>
+              <Stamp at={now} />
+              <p>
+                Marca {usd(px)} · T1 {usd(trade.t1)} · T2 {usd(trade.t2)} · lleva {fmtDur(trade.openedAt, now)}
+              </p>
+            </div>
+          </li>
+        ) : (
+          <li>
+            <i />
+            <div>
+              <small>Cierre · {exitLabel(trade.exitReason)}</small>
+              <Stamp at={trade.closedAt ?? trade.openedAt} />
+              <p>
+                Salida {usd(trade.exit ?? 0)} · duración {fmtDur(trade.openedAt, end)}
+              </p>
+            </div>
+          </li>
+        )}
+      </ol>
+    </article>
+  );
+}
+
 export function MercadosPaperDesk({
   userId,
-  signal,
-  pairLabel,
-  binance,
+  interval,
+  pairs,
 }: {
   userId: number;
-  signal: BtcTradeSignal | null;
-  pairLabel: string;
-  binance: string;
+  interval: string;
+  pairs: PaperPairOpt[];
 }) {
-  const symbol = binance;
   const [open, setOpen] = useState(false);
-  const [book, setBook] = useState<PaperBook>(() => loadPaperBook(userId, symbol));
-  const [fund, setFund] = useState(() => String(Math.round(loadPaperBook(userId, symbol).initialUsd)));
+  const [book, setBook] = useState<PaperBook>(() => loadPaperBook(userId));
+  const [fund, setFund] = useState(() => String(Math.round(loadPaperBook(userId).initialUsd)));
+  const [cap, setCap] = useState(() => String(loadPaperBook(userId).maxOps));
+  const [marks, setMarks] = useState<Record<string, number>>({});
+  const [sigs, setSigs] = useState<BtcTradeSignal[]>([]);
+  const [nowTick, setNowTick] = useState(Date.now());
   const bookRef = useRef(book);
   bookRef.current = book;
+  const iv = interval === "LIVE" ? "1s" : interval;
+  const tag = (symbol: string) => pairTag(pairs, symbol);
+  const hydrated = useRef(false);
 
   useEffect(() => {
-    const b = loadPaperBook(userId, symbol);
-    setBook(b);
-    setFund(String(Math.round(b.initialUsd)));
-  }, [userId, symbol]);
-
-  useEffect(() => {
-    if (!signal || signal.symbol !== symbol) return;
-    const { book: next, events } = tickPaper(bookRef.current, signal);
-    const changed =
-      events.length > 0 ||
-      next.cashUsd !== book.cashUsd ||
-      next.confirm !== book.confirm ||
-      next.position?.stop !== book.position?.stop ||
-      next.equityHist.length !== book.equityHist.length;
-    if (!changed) return;
-    setBook(next);
-    savePaperBook(userId, symbol, next);
-    for (const ev of events) {
-      if (ev.kind === "open") {
-        playMarketplaceCartItemAddedSound();
-        showToast(`${ev.note} ${pairLabel} @ ${usd(ev.price)}`, "success", "Agente paper");
-      } else {
-        playMarketplaceCartItemRemovedSound();
-        const pnl = ev.pnl ?? 0;
-        showToast(
-          `${ev.note} ${pnl >= 0 ? "+" : ""}${usd(pnl)}`,
-          pnl >= 0 ? "success" : "warning",
-          "Agente paper",
-        );
+    let cancelled = false;
+    hydrated.current = false;
+    void (async () => {
+      try {
+        const remote = await getPaperBook();
+        if (cancelled) return;
+        if (remote.book) {
+          setBook(remote.book);
+          setFund(String(Math.round(remote.book.initialUsd)));
+          setCap(String(remote.book.maxOps));
+          savePaperBook(userId, remote.book);
+        } else {
+          const local = loadPaperBook(userId);
+          local.runInterval = iv;
+          const saved = await putPaperBook({ seed: local, runInterval: iv });
+          if (cancelled) return;
+          setBook(saved.book);
+          setFund(String(Math.round(saved.book.initialUsd)));
+          setCap(String(saved.book.maxOps));
+          savePaperBook(userId, saved.book);
+        }
+      } catch {
+        const b = loadPaperBook(userId);
+        if (cancelled) return;
+        setBook(b);
+        setFund(String(Math.round(b.initialUsd)));
+        setCap(String(b.maxOps));
+      } finally {
+        hydrated.current = true;
       }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- tick only on new confluence snapshot
-  }, [signal?.updatedAt, signal?.price, signal?.bias, symbol, userId, pairLabel]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
-  const px = signal?.price ?? 0;
-  const eq = paperEquity(book, px || book.cashUsd);
+  useEffect(() => {
+    if (!hydrated.current) return;
+    if (book.runInterval === iv) return;
+    void putPaperBook({ runInterval: iv })
+      .then((r) => {
+        setBook(r.book);
+        savePaperBook(userId, r.book);
+      })
+      .catch(() => undefined);
+  }, [iv, userId, book.runInterval]);
+
+  useEffect(() => {
+    if (!open) return;
+    const t = window.setInterval(() => setNowTick(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, [open]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const poll = async () => {
+      const cur = bookRef.current;
+      const want = new Set<string>();
+      if (cur.universe === "ALL") for (const p of pairs) want.add(p.binance);
+      else want.add(cur.universe);
+      for (const p of cur.positions) want.add(p.symbol);
+      const [remote, results] = await Promise.all([
+        getPaperBook().catch(() => ({ book: null as PaperBook | null })),
+        want.size
+          ? Promise.allSettled([...want].map((symbol) => getBtcTradeSignal({ symbol, interval: iv })))
+          : Promise.resolve([] as PromiseSettledResult<{ signal: BtcTradeSignal }>[]),
+      ]);
+      if (cancelled) return;
+      if (remote.book) {
+        const prev = bookRef.current;
+        setBook(remote.book);
+        savePaperBook(userId, remote.book);
+        setFund(String(Math.round(remote.book.initialUsd)));
+        setCap(String(remote.book.maxOps));
+        if (remote.book.fills[0] && remote.book.fills[0].at !== prev.fills[0]?.at) {
+          const ev = remote.book.fills[0];
+          const name = tag(ev.symbol);
+          if (ev.action === "open") {
+            playMarketplaceCartItemAddedSound();
+            showToast(`${ev.note || ev.action} ${name} @ ${usd(ev.price)}`, "success", ROXY);
+          } else if (ev.action === "close" || ev.action === "scale") {
+            playMarketplaceCartItemRemovedSound();
+            const pnl = ev.pnl ?? 0;
+            showToast(`${name} ${pnl >= 0 ? "+" : ""}${usd(pnl)}`, pnl >= 0 ? "success" : "warning", ROXY);
+          }
+        }
+      }
+      const nextSigs = results.flatMap((r) => (r.status === "fulfilled" ? [r.value.signal] : []));
+      if (nextSigs.length) {
+        setSigs(nextSigs);
+        const nextMarks: Record<string, number> = {};
+        for (const s of nextSigs) nextMarks[s.symbol] = s.price;
+        setMarks((prev) => ({ ...prev, ...nextMarks }));
+      }
+    };
+    void poll();
+    const t = window.setInterval(() => void poll(), 15_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(t);
+    };
+  }, [userId, iv, pairs]);
+
+  const eq = paperEquity(book, marks);
   const ret = book.initialUsd > 0 ? ((eq - book.initialUsd) / book.initialUsd) * 100 : 0;
   const dd = book.peakUsd > 0 ? ((eq - book.peakUsd) / book.peakUsd) * 100 : 0;
-  const trades = book.wins + book.losses;
-  const wr = trades > 0 ? (book.wins / trades) * 100 : 0;
-  const pos = book.position;
-  const uPnl = pos && px ? pos.qty * (px - pos.entry) : 0;
+  const tradesN = book.wins + book.losses;
+  const wr = tradesN > 0 ? (book.wins / tradesN) * 100 : 0;
+  const posN = book.positions.length;
+  const uniLabel = book.universe === "ALL" ? "todas las monedas" : tag(book.universe);
+  const atCap = paperAtOpsCap(book);
+  const left = paperOpsLeft(book);
+  const ledger = useMemo(() => splitPaperTrades(book), [book]);
+  const liveTalk = useMemo(() => narratePaper(book, sigs, [], tag), [book, sigs, pairs]);
+  const alert = useMemo(() => paperEntryAlert(book, sigs), [book, sigs]);
 
   const status = useMemo(() => {
     if (!book.armed) return "PAUSA";
-    if (pos) return pos.side === "long" ? "LARGO" : "CORTO";
-    if (book.lastFire === "wait") return "ESPERA";
-    return "BUSCANDO";
-  }, [book.armed, book.lastFire, pos]);
+    if (atCap && !posN) return "TOPE";
+    if (posN > 1) return `${posN} OPS`;
+    if (posN === 1) return book.positions[0]!.side === "long" ? "LARGO" : "CORTO";
+    return "ESPERA";
+  }, [book.armed, book.positions, posN, atCap]);
+
+  const persistPatch = (patch: Parameters<typeof putPaperBook>[0], fallback?: PaperBook) => {
+    if (fallback) {
+      setBook(fallback);
+      savePaperBook(userId, fallback);
+    }
+    void putPaperBook(patch)
+      .then((r) => {
+        setBook(r.book);
+        savePaperBook(userId, r.book);
+        setFund(String(Math.round(r.book.initialUsd)));
+        setCap(String(r.book.maxOps));
+      })
+      .catch(() => undefined);
+  };
+
+  const setUniverse = (universe: PaperUniverse) => {
+    persistPatch({ universe }, { ...book, universe });
+  };
+
+  const applyCap = () => {
+    const n = clampPaperMaxOps(Number(cap));
+    setCap(String(n));
+    if (n === book.maxOps) return;
+    persistPatch({ maxOps: n }, { ...book, maxOps: n });
+    showToast(`Tope en ${n} operaciones`, "info", ROXY);
+  };
 
   return (
-    <div className={`tv-paper hrs-card sgi-glass-panel tv-paper--${pos?.side ?? "flat"}${open ? " is-open" : ""}`}>
-      <button type="button" className="tv-paper__toggle" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
-        <span>
-          Agente paper
-          <em>Simulación</em>
-        </span>
-        <strong className={ret >= 0 ? "is-up" : "is-down"}>{usd(eq)}</strong>
-        <i className={`tv-paper__chev${open ? " is-open" : ""}`} aria-hidden />
-      </button>
+    <div className={`tv-paper hrs-card sgi-glass-panel${posN ? " tv-paper--multi" : ""}${open ? " is-open" : ""}`}>
+      <div className="tv-paper__head">
+        <button type="button" className="tv-paper__toggle" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+          <span>
+            {ROXY}
+            <em>
+              {book.armed ? "24/7 en servidor" : "Pausada"} · {book.universe === "ALL" ? "Todas" : tag(book.universe)} ·{" "}
+              {book.opsUsed}/{book.maxOps} ops
+            </em>
+          </span>
+          <strong className={ret >= 0 ? "is-up" : "is-down"}>{usd(eq)}</strong>
+          <i className={`tv-paper__chev${open ? " is-open" : ""}`} aria-hidden />
+        </button>
+        {open ? (
+          <button
+            type="button"
+            className={`tv-paper__arm${book.armed ? " is-on" : ""}`}
+            onClick={() => {
+              persistPatch({ armed: !book.armed }, { ...book, armed: !book.armed });
+            }}
+          >
+            {book.armed ? "ON" : "OFF"}
+          </button>
+        ) : null}
+      </div>
       {open ? (
         <>
-      <div className="tv-paper__top">
-        <p className="tv-paper__disc">
-          Opera {pairLabel} con la confluencia del escritorio. 1% de riesgo, stop ATR, T1 50% y T2. No es dinero real.
-        </p>
-        <button
-          type="button"
-          className={`tv-paper__arm${book.armed ? " is-on" : ""}`}
-          onClick={() => {
-            const next = { ...book, armed: !book.armed };
-            setBook(next);
-            savePaperBook(userId, symbol, next);
-          }}
-        >
-          {book.armed ? "ON" : "OFF"}
-        </button>
-      </div>
-      <div className="tv-paper__eq">
-        <strong className={ret >= 0 ? "is-up" : "is-down"}>{usd(eq)}</strong>
-        <span className={ret >= 0 ? "is-up" : "is-down"}>
-          {ret >= 0 ? "+" : ""}
-          {ret.toFixed(2)}%
-        </span>
-      </div>
-      <Spark values={book.equityHist} />
-      <div className="tv-paper__kpis">
-        <div>
-          <span>Estado</span>
-          <strong>{status}</strong>
-        </div>
-        <div>
-          <span>Win rate</span>
-          <strong>{trades ? `${wr.toFixed(0)}%` : "—"}</strong>
-        </div>
-        <div>
-          <span>DD</span>
-          <strong className={dd < 0 ? "is-down" : ""}>{dd.toFixed(1)}%</strong>
-        </div>
-        <div>
-          <span>Ops</span>
-          <strong>
-            {book.wins}W {book.losses}L
-          </strong>
-        </div>
-      </div>
-      {pos ? (
-        <div className="tv-paper__pos">
-          <span>
-            {pos.side === "long" ? "Largo" : "Corto"} · {Math.abs(pos.qty).toFixed(6)}
-          </span>
-          <strong className={uPnl >= 0 ? "is-up" : "is-down"}>
-            {uPnl >= 0 ? "+" : ""}
-            {usd(uPnl)}
-          </strong>
-          <em>
-            Entrada {usd(pos.entry)} · Stop {usd(pos.stop)} · T1 {usd(pos.t1)}
-            {pos.t1Done ? " · BE" : ""}
-          </em>
-        </div>
-      ) : (
-        <div className="tv-paper__pos is-flat">Sin posición · espera COMPRAR/VENDER con alineación ≥ 58%</div>
-      )}
-      <div className="tv-paper__fund">
-        <label>
-          Fondeo USD
-          <input
-            type="number"
-            min={100}
-            step={100}
-            value={fund}
-            onChange={(e) => setFund(e.target.value)}
-          />
-        </label>
-        <button
-          type="button"
-          onClick={() => {
-            const n = Number(fund);
-            if (!Number.isFinite(n) || n < 100) return;
-            const next = resetPaperBook(n);
-            next.armed = book.armed;
-            setBook(next);
-            savePaperBook(userId, symbol, next);
-            showToast(`Cuenta paper en ${usd(n)}`, "info", "Agente paper");
-          }}
-        >
-          Reiniciar
-        </button>
-      </div>
-      {book.fills.length ? (
-        <ul className="tv-paper__fills">
-          {book.fills.slice(0, 6).map((f) => (
-            <li key={f.id} className={f.pnl != null && f.pnl < 0 ? "is-down" : "is-up"}>
-              <span>
-                {f.action === "open" ? "IN" : f.action === "scale" ? "T1" : "OUT"} {f.side === "long" ? "L" : "C"}
+          <div className="tv-paper__uni" role="group" aria-label={`Moneda de ${ROXY}`}>
+            <button type="button" className={book.universe === "ALL" ? "is-on" : ""} onClick={() => setUniverse("ALL")}>
+              Todas
+            </button>
+            {pairs.map((p) => (
+              <button
+                key={p.binance}
+                type="button"
+                className={book.universe === p.binance ? "is-on" : ""}
+                onClick={() => setUniverse(p.binance)}
+              >
+                {p.label.replace("/USDT", "")}
+              </button>
+            ))}
+          </div>
+
+          <div className={`tv-paper-alert tv-paper-alert--${alert.light}`} role="status">
+            <div className="tv-paper-alert__lights" aria-hidden>
+              <i className={alert.light === "red" ? "is-on" : ""} />
+              <i className={alert.light === "yellow" ? "is-on" : ""} />
+              <i className={alert.light === "green" ? "is-on" : ""} />
+            </div>
+            <div className="tv-paper-alert__copy">
+              <strong>{alert.headline}</strong>
+              <em>{alert.detail}</em>
+            </div>
+            <b className="tv-paper-alert__score">{alert.score}</b>
+          </div>
+
+          <AgentOpinion notes={book.notes} live={liveTalk} />
+
+          <div className="tv-paper__acct">
+            <div className="tv-paper__eq">
+              <strong className={ret >= 0 ? "is-up" : "is-down"}>{usd(eq)}</strong>
+              <span className={ret >= 0 ? "is-up" : "is-down"}>
+                {ret >= 0 ? "+" : ""}
+                {ret.toFixed(2)}%
               </span>
-              <em>{usd(f.price)}</em>
-              <strong>{f.pnl != null ? usd(f.pnl) : f.reason}</strong>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+            </div>
+            <Spark values={book.equityHist} />
+            <div className="tv-paper__kpis">
+              <div>
+                <span>Estado</span>
+                <strong>{status}</strong>
+              </div>
+              <div>
+                <span>Win rate</span>
+                <strong>{tradesN ? `${wr.toFixed(0)}%` : "—"}</strong>
+              </div>
+              <div>
+                <span>DD</span>
+                <strong className={dd < 0 ? "is-down" : ""}>{dd.toFixed(1)}%</strong>
+              </div>
+              <div>
+                <span>Tope</span>
+                <strong className={atCap ? "is-down" : ""}>
+                  {book.opsUsed}/{book.maxOps}
+                </strong>
+              </div>
+            </div>
+
+            <div className="tv-paper__fund">
+              <label>
+                Fondeo USD
+                <input type="number" min={100} step={100} value={fund} onChange={(e) => setFund(e.target.value)} />
+              </label>
+              <label>
+                Tope de ops
+                <input
+                  type="number"
+                  min={1}
+                  max={999}
+                  step={1}
+                  value={cap}
+                  onChange={(e) => setCap(e.target.value)}
+                  onBlur={applyCap}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      applyCap();
+                    }
+                  }}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  const n = Number(fund);
+                  if (!Number.isFinite(n) || n < 100) return;
+                  const maxOps = clampPaperMaxOps(Number(cap) || book.maxOps);
+                  persistPatch({ reset: { fund: n, maxOps } });
+                  setCap(String(maxOps));
+                  showToast(`Cuenta paper en ${usd(n)} · tope ${maxOps}`, "info", ROXY);
+                }}
+              >
+                Reiniciar
+              </button>
+            </div>
+            <p className="tv-paper__capline">
+              {atCap
+                ? "Tope completo: no abre más; solo cierra o gestiona lo que ya está abierto."
+                : `Puede abrir ${left} operación${left === 1 ? "" : "es"} más en esta cuenta.`}
+            </p>
+          </div>
+
+          <section className="tv-paper-ledger">
+            <header>
+              <h3>Operaciones</h3>
+              <span>
+                {ledger.open.length} abiertas · {ledger.closed.length} cerradas
+              </span>
+            </header>
+            {ledger.open.length ? (
+              <div className="tv-paper-ledger__block">
+                <h4>Abiertas</h4>
+                {ledger.open.map((t) => (
+                  <TradeCard key={t.id} trade={t} tag={tag(t.symbol)} mark={marks[t.symbol]} now={nowTick} />
+                ))}
+              </div>
+            ) : (
+              <p className="tv-paper__pos is-flat">
+                {atCap
+                  ? "Sin posición abierta · tope de operaciones alcanzado."
+                  : `Sin posición · espera COMPRAR/VENDER con alineación ≥ 58%${book.universe === "ALL" ? " en cualquier moneda" : ` en ${uniLabel}`}.`}
+              </p>
+            )}
+            {ledger.closed.length ? (
+              <div className="tv-paper-ledger__block">
+                <h4>Cerradas</h4>
+                <div className="tv-paper-ledger__closed">
+                  {ledger.closed.map((t) => (
+                    <TradeCard key={t.id} trade={t} tag={tag(t.symbol)} now={nowTick} />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="tv-paper-ledger__empty">Todavía no hay cierres en esta cuenta.</p>
+            )}
+          </section>
         </>
       ) : null}
     </div>

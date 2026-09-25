@@ -2451,6 +2451,21 @@ export function getBtcTradeSignal(params: { symbol: string; interval: string }):
   return api(`/api/crypto-noticias/trade-signal?${q.toString()}`);
 }
 
+export function getPaperBook(): Promise<{ book: import("./mercadosPaperAgent").PaperBook | null; server: boolean }> {
+  return api("/api/paper/book");
+}
+
+export function putPaperBook(body: {
+  seed?: import("./mercadosPaperAgent").PaperBook;
+  armed?: boolean;
+  universe?: string;
+  maxOps?: number;
+  runInterval?: string;
+  reset?: { fund: number; maxOps?: number };
+}): Promise<{ book: import("./mercadosPaperAgent").PaperBook; server: boolean }> {
+  return api("/api/paper/book", { method: "PUT", body: JSON.stringify(body) });
+}
+
 export type CryptoNoticiaMedio = {
   id: number;
   feedKey: string;

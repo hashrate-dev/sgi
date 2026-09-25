@@ -56,6 +56,10 @@
     {
       "path": "/api/ops-comunicacion/cron-flush",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/paper/cron-tick",
+      "schedule": "* * * * *"
     }
   ]
 }
