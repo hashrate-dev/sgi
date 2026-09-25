@@ -1,5 +1,12 @@
 import { db } from "../db.js";
-import { hydrateRoxyFacts, hydrateRoxySaid, ingestNewsFacts, type RoxyNewsHit } from "./roxyMind.js";
+import {
+  hydrateRoxyFacts,
+  hydrateRoxySaid,
+  ingestNewsFacts,
+  pruneRoxyNewsFacts,
+  ROXY_NEWS_MAX_AGE_MS,
+  type RoxyNewsHit,
+} from "./roxyMind.js";
 
 const COINS: Array<{ symbol: string; topic?: string; re: RegExp }> = [
   { symbol: "BTCUSDT", topic: "bitcoin", re: /bitcoin|\bbtc\b/i },
@@ -66,11 +73,14 @@ export async function readSgiCryptoNews(symbols: string[], limit = 24): Promise<
     return [];
   }
 
+  const cutoff = Date.now() - ROXY_NEWS_MAX_AGE_MS;
   const out: RoxyNewsHit[] = [];
   const seen = new Set<string>();
   for (const row of rows) {
     const url = String(row.url ?? row.URL ?? "").trim();
     if (!url || seen.has(url)) continue;
+    const published = Date.parse(String(row.published_at ?? row.PUBLISHED_AT ?? ""));
+    if (!Number.isFinite(published) || published < cutoff) continue;
     const title = stripHtml(String(row.title_es || row.TITLE_ES || row.title || row.TITLE || ""));
     if (title.length < 12) continue;
     const topics = parseTopics(row.topics_json ?? row.TOPICS_JSON);
@@ -78,14 +88,13 @@ export async function readSgiCryptoNews(symbols: string[], limit = 24): Promise<
     if (symbol && want.size && !want.has(symbol)) continue;
     if (!symbol && want.size && want.size <= 2) continue;
     seen.add(url);
-    const published = Date.parse(String(row.published_at ?? row.PUBLISHED_AT ?? ""));
     out.push({
       url: url.slice(0, 2000),
       title: title.slice(0, 220),
       summary: stripHtml(String(row.summary_es || row.SUMMARY_ES || row.summary || row.SUMMARY || "")).slice(0, 280),
       source: stripHtml(String(row.source_name || row.SOURCE_NAME || "")).slice(0, 80),
       symbol,
-      at: Number.isFinite(published) ? published : Date.now(),
+      at: published,
     });
     if (out.length >= limit) break;
   }
@@ -99,8 +108,13 @@ export async function rememberSgiNewsOnBook<T extends { mind?: Record<string, un
   const now = Date.now();
   const prev = book.mind && typeof book.mind === "object" ? book.mind : {};
   const newsAt = Number(prev.newsAt) || 0;
-  const facts0 = hydrateRoxyFacts(prev.facts);
-  if (now - newsAt < 18 * 60_000 && facts0.some((f) => f.kind === "news")) return book;
+  const facts0 = pruneRoxyNewsFacts(hydrateRoxyFacts(prev.facts), now);
+  if (now - newsAt < 15 * 60_000 && facts0.some((f) => f.kind === "news")) {
+    return {
+      ...book,
+      mind: { ...prev, facts: facts0 },
+    };
+  }
   const hits = await readSgiCryptoNews(symbols, 20);
   return {
     ...book,

@@ -1,5 +1,7 @@
 export const ROXY_FACTS_CAP = 140;
 export const ROXY_SAID_CAP = 56;
+/** Solo titulares de las últimas 24 h (actualidad). */
+export const ROXY_NEWS_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 export type RoxyFactKind = "tape" | "news" | "coin";
 
@@ -55,12 +57,19 @@ export function normRoxyTalk(s: string): string {
 }
 
 export function roxyTooClose(a: string, b: string): boolean {
-  const na = normRoxyTalk(a).slice(0, 110);
-  const nb = normRoxyTalk(b).slice(0, 110);
+  const na = normRoxyTalk(a);
+  const nb = normRoxyTalk(b);
   if (!na || !nb) return false;
   if (na === nb) return true;
-  const cut = Math.min(40, na.length, nb.length);
-  if (cut >= 28 && (na.startsWith(nb.slice(0, cut)) || nb.startsWith(na.slice(0, cut)))) return true;
+  const short = na.length <= nb.length ? na : nb;
+  const long = na.length <= nb.length ? nb : na;
+  if (short.length >= 18 && long.includes(short.slice(0, Math.min(48, short.length)))) return true;
+  const wa = short.split(" ").filter((w) => w.length > 3);
+  if (wa.length >= 4) {
+    const wb = new Set(long.split(" ").filter((w) => w.length > 3));
+    const hit = wa.filter((w) => wb.has(w)).length;
+    if (hit / wa.length >= 0.52) return true;
+  }
   return false;
 }
 
@@ -76,9 +85,8 @@ export function rememberRoxySaid(said: string[], lines: string[]): string[] {
   let next = said.slice();
   for (const line of lines) {
     const n = normRoxyTalk(line);
-    if (n.length < 10) continue;
-    if (next.some((x) => roxyTooClose(x, n))) continue;
-    next = [n, ...next];
+    if (n.length < 8) continue;
+    next = [n, ...next.filter((x) => x !== n)];
   }
   return next.slice(0, ROXY_SAID_CAP);
 }
@@ -131,9 +139,20 @@ export function ingestTapeFacts(facts: RoxyFact[], snaps: TapeSnap[], now: numbe
   return next;
 }
 
+export function pruneRoxyNewsFacts(facts: RoxyFact[], now = Date.now()): RoxyFact[] {
+  const cutoff = now - ROXY_NEWS_MAX_AGE_MS;
+  return facts.filter((f) => {
+    if (f.kind !== "news" && f.kind !== "coin") return true;
+    return Number(f.at) >= cutoff;
+  });
+}
+
 export function ingestNewsFacts(facts: RoxyFact[], hits: RoxyNewsHit[], now: number): RoxyFact[] {
-  let next = facts;
+  const cutoff = now - ROXY_NEWS_MAX_AGE_MS;
+  let next = pruneRoxyNewsFacts(facts, now);
   for (const h of hits) {
+    const at = Number(h.at) || 0;
+    if (!at || at < cutoff) continue;
     const title = h.title.replace(/\s+/g, " ").trim().slice(0, 180);
     if (title.length < 12) continue;
     next = pushRoxyFact(next, {
@@ -166,8 +185,18 @@ export function pickFreshFact(
   const want = new Set(symbols);
   const pool = facts.filter((f) => {
     if (kind !== "any" && f.kind !== kind) return false;
+    if ((f.kind === "news" || f.kind === "coin") && Number(f.at) < Date.now() - ROXY_NEWS_MAX_AGE_MS) return false;
     if (want.size && f.symbol && !want.has(f.symbol)) return false;
-    if (avoid.some((a) => roxyTooClose(a, f.text))) return false;
+    const blob = normRoxyTalk(f.text);
+    if (
+      avoid.some(
+        (a) =>
+          roxyTooClose(a, f.text) ||
+          (blob.length >= 18 && normRoxyTalk(a).includes(blob.slice(0, 36))),
+      )
+    ) {
+      return false;
+    }
     return true;
   });
   if (!pool.length) return null;

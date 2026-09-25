@@ -215,9 +215,8 @@ function AgentOpinion({
   muted: boolean;
 }) {
   const feed = useMemo(() => {
-    if (!notes.length) return [{ ...live, id: "live" } as PaperNote];
-    if (notes[0]!.fingerprint === live.fingerprint) return notes;
-    return [{ ...live, id: "live" } as PaperNote, ...notes];
+    if (notes.length) return notes;
+    return [{ ...live, id: "live" } as PaperNote];
   }, [notes, live]);
   const [i, setI] = useState(0);
   const latestId = feed[0]?.id;
@@ -277,7 +276,6 @@ function AgentOpinion({
     const line = current.body?.trim() || current.title;
     if (!line) return;
     speakRoxy(line);
-    return () => hushRoxy();
   }, [muted, current.id, current.title, current.body]);
 
   const older = i < feed.length - 1;
@@ -571,14 +569,8 @@ export function MercadosPaperDesk({
   const left = paperOpsLeft(book);
   const ledger = useMemo(() => splitPaperTrades(book), [book]);
   const liveTalk = useMemo(() => {
-    const spoken = narratePaper(book, sigs, [], tag);
-    const last = book.notes[0];
-    if (!last) return spoken;
-    if (Date.now() - last.at < 70_000) return last;
-    const a = spoken.body.replace(/\s+/g, " ").slice(0, 96).toLowerCase();
-    const b = last.body.replace(/\s+/g, " ").slice(0, 96).toLowerCase();
-    if (a && a === b) return last;
-    return spoken;
+    if (book.notes[0]) return book.notes[0];
+    return narratePaper(book, sigs, [], tag);
   }, [book, sigs, pairs]);
   const alert = useMemo(() => paperEntryAlert(book, sigs), [book, sigs]);
   const prep = useMemo(() => paperPrepProcess(book, sigs), [book, sigs]);

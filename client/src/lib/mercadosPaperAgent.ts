@@ -5,6 +5,7 @@ import {
   ingestTapeFacts,
   pickFreshFact,
   rememberRoxySaid,
+  roxyTooClose,
   type RoxyFact,
 } from "./roxyMind";
 
@@ -1549,63 +1550,6 @@ function lifeAside(at: number, seed: string, avoid: string[]): string | null {
   return `${feel} ${meal}`;
 }
 
-function quirkAside(seed: string, avoid: string[]): string | null {
-  const roll = voiceHash(seed + "|quirk") % 11;
-  if (roll > 2) return null;
-  if (roll === 0) {
-    return speak(
-      seed + "hum",
-      {
-        real: ["♪ Tararea bajito y sigue con las velas.", "♪ Mm mm. Como quien no quiere la cosa."],
-        dry: ["♪ Tararea una tonada y no explica nada."],
-        fun: ["♪ Tararea, desafinada a propósito. Mm mm."],
-      },
-      avoid,
-    );
-  }
-  if (roll === 1) {
-    return speak(
-      seed + "lolsolo",
-      {
-        real: ["Ja ja. No pasó nada. Me reí de un pensamiento.", "Je. Perdón, se me escapó."],
-        dry: ["Ja ja. Era un chiste interno. No lo cuento."],
-        fun: ["Ja ja ja. Estoy sola y igual me hice reír."],
-      },
-      avoid,
-    );
-  }
-  return speak(
-    seed + "joke",
-    {
-      real: [
-        "¿Por qué el stop nunca sale? Porque se queda en casa. Ja ja. Perdón, el chiste era mío.",
-        "Le pedí una señal clara al gráfico y me dejó en visto. Ja ja. Soy yo la graciosa.",
-      ],
-      dry: [
-        "Mi plan de hoy: entrar poco y quejarme con estilo. Ja ja. Bueno, era un chiste.",
-        "El café está caliente y el mercado, tibio. Ja ja. Perdón, me reí sola.",
-      ],
-      fun: [
-        "¿Cuál es el hobby del RSI? Estirarse en las fiestas. Ja ja. Ta, no era tan bueno, pero me río igual.",
-        "Un vendedor entra a un bar. El stop lo espera afuera. Ja ja. Soy insoportable, lo sé.",
-      ],
-    },
-    avoid,
-  );
-}
-
-function maybeLaugh(seed: string, line: string): string {
-  if (!line) return line;
-  if (/jaja|jeje|me río/i.test(line)) return line;
-  if (moodOf(seed) !== "fun") return line;
-  if (voiceHash(seed + "|lol") % 5) return line;
-  return speak(seed + "lol", {
-    real: [`${line} Jaja.`],
-    dry: [`${line} Me río, y sigo.`],
-    fun: [`${line} Jaja, perdón, era en serio el stop.`],
-  });
-}
-
 function usdTalk(n: number): string {
   if (!Number.isFinite(n)) return "—";
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n);
@@ -1629,17 +1573,6 @@ function moodOf(seed: string): RoxyMood {
   return "real";
 }
 
-function oralLead(seed: string, line: string): string {
-  if (!line) return line;
-  if (/^(mirá|mira|bueno|a ver|che|ta[,.]|la verdad|ojo|dale|te soy)/i.test(line)) return line;
-  const pick = voiceHash(seed + "|oral") % 9;
-  if (pick === 0) return `Mirá. ${line}`;
-  if (pick === 1) return `Bueno. ${line}`;
-  if (pick === 2) return `A ver. ${line}`;
-  if (pick === 3) return `La verdad. ${line}`;
-  return line;
-}
-
 function normTalk(s: string): string {
   return s
     .toLowerCase()
@@ -1651,13 +1584,7 @@ function normTalk(s: string): string {
 }
 
 function tooClose(a: string, b: string): boolean {
-  const na = normTalk(a).slice(0, 96);
-  const nb = normTalk(b).slice(0, 96);
-  if (!na || !nb) return false;
-  if (na === nb) return true;
-  const cut = Math.min(36, na.length, nb.length);
-  if (cut >= 24 && (na.startsWith(nb.slice(0, cut)) || nb.startsWith(na.slice(0, cut)))) return true;
-  return false;
+  return roxyTooClose(a, b);
 }
 
 function speak(
@@ -1777,11 +1704,16 @@ function reasonTalk(reason: string): string {
 
 export function pushPaperNote(book: PaperBook, note: Omit<PaperNote, "id">): PaperBook {
   const last = book.notes[0];
+  if (last && roxyTooClose(last.body, note.body)) {
+    return book;
+  }
+  if (book.notes.some((n) => roxyTooClose(n.body, note.body))) {
+    return book;
+  }
   const same = last && last.fingerprint === note.fingerprint;
   const fresh = last && note.at - last.at < 75_000;
   if (same && fresh) {
-    const updated: PaperNote = { ...last, at: note.at, title: note.title, body: note.body };
-    return { ...book, notes: [updated, ...book.notes.slice(1)] };
+    return book;
   }
   const full: PaperNote = {
     ...note,
@@ -1793,6 +1725,39 @@ export function pushPaperNote(book: PaperBook, note: Omit<PaperNote, "id">): Pap
   return { ...book, mind, notes: [full, ...(book.notes ?? [])].slice(0, NOTES) };
 }
 
+function newsClip(
+  book: PaperBook,
+  tag: (symbol: string) => string,
+  wantSyms: string[],
+  recent: string[],
+  seed: string,
+): string {
+  const fact = pickFreshFact(book.mind?.facts ?? [], "news", wantSyms, recent, voiceHash(seed + "news"));
+  if (!fact) return "";
+  let t = fact.text.replace(/\s*\([^)]*\)\s*$/, "").trim();
+  if (t.length > 150) t = `${t.slice(0, 147)}…`;
+  const who = fact.symbol ? tag(fact.symbol) : "cripto";
+  return speak(
+    seed + "nws",
+    {
+      real: [
+        `Noticia del momento en ${who}: ${t}.`,
+        `Acabo de leer en el desk: ${t}.`,
+        `En el wire ahora, ${who}: ${t}.`,
+      ],
+      dry: [`Titular fresco de ${who}: ${t}.`],
+      fun: [`Mientras, en noticias: ${t}.`],
+    },
+    recent,
+  );
+}
+
+function biasWord(bias: string): string {
+  if (bias === "buy") return "compra";
+  if (bias === "sell") return "venta";
+  return "sin lado claro";
+}
+
 export function narratePaper(
   book: PaperBook,
   signals: BtcTradeSignal[],
@@ -1800,7 +1765,7 @@ export function narratePaper(
   tag: (symbol: string) => string,
 ): Omit<PaperNote, "id"> {
   const at = Date.now();
-  const beat = Math.floor(at / 12_000);
+  const beat = Math.floor(at / 18_000);
   const left = paperOpsLeft(book);
   const atCap = paperAtOpsCap(book);
   const minC = paperMinConfOf(book);
@@ -1813,8 +1778,8 @@ export function narratePaper(
   const view = focused.length ? focused : signals;
   const buys = [...view.filter((s) => s.bias === "buy")].sort((a, b) => b.confidence - a.confidence);
   const sells = [...view.filter((s) => s.bias === "sell")].sort((a, b) => b.confidence - a.confidence);
-  const waits = view.filter((s) => s.bias === "wait");
   const lead = [...view].sort((a, b) => b.confidence - a.confidence)[0];
+  const hot = buys[0] ?? sells[0] ?? lead;
   const rawIv = view[0]?.interval || book.runInterval || "";
   const iv = ivTalk(rawIv);
   const band = scalpBand(rawIv);
@@ -1823,309 +1788,105 @@ export function narratePaper(
     ...(book.mind?.said ?? []),
     ...(book.notes ?? []).slice(0, 12).flatMap((n) => [n.title, ...(n.body.split(/\n+/))]),
   ];
-  const angle = beat % 7;
+  const angle = beat % 5;
   const seed = `${beat}|a${angle}|s${book.mind?.said?.length ?? 0}|n${book.mind?.facts?.length ?? 0}|${book.universe}|${rawIv}|${lead?.symbol ?? ""}|${lead?.bias ?? "x"}|${Math.round((lead?.confidence ?? 0) / 4)}|${book.armed ? 1 : 0}|${book.positions.length}`;
   const paras: string[] = [];
-  const planName = lead ? tag(lead.symbol) : "el mercado";
-  const hotName = lead ? tag(lead.symbol) : "nadie";
+  const wantSyms = book.universe === "ALL" ? view.map((s) => s.symbol) : [book.universe];
+  const nws = () => newsClip(book, tag, wantSyms, recent, seed);
 
   for (const ev of events) {
     const name = tag(ev.symbol);
     if (ev.kind === "open") {
       paras.push(
-        speak(seed + ev.symbol + "o", {
-          real: [
-            tradeStyle === "swing"
-              ? `Swing ${ev.side === "long" ? "largo" : "corto"} en ${name} a ${usdTalk(ev.price)}, gráfico de ${iv}. Cierro por stop, objetivo o giro; no por el calendario.`
-              : `Scalp ${ev.side === "long" ? "largo" : "corto"} en ${name} a ${usdTalk(ev.price)}, gráfico de ${iv}. Stop y objetivos de intradía.`,
-          ],
-          dry: [
-            tradeStyle === "swing"
-              ? `Abrí ${name} a ${usdTalk(ev.price)} en ${iv}. Swing: dejo correr el plan.`
-              : `Abrí ${name} a ${usdTalk(ev.price)} en ${iv}. Scalping del día: si no paga rápido, salgo.`,
-          ],
-          fun: [
-            tradeStyle === "swing"
-              ? `${name} en ${iv}: swing a ${usdTalk(ev.price)}. No la saco porque se hizo de noche.`
-              : `${name} en ${iv}: entré de scalp a ${usdTalk(ev.price)}. Si se pone romántico, lo corto.`,
-          ],
-        }, recent),
+        speak(
+          seed + ev.symbol + "o",
+          {
+            real: [
+              `Abrí ${name} ${ev.side === "long" ? "larga" : "corta"} a ${usdTalk(ev.price)} en ${iv}. Riesgo ${risk}%. Ahora dejo correr stop y objetivos.`,
+              `Entré en ${name} a ${usdTalk(ev.price)}. ${tradeStyle === "swing" ? "Swing: salgo por stop, objetivo o giro." : "Scalp del día: si no paga, salgo."}`,
+            ],
+            dry: [`Operación nueva: ${name} a ${usdTalk(ev.price)}. Ya está en el libro.`],
+            fun: [`Listo, ${name} es mía a ${usdTalk(ev.price)}. Ahora a no manosearla.`],
+          },
+          recent,
+        ),
       );
     } else if (ev.kind === "scale") {
       paras.push(
-        speak(seed + ev.symbol + "sc", {
-          real: [`T1 en ${name}: saqué ${t1p}% y el stop se fue a la entrada.`, `Parcial en ${name}. El trade ya no me puede devolver al mismo riesgo.`],
-          dry: [`${name} me pagó un adelanto. Stop en casa.`, `T1 cobrado. El resto trabaja; yo no le mando memes.`],
-          fun: [`T1 en ${name}. Mitad en el bolsillo, ego en la jaula.`, `Adelanto cobrado. El resto que se luzca si quiere.`],
-        }, recent),
+        speak(
+          seed + ev.symbol + "sc",
+          {
+            real: [`Saqué el ${t1p}% de ${name} en el primer objetivo y subí el stop a la entrada.`],
+            dry: [`Parcial en ${name}. El resto ya no me puede devolver el mismo riesgo.`],
+            fun: [`${name} me pagó un adelanto. El resto, que se luzca.`],
+          },
+          recent,
+        ),
       );
     } else {
       const pnl = ev.pnl ?? 0;
       const signed = `${pnl >= 0 ? "+" : ""}${usdTalk(pnl)}`;
       paras.push(
-        speak(seed + ev.symbol + "cl", {
-          real: [`Cerré ${name} por ${reasonTalk(ev.reason)} (${signed}). No persigo el mismo movimiento.`, `Salí de ${name}: ${reasonTalk(ev.reason)}, ${signed}. Siguiente idea, otra.`],
-          dry: [`${name} se acabó. ${signed}. Sin bis.`, `Cortina en ${name}. ${signed}.`],
-          fun: [`Listo ${name} (${signed}). Aplausos cortos.`, `Cerré ${name}. La secuela no está en cartelera.`],
-        }, recent),
+        speak(
+          seed + ev.symbol + "cl",
+          {
+            real: [`Cerré ${name} por ${reasonTalk(ev.reason)}: ${signed}. No persigo el mismo movimiento.`],
+            dry: [`Salí de ${name} (${signed}). Capítulo cerrado.`],
+            fun: [`Listo ${name}, ${signed}. Sin bis.`],
+          },
+          recent,
+        ),
       );
     }
   }
 
   let tone: PaperNoteTone = "idle";
-  let title = speak(
-    seed + "t0",
-    {
-      real: ["Mirando sin apuro", "Todavía pienso", "Sigo en el mapa", "Nada de drama", "Un ojo en el tape"],
-      dry: ["El mercado se hace el interesante", "Otra ronda de velas", "Hoy hay tesis y también teatro", "Ruido con corbata"],
-      fun: ["Café y velas", "Estoy de turno", "Respire, que yo también", "El gráfico tiene opiniones"],
-    },
-    recent,
-  );
-
-  const waitNames = waits.map((s) => tag(s.symbol)).join(", ");
-  const buyTop = buys.slice(0, 2).map((s) => tag(s.symbol)).join(" y ");
-  const sellTop = sells.slice(0, 2).map((s) => tag(s.symbol)).join(" y ");
-  const detail = lead ? oneDetail(seed, lead, recent, angle) : "";
-
-  if (tradeStyle === "swing" && !paperAllowsOpen(rawIv, "swing")) {
-    tone = "idle";
-    title = speak(seed + "swTf", {
-      real: ["Swing, otro gráfico", "Esta vela es chica para swing"],
-      dry: ["Acá no hago swing"],
-      fun: ["Esto es para picar, no para dormir"],
-    }, recent);
-    paras.push(
-      speak(seed + "swTfB", {
-        real: [`Estoy en modo swing. En ${iv} no abro: pasá a 15 minutos, 1 hora, 4 horas o diario.`],
-        dry: [`Swing no se opera en ${iv}. Subí de temporalidad.`],
-        fun: [`En ${iv} me pongo nerviosa. Para swing quiero velas más gordas.`],
-      }, recent),
-    );
-  } else if (tradeStyle !== "swing" && band === "context") {
-    tone = "idle";
-    title = speak(seed + "ctxT", {
-      real: ["Mapa, no disparo", "Esto es lectura de contexto", "Velas grandes, yo en modo mapa"],
-      dry: ["Gráfico grande, manos quietas", "Acá miro, no pico"],
-      fun: ["4h no me invita a picar", "Esto es paisaje, no oficina de clic"],
-    }, recent);
-    paras.push(
-      speak(seed + "ctx", {
-        real: [
-          `Estamos en ${iv}: me sirve de mapa. Las operaciones de ahora son scalping intradía, no swing. Pasá a 1, 5 o 15 minutos si querés que abra.`,
-        ],
-        dry: [`${iv} es lectura. Hoy no abro acá: solo scalps del día en velas cortas.`],
-        fun: [`En ${iv} yo miro el paisaje. El clic vive en 1–15 minutos.`],
-      }, recent),
-    );
-  } else if (!view.length) {
-    paras.push(
-      speak(seed + "empty", {
-        real: ["Todavía no hay lectura fresca. Cuando llegue, armo plan; no invento sesgo."],
-        dry: ["Pantalla en blanco. Opinar ahora sería fanfic."],
-        fun: ["Cero velas, cero drama. Hasta yo me aburro con dignidad."],
-      }, recent),
-    );
-  } else if (book.universe === "ALL") {
-    if (angle === 0 && (buys.length || sells.length)) {
-      paras.push(
-        speak(seed + "all0", {
-          real: [
-            lead && lead.bias !== "wait"
-              ? `Hoy me quedo con ${hotName}: hay olor a ${lead.bias === "buy" ? "compra" : "venta"}, pero yo no corro.`
-              : "Hay movimiento, no hay convicción. Prefiero aburrirme.",
-          ],
-          dry: [`${hotName} hace más ruido. El resto, pasillo.`],
-          fun: [`Si esto fuera una mesa, ${hotName} habla más alto. Yo igual pido la carta y no pido todavía.`],
-        }, recent),
-      );
-    } else if (angle === 1) {
-      paras.push(
-        waits.length
-          ? speak(seed + "all1", {
-              real: [`${waitNames} no se deciden. Los dejo en paz.`],
-              dry: [`${waitNames} están en modo «después te llamo».`],
-              fun: [`${waitNames} eligieron el sofá. Los respeto.`],
-            }, recent)
-          : speak(seed + "all1b", {
-              real: ["Nadie se escondió: todos tienen cara. Igual no firmo por tener cara."],
-              fun: ["Hoy nadie se hizo el misterioso. Raro. Igual no me desespero."],
-            }, recent),
-      );
-    } else if (angle === 2 && lead) {
-      paras.push(
-        speak(seed + "all2", {
-          real: [`De ${hotName} hoy miro una sola cosa: ${detail}.`],
-          dry: [`${hotName}, recorte: ${detail}. El resto me lo guardo.`],
-          fun: [`Un dato, no un ensayo: ${detail}.`],
-        }, recent),
-      );
-    } else if (angle === 3) {
-      paras.push(
-        buys.length && sells.length
-          ? speak(seed + "all3", {
-              real: [`De un lado ${buyTop}; del otro ${sellTop}. Yo no arbitro una pelea de patio.`],
-              dry: ["Hay compra y venta a la vez. Traducción: todavía no."],
-              fun: ["La mesa está dividida. Yo no soy jueza de reality."],
-            }, recent)
-          : speak(seed + "all3b", {
-              real: [buyTop ? `${buyTop} tira a compra. Yo pido que se sostenga.` : sellTop ? `${sellTop} tira a venta. Sin funeral.` : "Nadie limpio. Perfecto para no operar."],
-              fun: ["Si no hay pelea clara, yo tampoco invento una."],
-            }, recent),
-      );
-    } else if (angle === 4) {
-      paras.push(
-        speak(seed + "all4", {
-          real: ["Hoy no voy a perseguir nada que se estire. Si se desarma, cancelo y listo."],
-          dry: ["Lo que no hago: entrar porque me aburrí."],
-          fun: ["Mi plan secreto: no tener plan de héroe."],
-        }, recent),
-      );
-    } else if (angle === 5 && lead && (lead.bias === "buy" || lead.bias === "sell")) {
-      paras.push(
-        speak(seed + "all5", {
-          real: [`${hotName} lidera al ${lead.confidence.toFixed(0)}%. Confirmación en ${iv} o no hay cita.`],
-          dry: [`Candidata ${hotName}. Contrato, todavía no.`],
-          fun: [`${hotName} me guiña. Le pido que se quede quieta dos velas más.`],
-        }, recent),
-      );
-    } else {
-      paras.push(
-        speak(seed + "all6", {
-          real: [`En ${iv} quiero algo limpio o me quedo quieta. ${planName} no me debe nada.`],
-          dry: ["Seis pares. Cero obligación de opinar de los seis."],
-          fun: ["Pasé lista y no tomé asistencia emocional. Bien por mí."],
-        }, recent),
-      );
-    }
-  } else {
-    const s = view.find((x) => x.symbol === book.universe) ?? view[0];
-    if (s) {
-      const name = tag(s.symbol);
-      const need = neededConfirm(s.interval, paperStyleOf(book));
-      const conf = book.confirms[s.symbol];
-      if (angle % 2 === 0) {
-        paras.push(
-          speak(seed + "one", {
-            real: [
-              s.bias === "buy"
-                ? `${name} huele a compra. Todavía no es entrada.`
-                : s.bias === "sell"
-                  ? `${name} tiene cara de venta. Sin disparar.`
-                  : `${name} se hace el misterioso. Espera.`,
-            ],
-            dry: [`${name}: ${s.bias === "wait" ? "sin lado" : s.bias === "buy" ? "lado largo, sin desfile" : "lado corto, sin funeral"}.`],
-            fun: [
-              s.bias === "buy"
-                ? `${name} se acomoda la corbata. Yo le digo que hay tiempo.`
-                : s.bias === "sell"
-                  ? `${name} levantó la mano. Todavía no le doy la palabra.`
-                  : `${name} eligió el clásico «después vemos».`,
-            ],
-          }, recent),
-        );
-      } else {
-        paras.push(
-          speak(seed + "oneD", {
-            real: [`${name}: ${oneDetail(seed, s, recent, angle)}.`],
-            dry: [`Un recorte de ${name}. ${oneDetail(seed + "x", s, recent, angle + 1)}.`],
-            fun: [`${name} en una frase: ${oneDetail(seed + "y", s, recent, angle + 2)}.`],
-          }, recent),
-        );
-      }
-      if (s.bias !== "wait" && conf && angle !== 4) {
-        if (conf.fire !== s.bias) {
-          paras.push(
-            speak(seed + "flip", {
-              real: ["El sesgo giró. Cuento de nuevo. No persigo el giro."],
-              dry: ["Cambió de camiseta. Yo vuelvo a cero."],
-              fun: ["Plot twist. La secuela no está en preventa."],
-            }, recent),
-          );
-        } else if (conf.n >= need) {
-          paras.push(
-            speak(seed + "ripe", {
-              real: [`Ya se sostuvo ${Math.min(conf.n, need)} veces. Si el riesgo da, ejecuto.`],
-              dry: [`${Math.min(conf.n, need)}/${need}: ya no es capricho.`],
-              fun: [`Semáforo quieto. Ahora sí o ahora no, sin poesía.`],
-            }, recent),
-          );
-        } else if (angle === 1 || angle === 5) {
-          paras.push(
-            speak(seed + "waitc", {
-              real: [`Llevo ${Math.min(conf.n, need)} de ${need}. Falta que se quede.`],
-              dry: [`${Math.min(conf.n, need)}/${need}. Puede ser amague.`],
-              fun: [`Una vela heroica no me convence; quiero que se quede a dormir.`],
-            }, recent),
-          );
-        }
-      }
-    }
-  }
-
-  const readyBuy = buys.find((s) => s.confidence >= minC);
+  let title = speak(seed + "t0", { real: ["Resumen", "Lo que estoy haciendo", "Ahora"], dry: ["Tape"], fun: ["De turno"] }, recent);
 
   if (!book.armed) {
     tone = "pause";
-    title = speak(seed + "tp", { real: ["Pausa operativa", "OFF: solo lectura"], dry: ["Me dejaron el mute"], fun: ["Pausa con palomitas"] }, recent);
+    title = "En pausa";
     paras.push(
       speak(seed + "off", {
-        real: ["Estoy en OFF. No abro. Si hay algo abierto, lo cuido."],
-        dry: ["Me apagaron. Plan: mirar y no firmar locuras."],
-        fun: ["OFF. Crítica de cine: opino, no cobro entrada."],
+        real: ["Estoy en pausa: miro el tape y las noticias, no abro nada nuevo."],
+        dry: ["OFF. Solo lectura."],
+        fun: ["Pausa. Opino, no disparo."],
       }, recent),
     );
   } else if (atCap && !book.positions.length) {
     tone = "cap";
-    title = speak(seed + "tc", { real: ["Tope alcanzado", "Cupo lleno"], dry: ["Show cerrado"], fun: ["Sin fichas, con opiniones"] }, recent);
+    title = "Tope del día";
     paras.push(
       speak(seed + "cap0", {
-        real: [`Usé las ${book.maxOps}. Sigo leyendo; no entro hasta que subas el tope.`],
-        dry: ["Tope lleno. El mercado puede lucirse; yo ya jugué."],
-        fun: [`Inventario de tiros: cero. Catálogo de opiniones: abierto.`],
+        real: [`Ya usé las ${book.maxOps} operaciones. Sigo el mercado, no entro otra.`],
+        dry: ["Cupo lleno. Solo comento."],
       }, recent),
     );
   } else if (atCap) {
     tone = "cap";
-    title = speak(seed + "tg", { real: ["Solo gestiono"], dry: ["Sin entradas nuevas"], fun: ["Niñera de stop"] }, recent);
+    title = "Solo gestiono";
     paras.push(
       speak(seed + "cap1", {
-        real: ["El cupo está lleno. Stop, T1 y T2. Nada de una más."],
-        dry: ["Las oportunidades de último minuto se quedan en el pasillo."],
+        real: ["El cupo está lleno. Cuido lo abierto: stop y objetivos, nada de una más."],
       }, recent),
     );
   } else if (events.some((e) => e.kind === "open")) {
     tone = "open";
-    title = speak(seed + "to", { real: ["Ya entré", "Operación abierta"], dry: ["Ejecuté, ahora el plan"], fun: ["Adentro"] }, recent);
-    paras.push(
-      speak(seed + "po", {
-        real: ["No muevo el stop en contra. Si corre, T1; si se da vuelta, el stop cierra."],
-        dry: ["La orden ya voló. Interferir ahora sería vanidad."],
-        fun: ["Adentro. El aburrimiento, de ahora en más, es el trabajo."],
-      }, recent),
-    );
+    title = "Entré";
   } else if (events.some((e) => e.kind === "scale")) {
     tone = "adjust";
-    title = speak(seed + "ta", { real: ["T1 hecho"], dry: ["Me pagué el nervio"], fun: ["Ego en jaula"] }, recent);
-    paras.push(
-      speak(seed + "ps", {
-        real: ["El trade se autofinanció. Resto con stop en entrada."],
-        fun: ["Ya cobré adelanto. El resto puede lucirse."],
-      }, recent),
-    );
+    title = "Parcial cobrado";
   } else if (events.some((e) => e.kind === "close")) {
     tone = "close";
-    title = speak(seed + "tx", { real: ["Cerrado", "A esperar"], dry: ["Capítulo cerrado"], fun: ["Ego a dieta"] }, recent);
-    paras.push(
-      left > 0
-        ? speak(seed + "pc", {
-            real: [`Quedan ${left}. No reingreso al mismo movimiento.`],
-            dry: [`Cerrado. Me quedan ${left} y paciencia.`],
-            fun: [`Listo. El bis está prohibido.`],
-          }, recent)
-        : speak(seed + "pc0", { real: ["Tope seco. Nada de una más."] }, recent),
-    );
-  } else if (book.positions.length && angle % 2 === 0) {
+    title = "Cerré";
+    if (left > 0) {
+      paras.push(
+        speak(seed + "pc", {
+          real: [`Me quedan ${left} en el día. La próxima idea tiene que ser otra, no la misma.`],
+        }, recent),
+      );
+    }
+  } else if (book.positions.length) {
     tone = "hold";
     const pos = book.positions[0]!;
     const s = view.find((x) => x.symbol === pos.symbol);
@@ -2133,124 +1894,103 @@ export function narratePaper(
     const u = pos.qty * (px - pos.entry);
     const name = tag(pos.symbol);
     const uTxt = `${u >= 0 ? "+" : ""}${usdTalk(u)}`;
-    title = speak(seed + "th", {
-      real: ["Sostengo y no toco", "Adentro: manda el plan"],
-      dry: ["Niñera de stop", "Sin manosear"],
-      fun: ["Estoy adentro, ahora calladita", "El trade trabaja; yo no"],
-    }, recent);
+    title = speak(seed + "th", { real: [`Sostengo ${name}`, "Operación abierta"], dry: ["Adentro"], fun: ["Dejo correr"] }, recent);
+    const next = pos.t1Done
+      ? `Ya cobré parcial. Stop en la entrada, apunto al segundo objetivo en ${usdTalk(pos.t2)}.`
+      : `Si llega a ${usdTalk(pos.t1)} saco parcial; si toca ${usdTalk(pos.stop)}, salgo.`;
     paras.push(
       speak(seed + "ph", {
-        real: [`${name} sigue ${pos.side === "long" ? "larga" : "corta"} (${uTxt}) en scalp de ${ivTalk(pos.interval)}. No agrando ni me quedo a dormir.`],
-        dry: [`Gestión de ${name}: ${uTxt}. Intradía. El stop es la niñera.`],
-        fun: [`${name} está en la oficina (${uTxt}). Si se hace de noche, la saco.`],
+        real: [
+          `${name} sigue ${pos.side === "long" ? "larga" : "corta"} desde ${usdTalk(pos.entry)}, ahora ${usdTalk(px)} (${uTxt}). ${next}`,
+          `Tengo ${name} abierta (${uTxt}). ${next}`,
+        ],
+        dry: [`Gestión: ${name} ${uTxt}. ${next}`],
+        fun: [`${name} está trabajando (${uTxt}). Yo no la toco. ${next}`],
       }, recent),
     );
-  } else if (book.positions.length) {
-    tone = "hold";
-    title = speak(seed + "th2", {
-      real: ["Dejo correr el plan"],
-      dry: ["Sin nuevas ideas en el mismo par"],
-      fun: ["Una apuesta. El resto es café"],
-    }, recent);
+    if (s && angle % 2 === 0) {
+      paras.push(
+        speak(seed + "phd", {
+          real: [`Dato: ${oneDetail(seed, s, recent, angle)}.`],
+        }, recent),
+      );
+    }
+  } else if (tradeStyle === "swing" && !paperAllowsOpen(rawIv, "swing")) {
+    tone = "idle";
+    title = "Otro gráfico";
+    paras.push(
+      speak(seed + "sw", {
+        real: [`Estoy en swing. En ${iv} solo miro contexto; para abrir quiero 15 minutos, 1 hora, 4 horas o diario.`],
+      }, recent),
+    );
   } else if (tradeStyle !== "swing" && band === "context") {
     tone = "idle";
-  } else if (buys.length || sells.length) {
+    title = "Mapa, no clic";
+    const name = hot ? tag(hot.symbol) : "el tape";
+    paras.push(
+      speak(seed + "ctx", {
+        real: [
+          `Estoy en ${iv}, esto me sirve de mapa. ${hot ? `${name} va de ${biasWord(hot.bias)} al ${hot.confidence.toFixed(0)}%.` : ""} Para operar intradía bajo a velas más cortas.`,
+        ],
+      }, recent),
+    );
+  } else if (!view.length) {
+    paras.push(
+      speak(seed + "empty", {
+        real: ["Todavía no me llega una lectura. Cuando haya confluencia, armo el resumen."],
+      }, recent),
+    );
+  } else if (hot && (hot.bias === "buy" || hot.bias === "sell") && hot.confidence >= minC) {
     tone = "watch";
-    const hot = readyBuy ?? buys[0] ?? sells[0]!;
+    const name = tag(hot.symbol);
     const goingBuy = hot.bias === "buy";
-    title = speak(seed + "tw", {
-      real: [goingBuy ? "Scalp de compra" : "Scalp de venta", goingBuy ? "Compra corta, del día" : "Venta corta, del día"],
-      dry: ["Hay sesgo de intradía, no hay clic"],
-      fun: ["Me guiña. Yo pido dos velas"],
-    }, recent);
+    title = goingBuy ? `Miro compra en ${name}` : `Miro venta en ${name}`;
+    const conf = book.confirms[hot.symbol];
+    const need = neededConfirm(hot.interval, tradeStyle);
+    const count = conf && conf.fire === hot.bias ? Math.min(conf.n, need) : 0;
     paras.push(
-      speak(seed + "pw", {
+      speak(seed + "watch", {
         real: [
-          goingBuy
-            ? `Scalping en ${iv}: si ${tag(hot.symbol)} se confirma, compro. Si se desarma, cancelo el mismo día.`
-            : `Corto de scalp en ${tag(hot.symbol)} (${iv}) solo con confirmación y stop corto.`,
+          `Resumen: ${name} tira a ${biasWord(hot.bias)} al ${hot.confidence.toFixed(0)}% en ${iv}. ${oneDetail(seed, hot, recent, angle)}. ${count >= need ? "Si el riesgo da, el próximo paso es entrar." : `Voy ${count} de ${need} velas de confirmación; si se desarma, cancelo.`}`,
+          `Lo que estoy haciendo: esperar ${name}. Hay olor a ${biasWord(hot.bias)}, alineación ${hot.confidence.toFixed(0)}%. ${oneDetail(seed + "d", hot, recent, angle + 1)}. No corro el primer guiño.`,
         ],
-        dry: [`${tag(hot.symbol)} en ${iv}. Candidata de scalp, no de casamiento.`],
-        fun: [
-          goingBuy
-            ? `${tag(hot.symbol)} me guiña en ${iv}. Confirmación o no hay cita.`
-            : `${tag(hot.symbol)} quiere corto rápido. Yo freno y cuento.`,
-        ],
+        dry: [`${name}: ${biasWord(hot.bias)}, ${hot.confidence.toFixed(0)}%. ${count}/${need} confirmaciones.`],
+        fun: [`${name} me guiña (${hot.confidence.toFixed(0)}%). Yo pido que se quede dos velas. ${oneDetail(seed + "f", hot, recent, angle)}.`],
       }, recent),
     );
-  } else {
+  } else if (hot) {
     tone = "idle";
-    title = speak(seed + "ti", {
-      real: ["Sin scalp limpio", "Hoy no hay oficio"],
-      dry: ["No firmo locuras"],
-      fun: ["El plan es no tener plan de héroe"],
-    }, recent);
+    const name = tag(hot.symbol);
+    title = speak(seed + "ti", { real: ["Sin disparo", "Espero algo limpio"], dry: ["Nada maduro"], fun: ["Manos quietas"] }, recent);
+    const board =
+      buys.length || sells.length
+        ? `Lo más vivo es ${name} (${biasWord(hot.bias)}, ${hot.confidence.toFixed(0)}%), pero no me alcanza el piso de ${minC}%.`
+        : `En ${iv} nadie me da un comprar o vender limpio.`;
     paras.push(
-      speak(seed + "pi", {
-        real: [`En ${iv} no hay scalp que merezca orden. Prefiero no operar.`],
-        dry: [`En ${iv} quiero algo limpio o me quedo quieta. Intradía, no swing.`],
-        fun: ["El mercado mueve las cejas. Yo no pico."],
+      speak(seed + "idle", {
+        real: [
+          `${board} ${lead ? oneDetail(seed, lead, recent, angle) + "." : ""} Yo espero. Me quedan ${left} operaciones en el día.`,
+          `Ahora mismo no hay oficio. ${board}`,
+        ],
+        dry: [`Sin orden. ${board}`],
+        fun: [`Nada que merezca clic. ${board}`],
       }, recent),
     );
   }
 
-  if (book.armed && paperAllowsOpen(rawIv, tradeStyle) && !atCap && !events.length && !book.positions.length && (angle === 2 || angle === 6)) {
-    paras.push(
-      book.opsUsed === 0
-        ? speak(seed + "ops0", {
-            real: [`Tope intacto. Solo si está limpio.`],
-            dry: [`Tengo ${book.maxOps} tiros. Los gasto como si fueran míos.`],
-            fun: [`No tiro fichas porque alguien gritó «se va».`],
-          }, recent)
-        : speak(seed + "opsn", {
-            real: [`Quedan ${left}. No las gasto en un amague.`],
-            dry: [`${left} en el bolsillo. Si no está limpio, no está.`],
-            fun: [`Criterio que no se negocia ni con café.`],
-          }, recent),
-    );
-  }
+  const news = nws();
+  if (news) paras.push(news);
 
-  if (!events.length) {
+  if (voiceHash(seed + "|life") % 9 === 0 && !events.length) {
     const aside = lifeAside(at, seed, recent);
-    if (aside) {
-      if (angle % 2 === 0) paras.push(maybeLaugh(seed, aside));
-      else paras.unshift(maybeLaugh(seed + "u", aside));
-    } else if (moodOf(seed) === "fun" && paras[0]) {
-      paras[0] = maybeLaugh(seed, paras[0]!);
-    }
-    const quirk = quirkAside(seed, recent);
-    if (quirk) paras.push(quirk);
-    const wantSyms = book.universe === "ALL" ? view.map((s) => s.symbol) : [book.universe];
-    const newsFact = pickFreshFact(book.mind?.facts ?? [], "news", wantSyms, recent, voiceHash(seed + "news"));
-    if (newsFact) {
-      const nline = speak(seed + "news", {
-        real: [
-          `Miré Noticias del SGI. ${newsFact.symbol ? tag(newsFact.symbol) : "Cripto"}: ${newsFact.text}. Lo guardo. Un titular no es una orden.`,
-          `Del desk de noticias: ${newsFact.text}. Queda en mi memoria.`,
-        ],
-        dry: [`Wire SGI: ${newsFact.text}. Anotado.`],
-        fun: [`Leí el mural de noticias. ${newsFact.text}. Archivo, no me desespero.`],
-      }, recent);
-      if (nline) paras.push(nline);
-    } else {
-      const tape = pickFreshFact(book.mind?.facts ?? [], "tape", wantSyms, recent, voiceHash(seed + "mem"));
-      if (tape) {
-        const tline = speak(seed + "mem", {
-          real: [`Me acuerdo de ${tape.text}`, `Anoto lo que veo: ${tape.text}`],
-          dry: [`Memoria de tape: ${tape.text}`],
-          fun: [`Esto ya lo vi: ${tape.text}. No me hago la amnésica.`],
-        }, recent);
-        if (tline) paras.push(tline);
-      }
-    }
+    if (aside) paras.push(aside);
   }
 
-  if (paras[0] && !events.length) paras[0] = oralLead(seed, paras[0]);
-  if (risk > 0 && paras[0] && events.some((e) => e.kind === "open")) {
-    paras[0] = `${paras[0]} Riesgo ${risk}% del equity.`;
+  const last = book.notes[0];
+  let body = paras.filter(Boolean).slice(0, 4).join(" ");
+  if (last && !events.length && body && roxyTooClose(body, last.body)) {
+    return { at: last.at, tone: last.tone, title: last.title, body: last.body, fingerprint: last.fingerprint };
   }
-
-  const body = paras.filter(Boolean).join("\n");
   const fingerprint = [
     tone,
     String(beat),

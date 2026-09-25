@@ -69,11 +69,13 @@ function scoreVoice(v: SpeechSynthesisVoice): number {
   let n = 0;
   if (v.lang.toLowerCase().startsWith("es")) n += 36;
   if (/es-uy|uruguay/.test(name)) n += 28;
-  if (/es-ar|argentin/.test(name)) n += 22;
+  if (/es-ar|argentin/.test(name)) n += 24;
   if (/es-mx|es-us|es-co|es-cl|es-es/.test(name)) n += 8;
-  if (/sabina|paulina|dalia|helena|mónica|monica|lucía|lucia|paloma|soledad|elena|camila|valentina|microsoft sabina/.test(name)) n += 22;
-  if (/female|mujer|woman|zira/.test(name)) n += 10;
-  if (/neural|natural|online|google/.test(name)) n += 10;
+  if (/sabina|paulina|dalia|helena|mónica|monica|lucía|lucia|paloma|soledad|elena|camila|valentina/.test(name)) n += 18;
+  if (/female|mujer|woman/.test(name)) n += 10;
+  if (/google/.test(name)) n += 26;
+  if (/neural|natural|online/.test(name)) n += 22;
+  if (/desktop|sapi|espeak/.test(name)) n -= 8;
   if (/male|hombre|jorge|pablo|diego|carlos|raul|raúl/.test(name)) n -= 34;
   return n;
 }
@@ -162,11 +164,21 @@ function playHum(gen: number, done: () => void): void {
   }
 }
 
+function talkHash(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
 export function toSpokenRoxy(raw: string): string {
   let s = raw
     .replace(/\r/g, "")
+    .replace(/♪/g, "")
     .replace(/[•·]/g, ",")
-    .replace(/[«»""]/g, "")
+    .replace(/[«»“”]/g, "")
     .replace(/USDT/gi, "")
     .replace(/\bT1\b/g, "primer objetivo")
     .replace(/\bT2\b/g, "segundo objetivo")
@@ -175,18 +187,30 @@ export function toSpokenRoxy(raw: string): string {
     .replace(/\bFOMO\b/g, "las ganas de entrar porque sí")
     .replace(/\bOFF\b/g, "pausa")
     .replace(/\bON\b/g, "prendida")
-    .replace(/\bscalping\b/gi, "scalping")
     .replace(/\bscalp\b/gi, "operación rápida")
-    .replace(/jaja\.?/gi, "ja ja")
-    .replace(/jeje\.?/gi, "je")
-    .replace(/me río/gi, "me río")
+    .replace(/cof,?\s*cof\.?/gi, "ejem")
+    .replace(/\btose\b/gi, "ejem")
+    .replace(/jaja+/gi, "jaja")
+    .replace(/jeje+/gi, "je")
+    .replace(/…+/g, ",")
+    .replace(/\.{3,}/g, ",")
     .replace(/(\d)\s*%/g, "$1 por ciento")
     .replace(/(\d)\/(\d)/g, "$1 de $2")
     .replace(/\s*—\s*/g, ", ")
+    .replace(/\s*;\s*/g, ", ")
+    .replace(/\n+/g, ". ")
     .replace(/\s+/g, " ")
     .trim();
   s = moneyTalk(s);
-  return s.slice(0, 1400);
+  return s.slice(0, 1600);
+}
+
+function sameTalk(a: string, b: string): boolean {
+  const n = (s: string) => s.toLowerCase().replace(/[^a-z0-9áéíóúñü ]+/gi, " ").replace(/\s+/g, " ").trim().slice(0, 140);
+  const na = n(a);
+  const nb = n(b);
+  if (!na || !nb) return false;
+  return na === nb || na.startsWith(nb.slice(0, 48)) || nb.startsWith(na.slice(0, 48));
 }
 
 type SpeakBit =
@@ -196,34 +220,42 @@ type SpeakBit =
 
 function splitForSpeech(raw: string): SpeakBit[] {
   const bits: SpeakBit[] = [];
-  const chunks = raw
-    .replace(/\n+/g, ". ")
-    .split(/(?<=[.!?…,;:])\s+/)
+  const parts = raw
+    .split(/(♪|tararea bajito\.?|\bmm mm\b)/i)
     .map((x) => x.trim())
-    .filter((x) => x.length > 1);
-  chunks.forEach((chunk, i) => {
-    const hum = /♪|tararea|\bmm mm\b|\bnana\b/i.test(chunk);
-    const cough = /cof|tose/i.test(chunk);
-    const laugh = /ja ja|je\b|me río|me rei|me reí/i.test(chunk);
-    const breath = /^(mirá|mira|bueno|a ver|che|ta,|la verdad|ojo|dale)\b/i.test(chunk);
-    if (hum) bits.push({ kind: "hum" });
-    if (cough) bits.push({ kind: "pause", ms: 220 });
-    const spoken = chunk.replace(/♪/g, "").replace(/tararea bajito\.?/i, "").replace(/\s+/g, " ").trim();
-    if (spoken.length > 1 && !/^mm+$/i.test(spoken)) {
-      bits.push({
-        kind: "say",
-        text: spoken.replace(/…/g, "."),
-        laugh,
-        rate: laugh ? 1.02 : breath ? 0.9 : 0.94,
-        pitch: laugh ? 1.14 : breath ? 1.0 : 1.02,
-      });
-    } else if (hum && spoken.length <= 1) {
-      /* melody only */
+    .filter(Boolean);
+
+  const pushSay = (text: string) => {
+    const spoken = text.replace(/\s+/g, " ").trim();
+    if (spoken.length < 2) return;
+    const laugh = /jaja|\bje\b|me río|me rei|me reí/i.test(spoken);
+    const h = talkHash(spoken);
+    const rate = laugh ? 1.12 : 1.06 + (h % 7) * 0.008;
+    const pitch = laugh ? 1.12 : 1.04 + (h % 5) * 0.012;
+    bits.push({ kind: "say", text: spoken, laugh, rate, pitch });
+  };
+
+  for (const part of parts) {
+    if (/^(♪|tararea bajito\.?|mm mm)$/i.test(part)) {
+      bits.push({ kind: "hum" });
+      continue;
     }
-    if (i >= chunks.length - 1) return;
-    const endPause = /[.!?]$/.test(chunk) || /…$/.test(chunk);
-    bits.push({ kind: "pause", ms: laugh ? 480 : hum ? 200 : endPause ? 280 : breath ? 220 : 120 });
-  });
+    const sentences: string[] = [];
+    for (const piece of part.split(/(?<=[.!?])\s+/)) {
+      const t = piece.trim();
+      if (!t) continue;
+      const last = sentences[sentences.length - 1];
+      if (last && last.length + t.length < 220 && last.length < 140) {
+        sentences[sentences.length - 1] = `${last} ${t}`;
+      } else {
+        sentences.push(t);
+      }
+    }
+    for (let i = 0; i < sentences.length; i++) {
+      pushSay(sentences[i]!);
+      if (i < sentences.length - 1) bits.push({ kind: "pause", ms: 70 });
+    }
+  }
   return bits;
 }
 
@@ -233,11 +265,11 @@ export function speakRoxy(text: string): void {
   const said = toSpokenRoxy(text);
   if (said.length < 2) return;
   const now = Date.now();
-  const key = said.slice(0, 120).toLowerCase();
-  if (key && recentSaid.some((x) => x === key) && now - lastSaidAt < 180_000) return;
-  if (said === lastSaid && now - lastSaidAt < 90_000) return;
+  if (speakingNow && sameTalk(said, lastSaid)) return;
+  if (!speakingNow && sameTalk(said, lastSaid) && now - lastSaidAt < 50_000) return;
   lastSaid = said;
   lastSaidAt = now;
+  const key = said.slice(0, 120).toLowerCase();
   if (key) {
     recentSaid.unshift(key);
     if (recentSaid.length > 10) recentSaid.length = 10;
@@ -279,14 +311,21 @@ export function speakRoxy(text: string): void {
       }
       u.rate = bit.rate;
       u.pitch = bit.pitch;
-      u.volume = 0.96;
+      u.volume = 1;
       u.onstart = () => setSpeaking(true);
       u.onend = () => runBit(i + 1);
-      u.onerror = () => setSpeaking(false);
+      u.onerror = () => {
+        if (gen === speakGen) runBit(i + 1);
+        else setSpeaking(false);
+      };
       window.speechSynthesis.speak(u);
     };
     if (!voicesReady && !warmVoices().length) {
-      pauseTimer = window.setTimeout(go, 160);
+      pauseTimer = window.setTimeout(go, 120);
+      return;
+    }
+    if (i === 0) {
+      pauseTimer = window.setTimeout(go, 70);
       return;
     }
     go();

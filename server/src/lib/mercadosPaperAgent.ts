@@ -1172,11 +1172,16 @@ function reasonTalk(reason: string): string {
 
 export function pushPaperNote(book: PaperBook, note: Omit<PaperNote, "id">): PaperBook {
   const last = book.notes[0];
+  if (last && roxyTooClose(last.body, note.body)) {
+    return book;
+  }
+  if ((book.notes ?? []).some((n) => roxyTooClose(n.body, note.body))) {
+    return book;
+  }
   const same = last && last.fingerprint === note.fingerprint;
   const fresh = last && note.at - last.at < 75_000;
   if (same && fresh) {
-    const updated: PaperNote = { ...last, at: note.at, title: note.title, body: note.body };
-    return { ...book, notes: [updated, ...book.notes.slice(1)] };
+    return book;
   }
   const full: PaperNote = {
     ...note,
