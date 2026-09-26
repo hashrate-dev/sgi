@@ -1,8 +1,8 @@
 import { buildTradeConfluence } from "./btcTradeConfluence.js";
 import {
   narratePaper,
-  normalizePaperRunInterval,
   pushPaperNote,
+  roxyWorkInterval,
   tickPaperMany,
   type PaperBook,
 } from "./mercadosPaperAgent.js";
@@ -44,7 +44,7 @@ function wantedSymbols(book: PaperBook): string[] {
 }
 
 export async function tickArmedPaperBook(book: PaperBook): Promise<PaperBook> {
-  const iv = normalizePaperRunInterval(book.runInterval);
+  const iv = roxyWorkInterval(book);
   const symbols = wantedSymbols(book);
   const signals = (
     await Promise.all(
@@ -60,7 +60,7 @@ export async function tickArmedPaperBook(book: PaperBook): Promise<PaperBook> {
   if (!signals.length) return book;
   const primed = await rememberSgiNewsOnBook({ ...book, runInterval: iv }, symbols);
   const { book: ticked, events } = tickPaperMany(primed, signals);
-  const withNews = ticked;
+  const withNews = { ...ticked, runInterval: iv };
   const now = Date.now();
   const lead = [...signals].sort((a, b) => b.confidence - a.confidence)[0];
   const sceneKey = roxySceneKey({

@@ -86,6 +86,40 @@ function snapshotMatchesTf(rows: MarketCandle[], interval: string): boolean {
 const WS_KLINE = (symbol: string, tf: string) =>
   `wss://stream.binance.com:9443/ws/${symbol.toLowerCase()}@kline_${tf}`;
 
+const OSC_PANE_KEY = "hrs_chart_osc_h";
+const OSC_PANE_MIN = 0.08;
+const OSC_PANE_MAX = 0.45;
+const OSC_PANE_DEF = 0.17;
+
+type OscPaneShare = { macd: number; rsi: number };
+type OscSplitKind = "macdTop" | "rsiTop";
+
+function loadOscPaneShare(): OscPaneShare {
+  try {
+    const raw = JSON.parse(window.localStorage.getItem(OSC_PANE_KEY) || "");
+    const macd = Number(raw?.macd);
+    const rsi = Number(raw?.rsi);
+    if (macd >= OSC_PANE_MIN && macd <= OSC_PANE_MAX && rsi >= OSC_PANE_MIN && rsi <= OSC_PANE_MAX) {
+      return { macd, rsi };
+    }
+  } catch {
+    /* */
+  }
+  return { macd: OSC_PANE_DEF, rsi: OSC_PANE_DEF };
+}
+
+function saveOscPaneShare(share: OscPaneShare) {
+  try {
+    window.localStorage.setItem(OSC_PANE_KEY, JSON.stringify(share));
+  } catch {
+    /* */
+  }
+}
+
+function clampShare(n: number): number {
+  return Math.max(OSC_PANE_MIN, Math.min(OSC_PANE_MAX, n));
+}
+
 export type { ChartDrawTool };
 
 type Studies = Record<string, boolean>;
@@ -223,15 +257,21 @@ export function MercadosNativeChart({
   const viewRef = useRef({ end: 0, count: 120, follow: true });
   const scaleRef = useRef({ auto: true, min: 0, max: 1 });
   const dragRef = useRef<{
-    mode: "pan" | "zoomX" | "zoomY";
+    mode: "pan" | "zoomX" | "zoomY" | "pane";
     x: number;
     y: number;
     end: number;
     count: number;
     min: number;
     max: number;
+    pane?: OscSplitKind;
+    macdH?: number;
+    rsiH?: number;
+    inner?: number;
   } | null>(null);
   const hoverRef = useRef<number | null>(null);
+  const paneHoverRef = useRef<OscSplitKind | null>(null);
+  const paneShareRef = useRef<OscPaneShare>(loadOscPaneShare());
   const geomRef = useRef({
     padL: 56,
     padR: 78,
@@ -244,6 +284,10 @@ export function MercadosNativeChart({
     barW: 1,
     minP: 0,
     span: 1,
+    macdH: 0,
+    rsiH: 0,
+    inner: 0,
+    splits: [] as Array<{ y: number; which: OscSplitKind }>,
   });
   const axisYRef = useRef<HTMLDivElement>(null);
   const axisXRef = useRef<HTMLDivElement>(null);
@@ -543,7 +587,9 @@ export function MercadosNativeChart({
     if (!ctx) return null;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const tool = drawToolRef.current;
-    canvas.style.cursor = tool === "cursor" ? "crosshair" : tool === "eraser" ? "cell" : "crosshair";
+    if (dragRef.current?.mode !== "pane" && !paneHoverRef.current) {
+      canvas.style.cursor = tool === "cursor" ? "crosshair" : tool === "eraser" ? "cell" : "crosshair";
+    }
     return { ctx, w, h };
   }
 
@@ -563,17 +609,38 @@ export function MercadosNativeChart({
       return;
     }
 
-    const oscN = (on.rsi !== false ? 1 : 0) + (on.macd !== false ? 1 : 0);
-    const oscH = oscN ? Math.min(132, h * 0.18) : 0;
+    const showMacd = on.macd !== false;
+    const showRsi = on.rsi !== false;
+    const oscN = (showRsi ? 1 : 0) + (showMacd ? 1 : 0);
     const padR = 78;
     const padL = Math.max(4, gutterLeftRef.current);
     const padT = 10;
     const timeH = 32;
-    const gap = oscN ? 8 : 0;
-    const priceH = h - padT - timeH - oscN * oscH - gap * Math.max(0, oscN - 1) - (oscN ? 6 : 0);
+    const gap = showMacd && showRsi ? 8 : 0;
+    const gapPrice = oscN ? 6 : 0;
+    const inner = Math.max(1, h - padT - timeH);
+    const minOsc = 40;
+    const minPrice = Math.max(90, inner * 0.34);
+    const oscBudget = Math.max(minOsc * oscN, inner - minPrice - gapPrice - gap);
+    const share = paneShareRef.current;
+    let macdH = showMacd ? inner * share.macd : 0;
+    let rsiH = showRsi ? inner * share.rsi : 0;
+    if (showMacd) macdH = Math.max(minOsc, macdH);
+    if (showRsi) rsiH = Math.max(minOsc, rsiH);
+    if (macdH + rsiH > oscBudget && macdH + rsiH > 0) {
+      const k = oscBudget / (macdH + rsiH);
+      macdH *= k;
+      rsiH *= k;
+    }
+    const priceH = inner - macdH - rsiH - gapPrice - gap;
     const priceTop = padT;
     const priceBot = padT + Math.max(80, priceH);
     const volH = Math.max(28, priceH * 0.16);
+    const macdTop = showMacd ? priceBot + gapPrice : 0;
+    const rsiTop = showRsi ? (showMacd ? macdTop + macdH + gap : priceBot + gapPrice) : 0;
+    const splits: Array<{ y: number; which: OscSplitKind }> = [];
+    if (showMacd) splits.push({ y: priceBot, which: "macdTop" });
+    if (showRsi) splits.push({ y: showMacd ? macdTop + macdH + gap / 2 : priceBot, which: "rsiTop" });
 
     let { end, count } = viewRef.current;
     count = Math.max(12, Math.min(candles.length, count));
@@ -586,7 +653,23 @@ export function MercadosNativeChart({
     const innerW = Math.max(40, plotW - heatW);
     const barW = innerW / count;
     const xOf = (i: number) => padL + (i - start + 0.5) * barW;
-    geomRef.current = { padL, padR, timeH, priceTop, priceBot, h, w, start, barW, minP: 0, span: 1 };
+    geomRef.current = {
+      padL,
+      padR,
+      timeH,
+      priceTop,
+      priceBot,
+      h,
+      w,
+      start,
+      barW,
+      minP: 0,
+      span: 1,
+      macdH,
+      rsiH,
+      inner,
+      splits,
+    };
 
     let minP = Infinity;
     let maxP = -Infinity;
@@ -1212,13 +1295,13 @@ export function MercadosNativeChart({
       }
     }
 
-    let oscTop = priceBot + 6;
-    const macd = on.macd !== false ? macdSeries(closes) : null;
-    const rsi = on.rsi !== false ? rsiWilder(closes, 14) : null;
+    let oscTop = showMacd ? macdTop : rsiTop;
+    const macd = showMacd ? macdSeries(closes) : null;
+    const rsi = showRsi ? rsiWilder(closes, 14) : null;
     const readI = hoverRef.current != null && hoverRef.current >= start && hoverRef.current <= end ? hoverRef.current : end;
 
-    const paintOscTag = (y: number, bg: string, fg: string, text: string) => {
-      const yy = Math.min(oscTop + oscH - 8, Math.max(oscTop + 8, y));
+    const paintOscTag = (bandTop: number, bandH: number, y: number, bg: string, fg: string, text: string) => {
+      const yy = Math.min(bandTop + bandH - 8, Math.max(bandTop + 8, y));
       roundRect(ctx, w - padR + 2, yy - 8, padR - 6, 16, 3);
       ctx.fillStyle = bg;
       ctx.fill();
@@ -1230,6 +1313,7 @@ export function MercadosNativeChart({
     };
 
     if (macd) {
+      const bandH = macdH;
       let mn = 0;
       let mx = 0;
       for (let i = start; i <= end; i++) {
@@ -1243,13 +1327,13 @@ export function MercadosNativeChart({
         }
       }
       const sp = mx - mn || 1;
-      const yM = (v: number) => oscTop + (1 - (v - mn) / sp) * oscH;
+      const yM = (v: number) => oscTop + (1 - (v - mn) / sp) * bandH;
       ctx.save();
       ctx.beginPath();
-      ctx.rect(padL, oscTop, plotW, oscH);
+      ctx.rect(padL, oscTop, plotW, bandH);
       ctx.clip();
       ctx.fillStyle = "#0c1210";
-      ctx.fillRect(padL, oscTop, plotW, oscH);
+      ctx.fillRect(padL, oscTop, plotW, bandH);
       ctx.strokeStyle = "rgba(139,145,156,0.35)";
       ctx.beginPath();
       ctx.moveTo(padL, yM(0));
@@ -1317,24 +1401,25 @@ export function MercadosNativeChart({
       ctx.font = "600 9px ui-sans-serif, system-ui, sans-serif";
       ctx.textAlign = "left";
       ctx.fillText("0", w - padR + 8, yM(0));
-      if (Number.isFinite(mLine)) paintOscTag(yM(mLine), "rgba(38,198,218,0.95)", "#041016", fmtOsc(mLine));
+      if (Number.isFinite(mLine)) paintOscTag(oscTop, bandH, yM(mLine), "rgba(38,198,218,0.95)", "#041016", fmtOsc(mLine));
       if (Number.isFinite(mSig) && Math.abs(yM(mSig) - yM(mLine)) > 14) {
-        paintOscTag(yM(mSig), "rgba(245,197,66,0.95)", "#1a1404", fmtOsc(mSig));
+        paintOscTag(oscTop, bandH, yM(mSig), "rgba(245,197,66,0.95)", "#1a1404", fmtOsc(mSig));
       }
       if (Number.isFinite(mHist)) {
-        paintOscTag(yM(mHist), mHist >= 0 ? "rgba(38,166,154,0.95)" : "rgba(239,83,80,0.95)", "#fff", fmtOsc(mHist));
+        paintOscTag(oscTop, bandH, yM(mHist), mHist >= 0 ? "rgba(38,166,154,0.95)" : "rgba(239,83,80,0.95)", "#fff", fmtOsc(mHist));
       }
-      oscTop += oscH + gap;
+      oscTop += bandH + gap;
     }
 
     if (rsi) {
-      const yR = (v: number) => oscTop + (1 - v / 100) * oscH;
+      const bandH = rsiH;
+      const yR = (v: number) => oscTop + (1 - v / 100) * bandH;
       ctx.save();
       ctx.beginPath();
-      ctx.rect(padL, oscTop, plotW, oscH);
+      ctx.rect(padL, oscTop, plotW, bandH);
       ctx.clip();
       ctx.fillStyle = "#0c1210";
-      ctx.fillRect(padL, oscTop, plotW, oscH);
+      ctx.fillRect(padL, oscTop, plotW, bandH);
       ctx.strokeStyle = "rgba(171,71,188,0.25)";
       ctx.setLineDash([4, 4]);
       ctx.beginPath();
@@ -1387,12 +1472,28 @@ export function MercadosNativeChart({
       ctx.fillText("30", w - padR + 8, yR(30));
       if (Number.isFinite(rNow)) {
         paintOscTag(
+          oscTop,
+          bandH,
           yR(rNow),
           rNow >= 70 ? "rgba(239,83,80,0.95)" : rNow <= 30 ? "rgba(38,166,154,0.95)" : "rgba(171,71,188,0.95)",
           "#fff",
           rNow.toFixed(1),
         );
       }
+    }
+
+    const hotSplit = paneHoverRef.current || (dragRef.current?.mode === "pane" ? dragRef.current.pane ?? null : null);
+    for (const split of splits) {
+      const hot = hotSplit === split.which;
+      ctx.fillStyle = hot ? "rgba(245,197,66,0.55)" : "rgba(232,238,245,0.16)";
+      ctx.fillRect(0, split.y - 2, w, 4);
+      const gx = padL + Math.max(40, plotW) / 2;
+      roundRect(ctx, gx - 16, split.y - 3.5, 32, 7, 3);
+      ctx.fillStyle = hot ? "#f5c542" : "rgba(232,238,245,0.42)";
+      ctx.fill();
+      ctx.fillStyle = hot ? "#1a1404" : "rgba(10,16,14,0.7)";
+      ctx.fillRect(gx - 8, split.y - 1.2, 16, 1.1);
+      ctx.fillRect(gx - 8, split.y + 0.6, 16, 1.1);
     }
 
     ctx.fillStyle = "#101614";
@@ -1485,7 +1586,8 @@ export function MercadosNativeChart({
     }
     const canvas = canvasRef.current;
     if (canvas) {
-      if (hoverEditRef.current) canvas.style.cursor = "pointer";
+      if (hotSplit) canvas.style.cursor = "ns-resize";
+      else if (hoverEditRef.current) canvas.style.cursor = "pointer";
       else if (drawToolRef.current === "eraser") canvas.style.cursor = "cell";
       else canvas.style.cursor = "crosshair";
     }
@@ -1565,6 +1667,36 @@ export function MercadosNativeChart({
         scaleRef.current.auto = false;
         scaleRef.current.min = mid - span / 2;
         scaleRef.current.max = mid + span / 2;
+      } else if (drag.mode === "pane") {
+        const inner = Math.max(1, drag.inner ?? g.inner);
+        const dy = e.clientY - drag.y;
+        let macdH = drag.macdH ?? 0;
+        let rsiH = drag.rsiH ?? 0;
+        const minOsc = 40;
+        const minPrice = Math.max(90, inner * 0.34);
+        const both = (drag.macdH ?? 0) > 0 && (drag.rsiH ?? 0) > 0;
+        const gaps = ((drag.macdH ?? 0) > 0 || (drag.rsiH ?? 0) > 0 ? 6 : 0) + (both ? 8 : 0);
+        if (drag.pane === "macdTop") {
+          macdH = (drag.macdH ?? 0) - dy;
+        } else if ((drag.macdH ?? 0) > 0) {
+          macdH = (drag.macdH ?? 0) + dy;
+          rsiH = (drag.rsiH ?? 0) - dy;
+        } else {
+          rsiH = (drag.rsiH ?? 0) - dy;
+        }
+        if ((drag.macdH ?? 0) > 0) macdH = Math.max(minOsc, macdH);
+        if ((drag.rsiH ?? 0) > 0) rsiH = Math.max(minOsc, rsiH);
+        const budget = Math.max(minOsc, inner - minPrice - gaps);
+        if (macdH + rsiH > budget && macdH + rsiH > 0) {
+          const k = budget / (macdH + rsiH);
+          macdH *= k;
+          rsiH *= k;
+        }
+        paneShareRef.current = {
+          macd: (drag.macdH ?? 0) > 0 ? clampShare(macdH / inner) : paneShareRef.current.macd,
+          rsi: (drag.rsiH ?? 0) > 0 ? clampShare(rsiH / inner) : paneShareRef.current.rsi,
+        };
+        wrap?.classList.add("is-pane-resize");
       } else {
         const shift = Math.round(-(e.clientX - drag.x) / barWidth());
         const count = viewRef.current.count;
@@ -1586,9 +1718,14 @@ export function MercadosNativeChart({
       const el = e.currentTarget as HTMLElement;
       if (el.hasPointerCapture?.(e.pointerId)) el.releasePointerCapture(e.pointerId);
       wrapRef.current?.classList.remove("is-panning");
+      wrapRef.current?.classList.remove("is-pane-resize");
       if (canvasRef.current) canvasRef.current.style.cursor = "";
       const drag = dragRef.current;
       const down = downRef.current;
+      if (drag?.mode === "pane") {
+        saveOscPaneShare(paneShareRef.current);
+        paneHoverRef.current = null;
+      }
       if (drag?.mode === "pan" && down?.tool === "cursor") {
         const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
         if (moved < 6) {
@@ -1729,6 +1866,28 @@ export function MercadosNativeChart({
       }
     };
 
+    const startPaneDrag = (e: PointerEvent, which: OscSplitKind) => {
+      e.preventDefault();
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      const g = geomRef.current;
+      dragRef.current = {
+        mode: "pane",
+        x: e.clientX,
+        y: e.clientY,
+        end: viewRef.current.end,
+        count: viewRef.current.count,
+        min: scaleRef.current.min,
+        max: scaleRef.current.max,
+        pane: which,
+        macdH: g.macdH,
+        rsiH: g.rsiH,
+        inner: g.inner,
+      };
+      paneHoverRef.current = which;
+      wrapRef.current?.classList.add("is-pane-resize");
+      paint();
+    };
+
     const onCanvasDown = (e: PointerEvent) => {
       const tool = drawToolRef.current;
       downRef.current = { x: e.clientX, y: e.clientY, tool };
@@ -1754,6 +1913,11 @@ export function MercadosNativeChart({
           if (i >= 0) list.splice(i, 1);
           if (selectedIdRef.current === hitId) selectedIdRef.current = null;
           paint();
+          return;
+        }
+        const split = geomRef.current.splits.find((s) => Math.abs(y - s.y) <= 8);
+        if (split) {
+          startPaneDrag(e, split.which);
           return;
         }
       }
@@ -1793,6 +1957,15 @@ export function MercadosNativeChart({
     };
     const onYDown = (e: PointerEvent) => {
       e.stopPropagation();
+      const wrap = wrapRef.current;
+      if (wrap) {
+        const y = e.clientY - wrap.getBoundingClientRect().top;
+        const split = geomRef.current.splits.find((s) => Math.abs(y - s.y) <= 8);
+        if (split) {
+          startPaneDrag(e, split.which);
+          return;
+        }
+      }
       begin("zoomY", e);
     };
     const onXDown = (e: PointerEvent) => {
@@ -1833,10 +2006,15 @@ export function MercadosNativeChart({
         const i = start + Math.floor(((x - g.padL) / plotW) * count);
         hoverRef.current = Math.max(start, Math.min(end, i));
         const y = e.clientY - rect.top;
+        const overSplit = geomRef.current.splits.find((s) => Math.abs(y - s.y) <= 8)?.which ?? null;
+        paneHoverRef.current = overSplit;
+        if (overSplit) wrap.classList.add("is-pane-resize");
+        else wrap.classList.remove("is-pane-resize");
         const overX = deleteHitsRef.current.some((b) => Math.hypot(x - b.x, y - b.y) <= b.r);
-        hoverEditRef.current = overX ? null : pickHoverTarget(x, y);
+        hoverEditRef.current = overX || overSplit ? null : pickHoverTarget(x, y);
         paint();
-        if ((overX || hoverEditRef.current) && canvasRef.current) canvasRef.current.style.cursor = "pointer";
+        if (overSplit && canvasRef.current) canvasRef.current.style.cursor = "ns-resize";
+        else if ((overX || hoverEditRef.current) && canvasRef.current) canvasRef.current.style.cursor = "pointer";
       }
       move(e);
     };
@@ -1859,6 +2037,10 @@ export function MercadosNativeChart({
     };
     const onLeave = () => {
       hoverRef.current = null;
+      if (dragRef.current?.mode !== "pane") {
+        paneHoverRef.current = null;
+        wrapRef.current?.classList.remove("is-pane-resize");
+      }
       paint();
     };
     const onEsc = (e: KeyboardEvent) => {

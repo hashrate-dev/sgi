@@ -1,4 +1,55 @@
 const MUTE_KEY = "hrs_roxy_voice_mute";
+const MODE_KEY = "hrs_roxy_sound_mode";
+
+export type RoxySoundMode = "mute" | "voice" | "type";
+
+const SOUND_MODES: RoxySoundMode[] = ["voice", "type", "mute"];
+
+function readMode(): RoxySoundMode {
+  try {
+    const raw = window.localStorage.getItem(MODE_KEY);
+    if (raw === "mute" || raw === "voice" || raw === "type") return raw;
+    if (window.localStorage.getItem(MUTE_KEY) === "1") return "mute";
+  } catch {
+    /* */
+  }
+  return "voice";
+}
+
+function voiceOff(): boolean {
+  return readMode() !== "voice";
+}
+
+export function isRoxyMuted(): boolean {
+  if (typeof window === "undefined") return true;
+  return voiceOff();
+}
+
+export function getRoxySoundMode(): RoxySoundMode {
+  if (typeof window === "undefined") return "mute";
+  return readMode();
+}
+
+export function setRoxySoundMode(mode: RoxySoundMode): void {
+  try {
+    window.localStorage.setItem(MODE_KEY, mode);
+    window.localStorage.setItem(MUTE_KEY, mode === "mute" ? "1" : "0");
+  } catch {
+    /* */
+  }
+  if (mode !== "voice") hushRoxy();
+}
+
+export function cycleRoxySoundMode(from: RoxySoundMode = getRoxySoundMode()): RoxySoundMode {
+  const i = SOUND_MODES.indexOf(from);
+  const next = SOUND_MODES[(i < 0 ? 0 : i + 1) % SOUND_MODES.length]!;
+  setRoxySoundMode(next);
+  return next;
+}
+
+export function setRoxyMuted(muted: boolean): void {
+  setRoxySoundMode(muted ? "mute" : "voice");
+}
 
 let voicesReady = false;
 let speakGen = 0;
@@ -6,28 +57,6 @@ let pauseTimer = 0;
 let lastSaid = "";
 let lastSaidAt = 0;
 const recentSaid: string[] = [];
-
-function mutedNow(): boolean {
-  try {
-    return window.localStorage.getItem(MUTE_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-export function isRoxyMuted(): boolean {
-  if (typeof window === "undefined") return true;
-  return mutedNow();
-}
-
-export function setRoxyMuted(muted: boolean): void {
-  try {
-    window.localStorage.setItem(MUTE_KEY, muted ? "1" : "0");
-  } catch {
-    /* */
-  }
-  if (muted) hushRoxy();
-}
 
 type SpeechListener = (speaking: boolean) => void;
 const speechListeners = new Set<SpeechListener>();
@@ -261,7 +290,7 @@ function splitForSpeech(raw: string): SpeakBit[] {
 
 export function speakRoxy(text: string): void {
   if (typeof window === "undefined" || !window.speechSynthesis) return;
-  if (mutedNow()) return;
+  if (voiceOff()) return;
   const said = toSpokenRoxy(text);
   if (said.length < 2) return;
   const now = Date.now();
@@ -279,7 +308,7 @@ export function speakRoxy(text: string): void {
   const bits = splitForSpeech(said);
   if (!bits.length) return;
   const runBit = (i: number) => {
-    if (gen !== speakGen || mutedNow()) {
+    if (gen !== speakGen || voiceOff()) {
       setSpeaking(false);
       return;
     }
@@ -297,7 +326,7 @@ export function speakRoxy(text: string): void {
       return;
     }
     const go = () => {
-      if (gen !== speakGen || mutedNow()) {
+      if (gen !== speakGen || voiceOff()) {
         setSpeaking(false);
         return;
       }

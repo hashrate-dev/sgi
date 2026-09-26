@@ -24,6 +24,7 @@ import {
   paperVenueOf,
   resetPaperBook,
   roxyLiveDesk,
+  roxyWorkInterval,
   savePaperBook,
   splitPaperTrades,
   type PaperBook,
@@ -39,7 +40,14 @@ import { AppModal } from "./ui";
 import { showToast } from "./ToastNotification";
 import { playMarketplaceCartItemAddedSound, playMarketplaceCartItemRemovedSound } from "../lib/marketplaceCartSound";
 import { playRoxyTypeTick } from "../lib/roxyTypeSound";
-import { hushRoxy, isRoxyMuted, setRoxyMuted, speakRoxy, subscribeRoxySpeech } from "../lib/roxyVoice";
+import {
+  cycleRoxySoundMode,
+  getRoxySoundMode,
+  hushRoxy,
+  speakRoxy,
+  subscribeRoxySpeech,
+  type RoxySoundMode,
+} from "../lib/roxyVoice";
 
 export type PaperPairOpt = { binance: string; label: string };
 
@@ -265,12 +273,12 @@ function pairTag(pairs: PaperPairOpt[], symbol: string): string {
 function AgentOpinion({
   notes,
   live,
-  muted,
+  sound,
   now,
 }: {
   notes: PaperNote[];
   live: Omit<PaperNote, "id">;
-  muted: boolean;
+  sound: RoxySoundMode;
   now: number;
 }) {
   const feed = useMemo(() => {
@@ -322,7 +330,7 @@ function AgentOpinion({
       if (elapsed >= wait) {
         const from = n;
         n = Math.min(body.length, n + 1);
-        if (n > from && !muted) playRoxyTypeTick(body[from] ?? "");
+        if (n > from && sound !== "mute") playRoxyTypeTick(body[from] ?? "");
         setShown(body.slice(0, n));
         last = t;
       }
@@ -331,10 +339,10 @@ function AgentOpinion({
     };
     raf = window.requestAnimationFrame(tick);
     return () => window.cancelAnimationFrame(raf);
-  }, [isLive, current.id, shownNote.body, muted]);
+  }, [isLive, current.id, shownNote.body, sound]);
 
   useEffect(() => {
-    if (muted) {
+    if (sound !== "voice") {
       hushRoxy();
       return;
     }
@@ -342,7 +350,7 @@ function AgentOpinion({
     const line = (shownNote.body || "").trim();
     if (!line) return;
     speakRoxy(line);
-  }, [muted, hush, current.id, shownNote.body]);
+  }, [sound, hush, current.id, shownNote.body]);
 
   const older = i < feed.length - 1;
   const newer = i > 0;
@@ -352,7 +360,7 @@ function AgentOpinion({
 
   return (
     <blockquote className={`tv-paper-opine tv-paper-opine--${current.tone}`}>
-      <RoxyFace talking={Boolean(voicing || (isLive && !done && !muted))} />
+      <RoxyFace talking={Boolean(voicing || (isLive && !done && sound !== "mute"))} />
       <div className="tv-paper-opine__ident">
         <p className="tv-paper-opine__kicker">Opinión de {ROXY}</p>
         <p className="tv-paper-opine__title">{shownNote.title}</p>
@@ -752,7 +760,7 @@ export function MercadosPaperDesk({
 }) {
   const [open, setOpen] = useState(false);
   const [cfgOpen, setCfgOpen] = useState(false);
-  const [muted, setMuted] = useState(() => isRoxyMuted());
+  const [sound, setSound] = useState<RoxySoundMode>(() => getRoxySoundMode());
   const [book, setBook] = useState<PaperBook>(() => loadPaperBook(userId));
   const [fund, setFund] = useState(() => String(Math.round(loadPaperBook(userId).initialUsd)));
   const [cap, setCap] = useState(() => String(loadPaperBook(userId).maxOps));
@@ -763,8 +771,8 @@ export function MercadosPaperDesk({
   const [movesOpen, setMovesOpen] = useState(false);
   const bookRef = useRef(book);
   bookRef.current = book;
-  const mutedRef = useRef(muted);
-  mutedRef.current = muted;
+  const soundRef = useRef(sound);
+  soundRef.current = sound;
   const inflightRef = useRef(0);
   const iv = interval === "LIVE" ? "1s" : interval;
   const tag = (symbol: string) => pairTag(pairs, symbol);
@@ -789,8 +797,8 @@ export function MercadosPaperDesk({
           savePaperBook(userId, remote.book);
         } else {
           const local = loadPaperBook(userId);
-          local.runInterval = iv;
-          const saved = await putPaperBook({ seed: local, runInterval: iv });
+          local.runInterval = roxyWorkInterval({ ...local, runInterval: iv });
+          const saved = await putPaperBook({ seed: local, runInterval: local.runInterval });
           if (cancelled) return;
           setBook(saved.book);
           setFund(String(Math.round(saved.book.initialUsd)));
@@ -815,17 +823,6 @@ export function MercadosPaperDesk({
   }, [userId]);
 
   useEffect(() => {
-    if (!hydrated.current) return;
-    if (book.runInterval === iv) return;
-    void putPaperBook({ runInterval: iv })
-      .then((r) => {
-        setBook(r.book);
-        savePaperBook(userId, r.book);
-      })
-      .catch(() => undefined);
-  }, [iv, userId, book.runInterval]);
-
-  useEffect(() => {
     if (!open) return;
     const t = window.setInterval(() => setNowTick(Date.now()), 1000);
     return () => window.clearInterval(t);
@@ -842,7 +839,7 @@ export function MercadosPaperDesk({
       const [remote, results] = await Promise.all([
         getPaperBook().catch(() => ({ book: null as PaperBook | null })),
         want.size
-          ? Promise.allSettled([...want].map((symbol) => getBtcTradeSignal({ symbol, interval: iv })))
+          ? Promise.allSettled([...want].map((symbol) => getBtcTradeSignal({ symbol, interval: roxyWorkInterval(cur) })))
           : Promise.resolve([] as PromiseSettledResult<{ signal: BtcTradeSignal }>[]),
       ]);
       if (cancelled) return;
@@ -858,12 +855,12 @@ export function MercadosPaperDesk({
           if (ev.action === "open") {
             playMarketplaceCartItemAddedSound();
             showToast(`${ev.note || ev.action} ${name} @ ${usd(ev.price)}`, "success", ROXY);
-            if (!mutedRef.current) speakRoxy(`Abrí ${name} a ${usd(ev.price)}`);
+            if (soundRef.current === "voice") speakRoxy(`Abrí ${name} a ${usd(ev.price)}`);
           } else if (ev.action === "close" || ev.action === "scale") {
             playMarketplaceCartItemRemovedSound();
             const pnl = ev.pnl ?? 0;
             showToast(`${name} ${pnl >= 0 ? "+" : ""}${usd(pnl)}`, pnl >= 0 ? "success" : "warning", ROXY);
-            if (!mutedRef.current) {
+            if (soundRef.current === "voice") {
               speakRoxy(
                 ev.action === "scale"
                   ? `T1 en ${name}. ${pnl >= 0 ? "En verde" : "En rojo"} ${usd(pnl)}`
@@ -1058,21 +1055,32 @@ export function MercadosPaperDesk({
         </button>
         <button
           type="button"
-          className={`tv-paper__voice${muted ? " is-muted" : ""}`}
-          title={muted ? "Roxy está muda" : "Roxy habla"}
-          aria-pressed={!muted}
-          aria-label={muted ? "Activar voz de Roxy" : "Dejar muda a Roxy"}
+          className={`tv-paper__voice${sound === "mute" ? " is-muted" : sound === "type" ? " is-type" : ""}`}
+          title={
+            sound === "mute"
+              ? "Roxy está muda. Clic: voz"
+              : sound === "type"
+                ? "Solo tecleo de los comentarios. Clic: muda"
+                : "Roxy habla. Clic: solo tecleo"
+          }
+          aria-label={
+            sound === "mute" ? "Roxy muda. Cambiar a voz" : sound === "type" ? "Solo tecleo. Cambiar a muda" : "Con voz. Cambiar a solo tecleo"
+          }
           onClick={() => {
-            const next = !muted;
-            setMuted(next);
-            setRoxyMuted(next);
-            if (next) hushRoxy();
+            const next = cycleRoxySoundMode(sound);
+            setSound(next);
           }}
         >
-          {muted ? (
+          {sound === "mute" ? (
             <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden>
               <path d="M3.2 8.2 H6.1 L10.4 4.6 V15.4 L6.1 11.8 H3.2 Z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
               <path d="M12.6 8.2 L16.6 12.2 M16.6 8.2 L12.6 12.2" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          ) : sound === "type" ? (
+            <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden>
+              <path d="M3.2 8.2 H6.1 L10.4 4.6 V15.4 L6.1 11.8 H3.2 Z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+              <path d="M12.4 11.2 h1.3 M14.4 11.2 h1.3 M16.4 11.2 h1.2" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+              <path d="M13.2 13.4 h4.6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
           ) : (
             <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden>
@@ -1123,7 +1131,7 @@ export function MercadosPaperDesk({
       </div>
       {open ? (
         <>
-          <AgentOpinion notes={book.notes} live={liveTalk} muted={muted || !open} now={nowTick} />
+          <AgentOpinion notes={book.notes} live={liveTalk} sound={open ? sound : "mute"} now={nowTick} />
 
           <div className="tv-paper__uni" role="group" aria-label={`Moneda de ${ROXY}`}>
             <button type="button" className={book.universe === "ALL" ? "is-on" : ""} onClick={() => setUniverse("ALL")}>

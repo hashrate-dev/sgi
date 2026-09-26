@@ -627,7 +627,9 @@ body > .tv-markets-tape.hrs-card,
 }
 
 .tv-markets-native.is-price-hover,
-.tv-markets-native.is-price-hover:active {
+.tv-markets-native.is-price-hover:active,
+.tv-markets-native.is-pane-resize,
+.tv-markets-native.is-pane-resize .tv-markets-native__canvas {
   cursor: ns-resize;
 }
 
@@ -2494,6 +2496,12 @@ html.hrs-mercados-fs .tv-markets-dock.is-hid {
   border-color: rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.05);
   color: var(--tv-muted);
+}
+
+.tv-paper__voice.is-type {
+  border-color: rgba(125, 211, 252, 0.38);
+  background: rgba(14, 116, 144, 0.2);
+  color: #7dd3fc;
 }
 
 .tv-paper__cfg {

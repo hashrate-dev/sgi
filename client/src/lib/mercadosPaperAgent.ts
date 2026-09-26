@@ -1,5 +1,5 @@
 import type { BtcTradeSignal } from "./api";
-import { rankRoxyBallots, roxyBallotOpenKey } from "./roxyBallot";
+import { parseRoxyOpenKey, rankRoxyBallots, roxyBallotOpenKey } from "./roxyBallot";
 import {
   hydrateRoxyFacts,
   hydrateRoxySaid,
@@ -618,6 +618,18 @@ export function normalizePaperRunInterval(raw: unknown): string {
   return "60";
 }
 
+/** Timeframe Roxy usa para operar 24/7. No sigue el gráfico que mira el usuario. */
+export function roxyWorkInterval(book: Pick<PaperBook, "style" | "runInterval">): string {
+  const style = paperStyleOf(book);
+  const iv = normalizePaperRunInterval(book.runInterval);
+  if (style === "swing") {
+    if (iv === "15" || iv === "30" || iv === "60" || iv === "240" || iv === "D") return iv;
+    return "240";
+  }
+  if (iv === "1s" || iv === "1" || iv === "5" || iv === "15" || iv === "30" || iv === "60") return iv;
+  return "15";
+}
+
 export function paperVenueOf(mode: PaperMode): PaperVenue {
   return mode === "spot-long" ? "spot" : "futures";
 }
@@ -1040,29 +1052,34 @@ export function paperPrepProcess(book: PaperBook, signals: BtcTradeSignal[]): Pa
   }
   if (!view.length) return { pct: 1, stage: "Esperando lectura", symbol: "", intent: "none" };
 
+  const voted = roxyVotedTrade(book, view);
   let best = { pct: 1, symbol: "", intent: "none" as "buy" | "sell" | "none", stage: "Mirando el tablero" };
-  for (const sig of view) {
-    const side: "buy" | "sell" | null = sig.bias === "buy" || sig.bias === "sell" ? sig.bias : null;
+  const ranked = voted ? [voted.sig, ...view.filter((s) => s.symbol !== voted.sig.symbol)] : view;
+  for (const sig of ranked) {
+    const voteSide = voted && voted.sig.symbol === sig.symbol ? (voted.side === "long" ? "buy" : "sell") : null;
+    const side: "buy" | "sell" | null =
+      voteSide ?? (sig.bias === "buy" || sig.bias === "sell" ? sig.bias : null);
     if (!side) continue;
     if (!paperAllowsSide(mode, side === "buy" ? "long" : "short")) continue;
-    const need = Math.max(1, neededConfirm(sig.interval, style));
+    const need = voteSide ? 1 : Math.max(1, neededConfirm(sig.interval, style));
     const c = book.confirms[sig.symbol];
     const n = c && c.fire === side ? c.n : 0;
     const align = Math.max(0, Math.min(1, sig.confidence / minC));
     const confs = Math.max(0, Math.min(1, n / need));
-    const rsiOk = side === "buy" ? sig.rsi < 76 : sig.rsi > 24;
+    const rsiOk = side === "buy" ? sig.rsi < 82 : sig.rsi > 18;
     const cloudOk = side === "buy" ? sig.ichiCloud !== "below" : sig.ichiCloud !== "above";
-    const volOk = !Number.isFinite(sig.volRatio) || (sig.volRatio ?? 1) >= 0.82;
+    const volOk = !Number.isFinite(sig.volRatio) || (sig.volRatio ?? 1) >= 0.68;
     const filters = (rsiOk ? 0.34 : 0) + (cloudOk ? 0.34 : 0) + (volOk ? 0.32 : 0);
     let pct = Math.round(align * 42 + confs * 40 + filters * 18);
-    if (!rsiOk || !cloudOk) pct = Math.min(pct, 72);
-    if (align >= 1 && confs >= 1 && rsiOk && cloudOk && volOk) pct = 100;
+    if (voteSide) pct = Math.max(pct, 70);
+    if (!rsiOk) pct = Math.min(pct, 72);
+    if (align >= 1 && confs >= 1 && rsiOk && volOk) pct = 100;
     pct = Math.max(1, Math.min(100, pct));
     if (pct > best.pct) {
       let stage = "Leyendo mercado";
       if (pct >= 100) stage = `Lista · ${side === "buy" ? "compra" : "venta"} ${sig.symbol.replace("USDT", "")}`;
       else if (pct >= 82) stage = "Filtros finales · un paso de ejecutar";
-      else if (pct >= 61) stage = `Confirmando velas ${Math.min(n, need)}/${need}`;
+      else if (pct >= 61) stage = voteSide ? `Votación lista · ${sig.symbol.replace("USDT", "")}` : `Confirmando velas ${Math.min(n, need)}/${need}`;
       else if (pct >= 41) stage = `Alineación ${sig.confidence.toFixed(0)}% (piso ${minC}%)`;
       else if (pct >= 21) stage = `Armando sesgo de ${side === "buy" ? "compra" : "venta"}`;
       best = { pct, symbol: sig.symbol, intent: side, stage };
@@ -1312,19 +1329,21 @@ function markHist(book: PaperBook, marks: Record<string, number>): void {
   if (eq > book.peakUsd) book.peakUsd = eq;
 }
 
-function canEnter(sig: BtcTradeSignal, side: "long" | "short", book: PaperBook): boolean {
+function canEnter(sig: BtcTradeSignal, side: "long" | "short", book: PaperBook, voteLed = false): boolean {
   const now = Date.now();
-  const minConf = paperEntryFloor(book, sig.symbol, now);
+  const minConf = paperEntryFloor(book, sig.symbol, now) - (voteLed ? 6 : 0);
   const style = paperStyleOf(book);
   if (!paperAllowsOpen(sig.interval, style)) return false;
   if (!roxyAllowsEntry(book, sig.symbol, sig.confidence, now)) return false;
   if (roxyNewsBlocksSide(book.mind?.facts, sig.symbol, side, now)) return false;
   if (sig.confidence < minConf + roxyNewsConfBump(book.mind?.facts, sig.symbol, side, now)) return false;
-  if (side === "long" && sig.rsi >= 76) return false;
-  if (side === "short" && sig.rsi <= 24) return false;
-  if (side === "long" && sig.ichiCloud === "below") return false;
-  if (side === "short" && sig.ichiCloud === "above") return false;
-  if (Number.isFinite(sig.volRatio) && (sig.volRatio ?? 1) < 0.82) return false;
+  if (side === "long" && sig.rsi >= (voteLed ? 82 : 76)) return false;
+  if (side === "short" && sig.rsi <= (voteLed ? 18 : 24)) return false;
+  if (!voteLed) {
+    if (side === "long" && sig.ichiCloud === "below") return false;
+    if (side === "short" && sig.ichiCloud === "above") return false;
+  }
+  if (Number.isFinite(sig.volRatio) && (sig.volRatio ?? 1) < (voteLed ? 0.68 : 0.82)) return false;
   const plan = entryPlan(sig, side, style);
   const dist = Math.abs(sig.price - plan.stop);
   const minStop = style === "swing" ? 0.006 : 0.004;
@@ -1411,7 +1430,15 @@ export function tickPaper(
   };
   const px = sig.price;
   const now = Date.now();
-  const fire = sig.bias === "buy" || sig.bias === "sell" ? sig.bias : "wait";
+  const voted = parseRoxyOpenKey(opts?.openKey);
+  const voteHit = Boolean(voted && voted.symbol === sig.symbol);
+  const fire = voteHit
+    ? voted!.side === "long"
+      ? "buy"
+      : "sell"
+    : sig.bias === "buy" || sig.bias === "sell"
+      ? sig.bias
+      : "wait";
   const prev = next.confirms[sig.symbol] ?? { fire: "wait" as const, n: 0 };
   const n = fire === prev.fire && fire !== "wait" ? prev.n + 1 : fire === "wait" ? 0 : 1;
   next.confirms[sig.symbol] = { fire, n };
@@ -1564,10 +1591,11 @@ export function tickPaper(
   const underCap = paperCanOpen(next, now);
   const mode = normalizePaperMode(next.mode);
   const lev = paperEffectiveLev(mode, next.leverage ?? 1);
-  if (next.armed && underCap && !hasPos && (fire === "buy" || fire === "sell") && n >= neededConfirm(sig.interval, paperStyleOf(next))) {
+  const need = voteHit ? 1 : neededConfirm(sig.interval, paperStyleOf(next));
+  if (next.armed && underCap && !hasPos && (fire === "buy" || fire === "sell") && n >= need) {
     const side = fire === "buy" ? "long" : "short";
-    const voteOk = opts?.openKey === undefined || opts.openKey === `${sig.symbol}:${side}`;
-    if (voteOk && paperAllowsSide(mode, side) && paperAllowsOpen(sig.interval, paperStyleOf(next)) && canEnter(sig, side, next)) {
+    const voteOk = !opts?.openKey || opts.openKey === `${sig.symbol}:${side}`;
+    if (voteOk && paperAllowsSide(mode, side) && paperAllowsOpen(sig.interval, paperStyleOf(next)) && canEnter(sig, side, next, voteHit)) {
       const marks = { ...(opts?.marks ?? {}), [sig.symbol]: px };
       const plan = entryPlan(sig, side, paperStyleOf(next));
       const qty = sizeQty(next, sig, side, marks, plan.stop);
@@ -1626,18 +1654,15 @@ export function tickPaper(
 export function tickPaperMany(book: PaperBook, signals: BtcTradeSignal[]): { book: PaperBook; events: PaperEvent[] } {
   const marks: Record<string, number> = {};
   for (const s of signals) marks[s.symbol] = s.price;
-  const ballots = rankRoxyBallots(signals, book.mind?.facts);
-  let openKey = roxyBallotOpenKey(ballots);
-  if (openKey) {
-    const [sym, side] = openKey.split(":") as [string, "long" | "short"];
-    const sig = signals.find((s) => s.symbol === sym);
-    const mode = normalizePaperMode(book.mode);
-    if (!sig || !paperAllowsSide(mode, side) || !canEnter(sig, side, book)) openKey = null;
-  }
+  const ballots = rankRoxyBallots(signals, book.mind?.facts, {
+    long: paperAllowsSide(normalizePaperMode(book.mode), "long"),
+    short: paperAllowsSide(normalizePaperMode(book.mode), "short"),
+  });
+  const openKey = roxyBallotOpenKey(ballots);
   let cur = book;
   const events: PaperEvent[] = [];
   for (const sig of signals) {
-    const r = tickPaper(cur, sig, { skipHist: true, marks, openKey: openKey ?? "" });
+    const r = tickPaper(cur, sig, { skipHist: true, marks, openKey });
     cur = r.book;
     events.push(...r.events);
   }
