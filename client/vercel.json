@@ -9,15 +9,5 @@
   "functions": {
     "api/index.js": { "maxDuration": 60 },
     "api/paper/cron-tick.js": { "maxDuration": 60 }
-  },
-  "crons": [
-    {
-      "path": "/api/paper/cron-tick",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/crypto-noticias/cron-ingest",
-      "schedule": "*/2 * * * *"
-    }
-  ]
+  }
 }

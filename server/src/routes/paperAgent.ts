@@ -212,9 +212,13 @@ export async function paperAgentCronHandler(req: Request, res: Response, next: N
     const cronHeader = String(req.headers["x-vercel-cron"] ?? "").trim().toLowerCase();
     const ua = String(req.headers["user-agent"] ?? "").toLowerCase();
     const secret = String(process.env.CRON_SECRET ?? "").trim();
-    const okBearer = Boolean(secret) && auth === `Bearer ${secret}`;
+    const okBearer = Boolean(secret) && (auth === `Bearer ${secret}` || auth === `Bearer ${secret.trim()}`);
+    const q = String((req.query as { secret?: unknown; token?: unknown } | undefined)?.secret
+      ?? (req.query as { token?: unknown } | undefined)?.token
+      ?? "");
+    const okQuery = Boolean(secret) && q === secret;
     const okVercel = cronHeader === "1" || cronHeader === "true" || ua.includes("vercel-cron");
-    if (!okBearer && !okVercel) {
+    if (!okBearer && !okQuery && !okVercel) {
       res.status(401).json({ error: { message: "No autorizado." } });
       return;
     }
