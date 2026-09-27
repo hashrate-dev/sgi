@@ -1345,13 +1345,17 @@ export function MercadosPaperDesk({
           className={`tv-paper__voice${sound === "mute" ? " is-muted" : sound === "type" ? " is-type" : ""}`}
           title={
             sound === "mute"
-              ? "Muda. Clic: voz"
-              : sound === "type"
-                ? "Tecleo. Clic: muda"
-                : "Voz. Clic: tecleo"
+              ? "Silencio total. Clic: voz"
+              : sound === "voice"
+                ? "Voz. Clic: ruido al escribir"
+                : "Ruido al escribir. Clic: silencio total"
           }
           aria-label={
-            sound === "mute" ? "Muda. Cambiar a voz" : sound === "type" ? "Tecleo. Cambiar a muda" : "Voz. Cambiar a tecleo"
+            sound === "mute"
+              ? "Silencio total. Cambiar a voz"
+              : sound === "voice"
+                ? "Voz. Cambiar a ruido al escribir"
+                : "Ruido al escribir. Cambiar a silencio total"
           }
           onClick={(e) => {
             e.stopPropagation();

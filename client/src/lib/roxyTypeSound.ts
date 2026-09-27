@@ -24,8 +24,14 @@ function noiseBuf(ac: AudioContext): AudioBuffer {
   return buf;
 }
 
-/** Clic corto de tecla, una letra. */
+/** Clic corto de tecla, una letra. Solo en modo tecleo. */
 export function playRoxyTypeTick(ch: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (window.localStorage.getItem("hrs_roxy_sound_mode") !== "type") return;
+  } catch {
+    return;
+  }
   const ac = audio();
   if (!ac) return;
   const space = ch === " " || ch === "\n";

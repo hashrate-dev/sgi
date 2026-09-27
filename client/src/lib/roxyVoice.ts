@@ -3,7 +3,7 @@ const MODE_KEY = "hrs_roxy_sound_mode";
 
 export type RoxySoundMode = "mute" | "voice" | "type";
 
-const SOUND_MODES: RoxySoundMode[] = ["voice", "type", "mute"];
+const SOUND_MODES: RoxySoundMode[] = ["mute", "voice", "type"];
 
 function readMode(): RoxySoundMode {
   try {
