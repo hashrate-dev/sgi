@@ -11,6 +11,7 @@ import {
   addCandleHeat,
   ichimokuCloud,
   bollingerBands,
+  buildRenko,
   type MarketCandle,
 } from "../lib/mercadosChartMath";
 import {
@@ -155,18 +156,27 @@ function fmtPx(n: number): string {
   if (!Number.isFinite(n)) return "";
   if (n >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
   if (n >= 1) return n.toLocaleString("en-US", { maximumFractionDigits: 4 });
-  return n.toLocaleString("en-US", { maximumFractionDigits: 6 });
+  return n.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 6 });
+}
+
+const CHART_TZ = "America/Montevideo";
+
+function fmtAxisParts(t: number, interval: string): { date: string; time: string } {
+  const d = new Date(t);
+  const date = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", timeZone: CHART_TZ });
+  const time = d.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: interval === "LIVE" ? "2-digit" : undefined,
+    hour12: false,
+    timeZone: CHART_TZ,
+  });
+  return { date, time };
 }
 
 function fmtTime(t: number, interval: string): string {
-  const d = new Date(t);
-  if (interval === "D") {
-    return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
-  }
-  if (interval === "LIVE") {
-    return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  }
-  return d.toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+  const { date, time } = fmtAxisParts(t, interval);
+  return `${date} ${time}`;
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
@@ -275,7 +285,7 @@ export function MercadosNativeChart({
   const geomRef = useRef({
     padL: 56,
     padR: 78,
-    timeH: 32,
+    timeH: 40,
     priceTop: 10,
     priceBot: 0,
     h: 0,
@@ -324,6 +334,16 @@ export function MercadosNativeChart({
     width: number;
     dash: LineDash;
   } | null>(null);
+  const [awayFromNow, setAwayFromNow] = useState(false);
+  const awayRef = useRef(false);
+  const syncAwayRef = useRef<() => void>(() => {});
+  syncAwayRef.current = () => {
+    const rows = candlesRef.current.length;
+    const away = rows > 2 && !viewRef.current.follow;
+    if (awayRef.current === away) return;
+    awayRef.current = away;
+    setAwayFromNow(away);
+  };
 
   const drawingsOf = () => {
     const k = pairRef.current;
@@ -448,6 +468,8 @@ export function MercadosNativeChart({
     viewRef.current.count = live ? 180 : 120;
     viewRef.current.follow = true;
     scaleRef.current.auto = true;
+    awayRef.current = false;
+    setAwayFromNow(false);
     requestPaint();
 
     const applyRows = (rows: MarketCandle[]) => {
@@ -597,17 +619,22 @@ export function MercadosNativeChart({
     const box = layout();
     if (!box) return;
     const { ctx, w, h } = box;
-    const candles = candlesRef.current;
+    const source = candlesRef.current;
     const on = onRef.current;
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = "#0a100e";
     ctx.fillRect(0, 0, w, h);
-    if (candles.length < 2) {
+    if (source.length < 2) {
       ctx.fillStyle = "#8b919c";
       ctx.font = "13px ui-sans-serif, system-ui, sans-serif";
       ctx.fillText("Cargando velas…", 16, 28);
       return;
     }
+
+    const useRenko = on.renko === true;
+    const renko = useRenko ? buildRenko(source) : null;
+    const candles = renko && renko.bricks.length >= 8 ? renko.bricks : source;
+    const brickPx = candles !== source && renko ? renko.brick : 0;
 
     const showMacd = on.macd !== false;
     const showRsi = on.rsi !== false;
@@ -615,7 +642,7 @@ export function MercadosNativeChart({
     const padR = 78;
     const padL = Math.max(4, gutterLeftRef.current);
     const padT = 10;
-    const timeH = 32;
+    const timeH = 40;
     const gap = showMacd && showRsi ? 8 : 0;
     const gapPrice = oscN ? 6 : 0;
     const inner = Math.max(1, h - padT - timeH);
@@ -649,7 +676,7 @@ export function MercadosNativeChart({
     viewRef.current.count = count;
     const start = Math.max(0, end - count + 1);
     const plotW = w - padL - padR;
-    const heatW = on.heatmap !== false ? 48 : 0;
+    const heatW = useRenko || on.heatmap === false ? 0 : 48;
     const innerW = Math.max(40, plotW - heatW);
     const barW = innerW / count;
     const xOf = (i: number) => padL + (i - start + 0.5) * barW;
@@ -766,7 +793,7 @@ export function MercadosNativeChart({
       ctx.stroke();
     }
 
-    if (on.heatmap !== false) {
+    if (on.heatmap !== false && !useRenko) {
       const bins = Math.max(28, Math.min(72, Math.floor((priceBot - priceTop) / 5)));
       const heat = new Float64Array(count * bins);
       const peakBox = { v: 0 };
@@ -858,24 +885,33 @@ export function MercadosNativeChart({
       const x = xOf(i);
       const up = c.c >= c.o;
       const col = up ? "#26a69a" : "#ef5350";
-      if (maxV > 0) {
+      if (!useRenko && maxV > 0) {
         const vh = (c.v / maxV) * volH;
         ctx.globalAlpha = 0.28;
         ctx.fillStyle = col;
         ctx.fillRect(x - barW * 0.32, priceBot - vh, Math.max(1, barW * 0.64), vh);
         ctx.globalAlpha = 1;
       }
-      ctx.strokeStyle = col;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(x, yOf(c.h));
-      ctx.lineTo(x, yOf(c.l));
-      ctx.stroke();
       const bodyTop = yOf(Math.max(c.o, c.c));
       const bodyBot = yOf(Math.min(c.o, c.c));
-      const bw = Math.max(1.2, barW * 0.62);
-      ctx.fillStyle = col;
-      ctx.fillRect(x - bw / 2, bodyTop, bw, Math.max(1, bodyBot - bodyTop));
+      if (useRenko) {
+        const bw = Math.max(2, barW * 0.9);
+        ctx.fillStyle = col;
+        ctx.fillRect(x - bw / 2, bodyTop, bw, Math.max(2, bodyBot - bodyTop));
+        ctx.strokeStyle = up ? "rgba(232,238,245,0.12)" : "rgba(0,0,0,0.28)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x - bw / 2 + 0.5, bodyTop + 0.5, bw - 1, Math.max(1, bodyBot - bodyTop - 1));
+      } else {
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x, yOf(c.h));
+        ctx.lineTo(x, yOf(c.l));
+        ctx.stroke();
+        const bw = Math.max(1.2, barW * 0.62);
+        ctx.fillStyle = col;
+        ctx.fillRect(x - bw / 2, bodyTop, bw, Math.max(1, bodyBot - bodyTop));
+      }
     }
 
     const st = studyStyleRef.current;
@@ -1170,6 +1206,19 @@ export function MercadosNativeChart({
     for (const d of drawingsOf()) paintOneDrawing(d, false, d.id === selId);
     if (draftRef.current) paintOneDrawing(draftRef.current, true);
     ctx.restore();
+
+    if (useRenko && brickPx > 0) {
+      ctx.fillStyle = "rgba(10,16,14,0.82)";
+      ctx.fillRect(padL, priceTop, 168, 18);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.font = "700 10px ui-sans-serif, system-ui, sans-serif";
+      ctx.fillStyle = "#8b919c";
+      ctx.fillText("RENKO", padL + 8, priceTop + 9);
+      ctx.fillStyle = "#f5c542";
+      ctx.font = "800 11px ui-sans-serif, system-ui, sans-serif";
+      ctx.fillText(`ATR ${fmtPx(brickPx)}`, padL + 58, priceTop + 9);
+    }
 
     if (oscN) {
       ctx.fillStyle = "#0a100e";
@@ -1505,8 +1554,6 @@ export function MercadosNativeChart({
     ctx.lineTo(w, h - timeH + 0.5);
     ctx.stroke();
 
-    ctx.fillStyle = "#8b919c";
-    ctx.font = "11px ui-sans-serif, system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     const step = Math.max(1, Math.round(count / 6));
@@ -1517,8 +1564,13 @@ export function MercadosNativeChart({
       ctx.moveTo(x, h - timeH + 1);
       ctx.lineTo(x, h - timeH + 7);
       ctx.stroke();
+      const parts = fmtAxisParts(candles[i]!.t, intervalRef.current);
+      ctx.font = "10px ui-sans-serif, system-ui, sans-serif";
       ctx.fillStyle = "#9aa3a0";
-      ctx.fillText(fmtTime(candles[i]!.t, intervalRef.current), x, h - timeH / 2 + 3);
+      ctx.fillText(parts.date, x, h - timeH + 16);
+      ctx.font = "10px ui-sans-serif, system-ui, sans-serif";
+      ctx.fillStyle = "#c5cdc8";
+      ctx.fillText(parts.time, x, h - timeH + 29);
     }
 
     const gripX = w - padR + 18;
@@ -1659,6 +1711,7 @@ export function MercadosNativeChart({
         viewRef.current.count = next;
         viewRef.current.end = Math.max(next - 1, Math.min(rows - 1, drag.end));
         viewRef.current.follow = viewRef.current.end >= rows - 2;
+        syncAwayRef.current();
       } else if (drag.mode === "zoomY") {
         const dy = e.clientY - drag.y;
         const factor = Math.pow(1.012, -dy);
@@ -1703,6 +1756,7 @@ export function MercadosNativeChart({
         const next = Math.max(count - 1, Math.min(rows - 1, drag.end + shift));
         viewRef.current.end = next;
         viewRef.current.follow = next >= rows - 2;
+        syncAwayRef.current();
         const plotH = Math.max(1, g.priceBot - g.priceTop);
         const span = Math.max(1e-8, drag.max - drag.min);
         const dPrice = ((e.clientY - drag.y) / plotH) * span;
@@ -1802,6 +1856,7 @@ export function MercadosNativeChart({
       const factor = e.deltaY > 0 ? 1.12 : 0.88;
       v.count = Math.round(Math.max(12, Math.min(rows, v.count * factor)));
       if (v.follow) v.end = rows - 1;
+      syncAwayRef.current();
       paint();
     };
 
@@ -2033,6 +2088,7 @@ export function MercadosNativeChart({
       const rows = candlesRef.current.length;
       viewRef.current.count = Math.min(rows, live ? 180 : 120);
       if (viewRef.current.follow) viewRef.current.end = Math.max(0, rows - 1);
+      syncAwayRef.current();
       paint();
     };
     const onLeave = () => {
@@ -2108,9 +2164,29 @@ export function MercadosNativeChart({
     };
   }, []);
 
+  const goToNow = () => {
+    const rows = candlesRef.current.length;
+    viewRef.current.follow = true;
+    viewRef.current.end = Math.max(0, rows - 1);
+    scaleRef.current.auto = true;
+    awayRef.current = false;
+    setAwayFromNow(false);
+    requestPaint();
+  };
+
   return (
     <div className="tv-markets-native" ref={wrapRef}>
       <canvas ref={canvasRef} className="tv-markets-native__canvas" />
+      {awayFromNow ? (
+        <button
+          type="button"
+          className="tv-markets-now"
+          onClick={goToNow}
+          title="Volver al momento actual"
+        >
+          Ahora
+        </button>
+      ) : null}
       <div
         ref={axisYRef}
         className="tv-markets-axis tv-markets-axis--y"

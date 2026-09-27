@@ -141,6 +141,7 @@ const INTERVALS = [
 ] as const;
 
 const CHART_STUDIES = [
+  { key: "renko", label: "Gráfico Renko", hint: "Reemplaza velas · ladrillo ATR 14", group: "Gráfico" },
   { key: "ema25", label: "EMA 25", hint: "Media rápida", group: "Tendencia" },
   { key: "ema50", label: "EMA 50", hint: "Media intermedia", group: "Tendencia" },
   { key: "ema200", label: "EMA 200", hint: "Régimen / tendencia", group: "Tendencia" },
@@ -157,6 +158,15 @@ const CHART_STUDIES = [
 
 function StudyGlyph({ kind }: { kind: (typeof CHART_STUDIES)[number]["key"] }) {
   const common = { width: 18, height: 18, viewBox: "0 0 18 18", fill: "none", "aria-hidden": true as const };
+  if (kind === "renko") {
+    return (
+      <svg {...common}>
+        <rect x="2" y="9" width="5" height="6" rx="0.6" fill="#26a69a" />
+        <rect x="6.6" y="4" width="5" height="6" rx="0.6" fill="#26a69a" />
+        <rect x="11.2" y="8.5" width="5" height="6" rx="0.6" fill="#ef5350" />
+      </svg>
+    );
+  }
   if (kind === "ema25") {
     return (
       <svg {...common}>
@@ -259,7 +269,7 @@ function fmtPx(n: number): string {
   if (!Number.isFinite(n)) return "—";
   if (n >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
   if (n >= 1) return n.toLocaleString("en-US", { maximumFractionDigits: 4 });
-  return n.toLocaleString("en-US", { maximumFractionDigits: 6 });
+  return n.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 6 });
 }
 
 function distPct(price: number, ref: number): string {
@@ -599,7 +609,7 @@ export function MercadosTradingPage() {
   const [colorOpen, setColorOpen] = useState(false);
   const [pairOpen, setPairOpen] = useState(false);
   const [studyOn, setStudyOn] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(CHART_STUDIES.map((s) => [s.key, true]))
+    Object.fromEntries(CHART_STUDIES.map((s) => [s.key, s.key !== "renko"]))
   );
   const [drawTool, setDrawTool] = useState<ChartDrawTool>("cursor");
   const [drawColor, setDrawColor] = useState(DRAW_COLORS[0]!);
@@ -860,7 +870,7 @@ export function MercadosTradingPage() {
             >
               {active.label}/{active.quote}
             </HudLab>
-            <strong>{signal ? usd(signal.price) : "—"}</strong>
+            <strong>{signal ? fmtPx(signal.price) : "—"}</strong>
             <HudTip title={copy.kicker} detail={signal?.guide ?? signal?.thesis} />
           </div>
           <div className={`tv-markets-hud__cell tv-markets-hud__cell--action is-${signal?.bias ?? "wait"}`}>
@@ -1201,24 +1211,6 @@ export function MercadosTradingPage() {
               aria-label="Temporalidad e indicadores"
               ref={dockRef}
             >
-              {INTERVALS.map((it) => (
-                <button
-                  key={it.id}
-                  type="button"
-                  className={`tv-markets-dock__btn${it.id === interval ? " is-on" : ""}${it.id === "LIVE" ? " is-live" : ""}`}
-                  onClick={() => setInterval(it.id)}
-                >
-                  {it.id === "LIVE" ? (
-                    <>
-                      <span className="tv-markets-dock__live-dot" aria-hidden />
-                      LIVE
-                    </>
-                  ) : (
-                    it.label
-                  )}
-                </button>
-              ))}
-              <span className="tv-markets-dock__sep" aria-hidden />
               <div className="tv-markets-dock__ind-wrap">
               <button
                 type="button"
@@ -1287,6 +1279,24 @@ export function MercadosTradingPage() {
                 </div>
               ) : null}
               </div>
+              <span className="tv-markets-dock__sep" aria-hidden />
+              {INTERVALS.map((it) => (
+                <button
+                  key={it.id}
+                  type="button"
+                  className={`tv-markets-dock__btn${it.id === interval ? " is-on" : ""}${it.id === "LIVE" ? " is-live" : ""}`}
+                  onClick={() => setInterval(it.id)}
+                >
+                  {it.id === "LIVE" ? (
+                    <>
+                      <span className="tv-markets-dock__live-dot" aria-hidden />
+                      LIVE
+                    </>
+                  ) : (
+                    it.label
+                  )}
+                </button>
+              ))}
               <span className="tv-markets-dock__sep" aria-hidden />
               {DRAW_TOOLS.map((tool) => (
                 <button
@@ -1392,7 +1402,7 @@ export function MercadosTradingPage() {
               className={`tv-desk-signal tv-desk-signal--${signal?.bias ?? "wait"} hrs-card sgi-glass-panel`}
               title={signalLoading && !signal ? "Leyendo…" : copy.title}
               summary={copy.kicker}
-              value={signal ? usd(signal.price) : undefined}
+              value={signal ? fmtPx(signal.price) : undefined}
               open={foldSignal}
               onToggle={() => setFoldSignal((v) => !v)}
             >
@@ -1401,7 +1411,7 @@ export function MercadosTradingPage() {
                 <div className="tv-desk-signal__lead-row">
                   <div className="tv-desk-signal__call">
                     <div className="tv-desk-signal__title">{signalLoading && !signal ? "LEYENDO…" : copy.title}</div>
-                    <div className="tv-desk-signal__price">{signal ? usd(signal.price) : "—"}</div>
+                    <div className="tv-desk-signal__price">{signal ? fmtPx(signal.price) : "—"}</div>
                   </div>
                   <span className="tv-desk-signal__icon" title={copy.title} aria-hidden>
                     <BiasGlyph bias={signal?.bias ?? "wait"} size={26} />
@@ -1417,7 +1427,7 @@ export function MercadosTradingPage() {
                     <div className="tv-desk-signal__facts">
                       <div>
                         <span>Stop</span>
-                        <strong>{usd(signal.stop)}</strong>
+                        <strong>{fmtPx(signal.stop)}</strong>
                       </div>
                       <div>
                         <span>Riesgo 1R</span>
@@ -1428,7 +1438,7 @@ export function MercadosTradingPage() {
                       </div>
                       <div>
                         <span>Invalida</span>
-                        <strong>{usd(signal.invalidation)}</strong>
+                        <strong>{fmtPx(signal.invalidation)}</strong>
                       </div>
                     </div>
                   ) : null}
@@ -1456,28 +1466,28 @@ export function MercadosTradingPage() {
               <DeskFold
                 className={`tv-desk-levels tv-desk-levels--${signal.bias} hrs-card sgi-glass-panel`}
                 title="Plan"
-                summary={signal.bias === "buy" ? "Largo" : "Corto"}
-                value={usd(signal.price)}
+                summary={signal.bias === "buy" ? "Long" : "Short"}
+                value={fmtPx(signal.price)}
                 open={foldLevels}
                 onToggle={() => setFoldLevels((v) => !v)}
               >
                 <div className="tv-desk-level">
-                  <span>{signal.bias === "buy" ? "Largo · entrada" : "Corto · entrada"}</span>
-                  <strong>{usd(signal.price)}</strong>
+                  <span>{signal.bias === "buy" ? "Long · entrada" : "Short · entrada"}</span>
+                  <strong>{fmtPx(signal.price)}</strong>
                 </div>
                 <div className="tv-desk-level">
                   <span>{signal.bias === "buy" ? "Stop debajo" : "Stop arriba"}</span>
-                  <strong>{usd(signal.stop)}</strong>
+                  <strong>{fmtPx(signal.stop)}</strong>
                   <em>{signal.riskUsd ? `Riesgo ${usd(signal.riskUsd)}` : ""}</em>
                 </div>
                 <div className="tv-desk-level">
                   <span>{signal.bias === "buy" ? "T1 arriba" : "T1 abajo"}</span>
-                  <strong>{usd(signal.target1)}</strong>
+                  <strong>{fmtPx(signal.target1)}</strong>
                   <em>{signal.rr1.toFixed(1)}R</em>
                 </div>
                 <div className="tv-desk-level">
                   <span>{signal.bias === "buy" ? "T2 arriba" : "T2 abajo"}</span>
-                  <strong>{usd(signal.target2)}</strong>
+                  <strong>{fmtPx(signal.target2)}</strong>
                 </div>
               </DeskFold>
             ) : signal ? (
@@ -1485,21 +1495,21 @@ export function MercadosTradingPage() {
                 className="tv-desk-levels tv-desk-levels--wait hrs-card sgi-glass-panel"
                 title="Plan"
                 summary="Esperar"
-                value={usd(signal.price)}
+                value={fmtPx(signal.price)}
                 open={foldLevels}
                 onToggle={() => setFoldLevels((v) => !v)}
               >
                 <div className="tv-desk-level">
                   <span>Precio</span>
-                  <strong>{usd(signal.price)}</strong>
+                  <strong>{fmtPx(signal.price)}</strong>
                 </div>
                 <div className="tv-desk-level">
                   <span>Supertrend</span>
-                  <strong>{usd(signal.supertrend)}</strong>
+                  <strong>{fmtPx(signal.supertrend)}</strong>
                 </div>
                 <div className="tv-desk-level">
                   <span>EMA 200</span>
-                  <strong>{usd(signal.ema200)}</strong>
+                  <strong>{fmtPx(signal.ema200)}</strong>
                 </div>
                 <div className="tv-desk-level">
                   <span>Plan</span>

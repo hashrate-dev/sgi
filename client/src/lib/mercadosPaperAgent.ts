@@ -8,6 +8,7 @@ import {
   pickFreshFact,
   rememberRoxySaid,
   roxyMaySpeak,
+  roxyPosHeat,
   roxyNewsBlocksSide,
   roxyNewsConfBump,
   roxySceneKey,
@@ -307,6 +308,20 @@ function placePlan(
 ): { stop: number; t1: number; t2: number } {
   const px = sig.price;
   if (side === "long") {
+    if (
+      sig.bias === "buy" &&
+      Number.isFinite(sig.stop) &&
+      sig.stop > 0 &&
+      sig.stop < px &&
+      Number.isFinite(sig.target1) &&
+      sig.target1 > px
+    ) {
+      const t2 =
+        Number.isFinite(sig.target2) && sig.target2 > sig.target1
+          ? sig.target2
+          : sig.target1 + (sig.target1 - px) * 0.7;
+      return { stop: sig.stop, t1: sig.target1, t2 };
+    }
     const floor = px * (1 - stopP);
     const raw = Number.isFinite(sig.stop) && sig.stop < px ? sig.stop : floor;
     const stop = Math.min(raw, floor);
@@ -316,6 +331,20 @@ function placePlan(
     const t1 = Number.isFinite(sig.target1) && sig.target1 > t1Need ? sig.target1 : t1Need;
     const t2 = Number.isFinite(sig.target2) && sig.target2 > Math.max(t2Need, t1) ? sig.target2 : Math.max(t2Need, t1 + risk * 0.6);
     return { stop, t1, t2 };
+  }
+  if (
+    sig.bias === "sell" &&
+    Number.isFinite(sig.stop) &&
+    sig.stop > px &&
+    Number.isFinite(sig.target1) &&
+    sig.target1 > 0 &&
+    sig.target1 < px
+  ) {
+    const t2 =
+      Number.isFinite(sig.target2) && sig.target2 < sig.target1 && sig.target2 > 0
+        ? sig.target2
+        : sig.target1 - (px - sig.target1) * 0.7;
+    return { stop: sig.stop, t1: sig.target1, t2 };
   }
   const ceil = px * (1 + stopP);
   const raw = Number.isFinite(sig.stop) && sig.stop > px ? sig.stop : ceil;
@@ -334,8 +363,8 @@ function entryPlan(sig: BtcTradeSignal, side: "long" | "short", style: PaperStyl
     const stopP = b === "context" ? 0.024 : b === "hour" ? 0.018 : 0.012;
     return placePlan(sig, side, stopP, 1.8, 3.2);
   }
-  const stopP = b === "ultra" ? 0.0048 : b === "fast" ? 0.007 : b === "mid" ? 0.01 : 0.014;
-  return placePlan(sig, side, stopP, 1.6, 2.7);
+  const stopP = b === "ultra" ? 0.0048 : b === "fast" ? 0.008 : b === "mid" ? 0.011 : 0.014;
+  return placePlan(sig, side, stopP, 1.2, 2.2);
 }
 
 function scalpMaxHoldMs(interval: string): number {
@@ -1137,12 +1166,15 @@ function liveChipsOf(s: BtcTradeSignal): RoxyLiveChip[] {
   const rsiTone: RoxyLiveChip["tone"] = s.rsi <= 32 ? "buy" : s.rsi >= 72 ? "sell" : tone("rsi", "wait");
   const vol = Number.isFinite(s.volRatio) ? s.volRatio! : 1;
   return [
+    { id: "plan", label: s.bias === "buy" ? "Plan Long" : s.bias === "sell" ? "Plan Short" : "Plan Wait", tone: s.bias },
+    { id: "align", label: `${s.confidence.toFixed(0)}%`, tone: s.bias },
     { id: "rsi", label: `RSI ${s.rsi.toFixed(0)}`, tone: rsiTone },
     { id: "macd", label: "MACD", tone: tone("macd", macdTone) },
     { id: "supertrend", label: "SuperT", tone: tone("supertrend", stTone) },
     { id: "ema200", label: "EMA 200", tone: tone("ema200", ema200Tone) },
     { id: "ema-cross", label: "EMA 25/50", tone: tone("ema-cross", emaCrossTone) },
     { id: "ichimoku", label: "Ichimoku", tone: tone("ichimoku", s.ichiCloud === "above" ? "buy" : s.ichiCloud === "below" ? "sell" : "wait") },
+    { id: "renko", label: "Renko", tone: tone("renko", "wait") },
     { id: "fib", label: "Fib", tone: tone("fib", "wait") },
     { id: "divergence", label: "Diverg.", tone: tone("divergence", "wait") },
     { id: "psar", label: "PSAR", tone: tone("psar", psarTone) },
@@ -1206,7 +1238,7 @@ export function roxyLiveDesk(book: PaperBook, signals: BtcTradeSignal[], now = D
       ? `${p.symbol.replace(/USDT$/i, "")} · trail a T2`
       : `${p.symbol.replace(/USDT$/i, "")} · stop y T1`;
   } else if (voteLead && voteLead.pick !== "wait") {
-    doing = `Voto ${voteLead.name} ${voteLead.pick === "long" ? "LARGO" : "CORTO"}`;
+    doing = `Voto ${voteLead.name} ${voteLead.pick === "long" ? "LONG" : "SHORT"}`;
   } else if ((book.mind?.revengeUntil ?? 0) > now && book.mind?.pairs) {
     const cooled = Object.values(book.mind.pairs).find((p) => p.coolUntil > now);
     if (cooled) doing = `${cooled.symbol.replace(/USDT$/i, "")} · sin revancha`;
@@ -1264,6 +1296,7 @@ export function roxyLiveDesk(book: PaperBook, signals: BtcTradeSignal[], now = D
       `RSI 14 · ${coin} · ${work.rsi.toFixed(0)}`,
       `MACD · ${coin}`,
     ];
+    if (ck("renko")) acts.push(`Renko · ${coin}`);
     if (ck("divergence") && ck("divergence")!.bias !== "wait") acts.push(`Divergencia · ${coin}`);
     if (ck("ichimoku")) acts.push(`Ichimoku · ${coin}`);
     if (ck("supertrend")) acts.push(`Supertrend · ${coin}`);
@@ -1285,6 +1318,141 @@ export function splitPaperTrades(book: PaperBook): { open: PaperTrade[]; closed:
   open.sort((a, b) => b.openedAt - a.openedAt);
   closed.sort((a, b) => (b.closedAt ?? b.openedAt) - (a.closedAt ?? a.openedAt));
   return { open, closed };
+}
+
+export type PaperReportBucket = {
+  key: string;
+  n: number;
+  wins: number;
+  losses: number;
+  pnl: number;
+};
+
+export type PaperReport = {
+  at: number;
+  equity: number;
+  initial: number;
+  cash: number;
+  retPct: number;
+  peak: number;
+  drawdownPct: number;
+  openN: number;
+  closedN: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  realized: number;
+  floating: number;
+  grossWin: number;
+  grossLoss: number;
+  profitFactor: number;
+  avgWin: number;
+  avgLoss: number;
+  expectancy: number;
+  avgHoldMs: number;
+  exposure: number;
+  opsUsed: number;
+  maxOps: number;
+  dayUsed: number;
+  equityHist: number[];
+  bySymbol: PaperReportBucket[];
+  bySide: { long: PaperReportBucket; short: PaperReportBucket };
+  byReason: PaperReportBucket[];
+  openRows: Array<{ trade: PaperTrade; mark: number; pnl: number }>;
+  closedRows: PaperTrade[];
+};
+
+export function paperTradeLivePnl(trade: PaperTrade, mark?: number): number {
+  if (trade.status !== "open") return trade.realizedPnl;
+  const px = mark ?? trade.entry;
+  return trade.qtyLeft * (px - trade.entry) + trade.realizedPnl;
+}
+
+export function buildPaperReport(book: PaperBook, marks: Record<string, number>, now = Date.now()): PaperReport {
+  const { open, closed } = splitPaperTrades(book);
+  const equity = paperEquity(book, marks);
+  const openRows = open.map((trade) => {
+    const mark = marks[trade.symbol] ?? trade.entry;
+    return { trade, mark, pnl: paperTradeLivePnl(trade, mark) };
+  });
+  const floating = openRows.reduce((s, r) => s + r.pnl, 0);
+  const realized = closed.reduce((s, t) => s + t.realizedPnl, 0);
+  const winList = closed.filter((t) => t.realizedPnl > 0);
+  const lossList = closed.filter((t) => t.realizedPnl < 0);
+  const grossWin = winList.reduce((s, t) => s + t.realizedPnl, 0);
+  const grossLoss = Math.abs(lossList.reduce((s, t) => s + t.realizedPnl, 0));
+  const wins = book.wins || winList.length;
+  const losses = book.losses || lossList.length;
+  const closedN = closed.length;
+  const avgHoldMs =
+    closedN > 0
+      ? closed.reduce((s, t) => s + Math.max(0, (t.closedAt ?? now) - t.openedAt), 0) / closedN
+      : open.length
+        ? open.reduce((s, t) => s + Math.max(0, now - t.openedAt), 0) / open.length
+        : 0;
+  const exposure = open.reduce((s, t) => s + Math.abs(t.qtyLeft) * (marks[t.symbol] ?? t.entry), 0);
+  const buckets = new Map<string, PaperReportBucket>();
+  const bump = (key: string, pnl: number, closedRow: boolean) => {
+    const cur = buckets.get(key) ?? { key, n: 0, wins: 0, losses: 0, pnl: 0 };
+    cur.n += 1;
+    cur.pnl += pnl;
+    if (closedRow && pnl > 0) cur.wins += 1;
+    if (closedRow && pnl < 0) cur.losses += 1;
+    buckets.set(key, cur);
+  };
+  for (const t of closed) {
+    bump(`sym:${t.symbol}`, t.realizedPnl, true);
+    bump(`side:${t.side}`, t.realizedPnl, true);
+    bump(`why:${t.exitReason || "otro"}`, t.realizedPnl, true);
+  }
+  for (const r of openRows) {
+    bump(`sym:${r.trade.symbol}`, r.pnl, false);
+    bump(`side:${r.trade.side}`, r.pnl, false);
+  }
+  const bySymbol = [...buckets.values()]
+    .filter((b) => b.key.startsWith("sym:"))
+    .map((b) => ({ ...b, key: b.key.slice(4).replace(/USDT$/i, "") }))
+    .sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl));
+  const byReason = [...buckets.values()]
+    .filter((b) => b.key.startsWith("why:"))
+    .map((b) => ({ ...b, key: b.key.slice(4) }))
+    .sort((a, b) => b.n - a.n);
+  const long = buckets.get("side:long") ?? { key: "long", n: 0, wins: 0, losses: 0, pnl: 0 };
+  const short = buckets.get("side:short") ?? { key: "short", n: 0, wins: 0, losses: 0, pnl: 0 };
+  const closedPnlN = closedN || 1;
+  return {
+    at: now,
+    equity,
+    initial: book.initialUsd,
+    cash: book.cashUsd,
+    retPct: book.initialUsd > 0 ? ((equity - book.initialUsd) / book.initialUsd) * 100 : 0,
+    peak: book.peakUsd,
+    drawdownPct: book.peakUsd > 0 ? ((equity - book.peakUsd) / book.peakUsd) * 100 : 0,
+    openN: open.length,
+    closedN,
+    wins,
+    losses,
+    winRate: wins + losses > 0 ? (wins / (wins + losses)) * 100 : 0,
+    realized,
+    floating,
+    grossWin,
+    grossLoss,
+    profitFactor: grossLoss > 0 ? grossWin / grossLoss : grossWin > 0 ? 99 : 0,
+    avgWin: winList.length ? grossWin / winList.length : 0,
+    avgLoss: lossList.length ? -(grossLoss / lossList.length) : 0,
+    expectancy: closedN ? realized / closedPnlN : floating,
+    avgHoldMs,
+    exposure,
+    opsUsed: book.opsUsed,
+    maxOps: book.maxOps,
+    dayUsed: paperOpsToday(book),
+    equityHist: book.equityHist.length ? book.equityHist : [book.initialUsd, equity],
+    bySymbol,
+    bySide: { long: { ...long, key: "Long" }, short: { ...short, key: "Short" } },
+    byReason,
+    openRows,
+    closedRows: closed,
+  };
 }
 
 function neededConfirm(interval: string, style: PaperStyle = "intraday"): number {
@@ -1337,6 +1505,8 @@ function canEnter(sig: BtcTradeSignal, side: "long" | "short", book: PaperBook, 
   if (!roxyAllowsEntry(book, sig.symbol, sig.confidence, now)) return false;
   if (roxyNewsBlocksSide(book.mind?.facts, sig.symbol, side, now)) return false;
   if (sig.confidence < minConf + roxyNewsConfBump(book.mind?.facts, sig.symbol, side, now)) return false;
+  if (sig.bias === "buy" && side === "short") return false;
+  if (sig.bias === "sell" && side === "long") return false;
   if (side === "long" && sig.rsi >= (voteLed ? 82 : 76)) return false;
   if (side === "short" && sig.rsi <= (voteLed ? 18 : 24)) return false;
   if (!voteLed) {
@@ -1637,7 +1807,7 @@ export function tickPaper(
           symbol: sig.symbol,
           reason: "signal",
           price: px,
-          note: `${side === "long" ? "LARGO" : "CORTO"} ${sig.symbol}`,
+          note: `${side === "long" ? "LONG" : "SHORT"} ${sig.symbol}`,
         });
       }
     }
@@ -1697,6 +1867,59 @@ function ivTalk(iv: string): string {
 function usdTalk(n: number): string {
   if (!Number.isFinite(n)) return "—";
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n);
+}
+
+function pxTalk(n: number): string {
+  if (!Number.isFinite(n)) return "—";
+  if (n >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  if (n >= 1) return n.toLocaleString("en-US", { maximumFractionDigits: 4 });
+  return n.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 6 });
+}
+
+function holdBrief(
+  pos: PaperPosition,
+  px: number,
+  sig: BtcTradeSignal | undefined,
+  t1Pct: number,
+): { title: string; status: string; think: string } {
+  const name = pos.symbol.replace(/USDT$/i, "");
+  const short = pos.side === "short";
+  const u = pos.qty * (px - pos.entry);
+  const uTxt = `${u >= 0 ? "+" : ""}${usdTalk(u)}`;
+  const nearStop = pos.entry > 0 && Math.abs(px - pos.stop) / pos.entry <= 0.004;
+  const nearT1 = !pos.t1Done && pos.entry > 0 && Math.abs(px - pos.t1) / pos.entry <= 0.004;
+  const green = u >= 0;
+  const status = `${name} ${short ? "Short" : "Long"}: entrada ${pxTalk(pos.entry)}, ahora ${pxTalk(px)} (${uTxt}). Stop ${pxTalk(pos.stop)} · T1 ${pxTalk(pos.t1)} · T2 ${pxTalk(pos.t2)}.`;
+  let think = "";
+  if (nearStop) {
+    think = short
+      ? `Está rozando el stop. Si sigue subiendo salgo en ${pxTalk(pos.stop)}; si rechaza, todavía puede ir a T1 ${pxTalk(pos.t1)}. No promedio.`
+      : `Está rozando el stop ${pxTalk(pos.stop)}. Si pincha, cierro. Si aguanta, el plan sigue a T1 ${pxTalk(pos.t1)}.`;
+  } else if (nearT1) {
+    think = `Está a un paso de T1 ${pxTalk(pos.t1)}. Si lo toca cobro el ${t1Pct}% y dejo el resto con stop en la entrada. Si se da vuelta antes, el stop manda.`;
+  } else if (pos.t1Done) {
+    think = `Ya cobré parcial. El resto vive de prestado: T2 ${pxTalk(pos.t2)} o stop en ${pxTalk(pos.stop)}.`;
+  } else if (green) {
+    think = short
+      ? `El short me está pagando. Si sigue bajando veo T1 ${pxTalk(pos.t1)}; si rebota fuerte, el stop ${pxTalk(pos.stop)} me saca. No lo cierro a mano.`
+      : `El long va a favor. Camino a T1 ${pxTalk(pos.t1)}. Un rechazo me deja en el stop ${pxTalk(pos.stop)}.`;
+  } else {
+    think = short
+      ? `El short está un poco en contra. Puede ser ruido y después bajar a T1 ${pxTalk(pos.t1)}, o irse al stop ${pxTalk(pos.stop)}. Yo no toco: el mapa decide.`
+      : `El long está flojo. Puede recuperar hacia T1 ${pxTalk(pos.t1)} o irse al stop ${pxTalk(pos.stop)}. Sigo el plan, no improviso.`;
+  }
+  if (sig) {
+    if (short && sig.bias === "buy" && sig.confidence >= 58) {
+      think += ` El tape ahora tira alcista (${sig.confidence.toFixed(0)}%): alerta, no salida anticipada.`;
+    } else if (!short && sig.bias === "sell" && sig.confidence >= 58) {
+      think += ` El tape se puso vendedor: vigilo el stop, no agrando.`;
+    } else if (short && sig.bias === "sell") {
+      think += ` El sesgo sigue vendedor: favorece que busque T1.`;
+    } else if (!short && sig.bias === "buy") {
+      think += ` El sesgo sigue comprador: favorece el camino a T1.`;
+    }
+  }
+  return { title: green ? `Cómo va ${name}` : `${name} en contra`, status, think };
 }
 
 function voiceHash(seed: string): number {
@@ -1923,6 +2146,9 @@ export function narratePaper(
       : signals.filter((s) => s.symbol === book.universe || book.positions.some((p) => p.symbol === s.symbol));
   const view = focused.length ? focused : signals;
   const lead = [...view].sort((a, b) => b.confidence - a.confidence)[0];
+  const marks: Record<string, number> = {};
+  for (const s of view) marks[s.symbol] = s.price;
+  const holding = book.positions.length > 0;
   const sceneKey = roxySceneKey({
     armed: book.armed,
     universe: book.universe,
@@ -1931,6 +2157,7 @@ export function narratePaper(
     positions: book.positions,
     lead,
     interval: lead?.interval || book.runInterval,
+    heat: holding ? roxyPosHeat(book.positions, marks) : "",
   });
   if (
     !roxyMaySpeak({
@@ -1940,6 +2167,7 @@ export function narratePaper(
       sceneKey,
       hasEvents: events.length > 0,
       now: at,
+      holding,
     })
   ) {
     if (book.mind) book.mind.lastTalkKey = sceneKey;
@@ -2063,32 +2291,14 @@ export function narratePaper(
     }
   } else if (book.positions.length) {
     tone = "hold";
-    const pos = book.positions[0]!;
-    const s = view.find((x) => x.symbol === pos.symbol);
-    const px = s?.price ?? pos.entry;
-    const u = pos.qty * (px - pos.entry);
-    const name = tag(pos.symbol);
-    const uTxt = `${u >= 0 ? "+" : ""}${usdTalk(u)}`;
-    title = speak(seed + "th", { real: [`Sostengo ${name}`, "Operación abierta"], dry: ["Adentro"], fun: ["Dejo correr"] }, recent);
-    const next = pos.t1Done
-      ? `Ya cobré parcial. Stop en la entrada, apunto al segundo objetivo en ${usdTalk(pos.t2)}.`
-      : `Si llega a ${usdTalk(pos.t1)} saco parcial; si toca ${usdTalk(pos.stop)}, salgo.`;
-    paras.push(
-      speak(seed + "ph", {
-        real: [
-          `${name} sigue ${pos.side === "long" ? "larga" : "corta"} desde ${usdTalk(pos.entry)}, ahora ${usdTalk(px)} (${uTxt}). ${next}`,
-          `Tengo ${name} abierta (${uTxt}). ${next}`,
-        ],
-        dry: [`Gestión: ${name} ${uTxt}. ${next}`],
-        fun: [`${name} está trabajando (${uTxt}). Yo no la toco. ${next}`],
-      }, recent),
-    );
-    if (s && angle % 2 === 0) {
-      paras.push(
-        speak(seed + "phd", {
-          real: [`Dato: ${oneDetail(seed, s, recent, angle)}.`],
-        }, recent),
-      );
+    const t1pHold = clampPaperT1Pct(book.t1Pct ?? 50);
+    const briefs = book.positions.map((pos) => {
+      const s = view.find((x) => x.symbol === pos.symbol);
+      return holdBrief(pos, s?.price ?? pos.entry, s, t1pHold);
+    });
+    title = briefs[0]?.title ?? "Operación abierta";
+    for (const b of briefs) {
+      paras.push(`${b.status} ${b.think}`);
     }
   } else if (tradeStyle === "swing" && !paperAllowsOpen(rawIv, "swing")) {
     tone = "idle";
@@ -2154,7 +2364,7 @@ export function narratePaper(
   }
 
   const news = nws();
-  if (news && (events.length || tone === "watch" || tone === "open" || tone === "close" || tone === "adjust")) {
+  if (news && (events.length || tone === "watch" || tone === "open" || tone === "close" || tone === "adjust" || tone === "hold")) {
     paras.push(news);
   }
 
@@ -2179,6 +2389,6 @@ export function narratePaper(
     String(book.mind?.said?.length ?? 0),
   ].join("/");
 
-  if (book.mind) markRoxySpoke(book.mind, sceneKey, events, at);
+  if (book.mind) markRoxySpoke(book.mind, sceneKey, events, at, holding);
   return { at, tone, title, body, fingerprint };
 }

@@ -8,6 +8,9 @@ type SignalLike = {
   symbol: string;
   bias?: "buy" | "sell" | "wait";
   confidence?: number;
+  buyVotes?: number;
+  sellVotes?: number;
+  waitVotes?: number;
   checks?: CheckLike[];
 };
 
@@ -27,6 +30,10 @@ const WEIGHT: Record<string, number> = {
   fib: 1.45,
   divergence: 1.7,
   news: 1.55,
+  renko: 1.65,
+  plan: 2.5,
+  regime: 2.35,
+  align: 1.85,
 };
 
 export type RoxyToolChip = {
@@ -60,6 +67,7 @@ function wOf(id: string): number {
 function tallySide(sig: SignalLike, side: RoxyVoteSide, facts: RoxyFact[] | undefined): RoxySideTally {
   const want = side === "long" ? "buy" : "sell";
   const against = side === "long" ? "sell" : "buy";
+  const desk = sig.bias === "buy" || sig.bias === "sell" ? sig.bias : "wait";
   let yesW = 0;
   let noW = 0;
   let yes = 0;
@@ -73,6 +81,27 @@ function tallySide(sig: SignalLike, side: RoxyVoteSide, facts: RoxyFact[] | unde
     } else if (c.bias === against) {
       noW += w;
     }
+  }
+  if (desk === want) {
+    const planW = wOf("plan");
+    yesW += planW;
+    yes += 1;
+    tools.push({ id: "plan", label: side === "long" ? "Plan Long" : "Plan Short", weight: planW, forSide: side });
+    const regW = wOf("regime");
+    yesW += regW;
+    yes += 1;
+    tools.push({ id: "regime", label: "Régimen", weight: regW, forSide: side });
+    const conf = Number(sig.confidence) || 0;
+    if (conf > 0) {
+      const aw = wOf("align") * Math.min(1.3, Math.max(0.35, conf / 70));
+      yesW += aw;
+      yes += 1;
+      tools.push({ id: "align", label: `Alineación ${conf.toFixed(0)}%`, weight: aw, forSide: side });
+    }
+  } else if (desk === "buy" && side === "short") {
+    noW += wOf("plan") + wOf("regime");
+  } else if (desk === "sell" && side === "long") {
+    noW += wOf("plan") + wOf("regime");
   }
   const tilt = roxyNewsTiltScore(facts, sig.symbol);
   if ((side === "long" && tilt > 0.45) || (side === "short" && tilt < -0.45)) {
@@ -90,9 +119,16 @@ function tallySide(sig: SignalLike, side: RoxyVoteSide, facts: RoxyFact[] | unde
 
 export type RoxyVoteGate = { long: boolean; short: boolean };
 
-function pickSide(long: RoxySideTally, short: RoxySideTally, gate?: RoxyVoteGate): RoxyVoteSide | "wait" {
-  const allowL = gate?.long !== false;
-  const allowS = gate?.short !== false;
+function pickSide(
+  long: RoxySideTally,
+  short: RoxySideTally,
+  gate?: RoxyVoteGate,
+  desk?: "buy" | "sell" | "wait",
+): RoxyVoteSide | "wait" {
+  let allowL = gate?.long !== false;
+  let allowS = gate?.short !== false;
+  if (desk === "buy") allowS = false;
+  if (desk === "sell") allowL = false;
   const longOk = allowL && long.yes >= 3 && long.score >= 1.4;
   const shortOk = allowS && short.yes >= 3 && short.score >= 1.4;
   if (allowL && !allowS) return longOk ? "long" : "wait";
@@ -108,7 +144,8 @@ export function rankRoxyBallots(signals: SignalLike[], facts?: RoxyFact[], gate?
     const long = tallySide(sig, "long", facts);
     const short = tallySide(sig, "short", facts);
     const margin = Math.abs(long.score - short.score);
-    const pick = pickSide(long, short, gate);
+    const desk = sig.bias === "buy" || sig.bias === "sell" ? sig.bias : "wait";
+    const pick = pickSide(long, short, gate, desk);
     return {
       symbol: sig.symbol,
       name: sig.symbol.replace(/USDT$/i, ""),

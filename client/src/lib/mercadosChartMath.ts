@@ -360,6 +360,77 @@ export function bollingerBands(closes: number[], period = 20, mult = 2): Bolling
   return { mid, upper, lower };
 }
 
+export function atrOf(candles: MarketCandle[], period = 14): number {
+  const a = rma(trueRange(candles), period);
+  for (let i = a.length - 1; i >= 0; i--) {
+    const v = a[i];
+    if (Number.isFinite(v) && (v as number) > 0) return v as number;
+  }
+  const last = candles[candles.length - 1];
+  return last && last.c > 0 ? last.c * 0.004 : 1;
+}
+
+/** Ladrillos Renko (cierre). Reversión = 2 ladrillos. Tamaño = ATR 14. */
+export function buildRenko(src: MarketCandle[]): { bricks: MarketCandle[]; brick: number } {
+  if (src.length < 8) return { bricks: src, brick: 0 };
+  const brick = atrOf(src, 14);
+  if (!(brick > 0)) return { bricks: src, brick: 0 };
+  const bricks: MarketCandle[] = [];
+  let last = src[0]!.c;
+  let dir = 0;
+  const emit = (t: number, v: number, up: boolean) => {
+    const o = last;
+    const c = up ? last + brick : last - brick;
+    bricks.push({ t, o, c, h: Math.max(o, c), l: Math.min(o, c), v });
+    last = c;
+    dir = up ? 1 : -1;
+  };
+  for (const bar of src) {
+    const p = bar.c;
+    let n = 0;
+    if (dir === 0) {
+      while (p >= last + brick && n < 24) {
+        emit(bar.t, bar.v, true);
+        n += 1;
+      }
+      while (p <= last - brick && n < 24) {
+        emit(bar.t, bar.v, false);
+        n += 1;
+      }
+      continue;
+    }
+    if (dir === 1) {
+      while (p >= last + brick && n < 24) {
+        emit(bar.t, bar.v, true);
+        n += 1;
+      }
+      if (p <= last - 2 * brick) {
+        last -= brick;
+        dir = -1;
+        while (p <= last - brick && n < 24) {
+          emit(bar.t, bar.v, false);
+          n += 1;
+        }
+      }
+    } else {
+      while (p <= last - brick && n < 24) {
+        emit(bar.t, bar.v, false);
+        n += 1;
+      }
+      if (p >= last + 2 * brick) {
+        last += brick;
+        dir = 1;
+        while (p >= last + brick && n < 24) {
+          emit(bar.t, bar.v, true);
+          n += 1;
+        }
+      }
+    }
+  }
+  if (bricks.length < 8) return { bricks: src, brick };
+  return { bricks, brick };
+}
+
 export const ZZ_PCT: Record<string, number> = {
   "1s": 0.0012,
   "1m": 0.006,

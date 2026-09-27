@@ -8,7 +8,7 @@ import {
 } from "./mercadosPaperAgent.js";
 import { listArmedPaperBooks, saveUserPaperBook } from "./paperBookStore.js";
 import { rememberSgiNewsOnBook } from "./roxyNews.js";
-import { markRoxySpoke, roxyMaySpeak, roxySceneKey } from "./roxyMind.js";
+import { markRoxySpoke, roxyMaySpeak, roxyPosHeat, roxySceneKey } from "./roxyMind.js";
 import { kickIngest } from "../routes/cryptoNoticias.js";
 
 let lastNewsKickMs = 0;
@@ -63,6 +63,9 @@ export async function tickArmedPaperBook(book: PaperBook): Promise<PaperBook> {
   const withNews = { ...ticked, runInterval: iv };
   const now = Date.now();
   const lead = [...signals].sort((a, b) => b.confidence - a.confidence)[0];
+  const marks: Record<string, number> = {};
+  for (const s of signals) marks[s.symbol] = s.price;
+  const holding = withNews.positions.length > 0;
   const sceneKey = roxySceneKey({
     armed: withNews.armed,
     universe: withNews.universe,
@@ -71,6 +74,7 @@ export async function tickArmedPaperBook(book: PaperBook): Promise<PaperBook> {
     positions: withNews.positions,
     lead,
     interval: lead?.interval || withNews.runInterval,
+    heat: holding ? roxyPosHeat(withNews.positions, marks) : "",
   });
   if (!withNews.mind) {
     withNews.mind = {
@@ -93,6 +97,7 @@ export async function tickArmedPaperBook(book: PaperBook): Promise<PaperBook> {
       sceneKey,
       hasEvents: events.length > 0,
       now,
+      holding,
     })
   ) {
     withNews.mind.lastTalkKey = sceneKey;
@@ -104,7 +109,7 @@ export async function tickArmedPaperBook(book: PaperBook): Promise<PaperBook> {
     return withNews;
   }
   const next = pushPaperNote(withNews, spoken);
-  markRoxySpoke(next.mind, sceneKey, events, now);
+  markRoxySpoke(next.mind, sceneKey, events, now, holding);
   return next;
 }
 

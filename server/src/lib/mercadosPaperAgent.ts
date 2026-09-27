@@ -8,6 +8,7 @@ import {
   pickFreshFact,
   rememberRoxySaid,
   roxyMaySpeak,
+  roxyPosHeat,
   roxyNewsBlocksSide,
   roxyNewsConfBump,
   roxySceneKey,
@@ -261,6 +262,20 @@ function placePlan(
 ): { stop: number; t1: number; t2: number } {
   const px = sig.price;
   if (side === "long") {
+    if (
+      sig.bias === "buy" &&
+      Number.isFinite(sig.stop) &&
+      sig.stop > 0 &&
+      sig.stop < px &&
+      Number.isFinite(sig.target1) &&
+      sig.target1 > px
+    ) {
+      const t2 =
+        Number.isFinite(sig.target2) && sig.target2 > sig.target1
+          ? sig.target2
+          : sig.target1 + (sig.target1 - px) * 0.7;
+      return { stop: sig.stop, t1: sig.target1, t2 };
+    }
     const floor = px * (1 - stopP);
     const raw = Number.isFinite(sig.stop) && sig.stop < px ? sig.stop : floor;
     const stop = Math.min(raw, floor);
@@ -270,6 +285,20 @@ function placePlan(
     const t1 = Number.isFinite(sig.target1) && sig.target1 > t1Need ? sig.target1 : t1Need;
     const t2 = Number.isFinite(sig.target2) && sig.target2 > Math.max(t2Need, t1) ? sig.target2 : Math.max(t2Need, t1 + risk * 0.6);
     return { stop, t1, t2 };
+  }
+  if (
+    sig.bias === "sell" &&
+    Number.isFinite(sig.stop) &&
+    sig.stop > px &&
+    Number.isFinite(sig.target1) &&
+    sig.target1 > 0 &&
+    sig.target1 < px
+  ) {
+    const t2 =
+      Number.isFinite(sig.target2) && sig.target2 < sig.target1 && sig.target2 > 0
+        ? sig.target2
+        : sig.target1 - (px - sig.target1) * 0.7;
+    return { stop: sig.stop, t1: sig.target1, t2 };
   }
   const ceil = px * (1 + stopP);
   const raw = Number.isFinite(sig.stop) && sig.stop > px ? sig.stop : ceil;
@@ -288,8 +317,8 @@ function entryPlan(sig: BtcTradeSignal, side: "long" | "short", style: PaperStyl
     const stopP = b === "context" ? 0.024 : b === "hour" ? 0.018 : 0.012;
     return placePlan(sig, side, stopP, 1.8, 3.2);
   }
-  const stopP = b === "ultra" ? 0.0048 : b === "fast" ? 0.007 : b === "mid" ? 0.01 : 0.014;
-  return placePlan(sig, side, stopP, 1.6, 2.7);
+  const stopP = b === "ultra" ? 0.0048 : b === "fast" ? 0.008 : b === "mid" ? 0.011 : 0.014;
+  return placePlan(sig, side, stopP, 1.2, 2.2);
 }
 
 function scalpMaxHoldMs(interval: string): number {
@@ -811,6 +840,8 @@ function canEnter(sig: BtcTradeSignal, side: "long" | "short", book: PaperBook, 
   if ((book.mind?.revengeUntil ?? 0) > now && book.mind?.lastStopSymbol === sig.symbol) return false;
   if (roxyNewsBlocksSide(book.mind?.facts, sig.symbol, side, now)) return false;
   if (sig.confidence < minConf + roxyNewsConfBump(book.mind?.facts, sig.symbol, side, now)) return false;
+  if (sig.bias === "buy" && side === "short") return false;
+  if (sig.bias === "sell" && side === "long") return false;
   if (side === "long" && sig.rsi >= (voteLed ? 82 : 76)) return false;
   if (side === "short" && sig.rsi <= (voteLed ? 18 : 24)) return false;
   if (!voteLed) {
@@ -1107,7 +1138,7 @@ export function tickPaper(
           symbol: sig.symbol,
           reason: "signal",
           price: px,
-          note: `${side === "long" ? "LARGO" : "CORTO"} ${sig.symbol}`,
+          note: `${side === "long" ? "LONG" : "SHORT"} ${sig.symbol}`,
         });
       }
     }
@@ -1183,6 +1214,59 @@ function ivTalk(iv: string): string {
 function usdTalk(n: number): string {
   if (!Number.isFinite(n)) return "—";
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n);
+}
+
+function pxTalk(n: number): string {
+  if (!Number.isFinite(n)) return "—";
+  if (n >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  if (n >= 1) return n.toLocaleString("en-US", { maximumFractionDigits: 4 });
+  return n.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 6 });
+}
+
+function holdBrief(
+  pos: PaperPosition,
+  px: number,
+  sig: BtcTradeSignal | undefined,
+  t1Pct: number,
+): { title: string; status: string; think: string } {
+  const name = pos.symbol.replace(/USDT$/i, "");
+  const short = pos.side === "short";
+  const u = pos.qty * (px - pos.entry);
+  const uTxt = `${u >= 0 ? "+" : ""}${usdTalk(u)}`;
+  const nearStop = pos.entry > 0 && Math.abs(px - pos.stop) / pos.entry <= 0.004;
+  const nearT1 = !pos.t1Done && pos.entry > 0 && Math.abs(px - pos.t1) / pos.entry <= 0.004;
+  const green = u >= 0;
+  const status = `${name} ${short ? "Short" : "Long"}: entrada ${pxTalk(pos.entry)}, ahora ${pxTalk(px)} (${uTxt}). Stop ${pxTalk(pos.stop)} · T1 ${pxTalk(pos.t1)} · T2 ${pxTalk(pos.t2)}.`;
+  let think = "";
+  if (nearStop) {
+    think = short
+      ? `Está rozando el stop. Si sigue subiendo salgo en ${pxTalk(pos.stop)}; si rechaza, todavía puede ir a T1 ${pxTalk(pos.t1)}. No promedio.`
+      : `Está rozando el stop ${pxTalk(pos.stop)}. Si pincha, cierro. Si aguanta, el plan sigue a T1 ${pxTalk(pos.t1)}.`;
+  } else if (nearT1) {
+    think = `Está a un paso de T1 ${pxTalk(pos.t1)}. Si lo toca cobro el ${t1Pct}% y dejo el resto con stop en la entrada. Si se da vuelta antes, el stop manda.`;
+  } else if (pos.t1Done) {
+    think = `Ya cobré parcial. El resto vive de prestado: T2 ${pxTalk(pos.t2)} o stop en ${pxTalk(pos.stop)}.`;
+  } else if (green) {
+    think = short
+      ? `El short me está pagando. Si sigue bajando veo T1 ${pxTalk(pos.t1)}; si rebota fuerte, el stop ${pxTalk(pos.stop)} me saca. No lo cierro a mano.`
+      : `El long va a favor. Camino a T1 ${pxTalk(pos.t1)}. Un rechazo me deja en el stop ${pxTalk(pos.stop)}.`;
+  } else {
+    think = short
+      ? `El short está un poco en contra. Puede ser ruido y después bajar a T1 ${pxTalk(pos.t1)}, o irse al stop ${pxTalk(pos.stop)}. Yo no toco: el mapa decide.`
+      : `El long está flojo. Puede recuperar hacia T1 ${pxTalk(pos.t1)} o irse al stop ${pxTalk(pos.stop)}. Sigo el plan, no improviso.`;
+  }
+  if (sig) {
+    if (short && sig.bias === "buy" && sig.confidence >= 58) {
+      think += ` El tape ahora tira alcista (${sig.confidence.toFixed(0)}%): alerta, no salida anticipada.`;
+    } else if (!short && sig.bias === "sell" && sig.confidence >= 58) {
+      think += ` El tape se puso vendedor: vigilo el stop, no agrando.`;
+    } else if (short && sig.bias === "sell") {
+      think += ` El sesgo sigue vendedor: favorece que busque T1.`;
+    } else if (!short && sig.bias === "buy") {
+      think += ` El sesgo sigue comprador: favorece el camino a T1.`;
+    }
+  }
+  return { title: green ? `Cómo va ${name}` : `${name} en contra`, status, think };
 }
 
 function voiceHash(seed: string): number {
@@ -1315,6 +1399,9 @@ export function narratePaper(
       : signals.filter((s) => s.symbol === book.universe || book.positions.some((p) => p.symbol === s.symbol));
   const view = focused.length ? focused : signals;
   const lead = [...view].sort((a, b) => b.confidence - a.confidence)[0];
+  const marks: Record<string, number> = {};
+  for (const s of view) marks[s.symbol] = s.price;
+  const holding = book.positions.length > 0;
   const sceneKey = roxySceneKey({
     armed: book.armed,
     universe: book.universe,
@@ -1323,6 +1410,7 @@ export function narratePaper(
     positions: book.positions,
     lead,
     interval: lead?.interval || book.runInterval,
+    heat: holding ? roxyPosHeat(book.positions, marks) : "",
   });
   if (
     !roxyMaySpeak({
@@ -1332,6 +1420,7 @@ export function narratePaper(
       sceneKey,
       hasEvents: events.length > 0,
       now: at,
+      holding,
     })
   ) {
     if (book.mind) book.mind.lastTalkKey = sceneKey;
@@ -1391,7 +1480,7 @@ export function narratePaper(
         "Pantalla en blanco, cerebro en standby. En cuanto haya confluencia, hablo.",
       ]),
     );
-  } else if (book.universe === "ALL") {
+  } else if (book.universe === "ALL" && !book.positions.length) {
     const board =
       buys.length || sells.length
         ? [
@@ -1420,7 +1509,7 @@ export function narratePaper(
         ]),
       );
     }
-  } else {
+  } else if (!book.positions.length) {
     const s = view.find((x) => x.symbol === book.universe) ?? view[0];
     if (s) {
       const name = tag(s.symbol);
@@ -1462,16 +1551,8 @@ export function narratePaper(
 
   for (const pos of book.positions) {
     const s = view.find((x) => x.symbol === pos.symbol);
-    const px = s?.price ?? pos.entry;
-    const u = pos.qty * (px - pos.entry);
-    const name = tag(pos.symbol);
-    const uTxt = `${u >= 0 ? "+" : ""}${usdTalk(u)}`;
-    paras.push(
-      say(seed + pos.id, [
-        `${name} sigue ${pos.side === "long" ? "larga" : "corta"} desde ${usdTalk(pos.entry)}, ahora ${usdTalk(px)} (${uTxt}). Stop ${usdTalk(pos.stop)}${pos.t1Done ? ". T1 ya cobrado; el resto vive de prestado." : `; T1 en ${usdTalk(pos.t1)}, sin adelantarme.`} Plan: no agrando, no promedio, no rezo.`,
-        `Gestión de ${name}: ${uTxt} flotando. El stop es la niñera. ${pos.t1Done ? "Ya saqué mitad." : `Si llega a ${usdTalk(pos.t1)}, cobro 50% y me pongo cómoda.`}`,
-      ]),
-    );
+    const brief = holdBrief(pos, s?.price ?? pos.entry, s, clampPaperT1Pct(book.t1Pct ?? 50));
+    paras.push(`${brief.status} ${brief.think}`);
   }
 
   const readyBuy = buys.find((s) => s.confidence >= MIN_CONF);
@@ -1524,17 +1605,9 @@ export function narratePaper(
     );
   } else if (book.positions.length) {
     tone = "hold";
-    title = say(seed + "th", [
-      book.positions.length > 1 ? "Sostengo el inventario" : "Sostengo y no toco",
-      "Estoy adentro: ahora manda el plan",
-      "Niñera de stop, no de ego",
-    ]);
-    paras.push(
-      say(seed + "ph", [
-        "No voy a mejorar una posición que ya existe. Stop trabaja, T1 escala, T2 cierra. Solo subo el stop si el Supertrend me regala trail a favor.",
-        "Pensando en voz alta: no abro otra en el mismo par. Una idea, una apuesta. El resto es comentario de café.",
-      ]),
-    );
+    const first = book.positions[0]!;
+    const s = view.find((x) => x.symbol === first.symbol);
+    title = holdBrief(first, s?.price ?? first.entry, s, clampPaperT1Pct(book.t1Pct ?? 50)).title;
   } else if (buys.length || sells.length) {
     tone = "watch";
     const hot = readyBuy ?? buys[0] ?? sells[0]!;
@@ -1563,7 +1636,7 @@ export function narratePaper(
     );
   }
 
-  if (book.armed && !atCap && !events.length) {
+  if (book.armed && !atCap && !events.length && !book.positions.length) {
     paras.push(
       book.opsUsed === 0
         ? say(seed + "ops0", [
@@ -1610,6 +1683,6 @@ export function narratePaper(
     String(book.mind?.said?.length ?? 0),
   ].join("/");
 
-  if (book.mind) markRoxySpoke(book.mind, sceneKey, events, at);
+  if (book.mind) markRoxySpoke(book.mind, sceneKey, events, at, holding);
   return { at, tone, title, body, fingerprint };
 }

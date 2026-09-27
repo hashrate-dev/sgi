@@ -96,16 +96,20 @@ if (typeof window !== "undefined" && window.speechSynthesis) {
 function scoreVoice(v: SpeechSynthesisVoice): number {
   const name = `${v.name} ${v.lang}`.toLowerCase();
   let n = 0;
-  if (v.lang.toLowerCase().startsWith("es")) n += 36;
-  if (/es-uy|uruguay/.test(name)) n += 28;
-  if (/es-ar|argentin/.test(name)) n += 24;
-  if (/es-mx|es-us|es-co|es-cl|es-es/.test(name)) n += 8;
-  if (/sabina|paulina|dalia|helena|mónica|monica|lucía|lucia|paloma|soledad|elena|camila|valentina/.test(name)) n += 18;
-  if (/female|mujer|woman/.test(name)) n += 10;
-  if (/google/.test(name)) n += 26;
-  if (/neural|natural|online/.test(name)) n += 22;
-  if (/desktop|sapi|espeak/.test(name)) n -= 8;
-  if (/male|hombre|jorge|pablo|diego|carlos|raul|raúl/.test(name)) n -= 34;
+  if (v.lang.toLowerCase().startsWith("es")) n += 40;
+  if (/es-ar|argentin/.test(name)) n += 72;
+  if (/es-uy|uruguay/.test(name)) n += 18;
+  if (/es-mx|mexico/.test(name)) n += 10;
+  if (/es-us/.test(name)) n += 8;
+  if (/es-es|españa|spain|castellano/.test(name)) n -= 18;
+  if (/elena/.test(name) && /es-ar|argentin/.test(name)) n += 36;
+  if (/mia\b|mía|camila|valentina|dalia|beatriz|sofia|sofía|catalina|isabella|lucia|lucía|paloma|sabina/.test(name)) n += 26;
+  if (/female|mujer|woman|girl|joven/.test(name)) n += 16;
+  if (/google/.test(name)) n += 28;
+  if (/neural|natural|online/.test(name)) n += 26;
+  if (/helena|mónica|monica|pilar|ines|inés/.test(name)) n -= 10;
+  if (/desktop|sapi|espeak/.test(name)) n -= 10;
+  if (/male|hombre|jorge|pablo|diego|carlos|raul|raúl|tomas|tomás|santiago/.test(name)) n -= 48;
   return n;
 }
 
@@ -119,8 +123,8 @@ function moneyTalk(raw: string): string {
   return raw.replace(/\$[\s]*([\d.,]+)/g, (_m, num: string) => {
     const n = Number(String(num).replace(/,/g, ""));
     if (!Number.isFinite(n)) return "dólares";
-    if (n >= 1000) return `${Math.round(n).toLocaleString("es-UY")} dólares`;
-    return `${n.toLocaleString("es-UY", { maximumFractionDigits: 1 })} dólares`;
+    if (n >= 1000) return `${Math.round(n).toLocaleString("es-AR")} dólares`;
+    return `${n.toLocaleString("es-AR", { maximumFractionDigits: 1 })} dólares`;
   });
 }
 
@@ -219,6 +223,10 @@ export function toSpokenRoxy(raw: string): string {
     .replace(/\bscalp\b/gi, "operación rápida")
     .replace(/cof,?\s*cof\.?/gi, "ejem")
     .replace(/\btose\b/gi, "ejem")
+    .replace(/\btú\b/gi, "vos")
+    .replace(/\bti\b/gi, "vos")
+    .replace(/\btu\b/g, "tu")
+    .replace(/\bcontigo\b/gi, "con vos")
     .replace(/jaja+/gi, "jaja")
     .replace(/jeje+/gi, "je")
     .replace(/…+/g, ",")
@@ -259,8 +267,8 @@ function splitForSpeech(raw: string): SpeakBit[] {
     if (spoken.length < 2) return;
     const laugh = /jaja|\bje\b|me río|me rei|me reí/i.test(spoken);
     const h = talkHash(spoken);
-    const rate = laugh ? 1.12 : 1.06 + (h % 7) * 0.008;
-    const pitch = laugh ? 1.12 : 1.04 + (h % 5) * 0.012;
+    const rate = laugh ? 1.2 : 1.14 + (h % 6) * 0.012;
+    const pitch = laugh ? 1.42 : 1.34 + (h % 6) * 0.022;
     bits.push({ kind: "say", text: spoken, laugh, rate, pitch });
   };
 
@@ -334,12 +342,12 @@ export function speakRoxy(text: string): void {
       const voice = pickRoxyVoice();
       if (voice) {
         u.voice = voice;
-        u.lang = voice.lang || "es-AR";
+        u.lang = /es-ar/i.test(voice.lang) ? voice.lang : "es-AR";
       } else {
         u.lang = "es-AR";
       }
-      u.rate = bit.rate;
-      u.pitch = bit.pitch;
+      u.rate = Math.min(1.26, Math.max(1.08, bit.rate));
+      u.pitch = Math.min(1.62, Math.max(1.28, bit.pitch));
       u.volume = 1;
       u.onstart = () => setSpeaking(true);
       u.onend = () => runBit(i + 1);

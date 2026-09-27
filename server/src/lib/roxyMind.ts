@@ -207,7 +207,33 @@ export function pickFreshFact(
   return pool[Math.abs(salt) % pool.length]!;
 }
 
-export function roxyQuietGapMs(patience = 50, discipline = 50, afterStop = false): number {
+export function roxyPosHeat(
+  positions: Array<{
+    id: string;
+    symbol: string;
+    t1Done: boolean;
+    qty: number;
+    entry: number;
+    stop: number;
+    t1: number;
+  }>,
+  marks: Record<string, number>,
+): string {
+  return positions
+    .map((p) => {
+      const px = marks[p.symbol] ?? p.entry;
+      const u = p.qty * (px - p.entry);
+      const nearS = p.entry > 0 && Math.abs(px - p.stop) / p.entry < 0.004 ? "S" : "";
+      const nearT = !p.t1Done && p.entry > 0 && Math.abs(px - p.t1) / p.entry < 0.004 ? "T" : "";
+      return `${p.id}:${u >= 0 ? "g" : "r"}${nearS}${nearT}`;
+    })
+    .join(",");
+}
+
+export function roxyQuietGapMs(patience = 50, discipline = 50, afterStop = false, holding = false): number {
+  if (holding && !afterStop) {
+    return Math.min(4 * 60_000, Math.max(90_000, 110_000 + Math.max(0, patience - 50) * 2_000));
+  }
   let ms = 8 * 60_000;
   ms += Math.max(0, patience - 48) * 14_000;
   ms += Math.max(0, discipline - 48) * 10_000;
@@ -222,11 +248,13 @@ export function roxyMaySpeak(opts: {
   sceneKey: string;
   hasEvents: boolean;
   now: number;
+  holding?: boolean;
 }): boolean {
   if (opts.hasEvents) return true;
   if ((opts.quietUntil ?? 0) > opts.now) return false;
   if ((opts.lastTalkKey ?? "") === opts.sceneKey) return false;
-  if (opts.lastNoteAt && opts.now - opts.lastNoteAt < 5 * 60_000) return false;
+  const gap = opts.holding ? 90_000 : 5 * 60_000;
+  if (opts.lastNoteAt && opts.now - opts.lastNoteAt < gap) return false;
   return true;
 }
 
@@ -238,12 +266,14 @@ export function roxySceneKey(input: {
   positions: { id: string; t1Done: boolean }[];
   lead?: { symbol: string; bias: string; confidence: number };
   interval?: string;
+  heat?: string;
 }): string {
   return [
     input.armed ? "on" : "off",
     input.universe,
     `${input.opsUsed}/${input.maxOps}`,
     input.positions.map((p) => `${p.id}:${p.t1Done ? "t1" : "op"}`).join(",") || "-",
+    input.heat || "",
     input.lead ? `${input.lead.symbol}:${input.lead.bias}:${Math.round(input.lead.confidence / 10)}` : "x",
     input.interval || "",
   ].join("|");
@@ -254,12 +284,13 @@ export function markRoxySpoke(
   sceneKey: string,
   events: { kind: string; reason?: string; pnl?: number }[],
   now: number,
+  holding = false,
 ): void {
   mind.lastTalkKey = sceneKey;
   const afterStop = events.some(
     (e) => e.kind === "close" && (e.reason === "stop" || (e.pnl ?? 0) < 0),
   );
-  mind.quietUntil = now + roxyQuietGapMs(mind.patience ?? 50, mind.discipline ?? 50, afterStop);
+  mind.quietUntil = now + roxyQuietGapMs(mind.patience ?? 50, mind.discipline ?? 50, afterStop, holding && !events.length);
 }
 
 const NEWS_BULL =

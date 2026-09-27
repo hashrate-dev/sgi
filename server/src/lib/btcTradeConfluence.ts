@@ -1,6 +1,6 @@
 /**
- * Confluencia operativa: régimen (EMA200 + Supertrend + Ichimoku) + gatillos (MACD, PSAR, EMA 25/50)
- * + filtros (RSI, Bollinger, volumen, ZigZag). Señal de escritorio, no es consejo de inversión.
+ * Confluencia operativa: régimen (EMA200 + Supertrend + Ichimoku) + gatillos (MACD, PSAR, EMA 25/50, Renko, Fib, divergencia)
+ * + filtros (RSI, Bollinger, volumen, ZigZag, Jerry). Señal de escritorio, no es consejo de inversión.
  */
 
 export type TradeBias = "buy" | "sell" | "wait";
@@ -313,6 +313,100 @@ function zigzagPivots(candles: Candle[], pct: number): Array<{ i: number; price:
   }
   pts.push({ i: extI, price: ext });
   return pts;
+}
+
+function buildRenko(src: Candle[]): Candle[] {
+  if (src.length < 8) return src;
+  const atr = rma(trueRange(src), 14);
+  let brick = 0;
+  for (let i = atr.length - 1; i >= 0; i--) {
+    if (Number.isFinite(atr[i]) && (atr[i] as number) > 0) {
+      brick = atr[i] as number;
+      break;
+    }
+  }
+  const lastC = src[src.length - 1];
+  if (!(brick > 0)) brick = lastC && lastC.c > 0 ? lastC.c * 0.004 : 1;
+  const bricks: Candle[] = [];
+  let last = src[0]!.c;
+  let dir = 0;
+  const emit = (t: number, v: number, up: boolean) => {
+    const o = last;
+    const c = up ? last + brick : last - brick;
+    bricks.push({ t, o, c, h: Math.max(o, c), l: Math.min(o, c), v });
+    last = c;
+    dir = up ? 1 : -1;
+  };
+  for (const bar of src) {
+    const p = bar.c;
+    let n = 0;
+    if (dir === 0) {
+      while (p >= last + brick && n < 24) {
+        emit(bar.t, bar.v, true);
+        n += 1;
+      }
+      while (p <= last - brick && n < 24) {
+        emit(bar.t, bar.v, false);
+        n += 1;
+      }
+      continue;
+    }
+    if (dir === 1) {
+      while (p >= last + brick && n < 24) {
+        emit(bar.t, bar.v, true);
+        n += 1;
+      }
+      if (p <= last - 2 * brick) {
+        last -= brick;
+        dir = -1;
+        while (p <= last - brick && n < 24) {
+          emit(bar.t, bar.v, false);
+          n += 1;
+        }
+      }
+    } else {
+      while (p <= last - brick && n < 24) {
+        emit(bar.t, bar.v, false);
+        n += 1;
+      }
+      if (p >= last + 2 * brick) {
+        last += brick;
+        dir = 1;
+        while (p >= last + brick && n < 24) {
+          emit(bar.t, bar.v, true);
+          n += 1;
+        }
+      }
+    }
+  }
+  return bricks.length >= 8 ? bricks : src;
+}
+
+function renkoNow(candles: Candle[]): { bias: TradeBias; detail: string } {
+  const bricks = buildRenko(candles);
+  if (bricks.length < 4) return { bias: "wait", detail: "Renko: pocos ladrillos" };
+  const last = bricks[bricks.length - 1]!;
+  const up = last.c >= last.o;
+  let run = 1;
+  for (let i = bricks.length - 2; i >= 0; i--) {
+    const b = bricks[i]!;
+    if (b.c >= b.o === up) run += 1;
+    else break;
+  }
+  const prev = bricks[bricks.length - 2];
+  const flipped = Boolean(prev) && prev!.c >= prev!.o !== up;
+  if (flipped && run === 1) {
+    return {
+      bias: up ? "buy" : "sell",
+      detail: up ? "Renko: reversión a ladrillo alcista" : "Renko: reversión a ladrillo bajista",
+    };
+  }
+  return {
+    bias: up ? "buy" : "sell",
+    detail: up
+      ? `Renko: ${run} ladrillo${run === 1 ? "" : "s"} alcista${run === 1 ? "" : "s"}`
+      : `Renko: ${run} ladrillo${run === 1 ? "" : "s"} bajista${run === 1 ? "" : "s"}`,
+  };
 }
 
 function fibNow(candles: Candle[], pct: number, price: number): { bias: TradeBias; detail: string } {
@@ -742,13 +836,15 @@ export async function buildTradeConfluence(symbolRaw: string, intervalRaw: strin
   checks.push({ id: "fib", label: "Fibonacci", bias: fib.bias, detail: fib.detail });
   const div = rsiDivNow(candles, rsiA, zzPct);
   checks.push({ id: "divergence", label: "Divergencia RSI", bias: div.bias, detail: div.detail });
+  const rk = renkoNow(candles);
+  checks.push({ id: "renko", label: "Gráfico Renko", bias: rk.bias, detail: rk.detail });
 
   const buyVotes = checks.filter((c) => c.bias === "buy").length;
   const sellVotes = checks.filter((c) => c.bias === "sell").length;
   const waitVotes = checks.filter((c) => c.bias === "wait").length;
 
   const regimeIds = new Set(["ema200", "supertrend", "ichimoku"]);
-  const triggerIds = new Set(["ema-cross", "ema-slope", "psar", "macd", "jerry", "fib", "divergence"]);
+  const triggerIds = new Set(["ema-cross", "ema-slope", "psar", "macd", "jerry", "fib", "divergence", "renko"]);
   const regimeBuy = checks.filter((c) => regimeIds.has(c.id) && c.bias === "buy").length;
   const regimeSell = checks.filter((c) => regimeIds.has(c.id) && c.bias === "sell").length;
   const trigBuy = checks.filter((c) => triggerIds.has(c.id) && c.bias === "buy").length;

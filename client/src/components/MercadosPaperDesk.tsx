@@ -27,6 +27,7 @@ import {
   roxyWorkInterval,
   savePaperBook,
   splitPaperTrades,
+  buildPaperReport,
   type PaperBook,
   type PaperDir,
   type PaperLev,
@@ -116,6 +117,14 @@ function usd(n: number): string {
   }).format(n);
 }
 
+/** Same digits as candle OHLC / price axis (BTC ~2, alts < $1 up to 6). */
+function fmtPx(n: number): string {
+  if (!Number.isFinite(n)) return "—";
+  if (n >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  if (n >= 1) return n.toLocaleString("en-US", { maximumFractionDigits: 4 });
+  return n.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 6 });
+}
+
 function fmtStamp(ms: number): { date: string; time: string; iso: string } {
   const d = new Date(ms);
   return {
@@ -183,6 +192,268 @@ function PrepMeter({ target, stage, intent }: { target: number; stage: string; i
         <i style={{ width: `${Math.max(pct, 1)}%` }} />
       </div>
       <em>{stage}</em>
+    </div>
+  );
+}
+
+function EquityArea({ values, initial }: { values: number[]; initial: number }) {
+  const series = values.filter((v) => Number.isFinite(v) && v > 0);
+  const pts = series.length >= 2 ? series : [initial, series[0] ?? initial];
+  const w = 920;
+  const h = 280;
+  const padL = 58;
+  const padR = 54;
+  const padT = 18;
+  const padB = 28;
+  const min = Math.min(...pts, initial);
+  const max = Math.max(...pts, initial);
+  const span = max - min || 1;
+  const xOf = (i: number) => padL + (i / (pts.length - 1)) * (w - padL - padR);
+  const yOf = (v: number) => padT + (1 - (v - min) / span) * (h - padT - padB);
+  const line = pts.map((v, i) => `${i === 0 ? "M" : "L"}${xOf(i).toFixed(1)} ${yOf(v).toFixed(1)}`).join(" ");
+  const area = `${line} L${xOf(pts.length - 1).toFixed(1)} ${h - padB} L${padL} ${h - padB} Z`;
+  const last = pts[pts.length - 1]!;
+  const up = last >= initial;
+  const stroke = up ? "#26a69a" : "#ef5350";
+  const fillId = "roxyEqFill";
+  const clipId = "roxyEqClip";
+  const yInit = yOf(initial);
+  const ticks = [max, min + span * 0.5, min];
+  const fmtTick = (v: number) =>
+    v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (
+    <div className="tv-paper-report__eqwrap">
+      <svg
+        className="tv-paper-report__eqchart"
+        viewBox={`0 0 ${w} ${h}`}
+        preserveAspectRatio="none"
+        role="img"
+        aria-label="Evolución del portfolio"
+      >
+        <defs>
+          <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={stroke} stopOpacity="0.42" />
+            <stop offset="100%" stopColor={stroke} stopOpacity="0.03" />
+          </linearGradient>
+          <clipPath id={clipId}>
+            <rect x={padL} y={padT} width={w - padL - padR} height={h - padT - padB} rx="6" />
+          </clipPath>
+        </defs>
+        {ticks.map((v, i) => (
+          <g key={i}>
+            <path d={`M${padL} ${yOf(v).toFixed(1)} H${w - padR}`} stroke="rgba(232,238,245,0.09)" />
+            <text x={8} y={yOf(v) + 4} fill="#8b969c" fontSize="11">
+              {fmtTick(v)}
+            </text>
+          </g>
+        ))}
+        <g clipPath={`url(#${clipId})`}>
+          <path d={area} fill={`url(#${fillId})`} />
+          <path d={line} fill="none" stroke={stroke} strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round" />
+        </g>
+        <path d={`M${padL} ${yInit.toFixed(1)} H${w - padR}`} stroke="rgba(232,238,245,0.32)" strokeDasharray="4 5" />
+        <text x={w - padR + 6} y={yInit + 4} fill="#9fb0b8" fontSize="10">
+          fondeo
+        </text>
+        <circle cx={xOf(pts.length - 1)} cy={yOf(last)} r="4.2" fill={stroke} />
+        <text x={w - 6} y={yOf(last) - 8} textAnchor="end" fill={stroke} fontSize="11" fontWeight="700">
+          {fmtTick(last)}
+        </text>
+      </svg>
+    </div>
+  );
+}
+
+function BarRow({ label, value, max, tone }: { label: string; value: number; max: number; tone: "up" | "down" | "flat" }) {
+  const w = max > 0 ? Math.min(100, (Math.abs(value) / max) * 100) : 0;
+  return (
+    <div className="tv-paper-report__barrow">
+      <span>{label}</span>
+      <i>
+        <b className={`is-${tone}`} style={{ width: `${Math.max(w, value === 0 ? 0 : 4)}%` }} />
+      </i>
+      <em className={tone === "flat" ? "" : tone === "up" ? "is-up" : "is-down"}>
+        {value >= 0 ? "+" : ""}
+        {usd(value)}
+      </em>
+    </div>
+  );
+}
+
+function PaperReportView({ report }: { report: ReturnType<typeof buildPaperReport> }) {
+  const maxSym = Math.max(1, ...report.bySymbol.map((b) => Math.abs(b.pnl)));
+  const pf = report.closedN === 0 || report.profitFactor >= 99 ? "—" : report.profitFactor.toFixed(2);
+  const payoff =
+    report.avgLoss < 0 && report.avgWin > 0 ? Math.abs(report.avgWin / report.avgLoss) : 0;
+  const best = report.closedRows.reduce<number | null>((acc, t) => {
+    if (acc == null || t.realizedPnl > acc) return t.realizedPnl;
+    return acc;
+  }, null);
+  const worst = report.closedRows.reduce<number | null>((acc, t) => {
+    if (acc == null || t.realizedPnl < acc) return t.realizedPnl;
+    return acc;
+  }, null);
+  return (
+    <div className="tv-paper-report">
+      <div className="tv-paper-report__top">
+        <header className="tv-paper-report__hero">
+          <span>Equity paper</span>
+          <strong className={report.retPct >= 0 ? "is-up" : "is-down"}>{usd(report.equity)}</strong>
+          <em className={report.retPct >= 0 ? "is-up" : "is-down"}>
+            {report.retPct >= 0 ? "+" : ""}
+            {report.retPct.toFixed(2)}% vs fondeo
+          </em>
+          <ul>
+            <li>
+              <span>Fondeo</span>
+              <b>{usd(report.initial)}</b>
+            </li>
+            <li>
+              <span>Pico</span>
+              <b>{usd(report.peak)}</b>
+            </li>
+            <li>
+              <span>Drawdown</span>
+              <b className={report.drawdownPct < 0 ? "is-down" : ""}>
+                {report.drawdownPct >= 0 ? "0.00%" : `${report.drawdownPct.toFixed(2)}%`}
+              </b>
+            </li>
+            <li>
+              <span>Caja</span>
+              <b>{usd(report.cash)}</b>
+            </li>
+          </ul>
+        </header>
+        <div className="tv-paper-report__chart">
+          <EquityArea values={report.equityHist} initial={report.initial} />
+          <p className="tv-paper-report__cap">Evolución de equity · cada tick de Roxy · simulación paper</p>
+        </div>
+      </div>
+
+      <div className="tv-paper-report__kpis">
+        <div>
+          <span>Realizado</span>
+          <strong className={report.realized >= 0 ? "is-up" : "is-down"}>{usd(report.realized)}</strong>
+        </div>
+        <div>
+          <span>Flotante</span>
+          <strong className={report.floating >= 0 ? "is-up" : "is-down"}>{usd(report.floating)}</strong>
+        </div>
+        <div>
+          <span>Win rate</span>
+          <strong>{report.wins + report.losses ? `${report.winRate.toFixed(0)}%` : "—"}</strong>
+          <em>
+            {report.wins}W / {report.losses}L
+          </em>
+        </div>
+        <div>
+          <span>Expectativa</span>
+          <strong className={report.expectancy >= 0 ? "is-up" : "is-down"}>{usd(report.expectancy)}</strong>
+          <em>por cierre</em>
+        </div>
+        <div>
+          <span>Profit factor</span>
+          <strong>{pf}</strong>
+        </div>
+        <div>
+          <span>Payoff</span>
+          <strong>{payoff ? payoff.toFixed(2) : "—"}</strong>
+          <em>avg W / |L|</em>
+        </div>
+        <div>
+          <span>Avg win</span>
+          <strong className={report.avgWin ? "is-up" : ""}>{report.avgWin ? usd(report.avgWin) : "—"}</strong>
+        </div>
+        <div>
+          <span>Avg loss</span>
+          <strong className={report.avgLoss ? "is-down" : ""}>{report.avgLoss ? usd(report.avgLoss) : "—"}</strong>
+        </div>
+        <div>
+          <span>Mejor / peor</span>
+          <strong>
+            {best == null ? "—" : usd(best)}
+            <i> / </i>
+            {worst == null ? "—" : usd(worst)}
+          </strong>
+        </div>
+        <div>
+          <span>Exposición</span>
+          <strong>{usd(report.exposure)}</strong>
+          <em>
+            {report.openN} abiertas
+          </em>
+        </div>
+        <div>
+          <span>Hold promedio</span>
+          <strong>{fmtDur(0, report.avgHoldMs)}</strong>
+        </div>
+        <div>
+          <span>Cupo</span>
+          <strong>
+            {report.opsUsed}/{report.maxOps}
+          </strong>
+          <em>{report.dayUsed} hoy</em>
+        </div>
+      </div>
+
+      <div className="tv-paper-report__grid">
+        {report.bySymbol.length ? (
+          <section>
+            <h4>P&L por par</h4>
+            {report.bySymbol.map((b) => (
+              <BarRow
+                key={b.key}
+                label={`${b.key} · ${b.n}`}
+                value={b.pnl}
+                max={maxSym}
+                tone={b.pnl > 0 ? "up" : b.pnl < 0 ? "down" : "flat"}
+              />
+            ))}
+          </section>
+        ) : null}
+
+        <section>
+          <h4>Long vs Short</h4>
+          <div className="tv-paper-report__split">
+            <div>
+              <span>Long</span>
+              <strong className={report.bySide.long.pnl >= 0 ? "is-up" : "is-down"}>{usd(report.bySide.long.pnl)}</strong>
+              <em>
+                {report.bySide.long.n} ops · {report.bySide.long.wins}W {report.bySide.long.losses}L
+              </em>
+            </div>
+            <div>
+              <span>Short</span>
+              <strong className={report.bySide.short.pnl >= 0 ? "is-up" : "is-down"}>{usd(report.bySide.short.pnl)}</strong>
+              <em>
+                {report.bySide.short.n} ops · {report.bySide.short.wins}W {report.bySide.short.losses}L
+              </em>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {report.byReason.length ? (
+        <section>
+          <h4>Motivo de cierre</h4>
+          <ul className="tv-paper-report__reasons">
+            {report.byReason.map((b) => (
+              <li key={b.key}>
+                <b>{exitLabel(b.key)}</b>
+                <span>{b.n}</span>
+                <em className={b.pnl >= 0 ? "is-up" : "is-down"}>{usd(b.pnl)}</em>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {report.closedN === 0 && report.openN > 0 ? (
+        <p className="tv-paper-report__note">
+          Todavía no hay cierres: el win rate y el profit factor se completan al cerrar. El gráfico y el flotante sí
+          cuentan las abiertas.
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -429,23 +700,23 @@ function TradeRow({
   const pnl = tradePnlOf(trade, mark);
   const why = open ? "Abierta" : exitLabel(trade.exitReason);
   let note = open
-    ? `Marca ${usd(mark ?? trade.entry)} · stop ${usd(trade.stop)}`
-    : `Entró ${usd(trade.entry)} · salió ${usd(trade.exit ?? 0)}`;
+    ? `Marca ${fmtPx(mark ?? trade.entry)} · stop ${fmtPx(trade.stop)}`
+    : `Entró ${fmtPx(trade.entry)} · salió ${fmtPx(trade.exit ?? 0)}`;
   if (!open && Number.isFinite(mark) && mark != null && trade.exit != null) {
     const after = trade.side === "long" ? mark > trade.exit : mark < trade.exit;
     if (after && trade.exitReason === "stop") {
       note =
         trade.side === "long"
-          ? `${note} · ahora ${usd(mark)} (subió después del stop; esa subida no entra en el P&L)`
-          : `${note} · ahora ${usd(mark)} (bajó después del stop; esa baja no entra en el P&L)`;
+          ? `${note} · ahora ${fmtPx(mark)} (subió después del stop; esa subida no entra en el P&L)`
+          : `${note} · ahora ${fmtPx(mark)} (bajó después del stop; esa baja no entra en el P&L)`;
     } else {
-      note = `${note} · ahora ${usd(mark)}`;
+      note = `${note} · ahora ${fmtPx(mark)}`;
     }
   }
   return (
     <article className={`tv-paper-row tv-paper-row--${trade.side}${open ? " is-open" : " is-closed"}`}>
       <b>
-        {tag} · {trade.side === "long" ? "Largo" : "Corto"}
+        {tag} · {trade.side === "long" ? "Long" : "Short"}
       </b>
       <em>{why}</em>
       <span className={pnl >= 0 ? "is-up" : "is-down"}>
@@ -477,7 +748,7 @@ function TradeCard({
     <article className={`tv-paper-op tv-paper-op--${trade.side}${open ? " is-open" : " is-closed"}`}>
       <header>
         <strong>
-          {tag} · {trade.side === "long" ? "Largo" : "Corto"}
+          {tag} · {trade.side === "long" ? "Long" : "Short"}
         </strong>
         <em className={open ? "is-live" : ""}>{open ? "Abierta" : "Cerrada"}</em>
         <span className={pnl >= 0 ? "is-up" : "is-down"}>
@@ -492,7 +763,7 @@ function TradeCard({
             <small>Apertura</small>
             <Stamp at={trade.openedAt} />
             <p>
-              Entrada {usd(trade.entry)} · {Math.abs(trade.qty).toFixed(6)} · Stop {usd(trade.stop)}
+              Entrada {fmtPx(trade.entry)} · {Math.abs(trade.qty).toFixed(6)} · Stop {fmtPx(trade.stop)}
             </p>
           </div>
         </li>
@@ -503,7 +774,7 @@ function TradeCard({
               <small>T1 · 50%</small>
               <Stamp at={trade.t1At} />
               <p>
-                {usd(trade.t1Price ?? trade.t1)}
+                {fmtPx(trade.t1Price ?? trade.t1)}
                 {trade.t1Pnl != null ? ` · ${trade.t1Pnl >= 0 ? "+" : ""}${usd(trade.t1Pnl)}` : ""} · stop a BE
               </p>
             </div>
@@ -516,7 +787,7 @@ function TradeCard({
               <small>Ahora</small>
               <Stamp at={now} />
               <p>
-                Marca {usd(px)} · T1 {usd(trade.t1)} · T2 {usd(trade.t2)} · lleva {fmtDur(trade.openedAt, now)}
+                Marca {fmtPx(px)} · T1 {fmtPx(trade.t1)} · T2 {fmtPx(trade.t2)} · lleva {fmtDur(trade.openedAt, now)}
               </p>
             </div>
           </li>
@@ -527,7 +798,7 @@ function TradeCard({
               <small>Cierre · {exitLabel(trade.exitReason)}</small>
               <Stamp at={trade.closedAt ?? trade.openedAt} />
               <p>
-                Salida {usd(trade.exit ?? 0)} · duración {fmtDur(trade.openedAt, end)}
+                Salida {fmtPx(trade.exit ?? 0)} · duración {fmtDur(trade.openedAt, end)}
               </p>
             </div>
           </li>
@@ -589,7 +860,7 @@ function RoxyVoteBoard({ ballots }: { ballots: RoxyCoinBallot[] }) {
         <span>Votación</span>
         <em>
           {lead && lead.pick !== "wait"
-            ? `Gana ${lead.name} ${lead.pick === "long" ? "LARGO" : "CORTO"}`
+            ? `Gana ${lead.name} ${lead.pick === "long" ? "LONG" : "SHORT"}`
             : "Sin mayoría aún"}
         </em>
       </header>
@@ -603,7 +874,7 @@ function RoxyVoteBoard({ ballots }: { ballots: RoxyCoinBallot[] }) {
               <div className="tv-paper-vote__row">
                 <b>{b.name}</b>
                 <span className={`tv-paper-vote__pick is-${b.pick}`}>
-                  {b.pick === "long" ? "Largo" : b.pick === "short" ? "Corto" : "Empate"}
+                  {b.pick === "long" ? "Long" : b.pick === "short" ? "Short" : "Empate"}
                 </span>
                 <em>
                   {b.long.score.toFixed(1)} / {b.short.score.toFixed(1)}
@@ -769,6 +1040,7 @@ export function MercadosPaperDesk({
   const [sigs, setSigs] = useState<BtcTradeSignal[]>([]);
   const [nowTick, setNowTick] = useState(Date.now());
   const [movesOpen, setMovesOpen] = useState(false);
+  const [movesTab, setMovesTab] = useState<"report" | "ops">("report");
   const bookRef = useRef(book);
   bookRef.current = book;
   const soundRef = useRef(sound);
@@ -854,8 +1126,8 @@ export function MercadosPaperDesk({
           const name = tag(ev.symbol);
           if (ev.action === "open") {
             playMarketplaceCartItemAddedSound();
-            showToast(`${ev.note || ev.action} ${name} @ ${usd(ev.price)}`, "success", ROXY);
-            if (soundRef.current === "voice") speakRoxy(`Abrí ${name} a ${usd(ev.price)}`);
+            showToast(`${ev.note || ev.action} ${name} @ ${fmtPx(ev.price)}`, "success", ROXY);
+            if (soundRef.current === "voice") speakRoxy(`Abrí ${name} a ${fmtPx(ev.price)}`);
           } else if (ev.action === "close" || ev.action === "scale") {
             playMarketplaceCartItemRemovedSound();
             const pnl = ev.pnl ?? 0;
@@ -896,6 +1168,7 @@ export function MercadosPaperDesk({
   const atCap = paperAtOpsCap(book);
   const left = paperOpsLeft(book);
   const ledger = useMemo(() => splitPaperTrades(book), [book]);
+  const report = useMemo(() => buildPaperReport(book, marks, nowTick), [book, marks, nowTick]);
   const previewOps = useMemo(() => {
     return [
       ...ledger.open.map((t) => ({ t, at: t.openedAt })),
@@ -923,7 +1196,7 @@ export function MercadosPaperDesk({
     if (!book.armed) return "PAUSA";
     if (atCap && !posN) return "TOPE";
     if (posN > 1) return `${posN} OPS`;
-    if (posN === 1) return book.positions[0]!.side === "long" ? "LARGO" : "CORTO";
+    if (posN === 1) return book.positions[0]!.side === "long" ? "LONG" : "SHORT";
     return "ESPERA";
   }, [book.armed, book.positions, posN, atCap]);
 
@@ -1409,8 +1682,15 @@ export function MercadosPaperDesk({
                     </li>
                   ))}
                 </ul>
-                <button type="button" className="tv-paper-ledger__more" onClick={() => setMovesOpen(true)}>
-                  Ver todos los movimientos
+                <button
+                  type="button"
+                  className="tv-paper-ledger__more"
+                  onClick={() => {
+                    setMovesTab("report");
+                    setMovesOpen(true);
+                  }}
+                >
+                  Informe estadístico
                 </button>
               </>
             ) : (
@@ -1425,32 +1705,61 @@ export function MercadosPaperDesk({
           <AppModal
             open={movesOpen}
             onOpenChange={setMovesOpen}
-            title={`Movimientos de ${ROXY}`}
-            description={`${ledger.open.length} abiertas · ${ledger.closed.length} cerradas`}
-            size="lg"
-            contentMaxW="min(100%, 520px)"
+            title={`Informe de ${ROXY}`}
+            description={`${ledger.open.length} abiertas · ${ledger.closed.length} cerradas · ${usd(eq)}`}
+            size="xl"
+            contentMaxW="min(96vw, 1180px)"
+            titleFontSize="xl"
             variant="nicehash_watcher"
             contentClassName="tv-paper-moves-modal"
             blurBackdrop
           >
-            <div className="tv-paper-moves">
-              {ledger.open.length ? (
-                <section className="tv-paper-moves__block">
-                  <h4>Abiertas</h4>
-                  {ledger.open.map((t) => (
-                    <TradeCard key={t.id} trade={t} tag={tag(t.symbol)} mark={marks[t.symbol]} now={nowTick} />
-                  ))}
-                </section>
-              ) : null}
-              {ledger.closed.length ? (
-                <section className="tv-paper-moves__block">
-                  <h4>Cerradas</h4>
-                  {ledger.closed.map((t) => (
-                    <TradeCard key={t.id} trade={t} tag={tag(t.symbol)} mark={marks[t.symbol]} now={nowTick} />
-                  ))}
-                </section>
+            <div className="tv-paper-moves-shell">
+              <div className="tv-paper-moves-tabs" role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={movesTab === "report"}
+                  className={movesTab === "report" ? "is-on" : ""}
+                  onClick={() => setMovesTab("report")}
+                >
+                  Informe
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={movesTab === "ops"}
+                  className={movesTab === "ops" ? "is-on" : ""}
+                  onClick={() => setMovesTab("ops")}
+                >
+                  Operaciones
+                </button>
+              </div>
+              {movesTab === "report" ? (
+                <div className="tv-paper-moves tv-paper-moves--report">
+                  <PaperReportView report={report} />
+                </div>
               ) : (
-                <p className="tv-paper-moves__empty">Todavía no hay cierres en esta cuenta.</p>
+                <div className="tv-paper-moves">
+                  {ledger.open.length ? (
+                    <section className="tv-paper-moves__block">
+                      <h4>Abiertas</h4>
+                      {ledger.open.map((t) => (
+                        <TradeCard key={t.id} trade={t} tag={tag(t.symbol)} mark={marks[t.symbol]} now={nowTick} />
+                      ))}
+                    </section>
+                  ) : null}
+                  {ledger.closed.length ? (
+                    <section className="tv-paper-moves__block">
+                      <h4>Cerradas</h4>
+                      {ledger.closed.map((t) => (
+                        <TradeCard key={t.id} trade={t} tag={tag(t.symbol)} mark={marks[t.symbol]} now={nowTick} />
+                      ))}
+                    </section>
+                  ) : (
+                    <p className="tv-paper-moves__empty">Todavía no hay cierres en esta cuenta.</p>
+                  )}
+                </div>
               )}
             </div>
           </AppModal>
