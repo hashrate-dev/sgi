@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { BtcTradeSignal } from "../lib/api";
-import { getBtcTradeSignal, getPaperBook, putPaperBook } from "../lib/api";
+import { getBtcTradeSignal, getPaperBook, putPaperBook, tickPaperBook } from "../lib/api";
 import {
   clampPaperLev,
   clampPaperMaxOps,
@@ -22,6 +22,8 @@ import {
   paperOpsToday,
   paperStyleOf,
   paperVenueOf,
+  paperMenuSignals,
+  paperMenuBook,
   resetPaperBook,
   roxyLiveDesk,
   roxyWorkInterval,
@@ -37,6 +39,7 @@ import {
   type PaperVenue,
 } from "../lib/mercadosPaperAgent";
 import { rankRoxyBallots, type RoxyCoinBallot } from "../lib/roxyBallot";
+import { buildRoxyHorizons, type RoxyHorizonCoin } from "../lib/roxyHorizon";
 import { AppModal } from "./ui";
 import { showToast } from "./ToastNotification";
 import { playMarketplaceCartItemAddedSound, playMarketplaceCartItemRemovedSound } from "../lib/marketplaceCartSound";
@@ -874,7 +877,7 @@ function RoxyVoteBoard({ ballots }: { ballots: RoxyCoinBallot[] }) {
         </em>
       </header>
       <ul>
-        {ballots.map((b) => {
+        {ballots.length ? ballots.map((b) => {
           const longPct = Math.max(b.long.score, 0) + Math.max(b.short.score, 0);
           const longW = longPct > 0 ? (Math.max(b.long.score, 0) / longPct) * 100 : 50;
           const pickTools = b.pick === "long" ? b.long.tools : b.pick === "short" ? b.short.tools : [];
@@ -899,8 +902,132 @@ function RoxyVoteBoard({ ballots }: { ballots: RoxyCoinBallot[] }) {
               ) : null}
             </li>
           );
-        })}
+        }) : (
+          <li className="is-wait">
+            <p className="tv-paper-vote__yes">Esperando lecturas de todas las monedas…</p>
+          </li>
+        )}
       </ul>
+    </section>
+  );
+}
+
+function HorizonRange({ mark }: { min: number; mark: number; max: number }) {
+  return (
+    <div className="tv-paper-hz__range" title={`Proyección de Roxy ${hzPx(mark)}`}>
+      <i style={{ left: "50%" }} />
+      <b className="tv-paper-hz__now" style={{ left: "50%" }}>
+        {hzPx(mark)}
+      </b>
+    </div>
+  );
+}
+
+function hzPx(n: number): string {
+  if (!Number.isFinite(n)) return "—";
+  if (n >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+  if (n >= 1) return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  return n.toLocaleString("en-US", { maximumFractionDigits: 5 });
+}
+
+function RoxyHorizonBoard({ coins, focus }: { coins: RoxyHorizonCoin[]; focus?: string }) {
+  const rotate = !focus || focus === "ALL";
+  const symbols = coins.map((c) => c.symbol);
+  const [tour, setTour] = useState(symbols[0] || "");
+
+  useEffect(() => {
+    if (!rotate) {
+      setTour(focus || "");
+      return;
+    }
+    if (tour && symbols.includes(tour)) return;
+    setTour(symbols[0] || "");
+  }, [rotate, focus, symbols.join("|")]);
+
+  useEffect(() => {
+    if (!rotate || symbols.length < 2) return;
+    const t = window.setInterval(() => {
+      setTour((cur) => {
+        const i = Math.max(0, symbols.indexOf(cur));
+        return symbols[(i + 1) % symbols.length]!;
+      });
+    }, 6000);
+    return () => window.clearInterval(t);
+  }, [rotate, symbols.join("|")]);
+
+  const coin =
+    (rotate ? coins.find((c) => c.symbol === tour) : coins.find((c) => c.symbol === focus)) ||
+    coins.find((c) => c.bias !== "wait") ||
+    coins[0];
+  if (!coin) {
+    return (
+      <section className="tv-paper-hz">
+        <header>
+          <span>Proyección</span>
+        </header>
+        <p className="tv-paper-live__empty">Esperando confluencia y noticias para armar el mapa…</p>
+      </section>
+    );
+  }
+  const side = coin.bias === "buy" ? "Alcista" : coin.bias === "sell" ? "Bajista" : "Neutral";
+  const step = Math.max(1, symbols.indexOf(coin.symbol) + 1);
+  return (
+    <section className="tv-paper-hz" aria-label="Proyección de Roxy">
+      <header>
+        <span>Proyección</span>
+        <em>
+          {rotate && coins.length > 1 ? `${step}/${coins.length} · ` : ""}
+          {coin.name} · {side} · convicción {coin.conviction}%
+        </em>
+      </header>
+      {rotate && coins.length > 1 ? (
+        <div className="tv-paper-hz__coins" aria-hidden>
+          {coins.map((c) => (
+            <button
+              key={c.symbol}
+              type="button"
+              className={c.symbol === coin.symbol ? "is-on" : ""}
+              onClick={() => setTour(c.symbol)}
+            >
+              {c.name}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <p className="tv-paper-hz__thesis">{coin.thesis}</p>
+      <ul className="tv-paper-hz__grid">
+        {coin.bands.map((b) => (
+          <li key={`${coin.symbol}-${b.id}`} className={`is-${b.bias}`}>
+            <div className="tv-paper-hz__top">
+              <b>{b.label}</b>
+              <span>{b.play}</span>
+            </div>
+            <HorizonRange min={b.min} mark={b.mid} max={b.max} />
+            <div className="tv-paper-hz__px">
+              <em>
+                {hzPx(b.min)}
+                <small>{b.minPct >= 0 ? "+" : ""}{b.minPct.toFixed(1)}%</small>
+              </em>
+              <em>
+                {hzPx(b.max)}
+                <small>{b.maxPct >= 0 ? "+" : ""}{b.maxPct.toFixed(1)}%</small>
+              </em>
+            </div>
+            <div className="tv-paper-hz__odds">
+              <em className="is-up">↑ {b.upPct}% sube</em>
+              <em className="is-down">↓ {b.downPct}% baja</em>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <ul className="tv-paper-hz__drv">
+        {coin.drivers.map((d) => (
+          <li key={d}>{d}</li>
+        ))}
+      </ul>
+      <p className="tv-paper-hz__news">
+        {coin.news[0] ? coin.news[0].slice(0, 88) : "Sin titular fuerte hoy."}
+      </p>
     </section>
   );
 }
@@ -1114,8 +1241,7 @@ export function MercadosPaperDesk({
     const poll = async () => {
       const cur = bookRef.current;
       const want = new Set<string>();
-      if (cur.universe === "ALL") for (const p of pairs) want.add(p.binance);
-      else want.add(cur.universe);
+      for (const p of pairs) want.add(p.binance);
       for (const p of cur.positions) want.add(p.symbol);
       const [remote, results] = await Promise.all([
         getPaperBook().catch(() => ({ book: null as PaperBook | null })),
@@ -1167,6 +1293,48 @@ export function MercadosPaperDesk({
     };
   }, [userId, iv, pairs]);
 
+  useEffect(() => {
+    if (!book.armed) return;
+    let cancelled = false;
+    const kick = async () => {
+      try {
+        const r = await tickPaperBook();
+        if (cancelled || !r.book || inflightRef.current > 0) return;
+        const prev = bookRef.current;
+        setBook(r.book);
+        savePaperBook(userId, r.book);
+        if (r.book.fills[0] && r.book.fills[0].at !== prev.fills[0]?.at) {
+          const ev = r.book.fills[0];
+          const name = tag(ev.symbol);
+          if (ev.action === "open") {
+            playMarketplaceCartItemAddedSound();
+            showToast(`${ev.note || ev.action} ${name} @ ${fmtPx(ev.price)}`, "success", ROXY);
+            if (soundRef.current === "voice") speakRoxy(`Abrí ${name} a ${fmtPx(ev.price)}`);
+          } else if (ev.action === "close" || ev.action === "scale") {
+            playMarketplaceCartItemRemovedSound();
+            const pnl = ev.pnl ?? 0;
+            showToast(`${name} ${pnl >= 0 ? "+" : ""}${usd(pnl)}`, pnl >= 0 ? "success" : "warning", ROXY);
+            if (soundRef.current === "voice") {
+              speakRoxy(
+                ev.action === "scale"
+                  ? `T1 en ${name}. ${pnl >= 0 ? "En verde" : "En rojo"} ${usd(pnl)}`
+                  : `Cerré ${name}. ${pnl >= 0 ? "Ganancia" : "Pérdida"} ${usd(pnl)}`,
+              );
+            }
+          }
+        }
+      } catch {
+        /* el cron de producción cubre el 24/7 */
+      }
+    };
+    void kick();
+    const t = window.setInterval(() => void kick(), 20_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(t);
+    };
+  }, [userId, book.armed, pairs]);
+
   const eq = paperEquity(book, marks);
   const ret = book.initialUsd > 0 ? ((eq - book.initialUsd) / book.initialUsd) * 100 : 0;
   const dd = book.peakUsd > 0 ? ((eq - book.peakUsd) / book.peakUsd) * 100 : 0;
@@ -1176,16 +1344,21 @@ export function MercadosPaperDesk({
   const uniLabel = book.universe === "ALL" ? "todas las monedas" : tag(book.universe);
   const atCap = paperAtOpsCap(book);
   const left = paperOpsLeft(book);
+  const menuBook = useMemo(() => paperMenuBook(book), [book]);
+  const menuSigs = useMemo(() => paperMenuSignals(book, sigs), [book, sigs]);
+  const menuPosN = menuBook.positions.length;
   const ledger = useMemo(() => splitPaperTrades(book), [book]);
   const report = useMemo(() => buildPaperReport(book, marks, nowTick), [book, marks, nowTick]);
   const previewOps = useMemo(() => {
+    const open = book.universe === "ALL" ? ledger.open : ledger.open.filter((t) => t.symbol === book.universe);
+    const closed = book.universe === "ALL" ? ledger.closed : ledger.closed.filter((t) => t.symbol === book.universe);
     return [
-      ...ledger.open.map((t) => ({ t, at: t.openedAt })),
-      ...ledger.closed.map((t) => ({ t, at: t.closedAt ?? t.openedAt })),
+      ...open.map((t) => ({ t, at: t.openedAt })),
+      ...closed.map((t) => ({ t, at: t.closedAt ?? t.openedAt })),
     ]
       .sort((a, b) => b.at - a.at)
       .slice(0, 4);
-  }, [ledger]);
+  }, [ledger, book.universe]);
   const liveTalk = useMemo(() => {
     if (book.notes[0]) return book.notes[0];
     return {
@@ -1196,18 +1369,22 @@ export function MercadosPaperDesk({
       fingerprint: "hush",
     };
   }, [book.notes]);
-  const alert = useMemo(() => paperEntryAlert(book, sigs), [book, sigs]);
-  const prep = useMemo(() => paperPrepProcess(book, sigs), [book, sigs]);
-  const liveDesk = useMemo(() => roxyLiveDesk(book, sigs, nowTick), [book, sigs, nowTick]);
+  const alert = useMemo(() => paperEntryAlert(menuBook, menuSigs), [menuBook, menuSigs]);
+  const prep = useMemo(() => paperPrepProcess(menuBook, menuSigs), [menuBook, menuSigs]);
+  const liveDesk = useMemo(() => roxyLiveDesk(menuBook, menuSigs, nowTick), [menuBook, menuSigs, nowTick]);
   const ballots = useMemo(() => rankRoxyBallots(sigs, book.mind?.facts), [sigs, book.mind?.facts]);
+  const horizons = useMemo(
+    () => buildRoxyHorizons(menuSigs, ballots, book.mind?.facts, nowTick),
+    [menuSigs, ballots, book.mind?.facts, nowTick],
+  );
 
   const status = useMemo(() => {
     if (!book.armed) return "PAUSA";
-    if (atCap && !posN) return "TOPE";
-    if (posN > 1) return `${posN} OPS`;
-    if (posN === 1) return book.positions[0]!.side === "long" ? "LONG" : "SHORT";
+    if (atCap && !menuPosN) return "TOPE";
+    if (menuPosN > 1) return `${menuPosN} OPS`;
+    if (menuPosN === 1) return menuBook.positions[0]!.side === "long" ? "LONG" : "SHORT";
     return "ESPERA";
-  }, [book.armed, book.positions, posN, atCap]);
+  }, [book.armed, menuBook.positions, menuPosN, atCap]);
 
   const persistPatch = (patch: Parameters<typeof putPaperBook>[0], fallback?: PaperBook) => {
     inflightRef.current += 1;
@@ -1430,8 +1607,13 @@ export function MercadosPaperDesk({
         <>
           <AgentOpinion notes={book.notes} live={liveTalk} sound={open ? sound : "mute"} now={nowTick} />
 
-          <div className="tv-paper__uni" role="group" aria-label={`Moneda de ${ROXY}`}>
-            <button type="button" className={book.universe === "ALL" ? "is-on" : ""} onClick={() => setUniverse("ALL")}>
+          <div className="tv-paper__uni" role="group" aria-label="Moneda del resumen (proyección y ahora mismo)">
+            <button
+              type="button"
+              className={book.universe === "ALL" ? "is-on" : ""}
+              title="Resumen de todas las monedas. La votación siempre muestra todas."
+              onClick={() => setUniverse("ALL")}
+            >
               Todas
             </button>
             {pairs.map((p) => (
@@ -1439,6 +1621,7 @@ export function MercadosPaperDesk({
                 key={p.binance}
                 type="button"
                 className={book.universe === p.binance ? "is-on" : ""}
+                title={`Resumen de ${p.label.replace("/USDT", "")}. La votación sigue mostrando todas.`}
                 onClick={() => setUniverse(p.binance)}
               >
                 {p.label.replace("/USDT", "")}
@@ -1611,6 +1794,8 @@ export function MercadosPaperDesk({
           <PrepMeter target={prep.pct} stage={prep.stage} intent={prep.intent} />
 
           <RoxyVoteBoard ballots={ballots} />
+
+          <RoxyHorizonBoard coins={horizons} focus={book.universe} />
 
           <RoxyLiveBoard live={liveDesk} />
 

@@ -280,6 +280,7 @@ export function MercadosNativeChart({
     inner?: number;
   } | null>(null);
   const hoverRef = useRef<number | null>(null);
+  const hoverPtRef = useRef<{ x: number; y: number } | null>(null);
   const paneHoverRef = useRef<OscSplitKind | null>(null);
   const paneShareRef = useRef<OscPaneShare>(loadOscPaneShare());
   const geomRef = useRef({
@@ -465,6 +466,7 @@ export function MercadosNativeChart({
     const binanceTf = TF[interval] ?? "1h";
     candlesRef.current = [];
     hoverRef.current = null;
+    hoverPtRef.current = null;
     viewRef.current.count = live ? 180 : 120;
     viewRef.current.follow = true;
     scaleRef.current.auto = true;
@@ -1588,22 +1590,75 @@ export function MercadosNativeChart({
     }
 
     const hover = hoverRef.current;
+    const pt = hoverPtRef.current;
     if (hover != null && hover >= start && hover <= end) {
       const c = candles[hover]!;
-      const x = xOf(hover);
-      ctx.strokeStyle = "rgba(232,238,245,0.28)";
-      ctx.setLineDash([3, 3]);
+      const xSnap = xOf(hover);
+      const xLine = pt
+        ? Math.max(padL + 0.5, Math.min(w - padR - 0.5, pt.x))
+        : xSnap;
+      const yLine = pt
+        ? Math.max(priceTop, Math.min(h - timeH, pt.y))
+        : yOf(c.c);
+      const inPrice = yLine >= priceTop && yLine <= priceBot;
+      const readPx = inPrice
+        ? minP + (1 - (yLine - priceTop) / Math.max(1, priceBot - priceTop)) * span
+        : c.c;
+
+      ctx.save();
       ctx.beginPath();
-      ctx.moveTo(x, priceTop);
-      ctx.lineTo(x, priceBot);
+      ctx.rect(padL, priceTop, plotW, h - timeH - priceTop);
+      ctx.clip();
+      ctx.strokeStyle = "rgba(232,238,245,0.62)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      ctx.moveTo(xLine, priceTop);
+      ctx.lineTo(xLine, h - timeH);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(padL, yLine);
+      ctx.lineTo(w - padR, yLine);
       ctx.stroke();
       ctx.setLineDash([]);
-      const y = Math.min(priceBot, Math.max(priceTop, yOf(c.c)));
+      ctx.fillStyle = "#e8eef2";
       ctx.beginPath();
-      ctx.moveTo(padL, y);
-      ctx.lineTo(w - padR, y);
-      ctx.strokeStyle = "rgba(232,238,245,0.18)";
-      ctx.stroke();
+      ctx.arc(xLine, yLine, 2.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      if (inPrice) {
+        const tagH = 18;
+        const tagW = padR - 6;
+        const tagY = Math.min(priceBot - tagH / 2, Math.max(priceTop + tagH / 2, yLine));
+        roundRect(ctx, w - padR + 2, tagY - tagH / 2, tagW, tagH, 3);
+        ctx.fillStyle = "#e8eef2";
+        ctx.fill();
+        ctx.fillStyle = "#101614";
+        ctx.font = "700 11px ui-sans-serif, system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(fmtPx(readPx), w - padR + 2 + tagW / 2, tagY + 0.5);
+      }
+
+      const parts = fmtAxisParts(c.t, intervalRef.current);
+      ctx.font = "700 10px ui-sans-serif, system-ui, sans-serif";
+      const line1 = parts.date;
+      const line2 = parts.time;
+      const tw = Math.max(ctx.measureText(line1).width, ctx.measureText(line2).width) + 14;
+      const th = 30;
+      let lx = xSnap - tw / 2;
+      lx = Math.max(4, Math.min(w - tw - 4, lx));
+      const ly = h - timeH + 5;
+      roundRect(ctx, lx, ly, tw, th, 4);
+      ctx.fillStyle = "#e8eef2";
+      ctx.fill();
+      ctx.fillStyle = "#101614";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(line1, lx + tw / 2, ly + 9);
+      ctx.fillText(line2, lx + tw / 2, ly + 21);
+
       ctx.fillStyle = "rgba(10,16,14,0.88)";
       const extra = (macd ? 18 : 0) + (rsi ? 18 : 0);
       roundRect(ctx, padL + 6, priceTop + 6, 268, 52 + extra, 6);
@@ -1672,6 +1727,20 @@ export function MercadosNativeChart({
       return Math.max(0.5, w / n);
     };
 
+    const applyHover = (clientX: number, clientY: number) => {
+      const wrap = wrapRef.current;
+      const g = geomRef.current;
+      if (!wrap) return;
+      const rect = wrap.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+      const { end, count } = viewRef.current;
+      const start = Math.max(0, end - count + 1);
+      const i = Math.round(g.start + (x - g.padL) / Math.max(0.001, g.barW) - 0.5);
+      hoverRef.current = Math.max(start, Math.min(end, i));
+      hoverPtRef.current = { x, y };
+    };
+
     const begin = (mode: "pan" | "zoomX" | "zoomY", e: PointerEvent) => {
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       if (mode === "pan") scaleRef.current.auto = false;
@@ -1690,13 +1759,7 @@ export function MercadosNativeChart({
       const wrap = wrapRef.current;
       const g = geomRef.current;
       if (wrap && dragRef.current?.mode === "pan") {
-        const rect = wrap.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const { end, count } = viewRef.current;
-        const start = Math.max(0, end - count + 1);
-        const plotW = wrap.clientWidth - g.padL - g.padR;
-        const i = start + Math.floor(((x - g.padL) / plotW) * count);
-        hoverRef.current = Math.max(start, Math.min(end, i));
+        applyHover(e.clientX, e.clientY);
       }
       const drag = dragRef.current;
       if (!drag) {
@@ -2028,6 +2091,7 @@ export function MercadosNativeChart({
       begin("zoomX", e);
     };
     const onCanvasMove = (e: PointerEvent) => {
+      applyHover(e.clientX, e.clientY);
       const draft = draftRef.current;
       if (draft) {
         const pt = fromEvent(e);
@@ -2052,14 +2116,9 @@ export function MercadosNativeChart({
       }
       const wrap = wrapRef.current;
       if (wrap && !dragRef.current) {
+        applyHover(e.clientX, e.clientY);
         const rect = wrap.getBoundingClientRect();
         const x = e.clientX - rect.left;
-        const { end, count } = viewRef.current;
-        const start = Math.max(0, end - count + 1);
-        const g = geomRef.current;
-        const plotW = wrap.clientWidth - g.padL - g.padR;
-        const i = start + Math.floor(((x - g.padL) / plotW) * count);
-        hoverRef.current = Math.max(start, Math.min(end, i));
         const y = e.clientY - rect.top;
         const overSplit = geomRef.current.splits.find((s) => Math.abs(y - s.y) <= 8)?.which ?? null;
         paneHoverRef.current = overSplit;
@@ -2093,6 +2152,7 @@ export function MercadosNativeChart({
     };
     const onLeave = () => {
       hoverRef.current = null;
+      hoverPtRef.current = null;
       if (dragRef.current?.mode !== "pane") {
         paneHoverRef.current = null;
         wrapRef.current?.classList.remove("is-pane-resize");

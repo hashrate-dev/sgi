@@ -954,6 +954,20 @@ export function paperViewSignals(book: PaperBook, signals: BtcTradeSignal[]): Bt
   return signals.filter((s) => s.symbol === book.universe || book.positions.some((p) => p.symbol === s.symbol));
 }
 
+/** Señales del menú: solo lo que el usuario marcó (Todas o una moneda). */
+export function paperMenuSignals(book: PaperBook, signals: BtcTradeSignal[]): BtcTradeSignal[] {
+  if (book.universe === "ALL") return signals;
+  return signals.filter((s) => s.symbol === book.universe);
+}
+
+export function paperMenuBook(book: PaperBook): PaperBook {
+  if (book.universe === "ALL") return book;
+  return {
+    ...book,
+    positions: book.positions.filter((p) => p.symbol === book.universe),
+  };
+}
+
 export function roxyVotedTrade(
   book: PaperBook,
   signals: BtcTradeSignal[],

@@ -2455,6 +2455,14 @@ export function getPaperBook(): Promise<{ book: import("./mercadosPaperAgent").P
   return api("/api/paper/book");
 }
 
+export function tickPaperBook(): Promise<{
+  book: import("./mercadosPaperAgent").PaperBook | null;
+  server: boolean;
+  ticked?: boolean;
+}> {
+  return api("/api/paper/tick", { method: "POST", body: "{}" });
+}
+
 export function putPaperBook(body: {
   seed?: import("./mercadosPaperAgent").PaperBook;
   armed?: boolean;

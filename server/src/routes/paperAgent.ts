@@ -25,7 +25,7 @@ import {
   type PaperUniverse,
 } from "../lib/mercadosPaperAgent.js";
 import { loadOrCreatePaperBook, loadUserPaperBook, saveUserPaperBook } from "../lib/paperBookStore.js";
-import { PAPER_SYMBOLS, runArmedPaperAgents } from "../lib/paperWorker.js";
+import { PAPER_SYMBOLS, runArmedPaperAgents, tickArmedPaperBook } from "../lib/paperWorker.js";
 import { rememberSgiNewsOnBook } from "../lib/roxyNews.js";
 
 export const paperAgentRouter = Router();
@@ -177,6 +177,25 @@ paperAgentRouter.put("/paper/book", ...writeMw, async (req, res, next) => {
   }
 });
 
+paperAgentRouter.post("/paper/tick", ...writeMw, async (req, res, next) => {
+  try {
+    let book = await loadUserPaperBook(req.user!.id);
+    if (!book) {
+      res.json({ book: null, server: true, ticked: false });
+      return;
+    }
+    if (!book.armed) {
+      res.json({ book, server: true, ticked: false });
+      return;
+    }
+    book = await tickArmedPaperBook(book);
+    await saveUserPaperBook(req.user!.id, book);
+    res.json({ book, server: true, ticked: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
 paperAgentRouter.post("/paper/book", ...writeMw, async (req, res, next) => {
   try {
     const seed = hydratePaperBook((req.body as { seed?: unknown })?.seed as Partial<PaperBook> & { v?: number });
@@ -190,10 +209,11 @@ paperAgentRouter.post("/paper/book", ...writeMw, async (req, res, next) => {
 export async function paperAgentCronHandler(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const auth = String(req.headers.authorization ?? "");
-    const cronHeader = String(req.headers["x-vercel-cron"] ?? "");
+    const cronHeader = String(req.headers["x-vercel-cron"] ?? "").trim().toLowerCase();
+    const ua = String(req.headers["user-agent"] ?? "").toLowerCase();
     const secret = String(process.env.CRON_SECRET ?? "").trim();
     const okBearer = Boolean(secret) && auth === `Bearer ${secret}`;
-    const okVercel = cronHeader === "1";
+    const okVercel = cronHeader === "1" || cronHeader === "true" || ua.includes("vercel-cron");
     if (!okBearer && !okVercel) {
       res.status(401).json({ error: { message: "No autorizado." } });
       return;

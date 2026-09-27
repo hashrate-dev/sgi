@@ -3123,6 +3123,254 @@ html.hrs-mercados-fs .tv-markets-dock.is-hid {
   overflow-wrap: break-word;
 }
 
+.tv-paper-hz {
+  margin: 0.45rem 0 0;
+  padding: 0.5rem 0.5rem 0.45rem;
+  border-radius: 10px;
+  border: 1px solid rgba(110, 231, 183, 0.2);
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(16, 185, 129, 0.1), transparent 58%),
+    rgba(8, 16, 14, 0.9);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.tv-paper-hz > header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+
+.tv-paper-hz > header span {
+  font-size: 0.68rem;
+  font-weight: 780;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7dccb4;
+}
+
+.tv-paper-hz > header em {
+  font-style: normal;
+  font-size: 0.64rem;
+  font-weight: 650;
+  color: #e8eef2;
+}
+
+.tv-paper-hz__coins {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.28rem;
+  margin-bottom: 0.45rem;
+}
+
+.tv-paper-hz__coins button {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #141c1a;
+  color: #9fb0b8;
+  font-size: 0.62rem;
+  font-weight: 760;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 0.22rem 0.5rem;
+  cursor: pointer;
+}
+
+.tv-paper-hz__coins button.is-on {
+  background: #163028;
+  border-color: rgba(110, 231, 183, 0.42);
+  color: #e8eef2;
+}
+
+.tv-paper-hz__thesis {
+  margin: 0 0 0.4rem;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  color: #d7e2e6;
+}
+
+.tv-paper-hz__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.32rem;
+}
+
+.tv-paper-hz__grid li {
+  min-width: 0;
+  overflow: hidden;
+  padding: 0.38rem 0.4rem 0.36rem;
+  border-radius: 9px;
+  background: #16211e;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tv-paper-hz__grid li.is-buy {
+  border-color: rgba(38, 166, 154, 0.28);
+}
+
+.tv-paper-hz__grid li.is-sell {
+  border-color: rgba(239, 83, 80, 0.28);
+}
+
+.tv-paper-hz__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.35rem;
+  align-items: baseline;
+}
+
+.tv-paper-hz__top b {
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.tv-paper-hz__top span {
+  font-size: 0.56rem;
+  color: #8b969c;
+  text-align: right;
+  max-width: 46%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tv-paper-hz__range {
+  position: relative;
+  height: 18px;
+  margin: 0.4rem 0 0.36rem;
+  border-radius: 99px;
+  background: linear-gradient(90deg, rgba(239, 83, 80, 0.45), rgba(245, 213, 138, 0.35), rgba(38, 166, 154, 0.5));
+}
+
+.tv-paper-hz__range i {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: #e8eef2;
+  box-shadow: 0 0 0 1px rgba(16, 24, 22, 0.45);
+}
+
+.tv-paper-hz__now {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  max-width: 70%;
+  padding: 0 0.28rem;
+  border-radius: 5px;
+  background: #e8eef2;
+  color: #101816;
+  font-size: 0.58rem;
+  font-weight: 800;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 0 0 1px rgba(16, 24, 22, 0.35);
+}
+
+.tv-paper-hz__px {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.2rem;
+  align-items: start;
+  font-variant-numeric: tabular-nums;
+}
+
+.tv-paper-hz__px em {
+  font-style: normal;
+  font-size: 0.62rem;
+  font-weight: 720;
+  color: #e8eef2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tv-paper-hz__px em:last-child {
+  text-align: right;
+}
+
+.tv-paper-hz__px small {
+  display: block;
+  color: #8b969c;
+  font-weight: 600;
+}
+
+.tv-paper-hz__odds {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.2rem;
+  margin-top: 0.28rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.tv-paper-hz__odds em {
+  font-style: normal;
+  font-size: 0.6rem;
+  font-weight: 780;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tv-paper-hz__odds .is-up {
+  color: #5ee0c5;
+}
+
+.tv-paper-hz__odds .is-down {
+  color: #ff8f8c;
+  text-align: right;
+}
+
+.tv-paper-hz__drv {
+  list-style: none;
+  margin: 0.48rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.tv-paper-hz__drv li {
+  font-size: 0.58rem;
+  font-weight: 700;
+  padding: 0.12rem 0.38rem;
+  border-radius: 999px;
+  border: 1px solid rgba(110, 231, 183, 0.2);
+  color: #9fd8c8;
+  background: rgba(16, 48, 38, 0.45);
+}
+
+.tv-paper-hz__news {
+  margin: 0.35rem 0 0;
+  font-size: 0.6rem;
+  line-height: 1.35;
+  color: #b7c4c9;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .tv-paper-hz__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .tv-paper-live {
   margin: 0.45rem 0 0;
   padding: 0.5rem 0.55rem 0.45rem;
