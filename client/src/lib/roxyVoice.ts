@@ -36,7 +36,10 @@ export function setRoxySoundMode(mode: RoxySoundMode): void {
   } catch {
     /* */
   }
-  if (mode !== "voice") hushRoxy();
+  if (mode !== "voice") {
+    pendingSpeak = "";
+    hushRoxy();
+  }
 }
 
 export function cycleRoxySoundMode(from: RoxySoundMode = getRoxySoundMode()): RoxySoundMode {

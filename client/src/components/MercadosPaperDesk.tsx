@@ -109,6 +109,15 @@ function roxyAnalyzeMood(now: number): { title: string; body: string } {
   return pack[Math.floor(now / 28_000) % pack.length]!;
 }
 
+function roxySpeakLine(notes: PaperNote[], live: Omit<PaperNote, "id">, now: number): string {
+  const current = notes[0] ?? live;
+  const hush =
+    !String(current.body || "").trim() ||
+    current.title === "Silencio" ||
+    String(current.fingerprint || "").startsWith("hush/");
+  return (hush ? roxyAnalyzeMood(now).body : current.body || "").trim();
+}
+
 function usd(n: number): string {
   if (!Number.isFinite(n)) return "—";
   return new Intl.NumberFormat("en-US", {
@@ -602,7 +611,7 @@ function AgentOpinion({
       if (elapsed >= wait) {
         const from = n;
         n = Math.min(body.length, n + 1);
-        if (n > from && sound !== "mute") playRoxyTypeTick(body[from] ?? "");
+        if (n > from && sound === "type") playRoxyTypeTick(body[from] ?? "");
         setShown(body.slice(0, n));
         last = t;
       }
@@ -631,7 +640,7 @@ function AgentOpinion({
 
   return (
     <blockquote className={`tv-paper-opine tv-paper-opine--${current.tone}`}>
-      <RoxyFace talking={Boolean(voicing || (isLive && !done && sound !== "mute"))} />
+      <RoxyFace talking={Boolean((sound === "voice" && voicing) || (sound === "type" && isLive && !done))} />
       <div className="tv-paper-opine__ident">
         <p className="tv-paper-opine__kicker">Opinión de {ROXY}</p>
         <p className="tv-paper-opine__title">{shownNote.title}</p>
@@ -1302,7 +1311,9 @@ export function MercadosPaperDesk({
   return (
     <div
       className={`tv-paper hrs-card sgi-glass-panel${posN ? " tv-paper--multi" : ""}${open ? " is-open" : ""}`}
-      onPointerDown={() => unlockRoxySpeech()}
+      onPointerDown={() => {
+        if (sound === "voice") unlockRoxySpeech();
+      }}
     >
       <div className="tv-paper__head">
         <button type="button" className="tv-paper__toggle" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
@@ -1334,18 +1345,23 @@ export function MercadosPaperDesk({
           className={`tv-paper__voice${sound === "mute" ? " is-muted" : sound === "type" ? " is-type" : ""}`}
           title={
             sound === "mute"
-              ? "Roxy está muda. Clic: voz"
+              ? "Muda. Clic: voz"
               : sound === "type"
-                ? "Solo tecleo de los comentarios. Clic: muda"
-                : "Roxy habla. Clic: solo tecleo"
+                ? "Tecleo. Clic: muda"
+                : "Voz. Clic: tecleo"
           }
           aria-label={
-            sound === "mute" ? "Roxy muda. Cambiar a voz" : sound === "type" ? "Solo tecleo. Cambiar a muda" : "Con voz. Cambiar a solo tecleo"
+            sound === "mute" ? "Muda. Cambiar a voz" : sound === "type" ? "Tecleo. Cambiar a muda" : "Voz. Cambiar a tecleo"
           }
-          onClick={() => {
-            unlockRoxySpeech();
+          onClick={(e) => {
+            e.stopPropagation();
             const next = cycleRoxySoundMode(sound);
             setSound(next);
+            if (next === "voice") {
+              unlockRoxySpeech();
+              const line = roxySpeakLine(book.notes, liveTalk, nowTick);
+              if (line) speakRoxy(line);
+            }
           }}
         >
           {sound === "mute" ? (
