@@ -47,6 +47,7 @@ import {
   hushRoxy,
   speakRoxy,
   subscribeRoxySpeech,
+  unlockRoxySpeech,
   type RoxySoundMode,
 } from "../lib/roxyVoice";
 
@@ -617,11 +618,10 @@ function AgentOpinion({
       hushRoxy();
       return;
     }
-    if (hush) return;
     const line = (shownNote.body || "").trim();
     if (!line) return;
     speakRoxy(line);
-  }, [sound, hush, current.id, shownNote.body]);
+  }, [sound, current.id, shownNote.body]);
 
   const older = i < feed.length - 1;
   const newer = i > 0;
@@ -1300,7 +1300,10 @@ export function MercadosPaperDesk({
   const venueHint = venue === "spot" ? "Spot" : `Fut ×${lev}`;
 
   return (
-    <div className={`tv-paper hrs-card sgi-glass-panel${posN ? " tv-paper--multi" : ""}${open ? " is-open" : ""}`}>
+    <div
+      className={`tv-paper hrs-card sgi-glass-panel${posN ? " tv-paper--multi" : ""}${open ? " is-open" : ""}`}
+      onPointerDown={() => unlockRoxySpeech()}
+    >
       <div className="tv-paper__head">
         <button type="button" className="tv-paper__toggle" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
           <span>
@@ -1340,6 +1343,7 @@ export function MercadosPaperDesk({
             sound === "mute" ? "Roxy muda. Cambiar a voz" : sound === "type" ? "Solo tecleo. Cambiar a muda" : "Con voz. Cambiar a solo tecleo"
           }
           onClick={() => {
+            unlockRoxySpeech();
             const next = cycleRoxySoundMode(sound);
             setSound(next);
           }}

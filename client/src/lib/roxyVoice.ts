@@ -9,7 +9,6 @@ function readMode(): RoxySoundMode {
   try {
     const raw = window.localStorage.getItem(MODE_KEY);
     if (raw === "mute" || raw === "voice" || raw === "type") return raw;
-    if (window.localStorage.getItem(MUTE_KEY) === "1") return "mute";
   } catch {
     /* */
   }
@@ -52,11 +51,42 @@ export function setRoxyMuted(muted: boolean): void {
 }
 
 let voicesReady = false;
+let speechUnlocked = false;
+let pendingSpeak = "";
 let speakGen = 0;
 let pauseTimer = 0;
 let lastSaid = "";
 let lastSaidAt = 0;
 const recentSaid: string[] = [];
+
+function resumeEngine(): void {
+  if (typeof window === "undefined" || !window.speechSynthesis) return;
+  try {
+    window.speechSynthesis.resume();
+  } catch {
+    /* */
+  }
+}
+
+export function unlockRoxySpeech(): void {
+  if (typeof window === "undefined" || !window.speechSynthesis) return;
+  speechUnlocked = true;
+  warmVoices();
+  resumeEngine();
+  try {
+    audioCtx = audioCtx ?? new AudioContext();
+    void audioCtx.resume();
+  } catch {
+    /* */
+  }
+  if (pendingSpeak && !voiceOff()) {
+    const line = pendingSpeak;
+    pendingSpeak = "";
+    lastSaid = "";
+    lastSaidAt = 0;
+    speakRoxy(line);
+  }
+}
 
 type SpeechListener = (speaking: boolean) => void;
 const speechListeners = new Set<SpeechListener>();
@@ -91,6 +121,9 @@ if (typeof window !== "undefined" && window.speechSynthesis) {
   window.speechSynthesis.addEventListener("voiceschanged", () => {
     voicesReady = true;
   });
+  window.setInterval(() => {
+    if (speakingNow) resumeEngine();
+  }, 8000);
 }
 
 function scoreVoice(v: SpeechSynthesisVoice): number {
@@ -301,6 +334,10 @@ export function speakRoxy(text: string): void {
   if (voiceOff()) return;
   const said = toSpokenRoxy(text);
   if (said.length < 2) return;
+  if (!speechUnlocked) {
+    pendingSpeak = said;
+    return;
+  }
   const now = Date.now();
   if (speakingNow && sameTalk(said, lastSaid)) return;
   if (!speakingNow && sameTalk(said, lastSaid) && now - lastSaidAt < 50_000) return;
@@ -315,6 +352,7 @@ export function speakRoxy(text: string): void {
   const gen = speakGen;
   const bits = splitForSpeech(said);
   if (!bits.length) return;
+  resumeEngine();
   const runBit = (i: number) => {
     if (gen !== speakGen || voiceOff()) {
       setSpeaking(false);
@@ -333,39 +371,28 @@ export function speakRoxy(text: string): void {
       playHum(gen, () => runBit(i + 1));
       return;
     }
-    const go = () => {
-      if (gen !== speakGen || voiceOff()) {
-        setSpeaking(false);
-        return;
-      }
-      const u = new SpeechSynthesisUtterance(bit.text);
-      const voice = pickRoxyVoice();
-      if (voice) {
-        u.voice = voice;
-        u.lang = /es-ar/i.test(voice.lang) ? voice.lang : "es-AR";
-      } else {
-        u.lang = "es-AR";
-      }
-      u.rate = Math.min(1.26, Math.max(1.08, bit.rate));
-      u.pitch = Math.min(1.62, Math.max(1.28, bit.pitch));
-      u.volume = 1;
-      u.onstart = () => setSpeaking(true);
-      u.onend = () => runBit(i + 1);
-      u.onerror = () => {
-        if (gen === speakGen) runBit(i + 1);
-        else setSpeaking(false);
-      };
-      window.speechSynthesis.speak(u);
+    const u = new SpeechSynthesisUtterance(bit.text);
+    const voice = pickRoxyVoice();
+    if (voice) {
+      u.voice = voice;
+      u.lang = /es-ar/i.test(voice.lang) ? voice.lang : "es-AR";
+    } else {
+      u.lang = "es-AR";
+    }
+    u.rate = Math.min(1.26, Math.max(1.08, bit.rate));
+    u.pitch = Math.min(1.62, Math.max(1.28, bit.pitch));
+    u.volume = 1;
+    u.onstart = () => {
+      pendingSpeak = "";
+      setSpeaking(true);
+      resumeEngine();
     };
-    if (!voicesReady && !warmVoices().length) {
-      pauseTimer = window.setTimeout(go, 120);
-      return;
-    }
-    if (i === 0) {
-      pauseTimer = window.setTimeout(go, 70);
-      return;
-    }
-    go();
+    u.onend = () => runBit(i + 1);
+    u.onerror = () => {
+      if (gen === speakGen) runBit(i + 1);
+      else setSpeaking(false);
+    };
+    window.speechSynthesis.speak(u);
   };
   runBit(0);
 }
