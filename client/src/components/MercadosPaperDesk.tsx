@@ -1350,15 +1350,10 @@ export function MercadosPaperDesk({
   const ledger = useMemo(() => splitPaperTrades(book), [book]);
   const report = useMemo(() => buildPaperReport(book, marks, nowTick), [book, marks, nowTick]);
   const previewOps = useMemo(() => {
-    const open = book.universe === "ALL" ? ledger.open : ledger.open.filter((t) => t.symbol === book.universe);
-    const closed = book.universe === "ALL" ? ledger.closed : ledger.closed.filter((t) => t.symbol === book.universe);
-    return [
-      ...open.map((t) => ({ t, at: t.openedAt })),
-      ...closed.map((t) => ({ t, at: t.closedAt ?? t.openedAt })),
-    ]
-      .sort((a, b) => b.at - a.at)
-      .slice(0, 4);
-  }, [ledger, book.universe]);
+    const opens = ledger.open;
+    const extra = Math.max(2, 8 - opens.length);
+    return [...opens, ...ledger.closed.slice(0, extra)];
+  }, [ledger]);
   const liveTalk = useMemo(() => {
     if (book.notes[0]) return book.notes[0];
     return {
@@ -1885,8 +1880,8 @@ export function MercadosPaperDesk({
             {previewOps.length ? (
               <>
                 <ul className="tv-paper-ledger__preview">
-                  {previewOps.map(({ t }) => (
-                    <li key={t.id}>
+                  {previewOps.map((t, i) => (
+                    <li key={`${t.id}-${t.status}-${i}`}>
                       <TradeRow trade={t} tag={tag(t.symbol)} mark={marks[t.symbol]} />
                     </li>
                   ))}
