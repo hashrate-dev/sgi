@@ -53,7 +53,6 @@ export function setRoxyMuted(muted: boolean): void {
   setRoxySoundMode(muted ? "mute" : "voice");
 }
 
-let voicesReady = false;
 let speechUnlocked = false;
 let pendingSpeak = "";
 let speakGen = 0;
@@ -115,14 +114,12 @@ export function subscribeRoxySpeech(fn: SpeechListener): () => void {
 
 function warmVoices(): SpeechSynthesisVoice[] {
   if (typeof window === "undefined" || !window.speechSynthesis) return [];
-  const list = window.speechSynthesis.getVoices();
-  if (list.length) voicesReady = true;
-  return list;
+  return window.speechSynthesis.getVoices();
 }
 
 if (typeof window !== "undefined" && window.speechSynthesis) {
   window.speechSynthesis.addEventListener("voiceschanged", () => {
-    voicesReady = true;
+    warmVoices();
   });
   window.setInterval(() => {
     if (speakingNow) resumeEngine();
