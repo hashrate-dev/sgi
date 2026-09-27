@@ -1,6 +1,14 @@
 #!/usr/bin/env node
-/** Ejecuta vercel --prod con VERCEL_ORG_ID y VERCEL_PROJECT_ID para que el deploy funcione sin prompt. */
-process.env.VERCEL_ORG_ID = "team_ZrFs7KNf947ZEMU0YbE1Ri05";
-process.env.VERCEL_PROJECT_ID = "prj_mzDDYrMiQPXnQcHlWVpGUXoIfQ77";
+/**
+ * hashrate.space = Vercel project `sgi` (settings Root Directory = client/).
+ * Run from the repo root so Vercel does not look for client/client.
+ * Do not target `sgi-client` (legacy Hobby); that is not production.
+ */
+const path = require("path");
 const { execSync } = require("child_process");
-execSync("npx vercel --prod", { stdio: "inherit", cwd: require("path").resolve(__dirname, "..") });
+
+process.env.VERCEL_ORG_ID = "team_ZrFs7KNf947ZEMU0YbE1Ri05";
+process.env.VERCEL_PROJECT_ID = "prj_kjqLA3yUL27AlCiGOACNhjqNekgN";
+
+const root = path.resolve(__dirname, "..");
+execSync("npx vercel --prod --yes", { stdio: "inherit", cwd: root });

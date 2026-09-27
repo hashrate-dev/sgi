@@ -19,7 +19,7 @@ const RESEND_LOCAL_PATH = path.join(ROOT, ".env.resend.local");
 
 /** Defaults alineados con scripts/deploy-vercel.cjs */
 const DEFAULT_TEAM_ID = "team_ZrFs7KNf947ZEMU0YbE1Ri05";
-const DEFAULT_PROJECT_ID = "prj_mzDDYrMiQPXnQcHlWVpGUXoIfQ77";
+const DEFAULT_PROJECT_ID = "prj_kjqLA3yUL27AlCiGOACNhjqNekgN";
 
 function parseDotEnv(filePath) {
   if (!fs.existsSync(filePath)) return {};
