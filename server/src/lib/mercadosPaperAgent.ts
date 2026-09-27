@@ -19,11 +19,13 @@ import {
 type BtcTradeSignal = TradeConfluence;
 
 const FEE = 0.0004;
-const MIN_CONF = 58;
+const MIN_CONF = 68;
 const CASH_CAP = 0.92;
-const DEFAULT_RISK_PCT = 1;
-const DEFAULT_SIZE_PCT = 25;
-const DEFAULT_T1_PCT = 50;
+const DEFAULT_RISK_PCT = 0.5;
+const DEFAULT_SIZE_PCT = 12;
+const DEFAULT_T1_PCT = 60;
+const PRO_DAY_CAP = 3;
+const PRO_MAX_OPEN = 1;
 const HIST = 72;
 const FILLS = 48;
 const TRADES = 200;
@@ -317,8 +319,8 @@ function entryPlan(sig: BtcTradeSignal, side: "long" | "short", style: PaperStyl
     const stopP = b === "context" ? 0.024 : b === "hour" ? 0.018 : 0.012;
     return placePlan(sig, side, stopP, 1.8, 3.2);
   }
-  const stopP = b === "ultra" ? 0.0048 : b === "fast" ? 0.008 : b === "mid" ? 0.011 : 0.014;
-  return placePlan(sig, side, stopP, 1.2, 2.2);
+  const stopP = b === "ultra" ? 0.0055 : b === "fast" ? 0.009 : b === "mid" ? 0.012 : 0.016;
+  return placePlan(sig, side, stopP, 1.6, 2.6);
 }
 
 function scalpMaxHoldMs(interval: string): number {
@@ -663,11 +665,16 @@ export function paperOpsToday(book: PaperBook, now = Date.now()): number {
 }
 
 export function paperAtDayCap(book: PaperBook, now = Date.now()): boolean {
-  return paperOpsToday(book, now) >= clampPaperMaxOpsDay(book.maxOpsDay ?? DEFAULT_MAX_OPS_DAY);
+  const cap = Math.min(PRO_DAY_CAP, clampPaperMaxOpsDay(book.maxOpsDay ?? DEFAULT_MAX_OPS_DAY));
+  return paperOpsToday(book, now) >= cap;
 }
 
 export function paperCanOpen(book: PaperBook, now = Date.now()): boolean {
-  return !paperAtOpsCap(book) && !paperAtDayCap(book, now);
+  if (paperAtOpsCap(book) || paperAtDayCap(book, now)) return false;
+  const live = book.positions.filter((p) => !p.t1Done);
+  if (live.length >= PRO_MAX_OPEN) return false;
+  if (book.positions.length >= 2) return false;
+  return true;
 }
 
 export type PaperAlertLight = "red" | "yellow" | "green";
@@ -793,12 +800,13 @@ export function splitPaperTrades(book: PaperBook): { open: PaperTrade[]; closed:
 function neededConfirm(interval: string, style: PaperStyle = "intraday"): number {
   const iv = chartInterval(interval);
   if (style === "swing") {
-    if (iv === "240" || iv === "D") return 1;
-    return 2;
+    if (iv === "240" || iv === "D") return 2;
+    return 3;
   }
   const b = scalpBand(interval);
-  if (b === "ultra") return 3;
-  if (b === "fast" || b === "mid" || b === "hour") return 2;
+  if (b === "ultra") return 4;
+  if (b === "fast") return 3;
+  if (b === "mid" || b === "hour") return 3;
   return 99;
 }
 
@@ -832,8 +840,24 @@ function markHist(book: PaperBook, marks: Record<string, number>): void {
   if (eq > book.peakUsd) book.peakUsd = eq;
 }
 
-function canEnter(sig: BtcTradeSignal, side: "long" | "short", book: PaperBook, voteLed = false): boolean {
-  const minConf = paperMinConfOf(book) - (voteLed ? 6 : 0);
+function regimeAllows(sig: BtcTradeSignal, side: "long" | "short", btc?: BtcTradeSignal | null): boolean {
+  if (!btc || sig.symbol === "BTCUSDT") return true;
+  const btcLong = btc.supertrendDir === 1 && btc.price >= btc.ema200;
+  const btcShort = btc.supertrendDir === -1 && btc.price <= btc.ema200;
+  if (side === "long" && btcShort && btc.bias === "sell") return false;
+  if (side === "short" && btcLong && btc.bias === "buy") return false;
+  return true;
+}
+
+function canEnter(
+  sig: BtcTradeSignal,
+  side: "long" | "short",
+  book: PaperBook,
+  voteLed = false,
+  btc?: BtcTradeSignal | null,
+): boolean {
+  void voteLed;
+  const minConf = Math.max(MIN_CONF, paperMinConfOf(book));
   const style = paperStyleOf(book);
   const now = Date.now();
   if (!paperAllowsOpen(sig.interval, style)) return false;
@@ -842,17 +866,26 @@ function canEnter(sig: BtcTradeSignal, side: "long" | "short", book: PaperBook, 
   if (sig.confidence < minConf + roxyNewsConfBump(book.mind?.facts, sig.symbol, side, now)) return false;
   if (sig.bias === "buy" && side === "short") return false;
   if (sig.bias === "sell" && side === "long") return false;
-  if (side === "long" && sig.rsi >= (voteLed ? 82 : 76)) return false;
-  if (side === "short" && sig.rsi <= (voteLed ? 18 : 24)) return false;
-  if (!voteLed) {
-    if (side === "long" && sig.ichiCloud === "below") return false;
-    if (side === "short" && sig.ichiCloud === "above") return false;
+  if (side === "long" && sig.supertrendDir !== 1) return false;
+  if (side === "short" && sig.supertrendDir !== -1) return false;
+  if (Number.isFinite(sig.ema200) && sig.ema200 > 0) {
+    if (side === "long" && sig.price < sig.ema200) return false;
+    if (side === "short" && sig.price > sig.ema200) return false;
   }
-  if (Number.isFinite(sig.volRatio) && (sig.volRatio ?? 1) < (voteLed ? 0.68 : 0.82)) return false;
+  if (side === "long" && sig.macdHist <= 0) return false;
+  if (side === "short" && sig.macdHist >= 0) return false;
+  if (side === "long" && sig.rsi >= 70) return false;
+  if (side === "short" && sig.rsi <= 30) return false;
+  if (side === "long" && sig.ichiCloud === "below") return false;
+  if (side === "short" && sig.ichiCloud === "above") return false;
+  if (Number.isFinite(sig.volRatio) && (sig.volRatio ?? 1) < 0.95) return false;
+  if (!regimeAllows(sig, side, btc)) return false;
   const plan = entryPlan(sig, side, style);
   const dist = Math.abs(sig.price - plan.stop);
-  const minStop = style === "swing" ? 0.006 : 0.004;
+  const minStop = style === "swing" ? 0.007 : 0.005;
   if (!(dist > 0) || dist / sig.price < minStop) return false;
+  const reward = Math.abs(plan.t1 - sig.price);
+  if (reward / dist < 1.45) return false;
   return true;
 }
 
@@ -916,7 +949,7 @@ function closeTrade(book: PaperBook, pos: PaperPosition, at: number, price: numb
 export function tickPaper(
   book: PaperBook,
   sig: BtcTradeSignal,
-  opts?: { skipHist?: boolean; marks?: Record<string, number>; openKey?: string | null },
+  opts?: { skipHist?: boolean; marks?: Record<string, number>; openKey?: string | null; btc?: BtcTradeSignal | null },
 ): { book: PaperBook; events: PaperEvent[] } {
   const events: PaperEvent[] = [];
   if (!shouldTick(book, sig.symbol)) return { book, events };
@@ -1024,24 +1057,31 @@ export function tickPaper(
       events.push({ kind: "scale", side: pos.side, symbol: sig.symbol, reason: "t1", price: px, pnl, note: `${sig.symbol} T1` });
       if (pnl >= 0) next.wins += 1;
     } else if (flip) {
-      const pnl = applyCloseQty(next, pos, pos.qty, px);
-      pushFill(next, {
-        at: now,
-        symbol: sig.symbol,
-        side: pos.side,
-        action: "close",
-        reason: "flip",
-        price: px,
-        qty: pos.qty,
-        pnl,
-        note: `${sig.symbol} sesgo`,
-      });
-      events.push({ kind: "close", side: pos.side, symbol: sig.symbol, reason: "flip", price: px, pnl, note: `${sig.symbol} sesgo` });
-      if (pnl >= 0) next.wins += 1;
-      else next.losses += 1;
-      closeTrade(next, pos, now, px, "flip", pnl);
-      dropPos();
-    } else if (paperStyleOf(next) !== "swing" && now - pos.openedAt >= scalpMaxHoldMs(pos.interval || sig.interval)) {
+      const uPnl = pos.qty * (px - pos.entry);
+      if (!(uPnl < 0 && !pos.t1Done)) {
+        const pnl = applyCloseQty(next, pos, pos.qty, px);
+        pushFill(next, {
+          at: now,
+          symbol: sig.symbol,
+          side: pos.side,
+          action: "close",
+          reason: "flip",
+          price: px,
+          qty: pos.qty,
+          pnl,
+          note: `${sig.symbol} sesgo`,
+        });
+        events.push({ kind: "close", side: pos.side, symbol: sig.symbol, reason: "flip", price: px, pnl, note: `${sig.symbol} sesgo` });
+        if (pnl >= 0) next.wins += 1;
+        else next.losses += 1;
+        closeTrade(next, pos, now, px, "flip", pnl);
+        dropPos();
+      }
+    } else if (
+      paperStyleOf(next) !== "swing" &&
+      now - pos.openedAt >= scalpMaxHoldMs(pos.interval || sig.interval) &&
+      pos.qty * (px - pos.entry) >= 0
+    ) {
       const pnl = applyCloseQty(next, pos, pos.qty, px);
       pushFill(next, {
         at: now,
@@ -1059,7 +1099,11 @@ export function tickPaper(
       else next.losses += 1;
       closeTrade(next, pos, now, px, "time", pnl);
       dropPos();
-    } else if (paperStyleOf(next) !== "swing" && uruguayDayKey(pos.openedAt) !== uruguayDayKey(now)) {
+    } else if (
+      paperStyleOf(next) !== "swing" &&
+      uruguayDayKey(pos.openedAt) !== uruguayDayKey(now) &&
+      pos.qty * (px - pos.entry) >= 0
+    ) {
       const pnl = applyCloseQty(next, pos, pos.qty, px);
       pushFill(next, {
         at: now,
@@ -1092,11 +1136,11 @@ export function tickPaper(
   const underCap = paperCanOpen(next, now);
   const mode = normalizePaperMode(next.mode);
   const lev = paperEffectiveLev(mode, next.leverage ?? 1);
-  const need = voteHit ? 1 : neededConfirm(sig.interval, paperStyleOf(next));
+  const need = neededConfirm(sig.interval, paperStyleOf(next));
   if (next.armed && underCap && !hasPos && (fire === "buy" || fire === "sell") && n >= need) {
     const side = fire === "buy" ? "long" : "short";
     const voteOk = !opts?.openKey || opts.openKey === `${sig.symbol}:${side}`;
-    if (voteOk && paperAllowsSide(mode, side) && paperAllowsOpen(sig.interval, paperStyleOf(next)) && canEnter(sig, side, next, voteHit)) {
+    if (voteOk && paperAllowsSide(mode, side) && paperAllowsOpen(sig.interval, paperStyleOf(next)) && canEnter(sig, side, next, voteHit, opts?.btc)) {
       const marks = { ...(opts?.marks ?? {}), [sig.symbol]: px };
       const plan = entryPlan(sig, side, paperStyleOf(next));
       const qty = sizeQty(next, sig, side, marks, plan.stop);
@@ -1156,10 +1200,11 @@ export function tickPaperMany(book: PaperBook, signals: BtcTradeSignal[]): { boo
     short: paperAllowsSide(normalizePaperMode(book.mode), "short"),
   });
   const openKey = roxyBallotOpenKey(ballots);
+  const btc = signals.find((s) => s.symbol === "BTCUSDT") ?? null;
   let cur = book;
   const events: PaperEvent[] = [];
   for (const sig of signals) {
-    const r = tickPaper(cur, sig, { skipHist: true, marks, openKey });
+    const r = tickPaper(cur, sig, { skipHist: true, marks, openKey, btc });
     cur = r.book;
     events.push(...r.events);
   }
@@ -1183,7 +1228,7 @@ export function tickPaperMany(book: PaperBook, signals: BtcTradeSignal[]): { boo
     if (ev.kind === "close" && (ev.reason === "stop" || (ev.pnl ?? 0) < 0)) {
       cur.mind.lastStopAt = now;
       cur.mind.lastStopSymbol = ev.symbol;
-      cur.mind.revengeUntil = now + 12 * 60_000;
+      cur.mind.revengeUntil = now + 45 * 60_000;
     }
   }
   return { book: cur, events };

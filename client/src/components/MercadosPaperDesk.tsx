@@ -1693,7 +1693,7 @@ export function MercadosPaperDesk({
               <div className="tv-paper-cfg__row">
                 <span>Mín. alineación</span>
                 <div>
-                  {([50, 58, 65, 75] as const).map((n) => (
+                  {([68, 72, 78, 82] as const).map((n) => (
                     <CfgBtn
                       key={n}
                       on={clampPaperMinConf(book.minConf) === n}
@@ -1901,7 +1901,7 @@ export function MercadosPaperDesk({
               <p className="tv-paper__pos is-flat">
                 {atCap
                   ? "Sin posición abierta · tope de operaciones alcanzado."
-                  : `Sin posición · espera COMPRAR/VENDER con alineación ≥ 58%${book.universe === "ALL" ? " en cualquier moneda" : ` en ${uniLabel}`}.`}
+                  : `Sin posición · espera COMPRAR/VENDER con alineación ≥ 68%${book.universe === "ALL" ? " en cualquier moneda" : ` en ${uniLabel}`}.`}
               </p>
             )}
           </section>

@@ -129,12 +129,12 @@ function pickSide(
   let allowS = gate?.short !== false;
   if (desk === "buy") allowS = false;
   if (desk === "sell") allowL = false;
-  const longOk = allowL && long.yes >= 3 && long.score >= 1.4;
-  const shortOk = allowS && short.yes >= 3 && short.score >= 1.4;
+  const longOk = allowL && long.yes >= 4 && long.score >= 2.4;
+  const shortOk = allowS && short.yes >= 4 && short.score >= 2.4;
   if (allowL && !allowS) return longOk ? "long" : "wait";
   if (allowS && !allowL) return shortOk ? "short" : "wait";
-  if (longOk && long.score >= short.score + 0.55) return "long";
-  if (shortOk && short.score >= long.score + 0.55) return "short";
+  if (longOk && long.score >= short.score + 1.1) return "long";
+  if (shortOk && short.score >= long.score + 1.1) return "short";
   return "wait";
 }
 
