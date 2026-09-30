@@ -72,11 +72,10 @@ export function OpsComunicacionBotUsersPage() {
     return <Navigate to={sgiHome()} replace />;
   }
 
-  const persist = async (next: OpsComunicacionTelegramRecipient[], removeChatIds?: string[]) => {
+  const persist = async (next: OpsComunicacionTelegramRecipient[]) => {
     const saved = await putOpsComunicacionTelegram({
       enabled: enabled && next.length > 0,
       recipients: next,
-      ...(removeChatIds?.length ? { removeChatIds } : {}),
     });
     const list = saved.recipients || next;
     setRows(list);
@@ -144,10 +143,7 @@ export function OpsComunicacionBotUsersPage() {
     setErr("");
     setOk("");
     try {
-      await persist(
-        rows.filter((c) => c.chatId !== chatId),
-        [chatId]
-      );
+      await persist(rows.filter((c) => c.chatId !== chatId));
       setOk("Usuario quitado. Ya no recibe avisos.");
     } catch (e) {
       setErr(e instanceof Error ? e.message : "No se pudo quitar.");
@@ -166,8 +162,8 @@ export function OpsComunicacionBotUsersPage() {
             <div>
               <h1 className="ops-com-users__title">Conectados a Hashrate Operations</h1>
               <p className="ops-com-users__lead">
-                Cada fila es un chat privado. Ellos no ven esta tabla ni a los demás. Quien manda /start al bot queda
-                habilitado solo para recibir comunicados. El nombre de cliente y el usuario pool los cargás vos en el SGI.
+                Cada fila es un chat privado. Ellos no ven esta tabla ni a los demás. El nombre de cliente y el usuario
+                pool los cargás vos en el SGI.
               </p>
             </div>
             <div className="ops-com-users__actions">
@@ -194,8 +190,7 @@ export function OpsComunicacionBotUsersPage() {
             <p className="text-muted mb-0">Cargando usuarios…</p>
           ) : rows.length === 0 ? (
             <p className="ops-com-users__empty">
-              Todavía no hay usuarios. Que manden /start a @hashrate_operations_bot: quedan habilitados solos. Esta
-              lista se actualiza al recargar o con Actualizar desde Telegram.
+              Todavía no hay usuarios. Que manden /start a @hashrate_operations_bot y tocá Actualizar desde Telegram.
             </p>
           ) : (
             <div className="ops-com-users__table-wrap">
