@@ -297,6 +297,40 @@
   margin-top: 0.15rem;
 }
 
+.ops-com-cierre__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem 0.75rem;
+}
+
+.ops-com-cierre__lock {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(125, 211, 252, 0.28);
+  background: rgba(8, 22, 32, 0.85);
+  color: rgba(186, 230, 253, 0.88);
+  font-size: 0.72rem;
+  font-weight: 720;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.ops-com-cierre__lock.is-on {
+  border-color: rgba(250, 204, 21, 0.45);
+  color: #fde68a;
+}
+
+.ops-com-cierre.is-locked .ops-com-textarea--cierre {
+  opacity: 0.78;
+  cursor: default;
+}
+
 .ops-com-textarea--cierre {
   min-height: 4.6rem;
   height: 4.6rem;

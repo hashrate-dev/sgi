@@ -130,6 +130,7 @@ export function OpsComunicacionPage() {
   const [headerDraft, setHeaderDraft] = useState(DEFAULT_TG_HEADER);
   const [telegramCierre, setTelegramCierre] = useState(DEFAULT_TG_CIERRE);
   const [cierreDraft, setCierreDraft] = useState(DEFAULT_TG_CIERRE);
+  const [cierreLocked, setCierreLocked] = useState(true);
   const [categoryLabelDraft, setCategoryLabelDraft] = useState("Operaciones");
   const [copyBusy, setCopyBusy] = useState(false);
   const [sendNow, setSendNow] = useState(true);
@@ -196,6 +197,7 @@ export function OpsComunicacionPage() {
       const cierre = String(res.telegramCierre || "").replace(/\r\n/g, "\n").trim() || DEFAULT_TG_CIERRE;
       setTelegramCierre(cierre);
       setCierreDraft(cierre);
+      setCierreLocked(true);
       setTelegramRecipientCount(res.telegramRecipientCount || res.telegramRecipients?.length || 0);
       const recips = res.telegramRecipients || [];
       setTelegramRecipients(recips);
@@ -351,6 +353,7 @@ export function OpsComunicacionPage() {
         const cierre = String(saved.telegramCierre || "").replace(/\r\n/g, "\n").trim() || DEFAULT_TG_CIERRE;
         setTelegramCierre(cierre);
         setCierreDraft(cierre);
+        setCierreLocked(true);
         if (saved.categories?.length) setCategories(saved.categories);
       }
       const r = await createOpsComunicacion({
@@ -483,6 +486,7 @@ export function OpsComunicacionPage() {
       const cierre = String(r.telegramCierre || "").replace(/\r\n/g, "\n").trim() || DEFAULT_TG_CIERRE;
       setTelegramCierre(cierre);
       setCierreDraft(cierre);
+      setCierreLocked(true);
       setOk("Textos de Telegram guardados. Los próximos envíos usan este encabezado, tipo y cierre.");
     } catch (e) {
       setErr(e instanceof Error ? e.message : "No se pudieron guardar los textos de Telegram.");
@@ -844,23 +848,64 @@ export function OpsComunicacionPage() {
                       />
                     </div>
                   </div>
-                  <div className="ops-com-cierre">
-                    <label htmlFor="ops-cierre" className="ops-com-body-split__label">
-                      Cierre (abajo de todo en Telegram)
-                    </label>
+                  <div className={`ops-com-cierre${cierreLocked ? " is-locked" : ""}`}>
+                    <div className="ops-com-cierre__bar">
+                      <label htmlFor="ops-cierre" className="ops-com-body-split__label">
+                        Cierre (abajo de todo en Telegram)
+                      </label>
+                      {canEdit ? (
+                        <button
+                          type="button"
+                          className={`ops-com-cierre__lock${cierreLocked ? " is-on" : ""}`}
+                          aria-pressed={cierreLocked}
+                          title={cierreLocked ? "Desbloquear cierre" : "Bloquear cierre"}
+                          onClick={() => {
+                            setCierreLocked((on) => {
+                              if (on) {
+                                setOk("Cierre desbloqueado. Editá y guardá textos, o volvé a bloquear.");
+                                setErr("");
+                                return false;
+                              }
+                              setCierreDraft(telegramCierre);
+                              setOk("Cierre bloqueado.");
+                              return true;
+                            });
+                          }}
+                        >
+                          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden>
+                            {cierreLocked ? (
+                              <path
+                                fill="currentColor"
+                                d="M12 1a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V11a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5Zm3 8H9V6a3 3 0 1 1 6 0v3Z"
+                              />
+                            ) : (
+                              <path
+                                fill="currentColor"
+                                d="M12 1a5 5 0 0 0-5 5h2a3 3 0 1 1 6 0v3H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V11a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5Z"
+                              />
+                            )}
+                          </svg>
+                          {cierreLocked ? "Bloqueado" : "Desbloqueado"}
+                        </button>
+                      ) : null}
+                    </div>
                     <textarea
                       id="ops-cierre"
                       className="fact-input ops-com-textarea ops-com-textarea--cierre"
                       value={cierreDraft}
-                      onChange={(e) => setCierreDraft(e.target.value)}
+                      onChange={(e) => {
+                        if (cierreLocked) return;
+                        setCierreDraft(e.target.value);
+                      }}
                       onBlur={() => {
-                        if (!canEdit || copyBusy) return;
+                        if (!canEdit || copyBusy || cierreLocked) return;
                         if (cierreDraft.replace(/\r\n/g, "\n").trim() === telegramCierre.replace(/\r\n/g, "\n").trim()) {
                           return;
                         }
                         void onSaveCopy();
                       }}
                       onKeyDown={(e) => e.stopPropagation()}
+                      readOnly={cierreLocked || !canEdit}
                       disabled={busy || copyBusy}
                       maxLength={400}
                       rows={3}
