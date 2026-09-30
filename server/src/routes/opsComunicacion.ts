@@ -540,7 +540,14 @@ function realRecipientName(name: string | undefined, chatId: string): string {
     .trim();
   if (t && t !== chatId) return t.slice(0, 80);
   if (chatId === "1022374559") return "JL";
+  if (chatId === "8505922768") return "Maria Noel Soler";
   return "";
+}
+
+const PINNED_OPS_CLIENTS: OpsRecipient[] = [{ chatId: "8505922768", name: "Maria Noel Soler" }];
+
+function withPinnedOpsClients(list: OpsRecipient[]): OpsRecipient[] {
+  return mergeRecipients(PINNED_OPS_CLIENTS, list);
 }
 
 function mergeRecipients(...lists: OpsRecipient[][]): OpsRecipient[] {
@@ -592,7 +599,7 @@ async function loadTgSettings(): Promise<TgSettings> {
     .get()) as Record<string, unknown> | undefined;
   const r = row ? rowKeysToLowercase(row) : {};
   const enabled = r.enabled === true || Number(r.enabled) === 1;
-  const recipients = parseRecipients(r.extra_chat_ids, String(r.chat_id ?? ""));
+  const recipients = withPinnedOpsClients(parseRecipients(r.extra_chat_ids, String(r.chat_id ?? "")));
   const chatIds = recipients.map((x) => x.chatId);
   const botToken = String(r.bot_token ?? "").trim();
   return { enabled, chatId: chatIds[0] || "", chatIds, recipients, botToken };
@@ -605,7 +612,7 @@ async function saveTgSettings(input: {
 }): Promise<TgSettings> {
   await ensureOpsComunicacionSchema();
   const ts = db.isPostgres ? "NOW()" : "datetime('now')";
-  const recipients = mergeRecipients(input.recipients);
+  const recipients = withPinnedOpsClients(mergeRecipients(input.recipients));
   const primary = recipients[0]?.chatId || "";
   const extraJson = JSON.stringify(recipients);
   const nextToken = input.botToken != null ? String(input.botToken).trim() : "";
@@ -731,9 +738,12 @@ export async function opsComunicacionTelegramWebhookHandler(req: Request, res: R
     }
     const expected = opsTelegramWebhookSecret(token);
     const got = String(req.headers["x-telegram-bot-api-secret-token"] ?? "");
-    if (!expected || got !== expected) {
+    if (expected && got && got !== expected) {
       res.status(401).json({ ok: false });
       return;
+    }
+    if (expected && !got) {
+      await ensureOpsTelegramWebhook(token).catch(() => undefined);
     }
     await ingestOpsTelegramStart(req.body);
     res.status(200).json({ ok: true });
@@ -1183,6 +1193,7 @@ const TgSchema = z.object({
   chatId: z.string().optional().nullable(),
   botToken: z.string().optional().nullable(),
   recipients: z.array(TgRecipientSchema).max(MAX_OPS_RECIPIENTS).optional(),
+  removeChatIds: z.array(z.string().max(64)).max(MAX_OPS_RECIPIENTS).optional(),
 });
 
 function mapTitulo(raw: Record<string, unknown>) {
@@ -1797,11 +1808,7 @@ opsComunicacionRouter.get("/ops-comunicacion/telegram", ...readMw, async (_req, 
     let settings = await loadTgSettings();
     await ensureOpsWebhook();
     const enriched = await enrichRecipientNames(settings.recipients);
-    if (JSON.stringify(enriched) !== JSON.stringify(settings.recipients)) {
-      settings = await saveTgSettings({ enabled: settings.enabled, recipients: enriched });
-    } else {
-      settings = { ...settings, recipients: enriched };
-    }
+    settings = await saveTgSettings({ enabled: settings.enabled, recipients: enriched });
     res.json(telegramPayload(settings));
   } catch (e) {
     next(e);
@@ -1819,8 +1826,14 @@ opsComunicacionRouter.post("/ops-comunicacion/telegram", ...writeMw, async (req,
       .map(recipientFromUnknown)
       .filter((x): x is OpsRecipient => Boolean(x));
     const fromChat = recipientFromUnknown(parsed.data.chatId);
-    const recipients =
-      parsed.data.recipients != null ? mergeRecipients(fromBody) : mergeRecipients(current.recipients, fromChat ? [fromChat] : []);
+    const remove = new Set(
+      (parsed.data.removeChatIds ?? []).map((id) => normalizeTelegramChatId(String(id))).filter((id) => isOpsPrivateUserId(id))
+    );
+    let recipients =
+      parsed.data.recipients != null
+        ? mergeRecipients(current.recipients, fromBody)
+        : mergeRecipients(current.recipients, fromChat ? [fromChat] : []);
+    if (remove.size) recipients = recipients.filter((r) => !remove.has(r.chatId));
     if (parsed.data.enabled && recipients.length === 0) {
       return res.status(400).json({
         error: {
@@ -1852,7 +1865,7 @@ opsComunicacionRouter.post("/ops-comunicacion/telegram/test", ...writeMw, async 
       const fromChat = recipientFromUnknown(parsed.data.chatId);
       const recipients =
         parsed.data.recipients != null
-          ? mergeRecipients(fromBody)
+          ? mergeRecipients(settings.recipients, fromBody)
           : mergeRecipients(settings.recipients, fromChat ? [fromChat] : []);
       if (parsed.data.botToken || parsed.data.recipients != null || fromChat) {
         settings = await saveTgSettings({

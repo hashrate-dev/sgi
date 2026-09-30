@@ -2813,6 +2813,7 @@ export function putOpsComunicacionTelegram(body: {
   chatId?: string | null;
   botToken?: string | null;
   recipients?: OpsComunicacionTelegramRecipient[];
+  removeChatIds?: string[];
 }): Promise<OpsComunicacionTelegramSettings & { ok: boolean }> {
   return apiTelegramOnce("/api/ops-comunicacion/telegram", { method: "POST", body: JSON.stringify(body) });
 }

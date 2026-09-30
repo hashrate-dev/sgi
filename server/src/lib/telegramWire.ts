@@ -98,9 +98,7 @@ export async function ensureOpsTelegramWebhook(tokenOverride?: string): Promise<
   const current = info?.ok && info.result && typeof info.result === "object"
     ? String((info.result as { url?: string }).url ?? "")
     : "";
-  if (current === url) {
-    webhookEnsureAt = now;
-    webhookEnsureUrl = url;
+  if (current === url && webhookEnsureUrl === url && now - webhookEnsureAt < 6 * 60 * 1000) {
     return true;
   }
   const j = await telegramFetchJson(
