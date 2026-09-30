@@ -297,33 +297,85 @@
   margin-top: 0.15rem;
 }
 
-.ops-com-cierre__bar {
-  display: flex;
-  flex-wrap: wrap;
+.ops-com-cierre__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
-  gap: 0.45rem 0.75rem;
+  gap: 0.85rem 1rem;
 }
 
-.ops-com-cierre__lock {
+.ops-com-cierre__switch {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.55rem;
+  justify-self: start;
   margin: 0;
-  padding: 0.22rem 0.55rem;
-  border-radius: 999px;
-  border: 1px solid rgba(125, 211, 252, 0.28);
-  background: rgba(8, 22, 32, 0.85);
-  color: rgba(186, 230, 253, 0.88);
-  font-size: 0.72rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ops-com-cierre__switch-text {
+  font-size: 0.78rem;
   font-weight: 720;
-  letter-spacing: 0.02em;
+  color: rgba(186, 230, 253, 0.88);
+  min-width: 6.6rem;
+}
+
+.ops-com-cierre.is-locked .ops-com-cierre__switch-text {
+  color: #fde68a;
+}
+
+.ops-com-cierre__switch-ctrl {
+  position: relative;
+  width: 2.7rem;
+  height: 1.5rem;
+  flex: 0 0 auto;
+}
+
+.ops-com-cierre__switch-ctrl input {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  margin: 0;
+  opacity: 0;
   cursor: pointer;
 }
 
-.ops-com-cierre__lock.is-on {
-  border-color: rgba(250, 204, 21, 0.45);
-  color: #fde68a;
+.ops-com-cierre__switch-track {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+
+.ops-com-cierre__switch-track::after {
+  content: "";
+  position: absolute;
+  top: 0.14rem;
+  left: 0.16rem;
+  width: 1.12rem;
+  height: 1.12rem;
+  border-radius: 50%;
+  background: #e8eef5;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: transform 0.16s ease;
+}
+
+.ops-com-cierre__switch-ctrl:has(input:checked) .ops-com-cierre__switch-track {
+  background: #f59e0b;
+  border-color: rgba(253, 230, 138, 0.55);
+}
+
+.ops-com-cierre__switch-ctrl:has(input:checked) .ops-com-cierre__switch-track::after {
+  transform: translateX(1.18rem);
+}
+
+.ops-com-cierre__switch-ctrl:has(input:focus-visible) .ops-com-cierre__switch-track {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
 }
 
 .ops-com-cierre.is-locked .ops-com-textarea--cierre {
@@ -334,6 +386,12 @@
 .ops-com-textarea--cierre {
   min-height: 4.6rem;
   height: 4.6rem;
+}
+
+@media (max-width: 860px) {
+  .ops-com-cierre__row {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 860px) {

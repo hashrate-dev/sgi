@@ -849,68 +849,62 @@ export function OpsComunicacionPage() {
                     </div>
                   </div>
                   <div className={`ops-com-cierre${cierreLocked ? " is-locked" : ""}`}>
-                    <div className="ops-com-cierre__bar">
-                      <label htmlFor="ops-cierre" className="ops-com-body-split__label">
-                        Cierre (abajo de todo en Telegram)
-                      </label>
+                    <label htmlFor="ops-cierre" className="ops-com-body-split__label">
+                      Cierre (abajo de todo en Telegram)
+                    </label>
+                    <div className="ops-com-cierre__row">
+                      <textarea
+                        id="ops-cierre"
+                        className="fact-input ops-com-textarea ops-com-textarea--cierre"
+                        value={cierreDraft}
+                        onChange={(e) => {
+                          if (cierreLocked) return;
+                          setCierreDraft(e.target.value);
+                        }}
+                        onBlur={() => {
+                          if (!canEdit || copyBusy || cierreLocked) return;
+                          if (cierreDraft.replace(/\r\n/g, "\n").trim() === telegramCierre.replace(/\r\n/g, "\n").trim()) {
+                            return;
+                          }
+                          void onSaveCopy();
+                        }}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        readOnly={cierreLocked || !canEdit}
+                        disabled={busy || copyBusy}
+                        maxLength={400}
+                        rows={3}
+                        placeholder={"Hashrate Space\nhashrate.space"}
+                      />
                       {canEdit ? (
-                        <button
-                          type="button"
-                          className={`ops-com-cierre__lock${cierreLocked ? " is-on" : ""}`}
-                          aria-pressed={cierreLocked}
-                          title={cierreLocked ? "Desbloquear cierre" : "Bloquear cierre"}
-                          onClick={() => {
-                            setCierreLocked((on) => {
-                              if (on) {
-                                setOk("Cierre desbloqueado. Editá y guardá textos, o volvé a bloquear.");
-                                setErr("");
-                                return false;
-                              }
-                              setCierreDraft(telegramCierre);
-                              setOk("Cierre bloqueado.");
-                              return true;
-                            });
-                          }}
-                        >
-                          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden>
-                            {cierreLocked ? (
-                              <path
-                                fill="currentColor"
-                                d="M12 1a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V11a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5Zm3 8H9V6a3 3 0 1 1 6 0v3Z"
-                              />
-                            ) : (
-                              <path
-                                fill="currentColor"
-                                d="M12 1a5 5 0 0 0-5 5h2a3 3 0 1 1 6 0v3H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V11a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5Z"
-                              />
-                            )}
-                          </svg>
-                          {cierreLocked ? "Bloqueado" : "Desbloqueado"}
-                        </button>
+                        <label className="ops-com-cierre__switch">
+                          <span className="ops-com-cierre__switch-text">
+                            {cierreLocked ? "Bloqueado" : "Desbloqueado"}
+                          </span>
+                          <span className="ops-com-cierre__switch-ctrl">
+                            <input
+                              type="checkbox"
+                              role="switch"
+                              checked={cierreLocked}
+                              disabled={busy || copyBusy}
+                              aria-label={cierreLocked ? "Desbloquear cierre" : "Bloquear cierre"}
+                              onChange={() => {
+                                setCierreLocked((on) => {
+                                  if (on) {
+                                    setOk("Cierre desbloqueado. Editá y guardá textos, o volvé a bloquear.");
+                                    setErr("");
+                                    return false;
+                                  }
+                                  setCierreDraft(telegramCierre);
+                                  setOk("Cierre bloqueado.");
+                                  return true;
+                                });
+                              }}
+                            />
+                            <span className="ops-com-cierre__switch-track" aria-hidden />
+                          </span>
+                        </label>
                       ) : null}
                     </div>
-                    <textarea
-                      id="ops-cierre"
-                      className="fact-input ops-com-textarea ops-com-textarea--cierre"
-                      value={cierreDraft}
-                      onChange={(e) => {
-                        if (cierreLocked) return;
-                        setCierreDraft(e.target.value);
-                      }}
-                      onBlur={() => {
-                        if (!canEdit || copyBusy || cierreLocked) return;
-                        if (cierreDraft.replace(/\r\n/g, "\n").trim() === telegramCierre.replace(/\r\n/g, "\n").trim()) {
-                          return;
-                        }
-                        void onSaveCopy();
-                      }}
-                      onKeyDown={(e) => e.stopPropagation()}
-                      readOnly={cierreLocked || !canEdit}
-                      disabled={busy || copyBusy}
-                      maxLength={400}
-                      rows={3}
-                      placeholder={"Hashrate Space\nhashrate.space"}
-                    />
                   </div>
                   <div className="ops-com-model-save">
                     <button
