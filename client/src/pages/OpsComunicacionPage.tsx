@@ -876,33 +876,32 @@ export function OpsComunicacionPage() {
                         placeholder={"Hashrate Space\nhashrate.space"}
                       />
                       {canEdit ? (
-                        <label className="ops-com-cierre__switch">
+                        <button
+                          type="button"
+                          className={`ops-com-cierre__switch${cierreLocked ? " is-on" : ""}`}
+                          role="switch"
+                          aria-checked={cierreLocked}
+                          disabled={busy || copyBusy}
+                          onClick={() => {
+                            setCierreLocked((on) => {
+                              if (on) {
+                                setOk("Cierre desbloqueado. Editá y guardá textos, o volvé a bloquear.");
+                                setErr("");
+                                return false;
+                              }
+                              setCierreDraft(telegramCierre);
+                              setOk("Cierre bloqueado.");
+                              return true;
+                            });
+                          }}
+                        >
                           <span className="ops-com-cierre__switch-text">
                             {cierreLocked ? "Bloqueado" : "Desbloqueado"}
                           </span>
-                          <span className="ops-com-cierre__switch-ctrl">
-                            <input
-                              type="checkbox"
-                              role="switch"
-                              checked={cierreLocked}
-                              disabled={busy || copyBusy}
-                              aria-label={cierreLocked ? "Desbloquear cierre" : "Bloquear cierre"}
-                              onChange={() => {
-                                setCierreLocked((on) => {
-                                  if (on) {
-                                    setOk("Cierre desbloqueado. Editá y guardá textos, o volvé a bloquear.");
-                                    setErr("");
-                                    return false;
-                                  }
-                                  setCierreDraft(telegramCierre);
-                                  setOk("Cierre bloqueado.");
-                                  return true;
-                                });
-                              }}
-                            />
-                            <span className="ops-com-cierre__switch-track" aria-hidden />
+                          <span className="ops-com-cierre__knob" aria-hidden>
+                            <span className="ops-com-cierre__knob-thumb" />
                           </span>
-                        </label>
+                        </button>
                       ) : null}
                     </div>
                   </div>
