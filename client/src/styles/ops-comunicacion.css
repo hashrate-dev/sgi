@@ -602,6 +602,30 @@
   gap: 0.65rem 1rem;
 }
 
+.ops-com-send-to {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.86rem;
+  color: rgba(232, 238, 245, 0.86);
+  font-weight: 600;
+}
+
+.ops-com-send-to__select {
+  min-width: 12.5rem;
+  max-width: 18rem;
+  height: 2.15rem;
+  padding: 0.2rem 0.55rem;
+}
+
+.ops-com-send-to__hint {
+  margin: 0;
+  flex: 1 1 100%;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: rgba(186, 230, 253, 0.68);
+}
+
 .ops-com-schedule-publish {
   display: flex;
   flex-wrap: wrap;

@@ -2730,6 +2730,7 @@ export function createOpsComunicacion(body: {
   categoria?: string;
   imageUrl?: string;
   sendNow?: boolean;
+  chatId?: string;
   scheduledAt?: string;
   corteControl?: {
     fecha?: string;
@@ -2800,8 +2801,14 @@ export function cancelOpsComunicacionSchedule(id: number): Promise<{ ok: boolean
   return api(`/api/ops-comunicacion/${id}/schedule`, { method: "DELETE" });
 }
 
-export function sendOpsComunicacionTelegram(id: number): Promise<{ ok: boolean; sentTo?: number }> {
-  return apiTelegramOnce(`/api/ops-comunicacion/${id}/send`, { method: "POST", body: "{}" });
+export function sendOpsComunicacionTelegram(
+  id: number,
+  chatId?: string
+): Promise<{ ok: boolean; sentTo?: number }> {
+  return apiTelegramOnce(`/api/ops-comunicacion/${id}/send`, {
+    method: "POST",
+    body: JSON.stringify(chatId ? { chatId } : {}),
+  });
 }
 
 export function getOpsComunicacionTelegram(): Promise<OpsComunicacionTelegramSettings> {

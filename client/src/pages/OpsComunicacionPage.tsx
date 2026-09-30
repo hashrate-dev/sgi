@@ -19,6 +19,7 @@ import {
   updateOpsComunicacionTitle,
   type OpsComunicacionItem,
   type OpsComunicacionTitle,
+  type OpsComunicacionTelegramRecipient,
 } from "../lib/api";
 import { getOpsComHiresMarkUrl } from "../lib/opsComunicacionTelegramAvatar";
 import { CORTE_PROGRAMADO_CUERPO, fillOpsComunicacionMessage, messageHasScheduleSlots, plantillaFromFilledMessage } from "../lib/opsComunicacionTemplates";
@@ -65,6 +66,15 @@ function formatPublishedParts(iso: string): { date: string; time: string } {
     date: d.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" }),
     time: d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false }),
   };
+}
+
+function opsTelegramUserLabel(c: OpsComunicacionTelegramRecipient): string {
+  const n = String(c.name || "").trim();
+  if (n && n !== c.chatId) return n;
+  const pool = String(c.poolUser || "").trim();
+  if (pool) return pool;
+  if (c.chatId === "1022374559") return "JL";
+  return c.username ? `@${c.username}` : c.chatId;
 }
 
 function OpsComPublishedStamp({ iso, compact }: { iso: string; compact?: boolean }) {
@@ -118,6 +128,8 @@ export function OpsComunicacionPage() {
   const [queueOpen, setQueueOpen] = useState(false);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
   const [telegramRecipientCount, setTelegramRecipientCount] = useState(0);
+  const [telegramRecipients, setTelegramRecipients] = useState<OpsComunicacionTelegramRecipient[]>([]);
+  const [sendToChatId, setSendToChatId] = useState("");
   const [cuerpoEn, setCuerpoEn] = useState("");
   const [translatingEn, setTranslatingEn] = useState(false);
   const cuerpoEnSeq = useRef(0);
@@ -156,6 +168,11 @@ export function OpsComunicacionPage() {
     headerDraft.replace(/\s+/g, " ").trim() !== telegramHeader.replace(/\s+/g, " ").trim() ||
     categoryLabelDraft.replace(/\s+/g, " ").trim() !== savedCategoryLabel.replace(/\s+/g, " ").trim() ||
     cierreDraft.replace(/\r\n/g, "\n").trim() !== telegramCierre.replace(/\r\n/g, "\n").trim();
+  const sendTargetName = sendToChatId
+    ? opsTelegramUserLabel(
+        telegramRecipients.find((c) => c.chatId === sendToChatId) || { chatId: sendToChatId, name: sendToChatId }
+      )
+    : "";
 
   const load = useCallback(async () => {
     setTableLoading(true);
@@ -170,6 +187,9 @@ export function OpsComunicacionPage() {
       setTelegramCierre(cierre);
       setCierreDraft(cierre);
       setTelegramRecipientCount(res.telegramRecipientCount || res.telegramRecipients?.length || 0);
+      const recips = res.telegramRecipients || [];
+      setTelegramRecipients(recips);
+      setSendToChatId((cur) => (cur && recips.some((c) => c.chatId === cur) ? cur : ""));
       const nextTitles = res.titles || [];
       setTitles(nextTitles);
       setTituloId((cur) => {
@@ -329,6 +349,7 @@ export function OpsComunicacionPage() {
         categoria,
         imageUrl: "",
         sendNow,
+        ...(sendNow && sendToChatId ? { chatId: sendToChatId } : {}),
         ...(scheduledAt ? { scheduledAt } : {}),
         ...(tituloEsCorte || usesSchedule
           ? {
@@ -345,7 +366,20 @@ export function OpsComunicacionPage() {
       });
       setOk(
         sendNow
-          ? `Comunicado enviado a Telegram${r.sentTo ? ` (${r.sentTo} chat${r.sentTo === 1 ? "" : "s"} privados)` : ""}.`
+          ? `Comunicado enviado a Telegram${
+              r.sentTo
+                ? ` (${r.sentTo} chat${r.sentTo === 1 ? "" : "s"} ${
+                    sendToChatId
+                      ? opsTelegramUserLabel(
+                          telegramRecipients.find((c) => c.chatId === sendToChatId) || {
+                            chatId: sendToChatId,
+                            name: sendToChatId,
+                          }
+                        )
+                      : "privados"
+                  })`
+                : ""
+            }.`
           : r.queued
             ? `Publicación programada para ${scheduleDate} ${scheduleTime}.`
             : "Comunicado guardado. Todavía no se envió a Telegram."
@@ -469,8 +503,13 @@ export function OpsComunicacionPage() {
     setErr("");
     setOk("");
     try {
-      await sendOpsComunicacionTelegram(row.id);
-      setOk(`Enviado a Telegram: ${row.titulo}`);
+      await sendOpsComunicacionTelegram(row.id, sendToChatId || undefined);
+      const who = sendToChatId
+        ? opsTelegramUserLabel(
+            telegramRecipients.find((c) => c.chatId === sendToChatId) || { chatId: sendToChatId, name: sendToChatId }
+          )
+        : "todos los chats del bot";
+      setOk(`Enviado a Telegram (${who}): ${row.titulo}`);
       await load();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "No se pudo enviar a Telegram.");
@@ -856,7 +895,7 @@ export function OpsComunicacionPage() {
                       onChange={() => setSendNow(true)}
                     />
                     Publicar ahora
-                    {telegramRecipientCount ? ` (${telegramRecipientCount})` : ""}
+                    {!sendToChatId && telegramRecipientCount ? ` (${telegramRecipientCount})` : ""}
                   </label>
                   <label className="ops-com-check">
                     <input
@@ -868,6 +907,58 @@ export function OpsComunicacionPage() {
                     />
                     Programar
                   </label>
+                  <label className="ops-com-check">
+                    <input
+                      type="radio"
+                      name="ops-send-who"
+                      checked={!sendToChatId}
+                      disabled={busy || !telegramRecipients.length}
+                      onChange={() => setSendToChatId("")}
+                    />
+                    Todos los usuarios
+                    {telegramRecipientCount ? ` (${telegramRecipientCount})` : ""}
+                  </label>
+                  <label className="ops-com-check">
+                    <input
+                      type="radio"
+                      name="ops-send-who"
+                      checked={Boolean(sendToChatId)}
+                      disabled={busy || !telegramRecipients.length}
+                      onChange={() => {
+                        const first = telegramRecipients[0]?.chatId || "";
+                        setSendToChatId(first);
+                      }}
+                    />
+                    Un usuario
+                  </label>
+                  {sendToChatId ? (
+                    <label className="ops-com-send-to">
+                      <select
+                        className="fact-input ops-com-send-to__select"
+                        value={sendToChatId}
+                        disabled={busy}
+                        onChange={(e) => setSendToChatId(e.target.value)}
+                        aria-label="Elegir un usuario del bot"
+                      >
+                        {telegramRecipients.map((c) => (
+                          <option key={c.chatId} value={c.chatId}>
+                            {opsTelegramUserLabel(c)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+                  {sendNow ? (
+                    <p className="ops-com-send-to__hint">
+                      {sendToChatId
+                        ? `Solo le llega a ${sendTargetName}. El aviso queda como enviado.`
+                        : telegramRecipientCount
+                          ? `Les llega a los ${telegramRecipientCount} chats del bot.`
+                          : "Les llega a todos los chats del bot."}
+                    </p>
+                  ) : (
+                    <p className="ops-com-send-to__hint">La programación se envía a todos los chats del bot.</p>
+                  )}
                   {!sendNow ? (
                     <div className="ops-com-schedule-publish">
                       <input
@@ -891,7 +982,13 @@ export function OpsComunicacionPage() {
                 </div>
                 <div className="ops-com-actions__btns">
                   <button type="submit" className="btn btn-success" disabled={busy}>
-                    {busy ? "Publicando…" : sendNow ? "Publicar y enviar" : "Programar envío"}
+                    {busy
+                      ? "Publicando…"
+                      : sendNow
+                        ? sendTargetName
+                          ? `Publicar y enviar a ${sendTargetName}`
+                          : "Publicar y enviar a todos"
+                        : "Programar envío"}
                   </button>
                   <button
                     type="button"
@@ -966,7 +1063,7 @@ export function OpsComunicacionPage() {
                             disabled={sendingId != null || cancellingId != null}
                             onClick={() => void onSend(n)}
                           >
-                            {sendingId === n.id ? "Enviando…" : "Enviar ahora"}
+                            {sendingId === n.id ? "Enviando…" : sendTargetName ? `Enviar a ${sendTargetName}` : "Enviar a todos"}
                           </button>
                           <button
                             type="button"
@@ -1076,7 +1173,7 @@ export function OpsComunicacionPage() {
                         disabled={sendingId != null}
                         onClick={() => void onSend(n)}
                       >
-                        {sendingId === n.id ? "Enviando…" : "Enviar a Telegram"}
+                        {sendingId === n.id ? "Enviando…" : sendTargetName ? `Enviar a ${sendTargetName}` : "Enviar a todos"}
                       </button>
                     ) : null}
                   </div>

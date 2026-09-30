@@ -637,6 +637,32 @@ function telegramPayload(settings: TgSettings) {
   };
 }
 
+function allOpsChatIds(settings: TgSettings): string[] {
+  return settings.chatIds.length ? settings.chatIds : settings.chatId ? [settings.chatId] : [];
+}
+
+function resolveOpsSendDest(
+  settings: TgSettings,
+  chatId?: string | null
+): { dest: string[]; error?: string } {
+  const all = allOpsChatIds(settings);
+  if (!settings.enabled || all.length === 0) {
+    return {
+      dest: [],
+      error: "Activá Telegram y agregá al menos un cliente (chat privado) en Usuarios del bot.",
+    };
+  }
+  const wanted = normalizeTelegramChatId(String(chatId ?? ""));
+  if (!wanted) return { dest: all };
+  if (!isOpsPrivateUserId(wanted) || !all.includes(wanted)) {
+    return {
+      dest: [],
+      error: "Ese usuario no está en la lista del bot. Actualizá desde Telegram en Usuarios del bot y elegí de nuevo.",
+    };
+  }
+  return { dest: [wanted] };
+}
+
 async function enrichRecipientNames(list: OpsRecipient[]): Promise<OpsRecipient[]> {
   const token = opsComunicacionBotToken((await loadTgSettings()).botToken);
   if (!token || !list.length) return list;
@@ -808,6 +834,7 @@ const CreateSchema = z.object({
   categoria: z.enum(["general", "energia", "mantenimiento", "hashrate", "clima", "logistica"]).optional(),
   imageUrl: z.string().trim().max(500).optional().default(""),
   sendNow: z.boolean().optional(),
+  chatId: z.string().trim().max(32).optional().nullable(),
   scheduledAt: z.string().trim().max(40).optional().default(""),
   corteControl: z
     .object({
@@ -1422,16 +1449,18 @@ opsComunicacionRouter.post("/ops-comunicacion", ...writeMw, async (req, res, nex
     }
     if (data.sendNow && item) {
       const settings = await loadTgSettings();
-      const dest = settings.chatIds.length ? settings.chatIds : settings.chatId ? [settings.chatId] : [];
-      if (!settings.enabled || dest.length === 0) {
+      const picked = resolveOpsSendDest(settings, data.chatId);
+      if (picked.error || picked.dest.length === 0) {
         return res.status(400).json({
           error: {
-            message: "El comunicado se guardó, pero Telegram no está listo. Activá el bot y agregá al menos un cliente (chat privado) en el engranaje.",
+            message:
+              picked.error ||
+              "El comunicado se guardó, pero Telegram no está listo. Activá el bot y agregá al menos un cliente (chat privado) en Usuarios del bot.",
           },
           item,
         });
       }
-      const sentTo = await deliverToTelegram(item.titulo, item.cuerpo, item.categoria, item.imageUrl, dest);
+      const sentTo = await deliverToTelegram(item.titulo, item.cuerpo, item.categoria, item.imageUrl, picked.dest);
       const sentTs = db.isPostgres ? "NOW()" : "datetime('now')";
       await db
         .prepare(`UPDATE sgi_ops_comunicacion SET telegram_sent = 1, sent_at = ${sentTs} WHERE id = ?`)
@@ -1623,14 +1652,15 @@ opsComunicacionRouter.post("/ops-comunicacion/:id/send", ...writeMw, async (req,
     if (item.telegramSent) {
       return res.status(409).json({ error: { message: "Este comunicado ya se envió a Telegram." } });
     }
+    const parsed = z.object({ chatId: z.string().trim().max(32).optional().nullable() }).safeParse(req.body ?? {});
     const settings = await loadTgSettings();
-    const dest = settings.chatIds.length ? settings.chatIds : settings.chatId ? [settings.chatId] : [];
-    if (!settings.enabled || dest.length === 0) {
+    const picked = resolveOpsSendDest(settings, parsed.success ? parsed.data.chatId : undefined);
+    if (picked.error || picked.dest.length === 0) {
       return res.status(400).json({
-        error: { message: "Activá Telegram y agregá al menos un cliente (chat privado) en el engranaje de Comunicación." },
+        error: { message: picked.error || "Activá Telegram y agregá al menos un cliente (chat privado) en Usuarios del bot." },
       });
     }
-    const sentTo = await deliverToTelegram(item.titulo, item.cuerpo, item.categoria, item.imageUrl, dest);
+    const sentTo = await deliverToTelegram(item.titulo, item.cuerpo, item.categoria, item.imageUrl, picked.dest);
     const sentTs = db.isPostgres ? "NOW()" : "datetime('now')";
     await db.prepare(`UPDATE sgi_ops_comunicacion SET telegram_sent = 1, sent_at = ${sentTs} WHERE id = ?`).run(id);
     await ingestCortesFromMessage({
