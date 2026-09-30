@@ -28,8 +28,8 @@ const STEPS = [
   },
   {
     n: "04",
-    title: "Esperá la autorización",
-    body: "Esperá a que te autoricen para acceder al bot de Hashrate. Cuando esté habilitado, vas a recibir los avisos de operaciones en este mismo chat.",
+    title: "Ya está habilitado",
+    body: "Al tocar Iniciar, el bot confirma la suscripción. Desde ese momento recibís en este chat los comunicados oficiales de operación de Hashrate Space.",
   },
 ];
 

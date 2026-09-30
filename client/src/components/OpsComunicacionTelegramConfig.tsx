@@ -341,7 +341,7 @@ export function OpsComunicacionTelegramConfig({ canEdit, open, onClose }: Props)
                     <p className="crypto-news-tg-field__label">Clientes (chats privados)</p>
                     <p className="crypto-news-tg-field__hint">
                       Cada persona abre {botLink ? <a href={botLink} target="_blank" rel="noreferrer">el bot</a> : "el bot"}{" "}
-                      y manda /start. Después Detectar chats. Nadie ve a los demás ni cuántos hay.
+                      y manda /start: queda habilitada sola para recibir avisos. Detectar chats es solo un respaldo.
                     </p>
                     {recipients.length ? (
                       <ul className="ops-com-tg-recip__list">
