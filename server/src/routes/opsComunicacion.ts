@@ -640,10 +640,14 @@ function telegramPayload(settings: TgSettings) {
 }
 
 const OPS_WELCOME_HTML = [
-  <b>Bienvenido/a al canal de comunicación de Hashrate Space</b>
-  Este chat privado es el canal institucional de Hashrate Space para comunicar información oficial relacionada con nuestras operaciones de minería.
-  Los mensajes son unidireccionales. Recibirá únicamente comunicados y actualizaciones operativas de interés.
-  <b>Hashrate Space</b>
+  "<b>Bienvenido/a al canal de comunicación de Hashrate Space</b>",
+  "",
+  "Este chat privado es el canal institucional de Hashrate Space para comunicar información oficial relacionada con nuestras operaciones de minería.",
+  "",
+  "Los mensajes son unidireccionales. Recibirá únicamente comunicados y actualizaciones operativas de interés.",
+  "",
+  "<b>Hashrate Space</b>",
+  "hashrate.space",
 ].join("\n");
 
 function isTelegramStartCommand(text: unknown): boolean {
