@@ -540,14 +540,7 @@ function realRecipientName(name: string | undefined, chatId: string): string {
     .trim();
   if (t && t !== chatId) return t.slice(0, 80);
   if (chatId === "1022374559") return "JL";
-  if (chatId === "8505922768") return "Maria Noel Soler";
   return "";
-}
-
-const PINNED_OPS_CLIENTS: OpsRecipient[] = [{ chatId: "8505922768", name: "Maria Noel Soler" }];
-
-function withPinnedOpsClients(list: OpsRecipient[]): OpsRecipient[] {
-  return mergeRecipients(PINNED_OPS_CLIENTS, list);
 }
 
 function mergeRecipients(...lists: OpsRecipient[][]): OpsRecipient[] {
@@ -599,7 +592,7 @@ async function loadTgSettings(): Promise<TgSettings> {
     .get()) as Record<string, unknown> | undefined;
   const r = row ? rowKeysToLowercase(row) : {};
   const enabled = r.enabled === true || Number(r.enabled) === 1;
-  const recipients = withPinnedOpsClients(parseRecipients(r.extra_chat_ids, String(r.chat_id ?? "")));
+  const recipients = parseRecipients(r.extra_chat_ids, String(r.chat_id ?? ""));
   const chatIds = recipients.map((x) => x.chatId);
   const botToken = String(r.bot_token ?? "").trim();
   return { enabled, chatId: chatIds[0] || "", chatIds, recipients, botToken };
@@ -612,7 +605,7 @@ async function saveTgSettings(input: {
 }): Promise<TgSettings> {
   await ensureOpsComunicacionSchema();
   const ts = db.isPostgres ? "NOW()" : "datetime('now')";
-  const recipients = withPinnedOpsClients(mergeRecipients(input.recipients));
+  const recipients = mergeRecipients(input.recipients);
   const primary = recipients[0]?.chatId || "";
   const extraJson = JSON.stringify(recipients);
   const nextToken = input.botToken != null ? String(input.botToken).trim() : "";
@@ -1808,7 +1801,11 @@ opsComunicacionRouter.get("/ops-comunicacion/telegram", ...readMw, async (_req, 
     let settings = await loadTgSettings();
     await ensureOpsWebhook();
     const enriched = await enrichRecipientNames(settings.recipients);
-    settings = await saveTgSettings({ enabled: settings.enabled, recipients: enriched });
+    if (JSON.stringify(enriched) !== JSON.stringify(settings.recipients)) {
+      settings = await saveTgSettings({ enabled: settings.enabled, recipients: enriched });
+    } else {
+      settings = { ...settings, recipients: enriched };
+    }
     res.json(telegramPayload(settings));
   } catch (e) {
     next(e);
