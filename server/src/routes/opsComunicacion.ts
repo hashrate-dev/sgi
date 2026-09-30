@@ -205,6 +205,10 @@ async function ensureOpsComunicacionSchema(): Promise<void> {
     .run();
   if (db.isPostgres) {
     await db.prepare("ALTER TABLE sgi_ops_comunicacion ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ").run();
+    await db.prepare("ALTER TABLE sgi_ops_comunicacion ADD COLUMN IF NOT EXISTS telegram_dest TEXT NOT NULL DEFAULT ''").run();
+    await db
+      .prepare("ALTER TABLE sgi_ops_comunicacion ADD COLUMN IF NOT EXISTS telegram_dest_label TEXT NOT NULL DEFAULT ''")
+      .run();
     await db.prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS bot_token TEXT NOT NULL DEFAULT ''").run();
     await db
       .prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS telegram_header TEXT NOT NULL DEFAULT ''")
@@ -270,6 +274,8 @@ async function ensureOpsComunicacionSchema(): Promise<void> {
       "ALTER TABLE sgi_ops_comunicacion_titulos ADD COLUMN is_builtin INTEGER NOT NULL DEFAULT 0",
       "ALTER TABLE sgi_ops_comunicacion_titulos ADD COLUMN cuerpo TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE sgi_ops_comunicacion_mensajes ADD COLUMN is_builtin INTEGER NOT NULL DEFAULT 0",
+      "ALTER TABLE sgi_ops_comunicacion ADD COLUMN telegram_dest TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE sgi_ops_comunicacion ADD COLUMN telegram_dest_label TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN telegram_header TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN telegram_cierre TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN categories_json TEXT NOT NULL DEFAULT ''",
@@ -663,6 +669,37 @@ function resolveOpsSendDest(
   return { dest: [wanted] };
 }
 
+const OPS_ITEM_COLS =
+  "id, titulo, cuerpo, categoria, image_url, telegram_sent, sent_at, scheduled_at, telegram_dest, telegram_dest_label, created_by_email, created_at";
+
+function opsRecipientDisplayName(r: OpsRecipient): string {
+  const n = String(r.name || "").trim();
+  if (n && n !== r.chatId) return n;
+  const pool = String(r.poolUser || "").trim();
+  if (pool) return pool;
+  if (r.chatId === "1022374559") return "JL";
+  return r.username ? `@${r.username}` : r.chatId;
+}
+
+function describeOpsDest(settings: TgSettings, chatId?: string | null): { dest: string; label: string } {
+  const wanted = normalizeTelegramChatId(String(chatId ?? ""));
+  const n = allOpsChatIds(settings).length;
+  if (!wanted) {
+    return { dest: "all", label: n > 1 ? `Todos los usuarios (${n})` : "Todos los usuarios" };
+  }
+  const r = settings.recipients.find((x) => x.chatId === wanted);
+  return { dest: wanted, label: (r ? opsRecipientDisplayName(r) : wanted).slice(0, 80) };
+}
+
+async function markOpsItemSent(id: number, dest: string, label: string): Promise<void> {
+  const sentTs = db.isPostgres ? "NOW()" : "datetime('now')";
+  await db
+    .prepare(
+      `UPDATE sgi_ops_comunicacion SET telegram_sent = 1, sent_at = ${sentTs}, telegram_dest = ?, telegram_dest_label = ? WHERE id = ?`
+    )
+    .run(dest, String(label || "").slice(0, 80), id);
+}
+
 async function enrichRecipientNames(list: OpsRecipient[]): Promise<OpsRecipient[]> {
   const token = opsComunicacionBotToken((await loadTgSettings()).botToken);
   if (!token || !list.length) return list;
@@ -707,6 +744,8 @@ function mapItem(raw: Record<string, unknown>, cats?: OpsCategory[], corteNo = 0
     createdAt: String(r.created_at ?? ""),
     corteNo: n,
     corteId: formatCorteId(n),
+    telegramDest: String(r.telegram_dest ?? "").trim(),
+    telegramDestLabel: String(r.telegram_dest_label ?? "").trim(),
   };
 }
 
@@ -767,7 +806,7 @@ export async function flushDueOpsComunicacion(): Promise<{ sent: number; failed:
   const copy = await loadCopySettings();
   const rows = (await db
     .prepare(
-      `SELECT id, titulo, cuerpo, categoria, image_url, telegram_sent, sent_at, scheduled_at, created_by_email, created_at
+      `SELECT ${OPS_ITEM_COLS}
        FROM sgi_ops_comunicacion
        WHERE telegram_sent = 0 AND scheduled_at IS NOT NULL
        ORDER BY scheduled_at ASC, id ASC
@@ -787,8 +826,8 @@ export async function flushDueOpsComunicacion(): Promise<{ sent: number; failed:
     }
     try {
       await deliverToTelegram(item.titulo, item.cuerpo, item.categoria, item.imageUrl, dest);
-      const sentTs = db.isPostgres ? "NOW()" : "datetime('now')";
-      await db.prepare(`UPDATE sgi_ops_comunicacion SET telegram_sent = 1, sent_at = ${sentTs} WHERE id = ?`).run(item.id);
+      const who = describeOpsDest(settings, null);
+      await markOpsItemSent(item.id, who.dest, who.label);
       sent += 1;
     } catch {
       failed += 1;
@@ -1157,7 +1196,7 @@ opsComunicacionRouter.get("/ops-comunicacion", ...readMw, async (_req, res, next
     await flushDueOpsComunicacion().catch(() => undefined);
     const rows = (await db
       .prepare(
-        `SELECT id, titulo, cuerpo, categoria, image_url, telegram_sent, sent_at, scheduled_at, created_by_email, created_at
+        `SELECT ${OPS_ITEM_COLS}
          FROM sgi_ops_comunicacion ORDER BY created_at DESC, id DESC LIMIT 200`
       )
       .all()) as Record<string, unknown>[];
@@ -1433,7 +1472,7 @@ opsComunicacionRouter.post("/ops-comunicacion", ...writeMw, async (req, res, nex
 
     const row = (await db
       .prepare(
-        `SELECT id, titulo, cuerpo, categoria, image_url, telegram_sent, sent_at, scheduled_at, created_by_email, created_at
+        `SELECT ${OPS_ITEM_COLS}
          FROM sgi_ops_comunicacion ORDER BY id DESC LIMIT 1`
       )
       .get()) as Record<string, unknown> | undefined;
@@ -1461,14 +1500,18 @@ opsComunicacionRouter.post("/ops-comunicacion", ...writeMw, async (req, res, nex
         });
       }
       const sentTo = await deliverToTelegram(item.titulo, item.cuerpo, item.categoria, item.imageUrl, picked.dest);
-      const sentTs = db.isPostgres ? "NOW()" : "datetime('now')";
-      await db
-        .prepare(`UPDATE sgi_ops_comunicacion SET telegram_sent = 1, sent_at = ${sentTs} WHERE id = ?`)
-        .run(item.id);
+      const who = describeOpsDest(settings, data.chatId);
+      await markOpsItemSent(item.id, who.dest, who.label);
       return res.json({
         ok: true,
         sentTo,
-        item: { ...item, telegramSent: true, sentAt: new Date().toISOString() },
+        item: {
+          ...item,
+          telegramSent: true,
+          sentAt: new Date().toISOString(),
+          telegramDest: who.dest,
+          telegramDestLabel: who.label,
+        },
       });
     }
     if (scheduledAt && item) {
@@ -1616,7 +1659,7 @@ opsComunicacionRouter.delete("/ops-comunicacion/:id/schedule", ...writeMw, async
     }
     const row = (await db
       .prepare(
-        `SELECT id, titulo, cuerpo, categoria, image_url, telegram_sent, sent_at, scheduled_at, created_by_email, created_at
+        `SELECT ${OPS_ITEM_COLS}
          FROM sgi_ops_comunicacion WHERE id = ?`
       )
       .get(id)) as Record<string, unknown> | undefined;
@@ -1642,7 +1685,7 @@ opsComunicacionRouter.post("/ops-comunicacion/:id/send", ...writeMw, async (req,
     }
     const row = (await db
       .prepare(
-        `SELECT id, titulo, cuerpo, categoria, image_url, telegram_sent, sent_at, scheduled_at, created_by_email, created_at
+        `SELECT ${OPS_ITEM_COLS}
          FROM sgi_ops_comunicacion WHERE id = ?`
       )
       .get(id)) as Record<string, unknown> | undefined;
@@ -1661,14 +1704,18 @@ opsComunicacionRouter.post("/ops-comunicacion/:id/send", ...writeMw, async (req,
       });
     }
     const sentTo = await deliverToTelegram(item.titulo, item.cuerpo, item.categoria, item.imageUrl, picked.dest);
-    const sentTs = db.isPostgres ? "NOW()" : "datetime('now')";
-    await db.prepare(`UPDATE sgi_ops_comunicacion SET telegram_sent = 1, sent_at = ${sentTs} WHERE id = ?`).run(id);
+    const who = describeOpsDest(settings, parsed.success ? parsed.data.chatId : undefined);
+    await markOpsItemSent(id, who.dest, who.label);
     await ingestCortesFromMessage({
       messageId: item.id,
       titulo: item.titulo,
       cuerpo: item.cuerpo,
     }).catch(() => undefined);
-    res.json({ ok: true, sentTo, item: { ...item, telegramSent: true } });
+    res.json({
+      ok: true,
+      sentTo,
+      item: { ...item, telegramSent: true, telegramDest: who.dest, telegramDestLabel: who.label },
+    });
   } catch (e) {
     next(e);
   }

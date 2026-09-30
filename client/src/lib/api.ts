@@ -2621,6 +2621,8 @@ export type OpsComunicacionItem = {
   createdAt: string;
   corteNo?: number;
   corteId?: string;
+  telegramDest?: string;
+  telegramDestLabel?: string;
 };
 
 export type OpsComunicacionTelegramRecipient = {

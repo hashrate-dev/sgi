@@ -88,6 +88,16 @@ function OpsComPublishedStamp({ iso, compact }: { iso: string; compact?: boolean
   );
 }
 
+function opsHistDestLabel(row: OpsComunicacionItem, recipients: OpsComunicacionTelegramRecipient[]): string {
+  if (!row.telegramSent) return "";
+  const saved = String(row.telegramDestLabel || "").trim();
+  if (saved) return saved;
+  const dest = String(row.telegramDest || "").trim();
+  if (!dest || dest === "all") return "Todos los usuarios";
+  const hit = recipients.find((c) => c.chatId === dest);
+  return hit ? opsTelegramUserLabel(hit) : dest;
+}
+
 export function OpsComunicacionPage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
@@ -1115,9 +1125,9 @@ export function OpsComunicacionPage() {
                     <p className="ops-com-hist-modal__meta">
                       {histOpen.categoriaLabel}
                       {histOpen.telegramSent
-                        ? " · Enviado"
+                        ? ` · Enviado a ${opsHistDestLabel(histOpen, telegramRecipients)}`
                         : histOpen.scheduledAt
-                          ? " · Programado"
+                          ? " · Programado (todos los usuarios)"
                           : " · Pendiente"}
                     </p>
                     <OpsComPublishedStamp iso={publishedAt(histOpen)} compact />
@@ -1160,22 +1170,16 @@ export function OpsComunicacionPage() {
                   </div>
                   {n.cuerpo ? <p className="crypto-news-card__summary">{n.cuerpo}</p> : null}
                   <div className="crypto-news-card__actions">
-                    <span className={`crypto-news-send-tg${n.telegramSent ? " crypto-news-send-tg--sent" : ""}`}>
-                      {n.telegramSent ? "Ya enviado" : n.scheduledAt ? "Programado" : "Pendiente"}
+                    <span className={`ops-com-hist__dest${n.telegramSent ? " is-sent" : ""}`}>
+                      {n.telegramSent
+                        ? `Enviado a ${opsHistDestLabel(n, telegramRecipients)}`
+                        : n.scheduledAt
+                          ? "Programado · todos los usuarios"
+                          : "Pendiente"}
                     </span>
                     <button type="button" className="ops-com-hist-full" onClick={() => setHistOpen(n)}>
                       Ver completo
                     </button>
-                    {canEdit && !n.telegramSent ? (
-                      <button
-                        type="button"
-                        className="crypto-news-send-tg"
-                        disabled={sendingId != null}
-                        onClick={() => void onSend(n)}
-                      >
-                        {sendingId === n.id ? "Enviando…" : sendTargetName ? `Enviar a ${sendTargetName}` : "Enviar a todos"}
-                      </button>
-                    ) : null}
                   </div>
                 </div>
               </article>

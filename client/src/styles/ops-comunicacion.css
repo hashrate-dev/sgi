@@ -1170,6 +1170,25 @@ a.ops-com-users-btn {
   color: #e8eef4;
 }
 
+.ops-com-hist__dest {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(125, 211, 252, 0.22);
+  background: rgba(5, 16, 24, 0.55);
+  color: rgba(186, 230, 253, 0.88);
+  font-size: 0.72rem;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.ops-com-hist__dest.is-sent {
+  border-color: rgba(52, 211, 153, 0.35);
+  color: #a7f3d0;
+}
+
 .ops-com-hist__head {
   display: flex;
   align-items: flex-start;
