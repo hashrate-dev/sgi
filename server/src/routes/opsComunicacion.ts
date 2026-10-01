@@ -11,6 +11,7 @@ import {
   formatOpsFarmTelegramHtml,
   getOpsTelegramBotStatus,
   getTelegramBotIdentity,
+  getTelegramChatByUsername,
   getTelegramPrivateUserLabel,
   listRecentTelegramPrivateChats,
   normalizeTelegramChatId,
@@ -588,11 +589,13 @@ function realRecipientName(name: string | undefined, chatId: string): string {
   return "";
 }
 
-/** Restaurar si extra_chat_ids quedó en []. No ancla: Quitar sigue funcionando mientras quede alguien. */
+/** Semilla si extra_chat_ids quedó vacío. No ancla: Quitar sigue funcionando. */
 const KNOWN_OPS_BOT_ROSTER: OpsRecipient[] = [
   { chatId: "1022374559", name: "JL" },
   { chatId: "8505922768", name: "Maria Noel Soler" },
 ];
+
+const KNOWN_OPS_BOT_USERNAMES = ["reibenitez"];
 
 function mergeRecipients(...lists: OpsRecipient[][]): OpsRecipient[] {
   const byId = new Map<string, OpsRecipient>();
@@ -648,13 +651,59 @@ async function writeOpsRoster(recipients: OpsRecipient[], enabled: boolean): Pro
     .run(enabled ? 1 : 0, primary, extraJson);
 }
 
-async function recoverOpsBotRosterIfEmpty(current: OpsRecipient[]): Promise<OpsRecipient[]> {
-  if (current.length) return current;
+function rosterIds(list: OpsRecipient[]): string {
+  return list
+    .map((x) => x.chatId)
+    .filter(Boolean)
+    .sort()
+    .join(",");
+}
+
+async function loadHistDestRecipients(): Promise<OpsRecipient[]> {
+  await ensureOpsComunicacionSchema();
+  const rows = (await db
+    .prepare(
+      "SELECT telegram_dest, telegram_dest_label FROM sgi_ops_comunicacion WHERE COALESCE(telegram_dest, '') <> '' AND telegram_dest <> 'all'"
+    )
+    .all()) as Record<string, unknown>[];
+  const out: OpsRecipient[] = [];
+  for (const raw of rows) {
+    const r = rowKeysToLowercase(raw);
+    const rec = recipientFromUnknown({
+      chatId: String(r.telegram_dest ?? ""),
+      name: String(r.telegram_dest_label ?? ""),
+    });
+    if (rec) out.push(rec);
+  }
+  return mergeRecipients(out);
+}
+
+async function resolveKnownOpsUsernames(token: string): Promise<OpsRecipient[]> {
+  const out: OpsRecipient[] = [];
+  for (const username of KNOWN_OPS_BOT_USERNAMES) {
+    const hit = await getTelegramChatByUsername(username, token).catch(() => null);
+    if (!hit) continue;
+    out.push({
+      chatId: hit.chatId,
+      name: realRecipientName(hit.name, hit.chatId) || hit.name || username,
+      username,
+      poolUser: username,
+    });
+  }
+  return out;
+}
+
+async function hydrateOpsRoster(current: OpsRecipient[], enabled: boolean, botToken: string): Promise<OpsRecipient[]> {
   const inbox = await loadStartInbox();
-  const recovered = mergeRecipients(KNOWN_OPS_BOT_ROSTER, inbox);
-  if (!recovered.length) return current;
-  await writeOpsRoster(recovered, true);
-  return recovered;
+  const hist = await loadHistDestRecipients();
+  const seed = current.length ? [] : KNOWN_OPS_BOT_ROSTER;
+  const token = opsComunicacionBotToken(botToken);
+  const byUser = token ? await resolveKnownOpsUsernames(token) : [];
+  const next = mergeRecipients(current, seed, inbox, hist, byUser);
+  if (next.length && rosterIds(next) !== rosterIds(current)) {
+    await writeOpsRoster(next, current.length ? enabled : true);
+  }
+  return next;
 }
 
 async function loadTgSettings(): Promise<TgSettings> {
@@ -664,13 +713,12 @@ async function loadTgSettings(): Promise<TgSettings> {
     .get()) as Record<string, unknown> | undefined;
   const r = row ? rowKeysToLowercase(row) : {};
   let enabled = r.enabled === true || Number(r.enabled) === 1;
-  let recipients = parseRecipients(r.extra_chat_ids, String(r.chat_id ?? ""));
-  if (!recipients.length) {
-    recipients = await recoverOpsBotRosterIfEmpty(recipients);
-    if (recipients.length) enabled = true;
-  }
-  const chatIds = recipients.map((x) => x.chatId);
   const botToken = String(r.bot_token ?? "").trim();
+  let recipients = parseRecipients(r.extra_chat_ids, String(r.chat_id ?? ""));
+  const before = rosterIds(recipients);
+  recipients = await hydrateOpsRoster(recipients, enabled, botToken);
+  if (!before && recipients.length) enabled = true;
+  const chatIds = recipients.map((x) => x.chatId);
   return {
     enabled: Boolean(enabled && chatIds.length),
     chatId: chatIds[0] || "",
@@ -684,7 +732,7 @@ async function loadTgSettings(): Promise<TgSettings> {
 function recipientsForSave(current: OpsRecipient[], fromBody: OpsRecipient[], provided: boolean): OpsRecipient[] {
   if (!provided) return current;
   if (fromBody.length === 0) return current;
-  return mergeRecipients(fromBody);
+  return mergeRecipients(current, fromBody);
 }
 
 async function saveTgSettings(input: {
@@ -766,6 +814,18 @@ async function rememberOpsStartChat(row: OpsRecipient): Promise<void> {
     .run(JSON.stringify(next));
 }
 
+async function dropOpsChatFromInbox(chatId: string): Promise<void> {
+  const id = normalizeTelegramChatId(chatId);
+  if (!id) return;
+  const cur = await loadStartInbox();
+  const next = cur.filter((x) => x.chatId !== id);
+  if (next.length === cur.length) return;
+  const ts = db.isPostgres ? "NOW()" : "datetime('now')";
+  await db
+    .prepare(`UPDATE sgi_ops_comunicacion_tg SET telegram_start_inbox = ?, updated_at = ${ts} WHERE id = 1`)
+    .run(JSON.stringify(next));
+}
+
 function isTelegramStartCommand(text: unknown): boolean {
   return /^\/start(?:@\w+)?(?:\s|$)/i.test(String(text ?? "").trim());
 }
@@ -773,7 +833,7 @@ function isTelegramStartCommand(text: unknown): boolean {
 async function ingestOpsTelegramStart(body: unknown): Promise<void> {
   const update = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
   const msg = update.message && typeof update.message === "object" ? (update.message as Record<string, unknown>) : null;
-  if (!msg || !isTelegramStartCommand(msg.text)) return;
+  if (!msg) return;
   const chat = msg.chat && typeof msg.chat === "object" ? (msg.chat as Record<string, unknown>) : null;
   if (!chat || String(chat.type ?? "") !== "private") return;
   const chatId = normalizeTelegramChatId(String(chat.id ?? ""));
@@ -791,7 +851,19 @@ async function ingestOpsTelegramStart(body: unknown): Promise<void> {
     .slice(0, 80) || username || chatId;
   const rec: OpsRecipient = { chatId, name };
   if (username) rec.username = username;
+  if (/^reibenitez$/i.test(username)) rec.poolUser = "reibenitez";
   await rememberOpsStartChat(rec);
+  const row = (await db
+    .prepare("SELECT enabled, chat_id, extra_chat_ids FROM sgi_ops_comunicacion_tg WHERE id = 1")
+    .get()) as Record<string, unknown> | undefined;
+  const r = row ? rowKeysToLowercase(row) : {};
+  const enabled = r.enabled === true || Number(r.enabled) === 1;
+  const current = parseRecipients(r.extra_chat_ids, String(r.chat_id ?? ""));
+  const next = mergeRecipients(current, [rec]);
+  if (rosterIds(next) !== rosterIds(current)) {
+    await writeOpsRoster(next, enabled || true);
+  }
+  if (!isTelegramStartCommand(msg.text)) return;
   const settings = await loadTgSettings();
   const token = opsComunicacionBotToken(settings.botToken);
   if (!token) return;
@@ -1340,6 +1412,7 @@ const TgSchema = z.object({
   botToken: z.string().optional().nullable(),
   recipients: z.array(TgRecipientSchema).max(MAX_OPS_RECIPIENTS).optional(),
   welcomeHtml: z.string().max(4000).optional().nullable(),
+  removeChatId: z.string().max(64).optional().nullable(),
 });
 
 function mapTitulo(raw: Record<string, unknown>) {
@@ -1988,10 +2061,16 @@ opsComunicacionRouter.post("/ops-comunicacion/telegram", ...writeMw, async (req,
       .map(recipientFromUnknown)
       .filter((x): x is OpsRecipient => Boolean(x));
     const fromChat = recipientFromUnknown(parsed.data.chatId);
-    const recipients =
-      parsed.data.recipients != null
-        ? recipientsForSave(current.recipients, fromBody, true)
-        : mergeRecipients(current.recipients, fromChat ? [fromChat] : []);
+    const removeId = normalizeTelegramChatId(String(parsed.data.removeChatId ?? ""));
+    let recipients: OpsRecipient[];
+    if (removeId && isOpsPrivateUserId(removeId)) {
+      await dropOpsChatFromInbox(removeId);
+      recipients = current.recipients.filter((x) => x.chatId !== removeId);
+    } else if (parsed.data.recipients != null) {
+      recipients = recipientsForSave(current.recipients, fromBody, true);
+    } else {
+      recipients = mergeRecipients(current.recipients, fromChat ? [fromChat] : []);
+    }
     if (parsed.data.enabled && recipients.length === 0) {
       return res.status(400).json({
         error: {

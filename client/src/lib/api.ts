@@ -2824,6 +2824,7 @@ export function putOpsComunicacionTelegram(body: {
   botToken?: string | null;
   recipients?: OpsComunicacionTelegramRecipient[];
   welcomeHtml?: string | null;
+  removeChatId?: string | null;
 }): Promise<OpsComunicacionTelegramSettings & { ok: boolean }> {
   return apiTelegramOnce("/api/ops-comunicacion/telegram", { method: "POST", body: JSON.stringify(body) });
 }

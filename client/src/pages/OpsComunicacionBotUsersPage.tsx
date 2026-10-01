@@ -73,8 +73,8 @@ export function OpsComunicacionBotUsersPage() {
     return <Navigate to={sgiHome()} replace />;
   }
 
-  const persist = async (next: OpsComunicacionTelegramRecipient[]) => {
-    if (!next.length) {
+  const persist = async (next: OpsComunicacionTelegramRecipient[], removeChatId?: string) => {
+    if (!next.length && !removeChatId) {
       const tg = await getOpsComunicacionTelegram();
       const list = tg.recipients || [];
       setEnabled(Boolean(tg.enabled));
@@ -86,6 +86,7 @@ export function OpsComunicacionBotUsersPage() {
     const saved = await putOpsComunicacionTelegram({
       enabled: enabled || next.length > 0,
       recipients: next,
+      ...(removeChatId ? { removeChatId } : {}),
     });
     const list = saved.recipients || next;
     setRows(list);
@@ -154,7 +155,10 @@ export function OpsComunicacionBotUsersPage() {
     setErr("");
     setOk("");
     try {
-      await persist(rows.filter((c) => c.chatId !== chatId));
+      await persist(
+        rows.filter((c) => c.chatId !== chatId),
+        chatId
+      );
       setOk("Usuario quitado. Ya no recibe avisos.");
     } catch (e) {
       setErr(e instanceof Error ? e.message : "No se pudo quitar.");

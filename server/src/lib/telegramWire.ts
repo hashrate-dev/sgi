@@ -400,6 +400,27 @@ export async function getTelegramPrivateUserLabel(
   return username ? { name: name || username, username } : { name: name || chat };
 }
 
+export async function getTelegramChatByUsername(
+  username: string,
+  tokenOverride?: string
+): Promise<{ chatId: string; name: string; username?: string } | null> {
+  const user = String(username ?? "")
+    .replace(/^@/, "")
+    .trim()
+    .slice(0, 32);
+  if (!/^[A-Za-z0-9_]{5,32}$/.test(user)) return null;
+  const j = await telegramFetchJson("getChat", { chat_id: `@${user}` }, 8_000, tokenOverride);
+  if (!j.ok || !j.result || typeof j.result !== "object") return null;
+  const r = j.result as { id?: number | string; first_name?: string; last_name?: string; username?: string; type?: string };
+  const chatId = normalizeTelegramChatId(String(r.id ?? ""));
+  if (!/^\d{5,20}$/.test(chatId)) return null;
+  if (r.type && r.type !== "private") return null;
+  const name =
+    [r.first_name, r.last_name].filter(Boolean).join(" ").trim() || String(r.username ?? "").replace(/^@/, "").trim() || chatId;
+  const uname = String(r.username ?? user).replace(/^@/, "").trim();
+  return uname ? { chatId, name, username: uname } : { chatId, name };
+}
+
 function chatIdForApi(chat: string): string | number {
   return /^-?\d+$/.test(chat) ? Number(chat) : chat;
 }
