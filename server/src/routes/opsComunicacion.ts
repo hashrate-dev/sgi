@@ -552,7 +552,7 @@ function isOpsPrivateUserId(raw: string): boolean {
 function recipientFromUnknown(x: unknown): OpsRecipient | null {
   if (x && typeof x === "object") {
     const o = x as Record<string, unknown>;
-    const chatId = normalizeTelegramChatId(String(o.chatId ?? o.chat_id ?? o.id ?? ""));
+    const chatId = canonicalOpsChatId(String(o.chatId ?? o.chat_id ?? o.id ?? ""));
     if (!isOpsPrivateUserId(chatId)) return null;
     const name =
       String(o.name ?? o.title ?? "")
@@ -574,7 +574,7 @@ function recipientFromUnknown(x: unknown): OpsRecipient | null {
     else if (poolUser) row.poolUser = poolUser;
     return row;
   }
-  const chatId = normalizeTelegramChatId(String(x ?? ""));
+  const chatId = canonicalOpsChatId(String(x ?? ""));
   if (!isOpsPrivateUserId(chatId)) return null;
   return { chatId, name: chatId };
 }
@@ -585,37 +585,58 @@ function realRecipientName(name: string | undefined, chatId: string): string {
     .trim();
   if (t && t !== chatId) return t.slice(0, 80);
   if (chatId === "1022374559") return "JL";
-  if (chatId === "8505922768") return "Maria Noel Soler";
+  if (chatId === "456734749") return "Fabrizio";
+  if (chatId === "1561248371") return "Jose Luis Vila Diaz";
+  if (chatId === "8508922768" || chatId === "8505922768") return "Maria Noel Soler";
+  if (chatId === "884077499") return "reibenitezb";
   return "";
 }
 
-/** Semilla si extra_chat_ids quedó vacío. No ancla: Quitar sigue funcionando. */
+/** IDs fantasma (OCR / semilla vieja) → el chat real. No borra personas, solo fusiona duplicados. */
+const CHAT_ID_ALIASES: Record<string, string> = {
+  "8505922768": "8508922768",
+  "456234742": "456734749",
+};
+
+function canonicalOpsChatId(raw: string): string {
+  const id = normalizeTelegramChatId(raw);
+  return CHAT_ID_ALIASES[id] || id;
+}
+
+/** Semilla permanente: se suma a la lista, nunca la reemplaza. */
 const KNOWN_OPS_BOT_ROSTER: OpsRecipient[] = [
   { chatId: "1022374559", name: "JL" },
-  { chatId: "8505922768", name: "Maria Noel Soler" },
+  { chatId: "456734749", name: "Fabrizio" },
+  { chatId: "1561248371", name: "Jose Luis Vila Diaz" },
+  { chatId: "8508922768", name: "Maria Noel Soler" },
+  { chatId: "884077499", name: "reibenitezb", username: "reibenitezb", poolUser: "reibenitez" },
 ];
 
-const KNOWN_OPS_BOT_USERNAMES = ["reibenitez"];
+const KNOWN_OPS_BOT_USERNAMES = ["reibenitez", "reibenitezb"];
 
 function mergeRecipients(...lists: OpsRecipient[][]): OpsRecipient[] {
   const byId = new Map<string, OpsRecipient>();
   for (const list of lists) {
     for (const r of list) {
-      if (!r?.chatId || (byId.size >= MAX_OPS_RECIPIENTS && !byId.has(r.chatId))) continue;
-      const prev = byId.get(r.chatId);
+      const chatId = canonicalOpsChatId(r?.chatId || "");
+      if (!chatId || (byId.size >= MAX_OPS_RECIPIENTS && !byId.has(chatId))) continue;
+      const prev = byId.get(chatId);
+      const incoming: OpsRecipient = { ...r, chatId };
       if (!prev) {
-        byId.set(r.chatId, r);
+        const named = realRecipientName(incoming.name, chatId);
+        if (named) incoming.name = named;
+        byId.set(chatId, incoming);
         continue;
       }
-      const name = realRecipientName(r.name, r.chatId) || realRecipientName(prev.name, prev.chatId) || prev.name || r.name;
-      const username = r.username || prev.username;
-      const poolUser = String((r.poolUser !== undefined ? r.poolUser : prev.poolUser) || "")
+      const name = realRecipientName(incoming.name, chatId) || realRecipientName(prev.name, chatId) || prev.name || incoming.name;
+      const username = incoming.username || prev.username;
+      const poolUser = String((incoming.poolUser !== undefined ? incoming.poolUser : prev.poolUser) || "")
         .trim()
         .slice(0, 80);
-      const row: OpsRecipient = { chatId: r.chatId, name };
+      const row: OpsRecipient = { chatId, name };
       if (username) row.username = username;
       if (poolUser) row.poolUser = poolUser;
-      byId.set(r.chatId, row);
+      byId.set(chatId, row);
     }
   }
   return [...byId.values()].slice(0, MAX_OPS_RECIPIENTS);
@@ -696,10 +717,10 @@ async function resolveKnownOpsUsernames(token: string): Promise<OpsRecipient[]> 
 async function hydrateOpsRoster(current: OpsRecipient[], enabled: boolean, botToken: string): Promise<OpsRecipient[]> {
   const inbox = await loadStartInbox();
   const hist = await loadHistDestRecipients();
-  const seed = current.length ? [] : KNOWN_OPS_BOT_ROSTER;
+  const seed = KNOWN_OPS_BOT_ROSTER;
   const token = opsComunicacionBotToken(botToken);
   const byUser = token ? await resolveKnownOpsUsernames(token) : [];
-  const next = mergeRecipients(current, seed, inbox, hist, byUser);
+  const next = mergeRecipients(seed, current, inbox, hist, byUser);
   if (next.length && rosterIds(next) !== rosterIds(current)) {
     await writeOpsRoster(next, current.length ? enabled : true);
   }
@@ -744,7 +765,7 @@ async function saveTgSettings(input: {
   await ensureOpsComunicacionSchema();
   const ts = db.isPostgres ? "NOW()" : "datetime('now')";
   const existing = await loadTgSettings();
-  let recipients = mergeRecipients(input.recipients);
+  let recipients = mergeRecipients(KNOWN_OPS_BOT_ROSTER, existing.recipients, input.recipients);
   if (!recipients.length && existing.recipients.length) recipients = existing.recipients;
   const primary = recipients[0]?.chatId || "";
   const extraJson = JSON.stringify(recipients);
@@ -851,7 +872,7 @@ async function ingestOpsTelegramStart(body: unknown): Promise<void> {
     .slice(0, 80) || username || chatId;
   const rec: OpsRecipient = { chatId, name };
   if (username) rec.username = username;
-  if (/^reibenitez$/i.test(username)) rec.poolUser = "reibenitez";
+  if (/^reibenitez/i.test(username)) rec.poolUser = "reibenitez";
   await rememberOpsStartChat(rec);
   const row = (await db
     .prepare("SELECT enabled, chat_id, extra_chat_ids FROM sgi_ops_comunicacion_tg WHERE id = 1")

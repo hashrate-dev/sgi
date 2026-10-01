@@ -21,7 +21,10 @@ function displayName(c: OpsComunicacionTelegramRecipient): string {
   const n = String(c.name || "").trim();
   if (n && n !== c.chatId) return n;
   if (c.chatId === "1022374559") return "JL";
-  if (c.chatId === "8505922768") return "Maria Noel Soler";
+  if (c.chatId === "456734749") return "Fabrizio";
+  if (c.chatId === "1561248371") return "Jose Luis Vila Diaz";
+  if (c.chatId === "8508922768" || c.chatId === "8505922768") return "Maria Noel Soler";
+  if (c.chatId === "884077499") return "reibenitezb";
   return "";
 }
 
