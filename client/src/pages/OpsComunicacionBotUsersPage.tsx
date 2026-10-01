@@ -21,6 +21,7 @@ function displayName(c: OpsComunicacionTelegramRecipient): string {
   const n = String(c.name || "").trim();
   if (n && n !== c.chatId) return n;
   if (c.chatId === "1022374559") return "JL";
+  if (c.chatId === "8505922768") return "Maria Noel Soler";
   return "";
 }
 
@@ -73,8 +74,17 @@ export function OpsComunicacionBotUsersPage() {
   }
 
   const persist = async (next: OpsComunicacionTelegramRecipient[]) => {
+    if (!next.length) {
+      const tg = await getOpsComunicacionTelegram();
+      const list = tg.recipients || [];
+      setEnabled(Boolean(tg.enabled));
+      setRows(list);
+      setNames(Object.fromEntries(list.map((c) => [c.chatId, displayName(c)])));
+      setPoolUsers(Object.fromEntries(list.map((c) => [c.chatId, String(c.poolUser || "")])));
+      return list;
+    }
     const saved = await putOpsComunicacionTelegram({
-      enabled: enabled && next.length > 0,
+      enabled: enabled || next.length > 0,
       recipients: next,
     });
     const list = saved.recipients || next;
@@ -124,7 +134,8 @@ export function OpsComunicacionBotUsersPage() {
         });
       }
       const next = [...byId.values()];
-      await persist(next);
+      if (next.length) await persist(next);
+      else await load();
       setOk(
         found.length
           ? `Lista actualizada: ${next.length} usuario(s) conectado(s) al bot.`

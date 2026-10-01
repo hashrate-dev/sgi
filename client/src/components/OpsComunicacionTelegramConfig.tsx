@@ -43,6 +43,7 @@ function realName(name: string | undefined, chatId: string): string {
   const t = String(name ?? "").trim();
   if (t && t !== chatId) return t.slice(0, 80);
   if (chatId === "1022374559") return "JL";
+  if (chatId === "8505922768") return "Maria Noel Soler";
   return "";
 }
 
@@ -147,6 +148,11 @@ export function OpsComunicacionTelegramConfig({ canEdit, canEditWelcome, open, o
   }, [open, onClose]);
 
   const persist = async (next: OpsComunicacionTelegramRecipient[], enabled = tgEnabled) => {
+    if (!next.length) {
+      const r = await getOpsComunicacionTelegram();
+      applySettings(r);
+      return r;
+    }
     const r = await putOpsComunicacionTelegram({
       enabled,
       recipients: next,

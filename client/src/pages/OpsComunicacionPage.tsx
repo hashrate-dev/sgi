@@ -74,6 +74,7 @@ function opsTelegramUserLabel(c: OpsComunicacionTelegramRecipient): string {
   const pool = String(c.poolUser || "").trim();
   if (pool) return pool;
   if (c.chatId === "1022374559") return "JL";
+  if (c.chatId === "8505922768") return "Maria Noel Soler";
   return c.username ? `@${c.username}` : c.chatId;
 }
 

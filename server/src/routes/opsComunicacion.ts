@@ -584,8 +584,15 @@ function realRecipientName(name: string | undefined, chatId: string): string {
     .trim();
   if (t && t !== chatId) return t.slice(0, 80);
   if (chatId === "1022374559") return "JL";
+  if (chatId === "8505922768") return "Maria Noel Soler";
   return "";
 }
+
+/** Restaurar si extra_chat_ids quedó en []. No ancla: Quitar sigue funcionando mientras quede alguien. */
+const KNOWN_OPS_BOT_ROSTER: OpsRecipient[] = [
+  { chatId: "1022374559", name: "JL" },
+  { chatId: "8505922768", name: "Maria Noel Soler" },
+];
 
 function mergeRecipients(...lists: OpsRecipient[][]): OpsRecipient[] {
   const byId = new Map<string, OpsRecipient>();
@@ -629,24 +636,55 @@ function parseRecipients(rawExtra: unknown, primaryChatId?: string): OpsRecipien
   return mergeRecipients(fromPrimary ? [fromPrimary] : [], extra);
 }
 
+async function writeOpsRoster(recipients: OpsRecipient[], enabled: boolean): Promise<void> {
+  const ts = db.isPostgres ? "NOW()" : "datetime('now')";
+  const list = mergeRecipients(recipients);
+  const extraJson = JSON.stringify(list);
+  const primary = list[0]?.chatId || "";
+  await db
+    .prepare(
+      `UPDATE sgi_ops_comunicacion_tg SET enabled = ?, chat_id = ?, extra_chat_ids = ?, updated_at = ${ts} WHERE id = 1`
+    )
+    .run(enabled ? 1 : 0, primary, extraJson);
+}
+
+async function recoverOpsBotRosterIfEmpty(current: OpsRecipient[]): Promise<OpsRecipient[]> {
+  if (current.length) return current;
+  const inbox = await loadStartInbox();
+  const recovered = mergeRecipients(KNOWN_OPS_BOT_ROSTER, inbox);
+  if (!recovered.length) return current;
+  await writeOpsRoster(recovered, true);
+  return recovered;
+}
+
 async function loadTgSettings(): Promise<TgSettings> {
   await ensureOpsComunicacionSchema();
   const row = (await db
     .prepare("SELECT enabled, chat_id, extra_chat_ids, bot_token, telegram_welcome FROM sgi_ops_comunicacion_tg WHERE id = 1")
     .get()) as Record<string, unknown> | undefined;
   const r = row ? rowKeysToLowercase(row) : {};
-  const enabled = r.enabled === true || Number(r.enabled) === 1;
-  const recipients = parseRecipients(r.extra_chat_ids, String(r.chat_id ?? ""));
+  let enabled = r.enabled === true || Number(r.enabled) === 1;
+  let recipients = parseRecipients(r.extra_chat_ids, String(r.chat_id ?? ""));
+  if (!recipients.length) {
+    recipients = await recoverOpsBotRosterIfEmpty(recipients);
+    if (recipients.length) enabled = true;
+  }
   const chatIds = recipients.map((x) => x.chatId);
   const botToken = String(r.bot_token ?? "").trim();
   return {
-    enabled,
+    enabled: Boolean(enabled && chatIds.length),
     chatId: chatIds[0] || "",
     chatIds,
     recipients,
     botToken,
     welcomeHtml: normalizeOpsWelcome(r.telegram_welcome),
   };
+}
+
+function recipientsForSave(current: OpsRecipient[], fromBody: OpsRecipient[], provided: boolean): OpsRecipient[] {
+  if (!provided) return current;
+  if (fromBody.length === 0) return current;
+  return mergeRecipients(fromBody);
 }
 
 async function saveTgSettings(input: {
@@ -657,12 +695,13 @@ async function saveTgSettings(input: {
 }): Promise<TgSettings> {
   await ensureOpsComunicacionSchema();
   const ts = db.isPostgres ? "NOW()" : "datetime('now')";
-  const recipients = mergeRecipients(input.recipients);
+  const existing = await loadTgSettings();
+  let recipients = mergeRecipients(input.recipients);
+  if (!recipients.length && existing.recipients.length) recipients = existing.recipients;
   const primary = recipients[0]?.chatId || "";
   const extraJson = JSON.stringify(recipients);
   const nextToken = input.botToken != null ? String(input.botToken).trim() : "";
-  const welcome =
-    input.welcomeHtml != null ? normalizeOpsWelcome(input.welcomeHtml) : (await loadTgSettings()).welcomeHtml;
+  const welcome = input.welcomeHtml != null ? normalizeOpsWelcome(input.welcomeHtml) : existing.welcomeHtml;
   if (nextToken) {
     await db
       .prepare(
@@ -1950,7 +1989,9 @@ opsComunicacionRouter.post("/ops-comunicacion/telegram", ...writeMw, async (req,
       .filter((x): x is OpsRecipient => Boolean(x));
     const fromChat = recipientFromUnknown(parsed.data.chatId);
     const recipients =
-      parsed.data.recipients != null ? mergeRecipients(fromBody) : mergeRecipients(current.recipients, fromChat ? [fromChat] : []);
+      parsed.data.recipients != null
+        ? recipientsForSave(current.recipients, fromBody, true)
+        : mergeRecipients(current.recipients, fromChat ? [fromChat] : []);
     if (parsed.data.enabled && recipients.length === 0) {
       return res.status(400).json({
         error: {
@@ -1982,7 +2023,7 @@ opsComunicacionRouter.post("/ops-comunicacion/telegram/test", ...writeMw, async 
       const fromChat = recipientFromUnknown(parsed.data.chatId);
       const recipients =
         parsed.data.recipients != null
-          ? mergeRecipients(fromBody)
+          ? recipientsForSave(settings.recipients, fromBody, true)
           : mergeRecipients(settings.recipients, fromChat ? [fromChat] : []);
       if (parsed.data.botToken || parsed.data.recipients != null || fromChat) {
         settings = await saveTgSettings({
@@ -2023,6 +2064,7 @@ opsComunicacionRouter.get("/ops-comunicacion/telegram/chats", ...writeMw, async 
     const found = await listRecentTelegramPrivateChats(50, token, { privateOnly: true, keepWebhook: true }).catch(() => []);
     const inbox = await loadStartInbox();
     const chats = mergeRecipients(
+      settings.recipients,
       inbox,
       found.filter((c) => isOpsPrivateUserId(c.chatId))
     );
