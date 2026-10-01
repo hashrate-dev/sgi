@@ -499,6 +499,8 @@ INSERT OR IGNORE INTO sgi_ops_comunicacion_corte_seq (id, next_num) VALUES (1, 0
     "telegram_header TEXT NOT NULL DEFAULT ''",
     "telegram_cierre TEXT NOT NULL DEFAULT ''",
     "categories_json TEXT NOT NULL DEFAULT ''",
+    "telegram_welcome TEXT NOT NULL DEFAULT ''",
+    "telegram_start_inbox TEXT NOT NULL DEFAULT '[]'",
   ] as const) {
     try {
       db.exec(`ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN ${col}`);

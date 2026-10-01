@@ -2642,6 +2642,7 @@ export type OpsComunicacionTelegramSettings = {
   defaultChatId: string | null;
   readyToSend: boolean;
   sentTo?: number;
+  welcomeHtml?: string;
 };
 
 export type OpsComunicacionTitle = {
@@ -2822,6 +2823,7 @@ export function putOpsComunicacionTelegram(body: {
   chatId?: string | null;
   botToken?: string | null;
   recipients?: OpsComunicacionTelegramRecipient[];
+  welcomeHtml?: string | null;
 }): Promise<OpsComunicacionTelegramSettings & { ok: boolean }> {
   return apiTelegramOnce("/api/ops-comunicacion/telegram", { method: "POST", body: JSON.stringify(body) });
 }

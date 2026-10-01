@@ -7,6 +7,7 @@ import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
 import {
   explainTelegramSendFailure,
   composeBilingualOpsCuerpo,
+  ensureOpsTelegramWebhook,
   formatOpsFarmTelegramHtml,
   getOpsTelegramBotStatus,
   getTelegramBotIdentity,
@@ -14,6 +15,7 @@ import {
   listRecentTelegramPrivateChats,
   normalizeTelegramChatId,
   opsComunicacionBotToken,
+  opsTelegramWebhookSecret,
   sendTelegramPhoto,
   sendTelegramText,
 } from "../lib/telegramWire.js";
@@ -56,9 +58,33 @@ type TgSettings = {
   chatIds: string[];
   recipients: OpsRecipient[];
   botToken: string;
+  welcomeHtml: string;
 };
 
 const MAX_OPS_RECIPIENTS = 250;
+
+export const DEFAULT_OPS_WELCOME_HTML = [
+  "<b>Bienvenido/a al canal de comunicación de Hashrate Space</b>",
+  "",
+  "Este chat privado es el canal institucional de Hashrate Space para comunicar información oficial relacionada con nuestras operaciones de minería.",
+  "",
+  "Los mensajes son unidireccionales. Recibirá únicamente comunicados y actualizaciones operativas de interés.",
+  "",
+  "<b>Hashrate Space</b>",
+].join("\n");
+
+function normalizeOpsWelcome(raw: unknown): string {
+  const t = String(raw ?? "")
+    .replace(/\r\n/g, "\n")
+    .trim()
+    .slice(0, 4000);
+  return t || DEFAULT_OPS_WELCOME_HTML;
+}
+
+function isOpsWelcomeAdmin(role: unknown): boolean {
+  const r = String(role ?? "").toLowerCase().trim();
+  return r === "admin_a" || r === "admin_b";
+}
 
 function normalizeHeaderLine(raw: string): string {
   return String(raw ?? "")
@@ -220,6 +246,12 @@ async function ensureOpsComunicacionSchema(): Promise<void> {
       .prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS categories_json TEXT NOT NULL DEFAULT ''")
       .run();
     await db
+      .prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS telegram_welcome TEXT NOT NULL DEFAULT ''")
+      .run();
+    await db
+      .prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS telegram_start_inbox TEXT NOT NULL DEFAULT '[]'")
+      .run();
+    await db
       .prepare(
         `CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion_titulos (
           id BIGSERIAL PRIMARY KEY,
@@ -279,6 +311,8 @@ async function ensureOpsComunicacionSchema(): Promise<void> {
       "ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN telegram_header TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN telegram_cierre TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN categories_json TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN telegram_welcome TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN telegram_start_inbox TEXT NOT NULL DEFAULT '[]'",
     ]) {
       try {
         await db.prepare(sql).run();
@@ -316,6 +350,12 @@ async function ensureOpsComunicacionSchema(): Promise<void> {
       .run();
     await db
       .prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS categories_json TEXT NOT NULL DEFAULT ''")
+      .run();
+    await db
+      .prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS telegram_welcome TEXT NOT NULL DEFAULT ''")
+      .run();
+    await db
+      .prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS telegram_start_inbox TEXT NOT NULL DEFAULT '[]'")
       .run();
   }
   if (db.isPostgres) {
@@ -592,20 +632,28 @@ function parseRecipients(rawExtra: unknown, primaryChatId?: string): OpsRecipien
 async function loadTgSettings(): Promise<TgSettings> {
   await ensureOpsComunicacionSchema();
   const row = (await db
-    .prepare("SELECT enabled, chat_id, extra_chat_ids, bot_token FROM sgi_ops_comunicacion_tg WHERE id = 1")
+    .prepare("SELECT enabled, chat_id, extra_chat_ids, bot_token, telegram_welcome FROM sgi_ops_comunicacion_tg WHERE id = 1")
     .get()) as Record<string, unknown> | undefined;
   const r = row ? rowKeysToLowercase(row) : {};
   const enabled = r.enabled === true || Number(r.enabled) === 1;
   const recipients = parseRecipients(r.extra_chat_ids, String(r.chat_id ?? ""));
   const chatIds = recipients.map((x) => x.chatId);
   const botToken = String(r.bot_token ?? "").trim();
-  return { enabled, chatId: chatIds[0] || "", chatIds, recipients, botToken };
+  return {
+    enabled,
+    chatId: chatIds[0] || "",
+    chatIds,
+    recipients,
+    botToken,
+    welcomeHtml: normalizeOpsWelcome(r.telegram_welcome),
+  };
 }
 
 async function saveTgSettings(input: {
   enabled: boolean;
   recipients: OpsRecipient[];
   botToken?: string;
+  welcomeHtml?: string;
 }): Promise<TgSettings> {
   await ensureOpsComunicacionSchema();
   const ts = db.isPostgres ? "NOW()" : "datetime('now')";
@@ -613,20 +661,25 @@ async function saveTgSettings(input: {
   const primary = recipients[0]?.chatId || "";
   const extraJson = JSON.stringify(recipients);
   const nextToken = input.botToken != null ? String(input.botToken).trim() : "";
+  const welcome =
+    input.welcomeHtml != null ? normalizeOpsWelcome(input.welcomeHtml) : (await loadTgSettings()).welcomeHtml;
   if (nextToken) {
     await db
       .prepare(
-        `UPDATE sgi_ops_comunicacion_tg SET enabled = ?, chat_id = ?, extra_chat_ids = ?, bot_token = ?, updated_at = ${ts} WHERE id = 1`
+        `UPDATE sgi_ops_comunicacion_tg SET enabled = ?, chat_id = ?, extra_chat_ids = ?, bot_token = ?, telegram_welcome = ?, updated_at = ${ts} WHERE id = 1`
       )
-      .run(input.enabled ? 1 : 0, primary, extraJson, nextToken);
+      .run(input.enabled ? 1 : 0, primary, extraJson, nextToken, welcome);
   } else {
     await db
       .prepare(
-        `UPDATE sgi_ops_comunicacion_tg SET enabled = ?, chat_id = ?, extra_chat_ids = ?, updated_at = ${ts} WHERE id = 1`
+        `UPDATE sgi_ops_comunicacion_tg SET enabled = ?, chat_id = ?, extra_chat_ids = ?, telegram_welcome = ?, updated_at = ${ts} WHERE id = 1`
       )
-      .run(input.enabled ? 1 : 0, primary, extraJson);
+      .run(input.enabled ? 1 : 0, primary, extraJson, welcome);
   }
-  return loadTgSettings();
+  const saved = await loadTgSettings();
+  const token = opsComunicacionBotToken(saved.botToken);
+  if (token) await ensureOpsTelegramWebhook(token).catch(() => undefined);
+  return saved;
 }
 
 function telegramPayload(settings: TgSettings) {
@@ -640,7 +693,114 @@ function telegramPayload(settings: TgSettings) {
     botUsername: bot.botUsernameHint || null,
     defaultChatId: bot.defaultChatId || null,
     readyToSend: settings.enabled && settings.chatIds.length > 0 && bot.tokenConfigured,
+    welcomeHtml: settings.welcomeHtml,
   };
+}
+
+function parseStartInbox(raw: unknown): OpsRecipient[] {
+  const s = String(raw ?? "").trim();
+  if (!s) return [];
+  try {
+    const j = JSON.parse(s) as unknown;
+    if (!Array.isArray(j)) return [];
+    return j.map(recipientFromUnknown).filter((x): x is OpsRecipient => Boolean(x)).slice(0, MAX_OPS_RECIPIENTS);
+  } catch {
+    return [];
+  }
+}
+
+async function loadStartInbox(): Promise<OpsRecipient[]> {
+  await ensureOpsComunicacionSchema();
+  const row = (await db
+    .prepare("SELECT telegram_start_inbox FROM sgi_ops_comunicacion_tg WHERE id = 1")
+    .get()) as Record<string, unknown> | undefined;
+  const r = row ? rowKeysToLowercase(row) : {};
+  return parseStartInbox(r.telegram_start_inbox);
+}
+
+async function rememberOpsStartChat(row: OpsRecipient): Promise<void> {
+  const cur = await loadStartInbox();
+  const next = mergeRecipients(cur, [row]);
+  const ts = db.isPostgres ? "NOW()" : "datetime('now')";
+  await db
+    .prepare(`UPDATE sgi_ops_comunicacion_tg SET telegram_start_inbox = ?, updated_at = ${ts} WHERE id = 1`)
+    .run(JSON.stringify(next));
+}
+
+function isTelegramStartCommand(text: unknown): boolean {
+  return /^\/start(?:@\w+)?(?:\s|$)/i.test(String(text ?? "").trim());
+}
+
+async function ingestOpsTelegramStart(body: unknown): Promise<void> {
+  const update = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  const msg = update.message && typeof update.message === "object" ? (update.message as Record<string, unknown>) : null;
+  if (!msg || !isTelegramStartCommand(msg.text)) return;
+  const chat = msg.chat && typeof msg.chat === "object" ? (msg.chat as Record<string, unknown>) : null;
+  if (!chat || String(chat.type ?? "") !== "private") return;
+  const chatId = normalizeTelegramChatId(String(chat.id ?? ""));
+  if (!isOpsPrivateUserId(chatId)) return;
+  const username = String(chat.username ?? "")
+    .replace(/^@/, "")
+    .trim()
+    .slice(0, 32);
+  const name = [chat.first_name, chat.last_name]
+    .map((x) => String(x ?? "").trim())
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80) || username || chatId;
+  const rec: OpsRecipient = { chatId, name };
+  if (username) rec.username = username;
+  await rememberOpsStartChat(rec);
+  const settings = await loadTgSettings();
+  const token = opsComunicacionBotToken(settings.botToken);
+  if (!token) return;
+  await sendTelegramText(chatId, settings.welcomeHtml, { html: true, disablePreview: true, token }).catch((e) => {
+    // eslint-disable-next-line no-console
+    console.warn("[ops-telegram] welcome", e instanceof Error ? e.message : e);
+  });
+}
+
+export function kickOpsTelegramWebhook(): void {
+  void loadTgSettings()
+    .then((s) => {
+      const token = opsComunicacionBotToken(s.botToken);
+      if (token) return ensureOpsTelegramWebhook(token);
+      return false;
+    })
+    .catch(() => undefined);
+}
+
+export async function opsComunicacionTelegramWebhookHandler(req: Request, res: Response): Promise<void> {
+  try {
+    if (req.method === "GET") {
+      kickOpsTelegramWebhook();
+      res.status(200).json({ ok: true });
+      return;
+    }
+    const settings = await loadTgSettings();
+    const token = opsComunicacionBotToken(settings.botToken);
+    if (!token) {
+      res.status(200).json({ ok: true });
+      return;
+    }
+    const expected = opsTelegramWebhookSecret(token);
+    const got = String(req.headers["x-telegram-bot-api-secret-token"] ?? "");
+    if (expected && got && got !== expected) {
+      res.status(401).json({ ok: false });
+      return;
+    }
+    if (expected && !got) {
+      await ensureOpsTelegramWebhook(token).catch(() => undefined);
+    }
+    await ingestOpsTelegramStart(req.body);
+    res.status(200).json({ ok: true });
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn("[ops-telegram] webhook", e instanceof Error ? e.message : e);
+    res.status(200).json({ ok: true });
+  }
 }
 
 function allOpsChatIds(settings: TgSettings): string[] {
@@ -1140,6 +1300,7 @@ const TgSchema = z.object({
   chatId: z.string().optional().nullable(),
   botToken: z.string().optional().nullable(),
   recipients: z.array(TgRecipientSchema).max(MAX_OPS_RECIPIENTS).optional(),
+  welcomeHtml: z.string().max(4000).optional().nullable(),
 });
 
 function mapTitulo(raw: Record<string, unknown>) {
@@ -1763,6 +1924,8 @@ opsComunicacionRouter.post("/ops-comunicacion/copy", ...writeMw, async (req, res
 opsComunicacionRouter.get("/ops-comunicacion/telegram", ...readMw, async (_req, res, next) => {
   try {
     let settings = await loadTgSettings();
+    const token = opsComunicacionBotToken(settings.botToken);
+    if (token) await ensureOpsTelegramWebhook(token).catch(() => undefined);
     const enriched = await enrichRecipientNames(settings.recipients);
     if (JSON.stringify(enriched) !== JSON.stringify(settings.recipients)) {
       settings = await saveTgSettings({ enabled: settings.enabled, recipients: enriched });
@@ -1800,6 +1963,7 @@ opsComunicacionRouter.post("/ops-comunicacion/telegram", ...writeMw, async (req,
       enabled: parsed.data.enabled,
       recipients,
       botToken: parsed.data.botToken ?? undefined,
+      welcomeHtml: isOpsWelcomeAdmin(req.user?.role) ? parsed.data.welcomeHtml ?? undefined : undefined,
     });
     res.json({ ok: true, ...telegramPayload(saved) });
   } catch (e) {
@@ -1856,8 +2020,13 @@ opsComunicacionRouter.get("/ops-comunicacion/telegram/chats", ...writeMw, async 
         },
       });
     }
-    const found = await listRecentTelegramPrivateChats(50, token, { privateOnly: true });
-    const chats = found.filter((c) => isOpsPrivateUserId(c.chatId));
+    const found = await listRecentTelegramPrivateChats(50, token, { privateOnly: true, keepWebhook: true }).catch(() => []);
+    const inbox = await loadStartInbox();
+    const chats = mergeRecipients(
+      inbox,
+      found.filter((c) => isOpsPrivateUserId(c.chatId))
+    );
+    await ensureOpsTelegramWebhook(token).catch(() => undefined);
     const ident = await getTelegramBotIdentity(token).catch(() => null);
     res.json({
       chats,

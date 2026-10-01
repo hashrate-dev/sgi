@@ -23,7 +23,7 @@ import {
 } from "../lib/api";
 import { getOpsComHiresMarkUrl } from "../lib/opsComunicacionTelegramAvatar";
 import { CORTE_PROGRAMADO_CUERPO, fillOpsComunicacionMessage, messageHasScheduleSlots, plantillaFromFilledMessage } from "../lib/opsComunicacionTemplates";
-import { canAccessComunicacionModule, canEditComunicacionModule } from "../lib/auth";
+import { canAccessComunicacionModule, canEditComunicacionModule, canEditOpsTelegramWelcome } from "../lib/auth";
 import { sgiHome } from "../lib/marketplacePaths.js";
 import { canUserAccessNavPath } from "../lib/sgiNavigation";
 import "../styles/facturacion.css";
@@ -1056,6 +1056,7 @@ export function OpsComunicacionPage() {
 
         <OpsComunicacionTelegramConfig
           canEdit={canEdit}
+          canEditWelcome={Boolean(user && canEditOpsTelegramWelcome(user))}
           open={configOpen}
           onClose={() => {
             setConfigOpen(false);

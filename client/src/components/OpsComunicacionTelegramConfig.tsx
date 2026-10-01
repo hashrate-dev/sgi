@@ -10,9 +10,20 @@ import {
 
 type Props = {
   canEdit: boolean;
+  canEditWelcome: boolean;
   open: boolean;
   onClose: () => void;
 };
+
+const DEFAULT_WELCOME = [
+  "<b>Bienvenido/a al canal de comunicación de Hashrate Space</b>",
+  "",
+  "Este chat privado es el canal institucional de Hashrate Space para comunicar información oficial relacionada con nuestras operaciones de minería.",
+  "",
+  "Los mensajes son unidireccionales. Recibirá únicamente comunicados y actualizaciones operativas de interés.",
+  "",
+  "<b>Hashrate Space</b>",
+].join("\n");
 
 function channelLabel(s: OpsComunicacionTelegramSettings | null): string {
   if (!s) return "…";
@@ -58,7 +69,7 @@ function mergeRecipients(
   return [...byId.values()];
 }
 
-export function OpsComunicacionTelegramConfig({ canEdit, open, onClose }: Props) {
+export function OpsComunicacionTelegramConfig({ canEdit, canEditWelcome, open, onClose }: Props) {
   const titleId = useId();
   const closeBtnRef = useRef<HTMLButtonElement>(null);
   const [loading, setLoading] = useState(false);
@@ -74,11 +85,13 @@ export function OpsComunicacionTelegramConfig({ canEdit, open, onClose }: Props)
   const [tgTesting, setTgTesting] = useState(false);
   const [tgDetecting, setTgDetecting] = useState(false);
   const [pending, setPending] = useState<OpsComunicacionTelegramRecipient[]>([]);
+  const [welcomeHtml, setWelcomeHtml] = useState(DEFAULT_WELCOME);
 
   const applySettings = (r: OpsComunicacionTelegramSettings) => {
     setTg(r);
     setTgEnabled(Boolean(r.enabled));
     setRecipients(mergeRecipients(r.recipients || (r.chatId ? [{ chatId: r.chatId, name: r.chatId }] : [])));
+    setWelcomeHtml(String(r.welcomeHtml || "").trim() || DEFAULT_WELCOME);
   };
 
   const load = useCallback(async () => {
@@ -138,6 +151,7 @@ export function OpsComunicacionTelegramConfig({ canEdit, open, onClose }: Props)
       enabled,
       recipients: next,
       botToken: tgBotToken.trim() || undefined,
+      ...(canEditWelcome ? { welcomeHtml } : {}),
     });
     applySettings(r);
     setTgBotToken("");
@@ -335,6 +349,28 @@ export function OpsComunicacionTelegramConfig({ canEdit, open, onClose }: Props)
                         ? "Dejalo vacío. Solo pegá un token nuevo si BotFather te dio otro."
                         : "Copiá el API Token de @BotFather (Hashrate Operations)."}
                     </p>
+                  </div>
+
+                  <div className="ops-com-tg-field">
+                    <label className="crypto-news-tg-field__label" htmlFor="ops-tg-welcome">
+                      Mensaje de bienvenida (/start)
+                    </label>
+                    <p className="crypto-news-tg-field__hint">
+                      Lo ve quien abre el bot y manda /start. No lo agrega solo a la lista de avisos. Podés usar HTML de
+                      Telegram: {"<b>negrita</b>"}.
+                      {canEditWelcome ? "" : " Solo el administrador o superadministrador puede editarlo."}
+                    </p>
+                    <textarea
+                      id="ops-tg-welcome"
+                      className="form-control ops-com-welcome-edit"
+                      value={welcomeHtml}
+                      rows={10}
+                      maxLength={4000}
+                      spellCheck={false}
+                      readOnly={!canEditWelcome}
+                      disabled={tgSaving || tgTesting || tgDetecting || !canEditWelcome}
+                      onChange={(e) => setWelcomeHtml(e.target.value)}
+                    />
                   </div>
 
                   <div className="ops-com-tg-recip">

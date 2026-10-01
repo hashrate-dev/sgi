@@ -1,4 +1,6 @@
+import { createHash } from "node:crypto";
 import { stockPhotoForNewsTitle, telegramPhotoForTitle } from "./cryptoNoticiasBot.js";
+import { CANONICAL_PUBLIC_ORIGIN } from "./publicAppOrigin.js";
 import { toPublisherSpanishUrl } from "./newsPublisherSpanishUrl.js";
 
 export type CryptoWireNewsItem = {
@@ -60,6 +62,64 @@ export function getOpsTelegramBotStatus(storedToken?: string): TelegramBotStatus
     defaultChatId: runtimeEnv("TELEGRAM_OPS_CHAT_ID") || runtimeEnv("TELEGRAM_CHAT_ID"),
     botUsernameHint: (runtimeEnv("TELEGRAM_OPS_BOT_USERNAME") || runtimeEnv("TELEGRAM_BOT_USERNAME")).replace(/^@/, ""),
   };
+}
+
+export function opsTelegramWebhookUrl(): string {
+  const fromEnv = runtimeEnv("APP_PUBLIC_URL") || runtimeEnv("FRONTEND_ORIGIN");
+  const origin =
+    /^https:\/\//i.test(fromEnv) && !/localhost|127\.0\.0\.1|\.vercel\.app/i.test(fromEnv)
+      ? fromEnv.replace(/\/+$/, "")
+      : CANONICAL_PUBLIC_ORIGIN;
+  return `${origin}/api/ops-comunicacion/telegram/webhook`;
+}
+
+export function opsTelegramWebhookSecret(token: string): string {
+  const env = runtimeEnv("TELEGRAM_OPS_WEBHOOK_SECRET").replace(/[^A-Za-z0-9_-]/g, "");
+  if (env.length >= 8) return env.slice(0, 256);
+  const t = String(token || "").trim();
+  if (!t) return "";
+  return `hrs${createHash("sha256").update(`ops-tg:${t}`).digest("hex").slice(0, 40)}`;
+}
+
+let webhookEnsureAt = 0;
+let webhookEnsureUrl = "";
+
+export async function ensureOpsTelegramWebhook(tokenOverride?: string): Promise<boolean> {
+  const token = opsComunicacionBotToken(tokenOverride);
+  if (!token) return false;
+  const url = opsTelegramWebhookUrl();
+  if (!/^https:\/\//i.test(url) || /localhost|127\.0\.0\.1/i.test(url)) return false;
+  const now = Date.now();
+  if (webhookEnsureUrl === url && now - webhookEnsureAt < 6 * 60 * 1000) return true;
+  const secret = opsTelegramWebhookSecret(token);
+  if (!secret) return false;
+  const info = await telegramFetchJson("getWebhookInfo", undefined, 10_000, token).catch(() => null);
+  const current =
+    info?.ok && info.result && typeof info.result === "object"
+      ? String((info.result as { url?: string }).url ?? "")
+      : "";
+  if (current === url && webhookEnsureUrl === url && now - webhookEnsureAt < 6 * 60 * 1000) {
+    return true;
+  }
+  const j = await telegramFetchJson(
+    "setWebhook",
+    {
+      url,
+      secret_token: secret,
+      allowed_updates: ["message"],
+      drop_pending_updates: false,
+    },
+    12_000,
+    token
+  );
+  if (!j.ok) {
+    // eslint-disable-next-line no-console
+    console.warn("[telegram] setWebhook", j.description || "falló");
+    return false;
+  }
+  webhookEnsureAt = now;
+  webhookEnsureUrl = url;
+  return true;
 }
 
 function articleLink(raw?: string): string {
@@ -550,13 +610,19 @@ function pickChatFromUpdate(u: Record<string, unknown>): { id: number; type?: st
 export async function listRecentTelegramPrivateChats(
   limit = 8,
   tokenOverride?: string,
-  opts?: { privateOnly?: boolean }
+  opts?: { privateOnly?: boolean; keepWebhook?: boolean }
 ): Promise<
   Array<{ chatId: string; name: string; username?: string }>
 > {
-  await telegramFetchJson("deleteWebhook", { drop_pending_updates: false }, 12_000, tokenOverride).catch(() => undefined);
+  if (!opts?.keepWebhook) {
+    await telegramFetchJson("deleteWebhook", { drop_pending_updates: false }, 12_000, tokenOverride).catch(() => undefined);
+  }
   const j = await telegramFetchJson("getUpdates?limit=100", undefined, 12_000, tokenOverride);
-  if (!j.ok) throw new Error(j.description || "getUpdates falló");
+  if (!j.ok) {
+    const d = String(j.description || "");
+    if (/webhook is active|can't use getUpdates/i.test(d)) return [];
+    throw new Error(d || "getUpdates falló");
+  }
   const rows = Array.isArray(j.result) ? (j.result as Record<string, unknown>[]) : [];
   const byId = new Map<string, { chatId: string; name: string; username?: string }>();
   for (const u of rows) {

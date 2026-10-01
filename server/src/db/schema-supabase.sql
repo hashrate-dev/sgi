@@ -271,6 +271,8 @@ ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS bot_token TEXT NOT 
 ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS telegram_header TEXT NOT NULL DEFAULT '';
 ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS telegram_cierre TEXT NOT NULL DEFAULT '';
 ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS categories_json TEXT NOT NULL DEFAULT '';
+ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS telegram_welcome TEXT NOT NULL DEFAULT '';
+ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS telegram_start_inbox TEXT NOT NULL DEFAULT '[]';
 
 CREATE TABLE IF NOT EXISTS sgi_ops_comunicacion_titulos (
   id BIGSERIAL PRIMARY KEY,

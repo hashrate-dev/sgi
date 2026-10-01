@@ -492,3 +492,7 @@ export function canEditComunicacionModule(user: PermUser): boolean {
   return canAccessComunicacionModule(user);
 }
 
+export function canEditOpsTelegramWelcome(user: PermUser): boolean {
+  return user?.role === "admin_a" || user?.role === "admin_b";
+}
+

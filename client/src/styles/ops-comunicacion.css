@@ -1656,3 +1656,11 @@ a.ops-com-users-btn {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+.ops-com-welcome-edit {
+  min-height: 12rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
