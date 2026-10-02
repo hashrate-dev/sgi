@@ -22,7 +22,7 @@ import {
   type OpsComunicacionTelegramRecipient,
 } from "../lib/api";
 import { getOpsComHiresMarkUrl } from "../lib/opsComunicacionTelegramAvatar";
-import { CORTE_PROGRAMADO_CUERPO, fillOpsComunicacionMessage, messageHasScheduleSlots, plantillaFromFilledMessage } from "../lib/opsComunicacionTemplates";
+import { CORTE_PROGRAMADO_CUERPO, fillOpsComunicacionMessage, messageHasScheduleSlots, plantillaFromFilledMessage, type OpsCortePeriodo } from "../lib/opsComunicacionTemplates";
 import { canAccessComunicacionModule, canEditComunicacionModule, canEditOpsTelegramWelcome } from "../lib/auth";
 import { sgiHome } from "../lib/marketplacePaths.js";
 import { canUserAccessNavPath } from "../lib/sgiNavigation";
@@ -188,6 +188,7 @@ export function OpsComunicacionPage() {
   const [horario1To, setHorario1To] = useState("17:00");
   const [horario2From, setHorario2From] = useState("20:00");
   const [horario2To, setHorario2To] = useState("24:00");
+  const [cortePeriodos, setCortePeriodos] = useState<OpsCortePeriodo>("ambos");
   const [cuerpo, setCuerpo] = useState("");
   const [categoria, setCategoria] = useState("general");
   const [telegramHeader, setTelegramHeader] = useState(DEFAULT_TG_HEADER);
@@ -217,15 +218,15 @@ export function OpsComunicacionPage() {
   const tituloEsCorte = Boolean(tituloRow?.isBuiltin);
   const plantilla = mensajeLibre ? "" : tituloRow?.cuerpo || (tituloEsCorte ? CORTE_PROGRAMADO_CUERPO : "");
   const usesSchedule = Boolean(plantilla && messageHasScheduleSlots(plantilla));
-  const cuerpoLleno = usesSchedule
-    ? fillOpsComunicacionMessage(plantilla, {
-        fecha: fechaAviso,
-        horario1From,
-        horario1To,
-        horario2From,
-        horario2To,
-      })
-    : plantilla;
+  const scheduleOpts = {
+    fecha: fechaAviso,
+    horario1From,
+    horario1To,
+    horario2From,
+    horario2To,
+    periodos: cortePeriodos,
+  };
+  const cuerpoLleno = usesSchedule ? fillOpsComunicacionMessage(plantilla, scheduleOpts) : plantilla;
   const cuerpoDraft = cuerpoOverride ?? (plantilla ? cuerpoLleno : cuerpo);
   const cuerpoFinal = cuerpoDraft.trim();
   const queuedItems = items
@@ -434,8 +435,8 @@ export function OpsComunicacionPage() {
                 fecha: fechaAviso,
                 motivo: tituloEsCorte ? "Reducción 23 kV ANDE · 10% potencia reservada" : titulo.trim(),
                 windows: [
-                  { from: horario1From, to: horario1To },
-                  { from: horario2From, to: horario2To },
+                  ...(cortePeriodos !== "tarde" ? [{ from: horario1From, to: horario1To }] : []),
+                  ...(cortePeriodos !== "manana" ? [{ from: horario2From, to: horario2To }] : []),
                 ].filter((w) => w.from.trim() && w.to.trim()),
               },
             }
@@ -483,13 +484,7 @@ export function OpsComunicacionPage() {
       return;
     }
     const cuerpoGuardar = usesSchedule
-      ? plantillaFromFilledMessage(cuerpoFinal, plantilla, {
-          fecha: fechaAviso,
-          horario1From,
-          horario1To,
-          horario2From,
-          horario2To,
-        })
+      ? plantillaFromFilledMessage(cuerpoFinal, plantilla, scheduleOpts)
       : cuerpoFinal;
     setTitleBusy(true);
     setErr("");
@@ -516,6 +511,7 @@ export function OpsComunicacionPage() {
     setHorario1To("17:00");
     setHorario2From("20:00");
     setHorario2To("24:00");
+    setCortePeriodos("ambos");
     setErr("");
     setOk("Mensaje en blanco. Escribí uno nuevo o volvé a elegir el título.");
   };
@@ -803,6 +799,33 @@ export function OpsComunicacionPage() {
                 <div className="ops-com-title">
                   {usesSchedule ? (
                     <div className="ops-com-schedule">
+                      <div className="ops-com-field ops-com-etapas">
+                        <label>Etapa</label>
+                        <div className="ops-com-etapas__row" role="radiogroup" aria-label="Etapa del corte">
+                          {(
+                            [
+                              ["manana", "Solo mañana"],
+                              ["tarde", "Solo tarde"],
+                              ["ambos", "Las dos"],
+                            ] as const
+                          ).map(([id, label]) => (
+                            <button
+                              key={id}
+                              type="button"
+                              role="radio"
+                              aria-checked={cortePeriodos === id}
+                              className={`ops-com-etapas__btn${cortePeriodos === id ? " is-on" : ""}`}
+                              disabled={busy || titleBusy}
+                              onClick={() => {
+                                setCortePeriodos(id);
+                                setCuerpoOverride(null);
+                              }}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                       <div className="ops-com-field">
                         <label htmlFor="ops-fecha">Fecha del aviso</label>
                         <input
@@ -817,10 +840,14 @@ export function OpsComunicacionPage() {
                           disabled={busy || titleBusy}
                         />
                       </div>
-                      <div className="ops-com-field">
+                      <div className={`ops-com-field${cortePeriodos === "tarde" ? " is-period-off" : ""}`}>
                         <label htmlFor="ops-h1-from">Mañana (etapa 1)</label>
                         <p className="ops-com-tg-copy__hint" style={{ margin: "0 0 0.35rem" }}>
-                          Si hay un horario:
+                          {cortePeriodos === "tarde"
+                            ? "No entra en este aviso."
+                            : cortePeriodos === "ambos"
+                              ? "Si hay dos horarios, en el medio se prende."
+                              : "Una sola etapa: el mensaje no dice Mañana."}
                         </p>
                         <div className="ops-com-title__row">
                           <input
@@ -831,7 +858,7 @@ export function OpsComunicacionPage() {
                               setHorario1From(e.target.value);
                               setCuerpoOverride(null);
                             }}
-                            disabled={busy || titleBusy}
+                            disabled={busy || titleBusy || cortePeriodos === "tarde"}
                             placeholder="9:00"
                           />
                           <input
@@ -841,15 +868,19 @@ export function OpsComunicacionPage() {
                               setHorario1To(e.target.value);
                               setCuerpoOverride(null);
                             }}
-                            disabled={busy || titleBusy}
+                            disabled={busy || titleBusy || cortePeriodos === "tarde"}
                             placeholder="17:00"
                           />
                         </div>
                       </div>
-                      <div className="ops-com-field">
+                      <div className={`ops-com-field${cortePeriodos === "manana" ? " is-period-off" : ""}`}>
                         <label htmlFor="ops-h2-from">Tarde (etapa 2)</label>
                         <p className="ops-com-tg-copy__hint" style={{ margin: "0 0 0.35rem" }}>
-                          Si hay dos horarios, en el medio se prende. Dejá tarde vacío si ese día es una sola etapa:
+                          {cortePeriodos === "manana"
+                            ? "No entra en este aviso."
+                            : cortePeriodos === "ambos"
+                              ? "Si hay dos horarios, en el medio se prende."
+                              : "Una sola etapa: el mensaje no dice Tarde."}
                         </p>
                         <div className="ops-com-title__row">
                           <input
@@ -860,7 +891,7 @@ export function OpsComunicacionPage() {
                               setHorario2From(e.target.value);
                               setCuerpoOverride(null);
                             }}
-                            disabled={busy || titleBusy}
+                            disabled={busy || titleBusy || cortePeriodos === "manana"}
                             placeholder="20:00"
                           />
                           <input
@@ -870,7 +901,7 @@ export function OpsComunicacionPage() {
                               setHorario2To(e.target.value);
                               setCuerpoOverride(null);
                             }}
-                            disabled={busy || titleBusy}
+                            disabled={busy || titleBusy || cortePeriodos === "manana"}
                             placeholder="24:00"
                           />
                         </div>

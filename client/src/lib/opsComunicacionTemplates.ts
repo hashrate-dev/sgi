@@ -35,12 +35,24 @@ export function formatOpsHorarioLine(from: string, to: string, label = ""): stri
   return label ? `• ${label}: ${a} a ${b} hs` : `• ${a} a ${b} hs`;
 }
 
+export type OpsCortePeriodo = "ambos" | "manana" | "tarde";
+
 export function formatOpsHorariosBlock(opts: {
   horario1From: string;
   horario1To: string;
   horario2From: string;
   horario2To: string;
+  periodos?: OpsCortePeriodo;
 }): string {
+  const periodos = opts.periodos ?? "ambos";
+  if (periodos === "manana") {
+    const line = formatOpsHorarioLine(opts.horario1From, opts.horario1To);
+    return line ? ["Horarios (UTC-3)", line].join("\n") : "";
+  }
+  if (periodos === "tarde") {
+    const line = formatOpsHorarioLine(opts.horario2From, opts.horario2To);
+    return line ? ["Horarios (UTC-3)", line].join("\n") : "";
+  }
   const manana = formatOpsHorarioLine(opts.horario1From, opts.horario1To, "Mañana");
   const tarde = formatOpsHorarioLine(opts.horario2From, opts.horario2To, "Tarde");
   if (manana && tarde) {
@@ -58,7 +70,14 @@ export function formatOpsHorariosBlock(opts: {
 
 export function fillOpsComunicacionMessage(
   plantilla: string,
-  opts: { fecha: string; horario1From: string; horario1To: string; horario2From: string; horario2To: string }
+  opts: {
+    fecha: string;
+    horario1From: string;
+    horario1To: string;
+    horario2From: string;
+    horario2To: string;
+    periodos?: OpsCortePeriodo;
+  }
 ): string {
   const fecha = formatOpsFechaEs(opts.fecha);
   const horarios = formatOpsHorariosBlock(opts);
@@ -71,7 +90,14 @@ export function fillOpsComunicacionMessage(
 export function plantillaFromFilledMessage(
   filled: string,
   plantilla: string,
-  opts: { fecha: string; horario1From: string; horario1To: string; horario2From: string; horario2To: string }
+  opts: {
+    fecha: string;
+    horario1From: string;
+    horario1To: string;
+    horario2From: string;
+    horario2To: string;
+    periodos?: OpsCortePeriodo;
+  }
 ): string {
   let out = String(filled || "").replace(/\r\n/g, "\n");
   if (!messageHasScheduleSlots(plantilla)) return out.trim();
