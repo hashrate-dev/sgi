@@ -12,7 +12,7 @@ import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import { canExport } from "../lib/auth";
 import { formatCurrency, formatCurrencyNumber } from "../lib/formatCurrency";
-import { isAsicEquipmentSaleInvoice } from "../lib/asicDocumentKind";
+import { isAsicEquipmentSaleInvoice, resolveAsicInvoiceDocumentContext } from "../lib/asicDocumentKind";
 import { buildAsicComprobantePdfFilename } from "../lib/asicPdfFilename";
 import "../styles/facturacion.css";
 
@@ -259,7 +259,7 @@ export function PendientesMineriaPage() {
           subtotal: inv.subtotal || 0,
           discounts: inv.discounts || 0,
           total: inv.total || 0,
-          documentContext: isAsicEquipmentSaleInvoice(inv) ? "comprobante-pago" : undefined,
+          documentContext: resolveAsicInvoiceDocumentContext(inv),
         },
         { logoBase64 }
       );
@@ -270,7 +270,7 @@ export function PendientesMineriaPage() {
           clientName: client.name,
           type: inv.type,
           items: validItems,
-          documentContext: isAsicEquipmentSaleInvoice(inv) ? "comprobante-pago" : undefined,
+          documentContext: resolveAsicInvoiceDocumentContext(inv),
         })
       );
       showToast("PDF generado correctamente.", "success", "Pendientes");

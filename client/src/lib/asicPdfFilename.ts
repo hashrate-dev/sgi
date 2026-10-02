@@ -36,7 +36,7 @@ export function asicPdfDocumentTypeLabel(
     return "COMPROBANTE GARANTIA";
   }
   if (type === "Factura") {
-    if (ctx === "comprobante-pago" || isAsicEquipmentSaleDocument(opts?.items)) {
+    if (ctx === "comprobante-pago" || isAsicEquipmentSaleDocument(opts?.items, ctx)) {
       return "COMPROBANTE PAGO";
     }
     return "FACTURA CREDITO";

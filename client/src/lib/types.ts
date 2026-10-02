@@ -84,6 +84,8 @@ export type Invoice = {
   items: LineItem[];
   relatedInvoiceId?: string; // ID de la factura relacionada (para notas de crédito y recibos)
   relatedInvoiceNumber?: string; // Número de la factura relacionada (para notas de crédito y recibos)
+  /** ASIC: "factura" (crédito + Recibo) vs "comprobante-pago" (anticipado, sin Recibo). */
+  documentContext?: import("./invoiceDocumentContext").InvoiceDocumentContext;
 };
 
 export type EquipoASIC = {

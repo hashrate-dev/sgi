@@ -91,7 +91,8 @@ CREATE TABLE IF NOT EXISTS invoices (
   payment_date TEXT,
   emission_time TEXT,
   due_date TEXT,
-  source TEXT NOT NULL DEFAULT 'hosting' CHECK (source IN ('hosting', 'asic'))
+  source TEXT NOT NULL DEFAULT 'hosting' CHECK (source IN ('hosting', 'asic')),
+  document_context TEXT
 );
 
 CREATE TABLE IF NOT EXISTS invoice_items (
@@ -431,6 +432,7 @@ ALTER TABLE invoices ADD COLUMN IF NOT EXISTS related_invoice_number TEXT;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payment_date TEXT;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS emission_time TEXT;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS due_date TEXT;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS document_context TEXT;
 ALTER TABLE setups ADD COLUMN IF NOT EXISTS codigo TEXT;
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS documento_identidad TEXT;
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS country TEXT;

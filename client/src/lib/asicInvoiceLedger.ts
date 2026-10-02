@@ -24,6 +24,7 @@ export function mapApiInvoiceToInvoice(inv: ApiInvoiceRow): Invoice {
     paymentDate: inv.paymentDate,
     emissionTime: inv.emissionTime,
     dueDate: inv.dueDate,
+    documentContext: inv.documentContext,
     items: [],
   };
 }

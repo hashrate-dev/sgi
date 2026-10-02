@@ -1,7 +1,7 @@
 import type { ComprobanteType } from "./types";
 
 /** Contexto de documento para adaptar títulos/frases sin cambiar el tipo interno. */
-export type InvoiceDocumentContext = "garantia-ande" | "comprobante-pago";
+export type InvoiceDocumentContext = "garantia-ande" | "comprobante-pago" | "factura";
 
 /** Texto legal corto para depósito en garantía (sin nombrar ANDE) — emisión. */
 export const GARANTIA_DEPOSITO_LEGAL =

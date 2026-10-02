@@ -56,6 +56,8 @@ import { formatCurrencyNumber, formatUSD } from "../lib/formatCurrency";
 import { isAsicEquipmentSaleInvoice } from "../lib/asicDocumentKind";
 import { buildAsicComprobantePdfFilename } from "../lib/asicPdfFilename";
 import type { InvoiceDocumentContext } from "../lib/invoiceDocumentContext";
+
+type AsicTipoSelect = "Factura" | "comprobante-pago" | "Recibo" | "Nota de Crédito";
 import "../styles/facturacion.css";
 
 function todayLocale() {
@@ -162,6 +164,8 @@ export function FacturacionMineriaPage() {
   const { user } = useAuth();
   const location = useLocation();
   const [type, setType] = useState<ComprobanteType>("Factura");
+  /** Factura ASIC a crédito vs comprobante de pago anticipado (mismo type interno "Factura"). */
+  const [asicFacturaKind, setAsicFacturaKind] = useState<"factura" | "comprobante-pago">("comprobante-pago");
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [items, setItems] = useState<LineItem[]>([]);
@@ -530,26 +534,36 @@ export function FacturacionMineriaPage() {
     );
   }, [invoicesAll, selectedClient, type]);
 
-  /** Venta ASIC: solo Factura (comprobante de pago) y NC — sin emisión de Recibo. */
-  useEffect(() => {
-    if (type === "Recibo" || type === "Recibo Devolución") {
-      setType("Factura");
-      setRelatedInvoiceId("");
-      setItems([]);
-      setItemsLocked(false);
-      setPaymentDate("");
-    }
-  }, [type]);
+  /** Recibo solo sobre Factura a crédito (no sobre comprobante de pago anticipado). */
+  const invoicesWithoutReceipt = useMemo(() => {
+    if (!selectedClient || type !== "Recibo") return [];
+    const clientNorm = normalizeClientName(selectedClient.name);
+    return invoicesAll.filter(
+      (inv) =>
+        inv.type === "Factura" &&
+        normalizeClientName(inv.clientName) === clientNorm &&
+        !isAsicEquipmentSaleInvoice(inv) &&
+        invoicePendingCollectionAmount(inv, invoicesAll) > INVOICE_BALANCE_EPS
+    );
+  }, [invoicesAll, selectedClient, type]);
 
-  /** Toda Factura ASIC → COMPROBANTE DE PAGO (sin recibo). */
+  const asicTipoSelect: AsicTipoSelect =
+    type === "Factura"
+      ? asicFacturaKind === "comprobante-pago"
+        ? "comprobante-pago"
+        : "Factura"
+      : type === "Recibo" || type === "Nota de Crédito"
+        ? type
+        : "Factura";
+
   const asicFacturaDocumentContext = useMemo<InvoiceDocumentContext | undefined>(() => {
     if (type !== "Factura") return undefined;
-    return "comprobante-pago";
-  }, [type]);
+    return asicFacturaKind === "comprobante-pago" ? "comprobante-pago" : "factura";
+  }, [type, asicFacturaKind]);
 
   // Limpiar factura relacionada cuando cambia el tipo o el cliente
   useEffect(() => {
-    if (type !== "Nota de Crédito") {
+    if (type !== "Nota de Crédito" && type !== "Recibo") {
       setRelatedInvoiceId("");
       setItemsLocked(false);
     }
@@ -776,6 +790,10 @@ export function FacturacionMineriaPage() {
       showToast("Debe seleccionar un comprobante a cancelar para la Nota de Crédito.", "error");
       return;
     }
+    if (type === "Recibo" && !relatedInvoiceId) {
+      showToast("Debe seleccionar la factura abonada para emitir el Recibo.", "error");
+      return;
+    }
     if (type === "Nota de Crédito" && relatedInvoiceId) {
       const facturaTarget = invoicesAll.find(
         (i) => i.type === "Factura" && String(i.id) === String(relatedInvoiceId)
@@ -794,6 +812,10 @@ export function FacturacionMineriaPage() {
     }
     if (type === "Recibo" && relatedInvoiceId) {
       const factura = invoicesAll.find((i) => i.type === "Factura" && String(i.id) === String(relatedInvoiceId)) ?? null;
+      if (factura && isAsicEquipmentSaleInvoice(factura)) {
+        showToast("El comprobante de pago anticipado no requiere Recibo.", "error");
+        return;
+      }
       if (factura && invoicePendingCollectionAmount(factura, invoicesAll) <= INVOICE_BALANCE_EPS) {
         showToast(
           "Este comprobante no tiene saldo pendiente de cobro (puede estar totalmente pagado o cancelado por nota(s) de crédito).",
@@ -810,7 +832,11 @@ export function FacturacionMineriaPage() {
       showToast("Hay que llenar los campos para emitir el documento. El total no puede ser cero.", "error");
       return;
     }
-    if (items.some((it) => !asicLineItemHasCatalogSelection(it))) {
+    if (
+      type !== "Recibo" &&
+      type !== "Nota de Crédito" &&
+      items.some((it) => !asicLineItemHasCatalogSelection(it))
+    ) {
       showToast(
         "Todos los ítems deben tener un equipo ASIC, Setup, tipo de Reparación o ítem de Transporte/Flete seleccionado.",
         "error"
@@ -866,7 +892,8 @@ export function FacturacionMineriaPage() {
       relatedInvoiceNumber: relatedInvoice?.number,
       paymentDate: type === "Recibo" ? paymentDate : undefined,
       emissionTime,
-      dueDate: dueDateStr
+      dueDate: dueDateStr,
+      documentContext: type === "Factura" ? asicFacturaDocumentContext : undefined,
     };
 
     let createdInvoice: { id: number; number: string };
@@ -920,7 +947,7 @@ export function FacturacionMineriaPage() {
           dueDateDays,
           relatedInvoiceNumber: relatedInvoice?.number,
           creditNoteMode: inferredNcMode,
-          documentContext: type === "Factura" ? "comprobante-pago" : undefined,
+          documentContext: asicFacturaDocumentContext,
         },
         { logoBase64 }
       );
@@ -930,15 +957,27 @@ export function FacturacionMineriaPage() {
           clientName: selectedClient.name,
           type,
           items,
-          documentContext: type === "Factura" ? "comprobante-pago" : undefined,
+          documentContext: asicFacturaDocumentContext,
         })
       );
       const tipoMensaje =
-        type === "Factura" ? "Comprobante de pago" : type === "Nota de Crédito" ? "Nota de Crédito" : type;
+        type === "Factura"
+          ? asicFacturaKind === "comprobante-pago"
+            ? "Comprobante de pago"
+            : "Factura"
+          : type === "Nota de Crédito"
+            ? "Nota de Crédito"
+            : type;
       showToast(`${tipoMensaje} generado y guardado correctamente.`, "success");
     } else {
       const tipoMensaje =
-        type === "Factura" ? "Comprobante de pago" : type === "Nota de Crédito" ? "Nota de Crédito" : type;
+        type === "Factura"
+          ? asicFacturaKind === "comprobante-pago"
+            ? "Comprobante de pago"
+            : "Factura"
+          : type === "Nota de Crédito"
+            ? "Nota de Crédito"
+            : type;
       showToast(`${tipoMensaje} registrado correctamente.`, "success");
     }
 
@@ -966,7 +1005,8 @@ export function FacturacionMineriaPage() {
       total: finalTotal,
       items,
       relatedInvoiceId: relatedInvoice?.id,
-      relatedInvoiceNumber: relatedInvoice?.number
+      relatedInvoiceNumber: relatedInvoice?.number,
+      documentContext: type === "Factura" ? asicFacturaDocumentContext : undefined,
     };
     const hist = loadInvoicesAsic();
     hist.push(inv);
@@ -1051,7 +1091,7 @@ export function FacturacionMineriaPage() {
         dueDate: parseDueDateStr(inv.dueDate ?? ""),
         relatedInvoiceNumber: inv.relatedInvoiceNumber ?? relatedForNc?.number,
         creditNoteMode: inferredNcMode,
-        documentContext: inv.type === "Factura" ? "comprobante-pago" : undefined,
+        documentContext: inv.documentContext ?? (inv.type === "Factura" ? "comprobante-pago" : undefined),
       },
       { logoBase64 }
     );
@@ -1061,7 +1101,7 @@ export function FacturacionMineriaPage() {
         clientName: inv.clientName,
         type: inv.type,
         items: inv.items,
-        documentContext: inv.type === "Factura" ? "comprobante-pago" : undefined,
+        documentContext: inv.documentContext ?? (inv.type === "Factura" ? "comprobante-pago" : undefined),
       })
     );
     showToast(`PDF ${inv.number} descargado.`, "success");
@@ -1113,18 +1153,37 @@ export function FacturacionMineriaPage() {
                       <label className="fact-label"><span style={{ fontSize: "1.25em", lineHeight: 1 }}>📑</span> Tipo</label>
                       <select
                         className="fact-select"
-                        value={type}
+                        value={asicTipoSelect}
                         onChange={(e) => {
-                          const newType = e.target.value as ComprobanteType;
-                          setType(newType);
-                          // Limpiar factura relacionada y ítems si cambia el tipo
-                          if (newType !== "Nota de Crédito") {
-                            setRelatedInvoiceId("");
-                            setItems([]);
+                          const v = e.target.value as AsicTipoSelect;
+                          setRelatedInvoiceId("");
+                          setItems([]);
+                          setItemsLocked(false);
+                          setPaymentDate("");
+                          if (v === "comprobante-pago") {
+                            setType("Factura");
+                            setAsicFacturaKind("comprobante-pago");
+                            return;
                           }
+                          if (v === "Factura") {
+                            setType("Factura");
+                            setAsicFacturaKind("factura");
+                            return;
+                          }
+                          if (v === "Recibo") {
+                            setType("Recibo");
+                            const t = new Date();
+                            setPaymentDate(
+                              `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`
+                            );
+                            return;
+                          }
+                          setType("Nota de Crédito");
                         }}
                       >
                         <option value="Factura">Factura</option>
+                        <option value="comprobante-pago">Comprobante de Pago</option>
+                        <option value="Recibo">Recibo</option>
                         <option value="Nota de Crédito">NC</option>
                       </select>
                     </div>
@@ -1140,21 +1199,35 @@ export function FacturacionMineriaPage() {
                   className="fact-field fact-field--doc-extra-top"
                   aria-hidden={
                     !(
-                      (type === "Factura" && items.length > 0) ||
-                      (type === "Nota de Crédito" && !selectedClient) ||
+                      (type === "Factura") ||
+                      ((type === "Nota de Crédito" || type === "Recibo") && !selectedClient) ||
+                      (type === "Recibo" && !!selectedClient && invoicesWithoutReceipt.length === 0) ||
+                      (type === "Recibo" && !!relatedInvoiceId) ||
                       (type === "Nota de Crédito" && !!selectedClient && invoicesWithoutCreditNote.length === 0)
                     )
                   }
                 >
-                  {type === "Factura" && items.length > 0 ? (
+                  {type === "Factura" && asicFacturaKind === "comprobante-pago" ? (
                     <div className="fact-select-client-hint-box fact-select-client-hint-box--ok">
-                      <small>Comprobante de pago (sin recibo)</small>
+                      <small>Pago anticipado: cerrado al emitir, sin Recibo.</small>
                     </div>
-                  ) : type === "Nota de Crédito" && !selectedClient ? (
+                  ) : type === "Factura" && asicFacturaKind === "factura" ? (
+                    <div className="fact-select-client-hint-box fact-select-client-hint-box--info">
+                      <small>Factura a crédito: se cierra con Recibo al cobrar.</small>
+                    </div>
+                  ) : (type === "Nota de Crédito" || type === "Recibo") && !selectedClient ? (
                     <div className="fact-select-client-hint-box">
                       <small className="text-warning">
-                        Seleccionar un cliente para ver comprobantes disponibles.
+                        Seleccionar un cliente para ver {type === "Recibo" ? "facturas" : "comprobantes"} disponibles.
                       </small>
+                    </div>
+                  ) : type === "Recibo" && relatedInvoiceId ? (
+                    <div className="fact-select-client-hint-box fact-select-client-hint-box--info">
+                      <small>✓ Los ítems se cargaron desde la factura.</small>
+                    </div>
+                  ) : type === "Recibo" && selectedClient && invoicesWithoutReceipt.length === 0 ? (
+                    <div className="fact-select-client-hint-box fact-select-client-hint-box--ok">
+                      <small>Este cliente no tiene facturas a crédito pendientes de cobro.</small>
                     </div>
                   ) : type === "Nota de Crédito" && selectedClient && invoicesWithoutCreditNote.length === 0 ? (
                     <div className="fact-select-client-hint-box fact-select-client-hint-box--danger">
@@ -1185,7 +1258,7 @@ export function FacturacionMineriaPage() {
 
                 <div
                   className="fact-field fact-field--doc-extra-bottom"
-                  aria-hidden={type !== "Nota de Crédito"}
+                  aria-hidden={type !== "Nota de Crédito" && type !== "Recibo"}
                 >
                 {/* Selector de factura relacionada para Nota de Crédito */}
                 {type === "Nota de Crédito" && (
@@ -1206,6 +1279,7 @@ export function FacturacionMineriaPage() {
                           {invoicesWithoutCreditNote.map((inv) => (
                             <option key={inv.id} value={inv.id}>
                               {inv.number} - {inv.date} - Total: {formatUSD(Math.abs(inv.total))}
+                              {isAsicEquipmentSaleInvoice(inv) ? " (Comp. pago)" : ""}
                             </option>
                           ))}
                         </select>
@@ -1220,6 +1294,43 @@ export function FacturacionMineriaPage() {
                     ) : null}
                   </div>
                 )}
+                {type === "Recibo" && (
+                  <div className="fact-field" style={{ borderTop: "none", paddingTop: 0, marginTop: 0 }}>
+                    <label className="fact-label" style={{ fontWeight: "bold", color: "#fff" }}>
+                      <span style={{ fontSize: "1.3em", lineHeight: 1 }}>🧾</span> Factura abonada (Requerido)
+                    </label>
+                    {selectedClient ? (
+                      <>
+                        <select
+                          className="fact-select"
+                          value={relatedInvoiceId}
+                          onChange={(e) => setRelatedInvoiceId(e.target.value)}
+                          style={{ border: relatedInvoiceId ? "2px solid #0d6efd" : "1px solid #ced4da" }}
+                        >
+                          <option value="">-- Seleccione factura --</option>
+                          {invoicesWithoutReceipt.map((inv) => (
+                            <option key={inv.id} value={inv.id}>
+                              {inv.number} - {inv.date} - Total: {formatUSD(Math.abs(inv.total))}
+                            </option>
+                          ))}
+                        </select>
+                      </>
+                    ) : null}
+                    <div className="fact-field" style={{ borderTop: "none", paddingTop: "0.65rem", marginTop: "0.35rem" }}>
+                      <label className="fact-label" style={{ fontWeight: "bold", color: "#ffcdd2" }}>
+                        📅 Fecha de pago (Requerido)
+                      </label>
+                      <input
+                        type="date"
+                        className="fact-input"
+                        value={paymentDate}
+                        onChange={(e) => setPaymentDate(e.target.value)}
+                        style={{ border: paymentDate ? "2px solid #0d6efd" : "2px solid #dc3545" }}
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
                 </div>
               </div>
             </div>
@@ -1232,14 +1343,14 @@ export function FacturacionMineriaPage() {
                 <div className="fact-detail-servicios-outer">
                   <div className="fact-detail-servicios-container">
                     <div className="card fact-detail-servicios-card">
-                      <div className="fact-detail-servicios-header" style={{ marginBottom: type === "Nota de Crédito" && !relatedInvoiceId ? "1.5rem" : undefined }}>
+                      <div className="fact-detail-servicios-header" style={{ marginBottom: (type === "Nota de Crédito" || type === "Recibo") && !relatedInvoiceId ? "1.5rem" : undefined }}>
                         <h2 className="fact-detail-servicios-title"><span style={{ fontSize: "1.25em", lineHeight: 1 }}>📋</span> Detalle de servicios</h2>
                         <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
                           <button
                             type="button"
                             className="fact-detail-servicios-btn-clear"
                             onClick={() => !itemsLocked && setItems([])}
-                            disabled={itemsLocked || (type === "Nota de Crédito" && !relatedInvoiceId) || !selectedClient || items.length === 0}
+                            disabled={itemsLocked || ((type === "Nota de Crédito" || type === "Recibo") && !relatedInvoiceId) || !selectedClient || items.length === 0}
                             title={itemsLocked ? "Los detalles están bloqueados" : !selectedClient ? "Primero debe seleccionar un cliente" : items.length === 0 ? "No hay ítems para borrar" : "Vaciar lista de ítems"}
                           >
                             🗑️ Borrar
@@ -1248,8 +1359,8 @@ export function FacturacionMineriaPage() {
                             type="button"
                             className="fact-detail-servicios-btn-add"
                             onClick={addItem}
-                            disabled={itemsLocked || (type === "Nota de Crédito" && !relatedInvoiceId) || !selectedClient}
-                            title={itemsLocked ? "Los detalles están bloqueados porque vienen de un comprobante relacionado" : !selectedClient ? "Primero debe seleccionar un cliente" : type === "Nota de Crédito" && !relatedInvoiceId ? "Primero debe seleccionar un comprobante a cancelar" : (type === "Recibo" || type === "Nota de Crédito") && relatedInvoiceId ? "Los ítems se cargaron desde el comprobante relacionado" : ""}
+                            disabled={itemsLocked || ((type === "Nota de Crédito" || type === "Recibo") && !relatedInvoiceId) || !selectedClient}
+                            title={itemsLocked ? "Los detalles están bloqueados porque vienen de un comprobante relacionado" : !selectedClient ? "Primero debe seleccionar un cliente" : type === "Recibo" && !relatedInvoiceId ? "Primero debe seleccionar la factura abonada" : type === "Nota de Crédito" && !relatedInvoiceId ? "Primero debe seleccionar un comprobante a cancelar" : (type === "Recibo" || type === "Nota de Crédito") && relatedInvoiceId ? "Los ítems se cargaron desde el comprobante relacionado" : ""}
                           >
                             + Agregar ítem
                           </button>
@@ -1259,6 +1370,13 @@ export function FacturacionMineriaPage() {
                         <div style={{ padding: "1rem", backgroundColor: "rgba(255, 193, 7, 0.2)", border: "1px solid rgba(255, 193, 7, 0.6)", borderRadius: "10px", marginBottom: "1rem" }}>
                           <small style={{ fontWeight: "bold", color: "#fff" }}>
                             ⚠️ Para crear una Nota de Crédito, primero debe seleccionar un comprobante a cancelar en el panel izquierdo.
+                          </small>
+                        </div>
+                      )}
+                      {type === "Recibo" && !relatedInvoiceId && (
+                        <div style={{ padding: "1rem", backgroundColor: "rgba(255, 193, 7, 0.2)", border: "1px solid rgba(255, 193, 7, 0.6)", borderRadius: "10px", marginBottom: "1rem" }}>
+                          <small style={{ fontWeight: "bold", color: "#fff" }}>
+                            ⚠️ El Recibo cierra una Factura a crédito. Seleccioná la factura abonada en el panel izquierdo.
                           </small>
                         </div>
                       )}
@@ -1289,7 +1407,9 @@ export function FacturacionMineriaPage() {
                               <p className="fact-detail-servicios-empty-text">
                                 {type === "Nota de Crédito" && !relatedInvoiceId
                                   ? "Seleccioná un comprobante a cancelar en el panel izquierdo para cargar los ítems."
-                                  : "Agregá tu primer ítem para armar el comprobante."}
+                                  : type === "Recibo" && !relatedInvoiceId
+                                    ? "Seleccioná la factura abonada en el panel izquierdo para cargar los ítems."
+                                    : "Agregá tu primer ítem para armar el comprobante."}
                               </p>
                             </td>
                           </tr>
@@ -1786,7 +1906,8 @@ export function FacturacionMineriaPage() {
                           : undefined
                       }
                       documentContext={
-                        previewEmitted.invoice.type === "Factura" ? "comprobante-pago" : undefined
+                        previewEmitted.invoice.documentContext ??
+                        (previewEmitted.invoice.type === "Factura" ? "comprobante-pago" : undefined)
                       }
                     />
                   ) : selectedClient && items.length > 0 ? (
@@ -1801,7 +1922,7 @@ export function FacturacionMineriaPage() {
                       total={totals.total}
                       dueDateDays={dueDateDays}
                       relatedInvoiceNumber={
-                        type === "Nota de Crédito"
+                        type === "Nota de Crédito" || type === "Recibo"
                           ? invoicesAll.find((i) => String(i.id) === String(relatedInvoiceId))?.number
                           : undefined
                       }

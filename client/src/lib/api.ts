@@ -1953,6 +1953,7 @@ export type InvoiceCreateBody = {
   emissionTime?: string;
   dueDate?: string;
   source?: "hosting" | "asic";
+  documentContext?: "factura" | "comprobante-pago" | "garantia-ande";
 };
 export type InvoiceCreateResponse = { invoice: { id: number; number: string; type: string; clientName: string; date: string; month: string; subtotal: number; discounts: number; total: number } };
 
@@ -1964,7 +1965,7 @@ export function createInvoice(body: InvoiceCreateBody): Promise<InvoiceCreateRes
 }
 
 /** Listar facturas/recibos/NC desde la base de datos (filtros opcionales). */
-export type InvoicesListResponse = { invoices: Array<{ id: number; number: string; type: string; clientName: string; date: string; month: string; subtotal: number; discounts: number; total: number; relatedInvoiceId?: number; relatedInvoiceNumber?: string; paymentDate?: string; emissionTime?: string; dueDate?: string; source?: string }> };
+export type InvoicesListResponse = { invoices: Array<{ id: number; number: string; type: string; clientName: string; date: string; month: string; subtotal: number; discounts: number; total: number; relatedInvoiceId?: number; relatedInvoiceNumber?: string; paymentDate?: string; emissionTime?: string; dueDate?: string; source?: string; documentContext?: "factura" | "comprobante-pago" | "garantia-ande" }> };
 
 export function getInvoices(params?: { client?: string; type?: "Factura" | "Recibo" | "Nota de Crédito"; month?: string; source?: "hosting" | "asic" }): Promise<InvoicesListResponse> {
   const sp = new URLSearchParams();
@@ -1994,6 +1995,7 @@ export type InvoiceWithItemsResponse = {
     emissionTime?: string;
     dueDate?: string;
     source?: string;
+    documentContext?: "factura" | "comprobante-pago" | "garantia-ande";
     items: Array<{ service: string; month: string; quantity: number; price: number; discount: number }>;
   };
 };

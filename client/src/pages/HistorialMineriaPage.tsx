@@ -14,7 +14,7 @@ import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import { canDeleteHistorial, canExport } from "../lib/auth";
 import { formatCurrency, formatCurrencyNumber } from "../lib/formatCurrency";
-import { isAsicEquipmentSaleInvoice } from "../lib/asicDocumentKind";
+import { isAsicEquipmentSaleInvoice, resolveAsicInvoiceDocumentContext } from "../lib/asicDocumentKind";
 import { buildAsicComprobantePdfFilename } from "../lib/asicPdfFilename";
 import "../styles/facturacion.css";
 
@@ -659,7 +659,7 @@ export function HistorialMineriaPage() {
           total: inv.total || 0,
           relatedInvoiceNumber: relatedInvoiceNumberForPdf,
           creditNoteMode: inferredNcMode,
-          documentContext: isAsicEquipmentSaleInvoice(inv) ? "comprobante-pago" : undefined,
+          documentContext: resolveAsicInvoiceDocumentContext(inv),
         },
         { logoBase64 }
       );
@@ -671,7 +671,7 @@ export function HistorialMineriaPage() {
           clientName: client.name,
           type: inv.type,
           items: validItems,
-          documentContext: isAsicEquipmentSaleInvoice(inv) ? "comprobante-pago" : undefined,
+          documentContext: resolveAsicInvoiceDocumentContext(inv),
         })
       );
       showToast("PDF generado correctamente.", "success");
@@ -1191,7 +1191,7 @@ export function HistorialMineriaPage() {
                             <div className="rounded p-3" style={{ backgroundColor: "#fff3cd", border: "1px solid #856404" }}>
                               <strong style={{ color: "#856404" }}>Pendiente de Pago</strong>
                               <div className="mt-1 small" style={{ color: "#856404" }}>
-                                Reparación / flete: emitir recibo para cerrar el cobro.
+                                Emití un Recibo para cerrar el cobro de esta factura.
                               </div>
                             </div>
                           )

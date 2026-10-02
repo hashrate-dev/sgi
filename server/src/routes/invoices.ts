@@ -34,8 +34,16 @@ const InvoiceCreateSchema = z.object({
   paymentDate: z.string().optional(),
   emissionTime: z.string().optional(),
   dueDate: z.string().optional(),
-  source: z.enum(["hosting", "asic"]).optional()
+  source: z.enum(["hosting", "asic"]).optional(),
+  documentContext: z.enum(["factura", "comprobante-pago", "garantia-ande"]).optional()
 });
+
+function rowDocumentContext(r: Record<string, unknown>): string | undefined {
+  const raw = r.documentContext ?? r.documentcontext ?? r.document_context;
+  const s = typeof raw === "string" ? raw.trim() : "";
+  if (s === "factura" || s === "comprobante-pago" || s === "garantia-ande") return s;
+  return undefined;
+}
 
 const TYPE_PREFIX: Record<string, string> = {
   "Factura": "F",
@@ -169,7 +177,7 @@ invoicesRouter.get(
       `SELECT id, number, type, ${clientNameCol()} as clientName, date, month, subtotal, discounts, total,
               related_invoice_id as relatedInvoiceId, related_invoice_number as relatedInvoiceNumber,
               payment_date as paymentDate, emission_time as emissionTime, due_date as dueDate,
-              ${sourceCol()} as source
+              ${sourceCol()} as source, document_context as documentContext
        FROM invoices ${where} ORDER BY id DESC`
     )
     .all(...params);
@@ -190,7 +198,8 @@ invoicesRouter.get(
     paymentDate: r.paymentDate ?? r.paymentdate,
     emissionTime: r.emissionTime ?? r.emissiontime ?? r.emission_time,
     dueDate: r.dueDate ?? r.duedate,
-    source: r.source
+    source: r.source,
+    documentContext: rowDocumentContext(r)
   }));
 
   res.json({ invoices });
@@ -210,7 +219,7 @@ invoicesRouter.get(
     `SELECT id, number, type, ${clientNameCol()} as clientName, date, month, subtotal, discounts, total,
             related_invoice_id as relatedInvoiceId, related_invoice_number as relatedInvoiceNumber,
             payment_date as paymentDate, emission_time as emissionTime, due_date as dueDate,
-            ${sourceCol()} as source
+            ${sourceCol()} as source, document_context as documentContext
      FROM invoices WHERE id = ?`
   ).get(id) as Record<string, unknown> | undefined;
   if (!row) {
@@ -242,6 +251,7 @@ invoicesRouter.get(
     emissionTime: row.emissionTime ?? row.emissiontime ?? row.emission_time,
     dueDate: row.dueDate ?? row.duedate,
     source: row.source,
+    documentContext: rowDocumentContext(row),
     items
   };
   res.json({ invoice });
@@ -267,6 +277,12 @@ invoicesRouter.post(
 
   const inv = parsed.data;
   const sourceVal = inv.source ?? "hosting";
+  const documentContextVal =
+    sourceVal === "asic" && inv.type === "Factura"
+      ? inv.documentContext === "factura"
+        ? "factura"
+        : "comprobante-pago"
+      : inv.documentContext || null;
   const subtotalDb = inv.type === "Recibo" || inv.type === "Nota de Crédito" ? -Math.abs(inv.subtotal) : inv.subtotal;
   const discountsDb = inv.type === "Recibo" || inv.type === "Nota de Crédito" ? -Math.abs(inv.discounts) : inv.discounts;
   const totalDb = inv.type === "Recibo" || inv.type === "Nota de Crédito" ? -Math.abs(inv.total) : inv.total;
@@ -277,8 +293,8 @@ invoicesRouter.post(
 
       const info = await tx.prepare(`
         INSERT INTO invoices (number, type, ${clientNameCol()}, date, month, subtotal, discounts, total,
-                              related_invoice_id, related_invoice_number, payment_date, emission_time, due_date, source)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                              related_invoice_id, related_invoice_number, payment_date, emission_time, due_date, source, document_context)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         numberToUse,
         inv.type,
@@ -293,7 +309,8 @@ invoicesRouter.post(
         inv.paymentDate || null,
         inv.emissionTime || null,
         inv.dueDate || null,
-        sourceVal
+        sourceVal,
+        documentContextVal
       );
       let invoiceId = Number(info.lastInsertRowid);
       if (!Number.isFinite(invoiceId) || invoiceId <= 0) {
@@ -322,7 +339,8 @@ invoicesRouter.post(
       const createdRow = await tx.prepare(
         `SELECT id, number, type, ${clientNameCol()} as clientName, date, month, subtotal, discounts, total,
                 related_invoice_id as relatedInvoiceId, related_invoice_number as relatedInvoiceNumber,
-                payment_date as paymentDate, emission_time as emissionTime, due_date as dueDate
+                payment_date as paymentDate, emission_time as emissionTime, due_date as dueDate,
+                document_context as documentContext
          FROM invoices WHERE id = ?`
       ).get(invoiceId);
       return createdRow;
