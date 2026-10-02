@@ -28,6 +28,40 @@ function displayName(c: OpsComunicacionTelegramRecipient): string {
   return "";
 }
 
+function collapseBotUserRows(list: OpsComunicacionTelegramRecipient[]): OpsComunicacionTelegramRecipient[] {
+  const alias: Record<string, string> = {
+    "8505922768": "8508922768",
+    "456234742": "456734749",
+  };
+  const byId = new Map<string, OpsComunicacionTelegramRecipient>();
+  for (const raw of list) {
+    let chatId = alias[raw.chatId] || raw.chatId;
+    const label = displayName({ ...raw, chatId }).toLowerCase();
+    const user = String(raw.username || "").toLowerCase();
+    const pool = String(raw.poolUser || "").toLowerCase();
+    if (chatId === "8505922768" || label.includes("maria noel")) chatId = "8508922768";
+    if (chatId === "884077499" || user.startsWith("reibenitez") || pool.startsWith("reibenitez") || label.startsWith("reibenitez")) {
+      chatId = "884077499";
+    }
+    const prev = byId.get(chatId);
+    const name =
+      chatId === "8508922768"
+        ? "Maria Noel Soler"
+        : chatId === "884077499"
+          ? "reibenitezb"
+          : displayName({ ...raw, chatId }) || raw.name;
+    byId.set(chatId, {
+      ...prev,
+      ...raw,
+      chatId,
+      name,
+      username: raw.username || prev?.username,
+      poolUser: (raw.poolUser || prev?.poolUser || (chatId === "884077499" ? "reibenitez" : "")).trim(),
+    });
+  }
+  return [...byId.values()];
+}
+
 export function OpsComunicacionBotUsersPage() {
   const { user, loading } = useAuth();
   const [rows, setRows] = useState<OpsComunicacionTelegramRecipient[]>([]);
@@ -46,7 +80,7 @@ export function OpsComunicacionBotUsersPage() {
     setErr("");
     try {
       const tg = await getOpsComunicacionTelegram();
-      const list = tg.recipients || [];
+      const list = collapseBotUserRows(tg.recipients || []);
       setEnabled(Boolean(tg.enabled));
       setRows(list);
       setNames(Object.fromEntries(list.map((c) => [c.chatId, displayName(c)])));
@@ -79,7 +113,7 @@ export function OpsComunicacionBotUsersPage() {
   const persist = async (next: OpsComunicacionTelegramRecipient[], removeChatId?: string) => {
     if (!next.length && !removeChatId) {
       const tg = await getOpsComunicacionTelegram();
-      const list = tg.recipients || [];
+      const list = collapseBotUserRows(tg.recipients || []);
       setEnabled(Boolean(tg.enabled));
       setRows(list);
       setNames(Object.fromEntries(list.map((c) => [c.chatId, displayName(c)])));
@@ -88,10 +122,10 @@ export function OpsComunicacionBotUsersPage() {
     }
     const saved = await putOpsComunicacionTelegram({
       enabled: enabled || next.length > 0,
-      recipients: next,
+      recipients: collapseBotUserRows(next),
       ...(removeChatId ? { removeChatId } : {}),
     });
-    const list = saved.recipients || next;
+    const list = collapseBotUserRows(saved.recipients || next);
     setRows(list);
     setNames(Object.fromEntries(list.map((c) => [c.chatId, displayName(c)])));
     setPoolUsers(Object.fromEntries(list.map((c) => [c.chatId, String(c.poolUser || "")])));
@@ -125,8 +159,8 @@ export function OpsComunicacionBotUsersPage() {
     setOk("");
     try {
       const r = await detectOpsComunicacionTelegramChats();
-      const found = r.chats || [];
-      const byId = new Map(rows.map((c) => [c.chatId, c]));
+      const found = collapseBotUserRows(r.chats || []);
+      const byId = new Map(collapseBotUserRows(rows).map((c) => [c.chatId, c]));
       for (const c of found) {
         const prev = byId.get(c.chatId);
         const name = (names[c.chatId] || "").trim() || (c.name && c.name !== c.chatId ? c.name : "") || prev?.name || c.chatId;

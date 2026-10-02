@@ -556,7 +556,12 @@ function isOpsPrivateUserId(raw: string): boolean {
 function recipientFromUnknown(x: unknown): OpsRecipient | null {
   if (x && typeof x === "object") {
     const o = x as Record<string, unknown>;
-    const chatId = canonicalOpsChatId(String(o.chatId ?? o.chat_id ?? o.id ?? ""));
+    const chatId = applyIdentityCanonical({
+      chatId: String(o.chatId ?? o.chat_id ?? o.id ?? ""),
+      name: String(o.name ?? o.title ?? ""),
+      username: String(o.username ?? ""),
+      poolUser: String(o.poolUser ?? o.pool_user ?? ""),
+    });
     if (!isOpsPrivateUserId(chatId)) return null;
     const name =
       String(o.name ?? o.title ?? "")
@@ -578,7 +583,7 @@ function recipientFromUnknown(x: unknown): OpsRecipient | null {
     else if (poolUser) row.poolUser = poolUser;
     return row;
   }
-  const chatId = canonicalOpsChatId(String(x ?? ""));
+  const chatId = applyIdentityCanonical({ chatId: String(x ?? "") });
   if (!isOpsPrivateUserId(chatId)) return null;
   return { chatId, name: chatId };
 }
@@ -602,9 +607,49 @@ const CHAT_ID_ALIASES: Record<string, string> = {
   "456234742": "456734749",
 };
 
+const IDENTITY_CANONICAL: Record<string, { chatId: string; name: string }> = {
+  "maria-noel": { chatId: "8508922768", name: "Maria Noel Soler" },
+  reibenitezb: { chatId: "884077499", name: "reibenitezb" },
+};
+
+function identityKey(r: Pick<OpsRecipient, "chatId" | "name" | "username" | "poolUser">): string | null {
+  const id = canonicalOpsChatId(r.chatId || "");
+  const name = (realRecipientName(r.name, id) || r.name || "").toLowerCase().replace(/\s+/g, " ").trim();
+  const user = String(r.username || "")
+    .toLowerCase()
+    .replace(/^@/, "")
+    .trim();
+  const pool = String(r.poolUser || "")
+    .toLowerCase()
+    .replace(/^@/, "")
+    .trim();
+  if (id === "8508922768" || id === "8505922768" || name.includes("maria noel")) return "maria-noel";
+  if (
+    id === "884077499" ||
+    user.startsWith("reibenitez") ||
+    pool.startsWith("reibenitez") ||
+    name.startsWith("reibenitez")
+  ) {
+    return "reibenitezb";
+  }
+  return null;
+}
+
 function canonicalOpsChatId(raw: string): string {
   const id = normalizeTelegramChatId(raw);
   return CHAT_ID_ALIASES[id] || id;
+}
+
+function applyIdentityCanonical(rec: Partial<OpsRecipient> & { chatId?: string }): string {
+  const id = canonicalOpsChatId(String(rec.chatId || ""));
+  const key = identityKey({
+    chatId: id,
+    name: rec.name || "",
+    username: rec.username || "",
+    poolUser: rec.poolUser || "",
+  });
+  if (key && IDENTITY_CANONICAL[key]) return IDENTITY_CANONICAL[key].chatId;
+  return id;
 }
 
 /** Semilla permanente: se suma a la lista, nunca la reemplaza. */
@@ -622,13 +667,18 @@ function mergeRecipients(...lists: OpsRecipient[][]): OpsRecipient[] {
   const byId = new Map<string, OpsRecipient>();
   for (const list of lists) {
     for (const r of list) {
-      const chatId = canonicalOpsChatId(r?.chatId || "");
+      const chatId = applyIdentityCanonical(r || {});
       if (!chatId || (byId.size >= MAX_OPS_RECIPIENTS && !byId.has(chatId))) continue;
+      const ident = identityKey({ ...r, chatId });
+      const incoming: OpsRecipient = {
+        ...r,
+        chatId,
+        name: (ident && IDENTITY_CANONICAL[ident]?.name) || realRecipientName(r.name, chatId) || r.name,
+      };
+      if (ident === "reibenitezb" && !incoming.username) incoming.username = "reibenitezb";
+      if (ident === "reibenitezb" && !incoming.poolUser) incoming.poolUser = "reibenitez";
       const prev = byId.get(chatId);
-      const incoming: OpsRecipient = { ...r, chatId };
       if (!prev) {
-        const named = realRecipientName(incoming.name, chatId);
-        if (named) incoming.name = named;
         byId.set(chatId, incoming);
         continue;
       }
@@ -643,7 +693,21 @@ function mergeRecipients(...lists: OpsRecipient[][]): OpsRecipient[] {
       byId.set(chatId, row);
     }
   }
-  return [...byId.values()].slice(0, MAX_OPS_RECIPIENTS);
+  const ordered: OpsRecipient[] = [];
+  const seen = new Set<string>();
+  for (const seed of KNOWN_OPS_BOT_ROSTER) {
+    const hit = byId.get(seed.chatId);
+    if (hit && !seen.has(hit.chatId)) {
+      ordered.push(hit);
+      seen.add(hit.chatId);
+    }
+  }
+  for (const rec of byId.values()) {
+    if (seen.has(rec.chatId)) continue;
+    ordered.push(rec);
+    seen.add(rec.chatId);
+  }
+  return ordered.slice(0, MAX_OPS_RECIPIENTS);
 }
 
 function parseRecipients(rawExtra: unknown, primaryChatId?: string): OpsRecipient[] {
@@ -708,11 +772,17 @@ async function resolveKnownOpsUsernames(token: string): Promise<OpsRecipient[]> 
   for (const username of KNOWN_OPS_BOT_USERNAMES) {
     const hit = await getTelegramChatByUsername(username, token).catch(() => null);
     if (!hit) continue;
-    out.push({
+    const chatId = applyIdentityCanonical({
       chatId: hit.chatId,
-      name: realRecipientName(hit.name, hit.chatId) || hit.name || username,
-      username,
+      name: hit.name,
+      username: hit.username || username,
       poolUser: username,
+    });
+    out.push({
+      chatId,
+      name: realRecipientName(hit.name, chatId) || hit.name || username,
+      username: chatId === "884077499" ? "reibenitezb" : username,
+      poolUser: chatId === "884077499" ? "reibenitez" : username,
     });
   }
   return out;
@@ -725,7 +795,7 @@ async function hydrateOpsRoster(current: OpsRecipient[], enabled: boolean, botTo
   const token = opsComunicacionBotToken(botToken);
   const byUser = token ? await resolveKnownOpsUsernames(token) : [];
   const next = mergeRecipients(seed, current, inbox, hist, byUser);
-  if (next.length && rosterIds(next) !== rosterIds(current)) {
+  if (next.length && (rosterIds(next) !== rosterIds(current) || JSON.stringify(next) !== JSON.stringify(mergeRecipients(current)))) {
     await writeOpsRoster(next, current.length ? enabled : true);
   }
   return next;
@@ -840,10 +910,10 @@ async function rememberOpsStartChat(row: OpsRecipient): Promise<void> {
 }
 
 async function dropOpsChatFromInbox(chatId: string): Promise<void> {
-  const id = normalizeTelegramChatId(chatId);
+  const id = applyIdentityCanonical({ chatId });
   if (!id) return;
   const cur = await loadStartInbox();
-  const next = cur.filter((x) => x.chatId !== id);
+  const next = cur.filter((x) => applyIdentityCanonical(x) !== id);
   if (next.length === cur.length) return;
   const ts = db.isPostgres ? "NOW()" : "datetime('now')";
   await db
@@ -861,19 +931,21 @@ async function ingestOpsTelegramStart(body: unknown): Promise<void> {
   if (!msg) return;
   const chat = msg.chat && typeof msg.chat === "object" ? (msg.chat as Record<string, unknown>) : null;
   if (!chat || String(chat.type ?? "") !== "private") return;
-  const chatId = normalizeTelegramChatId(String(chat.id ?? ""));
-  if (!isOpsPrivateUserId(chatId)) return;
   const username = String(chat.username ?? "")
     .replace(/^@/, "")
     .trim()
     .slice(0, 32);
-  const name = [chat.first_name, chat.last_name]
+  const rawName = [chat.first_name, chat.last_name]
     .map((x) => String(x ?? "").trim())
     .filter(Boolean)
     .join(" ")
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, 80) || username || chatId;
+    .slice(0, 80);
+  const rawId = normalizeTelegramChatId(String(chat.id ?? ""));
+  const chatId = applyIdentityCanonical({ chatId: rawId, name: rawName, username });
+  if (!isOpsPrivateUserId(chatId)) return;
+  const name = rawName || username || chatId;
   const rec: OpsRecipient = { chatId, name };
   if (username) rec.username = username;
   if (/^reibenitez/i.test(username)) rec.poolUser = "reibenitez";
@@ -2133,11 +2205,11 @@ opsComunicacionRouter.post("/ops-comunicacion/telegram", ...writeMw, async (req,
       .map(recipientFromUnknown)
       .filter((x): x is OpsRecipient => Boolean(x));
     const fromChat = recipientFromUnknown(parsed.data.chatId);
-    const removeId = normalizeTelegramChatId(String(parsed.data.removeChatId ?? ""));
+    const removeId = applyIdentityCanonical({ chatId: String(parsed.data.removeChatId ?? "") });
     let recipients: OpsRecipient[];
     if (removeId && isOpsPrivateUserId(removeId)) {
       await dropOpsChatFromInbox(removeId);
-      recipients = current.recipients.filter((x) => x.chatId !== removeId);
+      recipients = current.recipients.filter((x) => applyIdentityCanonical(x) !== removeId);
     } else if (parsed.data.recipients != null) {
       recipients = recipientsForSave(current.recipients, fromBody, true);
     } else {
