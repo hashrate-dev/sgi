@@ -172,8 +172,8 @@ export function FacturacionMineriaPage() {
   const [relatedInvoiceId, setRelatedInvoiceId] = useState<string>("");
   const [paymentDate, setPaymentDate] = useState<string>("");
   const [itemsLocked, setItemsLocked] = useState(false); // Indica si los items están bloqueados por venir de factura relacionada
-  /** Días para fecha de vencimiento (5, 6 o 7). Por defecto 6. */
-  const dueDateDays = 6;
+  /** Días para fecha de vencimiento de Factura a crédito (5, 6 o 7). Por defecto 6. */
+  const [dueDateDays, setDueDateDays] = useState<5 | 6 | 7>(6);
 
   const [invoices, setInvoices] = useState<Invoice[]>(() => loadInvoicesAsic());
   /** Facturas ASIC en base (source=asic): necesarias para Recibo/NC sobre facturas emitidas en servidor u otro equipo */
@@ -1212,9 +1212,24 @@ export function FacturacionMineriaPage() {
                       <small>Pago anticipado: cerrado al emitir, sin Recibo.</small>
                     </div>
                   ) : type === "Factura" && asicFacturaKind === "factura" ? (
-                    <div className="fact-select-client-hint-box fact-select-client-hint-box--info">
-                      <small>Factura a crédito: se cierra con Recibo al cobrar.</small>
-                    </div>
+                    <>
+                      <label className="fact-label"><span style={{ fontSize: "1.1em" }}>📅</span> Plazo de vencimiento</label>
+                      <div className="d-flex gap-2 mt-1 flex-wrap">
+                        {([5, 6, 7] as const).map((d) => (
+                          <button
+                            key={d}
+                            type="button"
+                            className={`btn btn-sm ${dueDateDays === d ? "btn-success" : "btn-outline-secondary"}`}
+                            onClick={() => setDueDateDays(d)}
+                          >
+                            {d} días
+                          </button>
+                        ))}
+                      </div>
+                      <div className="fact-select-client-hint-box fact-select-client-hint-box--info" style={{ marginTop: "0.5rem" }}>
+                        <small>Factura a crédito: se cierra con Recibo al cobrar.</small>
+                      </div>
+                    </>
                   ) : (type === "Nota de Crédito" || type === "Recibo") && !selectedClient ? (
                     <div className="fact-select-client-hint-box">
                       <small className="text-warning">
