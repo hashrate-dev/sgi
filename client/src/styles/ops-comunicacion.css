@@ -1276,8 +1276,76 @@ a.ops-com-users-btn {
 }
 
 .ops-com-hist__dest.is-sent {
-  border-color: rgba(52, 211, 153, 0.35);
-  color: #a7f3d0;
+  border-color: rgba(83, 189, 235, 0.45);
+  color: #a5e4f7;
+  gap: 0.3rem;
+}
+
+.ops-com-hist__actions {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.6rem;
+}
+
+.ops-com-receipts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ops-com-receipt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  max-width: 100%;
+  padding: 0.16rem 0.5rem 0.16rem 0.32rem;
+  border-radius: 999px;
+  border: 1px solid rgba(83, 189, 235, 0.28);
+  background: rgba(5, 16, 24, 0.6);
+  color: #dbeafe;
+  font-size: 0.72rem;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.ops-com-receipt.is-ok {
+  border-color: rgba(83, 189, 235, 0.5);
+}
+
+.ops-com-receipt.is-fail {
+  border-color: rgba(248, 113, 113, 0.45);
+  color: #fecaca;
+}
+
+.ops-com-receipt__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 11rem;
+}
+
+.ops-com-receipt__x {
+  display: inline-grid;
+  place-items: center;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: rgba(248, 113, 113, 0.25);
+  color: #fca5a5;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.ops-com-ticks {
+  display: inline-flex;
+  flex: 0 0 auto;
+  line-height: 0;
+}
+
+.ops-com-hist-modal__panel .ops-com-receipts {
+  margin: 0.45rem 0 0.15rem;
 }
 
 .ops-com-hist__head {

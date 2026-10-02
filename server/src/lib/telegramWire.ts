@@ -438,11 +438,17 @@ export function explainTelegramSendFailure(raw: string, botUsername?: string): s
   return clip(raw, 280);
 }
 
+function telegramResultMessageId(result: unknown): number {
+  if (!result || typeof result !== "object") return 0;
+  const id = Number((result as { message_id?: unknown }).message_id);
+  return Number.isFinite(id) && id > 0 ? id : 0;
+}
+
 export async function sendTelegramText(
   chatId: string,
   text: string,
   opts?: { html?: boolean; disablePreview?: boolean; token?: string }
-): Promise<void> {
+): Promise<number> {
   const chat = normalizeTelegramChatId(chatId);
   if (!chat) throw new Error("Chat ID de Telegram inválido");
   const j = await telegramFetchJson(
@@ -459,6 +465,7 @@ export async function sendTelegramText(
   if (!j.ok) throw new Error(`Telegram API: ${clip(j.description || "error", 280)}`);
   // eslint-disable-next-line no-console
   console.log(`[telegram] mensaje OK → ${chat}`);
+  return telegramResultMessageId(j.result);
 }
 
 export async function sendTelegramPhoto(
@@ -466,14 +473,14 @@ export async function sendTelegramPhoto(
   photoUrl: string,
   caption: string,
   tokenOverride?: string
-): Promise<void> {
+): Promise<number> {
   const chat = normalizeTelegramChatId(chatId);
   if (!chat) throw new Error("Chat ID de Telegram inválido");
   const photo = String(photoUrl || "").trim();
   if (!/^https?:\/\//i.test(photo)) throw new Error("URL de imagen inválida");
   const captionClipped = caption.length > 1024 ? `${caption.slice(0, 1023)}…` : caption;
   const uploaded = await uploadTelegramPhoto(chat, photo, captionClipped, tokenOverride);
-  if (uploaded) return;
+  if (uploaded) return uploaded;
   const j = await telegramFetchJson(
     "sendPhoto",
     {
@@ -488,9 +495,10 @@ export async function sendTelegramPhoto(
   if (!j.ok) throw new Error(`Telegram API: ${clip(j.description || "error", 280)}`);
   // eslint-disable-next-line no-console
   console.log(`[telegram] foto OK → ${chat}`);
+  return telegramResultMessageId(j.result);
 }
 
-async function uploadTelegramPhoto(chat: string, photoUrl: string, caption: string, tokenOverride?: string): Promise<boolean> {
+async function uploadTelegramPhoto(chat: string, photoUrl: string, caption: string, tokenOverride?: string): Promise<number | false> {
   const token = botToken(tokenOverride);
   if (!token) return false;
   const ac = new AbortController();
@@ -522,11 +530,11 @@ async function uploadTelegramPhoto(chat: string, photoUrl: string, caption: stri
       body: form,
       signal: ac.signal,
     });
-    const j = (await res.json().catch(() => ({}))) as { ok?: boolean; description?: string };
+    const j = (await res.json().catch(() => ({}))) as { ok?: boolean; description?: string; result?: unknown };
     if (!j.ok) return false;
     // eslint-disable-next-line no-console
     console.log(`[telegram] foto subida OK → ${chat}`);
-    return true;
+    return telegramResultMessageId(j.result) || 1;
   } catch {
     return false;
   } finally {

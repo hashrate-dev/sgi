@@ -99,6 +99,69 @@ function opsHistDestLabel(row: OpsComunicacionItem, recipients: OpsComunicacionT
   return hit ? opsTelegramUserLabel(hit) : dest;
 }
 
+function OpsWaTicks({ ok }: { ok: boolean }) {
+  const color = ok ? "#53bdeb" : "#64748b";
+  return (
+    <span className={`ops-com-ticks${ok ? " is-ok" : ""}`} aria-hidden>
+      <svg viewBox="0 0 16 15" width="18" height="16">
+        <path
+          fill={color}
+          d="M11.1 3.2 6.05 8.7 4.1 6.7 2.9 7.95l3.15 3.2 6.3-6.85-1.25-1.1Z"
+        />
+        <path
+          fill={color}
+          d="M14.35 3.2 9.3 8.7l-.55-.55-1.15 1.25 1.7 1.7 6.3-6.85-1.25-1.1Z"
+        />
+      </svg>
+    </span>
+  );
+}
+
+function OpsTelegramReceipts({
+  row,
+  recipients,
+}: {
+  row: OpsComunicacionItem;
+  recipients: OpsComunicacionTelegramRecipient[];
+}) {
+  const receipts = row.telegramReceipts || [];
+  if (!row.telegramSent && !receipts.length) {
+    return <span className="ops-com-hist__dest">{row.scheduledAt ? "Programado · todos los usuarios" : "Pendiente"}</span>;
+  }
+  if (!receipts.length) {
+    return (
+      <span className="ops-com-hist__dest is-sent" title="Enviado. Los envíos nuevos muestran el check por usuario.">
+        <OpsWaTicks ok />
+        Enviado a {opsHistDestLabel(row, recipients)}
+      </span>
+    );
+  }
+  return (
+    <div className="ops-com-receipts" aria-label="Confirmación de Telegram por usuario">
+      {receipts.map((r) => {
+        const who =
+          r.name && r.name !== r.chatId
+            ? r.name
+            : opsTelegramUserLabel(recipients.find((c) => c.chatId === r.chatId) || { chatId: r.chatId, name: r.chatId });
+        return (
+          <span
+            key={r.chatId}
+            className={`ops-com-receipt${r.ok ? " is-ok" : " is-fail"}`}
+            title={
+              r.ok
+                ? `Telegram aceptó el mensaje en el chat de ${who}. El bot no puede saber si lo abrieron.`
+                : `No llegó a ${who}: ${r.error || "Telegram rechazó el envío (bloqueo o chat cerrado)."}`
+            }
+          >
+            {r.ok ? <OpsWaTicks ok /> : <span className="ops-com-receipt__x">!</span>}
+            <span className="ops-com-receipt__name">{who}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 export function OpsComunicacionPage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
@@ -380,7 +443,7 @@ export function OpsComunicacionPage() {
       });
       setOk(
         sendNow
-          ? `Comunicado enviado a Telegram${
+          ? `Telegram confirmó la entrega${
               r.sentTo
                 ? ` (${r.sentTo} chat${r.sentTo === 1 ? "" : "s"} ${
                     sendToChatId
@@ -393,7 +456,7 @@ export function OpsComunicacionPage() {
                       : "privados"
                   })`
                 : ""
-            }.`
+            }. En el historial aparece el doble check por usuario.`
           : r.queued
             ? `Publicación programada para ${scheduleDate} ${scheduleTime}.`
             : "Comunicado guardado. Todavía no se envió a Telegram."
@@ -524,7 +587,7 @@ export function OpsComunicacionPage() {
             telegramRecipients.find((c) => c.chatId === sendToChatId) || { chatId: sendToChatId, name: sendToChatId }
           )
         : "todos los chats del bot";
-      setOk(`Enviado a Telegram (${who}): ${row.titulo}`);
+      setOk(`Telegram confirmó la entrega (${who}). En el historial ves el doble check por usuario: ${row.titulo}`);
       await load();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "No se pudo enviar a Telegram.");
@@ -1164,12 +1227,9 @@ export function OpsComunicacionPage() {
                     </h2>
                     <p className="ops-com-hist-modal__meta">
                       {histOpen.categoriaLabel}
-                      {histOpen.telegramSent
-                        ? ` · Enviado a ${opsHistDestLabel(histOpen, telegramRecipients)}`
-                        : histOpen.scheduledAt
-                          ? " · Programado (todos los usuarios)"
-                          : " · Pendiente"}
+                      {histOpen.telegramSent ? " · Entrega Telegram" : histOpen.scheduledAt ? " · Programado (todos los usuarios)" : " · Pendiente"}
                     </p>
+                    {histOpen.telegramSent ? <OpsTelegramReceipts row={histOpen} recipients={telegramRecipients} /> : null}
                     <OpsComPublishedStamp iso={publishedAt(histOpen)} compact />
                   </div>
                 </div>
@@ -1209,14 +1269,8 @@ export function OpsComunicacionPage() {
                     </h3>
                   </div>
                   {n.cuerpo ? <p className="crypto-news-card__summary">{n.cuerpo}</p> : null}
-                  <div className="crypto-news-card__actions">
-                    <span className={`ops-com-hist__dest${n.telegramSent ? " is-sent" : ""}`}>
-                      {n.telegramSent
-                        ? `Enviado a ${opsHistDestLabel(n, telegramRecipients)}`
-                        : n.scheduledAt
-                          ? "Programado · todos los usuarios"
-                          : "Pendiente"}
-                    </span>
+                  <div className="crypto-news-card__actions ops-com-hist__actions">
+                    <OpsTelegramReceipts row={n} recipients={telegramRecipients} />
                     <button type="button" className="ops-com-hist-full" onClick={() => setHistOpen(n)}>
                       Ver completo
                     </button>

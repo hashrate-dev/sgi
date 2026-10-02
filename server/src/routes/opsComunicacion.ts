@@ -236,6 +236,9 @@ async function ensureOpsComunicacionSchema(): Promise<void> {
     await db
       .prepare("ALTER TABLE sgi_ops_comunicacion ADD COLUMN IF NOT EXISTS telegram_dest_label TEXT NOT NULL DEFAULT ''")
       .run();
+    await db
+      .prepare("ALTER TABLE sgi_ops_comunicacion ADD COLUMN IF NOT EXISTS telegram_receipts TEXT NOT NULL DEFAULT '[]'")
+      .run();
     await db.prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS bot_token TEXT NOT NULL DEFAULT ''").run();
     await db
       .prepare("ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN IF NOT EXISTS telegram_header TEXT NOT NULL DEFAULT ''")
@@ -309,6 +312,7 @@ async function ensureOpsComunicacionSchema(): Promise<void> {
       "ALTER TABLE sgi_ops_comunicacion_mensajes ADD COLUMN is_builtin INTEGER NOT NULL DEFAULT 0",
       "ALTER TABLE sgi_ops_comunicacion ADD COLUMN telegram_dest TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE sgi_ops_comunicacion ADD COLUMN telegram_dest_label TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE sgi_ops_comunicacion ADD COLUMN telegram_receipts TEXT NOT NULL DEFAULT '[]'",
       "ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN telegram_header TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN telegram_cierre TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE sgi_ops_comunicacion_tg ADD COLUMN categories_json TEXT NOT NULL DEFAULT ''",
@@ -962,7 +966,7 @@ function resolveOpsSendDest(
 }
 
 const OPS_ITEM_COLS =
-  "id, titulo, cuerpo, categoria, image_url, telegram_sent, sent_at, scheduled_at, telegram_dest, telegram_dest_label, created_by_email, created_at";
+  "id, titulo, cuerpo, categoria, image_url, telegram_sent, sent_at, scheduled_at, telegram_dest, telegram_dest_label, telegram_receipts, created_by_email, created_at";
 
 function opsRecipientDisplayName(r: OpsRecipient): string {
   const n = String(r.name || "").trim();
@@ -983,13 +987,45 @@ function describeOpsDest(settings: TgSettings, chatId?: string | null): { dest: 
   return { dest: wanted, label: (r ? opsRecipientDisplayName(r) : wanted).slice(0, 80) };
 }
 
-async function markOpsItemSent(id: number, dest: string, label: string): Promise<void> {
+type OpsTgReceipt = { chatId: string; name: string; ok: boolean; messageId?: number; error?: string };
+
+function parseTelegramReceipts(raw: unknown): OpsTgReceipt[] {
+  const s = String(raw ?? "").trim();
+  if (!s) return [];
+  try {
+    const j = JSON.parse(s) as unknown;
+    if (!Array.isArray(j)) return [];
+    return j
+      .map((x) => {
+        if (!x || typeof x !== "object") return null;
+        const o = x as Record<string, unknown>;
+        const chatId = normalizeTelegramChatId(String(o.chatId ?? o.chat_id ?? ""));
+        if (!isOpsPrivateUserId(chatId)) return null;
+        const messageId = Number(o.messageId ?? o.message_id ?? 0);
+        const row: OpsTgReceipt = {
+          chatId,
+          name: String(o.name ?? "").trim().slice(0, 80) || chatId,
+          ok: o.ok === true,
+        };
+        if (Number.isFinite(messageId) && messageId > 0) row.messageId = messageId;
+        const err = String(o.error ?? "").trim().slice(0, 160);
+        if (err) row.error = err;
+        return row;
+      })
+      .filter((x): x is OpsTgReceipt => Boolean(x))
+      .slice(0, MAX_OPS_RECIPIENTS);
+  } catch {
+    return [];
+  }
+}
+
+async function markOpsItemSent(id: number, dest: string, label: string, receipts: OpsTgReceipt[] = []): Promise<void> {
   const sentTs = db.isPostgres ? "NOW()" : "datetime('now')";
   await db
     .prepare(
-      `UPDATE sgi_ops_comunicacion SET telegram_sent = 1, sent_at = ${sentTs}, telegram_dest = ?, telegram_dest_label = ? WHERE id = ?`
+      `UPDATE sgi_ops_comunicacion SET telegram_sent = 1, sent_at = ${sentTs}, telegram_dest = ?, telegram_dest_label = ?, telegram_receipts = ? WHERE id = ?`
     )
-    .run(dest, String(label || "").slice(0, 80), id);
+    .run(dest, String(label || "").slice(0, 80), JSON.stringify(receipts.slice(0, MAX_OPS_RECIPIENTS)), id);
 }
 
 async function enrichRecipientNames(list: OpsRecipient[]): Promise<OpsRecipient[]> {
@@ -1038,6 +1074,7 @@ function mapItem(raw: Record<string, unknown>, cats?: OpsCategory[], corteNo = 0
     corteId: formatCorteId(n),
     telegramDest: String(r.telegram_dest ?? "").trim(),
     telegramDestLabel: String(r.telegram_dest_label ?? "").trim(),
+    telegramReceipts: parseTelegramReceipts(r.telegram_receipts),
   };
 }
 
@@ -1059,29 +1096,36 @@ async function deliverToTelegram(titulo: string, cuerpo: string, categoria: stri
   });
   let sent = 0;
   let lastError = "";
+  const receipts: OpsTgReceipt[] = [];
   for (const chat of dest) {
+    const rec = settings.recipients.find((x) => x.chatId === chat);
+    const name = rec ? opsRecipientDisplayName(rec) : chat;
     try {
       const photo = String(imageUrl || "").trim();
+      let messageId = 0;
       if (/^https?:\/\//i.test(photo)) {
         try {
-          await sendTelegramPhoto(chat, photo, html, token);
-          sent += 1;
-          continue;
+          messageId = await sendTelegramPhoto(chat, photo, html, token);
         } catch {
-          /* fallback texto */
+          messageId = await sendTelegramText(chat, html, { html: true, disablePreview: true, token });
         }
+      } else {
+        messageId = await sendTelegramText(chat, html, { html: true, disablePreview: true, token });
       }
-      await sendTelegramText(chat, html, { html: true, disablePreview: true, token });
       sent += 1;
+      const row: OpsTgReceipt = { chatId: chat, name, ok: true };
+      if (messageId > 0) row.messageId = messageId;
+      receipts.push(row);
     } catch (e) {
       lastError = e instanceof Error ? e.message : String(e);
+      receipts.push({ chatId: chat, name, ok: false, error: lastError.slice(0, 160) });
     }
   }
   if (sent === 0) {
     const ident = await getTelegramBotIdentity(token).catch(() => null);
     throw new Error(explainTelegramSendFailure(lastError || "No se pudo enviar", ident?.username || getOpsTelegramBotStatus(settings.botToken).botUsernameHint));
   }
-  return sent;
+  return { sent, receipts };
 }
 
 function isQueuedItem(item: { telegramSent: boolean; scheduledAt: string }): boolean {
@@ -1117,9 +1161,9 @@ export async function flushDueOpsComunicacion(): Promise<{ sent: number; failed:
       continue;
     }
     try {
-      await deliverToTelegram(item.titulo, item.cuerpo, item.categoria, item.imageUrl, dest);
+      const delivered = await deliverToTelegram(item.titulo, item.cuerpo, item.categoria, item.imageUrl, dest);
       const who = describeOpsDest(settings, null);
-      await markOpsItemSent(item.id, who.dest, who.label);
+      await markOpsItemSent(item.id, who.dest, who.label, delivered.receipts);
       sent += 1;
     } catch {
       failed += 1;
@@ -1793,18 +1837,19 @@ opsComunicacionRouter.post("/ops-comunicacion", ...writeMw, async (req, res, nex
           item,
         });
       }
-      const sentTo = await deliverToTelegram(item.titulo, item.cuerpo, item.categoria, item.imageUrl, picked.dest);
+      const delivered = await deliverToTelegram(item.titulo, item.cuerpo, item.categoria, item.imageUrl, picked.dest);
       const who = describeOpsDest(settings, data.chatId);
-      await markOpsItemSent(item.id, who.dest, who.label);
+      await markOpsItemSent(item.id, who.dest, who.label, delivered.receipts);
       return res.json({
         ok: true,
-        sentTo,
+        sentTo: delivered.sent,
         item: {
           ...item,
           telegramSent: true,
           sentAt: new Date().toISOString(),
           telegramDest: who.dest,
           telegramDestLabel: who.label,
+          telegramReceipts: delivered.receipts,
         },
       });
     }
@@ -1997,9 +2042,9 @@ opsComunicacionRouter.post("/ops-comunicacion/:id/send", ...writeMw, async (req,
         error: { message: picked.error || "Activá Telegram y agregá al menos un cliente (chat privado) en Usuarios del bot." },
       });
     }
-    const sentTo = await deliverToTelegram(item.titulo, item.cuerpo, item.categoria, item.imageUrl, picked.dest);
+    const delivered = await deliverToTelegram(item.titulo, item.cuerpo, item.categoria, item.imageUrl, picked.dest);
     const who = describeOpsDest(settings, parsed.success ? parsed.data.chatId : undefined);
-    await markOpsItemSent(id, who.dest, who.label);
+    await markOpsItemSent(id, who.dest, who.label, delivered.receipts);
     await ingestCortesFromMessage({
       messageId: item.id,
       titulo: item.titulo,
@@ -2007,8 +2052,14 @@ opsComunicacionRouter.post("/ops-comunicacion/:id/send", ...writeMw, async (req,
     }).catch(() => undefined);
     res.json({
       ok: true,
-      sentTo,
-      item: { ...item, telegramSent: true, telegramDest: who.dest, telegramDestLabel: who.label },
+      sentTo: delivered.sent,
+      item: {
+        ...item,
+        telegramSent: true,
+        telegramDest: who.dest,
+        telegramDestLabel: who.label,
+        telegramReceipts: delivered.receipts,
+      },
     });
   } catch (e) {
     next(e);
@@ -2136,14 +2187,20 @@ opsComunicacionRouter.post("/ops-comunicacion/telegram/test", ...writeMw, async 
     if (!settings.chatIds.length) {
       return res.status(400).json({ error: { message: "Guardá primero al menos un cliente (chat privado) en la lista." } });
     }
-    const sentTo = await deliverToTelegram(
+    const delivered = await deliverToTelegram(
       "Prueba Comunicación granja HRS",
       "Si ves esto, el bot de operaciones de la granja ya funciona.",
       "general",
       "",
       settings.chatIds
     );
-    res.json({ ok: true, via: "telegram", sentTo, ...telegramPayload(settings) });
+    res.json({
+      ok: true,
+      via: "telegram",
+      sentTo: delivered.sent,
+      receipts: delivered.receipts,
+      ...telegramPayload(settings),
+    });
   } catch (e) {
     next(e);
   }

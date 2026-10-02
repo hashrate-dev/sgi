@@ -2623,6 +2623,7 @@ export type OpsComunicacionItem = {
   corteId?: string;
   telegramDest?: string;
   telegramDestLabel?: string;
+  telegramReceipts?: Array<{ chatId: string; name: string; ok: boolean; messageId?: number; error?: string }>;
 };
 
 export type OpsComunicacionTelegramRecipient = {
