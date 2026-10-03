@@ -10,6 +10,7 @@ const hostingMenuItems: Array<{ to: string; icon: string; label: string; desc: s
   { to: "/hosting/history", icon: "bi-clock-history", label: "Historial Servicios de Hosting", desc: "Ver y gestionar comprobantes por Servicios de Hosting" },
   { to: "/hosting/pending", icon: "bi-hourglass-split", label: "Pendientes de Cobro", desc: "Facturas pendientes de cobro por venta de Servicios de Hosting" },
   { to: "/hosting/email-flow", icon: "bi-envelope-check", label: "Flujo de Emails", desc: "Documentos del mes y control de envío por mail" },
+  { to: "/hosting/margen", icon: "bi-percent", label: "Margen de Hosting", desc: "Comparar ingresos cobrados vs gastos de proveedores de hosting por mes" },
   { to: "/reports", icon: "bi-graph-up", label: "Reportes", desc: "Estadísticas y análisis de facturación" },
 ];
 

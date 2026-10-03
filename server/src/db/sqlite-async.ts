@@ -817,6 +817,15 @@ CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_visitor ON marketplace_presence_
     native.exec(`CREATE INDEX IF NOT EXISTS idx_proveedores_hrs_created ON proveedores_hrs(created_at DESC)`);
   }
 
+  native.exec(`CREATE TABLE IF NOT EXISTS hosting_margin_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    supplier_numbers_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT '',
+    updated_by TEXT NOT NULL DEFAULT ''
+  )`);
+  native.exec(`INSERT OR IGNORE INTO hosting_margin_settings (id, supplier_numbers_json, updated_at, updated_by)
+    VALUES (1, '["P002","P003"]', '', '')`);
+
   try {
     native.exec("ALTER TABLE proveedores_hrs ADD COLUMN rubro TEXT NOT NULL DEFAULT ''");
   } catch (e: unknown) {

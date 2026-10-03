@@ -627,6 +627,16 @@ ALTER TABLE contabilidad_gastos ADD CONSTRAINT contabilidad_gastos_moneda_check 
 CREATE INDEX IF NOT EXISTS idx_contabilidad_gastos_fecha ON contabilidad_gastos(fecha DESC);
 CREATE INDEX IF NOT EXISTS idx_contabilidad_gastos_prov ON contabilidad_gastos(proveedor_id);
 
+CREATE TABLE IF NOT EXISTS hosting_margin_settings (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  supplier_numbers_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT '',
+  updated_by TEXT NOT NULL DEFAULT ''
+);
+INSERT INTO hosting_margin_settings (id, supplier_numbers_json, updated_at, updated_by)
+VALUES (1, '["P002","P003"]', '', '')
+ON CONFLICT (id) DO NOTHING;
+
 -- Historial de notas por equipo (monitor ASIC; equipo_id = UUID en el cliente)
 CREATE TABLE IF NOT EXISTS monitor_equipo_asic_historial (
   id BIGSERIAL PRIMARY KEY,

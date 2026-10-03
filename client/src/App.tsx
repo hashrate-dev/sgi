@@ -7,6 +7,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { FacturacionPage } from "./pages/FacturacionPage";
 import { FacturacionMineriaPage } from "./pages/FacturacionMineriaPage";
 import { HostingHubPage } from "./pages/HostingHubPage";
+import { HostingMargenPage } from "./pages/HostingMargenPage";
 import { HostingCommercialInvoicePage } from "./pages/HostingCommercialInvoicePage";
 import { GestionAdministrativaPage } from "./pages/GestionAdministrativaPage";
 import { LeadsBasePage } from "./pages/LeadsBasePage";
@@ -473,6 +474,7 @@ function App() {
             <Route path="/gestion-financiera/resumen-presupuesto" element={<ResumenPresupuestoPage />} />
             <Route path="/gestion-financiera/monitor-financiero" element={<MonitorFinancieroPage />} />
             <Route path="/hosting" element={<HostingHubPage />} />
+            <Route path="/hosting/margen" element={<HostingMargenPage />} />
             <Route path="/hosting/email-flow" element={<FacturasMesHostingPage />} />
             <Route path="/hosting/exchange-operations" element={<HostingExchangeOperationsPage />} />
             <Route path="/hosting/tipo-cambio-historial" element={<HostingTipoCambioHistorialPage />} />

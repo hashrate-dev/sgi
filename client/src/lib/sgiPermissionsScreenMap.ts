@@ -213,6 +213,16 @@ export const SGI_PERMISSION_SCREEN_MAP: readonly SgiPermissionScreenRow[] = [
     audience: ["staff"],
   },
   {
+    id: "hosting-margen",
+    zoneOrder: 20,
+    zone: "Hosting — Servicios de hosting",
+    legacyModule: "facturacion",
+    title: "Margen de hosting",
+    routes: ["/hosting/margen"],
+    accessNote: "Ingresos cobrados vs gastos de proveedores de hosting por mes.",
+    audience: ["staff", "lector"],
+  },
+  {
     id: "hosting-reports-shortcut",
     zoneOrder: 20,
     zone: "Hosting — Servicios de hosting",

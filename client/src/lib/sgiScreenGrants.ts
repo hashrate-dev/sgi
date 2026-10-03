@@ -129,6 +129,7 @@ export const HOSTING_HUB_SCREENS = [
   "hosting-history",
   "hosting-pending",
   "hosting-email-flow",
+  "hosting-margen",
   "hosting-reports-shortcut",
 ] as const;
 

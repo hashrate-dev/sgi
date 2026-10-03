@@ -654,6 +654,14 @@ CREATE TABLE IF NOT EXISTS commercial_invoice_countries (
   name TEXT NOT NULL UNIQUE,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS hosting_margin_settings (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  supplier_numbers_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT '',
+  updated_by TEXT NOT NULL DEFAULT ''
+);
+INSERT OR IGNORE INTO hosting_margin_settings (id, supplier_numbers_json, updated_at, updated_by)
+VALUES (1, '["P002","P003"]', '', '');
 `);
 
   return db;

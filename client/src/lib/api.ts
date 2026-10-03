@@ -1679,6 +1679,41 @@ export function getProveedoresHrs(): Promise<{ items: ProveedorHrs[] }> {
   return api<{ items: ProveedorHrs[] }>("/api/proveedores-hrs");
 }
 
+export type HostingMarginProveedor = { number: string; name: string };
+
+export type HostingMarginGasto = {
+  id: number;
+  fecha: string;
+  proveedorId: number;
+  supplierNumber: string;
+  supplierName: string;
+  descripcion: string;
+  mesServicio: string;
+  presupuestoMes: string;
+  moneda: string;
+  monto: number;
+};
+
+export type HostingMarginSettingsResponse = {
+  supplierNumbers: string[];
+  updatedAt?: string;
+  updatedBy?: string;
+  proveedores: HostingMarginProveedor[];
+  gastos: HostingMarginGasto[];
+  ok?: boolean;
+};
+
+export function getHostingMarginSettings(): Promise<HostingMarginSettingsResponse> {
+  return api<HostingMarginSettingsResponse>("/api/hosting/margin-settings");
+}
+
+export function putHostingMarginSettings(supplierNumbers: string[]): Promise<HostingMarginSettingsResponse> {
+  return api<HostingMarginSettingsResponse>("/api/hosting/margin-settings", {
+    method: "PUT",
+    body: JSON.stringify({ supplierNumbers }),
+  });
+}
+
 export function createProveedorHrs(body: ProveedorHrsPayload): Promise<{ ok: boolean; item: ProveedorHrs }> {
   return api<{ ok: boolean; item: ProveedorHrs }>("/api/proveedores-hrs", {
     method: "POST",
