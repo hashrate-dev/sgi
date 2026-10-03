@@ -292,7 +292,8 @@ export function HostingMargenPage() {
 
           <p className="text-muted small mb-3">
             Ingresos: cobros de hosting (Recibos menos Notas de Crédito) del historial. Gastos: USD de
-            contabilidad de los proveedores de hosting, por mes de presupuesto
+            contabilidad de los proveedores de hosting, por <strong>mes de servicio</strong> (la factura llega
+            al mes siguiente; el presupuesto queda en el mes de pago)
             {supplierSummary ? ` (${supplierSummary})` : " (ninguno elegido)"}. El margen es ingresos menos
             gastos, en USD.
           </p>

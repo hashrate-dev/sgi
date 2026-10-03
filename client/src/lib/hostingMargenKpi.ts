@@ -26,12 +26,16 @@ export type HostingMargenTotals = {
   margenPct: number | null;
 };
 
-/** Mes contable del gasto: presupuesto, si falta servicio, si falta fecha. */
+/**
+ * Mes del gasto para el margen: mes de servicio (el mes cerrado de hosting).
+ * La factura llega al mes siguiente y el presupuesto queda en ese mes de pago;
+ * el margen compara cobros del mes con el costo de ese mismo servicio.
+ */
 export function hostingGastoYm(g: Pick<ContabilidadGasto, "presupuestoMes" | "mesServicio" | "fecha">): string | null {
-  const pm = String(g.presupuestoMes ?? "").trim().slice(0, 7);
-  if (/^\d{4}-\d{2}$/.test(pm)) return pm;
   const ms = String(g.mesServicio ?? "").trim().slice(0, 7);
   if (/^\d{4}-\d{2}$/.test(ms)) return ms;
+  const pm = String(g.presupuestoMes ?? "").trim().slice(0, 7);
+  if (/^\d{4}-\d{2}$/.test(pm)) return pm;
   return yyyyMmFromDate(g.fecha);
 }
 
