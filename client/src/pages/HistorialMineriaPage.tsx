@@ -55,6 +55,12 @@ function getCreditNoteMode(creditNote: Invoice | null | undefined, factura: Invo
   return ncAbs + 0.0001 >= facAbs ? "total" : "partial";
 }
 
+function isLinkedToInvoice(comp: Invoice, factura: Invoice): boolean {
+  const matchId = comp.relatedInvoiceId != null && String(comp.relatedInvoiceId) === String(factura.id);
+  const matchNumber = comp.relatedInvoiceNumber != null && comp.relatedInvoiceNumber === factura.number;
+  return matchId || matchNumber;
+}
+
 // Función auxiliar para encontrar columna en Excel por nombres posibles
 function findCol(headerRow: (string | number)[], ...names: string[]): number {
   for (let i = 1; i < headerRow.length; i++) {
@@ -272,7 +278,7 @@ export function HistorialMineriaPage() {
     }
   }
 
-  /** Resumen: Facturas, NC y Recibos. Facturación total = facturas - NC. Cobros realizados = recibos. Pendientes = facturación - realizados (≥ 0). */
+  /** Facturación = Facturas + Comp. pago − NC. Pendiente = saldo de Facturas a crédito. Cobrado no cuenta un Recibo encima de un Comp. pago. */
   const stats = useMemo(() => {
     const src = filtered;
     const facturas = src.filter((i) => i.type === "Factura").length;
@@ -280,14 +286,18 @@ export function HistorialMineriaPage() {
     const notasCredito = src.filter((i) => i.type === "Nota de Crédito").length;
     const sumaFacturas = src.filter((i) => i.type === "Factura").reduce((s, i) => s + Math.abs(Number(i.total) || 0), 0);
     const sumaNotasCredito = src.filter((i) => i.type === "Nota de Crédito").reduce((s, i) => s + Math.abs(Number(i.total) || 0), 0);
-    const sumaRecibos = src.filter((i) => i.type === "Recibo").reduce((s, i) => s + Math.abs(Number(i.total) || 0), 0);
-    /** Venta de equipos: comprobante de pago (sin recibo) cuenta como cobrado al emitir. */
-    const sumaVentaEquipos = src
-      .filter((i) => isAsicEquipmentSaleInvoice(i))
-      .reduce((s, i) => s + Math.abs(Number(i.total) || 0), 0);
     const facturacionTotal = sumaFacturas - sumaNotasCredito;
-    const cobrosRealizados = sumaRecibos + sumaVentaEquipos;
-    const cobrosPendientes = Math.max(0, facturacionTotal - cobrosRealizados);
+    const creditFacturas = src.filter((i) => i.type === "Factura" && !isAsicEquipmentSaleInvoice(i));
+    const cobrosPendientes = creditFacturas.reduce((sum, factura) => {
+      const creditApplied = src
+        .filter((nc) => nc.type === "Nota de Crédito" && isLinkedToInvoice(nc, factura))
+        .reduce((s, nc) => s + Math.abs(Number(nc.total) || 0), 0);
+      const paidApplied = src
+        .filter((r) => r.type === "Recibo" && isLinkedToInvoice(r, factura))
+        .reduce((s, r) => s + Math.abs(Number(r.total) || 0), 0);
+      return sum + Math.max(0, Math.abs(Number(factura.total) || 0) - creditApplied - paidApplied);
+    }, 0);
+    const cobrosRealizados = Math.max(0, facturacionTotal - cobrosPendientes);
     return { facturas, recibos, notasCredito, facturacionTotal, cobrosPendientes, cobrosRealizados, registros: filtered.length };
   }, [filtered]);
 
