@@ -7,6 +7,8 @@ export type MonitorResultadoMonth = {
   ym: string;
   label: string;
   ingresos: number;
+  costosAsic: number;
+  cambioUsd: number;
   gastos: number;
   resultadoUsd: number;
   margenPct: number | null;
@@ -14,6 +16,8 @@ export type MonitorResultadoMonth = {
 
 export type MonitorResultadoKpi = {
   ingresos: number;
+  costosAsic: number;
+  cambioUsd: number;
   gastos: number;
   resultadoUsd: number;
   margenPct: number | null;
@@ -100,17 +104,21 @@ export function buildMonitorResultadoYearSeries(
   asicInvoices: InvoiceMonthNetRow[] | null | undefined
 ): MonitorResultadoMonth[] {
   const keys = chartMonthKeys(year);
-  const { hosting, asic, cambio } = monthlyTripleIngresosArrays(operations, hostingInvoices, asicInvoices, year);
+  const { hosting, asic, cambio, asicCost } = monthlyTripleIngresosArrays(operations, hostingInvoices, asicInvoices, year);
   const gastos = monthlyGastosPresupuesto12(gastosItems, year);
   return keys.map((ym, i) => {
     const ing = (hosting[i] ?? 0) + (asic[i] ?? 0);
+    const costAsic = asicCost[i] ?? 0;
+    const fx = cambio[i] ?? 0;
     const gas = gastos[i] ?? 0;
-    const resultadoUsd = ing + (cambio[i] ?? 0) - gas;
+    const resultadoUsd = ing - costAsic + fx - gas;
     const margenPct = ing > EPS ? (resultadoUsd / ing) * 100 : null;
     return {
       ym,
       label: formatMonthAxisEs(ym),
       ingresos: ing,
+      costosAsic: costAsic,
+      cambioUsd: fx,
       gastos: gas,
       resultadoUsd,
       margenPct,
@@ -128,6 +136,8 @@ export function computeMonitorResultadoKpi(
   if (mesYm != null && mesYm !== "") {
     const row = months.find((m) => m.ym === mesYm.slice(0, 7));
     const ingresos = row?.ingresos ?? 0;
+    const costosAsic = row?.costosAsic ?? 0;
+    const cambioUsd = row?.cambioUsd ?? 0;
     const gastos = row?.gastos ?? 0;
     const resultadoUsd = row?.resultadoUsd ?? 0;
     const margenPct = row?.margenPct ?? null;
@@ -141,6 +151,8 @@ export function computeMonitorResultadoKpi(
     }
     return {
       ingresos,
+      costosAsic,
+      cambioUsd,
       gastos,
       resultadoUsd,
       margenPct,
@@ -148,17 +160,19 @@ export function computeMonitorResultadoKpi(
       singleMonthMode: true,
       rangeTitle: formatMonthShortEs(mesYm),
       nMonthsPositive: resultadoUsd > EPS ? 1 : 0,
-      nMonthsWithData: ingresos > EPS || gastos > EPS ? 1 : 0,
+      nMonthsWithData: ingresos > EPS || gastos > EPS || costosAsic > EPS || Math.abs(cambioUsd) > EPS ? 1 : 0,
       chartRangeTitle,
     };
   }
 
   const ingresos = months.reduce((s, m) => s + m.ingresos, 0);
+  const costosAsic = months.reduce((s, m) => s + m.costosAsic, 0);
+  const cambioUsd = months.reduce((s, m) => s + m.cambioUsd, 0);
   const gastos = months.reduce((s, m) => s + m.gastos, 0);
   const resultadoUsd = months.reduce((s, m) => s + m.resultadoUsd, 0);
   const margenPct = ingresos > EPS ? (resultadoUsd / ingresos) * 100 : null;
   const nMonthsPositive = months.filter((m) => m.resultadoUsd > EPS).length;
-  const nMonthsWithData = months.filter((m) => m.ingresos > EPS || m.gastos > EPS).length;
+  const nMonthsWithData = months.filter((m) => m.ingresos > EPS || m.gastos > EPS || m.costosAsic > EPS || Math.abs(m.cambioUsd) > EPS).length;
   let pctVsPrevResultado: number | null = null;
   if (months.length >= 2) {
     const last = months[11]!.resultadoUsd;
@@ -167,6 +181,8 @@ export function computeMonitorResultadoKpi(
   }
   return {
     ingresos,
+    costosAsic,
+    cambioUsd,
     gastos,
     resultadoUsd,
     margenPct,

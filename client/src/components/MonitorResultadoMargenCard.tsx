@@ -119,7 +119,7 @@ export type MonitorResultadoMargenCardProps = {
 };
 
 /**
- * Resultado mensual (ingresos cobrados − gastos presupuesto) + margen %.
+ * Resultado mensual (cobros − costos ASIC − gastos + ganancia de cambio) + margen %.
  * Barras divergentes USD + línea de margen (estándar P&L).
  */
 export function MonitorResultadoMargenCard({
@@ -300,6 +300,8 @@ export function MonitorResultadoMargenCard({
                 if (!row) return [];
                 return [
                   `Ingresos (cobros): ${formatCurrency(row.ingresos)}`,
+                  `Costos ASIC: ${formatCurrency(row.costosAsic)}`,
+                  `Ganancia por cambio: ${formatCurrency(row.cambioUsd)}`,
                   `Gastos (presupuesto): ${formatCurrency(row.gastos)}`,
                 ];
               },
@@ -407,6 +409,18 @@ export function MonitorResultadoMargenCard({
               {formatCurrency(kpi.ingresos)}
             </span>
           </div>
+          <div className="d-flex justify-content-between align-items-baseline small mb-1 gap-2">
+            <span className="text-muted">Costos ASIC</span>
+            <span className="fw-bold" style={{ color: ACCENT_NEG }}>
+              {formatCurrency(kpi.costosAsic)}
+            </span>
+          </div>
+          <div className="d-flex justify-content-between align-items-baseline small mb-1 gap-2">
+            <span className="text-muted">Ganancia por cambio</span>
+            <span className="fw-bold" style={{ color: ACCENT_POS }}>
+              {formatCurrency(kpi.cambioUsd)}
+            </span>
+          </div>
           <div className="d-flex justify-content-between align-items-baseline small gap-2">
             <span className="text-muted">Gastos (presupuesto)</span>
             <span className="fw-bold" style={{ color: ACCENT_NEG }}>
@@ -500,8 +514,9 @@ export function MonitorResultadoMargenCard({
           ) : null}
         </div>
         <p className="text-muted small mb-2 mb-0" style={{ fontSize: "0.7rem", lineHeight: 1.35 }}>
-          Barras = resultado neto (cobros Hosting/ASIC + ganancia de cambio − gastos). Línea gris = promedio mensual del
-          resultado. Línea azul = margen % sobre ingresos cobrados. Ingresos por caja; gastos por mes de presupuesto.
+          Barras = resultado neto (cobros − costos ASIC + ganancia de cambio − gastos). El costo ASIC sale del
+          margen cargado en cada operación (|cobro| − margen). Línea gris = promedio mensual del resultado. Línea azul =
+          margen % sobre ingresos cobrados.
         </p>
         <div className="reportes-dash__canvas-wrap monitor-financiero-dash__canvas monitor-financiero-dash__canvas--resultado">
           <canvas

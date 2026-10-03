@@ -136,30 +136,35 @@ export function monthlyInvoiceCashCollected12(
 }
 
 /**
- * Margen ASIC por mes de caja: Comp. pago en el mes de emisión;
+ * Margen y costo ASIC por mes de caja: Comp. pago en emisión;
  * Factura a crédito prorrateada con cada Recibo / NC.
+ * El costo solo se toma si la operación tiene margen cargado (|total| − margen).
  */
-export function monthlyAsicOperationMargin12(
+function monthlyAsicMarginAndCost12(
   invoices: InvoiceMonthNetRow[] | null | undefined,
   year: number
-): number[] {
+): { margin: number[]; cost: number[] } {
   const list = Array.isArray(invoices) ? invoices : [];
   const yStr = String(year);
   const keys = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
-  const totals = keys.map(() => 0);
+  const margin = keys.map(() => 0);
+  const cost = keys.map(() => 0);
 
-  const addMargin = (mk: string | null, delta: number) => {
+  const add = (mk: string | null, marginDelta: number, costDelta: number) => {
     if (!mk || !/^\d{4}-\d{2}$/.test(mk) || mk.slice(0, 4) !== yStr) return;
     const mi = keys.indexOf(mk);
-    if (mi < 0 || !Number.isFinite(delta) || Math.abs(delta) < 0.0005) return;
-    totals[mi] += delta;
+    if (mi < 0) return;
+    if (Number.isFinite(marginDelta) && Math.abs(marginDelta) >= 0.0005) margin[mi] += marginDelta;
+    if (Number.isFinite(costDelta) && Math.abs(costDelta) >= 0.0005) cost[mi] += costDelta;
   };
 
   for (const inv of list) {
     if (!isAsicPrepaidCashInvoice(inv)) continue;
     const m = Number(inv.marginUsd);
     if (!Number.isFinite(m)) continue;
-    addMargin(cashMonthKeyFromInvoice(inv), Math.abs(m));
+    const totalAbs = Math.abs(Number(inv.total) || 0);
+    const marginAbs = Math.abs(m);
+    add(cashMonthKeyFromInvoice(inv), marginAbs, Math.max(0, totalAbs - marginAbs));
   }
 
   for (const inv of list) {
@@ -167,16 +172,31 @@ export function monthlyAsicOperationMargin12(
     if (type !== "Recibo" && type !== "Nota de Crédito") continue;
     const factura = findRelatedFactura(list, inv);
     if (!factura || isAsicPrepaidCashInvoice(factura)) continue;
-    const margin = Number(factura.marginUsd);
+    const marginRaw = Number(factura.marginUsd);
     const factAbs = Math.abs(Number(factura.total) || 0);
-    if (!Number.isFinite(margin) || factAbs < 0.0005) continue;
+    if (!Number.isFinite(marginRaw) || factAbs < 0.0005) continue;
     const share = Math.abs(Number(inv.total) || 0) / factAbs;
-    const delta = Math.abs(margin) * share;
+    const marginAbs = Math.abs(marginRaw);
+    const costAbs = Math.max(0, factAbs - marginAbs);
+    const sign = type === "Recibo" ? 1 : -1;
     const mk = cashMonthKeyFromInvoice(inv);
-    if (type === "Recibo") addMargin(mk, delta);
-    else addMargin(mk, -delta);
+    add(mk, sign * marginAbs * share, sign * costAbs * share);
   }
-  return totals;
+  return { margin, cost };
+}
+
+export function monthlyAsicOperationMargin12(
+  invoices: InvoiceMonthNetRow[] | null | undefined,
+  year: number
+): number[] {
+  return monthlyAsicMarginAndCost12(invoices, year).margin;
+}
+
+export function monthlyAsicOperationCost12(
+  invoices: InvoiceMonthNetRow[] | null | undefined,
+  year: number
+): number[] {
+  return monthlyAsicMarginAndCost12(invoices, year).cost;
 }
 
 /** @deprecated Solo devengado (Factura − NC por MES). El monitor usa `monthlyInvoiceCashCollected12`. */
@@ -228,6 +248,7 @@ export function monthlyTripleIngresosArrays(
   hosting: number[];
   asic: number[];
   asicMargin: number[];
+  asicCost: number[];
   ingresos: number[];
   margen: number[];
   combined: number[];
@@ -235,11 +256,11 @@ export function monthlyTripleIngresosArrays(
   const cambio = monthlyFxProfitTotals12(operations, year);
   const hosting = monthlyInvoiceCashCollected12(hostingInvoices, year);
   const asic = monthlyInvoiceCashCollected12(asicInvoices, year);
-  const asicMargin = monthlyAsicOperationMargin12(asicInvoices, year);
+  const { margin: asicMargin, cost: asicCost } = monthlyAsicMarginAndCost12(asicInvoices, year);
   const ingresos = hosting.map((h, i) => h + asic[i]!);
   const margen = cambio.map((c, i) => c + asicMargin[i]!);
   const combined = ingresos;
-  return { cambio, hosting, asic, asicMargin, ingresos, margen, combined };
+  return { cambio, hosting, asic, asicMargin, asicCost, ingresos, margen, combined };
 }
 
 function prevCalendarMonthYm(ym: string): string | null {
