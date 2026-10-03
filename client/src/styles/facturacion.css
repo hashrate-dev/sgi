@@ -15871,6 +15871,28 @@ button.nh-watcher-btc-card__corner-btn:hover {
 .hm-table td {
   white-space: nowrap;
 }
+.hm-table th.hm-th-prov {
+  white-space: normal;
+  min-width: 9.5rem;
+  max-width: 14rem;
+  vertical-align: bottom;
+  line-height: 1.2;
+}
+.hm-th-code {
+  display: block;
+  font-weight: 700;
+}
+.hm-th-name {
+  display: block;
+  font-weight: 500;
+  font-size: 0.72rem;
+  color: #475569;
+  text-transform: none;
+  margin-top: 0.15rem;
+}
+.hm-td-margen {
+  font-weight: 600;
+}
 .hm-prov-list {
   max-height: 320px;
   overflow: auto;

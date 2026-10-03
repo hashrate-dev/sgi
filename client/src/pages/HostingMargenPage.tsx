@@ -121,6 +121,28 @@ export function HostingMargenPage() {
   );
   const totals = useMemo(() => hostingMargenTotals(months), [months]);
 
+  const nameByCode = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of proveedores) {
+      const code = normalizeHostingSupplierCode(p.number);
+      const name = String(p.name ?? "").trim();
+      if (code && name) m.set(code, name);
+    }
+    for (const g of gastos) {
+      const code = normalizeHostingSupplierCode(g.supplierNumber);
+      const name = String(g.supplierName ?? "").trim();
+      if (code && name && !m.has(code)) m.set(code, name);
+    }
+    return m;
+  }, [proveedores, gastos]);
+
+  const supplierSummary = supplierNumbers
+    .map((c) => {
+      const name = nameByCode.get(c);
+      return name ? `${c} ${name}` : c;
+    })
+    .join(", ");
+
   useEffect(() => {
     const canvas = chartRef.current;
     if (!canvas) return;
@@ -271,7 +293,8 @@ export function HostingMargenPage() {
           <p className="text-muted small mb-3">
             Ingresos: cobros de hosting (Recibos menos Notas de Crédito) del historial. Gastos: USD de
             contabilidad de los proveedores de hosting, por mes de presupuesto
-            {supplierNumbers.length ? ` (${supplierNumbers.join(", ")})` : " (ninguno elegido)"}.
+            {supplierSummary ? ` (${supplierSummary})` : " (ninguno elegido)"}. El margen es ingresos menos
+            gastos, en USD.
           </p>
 
           {err ? <div className="alert alert-danger py-2">{err}</div> : null}
@@ -289,7 +312,7 @@ export function HostingMargenPage() {
                   <strong className="hm-kpi-val hm-kpi-val--gas">{formatCurrency(totals.gastos)}</strong>
                 </div>
                 <div className="hm-kpi">
-                  <span className="hm-kpi-label">Margen</span>
+                  <span className="hm-kpi-label">Margen USD</span>
                   <strong
                     className="hm-kpi-val"
                     style={{ color: totals.margen >= 0 ? MAR_POS : MAR_NEG }}
@@ -312,14 +335,15 @@ export function HostingMargenPage() {
                   <thead>
                     <tr>
                       <th>Mes</th>
-                      <th className="text-end">Ingresos</th>
-                      <th className="text-end">Gastos</th>
+                      <th className="text-end">Ingresos USD</th>
+                      <th className="text-end">Gastos USD</th>
                       {supplierNumbers.map((c) => (
-                        <th key={c} className="text-end">
-                          {c}
+                        <th key={c} className="text-end hm-th-prov">
+                          <span className="hm-th-code">{c}</span>
+                          <span className="hm-th-name">{nameByCode.get(c) || "Proveedor"}</span>
                         </th>
                       ))}
-                      <th className="text-end">Margen</th>
+                      <th className="text-end">Margen USD</th>
                       <th className="text-end">%</th>
                     </tr>
                   </thead>
@@ -337,10 +361,10 @@ export function HostingMargenPage() {
                           </td>
                         ))}
                         <td
-                          className="text-end"
-                          style={{ color: m.margen >= 0 ? MAR_POS : MAR_NEG, fontWeight: 600 }}
+                          className="text-end hm-td-margen"
+                          style={{ color: m.margen >= 0 ? MAR_POS : MAR_NEG }}
                         >
-                          {formatCurrencyNumber(m.margen)}
+                          {formatCurrency(m.margen)}
                         </td>
                         <td className="text-end">{formatPct(m.margenPct)}</td>
                       </tr>
@@ -356,8 +380,8 @@ export function HostingMargenPage() {
                           {formatCurrencyNumber(months.reduce((a, m) => a + (m.gastosBySupplier[c] ?? 0), 0))}
                         </th>
                       ))}
-                      <th className="text-end" style={{ color: totals.margen >= 0 ? MAR_POS : MAR_NEG }}>
-                        {formatCurrencyNumber(totals.margen)}
+                      <th className="text-end hm-td-margen" style={{ color: totals.margen >= 0 ? MAR_POS : MAR_NEG }}>
+                        {formatCurrency(totals.margen)}
                       </th>
                       <th className="text-end">{formatPct(totals.margenPct)}</th>
                     </tr>
