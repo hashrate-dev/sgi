@@ -52,21 +52,38 @@ function normalizeMedio(raw: string): string {
   return String(raw ?? "").trim();
 }
 
-function mapInvoicesToMonthRows(inv: {
-  invoices?: Array<{
-    type: string;
-    month: string;
-    total: number;
-    paymentDate?: string;
-    date?: string;
-  }>;
-}): InvoiceMonthNetRow[] {
+function mapInvoicesToMonthRows(
+  inv: {
+    invoices?: Array<{
+      id?: number;
+      number?: string;
+      type: string;
+      month: string;
+      total: number;
+      paymentDate?: string;
+      date?: string;
+      relatedInvoiceId?: number;
+      relatedInvoiceNumber?: string;
+      source?: string;
+      documentContext?: string;
+      marginUsd?: number;
+    }>;
+  },
+  defaultSource: "hosting" | "asic"
+): InvoiceMonthNetRow[] {
   return (inv.invoices ?? []).map((x) => ({
+    id: x.id,
+    number: x.number,
     type: String(x.type ?? ""),
     month: String(x.month ?? ""),
     total: Number(x.total) || 0,
     paymentDate: x.paymentDate,
     date: x.date,
+    relatedInvoiceId: x.relatedInvoiceId,
+    relatedInvoiceNumber: x.relatedInvoiceNumber,
+    source: (x.source === "asic" || x.source === "hosting" ? x.source : defaultSource),
+    documentContext: x.documentContext,
+    marginUsd: typeof x.marginUsd === "number" && Number.isFinite(x.marginUsd) ? x.marginUsd : undefined,
   }));
 }
 
@@ -170,12 +187,12 @@ export function MonitorFinancieroPage() {
         setFxOperations([]);
       }
       if (hInvSettled.status === "fulfilled") {
-        setInvoicesHosting(mapInvoicesToMonthRows(hInvSettled.value));
+        setInvoicesHosting(mapInvoicesToMonthRows(hInvSettled.value, "hosting"));
       } else {
         setInvoicesHosting([]);
       }
       if (aInvSettled.status === "fulfilled") {
-        setInvoicesAsic(mapInvoicesToMonthRows(aInvSettled.value));
+        setInvoicesAsic(mapInvoicesToMonthRows(aInvSettled.value, "asic"));
       } else {
         setInvoicesAsic([]);
       }

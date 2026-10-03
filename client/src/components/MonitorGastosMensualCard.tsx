@@ -465,7 +465,7 @@ export function MonitorGastosMensualCard({
         {totalIngresosCombinedUsd != null ? (
           <div className="pt-2 mt-2 border-top">
             <p className="reportes-dash__kpi-cell-label mb-1">% gasto prom. / ingreso prom.</p>
-            <p className="reportes-dash__kpi-cell-value mb-0" title="Gasto promedio mensual ÷ ingreso promedio mensual (Cambio + Hosting + ASIC)">
+            <p className="reportes-dash__kpi-cell-value mb-0" title="Gasto promedio mensual ÷ ingreso promedio mensual (cobros Hosting + ASIC)">
               {pctGastoPromVsIngresoProm != null ? `${pctGastoPromVsIngresoProm.toFixed(1)} %` : "—"}
             </p>
           </div>

@@ -19,23 +19,9 @@ import type { PresupuestoFilterControl } from "./MonitorGastosMensualCard";
 const ACCENT_CAMBIO = "#059669";
 const ACCENT_HOSTING = "#15803d";
 const ACCENT_ASIC = "#65a30d";
+const ACCENT_MARGEN = "#c2410c";
 
 /** Tres gamas de verde distintas; dentro de cada una, degradé por mes (4×3 como gastos). */
-const GREEN_GRADIENT_CAMBIO: readonly [string, string][] = [
-  ["#6ee7b7", "#059669"],
-  ["#6ee7b7", "#059669"],
-  ["#6ee7b7", "#059669"],
-  ["#34d399", "#047857"],
-  ["#34d399", "#047857"],
-  ["#34d399", "#047857"],
-  ["#5eead4", "#0d9488"],
-  ["#5eead4", "#0d9488"],
-  ["#5eead4", "#0d9488"],
-  ["#a7f3d0", "#10b981"],
-  ["#a7f3d0", "#10b981"],
-  ["#a7f3d0", "#10b981"],
-];
-
 const GREEN_GRADIENT_HOSTING: readonly [string, string][] = [
   ["#bbf7d0", "#15803d"],
   ["#bbf7d0", "#15803d"],
@@ -66,7 +52,7 @@ const GREEN_GRADIENT_ASIC: readonly [string, string][] = [
   ["#ecfccb", "#84cc16"],
 ];
 
-const GREEN_GRADIENT_BY_DATASET = [GREEN_GRADIENT_CAMBIO, GREEN_GRADIENT_HOSTING, GREEN_GRADIENT_ASIC] as const;
+const GREEN_GRADIENT_BY_DATASET = [GREEN_GRADIENT_HOSTING, GREEN_GRADIENT_ASIC] as const;
 
 function barGradientGreen(
   ctx2d: CanvasRenderingContext2D,
@@ -75,7 +61,7 @@ function barGradientGreen(
   datasetIndex: number,
   opacity: number
 ) {
-  const pairs = GREEN_GRADIENT_BY_DATASET[datasetIndex] ?? GREEN_GRADIENT_CAMBIO;
+  const pairs = GREEN_GRADIENT_BY_DATASET[datasetIndex] ?? GREEN_GRADIENT_HOSTING;
   const pair = pairs[monthIndex % 12]!;
   const bottom = chartArea?.bottom ?? 300;
   const top = chartArea?.top ?? 0;
@@ -151,11 +137,14 @@ function buildMonthlyTripleIngresoChartSeries(
   cambio: number[];
   hosting: number[];
   asic: number[];
+  asicMargin: number[];
+  ingresos: number[];
+  margen: number[];
   combined: number[];
   chartRangeTitle: string;
 } {
   const keys = chartMonthKeys(year);
-  const { cambio, hosting, asic, combined } = monthlyTripleIngresosArrays(
+  const { cambio, hosting, asic, asicMargin, ingresos, margen, combined } = monthlyTripleIngresosArrays(
     operations,
     invoicesHosting,
     invoicesAsic,
@@ -163,7 +152,7 @@ function buildMonthlyTripleIngresoChartSeries(
   );
   const labels = keys.map((ym) => formatMonthAxisEs(ym));
   const chartRangeTitle = `${formatMonthAxisEs(keys[0]!)} – ${formatMonthAxisEs(keys[11]!)} · ${year}`;
-  return { labels, cambio, hosting, asic, combined, chartRangeTitle };
+  return { labels, cambio, hosting, asic, asicMargin, ingresos, margen, combined, chartRangeTitle };
 }
 
 type Props = {
@@ -208,7 +197,7 @@ export function CambioGananciasMensualAreaCard({
     [mesYm, year]
   );
 
-  const chartDataKey = `triple-ingreso-bar-${year}-${mesYm ?? "all"}-${chartYearSeries.combined.join(",")}-${chartYearSeries.cambio.join(",")}`;
+  const chartDataKey = `triple-ingreso-bar-${year}-${mesYm ?? "all"}-${chartYearSeries.ingresos.join(",")}-${chartYearSeries.margen.join(",")}`;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -219,8 +208,8 @@ export function CambioGananciasMensualAreaCard({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const combined = chartYearSeries.combined;
-    const cap = combined.length ? Math.max(...combined, 0) : 0;
+    const ingresos = chartYearSeries.ingresos;
+    const cap = ingresos.length ? Math.max(...ingresos, ...chartYearSeries.margen, 0) : 0;
     const hi = highlightMonthIndex;
     const radiusTop = { topLeft: 10, topRight: 10, bottomLeft: 4, bottomRight: 4 };
 
@@ -229,21 +218,6 @@ export function CambioGananciasMensualAreaCard({
       data: {
         labels: chartYearSeries.labels,
         datasets: [
-          {
-            label: "Cambio",
-            data: chartYearSeries.cambio,
-            stack: "ing",
-            maxBarThickness: 42,
-            borderSkipped: false,
-            borderRadius: radiusTop,
-            order: 0,
-            backgroundColor(ctx: { chart: ChartInstance; dataIndex: number; datasetIndex: number }) {
-              const chart = ctx.chart;
-              const ds = ctx.datasetIndex ?? 0;
-              const op = barFillOpacityForMonthFilter(ctx.dataIndex, hi);
-              return barGradientGreen(chart.ctx, chart.chartArea, ctx.dataIndex, ds, op);
-            },
-          },
           {
             label: "Cobros hosting",
             data: chartYearSeries.hosting,
@@ -254,7 +228,7 @@ export function CambioGananciasMensualAreaCard({
             order: 1,
             backgroundColor(ctx: { chart: ChartInstance; dataIndex: number; datasetIndex: number }) {
               const chart = ctx.chart;
-              const ds = ctx.datasetIndex ?? 1;
+              const ds = ctx.datasetIndex ?? 0;
               const op = barFillOpacityForMonthFilter(ctx.dataIndex, hi);
               return barGradientGreen(chart.ctx, chart.chartArea, ctx.dataIndex, ds, op);
             },
@@ -269,23 +243,24 @@ export function CambioGananciasMensualAreaCard({
             order: 2,
             backgroundColor(ctx: { chart: ChartInstance; dataIndex: number; datasetIndex: number }) {
               const chart = ctx.chart;
-              const ds = ctx.datasetIndex ?? 2;
+              const ds = ctx.datasetIndex ?? 1;
               const op = barFillOpacityForMonthFilter(ctx.dataIndex, hi);
               return barGradientGreen(chart.ctx, chart.chartArea, ctx.dataIndex, ds, op);
             },
           },
           {
             type: "line",
-            label: "Tendencia (total)",
-            data: combined,
+            label: "Margen (cambio + ASIC)",
+            data: chartYearSeries.margen,
+            stack: "margen-line",
             yAxisID: "y",
-            borderColor: "#14532d",
+            borderColor: ACCENT_MARGEN,
             borderWidth: 2.5,
             tension: 0.35,
             pointRadius: (c) => (Number(c.dataset.data[c.dataIndex]) > 0.005 ? 5 : 0),
             pointHoverRadius: (c) => (Number(c.dataset.data[c.dataIndex]) > 0.005 ? 6 : 0),
             pointBackgroundColor: "#ffffff",
-            pointBorderColor: "#14532d",
+            pointBorderColor: ACCENT_MARGEN,
             pointBorderWidth: 2.5,
             fill: false,
             order: 10,
@@ -309,27 +284,23 @@ export function CambioGananciasMensualAreaCard({
               boxHeight: 10,
               font: { size: 10 },
               generateLabels(chart: ChartInstance) {
-                const solids = [ACCENT_CAMBIO, ACCENT_HOSTING, ACCENT_ASIC];
-                return chart.data.datasets
-                  .map((ds, i) => {
-                    if (i > 2) return null;
-                    const fill = solids[i]!;
-                    return {
-                      text: String(ds.label ?? ""),
-                      fillStyle: fill,
-                      strokeStyle: fill,
-                      lineWidth: 0,
-                      hidden: !chart.isDatasetVisible(i),
-                      datasetIndex: i,
-                      index: i,
-                    };
-                  })
-                  .filter((item): item is NonNullable<typeof item> => item != null);
+                const solids = [ACCENT_HOSTING, ACCENT_ASIC, ACCENT_MARGEN];
+                return chart.data.datasets.map((ds, i) => {
+                  const fill = solids[i] ?? "#64748b";
+                  return {
+                    text: String(ds.label ?? ""),
+                    fillStyle: fill,
+                    strokeStyle: fill,
+                    lineWidth: i === 2 ? 2 : 0,
+                    hidden: !chart.isDatasetVisible(i),
+                    datasetIndex: i,
+                    index: i,
+                  };
+                });
               },
             },
           },
           tooltip: {
-            filter: (item) => item.datasetIndex !== 3,
             callbacks: {
               title(items) {
                 const item = items[0];
@@ -341,11 +312,19 @@ export function CambioGananciasMensualAreaCard({
               afterBody(items) {
                 const i = items[0]?.dataIndex;
                 if (i == null) return [];
-                const row = chartYearSeries.combined[i];
-                if (row == null) return [];
-                return [`Total: ${formatCurrency(Number(row))}`];
+                const ing = chartYearSeries.ingresos[i] ?? 0;
+                const mar = chartYearSeries.margen[i] ?? 0;
+                const cam = chartYearSeries.cambio[i] ?? 0;
+                const am = chartYearSeries.asicMargin[i] ?? 0;
+                return [
+                  `Ingresos: ${formatCurrency(Number(ing))}`,
+                  `Margen cambio: ${formatCurrency(Number(cam))}`,
+                  `Margen ASIC: ${formatCurrency(Number(am))}`,
+                  `Margen total: ${formatCurrency(Number(mar))}`,
+                ];
               },
               label(ctx) {
+                if (ctx.datasetIndex === 2) return "";
                 const label = ctx.dataset.label ?? "";
                 const v = ctx.parsed.y;
                 if (v == null) return label;
@@ -436,8 +415,31 @@ export function CambioGananciasMensualAreaCard({
         </div>
         <div
           className="rounded-2 px-2 py-2 mb-2"
-          style={{ background: "rgba(37, 99, 235, 0.05)", border: "1px solid rgba(226, 232, 240, 0.95)" }}
+          style={{ background: "rgba(22, 101, 52, 0.06)", border: "1px solid rgba(226, 232, 240, 0.95)" }}
         >
+          <p className="reportes-dash__kpi-split-label mb-1">Ingresos</p>
+          <div className="d-flex justify-content-between align-items-baseline small mb-1 gap-2">
+            <span className="text-muted">Cobros hosting</span>
+            <span className="fw-bold" style={{ color: ACCENT_HOSTING }}>
+              {formatCurrency(triple.totalHosting)}
+            </span>
+          </div>
+          <div className="d-flex justify-content-between align-items-baseline small mb-1 gap-2">
+            <span className="text-muted">Cobros ASIC</span>
+            <span className="fw-bold" style={{ color: ACCENT_ASIC }}>
+              {formatCurrency(triple.totalAsic)}
+            </span>
+          </div>
+          <div className="reportes-dash__kpi-main" style={{ fontSize: "1.45rem" }}>
+            {formatCurrency(triple.totalIngresos)}
+          </div>
+          <CambioKpiTrend pct={triple.pctVsPrev} />
+        </div>
+        <div
+          className="rounded-2 px-2 py-2 mb-2"
+          style={{ background: "rgba(194, 65, 12, 0.06)", border: "1px solid rgba(226, 232, 240, 0.95)" }}
+        >
+          <p className="reportes-dash__kpi-split-label mb-1">Margen de ganancia</p>
           <div className="d-flex justify-content-between align-items-baseline small mb-1 gap-2">
             <span className="text-muted">Ganancia por cambio</span>
             <span className="fw-bold" style={{ color: ACCENT_CAMBIO }}>
@@ -445,31 +447,25 @@ export function CambioGananciasMensualAreaCard({
             </span>
           </div>
           <div className="d-flex justify-content-between align-items-baseline small mb-1 gap-2">
-            <span className="text-muted">Cobros hosting</span>
-            <span className="fw-bold" style={{ color: ACCENT_HOSTING }}>
-              {formatCurrency(triple.totalHosting)}
+            <span className="text-muted">Margen ASIC</span>
+            <span className="fw-bold" style={{ color: ACCENT_MARGEN }}>
+              {formatCurrency(triple.totalAsicMargin)}
             </span>
           </div>
-          <div className="d-flex justify-content-between align-items-baseline small gap-2">
-            <span className="text-muted">Cobros ASIC</span>
-            <span className="fw-bold" style={{ color: ACCENT_ASIC }}>
-              {formatCurrency(triple.totalAsic)}
-            </span>
+          <div className="reportes-dash__kpi-main" style={{ fontSize: "1.35rem", color: ACCENT_MARGEN }}>
+            {formatCurrency(triple.totalMargen)}
           </div>
-        </div>
-        <div>
-          <div className="reportes-dash__kpi-main">{formatCurrency(triple.totalCombined)}</div>
-          <CambioKpiTrend pct={triple.pctVsPrev} />
+          <CambioKpiTrend pct={triple.pctVsPrevMargen} />
         </div>
         <div className="reportes-dash__kpi-row">
           <div>
-            <p className="reportes-dash__kpi-cell-label">{triple.singleMonthMode ? "Importe del mes" : "Promedio mensual"}</p>
+            <p className="reportes-dash__kpi-cell-label">{triple.singleMonthMode ? "Ingresos del mes" : "Ingreso promedio"}</p>
             <p className="reportes-dash__kpi-cell-value">
-              {triple.singleMonthMode ? formatCurrency(triple.totalCombined) : formatCurrency(triple.avgMonthlyCombined)}
+              {triple.singleMonthMode ? formatCurrency(triple.totalIngresos) : formatCurrency(triple.avgMonthlyCombined)}
             </p>
           </div>
           <div>
-            <p className="reportes-dash__kpi-cell-label">{triple.singleMonthMode ? "Mes seleccionado" : "Mejor mes"}</p>
+            <p className="reportes-dash__kpi-cell-label">{triple.singleMonthMode ? "Mes seleccionado" : "Mejor mes (ingresos)"}</p>
             <p className="reportes-dash__kpi-cell-value">
               {triple.singleMonthMode
                 ? triple.rangeTitle !== "Sin datos"
@@ -492,19 +488,19 @@ export function CambioGananciasMensualAreaCard({
           <i
             className="bi bi-calendar3 reportes-dash__kpi-foot-calendar"
             aria-hidden
-            title="Meses con suma combinada (cambio + hosting + ASIC)"
+            title="Ingresos = cobros hosting + ASIC. Margen = ganancia de cambio + margen ASIC."
           />
         </div>
       </aside>
 
       <div className="reportes-dash__chart">
         <p className="reportes-dash__chart-title">
-          Evolución mensual — Cambio + cobros Hosting + ASIC ({chartYearSeries.chartRangeTitle}) — USD
+          Evolución mensual — Ingresos (Hosting + ASIC) y margen ({chartYearSeries.chartRangeTitle}) — USD
         </p>
         <div className="reportes-dash__canvas-wrap monitor-financiero-dash__canvas monitor-financiero-dash__canvas--combo">
           <canvas
             ref={canvasRef}
-            aria-label="Ingresos mensuales: cambio y cobros hosting y ASIC, en USD"
+            aria-label="Ingresos mensuales de hosting y ASIC, y margen (cambio + ASIC), en USD"
             role="img"
           />
         </div>

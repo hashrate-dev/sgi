@@ -77,6 +77,15 @@
   line-height: 1.15;
 }
 
+.reportes-dash__kpi-split-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #475569;
+  margin: 0;
+}
+
 .reportes-dash__kpi-trend {
   display: inline-flex;
   align-items: center;

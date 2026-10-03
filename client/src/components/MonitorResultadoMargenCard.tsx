@@ -500,8 +500,8 @@ export function MonitorResultadoMargenCard({
           ) : null}
         </div>
         <p className="text-muted small mb-2 mb-0" style={{ fontSize: "0.7rem", lineHeight: 1.35 }}>
-          Barras = resultado neto (ingresos − gastos). Línea gris = promedio mensual del resultado. Línea azul =
-          margen % sobre ingresos cobrados. Ingresos por caja; gastos por mes de presupuesto.
+          Barras = resultado neto (cobros Hosting/ASIC + ganancia de cambio − gastos). Línea gris = promedio mensual del
+          resultado. Línea azul = margen % sobre ingresos cobrados. Ingresos por caja; gastos por mes de presupuesto.
         </p>
         <div className="reportes-dash__canvas-wrap monitor-financiero-dash__canvas monitor-financiero-dash__canvas--resultado">
           <canvas

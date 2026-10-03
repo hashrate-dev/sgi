@@ -6,11 +6,25 @@ export type InvoiceMonthNetRow = {
   type: string;
   month: string;
   total: number;
+  number?: string;
   /** Recibo: fecha de cobro. */
   paymentDate?: string;
-  /** Fecha de emisión (NC, respaldo). */
+  /** Fecha de emisión (NC, respaldo, Comp. pago ASIC). */
   date?: string;
+  id?: string | number;
+  relatedInvoiceId?: string | number;
+  relatedInvoiceNumber?: string;
+  source?: string;
+  documentContext?: string;
+  marginUsd?: number;
 };
+
+/** Comp. pago ASIC (anticipo): cerrado al emitir; no usa Recibo. */
+export function isAsicPrepaidCashInvoice(inv: Pick<InvoiceMonthNetRow, "type" | "source" | "documentContext">): boolean {
+  if (String(inv.type ?? "").trim() !== "Factura") return false;
+  if (String(inv.source ?? "").trim() !== "asic") return false;
+  return String(inv.documentContext ?? "").trim() !== "factura";
+}
 
 function normalizeInvoiceMonthKey(mm: string | undefined): string {
   if (!mm || typeof mm !== "string") return "";
@@ -46,7 +60,7 @@ export function yyyyMmFromDate(raw: string | undefined): string | null {
   return null;
 }
 
-/** Mes calendario para caja: Recibo → fecha de pago; NC / devolución → fecha de emisión. */
+/** Mes calendario para caja: Recibo → fecha de pago; NC → emisión; Comp. pago ASIC → emisión. */
 export function cashMonthKeyFromInvoice(inv: InvoiceMonthNetRow): string | null {
   const type = String(inv.type ?? "").trim();
   if (type === "Recibo" || type === "Recibo Devolución") {
@@ -59,13 +73,39 @@ export function cashMonthKeyFromInvoice(inv: InvoiceMonthNetRow): string | null 
   if (type === "Nota de Crédito") {
     return yyyyMmFromDate(inv.date) ?? (normalizeInvoiceMonthKey(inv.month) || null);
   }
+  if (isAsicPrepaidCashInvoice(inv)) {
+    return (
+      yyyyMmFromDate(inv.date) ??
+      yyyyMmFromDate(inv.paymentDate) ??
+      (normalizeInvoiceMonthKey(inv.month) || null)
+    );
+  }
   return null;
+}
+
+function rowIdKey(id: string | number | undefined): string {
+  const s = String(id ?? "").trim();
+  return s;
+}
+
+function findRelatedFactura(list: InvoiceMonthNetRow[], row: InvoiceMonthNetRow): InvoiceMonthNetRow | undefined {
+  const rid = rowIdKey(row.relatedInvoiceId);
+  const rnum = String(row.relatedInvoiceNumber ?? "").trim();
+  if (rid) {
+    const byId = list.find((f) => String(f.type) === "Factura" && rowIdKey(f.id) === rid);
+    if (byId) return byId;
+  }
+  if (rnum) {
+    return list.find((f) => String(f.type) === "Factura" && String(f.number ?? "").trim() === rnum);
+  }
+  return undefined;
 }
 
 /**
  * Cobros netos por mes calendario (índice 0 = enero):
- * + Recibos (fecha de pago), − NC y recibos devolución (fecha emisión/pago).
- * No incluye facturas sin cobro (criterio «a mes vencido» / caja).
+ * + Recibos (fecha de pago), + Comp. pago ASIC (emisión), − NC y recibos devolución.
+ * No cuenta Recibo encima de un Comp. pago (evita doble cobro).
+ * No incluye Factura a crédito sin cobro.
  */
 export function monthlyInvoiceCashCollected12(
   invoices: InvoiceMonthNetRow[] | null | undefined,
@@ -82,8 +122,59 @@ export function monthlyInvoiceCashCollected12(
     const mi = keys.indexOf(mk);
     if (mi < 0) continue;
     const amt = Math.abs(Number(inv.total) || 0);
-    if (type === "Recibo") totals[mi] += amt;
-    else if (type === "Nota de Crédito" || type === "Recibo Devolución") totals[mi] -= amt;
+    if (type === "Recibo") {
+      const related = findRelatedFactura(list, inv);
+      if (related && isAsicPrepaidCashInvoice(related)) continue;
+      totals[mi] += amt;
+    } else if (type === "Nota de Crédito" || type === "Recibo Devolución") {
+      totals[mi] -= amt;
+    } else if (isAsicPrepaidCashInvoice(inv)) {
+      totals[mi] += amt;
+    }
+  }
+  return totals;
+}
+
+/**
+ * Margen ASIC por mes de caja: Comp. pago en el mes de emisión;
+ * Factura a crédito prorrateada con cada Recibo / NC.
+ */
+export function monthlyAsicOperationMargin12(
+  invoices: InvoiceMonthNetRow[] | null | undefined,
+  year: number
+): number[] {
+  const list = Array.isArray(invoices) ? invoices : [];
+  const yStr = String(year);
+  const keys = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
+  const totals = keys.map(() => 0);
+
+  const addMargin = (mk: string | null, delta: number) => {
+    if (!mk || !/^\d{4}-\d{2}$/.test(mk) || mk.slice(0, 4) !== yStr) return;
+    const mi = keys.indexOf(mk);
+    if (mi < 0 || !Number.isFinite(delta) || Math.abs(delta) < 0.0005) return;
+    totals[mi] += delta;
+  };
+
+  for (const inv of list) {
+    if (!isAsicPrepaidCashInvoice(inv)) continue;
+    const m = Number(inv.marginUsd);
+    if (!Number.isFinite(m)) continue;
+    addMargin(cashMonthKeyFromInvoice(inv), Math.abs(m));
+  }
+
+  for (const inv of list) {
+    const type = String(inv.type ?? "").trim();
+    if (type !== "Recibo" && type !== "Nota de Crédito") continue;
+    const factura = findRelatedFactura(list, inv);
+    if (!factura || isAsicPrepaidCashInvoice(factura)) continue;
+    const margin = Number(factura.marginUsd);
+    const factAbs = Math.abs(Number(factura.total) || 0);
+    if (!Number.isFinite(margin) || factAbs < 0.0005) continue;
+    const share = Math.abs(Number(inv.total) || 0) / factAbs;
+    const delta = Math.abs(margin) * share;
+    const mk = cashMonthKeyFromInvoice(inv);
+    if (type === "Recibo") addMargin(mk, delta);
+    else addMargin(mk, -delta);
   }
   return totals;
 }
@@ -124,20 +215,31 @@ export function monthlyFxProfitTotals12(operations: HostingFxOperation[] | null 
 }
 
 /**
- * Series mensuales alineadas al año (índice 0 = enero):
- * cambio por fecha de operación; hosting y ASIC por **fecha de cobro** (recibos / NC).
+ * Series mensuales alineadas al año (índice 0 = enero).
+ * Ingresos = cobros hosting + cobros ASIC (caja). Cambio y margen ASIC van aparte.
  */
 export function monthlyTripleIngresosArrays(
   operations: HostingFxOperation[] | null | undefined,
   hostingInvoices: InvoiceMonthNetRow[] | null | undefined,
   asicInvoices: InvoiceMonthNetRow[] | null | undefined,
   year: number
-): { cambio: number[]; hosting: number[]; asic: number[]; combined: number[] } {
+): {
+  cambio: number[];
+  hosting: number[];
+  asic: number[];
+  asicMargin: number[];
+  ingresos: number[];
+  margen: number[];
+  combined: number[];
+} {
   const cambio = monthlyFxProfitTotals12(operations, year);
   const hosting = monthlyInvoiceCashCollected12(hostingInvoices, year);
   const asic = monthlyInvoiceCashCollected12(asicInvoices, year);
-  const combined = cambio.map((c, i) => c + hosting[i]! + asic[i]!);
-  return { cambio, hosting, asic, combined };
+  const asicMargin = monthlyAsicOperationMargin12(asicInvoices, year);
+  const ingresos = hosting.map((h, i) => h + asic[i]!);
+  const margen = cambio.map((c, i) => c + asicMargin[i]!);
+  const combined = ingresos;
+  return { cambio, hosting, asic, asicMargin, ingresos, margen, combined };
 }
 
 function prevCalendarMonthYm(ym: string): string | null {
@@ -167,11 +269,16 @@ export type TripleKpiResult = {
   totalCambio: number;
   totalHosting: number;
   totalAsic: number;
+  totalAsicMargin: number;
+  totalIngresos: number;
+  totalMargen: number;
   totalCombined: number;
   avgMonthlyCombined: number;
+  avgMonthlyMargen: number;
   bestMonthValue: number;
   nMonthsWithData: number;
   pctVsPrev: number | null;
+  pctVsPrevMargen: number | null;
   singleMonthMode: boolean;
   rangeTitle: string;
 };
@@ -187,12 +294,31 @@ export function computeTripleKpiResult(
   asicInvoices: InvoiceMonthNetRow[] | undefined
 ): TripleKpiResult {
   const keys = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
-  const { cambio: cambio12, hosting: hosting12, asic: asic12, combined } = monthlyTripleIngresosArrays(
+  const { cambio: cambio12, hosting: hosting12, asic: asic12, asicMargin: asicMargin12, ingresos, margen } = monthlyTripleIngresosArrays(
     operations,
     hostingInvoices,
     asicInvoices,
     year
   );
+
+  const pack = (
+    totalCambio: number,
+    totalHosting: number,
+    totalAsic: number,
+    totalAsicMargin: number,
+    totalIngresos: number,
+    totalMargen: number,
+    extra: Omit<TripleKpiResult, "totalCambio" | "totalHosting" | "totalAsic" | "totalAsicMargin" | "totalIngresos" | "totalMargen" | "totalCombined">
+  ): TripleKpiResult => ({
+    totalCambio,
+    totalHosting,
+    totalAsic,
+    totalAsicMargin,
+    totalIngresos,
+    totalMargen,
+    totalCombined: totalIngresos,
+    ...extra,
+  });
 
   if (mesYm != null && mesYm !== "") {
     const mk = mesYm.trim().slice(0, 7);
@@ -200,55 +326,63 @@ export function computeTripleKpiResult(
     const totalCambio = idx >= 0 ? cambio12[idx]! : 0;
     const totalHosting = idx >= 0 ? hosting12[idx]! : 0;
     const totalAsic = idx >= 0 ? asic12[idx]! : 0;
-    const totalCombined = totalCambio + totalHosting + totalAsic;
+    const totalAsicMargin = idx >= 0 ? asicMargin12[idx]! : 0;
+    const totalIngresos = totalHosting + totalAsic;
+    const totalMargen = totalCambio + totalAsicMargin;
     const prevYm = idx >= 0 ? prevCalendarMonthYm(mk) : null;
     let pctVsPrev: number | null = null;
+    let pctVsPrevMargen: number | null = null;
     if (prevYm != null) {
       const pIdx = keys.indexOf(prevYm);
-      const prevCombined = pIdx >= 0 ? combined[pIdx]! : 0;
-      if (prevCombined !== 0) pctVsPrev = ((totalCombined - prevCombined) / prevCombined) * 100;
+      const prevIng = pIdx >= 0 ? ingresos[pIdx]! : 0;
+      const prevMar = pIdx >= 0 ? margen[pIdx]! : 0;
+      if (prevIng !== 0) pctVsPrev = ((totalIngresos - prevIng) / prevIng) * 100;
+      if (prevMar !== 0) pctVsPrevMargen = ((totalMargen - prevMar) / prevMar) * 100;
     }
-    return {
-      totalCambio,
-      totalHosting,
-      totalAsic,
-      totalCombined,
-      avgMonthlyCombined: totalCombined,
-      bestMonthValue: totalCombined,
-      nMonthsWithData: totalCombined > EPS ? 1 : 0,
+    return pack(totalCambio, totalHosting, totalAsic, totalAsicMargin, totalIngresos, totalMargen, {
+      avgMonthlyCombined: totalIngresos,
+      avgMonthlyMargen: totalMargen,
+      bestMonthValue: totalIngresos,
+      nMonthsWithData: totalIngresos > EPS || totalMargen > EPS ? 1 : 0,
       pctVsPrev,
+      pctVsPrevMargen,
       singleMonthMode: true,
       rangeTitle: idx >= 0 ? formatMonthShortEsFromKey(keys[idx]!) : "Sin datos",
-    };
+    });
   }
 
   const sumArr = (a: number[]) => a.reduce((s, x) => s + x, 0);
   const totalCambio = sumArr(cambio12);
   const totalHosting = sumArr(hosting12);
   const totalAsic = sumArr(asic12);
-  const totalCombined = sumArr(combined);
-  const avgMonthlyCombined = totalCombined / 12;
-  let bestMonthValue = combined[0] ?? 0;
+  const totalAsicMargin = sumArr(asicMargin12);
+  const totalIngresos = sumArr(ingresos);
+  const totalMargen = sumArr(margen);
+  const avgMonthlyCombined = totalIngresos / 12;
+  const avgMonthlyMargen = totalMargen / 12;
+  let bestMonthValue = ingresos[0] ?? 0;
   for (let i = 1; i < 12; i++) {
-    if ((combined[i] ?? 0) > bestMonthValue) bestMonthValue = combined[i]!;
+    if ((ingresos[i] ?? 0) > bestMonthValue) bestMonthValue = ingresos[i]!;
   }
-  const nMonthsWithData = combined.filter((v) => v > EPS).length;
+  const nMonthsWithData = ingresos.filter((v, i) => v > EPS || (margen[i] ?? 0) > EPS).length;
   let pctVsPrev: number | null = null;
-  if (combined.length >= 2) {
-    const last = combined[11]!;
-    const prev = combined[10]!;
+  let pctVsPrevMargen: number | null = null;
+  if (ingresos.length >= 2) {
+    const last = ingresos[11]!;
+    const prev = ingresos[10]!;
     if (Math.abs(prev) > EPS) pctVsPrev = ((last - prev) / prev) * 100;
+    const lastM = margen[11]!;
+    const prevM = margen[10]!;
+    if (Math.abs(prevM) > EPS) pctVsPrevMargen = ((lastM - prevM) / prevM) * 100;
   }
-  return {
-    totalCambio,
-    totalHosting,
-    totalAsic,
-    totalCombined,
+  return pack(totalCambio, totalHosting, totalAsic, totalAsicMargin, totalIngresos, totalMargen, {
     avgMonthlyCombined,
+    avgMonthlyMargen,
     bestMonthValue,
     nMonthsWithData,
     pctVsPrev,
+    pctVsPrevMargen,
     singleMonthMode: false,
     rangeTitle: "",
-  };
+  });
 }

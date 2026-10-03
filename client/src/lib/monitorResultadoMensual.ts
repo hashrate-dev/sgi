@@ -82,7 +82,7 @@ export function monthlyGastosPresupuesto12(
   return totals;
 }
 
-/** Ingresos cobrados (cambio + hosting + ASIC) por mes, índice 0 = enero. */
+/** Ingresos cobrados (Hosting + ASIC) por mes, índice 0 = enero. */
 export function monthlyIngresosCombined12(
   operations: HostingFxOperation[] | null | undefined,
   hostingInvoices: InvoiceMonthNetRow[] | null | undefined,
@@ -100,12 +100,12 @@ export function buildMonitorResultadoYearSeries(
   asicInvoices: InvoiceMonthNetRow[] | null | undefined
 ): MonitorResultadoMonth[] {
   const keys = chartMonthKeys(year);
-  const ingresos = monthlyIngresosCombined12(operations, hostingInvoices, asicInvoices, year);
+  const { hosting, asic, cambio } = monthlyTripleIngresosArrays(operations, hostingInvoices, asicInvoices, year);
   const gastos = monthlyGastosPresupuesto12(gastosItems, year);
   return keys.map((ym, i) => {
-    const ing = ingresos[i] ?? 0;
+    const ing = (hosting[i] ?? 0) + (asic[i] ?? 0);
     const gas = gastos[i] ?? 0;
-    const resultadoUsd = ing - gas;
+    const resultadoUsd = ing + (cambio[i] ?? 0) - gas;
     const margenPct = ing > EPS ? (resultadoUsd / ing) * 100 : null;
     return {
       ym,
@@ -155,7 +155,7 @@ export function computeMonitorResultadoKpi(
 
   const ingresos = months.reduce((s, m) => s + m.ingresos, 0);
   const gastos = months.reduce((s, m) => s + m.gastos, 0);
-  const resultadoUsd = ingresos - gastos;
+  const resultadoUsd = months.reduce((s, m) => s + m.resultadoUsd, 0);
   const margenPct = ingresos > EPS ? (resultadoUsd / ingresos) * 100 : null;
   const nMonthsPositive = months.filter((m) => m.resultadoUsd > EPS).length;
   const nMonthsWithData = months.filter((m) => m.ingresos > EPS || m.gastos > EPS).length;
