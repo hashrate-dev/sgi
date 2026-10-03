@@ -35,7 +35,8 @@ const InvoiceCreateSchema = z.object({
   emissionTime: z.string().optional(),
   dueDate: z.string().optional(),
   source: z.enum(["hosting", "asic"]).optional(),
-  documentContext: z.enum(["factura", "comprobante-pago", "garantia-ande"]).optional()
+  documentContext: z.enum(["factura", "comprobante-pago", "garantia-ande"]).optional(),
+  marginUsd: z.number().finite().optional()
 });
 
 function rowDocumentContext(r: Record<string, unknown>): string | undefined {
@@ -43,6 +44,13 @@ function rowDocumentContext(r: Record<string, unknown>): string | undefined {
   const s = typeof raw === "string" ? raw.trim() : "";
   if (s === "factura" || s === "comprobante-pago" || s === "garantia-ande") return s;
   return undefined;
+}
+
+function rowMarginUsd(r: Record<string, unknown>): number | undefined {
+  const raw = r.marginUsd ?? r.marginusd ?? r.margin_usd;
+  const n = typeof raw === "number" ? raw : raw == null || raw === "" ? NaN : Number(raw);
+  if (!Number.isFinite(n)) return undefined;
+  return n;
 }
 
 const TYPE_PREFIX: Record<string, string> = {
@@ -177,7 +185,7 @@ invoicesRouter.get(
       `SELECT id, number, type, ${clientNameCol()} as clientName, date, month, subtotal, discounts, total,
               related_invoice_id as relatedInvoiceId, related_invoice_number as relatedInvoiceNumber,
               payment_date as paymentDate, emission_time as emissionTime, due_date as dueDate,
-              ${sourceCol()} as source, document_context as documentContext
+              ${sourceCol()} as source, document_context as documentContext, margin_usd as marginUsd
        FROM invoices ${where} ORDER BY id DESC`
     )
     .all(...params);
@@ -199,7 +207,8 @@ invoicesRouter.get(
     emissionTime: r.emissionTime ?? r.emissiontime ?? r.emission_time,
     dueDate: r.dueDate ?? r.duedate,
     source: r.source,
-    documentContext: rowDocumentContext(r)
+    documentContext: rowDocumentContext(r),
+    marginUsd: rowMarginUsd(r)
   }));
 
   res.json({ invoices });
@@ -219,7 +228,7 @@ invoicesRouter.get(
     `SELECT id, number, type, ${clientNameCol()} as clientName, date, month, subtotal, discounts, total,
             related_invoice_id as relatedInvoiceId, related_invoice_number as relatedInvoiceNumber,
             payment_date as paymentDate, emission_time as emissionTime, due_date as dueDate,
-            ${sourceCol()} as source, document_context as documentContext
+            ${sourceCol()} as source, document_context as documentContext, margin_usd as marginUsd
      FROM invoices WHERE id = ?`
   ).get(id) as Record<string, unknown> | undefined;
   if (!row) {
@@ -252,10 +261,53 @@ invoicesRouter.get(
     dueDate: row.dueDate ?? row.duedate,
     source: row.source,
     documentContext: rowDocumentContext(row),
+    marginUsd: rowMarginUsd(row),
     items
   };
-  res.json({ invoice });
+    res.json({ invoice });
 });
+
+/** PATCH /invoices/:id/margin — ASIC: cargar o corregir margen USD de Factura / Comp. pago. */
+invoicesRouter.patch(
+  "/invoices/:id/margin",
+  requireRole("admin_a", "admin_b", "operador"),
+  requireModuleGrant("facturacion"),
+  async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) {
+      return res.status(400).json({ error: { message: "Invalid id" } });
+    }
+    const parsed = z.object({ marginUsd: z.number().finite() }).safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: { message: "marginUsd debe ser un número." } });
+    }
+    const row = (await db
+      .prepare(
+        `SELECT id, type, total, ${sourceCol()} as source FROM invoices WHERE id = ?`
+      )
+      .get(id)) as Record<string, unknown> | undefined;
+    if (!row) {
+      return res.status(404).json({ error: { message: "Invoice not found" } });
+    }
+    const source = String(row.source ?? "hosting");
+    if (source !== "asic") {
+      return res.status(400).json({ error: { message: "El margen solo se edita en documentos ASIC." } });
+    }
+    if (row.type !== "Factura") {
+      return res.status(400).json({ error: { message: "El margen solo aplica a Factura o Comprobante de pago." } });
+    }
+    const totalAbs = Math.abs(Number(row.total) || 0);
+    if (parsed.data.marginUsd < 0) {
+      return res.status(400).json({ error: { message: "El margen no puede ser negativo." } });
+    }
+    if (parsed.data.marginUsd > totalAbs + 0.009) {
+      return res.status(400).json({ error: { message: "El margen no puede ser mayor que el total del documento." } });
+    }
+    const marginUsdVal = Math.round(parsed.data.marginUsd * 100) / 100;
+    await db.prepare("UPDATE invoices SET margin_usd = ? WHERE id = ?").run(marginUsdVal, id);
+    res.json({ ok: true, marginUsd: marginUsdVal });
+  }
+);
 
 invoicesRouter.post(
   "/invoices",
@@ -283,6 +335,19 @@ invoicesRouter.post(
         ? "factura"
         : "comprobante-pago"
       : inv.documentContext || null;
+  let marginUsdVal: number | null = null;
+  if (sourceVal === "asic" && inv.type === "Factura") {
+    if (inv.marginUsd == null || !Number.isFinite(inv.marginUsd)) {
+      return res.status(400).json({ error: { message: "El margen en USD es obligatorio al emitir Factura o Comprobante de pago ASIC." } });
+    }
+    if (inv.marginUsd < 0) {
+      return res.status(400).json({ error: { message: "El margen no puede ser negativo." } });
+    }
+    if (inv.marginUsd > Math.abs(inv.total) + 0.009) {
+      return res.status(400).json({ error: { message: "El margen no puede ser mayor que el total del documento." } });
+    }
+    marginUsdVal = Math.round(inv.marginUsd * 100) / 100;
+  }
   const subtotalDb = inv.type === "Recibo" || inv.type === "Nota de Crédito" ? -Math.abs(inv.subtotal) : inv.subtotal;
   const discountsDb = inv.type === "Recibo" || inv.type === "Nota de Crédito" ? -Math.abs(inv.discounts) : inv.discounts;
   const totalDb = inv.type === "Recibo" || inv.type === "Nota de Crédito" ? -Math.abs(inv.total) : inv.total;
@@ -293,8 +358,8 @@ invoicesRouter.post(
 
       const info = await tx.prepare(`
         INSERT INTO invoices (number, type, ${clientNameCol()}, date, month, subtotal, discounts, total,
-                              related_invoice_id, related_invoice_number, payment_date, emission_time, due_date, source, document_context)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                              related_invoice_id, related_invoice_number, payment_date, emission_time, due_date, source, document_context, margin_usd)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         numberToUse,
         inv.type,
@@ -310,7 +375,8 @@ invoicesRouter.post(
         inv.emissionTime || null,
         inv.dueDate || null,
         sourceVal,
-        documentContextVal
+        documentContextVal,
+        marginUsdVal
       );
       let invoiceId = Number(info.lastInsertRowid);
       if (!Number.isFinite(invoiceId) || invoiceId <= 0) {
@@ -340,7 +406,7 @@ invoicesRouter.post(
         `SELECT id, number, type, ${clientNameCol()} as clientName, date, month, subtotal, discounts, total,
                 related_invoice_id as relatedInvoiceId, related_invoice_number as relatedInvoiceNumber,
                 payment_date as paymentDate, emission_time as emissionTime, due_date as dueDate,
-                document_context as documentContext
+                document_context as documentContext, margin_usd as marginUsd
          FROM invoices WHERE id = ?`
       ).get(invoiceId);
       return createdRow;

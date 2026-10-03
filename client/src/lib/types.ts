@@ -86,6 +86,8 @@ export type Invoice = {
   relatedInvoiceNumber?: string; // Número de la factura relacionada (para notas de crédito y recibos)
   /** ASIC: "factura" (crédito + Recibo) vs "comprobante-pago" (anticipado, sin Recibo). */
   documentContext?: import("./invoiceDocumentContext").InvoiceDocumentContext;
+  /** ASIC: margen USD de la operación (Factura / Comp. pago), cargado a mano al emitir. */
+  marginUsd?: number;
 };
 
 export type EquipoASIC = {

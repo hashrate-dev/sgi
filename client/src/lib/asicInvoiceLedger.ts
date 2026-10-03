@@ -25,6 +25,7 @@ export function mapApiInvoiceToInvoice(inv: ApiInvoiceRow): Invoice {
     emissionTime: inv.emissionTime,
     dueDate: inv.dueDate,
     documentContext: inv.documentContext,
+    marginUsd: typeof inv.marginUsd === "number" && Number.isFinite(inv.marginUsd) ? inv.marginUsd : undefined,
     items: [],
   };
 }

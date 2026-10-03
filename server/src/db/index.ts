@@ -32,6 +32,7 @@ async function loadDb() {
           /* Columnas nuevas (p.ej. lector_grants_json): garantizar aunque el split SQL del archivo fallara en algo previo */
           await ensureSupabaseCriticalUserColumns(pool);
           await ensureSupabaseClientsEmailIsNotUnique(pool);
+          await ensureSupabaseInvoiceMarginColumn(pool);
           await pool.query("SELECT 1");
         })(),
         new Promise((_, rej) =>
@@ -84,6 +85,16 @@ async function ensureSupabaseClientsEmailIsNotUnique(pool: Pool) {
     const msg = e instanceof Error ? e.message : String(e);
     // eslint-disable-next-line no-console
     console.warn("[DB] drop clients_email_key index:", msg);
+  }
+}
+
+async function ensureSupabaseInvoiceMarginColumn(pool: Pool) {
+  try {
+    await pool.query(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS margin_usd REAL`);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // eslint-disable-next-line no-console
+    console.warn("[DB] ensureSupabaseInvoiceMarginColumn:", msg);
   }
 }
 

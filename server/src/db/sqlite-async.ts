@@ -434,6 +434,12 @@ CREATE INDEX IF NOT EXISTS idx_equipos_asic_audit_created ON equipos_asic_audit(
     if (!msg.includes("duplicate column")) throw e;
   }
   try {
+    native.exec("ALTER TABLE invoices ADD COLUMN margin_usd REAL");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+  try {
     native.exec("ALTER TABLE setups ADD COLUMN codigo TEXT");
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);

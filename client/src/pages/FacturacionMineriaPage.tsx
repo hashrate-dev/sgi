@@ -53,7 +53,7 @@ import { canEditClientes, canEditEquiposInventory, canEditFacturacion, lectorAll
 import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
 import { isClienteTiendaOnline } from "../lib/clientTienda";
 import { formatCurrencyNumber, formatUSD } from "../lib/formatCurrency";
-import { isAsicEquipmentSaleInvoice } from "../lib/asicDocumentKind";
+import { asicOperationCostUsd, isAsicEquipmentSaleInvoice, parseAsicMarginUsd } from "../lib/asicDocumentKind";
 import { buildAsicComprobantePdfFilename } from "../lib/asicPdfFilename";
 import type { InvoiceDocumentContext } from "../lib/invoiceDocumentContext";
 
@@ -174,6 +174,8 @@ export function FacturacionMineriaPage() {
   const [itemsLocked, setItemsLocked] = useState(false); // Indica si los items están bloqueados por venir de factura relacionada
   /** Días para fecha de vencimiento de Factura a crédito (5, 6 o 7). Por defecto 6. */
   const [dueDateDays, setDueDateDays] = useState<5 | 6 | 7>(6);
+  /** Margen USD de la operación (solo Factura / Comp. pago). */
+  const [marginUsdInput, setMarginUsdInput] = useState("");
 
   const [invoices, setInvoices] = useState<Invoice[]>(() => loadInvoicesAsic());
   /** Facturas ASIC en base (source=asic): necesarias para Recibo/NC sobre facturas emitidas en servidor u otro equipo */
@@ -353,6 +355,11 @@ export function FacturacionMineriaPage() {
     [type, invoicesAll, nextNumFromApi]
   );
   const totals = useMemo(() => calcTotals(items), [items]);
+  const parsedMarginUsd = useMemo(() => parseAsicMarginUsd(marginUsdInput), [marginUsdInput]);
+  const operationCostUsd = useMemo(
+    () => (type === "Factura" ? asicOperationCostUsd(totals.total, parsedMarginUsd) : undefined),
+    [type, totals.total, parsedMarginUsd]
+  );
 
   const canAddHostingClient = Boolean(user && canEditClientes(user));
   const canQuickAddSetupRepFlete = Boolean(user && canEditClientes(user));
@@ -832,6 +839,20 @@ export function FacturacionMineriaPage() {
       showToast("Hay que llenar los campos para emitir el documento. El total no puede ser cero.", "error");
       return;
     }
+    if (type === "Factura") {
+      if (parsedMarginUsd == null) {
+        showToast("Ingresá el margen de la operación en USD.", "error");
+        return;
+      }
+      if (parsedMarginUsd < 0) {
+        showToast("El margen no puede ser negativo.", "error");
+        return;
+      }
+      if (parsedMarginUsd > Math.abs(totals.total) + 0.009) {
+        showToast("El margen no puede ser mayor que el total del documento.", "error");
+        return;
+      }
+    }
     if (
       type !== "Recibo" &&
       type !== "Nota de Crédito" &&
@@ -894,6 +915,7 @@ export function FacturacionMineriaPage() {
       emissionTime,
       dueDate: dueDateStr,
       documentContext: type === "Factura" ? asicFacturaDocumentContext : undefined,
+      marginUsd: type === "Factura" ? parsedMarginUsd : undefined,
     };
 
     let createdInvoice: { id: number; number: string };
@@ -1007,6 +1029,7 @@ export function FacturacionMineriaPage() {
       relatedInvoiceId: relatedInvoice?.id,
       relatedInvoiceNumber: relatedInvoice?.number,
       documentContext: type === "Factura" ? asicFacturaDocumentContext : undefined,
+      marginUsd: type === "Factura" ? parsedMarginUsd : undefined,
     };
     const hist = loadInvoicesAsic();
     hist.push(inv);
@@ -1025,6 +1048,7 @@ export function FacturacionMineriaPage() {
     setRelatedInvoiceId("");
     setPaymentDate("");
     setItemsLocked(false);
+    setMarginUsdInput("");
     getNextInvoiceNumber((type === "Recibo Devolución" ? "Recibo" : type) as "Factura" | "Recibo" | "Nota de Crédito", { peek: true }).then((r) => setNextNumFromApi(r.number)).catch(() => setNextNumFromApi(""));
   }
 
@@ -1160,6 +1184,7 @@ export function FacturacionMineriaPage() {
                           setItems([]);
                           setItemsLocked(false);
                           setPaymentDate("");
+                          if (v === "Recibo" || v === "Nota de Crédito") setMarginUsdInput("");
                           if (v === "comprobante-pago") {
                             setType("Factura");
                             setAsicFacturaKind("comprobante-pago");
@@ -1762,6 +1787,34 @@ export function FacturacionMineriaPage() {
                               <span className="fact-summary-card-value">{formatCurrencyNumber(totals.total)}</span>
                               <span className="fact-summary-card-currency">USD</span>
                             </div>
+                            {type === "Factura" && (
+                              <div className="fact-op-margin-stack">
+                                <label className="fact-op-margin-row">
+                                  <span className="fact-op-margin-label">Margen</span>
+                                  <span className="fact-op-margin-value">
+                                    <input
+                                      type="text"
+                                      inputMode="decimal"
+                                      className="fact-op-margin-input"
+                                      value={marginUsdInput}
+                                      onChange={(e) => setMarginUsdInput(e.target.value)}
+                                      placeholder="0,00"
+                                      aria-label="Margen de la operación en USD"
+                                    />
+                                    <span className="fact-op-margin-currency">USD</span>
+                                  </span>
+                                </label>
+                                <div className="fact-op-margin-row">
+                                  <span className="fact-op-margin-label">Costos</span>
+                                  <span className="fact-op-margin-value">
+                                    <span className="fact-op-margin-amount">
+                                      {operationCostUsd != null ? formatCurrencyNumber(operationCostUsd) : "—"}
+                                    </span>
+                                    <span className="fact-op-margin-currency">USD</span>
+                                  </span>
+                                </div>
+                              </div>
+                            )}
                           </div>
                           <button type="button" className="fact-detail-servicios-btn-emitir" onClick={handleClickEmitir}>
                             📄 Emitir documento

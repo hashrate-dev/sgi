@@ -1954,6 +1954,8 @@ export type InvoiceCreateBody = {
   dueDate?: string;
   source?: "hosting" | "asic";
   documentContext?: "factura" | "comprobante-pago" | "garantia-ande";
+  /** ASIC Factura / Comp. pago: margen USD de la operación. */
+  marginUsd?: number;
 };
 export type InvoiceCreateResponse = { invoice: { id: number; number: string; type: string; clientName: string; date: string; month: string; subtotal: number; discounts: number; total: number } };
 
@@ -1965,7 +1967,7 @@ export function createInvoice(body: InvoiceCreateBody): Promise<InvoiceCreateRes
 }
 
 /** Listar facturas/recibos/NC desde la base de datos (filtros opcionales). */
-export type InvoicesListResponse = { invoices: Array<{ id: number; number: string; type: string; clientName: string; date: string; month: string; subtotal: number; discounts: number; total: number; relatedInvoiceId?: number; relatedInvoiceNumber?: string; paymentDate?: string; emissionTime?: string; dueDate?: string; source?: string; documentContext?: "factura" | "comprobante-pago" | "garantia-ande" }> };
+export type InvoicesListResponse = { invoices: Array<{ id: number; number: string; type: string; clientName: string; date: string; month: string; subtotal: number; discounts: number; total: number; relatedInvoiceId?: number; relatedInvoiceNumber?: string; paymentDate?: string; emissionTime?: string; dueDate?: string; source?: string; documentContext?: "factura" | "comprobante-pago" | "garantia-ande"; marginUsd?: number }> };
 
 export function getInvoices(params?: { client?: string; type?: "Factura" | "Recibo" | "Nota de Crédito"; month?: string; source?: "hosting" | "asic" }): Promise<InvoicesListResponse> {
   const sp = new URLSearchParams();
@@ -1996,6 +1998,7 @@ export type InvoiceWithItemsResponse = {
     dueDate?: string;
     source?: string;
     documentContext?: "factura" | "comprobante-pago" | "garantia-ande";
+    marginUsd?: number;
     items: Array<{ service: string; month: string; quantity: number; price: number; discount: number }>;
   };
 };
@@ -2018,6 +2021,17 @@ export function rebuildReciboSettlement(
 /** Eliminar una factura por id (solo admin_a, admin_b). */
 export function deleteInvoice(id: number): Promise<{ ok: boolean }> {
   return api<{ ok: boolean }>(`/api/invoices/${id}`, { method: "DELETE" });
+}
+
+/** ASIC: actualizar margen USD de una Factura / Comp. pago ya emitida. */
+export function updateInvoiceMargin(
+  id: number,
+  marginUsd: number
+): Promise<{ ok: boolean; marginUsd: number }> {
+  return api<{ ok: boolean; marginUsd: number }>(`/api/invoices/${id}/margin`, {
+    method: "PATCH",
+    body: JSON.stringify({ marginUsd }),
+  });
 }
 
 /** Eliminar todas las facturas (solo admin_a). source opcional: hosting|asic. */
