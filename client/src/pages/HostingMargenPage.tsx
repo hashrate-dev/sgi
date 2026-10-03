@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import Chart from "chart.js/auto";
 import type { Chart as ChartInstance } from "chart.js";
 import { PageHeader } from "../components/PageHeader";
