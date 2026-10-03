@@ -15893,6 +15893,55 @@ button.nh-watcher-btc-card__corner-btn:hover {
 .hm-td-margen {
   font-weight: 600;
 }
+.hm-th-vs,
+.hm-td-vs {
+  white-space: nowrap;
+  min-width: 168px;
+  vertical-align: middle;
+}
+.hm-vs {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 158px;
+}
+.hm-vs--empty {
+  justify-content: center;
+  color: #94a3b8;
+  font-weight: 500;
+}
+.hm-vs-lab {
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 2.7rem;
+  line-height: 1;
+}
+.hm-vs-lab--ing {
+  color: #0ecb81;
+  text-align: right;
+}
+.hm-vs-lab--gas {
+  color: #f6465d;
+  text-align: left;
+}
+.hm-vs-track {
+  display: flex;
+  flex: 1;
+  height: 10px;
+  min-width: 88px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #e2e8f0;
+}
+.hm-vs-fill--ing {
+  height: 100%;
+  background: #0ecb81;
+}
+.hm-vs-fill--gas {
+  height: 100%;
+  background: #f6465d;
+}
 .hm-prov-list {
   max-height: 320px;
   overflow: auto;

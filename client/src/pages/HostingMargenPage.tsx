@@ -39,6 +39,38 @@ function formatPct(n: number | null): string {
   return n < 0 ? `-${abs} %` : `${abs} %`;
 }
 
+function formatSharePct(n: number): string {
+  return `${n.toFixed(1).replace(".", ",")} %`;
+}
+
+function HostingIngGasVsBar({ ingresos, gastos }: { ingresos: number; gastos: number }) {
+  const ing = Math.max(0, Number(ingresos) || 0);
+  const gas = Math.max(0, Number(gastos) || 0);
+  const sum = ing + gas;
+  if (sum < 0.0005) {
+    return (
+      <div className="hm-vs hm-vs--empty" aria-hidden>
+        —
+      </div>
+    );
+  }
+  const ingPct = (ing / sum) * 100;
+  const gasPct = (gas / sum) * 100;
+  return (
+    <div
+      className="hm-vs"
+      title={`Ingresos ${formatSharePct(ingPct)} · Gastos ${formatSharePct(gasPct)}`}
+    >
+      <span className="hm-vs-lab hm-vs-lab--ing">{formatSharePct(ingPct)}</span>
+      <div className="hm-vs-track" role="img" aria-label={`Ingresos ${formatSharePct(ingPct)}, gastos ${formatSharePct(gasPct)}`}>
+        <div className="hm-vs-fill hm-vs-fill--ing" style={{ width: `${ingPct}%` }} />
+        <div className="hm-vs-fill hm-vs-fill--gas" style={{ width: `${gasPct}%` }} />
+      </div>
+      <span className="hm-vs-lab hm-vs-lab--gas">{formatSharePct(gasPct)}</span>
+    </div>
+  );
+}
+
 export function HostingMargenPage() {
   const { user, loading: authLoading } = useAuth();
   const canEdit = canEditFacturacion(user);
@@ -338,6 +370,7 @@ export function HostingMargenPage() {
                     <tr>
                       <th>Mes</th>
                       <th className="text-end">Ingresos USD</th>
+                      <th className="text-center hm-th-vs">Ing. vs Gast.</th>
                       <th className="text-end">Gastos USD</th>
                       {supplierNumbers.map((c) => (
                         <th key={c} className="text-end hm-th-prov">
@@ -356,6 +389,9 @@ export function HostingMargenPage() {
                           {m.label} {year}
                         </td>
                         <td className="text-end">{formatCurrencyNumber(m.ingresos)}</td>
+                        <td className="hm-td-vs">
+                          <HostingIngGasVsBar ingresos={m.ingresos} gastos={m.gastos} />
+                        </td>
                         <td className="text-end">{formatCurrencyNumber(m.gastos)}</td>
                         {supplierNumbers.map((c) => (
                           <td key={c} className="text-end">
@@ -376,6 +412,9 @@ export function HostingMargenPage() {
                     <tr>
                       <th>Total {year}</th>
                       <th className="text-end">{formatCurrencyNumber(totals.ingresos)}</th>
+                      <th className="hm-td-vs">
+                        <HostingIngGasVsBar ingresos={totals.ingresos} gastos={totals.gastos} />
+                      </th>
                       <th className="text-end">{formatCurrencyNumber(totals.gastos)}</th>
                       {supplierNumbers.map((c) => (
                         <th key={c} className="text-end">
