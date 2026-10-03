@@ -292,8 +292,9 @@ export function HostingMargenPage() {
 
           <p className="text-muted small mb-3">
             Ingresos: cobros de hosting (Recibos menos Notas de Crédito) del historial. Gastos: USD de
-            contabilidad de los proveedores de hosting, por <strong>mes de servicio</strong> (la factura llega
-            al mes siguiente; el presupuesto queda en el mes de pago)
+            los proveedores de hosting, imputados al <strong>mes de servicio</strong> (P002 Digital Assets y
+            P003 Blunode facturan a mes vencido; el pago queda en el mes siguiente). Si el mes de servicio no
+            está cargado o coincide con el de presupuesto, se usa el mes anterior al pago
             {supplierSummary ? ` (${supplierSummary})` : " (ninguno elegido)"}. El margen es ingresos menos
             gastos, en USD.
           </p>

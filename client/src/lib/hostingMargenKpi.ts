@@ -26,17 +26,33 @@ export type HostingMargenTotals = {
   margenPct: number | null;
 };
 
+function isYm(raw: string): boolean {
+  return /^\d{4}-\d{2}$/.test(raw);
+}
+
+/** YYYY-MM del mes calendario anterior (pago de hosting = mes siguiente al servicio). */
+function previousCalendarYm(ym: string): string | null {
+  if (!isYm(ym)) return null;
+  const y = Number.parseInt(ym.slice(0, 4), 10);
+  const m = Number.parseInt(ym.slice(5, 7), 10);
+  const d = new Date(y, m - 2, 1);
+  if (Number.isNaN(d.getTime())) return null;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 /**
  * Mes del gasto para el margen: mes de servicio (el mes cerrado de hosting).
- * La factura llega al mes siguiente y el presupuesto queda en ese mes de pago;
- * el margen compara cobros del mes con el costo de ese mismo servicio.
+ * P002 y P003 facturan a mes vencido: el presupuesto / pago queda en el mes siguiente.
+ * Si mes de servicio falta o coincide con el de presupuesto, se usa el mes anterior al pago.
  */
 export function hostingGastoYm(g: Pick<ContabilidadGasto, "presupuestoMes" | "mesServicio" | "fecha">): string | null {
   const ms = String(g.mesServicio ?? "").trim().slice(0, 7);
-  if (/^\d{4}-\d{2}$/.test(ms)) return ms;
   const pm = String(g.presupuestoMes ?? "").trim().slice(0, 7);
-  if (/^\d{4}-\d{2}$/.test(pm)) return pm;
-  return yyyyMmFromDate(g.fecha);
+  if (isYm(ms) && (!isYm(pm) || ms !== pm)) return ms;
+  if (isYm(pm)) return previousCalendarYm(pm) ?? pm;
+  if (isYm(ms)) return ms;
+  const fechaYm = yyyyMmFromDate(g.fecha);
+  return fechaYm ? previousCalendarYm(fechaYm) ?? fechaYm : null;
 }
 
 export function normalizeHostingSupplierCode(raw: string | undefined): string {
