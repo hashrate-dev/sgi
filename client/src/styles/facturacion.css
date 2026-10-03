@@ -15871,22 +15871,40 @@ button.nh-watcher-btc-card__corner-btn:hover {
 .hm-table td {
   white-space: nowrap;
 }
+.hm-table thead th {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  border-bottom: 1px solid #e2e8f0;
+}
+.hm-table tfoot th {
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  font-weight: 600;
+}
 .hm-table th.hm-th-prov {
   white-space: normal;
   min-width: 9.5rem;
   max-width: 14rem;
   vertical-align: bottom;
   line-height: 1.2;
+  text-transform: none;
 }
 .hm-th-code {
   display: block;
   font-weight: 700;
+  color: #334155;
+  text-transform: uppercase;
+  font-size: 0.7rem;
 }
 .hm-th-name {
   display: block;
   font-weight: 500;
   font-size: 0.72rem;
-  color: #475569;
+  color: #64748b;
   text-transform: none;
   margin-top: 0.15rem;
 }
@@ -15918,11 +15936,11 @@ button.nh-watcher-btc-card__corner-btn:hover {
   line-height: 1;
 }
 .hm-vs-lab--ing {
-  color: #0ecb81;
+  color: #2D5D46;
   text-align: right;
 }
 .hm-vs-lab--gas {
-  color: #f6465d;
+  color: #c2410c;
   text-align: left;
 }
 .hm-vs-track {
@@ -15936,11 +15954,11 @@ button.nh-watcher-btc-card__corner-btn:hover {
 }
 .hm-vs-fill--ing {
   height: 100%;
-  background: #0ecb81;
+  background: #2D5D46;
 }
 .hm-vs-fill--gas {
   height: 100%;
-  background: #f6465d;
+  background: #c2410c;
 }
 .hm-prov-list {
   max-height: 320px;

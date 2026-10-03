@@ -28,7 +28,7 @@ const YEAR_TO = new Date().getFullYear() + 1;
 const YEAR_OPTIONS: number[] = [];
 for (let y = YEAR_TO; y >= YEAR_FROM; y--) YEAR_OPTIONS.push(y);
 
-const ING_COLOR = "#0f766e";
+const ING_COLOR = "#2D5D46";
 const GAS_COLOR = "#c2410c";
 const MAR_POS = "#15803d";
 const MAR_NEG = "#dc2626";
@@ -294,9 +294,6 @@ export function HostingMargenPage() {
     <div className="fact-page hm-page">
       <div className="container">
         <PageHeader title="Margen de Hosting" />
-        <Link to="/hosting" className="fact-back">
-          <i className="bi bi-arrow-left" /> Volver a Servicios de Hosting
-        </Link>
 
         <div className="hrs-card p-4 mt-3">
           <div className="hm-toolbar">
@@ -347,16 +344,15 @@ export function HostingMargenPage() {
                 </div>
                 <div className="hm-kpi">
                   <span className="hm-kpi-label">Margen USD</span>
-                  <strong
-                    className="hm-kpi-val"
-                    style={{ color: totals.margen >= 0 ? MAR_POS : MAR_NEG }}
-                  >
+                  <strong className="hm-kpi-val" style={{ color: totals.margen >= 0 ? MAR_POS : MAR_NEG }}>
                     {formatCurrency(totals.margen)}
                   </strong>
                 </div>
                 <div className="hm-kpi">
                   <span className="hm-kpi-label">Margen %</span>
-                  <strong className="hm-kpi-val">{formatPct(totals.margenPct)}</strong>
+                  <strong className="hm-kpi-val" style={{ color: (totals.margenPct ?? 0) >= 0 ? MAR_POS : MAR_NEG }}>
+                    {formatPct(totals.margenPct)}
+                  </strong>
                 </div>
               </div>
 
@@ -398,13 +394,12 @@ export function HostingMargenPage() {
                             {formatCurrencyNumber(m.gastosBySupplier[c] ?? 0)}
                           </td>
                         ))}
-                        <td
-                          className="text-end hm-td-margen"
-                          style={{ color: m.margen >= 0 ? MAR_POS : MAR_NEG }}
-                        >
+                        <td className="text-end hm-td-margen" style={{ color: m.margen >= 0 ? MAR_POS : MAR_NEG }}>
                           {formatCurrency(m.margen)}
                         </td>
-                        <td className="text-end">{formatPct(m.margenPct)}</td>
+                        <td className="text-end" style={{ color: (m.margenPct ?? 0) >= 0 ? MAR_POS : MAR_NEG }}>
+                          {formatPct(m.margenPct)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -424,7 +419,9 @@ export function HostingMargenPage() {
                       <th className="text-end hm-td-margen" style={{ color: totals.margen >= 0 ? MAR_POS : MAR_NEG }}>
                         {formatCurrency(totals.margen)}
                       </th>
-                      <th className="text-end">{formatPct(totals.margenPct)}</th>
+                      <th className="text-end" style={{ color: (totals.margenPct ?? 0) >= 0 ? MAR_POS : MAR_NEG }}>
+                        {formatPct(totals.margenPct)}
+                      </th>
                     </tr>
                   </tfoot>
                 </table>
