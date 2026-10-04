@@ -1,4 +1,28 @@
-import type { ContabilidadGasto } from "./api";
+import type { ContabilidadGasto, HostingMarginGasto } from "./api";
+
+/** Filas de `/api/hosting/margin-settings` listas para el costo de margen (misma fuente que la tabla). */
+export function hostingMarginSettingsToCostGastos(
+  rows: HostingMarginGasto[] | null | undefined
+): ContabilidadGasto[] {
+  return (Array.isArray(rows) ? rows : []).map((g) => ({
+    id: g.id,
+    fecha: g.fecha,
+    proveedorId: g.proveedorId,
+    supplierNumber: g.supplierNumber,
+    supplierName: g.supplierName,
+    numeroFactura: "",
+    descripcion: g.descripcion,
+    observaciones: "",
+    mesServicio: g.mesServicio,
+    presupuestoMes: g.presupuestoMes,
+    medioPago: "",
+    moneda: (g.moneda as ContabilidadGasto["moneda"]) || "USD",
+    monto: g.monto,
+    montoOriginal: g.monto,
+    tipoCambio: null,
+    createdAt: "",
+  }));
+}
 
 export const DEFAULT_HOSTING_MARGIN_SUPPLIERS = ["P002", "P003"] as const;
 

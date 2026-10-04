@@ -245,7 +245,9 @@ export function monthlyTripleIngresosArrays(
   asicInvoices: InvoiceMonthNetRow[] | null | undefined,
   year: number,
   gastosItems?: ContabilidadGasto[] | null,
-  hostingSupplierNumbers?: string[] | null
+  hostingSupplierNumbers?: string[] | null,
+  /** Preferir gastos de margin-settings (misma tabla que /hosting/margen). */
+  hostingCostItems?: ContabilidadGasto[] | null
 ): {
   cambio: number[];
   hosting: number[];
@@ -262,7 +264,9 @@ export function monthlyTripleIngresosArrays(
   const hosting = monthlyInvoiceCashCollected12(hostingInvoices, year);
   const asic = monthlyInvoiceCashCollected12(asicInvoices, year);
   const { margin: asicMargin, cost: asicCost } = monthlyAsicMarginAndCost12(asicInvoices, year);
-  const hostingCost = monthlyHostingCost12(gastosItems, year, hostingSupplierNumbers);
+  const costSrc =
+    Array.isArray(hostingCostItems) && hostingCostItems.length > 0 ? hostingCostItems : gastosItems;
+  const hostingCost = monthlyHostingCost12(costSrc, year, hostingSupplierNumbers);
   const hostingMargin = hosting.map((h, i) => h - (hostingCost[i] ?? 0));
   const ingresos = hosting.map((h, i) => h + asic[i]!);
   const margen = cambio.map((c, i) => c + asicMargin[i]! + hostingMargin[i]!);
@@ -333,7 +337,8 @@ export function computeTripleKpiResult(
   hostingInvoices: InvoiceMonthNetRow[] | undefined,
   asicInvoices: InvoiceMonthNetRow[] | undefined,
   gastosItems?: ContabilidadGasto[] | null,
-  hostingSupplierNumbers?: string[] | null
+  hostingSupplierNumbers?: string[] | null,
+  hostingCostItems?: ContabilidadGasto[] | null
 ): TripleKpiResult {
   const keys = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
   const {
@@ -350,7 +355,8 @@ export function computeTripleKpiResult(
     asicInvoices,
     year,
     gastosItems,
-    hostingSupplierNumbers
+    hostingSupplierNumbers,
+    hostingCostItems
   );
 
   const pack = (

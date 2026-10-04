@@ -10,6 +10,7 @@ import multer from "multer";
 import { z } from "zod";
 import { env } from "../config/env.js";
 import { db } from "../db.js";
+import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
 import {
   extractFacturaScanText,
   facturaAttachmentExtFromUpload,
@@ -304,7 +305,8 @@ function normalizeFecha(v: unknown): string {
     .slice(0, 10);
 }
 
-function mapGasto(raw: GastoDbRow) {
+function mapGasto(rawIn: GastoDbRow) {
+  const raw = rowKeysToLowercase(rawIn as unknown as Record<string, unknown>) as GastoDbRow;
   const m = typeof raw.monto === "number" ? raw.monto : Number.parseFloat(String(raw.monto ?? 0));
   const rawMo = raw.monto_original;
   let montoOriginal = m;

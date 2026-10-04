@@ -116,6 +116,7 @@ export type MonitorResultadoMargenCardProps = {
   hostingInvoices: InvoiceMonthNetRow[] | null | undefined;
   asicInvoices: InvoiceMonthNetRow[] | null | undefined;
   hostingSupplierNumbers?: string[];
+  hostingCostItems?: ContabilidadGasto[];
   presupuestoFilter: PresupuestoFilterControl;
 };
 
@@ -128,6 +129,7 @@ export function MonitorResultadoMargenCard({
   hostingInvoices,
   asicInvoices,
   hostingSupplierNumbers,
+  hostingCostItems,
   presupuestoFilter,
 }: MonitorResultadoMargenCardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -144,9 +146,10 @@ export function MonitorResultadoMargenCard({
         operations,
         hostingInvoices,
         asicInvoices,
-        hostingSupplierNumbers
+        hostingSupplierNumbers,
+        hostingCostItems
       ),
-    [year, gastosItems, operations, hostingInvoices, asicInvoices, hostingSupplierNumbers]
+    [year, gastosItems, operations, hostingInvoices, asicInvoices, hostingSupplierNumbers, hostingCostItems]
   );
 
   const kpi = useMemo(

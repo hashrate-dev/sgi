@@ -107,19 +107,23 @@ export function buildMonitorResultadoYearSeries(
   operations: HostingFxOperation[] | null | undefined,
   hostingInvoices: InvoiceMonthNetRow[] | null | undefined,
   asicInvoices: InvoiceMonthNetRow[] | null | undefined,
-  hostingSupplierNumbers?: string[] | null
+  hostingSupplierNumbers?: string[] | null,
+  hostingCostItems?: ContabilidadGasto[] | null
 ): MonitorResultadoMonth[] {
   const keys = chartMonthKeys(year);
+  const costSrc =
+    Array.isArray(hostingCostItems) && hostingCostItems.length > 0 ? hostingCostItems : gastosItems;
   const { hosting, asic, cambio, asicCost } = monthlyTripleIngresosArrays(
     operations,
     hostingInvoices,
     asicInvoices,
     year,
     gastosItems,
-    hostingSupplierNumbers
+    hostingSupplierNumbers,
+    costSrc
   );
   const gastos = monthlyGastosPresupuesto12(gastosItems, year, hostingSupplierNumbers);
-  const costosHosting = monthlyHostingCost12(gastosItems, year, hostingSupplierNumbers);
+  const costosHosting = monthlyHostingCost12(costSrc, year, hostingSupplierNumbers);
   return keys.map((ym, i) => {
     const ing = (hosting[i] ?? 0) + (asic[i] ?? 0);
     const costAsic = asicCost[i] ?? 0;
