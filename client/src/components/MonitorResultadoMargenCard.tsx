@@ -416,33 +416,33 @@ export function MonitorResultadoMargenCard({
           className="rounded-2 px-2 py-2 mb-2"
           style={{ background: "rgba(37, 99, 235, 0.05)", border: "1px solid rgba(226, 232, 240, 0.95)" }}
         >
-          <div className="d-flex justify-content-between align-items-baseline small mb-1 gap-2">
-            <span className="text-muted">Ingresos (cobros)</span>
-            <span className="fw-bold" style={{ color: "#2563eb" }}>
+          <div className="mf-kpi-line">
+            <span className="mf-kpi-line__lab text-muted">Ingresos (cobros)</span>
+            <span className="mf-kpi-line__amt fw-bold" style={{ color: "#2563eb" }}>
               {formatSignedCurrency(kpi.ingresos, "in")}
             </span>
           </div>
-          <div className="d-flex justify-content-between align-items-baseline small mb-1 gap-2">
-            <span className="text-muted">Costos ASIC</span>
-            <span className="fw-bold" style={{ color: ACCENT_NEG }}>
+          <div className="mf-kpi-line">
+            <span className="mf-kpi-line__lab text-muted">Costos ASIC</span>
+            <span className="mf-kpi-line__amt fw-bold" style={{ color: ACCENT_NEG }}>
               {formatSignedCurrency(kpi.costosAsic, "out")}
             </span>
           </div>
-          <div className="d-flex justify-content-between align-items-baseline small mb-1 gap-2">
-            <span className="text-muted">Costos hosting</span>
-            <span className="fw-bold" style={{ color: ACCENT_NEG }}>
+          <div className="mf-kpi-line">
+            <span className="mf-kpi-line__lab text-muted">Costos hosting</span>
+            <span className="mf-kpi-line__amt fw-bold" style={{ color: ACCENT_NEG }}>
               {formatSignedCurrency(kpi.costosHosting, "out")}
             </span>
           </div>
-          <div className="d-flex justify-content-between align-items-baseline small mb-1 gap-2">
-            <span className="text-muted">Ganancia por cambio</span>
-            <span className="fw-bold" style={{ color: kpi.cambioUsd < 0 ? ACCENT_NEG : ACCENT_POS }}>
+          <div className="mf-kpi-line">
+            <span className="mf-kpi-line__lab text-muted">Ganancia por cambio</span>
+            <span className="mf-kpi-line__amt fw-bold" style={{ color: kpi.cambioUsd < 0 ? ACCENT_NEG : ACCENT_POS }}>
               {formatSignedCurrency(kpi.cambioUsd, "pnl")}
             </span>
           </div>
-          <div className="d-flex justify-content-between align-items-baseline small gap-2">
-            <span className="text-muted">Gastos (resto presupuesto)</span>
-            <span className="fw-bold" style={{ color: ACCENT_NEG }}>
+          <div className="mf-kpi-line">
+            <span className="mf-kpi-line__lab text-muted">Gastos (resto presupuesto)</span>
+            <span className="mf-kpi-line__amt fw-bold" style={{ color: ACCENT_NEG }}>
               {formatSignedCurrency(kpi.gastos, "out")}
             </span>
           </div>
