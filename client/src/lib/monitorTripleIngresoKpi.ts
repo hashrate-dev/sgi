@@ -1,5 +1,6 @@
-import type { HostingFxOperation } from "./api";
+import type { ContabilidadGasto, HostingFxOperation } from "./api";
 import { hostingFxOperationProfitUsd } from "./hostingFxOperationProfit";
+import { monthlyHostingCost12 } from "./hostingMargenCost";
 
 /** Fila de comprobante para el monitor de ingresos. */
 export type InvoiceMonthNetRow = {
@@ -242,13 +243,17 @@ export function monthlyTripleIngresosArrays(
   operations: HostingFxOperation[] | null | undefined,
   hostingInvoices: InvoiceMonthNetRow[] | null | undefined,
   asicInvoices: InvoiceMonthNetRow[] | null | undefined,
-  year: number
+  year: number,
+  gastosItems?: ContabilidadGasto[] | null,
+  hostingSupplierNumbers?: string[] | null
 ): {
   cambio: number[];
   hosting: number[];
   asic: number[];
   asicMargin: number[];
   asicCost: number[];
+  hostingCost: number[];
+  hostingMargin: number[];
   ingresos: number[];
   margen: number[];
   combined: number[];
@@ -257,10 +262,23 @@ export function monthlyTripleIngresosArrays(
   const hosting = monthlyInvoiceCashCollected12(hostingInvoices, year);
   const asic = monthlyInvoiceCashCollected12(asicInvoices, year);
   const { margin: asicMargin, cost: asicCost } = monthlyAsicMarginAndCost12(asicInvoices, year);
+  const hostingCost = monthlyHostingCost12(gastosItems, year, hostingSupplierNumbers);
+  const hostingMargin = hosting.map((h, i) => h - (hostingCost[i] ?? 0));
   const ingresos = hosting.map((h, i) => h + asic[i]!);
-  const margen = cambio.map((c, i) => c + asicMargin[i]!);
+  const margen = cambio.map((c, i) => c + asicMargin[i]! + hostingMargin[i]!);
   const combined = ingresos;
-  return { cambio, hosting, asic, asicMargin, asicCost, ingresos, margen, combined };
+  return {
+    cambio,
+    hosting,
+    asic,
+    asicMargin,
+    asicCost,
+    hostingCost,
+    hostingMargin,
+    ingresos,
+    margen,
+    combined,
+  };
 }
 
 function prevCalendarMonthYm(ym: string): string | null {
@@ -291,6 +309,7 @@ export type TripleKpiResult = {
   totalHosting: number;
   totalAsic: number;
   totalAsicMargin: number;
+  totalHostingMargin: number;
   totalIngresos: number;
   totalMargen: number;
   totalCombined: number;
@@ -312,14 +331,26 @@ export function computeTripleKpiResult(
   mesYm: string | null,
   operations: HostingFxOperation[] | undefined,
   hostingInvoices: InvoiceMonthNetRow[] | undefined,
-  asicInvoices: InvoiceMonthNetRow[] | undefined
+  asicInvoices: InvoiceMonthNetRow[] | undefined,
+  gastosItems?: ContabilidadGasto[] | null,
+  hostingSupplierNumbers?: string[] | null
 ): TripleKpiResult {
   const keys = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
-  const { cambio: cambio12, hosting: hosting12, asic: asic12, asicMargin: asicMargin12, ingresos, margen } = monthlyTripleIngresosArrays(
+  const {
+    cambio: cambio12,
+    hosting: hosting12,
+    asic: asic12,
+    asicMargin: asicMargin12,
+    hostingMargin: hostingMargin12,
+    ingresos,
+    margen,
+  } = monthlyTripleIngresosArrays(
     operations,
     hostingInvoices,
     asicInvoices,
-    year
+    year,
+    gastosItems,
+    hostingSupplierNumbers
   );
 
   const pack = (
@@ -327,14 +358,26 @@ export function computeTripleKpiResult(
     totalHosting: number,
     totalAsic: number,
     totalAsicMargin: number,
+    totalHostingMargin: number,
     totalIngresos: number,
     totalMargen: number,
-    extra: Omit<TripleKpiResult, "totalCambio" | "totalHosting" | "totalAsic" | "totalAsicMargin" | "totalIngresos" | "totalMargen" | "totalCombined">
+    extra: Omit<
+      TripleKpiResult,
+      | "totalCambio"
+      | "totalHosting"
+      | "totalAsic"
+      | "totalAsicMargin"
+      | "totalHostingMargin"
+      | "totalIngresos"
+      | "totalMargen"
+      | "totalCombined"
+    >
   ): TripleKpiResult => ({
     totalCambio,
     totalHosting,
     totalAsic,
     totalAsicMargin,
+    totalHostingMargin,
     totalIngresos,
     totalMargen,
     totalCombined: totalIngresos,
@@ -348,8 +391,9 @@ export function computeTripleKpiResult(
     const totalHosting = idx >= 0 ? hosting12[idx]! : 0;
     const totalAsic = idx >= 0 ? asic12[idx]! : 0;
     const totalAsicMargin = idx >= 0 ? asicMargin12[idx]! : 0;
+    const totalHostingMargin = idx >= 0 ? hostingMargin12[idx]! : 0;
     const totalIngresos = totalHosting + totalAsic;
-    const totalMargen = totalCambio + totalAsicMargin;
+    const totalMargen = totalCambio + totalAsicMargin + totalHostingMargin;
     const prevYm = idx >= 0 ? prevCalendarMonthYm(mk) : null;
     let pctVsPrev: number | null = null;
     let pctVsPrevMargen: number | null = null;
@@ -360,7 +404,7 @@ export function computeTripleKpiResult(
       if (prevIng !== 0) pctVsPrev = ((totalIngresos - prevIng) / prevIng) * 100;
       if (prevMar !== 0) pctVsPrevMargen = ((totalMargen - prevMar) / prevMar) * 100;
     }
-    return pack(totalCambio, totalHosting, totalAsic, totalAsicMargin, totalIngresos, totalMargen, {
+    return pack(totalCambio, totalHosting, totalAsic, totalAsicMargin, totalHostingMargin, totalIngresos, totalMargen, {
       avgMonthlyCombined: totalIngresos,
       avgMonthlyMargen: totalMargen,
       bestMonthValue: totalIngresos,
@@ -377,6 +421,7 @@ export function computeTripleKpiResult(
   const totalHosting = sumArr(hosting12);
   const totalAsic = sumArr(asic12);
   const totalAsicMargin = sumArr(asicMargin12);
+  const totalHostingMargin = sumArr(hostingMargin12);
   const totalIngresos = sumArr(ingresos);
   const totalMargen = sumArr(margen);
   const avgMonthlyCombined = totalIngresos / 12;
@@ -396,7 +441,7 @@ export function computeTripleKpiResult(
     const prevM = margen[10]!;
     if (Math.abs(prevM) > EPS) pctVsPrevMargen = ((lastM - prevM) / prevM) * 100;
   }
-  return pack(totalCambio, totalHosting, totalAsic, totalAsicMargin, totalIngresos, totalMargen, {
+  return pack(totalCambio, totalHosting, totalAsic, totalAsicMargin, totalHostingMargin, totalIngresos, totalMargen, {
     avgMonthlyCombined,
     avgMonthlyMargen,
     bestMonthValue,

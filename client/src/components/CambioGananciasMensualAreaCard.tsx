@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import Chart from "chart.js/auto";
 import type { Chart as ChartInstance } from "chart.js";
-import type { HostingFxOperation } from "../lib/api";
+import type { ContabilidadGasto, HostingFxOperation } from "../lib/api";
 import {
   computeTripleKpiResult,
   monthlyTripleIngresosArrays,
@@ -131,34 +131,41 @@ function buildMonthlyTripleIngresoChartSeries(
   operations: HostingFxOperation[] | undefined | null,
   invoicesHosting: InvoiceMonthNetRow[] | undefined | null,
   invoicesAsic: InvoiceMonthNetRow[] | undefined | null,
-  year: number
+  year: number,
+  gastosItems?: ContabilidadGasto[] | null,
+  hostingSupplierNumbers?: string[] | null
 ): {
   labels: string[];
   cambio: number[];
   hosting: number[];
   asic: number[];
   asicMargin: number[];
+  hostingMargin: number[];
   ingresos: number[];
   margen: number[];
   combined: number[];
   chartRangeTitle: string;
 } {
   const keys = chartMonthKeys(year);
-  const { cambio, hosting, asic, asicMargin, ingresos, margen, combined } = monthlyTripleIngresosArrays(
+  const { cambio, hosting, asic, asicMargin, hostingMargin, ingresos, margen, combined } = monthlyTripleIngresosArrays(
     operations,
     invoicesHosting,
     invoicesAsic,
-    year
+    year,
+    gastosItems,
+    hostingSupplierNumbers
   );
   const labels = keys.map((ym) => formatMonthAxisEs(ym));
   const chartRangeTitle = `${formatMonthAxisEs(keys[0]!)} – ${formatMonthAxisEs(keys[11]!)} · ${year}`;
-  return { labels, cambio, hosting, asic, asicMargin, ingresos, margen, combined, chartRangeTitle };
+  return { labels, cambio, hosting, asic, asicMargin, hostingMargin, ingresos, margen, combined, chartRangeTitle };
 }
 
 type Props = {
   operations: HostingFxOperation[];
   invoicesHosting: InvoiceMonthNetRow[];
   invoicesAsic: InvoiceMonthNetRow[];
+  gastosItems?: ContabilidadGasto[];
+  hostingSupplierNumbers?: string[];
   /** Años del selector (mismo origen que gastos presupuesto). */
   years: number[];
   presupuestoFilter: PresupuestoFilterControl;
@@ -170,6 +177,8 @@ export function CambioGananciasMensualAreaCard({
   operations = [],
   invoicesHosting = [],
   invoicesAsic = [],
+  gastosItems = [],
+  hostingSupplierNumbers,
   years,
   presupuestoFilter,
   hidePeriodSelectors,
@@ -183,13 +192,30 @@ export function CambioGananciasMensualAreaCard({
   const onMesYmChange = presupuestoFilter.onMesYmChange;
 
   const chartYearSeries = useMemo(
-    () => buildMonthlyTripleIngresoChartSeries(operations, invoicesHosting, invoicesAsic, year),
-    [operations, invoicesHosting, invoicesAsic, year]
+    () =>
+      buildMonthlyTripleIngresoChartSeries(
+        operations,
+        invoicesHosting,
+        invoicesAsic,
+        year,
+        gastosItems,
+        hostingSupplierNumbers
+      ),
+    [operations, invoicesHosting, invoicesAsic, year, gastosItems, hostingSupplierNumbers]
   );
 
   const triple = useMemo(
-    () => computeTripleKpiResult(year, mesYm, operations, invoicesHosting, invoicesAsic),
-    [year, mesYm, operations, invoicesHosting, invoicesAsic]
+    () =>
+      computeTripleKpiResult(
+        year,
+        mesYm,
+        operations,
+        invoicesHosting,
+        invoicesAsic,
+        gastosItems,
+        hostingSupplierNumbers
+      ),
+    [year, mesYm, operations, invoicesHosting, invoicesAsic, gastosItems, hostingSupplierNumbers]
   );
 
   const highlightMonthIndex = useMemo(
@@ -250,7 +276,7 @@ export function CambioGananciasMensualAreaCard({
           },
           {
             type: "line",
-            label: "Margen (cambio + ASIC)",
+            label: "Margen (cambio + ASIC + hosting)",
             data: chartYearSeries.margen,
             stack: "margen-line",
             yAxisID: "y",
@@ -316,10 +342,12 @@ export function CambioGananciasMensualAreaCard({
                 const mar = chartYearSeries.margen[i] ?? 0;
                 const cam = chartYearSeries.cambio[i] ?? 0;
                 const am = chartYearSeries.asicMargin[i] ?? 0;
+                const hm = chartYearSeries.hostingMargin[i] ?? 0;
                 return [
                   `Ingresos: ${formatCurrency(Number(ing))}`,
                   `Margen cambio: ${formatCurrency(Number(cam))}`,
                   `Margen ASIC: ${formatCurrency(Number(am))}`,
+                  `Margen hosting: ${formatCurrency(Number(hm))}`,
                   `Margen total: ${formatCurrency(Number(mar))}`,
                 ];
               },
@@ -452,6 +480,12 @@ export function CambioGananciasMensualAreaCard({
               {formatCurrency(triple.totalAsicMargin)}
             </span>
           </div>
+          <div className="d-flex justify-content-between align-items-baseline small mb-1 gap-2">
+            <span className="text-muted">Margen hosting</span>
+            <span className="fw-bold" style={{ color: ACCENT_HOSTING }}>
+              {formatCurrency(triple.totalHostingMargin)}
+            </span>
+          </div>
           <div className="reportes-dash__kpi-main" style={{ fontSize: "1.35rem", color: ACCENT_MARGEN }}>
             {formatCurrency(triple.totalMargen)}
           </div>
@@ -488,7 +522,7 @@ export function CambioGananciasMensualAreaCard({
           <i
             className="bi bi-calendar3 reportes-dash__kpi-foot-calendar"
             aria-hidden
-            title="Ingresos = cobros hosting + ASIC. Margen = ganancia de cambio + margen ASIC."
+            title="Ingresos = cobros hosting + ASIC. Margen = ganancia de cambio + margen ASIC + margen hosting (cobros − costos P002/P003 por mes de servicio)."
           />
         </div>
       </aside>

@@ -7,6 +7,7 @@ import { canAccessFinanzaContabilidadHub } from "../lib/auth";
 import {
   getContabilidadGastos,
   getHostingFxOperations,
+  getHostingMarginSettings,
   getInvoices,
   getProveedoresHrs,
   type ContabilidadGasto,
@@ -14,6 +15,7 @@ import {
   type ProveedorHrs,
 } from "../lib/api";
 import { cashMonthKeyFromInvoice, computeTripleKpiResult, type InvoiceMonthNetRow } from "../lib/monitorTripleIngresoKpi";
+import { DEFAULT_HOSTING_MARGIN_SUPPLIERS } from "../lib/hostingMargenCost";
 import {
   MonitorGastosMensualCard,
   collectYearsFromPresupuestoItems,
@@ -149,6 +151,7 @@ export function MonitorFinancieroPage() {
   const [fxOperations, setFxOperations] = useState<HostingFxOperation[]>([]);
   const [invoicesHosting, setInvoicesHosting] = useState<InvoiceMonthNetRow[]>([]);
   const [invoicesAsic, setInvoicesAsic] = useState<InvoiceMonthNetRow[]>([]);
+  const [hostingSupplierNumbers, setHostingSupplierNumbers] = useState<string[]>([...DEFAULT_HOSTING_MARGIN_SUPPLIERS]);
   const [listLoading, setListLoading] = useState(true);
   const [err, setErr] = useState("");
   const yearsAvailable = useMemo(
@@ -162,12 +165,13 @@ export function MonitorFinancieroPage() {
     setListLoading(true);
     setErr("");
     try {
-      const [gSettled, pSettled, fxSettled, hInvSettled, aInvSettled] = await Promise.allSettled([
+      const [gSettled, pSettled, fxSettled, hInvSettled, aInvSettled, hmSettled] = await Promise.allSettled([
         getContabilidadGastos(),
         getProveedoresHrs(),
         getHostingFxOperations(),
         getInvoices({ source: "hosting" }),
         getInvoices({ source: "asic" }),
+        getHostingMarginSettings(),
       ]);
       if (gSettled.status === "fulfilled") {
         setItems(Array.isArray(gSettled.value.items) ? gSettled.value.items : []);
@@ -196,6 +200,11 @@ export function MonitorFinancieroPage() {
       } else {
         setInvoicesAsic([]);
       }
+      if (hmSettled.status === "fulfilled" && Array.isArray(hmSettled.value.supplierNumbers) && hmSettled.value.supplierNumbers.length > 0) {
+        setHostingSupplierNumbers(hmSettled.value.supplierNumbers);
+      } else {
+        setHostingSupplierNumbers([...DEFAULT_HOSTING_MARGIN_SUPPLIERS]);
+      }
     } catch {
       setErr("No se pudieron cargar los gastos.");
       setItems([]);
@@ -203,6 +212,7 @@ export function MonitorFinancieroPage() {
       setFxOperations([]);
       setInvoicesHosting([]);
       setInvoicesAsic([]);
+      setHostingSupplierNumbers([...DEFAULT_HOSTING_MARGIN_SUPPLIERS]);
     } finally {
       setListLoading(false);
     }
@@ -286,8 +296,16 @@ export function MonitorFinancieroPage() {
 
   const tripleIngresoKpi = useMemo(
     () =>
-      computeTripleKpiResult(filterYear, filterMesYm, fxOperations, invoicesHosting, invoicesAsic),
-    [filterYear, filterMesYm, fxOperations, invoicesHosting, invoicesAsic]
+      computeTripleKpiResult(
+        filterYear,
+        filterMesYm,
+        fxOperations,
+        invoicesHosting,
+        invoicesAsic,
+        items,
+        hostingSupplierNumbers
+      ),
+    [filterYear, filterMesYm, fxOperations, invoicesHosting, invoicesAsic, items, hostingSupplierNumbers]
   );
 
   const proveedoresRanked = useMemo(() => {
@@ -408,6 +426,8 @@ export function MonitorFinancieroPage() {
                 operations={fxOperations}
                 invoicesHosting={invoicesHosting}
                 invoicesAsic={invoicesAsic}
+                gastosItems={items}
+                hostingSupplierNumbers={hostingSupplierNumbers}
                 years={yearsAvailable}
                 hidePeriodSelectors
                 presupuestoFilter={{
@@ -425,6 +445,7 @@ export function MonitorFinancieroPage() {
                 operations={fxOperations}
                 hostingInvoices={invoicesHosting}
                 asicInvoices={invoicesAsic}
+                hostingSupplierNumbers={hostingSupplierNumbers}
                 presupuestoFilter={{
                   year: filterYear,
                   mesYm: filterMesYm,

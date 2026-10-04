@@ -115,18 +115,19 @@ export type MonitorResultadoMargenCardProps = {
   operations: HostingFxOperation[] | null | undefined;
   hostingInvoices: InvoiceMonthNetRow[] | null | undefined;
   asicInvoices: InvoiceMonthNetRow[] | null | undefined;
+  hostingSupplierNumbers?: string[];
   presupuestoFilter: PresupuestoFilterControl;
 };
 
 /**
- * Resultado mensual (cobros − costos ASIC − gastos + ganancia de cambio) + margen %.
- * Barras divergentes USD + línea de margen (estándar P&L).
+ * Resultado mensual (cobros − costos ASIC − costos hosting − gastos + ganancia de cambio) + margen %.
  */
 export function MonitorResultadoMargenCard({
   gastosItems,
   operations,
   hostingInvoices,
   asicInvoices,
+  hostingSupplierNumbers,
   presupuestoFilter,
 }: MonitorResultadoMargenCardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -136,8 +137,16 @@ export function MonitorResultadoMargenCard({
   const mesYm = presupuestoFilter.mesYm;
 
   const chartYearSeries = useMemo(
-    () => buildMonitorResultadoYearSeries(year, gastosItems, operations, hostingInvoices, asicInvoices),
-    [year, gastosItems, operations, hostingInvoices, asicInvoices]
+    () =>
+      buildMonitorResultadoYearSeries(
+        year,
+        gastosItems,
+        operations,
+        hostingInvoices,
+        asicInvoices,
+        hostingSupplierNumbers
+      ),
+    [year, gastosItems, operations, hostingInvoices, asicInvoices, hostingSupplierNumbers]
   );
 
   const kpi = useMemo(
@@ -416,13 +425,19 @@ export function MonitorResultadoMargenCard({
             </span>
           </div>
           <div className="d-flex justify-content-between align-items-baseline small mb-1 gap-2">
+            <span className="text-muted">Costos hosting</span>
+            <span className="fw-bold" style={{ color: ACCENT_NEG }}>
+              {formatCurrency(kpi.costosHosting)}
+            </span>
+          </div>
+          <div className="d-flex justify-content-between align-items-baseline small mb-1 gap-2">
             <span className="text-muted">Ganancia por cambio</span>
             <span className="fw-bold" style={{ color: ACCENT_POS }}>
               {formatCurrency(kpi.cambioUsd)}
             </span>
           </div>
           <div className="d-flex justify-content-between align-items-baseline small gap-2">
-            <span className="text-muted">Gastos (presupuesto)</span>
+            <span className="text-muted">Gastos (resto presupuesto)</span>
             <span className="fw-bold" style={{ color: ACCENT_NEG }}>
               {formatCurrency(kpi.gastos)}
             </span>
@@ -514,9 +529,11 @@ export function MonitorResultadoMargenCard({
           ) : null}
         </div>
         <p className="text-muted small mb-2 mb-0" style={{ fontSize: "0.7rem", lineHeight: 1.35 }}>
-          Barras = resultado neto (cobros − costos ASIC + ganancia de cambio − gastos). El costo ASIC sale del
-          margen cargado en cada operación (|cobro| − margen). Línea gris = promedio mensual del resultado. Línea azul =
-          margen % sobre ingresos cobrados.
+          Barras = resultado neto (cobros − costos ASIC − costos hosting + ganancia de cambio − gastos del resto).
+          El costo ASIC sale del margen cargado en cada operación. El costo hosting es P002/P003 (u otros
+          configurados) por mes de servicio, igual que en Margen de Hosting. Esos proveedores no se vuelven a
+          restar en gastos. Línea gris = promedio mensual del resultado. Línea azul = margen % sobre ingresos
+          cobrados.
         </p>
         <div className="reportes-dash__canvas-wrap monitor-financiero-dash__canvas monitor-financiero-dash__canvas--resultado">
           <canvas

@@ -1,9 +1,14 @@
 import type { ContabilidadGasto } from "./api";
-import {
-  monthlyInvoiceCashCollected12,
-  yyyyMmFromDate,
-  type InvoiceMonthNetRow,
-} from "./monitorTripleIngresoKpi";
+import { hostingGastoYm, hostingSupplierCodes, normalizeHostingSupplierCode } from "./hostingMargenCost";
+import { monthlyInvoiceCashCollected12, type InvoiceMonthNetRow } from "./monitorTripleIngresoKpi";
+
+export {
+  DEFAULT_HOSTING_MARGIN_SUPPLIERS,
+  hostingGastoYm,
+  isHostingMarginSupplierGasto,
+  monthlyHostingCost12,
+  normalizeHostingSupplierCode,
+} from "./hostingMargenCost";
 
 const EPS = 0.0005;
 
@@ -26,41 +31,6 @@ export type HostingMargenTotals = {
   margenPct: number | null;
 };
 
-function isYm(raw: string): boolean {
-  return /^\d{4}-\d{2}$/.test(raw);
-}
-
-/** YYYY-MM del mes calendario anterior (pago de hosting = mes siguiente al servicio). */
-function previousCalendarYm(ym: string): string | null {
-  if (!isYm(ym)) return null;
-  const y = Number.parseInt(ym.slice(0, 4), 10);
-  const m = Number.parseInt(ym.slice(5, 7), 10);
-  const d = new Date(y, m - 2, 1);
-  if (Number.isNaN(d.getTime())) return null;
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
-/**
- * Mes del gasto para el margen: mes de servicio (el mes cerrado de hosting).
- * P002 y P003 facturan a mes vencido: el presupuesto / pago queda en el mes siguiente.
- * Si mes de servicio falta o coincide con el de presupuesto, se usa el mes anterior al pago.
- */
-export function hostingGastoYm(g: Pick<ContabilidadGasto, "presupuestoMes" | "mesServicio" | "fecha">): string | null {
-  const ms = String(g.mesServicio ?? "").trim().slice(0, 7);
-  const pm = String(g.presupuestoMes ?? "").trim().slice(0, 7);
-  if (isYm(ms) && (!isYm(pm) || ms !== pm)) return ms;
-  if (isYm(pm)) return previousCalendarYm(pm) ?? pm;
-  if (isYm(ms)) return ms;
-  const fechaYm = yyyyMmFromDate(g.fecha);
-  return fechaYm ? previousCalendarYm(fechaYm) ?? fechaYm : null;
-}
-
-export function normalizeHostingSupplierCode(raw: string | undefined): string {
-  return String(raw ?? "")
-    .trim()
-    .toUpperCase();
-}
-
 export function buildHostingMargenYearSeries(
   year: number,
   hostingInvoices: InvoiceMonthNetRow[] | null | undefined,
@@ -69,7 +39,7 @@ export function buildHostingMargenYearSeries(
 ): HostingMargenMonth[] {
   const keys = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
   const ingresos12 = monthlyInvoiceCashCollected12(hostingInvoices, year);
-  const codes = supplierNumbers.map(normalizeHostingSupplierCode).filter(Boolean);
+  const codes = hostingSupplierCodes(supplierNumbers);
   const gastosByMonth: Array<Record<string, number>> = keys.map(() => {
     const o: Record<string, number> = {};
     for (const c of codes) o[c] = 0;
