@@ -12,7 +12,7 @@ import {
   chartMonthDataIndex,
   withAlphaHex,
 } from "../lib/chartMonthBarHighlight";
-import { formatCurrency, formatCurrencyNumber } from "../lib/formatCurrency";
+import { formatCurrency, formatCurrencyNumber, formatSignedCurrency } from "../lib/formatCurrency";
 import type { PresupuestoFilterControl } from "./MonitorGastosMensualCard";
 
 /** Acentos sólidos (KPI + leyenda); barras usan degradados verdes por rubro. */
@@ -455,17 +455,17 @@ export function CambioGananciasMensualAreaCard({
           <div className="d-flex justify-content-between align-items-baseline small mb-1 gap-2">
             <span className="text-muted">Cobros hosting</span>
             <span className="fw-bold" style={{ color: ACCENT_HOSTING }}>
-              {formatCurrency(triple.totalHosting)}
+              {formatSignedCurrency(triple.totalHosting, "in")}
             </span>
           </div>
           <div className="d-flex justify-content-between align-items-baseline small mb-1 gap-2">
             <span className="text-muted">Cobros ASIC</span>
             <span className="fw-bold" style={{ color: ACCENT_ASIC }}>
-              {formatCurrency(triple.totalAsic)}
+              {formatSignedCurrency(triple.totalAsic, "in")}
             </span>
           </div>
           <div className="reportes-dash__kpi-main" style={{ fontSize: "1.45rem" }}>
-            {formatCurrency(triple.totalIngresos)}
+            {formatSignedCurrency(triple.totalIngresos, "in")}
           </div>
           <CambioKpiTrend pct={triple.pctVsPrev} />
         </div>
@@ -477,13 +477,13 @@ export function CambioGananciasMensualAreaCard({
           <div className="d-flex justify-content-between align-items-baseline small mb-1 gap-2">
             <span className="text-muted">Ganancia por cambio</span>
             <span className="fw-bold" style={{ color: ACCENT_CAMBIO }}>
-              {formatCurrency(triple.totalCambio)}
+              {formatSignedCurrency(triple.totalCambio, "pnl")}
             </span>
           </div>
           <div className="d-flex justify-content-between align-items-baseline small mb-1 gap-2">
             <span className="text-muted">Margen ASIC</span>
             <span className="fw-bold" style={{ color: ACCENT_MARGEN }}>
-              {formatCurrency(triple.totalAsicMargin)}
+              {formatSignedCurrency(triple.totalAsicMargin, "pnl")}
             </span>
           </div>
           <div className="d-flex justify-content-between align-items-baseline small mb-1 gap-2">
@@ -492,14 +492,14 @@ export function CambioGananciasMensualAreaCard({
               className="fw-bold"
               style={{ color: triple.totalHostingMargin < 0 ? ACCENT_MARGEN : ACCENT_HOSTING }}
             >
-              {formatCurrency(triple.totalHostingMargin)}
+              {formatSignedCurrency(triple.totalHostingMargin, "pnl")}
             </span>
           </div>
           <div
             className="reportes-dash__kpi-main"
             style={{ fontSize: "1.35rem", color: triple.totalMargen < 0 ? ACCENT_MARGEN : ACCENT_HOSTING }}
           >
-            {formatCurrency(triple.totalMargen)}
+            {formatSignedCurrency(triple.totalMargen, "pnl")}
           </div>
           <CambioKpiTrend pct={triple.pctVsPrevMargen} />
         </div>

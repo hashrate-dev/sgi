@@ -39,3 +39,14 @@ export function formatCurrency(n: number): string {
   const s = `${withDots},${decPart}`;
   return num < 0 ? `-${s} USD` : `${s} USD`;
 }
+
+/** `in` cobros/ingresos; `out` costos/gastos; `pnl` ganancia/resultado (signo del valor). */
+export function formatSignedCurrency(n: number, role: "in" | "out" | "pnl"): string {
+  const body = formatCurrency(Math.abs(Number(n) || 0));
+  if (role === "out") return `- ${body}`;
+  if (role === "in") return `+ ${body}`;
+  const v = Number(n) || 0;
+  if (v < 0) return `- ${body}`;
+  if (v > 0) return `+ ${body}`;
+  return body;
+}

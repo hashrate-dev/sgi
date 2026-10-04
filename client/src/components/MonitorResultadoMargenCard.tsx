@@ -7,7 +7,7 @@ import {
   chartMonthDataIndex,
   withAlphaHex,
 } from "../lib/chartMonthBarHighlight";
-import { formatCurrency, formatCurrencyNumber } from "../lib/formatCurrency";
+import { formatCurrency, formatCurrencyNumber, formatSignedCurrency } from "../lib/formatCurrency";
 import type { InvoiceMonthNetRow } from "../lib/monitorTripleIngresoKpi";
 import {
   buildMonitorResultadoYearSeries,
@@ -311,10 +311,11 @@ export function MonitorResultadoMargenCard({
                 const row = chartYearSeries[i];
                 if (!row) return [];
                 return [
-                  `Ingresos (cobros): ${formatCurrency(row.ingresos)}`,
-                  `Costos ASIC: ${formatCurrency(row.costosAsic)}`,
-                  `Ganancia por cambio: ${formatCurrency(row.cambioUsd)}`,
-                  `Gastos (presupuesto): ${formatCurrency(row.gastos)}`,
+                  `Ingresos (cobros): ${formatSignedCurrency(row.ingresos, "in")}`,
+                  `Costos ASIC: ${formatSignedCurrency(row.costosAsic, "out")}`,
+                  `Costos hosting: ${formatSignedCurrency(row.costosHosting, "out")}`,
+                  `Ganancia por cambio: ${formatSignedCurrency(row.cambioUsd, "pnl")}`,
+                  `Gastos (resto presupuesto): ${formatSignedCurrency(row.gastos, "out")}`,
                 ];
               },
               afterBody(items) {
@@ -418,37 +419,37 @@ export function MonitorResultadoMargenCard({
           <div className="d-flex justify-content-between align-items-baseline small mb-1 gap-2">
             <span className="text-muted">Ingresos (cobros)</span>
             <span className="fw-bold" style={{ color: "#2563eb" }}>
-              {formatCurrency(kpi.ingresos)}
+              {formatSignedCurrency(kpi.ingresos, "in")}
             </span>
           </div>
           <div className="d-flex justify-content-between align-items-baseline small mb-1 gap-2">
             <span className="text-muted">Costos ASIC</span>
             <span className="fw-bold" style={{ color: ACCENT_NEG }}>
-              {formatCurrency(kpi.costosAsic)}
+              {formatSignedCurrency(kpi.costosAsic, "out")}
             </span>
           </div>
           <div className="d-flex justify-content-between align-items-baseline small mb-1 gap-2">
             <span className="text-muted">Costos hosting</span>
             <span className="fw-bold" style={{ color: ACCENT_NEG }}>
-              {formatCurrency(kpi.costosHosting)}
+              {formatSignedCurrency(kpi.costosHosting, "out")}
             </span>
           </div>
           <div className="d-flex justify-content-between align-items-baseline small mb-1 gap-2">
             <span className="text-muted">Ganancia por cambio</span>
-            <span className="fw-bold" style={{ color: ACCENT_POS }}>
-              {formatCurrency(kpi.cambioUsd)}
+            <span className="fw-bold" style={{ color: kpi.cambioUsd < 0 ? ACCENT_NEG : ACCENT_POS }}>
+              {formatSignedCurrency(kpi.cambioUsd, "pnl")}
             </span>
           </div>
           <div className="d-flex justify-content-between align-items-baseline small gap-2">
             <span className="text-muted">Gastos (resto presupuesto)</span>
             <span className="fw-bold" style={{ color: ACCENT_NEG }}>
-              {formatCurrency(kpi.gastos)}
+              {formatSignedCurrency(kpi.gastos, "out")}
             </span>
           </div>
         </div>
         <div>
           <div className="reportes-dash__kpi-main" style={{ color: resultadoColor }}>
-            {formatCurrency(kpi.resultadoUsd)}
+            {formatSignedCurrency(kpi.resultadoUsd, "pnl")}
           </div>
           <ResultadoKpiTrend pct={kpi.pctVsPrevResultado} />
         </div>
