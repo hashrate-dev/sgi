@@ -1,6 +1,7 @@
-import type { ContabilidadGasto, HostingFxOperation } from "./api";
+import type { ContabilidadGasto, HostingFxOperation, HostingInvoiceTransferCommissionRow } from "./api";
 import { hostingFxOperationProfitUsd } from "./hostingFxOperationProfit";
 import { monthlyHostingCost12 } from "./hostingMargenCost";
+import { monthlyHostingTransferCommission12 } from "./hostingHistorialFilters";
 
 /** Fila de comprobante para el monitor de ingresos. */
 export type InvoiceMonthNetRow = {
@@ -235,6 +236,17 @@ export function monthlyFxProfitTotals12(operations: HostingFxOperation[] | null 
   return totals;
 }
 
+/** Spread de operaciones + comisiones 4% hosting (mismo total que historial de tipo de cambio). */
+export function monthlyCambioProfitWithHostingCommission12(
+  operations: HostingFxOperation[] | null | undefined,
+  transferCommissionInvoices: HostingInvoiceTransferCommissionRow[] | null | undefined,
+  year: number
+): number[] {
+  const fx = monthlyFxProfitTotals12(operations, year);
+  const comm = monthlyHostingTransferCommission12(transferCommissionInvoices, year);
+  return fx.map((v, i) => v + (comm[i] ?? 0));
+}
+
 /**
  * Series mensuales alineadas al año (índice 0 = enero).
  * Ingresos = cobros hosting + cobros ASIC (caja). Cambio y margen ASIC van aparte.
@@ -247,7 +259,8 @@ export function monthlyTripleIngresosArrays(
   gastosItems?: ContabilidadGasto[] | null,
   hostingSupplierNumbers?: string[] | null,
   /** Preferir gastos de margin-settings (misma tabla que /hosting/margen). */
-  hostingCostItems?: ContabilidadGasto[] | null
+  hostingCostItems?: ContabilidadGasto[] | null,
+  transferCommissionInvoices?: HostingInvoiceTransferCommissionRow[] | null
 ): {
   cambio: number[];
   hosting: number[];
@@ -260,7 +273,7 @@ export function monthlyTripleIngresosArrays(
   margen: number[];
   combined: number[];
 } {
-  const cambio = monthlyFxProfitTotals12(operations, year);
+  const cambio = monthlyCambioProfitWithHostingCommission12(operations, transferCommissionInvoices, year);
   const hosting = monthlyInvoiceCashCollected12(hostingInvoices, year);
   const asic = monthlyInvoiceCashCollected12(asicInvoices, year);
   const { margin: asicMargin, cost: asicCost } = monthlyAsicMarginAndCost12(asicInvoices, year);
@@ -338,7 +351,8 @@ export function computeTripleKpiResult(
   asicInvoices: InvoiceMonthNetRow[] | undefined,
   gastosItems?: ContabilidadGasto[] | null,
   hostingSupplierNumbers?: string[] | null,
-  hostingCostItems?: ContabilidadGasto[] | null
+  hostingCostItems?: ContabilidadGasto[] | null,
+  transferCommissionInvoices?: HostingInvoiceTransferCommissionRow[] | null
 ): TripleKpiResult {
   const keys = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
   const {
@@ -356,7 +370,8 @@ export function computeTripleKpiResult(
     year,
     gastosItems,
     hostingSupplierNumbers,
-    hostingCostItems
+    hostingCostItems,
+    transferCommissionInvoices
   );
 
   const pack = (

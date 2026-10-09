@@ -108,3 +108,27 @@ export function sumTransferCommissionUsd(rows: HostingInvoiceTransferCommissionR
   }
   return s;
 }
+
+/** Comisión 4% transferencia (facturas hosting cobradas) por mes de fecha de factura. */
+export function monthlyHostingTransferCommission12(
+  rows: HostingInvoiceTransferCommissionRow[] | null | undefined,
+  year: number
+): number[] {
+  const keys = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
+  const totals = keys.map(() => 0);
+  const yStr = String(year);
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const ymd = invoicePrintedDateToYmd(row.date);
+    let ym = ymd && /^\d{4}-\d{2}-\d{2}$/.test(ymd) ? ymd.slice(0, 7) : "";
+    if (!ym) {
+      const monthRaw = String(row.month ?? "").trim();
+      if (/^\d{4}-\d{2}$/.test(monthRaw)) ym = monthRaw;
+    }
+    if (!ym || ym.slice(0, 4) !== yStr) continue;
+    const mi = keys.indexOf(ym);
+    if (mi < 0) continue;
+    const v = Number(row.commissionUsd);
+    if (Number.isFinite(v)) totals[mi] += v;
+  }
+  return totals;
+}

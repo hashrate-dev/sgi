@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import Chart from "chart.js/auto";
 import type { Chart as ChartInstance } from "chart.js";
-import type { ContabilidadGasto, HostingFxOperation } from "../lib/api";
+import type { ContabilidadGasto, HostingFxOperation, HostingInvoiceTransferCommissionRow } from "../lib/api";
 import {
   computeTripleKpiResult,
   monthlyTripleIngresosArrays,
@@ -134,7 +134,8 @@ function buildMonthlyTripleIngresoChartSeries(
   year: number,
   gastosItems?: ContabilidadGasto[] | null,
   hostingSupplierNumbers?: string[] | null,
-  hostingCostItems?: ContabilidadGasto[] | null
+  hostingCostItems?: ContabilidadGasto[] | null,
+  transferCommissionInvoices?: HostingInvoiceTransferCommissionRow[] | null
 ): {
   labels: string[];
   cambio: number[];
@@ -155,7 +156,8 @@ function buildMonthlyTripleIngresoChartSeries(
     year,
     gastosItems,
     hostingSupplierNumbers,
-    hostingCostItems
+    hostingCostItems,
+    transferCommissionInvoices
   );
   const labels = keys.map((ym) => formatMonthAxisEs(ym));
   const chartRangeTitle = `${formatMonthAxisEs(keys[0]!)} – ${formatMonthAxisEs(keys[11]!)} · ${year}`;
@@ -168,6 +170,7 @@ type Props = {
   invoicesAsic: InvoiceMonthNetRow[];
   gastosItems?: ContabilidadGasto[];
   hostingCostItems?: ContabilidadGasto[];
+  transferCommissionInvoices?: HostingInvoiceTransferCommissionRow[];
   hostingSupplierNumbers?: string[];
   /** Años del selector (mismo origen que gastos presupuesto). */
   years: number[];
@@ -182,6 +185,7 @@ export function CambioGananciasMensualAreaCard({
   invoicesAsic = [],
   gastosItems = [],
   hostingCostItems,
+  transferCommissionInvoices,
   hostingSupplierNumbers,
   years,
   presupuestoFilter,
@@ -204,9 +208,10 @@ export function CambioGananciasMensualAreaCard({
         year,
         gastosItems,
         hostingSupplierNumbers,
-        hostingCostItems
+        hostingCostItems,
+        transferCommissionInvoices
       ),
-    [operations, invoicesHosting, invoicesAsic, year, gastosItems, hostingSupplierNumbers, hostingCostItems]
+    [operations, invoicesHosting, invoicesAsic, year, gastosItems, hostingSupplierNumbers, hostingCostItems, transferCommissionInvoices]
   );
 
   const triple = useMemo(
@@ -219,9 +224,10 @@ export function CambioGananciasMensualAreaCard({
         invoicesAsic,
         gastosItems,
         hostingSupplierNumbers,
-        hostingCostItems
+        hostingCostItems,
+        transferCommissionInvoices
       ),
-    [year, mesYm, operations, invoicesHosting, invoicesAsic, gastosItems, hostingSupplierNumbers, hostingCostItems]
+    [year, mesYm, operations, invoicesHosting, invoicesAsic, gastosItems, hostingSupplierNumbers, hostingCostItems, transferCommissionInvoices]
   );
 
   const highlightMonthIndex = useMemo(

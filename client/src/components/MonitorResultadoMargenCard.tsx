@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import Chart from "chart.js/auto";
 import type { Chart as ChartInstance } from "chart.js";
-import type { ContabilidadGasto, HostingFxOperation } from "../lib/api";
+import type { ContabilidadGasto, HostingFxOperation, HostingInvoiceTransferCommissionRow } from "../lib/api";
 import {
   barFillOpacityForMonthFilter,
   chartMonthDataIndex,
@@ -117,6 +117,7 @@ export type MonitorResultadoMargenCardProps = {
   asicInvoices: InvoiceMonthNetRow[] | null | undefined;
   hostingSupplierNumbers?: string[];
   hostingCostItems?: ContabilidadGasto[];
+  transferCommissionInvoices?: HostingInvoiceTransferCommissionRow[];
   presupuestoFilter: PresupuestoFilterControl;
 };
 
@@ -130,6 +131,7 @@ export function MonitorResultadoMargenCard({
   asicInvoices,
   hostingSupplierNumbers,
   hostingCostItems,
+  transferCommissionInvoices,
   presupuestoFilter,
 }: MonitorResultadoMargenCardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -147,9 +149,10 @@ export function MonitorResultadoMargenCard({
         hostingInvoices,
         asicInvoices,
         hostingSupplierNumbers,
-        hostingCostItems
+        hostingCostItems,
+        transferCommissionInvoices
       ),
-    [year, gastosItems, operations, hostingInvoices, asicInvoices, hostingSupplierNumbers, hostingCostItems]
+    [year, gastosItems, operations, hostingInvoices, asicInvoices, hostingSupplierNumbers, hostingCostItems, transferCommissionInvoices]
   );
 
   const kpi = useMemo(

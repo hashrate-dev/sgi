@@ -1,4 +1,4 @@
-import type { ContabilidadGasto, HostingFxOperation } from "./api";
+import type { ContabilidadGasto, HostingFxOperation, HostingInvoiceTransferCommissionRow } from "./api";
 import { monthlyTripleIngresosArrays, type InvoiceMonthNetRow } from "./monitorTripleIngresoKpi";
 import { isHostingMarginSupplierGasto, monthlyHostingCost12 } from "./hostingMargenCost";
 
@@ -108,7 +108,8 @@ export function buildMonitorResultadoYearSeries(
   hostingInvoices: InvoiceMonthNetRow[] | null | undefined,
   asicInvoices: InvoiceMonthNetRow[] | null | undefined,
   hostingSupplierNumbers?: string[] | null,
-  hostingCostItems?: ContabilidadGasto[] | null
+  hostingCostItems?: ContabilidadGasto[] | null,
+  transferCommissionInvoices?: HostingInvoiceTransferCommissionRow[] | null
 ): MonitorResultadoMonth[] {
   const keys = chartMonthKeys(year);
   const costSrc =
@@ -120,7 +121,8 @@ export function buildMonitorResultadoYearSeries(
     year,
     gastosItems,
     hostingSupplierNumbers,
-    costSrc
+    costSrc,
+    transferCommissionInvoices
   );
   const gastos = monthlyGastosPresupuesto12(gastosItems, year, hostingSupplierNumbers);
   const costosHosting = monthlyHostingCost12(costSrc, year, hostingSupplierNumbers);
