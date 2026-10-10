@@ -1,16 +1,28 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   addEmittedDocument,
+  createHostingBillingService,
   createInvoice,
   getClients,
   getEmittedDocuments,
+  getHostingBillingServices,
   getInvoiceById,
   getInvoices,
   getNextInvoiceNumber,
   wakeUpBackend,
+  type HostingBillingServiceRow,
   type InvoiceCreateBody,
 } from "../lib/api";
-import { serviceCatalog } from "../lib/constants";
+import {
+  hostingServiceCatalogMap,
+  hostingServiceSelectOptions,
+  isHostingTransferCommissionKey,
+  matchHostingServiceKey,
+} from "../lib/hostingServiceCatalog";
+import {
+  HostingBillingServiceQuickAddModal,
+  type HostingBillingServiceQuickAddForm,
+} from "../components/HostingBillingServiceQuickAddModal";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadInvoices, saveInvoices } from "../lib/storage";
 import type { Client, ComprobanteType, Invoice, LineItem } from "../lib/types";
@@ -252,6 +264,9 @@ export function FacturacionPage() {
   const [relatedInvoiceId, setRelatedInvoiceId] = useState<string>("");
   const [paymentDate, setPaymentDate] = useState<string>("");
   const [itemsLocked, setItemsLocked] = useState(false); // Indica si los items están bloqueados por venir de factura relacionada
+  const [catalogExtras, setCatalogExtras] = useState<HostingBillingServiceRow[]>([]);
+  const [catalogAddOpen, setCatalogAddOpen] = useState(false);
+  const [catalogAddBusy, setCatalogAddBusy] = useState(false);
   const [isPartialCreditNote, setIsPartialCreditNote] = useState(false);
   const [partialCreditItems, setPartialCreditItems] = useState<LineItem[]>([]);
   /** Días para fecha de vencimiento (5, 6 o 7). Por defecto 6. */
@@ -405,6 +420,24 @@ export function FacturacionPage() {
     void reloadHostingClients();
   }, [reloadHostingClients]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const r = await getHostingBillingServices();
+        if (!cancelled) setCatalogExtras(Array.isArray(r.items) ? r.items : []);
+      } catch {
+        if (!cancelled) setCatalogExtras([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const hostingCatalog = useMemo(() => hostingServiceCatalogMap(catalogExtras), [catalogExtras]);
+  const hostingServiceOptions = useMemo(() => hostingServiceSelectOptions(hostingCatalog), [hostingCatalog]);
+
   /** Vista previa: pedir siguiente número sin consumir (peek) para no gastar números al solo abrir la página */
   useEffect(() => {
     setNextNumFromApi(null);
@@ -499,8 +532,8 @@ export function FacturacionPage() {
   /** La fila 4% se agrega manual (desde el selector de ítem). Solo actualizamos precio/cantidad de cada D (4% de la fila de servicio correspondiente) y orden: Servicio, 4%, Servicio, 4%, ... */
   useEffect(() => {
     setItems((prev) => {
-      const serviceItems = prev.filter((it) => it.serviceKey === "A" || it.serviceKey === "B" || it.serviceKey === "C");
-      const dItems = prev.filter((it) => it.serviceKey === "D");
+      const serviceItems = prev.filter((it) => !isHostingTransferCommissionKey(it.serviceKey));
+      const dItems = prev.filter((it) => isHostingTransferCommissionKey(it.serviceKey));
       const numService = serviceItems.length;
       const basePorFila = serviceItems.map((s) => (s.price - (s.discount || 0)) * s.quantity);
 
@@ -611,7 +644,7 @@ export function FacturacionPage() {
           // Asegurar que todos los campos estén presentes y correctos
           const loadedItem: LineItem = {
             serviceKey: item.serviceKey || "A", // Fallback si no existe
-            serviceName: item.serviceName || serviceCatalog[item.serviceKey || "A"].name,
+            serviceName: item.serviceName || hostingCatalog[item.serviceKey || "A"]?.name || "Servicio alojamiento y mantenimiento L7",
             month: item.month || "", // Mes debe estar presente
             quantity: item.quantity || 1, // Cantidad debe ser al menos 1
             price: item.price || 0, // Precio debe estar presente
@@ -619,8 +652,8 @@ export function FacturacionPage() {
           };
           
           // Si el serviceKey existe pero no coincide con el serviceName, actualizar el nombre desde el catálogo
-          if (loadedItem.serviceKey && serviceCatalog[loadedItem.serviceKey]) {
-            const catalogService = serviceCatalog[loadedItem.serviceKey];
+          if (loadedItem.serviceKey && hostingCatalog[loadedItem.serviceKey]) {
+            const catalogService = hostingCatalog[loadedItem.serviceKey];
             // Solo actualizar el nombre si el precio coincide con el catálogo (para mantener precios personalizados)
             if (loadedItem.price === catalogService.price) {
               loadedItem.serviceName = catalogService.name;
@@ -656,10 +689,10 @@ export function FacturacionPage() {
             if (apiItems.length > 0) {
               const loadedItems: LineItem[] = apiItems.map((item) => {
                 const serviceName = item.service || "";
-                const key = (["A", "B", "C", "D"] as const).find((k) => serviceCatalog[k].name === serviceName || serviceCatalog[k].price === item.price) ?? "A";
+                const key = matchHostingServiceKey(serviceName, hostingCatalog) ?? "A";
                 return {
                   serviceKey: key,
-                  serviceName: serviceName || serviceCatalog[key].name,
+                  serviceName: serviceName || hostingCatalog[key]?.name || serviceName,
                   month: item.month || currentMonthValue(),
                   quantity: item.quantity || 1,
                   price: item.price || 0,
@@ -688,7 +721,7 @@ export function FacturacionPage() {
     } else {
       setItemsLocked(false);
     }
-  }, [relatedInvoiceId, type, selectedClient, invoicesAll]);
+  }, [relatedInvoiceId, type, selectedClient, invoicesAll, hostingCatalog]);
 
   // NC parcial: inicializa grilla manual independiente (se emite con estos ítems)
   useEffect(() => {
@@ -705,7 +738,7 @@ export function FacturacionPage() {
       return [
         {
           serviceKey: "A",
-          serviceName: serviceCatalog.A.name,
+          serviceName: hostingCatalog.A?.name ?? "Servicio alojamiento y mantenimiento L7",
           month: monthDefault,
           quantity: 1,
           price: 0,
@@ -716,7 +749,7 @@ export function FacturacionPage() {
   }, [type, isPartialCreditNote, relatedInvoiceId, invoicesAll]);
 
   function addItem() {
-    const def = serviceCatalog.A;
+    const def = hostingCatalog.A ?? { name: "Servicio alojamiento y mantenimiento L7", price: 100 };
     const now = new Date();
     const monthDefault = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     setItems((prev) => [
@@ -739,8 +772,8 @@ export function FacturacionPage() {
   function removeItem(idx: number) {
     setItems((prev) => {
       const it = prev[idx];
-      const isService = it && (it.serviceKey === "A" || it.serviceKey === "B" || it.serviceKey === "C");
-      if (isService && prev[idx + 1]?.serviceKey === "D") {
+      const isService = it && !isHostingTransferCommissionKey(it.serviceKey);
+      if (isService && isHostingTransferCommissionKey(prev[idx + 1]?.serviceKey)) {
         return prev.filter((_, i) => i !== idx && i !== idx + 1);
       }
       return prev.filter((_, i) => i !== idx);
@@ -748,7 +781,7 @@ export function FacturacionPage() {
   }
 
   function addPartialCreditItem() {
-    const def = serviceCatalog.A;
+    const def = hostingCatalog.A ?? { name: "Servicio alojamiento y mantenimiento L7", price: 100 };
     const now = new Date();
     const monthDefault = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     setPartialCreditItems((prev) => [
@@ -770,6 +803,25 @@ export function FacturacionPage() {
 
   function removePartialCreditItem(idx: number) {
     setPartialCreditItems((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  async function saveHostingCatalogItem(form: HostingBillingServiceQuickAddForm) {
+    const name = form.name.trim();
+    if (name.length < 3) return;
+    setCatalogAddBusy(true);
+    try {
+      const r = await createHostingBillingService({ name, price: form.price });
+      setCatalogExtras((prev) => {
+        const rest = prev.filter((x) => x.code !== r.item.code);
+        return [...rest, r.item];
+      });
+      setCatalogAddOpen(false);
+      showToast("Ítem agregado al catálogo.", "success");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "No se pudo guardar el ítem.", "error");
+    } finally {
+      setCatalogAddBusy(false);
+    }
   }
 
   function handleClickEmitir() {
@@ -1338,7 +1390,7 @@ export function FacturacionPage() {
                     <div className="card fact-detail-servicios-card">
                       <div className="fact-detail-servicios-header" style={{ marginBottom: type === "Nota de Crédito" && !relatedInvoiceId ? "1.5rem" : undefined }}>
                         <h2 className="fact-detail-servicios-title"><span style={{ fontSize: "1.25em", lineHeight: 1 }}>📋</span> Detalle de servicios</h2>
-                        <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap", justifyContent: "flex-end" }}>
                           <button
                             type="button"
                             className="fact-detail-servicios-btn-clear"
@@ -1347,6 +1399,15 @@ export function FacturacionPage() {
                             title={itemsLocked ? "Los detalles están bloqueados" : !selectedClient ? "Primero debe seleccionar un cliente" : items.length === 0 ? "No hay ítems para borrar" : "Vaciar lista de ítems"}
                           >
                             🗑️ Borrar
+                          </button>
+                          <button
+                            type="button"
+                            className="fact-detail-servicios-btn-add"
+                            onClick={() => setCatalogAddOpen(true)}
+                            disabled={!canEditFacturacion(user)}
+                            title="Agregar un servicio nuevo al catálogo (queda guardado para próximas facturas)"
+                          >
+                            + Nuevo ítem
                           </button>
                           <button
                             type="button"
@@ -1454,7 +1515,7 @@ export function FacturacionPage() {
                         </tr>
                       ) : (
                         items.map((it, idx) => {
-                          const is4Pct = it.serviceKey === "D";
+                          const is4Pct = isHostingTransferCommissionKey(it.serviceKey);
                           const lineTotal = (it.price - it.discount) * it.quantity;
                           return (
                             <tr key={idx}>
@@ -1473,18 +1534,27 @@ export function FacturacionPage() {
                                   value={it.serviceKey || ""}
                                   onChange={(e) => {
                                     if (itemsLocked) return;
-                                    const key = e.target.value as LineItem["serviceKey"];
-                                    if (key && serviceCatalog[key]) {
-                                      const def = serviceCatalog[key];
-                                      updateItem(idx, { serviceKey: key, serviceName: def.name, price: def.price, discount: key === "D" ? 0 : it.discount });
+                                    const key = e.target.value;
+                                    const def = hostingCatalog[key];
+                                    if (key && def) {
+                                      updateItem(idx, {
+                                        serviceKey: key,
+                                        serviceName: def.name,
+                                        price: def.price,
+                                        discount: isHostingTransferCommissionKey(key) ? 0 : it.discount,
+                                      });
                                     }
                                   }}
                                   disabled={itemsLocked}
                                 >
-                                  <option value="A">{serviceCatalog.A.name}</option>
-                                  <option value="B">{serviceCatalog.B.name}</option>
-                                  <option value="C">{serviceCatalog.C.name}</option>
-                                  <option value="D">{serviceCatalog.D.name}</option>
+                                  {it.serviceKey && !hostingServiceOptions.some((o) => o.code === it.serviceKey) ? (
+                                    <option value={it.serviceKey}>{it.serviceName || it.serviceKey}</option>
+                                  ) : null}
+                                  {hostingServiceOptions.map((o) => (
+                                    <option key={o.code} value={o.code}>
+                                      {o.name}
+                                    </option>
+                                  ))}
                                 </select>
                               </td>
                               <td className="fact-cell-center">
@@ -1681,17 +1751,25 @@ export function FacturacionPage() {
                                             style={{ padding: "0.4rem 0.5rem", fontSize: "0.8125rem", width: "100%", maxWidth: "100%" }}
                                             value={it.serviceKey || ""}
                                             onChange={(e) => {
-                                              const key = e.target.value as LineItem["serviceKey"];
-                                              if (key && serviceCatalog[key]) {
-                                                const def = serviceCatalog[key];
-                                                updatePartialCreditItem(idx, { serviceKey: key, serviceName: def.name, price: def.price });
+                                              const key = e.target.value;
+                                              const def = hostingCatalog[key];
+                                              if (key && def) {
+                                                updatePartialCreditItem(idx, {
+                                                  serviceKey: key,
+                                                  serviceName: def.name,
+                                                  price: def.price,
+                                                });
                                               }
                                             }}
                                           >
-                                            <option value="A">{serviceCatalog.A.name}</option>
-                                            <option value="B">{serviceCatalog.B.name}</option>
-                                            <option value="C">{serviceCatalog.C.name}</option>
-                                            <option value="D">{serviceCatalog.D.name}</option>
+                                            {it.serviceKey && !hostingServiceOptions.some((o) => o.code === it.serviceKey) ? (
+                                              <option value={it.serviceKey}>{it.serviceName || it.serviceKey}</option>
+                                            ) : null}
+                                            {hostingServiceOptions.map((o) => (
+                                              <option key={o.code} value={o.code}>
+                                                {o.name}
+                                              </option>
+                                            ))}
                                           </select>
                                         </td>
                                         <td className="fact-cell-center">
@@ -2040,6 +2118,15 @@ export function FacturacionPage() {
           </main>
         </div>
       </div>
+      <HostingBillingServiceQuickAddModal
+        open={catalogAddOpen}
+        busy={catalogAddBusy}
+        onClose={() => {
+          if (catalogAddBusy) return;
+          setCatalogAddOpen(false);
+        }}
+        onSubmit={saveHostingCatalogItem}
+      />
       <ConfirmModal
         open={showEmitPdfConfirm}
         title="Emitir documento"

@@ -27,7 +27,7 @@ export type Client = {
 };
 
 export type LineItem = {
-  serviceKey?: "A" | "B" | "C" | "D"; // Para facturas de Hosting
+  serviceKey?: string; // Para facturas de Hosting (A/B/C/E/D o código de catálogo)
   serviceName?: string; // Para facturas de Hosting
   /** Respaldo del texto de API/DB (getInvoice) cuando no se copió a serviceName. */
   service?: string;

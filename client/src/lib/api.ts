@@ -1703,6 +1703,27 @@ export type HostingMarginSettingsResponse = {
   ok?: boolean;
 };
 
+export type HostingBillingServiceRow = {
+  code: string;
+  name: string;
+  price: number;
+  builtin: boolean;
+};
+
+export function getHostingBillingServices(): Promise<{ items: HostingBillingServiceRow[] }> {
+  return api<{ items: HostingBillingServiceRow[] }>("/api/hosting/billing-services");
+}
+
+export function createHostingBillingService(body: {
+  name: string;
+  price: number;
+}): Promise<{ ok: boolean; item: HostingBillingServiceRow }> {
+  return api<{ ok: boolean; item: HostingBillingServiceRow }>("/api/hosting/billing-services", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
 export function getHostingMarginSettings(): Promise<HostingMarginSettingsResponse> {
   return api<HostingMarginSettingsResponse>("/api/hosting/margin-settings");
 }

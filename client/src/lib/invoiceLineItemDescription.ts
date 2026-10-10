@@ -95,15 +95,17 @@ export function getLineItemDescription(it: LineItem): string {
   return normalizeInvoiceDescriptionForCell(it.month ? formatInvoiceItemDescription("Item", it.month) : "Item");
 }
 
-/** Modelo de hosting (L7 / L9 / S21) desde nombre o serviceKey. */
-function hostingModelFromLineItem(it: LineItem): "L7" | "L9" | "S21" | null {
+/** Modelo de hosting (L7 / L9 / S21 / Z15) desde nombre o serviceKey. */
+function hostingModelFromLineItem(it: LineItem): "L7" | "L9" | "S21" | "Z15" | null {
   const label = `${lineItemServiceLabel(it)} ${it.modeloEquipo ?? ""}`.toUpperCase();
+  if (/\bZ15\b/.test(label)) return "Z15";
   if (/\bS21\b/.test(label)) return "S21";
   if (/\bL9\b/.test(label)) return "L9";
   if (/\bL7\b/.test(label)) return "L7";
   if (it.serviceKey === "A") return "L7";
   if (it.serviceKey === "B") return "L9";
   if (it.serviceKey === "C") return "S21";
+  if (it.serviceKey === "E") return "Z15";
   return null;
 }
 

@@ -817,6 +817,13 @@ CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_visitor ON marketplace_presence_
     native.exec(`CREATE INDEX IF NOT EXISTS idx_proveedores_hrs_created ON proveedores_hrs(created_at DESC)`);
   }
 
+  native.exec(`CREATE TABLE IF NOT EXISTS hosting_billing_services (
+    code TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    price REAL NOT NULL DEFAULT 0,
+    builtin INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT ''
+  )`);
   native.exec(`CREATE TABLE IF NOT EXISTS hosting_margin_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     supplier_numbers_json TEXT NOT NULL,

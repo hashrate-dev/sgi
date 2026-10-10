@@ -627,6 +627,14 @@ ALTER TABLE contabilidad_gastos ADD CONSTRAINT contabilidad_gastos_moneda_check 
 CREATE INDEX IF NOT EXISTS idx_contabilidad_gastos_fecha ON contabilidad_gastos(fecha DESC);
 CREATE INDEX IF NOT EXISTS idx_contabilidad_gastos_prov ON contabilidad_gastos(proveedor_id);
 
+CREATE TABLE IF NOT EXISTS hosting_billing_services (
+  code TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  price NUMERIC(18, 4) NOT NULL DEFAULT 0,
+  builtin SMALLINT NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT ''
+);
+
 CREATE TABLE IF NOT EXISTS hosting_margin_settings (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   supplier_numbers_json TEXT NOT NULL,

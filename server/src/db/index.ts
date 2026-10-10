@@ -34,6 +34,7 @@ async function loadDb() {
           await ensureSupabaseClientsEmailIsNotUnique(pool);
           await ensureSupabaseInvoiceMarginColumn(pool);
           await ensureSupabaseHostingMarginSettings(pool);
+          await ensureSupabaseHostingBillingServices(pool);
           await pool.query("SELECT 1");
         })(),
         new Promise((_, rej) =>
@@ -96,6 +97,24 @@ async function ensureSupabaseInvoiceMarginColumn(pool: Pool) {
     const msg = e instanceof Error ? e.message : String(e);
     // eslint-disable-next-line no-console
     console.warn("[DB] ensureSupabaseInvoiceMarginColumn:", msg);
+  }
+}
+
+async function ensureSupabaseHostingBillingServices(pool: Pool) {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS hosting_billing_services (
+        code TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        price NUMERIC(18, 4) NOT NULL DEFAULT 0,
+        builtin SMALLINT NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT ''
+      )
+    `);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // eslint-disable-next-line no-console
+    console.warn("[DB] ensureSupabaseHostingBillingServices:", msg);
   }
 }
 
