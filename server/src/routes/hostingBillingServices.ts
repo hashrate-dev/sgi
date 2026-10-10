@@ -41,7 +41,7 @@ async function ensureHostingBillingServicesSchema(): Promise<void> {
   schemaEnsured = true;
 }
 
-type Row = { code?: string; name?: string; price?: number | string; builtin?: number | boolean };
+type Row = { code?: string; name?: string; price?: number | string; builtin?: unknown };
 
 function mapRow(raw: Record<string, unknown>): { code: string; name: string; price: number; builtin: boolean } | null {
   const r = rowKeysToLowercase(raw) as Row;
@@ -49,8 +49,12 @@ function mapRow(raw: Record<string, unknown>): { code: string; name: string; pri
   const name = String(r.name ?? "").trim();
   if (!code || !name) return null;
   const price = Number(r.price);
-  const builtin = r.builtin === true || r.builtin === 1 || r.builtin === "1";
-  return { code, name, price: Number.isFinite(price) ? price : 0, builtin: Boolean(builtin) };
+  const builtinRaw = r.builtin;
+  const builtin =
+    builtinRaw === true ||
+    builtinRaw === 1 ||
+    String(builtinRaw ?? "").trim() === "1";
+  return { code, name, price: Number.isFinite(price) ? price : 0, builtin };
 }
 
 async function nextCustomCode(): Promise<string> {
