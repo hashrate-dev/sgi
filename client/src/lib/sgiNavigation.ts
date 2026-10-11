@@ -42,6 +42,7 @@ const GA_HUB_SECTION_SCREENS = [
   "ga-noticias",
   "ga-mercados",
   "ga-comunicacion",
+  "ga-agentes-facturacion-hosting",
 ] as const;
 
 const CAMBIO_USDT_HUB_SCREENS = ["ga-cambio-usdt-hub", "ga-cambio-usdt-clientes", "fin-exchange-hub"] as const;

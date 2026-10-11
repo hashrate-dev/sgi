@@ -27,6 +27,7 @@ import { kryptexRouter } from "./routes/kryptex.js";
 import { hostingFxOperationsRouter } from "./routes/hostingFxOperations.js";
 import { hostingMarginRouter } from "./routes/hostingMargin.js";
 import { hostingBillingServicesRouter } from "./routes/hostingBillingServices.js";
+import { hostingBillingAgentRouter, hostingBillingAgentCronHandler } from "./routes/hostingBillingAgent.js";
 import { commercialInvoicesRouter } from "./routes/commercialInvoices.js";
 import { asicCostosRouter } from "./routes/asicCostos.js";
 import { proveedoresHrsRouter } from "./routes/proveedoresHrs.js";
@@ -161,6 +162,8 @@ export function createApp() {
   app.post("/api/ops-comunicacion/telegram/webhook", opsComunicacionTelegramWebhookHandler);
   app.get("/api/paper/cron-tick", paperAgentCronHandler);
   app.post("/api/paper/cron-tick", paperAgentCronHandler);
+  app.get("/api/hosting/billing-agent/cron-generate", hostingBillingAgentCronHandler);
+  app.post("/api/hosting/billing-agent/cron-generate", hostingBillingAgentCronHandler);
   app.use("/api", paperAgentRouter);
   app.use("/api", requireAuth, opsComunicacionRouter);
   app.use("/api", requireAuth, setupsRouter);
@@ -170,6 +173,7 @@ export function createApp() {
   app.use("/api", requireAuth, hostingFxOperationsRouter);
   app.use("/api", requireAuth, hostingMarginRouter);
   app.use("/api", requireAuth, hostingBillingServicesRouter);
+  app.use("/api", requireAuth, hostingBillingAgentRouter);
   app.use("/api", requireAuth, asicCostosRouter);
   app.use("/api", requireAuth, proveedoresHrsRouter);
   app.use("/api", requireAuth, contabilidadGastosRouter);

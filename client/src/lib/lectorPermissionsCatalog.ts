@@ -181,6 +181,7 @@ export const LECTOR_GRANT_PATH_PREFIXES: Record<LectorPermissionKey, readonly st
     "/pendientes-equipos",
     "/mineria",
     "/equipos-asic",
+    "/gestion-administrativa/agentes-facturacion-hosting",
   ],
   clientes: ["/clients", "/cuenta-cliente", "/clientes", "/clientes-hub"],
   equipos: ["/asic/equipment", "/asic", "/equipos-asic", "/asic/cotizador-china-py"],

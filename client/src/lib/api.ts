@@ -1724,6 +1724,172 @@ export function createHostingBillingService(body: {
   });
 }
 
+export type HostingBillingAgentLine = {
+  serviceKey: string;
+  serviceName: string;
+  month: string;
+  quantity: number;
+  price: number;
+  discount: number;
+  watts: number;
+  kwhMonth: number;
+  daysInMonth: number;
+  usdPerKwh: number;
+};
+
+export type HostingBillingAgentUnit = {
+  id: number;
+  clientId: number;
+  serviceKey: string;
+  serviceName: string;
+  quantity: number;
+  watts: number;
+  discount: number;
+};
+
+export type HostingBillingAgentClient = {
+  clientId: number;
+  active: boolean;
+  usdPerKwh: number | null;
+  notes: string;
+  code: string;
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
+  city: string;
+  name2: string;
+  units: HostingBillingAgentUnit[];
+};
+
+export type HostingBillingAgentDraft = {
+  id: number;
+  serviceMonth: string;
+  clientId: number;
+  clientName: string;
+  daysInMonth: number;
+  usdPerKwh: number;
+  status: "draft" | "rejected" | "authorized" | "already_emitted";
+  warning: string;
+  items: HostingBillingAgentLine[];
+  subtotal: number;
+  discounts: number;
+  total: number;
+  invoiceId: number | null;
+  invoiceNumber: string | null;
+  authorizedAt: string | null;
+  authorizedBy: string;
+};
+
+export type HostingBillingAgentInvoice = {
+  id: string;
+  number: string;
+  type: string;
+  clientName: string;
+  clientPhone?: string;
+  clientEmail?: string;
+  clientAddress?: string;
+  clientCity?: string;
+  clientName2?: string;
+  clientPhone2?: string;
+  clientEmail2?: string;
+  clientAddress2?: string;
+  clientCity2?: string;
+  date: string;
+  emissionTime?: string;
+  dueDate?: string;
+  month: string;
+  subtotal: number;
+  discounts: number;
+  total: number;
+  items: HostingBillingAgentLine[];
+};
+
+export function getHostingBillingAgent(): Promise<{
+  settings: { usdPerKwh: number; dueDateDays: 5 | 6 | 7; include4pct: boolean };
+  catalog: Array<{ code: string; name: string; price: number; defaultWatts: number; wattsFromGarantia?: boolean }>;
+  clients: HostingBillingAgentClient[];
+  defaultClosedMonth: string;
+  daysInDefaultMonth: number;
+}> {
+  return api("/api/hosting/billing-agent");
+}
+
+export function putHostingBillingAgentSettings(body: {
+  usdPerKwh: number;
+  dueDateDays: 5 | 6 | 7;
+  include4pct: boolean;
+}): Promise<{ ok: boolean; settings: { usdPerKwh: number; dueDateDays: 5 | 6 | 7; include4pct: boolean } }> {
+  return api("/api/hosting/billing-agent/settings", { method: "PUT", body: JSON.stringify(body) });
+}
+
+export function addHostingBillingAgentClient(clientId: number): Promise<{ ok: boolean; clients: HostingBillingAgentClient[] }> {
+  return api("/api/hosting/billing-agent/clients", { method: "POST", body: JSON.stringify({ clientId }) });
+}
+
+export function putHostingBillingAgentClient(
+  clientId: number,
+  body: { active?: boolean; usdPerKwh?: number | null; notes?: string }
+): Promise<{ ok: boolean; clients: HostingBillingAgentClient[] }> {
+  return api(`/api/hosting/billing-agent/clients/${encodeURIComponent(String(clientId))}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export function removeHostingBillingAgentClient(clientId: number): Promise<{ ok: boolean; clients: HostingBillingAgentClient[] }> {
+  return api(`/api/hosting/billing-agent/clients/${encodeURIComponent(String(clientId))}`, { method: "DELETE" });
+}
+
+export function putHostingBillingAgentUnits(
+  clientId: number,
+  units: Array<{ serviceKey: string; quantity: number; watts: number; discount?: number }>
+): Promise<{ ok: boolean; clients: HostingBillingAgentClient[] }> {
+  return api(`/api/hosting/billing-agent/clients/${encodeURIComponent(String(clientId))}/units`, {
+    method: "PUT",
+    body: JSON.stringify({ units }),
+  });
+}
+
+export function importHostingBillingAgentLastInvoice(
+  clientId: number
+): Promise<{ ok: boolean; importedFromMonth: string; clients: HostingBillingAgentClient[] }> {
+  return api(`/api/hosting/billing-agent/clients/${encodeURIComponent(String(clientId))}/import-last-invoice`, {
+    method: "POST",
+  });
+}
+
+export function getHostingBillingAgentDrafts(month?: string): Promise<{
+  month: string;
+  daysInMonth: number;
+  monthLabel: string;
+  closed: boolean;
+  drafts: HostingBillingAgentDraft[];
+}> {
+  const q = month ? `?month=${encodeURIComponent(month)}` : "";
+  return api(`/api/hosting/billing-agent/drafts${q}`);
+}
+
+export function generateHostingBillingAgentDrafts(month?: string): Promise<{
+  ok: boolean;
+  month: string;
+  daysInMonth: number;
+  summary: { created: number; refreshed: number; skipped: number; already: number };
+  drafts: HostingBillingAgentDraft[];
+}> {
+  return api("/api/hosting/billing-agent/generate", { method: "POST", body: JSON.stringify(month ? { month } : {}) });
+}
+
+export function rejectHostingBillingAgentDraft(id: number): Promise<{ ok: boolean; draft: HostingBillingAgentDraft }> {
+  return api(`/api/hosting/billing-agent/drafts/${encodeURIComponent(String(id))}/reject`, { method: "POST" });
+}
+
+export function authorizeHostingBillingAgentDraft(
+  id: number
+): Promise<{ ok: boolean; draft: HostingBillingAgentDraft; invoice: HostingBillingAgentInvoice }> {
+  return api(`/api/hosting/billing-agent/drafts/${encodeURIComponent(String(id))}/authorize`, { method: "POST" });
+}
+
 export function getHostingMarginSettings(): Promise<HostingMarginSettingsResponse> {
   return api<HostingMarginSettingsResponse>("/api/hosting/margin-settings");
 }

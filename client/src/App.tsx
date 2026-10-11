@@ -10,6 +10,7 @@ import { HostingHubPage } from "./pages/HostingHubPage";
 import { HostingMargenPage } from "./pages/HostingMargenPage";
 import { HostingCommercialInvoicePage } from "./pages/HostingCommercialInvoicePage";
 import { GestionAdministrativaPage } from "./pages/GestionAdministrativaPage";
+import { HostingBillingAgentPage } from "./pages/HostingBillingAgentPage";
 import { LeadsBasePage } from "./pages/LeadsBasePage";
 import { NuevosLeadsPage } from "./pages/NuevosLeadsPage";
 import { PruebaPage } from "./pages/PruebaPage";
@@ -451,6 +452,7 @@ function App() {
             <Route path="/asic/equipment" element={<EquiposAsicPage />} />
             <Route path="/marketplace/home-banners" element={<TiendaOnlineBannersHomePage />} />
             <Route path="/gestion-administrativa" element={<GestionAdministrativaPage />} />
+            <Route path="/gestion-administrativa/agentes-facturacion-hosting" element={<HostingBillingAgentPage />} />
             <Route path="/gestion-administrativa/nuevos-leads" element={<NuevosLeadsPage />} />
             <Route path="/gestion-administrativa/leads-base" element={<LeadsBasePage />} />
             <Route path="/gestion-administrativa/cambio-usdt" element={<CambioUsdtHubPage />} />

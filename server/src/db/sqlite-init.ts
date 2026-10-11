@@ -684,6 +684,55 @@ CREATE TABLE IF NOT EXISTS hosting_margin_settings (
 );
 INSERT OR IGNORE INTO hosting_margin_settings (id, supplier_numbers_json, updated_at, updated_by)
 VALUES (1, '["P002","P003"]', '', '');
+
+CREATE TABLE IF NOT EXISTS hosting_billing_agent_settings (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  usd_per_kwh REAL NOT NULL DEFAULT 0.078,
+  due_date_days INTEGER NOT NULL DEFAULT 6,
+  include_4pct INTEGER NOT NULL DEFAULT 1,
+  updated_at TEXT NOT NULL DEFAULT ''
+);
+INSERT OR IGNORE INTO hosting_billing_agent_settings (id, usd_per_kwh, due_date_days, include_4pct, updated_at)
+VALUES (1, 0.078, 6, 1, '');
+CREATE TABLE IF NOT EXISTS hosting_billing_agent_clients (
+  client_id INTEGER PRIMARY KEY,
+  active INTEGER NOT NULL DEFAULT 1,
+  usd_per_kwh REAL,
+  notes TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS hosting_billing_agent_units (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  client_id INTEGER NOT NULL,
+  service_key TEXT NOT NULL DEFAULT 'A',
+  service_name TEXT NOT NULL DEFAULT '',
+  quantity INTEGER NOT NULL DEFAULT 1,
+  watts REAL NOT NULL DEFAULT 0,
+  discount REAL NOT NULL DEFAULT 0,
+  sort_order INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_hba_units_client ON hosting_billing_agent_units(client_id, sort_order, id);
+CREATE TABLE IF NOT EXISTS hosting_billing_agent_drafts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  service_month TEXT NOT NULL,
+  client_id INTEGER NOT NULL,
+  client_name TEXT NOT NULL DEFAULT '',
+  days_in_month INTEGER NOT NULL DEFAULT 30,
+  usd_per_kwh REAL NOT NULL DEFAULT 0.078,
+  status TEXT NOT NULL DEFAULT 'draft',
+  warning TEXT NOT NULL DEFAULT '',
+  payload_json TEXT NOT NULL DEFAULT '[]',
+  subtotal REAL NOT NULL DEFAULT 0,
+  discounts REAL NOT NULL DEFAULT 0,
+  total REAL NOT NULL DEFAULT 0,
+  invoice_id INTEGER,
+  invoice_number TEXT,
+  authorized_at TEXT,
+  authorized_by TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL DEFAULT '',
+  UNIQUE (client_id, service_month)
+);
 `);
 
   return db;

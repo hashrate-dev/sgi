@@ -162,6 +162,16 @@ export const SGI_PERMISSION_SCREEN_MAP: readonly SgiPermissionScreenRow[] = [
     audience: ["staff", "lector"],
   },
   {
+    id: "ga-agentes-facturacion-hosting",
+    zoneOrder: 10,
+    zone: "Gestión Administrativa",
+    legacyModule: "facturacion",
+    title: "Agentes Facturación de Hosting",
+    routes: ["/gestion-administrativa/agentes-facturacion-hosting"],
+    accessNote: "Borradores automáticos a mes vencido; cada factura requiere autorización del administrador. La emisión manual sigue en Emitir Facturas de Hosting.",
+    audience: ["staff", "lector"],
+  },
+  {
     id: "hosting-hub",
     zoneOrder: 20,
     zone: "Hosting — Servicios de hosting",

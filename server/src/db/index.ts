@@ -36,6 +36,7 @@ async function loadDb() {
           await ensureSupabaseHostingMarginSettings(pool);
           await ensureSupabaseHostingBillingServices(pool);
           await ensureSupabaseMarketplacePresenceCity(pool);
+          await ensureSupabaseHostingBillingAgent(pool);
           await pool.query("SELECT 1");
         })(),
         new Promise((_, rej) =>
@@ -109,6 +110,64 @@ async function ensureSupabaseMarketplacePresenceCity(pool: Pool) {
     const msg = e instanceof Error ? e.message : String(e);
     // eslint-disable-next-line no-console
     console.warn("[DB] ensureSupabaseMarketplacePresenceCity:", msg);
+  }
+}
+
+async function ensureSupabaseHostingBillingAgent(pool: Pool) {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS hosting_billing_agent_settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      usd_per_kwh DOUBLE PRECISION NOT NULL DEFAULT 0.078,
+      due_date_days INTEGER NOT NULL DEFAULT 6,
+      include_4pct INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL DEFAULT ''
+    )`);
+    await pool.query(`INSERT INTO hosting_billing_agent_settings (id, usd_per_kwh, due_date_days, include_4pct, updated_at)
+      VALUES (1, 0.078, 6, 1, '')
+      ON CONFLICT (id) DO NOTHING`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS hosting_billing_agent_clients (
+      client_id INTEGER PRIMARY KEY,
+      active INTEGER NOT NULL DEFAULT 1,
+      usd_per_kwh DOUBLE PRECISION,
+      notes TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT ''
+    )`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS hosting_billing_agent_units (
+      id BIGSERIAL PRIMARY KEY,
+      client_id INTEGER NOT NULL,
+      service_key TEXT NOT NULL DEFAULT 'A',
+      service_name TEXT NOT NULL DEFAULT '',
+      quantity INTEGER NOT NULL DEFAULT 1,
+      watts DOUBLE PRECISION NOT NULL DEFAULT 0,
+      discount DOUBLE PRECISION NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL DEFAULT 0
+    )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_hba_units_client ON hosting_billing_agent_units(client_id, sort_order, id)`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS hosting_billing_agent_drafts (
+      id BIGSERIAL PRIMARY KEY,
+      service_month TEXT NOT NULL,
+      client_id INTEGER NOT NULL,
+      client_name TEXT NOT NULL DEFAULT '',
+      days_in_month INTEGER NOT NULL DEFAULT 30,
+      usd_per_kwh DOUBLE PRECISION NOT NULL DEFAULT 0.078,
+      status TEXT NOT NULL DEFAULT 'draft',
+      warning TEXT NOT NULL DEFAULT '',
+      payload_json TEXT NOT NULL DEFAULT '[]',
+      subtotal DOUBLE PRECISION NOT NULL DEFAULT 0,
+      discounts DOUBLE PRECISION NOT NULL DEFAULT 0,
+      total DOUBLE PRECISION NOT NULL DEFAULT 0,
+      invoice_id INTEGER,
+      invoice_number TEXT,
+      authorized_at TEXT,
+      authorized_by TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT '',
+      UNIQUE (client_id, service_month)
+    )`);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // eslint-disable-next-line no-console
+    console.warn("[DB] ensureSupabaseHostingBillingAgent:", msg);
   }
 }
 

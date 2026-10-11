@@ -77,6 +77,9 @@ export function grantsIncludeScreen(grants: string[] | null | undefined, screenI
     const legacyLeads = ["facturacion", "equipos", "equipos_tienda", "garantias", "setups"] as const;
     if (legacyLeads.some((k) => grants.includes(k))) return true;
   }
+  if (screenId === "ga-agentes-facturacion-hosting") {
+    if (grants.includes("facturacion") || grants.includes("hosting-billing")) return true;
+  }
   return false;
 }
 
@@ -175,7 +178,8 @@ export function collectPathPrefixesFromScreenGrants(grants: readonly string[]): 
     grantsIncludeScreen(g, "ga-valores-garantias-asic") ||
     grantsIncludeScreen(g, "ga-noticias") ||
     grantsIncludeScreen(g, "ga-mercados") ||
-    grantsIncludeScreen(g, "ga-comunicacion");
+    grantsIncludeScreen(g, "ga-comunicacion") ||
+    grantsIncludeScreen(g, "ga-agentes-facturacion-hosting");
   const seesFin =
     grantsIncludeScreen(g, "fin-proveedores") ||
     grantsIncludeScreen(g, "fin-contabilidad") ||

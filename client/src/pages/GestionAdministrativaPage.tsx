@@ -20,6 +20,12 @@ const hubItems: readonly HubItem[] = [
     desc: "Información de facturación de servicios de hosting",
   },
   {
+    to: "/gestion-administrativa/agentes-facturacion-hosting",
+    icon: "bi-robot",
+    label: "Agentes Facturación de Hosting",
+    desc: "Borradores a mes vencido por equipos, energía y días del mes; el administrador autoriza cada factura",
+  },
+  {
     to: "/asic",
     icon: "bi-cpu",
     label: "Equipos ASIC",
