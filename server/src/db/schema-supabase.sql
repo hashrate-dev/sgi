@@ -664,8 +664,10 @@ CREATE TABLE IF NOT EXISTS hosting_billing_agent_clients (
   active INTEGER NOT NULL DEFAULT 1,
   usd_per_kwh DOUBLE PRECISION,
   notes TEXT NOT NULL DEFAULT '',
+  include_4pct INTEGER NOT NULL DEFAULT 0,
   updated_at TEXT NOT NULL DEFAULT ''
 );
+ALTER TABLE hosting_billing_agent_clients ADD COLUMN IF NOT EXISTS include_4pct INTEGER NOT NULL DEFAULT 0;
 CREATE TABLE IF NOT EXISTS hosting_billing_agent_units (
   id BIGSERIAL PRIMARY KEY,
   client_id INTEGER NOT NULL,
@@ -674,8 +676,10 @@ CREATE TABLE IF NOT EXISTS hosting_billing_agent_units (
   quantity INTEGER NOT NULL DEFAULT 1,
   watts DOUBLE PRECISION NOT NULL DEFAULT 0,
   discount DOUBLE PRECISION NOT NULL DEFAULT 0,
-  sort_order INTEGER NOT NULL DEFAULT 0
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  garantia_id INTEGER
 );
+ALTER TABLE hosting_billing_agent_units ADD COLUMN IF NOT EXISTS garantia_id INTEGER;
 CREATE INDEX IF NOT EXISTS idx_hba_units_client ON hosting_billing_agent_units(client_id, sort_order, id);
 CREATE TABLE IF NOT EXISTS hosting_billing_agent_drafts (
   id BIGSERIAL PRIMARY KEY,

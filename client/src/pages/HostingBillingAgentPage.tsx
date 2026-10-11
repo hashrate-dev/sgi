@@ -26,6 +26,7 @@ import {
   testPreviewHostingBillingAgent,
   type HostingBillingAgentClient,
   type HostingBillingAgentDraft,
+  type HostingBillingAgentGarantia,
   type HostingBillingAgentLine,
   type HostingBillingAgentTestPreview,
 } from "../lib/api";
@@ -56,6 +57,19 @@ function buildHostingPdfFilename(number: string, clientName: string, monthStr: s
   return `HRS_GROUP_${number}_${safeName}_${mesLabel}_${anio}.pdf`;
 }
 
+function energyUsdDay(watts: number, usdPerKwh: number): number {
+  const w = Math.max(0, Number(watts) || 0);
+  const rate = Math.max(0, Number(usdPerKwh) || 0);
+  return Math.round((w / 1000) * 24 * rate * 100) / 100;
+}
+
+function energyUsdMonth(watts: number, days: number, usdPerKwh: number): number {
+  const d = Math.max(0, Number(days) || 0);
+  const w = Math.max(0, Number(watts) || 0);
+  const rate = Math.max(0, Number(usdPerKwh) || 0);
+  return Math.round((w / 1000) * 24 * d * rate * 100) / 100;
+}
+
 function parseDueDateStr(s: string): Date | undefined {
   const t = String(s || "").trim();
   const m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
@@ -78,10 +92,11 @@ export function HostingBillingAgentPage() {
   const [loading, setLoading] = useState(true);
   const [usdPerKwh, setUsdPerKwh] = useState(0.078);
   const [dueDateDays, setDueDateDays] = useState<5 | 6 | 7>(6);
-  const [include4pct, setInclude4pct] = useState(true);
+  const [addInclude4pct, setAddInclude4pct] = useState(false);
   const [catalog, setCatalog] = useState<
     Array<{ code: string; name: string; price: number; defaultWatts: number; wattsFromGarantia?: boolean }>
   >([]);
+  const [garantias, setGarantias] = useState<HostingBillingAgentGarantia[]>([]);
   const [enrolled, setEnrolled] = useState<HostingBillingAgentClient[]>([]);
   const [allClients, setAllClients] = useState<Client[]>([]);
   const [addClientId, setAddClientId] = useState<string>("");
@@ -98,8 +113,8 @@ export function HostingBillingAgentPage() {
     const [meta, clientsRes] = await Promise.all([getHostingBillingAgent(), getClients().catch(() => ({ clients: [] as Client[] }))]);
     setUsdPerKwh(meta.settings.usdPerKwh);
     setDueDateDays(meta.settings.dueDateDays);
-    setInclude4pct(meta.settings.include4pct);
     setCatalog(meta.catalog);
+    setGarantias(meta.garantias || []);
     setEnrolled(meta.clients);
     setAllClients(((clientsRes.clients ?? []) as Client[]).filter((c) => !isClienteTiendaOnline(c)));
     const m = prefMonth || meta.defaultClosedMonth;
@@ -136,7 +151,7 @@ export function HostingBillingAgentPage() {
     if (!canWrite) return;
     setBusy(true);
     try {
-      await putHostingBillingAgentSettings({ usdPerKwh, dueDateDays, include4pct });
+      await putHostingBillingAgentSettings({ usdPerKwh, dueDateDays });
       showToast("Configuración del agente guardada.", "success");
     } catch (e) {
       showToast(e instanceof Error ? e.message : "No se pudo guardar.", "error");
@@ -150,9 +165,10 @@ export function HostingBillingAgentPage() {
     if (!canWrite || !Number.isFinite(id) || id <= 0) return;
     setBusy(true);
     try {
-      const r = await addHostingBillingAgentClient(id);
+      const r = await addHostingBillingAgentClient(id, { include4pct: addInclude4pct });
       setEnrolled(r.clients);
       setAddClientId("");
+      setAddInclude4pct(false);
       showToast("Cliente agregado al agente. Se importaron equipos de la última factura si existía.", "success");
     } catch (e) {
       showToast(e instanceof Error ? e.message : "No se pudo agregar.", "error");
@@ -177,7 +193,6 @@ export function HostingBillingAgentPage() {
         month,
         clientId: cid,
         usdPerKwh,
-        include4pct,
       });
       setTestResult(r);
       showToast("Testing listo: no se emitió ninguna factura.", "success");
@@ -350,7 +365,13 @@ export function HostingBillingAgentPage() {
     try {
       const r = await putHostingBillingAgentUnits(
         c.clientId,
-        units.map((u) => ({ serviceKey: u.serviceKey, quantity: u.quantity, watts: u.watts, discount: u.discount }))
+        units.map((u) => ({
+          serviceKey: u.serviceKey,
+          garantiaId: u.garantiaId || undefined,
+          quantity: u.quantity,
+          watts: u.watts,
+          discount: u.discount,
+        }))
       );
       setEnrolled(r.clients);
       showToast("Equipos del cliente actualizados.", "success");
@@ -377,7 +398,7 @@ export function HostingBillingAgentPage() {
             <Link to="/gestion-administrativa/valores-garantias-asic" className="link-success">
               Valores de garantías ASIC
             </Link>{" "}
-            (marca/modelo) y se combina con los días del mes y la tarifa USD/kWh.
+            (el consumo W de cada máquina de esa tabla) y se combina con los días del mes y la tarifa USD/kWh.
           </p>
           <p className="text-muted small mb-0">
             Nada se emite solo: el administrador revisa cada borrador y lo <strong>autoriza</strong>. La emisión manual
@@ -425,18 +446,6 @@ export function HostingBillingAgentPage() {
                   </div>
                 </div>
                 <div className="col-md-3">
-                  <label className="form-check mt-4">
-                    <input
-                      type="checkbox"
-                      className="form-check-input"
-                      checked={include4pct}
-                      disabled={!canWrite || busy}
-                      onChange={(e) => setInclude4pct(e.target.checked)}
-                    />
-                    <span className="form-check-label">Incluir 4% gastos operativos</span>
-                  </label>
-                </div>
-                <div className="col-md-3">
                   {canWrite ? (
                     <button type="button" className="btn btn-success btn-sm" disabled={busy} onClick={() => void saveSettings()}>
                       Guardar configuración
@@ -444,6 +453,44 @@ export function HostingBillingAgentPage() {
                   ) : null}
                 </div>
               </div>
+            </div>
+
+            <div className="hrs-card hrs-card--rect p-4 mb-3">
+              <h6 className="fw-bold border-bottom pb-2">Consumo W de Valores de garantías ASIC</h6>
+              <p className="small text-muted mb-3">
+                Esta es la misma tabla de{" "}
+                <Link to="/gestion-administrativa/valores-garantias-asic" className="link-success">
+                  Valores de garantías ASIC
+                </Link>
+                . El agente toma el W de la fila exacta (marca + modelo + procesador). Un S21 235 ths no es el mismo W
+                que un S21 270 ths; un Z15K no es un Z15Pro.
+              </p>
+              {garantias.length === 0 ? (
+                <p className="text-warning small mb-0">No hay filas con consumo cargado. Cargalas en Valores de garantías ASIC.</p>
+              ) : (
+                <div className="table-responsive">
+                  <table className="table table-sm mb-0" style={{ fontSize: "0.82rem" }}>
+                    <thead>
+                      <tr>
+                        <th>Marca</th>
+                        <th>Modelo</th>
+                        <th>Procesador</th>
+                        <th>Consumo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {garantias.map((g) => (
+                        <tr key={g.id}>
+                          <td>{g.marca}</td>
+                          <td>{g.modelo}</td>
+                          <td>{g.procesador}</td>
+                          <td>{g.consumoW.toLocaleString("es-PY")} W</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             <div className="hrs-card hrs-card--rect p-4 mb-3" style={{ border: "1px dashed rgba(234, 179, 8, 0.7)" }}>
@@ -488,6 +535,7 @@ export function HostingBillingAgentPage() {
                         <span className={p.checks.wattsFromGarantiaAsic ? "text-success" : "text-warning"}>
                           {p.checks.wattsFromGarantiaAsic ? "W conectado a garantías ASIC" : "W no encontrado en garantías ASIC"}
                         </span>
+                        <span>{p.include4pct ? "4% gastos op. marcado" : "Sin 4% gastos op."}</span>
                         <span>{p.checks.hasItems ? "Ítems OK" : "Sin ítems"}</span>
                         <span>{p.checks.totalPositive ? `Total ${formatUSD(p.total)}` : "Total 0"}</span>
                         {p.existingInvoiceNumber ? <span>Ya hay {p.existingInvoiceNumber} (no se duplicaría)</span> : null}
@@ -501,8 +549,10 @@ export function HostingBillingAgentPage() {
                               <th>W</th>
                               <th>Origen W</th>
                               <th>Cant.</th>
+                              <th>Días</th>
                               <th>kWh mes</th>
-                              <th>Precio</th>
+                              <th>Energía / día (1 eq.)</th>
+                              <th>Energía / mes (1 eq.)</th>
                               <th>Total línea</th>
                             </tr>
                           </thead>
@@ -512,19 +562,29 @@ export function HostingBillingAgentPage() {
                                 <td>{it.serviceName}</td>
                                 <td>{it.watts || "—"}</td>
                                 <td>
-                                  {it.wattsSource === "garantia-asic"
-                                    ? "Garantías ASIC"
-                                    : it.serviceKey === "D"
-                                      ? "4%"
-                                      : it.wattsSource === "fallback"
-                                        ? "Fallback"
-                                        : it.wattsSource === "stored"
-                                          ? "Guardado"
-                                          : "—"}
+                                  {it.serviceKey === "D"
+                                    ? "4%"
+                                    : it.garantiaLabel
+                                      ? it.garantiaLabel
+                                      : it.wattsSource === "garantia-asic"
+                                        ? "Valores de garantías ASIC"
+                                        : "Elegí la fila exacta en garantías ASIC"}
                                 </td>
                                 <td>{it.quantity}</td>
+                                <td>{it.daysInMonth || p.checks.daysInMonth}</td>
                                 <td>{it.kwhMonth ? it.kwhMonth.toLocaleString("es-PY", { maximumFractionDigits: 1 }) : "—"}</td>
-                                <td>{formatUSD(it.price)}</td>
+                                <td>
+                                  {it.serviceKey === "D" || !it.watts
+                                    ? "—"
+                                    : formatUSD(energyUsdDay(it.watts, it.usdPerKwh || usdPerKwh))}
+                                </td>
+                                <td>
+                                  {it.serviceKey === "D" || !it.watts
+                                    ? "—"
+                                    : formatUSD(
+                                        energyUsdMonth(it.watts, it.daysInMonth || p.checks.daysInMonth, it.usdPerKwh || usdPerKwh)
+                                      )}
+                                </td>
                                 <td>{formatUSD((it.price - it.discount) * it.quantity)}</td>
                               </tr>
                             ))}
@@ -532,7 +592,9 @@ export function HostingBillingAgentPage() {
                           <tfoot>
                             <tr>
                               <th colSpan={4}>Totales testing</th>
+                              <th>{p.checks.daysInMonth}</th>
                               <th>{p.kwhTotal ? p.kwhTotal.toLocaleString("es-PY", { maximumFractionDigits: 1 }) : "—"}</th>
+                              <th />
                               <th />
                               <th>{formatUSD(p.total)}</th>
                             </tr>
@@ -562,6 +624,16 @@ export function HostingBillingAgentPage() {
                       ))}
                     </select>
                   </div>
+                  <label className="form-check mb-1">
+                    <input
+                      type="checkbox"
+                      className="form-check-input"
+                      checked={addInclude4pct}
+                      disabled={busy}
+                      onChange={(e) => setAddInclude4pct(e.target.checked)}
+                    />
+                    <span className="form-check-label small">4% gastos operativos</span>
+                  </label>
                   <button type="button" className="btn btn-outline-success btn-sm" disabled={!addClientId || busy} onClick={() => void addClient()}>
                     Agregar
                   </button>
@@ -578,6 +650,7 @@ export function HostingBillingAgentPage() {
                         <th>Cliente</th>
                         <th>Equipos</th>
                         <th>Activo</th>
+                        <th>4% gastos op.</th>
                         <th />
                       </tr>
                     </thead>
@@ -587,10 +660,17 @@ export function HostingBillingAgentPage() {
                           key={c.clientId}
                           client={c}
                           catalog={catalog}
+                          garantias={garantias}
                           canWrite={canWrite}
                           busy={busy}
+                          usdPerKwh={usdPerKwh}
+                          daysInMonth={daysInMonth}
                           onToggleActive={async (active) => {
                             const r = await putHostingBillingAgentClient(c.clientId, { active });
+                            setEnrolled(r.clients);
+                          }}
+                          onToggle4pct={async (include4pct) => {
+                            const r = await putHostingBillingAgentClient(c.clientId, { include4pct });
                             setEnrolled(r.clients);
                           }}
                           onImport={async () => {
@@ -717,8 +797,11 @@ export function HostingBillingAgentPage() {
                                       <tr>
                                         <th>Servicio</th>
                                         <th>W</th>
+                                        <th>Máquina (garantías ASIC)</th>
                                         <th>Cant.</th>
-                                        <th>Precio</th>
+                                        <th>Días</th>
+                                        <th>Energía / día (1 eq.)</th>
+                                        <th>Energía / mes (1 eq.)</th>
                                         <th>Total</th>
                                       </tr>
                                     </thead>
@@ -727,8 +810,21 @@ export function HostingBillingAgentPage() {
                                         <tr key={i}>
                                           <td>{it.serviceName}</td>
                                           <td>{it.watts || "—"}</td>
+                                          <td>{it.serviceKey === "D" ? "—" : it.garantiaLabel || "—"}</td>
                                           <td>{it.quantity}</td>
-                                          <td>{formatUSD(it.price)}</td>
+                                          <td>{it.daysInMonth || d.daysInMonth}</td>
+                                          <td>
+                                            {it.serviceKey === "D" || !it.watts
+                                              ? "—"
+                                              : formatUSD(energyUsdDay(it.watts, it.usdPerKwh || usdPerKwh))}
+                                          </td>
+                                          <td>
+                                            {it.serviceKey === "D" || !it.watts
+                                              ? "—"
+                                              : formatUSD(
+                                                  energyUsdMonth(it.watts, it.daysInMonth || d.daysInMonth, it.usdPerKwh || usdPerKwh)
+                                                )}
+                                          </td>
                                           <td>{formatUSD((it.price - it.discount) * it.quantity)}</td>
                                         </tr>
                                       ))}
@@ -787,18 +883,26 @@ export function HostingBillingAgentPage() {
 function AgentClientRow({
   client,
   catalog,
+  garantias,
+  usdPerKwh,
+  daysInMonth,
   canWrite,
   busy,
   onToggleActive,
+  onToggle4pct,
   onImport,
   onSaveUnits,
   onRemove,
 }: {
   client: HostingBillingAgentClient;
   catalog: Array<{ code: string; name: string; defaultWatts: number; wattsFromGarantia?: boolean }>;
+  garantias: HostingBillingAgentGarantia[];
+  usdPerKwh: number;
+  daysInMonth: number;
   canWrite: boolean;
   busy: boolean;
   onToggleActive: (active: boolean) => Promise<void>;
+  onToggle4pct: (include4pct: boolean) => Promise<void>;
   onImport: () => void;
   onSaveUnits: (units: HostingBillingAgentClient["units"]) => void;
   onRemove: () => void;
@@ -806,6 +910,11 @@ function AgentClientRow({
   const [open, setOpen] = useState(false);
   const [units, setUnits] = useState(client.units);
   useEffect(() => setUnits(client.units), [client.units]);
+
+  function garantiaFor(u: HostingBillingAgentClient["units"][number]) {
+    if (u.garantiaId) return garantias.find((g) => g.id === u.garantiaId) ?? null;
+    return null;
+  }
 
   return (
     <>
@@ -824,6 +933,15 @@ function AgentClientRow({
             onChange={(e) => void onToggleActive(e.target.checked)}
           />
         </td>
+        <td>
+          <input
+            type="checkbox"
+            checked={Boolean(client.include4pct)}
+            disabled={!canWrite || busy}
+            title="4% Gastos Operativos Transferencia solo para este cliente"
+            onChange={(e) => void onToggle4pct(e.target.checked)}
+          />
+        </td>
         <td className="text-nowrap">
           {canWrite ? (
             <button type="button" className="btn btn-outline-danger btn-sm" disabled={busy} onClick={onRemove}>
@@ -834,7 +952,7 @@ function AgentClientRow({
       </tr>
       {open ? (
         <tr>
-          <td colSpan={4}>
+          <td colSpan={5}>
             <div className="d-flex flex-wrap gap-2 mb-2">
               {canWrite ? (
                 <>
@@ -845,20 +963,24 @@ function AgentClientRow({
                     type="button"
                     className="btn btn-outline-secondary btn-sm"
                     disabled={busy}
-                    onClick={() =>
+                    onClick={() => {
+                      const g = garantias[0];
+                      const cat = catalog[0];
                       setUnits((prev) => [
                         ...prev,
                         {
                           id: 0,
                           clientId: client.clientId,
-                          serviceKey: catalog[0]?.code || "A",
-                          serviceName: catalog[0]?.name || "",
+                          serviceKey: g?.serviceKey || cat?.code || "A",
+                          serviceName: g?.serviceName || cat?.name || "",
                           quantity: 1,
-                          watts: catalog[0]?.defaultWatts || 0,
+                          watts: g?.consumoW || 0,
                           discount: 0,
+                          garantiaId: g?.id ?? null,
+                          garantiaLabel: g?.label || "",
                         },
-                      ])
-                    }
+                      ]);
+                    }}
                   >
                     + Equipo
                   </button>
@@ -871,11 +993,26 @@ function AgentClientRow({
             <table className="table table-sm mb-0">
               <thead>
                 <tr>
-                  <th>Servicio</th>
+                  <th>
+                    Equipo
+                    <div className="small fw-normal text-muted">Valores de garantías ASIC</div>
+                  </th>
                   <th>Cantidad</th>
+                  <th>
+                    Días
+                    <div className="small fw-normal text-muted">Mes de la factura</div>
+                  </th>
                   <th>
                     Consumo (W)
                     <div className="small fw-normal text-muted">Valores de garantías ASIC</div>
+                  </th>
+                  <th>
+                    Energía / día
+                    <div className="small fw-normal text-muted">1 equipo · {formatUSD(usdPerKwh)}/kWh</div>
+                  </th>
+                  <th>
+                    Energía / mes
+                    <div className="small fw-normal text-muted">1 equipo · {daysInMonth} días</div>
                   </th>
                   {canWrite ? <th /> : null}
                 </tr>
@@ -883,7 +1020,7 @@ function AgentClientRow({
               <tbody>
                 {units.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="text-muted">
+                    <td colSpan={canWrite ? 7 : 6} className="text-muted">
                       Sin equipos. Importá la última factura o agregá filas.
                     </td>
                   </tr>
@@ -891,33 +1028,39 @@ function AgentClientRow({
                   units.map((u, idx) => (
                     <tr key={`${u.id}-${idx}`}>
                       <td>
-                        <select
-                          className="form-select form-select-sm"
-                          value={u.serviceKey}
-                          disabled={!canWrite}
-                          onChange={(e) => {
-                            const key = e.target.value;
-                            const cat = catalog.find((x) => x.code === key);
-                            setUnits((prev) =>
-                              prev.map((x, i) =>
-                                i === idx
-                                  ? {
-                                      ...x,
-                                      serviceKey: key,
-                                      serviceName: cat?.name || x.serviceName,
-                                      watts: cat?.defaultWatts || x.watts,
-                                    }
-                                  : x
-                              )
-                            );
-                          }}
-                        >
-                          {catalog.map((op) => (
-                            <option key={op.code} value={op.code}>
-                              {op.name}
-                            </option>
-                          ))}
-                        </select>
+                        {garantias.length > 0 ? (
+                          <select
+                            className="form-select form-select-sm"
+                            value={String(garantiaFor(u)?.id || u.garantiaId || "")}
+                            disabled={!canWrite}
+                            onChange={(e) => {
+                              const g = garantias.find((x) => String(x.id) === e.target.value);
+                              setUnits((prev) =>
+                                prev.map((x, i) =>
+                                  i === idx
+                                    ? {
+                                        ...x,
+                                        garantiaId: g?.id ?? null,
+                                        garantiaLabel: g?.label || "",
+                                        serviceKey: g?.serviceKey || x.serviceKey,
+                                        serviceName: g?.serviceName || x.serviceName,
+                                        watts: g?.consumoW || 0,
+                                      }
+                                    : x
+                                )
+                              );
+                            }}
+                          >
+                            <option value="">Elegí máquina de garantías ASIC…</option>
+                            {garantias.map((g) => (
+                              <option key={g.id} value={String(g.id)}>
+                                {g.label} · {g.consumoW.toLocaleString("es-PY")} W
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-warning small">No hay consumo cargado en Valores de garantías ASIC.</span>
+                        )}
                       </td>
                       <td>
                         <input
@@ -931,20 +1074,33 @@ function AgentClientRow({
                           }
                         />
                       </td>
+                      <td>{daysInMonth}</td>
                       <td>
                         {(() => {
-                          const cat = catalog.find((x) => x.code === u.serviceKey);
-                          const w = cat?.defaultWatts || u.watts || 0;
+                          const g = garantiaFor(u);
+                          const w = g?.consumoW || 0;
                           return (
-                            <span title={cat?.wattsFromGarantia ? "Tomado de Valores de garantías ASIC" : "Sin match en garantías ASIC"}>
+                            <span title={g ? `${g.label} · Valores de garantías ASIC` : "Sin match en garantías ASIC"}>
                               {w ? `${w.toLocaleString("es-PY")} W` : "—"}
-                              {cat?.wattsFromGarantia ? (
-                                <span className="text-muted small"> · conectado</span>
+                              {g ? (
+                                <span className="text-muted small"> · garantías ASIC</span>
                               ) : (
                                 <span className="text-warning small"> · falta en garantías</span>
                               )}
                             </span>
                           );
+                        })()}
+                      </td>
+                      <td>
+                        {(() => {
+                          const w = garantiaFor(u)?.consumoW || 0;
+                          return w ? formatUSD(energyUsdDay(w, usdPerKwh)) : "—";
+                        })()}
+                      </td>
+                      <td>
+                        {(() => {
+                          const w = garantiaFor(u)?.consumoW || 0;
+                          return w ? formatUSD(energyUsdMonth(w, daysInMonth, usdPerKwh)) : "—";
                         })()}
                       </td>
                       {canWrite ? (

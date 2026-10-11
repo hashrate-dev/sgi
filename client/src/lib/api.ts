@@ -1736,6 +1736,18 @@ export type HostingBillingAgentLine = {
   daysInMonth: number;
   usdPerKwh: number;
   wattsSource?: "garantia-asic" | "stored" | "fallback" | "none";
+  garantiaLabel?: string;
+};
+
+export type HostingBillingAgentGarantia = {
+  id: number;
+  marca: string;
+  modelo: string;
+  procesador: string;
+  consumoW: number;
+  serviceKey: string;
+  serviceName: string;
+  label: string;
 };
 
 export type HostingBillingAgentUnit = {
@@ -1746,11 +1758,14 @@ export type HostingBillingAgentUnit = {
   quantity: number;
   watts: number;
   discount: number;
+  garantiaId?: number | null;
+  garantiaLabel?: string;
 };
 
 export type HostingBillingAgentClient = {
   clientId: number;
   active: boolean;
+  include4pct: boolean;
   usdPerKwh: number | null;
   notes: string;
   code: string;
@@ -1807,8 +1822,9 @@ export type HostingBillingAgentInvoice = {
 };
 
 export function getHostingBillingAgent(): Promise<{
-  settings: { usdPerKwh: number; dueDateDays: 5 | 6 | 7; include4pct: boolean };
+  settings: { usdPerKwh: number; dueDateDays: 5 | 6 | 7 };
   catalog: Array<{ code: string; name: string; price: number; defaultWatts: number; wattsFromGarantia?: boolean }>;
+  garantias: HostingBillingAgentGarantia[];
   clients: HostingBillingAgentClient[];
   defaultClosedMonth: string;
   daysInDefaultMonth: number;
@@ -1819,18 +1835,23 @@ export function getHostingBillingAgent(): Promise<{
 export function putHostingBillingAgentSettings(body: {
   usdPerKwh: number;
   dueDateDays: 5 | 6 | 7;
-  include4pct: boolean;
-}): Promise<{ ok: boolean; settings: { usdPerKwh: number; dueDateDays: 5 | 6 | 7; include4pct: boolean } }> {
+}): Promise<{ ok: boolean; settings: { usdPerKwh: number; dueDateDays: 5 | 6 | 7 } }> {
   return api("/api/hosting/billing-agent/settings", { method: "PUT", body: JSON.stringify(body) });
 }
 
-export function addHostingBillingAgentClient(clientId: number): Promise<{ ok: boolean; clients: HostingBillingAgentClient[] }> {
-  return api("/api/hosting/billing-agent/clients", { method: "POST", body: JSON.stringify({ clientId }) });
+export function addHostingBillingAgentClient(
+  clientId: number,
+  body?: { include4pct?: boolean }
+): Promise<{ ok: boolean; clients: HostingBillingAgentClient[] }> {
+  return api("/api/hosting/billing-agent/clients", {
+    method: "POST",
+    body: JSON.stringify({ clientId, include4pct: body?.include4pct }),
+  });
 }
 
 export function putHostingBillingAgentClient(
   clientId: number,
-  body: { active?: boolean; usdPerKwh?: number | null; notes?: string }
+  body: { active?: boolean; include4pct?: boolean; usdPerKwh?: number | null; notes?: string }
 ): Promise<{ ok: boolean; clients: HostingBillingAgentClient[] }> {
   return api(`/api/hosting/billing-agent/clients/${encodeURIComponent(String(clientId))}`, {
     method: "PATCH",
@@ -1844,7 +1865,7 @@ export function removeHostingBillingAgentClient(clientId: number): Promise<{ ok:
 
 export function putHostingBillingAgentUnits(
   clientId: number,
-  units: Array<{ serviceKey: string; quantity: number; watts: number; discount?: number }>
+  units: Array<{ serviceKey?: string; garantiaId?: number | null; quantity: number; watts?: number; discount?: number }>
 ): Promise<{ ok: boolean; clients: HostingBillingAgentClient[] }> {
   return api(`/api/hosting/billing-agent/clients/${encodeURIComponent(String(clientId))}/units`, {
     method: "PUT",
@@ -1878,7 +1899,6 @@ export type HostingBillingAgentTestPreview = {
   month: string;
   daysInMonth: number;
   usdPerKwh: number;
-  include4pct: boolean;
   garantiaRows: number;
   formula: string;
   previews: Array<{
@@ -1886,6 +1906,7 @@ export type HostingBillingAgentTestPreview = {
     clientCode: string;
     clientName: string;
     enrolled: boolean;
+    include4pct: boolean;
     existingInvoiceNumber: string | null;
     warning: string;
     items: HostingBillingAgentLine[];

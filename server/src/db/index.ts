@@ -130,8 +130,12 @@ async function ensureSupabaseHostingBillingAgent(pool: Pool) {
       active INTEGER NOT NULL DEFAULT 1,
       usd_per_kwh DOUBLE PRECISION,
       notes TEXT NOT NULL DEFAULT '',
+      include_4pct INTEGER NOT NULL DEFAULT 0,
       updated_at TEXT NOT NULL DEFAULT ''
     )`);
+    await pool.query(
+      `ALTER TABLE hosting_billing_agent_clients ADD COLUMN IF NOT EXISTS include_4pct INTEGER NOT NULL DEFAULT 0`
+    );
     await pool.query(`CREATE TABLE IF NOT EXISTS hosting_billing_agent_units (
       id BIGSERIAL PRIMARY KEY,
       client_id INTEGER NOT NULL,
@@ -140,8 +144,10 @@ async function ensureSupabaseHostingBillingAgent(pool: Pool) {
       quantity INTEGER NOT NULL DEFAULT 1,
       watts DOUBLE PRECISION NOT NULL DEFAULT 0,
       discount DOUBLE PRECISION NOT NULL DEFAULT 0,
-      sort_order INTEGER NOT NULL DEFAULT 0
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      garantia_id INTEGER
     )`);
+    await pool.query(`ALTER TABLE hosting_billing_agent_units ADD COLUMN IF NOT EXISTS garantia_id INTEGER`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_hba_units_client ON hosting_billing_agent_units(client_id, sort_order, id)`);
     await pool.query(`CREATE TABLE IF NOT EXISTS hosting_billing_agent_drafts (
       id BIGSERIAL PRIMARY KEY,

@@ -699,6 +699,7 @@ CREATE TABLE IF NOT EXISTS hosting_billing_agent_clients (
   active INTEGER NOT NULL DEFAULT 1,
   usd_per_kwh REAL,
   notes TEXT NOT NULL DEFAULT '',
+  include_4pct INTEGER NOT NULL DEFAULT 0,
   updated_at TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS hosting_billing_agent_units (
@@ -709,7 +710,8 @@ CREATE TABLE IF NOT EXISTS hosting_billing_agent_units (
   quantity INTEGER NOT NULL DEFAULT 1,
   watts REAL NOT NULL DEFAULT 0,
   discount REAL NOT NULL DEFAULT 0,
-  sort_order INTEGER NOT NULL DEFAULT 0
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  garantia_id INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_hba_units_client ON hosting_billing_agent_units(client_id, sort_order, id);
 CREATE TABLE IF NOT EXISTS hosting_billing_agent_drafts (
@@ -734,6 +736,19 @@ CREATE TABLE IF NOT EXISTS hosting_billing_agent_drafts (
   UNIQUE (client_id, service_month)
 );
 `);
+
+  try {
+    db.exec("ALTER TABLE hosting_billing_agent_clients ADD COLUMN include_4pct INTEGER NOT NULL DEFAULT 0");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+  try {
+    db.exec("ALTER TABLE hosting_billing_agent_units ADD COLUMN garantia_id INTEGER");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
 
   return db;
 }

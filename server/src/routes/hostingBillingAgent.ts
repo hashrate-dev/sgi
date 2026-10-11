@@ -6,7 +6,6 @@ import {
   DEFAULT_USD_PER_KWH,
   addDaysPy,
   daysInYearMonth,
-  defaultWattsForServiceKey,
   formatPyDate,
   formatPyTime,
   isClosedMonth,
@@ -16,6 +15,7 @@ import {
   parseYearMonth,
   previousClosedMonth,
   priceFromEnergy,
+  bestGarantiaRow,
   resolveServiceWatts,
   roundUsd,
   scalePriceByDays,
@@ -80,8 +80,23 @@ async function ensureAgentSchema(): Promise<void> {
     active INTEGER NOT NULL DEFAULT 1,
     usd_per_kwh REAL,
     notes TEXT NOT NULL DEFAULT '',
+    include_4pct INTEGER NOT NULL DEFAULT 0,
     updated_at TEXT NOT NULL DEFAULT ''
   )`).run();
+  try {
+    if (isPg()) {
+      await db
+        .prepare(
+          `ALTER TABLE hosting_billing_agent_clients ADD COLUMN IF NOT EXISTS include_4pct INTEGER NOT NULL DEFAULT 0`
+        )
+        .run();
+    } else {
+      await db.prepare(`ALTER TABLE hosting_billing_agent_clients ADD COLUMN include_4pct INTEGER NOT NULL DEFAULT 0`).run();
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!/duplicate column|already exists/i.test(msg)) throw e;
+  }
   await db.prepare(`CREATE TABLE IF NOT EXISTS hosting_billing_agent_units (
     ${pkUnits},
     client_id INTEGER NOT NULL,
@@ -95,6 +110,16 @@ async function ensureAgentSchema(): Promise<void> {
   await db.prepare(
     "CREATE INDEX IF NOT EXISTS idx_hba_units_client ON hosting_billing_agent_units(client_id, sort_order, id)"
   ).run();
+  try {
+    if (isPg()) {
+      await db.prepare(`ALTER TABLE hosting_billing_agent_units ADD COLUMN IF NOT EXISTS garantia_id INTEGER`).run();
+    } else {
+      await db.prepare(`ALTER TABLE hosting_billing_agent_units ADD COLUMN garantia_id INTEGER`).run();
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!/duplicate column|already exists/i.test(msg)) throw e;
+  }
   await db.prepare(`CREATE TABLE IF NOT EXISTS hosting_billing_agent_drafts (
     ${pkDrafts},
     service_month TEXT NOT NULL,
@@ -155,7 +180,9 @@ async function loadGarantiaConsumos(): Promise<GarantiaConsumoRow[]> {
         fecha: String(r.fecha || ""),
       };
     });
-  } catch {
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn("[hosting-billing-agent] valores_garantias_asic:", msg);
     return [];
   }
 }
@@ -178,16 +205,24 @@ async function loadCatalog(): Promise<Record<string, { name: string; price: numb
   return out;
 }
 
+function dbFlagOn(v: unknown): boolean {
+  return v === true || v === 1 || String(v) === "1";
+}
+
+function lastLinesHave4pct(lines: Array<{ service: string }>): boolean {
+  return lines.some((l) => /4%\s*gastos operativos transferencia/i.test(l.service));
+}
+
 function matchServiceKey(serviceName: string, catalog: Record<string, { name: string; price: number }>): string {
   const n = String(serviceName ?? "").trim();
   if (!n) return "A";
   const exact = Object.keys(catalog).find((k) => catalog[k]!.name === n);
   if (exact) return exact;
   if (/4%\s*gastos operativos transferencia/i.test(n)) return "D";
-  if (/\bZ15\b/i.test(n)) return "E";
-  if (/\bS21\b/i.test(n)) return "C";
-  if (/\bL9\b/i.test(n)) return "B";
-  if (/\bL7\b/i.test(n)) return "A";
+  if (/Z15/i.test(n)) return "E";
+  if (/S21/i.test(n)) return "C";
+  if (/\bL9\b/i.test(n) || /L9/i.test(n)) return "B";
+  if (/L7/i.test(n)) return "A";
   return "A";
 }
 
@@ -199,17 +234,35 @@ type UnitRow = {
   quantity: number;
   watts: number;
   discount: number;
+  garantiaId: number | null;
 };
+
+function mapGarantiaOption(row: GarantiaConsumoRow, catalog: Record<string, { name: string; price: number }>) {
+  const blob = `${row.marca} ${row.modelo} ${row.procesador}`;
+  const serviceKey = matchServiceKey(blob, catalog);
+  const cat = catalog[serviceKey];
+  return {
+    id: row.id,
+    marca: row.marca,
+    modelo: row.modelo,
+    procesador: row.procesador,
+    consumoW: row.consumoW,
+    serviceKey,
+    serviceName: cat?.name || `Servicio alojamiento y mantenimiento ${row.modelo}`.trim(),
+    label: [row.marca, row.modelo, row.procesador].filter(Boolean).join(" · "),
+  };
+}
 
 async function loadUnits(clientId: number): Promise<UnitRow[]> {
   const rows = (await db
     .prepare(
-      `SELECT id, client_id, service_key, service_name, quantity, watts, discount
+      `SELECT id, client_id, service_key, service_name, quantity, watts, discount, garantia_id
        FROM hosting_billing_agent_units WHERE client_id = ? ORDER BY sort_order, id`
     )
     .all(clientId)) as Record<string, unknown>[];
   return rows.map((raw) => {
     const r = rowKeysToLowercase(raw);
+    const gid = Number(r.garantia_id);
     return {
       id: Number(r.id) || 0,
       clientId: Number(r.client_id) || clientId,
@@ -218,6 +271,7 @@ async function loadUnits(clientId: number): Promise<UnitRow[]> {
       quantity: Math.max(1, Math.round(Number(r.quantity) || 1)),
       watts: Math.max(0, Number(r.watts) || 0),
       discount: Math.max(0, Number(r.discount) || 0),
+      garantiaId: Number.isFinite(gid) && gid > 0 ? gid : null,
     };
   });
 }
@@ -284,14 +338,16 @@ function buildLines(opts: {
       : lastLodging.map((l, idx) => {
           const key = matchServiceKey(l.service, opts.catalog);
           const cat = opts.catalog[key];
+          const g = bestGarantiaRow(opts.garantiaRows, key, cat?.name || l.service);
           return {
             id: idx,
             clientId: 0,
             serviceKey: key,
             serviceName: cat?.name || l.service.replace(/\s*-\s*\d{2}-\d{4}\s*$/, "").trim(),
             quantity: l.quantity,
-            watts: resolveServiceWatts(opts.garantiaRows, key, cat?.name || l.service, 0).watts,
+            watts: g?.consumoW || 0,
             discount: l.discount,
+            garantiaId: g?.id ?? null,
           };
         });
 
@@ -303,12 +359,12 @@ function buildLines(opts: {
     if (u.serviceKey === "D") continue;
     const cat = opts.catalog[u.serviceKey] ?? opts.catalog.A!;
     const name = u.serviceName || cat.name;
-    const resolved = resolveServiceWatts(opts.garantiaRows, u.serviceKey, name, u.watts);
+    const resolved = resolveServiceWatts(opts.garantiaRows, u.serviceKey, name, 0, u.garantiaId || 0);
     const watts = resolved.watts;
     if (resolved.source !== "garantia-asic") {
       warning =
         warning ||
-        "Algún equipo no tiene consumo en Valores de garantías ASIC; revisá marca/modelo ahí para conectar el W.";
+        "Hay que elegir la máquina exacta de Valores de garantías ASIC (marca + modelo + procesador). Un mismo modelo puede tener varios W (por ejemplo S21 235 ths vs 270 ths, o Z15K).";
     }
     const lastMatch = lastLodging.find((l) => matchServiceKey(l.service, opts.catalog) === u.serviceKey);
     let price = 0;
@@ -334,6 +390,9 @@ function buildLines(opts: {
       daysInMonth: opts.days,
       usdPerKwh: opts.usdPerKwh,
       wattsSource: resolved.source,
+      garantiaLabel: resolved.garantia
+        ? [resolved.garantia.marca, resolved.garantia.modelo, resolved.garantia.procesador].filter(Boolean).join(" · ")
+        : "",
     });
   }
 
@@ -397,7 +456,7 @@ function mapDraft(raw: Record<string, unknown>) {
 async function listEnrolled() {
   const rows = (await db
     .prepare(
-      `SELECT a.client_id, a.active, a.usd_per_kwh, a.notes, c.code, c.name, c.phone, c.email, c.address, c.city, c.name2
+      `SELECT a.client_id, a.active, a.usd_per_kwh, a.notes, a.include_4pct, c.code, c.name, c.phone, c.email, c.address, c.city, c.name2
        FROM hosting_billing_agent_clients a
        JOIN clients c ON c.id = a.client_id
        WHERE ${HOSTING_ONLY_C}
@@ -410,12 +469,20 @@ async function listEnrolled() {
     const r = rowKeysToLowercase(raw);
     const clientId = Number(r.client_id) || 0;
     const units = (await loadUnits(clientId)).map((u) => {
-      const live = resolveServiceWatts(garantiaRows, u.serviceKey, u.serviceName, 0);
-      return { ...u, watts: live.watts || u.watts };
+      const live = resolveServiceWatts(garantiaRows, u.serviceKey, u.serviceName, 0, u.garantiaId || 0);
+      return {
+        ...u,
+        garantiaId: u.garantiaId || live.garantia?.id || null,
+        watts: live.watts,
+        garantiaLabel: live.garantia
+          ? [live.garantia.marca, live.garantia.modelo, live.garantia.procesador].filter(Boolean).join(" · ")
+          : "",
+      };
     });
     out.push({
       clientId,
       active: !(r.active === 0 || r.active === false || String(r.active) === "0"),
+      include4pct: dbFlagOn(r.include_4pct),
       usdPerKwh: r.usd_per_kwh == null || r.usd_per_kwh === "" ? null : Number(r.usd_per_kwh),
       notes: String(r.notes || ""),
       code: String(r.code || ""),
@@ -469,7 +536,7 @@ async function generateDraftsForMonth(month: string): Promise<{ created: number;
       month,
       days,
       usdPerKwh: kwh,
-      include4pct: settings.include4pct,
+      include4pct: c.include4pct,
       garantiaRows,
       last,
     });
@@ -591,10 +658,14 @@ hostingBillingAgentRouter.get("/hosting/billing-agent", ...staffRead, async (_re
             code,
             name: v.name,
             price: v.price,
-            defaultWatts: live.watts || defaultWattsForServiceKey(code),
+            defaultWatts: live.watts,
             wattsFromGarantia: live.source === "garantia-asic",
           };
         }),
+      garantias: garantiaRows
+        .filter((r) => r.consumoW > 0)
+        .map((r) => mapGarantiaOption(r, catalog))
+        .sort((a, b) => a.label.localeCompare(b.label, "es")),
       clients,
       defaultClosedMonth: closed,
       daysInDefaultMonth: daysInYearMonth(closed),
@@ -624,10 +695,16 @@ hostingBillingAgentRouter.post("/hosting/billing-agent/test-preview", ...staffRe
     const month = parsed.data.month;
     const days = daysInYearMonth(month);
     const usdPerKwh = parsed.data.usdPerKwh ?? settings.usdPerKwh;
-    const include4pct = parsed.data.include4pct ?? settings.include4pct;
     const enrolled = await listEnrolled();
 
-    type Target = { clientId: number; name: string; code: string; units: UnitRow[]; enrolled: boolean };
+    type Target = {
+      clientId: number;
+      name: string;
+      code: string;
+      units: UnitRow[];
+      enrolled: boolean;
+      include4pct: boolean;
+    };
     const targets: Target[] = [];
     if (parsed.data.clientId) {
       const enr = enrolled.find((c) => c.clientId === parsed.data.clientId);
@@ -635,16 +712,26 @@ hostingBillingAgentRouter.post("/hosting/billing-agent/test-preview", ...staffRe
         .prepare(`SELECT id, code, name FROM clients WHERE id = ? AND ${HOSTING_ONLY}`)
         .get(parsed.data.clientId)) as { id?: number; code?: string; name?: string } | undefined;
       if (!c?.id) return res.status(404).json({ error: { message: "Cliente de hosting no encontrado." } });
+      const lastForFlag = enr ? null : await lastHostingFacturaLines(String(c.name || ""));
       targets.push({
         clientId: Number(c.id),
         name: String(c.name || ""),
         code: String(c.code || ""),
         units: enr?.units ?? [],
         enrolled: Boolean(enr),
+        include4pct:
+          parsed.data.include4pct ?? (enr ? enr.include4pct : lastLinesHave4pct(lastForFlag?.lines ?? [])),
       });
     } else {
       for (const c of enrolled.filter((x) => x.active)) {
-        targets.push({ clientId: c.clientId, name: c.name, code: c.code, units: c.units, enrolled: true });
+        targets.push({
+          clientId: c.clientId,
+          name: c.name,
+          code: c.code,
+          units: c.units,
+          enrolled: true,
+          include4pct: parsed.data.include4pct ?? c.include4pct,
+        });
       }
     }
     if (targets.length === 0) {
@@ -663,7 +750,7 @@ hostingBillingAgentRouter.post("/hosting/billing-agent/test-preview", ...staffRe
         month,
         days,
         usdPerKwh,
-        include4pct,
+        include4pct: t.include4pct,
         garantiaRows,
         last,
       });
@@ -675,6 +762,7 @@ hostingBillingAgentRouter.post("/hosting/billing-agent/test-preview", ...staffRe
         clientCode: t.code,
         clientName: t.name,
         enrolled: t.enrolled,
+        include4pct: t.include4pct,
         existingInvoiceNumber: found?.number ?? null,
         warning: found
           ? `Testing: ya existe ${found.number} para este mes (el agente no la duplicaría).`
@@ -701,7 +789,6 @@ hostingBillingAgentRouter.post("/hosting/billing-agent/test-preview", ...staffRe
       month,
       daysInMonth: days,
       usdPerKwh,
-      include4pct,
       garantiaRows: garantiaRows.length,
       formula: "kWh = (W / 1000) × 24 × días del mes × cantidad de equipos",
       previews,
@@ -717,7 +804,7 @@ hostingBillingAgentRouter.put("/hosting/billing-agent/settings", ...staffWrite, 
     .object({
       usdPerKwh: z.coerce.number().min(0.001).max(5),
       dueDateDays: z.union([z.literal(5), z.literal(6), z.literal(7)]),
-      include4pct: z.boolean(),
+      include4pct: z.boolean().optional(),
     })
     .safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: { message: "Datos de configuración inválidos." } });
@@ -725,10 +812,8 @@ hostingBillingAgentRouter.put("/hosting/billing-agent/settings", ...staffWrite, 
     await ensureAgentSchema();
     const now = new Date().toISOString();
     await db
-      .prepare(
-        `UPDATE hosting_billing_agent_settings SET usd_per_kwh = ?, due_date_days = ?, include_4pct = ?, updated_at = ? WHERE id = 1`
-      )
-      .run(parsed.data.usdPerKwh, parsed.data.dueDateDays, parsed.data.include4pct ? 1 : 0, now);
+      .prepare(`UPDATE hosting_billing_agent_settings SET usd_per_kwh = ?, due_date_days = ?, updated_at = ? WHERE id = 1`)
+      .run(parsed.data.usdPerKwh, parsed.data.dueDateDays, now);
     res.json({ ok: true, settings: await loadSettings() });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -737,7 +822,12 @@ hostingBillingAgentRouter.put("/hosting/billing-agent/settings", ...staffWrite, 
 });
 
 hostingBillingAgentRouter.post("/hosting/billing-agent/clients", ...staffWrite, async (req, res) => {
-  const parsed = z.object({ clientId: z.coerce.number().int().positive() }).safeParse(req.body);
+  const parsed = z
+    .object({
+      clientId: z.coerce.number().int().positive(),
+      include4pct: z.boolean().optional(),
+    })
+    .safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: { message: "Cliente inválido." } });
   try {
     await ensureAgentSchema();
@@ -746,14 +836,15 @@ hostingBillingAgentRouter.post("/hosting/billing-agent/clients", ...staffWrite, 
       .get(parsed.data.clientId)) as { id?: number; name?: string } | undefined;
     if (!c?.id) return res.status(404).json({ error: { message: "Cliente de hosting no encontrado." } });
     const now = new Date().toISOString();
+    const last = await lastHostingFacturaLines(String(c.name || ""));
+    const include4pct = parsed.data.include4pct ?? lastLinesHave4pct(last?.lines ?? []);
     await db
       .prepare(
-        `INSERT INTO hosting_billing_agent_clients (client_id, active, notes, updated_at)
-         VALUES (?, 1, '', ?)
+        `INSERT INTO hosting_billing_agent_clients (client_id, active, notes, include_4pct, updated_at)
+         VALUES (?, 1, '', ?, ?)
          ON CONFLICT(client_id) DO UPDATE SET active = 1, updated_at = excluded.updated_at`
       )
-      .run(parsed.data.clientId, now);
-    const last = await lastHostingFacturaLines(String(c.name || ""));
+      .run(parsed.data.clientId, include4pct ? 1 : 0, now);
     const existingUnits = await loadUnits(parsed.data.clientId);
     if (existingUnits.length === 0 && last) {
       const catalog = await loadCatalog();
@@ -763,13 +854,13 @@ hostingBillingAgentRouter.post("/hosting/billing-agent/clients", ...staffWrite, 
       for (const l of lodging) {
         const key = matchServiceKey(l.service, catalog);
         const cat = catalog[key];
-        const watts = resolveServiceWatts(garantiaRows, key, cat?.name || l.service, 0).watts;
+        const live = resolveServiceWatts(garantiaRows, key, cat?.name || l.service, 0);
         await db
           .prepare(
-            `INSERT INTO hosting_billing_agent_units (client_id, service_key, service_name, quantity, watts, discount, sort_order)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`
+            `INSERT INTO hosting_billing_agent_units (client_id, service_key, service_name, quantity, watts, discount, sort_order, garantia_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
           )
-          .run(parsed.data.clientId, key, cat?.name || l.service, l.quantity, watts, l.discount, order);
+          .run(parsed.data.clientId, key, cat?.name || l.service, l.quantity, live.watts, l.discount, order, live.garantia?.id ?? null);
         order += 1;
       }
     }
@@ -785,6 +876,7 @@ hostingBillingAgentRouter.patch("/hosting/billing-agent/clients/:clientId", ...s
   const parsed = z
     .object({
       active: z.boolean().optional(),
+      include4pct: z.boolean().optional(),
       usdPerKwh: z.union([z.coerce.number().min(0.001).max(5), z.null()]).optional(),
       notes: z.string().max(400).optional(),
     })
@@ -803,6 +895,10 @@ hostingBillingAgentRouter.patch("/hosting/billing-agent/clients/:clientId", ...s
     if (parsed.data.active != null) {
       fields.push("active = ?");
       values.push(parsed.data.active ? 1 : 0);
+    }
+    if (parsed.data.include4pct != null) {
+      fields.push("include_4pct = ?");
+      values.push(parsed.data.include4pct ? 1 : 0);
     }
     if (parsed.data.usdPerKwh !== undefined) {
       fields.push("usd_per_kwh = ?");
@@ -836,9 +932,10 @@ hostingBillingAgentRouter.delete("/hosting/billing-agent/clients/:clientId", ...
 });
 
 const UnitBody = z.object({
-  serviceKey: z.string().trim().min(1).max(12),
+  serviceKey: z.string().trim().min(1).max(12).optional(),
+  garantiaId: z.coerce.number().int().positive().optional(),
   quantity: z.coerce.number().int().min(1).max(9999),
-  watts: z.coerce.number().min(0).max(100000),
+  watts: z.coerce.number().min(0).max(100000).optional(),
   discount: z.coerce.number().min(0).max(999999).optional(),
 });
 
@@ -859,17 +956,20 @@ hostingBillingAgentRouter.put("/hosting/billing-agent/clients/:clientId/units", 
     await db.prepare("DELETE FROM hosting_billing_agent_units WHERE client_id = ?").run(clientId);
     let order = 0;
     for (const u of parsed.data.units) {
-      const key = u.serviceKey.toUpperCase();
+      const gRow = u.garantiaId ? garantiaRows.find((r) => r.id === u.garantiaId) : null;
+      const mapped = gRow ? mapGarantiaOption(gRow, catalog) : null;
+      const key = (mapped?.serviceKey || u.serviceKey || "A").toUpperCase();
       if (key === "D") continue;
       const cat = catalog[key];
-      if (!cat) continue;
-      const watts = resolveServiceWatts(garantiaRows, key, cat.name, 0).watts;
+      const name = mapped?.serviceName || cat?.name;
+      if (!name) continue;
+      const live = resolveServiceWatts(garantiaRows, key, name, 0, mapped?.id || 0);
       await db
         .prepare(
-          `INSERT INTO hosting_billing_agent_units (client_id, service_key, service_name, quantity, watts, discount, sort_order)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO hosting_billing_agent_units (client_id, service_key, service_name, quantity, watts, discount, sort_order, garantia_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
         )
-        .run(clientId, key, cat.name, u.quantity, watts, u.discount ?? 0, order);
+        .run(clientId, key, name, u.quantity, live.watts, u.discount ?? 0, order, mapped?.id ?? live.garantia?.id ?? null);
       order += 1;
     }
     res.json({ ok: true, clients: await listEnrolled() });
@@ -898,13 +998,13 @@ hostingBillingAgentRouter.post("/hosting/billing-agent/clients/:clientId/import-
     for (const l of lodging) {
       const key = matchServiceKey(l.service, catalog);
       const cat = catalog[key];
-      const watts = resolveServiceWatts(garantiaRows, key, cat?.name || l.service, 0).watts;
+      const live = resolveServiceWatts(garantiaRows, key, cat?.name || l.service, 0);
       await db
         .prepare(
-          `INSERT INTO hosting_billing_agent_units (client_id, service_key, service_name, quantity, watts, discount, sort_order)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO hosting_billing_agent_units (client_id, service_key, service_name, quantity, watts, discount, sort_order, garantia_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
         )
-        .run(clientId, key, cat?.name || l.service, l.quantity, watts, l.discount, order);
+        .run(clientId, key, cat?.name || l.service, l.quantity, live.watts, l.discount, order, live.garantia?.id ?? null);
       order += 1;
     }
     res.json({ ok: true, importedFromMonth: last.month, clients: await listEnrolled() });
