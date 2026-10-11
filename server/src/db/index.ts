@@ -35,6 +35,7 @@ async function loadDb() {
           await ensureSupabaseInvoiceMarginColumn(pool);
           await ensureSupabaseHostingMarginSettings(pool);
           await ensureSupabaseHostingBillingServices(pool);
+          await ensureSupabaseMarketplacePresenceCity(pool);
           await pool.query("SELECT 1");
         })(),
         new Promise((_, rej) =>
@@ -97,6 +98,17 @@ async function ensureSupabaseInvoiceMarginColumn(pool: Pool) {
     const msg = e instanceof Error ? e.message : String(e);
     // eslint-disable-next-line no-console
     console.warn("[DB] ensureSupabaseInvoiceMarginColumn:", msg);
+  }
+}
+
+async function ensureSupabaseMarketplacePresenceCity(pool: Pool) {
+  try {
+    await pool.query(`ALTER TABLE marketplace_presence ADD COLUMN IF NOT EXISTS city TEXT`);
+    await pool.query(`ALTER TABLE marketplace_presence_history ADD COLUMN IF NOT EXISTS city TEXT`);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // eslint-disable-next-line no-console
+    console.warn("[DB] ensureSupabaseMarketplacePresenceCity:", msg);
   }
 }
 

@@ -4002,6 +4002,7 @@ export function getMarketplacePresenceLive(): Promise<{
     viewerType: string;
     countryCode: string;
     countryName: string;
+    city: string;
     clientIp: string;
     userEmail: string;
     currentPath: string;
@@ -4026,6 +4027,7 @@ export type MarketplacePresenceHistoryRow = {
   viewerType: string;
   countryCode: string;
   countryName: string;
+  city: string;
   clientIp: string;
   userEmail: string;
   currentPath: string;

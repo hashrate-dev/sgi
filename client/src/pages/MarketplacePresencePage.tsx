@@ -15,6 +15,7 @@ type PresenceRow = {
   viewerType: string;
   countryCode: string;
   countryName: string;
+  city: string;
   clientIp: string;
   userEmail: string;
   currentPath: string;
@@ -225,6 +226,9 @@ export function MarketplacePresencePage() {
                   <tr>
                     <th style={{ minWidth: 140 }}>Tipo</th>
                     <th>Ruta</th>
+                    <th style={{ minWidth: 140 }}>IP</th>
+                    <th style={{ minWidth: 120 }}>País</th>
+                    <th style={{ minWidth: 140 }}>Ciudad</th>
                     <th style={{ minWidth: 180 }}>Última actividad</th>
                     <th style={{ minWidth: 220 }}>Email</th>
                   </tr>
@@ -232,7 +236,7 @@ export function MarketplacePresencePage() {
                 <tbody>
                   {topRows.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="hrs-mplive-empty">
+                      <td colSpan={7} className="hrs-mplive-empty">
                         Sin actividad detectada dentro de la ventana en vivo.
                       </td>
                     </tr>
@@ -240,10 +244,15 @@ export function MarketplacePresencePage() {
                     topRows.map((r) => (
                       <tr key={r.visitorId}>
                         <td>{viewerTypeLabel(r.viewerType)}</td>
+                        <td>{r.currentPath || "/marketplace"}</td>
                         <td>
-                          {r.currentPath || "/marketplace"}
-                          <span className="hrs-mplive-row-country"> · {r.countryName || r.countryCode || "Desconocido"}</span>
+                          <code className="small">{r.clientIp || "—"}</code>
                         </td>
+                        <td>
+                          {r.countryName || "Desconocido"}
+                          {r.countryCode ? <span className="hrs-mplive-row-country"> ({r.countryCode})</span> : null}
+                        </td>
+                        <td>{r.city || "—"}</td>
                         <td>{new Date(r.lastSeenAt).toLocaleString("es-AR")}</td>
                         <td>
                           <code>{r.userEmail || "—"}</code>

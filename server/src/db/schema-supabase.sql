@@ -483,6 +483,7 @@ CREATE TABLE IF NOT EXISTS marketplace_presence (
   viewer_type TEXT NOT NULL DEFAULT 'anon' CHECK (viewer_type IN ('anon', 'cliente', 'staff')),
   country_code TEXT,
   country_name TEXT,
+  city TEXT,
   client_ip TEXT,
   user_email TEXT,
   current_path TEXT,
@@ -496,6 +497,7 @@ CREATE TABLE IF NOT EXISTS marketplace_presence_history (
   viewer_type TEXT NOT NULL,
   country_code TEXT,
   country_name TEXT,
+  city TEXT,
   client_ip TEXT,
   user_email TEXT,
   current_path TEXT,
@@ -508,8 +510,10 @@ CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_visitor ON marketplace_presence_
 
 ALTER TABLE marketplace_presence ADD COLUMN IF NOT EXISTS country_code TEXT;
 ALTER TABLE marketplace_presence ADD COLUMN IF NOT EXISTS country_name TEXT;
+ALTER TABLE marketplace_presence ADD COLUMN IF NOT EXISTS city TEXT;
 ALTER TABLE marketplace_presence ADD COLUMN IF NOT EXISTS client_ip TEXT;
 ALTER TABLE marketplace_presence ADD COLUMN IF NOT EXISTS user_email TEXT;
+ALTER TABLE marketplace_presence_history ADD COLUMN IF NOT EXISTS city TEXT;
 
 INSERT INTO marketplace_products (name, description, category, price_usd, image_url, stock, sort_order)
 SELECT * FROM (

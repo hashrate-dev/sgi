@@ -120,6 +120,7 @@ export function MarketplacePresenceHistorialPage() {
         { header: "Tipo", key: "viewerType", width: 20 },
         { header: "Ruta", key: "currentPath", width: 36 },
         { header: "Pais", key: "country", width: 24 },
+        { header: "Ciudad", key: "city", width: 22 },
         { header: "IP", key: "clientIp", width: 20 },
         { header: "Email", key: "userEmail", width: 34 },
         { header: "Locale", key: "locale", width: 16 },
@@ -132,6 +133,7 @@ export function MarketplacePresenceHistorialPage() {
           viewerType: viewerTypeLabel(r.viewerType),
           currentPath: r.currentPath || "—",
           country: `${r.countryName || "—"} (${r.countryCode || "—"})`,
+          city: r.city || "—",
           clientIp: r.clientIp || "—",
           userEmail: r.userEmail || "—",
           locale: r.locale || "—",
@@ -182,7 +184,7 @@ export function MarketplacePresenceHistorialPage() {
                     <label className="form-label small fw-bold">Texto libre</label>
                     <input
                       className="form-control form-control-sm"
-                      placeholder="Email, ruta, IP, país, código país, visitor…"
+                      placeholder="Email, ruta, IP, país, ciudad, visitor…"
                       value={qInput}
                       onChange={(e) => setQInput(e.target.value)}
                       aria-label="Filtrar por texto en el historial"
@@ -253,6 +255,7 @@ export function MarketplacePresenceHistorialPage() {
                   <th className="text-start">Tipo</th>
                   <th className="text-start">Ruta</th>
                   <th className="text-start">País</th>
+                  <th className="text-start">Ciudad</th>
                   <th className="text-start">IP</th>
                   <th className="text-start">Email</th>
                   <th className="text-start">Locale / TZ</th>
@@ -261,13 +264,13 @@ export function MarketplacePresenceHistorialPage() {
               <tbody>
                 {loading && rows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center text-muted py-4">
+                    <td colSpan={8} className="text-center text-muted py-4">
                       Cargando historial…
                     </td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center text-muted py-4">
+                    <td colSpan={8} className="text-center text-muted py-4">
                       Sin registros todavía o ningún resultado para el filtro.
                     </td>
                   </tr>
@@ -283,6 +286,7 @@ export function MarketplacePresenceHistorialPage() {
                         {r.countryName}
                         <span className="text-muted small"> ({r.countryCode})</span>
                       </td>
+                      <td className="text-start">{r.city || "—"}</td>
                       <td className="text-start">
                         <code className="small">{r.clientIp || "—"}</code>
                       </td>

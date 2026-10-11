@@ -262,6 +262,7 @@ CREATE TABLE IF NOT EXISTS marketplace_presence (
   viewer_type TEXT NOT NULL DEFAULT 'anon' CHECK (viewer_type IN ('anon', 'cliente', 'staff')),
   country_code TEXT,
   country_name TEXT,
+  city TEXT,
   client_ip TEXT,
   user_email TEXT,
   current_path TEXT,
@@ -277,6 +278,7 @@ CREATE TABLE IF NOT EXISTS marketplace_presence_history (
   viewer_type TEXT NOT NULL,
   country_code TEXT,
   country_name TEXT,
+  city TEXT,
   client_ip TEXT,
   user_email TEXT,
   current_path TEXT,
@@ -287,6 +289,19 @@ CREATE TABLE IF NOT EXISTS marketplace_presence_history (
 CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_recorded ON marketplace_presence_history(recorded_at DESC);
 CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_visitor ON marketplace_presence_history(visitor_id, recorded_at DESC);
 `);
+
+  try {
+    db.exec("ALTER TABLE marketplace_presence ADD COLUMN city TEXT");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+  try {
+    db.exec("ALTER TABLE marketplace_presence_history ADD COLUMN city TEXT");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
 
   db.exec(`
 CREATE TABLE IF NOT EXISTS hosting_fx_operations (
