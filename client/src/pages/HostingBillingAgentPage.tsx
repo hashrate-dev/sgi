@@ -23,9 +23,11 @@ import {
   rejectHostingBillingAgentDraft,
   removeHostingBillingAgentClient,
   addHostingBillingAgentClient,
+  testPreviewHostingBillingAgent,
   type HostingBillingAgentClient,
   type HostingBillingAgentDraft,
   type HostingBillingAgentLine,
+  type HostingBillingAgentTestPreview,
 } from "../lib/api";
 import type { Client, LineItem } from "../lib/types";
 import "../styles/facturacion.css";
@@ -89,6 +91,8 @@ export function HostingBillingAgentPage() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmDraft, setConfirmDraft] = useState<HostingBillingAgentDraft | null>(null);
+  const [testClientId, setTestClientId] = useState<string>("");
+  const [testResult, setTestResult] = useState<HostingBillingAgentTestPreview | null>(null);
 
   const loadAll = useCallback(async (prefMonth?: string) => {
     const [meta, clientsRes] = await Promise.all([getHostingBillingAgent(), getClients().catch(() => ({ clients: [] as Client[] }))]);
@@ -152,6 +156,34 @@ export function HostingBillingAgentPage() {
       showToast("Cliente agregado al agente. Se importaron equipos de la última factura si existía.", "success");
     } catch (e) {
       showToast(e instanceof Error ? e.message : "No se pudo agregar.", "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runTesting() {
+    const cid = Number(testClientId);
+    if (!testClientId || !Number.isFinite(cid) || cid <= 0) {
+      showToast("Elegí un cliente para el testing.", "warning");
+      return;
+    }
+    if (!month) {
+      showToast("Elegí el mes a probar.", "warning");
+      return;
+    }
+    setBusy(true);
+    try {
+      const r = await testPreviewHostingBillingAgent({
+        month,
+        clientId: cid,
+        usdPerKwh,
+        include4pct,
+      });
+      setTestResult(r);
+      showToast("Testing listo: no se emitió ninguna factura.", "success");
+    } catch (e) {
+      setTestResult(null);
+      showToast(e instanceof Error ? e.message : "No se pudo correr el testing.", "error");
     } finally {
       setBusy(false);
     }
@@ -412,6 +444,107 @@ export function HostingBillingAgentPage() {
                   ) : null}
                 </div>
               </div>
+            </div>
+
+            <div className="hrs-card hrs-card--rect p-4 mb-3" style={{ border: "1px dashed rgba(234, 179, 8, 0.7)" }}>
+              <h6 className="fw-bold border-bottom pb-2">Testing (no emite facturas)</h6>
+              <p className="small text-muted mb-3">
+                Simula el cálculo del agente para un cliente y un mes: días del mes, consumo W de Valores de garantías
+                ASIC, kWh y total. <strong>No guarda borradores ni crea documentos</strong>.
+              </p>
+              <div className="row g-2 align-items-end mb-3">
+                <div className="col-md-6">
+                  <label className="form-label small fw-bold">Cliente de prueba</label>
+                  <select className="form-select form-select-sm" value={testClientId} onChange={(e) => setTestClientId(e.target.value)}>
+                    <option value="">Elegí un cliente…</option>
+                    {allClients.map((c) => (
+                      <option key={String(c.id)} value={String(c.id)}>
+                        {c.code} — {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-md-3">
+                  <label className="form-label small fw-bold">Mes a simular</label>
+                  <input type="month" className="form-control form-control-sm" value={month} onChange={(e) => setMonth(e.target.value)} />
+                </div>
+                <div className="col-md-3">
+                  <button type="button" className="btn btn-warning btn-sm" disabled={busy} onClick={() => void runTesting()}>
+                    Correr testing
+                  </button>
+                </div>
+              </div>
+              {testResult ? (
+                <div>
+                  <div className="alert alert-warning py-2 small mb-3">
+                    Modo testing · mes {testResult.month} · {testResult.daysInMonth} días · {testResult.formula} · USD/kWh{" "}
+                    {testResult.usdPerKwh} · filas de garantías ASIC: {testResult.garantiaRows} · emite factura: no
+                  </div>
+                  {testResult.previews.map((p) => (
+                    <div key={p.clientId} className="mb-3">
+                      <div className="d-flex flex-wrap gap-2 small mb-2">
+                        <span className="badge text-bg-secondary">{p.clientCode}</span>
+                        <strong>{p.clientName}</strong>
+                        <span className={p.checks.wattsFromGarantiaAsic ? "text-success" : "text-warning"}>
+                          {p.checks.wattsFromGarantiaAsic ? "W conectado a garantías ASIC" : "W no encontrado en garantías ASIC"}
+                        </span>
+                        <span>{p.checks.hasItems ? "Ítems OK" : "Sin ítems"}</span>
+                        <span>{p.checks.totalPositive ? `Total ${formatUSD(p.total)}` : "Total 0"}</span>
+                        {p.existingInvoiceNumber ? <span>Ya hay {p.existingInvoiceNumber} (no se duplicaría)</span> : null}
+                      </div>
+                      {p.warning ? <div className="text-muted small mb-2">{p.warning}</div> : null}
+                      <div className="table-responsive">
+                        <table className="table table-sm mb-0" style={{ fontSize: "0.82rem" }}>
+                          <thead>
+                            <tr>
+                              <th>Servicio</th>
+                              <th>W</th>
+                              <th>Origen W</th>
+                              <th>Cant.</th>
+                              <th>kWh mes</th>
+                              <th>Precio</th>
+                              <th>Total línea</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {p.items.map((it, i) => (
+                              <tr key={i}>
+                                <td>{it.serviceName}</td>
+                                <td>{it.watts || "—"}</td>
+                                <td>
+                                  {it.wattsSource === "garantia-asic"
+                                    ? "Garantías ASIC"
+                                    : it.serviceKey === "D"
+                                      ? "4%"
+                                      : it.wattsSource === "fallback"
+                                        ? "Fallback"
+                                        : it.wattsSource === "stored"
+                                          ? "Guardado"
+                                          : "—"}
+                                </td>
+                                <td>{it.quantity}</td>
+                                <td>{it.kwhMonth ? it.kwhMonth.toLocaleString("es-PY", { maximumFractionDigits: 1 }) : "—"}</td>
+                                <td>{formatUSD(it.price)}</td>
+                                <td>{formatUSD((it.price - it.discount) * it.quantity)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr>
+                              <th colSpan={4}>Totales testing</th>
+                              <th>{p.kwhTotal ? p.kwhTotal.toLocaleString("es-PY", { maximumFractionDigits: 1 }) : "—"}</th>
+                              <th />
+                              <th>{formatUSD(p.total)}</th>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="small text-muted mb-0">Todavía no hay una corrida de testing. Elegí cliente y mes y pulsá Correr testing.</p>
+              )}
             </div>
 
             <div className="hrs-card hrs-card--rect p-4 mb-3">

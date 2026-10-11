@@ -32,6 +32,7 @@ export type HostingAgentLine = {
   kwhMonth: number;
   daysInMonth: number;
   usdPerKwh: number;
+  wattsSource?: "garantia-asic" | "stored" | "fallback" | "none";
 };
 
 export function daysInCalendarMonth(year: number, month1to12: number): number {

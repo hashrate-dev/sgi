@@ -1735,6 +1735,7 @@ export type HostingBillingAgentLine = {
   kwhMonth: number;
   daysInMonth: number;
   usdPerKwh: number;
+  wattsSource?: "garantia-asic" | "stored" | "fallback" | "none";
 };
 
 export type HostingBillingAgentUnit = {
@@ -1868,6 +1869,47 @@ export function getHostingBillingAgentDrafts(month?: string): Promise<{
 }> {
   const q = month ? `?month=${encodeURIComponent(month)}` : "";
   return api(`/api/hosting/billing-agent/drafts${q}`);
+}
+
+export type HostingBillingAgentTestPreview = {
+  testing: true;
+  emitsInvoice: false;
+  savesDraft: false;
+  month: string;
+  daysInMonth: number;
+  usdPerKwh: number;
+  include4pct: boolean;
+  garantiaRows: number;
+  formula: string;
+  previews: Array<{
+    clientId: number;
+    clientCode: string;
+    clientName: string;
+    enrolled: boolean;
+    existingInvoiceNumber: string | null;
+    warning: string;
+    items: HostingBillingAgentLine[];
+    subtotal: number;
+    discounts: number;
+    total: number;
+    kwhTotal: number;
+    checks: {
+      daysInMonth: number;
+      wattsFromGarantiaAsic: boolean;
+      hasItems: boolean;
+      totalPositive: boolean;
+      wouldEmit: false;
+    };
+  }>;
+};
+
+export function testPreviewHostingBillingAgent(body: {
+  month: string;
+  clientId?: number;
+  usdPerKwh?: number;
+  include4pct?: boolean;
+}): Promise<HostingBillingAgentTestPreview> {
+  return api("/api/hosting/billing-agent/test-preview", { method: "POST", body: JSON.stringify(body) });
 }
 
 export function generateHostingBillingAgentDrafts(month?: string): Promise<{

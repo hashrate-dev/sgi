@@ -333,6 +333,7 @@ function buildLines(opts: {
       kwhMonth: roundUsd(kwhForMonth(watts, opts.days) * u.quantity),
       daysInMonth: opts.days,
       usdPerKwh: opts.usdPerKwh,
+      wattsSource: resolved.source,
     });
   }
 
@@ -598,6 +599,112 @@ hostingBillingAgentRouter.get("/hosting/billing-agent", ...staffRead, async (_re
       defaultClosedMonth: closed,
       daysInDefaultMonth: daysInYearMonth(closed),
       asOf: ymdInAsuncion(),
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: { message: msg } });
+  }
+});
+
+hostingBillingAgentRouter.post("/hosting/billing-agent/test-preview", ...staffRead, async (req, res) => {
+  const parsed = z
+    .object({
+      month: z.string().regex(/^\d{4}-\d{2}$/),
+      clientId: z.coerce.number().int().positive().optional(),
+      usdPerKwh: z.coerce.number().min(0.001).max(5).optional(),
+      include4pct: z.boolean().optional(),
+    })
+    .safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ error: { message: "Indicá un mes válido (YYYY-MM) para el testing." } });
+  try {
+    await ensureAgentSchema();
+    const settings = await loadSettings();
+    const catalog = await loadCatalog();
+    const garantiaRows = await loadGarantiaConsumos();
+    const month = parsed.data.month;
+    const days = daysInYearMonth(month);
+    const usdPerKwh = parsed.data.usdPerKwh ?? settings.usdPerKwh;
+    const include4pct = parsed.data.include4pct ?? settings.include4pct;
+    const enrolled = await listEnrolled();
+
+    type Target = { clientId: number; name: string; code: string; units: UnitRow[]; enrolled: boolean };
+    const targets: Target[] = [];
+    if (parsed.data.clientId) {
+      const enr = enrolled.find((c) => c.clientId === parsed.data.clientId);
+      const c = (await db
+        .prepare(`SELECT id, code, name FROM clients WHERE id = ? AND ${HOSTING_ONLY}`)
+        .get(parsed.data.clientId)) as { id?: number; code?: string; name?: string } | undefined;
+      if (!c?.id) return res.status(404).json({ error: { message: "Cliente de hosting no encontrado." } });
+      targets.push({
+        clientId: Number(c.id),
+        name: String(c.name || ""),
+        code: String(c.code || ""),
+        units: enr?.units ?? [],
+        enrolled: Boolean(enr),
+      });
+    } else {
+      for (const c of enrolled.filter((x) => x.active)) {
+        targets.push({ clientId: c.clientId, name: c.name, code: c.code, units: c.units, enrolled: true });
+      }
+    }
+    if (targets.length === 0) {
+      return res.status(400).json({
+        error: { message: "Elegí un cliente para el testing, o agregá clientes al agente." },
+      });
+    }
+
+    const previews = [];
+    for (const t of targets) {
+      const last = await lastHostingFacturaLines(t.name);
+      const found = await existingFacturaForMonth(t.name, month);
+      const built = buildLines({
+        units: t.units,
+        catalog,
+        month,
+        days,
+        usdPerKwh,
+        include4pct,
+        garantiaRows,
+        last,
+      });
+      const totals = lineTotals(built.items);
+      const lodging = built.items.filter((i) => i.serviceKey !== "D");
+      const garantiaOk = lodging.length > 0 && lodging.every((i) => i.wattsSource === "garantia-asic" && i.watts > 0);
+      previews.push({
+        clientId: t.clientId,
+        clientCode: t.code,
+        clientName: t.name,
+        enrolled: t.enrolled,
+        existingInvoiceNumber: found?.number ?? null,
+        warning: found
+          ? `Testing: ya existe ${found.number} para este mes (el agente no la duplicaría).`
+          : built.warning,
+        items: built.items,
+        subtotal: totals.subtotal,
+        discounts: totals.discounts,
+        total: totals.total,
+        kwhTotal: lodging.reduce((a, i) => a + (i.kwhMonth || 0), 0),
+        checks: {
+          daysInMonth: days,
+          wattsFromGarantiaAsic: garantiaOk,
+          hasItems: built.items.length > 0,
+          totalPositive: totals.total > 0,
+          wouldEmit: false,
+        },
+      });
+    }
+
+    res.json({
+      testing: true,
+      emitsInvoice: false,
+      savesDraft: false,
+      month,
+      daysInMonth: days,
+      usdPerKwh,
+      include4pct,
+      garantiaRows: garantiaRows.length,
+      formula: "kWh = (W / 1000) × 24 × días del mes × cantidad de equipos",
+      previews,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
