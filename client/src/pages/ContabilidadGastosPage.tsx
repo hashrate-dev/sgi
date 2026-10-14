@@ -162,6 +162,13 @@ function gastoTieneObservacionPendiente(row: ContabilidadGasto): boolean {
   return Boolean(String(row.observaciones ?? "").trim()) && row.observacionResuelta !== true;
 }
 
+function gastoNotaEstadoTabla(row: ContabilidadGasto): string {
+  const obs = String(row.observaciones ?? "").trim();
+  if (gastoTieneObservacionPendiente(row)) return obs;
+  if (obs) return `Operación cerrada.\n${obs}`;
+  return "Operación cerrada — nada pendiente";
+}
+
 export function ContabilidadGastosPage() {
   const { user, loading } = useAuth();
   const [proveedores, setProveedores] = useState<ProveedorHrs[]>([]);
@@ -1091,14 +1098,27 @@ export function ContabilidadGastosPage() {
                               role="img"
                               tabIndex={0}
                               aria-label={`Observación pendiente: ${row.observaciones.trim()}`}
-                              onMouseEnter={(e) => showObsAlertaNota(e.currentTarget, row.observaciones)}
+                              onMouseEnter={(e) => showObsAlertaNota(e.currentTarget, gastoNotaEstadoTabla(row))}
                               onMouseLeave={() => setObsAlertaNota(null)}
-                              onFocus={(e) => showObsAlertaNota(e.currentTarget, row.observaciones)}
+                              onFocus={(e) => showObsAlertaNota(e.currentTarget, gastoNotaEstadoTabla(row))}
                               onBlur={() => setObsAlertaNota(null)}
                             >
                               <i className="bi bi-exclamation-triangle-fill" aria-hidden="true" />
                             </span>
-                          ) : null}
+                          ) : (
+                            <span
+                              className="contabilidad-gasto-obs-ok"
+                              role="img"
+                              tabIndex={0}
+                              aria-label="Operación cerrada, nada pendiente"
+                              onMouseEnter={(e) => showObsAlertaNota(e.currentTarget, gastoNotaEstadoTabla(row))}
+                              onMouseLeave={() => setObsAlertaNota(null)}
+                              onFocus={(e) => showObsAlertaNota(e.currentTarget, gastoNotaEstadoTabla(row))}
+                              onBlur={() => setObsAlertaNota(null)}
+                            >
+                              <i className="bi bi-check-circle-fill" aria-hidden="true" />
+                            </span>
+                          )}
                         </span>
                       </td>
                       <td className="contabilidad-gastos-col-nprov text-nowrap">

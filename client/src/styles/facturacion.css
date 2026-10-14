@@ -11170,18 +11170,27 @@ button.fact-back {
   width: 7.5%;
 }
 
-.contabilidad-gasto-obs-alerta {
+.contabilidad-gasto-obs-alerta,
+.contabilidad-gasto-obs-ok {
   display: inline-flex;
   align-items: center;
-  color: #d97706;
   font-size: 0.9rem;
   line-height: 1;
   cursor: help;
   outline: none;
 }
 
-.contabilidad-gasto-obs-alerta:focus-visible {
-  outline: 2px solid #d97706;
+.contabilidad-gasto-obs-alerta {
+  color: #d97706;
+}
+
+.contabilidad-gasto-obs-ok {
+  color: #198754;
+}
+
+.contabilidad-gasto-obs-alerta:focus-visible,
+.contabilidad-gasto-obs-ok:focus-visible {
+  outline: 2px solid currentColor;
   outline-offset: 2px;
   border-radius: 3px;
 }
