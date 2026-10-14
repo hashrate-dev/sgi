@@ -16,6 +16,11 @@ import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
 import { canDeleteHistorial, canExport } from "../lib/auth";
 import { formatCurrency, formatCurrencyNumber } from "../lib/formatCurrency";
+import {
+  invoiceCollectionState,
+  isPartialReceiptDocument,
+  relatedFacturaForDocument,
+} from "../lib/invoiceCollection";
 import "../styles/facturacion.css";
 
 /** Normaliza mes a YYYY-MM (ej. "2026-1" -> "2026-01") para filtrar por columna MES */
@@ -367,8 +372,11 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
     const facturacionTotal = sumaFacturas - sumaNotasCredito;
     const cobrosRealizados = sumaRecibos;
     const cobrosPendientes = Math.max(0, facturacionTotal - cobrosRealizados);
-    const tieneRecibo = (factura: Invoice) => src.some((r) => r.type === "Recibo" && isLinkedToInvoice(r, factura));
-    const facturasCobradas = src.filter((i) => i.type === "Factura" && tieneRecibo(i)).length;
+    const facturasCobradas = src.filter((i) => {
+      if (i.type !== "Factura") return false;
+      const st = invoiceCollectionState(i, src);
+      return st.isFullySettled && st.receipts.length > 0;
+    }).length;
     const progressPct = facturacionTotal <= 0 ? 0 : Math.min(100, Math.round((cobrosRealizados / facturacionTotal) * 100));
     return { facturas, recibos, notasCredito, facturacionTotal, cobrosPendientes, cobrosRealizados, facturasCobradas, progressPct, registros: filtered.length };
   }, [filtered]);
@@ -392,7 +400,9 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
       { header: "Total", key: "total", width: 12 },
       { header: "Total (S/TC)", key: "totalSinCambio", width: 18 },
       { header: "TC", key: "cambio", width: 12 },
-      { header: "Estado", key: "status", width: 10 }
+      { header: "Saldo Pendiente", key: "saldoPendiente", width: 16 },
+      { header: "Pagos Parciales", key: "pagosParciales", width: 16 },
+      { header: "Estado", key: "status", width: 14 }
     ];
 
     const allWithSource = all as InvoiceWithSource[];
@@ -417,33 +427,19 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
       const cambioExport = getCambio4Pct(inv) ?? 0;
       const totalSinCambioExport = total - Math.sign(total || 1) * cambioExport;
 
-      // Verificar si la operación está cerrada (solo dentro del mismo origen)
-      let isClosed = false;
-      let isCancelledByNC = false;
-      if (inv.type === "Factura") {
-        const hasReceipt = sameSource.some((r) => r.type === "Recibo" && isLinkedToInvoice(r, inv));
-        const creditNotes = sameSource.filter((nc) => nc.type === "Nota de Crédito" && isLinkedToInvoice(nc, inv));
-        const hasCreditNote = creditNotes.some((nc) => getCreditNoteMode(nc, inv) === "total");
-        isClosed = hasReceipt || hasCreditNote;
-        isCancelledByNC = hasCreditNote;
-      } else if (inv.type === "Recibo" && (inv.relatedInvoiceId || inv.relatedInvoiceNumber)) {
-        isClosed = true;
-      } else if (inv.type === "Nota de Crédito" && (inv.relatedInvoiceId || inv.relatedInvoiceNumber)) {
-        const relatedFactura = sameSource.find((f) => f.type === "Factura" && (String(f.id) === String(inv.relatedInvoiceId) || f.number === inv.relatedInvoiceNumber));
-        const otherNCs = relatedFactura ? sameSource.filter((nc) => nc.type === "Nota de Crédito" && nc.id !== inv.id && isLinkedToInvoice(nc, relatedFactura)) : [];
-        if (otherNCs.length === 0) {
-          const ncMode = getCreditNoteMode(inv, relatedFactura ?? undefined);
-          isClosed = true;
-          isCancelledByNC = ncMode === "total";
-        }
-      }
+      const relatedFactura = relatedFacturaForDocument(inv, sameSource);
+      const collection = relatedFactura ? invoiceCollectionState(relatedFactura, sameSource) : null;
+      const creditNotes = relatedFactura
+        ? sameSource.filter((nc) => nc.type === "Nota de Crédito" && isLinkedToInvoice(nc, relatedFactura))
+        : [];
+      const isCancelledByNC = creditNotes.some((nc) => getCreditNoteMode(nc, relatedFactura) === "total");
+      const isClosed = Boolean(collection?.isFullySettled && (collection.receipts.length > 0 || isCancelledByNC));
 
-      // Determinar el estado para Excel
       let status = "Pendiente";
-      if (isClosed) {
-        if (isCancelledByNC && inv.type === "Nota de Crédito") {
-          status = "✓ Cancelado (NC)";
-        } else if (isCancelledByNC) {
+      if (collection?.hasPartialBalance) {
+        status = "◐ Pago parcial (saldo pendiente)";
+      } else if (isClosed) {
+        if (isCancelledByNC) {
           status = "✓ Cancelado (NC)";
         } else {
           status = "✓ Cerrado";
@@ -451,6 +447,15 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
       } else if (inv.type === "Factura") {
         status = "⚠️ Pendiente";
       }
+
+      const saldoPendienteExport =
+        collection && collection.pendingAmount > 0.0001 ? collection.pendingAmount : 0;
+      const pagosParcialesExport =
+        inv.type === "Recibo" && isPartialReceiptDocument(inv)
+          ? Math.abs(Number(inv.total) || 0)
+          : collection && collection.partialPaidAmount > 0.0001
+            ? collection.partialPaidAmount
+            : 0;
       // Fecha de pago: misma lógica que la tabla (solo mismo origen)
       const relatedReciboPayment = inv.type === "Factura" ? sameSource.find((r) => r.type === "Recibo" && isLinkedToInvoice(r, inv)) : null;
       const relatedNCPayment = inv.type === "Factura" ? sameSource.find((n) => n.type === "Nota de Crédito" && isLinkedToInvoice(n, inv)) : null;
@@ -480,6 +485,8 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
         total: total,
         totalSinCambio: totalSinCambioExport,
         cambio: cambioVal != null ? formatCurrency(cambioVal) : "-",
+        saldoPendiente: saldoPendienteExport,
+        pagosParciales: pagosParcialesExport,
         status: status
       });
     });
@@ -1003,6 +1010,8 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
                 <col className="historial-col-total-sdesc" />
                 <col className="historial-col-cambio-header" />
                 <col className="historial-col-total" />
+                <col className="historial-col-saldo-pendiente" />
+                <col className="historial-col-pagos-parciales" />
                 <col className="historial-col-estado" />
                 <col className="historial-col-acciones" />
               </colgroup>
@@ -1019,6 +1028,8 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
                   <th className="text-end historial-col-total-sdesc" title="Total sin descuento">Total s/d</th>
                   <th className="text-end historial-col-cambio-header" title="4% Gastos Operativos Transferencia (si aplica)">TC</th>
                   <th className="text-end historial-col-total" title="Total">Total</th>
+                  <th className="text-end historial-col-saldo-pendiente" title="Saldo que aún debe el cliente sobre la factura">Saldo Pendiente</th>
+                  <th className="text-end historial-col-pagos-parciales" title="Pagos parciales aplicados a la factura">Pagos Parciales</th>
                   <th className="text-center historial-col-estado" title="Estado">Est.</th>
                   <th className="text-center historial-col-acciones">Acc.</th>
                 </tr>
@@ -1026,7 +1037,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={13} className="text-center text-muted py-4">
+                    <td colSpan={15} className="text-center text-muted py-4">
                       <small>No hay facturas registradas</small>
                     </td>
                   </tr>
@@ -1041,45 +1052,66 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
                     const total = isNegativeType ? -(Math.abs(inv.total) || 0) : (inv.total || 0);
 
                     // Fecha de pago: Factura = fecha del Recibo si pagada (solo mismo origen), "Cancelada" si cancelada por NC, sino "Pendiente"; NC = fecha emisión
-                    const relatedReciboForPayment = inv.type === "Factura" ? sameSource.find((r) => r.type === "Recibo" && isLinkedToInvoice(r, inv)) : null;
-                    const relatedNCForPayment = inv.type === "Factura" ? sameSource.find((n) => n.type === "Nota de Crédito" && isLinkedToInvoice(n, inv)) : null;
+                    const relatedFactura = relatedFacturaForDocument(inv, sameSource);
+                    const collection = relatedFactura ? invoiceCollectionState(relatedFactura, sameSource) : null;
+                    const relatedNCForPayment = inv.type === "Factura" ? collection?.creditNotes[0] ?? null : null;
                     const relatedNCMode = inv.type === "Factura" ? getCreditNoteMode(relatedNCForPayment, inv) : "partial";
-                    const paymentDateDisplay = (inv.type === "Factura" && relatedReciboForPayment?.paymentDate) ? relatedReciboForPayment.paymentDate : inv.paymentDate;
+                    const lastReceipt = collection?.receipts.length
+                      ? [...collection.receipts].sort((a, b) => String(a.id).localeCompare(String(b.id), undefined, { numeric: true }))[
+                          collection.receipts.length - 1
+                        ]
+                      : null;
+                    const paymentDateDisplay =
+                      inv.type === "Factura" && lastReceipt?.paymentDate ? lastReceipt.paymentDate : inv.paymentDate;
                     let paymentDateCell: string;
                     if (inv.type === "Factura") {
-                      if (relatedReciboForPayment?.paymentDate) paymentDateCell = new Date(relatedReciboForPayment.paymentDate).toLocaleDateString();
-                      else if (relatedNCForPayment) paymentDateCell = relatedNCMode === "total" ? "Cancelada" : "Parcial";
-                      else paymentDateCell = "Pendiente";
+                      if (collection?.hasPartialBalance) {
+                        paymentDateCell = lastReceipt?.paymentDate
+                          ? new Date(lastReceipt.paymentDate).toLocaleDateString()
+                          : "Parcial";
+                      } else if (lastReceipt?.paymentDate) {
+                        paymentDateCell = new Date(lastReceipt.paymentDate).toLocaleDateString();
+                      } else if (relatedNCForPayment) {
+                        paymentDateCell = relatedNCMode === "total" ? "Cancelada" : "Parcial";
+                      } else {
+                        paymentDateCell = "Pendiente";
+                      }
                     } else if (inv.type === "Nota de Crédito") {
                       paymentDateCell = inv.date || (inv.paymentDate ? new Date(inv.paymentDate).toLocaleDateString() : "-");
                     } else {
                       paymentDateCell = paymentDateDisplay ? new Date(paymentDateDisplay).toLocaleDateString() : "-";
                     }
-                    // Verificar si la operación está cerrada (solo dentro del mismo origen)
-                    let isClosed = false;
-                    let isCancelledByNC = false;
-                    if (inv.type === "Factura") {
-                      const hasReceipt = sameSource.some((r) => r.type === "Recibo" && isLinkedToInvoice(r, inv));
-                      const creditNotes = sameSource.filter((nc) => nc.type === "Nota de Crédito" && isLinkedToInvoice(nc, inv));
-                      const hasCreditNote = creditNotes.some((nc) => getCreditNoteMode(nc, inv) === "total");
-                      isClosed = hasReceipt || hasCreditNote;
-                      isCancelledByNC = hasCreditNote;
-                    } else if (inv.type === "Recibo" && (inv.relatedInvoiceId || inv.relatedInvoiceNumber)) {
-                      isClosed = true;
-                    } else if (inv.type === "Nota de Crédito" && (inv.relatedInvoiceId || inv.relatedInvoiceNumber)) {
-                      const relatedFactura = sameSource.find((f) => f.type === "Factura" && (String(f.id) === String(inv.relatedInvoiceId) || f.number === inv.relatedInvoiceNumber));
-                      const otherNCs = relatedFactura ? sameSource.filter((nc) => nc.type === "Nota de Crédito" && nc.id !== inv.id && isLinkedToInvoice(nc, relatedFactura)) : [];
-                      if (otherNCs.length === 0) {
-                        const ncMode = getCreditNoteMode(inv, relatedFactura ?? undefined);
-                        isClosed = true;
-                        isCancelledByNC = ncMode === "total";
-                      }
-                    }
+                    const isCancelledByNC = Boolean(
+                      collection?.creditNotes.some((nc) => getCreditNoteMode(nc, relatedFactura) === "total")
+                    );
+                    const isClosed = Boolean(
+                      collection?.isFullySettled && ((collection.receipts.length > 0 && inv.type === "Factura") || isCancelledByNC)
+                    );
+                    const showPartialBalanceIcon =
+                      Boolean(collection?.hasPartialBalance) &&
+                      (inv.type === "Factura" ||
+                        (inv.type === "Recibo" && isPartialReceiptDocument(inv)));
+                    const saldoPendienteCell =
+                      collection && collection.pendingAmount > 0.0001
+                        ? formatCurrencyNumber(collection.pendingAmount)
+                        : "—";
+                    const pagosParcialesCell =
+                      inv.type === "Recibo" && isPartialReceiptDocument(inv)
+                        ? formatCurrencyNumber(Math.abs(Number(inv.total) || 0))
+                        : collection && collection.partialPaidAmount > 0.0001
+                          ? formatCurrencyNumber(collection.partialPaidAmount)
+                          : "—";
+                    const tipoLabel =
+                      inv.type === "Nota de Crédito"
+                        ? "NC"
+                        : isPartialReceiptDocument(inv)
+                          ? "Rec. parc."
+                          : inv.type;
                     return (
                       <tr key={`${inv._source}-${inv.id}`}>
                         <td className="text-start small historial-col-origen">{inv._source === "hosting" ? "HOSTING" : "ASIC"}</td>
                         <td className="fw-bold text-start historial-col-num">{inv.number}</td>
-                        <td className="text-start historial-col-tipo">{inv.type === "Nota de Crédito" ? "NC" : inv.type}</td>
+                        <td className="text-start historial-col-tipo">{tipoLabel}</td>
                         <td className="text-start historial-col-cliente" title={inv.clientName}><span className="historial-cliente-nombre">{inv.clientName}</span></td>
                         <td className="text-start historial-col-fecha-emision">{inv.date}</td>
                         <td className="text-start historial-col-hora">{formatTimeNoSeconds(inv.emissionTime)}</td>
@@ -1090,17 +1122,50 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
                           {getCambio4Pct(inv) != null ? formatCurrencyNumber(getCambio4Pct(inv)!) : "-"}
                         </td>
                         <td className="text-end fw-bold historial-col-total historial-monto-cell">{formatCurrencyNumber(total)}</td>
+                        <td
+                          className="text-end historial-col-saldo-pendiente historial-monto-cell"
+                          title="Saldo pendiente de la factura"
+                          style={collection && collection.pendingAmount > 0.0001 ? { color: "#b45309", fontWeight: 700 } : undefined}
+                        >
+                          {saldoPendienteCell}
+                        </td>
+                        <td
+                          className="text-end historial-col-pagos-parciales historial-monto-cell"
+                          title="Pagos parciales"
+                        >
+                          {pagosParcialesCell}
+                        </td>
                         <td className="text-center historial-col-estado">
-                          {isClosed ? (
-                            isCancelledByNC ? (
-                              <span className="badge d-inline-flex" style={{ fontSize: "0.65rem", padding: "0.1rem 0.2rem", borderRadius: "50%", width: "1.05rem", height: "1.05rem", alignItems: "center", justifyContent: "center", backgroundColor: "#004085", color: "#fff" }} title={inv.type === "Nota de Crédito" ? "Nota de Crédito que cancela factura" : "Factura cancelada con Nota de Crédito"}>
-                                ✓
-                              </span>
-                            ) : (
-                              <span className="badge bg-success d-inline-flex" style={{ fontSize: "0.65rem", padding: "0.1rem 0.2rem", borderRadius: "50%", width: "1.05rem", height: "1.05rem", alignItems: "center", justifyContent: "center" }} title="Operación cerrada - Cliente pagó">
-                                ✓
-                              </span>
-                            )
+                          {showPartialBalanceIcon ? (
+                            <span
+                              className="badge d-inline-flex"
+                              style={{
+                                fontSize: "0.65rem",
+                                padding: "0.1rem 0.2rem",
+                                borderRadius: "50%",
+                                width: "1.05rem",
+                                height: "1.05rem",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                backgroundColor: "#f59e0b",
+                                color: "#fff",
+                              }}
+                              title={
+                                inv.type === "Recibo"
+                                  ? "Pago parcial: la factura todavía tiene saldo pendiente"
+                                  : "Pago parcial: queda saldo pendiente de cobro"
+                              }
+                            >
+                              ◐
+                            </span>
+                          ) : isCancelledByNC && (inv.type === "Factura" || inv.type === "Nota de Crédito") ? (
+                            <span className="badge d-inline-flex" style={{ fontSize: "0.65rem", padding: "0.1rem 0.2rem", borderRadius: "50%", width: "1.05rem", height: "1.05rem", alignItems: "center", justifyContent: "center", backgroundColor: "#004085", color: "#fff" }} title={inv.type === "Nota de Crédito" ? "Nota de Crédito que cancela factura" : "Factura cancelada con Nota de Crédito"}>
+                              ✓
+                            </span>
+                          ) : isClosed || (inv.type === "Recibo" && (inv.relatedInvoiceId || inv.relatedInvoiceNumber) && collection?.isFullySettled) || (inv.type === "Recibo" && (inv.relatedInvoiceId || inv.relatedInvoiceNumber) && !collection?.hasPartialBalance) ? (
+                            <span className="badge bg-success d-inline-flex" style={{ fontSize: "0.65rem", padding: "0.1rem 0.2rem", borderRadius: "50%", width: "1.05rem", height: "1.05rem", alignItems: "center", justifyContent: "center" }} title="Operación cerrada - Cliente pagó">
+                              ✓
+                            </span>
                           ) : inv.type === "Factura" ? (
                             <span className="d-inline-flex" style={{ fontSize: "0.95rem", padding: "0.1rem 0.2rem", borderRadius: "50%", width: "1.05rem", height: "1.05rem", alignItems: "center", justifyContent: "center", backgroundColor: "transparent", color: "#ffc107" }} title="Factura pendiente de pago">
                               ⚠️

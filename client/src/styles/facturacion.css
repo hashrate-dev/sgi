@@ -6365,7 +6365,19 @@ button.fact-back {
 .historial-listado-wrap .historial-listado-table col.historial-col-total,
 .historial-listado-wrap .historial-listado-table th.historial-col-total,
 .historial-listado-wrap .historial-listado-table td.historial-col-total {
-  width: 7.5%;
+  width: 6.5%;
+  white-space: nowrap;
+}
+.historial-listado-wrap .historial-listado-table col.historial-col-saldo-pendiente,
+.historial-listado-wrap .historial-listado-table th.historial-col-saldo-pendiente,
+.historial-listado-wrap .historial-listado-table td.historial-col-saldo-pendiente {
+  width: 7%;
+  white-space: nowrap;
+}
+.historial-listado-wrap .historial-listado-table col.historial-col-pagos-parciales,
+.historial-listado-wrap .historial-listado-table th.historial-col-pagos-parciales,
+.historial-listado-wrap .historial-listado-table td.historial-col-pagos-parciales {
+  width: 7%;
   white-space: nowrap;
 }
 .historial-listado-wrap .historial-listado-table th.historial-col-total-stc,

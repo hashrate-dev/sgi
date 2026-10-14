@@ -15,6 +15,11 @@ import { useAuth } from "../contexts/AuthContext";
 import { canDeleteHistorial, canEditFacturacion, canExport } from "../lib/auth";
 import { formatCurrency, formatCurrencyNumber } from "../lib/formatCurrency";
 import { asicInvoiceCarriesOperationMargin, asicOperationCostUsd, isAsicEquipmentSaleInvoice, parseAsicMarginUsd, resolveAsicInvoiceDocumentContext } from "../lib/asicDocumentKind";
+import {
+  invoiceCollectionState,
+  isPartialReceiptDocument,
+  relatedFacturaForDocument,
+} from "../lib/invoiceCollection";
 import { buildAsicComprobantePdfFilename } from "../lib/asicPdfFilename";
 import "../styles/facturacion.css";
 
@@ -922,6 +927,8 @@ export function HistorialMineriaPage() {
                   <th className="text-start">Total</th>
                   <th className="text-start">Margen</th>
                   <th className="text-start">Costos</th>
+                  <th className="text-end">Saldo Pendiente</th>
+                  <th className="text-end">Pagos Parciales</th>
                   <th className="text-start">Estado</th>
                   <th className="text-start">Acciones</th>
                 </tr>
@@ -929,7 +936,7 @@ export function HistorialMineriaPage() {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={14} className="text-center text-muted py-4">
+                    <td colSpan={16} className="text-center text-muted py-4">
                       <small>No hay facturas registradas</small>
                     </td>
                   </tr>
@@ -954,53 +961,60 @@ export function HistorialMineriaPage() {
                     }
                     const total = isNegativeType ? -(Math.abs(inv.total) || 0) : (inv.total || 0);
 
-                    // Fecha de pago: Factura = fecha del Recibo si pagada, "Cancelada" si cancelada por NC, sino "Pendiente"; NC = fecha emisión
-                    const relatedReciboForPayment = inv.type === "Factura" ? all.find((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id) : null;
-                    const relatedNCForPayment = inv.type === "Factura" ? all.find((n) => n.type === "Nota de Crédito" && n.relatedInvoiceId === inv.id) : null;
+                    const relatedFactura = relatedFacturaForDocument(inv, all);
+                    const collection =
+                      relatedFactura && !isAsicEquipmentSaleInvoice(relatedFactura)
+                        ? invoiceCollectionState(relatedFactura, all)
+                        : null;
+                    const relatedNCForPayment = inv.type === "Factura" ? collection?.creditNotes[0] ?? null : null;
                     const relatedNCMode = inv.type === "Factura" ? getCreditNoteMode(relatedNCForPayment, inv) : "partial";
-                    const paymentDateDisplay = (inv.type === "Factura" && relatedReciboForPayment?.paymentDate) ? relatedReciboForPayment.paymentDate : inv.paymentDate;
+                    const lastReceipt = collection?.receipts.length
+                      ? [...collection.receipts].sort((a, b) => String(a.id).localeCompare(String(b.id), undefined, { numeric: true }))[
+                          collection.receipts.length - 1
+                        ]
+                      : null;
+                    const paymentDateDisplay =
+                      inv.type === "Factura" && lastReceipt?.paymentDate ? lastReceipt.paymentDate : inv.paymentDate;
                     let paymentDateCell: string;
                     if (inv.type === "Factura") {
-                      if (relatedReciboForPayment?.paymentDate) paymentDateCell = new Date(relatedReciboForPayment.paymentDate).toLocaleDateString();
-                      else if (relatedNCForPayment) paymentDateCell = relatedNCMode === "total" ? "Cancelada" : "Parcial";
-                      else if (isAsicEquipmentSaleInvoice(inv)) paymentDateCell = inv.date || "-";
-                      else paymentDateCell = "Pendiente";
+                      if (isAsicEquipmentSaleInvoice(inv)) paymentDateCell = inv.date || "-";
+                      else if (collection?.hasPartialBalance) {
+                        paymentDateCell = lastReceipt?.paymentDate
+                          ? new Date(lastReceipt.paymentDate).toLocaleDateString()
+                          : "Parcial";
+                      } else if (lastReceipt?.paymentDate) {
+                        paymentDateCell = new Date(lastReceipt.paymentDate).toLocaleDateString();
+                      } else if (relatedNCForPayment) {
+                        paymentDateCell = relatedNCMode === "total" ? "Cancelada" : "Parcial";
+                      } else paymentDateCell = "Pendiente";
                     } else if (inv.type === "Nota de Crédito") {
                       paymentDateCell = inv.date || (inv.paymentDate ? new Date(inv.paymentDate).toLocaleDateString() : "-");
                     } else {
                       paymentDateCell = paymentDateDisplay ? new Date(paymentDateDisplay).toLocaleDateString() : "-";
                     }
-                    // Verificar si la operación está cerrada
-                    let isClosed = false;
-                    let isCancelledByNC = false;
-                    if (inv.type === "Factura") {
-                      const creditNotes = all.filter((nc) => nc.type === "Nota de Crédito" && nc.relatedInvoiceId === inv.id);
-                      const hasCreditNote = creditNotes.some((nc) => getCreditNoteMode(nc, inv) === "total");
-                      isCancelledByNC = hasCreditNote;
-                      if (isAsicEquipmentSaleInvoice(inv)) {
-                        isClosed = true;
-                      } else {
-                        const hasReceipt = all.some((r) => r.type === "Recibo" && r.relatedInvoiceId === inv.id);
-                        isClosed = hasReceipt || hasCreditNote;
-                      }
-                    } else if (inv.type === "Recibo" && inv.relatedInvoiceId) {
-                      // Si es un recibo con factura relacionada, está cerrado
-                      isClosed = true;
-                    } else if (inv.type === "Nota de Crédito" && inv.relatedInvoiceId) {
-                      // Verificar que sea la única NC para esa factura
-                      const otherNCs = all.filter((nc) => nc.type === "Nota de Crédito" && nc.relatedInvoiceId === inv.relatedInvoiceId && nc.id !== inv.id);
-                      // Solo mostrar check si es la única NC para esa factura
-                      if (otherNCs.length === 0) {
-                        const relatedFactura = all.find((f) => f.id === inv.relatedInvoiceId);
-                        const ncMode = getCreditNoteMode(inv, relatedFactura ?? undefined);
-                        isClosed = true;
-                        isCancelledByNC = ncMode === "total";
-                      }
-                    }
+                    const isCancelledByNC = Boolean(
+                      collection?.creditNotes.some((nc) => getCreditNoteMode(nc, relatedFactura) === "total")
+                    );
+                    const isClosed = isAsicEquipmentSaleInvoice(inv)
+                      ? true
+                      : Boolean(collection?.isFullySettled && (collection.receipts.length > 0 || isCancelledByNC));
+                    const showPartialBalanceIcon =
+                      Boolean(collection?.hasPartialBalance) &&
+                      (inv.type === "Factura" || (inv.type === "Recibo" && isPartialReceiptDocument(inv)));
+                    const saldoPendienteCell =
+                      collection && collection.pendingAmount > 0.0001
+                        ? formatCurrencyNumber(collection.pendingAmount)
+                        : "—";
+                    const pagosParcialesCell =
+                      inv.type === "Recibo" && isPartialReceiptDocument(inv)
+                        ? formatCurrencyNumber(Math.abs(Number(inv.total) || 0))
+                        : collection && collection.partialPaidAmount > 0.0001
+                          ? formatCurrencyNumber(collection.partialPaidAmount)
+                          : "—";
                     return (
                       <tr key={inv.id}>
                         <td className="fw-bold text-start">{inv.number}</td>
-                        <td className="text-start">{inv.type === "Nota de Crédito" ? "NC" : inv.type === "Factura" ? (isAsicEquipmentSaleInvoice(inv) ? "Comp. pago" : "Factura") : inv.type}</td>
+                        <td className="text-start">{inv.type === "Nota de Crédito" ? "NC" : inv.type === "Factura" ? (isAsicEquipmentSaleInvoice(inv) ? "Comp. pago" : "Factura") : isPartialReceiptDocument(inv) ? "Rec. parc." : inv.type}</td>
                         <td className="text-start">{inv.clientName}</td>
                         <td className="text-start">{inv.date}</td>
                         <td className="text-start">{inv.emissionTime || "-"}</td>
@@ -1022,8 +1036,34 @@ export function HistorialMineriaPage() {
                             return cost != null ? formatCurrency(cost) : "—";
                           })()}
                         </td>
+                        <td className="text-end" style={collection && collection.pendingAmount > 0.0001 ? { color: "#b45309", fontWeight: 700 } : undefined}>
+                          {saldoPendienteCell}
+                        </td>
+                        <td className="text-end">{pagosParcialesCell}</td>
                         <td className="text-center">
-                          {isClosed ? (
+                          {showPartialBalanceIcon ? (
+                            <span
+                              className="badge d-inline-flex"
+                              style={{
+                                fontSize: "0.65rem",
+                                padding: "0.1rem 0.2rem",
+                                borderRadius: "50%",
+                                width: "1.05rem",
+                                height: "1.05rem",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                backgroundColor: "#f59e0b",
+                                color: "#fff",
+                              }}
+                              title={
+                                inv.type === "Recibo"
+                                  ? "Pago parcial: la factura todavía tiene saldo pendiente"
+                                  : "Pago parcial: queda saldo pendiente de cobro"
+                              }
+                            >
+                              ◐
+                            </span>
+                          ) : isClosed ? (
                             isCancelledByNC ? (
                               <span className="badge d-inline-flex" style={{ fontSize: "0.65rem", padding: "0.1rem 0.2rem", borderRadius: "50%", width: "1.05rem", height: "1.05rem", alignItems: "center", justifyContent: "center", backgroundColor: "#004085", color: "#fff" }} title={inv.type === "Nota de Crédito" ? "Nota de Crédito que cancela factura" : "Factura cancelada con Nota de Crédito"}>
                                 ✓
@@ -1036,6 +1076,10 @@ export function HistorialMineriaPage() {
                           ) : inv.type === "Factura" ? (
                             <span className="d-inline-flex" style={{ fontSize: "0.95rem", padding: "0.1rem 0.2rem", borderRadius: "50%", width: "1.05rem", height: "1.05rem", alignItems: "center", justifyContent: "center", backgroundColor: "transparent", color: "#ffc107" }} title="Pendiente de cobro (reparación / flete — requiere recibo)">
                               ⚠️
+                            </span>
+                          ) : inv.type === "Recibo" && (inv.relatedInvoiceId || inv.relatedInvoiceNumber) ? (
+                            <span className="badge bg-success d-inline-flex" style={{ fontSize: "0.65rem", padding: "0.1rem 0.2rem", borderRadius: "50%", width: "1.05rem", height: "1.05rem", alignItems: "center", justifyContent: "center" }} title="Recibo registrado">
+                              ✓
                             </span>
                           ) : (
                             <span className="text-muted" style={{ fontSize: "0.875rem" }}>-</span>
