@@ -2245,6 +2245,13 @@ button.fact-back {
   vertical-align: middle;
 }
 
+.fact-emitted-tipo-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
 /* Impresión: encabezado tabla Documentos emitidos sin cortes raros y con color */
 @media print {
   .fact-emitted-section .fact-section-title {

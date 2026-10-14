@@ -56,6 +56,8 @@ import { formatCurrencyNumber, formatUSD } from "../lib/formatCurrency";
 import { asicOperationCostUsd, isAsicEquipmentSaleInvoice, parseAsicMarginUsd } from "../lib/asicDocumentKind";
 import { buildAsicComprobantePdfFilename } from "../lib/asicPdfFilename";
 import { invoiceTipoLabel, type InvoiceDocumentContext } from "../lib/invoiceDocumentContext";
+import { emittedDocumentTipoMark } from "../lib/invoiceCollection";
+import { EmittedDocumentTipoIcon } from "../components/EmittedDocumentTipoIcon";
 import { getLineItemDescription } from "../lib/invoiceLineItemDescription";
 import {
   buildReciboPaymentLineDescription,
@@ -397,6 +399,17 @@ export function FacturacionMineriaPage() {
     const now = Date.now();
     return emittedInSession.filter((item) => now - new Date(item.emittedAt).getTime() < MS_TABLE_WINDOW);
   }, [emittedInSession]);
+
+  const emittedSettlementLedger = useMemo(() => {
+    const map = new Map<string, Invoice>();
+    for (const inv of invoicesAll) map.set(`${inv.type}-${inv.number}`, inv);
+    for (const item of emittedInLast24h) {
+      const inv = item.invoice;
+      const key = `${inv.type}-${inv.number}`;
+      if (!map.has(key)) map.set(key, inv);
+    }
+    return Array.from(map.values());
+  }, [invoicesAll, emittedInLast24h]);
 
   useEffect(() => {
     const now = Date.now();
@@ -2247,24 +2260,12 @@ export function FacturacionMineriaPage() {
                               <tr key={item.invoice.id}>
                                 <td>
                                   <span className="d-inline-flex align-items-center gap-1">
-                                    {(inv.type === "Factura" || inv.type === "Recibo" || inv.type === "Nota de Crédito") && (Date.now() - new Date(item.emittedAt).getTime() < MS_22H) && (
-                                      <span
-                                        style={{
-                                          display: "inline-flex",
-                                          alignItems: "center",
-                                          justifyContent: "center",
-                                          width: "1.2rem",
-                                          height: "1.2rem",
-                                          flexShrink: 0,
-                                          borderRadius: "50%",
-                                          backgroundColor: "#ff9800",
-                                          fontSize: "0.7rem",
-                                          lineHeight: 1
-                                        }}
-                                        title={inv.type}
-                                      >
-                                        🔖
-                                      </span>
+                                    {(inv.type === "Factura" || inv.type === "Recibo" || inv.type === "Nota de Crédito") && (
+                                      <EmittedDocumentTipoIcon
+                                        mark={emittedDocumentTipoMark(inv, item.emittedAt, emittedSettlementLedger, MS_22H, {
+                                          closedOnEmit: isAsicEquipmentSaleInvoice(inv),
+                                        })}
+                                      />
                                     )}
                                     {inv.type === "Nota de Crédito"
                                       ? "Nota C."

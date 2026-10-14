@@ -75,6 +75,35 @@ export function invoiceCollectionState(factura: Invoice, all: Invoice[]): Invoic
   };
 }
 
+/**
+ * Proceso cerrado = la factura quedó en saldo 0 por Recibo(s) y/o Nota de Crédito.
+ * Recibo parcial o factura sin cobro/NC no cierran.
+ */
+export function isOperationProcessClosed(inv: Invoice, all: Invoice[]): boolean {
+  const factura = relatedFacturaForDocument(inv, all);
+  if (!factura) return false;
+  const st = invoiceCollectionState(factura, all);
+  return st.isFullySettled && (st.receipts.length > 0 || st.creditNotes.length > 0);
+}
+
+export type EmittedDocumentTipoMark = "recent" | "closed" | "pending";
+
+/** 🔖 las primeras horas; después check si el proceso cerró, o pendiente si no. */
+export function emittedDocumentTipoMark(
+  inv: Invoice,
+  emittedAt: string,
+  all: Invoice[],
+  recentMs: number,
+  opts?: { closedOnEmit?: boolean }
+): EmittedDocumentTipoMark {
+  const emittedMs = new Date(emittedAt).getTime();
+  const isRecent = Number.isFinite(emittedMs) && Date.now() - emittedMs < recentMs;
+  if (isRecent) return "recent";
+  if (opts?.closedOnEmit) return "closed";
+  const resolved = all.find((i) => i.type === inv.type && i.number === inv.number) ?? inv;
+  return isOperationProcessClosed(resolved, all) ? "closed" : "pending";
+}
+
 export function relatedFacturaForDocument(inv: Invoice, all: Invoice[]): Invoice | null {
   if (inv.type === "Factura") return inv;
   return (

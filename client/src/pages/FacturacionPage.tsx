@@ -49,6 +49,8 @@ import {
 } from "../lib/reciboConceptText";
 import { reciboHasSettlementRows, reciboIsPaymentLineSettledTable } from "../lib/receiptSettlementLine";
 import { invoiceTipoLabel } from "../lib/invoiceDocumentContext";
+import { emittedDocumentTipoMark } from "../lib/invoiceCollection";
+import { EmittedDocumentTipoIcon } from "../components/EmittedDocumentTipoIcon";
 import "../styles/facturacion.css";
 
 function todayLocale() {
@@ -401,6 +403,17 @@ export function FacturacionPage() {
     addAll(dbInvoices);
     return Array.from(map.values());
   }, [invoices, dbInvoices, isHostingPath]);
+
+  const emittedSettlementLedger = useMemo(() => {
+    const map = new Map<string, Invoice>();
+    for (const inv of invoicesAll) map.set(`${inv.type}-${inv.number}`, inv);
+    for (const item of emittedInLast24h) {
+      const inv = item.invoice;
+      const key = `${inv.type}-${inv.number}`;
+      if (!map.has(key)) map.set(key, inv);
+    }
+    return Array.from(map.values());
+  }, [invoicesAll, emittedInLast24h]);
 
   /** Cargar documentos emitidos (hosting) desde el servidor; al borrar del historial se borran también de aquí. */
   function fetchEmittedHosting() {
@@ -2187,24 +2200,10 @@ export function FacturacionPage() {
                               <tr key={item.invoice.id}>
                                 <td>
                                   <span className="d-inline-flex align-items-center gap-1">
-                                    {(inv.type === "Factura" || inv.type === "Recibo" || inv.type === "Nota de Crédito") && (Date.now() - new Date(item.emittedAt).getTime() < MS_22H) && (
-                                      <span
-                                        style={{
-                                          display: "inline-flex",
-                                          alignItems: "center",
-                                          justifyContent: "center",
-                                          width: "1.2rem",
-                                          height: "1.2rem",
-                                          flexShrink: 0,
-                                          borderRadius: "50%",
-                                          backgroundColor: "#ff9800",
-                                          fontSize: "0.7rem",
-                                          lineHeight: 1
-                                        }}
-                                        title={inv.type}
-                                      >
-                                        🔖
-                                      </span>
+                                    {(inv.type === "Factura" || inv.type === "Recibo" || inv.type === "Nota de Crédito") && (
+                                      <EmittedDocumentTipoIcon
+                                        mark={emittedDocumentTipoMark(inv, item.emittedAt, emittedSettlementLedger, MS_22H)}
+                                      />
                                     )}
                                     {inv.type === "Nota de Crédito"
                                       ? "Nota C."
