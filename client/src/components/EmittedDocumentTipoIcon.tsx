@@ -39,8 +39,8 @@ export function EmittedDocumentTipoIcon({ mark }: { mark: EmittedDocumentTipoMar
   return (
     <span
       className="fact-emitted-tipo-icon fact-emitted-tipo-icon--pending"
-      style={{ ...ICON_STYLE, backgroundColor: "#f59e0b", color: "#fff", fontSize: "0.72rem" }}
-      title="Operación pendiente: aún no se cerró con Recibo o Nota de Crédito"
+      style={{ ...ICON_STYLE, backgroundColor: "#dc3545", color: "#fff", fontSize: "0.72rem" }}
+      title="Factura pendiente de pago"
     >
       ⏳
     </span>
