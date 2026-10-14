@@ -2186,31 +2186,32 @@ export function FacturacionPage() {
                             return (
                               <tr key={item.invoice.id}>
                                 <td>
-                                  {inv.type === "Nota de Crédito"
-                                    ? "Nota C."
-                                    : invoiceTipoLabel(inv.type, inv.documentContext) === "RECIBO PARCIAL"
-                                      ? "Recibo parcial"
-                                      : inv.type}
-                                  {inv.type === "Recibo" && " "}
-                                  {(inv.type === "Factura" || inv.type === "Recibo" || inv.type === "Nota de Crédito") && (Date.now() - new Date(item.emittedAt).getTime() < MS_22H) && (
-                                    <span
-                                      style={{
-                                        marginLeft: "0.35rem",
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        width: "1.2rem",
-                                        height: "1.2rem",
-                                        borderRadius: "50%",
-                                        backgroundColor: "#ff9800",
-                                        fontSize: "0.7rem",
-                                        lineHeight: 1
-                                      }}
-                                      title={inv.type}
-                                    >
-                                      🔖
-                                    </span>
-                                  )}
+                                  <span className="d-inline-flex align-items-center gap-1">
+                                    {(inv.type === "Factura" || inv.type === "Recibo" || inv.type === "Nota de Crédito") && (Date.now() - new Date(item.emittedAt).getTime() < MS_22H) && (
+                                      <span
+                                        style={{
+                                          display: "inline-flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          width: "1.2rem",
+                                          height: "1.2rem",
+                                          flexShrink: 0,
+                                          borderRadius: "50%",
+                                          backgroundColor: "#ff9800",
+                                          fontSize: "0.7rem",
+                                          lineHeight: 1
+                                        }}
+                                        title={inv.type}
+                                      >
+                                        🔖
+                                      </span>
+                                    )}
+                                    {inv.type === "Nota de Crédito"
+                                      ? "Nota C."
+                                      : invoiceTipoLabel(inv.type, inv.documentContext) === "RECIBO PARCIAL"
+                                        ? "Recibo parcial"
+                                        : inv.type}
+                                  </span>
                                 </td>
                                 <td className="fw-bold">{inv.number}</td>
                                 <td>{inv.clientName}</td>
