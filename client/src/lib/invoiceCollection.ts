@@ -88,7 +88,7 @@ export function isOperationProcessClosed(inv: Invoice, all: Invoice[]): boolean 
 
 export type EmittedDocumentTipoMark = "recent" | "closed" | "pending";
 
-/** 🔖 las primeras horas; después check si el proceso cerró, o pendiente si no. */
+/** Check verde si el proceso ya cerró (también dentro de las 22 h). 🔖 solo si sigue abierta y es reciente. */
 export function emittedDocumentTipoMark(
   inv: Invoice,
   emittedAt: string,
@@ -96,12 +96,12 @@ export function emittedDocumentTipoMark(
   recentMs: number,
   opts?: { closedOnEmit?: boolean }
 ): EmittedDocumentTipoMark {
+  const resolved = all.find((i) => i.type === inv.type && i.number === inv.number) ?? inv;
+  if (opts?.closedOnEmit || isOperationProcessClosed(resolved, all)) return "closed";
   const emittedMs = new Date(emittedAt).getTime();
   const isRecent = Number.isFinite(emittedMs) && Date.now() - emittedMs < recentMs;
   if (isRecent) return "recent";
-  if (opts?.closedOnEmit) return "closed";
-  const resolved = all.find((i) => i.type === inv.type && i.number === inv.number) ?? inv;
-  return isOperationProcessClosed(resolved, all) ? "closed" : "pending";
+  return "pending";
 }
 
 export function relatedFacturaForDocument(inv: Invoice, all: Invoice[]): Invoice | null {
