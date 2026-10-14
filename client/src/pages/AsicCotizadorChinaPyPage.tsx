@@ -11,6 +11,10 @@ import {
 } from "../lib/api";
 import { downloadAsicCotizacionPdf } from "../lib/generateAsicCotizacionPdf";
 import { AsicCotizadorEvolucionModal } from "../components/AsicCotizadorEvolucionModal";
+import {
+  buildCotizadorPrecioDeltas,
+  type CotizadorPrecioDelta,
+} from "../lib/asicCotizadorPrecioDelta";
 import { showToast } from "../components/ToastNotification";
 import "../styles/facturacion.css";
 
@@ -94,6 +98,48 @@ function prioridadModeloCotizacion(modeloRaw: string): number {
   return 4;
 }
 
+function formatFechaCortaDelta(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("es-PY", { day: "2-digit", month: "2-digit", year: "2-digit" });
+}
+
+function tituloPrecioMovimiento(delta: CotizadorPrecioDelta, obs: string): string {
+  const ventana = obs.trim() || "sin etiqueta";
+  const prev = `${formatUsd(delta.prevPrecio)} el ${formatFechaCortaDelta(delta.prevFecha)}`;
+  if (delta.movimiento === "up") {
+    return `Subió ${formatUsd(delta.delta)} vs el precio anterior de este modelo (${ventana}): ${prev}`;
+  }
+  if (delta.movimiento === "down") {
+    return `Bajó ${formatUsd(Math.abs(delta.delta))} vs el precio anterior de este modelo (${ventana}): ${prev}`;
+  }
+  return `Se mantiene vs el precio anterior de este modelo (${ventana}): ${prev}`;
+}
+
+function PrecioMovimientoIcon({ delta, obs }: { delta: CotizadorPrecioDelta | undefined; obs: string }) {
+  if (!delta) return null;
+  const title = tituloPrecioMovimiento(delta, obs);
+  if (delta.movimiento === "up") {
+    return (
+      <span className="asic-cotizador-px-move asic-cotizador-px-move--up" title={title} role="img" aria-label={title}>
+        <i className="bi bi-caret-up-fill" aria-hidden="true" />
+      </span>
+    );
+  }
+  if (delta.movimiento === "down") {
+    return (
+      <span className="asic-cotizador-px-move asic-cotizador-px-move--down" title={title} role="img" aria-label={title}>
+        <i className="bi bi-caret-down-fill" aria-hidden="true" />
+      </span>
+    );
+  }
+  return (
+    <span className="asic-cotizador-px-move asic-cotizador-px-move--same" title={title} role="img" aria-label={title}>
+      <i className="bi bi-dash-lg" aria-hidden="true" />
+    </span>
+  );
+}
+
 function moneyToInput(n: number): string {
   if (!Number.isFinite(n) || n <= 0) return "";
   return String(Math.round(n));
@@ -173,6 +219,8 @@ export function AsicCotizadorChinaPyPage() {
     if (precioVenta <= 0) return 0;
     return (m / precioVenta) * 100;
   }, [margen, precioVenta]);
+
+  const precioDeltas = useMemo(() => buildCotizadorPrecioDeltas(registros), [registros]);
 
   const registrosHoy = useMemo(() => {
     const hoy = new Date();
@@ -903,6 +951,7 @@ export function AsicCotizadorChinaPyPage() {
                                     aria-label="Precio publicado en marketplace"
                                   />
                                 ) : null}
+                                <PrecioMovimientoIcon delta={precioDeltas.get(r.id)} obs={obs} />
                                 {formatUsd(r.precioVenta)}
                               </span>
                             </td>
@@ -988,7 +1037,13 @@ export function AsicCotizadorChinaPyPage() {
                                   <td>{r.procesador || "-"}</td>
                                   <td className="asic-cotizador-hoy-modal__date-cell">{fechaActualizacionHoy}</td>
                                   <td className="text-end fw-semibold asic-cotizador-hoy-modal__price-cell">
-                                    {formatUsd(r.precioVenta)}
+                                    <span className="asic-cotizador-precio-venta-cell__inner">
+                                      <PrecioMovimientoIcon
+                                        delta={precioDeltas.get(r.id)}
+                                        obs={r.observaciones?.trim() || ""}
+                                      />
+                                      {formatUsd(r.precioVenta)}
+                                    </span>
                                   </td>
                                 </tr>
                               ))}

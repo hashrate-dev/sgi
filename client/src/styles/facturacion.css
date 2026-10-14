@@ -3322,6 +3322,30 @@ button.fact-back {
   flex-shrink: 0;
 }
 
+.asic-cotizador-px-move {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.05rem;
+  height: 1.05rem;
+  flex-shrink: 0;
+  line-height: 1;
+  font-size: 0.85rem;
+  cursor: help;
+}
+
+.asic-cotizador-px-move--up {
+  color: #dc3545;
+}
+
+.asic-cotizador-px-move--down {
+  color: #198754;
+}
+
+.asic-cotizador-px-move--same {
+  color: #64748b;
+}
+
 .asic-cotizador-hoy-modal__title {
   display: flex;
   align-items: center;
