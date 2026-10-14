@@ -40,6 +40,7 @@ import { HistorialPage } from "./pages/HistorialPage";
 import { HistorialMineriaPage } from "./pages/HistorialMineriaPage";
 import { PendientesPage } from "./pages/PendientesPage";
 import { PendientesMineriaPage } from "./pages/PendientesMineriaPage";
+import { CobrosPendientesUnificadosPage } from "./pages/CobrosPendientesUnificadosPage";
 import { ClientesPage } from "./pages/ClientesPage";
 import { ClienteEditPage } from "./pages/ClienteEditPage";
 import { EquiposAsicPage } from "./pages/EquiposAsicPage";
@@ -453,6 +454,7 @@ function App() {
             <Route path="/marketplace/home-banners" element={<TiendaOnlineBannersHomePage />} />
             <Route path="/gestion-administrativa" element={<GestionAdministrativaPage />} />
             <Route path="/gestion-administrativa/agentes-facturacion-hosting" element={<HostingBillingAgentPage />} />
+            <Route path="/gestion-administrativa/cobros-pendientes" element={<CobrosPendientesUnificadosPage />} />
             <Route path="/gestion-administrativa/nuevos-leads" element={<NuevosLeadsPage />} />
             <Route path="/gestion-administrativa/leads-base" element={<LeadsBasePage />} />
             <Route path="/gestion-administrativa/cambio-usdt" element={<CambioUsdtHubPage />} />

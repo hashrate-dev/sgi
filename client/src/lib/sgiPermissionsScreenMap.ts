@@ -172,6 +172,16 @@ export const SGI_PERMISSION_SCREEN_MAP: readonly SgiPermissionScreenRow[] = [
     audience: ["staff", "lector"],
   },
   {
+    id: "ga-cobros-pendientes",
+    zoneOrder: 10,
+    zone: "Gestión Administrativa",
+    legacyModule: "facturacion",
+    title: "Todos los Cobros Pendientes",
+    routes: ["/gestion-administrativa/cobros-pendientes"],
+    accessNote: "Reúne facturas con saldo de Hosting y ASIC (sin comprobantes de pago ya cerrados).",
+    audience: ["staff", "lector"],
+  },
+  {
     id: "hosting-hub",
     zoneOrder: 20,
     zone: "Hosting — Servicios de hosting",

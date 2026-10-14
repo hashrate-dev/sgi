@@ -80,6 +80,17 @@ export function grantsIncludeScreen(grants: string[] | null | undefined, screenI
   if (screenId === "ga-agentes-facturacion-hosting") {
     if (grants.includes("facturacion") || grants.includes("hosting-billing")) return true;
   }
+  if (screenId === "ga-cobros-pendientes") {
+    if (
+      grants.includes("facturacion") ||
+      grants.includes("hosting-pending") ||
+      grants.includes("asic-pending") ||
+      grants.includes("hosting-billing") ||
+      grants.includes("asic-billing")
+    ) {
+      return true;
+    }
+  }
   return false;
 }
 
@@ -179,7 +190,8 @@ export function collectPathPrefixesFromScreenGrants(grants: readonly string[]): 
     grantsIncludeScreen(g, "ga-noticias") ||
     grantsIncludeScreen(g, "ga-mercados") ||
     grantsIncludeScreen(g, "ga-comunicacion") ||
-    grantsIncludeScreen(g, "ga-agentes-facturacion-hosting");
+    grantsIncludeScreen(g, "ga-agentes-facturacion-hosting") ||
+    grantsIncludeScreen(g, "ga-cobros-pendientes");
   const seesFin =
     grantsIncludeScreen(g, "fin-proveedores") ||
     grantsIncludeScreen(g, "fin-contabilidad") ||

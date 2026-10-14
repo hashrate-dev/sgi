@@ -14,6 +14,12 @@ type HubItem = {
 
 const hubItems: readonly HubItem[] = [
   {
+    to: "/gestion-administrativa/cobros-pendientes",
+    icon: "bi-cash-coin",
+    label: "Todos los Cobros Pendientes",
+    desc: "Saldo por cobrar unificado: Hosting, ASIC y todo lo que sigue pendiente de cobro",
+  },
+  {
     to: "/hosting",
     icon: "bi-hdd-network",
     label: "Servicios de Hosting",

@@ -12,6 +12,7 @@ export const SGI_SCREEN_GRANT_IDS = [
   "ga-noticias",
   "ga-comunicacion",
   "ga-agentes-facturacion-hosting",
+  "ga-cobros-pendientes",
   "hosting-billing",
   "hosting-commercial-invoice",
   "hosting-history",
@@ -61,6 +62,7 @@ const SCREEN_TO_LEGACY: Record<string, AdminBPermissionKey> = {
   "ga-noticias": "noticias",
   "ga-comunicacion": "comunicacion",
   "ga-agentes-facturacion-hosting": "facturacion",
+  "ga-cobros-pendientes": "facturacion",
   "hosting-billing": "facturacion",
   "hosting-commercial-invoice": "facturacion",
   "hosting-history": "facturacion",
@@ -126,6 +128,17 @@ export function grantsIncludeScreen(grants: string[] | null | undefined, screenI
   }
   if (screenId === "ga-agentes-facturacion-hosting") {
     if (grants.includes("facturacion") || grants.includes("hosting-billing")) return true;
+  }
+  if (screenId === "ga-cobros-pendientes") {
+    if (
+      grants.includes("facturacion") ||
+      grants.includes("hosting-pending") ||
+      grants.includes("asic-pending") ||
+      grants.includes("hosting-billing") ||
+      grants.includes("asic-billing")
+    ) {
+      return true;
+    }
   }
   return false;
 }
