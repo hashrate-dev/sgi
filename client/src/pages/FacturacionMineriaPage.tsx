@@ -391,9 +391,9 @@ export function FacturacionMineriaPage() {
       });
   }, [fetchDbInvoices, reloadAsicCatalogs]);
 
-  /** Emoji naranja 🔖 solo las primeras 22 h; la tabla muestra documentos hasta 10 días 22 h */
+  /** Emoji naranja 🔖 solo las primeras 22 h; la tabla muestra documentos hasta 30 días 22 h */
   const MS_22H = 22 * 60 * 60 * 1000;
-  const MS_TABLE_WINDOW = 10 * 24 * 60 * 60 * 1000 + MS_22H;
+  const MS_TABLE_WINDOW = 30 * 24 * 60 * 60 * 1000 + MS_22H;
 
   const emittedInLast24h = useMemo(() => {
     const now = Date.now();
@@ -413,13 +413,13 @@ export function FacturacionMineriaPage() {
 
   useEffect(() => {
     const now = Date.now();
-    const windowMs = 10 * 24 * 60 * 60 * 1000 + 22 * 60 * 60 * 1000;
+    const windowMs = 30 * 24 * 60 * 60 * 1000 + 22 * 60 * 60 * 1000;
     setEmittedInSession((prev) => prev.filter((item) => now - new Date(item.emittedAt).getTime() < windowMs));
   }, []);
 
   /** Cargar documentos emitidos (asic) desde el servidor; al borrar del historial se borran también de aquí. */
   function fetchEmittedAsic() {
-    const windowMs = 10 * 24 * 60 * 60 * 1000 + 22 * 60 * 60 * 1000;
+    const windowMs = 30 * 24 * 60 * 60 * 1000 + 22 * 60 * 60 * 1000;
     getEmittedDocuments("asic")
       .then((r) => {
         const now = Date.now();
@@ -1284,7 +1284,7 @@ export function FacturacionMineriaPage() {
     void fetchDbInvoices();
     const now = Date.now();
     const emittedAt = new Date().toISOString();
-    const windowMs = 10 * 24 * 60 * 60 * 1000 + 22 * 60 * 60 * 1000;
+    const windowMs = 30 * 24 * 60 * 60 * 1000 + 22 * 60 * 60 * 1000;
     setEmittedInSession((prev) => [
       ...prev.filter((item) => now - new Date(item.emittedAt).getTime() < windowMs),
       { invoice: inv, emittedAt }
@@ -2317,7 +2317,7 @@ export function FacturacionMineriaPage() {
                         <span className="fact-emitted-count-label">
                           {emittedInLast24h.length === 1 ? "Documento" : "Documentos"}
                         </span>
-                        <span className="fact-emitted-count-period"> emitidos en los últimos 10 días</span>
+                        <span className="fact-emitted-count-period"> emitidos en los últimos 30 días</span>
                       </span>
                     </div>
                   </div>

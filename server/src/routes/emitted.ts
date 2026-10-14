@@ -11,8 +11,8 @@ const requireCanPostEmitted = [
   requireModuleGrant("facturacion"),
 ];
 
-const MS_24H = 24 * 60 * 60 * 1000;
-const MS_15_DAYS = 15 * 24 * 60 * 60 * 1000;
+const MS_22H = 22 * 60 * 60 * 1000;
+const MS_30_DAYS = 30 * 24 * 60 * 60 * 1000;
 
 const AddEmittedSchema = z.object({
   source: z.enum(["hosting", "asic"]),
@@ -20,7 +20,7 @@ const AddEmittedSchema = z.object({
   emittedAt: z.string(),
 });
 
-/** GET /emitted?source=hosting|asic — últimos 20 días en ambos */
+/** GET /emitted?source=hosting|asic — últimos 30 días */
 emittedRouter.get(
   "/emitted",
   requireAuth,
@@ -31,7 +31,7 @@ emittedRouter.get(
   if (!q.success) {
     return res.status(400).json({ error: { message: "source debe ser hosting o asic" } });
   }
-  const cutoff = new Date(Date.now() - MS_15_DAYS).toISOString();
+  const cutoff = new Date(Date.now() - (MS_30_DAYS + MS_22H)).toISOString();
   const rows = (await db
     .prepare(
       `SELECT invoice_json, emitted_at FROM emitted_documents 
