@@ -2094,6 +2094,8 @@ export type ContabilidadGasto = {
   numeroFactura: string;
   descripcion: string;
   observaciones: string;
+  /** True cuando la observación existe pero ya no debe avisar en la tabla. */
+  observacionResuelta?: boolean;
   mesServicio: string;
   presupuestoMes: string;
   medioPago: string;
@@ -2115,6 +2117,7 @@ export type ContabilidadGastoPayload = {
   descripcion: string;
   numeroFactura?: string;
   observaciones?: string;
+  observacionResuelta?: boolean;
   mesServicio: string;
   presupuestoMes: string;
   medioPago: ContabilidadMedioPago;

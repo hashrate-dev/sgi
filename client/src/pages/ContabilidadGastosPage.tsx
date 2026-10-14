@@ -158,6 +158,10 @@ function formatMontoInline(moneda: ContabilidadMoneda, monto: number): string {
   }
 }
 
+function gastoTieneObservacionPendiente(row: ContabilidadGasto): boolean {
+  return Boolean(String(row.observaciones ?? "").trim()) && row.observacionResuelta !== true;
+}
+
 export function ContabilidadGastosPage() {
   const { user, loading } = useAuth();
   const [proveedores, setProveedores] = useState<ProveedorHrs[]>([]);
@@ -169,6 +173,7 @@ export function ContabilidadGastosPage() {
   const [mesServicio, setMesServicio] = useState(currentYearMonth);
   const [presupuestoMes, setPresupuestoMes] = useState(currentYearMonth);
   const [observaciones, setObservaciones] = useState("");
+  const [observacionResuelta, setObservacionResuelta] = useState(false);
   const [medioPago, setMedioPago] = useState<ContabilidadMedioPago>(MEDIO_PAGO_DEFAULT);
   const [moneda, setMoneda] = useState<ContabilidadMoneda>("UYU");
   const [montoStr, setMontoStr] = useState("");
@@ -194,6 +199,22 @@ export function ContabilidadGastosPage() {
   const [gastosListPresupuestoYm, setGastosListPresupuestoYm] = useState("");
   const [gastosListPageSize, setGastosListPageSize] = useState(10);
   const [gastosListPage, setGastosListPage] = useState(1);
+  const [obsAlertaNota, setObsAlertaNota] = useState<{ text: string; left: number; top: number } | null>(null);
+
+  const showObsAlertaNota = (el: HTMLElement, text: string) => {
+    const t = text.trim();
+    if (!t) {
+      setObsAlertaNota(null);
+      return;
+    }
+    const r = el.getBoundingClientRect();
+    const pad = 12;
+    const maxW = Math.min(320, window.innerWidth - pad * 2);
+    let left = r.left + r.width / 2;
+    left = Math.min(Math.max(left, pad + maxW * 0.2), window.innerWidth - pad);
+    const top = Math.min(r.bottom + 8, window.innerHeight - pad);
+    setObsAlertaNota({ text: t, left, top });
+  };
 
   const canEdit = Boolean(user && canEditContabilidadGastos(user));
   const canAddProveedor = Boolean(user && canEditProveedoresHrs(user));
@@ -412,6 +433,7 @@ export function ContabilidadGastosPage() {
     setMesServicio(currentYearMonth());
     setPresupuestoMes(currentYearMonth());
     setObservaciones("");
+    setObservacionResuelta(false);
     setMontoStr("");
     setTipoCambioStr("");
     setProveedorIdStr("");
@@ -444,6 +466,7 @@ export function ContabilidadGastosPage() {
     setMesServicio(/^\d{4}-\d{2}$/.test(ms) ? ms : currentYearMonth());
     setPresupuestoMes(/^\d{4}-\d{2}$/.test(pm) ? pm : currentYearMonth());
     setObservaciones(row.observaciones ?? "");
+    setObservacionResuelta(Boolean(row.observacionResuelta));
     setMedioPago(medioPagoFromStored(row.medioPago));
     setMoneda(row.moneda);
     setMontoStr(montoToFormStr(row.moneda, row.montoOriginal ?? row.monto));
@@ -582,7 +605,8 @@ export function ContabilidadGastosPage() {
       proveedorId: pid,
       descripcion: desc,
       ...(nf ? { numeroFactura: nf } : {}),
-      ...(obs ? { observaciones: obs } : {}),
+      observaciones: obs,
+      observacionResuelta: Boolean(obs && observacionResuelta),
       mesServicio: ms,
       presupuestoMes: pm,
       medioPago,
@@ -847,10 +871,29 @@ export function ContabilidadGastosPage() {
                         className="form-control contabilidad-gastos-textarea-pair"
                         rows={4}
                         value={observaciones}
-                        onChange={(e) => setObservaciones(e.target.value)}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          setObservaciones(next);
+                          if (!next.trim()) setObservacionResuelta(false);
+                        }}
                         placeholder="Notas internas, plazos, referencias extra…"
                         maxLength={4000}
                       />
+                      {observaciones.trim() ? (
+                        <div className="form-check mt-2">
+                          <input
+                            className="form-check-input"
+                            type="checkbox"
+                            id="contabilidad-gasto-obs-resuelta"
+                            checked={observacionResuelta}
+                            onChange={(e) => setObservacionResuelta(e.target.checked)}
+                          />
+                          <label className="form-check-label small" htmlFor="contabilidad-gasto-obs-resuelta">
+                            Observación resuelta
+                            <span className="text-muted"> — quita el aviso de atención en la tabla</span>
+                          </label>
+                        </div>
+                      ) : null}
                     </div>
                     <div className="col-12">
                       <div className="d-flex justify-content-end">
@@ -994,7 +1037,7 @@ export function ContabilidadGastosPage() {
                       <span className="ms-1">(sobre {items.length} cargados)</span>
                     ) : null}
                   </p>
-                  <div className="table-responsive contabilidad-gastos-tabla-wrap">
+                  <div className="table-responsive contabilidad-gastos-tabla-wrap" onScroll={() => setObsAlertaNota(null)}>
                     <table className="table table-sm table-striped align-middle mb-0 contabilidad-gastos-tabla">
                       <thead>
                         <tr>
@@ -1039,8 +1082,24 @@ export function ContabilidadGastosPage() {
                     const rubroLabel = proveedorRubroById.get(Number(row.proveedorId)) || "—";
                     return (
                     <tr key={row.id} className={editingId === row.id ? "table-active" : undefined}>
-                      <td className="contabilidad-gastos-col-fecha text-nowrap small" title={row.fecha || undefined}>
-                        {formatGastoFechaTabla(row.fecha)}
+                      <td className="contabilidad-gastos-col-fecha text-nowrap small">
+                        <span className="d-inline-flex align-items-center gap-1">
+                          {formatGastoFechaTabla(row.fecha)}
+                          {gastoTieneObservacionPendiente(row) ? (
+                            <span
+                              className="contabilidad-gasto-obs-alerta"
+                              role="img"
+                              tabIndex={0}
+                              aria-label={`Observación pendiente: ${row.observaciones.trim()}`}
+                              onMouseEnter={(e) => showObsAlertaNota(e.currentTarget, row.observaciones)}
+                              onMouseLeave={() => setObsAlertaNota(null)}
+                              onFocus={(e) => showObsAlertaNota(e.currentTarget, row.observaciones)}
+                              onBlur={() => setObsAlertaNota(null)}
+                            >
+                              <i className="bi bi-exclamation-triangle-fill" aria-hidden="true" />
+                            </span>
+                          ) : null}
+                        </span>
                       </td>
                       <td className="contabilidad-gastos-col-nprov text-nowrap">
                         <code>{row.supplierNumber}</code>
@@ -1250,7 +1309,25 @@ export function ContabilidadGastosPage() {
                     <dd className="col-sm-7 col-lg-8 text-break">{detailRow.descripcion}</dd>
 
                     <dt className="col-sm-5 col-lg-4">Observaciones</dt>
-                    <dd className="col-sm-7 col-lg-8 text-break">{detailRow.observaciones?.trim() ? detailRow.observaciones : "—"}</dd>
+                    <dd className="col-sm-7 col-lg-8 text-break">
+                      {detailRow.observaciones?.trim() ? (
+                        <>
+                          {detailRow.observaciones}
+                          <div className="small mt-1">
+                            {gastoTieneObservacionPendiente(detailRow) ? (
+                              <span className="text-warning">
+                                <i className="bi bi-exclamation-triangle-fill me-1" aria-hidden="true" />
+                                Pendiente de resolución
+                              </span>
+                            ) : (
+                              <span className="text-success">Observación resuelta</span>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        "—"
+                      )}
+                    </dd>
 
                     <dt className="col-sm-5 col-lg-4">Importe registrado (USD)</dt>
                     <dd className="col-sm-7 col-lg-8 font-monospace">{formatUsdReferencialPreview(detailRow.monto)}</dd>
@@ -1317,6 +1394,16 @@ export function ContabilidadGastosPage() {
             </div>
           </div>
         </>
+      ) : null}
+
+      {obsAlertaNota ? (
+        <div
+          className="contabilidad-gasto-obs-alerta-nota"
+          role="tooltip"
+          style={{ left: obsAlertaNota.left, top: obsAlertaNota.top }}
+        >
+          {obsAlertaNota.text}
+        </div>
       ) : null}
 
       <ConfirmModal

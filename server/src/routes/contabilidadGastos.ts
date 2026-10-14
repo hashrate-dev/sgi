@@ -78,6 +78,7 @@ const CreateContabilidadGastoSchema = z
     descripcion: z.string().min(1).max(4000).trim(),
     numeroFactura: z.string().max(120).optional(),
     observaciones: z.string().max(4000).optional(),
+    observacionResuelta: z.boolean().optional(),
     mesServicio: YmSchema,
     presupuestoMes: YmSchema,
     medioPago: MedioPagoGastoSchema,
@@ -99,6 +100,37 @@ let contabilidadFacturaColsEnsured = false;
 let contabilidadTipoCambioEnsured = false;
 let contabilidadMontoOriginalEnsured = false;
 let contabilidadFacturaPdfAdjuntoEnsured = false;
+let contabilidadObservacionResueltaEnsured = false;
+
+async function ensureContabilidadObservacionResueltaCol(): Promise<void> {
+  if (contabilidadObservacionResueltaEnsured) return;
+  const isPg = (db as { isPostgres?: boolean }).isPostgres === true;
+  if (isPg) {
+    await db
+      .prepare(
+        `ALTER TABLE contabilidad_gastos ADD COLUMN IF NOT EXISTS observacion_resuelta SMALLINT NOT NULL DEFAULT 0`
+      )
+      .run();
+  } else {
+    try {
+      await db
+        .prepare(`ALTER TABLE contabilidad_gastos ADD COLUMN observacion_resuelta INTEGER NOT NULL DEFAULT 0`)
+        .run();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!msg.includes("duplicate column") && !msg.toLowerCase().includes("duplicate column name")) throw e;
+    }
+  }
+  contabilidadObservacionResueltaEnsured = true;
+}
+
+const GASTO_SELECT_COLS =
+  "id, fecha, proveedor_id, supplier_number, supplier_name, numero_factura, descripcion, observaciones, observacion_resuelta, mes_servicio, presupuesto_mes, medio_pago, moneda, monto, monto_original, tipo_cambio, factura_pdf_adjunto, created_at";
+
+function observacionResueltaFlag(observaciones: string, requested?: boolean): number {
+  if (!observaciones.trim()) return 0;
+  return requested === true ? 1 : 0;
+}
 
 async function ensureContabilidadFacturaPdfAdjuntoCol(): Promise<void> {
   if (contabilidadFacturaPdfAdjuntoEnsured) return;
@@ -287,6 +319,7 @@ type GastoDbRow = {
   numero_factura?: string;
   descripcion: string;
   observaciones?: string;
+  observacion_resuelta?: number | boolean | string | null;
   mes_servicio?: string;
   presupuesto_mes?: string;
   medio_pago?: string;
@@ -335,6 +368,11 @@ function mapGasto(rawIn: GastoDbRow) {
     numeroFactura: String(raw.numero_factura ?? ""),
     descripcion: String(raw.descripcion ?? ""),
     observaciones: String(raw.observaciones ?? ""),
+    observacionResuelta:
+      raw.observacion_resuelta === true ||
+      raw.observacion_resuelta === 1 ||
+      raw.observacion_resuelta === "1" ||
+      (typeof raw.observacion_resuelta === "string" && raw.observacion_resuelta.toLowerCase() === "true"),
     mesServicio: String(raw.mes_servicio ?? "").slice(0, 7),
     presupuestoMes: String(raw.presupuesto_mes ?? "").slice(0, 7),
     medioPago: String(raw.medio_pago ?? "").slice(0, 80),
@@ -406,9 +444,10 @@ contabilidadGastosRouter.get(
     await ensureContabilidadTipoCambioCol();
     await ensureContabilidadMontoOriginalCol();
     await ensureContabilidadFacturaPdfAdjuntoCol();
+    await ensureContabilidadObservacionResueltaCol();
     const rows = (await db
       .prepare(
-        `SELECT id, fecha, proveedor_id, supplier_number, supplier_name, numero_factura, descripcion, observaciones, mes_servicio, presupuesto_mes, medio_pago, moneda, monto, monto_original, tipo_cambio, factura_pdf_adjunto, created_at
+        `SELECT ${GASTO_SELECT_COLS}
          FROM contabilidad_gastos ORDER BY fecha DESC, id DESC`
       )
       .all()) as GastoDbRow[];
@@ -426,6 +465,7 @@ contabilidadGastosRouter.post(
     await ensureContabilidadTipoCambioCol();
     await ensureContabilidadMontoOriginalCol();
     await ensureContabilidadFacturaPdfAdjuntoCol();
+    await ensureContabilidadObservacionResueltaCol();
     const parsed = CreateContabilidadGastoSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: { message: "Datos inválidos para registrar el gasto." } });
@@ -455,6 +495,7 @@ contabilidadGastosRouter.post(
       const observaciones = String(d.observaciones ?? "")
         .trim()
         .slice(0, 4000);
+      const observacionResuelta = observacionResueltaFlag(observaciones, d.observacionResuelta);
 
       const mesServicio = String(d.mesServicio ?? "").slice(0, 7);
       const presupuestoMes = String(d.presupuestoMes ?? "").slice(0, 7);
@@ -462,8 +503,8 @@ contabilidadGastosRouter.post(
 
       const insertRun = await db
         .prepare(
-          `INSERT INTO contabilidad_gastos (fecha, proveedor_id, supplier_number, supplier_name, numero_factura, descripcion, observaciones, mes_servicio, presupuesto_mes, medio_pago, moneda, monto, monto_original, tipo_cambio, factura_pdf_adjunto)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`
+          `INSERT INTO contabilidad_gastos (fecha, proveedor_id, supplier_number, supplier_name, numero_factura, descripcion, observaciones, observacion_resuelta, mes_servicio, presupuesto_mes, medio_pago, moneda, monto, monto_original, tipo_cambio, factura_pdf_adjunto)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`
         )
         .run(
           d.fecha,
@@ -473,6 +514,7 @@ contabilidadGastosRouter.post(
           numeroFactura,
           d.descripcion,
           observaciones,
+          observacionResuelta,
           mesServicio,
           presupuestoMes,
           medioPago,
@@ -489,7 +531,7 @@ contabilidadGastosRouter.post(
 
       const inserted = (await db
         .prepare(
-          `SELECT id, fecha, proveedor_id, supplier_number, supplier_name, numero_factura, descripcion, observaciones, mes_servicio, presupuesto_mes, medio_pago, moneda, monto, monto_original, tipo_cambio, factura_pdf_adjunto, created_at
+          `SELECT ${GASTO_SELECT_COLS}
            FROM contabilidad_gastos WHERE id = ?`
         )
         .get(Number(newId))) as GastoDbRow | undefined;
@@ -518,6 +560,7 @@ contabilidadGastosRouter.put(
     await ensureContabilidadTipoCambioCol();
     await ensureContabilidadMontoOriginalCol();
     await ensureContabilidadFacturaPdfAdjuntoCol();
+    await ensureContabilidadObservacionResueltaCol();
     const id = Number(typeof req.params.id === "string" ? req.params.id : "");
     if (!Number.isFinite(id) || id < 1) {
       return res.status(400).json({ error: { message: "ID de gasto inválido." } });
@@ -556,6 +599,7 @@ contabilidadGastosRouter.put(
       const observaciones = String(d.observaciones ?? "")
         .trim()
         .slice(0, 4000);
+      const observacionResuelta = observacionResueltaFlag(observaciones, d.observacionResuelta);
       const mesServicio = String(d.mesServicio ?? "").slice(0, 7);
       const presupuestoMes = String(d.presupuestoMes ?? "").slice(0, 7);
       const medioPago = String(d.medioPago ?? "").slice(0, 80);
@@ -564,7 +608,7 @@ contabilidadGastosRouter.put(
         .prepare(
           `UPDATE contabilidad_gastos SET
             fecha = ?, proveedor_id = ?, supplier_number = ?, supplier_name = ?, numero_factura = ?,
-            descripcion = ?, observaciones = ?, mes_servicio = ?, presupuesto_mes = ?, medio_pago = ?, moneda = ?, monto = ?, monto_original = ?, tipo_cambio = ?
+            descripcion = ?, observaciones = ?, observacion_resuelta = ?, mes_servicio = ?, presupuesto_mes = ?, medio_pago = ?, moneda = ?, monto = ?, monto_original = ?, tipo_cambio = ?
            WHERE id = ?`
         )
         .run(
@@ -575,6 +619,7 @@ contabilidadGastosRouter.put(
           numeroFactura,
           d.descripcion,
           observaciones,
+          observacionResuelta,
           mesServicio,
           presupuestoMes,
           medioPago,
@@ -591,7 +636,7 @@ contabilidadGastosRouter.put(
 
       const row = (await db
         .prepare(
-          `SELECT id, fecha, proveedor_id, supplier_number, supplier_name, numero_factura, descripcion, observaciones, mes_servicio, presupuesto_mes, medio_pago, moneda, monto, monto_original, tipo_cambio, factura_pdf_adjunto, created_at
+          `SELECT ${GASTO_SELECT_COLS}
            FROM contabilidad_gastos WHERE id = ?`
         )
         .get(id)) as GastoDbRow | undefined;
@@ -687,6 +732,7 @@ contabilidadGastosRouter.get(
   async (req, res) => {
     await ensureContabilidadGastosSchema();
     await ensureContabilidadFacturaPdfAdjuntoCol();
+    await ensureContabilidadObservacionResueltaCol();
     const id = Number(typeof req.params.id === "string" ? req.params.id : "");
     if (!Number.isFinite(id) || id < 1) {
       return res.status(400).json({ error: { message: "ID de gasto inválido." } });
@@ -769,6 +815,7 @@ contabilidadGastosRouter.post(
   async (req, res) => {
     await ensureContabilidadGastosSchema();
     await ensureContabilidadFacturaPdfAdjuntoCol();
+    await ensureContabilidadObservacionResueltaCol();
     const id = Number(typeof req.params.id === "string" ? req.params.id : "");
     if (!Number.isFinite(id) || id < 1) {
       return res.status(400).json({ error: { message: "ID de gasto inválido." } });
@@ -812,6 +859,7 @@ contabilidadGastosRouter.delete(
     await ensureContabilidadTipoCambioCol();
     await ensureContabilidadMontoOriginalCol();
     await ensureContabilidadFacturaPdfAdjuntoCol();
+    await ensureContabilidadObservacionResueltaCol();
     const id = Number(typeof req.params.id === "string" ? req.params.id : "");
     if (!Number.isFinite(id) || id < 1) {
       return res.status(400).json({ error: { message: "ID de gasto inválido." } });

@@ -958,6 +958,7 @@ CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_visitor ON marketplace_presence_
         tipo_cambio REAL,
         monto_original REAL,
         factura_pdf_adjunto INTEGER NOT NULL DEFAULT 0,
+        observacion_resuelta INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         FOREIGN KEY (proveedor_id) REFERENCES proveedores_hrs(id)
       )`);
@@ -980,12 +981,13 @@ CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_visitor ON marketplace_presence_
         colNames.has("tipo_cambio") ? "tipo_cambio" : "NULL AS tipo_cambio",
         colNames.has("monto_original") ? "monto_original" : "NULL AS monto_original",
         colNames.has("factura_pdf_adjunto") ? "factura_pdf_adjunto" : "0 AS factura_pdf_adjunto",
+        colNames.has("observacion_resuelta") ? "observacion_resuelta" : "0 AS observacion_resuelta",
         "created_at",
       ].join(", ");
       native.exec(
         `INSERT INTO contabilidad_gastos__eur (
           id, fecha, proveedor_id, supplier_number, supplier_name, numero_factura, descripcion, observaciones,
-          mes_servicio, presupuesto_mes, medio_pago, moneda, monto, tipo_cambio, monto_original, factura_pdf_adjunto, created_at
+          mes_servicio, presupuesto_mes, medio_pago, moneda, monto, tipo_cambio, monto_original, factura_pdf_adjunto, observacion_resuelta, created_at
         ) SELECT ${selectCols} FROM contabilidad_gastos`
       );
       native.exec("DROP TABLE contabilidad_gastos");
@@ -1049,6 +1051,12 @@ CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_visitor ON marketplace_presence_
   }
   try {
     native.exec("ALTER TABLE contabilidad_gastos ADD COLUMN factura_pdf_adjunto INTEGER NOT NULL DEFAULT 0");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+  try {
+    native.exec("ALTER TABLE contabilidad_gastos ADD COLUMN observacion_resuelta INTEGER NOT NULL DEFAULT 0");
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     if (!msg.includes("duplicate column")) throw e;

@@ -623,6 +623,7 @@ ALTER TABLE contabilidad_gastos ADD COLUMN IF NOT EXISTS medio_pago TEXT NOT NUL
 ALTER TABLE contabilidad_gastos ADD COLUMN IF NOT EXISTS tipo_cambio NUMERIC(18, 6);
 ALTER TABLE contabilidad_gastos ADD COLUMN IF NOT EXISTS monto_original NUMERIC(18, 4);
 ALTER TABLE contabilidad_gastos ADD COLUMN IF NOT EXISTS factura_pdf_adjunto SMALLINT NOT NULL DEFAULT 0;
+ALTER TABLE contabilidad_gastos ADD COLUMN IF NOT EXISTS observacion_resuelta SMALLINT NOT NULL DEFAULT 0;
 
 /* Ampliar CHECK de moneda en instalaciones previas. */
 ALTER TABLE contabilidad_gastos DROP CONSTRAINT IF EXISTS contabilidad_gastos_moneda_check;
