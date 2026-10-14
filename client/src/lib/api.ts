@@ -1737,6 +1737,8 @@ export type HostingBillingAgentLine = {
   usdPerKwh: number;
   wattsSource?: "garantia-asic" | "stored" | "fallback" | "none";
   garantiaLabel?: string;
+  lineIndex?: number;
+  choices?: Array<{ id: number; label: string; consumoW: number; modelo: string; procesador: string }>;
 };
 
 export type HostingBillingAgentGarantia = {
@@ -1929,6 +1931,7 @@ export function testPreviewHostingBillingAgent(body: {
   clientId?: number;
   usdPerKwh?: number;
   include4pct?: boolean;
+  lineGarantias?: Array<{ lineIndex: number; garantiaId: number }>;
 }): Promise<HostingBillingAgentTestPreview> {
   return api("/api/hosting/billing-agent/test-preview", { method: "POST", body: JSON.stringify(body) });
 }
@@ -2238,7 +2241,7 @@ export type InvoiceCreateBody = {
   emissionTime?: string;
   dueDate?: string;
   source?: "hosting" | "asic";
-  documentContext?: "factura" | "comprobante-pago" | "garantia-ande";
+  documentContext?: "factura" | "comprobante-pago" | "garantia-ande" | "recibo-parcial";
   /** ASIC Factura / Comp. pago: margen USD de la operación. */
   marginUsd?: number;
 };
@@ -2252,7 +2255,7 @@ export function createInvoice(body: InvoiceCreateBody): Promise<InvoiceCreateRes
 }
 
 /** Listar facturas/recibos/NC desde la base de datos (filtros opcionales). */
-export type InvoicesListResponse = { invoices: Array<{ id: number; number: string; type: string; clientName: string; date: string; month: string; subtotal: number; discounts: number; total: number; relatedInvoiceId?: number; relatedInvoiceNumber?: string; paymentDate?: string; emissionTime?: string; dueDate?: string; source?: string; documentContext?: "factura" | "comprobante-pago" | "garantia-ande"; marginUsd?: number }> };
+export type InvoicesListResponse = { invoices: Array<{ id: number; number: string; type: string; clientName: string; date: string; month: string; subtotal: number; discounts: number; total: number; relatedInvoiceId?: number; relatedInvoiceNumber?: string; paymentDate?: string; emissionTime?: string; dueDate?: string; source?: string; documentContext?: "factura" | "comprobante-pago" | "garantia-ande" | "recibo-parcial"; marginUsd?: number }> };
 
 export function getInvoices(params?: { client?: string; type?: "Factura" | "Recibo" | "Nota de Crédito"; month?: string; source?: "hosting" | "asic" }): Promise<InvoicesListResponse> {
   const sp = new URLSearchParams();
@@ -2282,7 +2285,7 @@ export type InvoiceWithItemsResponse = {
     emissionTime?: string;
     dueDate?: string;
     source?: string;
-    documentContext?: "factura" | "comprobante-pago" | "garantia-ande";
+    documentContext?: "factura" | "comprobante-pago" | "garantia-ande" | "recibo-parcial";
     marginUsd?: number;
     items: Array<{ service: string; month: string; quantity: number; price: number; discount: number }>;
   };

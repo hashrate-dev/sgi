@@ -16,6 +16,7 @@ import {
   previousClosedMonth,
   priceFromEnergy,
   bestGarantiaRow,
+  garantiaFamily,
   resolveServiceWatts,
   roundUsd,
   scalePriceByDays,
@@ -326,6 +327,7 @@ function buildLines(opts: {
   include4pct: boolean;
   garantiaRows: GarantiaConsumoRow[];
   last?: { month: string; lines: LastInvoiceLine[] } | null;
+  picks?: Array<{ lineIndex: number; garantiaId: number }>;
 }): { items: HostingAgentLine[]; warning: string } {
   const lastDays = opts.last?.month ? daysInYearMonth(opts.last.month) : 30;
   const lastLodging = (opts.last?.lines ?? []).filter((l) => !/4%\s*gastos operativos transferencia/i.test(l.service));
@@ -355,11 +357,14 @@ function buildLines(opts: {
     return { items: [], warning: "Sin equipos cargados ni factura previa para armar el mes." };
   }
 
+  let lodgingIndex = 0;
   for (const u of sources) {
     if (u.serviceKey === "D") continue;
     const cat = opts.catalog[u.serviceKey] ?? opts.catalog.A!;
     const name = u.serviceName || cat.name;
-    const resolved = resolveServiceWatts(opts.garantiaRows, u.serviceKey, name, 0, u.garantiaId || 0);
+    const pickId = opts.picks?.find((p) => p.lineIndex === lodgingIndex)?.garantiaId || 0;
+    const garantiaId = pickId || u.garantiaId || 0;
+    const resolved = resolveServiceWatts(opts.garantiaRows, u.serviceKey, name, 0, garantiaId);
     const watts = resolved.watts;
     if (resolved.source !== "garantia-asic") {
       warning =
@@ -393,7 +398,9 @@ function buildLines(opts: {
       garantiaLabel: resolved.garantia
         ? [resolved.garantia.marca, resolved.garantia.modelo, resolved.garantia.procesador].filter(Boolean).join(" · ")
         : "",
+      lineIndex: lodgingIndex,
     });
+    lodgingIndex += 1;
   }
 
   if (opts.include4pct) {
@@ -684,6 +691,14 @@ hostingBillingAgentRouter.post("/hosting/billing-agent/test-preview", ...staffRe
       clientId: z.coerce.number().int().positive().optional(),
       usdPerKwh: z.coerce.number().min(0.001).max(5).optional(),
       include4pct: z.boolean().optional(),
+      lineGarantias: z
+        .array(
+          z.object({
+            lineIndex: z.coerce.number().int().min(0),
+            garantiaId: z.coerce.number().int().positive(),
+          })
+        )
+        .optional(),
     })
     .safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: { message: "Indicá un mes válido (YYYY-MM) para el testing." } });
@@ -753,9 +768,30 @@ hostingBillingAgentRouter.post("/hosting/billing-agent/test-preview", ...staffRe
         include4pct: t.include4pct,
         garantiaRows,
         last,
+        picks: parsed.data.lineGarantias,
       });
-      const totals = lineTotals(built.items);
-      const lodging = built.items.filter((i) => i.serviceKey !== "D");
+      const items = built.items.map((it) => {
+        if (it.serviceKey === "D") return it;
+        const family = garantiaFamily(it.serviceKey, it.serviceName);
+        const matches = garantiaRows.filter((r) => {
+          if (!(r.consumoW > 0) || !family) return false;
+          const rowFam = garantiaFamily(r.modelo, `${r.marca} ${r.procesador}`);
+          if (rowFam === family) return true;
+          const blob = `${r.marca}${r.modelo}${r.procesador}`.toUpperCase().replace(/[^A-Z0-9]/g, "");
+          return blob.includes(family);
+        });
+        if (matches.length <= 1 && it.wattsSource === "garantia-asic") return it;
+        const choices = matches.map((r) => ({
+          id: r.id,
+          modelo: r.modelo,
+          procesador: r.procesador,
+          consumoW: r.consumoW,
+          label: [r.marca, r.modelo, r.procesador, `${r.consumoW} W`].filter(Boolean).join(" · "),
+        }));
+        return { ...it, choices };
+      });
+      const totals = lineTotals(items);
+      const lodging = items.filter((i) => i.serviceKey !== "D");
       const garantiaOk = lodging.length > 0 && lodging.every((i) => i.wattsSource === "garantia-asic" && i.watts > 0);
       previews.push({
         clientId: t.clientId,
@@ -767,7 +803,7 @@ hostingBillingAgentRouter.post("/hosting/billing-agent/test-preview", ...staffRe
         warning: found
           ? `Testing: ya existe ${found.number} para este mes (el agente no la duplicaría).`
           : built.warning,
-        items: built.items,
+        items,
         subtotal: totals.subtotal,
         discounts: totals.discounts,
         total: totals.total,

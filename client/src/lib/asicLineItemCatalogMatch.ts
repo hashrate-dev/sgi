@@ -39,6 +39,7 @@ function bestNameMatch<T extends { nombre: string }>(label: string, options: rea
 
 /** Asigna equipo/setup/reparación/flete del catálogo cuando el ítem solo trae texto de factura (API/BD). */
 export function enrichAsicLineItemFromCatalogs(item: LineItem, catalogs: AsicCatalogs): LineItem {
+  if (item.reciboLineKind === "payment_line") return item;
   if (item.equipoId || item.setupId || item.reparacionTipoId || item.transporteFleteTipoId) {
     return item;
   }
@@ -46,6 +47,7 @@ export function enrichAsicLineItemFromCatalogs(item: LineItem, catalogs: AsicCat
   const label = String(
     item.reparacionNombre || item.setupNombre || item.transporteFleteNombre || item.serviceName || ""
   ).trim();
+  if (/^pago (parcial )?de factura /i.test(label)) return item;
 
   const rep = bestNameMatch(label, catalogs.reparacionTipos);
   if (rep) {

@@ -31,6 +31,7 @@ export function getReceiptSettlementRowKind(it: LineItem & { service?: string })
   const n = itemServiceLabel(it);
   if (!n) return null;
   const low = n.toLowerCase();
+  if (low.startsWith("pago parcial de factura ")) return "payment_line";
   if (low.startsWith("pago de factura ")) {
     if (/\(nc\s+[^)]*aplicad/i.test(low) || low.includes("recibo previo") || low.includes("recibos previos") || low.includes("liquidación de saldo")) {
       return "payment_line";

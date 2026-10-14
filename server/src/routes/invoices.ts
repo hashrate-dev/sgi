@@ -12,7 +12,7 @@ const clientNameCol = () => (isPg() ? '"clientName"' : "clientName");
 export const invoicesRouter = Router();
 
 const LineItemSchema = z.object({
-  service: z.string().min(1).max(200),
+  service: z.string().min(1).max(500),
   month: z.string().regex(/^\d{4}-\d{2}$/),
   quantity: z.number().int().min(1),
   price: z.number().min(0),
@@ -35,14 +35,14 @@ const InvoiceCreateSchema = z.object({
   emissionTime: z.string().optional(),
   dueDate: z.string().optional(),
   source: z.enum(["hosting", "asic"]).optional(),
-  documentContext: z.enum(["factura", "comprobante-pago", "garantia-ande"]).optional(),
+  documentContext: z.enum(["factura", "comprobante-pago", "garantia-ande", "recibo-parcial"]).optional(),
   marginUsd: z.number().finite().optional()
 });
 
 function rowDocumentContext(r: Record<string, unknown>): string | undefined {
   const raw = r.documentContext ?? r.documentcontext ?? r.document_context;
   const s = typeof raw === "string" ? raw.trim() : "";
-  if (s === "factura" || s === "comprobante-pago" || s === "garantia-ande") return s;
+  if (s === "factura" || s === "comprobante-pago" || s === "garantia-ande" || s === "recibo-parcial") return s;
   return undefined;
 }
 

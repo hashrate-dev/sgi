@@ -300,11 +300,31 @@
   }
 
   function isSgiAppShell() {
-    return !!document.querySelector(".sgi-protected-root");
+    return (
+      !!document.querySelector(".sgi-protected-root") ||
+      document.documentElement.classList.contains("hrs-home-bg") ||
+      document.documentElement.classList.contains("hrs-protected-green-bg")
+    );
+  }
+
+  function isMarketplaceSurface() {
+    if (isSgiAppShell()) return false;
+    if (document.querySelector(".marketplace-asic-page") || document.querySelector(".site-header--marketplace")) {
+      return true;
+    }
+    var p = (window.location.pathname || "").replace(/\/+$/, "") || "/";
+    var host = window.location.hostname || "";
+    var local = host === "localhost" || host === "127.0.0.1" || host === "::1";
+    if (p === "/home" || p.indexOf("/marketplace") === 0) return true;
+    if (p === "/services" || p === "/company" || p === "/faq" || p === "/contact") return true;
+    if (p === "/equipment" || p === "/sign-in" || p === "/signup") return true;
+    if (p === "/email-inquiry" || p === "/email-inquiry-cart" || p === "/activate-account") return true;
+    if (p === "/" && !local && host !== "sgi.hashrate.space") return true;
+    return false;
   }
 
   function ensureFab() {
-    if (isSgiAppShell()) {
+    if (!isMarketplaceSurface()) {
       var onSgi = document.getElementById("hrs-calendly-fab");
       if (onSgi) onSgi.remove();
       return null;
@@ -343,6 +363,24 @@
     obs.observe(document.body, { childList: true, subtree: true });
   }
 
+  function watchSpaNavigation() {
+    window.addEventListener("popstate", function () {
+      ensureFab();
+    });
+    var push = history.pushState;
+    var replace = history.replaceState;
+    history.pushState = function () {
+      var ret = push.apply(this, arguments);
+      ensureFab();
+      return ret;
+    };
+    history.replaceState = function () {
+      var ret = replace.apply(this, arguments);
+      ensureFab();
+      return ret;
+    };
+  }
+
   function init() {
     patchSpinnerAppendChild();
     injectSpinnerKillCss();
@@ -351,6 +389,7 @@
     setupCalendlyMessageListener();
     ensureFab();
     watchSgiShell();
+    watchSpaNavigation();
     window.addEventListener("marketplace-lang-change", function () {
       ensureFab();
     });

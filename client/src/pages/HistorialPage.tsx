@@ -235,7 +235,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
   /** Cargar desde API cuando el backend está disponible (para Lector y todos: ver datos agregados por otros usuarios) */
   useEffect(() => {
     let cancelled = false;
-    const toInvoice = (inv: { id: number; number: string; type: string; clientName: string; date: string; month: string; subtotal: number; discounts: number; total: number; relatedInvoiceId?: number; relatedInvoiceNumber?: string; paymentDate?: string; emissionTime?: string; dueDate?: string; source?: string }, src: "hosting" | "asic"): Invoice & { _source: "hosting" | "asic" } => ({
+    const toInvoice = (inv: { id: number; number: string; type: string; clientName: string; date: string; month: string; subtotal: number; discounts: number; total: number; relatedInvoiceId?: number; relatedInvoiceNumber?: string; paymentDate?: string; emissionTime?: string; dueDate?: string; source?: string; documentContext?: Invoice["documentContext"] }, src: "hosting" | "asic"): Invoice & { _source: "hosting" | "asic" } => ({
       id: String(inv.id),
       number: inv.number,
       type: inv.type as ComprobanteType,
@@ -250,6 +250,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
       paymentDate: inv.paymentDate,
       emissionTime: inv.emissionTime,
       dueDate: inv.dueDate,
+      documentContext: inv.documentContext,
       items: [],
       _source: src
     });
@@ -862,6 +863,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
           total: invoiceToUse.total || 0,
           relatedInvoiceNumber: relatedInvoiceNumberForPdf,
           reciboConceptText: reciboConceptTextHistorial,
+          documentContext: invoiceToUse.documentContext,
           creditNoteMode: inferredNcMode
         },
         { logoBase64 }

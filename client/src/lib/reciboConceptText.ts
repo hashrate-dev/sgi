@@ -1,4 +1,5 @@
 import type { Invoice } from "./types";
+import { formatUSD } from "./formatCurrency";
 import { isLinkedToInvoice } from "./invoiceLinks";
 
 export type ReciboConceptParts = {
@@ -87,4 +88,36 @@ export function buildReciboPaymentLineDescription(
     return `${base} (liquidación de saldo)`;
   }
   return `${base} (${parts.join("; ")})`;
+}
+
+export type ReciboPartialAmounts = {
+  facturaNumber: string;
+  creditNoteNumbers: string[];
+  priorReceiptNumbers: string[];
+  pendingBefore: number;
+  thisPayment: number;
+  remainingAfter: number;
+};
+
+/** Concepto PDF: recibo que no cancela toda la deuda. */
+export function buildReciboPartialConceptLine(a: ReciboPartialAmounts): string {
+  const segs: string[] = [
+    `Recibo parcial de factura ${a.facturaNumber}`,
+    `este pago ${formatUSD(a.thisPayment)}`,
+    `saldo restante ${formatUSD(a.remainingAfter)}`,
+  ];
+  if (a.creditNoteNumbers.length === 1) segs.push(`nota de crédito ${a.creditNoteNumbers[0]} aplicada`);
+  else if (a.creditNoteNumbers.length > 1) segs.push(`notas de crédito ${a.creditNoteNumbers.join(", ")} aplicadas`);
+  if (a.priorReceiptNumbers.length === 1) segs.push(`recibo previo ${a.priorReceiptNumbers[0]}`);
+  else if (a.priorReceiptNumbers.length > 1) segs.push(`recibos previos ${a.priorReceiptNumbers.join(", ")}`);
+  return `Concepto: ${segs.join(" — ")}`;
+}
+
+/** Ítem del recibo parcial: documenta deuda, este pago y lo que sigue debiendo. */
+export function buildReciboPartialPaymentLineDescription(a: ReciboPartialAmounts): string {
+  const hist: string[] = [];
+  if (a.creditNoteNumbers.length) hist.push(`NC ${a.creditNoteNumbers.join(", ")}`);
+  if (a.priorReceiptNumbers.length) hist.push(`recibos ${a.priorReceiptNumbers.join(", ")}`);
+  const histTxt = hist.length ? `; ${hist.join("; ")}` : "";
+  return `Pago parcial de factura ${a.facturaNumber} (deuda ${formatUSD(a.pendingBefore)}; este pago ${formatUSD(a.thisPayment)}; saldo restante ${formatUSD(a.remainingAfter)}${histTxt})`;
 }

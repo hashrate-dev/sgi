@@ -481,7 +481,7 @@ button.fact-back {
   }
 }
 
-/* Panel izquierdo - altura FIJA (igual en Factura / Recibo / NC), dejando aire sobre el footer */
+/* Panel izquierdo: al menos viewport; puede crecer (recibo parcial) sin scroll interno */
 .fact-sidebar {
   position: sticky;
   top: 0.75rem;
@@ -489,9 +489,9 @@ button.fact-back {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  height: calc(100dvh - 8rem);
+  height: auto;
   min-height: calc(100dvh - 8rem);
-  max-height: calc(100dvh - 8rem);
+  max-height: none;
 }
 
 /* ========== Panel "Nuevo documento": mismo estilo que Detalle de servicios (verde #2D5D46) ========== */
@@ -508,22 +508,14 @@ button.fact-back {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  height: 100% !important;
-  max-height: 100%;
+  min-height: calc(100dvh - 8rem);
+  height: auto !important;
+  max-height: none;
+  overflow: visible;
 }
 
 .fact-panel-nuevo-documento::before {
-  content: "";
-  position: absolute;
-  bottom: -35%;
-  left: -20%;
-  width: 320px;
-  height: 320px;
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 50%;
-  z-index: 0;
-  pointer-events: none;
+  content: none;
 }
 
 .fact-panel-nuevo-documento-header {
@@ -552,7 +544,7 @@ button.fact-back {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 /* Reserva fija: plazo (Factura) o aviso amarillo (Recibo/NC) — Cliente no salta de posición */
@@ -602,23 +594,25 @@ button.fact-back {
   font-weight: 500;
 }
 
-/* Reserva fija debajo del cliente (= altura del bloque Recibo: factura + fecha)
-   Así el FORM Cliente queda igual de alto en Factura, Recibo y NC. */
+/* Debajo del cliente: crece con Recibo/NC (recibo parcial incluido). Sin scroll interno. */
 .fact-sidebar .fact-field--doc-extra-bottom {
-  flex: 0 0 10.75rem;
+  flex: 0 0 auto;
   min-height: 10.75rem;
-  max-height: 10.75rem;
+  max-height: none;
   margin-top: 0.75rem;
   padding-top: 0.75rem;
   border-top: 1px solid rgba(255, 255, 255, 0.25);
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: visible;
   box-sizing: border-box;
 }
 
 .fact-sidebar .fact-field--doc-extra-bottom[aria-hidden="true"] {
+  flex: 0 0 10.75rem;
+  min-height: 10.75rem;
+  max-height: 10.75rem;
   border-top-color: transparent;
   pointer-events: none;
+  overflow: hidden;
 }
 
 .fact-sidebar .fact-field--cliente {
@@ -893,14 +887,13 @@ button.fact-back {
   gap: 1rem;
   min-width: 0; /* Permite que el grid no desborde; el scroll va en fact-table-wrap */
   box-sizing: border-box;
-  height: calc(100dvh - 8rem);
+  height: auto;
   min-height: calc(100dvh - 8rem);
-  max-height: calc(100dvh - 8rem);
-  position: sticky;
-  top: 0.75rem;
-  align-self: start;
+  max-height: none;
+  position: static;
+  align-self: stretch;
   overflow-x: hidden;
-  overflow-y: auto;
+  overflow-y: visible;
 }
 
 .fact-main > .fact-card:first-of-type {
@@ -1850,8 +1843,7 @@ button.fact-back {
     inset 0 -1px 0 rgba(0, 0, 0, 0.06),
     0 4px 12px rgba(0, 0, 0, 0.12);
   overflow: hidden;
-  max-height: 520px;
-  overflow-y: auto;
+  max-height: none;
   margin-bottom: 1.25rem;
   min-height: 280px; /* un poco más alto */
 }

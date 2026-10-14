@@ -40,8 +40,15 @@ import { isClienteTiendaOnline } from "../lib/clientTienda";
 import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
 import { getLineItemDescription } from "../lib/invoiceLineItemDescription";
 import { isLinkedToInvoice } from "../lib/invoiceLinks";
-import { buildReciboPaymentLineDescription, buildReciboConceptLine, getReciboConceptParts } from "../lib/reciboConceptText";
+import {
+  buildReciboPaymentLineDescription,
+  buildReciboConceptLine,
+  buildReciboPartialConceptLine,
+  buildReciboPartialPaymentLineDescription,
+  getReciboConceptParts,
+} from "../lib/reciboConceptText";
 import { reciboHasSettlementRows, reciboIsPaymentLineSettledTable } from "../lib/receiptSettlementLine";
+import { invoiceTipoLabel } from "../lib/invoiceDocumentContext";
 import "../styles/facturacion.css";
 
 function todayLocale() {
@@ -177,6 +184,9 @@ type ReciboLinkedEmitResult = {
   pending: number;
   creditApplied: number;
   paidApplied: number;
+  thisPayment: number;
+  remainingAfter: number;
+  isPartial: boolean;
   finalTotals: { subtotal: number; discounts: number; total: number };
 };
 
@@ -190,7 +200,9 @@ function buildReciboLinkedEmitItems(
   relatedInvoiceId: string,
   itemsLocked: boolean,
   activeItems: LineItem[],
-  invoicesAll: Invoice[]
+  invoicesAll: Invoice[],
+  partialPayAmount?: number | null,
+  forcePartial?: boolean
 ): ReciboLinkedEmitResult | null {
   if (type !== "Recibo" || !relatedInvoiceId || !itemsLocked || activeItems.length === 0) return null;
   const factura = invoicesAll.find((i) => i.type === "Factura" && String(i.id) === String(relatedInvoiceId));
@@ -202,13 +214,36 @@ function buildReciboLinkedEmitItems(
   const creditApplied = ncs.reduce((s, nc) => s + Math.abs(Number(nc.total) || 0), 0);
   const paidApplied = recs.reduce((s, r) => s + Math.abs(Number(r.total) || 0), 0);
   const priorDocs = creditApplied + paidApplied;
+  const requested =
+    partialPayAmount != null && Number.isFinite(partialPayAmount) ? roundMoney(partialPayAmount) : 0;
+  const wantsPartial = forcePartial === true || requested > INVOICE_BALANCE_EPS;
+  const pay = wantsPartial ? roundMoney(Math.min(Math.max(0, requested), pending)) : roundMoney(pending);
+  const remainingAfter = roundMoney(Math.max(0, pending - pay));
+  const isPartial = remainingAfter > INVOICE_BALANCE_EPS;
   const delta = pending - lineTotals.total;
+  const parts = getReciboConceptParts(factura, invoicesAll);
+  const month = activeItems[0]?.month || factura.month || currentMonthValue();
 
   let items: LineItem[];
-  if (priorDocs > INVOICE_BALANCE_EPS) {
-    const month = activeItems[0]?.month || factura.month || currentMonthValue();
-    const pay = roundMoney(pending);
-    const parts = getReciboConceptParts(factura, invoicesAll);
+  if (isPartial) {
+    items = [
+      {
+        reciboLineKind: "payment_line",
+        serviceName: buildReciboPartialPaymentLineDescription({
+          facturaNumber: parts.facturaNumber,
+          creditNoteNumbers: parts.creditNoteNumbers,
+          priorReceiptNumbers: parts.priorReceiptNumbers,
+          pendingBefore: pending,
+          thisPayment: pay,
+          remainingAfter,
+        }),
+        month,
+        quantity: 1,
+        price: pay,
+        discount: 0,
+      },
+    ];
+  } else if (priorDocs > INVOICE_BALANCE_EPS) {
     const desc = buildReciboPaymentLineDescription(
       parts.facturaNumber,
       parts.creditNoteNumbers,
@@ -227,7 +262,6 @@ function buildReciboLinkedEmitItems(
   } else {
     items = activeItems;
     if (Math.abs(delta) > INVOICE_BALANCE_EPS) {
-      const month = activeItems[0]!.month || currentMonthValue();
       const price = delta > 0 ? delta : 0;
       const discount = delta < 0 ? Math.abs(delta) : 0;
       items = [
@@ -249,6 +283,9 @@ function buildReciboLinkedEmitItems(
     pending,
     creditApplied,
     paidApplied,
+    thisPayment: pay,
+    remainingAfter,
+    isPartial,
     finalTotals: calcTotals(items),
   };
 }
@@ -269,6 +306,8 @@ export function FacturacionPage() {
   const [catalogAddBusy, setCatalogAddBusy] = useState(false);
   const [isPartialCreditNote, setIsPartialCreditNote] = useState(false);
   const [partialCreditItems, setPartialCreditItems] = useState<LineItem[]>([]);
+  const [isPartialReceipt, setIsPartialReceipt] = useState(false);
+  const [partialReceiptAmount, setPartialReceiptAmount] = useState("");
   /** Días para fecha de vencimiento (5, 6 o 7). Por defecto 6. */
   const [dueDateDays, setDueDateDays] = useState<5 | 6 | 7>(6);
 
@@ -316,6 +355,7 @@ export function FacturacionPage() {
         total: inv.total,
         relatedInvoiceId: inv.relatedInvoiceId != null ? String(inv.relatedInvoiceId) : undefined,
         relatedInvoiceNumber: inv.relatedInvoiceNumber,
+        documentContext: inv.documentContext,
         paymentDate: inv.paymentDate,
         emissionTime: inv.emissionTime,
         dueDate: inv.dueDate,
@@ -456,9 +496,25 @@ export function FacturacionPage() {
   );
   const totals = useMemo(() => calcTotals(activeItems), [activeItems]);
 
+  const parsedPartialReceiptAmount = useMemo(() => {
+    if (!isPartialReceipt) return null;
+    const n = Number(String(partialReceiptAmount).replace(",", "."));
+    if (!Number.isFinite(n) || n <= 0) return null;
+    return roundMoney(n);
+  }, [isPartialReceipt, partialReceiptAmount]);
+
   const reciboLinkedEmit = useMemo(
-    () => buildReciboLinkedEmitItems(type, relatedInvoiceId, itemsLocked, activeItems, invoicesAll),
-    [type, relatedInvoiceId, itemsLocked, activeItems, invoicesAll]
+    () =>
+      buildReciboLinkedEmitItems(
+        type,
+        relatedInvoiceId,
+        itemsLocked,
+        activeItems,
+        invoicesAll,
+        parsedPartialReceiptAmount,
+        isPartialReceipt
+      ),
+    [type, relatedInvoiceId, itemsLocked, activeItems, invoicesAll, parsedPartialReceiptAmount, isPartialReceipt]
   );
 
   const displaySummary = useMemo(() => {
@@ -468,7 +524,7 @@ export function FacturacionPage() {
       return {
         subtotal: roundMoney(reciboLinkedEmit.finalTotals.subtotal),
         discounts: roundMoney(reciboLinkedEmit.finalTotals.discounts),
-        total: roundMoney(reciboLinkedEmit.pending),
+        total: roundMoney(reciboLinkedEmit.thisPayment),
         invoiceNetLines: invNet,
         previewItems: reciboLinkedEmit.items,
         previewSubtotal: roundMoney(reciboLinkedEmit.finalTotals.subtotal),
@@ -502,19 +558,41 @@ export function FacturacionPage() {
     const factura = invoicesAll.find((i) => i.type === "Factura" && String(i.id) === String(relatedInvoiceId));
     if (!factura) return { line: "", hasLinkedNc: false };
     const parts = getReciboConceptParts(factura, invoicesAll);
+    if (reciboLinkedEmit?.isPartial) {
+      return {
+        line: buildReciboPartialConceptLine({
+          facturaNumber: parts.facturaNumber,
+          creditNoteNumbers: parts.creditNoteNumbers,
+          priorReceiptNumbers: parts.priorReceiptNumbers,
+          pendingBefore: reciboLinkedEmit.pending,
+          thisPayment: reciboLinkedEmit.thisPayment,
+          remainingAfter: reciboLinkedEmit.remainingAfter,
+        }),
+        hasLinkedNc: parts.creditNoteNumbers.length > 0,
+      };
+    }
     return {
       line: buildReciboConceptLine(parts),
       hasLinkedNc: parts.creditNoteNumbers.length > 0,
     };
-  }, [type, relatedInvoiceId, invoicesAll]);
+  }, [type, relatedInvoiceId, invoicesAll, reciboLinkedEmit]);
 
   const reciboModeIndicator = useMemo(() => {
     if (type !== "Recibo" || !relatedInvoiceId) return null;
-    const isPartial = reciboIsPaymentLineSettledTable(displaySummary.previewItems);
-    if (isPartial) {
+    if (reciboLinkedEmit?.isPartial) {
       return {
-        label: "PARCIAL",
-        detail: "El PDF saldrá con una sola línea de liquidación (pago neto pendiente).",
+        label: "RECIBO PARCIAL",
+        detail: `Este comprobante registra ${formatUSD(reciboLinkedEmit.thisPayment)}. Quedará un saldo de ${formatUSD(reciboLinkedEmit.remainingAfter)} (se puede cobrar con otro recibo parcial o uno que cierre la deuda).`,
+        bg: "rgba(234, 179, 8, 0.22)",
+        border: "1px solid rgba(250, 204, 21, 0.55)",
+        color: "#fef9c3",
+      };
+    }
+    const isSettlement = reciboIsPaymentLineSettledTable(displaySummary.previewItems);
+    if (isSettlement) {
+      return {
+        label: "CIERRA SALDO",
+        detail: "Este recibo liquida el saldo pendiente (incluye pagos parciales y NC ya aplicados).",
         bg: "rgba(59, 130, 246, 0.2)",
         border: "1px solid rgba(96, 165, 250, 0.5)",
         color: "#e0f2fe",
@@ -527,7 +605,7 @@ export function FacturacionPage() {
       border: "1px solid rgba(52, 211, 153, 0.5)",
       color: "#dcfce7",
     };
-  }, [type, relatedInvoiceId, displaySummary.previewItems]);
+  }, [type, relatedInvoiceId, displaySummary.previewItems, reciboLinkedEmit]);
 
   /** La fila 4% se agrega manual (desde el selector de ítem). Solo actualizamos precio/cantidad de cada D (4% de la fila de servicio correspondiente) y orden: Servicio, 4%, Servicio, 4%, ... */
   useEffect(() => {
@@ -603,6 +681,10 @@ export function FacturacionPage() {
       setIsPartialCreditNote(false);
       setPartialCreditItems([]);
     }
+    if (type !== "Recibo") {
+      setIsPartialReceipt(false);
+      setPartialReceiptAmount("");
+    }
   }, [type]);
 
   // Limpiar factura relacionada cuando cambia el cliente
@@ -612,7 +694,14 @@ export function FacturacionPage() {
     setItemsLocked(false);
     setIsPartialCreditNote(false);
     setPartialCreditItems([]);
+    setIsPartialReceipt(false);
+    setPartialReceiptAmount("");
   }, [selectedClientId]);
+
+  useEffect(() => {
+    setIsPartialReceipt(false);
+    setPartialReceiptAmount("");
+  }, [relatedInvoiceId]);
 
   /** Sincronizar ítems con month vacío, inválido o anterior a 2025 al mes actual (solo 2025 para adelante) */
   useEffect(() => {
@@ -851,12 +940,27 @@ export function FacturacionPage() {
     }
     if (type === "Recibo" && relatedInvoiceId) {
       const factura = invoicesAll.find((i) => i.type === "Factura" && String(i.id) === String(relatedInvoiceId)) || null;
-      if (factura && invoicePendingCollectionAmount(factura, invoicesAll) <= INVOICE_BALANCE_EPS) {
+      const pending = factura ? invoicePendingCollectionAmount(factura, invoicesAll) : 0;
+      if (factura && pending <= INVOICE_BALANCE_EPS) {
         showToast(
           "Esta factura no tiene saldo pendiente de cobro (puede estar totalmente pagada o cancelada por nota(s) de crédito).",
           "error"
         );
         return;
+      }
+      if (isPartialReceipt) {
+        const pay = parsedPartialReceiptAmount;
+        if (pay == null || pay <= INVOICE_BALANCE_EPS) {
+          showToast("Indicá el importe de este pago parcial (mayor a 0).", "error");
+          return;
+        }
+        if (pay > pending + INVOICE_BALANCE_EPS) {
+          showToast(
+            `El pago parcial (${formatUSD(pay)}) no puede superar el saldo pendiente (${formatUSD(pending)}).`,
+            "error"
+          );
+          return;
+        }
       }
     }
     if (activeItems.length === 0) {
@@ -885,7 +989,15 @@ export function FacturacionPage() {
 
     if (downloadPdf) showToast("Guardando documento...", "info");
 
-    const linkedEmit = buildReciboLinkedEmitItems(type, relatedInvoiceId, itemsLocked, activeItems, invoicesAll);
+    const linkedEmit = buildReciboLinkedEmitItems(
+      type,
+      relatedInvoiceId,
+      itemsLocked,
+      activeItems,
+      invoicesAll,
+      parsedPartialReceiptAmount,
+      isPartialReceipt
+    );
     const itemsToEmit = linkedEmit?.items ?? activeItems;
     const { subtotal, discounts, total } = linkedEmit?.finalTotals ?? calcTotals(itemsToEmit);
     const dateNow = new Date();
@@ -899,10 +1011,23 @@ export function FacturacionPage() {
     const relatedInvoice = relatedInvoiceId
       ? invoicesAll.find((inv) => inv.type === "Factura" && String(inv.id) === String(relatedInvoiceId))
       : null;
+    const reciboParts = relatedInvoice ? getReciboConceptParts(relatedInvoice, invoicesAll) : null;
     const reciboConceptText =
-      type === "Recibo" && relatedInvoice && reciboHasSettlementRows(itemsToEmit)
-        ? buildReciboConceptLine(getReciboConceptParts(relatedInvoice, invoicesAll))
+      type === "Recibo" && relatedInvoice && reciboParts
+        ? linkedEmit?.isPartial
+          ? buildReciboPartialConceptLine({
+              facturaNumber: reciboParts.facturaNumber,
+              creditNoteNumbers: reciboParts.creditNoteNumbers,
+              priorReceiptNumbers: reciboParts.priorReceiptNumbers,
+              pendingBefore: linkedEmit.pending,
+              thisPayment: linkedEmit.thisPayment,
+              remainingAfter: linkedEmit.remainingAfter,
+            })
+          : reciboHasSettlementRows(itemsToEmit)
+            ? buildReciboConceptLine(reciboParts)
+            : undefined
         : undefined;
+    const emitDocumentContext = type === "Recibo" && linkedEmit?.isPartial ? "recibo-parcial" : undefined;
     const isNegativeType = type === "Recibo" || type === "Nota de Crédito";
     const finalSubtotal = isNegativeType ? -(Math.abs(subtotal)) : subtotal;
     const finalDiscounts = isNegativeType ? -(Math.abs(discounts)) : discounts;
@@ -924,10 +1049,12 @@ export function FacturacionPage() {
         price: it.price,
         discount: it.discount
       })),
+      relatedInvoiceId: relatedInvoice ? String(relatedInvoice.id) : undefined,
       relatedInvoiceNumber: relatedInvoice?.number,
       paymentDate: type === "Recibo" ? paymentDate : undefined,
       emissionTime,
-      dueDate: dueDateStr
+      dueDate: dueDateStr,
+      documentContext: emitDocumentContext,
     };
 
     let createdInvoice: { number: string };
@@ -975,6 +1102,7 @@ export function FacturacionPage() {
           dueDateDays,
           relatedInvoiceNumber: relatedInvoice?.number,
           reciboConceptText,
+          documentContext: emitDocumentContext,
           creditNoteMode:
             type === "Nota de Crédito"
               ? isPartialCreditNote
@@ -986,11 +1114,18 @@ export function FacturacionPage() {
       );
       const pdfFilename = buildHostingPdfFilename(numberToUse, selectedClient.name, month);
       doc.save(pdfFilename);
-      const tipoMensaje = type === "Factura" ? "Factura" : type === "Recibo" ? "Recibo" : "Nota de Crédito";
-      showToast(`${tipoMensaje} generada y guardada correctamente.`, "success");
+      const tipoMensaje =
+        type === "Factura" ? "Factura" : type === "Recibo" ? (linkedEmit?.isPartial ? "Recibo parcial" : "Recibo") : "Nota de Crédito";
+      showToast(
+        type === "Factura" || type === "Nota de Crédito"
+          ? `${tipoMensaje} generada y guardada correctamente.`
+          : `${tipoMensaje} generado y guardado correctamente.`,
+        "success"
+      );
     } else {
-      const tipoMensaje = type === "Factura" ? "Factura" : type === "Recibo" ? "Recibo" : "Nota de Crédito";
-      showToast(`${tipoMensaje} registrada correctamente.`, "success");
+      const tipoMensaje =
+        type === "Factura" ? "Factura" : type === "Recibo" ? (linkedEmit?.isPartial ? "Recibo parcial" : "Recibo") : "Nota de Crédito";
+      showToast(`${tipoMensaje} ${type === "Nota de Crédito" || type === "Factura" ? "registrada" : "registrado"} correctamente.`, "success");
     }
 
     const inv: Invoice = {
@@ -1017,7 +1152,8 @@ export function FacturacionPage() {
       total: finalTotal,
       items: itemsToEmit,
       relatedInvoiceId: relatedInvoice?.id,
-      relatedInvoiceNumber: relatedInvoice?.number
+      relatedInvoiceNumber: relatedInvoice?.number,
+      documentContext: emitDocumentContext,
     };
     if (!isHostingPath) {
       const hist = loadInvoices();
@@ -1042,6 +1178,8 @@ export function FacturacionPage() {
     setRelatedInvoiceId("");
     setPaymentDate("");
     setItemsLocked(false);
+    setIsPartialReceipt(false);
+    setPartialReceiptAmount("");
     getNextInvoiceNumber((type === "Recibo Devolución" ? "Recibo" : type) as "Factura" | "Recibo" | "Nota de Crédito", { peek: true }).then((r) => setNextNumFromApi(r.number)).catch(() => setNextNumFromApi(""));
   }
 
@@ -1095,9 +1233,42 @@ export function FacturacionPage() {
               (String(i.id) === String(inv.relatedInvoiceId ?? "") || i.number === inv.relatedInvoiceNumber)
           )
         : undefined;
+    const reciboPartsSession =
+      inv.type === "Recibo" && relatedForReciboConcept
+        ? getReciboConceptParts(relatedForReciboConcept, invoicesAll, { excludeReciboId: String(inv.id) })
+        : null;
+    const isPartialSession =
+      inv.documentContext === "recibo-parcial" ||
+      (inv.items || []).some((it) => String(it.serviceName ?? "").toLowerCase().startsWith("pago parcial de factura "));
+    const thisPaymentSession = Math.abs(Number(inv.total) || 0);
+    const pendingNowSession = relatedForReciboConcept
+      ? invoicePendingCollectionAmount(relatedForReciboConcept, invoicesAll)
+      : 0;
+    const alreadyCountedSession =
+      relatedForReciboConcept &&
+      invoicesAll.some(
+        (i) =>
+          i.type === "Recibo" &&
+          (String(i.id) === String(inv.id) || (inv.number && i.number === inv.number)) &&
+          isLinkedToInvoice(i, relatedForReciboConcept)
+      );
+    const remainingAfterSession = alreadyCountedSession
+      ? pendingNowSession
+      : roundMoney(Math.max(0, pendingNowSession - thisPaymentSession));
     const reciboConceptTextForSession =
-      inv.type === "Recibo" && relatedForReciboConcept && reciboHasSettlementRows(inv.items)
-        ? buildReciboConceptLine(getReciboConceptParts(relatedForReciboConcept, invoicesAll, { excludeReciboId: String(inv.id) }))
+      inv.type === "Recibo" && relatedForReciboConcept && reciboPartsSession
+        ? isPartialSession
+          ? buildReciboPartialConceptLine({
+              facturaNumber: reciboPartsSession.facturaNumber,
+              creditNoteNumbers: reciboPartsSession.creditNoteNumbers,
+              priorReceiptNumbers: reciboPartsSession.priorReceiptNumbers,
+              pendingBefore: roundMoney(remainingAfterSession + thisPaymentSession),
+              thisPayment: thisPaymentSession,
+              remainingAfter: remainingAfterSession,
+            })
+          : reciboHasSettlementRows(inv.items)
+            ? buildReciboConceptLine(reciboPartsSession)
+            : undefined
         : undefined;
 
     const doc = generateFacturaPdf(
@@ -1122,6 +1293,7 @@ export function FacturacionPage() {
         dueDate: parseDueDateStr(inv.dueDate ?? ""),
         relatedInvoiceNumber: inv.relatedInvoiceNumber ?? relatedForNc?.number,
         reciboConceptText: reciboConceptTextForSession,
+        documentContext: inv.documentContext,
         creditNoteMode: inferredNcMode
       },
       { logoBase64 }
@@ -1140,7 +1312,7 @@ export function FacturacionPage() {
   /** Limpiar vista previa de documento emitido cuando el usuario edita el formulario */
   useEffect(() => {
     setPreviewEmitted(null);
-  }, [type, selectedClientId, items, partialCreditItems, isPartialCreditNote]);
+  }, [type, selectedClientId, items, partialCreditItems, isPartialCreditNote, isPartialReceipt, partialReceiptAmount]);
 
   if (user && !canEditFacturacion(user)) {
     if (user.role === "lector" && lectorAllowsModule(user, "facturacion")) {
@@ -1353,12 +1525,93 @@ export function FacturacionPage() {
                           style={{ border: relatedInvoiceId ? "2px solid #0d6efd" : "1px solid #ced4da" }}
                         >
                           <option value="">-- Seleccione factura --</option>
-                          {invoicesWithoutReceipt.map((inv) => (
-                            <option key={inv.id} value={inv.id}>
-                              {inv.number} - {inv.date} - Total: {formatUSD(Math.abs(inv.total))}
-                            </option>
-                          ))}
+                          {invoicesWithoutReceipt.map((inv) => {
+                            const saldo = invoicePendingCollectionAmount(inv, invoicesAll);
+                            return (
+                              <option key={inv.id} value={inv.id}>
+                                {inv.number} - {inv.date} - Saldo: {formatUSD(saldo)} / Total: {formatUSD(Math.abs(inv.total))}
+                              </option>
+                            );
+                          })}
                         </select>
+                        {relatedInvoiceId && (
+                          <label
+                            style={{
+                              marginTop: "0.65rem",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.5rem",
+                              color: "#fff",
+                              fontSize: "0.9rem",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isPartialReceipt}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                setIsPartialReceipt(checked);
+                                if (!checked) setPartialReceiptAmount("");
+                              }}
+                            />
+                            Recibo parcial (el cliente paga una parte del saldo)
+                          </label>
+                        )}
+                        {relatedInvoiceId && isPartialReceipt && reciboLinkedEmit && (
+                          <div
+                            style={{
+                              marginTop: "0.6rem",
+                              padding: "0.75rem",
+                              backgroundColor: "rgba(250, 204, 21, 0.14)",
+                              border: "1px solid rgba(250, 204, 21, 0.45)",
+                              borderRadius: "8px",
+                            }}
+                          >
+                            <label className="fact-label" style={{ fontWeight: "bold", color: "#fef9c3" }}>
+                              Importe de este pago (USD)
+                            </label>
+                            <input
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              className="fact-input"
+                              value={partialReceiptAmount}
+                              onChange={(e) => setPartialReceiptAmount(e.target.value)}
+                              placeholder={`Máx. ${formatUSD(reciboLinkedEmit.pending)}`}
+                              style={{
+                                border:
+                                  parsedPartialReceiptAmount != null &&
+                                  parsedPartialReceiptAmount <= reciboLinkedEmit.pending + INVOICE_BALANCE_EPS
+                                    ? "2px solid #facc15"
+                                    : "2px solid #dc3545",
+                              }}
+                            />
+                            <div style={{ marginTop: "0.55rem", color: "#fefce8", fontSize: "0.82rem", lineHeight: 1.45 }}>
+                              <div>Deuda actual: {formatUSD(reciboLinkedEmit.pending)}</div>
+                              {reciboLinkedEmit.creditApplied > INVOICE_BALANCE_EPS ? (
+                                <div>NC aplicadas: {formatUSD(reciboLinkedEmit.creditApplied)}</div>
+                              ) : null}
+                              {reciboLinkedEmit.paidApplied > INVOICE_BALANCE_EPS ? (
+                                <div>Recibos previos: {formatUSD(reciboLinkedEmit.paidApplied)}</div>
+                              ) : null}
+                              <div>Este pago: {formatUSD(reciboLinkedEmit.thisPayment)}</div>
+                              <div style={{ fontWeight: 700 }}>
+                                Saldo restante: {formatUSD(reciboLinkedEmit.remainingAfter)}
+                              </div>
+                              {reciboLinkedEmit.remainingAfter <= INVOICE_BALANCE_EPS &&
+                              reciboLinkedEmit.thisPayment > INVOICE_BALANCE_EPS ? (
+                                <div style={{ marginTop: "0.35rem", opacity: 0.9 }}>
+                                  Este importe cierra la deuda: se emitirá Recibo (no parcial).
+                                </div>
+                              ) : (
+                                <div style={{ marginTop: "0.35rem", opacity: 0.9 }}>
+                                  Queda saldo: después se puede emitir otro recibo parcial o uno que cierre todo.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </>
                     ) : null}
                     <div className="fact-field" style={{ borderTop: "none", paddingTop: "0.65rem", marginTop: "0.35rem" }}>
@@ -1451,7 +1704,9 @@ export function FacturacionPage() {
                       {type === "Recibo" && relatedInvoiceId && (
                         <div style={{ padding: "0.75rem", backgroundColor: "rgba(255, 255, 255, 0.15)", border: "1px solid rgba(255, 255, 255, 0.4)", borderRadius: "10px", marginBottom: "1rem" }}>
                           <small style={{ fontWeight: "bold", color: "#fff" }}>
-                            🔒 Recibo relacionado con factura. Los detalles están bloqueados.
+                            {isPartialReceipt
+                              ? "🔒 Recibo parcial: el detalle documenta este pago y el saldo restante. El importe se carga a la izquierda."
+                              : "🔒 Recibo relacionado con factura. Los detalles están bloqueados."}
                           </small>
                         </div>
                       )}
@@ -1865,7 +2120,7 @@ export function FacturacionPage() {
                               <span className="fact-summary-card-currency">USD</span>
                             </div>
                           </div>
-                          {displaySummary.showPendingNote ? (
+                          {displaySummary.showPendingNote || reciboLinkedEmit?.isPartial ? (
                             <div
                               className="fact-recibo-nc-adjust"
                               role="region"
@@ -1879,10 +2134,22 @@ export function FacturacionPage() {
                               <span className="fact-recibo-nc-adjust__value">
                                 − {formatCurrencyNumber(displaySummary.creditApplied + displaySummary.paidApplied)} USD
                               </span>
+                              <span className="fact-recibo-nc-adjust__label">Deuda actual</span>
+                              <span className="fact-recibo-nc-adjust__value">
+                                {formatCurrencyNumber(reciboLinkedEmit?.pending ?? displaySummary.total)} USD
+                              </span>
                               <span className="fact-recibo-nc-adjust__label">Total de este recibo</span>
                               <span className="fact-recibo-nc-adjust__value fact-recibo-nc-adjust__value--emph">
                                 {formatCurrencyNumber(displaySummary.total)} USD
                               </span>
+                              {reciboLinkedEmit?.isPartial ? (
+                                <>
+                                  <span className="fact-recibo-nc-adjust__label">Saldo restante</span>
+                                  <span className="fact-recibo-nc-adjust__value fact-recibo-nc-adjust__value--emph">
+                                    {formatCurrencyNumber(reciboLinkedEmit.remainingAfter)} USD
+                                  </span>
+                                </>
+                              ) : null}
                             </div>
                           ) : null}
                           <button type="button" className="fact-detail-servicios-btn-emitir" onClick={handleClickEmitir}>
@@ -1919,7 +2186,11 @@ export function FacturacionPage() {
                             return (
                               <tr key={item.invoice.id}>
                                 <td>
-                                  {inv.type === "Nota de Crédito" ? "Nota C." : inv.type}
+                                  {inv.type === "Nota de Crédito"
+                                    ? "Nota C."
+                                    : invoiceTipoLabel(inv.type, inv.documentContext) === "RECIBO PARCIAL"
+                                      ? "Recibo parcial"
+                                      : inv.type}
                                   {inv.type === "Recibo" && " "}
                                   {(inv.type === "Factura" || inv.type === "Recibo" || inv.type === "Nota de Crédito") && (Date.now() - new Date(item.emittedAt).getTime() < MS_22H) && (
                                     <span
@@ -2042,8 +2313,9 @@ export function FacturacionPage() {
                             })()
                           : undefined
                       }
+                      documentContext={previewEmitted.invoice.documentContext}
                       reciboConceptText={
-                        previewEmitted.invoice.type === "Recibo" && reciboHasSettlementRows(previewEmitted.invoice.items)
+                        previewEmitted.invoice.type === "Recibo"
                           ? (() => {
                               const f = invoicesAll.find(
                                 (i) =>
@@ -2052,10 +2324,39 @@ export function FacturacionPage() {
                                     (previewEmitted.invoice.relatedInvoiceNumber != null &&
                                       i.number === previewEmitted.invoice.relatedInvoiceNumber))
                               );
-                              return f
-                                ? buildReciboConceptLine(
-                                    getReciboConceptParts(f, invoicesAll, { excludeReciboId: String(previewEmitted.invoice.id) })
-                                  )
+                              if (!f) return undefined;
+                              const parts = getReciboConceptParts(f, invoicesAll, {
+                                excludeReciboId: String(previewEmitted.invoice.id),
+                              });
+                              const isPartialPreview =
+                                previewEmitted.invoice.documentContext === "recibo-parcial" ||
+                                (previewEmitted.invoice.items || []).some((it) =>
+                                  String(it.serviceName ?? "").toLowerCase().startsWith("pago parcial de factura ")
+                                );
+                              if (isPartialPreview) {
+                                const thisPay = Math.abs(Number(previewEmitted.invoice.total) || 0);
+                                const pendingNow = invoicePendingCollectionAmount(f, invoicesAll);
+                                const alreadyCounted = invoicesAll.some(
+                                  (i) =>
+                                    i.type === "Recibo" &&
+                                    (String(i.id) === String(previewEmitted.invoice.id) ||
+                                      (previewEmitted.invoice.number && i.number === previewEmitted.invoice.number)) &&
+                                    isLinkedToInvoice(i, f)
+                                );
+                                const remaining = alreadyCounted
+                                  ? pendingNow
+                                  : roundMoney(Math.max(0, pendingNow - thisPay));
+                                return buildReciboPartialConceptLine({
+                                  facturaNumber: parts.facturaNumber,
+                                  creditNoteNumbers: parts.creditNoteNumbers,
+                                  priorReceiptNumbers: parts.priorReceiptNumbers,
+                                  pendingBefore: roundMoney(remaining + thisPay),
+                                  thisPayment: thisPay,
+                                  remainingAfter: remaining,
+                                });
+                              }
+                              return reciboHasSettlementRows(previewEmitted.invoice.items)
+                                ? buildReciboConceptLine(parts)
                                 : undefined;
                             })()
                           : undefined
@@ -2083,6 +2384,9 @@ export function FacturacionPage() {
                             ? "partial"
                             : "total"
                           : undefined
+                      }
+                      documentContext={
+                        type === "Recibo" && reciboLinkedEmit?.isPartial ? "recibo-parcial" : undefined
                       }
                       reciboConceptText={
                         type === "Recibo" && reciboConceptForForm.line && reciboHasSettlementRows(displaySummary.previewItems)

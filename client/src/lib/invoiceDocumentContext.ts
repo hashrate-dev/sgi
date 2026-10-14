@@ -1,7 +1,7 @@
 import type { ComprobanteType } from "./types";
 
 /** Contexto de documento para adaptar títulos/frases sin cambiar el tipo interno. */
-export type InvoiceDocumentContext = "garantia-ande" | "comprobante-pago" | "factura";
+export type InvoiceDocumentContext = "garantia-ande" | "comprobante-pago" | "factura" | "recibo-parcial";
 
 /** Texto legal corto para depósito en garantía (sin nombrar ANDE) — emisión. */
 export const GARANTIA_DEPOSITO_LEGAL =
@@ -21,6 +21,9 @@ export function invoiceTipoLabel(
   }
   if (documentContext === "comprobante-pago" && type === "Factura") {
     return "COMPROBANTE DE PAGO";
+  }
+  if (documentContext === "recibo-parcial" && type === "Recibo") {
+    return "RECIBO PARCIAL";
   }
   if (type === "Factura") return "FACTURA CREDITO";
   if (type === "Recibo") return "RECIBO";

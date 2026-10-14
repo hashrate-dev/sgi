@@ -210,7 +210,7 @@ body.calendly-overlay-open .market-registro-auth-toggle {
   right: 20px;
   bottom: calc(20px - 5mm);
   z-index: 99980;
-  display: inline-flex;
+  display: none;
   align-items: center;
   gap: 0.45rem;
   padding: 14px 20px;
@@ -238,7 +238,13 @@ body.calendly-overlay-open .market-registro-auth-toggle {
   box-shadow: 0 0 0 3px rgba(54, 160, 142, 0.45), 0 10px 24px rgba(15, 39, 66, 0.28);
 }
 
-/* SGI: no mostrar FAB «Reserva una reunión» (solo marketplace / web pública) */
+/* Marketplace / web pública: mostrar FAB. En SGI y login interno queda oculto. */
+body:has(.marketplace-asic-page) #hrs-calendly-fab,
+body:has(.site-header--marketplace) #hrs-calendly-fab {
+  display: inline-flex;
+}
+
+/* SGI: no mostrar FAB «Reserva una reunión» */
 body:has(.sgi-protected-root) #hrs-calendly-fab,
 html.hrs-home-bg #hrs-calendly-fab,
 html.hrs-protected-green-bg #hrs-calendly-fab {

@@ -74,7 +74,7 @@ export async function rebuildReciboSettlementByNumber(
   const db = getDb();
   const recRow = (await db
     .prepare(
-      `SELECT id, number, type, month, related_invoice_id, related_invoice_number, source
+      `SELECT id, number, type, month, related_invoice_id, related_invoice_number, source, document_context
        FROM invoices WHERE number = ? AND type = 'Recibo'`
     )
     .get(receiptNumber)) as Record<string, unknown> | null | undefined;
@@ -127,6 +127,13 @@ export async function rebuildReciboSettlementByNumber(
   }
 
   const reciboId = Number(pick(recRow, "id"));
+  const recCtx = String(pick(recRow, "document_context", "documentContext", "documentcontext") ?? "").trim();
+  if (recCtx === "recibo-parcial") {
+    return {
+      ok: false,
+      error: "Este recibo es parcial: no se reescribe a liquidación de saldo completo (conserva el importe de ese pago).",
+    };
+  }
 
   const ncs = sortById(
     (await db

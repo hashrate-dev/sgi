@@ -108,6 +108,7 @@ export function HostingBillingAgentPage() {
   const [confirmDraft, setConfirmDraft] = useState<HostingBillingAgentDraft | null>(null);
   const [testClientId, setTestClientId] = useState<string>("");
   const [testResult, setTestResult] = useState<HostingBillingAgentTestPreview | null>(null);
+  const [testPicks, setTestPicks] = useState<Record<number, number>>({});
 
   const loadAll = useCallback(async (prefMonth?: string) => {
     const [meta, clientsRes] = await Promise.all([getHostingBillingAgent(), getClients().catch(() => ({ clients: [] as Client[] }))]);
@@ -177,7 +178,7 @@ export function HostingBillingAgentPage() {
     }
   }
 
-  async function runTesting() {
+  async function runTesting(picks = testPicks) {
     const cid = Number(testClientId);
     if (!testClientId || !Number.isFinite(cid) || cid <= 0) {
       showToast("Elegí un cliente para el testing.", "warning");
@@ -189,10 +190,14 @@ export function HostingBillingAgentPage() {
     }
     setBusy(true);
     try {
+      const lineGarantias = Object.entries(picks)
+        .map(([lineIndex, garantiaId]) => ({ lineIndex: Number(lineIndex), garantiaId: Number(garantiaId) }))
+        .filter((x) => Number.isFinite(x.lineIndex) && x.garantiaId > 0);
       const r = await testPreviewHostingBillingAgent({
         month,
         clientId: cid,
         usdPerKwh,
+        lineGarantias: lineGarantias.length ? lineGarantias : undefined,
       });
       setTestResult(r);
       showToast("Testing listo: no se emitió ninguna factura.", "success");
@@ -497,12 +502,21 @@ export function HostingBillingAgentPage() {
               <h6 className="fw-bold border-bottom pb-2">Testing (no emite facturas)</h6>
               <p className="small text-muted mb-3">
                 Simula el cálculo del agente para un cliente y un mes: días del mes, consumo W de Valores de garantías
-                ASIC, kWh y total. <strong>No guarda borradores ni crea documentos</strong>.
+                ASIC, kWh y total. Si hay varios procesadores del mismo equipo (Z15 300 kSol vs 565 kSol, S21 235 vs
+                270 ths), elegí la variante en la tabla. <strong>No guarda borradores ni crea documentos</strong>.
               </p>
               <div className="row g-2 align-items-end mb-3">
                 <div className="col-md-6">
                   <label className="form-label small fw-bold">Cliente de prueba</label>
-                  <select className="form-select form-select-sm" value={testClientId} onChange={(e) => setTestClientId(e.target.value)}>
+                  <select
+                    className="form-select form-select-sm"
+                    value={testClientId}
+                    onChange={(e) => {
+                      setTestClientId(e.target.value);
+                      setTestPicks({});
+                      setTestResult(null);
+                    }}
+                  >
                     <option value="">Elegí un cliente…</option>
                     {allClients.map((c) => (
                       <option key={String(c.id)} value={String(c.id)}>
@@ -562,13 +576,35 @@ export function HostingBillingAgentPage() {
                                 <td>{it.serviceName}</td>
                                 <td>{it.watts || "—"}</td>
                                 <td>
-                                  {it.serviceKey === "D"
-                                    ? "4%"
-                                    : it.garantiaLabel
-                                      ? it.garantiaLabel
-                                      : it.wattsSource === "garantia-asic"
-                                        ? "Valores de garantías ASIC"
-                                        : "Elegí la fila exacta en garantías ASIC"}
+                                  {it.serviceKey === "D" ? (
+                                    "4%"
+                                  ) : it.choices && it.choices.length > 0 ? (
+                                    <select
+                                      className="form-select form-select-sm"
+                                      value={String((it.lineIndex != null && testPicks[it.lineIndex]) || "")}
+                                      disabled={busy}
+                                      onChange={(e) => {
+                                        const id = Number(e.target.value);
+                                        const idx = it.lineIndex ?? 0;
+                                        const next = { ...testPicks, [idx]: id };
+                                        setTestPicks(next);
+                                        if (id > 0) void runTesting(next);
+                                      }}
+                                    >
+                                      <option value="">Elegí procesador / variante…</option>
+                                      {it.choices.map((ch) => (
+                                        <option key={ch.id} value={String(ch.id)}>
+                                          {ch.modelo} · {ch.procesador} · {ch.consumoW.toLocaleString("es-PY")} W
+                                        </option>
+                                      ))}
+                                    </select>
+                                  ) : it.garantiaLabel ? (
+                                    it.garantiaLabel
+                                  ) : it.wattsSource === "garantia-asic" ? (
+                                    "Valores de garantías ASIC"
+                                  ) : (
+                                    "Elegí la fila exacta en garantías ASIC"
+                                  )}
                                 </td>
                                 <td>{it.quantity}</td>
                                 <td>{it.daysInMonth || p.checks.daysInMonth}</td>

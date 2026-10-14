@@ -34,6 +34,8 @@ export type HostingAgentLine = {
   usdPerKwh: number;
   wattsSource?: "garantia-asic" | "stored" | "fallback" | "none";
   garantiaLabel?: string;
+  lineIndex?: number;
+  choices?: Array<{ id: number; label: string; consumoW: number; modelo: string; procesador: string }>;
 };
 
 export function daysInCalendarMonth(year: number, month1to12: number): number {
@@ -118,6 +120,13 @@ export function hostingModelToken(key: string, name = ""): string {
   if (k === "B") return "L9";
   if (k === "A") return "L7";
   return "";
+}
+
+/** Familia de máquina (Z15K/Z15Pro → Z15, S21 235/270 → S21) para agrupar variantes. */
+export function garantiaFamily(key: string, name = ""): string {
+  const token = hostingModelToken(key, name);
+  const m = token.match(/^([A-Z]+)(\d+)/);
+  return m ? `${m[1]}${m[2]}` : token;
 }
 
 function blobOf(row: Pick<GarantiaConsumoRow, "marca" | "modelo" | "procesador">): string {

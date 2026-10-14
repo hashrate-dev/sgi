@@ -82,6 +82,7 @@ export function PendientesPage() {
           paymentDate: inv.paymentDate,
           emissionTime: inv.emissionTime,
           dueDate: inv.dueDate,
+          documentContext: inv.documentContext,
           items: [],
         }));
         setAll(list);
@@ -273,7 +274,8 @@ export function PendientesPage() {
           items: validItems,
           subtotal: inv.subtotal || 0,
           discounts: inv.discounts || 0,
-          total: inv.total || 0
+          total: inv.total || 0,
+          documentContext: inv.documentContext,
         },
         { logoBase64 }
       );
