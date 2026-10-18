@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
-import { Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { sgiHome } from "../lib/marketplacePaths.js";
 import { getMarketplacePresenceHistory, type MarketplacePresenceHistoryRow } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { canViewMarketplaceQuoteTickets } from "../lib/auth";
-import { PageHeader } from "../components/PageHeader";
 import "../styles/facturacion.css";
 import "../styles/hrs-marketplace-presence.css";
 
@@ -166,14 +165,18 @@ export function MarketplacePresenceHistorialPage() {
   return (
     <div className="fact-page hrs-mplive-page">
       <div className="container">
-        <PageHeader
-          title="Historial detalle — Presencia marketplace"
-          showBackButton
-          backTo="/marketplace/presence"
-          backText="Volver al monitor"
-        />
-
         <div className="hrs-card hrs-card--rect p-4">
+          <div className="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+            <div>
+              <h1 className="h5 mb-1">Historial de accesos</h1>
+              <p className="text-muted small mb-0">
+                Tipo, ruta, IP, país, ciudad, email y fecha. Queda guardado en la base aunque el usuario ya no esté en línea.
+              </p>
+            </div>
+            <Link to="/marketplace/presence" className="btn btn-outline-secondary btn-sm">
+              Volver al monitor
+            </Link>
+          </div>
 
           <div className="historial-filtros-outer">
             <div className="historial-filtros-container">

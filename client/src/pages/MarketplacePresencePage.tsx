@@ -6,7 +6,6 @@ import "leaflet/dist/leaflet.css";
 import { getMarketplacePresenceLive, getMarketplacePresenceStats } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { canViewMarketplaceQuoteTickets } from "../lib/auth";
-import { PageHeader } from "../components/PageHeader";
 import "../styles/facturacion.css";
 import "../styles/hrs-marketplace-presence.css";
 
@@ -125,23 +124,14 @@ export function MarketplacePresencePage() {
   return (
     <div className="fact-page hrs-mplive-page">
       <div className="container">
-        <PageHeader
-          title="Marketplace en vivo"
-          rightContent={
-            <div className="d-flex flex-wrap gap-2 align-items-center">
-              <Link to="/marketplace/presence/history" className="fact-back">
-                <i className="bi bi-table me-1" aria-hidden />
-                Historial detalle
-              </Link>
-              <Link to="/marketplace/orders" className="fact-back">
-                Ver órdenes marketplace
-              </Link>
-            </div>
-          }
-        />
-
         <section className="hrs-mplive-panel">
-          <p className="hrs-mplive-intro">Monitoreo en tiempo real de usuarios navegando en marketplace (logueados y sin cuenta).</p>
+          <div className="hrs-mplive-intro-row">
+            <p className="hrs-mplive-intro">Monitoreo en tiempo real de usuarios navegando en marketplace (logueados y sin cuenta).</p>
+            <Link to="/marketplace/presence/history" className="hrs-mplive-history-btn">
+              <i className="bi bi-clock-history" aria-hidden />
+              Ver historial de accesos
+            </Link>
+          </div>
 
           <div className="hrs-mplive-stats">
             <article className="hrs-mplive-stat hrs-mplive-stat--accent">
