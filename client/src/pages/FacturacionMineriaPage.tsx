@@ -54,7 +54,7 @@ import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
 import { isClienteTiendaOnline } from "../lib/clientTienda";
 import { formatCurrencyNumber, formatUSD } from "../lib/formatCurrency";
 import { asicOperationCostUsd, isAsicEquipmentSaleInvoice, parseAsicMarginUsd } from "../lib/asicDocumentKind";
-import { buildAsicComprobantePdfFilename } from "../lib/asicPdfFilename";
+import { asicReciboPdfItemToken, buildAsicComprobantePdfFilename } from "../lib/asicPdfFilename";
 import { invoiceTipoLabel, type InvoiceDocumentContext } from "../lib/invoiceDocumentContext";
 import { emittedDocumentTipoMark } from "../lib/invoiceCollection";
 import { EmittedDocumentTipoIcon } from "../components/EmittedDocumentTipoIcon";
@@ -1225,6 +1225,7 @@ export function FacturacionMineriaPage() {
           clientName: selectedClient.name,
           type,
           items: itemsToEmit,
+          productItems: type === "Recibo" ? items : undefined,
           documentContext: emitDocumentContext,
         })
       );
@@ -1406,13 +1407,39 @@ export function FacturacionMineriaPage() {
       },
       { logoBase64 }
     );
+    let productItems = relatedForRecibo?.items;
+    const receiptContext = inv.documentContext ?? (inv.type === "Factura" ? "comprobante-pago" : undefined);
+    if (
+      inv.type === "Recibo" &&
+      receiptContext !== "garantia-ande" &&
+      !asicReciboPdfItemToken(inv.items) &&
+      !asicReciboPdfItemToken(productItems)
+    ) {
+      const relId = Number(relatedForRecibo?.id ?? inv.relatedInvoiceId);
+      if (Number.isFinite(relId) && relId > 0) {
+        try {
+          const res = await getInvoiceById(relId);
+          productItems = (res.invoice.items ?? []).map((row) => ({
+            serviceName: String(row.service || "").trim(),
+            service: String(row.service || "").trim(),
+            month: row.month || "",
+            quantity: row.quantity || 1,
+            price: row.price || 0,
+            discount: row.discount || 0,
+          }));
+        } catch {
+          productItems = relatedForRecibo?.items;
+        }
+      }
+    }
     doc.save(
       buildAsicComprobantePdfFilename({
         number: inv.number,
         clientName: inv.clientName,
         type: inv.type,
         items: inv.items,
-        documentContext: inv.documentContext ?? (inv.type === "Factura" ? "comprobante-pago" : undefined),
+        productItems,
+        documentContext: receiptContext,
       })
     );
     showToast(`PDF ${inv.number} descargado.`, "success");

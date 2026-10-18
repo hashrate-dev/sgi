@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { fetchAsicInvoiceLedger, isNumericInvoiceId } from "../lib/asicInvoiceLedger";
-import { deleteAllInvoices, deleteEmittedDocumentOne, deleteEmittedDocumentsAll, deleteInvoice, getClients, updateInvoiceMargin, verifyPassword } from "../lib/api";
+import { deleteAllInvoices, deleteEmittedDocumentOne, deleteEmittedDocumentsAll, deleteInvoice, getClients, getInvoiceById, updateInvoiceMargin, verifyPassword } from "../lib/api";
 import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
 import { dispatchEmittedChanged } from "../lib/emittedEvents";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
@@ -20,7 +20,7 @@ import {
   isPartialReceiptDocument,
   relatedFacturaForDocument,
 } from "../lib/invoiceCollection";
-import { buildAsicComprobantePdfFilename } from "../lib/asicPdfFilename";
+import { asicReciboPdfItemToken, buildAsicComprobantePdfFilename } from "../lib/asicPdfFilename";
 import "../styles/facturacion.css";
 
 /** Normaliza mes a YYYY-MM para filtrar por columna MES */
@@ -790,13 +790,40 @@ export function HistorialMineriaPage() {
       );
 
       // Guardar el PDF
+      const pdfContext = resolveAsicInvoiceDocumentContext(inv);
+      let productItems =
+        inv.type === "Recibo" ? relatedFacturaForDocument(inv, all)?.items : undefined;
+      if (
+        inv.type === "Recibo" &&
+        pdfContext !== "garantia-ande" &&
+        !asicReciboPdfItemToken(validItems) &&
+        !asicReciboPdfItemToken(productItems)
+      ) {
+        const relId = Number(inv.relatedInvoiceId);
+        if (Number.isFinite(relId) && relId > 0) {
+          try {
+            const res = await getInvoiceById(relId);
+            productItems = (res.invoice.items ?? []).map((row) => ({
+              serviceName: String(row.service || "").trim(),
+              service: String(row.service || "").trim(),
+              month: row.month || "",
+              quantity: row.quantity || 1,
+              price: row.price || 0,
+              discount: row.discount || 0,
+            }));
+          } catch {
+            productItems = undefined;
+          }
+        }
+      }
       doc.save(
         buildAsicComprobantePdfFilename({
           number: inv.number,
           clientName: client.name,
           type: inv.type,
           items: validItems,
-          documentContext: resolveAsicInvoiceDocumentContext(inv),
+          productItems,
+          documentContext: pdfContext,
         })
       );
       showToast("PDF generado correctamente.", "success");

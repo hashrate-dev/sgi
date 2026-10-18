@@ -1,5 +1,10 @@
 import type { ContabilidadGasto } from "./api";
-import { hostingGastoYm, hostingSupplierCodes, normalizeHostingSupplierCode } from "./hostingMargenCost";
+import {
+  hostingGastoYm,
+  hostingSupplierCodes,
+  isHostingMarginSupplierGasto,
+  normalizeHostingSupplierCode,
+} from "./hostingMargenCost";
 import { monthlyInvoiceCashCollected12, type InvoiceMonthNetRow } from "./monitorTripleIngresoKpi";
 
 export {
@@ -47,8 +52,8 @@ export function buildHostingMargenYearSeries(
   });
 
   for (const g of Array.isArray(gastos) ? gastos : []) {
-    const code = normalizeHostingSupplierCode(g.supplierNumber);
-    if (!codes.includes(code)) continue;
+    if (!isHostingMarginSupplierGasto(g, supplierNumbers)) continue;
+    const code = normalizeHostingSupplierCode(g.supplierNumber) || "HOSTING";
     const ym = hostingGastoYm(g);
     if (!ym || ym.slice(0, 4) !== String(year)) continue;
     const mi = keys.indexOf(ym);
@@ -60,7 +65,7 @@ export function buildHostingMargenYearSeries(
   return keys.map((ym, i) => {
     const ingresos = ingresos12[i] ?? 0;
     const gastosBySupplier = gastosByMonth[i] ?? {};
-    const gastosTotal = codes.reduce((acc, c) => acc + (gastosBySupplier[c] ?? 0), 0);
+    const gastosTotal = Object.values(gastosBySupplier).reduce((acc, n) => acc + (n || 0), 0);
     const margen = ingresos - gastosTotal;
     return {
       ym,

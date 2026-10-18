@@ -30,15 +30,6 @@ function isYm(raw: string): boolean {
   return /^\d{4}-\d{2}$/.test(raw);
 }
 
-function previousCalendarYm(ym: string): string | null {
-  if (!isYm(ym)) return null;
-  const y = Number.parseInt(ym.slice(0, 4), 10);
-  const m = Number.parseInt(ym.slice(5, 7), 10);
-  const d = new Date(y, m - 2, 1);
-  if (Number.isNaN(d.getTime())) return null;
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
 function yyyyMmFromDate(raw: string | undefined): string | null {
   const t = String(raw ?? "").trim();
   if (!t) return null;
@@ -56,14 +47,27 @@ function yyyyMmFromDate(raw: string | undefined): string | null {
   return null;
 }
 
+/**
+ * Mes del costo de hosting.
+ * El margen del mes es cobros menos este costo, así que no se corre al mes anterior.
+ * Prioridad: mes de servicio, después mes de presupuesto, después la fecha del pago.
+ */
 export function hostingGastoYm(g: Pick<ContabilidadGasto, "presupuestoMes" | "mesServicio" | "fecha">): string | null {
   const ms = String(g.mesServicio ?? "").trim().slice(0, 7);
-  const pm = String(g.presupuestoMes ?? "").trim().slice(0, 7);
-  if (isYm(ms) && (!isYm(pm) || ms !== pm)) return ms;
-  if (isYm(pm)) return previousCalendarYm(pm) ?? pm;
   if (isYm(ms)) return ms;
-  const fechaYm = yyyyMmFromDate(g.fecha);
-  return fechaYm ? previousCalendarYm(fechaYm) ?? fechaYm : null;
+  const pm = String(g.presupuestoMes ?? "").trim().slice(0, 7);
+  if (isYm(pm)) return pm;
+  return yyyyMmFromDate(g.fecha);
+}
+
+/** Digital Assets y Blunode Paraguay: el costo de hosting aunque el código no sea P002/P003. */
+export function isNamedHostingInfraSupplier(name: string | undefined): boolean {
+  const n = String(name ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/\s+/g, " ");
+  return n.includes("DIGITAL ASSETS") || n.includes("BLUNODE");
 }
 
 export function normalizeHostingSupplierCode(raw: string | undefined): string {
@@ -78,9 +82,10 @@ export function hostingSupplierCodes(supplierNumbers: string[] | null | undefine
 }
 
 export function isHostingMarginSupplierGasto(
-  g: Pick<ContabilidadGasto, "supplierNumber">,
+  g: Pick<ContabilidadGasto, "supplierNumber" | "supplierName">,
   supplierNumbers: string[] | null | undefined
 ): boolean {
+  if (isNamedHostingInfraSupplier(g.supplierName)) return true;
   const codes = hostingSupplierCodes(supplierNumbers);
   const code = normalizeHostingSupplierCode(g.supplierNumber);
   return Boolean(code) && codes.includes(code);
@@ -93,11 +98,9 @@ export function monthlyHostingCost12(
   supplierNumbers: string[] | null | undefined
 ): number[] {
   const keys = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
-  const codes = hostingSupplierCodes(supplierNumbers);
   const totals = keys.map(() => 0);
   for (const g of Array.isArray(gastos) ? gastos : []) {
-    const code = normalizeHostingSupplierCode(g.supplierNumber);
-    if (!codes.includes(code)) continue;
+    if (!isHostingMarginSupplierGasto(g, supplierNumbers)) continue;
     const ym = hostingGastoYm(g);
     if (!ym || ym.slice(0, 4) !== String(year)) continue;
     const mi = keys.indexOf(ym);
