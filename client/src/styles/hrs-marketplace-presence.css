@@ -155,8 +155,13 @@
   width: 100%;
 }
 
-.hrs-mphist-map {
+.hrs-mplive-page .hrs-mphist-map {
   margin-bottom: 1rem;
+  margin-left: -1.5rem;
+  margin-right: -1.5rem;
+  width: calc(100% + 3rem);
+  max-width: none;
+  box-sizing: border-box;
 }
 
 .hrs-mplive-page .hrs-mphist-filtros {
@@ -193,7 +198,7 @@
   background: #f0fdf4;
 }
 
-.hrs-mphist-map:fullscreen {
+.hrs-mplive-page .hrs-mphist-map:fullscreen {
   margin: 0;
   background: #fff;
   display: flex;
