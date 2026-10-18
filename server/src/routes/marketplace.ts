@@ -44,6 +44,7 @@ import { marketplacePublicPostRateLimit } from "../middleware/authRateLimit.js";
 import { resolveSetupCompraHashrateUsd, resolveSetupEquipoCompletoUsd } from "../lib/marketplaceSetupHashratePrice.js";
 import { loadGarantiaQuoteRows } from "../lib/marketplaceGarantiaQuote.js";
 import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
+import { assignPresenceCoordinates } from "../lib/presenceMapCoords.js";
 import { mpVisibleFromDbValue } from "../lib/mpVisible.js";
 import { sendMarketplaceAsicInquiryEmail, sendMarketplaceContactEmail } from "../lib/marketplaceContactEmail.js";
 import { resolvePublicAppOrigin } from "../lib/publicAppOrigin.js";
@@ -920,6 +921,82 @@ marketplaceRouter.get("/marketplace/presence-history", requireAuth, ...adminAB, 
       };
     });
     res.json({ rows, total, limit, offset });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: { message: msg } });
+  }
+});
+
+/** Un punto por IP del historial, ubicado en la ciudad o, si no hay ciudad, en el país. */
+marketplaceRouter.get("/marketplace/presence-history-map", requireAuth, ...adminAB, async (req: Request, res: Response) => {
+  try {
+    await ensurePresenceCityColumn();
+    const qRaw = String(req.query.q || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[%_\\]/g, "")
+      .slice(0, 120);
+    const pat = qRaw ? `%${qRaw}%` : "";
+    const vtRaw = String(req.query.viewerType || "")
+      .trim()
+      .toLowerCase();
+    const viewerFilter = vtRaw === "anon" || vtRaw === "cliente" || vtRaw === "staff" ? vtRaw : "";
+    const whereParts: string[] = [];
+    const whereParams: unknown[] = [];
+    if (qRaw) {
+      whereParts.push(
+        `(LOWER(visitor_id) LIKE ? OR LOWER(COALESCE(user_email,'')) LIKE ? OR LOWER(COALESCE(current_path,'')) LIKE ? OR LOWER(COALESCE(client_ip,'')) LIKE ? OR LOWER(COALESCE(country_name,'')) LIKE ? OR LOWER(COALESCE(country_code,'')) LIKE ? OR LOWER(COALESCE(city,'')) LIKE ?)`
+      );
+      whereParams.push(pat, pat, pat, pat, pat, pat, pat);
+    }
+    if (viewerFilter) {
+      whereParts.push(`LOWER(TRIM(viewer_type)) = ?`);
+      whereParams.push(viewerFilter);
+    }
+    const where = whereParts.length ? ` WHERE ${whereParts.join(" AND ")}` : "";
+    const rowsRaw = (await db
+      .prepare(
+        `SELECT visitor_id, viewer_type, country_code, country_name, city, client_ip, user_email, current_path, recorded_at
+         FROM (
+           SELECT visitor_id, viewer_type, country_code, country_name, city, client_ip, user_email, current_path, recorded_at,
+                  ROW_NUMBER() OVER (
+                    PARTITION BY CASE
+                      WHEN TRIM(COALESCE(client_ip, '')) = '' THEN 'v:' || visitor_id
+                      ELSE 'ip:' || TRIM(client_ip)
+                    END
+                    ORDER BY recorded_at DESC, id DESC
+                  ) AS rn
+           FROM marketplace_presence_history${where}
+         ) ranked
+         WHERE rn = 1
+         ORDER BY recorded_at DESC
+         LIMIT 2500`
+      )
+      .all(...whereParams)) as Array<Record<string, unknown>>;
+    const latest = rowsRaw.map((raw) => {
+      const r = rowKeysToLowercase(raw) as Record<string, string | null | undefined>;
+      const countryCode = normalizeCountryCode(r.country_code) || "UN";
+      const storedName = String(r.country_name || "").trim();
+      const countryName =
+        storedName && storedName.toUpperCase() !== countryCode ? storedName : countryNameFromCode(countryCode) || storedName || "Desconocido";
+      return {
+        visitorId: String(r.visitor_id || ""),
+        viewerType: String(r.viewer_type || ""),
+        countryCode,
+        countryName,
+        city: String(r.city || "").trim(),
+        clientIp: String(r.client_ip || "").trim(),
+        userEmail: String(r.user_email || "").trim(),
+        currentPath: String(r.current_path || "").trim() || "/marketplace",
+        recordedAt: String(r.recorded_at || ""),
+      };
+    });
+    const points = assignPresenceCoordinates(latest).map((p) => ({
+      ...p,
+      lat: Math.round(p.lat * 10000) / 10000,
+      lng: Math.round(p.lng * 10000) / 10000,
+    }));
+    res.json({ points, total: points.length });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     res.status(500).json({ error: { message: msg } });

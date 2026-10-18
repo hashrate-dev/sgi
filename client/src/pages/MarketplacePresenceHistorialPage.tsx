@@ -3,7 +3,13 @@ import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { Link, Navigate } from "react-router-dom";
 import { sgiHome } from "../lib/marketplacePaths.js";
-import { getMarketplacePresenceHistory, type MarketplacePresenceHistoryRow } from "../lib/api";
+import {
+  getMarketplacePresenceHistory,
+  getMarketplacePresenceHistoryMap,
+  type MarketplacePresenceHistoryRow,
+  type MarketplacePresenceMapPoint,
+} from "../lib/api";
+import { MarketplacePresenceHistoryMap } from "../components/MarketplacePresenceHistoryMap";
 import { useAuth } from "../contexts/AuthContext";
 import { canViewMarketplaceQuoteTickets } from "../lib/auth";
 import "../styles/facturacion.css";
@@ -40,6 +46,8 @@ export function MarketplacePresenceHistorialPage() {
   const [viewerTypeFilter, setViewerTypeFilter] = useState<"" | "anon" | "cliente" | "staff">("");
   const [page, setPage] = useState(1);
   const [exportingExcel, setExportingExcel] = useState(false);
+  const [mapPoints, setMapPoints] = useState<MarketplacePresenceMapPoint[]>([]);
+  const [mapLoading, setMapLoading] = useState(true);
 
   useEffect(() => {
     const t = window.setTimeout(() => setQDebounced(qInput.trim()), 350);
@@ -83,6 +91,28 @@ export function MarketplacePresenceHistorialPage() {
   useEffect(() => {
     void loadPage();
   }, [loadPage]);
+
+  useEffect(() => {
+    if (!canView) return;
+    let cancelled = false;
+    setMapLoading(true);
+    void getMarketplacePresenceHistoryMap({
+      ...(qDebounced ? { q: qDebounced } : {}),
+      ...(viewerTypeFilter ? { viewerType: viewerTypeFilter } : {}),
+    })
+      .then((r) => {
+        if (!cancelled) setMapPoints(Array.isArray(r.points) ? r.points : []);
+      })
+      .catch(() => {
+        if (!cancelled) setMapPoints([]);
+      })
+      .finally(() => {
+        if (!cancelled) setMapLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canView, qDebounced, viewerTypeFilter]);
 
   const rangeLabel = useMemo(() => {
     if (total === 0) return "0 filas";
@@ -177,6 +207,8 @@ export function MarketplacePresenceHistorialPage() {
               Volver al monitor
             </Link>
           </div>
+
+          <MarketplacePresenceHistoryMap points={mapPoints} loading={mapLoading} />
 
           <div className="historial-filtros-outer">
             <div className="historial-filtros-container">

@@ -4271,6 +4271,31 @@ export type MarketplacePresenceHistoryRow = {
   recordedAt: string;
 };
 
+export type MarketplacePresenceMapPoint = {
+  visitorId: string;
+  viewerType: string;
+  countryCode: string;
+  countryName: string;
+  city: string;
+  clientIp: string;
+  userEmail: string;
+  currentPath: string;
+  recordedAt: string;
+  lat: number;
+  lng: number;
+};
+
+export function getMarketplacePresenceHistoryMap(params?: {
+  q?: string;
+  viewerType?: "anon" | "cliente" | "staff" | "";
+}): Promise<{ points: MarketplacePresenceMapPoint[]; total: number }> {
+  const qs = new URLSearchParams();
+  if (params?.q) qs.set("q", params.q);
+  if (params?.viewerType) qs.set("viewerType", params.viewerType);
+  const suf = qs.toString();
+  return api(`/api/marketplace/presence-history-map${suf ? `?${suf}` : ""}`);
+}
+
 export function getMarketplacePresenceHistory(params?: {
   limit?: number;
   offset?: number;
