@@ -193,7 +193,7 @@ export function MarketplacePresenceHistorialPage() {
   if (!canView) return <Navigate to={sgiHome()} replace />;
 
   return (
-    <div className="fact-page hrs-mplive-page hrs-mphist-page">
+    <div className="fact-page hrs-mplive-page">
       <div className="container">
         <div className="hrs-card hrs-card--rect p-4">
           <div className="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">

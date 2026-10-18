@@ -2,12 +2,6 @@
   max-width: var(--sgi-layout-max, 1320px);
 }
 
-/* Historial: usa el ancho de la ventana, igual que la emisión de facturas, sin el tope angosto. */
-.sgi-protected-root .hrs-mphist-page .container {
-  width: 100%;
-  max-width: 100%;
-}
-
 .hrs-mplive-panel {
   position: relative;
   overflow: hidden;
