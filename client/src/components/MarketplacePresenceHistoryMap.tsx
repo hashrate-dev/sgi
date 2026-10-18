@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CircleMarker, MapContainer, Popup, TileLayer, Tooltip, useMap } from "react-leaflet";
+import { Link } from "react-router-dom";
 import "leaflet/dist/leaflet.css";
 import type { MarketplacePresenceMapPoint } from "../lib/api";
 
@@ -139,6 +140,10 @@ export function MarketplacePresenceHistoryMap({
         <h3>Mapa de accesos</h3>
         <div className="hrs-mphist-map__tools">
           <span>{loading ? "cargando…" : `${points.length} IP${points.length === 1 ? "" : "s"}`}</span>
+          <Link to="/marketplace/presence" className="hrs-mphist-full-btn">
+            <i className="bi bi-arrow-left" aria-hidden />
+            Volver al monitor
+          </Link>
           <button type="button" className="hrs-mphist-full-btn" onClick={toggleFullscreen}>
             <i className={`bi ${fullscreen ? "bi-fullscreen-exit" : "bi-arrows-fullscreen"}`} aria-hidden />
             {fullscreen ? "Salir" : "Pantalla completa"}
@@ -166,9 +171,9 @@ export function MarketplacePresenceHistoryMap({
           <MapSizeOnFullscreen />
           {spots.map((spot) => {
             const emails = loggedEmails(spot.points);
-            const anonCount = spot.points.filter((point) => !String(point.userEmail || "").trim()).length;
             const color = spotColor(spot.points);
             const place = `${spot.city ? `${spot.city}, ` : ""}${spot.countryName}${spot.countryCode ? ` (${spot.countryCode})` : ""}`;
+            const movements = [...spot.points].sort((a, b) => String(b.recordedAt).localeCompare(String(a.recordedAt)));
             return (
               <CircleMarker
                 key={spot.key}
@@ -183,31 +188,31 @@ export function MarketplacePresenceHistoryMap({
                       {spot.points.length} IP
                       {emails.length > 0 ? ` · ${emails.length} email${emails.length === 1 ? "" : "s"}` : ""}
                     </div>
-                    {emails.slice(0, 4).map((item) => (
-                      <div key={item.email}>{item.email}</div>
-                    ))}
-                    {emails.length > 4 ? <div>+{emails.length - 4} emails</div> : null}
-                    {emails.length === 0 ? <div>Sin email logueado</div> : null}
+                    <div>Clic para ver cada IP y su horario</div>
                   </div>
                 </Tooltip>
-                <Popup>
+                <Popup className="hrs-mphist-popup" maxWidth={380} minWidth={280}>
                   <div className="hrs-mphist-tip hrs-mphist-tip--list">
                     <strong>{place}</strong>
-                    <div>{spot.points.length} IP en este nodo</div>
-                    {emails.length > 0 ? (
-                      <ul>
-                        {emails.map((item) => (
-                          <li key={item.email}>
-                            {item.email}
-                            <span> · {viewerTypeLabel(item.viewerType)}</span>
+                    <div>
+                      {spot.points.length} IP en este nodo
+                    </div>
+                    <ul>
+                      {movements.map((point) => {
+                        const email = String(point.userEmail || "").trim();
+                        const ip = point.clientIp || "sin IP";
+                        return (
+                          <li key={`${ip}|${point.visitorId}|${point.recordedAt}`}>
+                            <span className="hrs-mphist-tip__ip">{ip}</span>
+                            <span className="hrs-mphist-tip__when"> · {formatWhen(point.recordedAt) || "sin horario"}</span>
+                            <span>
+                              {" "}
+                              · {email ? `${email} (${viewerTypeLabel(point.viewerType)})` : viewerTypeLabel(point.viewerType)}
+                            </span>
                           </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <div>Sin email logueado</div>
-                    )}
-                    {anonCount > 0 ? <div>{anonCount} sin cuenta</div> : null}
-                    {spot.points.length === 1 ? <div>{formatWhen(spot.points[0]!.recordedAt)}</div> : null}
+                        );
+                      })}
+                    </ul>
                   </div>
                 </Popup>
               </CircleMarker>
@@ -219,7 +224,7 @@ export function MarketplacePresenceHistoryMap({
         <span><i className="hrs-mphist-dot hrs-mphist-dot--cliente" /> Cliente</span>
         <span><i className="hrs-mphist-dot hrs-mphist-dot--staff" /> Staff</span>
         <span><i className="hrs-mphist-dot hrs-mphist-dot--anon" /> Sin cuenta</span>
-        <span className="hrs-mphist-map__note">Un punto por nodo de conexión. Clic para ver los emails logueados de ese lugar.</span>
+        <span className="hrs-mphist-map__note">Un punto por nodo de conexión. Clic para ver cada IP y su horario de acceso.</span>
       </div>
     </div>
   );

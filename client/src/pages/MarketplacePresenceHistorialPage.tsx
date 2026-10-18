@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
-import { Link, Navigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { sgiHome } from "../lib/marketplacePaths.js";
 import {
   getMarketplacePresenceHistory,
@@ -196,21 +196,7 @@ export function MarketplacePresenceHistorialPage() {
     <div className="fact-page hrs-mplive-page">
       <div className="container">
         <div className="hrs-card hrs-card--rect p-4">
-          <div className="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
-            <div>
-              <h1 className="h5 mb-1">Historial de accesos</h1>
-              <p className="text-muted small mb-0">
-                Tipo, ruta, IP, país, ciudad, email y fecha. Queda guardado en la base aunque el usuario ya no esté en línea.
-              </p>
-            </div>
-            <Link to="/marketplace/presence" className="btn btn-outline-secondary btn-sm">
-              Volver al monitor
-            </Link>
-          </div>
-
-          <MarketplacePresenceHistoryMap points={mapPoints} loading={mapLoading} />
-
-          <div className="historial-filtros-outer">
+          <div className="historial-filtros-outer hrs-mphist-filtros">
             <div className="historial-filtros-container">
               <div className="card historial-filtros-card">
                 <h6 className="fw-bold border-bottom pb-2">🔍 Filtros</h6>
@@ -267,6 +253,8 @@ export function MarketplacePresenceHistorialPage() {
               </div>
             </div>
           </div>
+
+          <MarketplacePresenceHistoryMap points={mapPoints} loading={mapLoading} />
 
           {err ? <div className="alert alert-danger py-2">{err}</div> : null}
 

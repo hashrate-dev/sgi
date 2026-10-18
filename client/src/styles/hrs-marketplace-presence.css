@@ -159,6 +159,10 @@
   margin-bottom: 1rem;
 }
 
+.hrs-mplive-page .hrs-mphist-filtros {
+  margin-bottom: 1rem;
+}
+
 .hrs-mphist-map__canvas {
   height: 420px;
 }
@@ -181,6 +185,8 @@
   border-radius: 8px;
   padding: 0.35rem 0.65rem;
   line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
 }
 
 .hrs-mphist-full-btn:hover {
@@ -255,14 +261,28 @@
 }
 
 .hrs-mphist-tip--list ul {
-  margin: 0.35rem 0 0;
-  padding-left: 1rem;
-  max-height: 220px;
+  margin: 0.45rem 0 0;
+  padding: 0;
+  list-style: none;
+  max-height: 280px;
   overflow: auto;
 }
 
-.hrs-mphist-tip--list li span {
-  color: #64748b;
+.hrs-mphist-tip--list li {
+  padding: 0.32rem 0;
+  border-top: 1px solid #e2e8f0;
+  color: #334155;
+}
+
+.hrs-mphist-tip__ip {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #0f172a;
+}
+
+.hrs-mphist-tip__when {
+  color: #1d4ed8;
+  font-weight: 600;
 }
 
 .hrs-mplive-country-list {
