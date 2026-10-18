@@ -112,7 +112,7 @@ export function MarketplacePresenceHistoryMap({
         <span><i className="hrs-mphist-dot hrs-mphist-dot--cliente" /> Cliente</span>
         <span><i className="hrs-mphist-dot hrs-mphist-dot--staff" /> Staff</span>
         <span><i className="hrs-mphist-dot hrs-mphist-dot--anon" /> Sin cuenta</span>
-        <span className="hrs-mphist-map__note">Un punto por IP. Con ciudad, en esa ciudad. Sin ciudad, en el país.</span>
+        <span className="hrs-mphist-map__note">Un punto por IP, en la ubicación de la conexión.</span>
       </div>
     </div>
   );

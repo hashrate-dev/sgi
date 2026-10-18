@@ -44,7 +44,7 @@ import { marketplacePublicPostRateLimit } from "../middleware/authRateLimit.js";
 import { resolveSetupCompraHashrateUsd, resolveSetupEquipoCompletoUsd } from "../lib/marketplaceSetupHashratePrice.js";
 import { loadGarantiaQuoteRows } from "../lib/marketplaceGarantiaQuote.js";
 import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
-import { assignPresenceCoordinates } from "../lib/presenceMapCoords.js";
+import { assignPresenceCoordinates, nudgeSharedCoordinates } from "../lib/presenceMapCoords.js";
 import { mpVisibleFromDbValue } from "../lib/mpVisible.js";
 import { sendMarketplaceAsicInquiryEmail, sendMarketplaceContactEmail } from "../lib/marketplaceContactEmail.js";
 import { resolvePublicAppOrigin } from "../lib/publicAppOrigin.js";
@@ -60,7 +60,13 @@ const MARKETPLACE_PRESENCE_ONLINE_WINDOW_MS = 90_000;
 /** Evita duplicar filas cuando el cliente envía dos heartbeats seguidos (locale/IP) con el mismo estado. */
 const MARKETPLACE_PRESENCE_HISTORY_DEDUPE_MS = 15_000;
 const IP_COUNTRY_CACHE_TTL_MS = 60 * 60 * 1000;
-type IpGeo = { countryCode: string; countryName: string; city: string };
+type IpGeo = {
+  countryCode: string;
+  countryName: string;
+  city: string;
+  latitude: number | null;
+  longitude: number | null;
+};
 const ipCountryCache = new Map<string, IpGeo & { expiresAt: number }>();
 let presenceCityColumnEnsured = false;
 
@@ -317,24 +323,39 @@ function detectGeoFromHeaders(req: Request): IpGeo {
     decodeGeoHeader(req.headers["x-vercel-ip-city"]) ||
     decodeGeoHeader(req.headers["x-vercel-ip-country-region"]) ||
     decodeGeoHeader(req.headers["cf-ipcity"]);
+  const latitude = finiteCoord(req.headers["x-vercel-ip-latitude"], 90);
+  const longitude = finiteCoord(req.headers["x-vercel-ip-longitude"], 180);
   return {
     countryCode,
     countryName: countryCode ? countryNameFromCode(countryCode) || countryCode : "Desconocido",
     city,
+    latitude,
+    longitude,
   };
+}
+
+function finiteCoord(raw: unknown, maxAbs: number): number | null {
+  const n = Number(String(raw ?? "").trim());
+  if (!Number.isFinite(n) || Math.abs(n) > maxAbs) return null;
+  if (n === 0) return null;
+  return n;
+}
+
+function emptyIpGeo(countryCode = "UN", countryName = "Desconocido"): IpGeo {
+  return { countryCode, countryName, city: "", latitude: null, longitude: null };
 }
 
 async function lookupIpwhoGeo(ip: string): Promise<IpGeo> {
   const now = Date.now();
   const cached = ipCountryCache.get(ip);
   if (cached && cached.expiresAt > now) {
-    return { countryCode: cached.countryCode, countryName: cached.countryName, city: cached.city };
+    return cached;
   }
   try {
     const ac = new AbortController();
-    const t = setTimeout(() => ac.abort(), 1800);
+    const t = setTimeout(() => ac.abort(), 2500);
     const res = await fetch(
-      `https://ipwho.is/${encodeURIComponent(ip)}?fields=success,country,country_code,city,region`,
+      `https://ipwho.is/${encodeURIComponent(ip)}?fields=success,country,country_code,city,region,latitude,longitude`,
       { signal: ac.signal }
     );
     clearTimeout(t);
@@ -345,15 +366,24 @@ async function lookupIpwhoGeo(ip: string): Promise<IpGeo> {
       country_code?: string;
       city?: string;
       region?: string;
+      latitude?: number;
+      longitude?: number;
     };
     const cc = normalizeCountryCode(data?.country_code);
     const countryName = String(data?.country || cc || "Desconocido").slice(0, 80);
     const city = String(data?.city || data?.region || "").trim().slice(0, 80);
-    const out: IpGeo = { countryCode: cc || "UN", countryName, city };
+    const out: IpGeo = {
+      countryCode: cc || "UN",
+      countryName,
+      city,
+      latitude: finiteCoord(data?.latitude, 90),
+      longitude: finiteCoord(data?.longitude, 180),
+    };
     ipCountryCache.set(ip, { ...out, expiresAt: now + IP_COUNTRY_CACHE_TTL_MS });
+    if (out.latitude != null && out.longitude != null) void rememberIpSignal(ip, out);
     return out;
   } catch {
-    const out: IpGeo = { countryCode: "UN", countryName: "Desconocido", city: "" };
+    const out = emptyIpGeo();
     ipCountryCache.set(ip, { ...out, expiresAt: now + 5 * 60 * 1000 });
     return out;
   }
@@ -367,16 +397,20 @@ function mergeIpGeo(primary: IpGeo, secondary: IpGeo): IpGeo {
       ? secondary.countryName
       : countryNameFromCode(countryCode) || countryCode || "Desconocido";
   const city = String(primary.city || secondary.city || "").trim().slice(0, 80);
-  return { countryCode, countryName: countryName.slice(0, 80), city };
+  const latitude = primary.latitude ?? secondary.latitude ?? null;
+  const longitude = primary.longitude ?? secondary.longitude ?? null;
+  return { countryCode, countryName: countryName.slice(0, 80), city, latitude, longitude };
 }
 
 async function resolveCountryFromIp(req: Request): Promise<IpGeo> {
   const byHeader = detectGeoFromHeaders(req);
   const ip = extractClientIp(req);
-  if (isUsableCountryCode(byHeader.countryCode) && byHeader.city) return byHeader;
+  if (isUsableCountryCode(byHeader.countryCode) && byHeader.city && byHeader.latitude != null && byHeader.longitude != null) {
+    return byHeader;
+  }
   if (!ip || !isPublicIp(ip)) {
     if (isUsableCountryCode(byHeader.countryCode)) return byHeader;
-    return { countryCode: "LO", countryName: "Red local", city: "" };
+    return emptyIpGeo("LO", "Red local");
   }
   const fromIp = await lookupIpwhoGeo(ip);
   return mergeIpGeo(byHeader, fromIp);
@@ -384,7 +418,7 @@ async function resolveCountryFromIp(req: Request): Promise<IpGeo> {
 
 async function resolveCountryFromIpValue(ipRaw: string): Promise<IpGeo> {
   const ip = String(ipRaw || "").trim();
-  if (!ip || !isPublicIp(ip)) return { countryCode: "UN", countryName: "Desconocido", city: "" };
+  if (!ip || !isPublicIp(ip)) return emptyIpGeo();
   return lookupIpwhoGeo(ip);
 }
 
@@ -401,6 +435,89 @@ async function ensurePresenceCityColumn(): Promise<void> {
     /* ya existe */
   }
   presenceCityColumnEnsured = true;
+}
+
+let ipGeoTableEnsured = false;
+
+async function ensureIpGeoTable(): Promise<void> {
+  if (ipGeoTableEnsured) return;
+  await db
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS marketplace_ip_geo (
+        ip TEXT PRIMARY KEY,
+        latitude REAL,
+        longitude REAL,
+        city TEXT NOT NULL DEFAULT '',
+        country_code TEXT NOT NULL DEFAULT '',
+        country_name TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL DEFAULT ''
+      )`
+    )
+    .run();
+  ipGeoTableEnsured = true;
+}
+
+async function rememberIpSignal(ip: string, geo: IpGeo): Promise<void> {
+  const clean = String(ip || "").trim().slice(0, 80);
+  if (!isPublicIp(clean) || geo.latitude == null || geo.longitude == null) return;
+  try {
+    await ensureIpGeoTable();
+    await db
+      .prepare(
+        `INSERT INTO marketplace_ip_geo (ip, latitude, longitude, city, country_code, country_name, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(ip) DO UPDATE SET
+           latitude = excluded.latitude,
+           longitude = excluded.longitude,
+           city = excluded.city,
+           country_code = excluded.country_code,
+           country_name = excluded.country_name,
+           updated_at = excluded.updated_at`
+      )
+      .run(
+        clean,
+        geo.latitude,
+        geo.longitude,
+        geo.city.slice(0, 80),
+        geo.countryCode.slice(0, 8),
+        geo.countryName.slice(0, 80),
+        new Date().toISOString()
+      );
+  } catch {
+    /* la ubicación no debe romper el heartbeat */
+  }
+}
+
+async function loadIpSignals(ips: string[]): Promise<Map<string, IpGeo>> {
+  const out = new Map<string, IpGeo>();
+  const unique = [...new Set(ips.map((ip) => String(ip || "").trim()).filter((ip) => isPublicIp(ip)))];
+  if (unique.length === 0) return out;
+  await ensureIpGeoTable();
+  for (let i = 0; i < unique.length; i += 150) {
+    const chunk = unique.slice(i, i + 150);
+    const placeholders = chunk.map(() => "?").join(", ");
+    const rows = (await db
+      .prepare(
+        `SELECT ip, latitude, longitude, city, country_code, country_name
+         FROM marketplace_ip_geo WHERE ip IN (${placeholders})`
+      )
+      .all(...chunk)) as Array<Record<string, unknown>>;
+    for (const raw of rows) {
+      const r = rowKeysToLowercase(raw) as Record<string, string | number | null | undefined>;
+      const latitude = Number(r.latitude);
+      const longitude = Number(r.longitude);
+      const ip = String(r.ip || "").trim();
+      if (!ip || !Number.isFinite(latitude) || !Number.isFinite(longitude)) continue;
+      out.set(ip, {
+        countryCode: normalizeCountryCode(r.country_code) || "UN",
+        countryName: String(r.country_name || "").trim(),
+        city: String(r.city || "").trim(),
+        latitude,
+        longitude,
+      });
+    }
+  }
+  return out;
 }
 
 async function touchMarketplacePresence(req: Request, fallbackPath: string): Promise<void> {
@@ -631,11 +748,15 @@ marketplaceRouter.post("/marketplace/presence/heartbeat", marketplacePublicPostR
     const clientIp = selectBestPresenceIp(req, parsed.data.clientIp);
     const userEmail = (auth.email || String(parsed.data.userEmail || "").trim().toLowerCase()).slice(0, 200);
     await ensurePresenceCityColumn();
+    if (isPublicIp(clientIp)) {
+      const headerGeo = detectGeoFromHeaders(req);
+      if (headerGeo.latitude != null && headerGeo.longitude != null) void rememberIpSignal(clientIp, headerGeo);
+    }
     const ipCountry = await resolveCountryFromIp(req);
     const clientIpCountry =
       shouldUseClientCountryFallback(ipCountry.countryCode) && clientIp
         ? await resolveCountryFromIpValue(clientIp)
-        : { countryCode: "", countryName: "", city: "" };
+        : emptyIpGeo("", "");
     const clientCountryCode = normalizeCountryCode(parsed.data.countryCode);
     const clientCountryName = String(parsed.data.countryName || "").trim().slice(0, 80);
     const localeCode = countryCodeFromLocale(parsed.data.locale || "");
@@ -927,7 +1048,7 @@ marketplaceRouter.get("/marketplace/presence-history", requireAuth, ...adminAB, 
   }
 });
 
-/** Un punto por IP del historial, ubicado en la ciudad o, si no hay ciudad, en el país. */
+/** Un punto por IP, en las coordenadas de esa conexión. */
 marketplaceRouter.get("/marketplace/presence-history-map", requireAuth, ...adminAB, async (req: Request, res: Response) => {
   try {
     await ensurePresenceCityColumn();
@@ -991,7 +1112,35 @@ marketplaceRouter.get("/marketplace/presence-history-map", requireAuth, ...admin
         recordedAt: String(r.recorded_at || ""),
       };
     });
-    const points = assignPresenceCoordinates(latest).map((p) => ({
+    const signals = await loadIpSignals(latest.map((row) => row.clientIp));
+    const missing = [...new Set(latest.map((row) => row.clientIp).filter((ip) => isPublicIp(ip) && !signals.has(ip)))].slice(0, 40);
+    await Promise.all(
+      missing.map(async (ip) => {
+        const geo = await lookupIpwhoGeo(ip);
+        if (geo.latitude != null && geo.longitude != null) signals.set(ip, geo);
+      })
+    );
+    const placed = latest.map((row) => {
+      const signal = signals.get(row.clientIp);
+      if (signal?.latitude != null && signal.longitude != null) {
+        const countryCode = isUsableCountryCode(row.countryCode) ? row.countryCode : signal.countryCode;
+        const countryName =
+          row.countryName && row.countryName.toUpperCase() !== countryCode
+            ? row.countryName
+            : signal.countryName || countryNameFromCode(countryCode) || row.countryName;
+        return {
+          ...row,
+          countryCode,
+          countryName,
+          city: row.city || signal.city,
+          lat: signal.latitude,
+          lng: signal.longitude,
+        };
+      }
+      const fallback = assignPresenceCoordinates([row])[0]!;
+      return { ...row, ...fallback };
+    });
+    const points = nudgeSharedCoordinates(placed).map((p) => ({
       ...p,
       lat: Math.round(p.lat * 10000) / 10000,
       lng: Math.round(p.lng * 10000) / 10000,

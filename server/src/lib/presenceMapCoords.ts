@@ -154,7 +154,42 @@ export type PresenceMapRow = {
   city: string;
 };
 
-/** Un punto por fila. La ciudad manda; si no hay ciudad, el país. Los que comparten sitio se separan para que cada IP se vea. */
+/**
+ * Separa apenas los puntos que caen en la misma coordenada para que cada IP se pueda ver.
+ * El desplazamiento es de alrededor de 1 km, así siguen en la ciudad de la señal.
+ */
+export function nudgeSharedCoordinates<T extends { lat: number; lng: number; clientIp: string; visitorId: string }>(
+  rows: T[]
+): T[] {
+  const groups = new Map<string, T[]>();
+  for (const row of rows) {
+    const key = `${row.lat.toFixed(3)}|${row.lng.toFixed(3)}`;
+    const list = groups.get(key) ?? [];
+    list.push(row);
+    groups.set(key, list);
+  }
+  const out: T[] = [];
+  for (const list of groups.values()) {
+    list.sort((a, b) => (a.clientIp || a.visitorId).localeCompare(b.clientIp || b.visitorId));
+    list.forEach((row, index) => {
+      if (index === 0) {
+        out.push(row);
+        return;
+      }
+      const angle = index * 2.399963229728653;
+      const radius = 0.012 * Math.sqrt(index);
+      const lat = Math.max(-80, Math.min(80, row.lat + radius * Math.sin(angle)));
+      const cos = Math.max(0.25, Math.cos((row.lat * Math.PI) / 180));
+      let lng = row.lng + (radius * Math.cos(angle)) / cos;
+      if (lng > 180) lng -= 360;
+      if (lng < -180) lng += 360;
+      out.push({ ...row, lat, lng });
+    });
+  }
+  return out;
+}
+
+/** Respaldo si una IP no tiene coordenadas de la señal. La ciudad manda; si no hay ciudad, el país. */
 export function assignPresenceCoordinates<T extends PresenceMapRow>(rows: T[]): Array<T & { lat: number; lng: number }> {
   const groups = new Map<string, { base: [number, number]; cityKnown: boolean; countryCode: string; rows: T[] }>();
   for (const row of rows) {
