@@ -71,7 +71,7 @@ function prevCalendarMonthYm(ym: string): string | null {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-/** Gastos por mes de presupuesto, excluyendo proveedores de hosting (esos van por mes de servicio). */
+/** Gastos por mes de presupuesto, excluyendo proveedores de hosting (esos ya van en el margen de hosting). */
 export function monthlyGastosPresupuesto12(
   items: ContabilidadGasto[] | null | undefined,
   year: number,
