@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { CircleMarker, MapContainer, TileLayer, Tooltip, useMap } from "react-leaflet";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { CircleMarker, MapContainer, Popup, TileLayer, Tooltip, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import type { MarketplacePresenceMapPoint } from "../lib/api";
 
@@ -10,10 +10,55 @@ function viewerTypeLabel(raw: string): string {
   return "Invitado (sin cuenta)";
 }
 
-function pointColor(viewerType: string): string {
-  const t = String(viewerType || "").toLowerCase().trim();
-  if (t === "cliente") return "#16a34a";
-  if (t === "staff") return "#2563eb";
+type MapSpot = {
+  key: string;
+  lat: number;
+  lng: number;
+  city: string;
+  countryName: string;
+  countryCode: string;
+  points: MarketplacePresenceMapPoint[];
+};
+
+function groupSpots(points: MarketplacePresenceMapPoint[]): MapSpot[] {
+  const byCoord = new Map<string, MapSpot>();
+  for (const point of points) {
+    const key = `${point.lat.toFixed(5)}|${point.lng.toFixed(5)}`;
+    const spot = byCoord.get(key);
+    if (!spot) {
+      byCoord.set(key, {
+        key,
+        lat: point.lat,
+        lng: point.lng,
+        city: point.city,
+        countryName: point.countryName,
+        countryCode: point.countryCode,
+        points: [point],
+      });
+      continue;
+    }
+    spot.points.push(point);
+    if (!spot.city && point.city) spot.city = point.city;
+  }
+  return [...byCoord.values()];
+}
+
+function loggedEmails(points: MarketplacePresenceMapPoint[]): Array<{ email: string; viewerType: string }> {
+  const seen = new Set<string>();
+  const out: Array<{ email: string; viewerType: string }> = [];
+  for (const point of points) {
+    const email = String(point.userEmail || "").trim().toLowerCase();
+    if (!email || seen.has(email)) continue;
+    seen.add(email);
+    out.push({ email, viewerType: point.viewerType });
+  }
+  out.sort((a, b) => a.email.localeCompare(b.email));
+  return out;
+}
+
+function spotColor(points: MarketplacePresenceMapPoint[]): string {
+  if (points.some((point) => String(point.viewerType).toLowerCase() === "staff")) return "#2563eb";
+  if (points.some((point) => String(point.viewerType).toLowerCase() === "cliente")) return "#16a34a";
   return "#64748b";
 }
 
@@ -67,7 +112,8 @@ export function MarketplacePresenceHistoryMap({
   points: MarketplacePresenceMapPoint[];
   loading: boolean;
 }) {
-  const positions = points.map((p) => [p.lat, p.lng] as [number, number]);
+  const spots = useMemo(() => groupSpots(points), [points]);
+  const positions = spots.map((spot) => [spot.lat, spot.lng] as [number, number]);
   const mapRef = useRef<HTMLDivElement>(null);
   const [fullscreen, setFullscreen] = useState(false);
 
@@ -118,40 +164,62 @@ export function MarketplacePresenceHistoryMap({
           />
           <FitPresencePoints positions={positions} />
           <MapSizeOnFullscreen />
-          {points.map((p) => (
-            <CircleMarker
-              key={`${p.clientIp || p.visitorId}-${p.lat}-${p.lng}`}
-              center={[p.lat, p.lng]}
-              radius={6}
-              pathOptions={{
-                color: pointColor(p.viewerType),
-                fillColor: pointColor(p.viewerType),
-                fillOpacity: 0.85,
-                weight: 1,
-              }}
-            >
-              <Tooltip direction="top" offset={[0, -4]} opacity={0.96}>
-                <div className="hrs-mphist-tip">
-                  <strong>{p.userEmail || "Sin email"}</strong>
-                  <div>{p.clientIp || "Sin IP"}</div>
-                  <div>
-                    {p.city ? `${p.city}, ` : ""}
-                    {p.countryName}
-                    {p.countryCode ? ` (${p.countryCode})` : ""}
+          {spots.map((spot) => {
+            const emails = loggedEmails(spot.points);
+            const anonCount = spot.points.filter((point) => !String(point.userEmail || "").trim()).length;
+            const color = spotColor(spot.points);
+            const place = `${spot.city ? `${spot.city}, ` : ""}${spot.countryName}${spot.countryCode ? ` (${spot.countryCode})` : ""}`;
+            return (
+              <CircleMarker
+                key={spot.key}
+                center={[spot.lat, spot.lng]}
+                radius={emails.length > 0 ? 8 : 6}
+                pathOptions={{ color, fillColor: color, fillOpacity: 0.9, weight: 1 }}
+              >
+                <Tooltip direction="top" offset={[0, -4]} opacity={0.96}>
+                  <div className="hrs-mphist-tip">
+                    <strong>{place}</strong>
+                    <div>
+                      {spot.points.length} IP
+                      {emails.length > 0 ? ` · ${emails.length} email${emails.length === 1 ? "" : "s"}` : ""}
+                    </div>
+                    {emails.slice(0, 4).map((item) => (
+                      <div key={item.email}>{item.email}</div>
+                    ))}
+                    {emails.length > 4 ? <div>+{emails.length - 4} emails</div> : null}
+                    {emails.length === 0 ? <div>Sin email logueado</div> : null}
                   </div>
-                  <div>{viewerTypeLabel(p.viewerType)}</div>
-                  <div>{formatWhen(p.recordedAt)}</div>
-                </div>
-              </Tooltip>
-            </CircleMarker>
-          ))}
+                </Tooltip>
+                <Popup>
+                  <div className="hrs-mphist-tip hrs-mphist-tip--list">
+                    <strong>{place}</strong>
+                    <div>{spot.points.length} IP en este nodo</div>
+                    {emails.length > 0 ? (
+                      <ul>
+                        {emails.map((item) => (
+                          <li key={item.email}>
+                            {item.email}
+                            <span> · {viewerTypeLabel(item.viewerType)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div>Sin email logueado</div>
+                    )}
+                    {anonCount > 0 ? <div>{anonCount} sin cuenta</div> : null}
+                    {spot.points.length === 1 ? <div>{formatWhen(spot.points[0]!.recordedAt)}</div> : null}
+                  </div>
+                </Popup>
+              </CircleMarker>
+            );
+          })}
         </MapContainer>
       )}
       <div className="hrs-mphist-map__legend">
         <span><i className="hrs-mphist-dot hrs-mphist-dot--cliente" /> Cliente</span>
         <span><i className="hrs-mphist-dot hrs-mphist-dot--staff" /> Staff</span>
         <span><i className="hrs-mphist-dot hrs-mphist-dot--anon" /> Sin cuenta</span>
-        <span className="hrs-mphist-map__note">Un punto por IP, en la coordenada real de la conexión. Si varias salen del mismo nodo, se superponen.</span>
+        <span className="hrs-mphist-map__note">Un punto por nodo de conexión. Clic para ver los emails logueados de ese lugar.</span>
       </div>
     </div>
   );

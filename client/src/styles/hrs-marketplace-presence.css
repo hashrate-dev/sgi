@@ -254,6 +254,17 @@
   line-height: 1.35;
 }
 
+.hrs-mphist-tip--list ul {
+  margin: 0.35rem 0 0;
+  padding-left: 1rem;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.hrs-mphist-tip--list li span {
+  color: #64748b;
+}
+
 .hrs-mplive-country-list {
   display: flex;
   flex-wrap: wrap;
