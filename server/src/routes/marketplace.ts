@@ -44,7 +44,7 @@ import { marketplacePublicPostRateLimit } from "../middleware/authRateLimit.js";
 import { resolveSetupCompraHashrateUsd, resolveSetupEquipoCompletoUsd } from "../lib/marketplaceSetupHashratePrice.js";
 import { loadGarantiaQuoteRows } from "../lib/marketplaceGarantiaQuote.js";
 import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
-import { assignPresenceCoordinates, nudgeSharedCoordinates } from "../lib/presenceMapCoords.js";
+import { assignPresenceCoordinates } from "../lib/presenceMapCoords.js";
 import { mpVisibleFromDbValue } from "../lib/mpVisible.js";
 import { sendMarketplaceAsicInquiryEmail, sendMarketplaceContactEmail } from "../lib/marketplaceContactEmail.js";
 import { resolvePublicAppOrigin } from "../lib/publicAppOrigin.js";
@@ -1140,10 +1140,10 @@ marketplaceRouter.get("/marketplace/presence-history-map", requireAuth, ...admin
       const fallback = assignPresenceCoordinates([row])[0]!;
       return { ...row, ...fallback };
     });
-    const points = nudgeSharedCoordinates(placed).map((p) => ({
+    const points = placed.map((p) => ({
       ...p,
-      lat: Math.round(p.lat * 10000) / 10000,
-      lng: Math.round(p.lng * 10000) / 10000,
+      lat: Math.round(p.lat * 1e6) / 1e6,
+      lng: Math.round(p.lng * 1e6) / 1e6,
     }));
     res.json({ points, total: points.length });
   } catch (e) {

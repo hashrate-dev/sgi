@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CircleMarker, MapContainer, TileLayer, Tooltip, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import type { MarketplacePresenceMapPoint } from "../lib/api";
@@ -24,6 +24,18 @@ function formatWhen(iso: string): string {
   } catch {
     return iso;
   }
+}
+
+function MapSizeOnFullscreen() {
+  const map = useMap();
+  useEffect(() => {
+    const fix = () => {
+      window.setTimeout(() => map.invalidateSize(), 60);
+    };
+    document.addEventListener("fullscreenchange", fix);
+    return () => document.removeEventListener("fullscreenchange", fix);
+  }, [map]);
+  return null;
 }
 
 function FitPresencePoints({ positions }: { positions: Array<[number, number]> }) {
@@ -56,12 +68,36 @@ export function MarketplacePresenceHistoryMap({
   loading: boolean;
 }) {
   const positions = points.map((p) => [p.lat, p.lng] as [number, number]);
+  const mapRef = useRef<HTMLDivElement>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+
+  useEffect(() => {
+    const onChange = () => setFullscreen(document.fullscreenElement === mapRef.current);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    const node = mapRef.current;
+    if (!node) return;
+    if (document.fullscreenElement === node) {
+      void document.exitFullscreen();
+      return;
+    }
+    void node.requestFullscreen();
+  };
 
   return (
-    <div className="hrs-mplive-table-wrap hrs-mphist-map">
+    <div className="hrs-mplive-table-wrap hrs-mphist-map" ref={mapRef}>
       <div className="hrs-mplive-map-head">
         <h3>Mapa de accesos</h3>
-        <span>{loading ? "cargando…" : `${points.length} IP${points.length === 1 ? "" : "s"}`}</span>
+        <div className="hrs-mphist-map__tools">
+          <span>{loading ? "cargando…" : `${points.length} IP${points.length === 1 ? "" : "s"}`}</span>
+          <button type="button" className="hrs-mphist-full-btn" onClick={toggleFullscreen}>
+            <i className={`bi ${fullscreen ? "bi-fullscreen-exit" : "bi-arrows-fullscreen"}`} aria-hidden />
+            {fullscreen ? "Salir" : "Pantalla completa"}
+          </button>
+        </div>
       </div>
       {points.length === 0 && !loading ? (
         <p className="hrs-mphist-map__empty">No hay ubicaciones para estos filtros.</p>
@@ -81,6 +117,7 @@ export function MarketplacePresenceHistoryMap({
             maxNativeZoom={19}
           />
           <FitPresencePoints positions={positions} />
+          <MapSizeOnFullscreen />
           {points.map((p) => (
             <CircleMarker
               key={`${p.clientIp || p.visitorId}-${p.lat}-${p.lng}`}
@@ -114,7 +151,7 @@ export function MarketplacePresenceHistoryMap({
         <span><i className="hrs-mphist-dot hrs-mphist-dot--cliente" /> Cliente</span>
         <span><i className="hrs-mphist-dot hrs-mphist-dot--staff" /> Staff</span>
         <span><i className="hrs-mphist-dot hrs-mphist-dot--anon" /> Sin cuenta</span>
-        <span className="hrs-mphist-map__note">Un punto por IP, en la ubicación de la conexión.</span>
+        <span className="hrs-mphist-map__note">Un punto por IP, en la coordenada real de la conexión. Si varias salen del mismo nodo, se superponen.</span>
       </div>
     </div>
   );
