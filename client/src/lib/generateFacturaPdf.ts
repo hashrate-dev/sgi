@@ -557,7 +557,8 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
     );
     const notaGuarani =
       "El monto que se devuelve puede ser distinto al monto contable, debido a que se ajusta por el valor del Guaraní a la fecha.";
-    const yRecTop = y + (data.documentContext === "garantia-ande" ? 32 : 40);
+    /* Recibo: 1 cm más arriba para que no pise el TOTAL del pie. El TOTAL no se mueve. */
+    const yRecTop = y + (data.documentContext === "garantia-ande" ? 32 : 30);
     const recPaddingTop = 5;
     const recPaddingBottom = 5;
     const recLineH = 6;
