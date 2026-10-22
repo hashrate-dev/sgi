@@ -48,6 +48,9 @@ export type AsicPedido = {
   comisionUsd: number | null;
   aduanaAplica: boolean;
   notas: string;
+  facturaId: number | null;
+  facturaNumero: string;
+  facturaTitular: string;
   etapas: Partial<Record<AsicPedidoStageKey, AsicPedidoStageState>>;
   etapaActual: AsicPedidoStageKey | "completo";
   createdAt: string;
@@ -206,7 +209,7 @@ export function createAsicPedido(body: {
 
 export function updateAsicPedido(
   id: number,
-  body: Partial<Pick<AsicPedido, "cliente" | "equipo" | "cantidad" | "notas" | "aduanaAplica">>
+  body: Partial<Pick<AsicPedido, "cliente" | "equipo" | "cantidad" | "notas" | "aduanaAplica" | "facturaId" | "facturaNumero" | "facturaTitular">>
 ): Promise<{ pedido: AsicPedido }> {
   return api(`/api/asic-pedidos/${id}`, { method: "PATCH", body: JSON.stringify(body) });
 }

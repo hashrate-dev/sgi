@@ -61,6 +61,9 @@ type PedidoRow = {
   comisionUsd: number | null;
   aduanaAplica: boolean;
   notas: string;
+  facturaId: number | null;
+  facturaNumero: string;
+  facturaTitular: string;
   etapas: StagesMap;
   etapaActual: AsicPedidoStageKey | "completo";
   createdAt: string;
@@ -92,6 +95,9 @@ const PatchSchema = z.object({
   cantidad: z.coerce.number().int().min(1).max(500).optional(),
   notas: z.string().trim().max(2000).optional(),
   aduanaAplica: z.boolean().optional(),
+  facturaNumero: z.string().trim().max(80).optional(),
+  facturaId: z.number().int().positive().nullable().optional(),
+  facturaTitular: z.string().trim().max(200).optional(),
 });
 
 const ConfirmSchema = z.object({
@@ -162,6 +168,9 @@ async function ensureSchema(): Promise<void> {
         "ALTER TABLE asic_pedidos ADD COLUMN IF NOT EXISTS vendedor TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE asic_pedidos ADD COLUMN IF NOT EXISTS tiene_comision INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE asic_pedidos ADD COLUMN IF NOT EXISTS comision_usd DOUBLE PRECISION",
+        "ALTER TABLE asic_pedidos ADD COLUMN IF NOT EXISTS factura_id BIGINT",
+        "ALTER TABLE asic_pedidos ADD COLUMN IF NOT EXISTS factura_numero TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE asic_pedidos ADD COLUMN IF NOT EXISTS factura_titular TEXT NOT NULL DEFAULT ''",
       ]
     : [
         "ALTER TABLE asic_pedidos ADD COLUMN client_id INTEGER",
@@ -170,6 +179,9 @@ async function ensureSchema(): Promise<void> {
         "ALTER TABLE asic_pedidos ADD COLUMN vendedor TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE asic_pedidos ADD COLUMN tiene_comision INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE asic_pedidos ADD COLUMN comision_usd REAL",
+        "ALTER TABLE asic_pedidos ADD COLUMN factura_id INTEGER",
+        "ALTER TABLE asic_pedidos ADD COLUMN factura_numero TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE asic_pedidos ADD COLUMN factura_titular TEXT NOT NULL DEFAULT ''",
       ];
   for (const sql of alters) {
     try {
@@ -300,6 +312,9 @@ function mapPedido(raw: Record<string, unknown>): PedidoRow {
     comisionUsd: comisionRaw != null && Number.isFinite(comisionRaw) ? comisionRaw : null,
     aduanaAplica,
     notas: String(r.notas ?? ""),
+    facturaId: Number.isFinite(Number(r.factura_id)) && Number(r.factura_id) > 0 ? Number(r.factura_id) : null,
+    facturaNumero: String(r.factura_numero ?? ""),
+    facturaTitular: String(r.factura_titular ?? ""),
     etapas,
     etapaActual: etapaActual(aduanaAplica, etapas),
     createdAt: String(r.created_at ?? ""),
@@ -345,6 +360,54 @@ async function loadPedido(id: number): Promise<PedidoRow | null> {
   const raw = (await db.prepare("SELECT * FROM asic_pedidos WHERE id = ?").get(id)) as Record<string, unknown> | undefined;
   if (!raw) return null;
   return mapPedido(raw);
+}
+
+function isoDate(raw: string): string {
+  const text = String(raw ?? "").trim();
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(text);
+  if (iso?.[1] && iso[2] && iso[3]) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const dmy = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(text);
+  if (dmy?.[1] && dmy[2] && dmy[3]) return `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
+  const now = new Date();
+  const z = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${z(now.getMonth() + 1)}-${z(now.getDate())}`;
+}
+
+/** Cuando se emite el recibo de una factura ya conectada al pedido, cierra la etapa de documentos. */
+export async function attachAsicPedidoReceipt(opts: {
+  facturaNumber: string;
+  reciboNumber: string;
+  reciboDate: string;
+  titular?: string;
+}): Promise<void> {
+  const facturaNumber = String(opts.facturaNumber ?? "").trim();
+  const reciboNumber = String(opts.reciboNumber ?? "").trim();
+  if (!facturaNumber || !reciboNumber) return;
+  await ensureSchema();
+  const rows = (await db
+    .prepare("SELECT id FROM asic_pedidos WHERE upper(factura_numero) = upper(?)")
+    .all(facturaNumber)) as Array<{ id?: number }>;
+  for (const row of rows) {
+    const id = Number(row.id);
+    if (!Number.isFinite(id) || id <= 0) continue;
+    const pedido = await loadPedido(id);
+    if (!pedido || pedido.etapaActual !== "documentos" || pedido.etapas.documentos?.status === "done") continue;
+    const etapas: StagesMap = {
+      ...pedido.etapas,
+      documentos: {
+        status: "done",
+        fecha: isoDate(opts.reciboDate),
+        notas: "",
+        modoCobro: "factura_recibo",
+        numeroFactura: pedido.facturaNumero || facturaNumber,
+        numeroRecibo: reciboNumber,
+        ...(pedido.facturaTitular || opts.titular
+          ? { titularFactura: pedido.facturaTitular || String(opts.titular ?? "") }
+          : {}),
+      },
+    };
+    await saveStages(id, etapas);
+  }
 }
 
 async function saveStages(id: number, etapas: StagesMap, aduanaAplica?: boolean): Promise<void> {
@@ -612,10 +675,14 @@ asicPedidosRouter.patch("/asic-pedidos/:id", ...writeMw, async (req, res, next) 
       aduanaAplica = data.aduanaAplica;
     }
     const ts = nowSql();
+    const facturaNumero = data.facturaNumero !== undefined ? data.facturaNumero : pedido.facturaNumero;
+    const facturaId = data.facturaId !== undefined ? data.facturaId : pedido.facturaId;
+    const facturaTitular = data.facturaTitular !== undefined ? data.facturaTitular : pedido.facturaTitular;
     await db
       .prepare(
         `UPDATE asic_pedidos
-         SET cliente = ?, equipo = ?, cantidad = ?, notas = ?, aduana_aplica = ?, updated_at = ${ts}
+         SET cliente = ?, equipo = ?, cantidad = ?, notas = ?, aduana_aplica = ?,
+             factura_id = ?, factura_numero = ?, factura_titular = ?, updated_at = ${ts}
          WHERE id = ?`
       )
       .run(
@@ -624,6 +691,9 @@ asicPedidosRouter.patch("/asic-pedidos/:id", ...writeMw, async (req, res, next) 
         data.cantidad ?? pedido.cantidad,
         data.notas ?? pedido.notas,
         aduanaAplica ? 1 : 0,
+        facturaId,
+        facturaNumero,
+        facturaTitular,
         id
       );
     res.json({ pedido: await loadPedido(id) });

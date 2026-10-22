@@ -310,6 +310,10 @@
   gap: 0.45rem;
 }
 
+.asic-pedidos-docs input {
+  width: 100%;
+}
+
 .asic-pedidos-docs button {
   text-align: left;
   border-radius: 10px;

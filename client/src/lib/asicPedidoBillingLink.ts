@@ -96,7 +96,12 @@ function findOrderClient(clients: Client[], clientId: number | null, cliente: st
  * Incluye la razón social y el representante (nombre 2), y el cliente vinculado
  * cuando la factura sale a nombre de una LLC y los equipos son de la persona.
  */
-export function billingNamesForPedido(clients: Client[], clientId: number | null, cliente: string): string[] {
+export function billingNamesForPedido(
+  clients: Client[],
+  clientId: number | null,
+  cliente: string,
+  extraLabels: string[] = []
+): string[] {
   const seed = findOrderClient(clients, clientId, cliente);
   const known = new Set<string>();
   const add = (value: string) => {
@@ -104,6 +109,7 @@ export function billingNamesForPedido(clients: Client[], clientId: number | null
     if (text) known.add(text);
   };
   add(pedidoLabel(cliente));
+  extraLabels.forEach(add);
   if (seed) clientNames(seed).forEach(add);
 
   let grew = true;
@@ -193,33 +199,49 @@ function receiptFor(invoice: AsicBillingDoc, recibos: AsicBillingDoc[]): AsicBil
   );
 }
 
-/** Facturas crédito y comprobantes de pago ya emitidos que corresponden a este pedido. */
+function byDateDesc(a: { date: string; id: number }, b: { date: string; id: number }): number {
+  return dateRank(b.date) - dateRank(a.date) || b.id - a.id;
+}
+
+/**
+ * Facturas crédito para elegir en el pedido.
+ * `suggested` son las del cliente, su representante o su empresa.
+ * `others` son el resto de las facturas crédito, para conectar una LLC como FINANCE ANGELS LLC.
+ * El recibo se busca en todos los comprobantes, no solo en los del mismo nombre.
+ */
 export function matchAsicPedidoBilling(opts: {
   cliente: string;
   clientId: number | null;
   clients: Client[];
   invoices: AsicBillingDoc[];
-}): { credit: AsicPedidoBillingHit[]; vouchers: AsicBillingDoc[] } {
-  const names = billingNamesForPedido(opts.clients, opts.clientId, opts.cliente);
+  extraLabels?: string[];
+}): { suggested: AsicPedidoBillingHit[]; others: AsicPedidoBillingHit[]; vouchers: AsicBillingDoc[] } {
+  const names = billingNamesForPedido(opts.clients, opts.clientId, opts.cliente, opts.extraLabels ?? []);
   const orderClient = findOrderClient(opts.clients, opts.clientId, opts.cliente);
-  const related = opts.invoices.filter(
-    (doc) => doc.documentContext !== "garantia-ande" && invoiceMatchesNames(doc.clientName, names)
-  );
-  const recibos = related.filter((doc) => doc.type === "Recibo");
-  const credit = related
-    .filter(isCreditInvoice)
-    .map((invoice) => {
-      const link = reasonForInvoice(invoice.clientName, orderClient, opts.cliente);
-      return {
-        invoice,
-        receipt: receiptFor(invoice, recibos),
-        sameName: link.sameName,
-        reason: link.reason,
-      };
-    })
-    .sort((a, b) => dateRank(b.invoice.date) - dateRank(a.invoice.date) || b.invoice.id - a.invoice.id);
-  const vouchers = related
-    .filter(isPaymentVoucher)
-    .sort((a, b) => dateRank(b.date) - dateRank(a.date) || b.id - a.id);
-  return { credit, vouchers };
+  const recibos = opts.invoices.filter((doc) => doc.type === "Recibo");
+  const suggested: AsicPedidoBillingHit[] = [];
+  const others: AsicPedidoBillingHit[] = [];
+  for (const invoice of opts.invoices.filter(isCreditInvoice)) {
+    const related = invoiceMatchesNames(invoice.clientName, names);
+    const link = related
+      ? reasonForInvoice(invoice.clientName, orderClient, opts.cliente)
+      : {
+          sameName: false,
+          reason: `A nombre de ${invoice.clientName}. Se puede conectar a este pedido.`,
+        };
+    const hit: AsicPedidoBillingHit = {
+      invoice,
+      receipt: receiptFor(invoice, recibos),
+      sameName: related && link.sameName,
+      reason: link.reason,
+    };
+    if (related) suggested.push(hit);
+    else others.push(hit);
+  }
+  suggested.sort((a, b) => byDateDesc(a.invoice, b.invoice));
+  others.sort((a, b) => byDateDesc(a.invoice, b.invoice));
+  const vouchers = opts.invoices
+    .filter((doc) => doc.documentContext !== "garantia-ande" && isPaymentVoucher(doc) && invoiceMatchesNames(doc.clientName, names))
+    .sort(byDateDesc);
+  return { suggested, others, vouchers };
 }

@@ -837,6 +837,15 @@ function PedidoDetail({
                       busy={busy}
                       onError={onError}
                       onSubmit={(body) => void onRun(() => confirmAsicPedidoStage(pedido.id, key, body).then((r) => r.pedido))}
+                      onLinkInvoice={(hit) =>
+                        void onRun(() =>
+                          updateAsicPedido(pedido.id, {
+                            facturaId: hit.invoice.id,
+                            facturaNumero: hit.invoice.number,
+                            facturaTitular: hit.invoice.clientName,
+                          }).then((r) => r.pedido)
+                        )
+                      }
                     />
                   ) : null}
                 </div>
@@ -864,11 +873,13 @@ function StageForm({
   busy,
   onError,
   onSubmit,
+  onLinkInvoice,
 }: {
   pedido: AsicPedido;
   stage: AsicPedidoStageKey;
   busy: boolean;
   onError: (message: string | null) => void;
+  onLinkInvoice?: (hit: AsicPedidoBillingHit) => void;
   onSubmit: (body: {
     fecha: string;
     notas: string;
@@ -890,11 +901,15 @@ function StageForm({
   const [numeroRecibo, setNumeroRecibo] = useState("");
   const [numeroComprobante, setNumeroComprobante] = useState("");
   const [titularFactura, setTitularFactura] = useState("");
-  const [billingHits, setBillingHits] = useState<AsicPedidoBillingHit[]>([]);
+  const [billingSuggested, setBillingSuggested] = useState<AsicPedidoBillingHit[]>([]);
+  const [billingOthers, setBillingOthers] = useState<AsicPedidoBillingHit[]>([]);
+  const [billingQuery, setBillingQuery] = useState("");
   const [billingVouchers, setBillingVouchers] = useState<AsicPedidoBillingHit["invoice"][]>([]);
   const [billingDetalle, setBillingDetalle] = useState<Record<number, string>>({});
   const [billingState, setBillingState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const didAutoLink = useRef(false);
+  const onLinkRef = useRef(onLinkInvoice);
+  onLinkRef.current = onLinkInvoice;
   const [medio, setMedio] = useState<AsicPedidoMedioDinero>("banco_py");
   const [referencia, setReferencia] = useState("");
   const [monto, setMonto] = useState("");
@@ -907,7 +922,9 @@ function StageForm({
     setNumeroRecibo("");
     setNumeroComprobante("");
     setTitularFactura("");
-    setBillingHits([]);
+    setBillingSuggested([]);
+    setBillingOthers([]);
+    setBillingQuery("");
     setBillingVouchers([]);
     setBillingDetalle({});
     setBillingState("idle");
@@ -917,13 +934,14 @@ function StageForm({
     setMonto("");
   }, [stage, pedido.id]);
 
-  const applyCredit = useCallback((hit: AsicPedidoBillingHit) => {
+  const applyCredit = useCallback((hit: AsicPedidoBillingHit, persist = false) => {
     setModo("factura_recibo");
     setNumeroFactura(hit.invoice.number);
     setNumeroRecibo(hit.receipt?.number ?? "");
     setTitularFactura(hit.invoice.clientName);
     const iso = asicBillingDateToIso(hit.invoice.date);
     if (iso) setFecha(iso);
+    if (persist) onLinkRef.current?.(hit);
   }, []);
 
   const applyVoucher = useCallback((doc: AsicPedidoBillingHit["invoice"]) => {
@@ -962,19 +980,27 @@ function StageForm({
           clientId: pedido.clientId,
           clients,
           invoices,
+          extraLabels: [pedido.etapas.contrato?.referencia ?? ""],
         });
         if (cancelled) return;
-        setBillingHits(matched.credit);
+        setBillingSuggested(matched.suggested);
+        setBillingOthers(matched.others);
         setBillingVouchers(matched.vouchers);
         setBillingState("ready");
-        if (!didAutoLink.current && matched.credit.length === 1) {
+        const saved = [...matched.suggested, ...matched.others].find(
+          (hit) => hit.invoice.number.toUpperCase() === String(pedido.facturaNumero ?? "").trim().toUpperCase()
+        );
+        if (!didAutoLink.current && saved) {
           didAutoLink.current = true;
-          applyCredit(matched.credit[0]!);
-        } else if (!didAutoLink.current && matched.credit.length === 0 && matched.vouchers.length === 1) {
+          applyCredit(saved, false);
+        } else if (!didAutoLink.current && matched.suggested.length === 1) {
+          didAutoLink.current = true;
+          applyCredit(matched.suggested[0]!, true);
+        } else if (!didAutoLink.current && matched.suggested.length === 0 && matched.vouchers.length === 1) {
           didAutoLink.current = true;
           applyVoucher(matched.vouchers[0]!);
         }
-        const previewIds = matched.credit.slice(0, 8).map((hit) => hit.invoice.id);
+        const previewIds = [...matched.suggested, ...matched.others].slice(0, 12).map((hit) => hit.invoice.id);
         if (previewIds.length === 0) return;
         const details = await Promise.all(
           previewIds.map(async (id) => {
@@ -999,7 +1025,7 @@ function StageForm({
     return () => {
       cancelled = true;
     };
-  }, [stage, pedido.id, pedido.cliente, pedido.clientId, applyCredit, applyVoucher]);
+  }, [stage, pedido.id, pedido.cliente, pedido.clientId, pedido.facturaNumero, pedido.etapas.contrato?.referencia, applyCredit, applyVoucher]);
 
   const referenciaLabel =
     stage === "pedido"
@@ -1051,18 +1077,13 @@ function StageForm({
       {stage === "documentos" && modo === "factura_recibo" ? (
         <BillingDocList
           state={billingState}
-          hits={billingHits}
+          suggested={billingSuggested}
+          others={billingOthers}
+          query={billingQuery}
+          onQuery={setBillingQuery}
           selectedNumber={numeroFactura}
           detalle={billingDetalle}
-          emptyHint={
-            billingVouchers.length > 0
-              ? "No hay factura crédito de este cliente. Hay un comprobante de pago ya emitido."
-              : "No hay una factura crédito emitida a este cliente ni a su empresa."
-          }
-          onPick={applyCredit}
-          onUseVoucher={
-            billingVouchers.length > 0 ? () => applyVoucher(billingVouchers[0]!) : undefined
-          }
+          onPick={(hit) => applyCredit(hit, true)}
         />
       ) : null}
 
@@ -1079,7 +1100,9 @@ function StageForm({
         </div>
       ) : null}
       {stage === "documentos" && modo === "factura_recibo" && numeroFactura && !numeroRecibo ? (
-        <p className="asic-pedidos-doc-note">Esta factura todavía no tiene recibo. Cuando se emita, se completa solo.</p>
+        <p className="asic-pedidos-doc-note">
+          {numeroFactura} quedó conectada a este pedido{titularFactura ? ` (${titularFactura})` : ""}. Cuando se emita el recibo del pago, se agrega solo.
+        </p>
       ) : null}
 
       {stage === "documentos" && modo === "comprobante_previo" ? (
@@ -1172,64 +1195,86 @@ function formatUsd(value: number): string {
   })} USD`;
 }
 
-function BillingDocList({
-  state,
-  hits,
+function BillingDocButton({
+  hit,
   selectedNumber,
   detalle,
-  emptyHint,
   onPick,
-  onUseVoucher,
 }: {
-  state: "idle" | "loading" | "ready" | "error";
-  hits: AsicPedidoBillingHit[];
+  hit: AsicPedidoBillingHit;
   selectedNumber: string;
   detalle: Record<number, string>;
-  emptyHint: string;
   onPick: (hit: AsicPedidoBillingHit) => void;
-  onUseVoucher?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={selectedNumber === hit.invoice.number ? "is-on" : ""}
+      onClick={() => onPick(hit)}
+    >
+      <strong>
+        {hit.invoice.number} · {hit.invoice.clientName}
+      </strong>
+      <span>
+        {hit.invoice.date} · {formatUsd(hit.invoice.total)}
+        {hit.receipt ? ` · Recibo ${hit.receipt.number}` : " · Sin recibo"}
+      </span>
+      <span>{hit.reason}</span>
+      {detalle[hit.invoice.id] ? <span>{detalle[hit.invoice.id]}</span> : null}
+    </button>
+  );
+}
+
+function BillingDocList({
+  state,
+  suggested,
+  others,
+  query,
+  onQuery,
+  selectedNumber,
+  detalle,
+  onPick,
+}: {
+  state: "idle" | "loading" | "ready" | "error";
+  suggested: AsicPedidoBillingHit[];
+  others: AsicPedidoBillingHit[];
+  query: string;
+  onQuery: (value: string) => void;
+  selectedNumber: string;
+  detalle: Record<number, string>;
+  onPick: (hit: AsicPedidoBillingHit) => void;
 }) {
   if (state === "loading" || state === "idle") {
-    return <p className="asic-pedidos-doc-note">Buscando la factura crédito ya emitida de este cliente…</p>;
+    return <p className="asic-pedidos-doc-note">Buscando facturas crédito…</p>;
   }
   if (state === "error") {
     return <p className="asic-pedidos-doc-note">No se pudieron leer las facturas. Podés cargar el número a mano.</p>;
   }
-  if (hits.length === 0) {
-    return (
-      <div className="asic-pedidos-doc-note">
-        <p>{emptyHint}</p>
-        {onUseVoucher ? (
-          <button type="button" className="asic-pedidos-ghost" onClick={onUseVoucher}>
-            Usar el comprobante de pago
-          </button>
-        ) : null}
-      </div>
-    );
-  }
+  const q = query.trim().toLowerCase();
+  const filteredOthers = others.filter((hit) => {
+    if (!q) return true;
+    return `${hit.invoice.number} ${hit.invoice.clientName}`.toLowerCase().includes(q);
+  });
+  const visibleOthers = q ? filteredOthers : filteredOthers.slice(0, 30);
   return (
     <div className="asic-pedidos-docs">
       <p className="asic-pedidos-doc-note">
-        Facturas ya emitidas de este cliente. Si la factura está a nombre de su empresa, también aparece.
+        Elegí la factura crédito de esta operación, aunque esté a nombre de la empresa. El recibo se conecta solo cuando se emite el pago.
       </p>
-      {hits.map((hit) => (
-        <button
-          key={hit.invoice.id}
-          type="button"
-          className={selectedNumber === hit.invoice.number ? "is-on" : ""}
-          onClick={() => onPick(hit)}
-        >
-          <strong>
-            {hit.invoice.number} · {hit.invoice.clientName}
-          </strong>
-          <span>
-            {hit.invoice.date} · {formatUsd(hit.invoice.total)}
-            {hit.receipt ? ` · Recibo ${hit.receipt.number}` : " · Sin recibo"}
-          </span>
-          <span>{hit.reason}</span>
-          {detalle[hit.invoice.id] ? <span>{detalle[hit.invoice.id]}</span> : null}
-        </button>
+      <input
+        value={query}
+        onChange={(e) => onQuery(e.target.value)}
+        placeholder="Buscar por número o cliente, por ejemplo F100352"
+      />
+      {suggested.map((hit) => (
+        <BillingDocButton key={hit.invoice.id} hit={hit} selectedNumber={selectedNumber} detalle={detalle} onPick={onPick} />
       ))}
+      {visibleOthers.map((hit) => (
+        <BillingDocButton key={hit.invoice.id} hit={hit} selectedNumber={selectedNumber} detalle={detalle} onPick={onPick} />
+      ))}
+      {suggested.length === 0 && visibleOthers.length === 0 ? (
+        <p className="asic-pedidos-doc-note">No hay una factura crédito con ese dato.</p>
+      ) : null}
     </div>
   );
 }

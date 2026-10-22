@@ -5,6 +5,7 @@ import { rebuildReciboSettlementByNumber } from "../lib/rebuildReciboSettlement.
 import { normalizeInvoiceServiceStored } from "../lib/invoiceItemDescription.js";
 import { requireRole } from "../middleware/auth.js";
 import { requireModuleGrant } from "../middleware/moduleGrant.js";
+import { attachAsicPedidoReceipt } from "./asicPedidos.js";
 
 const isPg = () => (getDb() as { isPostgres?: boolean }).isPostgres === true;
 const clientNameCol = () => (isPg() ? '"clientName"' : "clientName");
@@ -411,6 +412,30 @@ invoicesRouter.post(
       ).get(invoiceId);
       return createdRow;
     });
+    const createdRec = created as {
+      type?: string;
+      number?: string;
+      date?: string;
+      clientName?: string;
+      relatedInvoiceNumber?: string;
+    } | null;
+    if (
+      sourceVal === "asic" &&
+      createdRec?.type === "Recibo" &&
+      createdRec.relatedInvoiceNumber &&
+      createdRec.number
+    ) {
+      try {
+        await attachAsicPedidoReceipt({
+          facturaNumber: String(createdRec.relatedInvoiceNumber),
+          reciboNumber: String(createdRec.number),
+          reciboDate: String(createdRec.date ?? ""),
+          titular: String(createdRec.clientName ?? ""),
+        });
+      } catch (err) {
+        console.error("No se pudo conectar el recibo al pedido ASIC", err);
+      }
+    }
     res.status(201).json({ invoice: created });
   } catch (e: unknown) {
     const err = e as { code?: string; message?: string };
