@@ -30,6 +30,7 @@ import { hostingBillingServicesRouter } from "./routes/hostingBillingServices.js
 import { hostingBillingAgentRouter, hostingBillingAgentCronHandler } from "./routes/hostingBillingAgent.js";
 import { commercialInvoicesRouter } from "./routes/commercialInvoices.js";
 import { asicCostosRouter } from "./routes/asicCostos.js";
+import { asicPedidosRouter } from "./routes/asicPedidos.js";
 import { proveedoresHrsRouter } from "./routes/proveedoresHrs.js";
 import { contabilidadGastosRouter } from "./routes/contabilidadGastos.js";
 import { contabilidadMediosPagoRouter } from "./routes/contabilidadMediosPago.js";
@@ -175,6 +176,7 @@ export function createApp() {
   app.use("/api", requireAuth, hostingBillingServicesRouter);
   app.use("/api", requireAuth, hostingBillingAgentRouter);
   app.use("/api", requireAuth, asicCostosRouter);
+  app.use("/api", requireAuth, asicPedidosRouter);
   app.use("/api", requireAuth, proveedoresHrsRouter);
   app.use("/api", requireAuth, contabilidadGastosRouter);
   app.use("/api", requireAuth, contabilidadMediosPagoRouter);

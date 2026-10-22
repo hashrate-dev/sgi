@@ -7,6 +7,12 @@ import "../styles/facturacion.css";
 
 const asicMenuItems: Array<{ to: string; icon: string; label: string; desc: string }> = [
   {
+    to: "/asic/pedidos",
+    icon: "bi-diagram-3",
+    label: "Seguimiento de pedidos ASIC",
+    desc: "Del contrato firmado al datacenter de Ayolas. Origen China o Paraguay, con cada etapa del pedido.",
+  },
+  {
     to: "/asic/monitor-equipos",
     icon: "bi-speedometer2",
     label: "Monitor equipos ASIC (NiceHash)",

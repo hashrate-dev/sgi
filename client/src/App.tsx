@@ -33,6 +33,7 @@ import { FacturasMesHostingPage } from "./pages/FacturasMesHostingPage";
 import { HostingExchangeOperationsPage } from "./pages/HostingExchangeOperationsPage";
 import { HostingTipoCambioHistorialPage } from "./pages/HostingTipoCambioHistorialPage";
 import { MineriaHubPage } from "./pages/MineriaHubPage";
+import { AsicPedidosPage } from "./pages/AsicPedidosPage";
 import { MonitorEquiposAsicPage } from "./pages/MonitorEquiposAsicPage";
 import { MonitorEquiposAsicBajasPage } from "./pages/MonitorEquiposAsicBajasPage";
 import { AsicCotizadorChinaPyPage } from "./pages/AsicCotizadorChinaPyPage";
@@ -490,6 +491,7 @@ function App() {
             <Route path="/asic/monitor-equipos" element={<MonitorEquiposAsicPage />} />
             <Route path="/asic/equipos-dados-de-baja" element={<MonitorEquiposAsicBajasPage />} />
             <Route path="/asic" element={<MineriaHubPage />} />
+            <Route path="/asic/pedidos" element={<AsicPedidosPage />} />
             <Route path="/asic/cotizador-china-py" element={<AsicCotizadorChinaPyPage />} />
             <Route path="/asic/setup" element={<SetupPage />} />
             <Route path="/asic/reparacion" element={<ReparacionPage />} />

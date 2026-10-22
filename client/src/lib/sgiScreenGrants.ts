@@ -156,6 +156,7 @@ export const ASIC_HUB_SCREENS = [
   "hosting-commercial-invoice",
   "asic-history",
   "asic-pending",
+  "asic-pedidos",
   "asic-setup",
   "asic-reparacion",
   "asic-garantia-ande",

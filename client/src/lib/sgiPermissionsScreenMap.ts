@@ -344,6 +344,16 @@ export const SGI_PERMISSION_SCREEN_MAP: readonly SgiPermissionScreenRow[] = [
     audience: ["staff", "lector"],
   },
   {
+    id: "asic-pedidos",
+    zoneOrder: 30,
+    zone: "Equipos ASIC — Minería corporativa",
+    legacyModule: "facturacion",
+    title: "Seguimiento de pedidos ASIC",
+    routes: ["/asic/pedidos"],
+    accessNote: "Proceso del pedido desde el contrato hasta la instalación en Ayolas.",
+    audience: ["staff", "lector"],
+  },
+  {
     id: "asic-setup",
     zoneOrder: 30,
     zone: "Equipos ASIC — Minería corporativa",
