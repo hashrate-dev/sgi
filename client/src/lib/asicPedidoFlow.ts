@@ -28,6 +28,7 @@ export type AsicPedidoStageState = {
   numeroFactura?: string;
   numeroRecibo?: string;
   numeroComprobante?: string;
+  titularFactura?: string;
   medioDinero?: AsicPedidoMedioDinero;
   referencia?: string;
   montoUsd?: number | null;
@@ -60,6 +61,7 @@ export type AsicPedidoConfirmBody = {
   numeroFactura?: string;
   numeroRecibo?: string;
   numeroComprobante?: string;
+  titularFactura?: string;
   medioDinero?: AsicPedidoMedioDinero;
   referencia?: string;
   montoUsd?: number;
@@ -140,10 +142,10 @@ export function asicPedidoStageSummary(key: AsicPedidoStageKey, state: AsicPedid
   const bits: string[] = [];
   if (state.fecha) bits.push(formatAsicPedidoFecha(state.fecha));
   if (key === "documentos" && state.modoCobro === "factura_recibo") {
-    bits.push(`Factura ${state.numeroFactura || "—"}`);
+    bits.push(`Factura ${state.numeroFactura || "—"}${state.titularFactura ? ` (${state.titularFactura})` : ""}`);
     bits.push(`Recibo ${state.numeroRecibo || "—"}`);
   } else if (key === "documentos" && state.modoCobro === "comprobante_previo") {
-    bits.push(`Comprobante ${state.numeroComprobante || "—"}`);
+    bits.push(`Comprobante ${state.numeroComprobante || "—"}${state.titularFactura ? ` (${state.titularFactura})` : ""}`);
   } else if (key === "dinero" && state.medioDinero) {
     bits.push(asicPedidoMedioLabel(state.medioDinero));
   } else if (state.referencia) {
@@ -166,6 +168,17 @@ export function formatAsicPedidoFecha(iso: string): string {
 export function asicPedidoEtapaLabel(pedido: AsicPedido): string {
   if (pedido.etapaActual === "completo") return "Instalado en Ayolas";
   return asicPedidoStageTitle(pedido.etapaActual, pedido.origen);
+}
+
+export function listAsicPedidoCatalogo(): Promise<{ vendedores: string[]; contratoRefs: string[] }> {
+  return api("/api/asic-pedidos/catalogo");
+}
+
+export function createAsicPedidoCatalogo(
+  tipo: "vendedor" | "contrato_ref",
+  nombre: string
+): Promise<{ nombre: string; alreadyExists: boolean }> {
+  return api("/api/asic-pedidos/catalogo", { method: "POST", body: JSON.stringify({ tipo, nombre }) });
 }
 
 export function listAsicPedidos(): Promise<{ pedidos: AsicPedido[] }> {

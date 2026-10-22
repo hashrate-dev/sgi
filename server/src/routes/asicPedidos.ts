@@ -39,6 +39,7 @@ type StageState = {
   numeroFactura?: string;
   numeroRecibo?: string;
   numeroComprobante?: string;
+  titularFactura?: string;
   medioDinero?: "banco_py" | "banco_uy" | "binance";
   referencia?: string;
   montoUsd?: number | null;
@@ -100,6 +101,7 @@ const ConfirmSchema = z.object({
   numeroFactura: z.string().trim().max(80).optional().default(""),
   numeroRecibo: z.string().trim().max(80).optional().default(""),
   numeroComprobante: z.string().trim().max(80).optional().default(""),
+  titularFactura: z.string().trim().max(200).optional().default(""),
   medioDinero: z.enum(["banco_py", "banco_uy", "binance"]).optional(),
   referencia: z.string().trim().max(200).optional().default(""),
   montoUsd: z.coerce.number().finite().min(0).max(100_000_000).optional(),
@@ -177,7 +179,55 @@ async function ensureSchema(): Promise<void> {
       if (!/duplicate column/i.test(msg) && !/already exists/i.test(msg)) throw e;
     }
   }
+  if (db.isPostgres) {
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS asic_pedido_catalogo (
+          id BIGSERIAL PRIMARY KEY,
+          tipo TEXT NOT NULL,
+          nombre TEXT NOT NULL,
+          nombre_key TEXT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`
+      )
+      .run();
+  } else {
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS asic_pedido_catalogo (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          tipo TEXT NOT NULL,
+          nombre TEXT NOT NULL,
+          nombre_key TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )`
+      )
+      .run();
+  }
+  await db
+    .prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_asic_pedido_catalogo_tipo_key ON asic_pedido_catalogo(tipo, nombre_key)")
+    .run();
   schemaEnsured = true;
+}
+
+type CatalogTipo = "vendedor" | "contrato_ref";
+
+function catalogKey(raw: string): string {
+  return String(raw ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function cleanCatalogName(raw: string): string {
+  return String(raw ?? "").trim().replace(/\s+/g, " ");
+}
+
+function isCatalogTipo(value: string): value is CatalogTipo {
+  return value === "vendedor" || value === "contrato_ref";
 }
 
 function isStageKey(value: string): value is AsicPedidoStageKey {
@@ -207,6 +257,7 @@ function parseStages(raw: unknown): StagesMap {
         ...(row.numeroFactura ? { numeroFactura: String(row.numeroFactura) } : {}),
         ...(row.numeroRecibo ? { numeroRecibo: String(row.numeroRecibo) } : {}),
         ...(row.numeroComprobante ? { numeroComprobante: String(row.numeroComprobante) } : {}),
+        ...(row.titularFactura ? { titularFactura: String(row.titularFactura) } : {}),
         ...(row.medioDinero === "banco_py" || row.medioDinero === "banco_uy" || row.medioDinero === "binance"
           ? { medioDinero: row.medioDinero }
           : {}),
@@ -324,6 +375,7 @@ function validateStage(key: AsicPedidoStageKey, body: z.infer<typeof ConfirmSche
       base.modoCobro = "factura_recibo";
       base.numeroFactura = body.numeroFactura;
       base.numeroRecibo = body.numeroRecibo;
+      if (body.titularFactura) base.titularFactura = body.titularFactura;
       return { ok: true, state: base };
     }
     if (body.modoCobro === "comprobante_previo") {
@@ -332,6 +384,7 @@ function validateStage(key: AsicPedidoStageKey, body: z.infer<typeof ConfirmSche
       }
       base.modoCobro = "comprobante_previo";
       base.numeroComprobante = body.numeroComprobante;
+      if (body.titularFactura) base.titularFactura = body.titularFactura;
       return { ok: true, state: base };
     }
     return { ok: false, message: "Elegí factura crédito + recibo, o comprobante de pago previo." };
@@ -358,6 +411,91 @@ asicPedidosRouter.get("/asic-pedidos", ...readMw, async (_req, res, next) => {
       .prepare("SELECT * FROM asic_pedidos ORDER BY updated_at DESC, id DESC LIMIT 500")
       .all()) as Record<string, unknown>[];
     res.json({ pedidos: rows.map(mapPedido) });
+  } catch (e) {
+    next(e);
+  }
+});
+
+async function catalogNames(tipo: CatalogTipo): Promise<string[]> {
+  const saved = (await db
+    .prepare("SELECT nombre FROM asic_pedido_catalogo WHERE tipo = ? ORDER BY nombre ASC")
+    .all(tipo)) as Array<{ nombre?: string }>;
+  const rows = (await db.prepare("SELECT vendedor, etapas_json FROM asic_pedidos").all()) as Array<{
+    vendedor?: string;
+    etapas_json?: string;
+  }>;
+  const map = new Map<string, string>();
+  const add = (raw: unknown) => {
+    const nombre = cleanCatalogName(String(raw ?? ""));
+    const key = catalogKey(nombre);
+    if (!key || map.has(key)) return;
+    map.set(key, nombre);
+  };
+  for (const row of saved) add(row.nombre);
+  for (const row of rows) {
+    if (tipo === "vendedor") add(row.vendedor);
+    else {
+      try {
+        const etapas = JSON.parse(String(row.etapas_json ?? "{}")) as { contrato?: { referencia?: string } };
+        add(etapas.contrato?.referencia);
+      } catch {
+        /* el pedido sigue aunque la etapa no se pueda leer */
+      }
+    }
+  }
+  return [...map.values()].sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+}
+
+asicPedidosRouter.get("/asic-pedidos/catalogo", ...readMw, async (_req, res, next) => {
+  try {
+    await ensureSchema();
+    const [vendedores, contratoRefs] = await Promise.all([catalogNames("vendedor"), catalogNames("contrato_ref")]);
+    res.json({ vendedores, contratoRefs });
+  } catch (e) {
+    next(e);
+  }
+});
+
+asicPedidosRouter.post("/asic-pedidos/catalogo", ...writeMw, async (req, res, next) => {
+  try {
+    await ensureSchema();
+    const parsed = z
+      .object({
+        tipo: z.enum(["vendedor", "contrato_ref"]),
+        nombre: z.string().trim().min(1).max(200),
+      })
+      .safeParse(req.body);
+    if (!parsed.success || !isCatalogTipo(parsed.data.tipo)) {
+      res.status(400).json({ error: { message: "Indicá el nombre para guardarlo." } });
+      return;
+    }
+    const nombre = cleanCatalogName(parsed.data.nombre);
+    const key = catalogKey(nombre);
+    if (!key) {
+      res.status(400).json({ error: { message: "Indicá el nombre para guardarlo." } });
+      return;
+    }
+    const existing = (await db
+      .prepare("SELECT nombre FROM asic_pedido_catalogo WHERE tipo = ? AND nombre_key = ?")
+      .get(parsed.data.tipo, key)) as { nombre?: string } | undefined;
+    if (existing?.nombre) {
+      res.json({ nombre: cleanCatalogName(existing.nombre), alreadyExists: true });
+      return;
+    }
+    try {
+      await db
+        .prepare(`INSERT INTO asic_pedido_catalogo (tipo, nombre, nombre_key, created_at) VALUES (?, ?, ?, ${nowSql()})`)
+        .run(parsed.data.tipo, nombre, key);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!/unique/i.test(msg)) throw e;
+      const again = (await db
+        .prepare("SELECT nombre FROM asic_pedido_catalogo WHERE tipo = ? AND nombre_key = ?")
+        .get(parsed.data.tipo, key)) as { nombre?: string } | undefined;
+      res.json({ nombre: cleanCatalogName(again?.nombre || nombre), alreadyExists: true });
+      return;
+    }
+    res.status(201).json({ nombre, alreadyExists: false });
   } catch (e) {
     next(e);
   }

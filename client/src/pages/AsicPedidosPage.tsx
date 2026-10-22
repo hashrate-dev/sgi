@@ -1,9 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { AsicCotizadorCatalogSelect } from "../components/AsicCotizadorCatalogSelect";
 import { BillingHostingClientPicker } from "../components/BillingHostingClientPicker";
 import { useAuth } from "../contexts/AuthContext";
-import { getClients, getEquipos } from "../lib/api";
+import { getClients, getEquipos, getInvoiceById, getInvoices } from "../lib/api";
+import {
+  asicBillingDateToIso,
+  matchAsicPedidoBilling,
+  type AsicPedidoBillingHit,
+} from "../lib/asicPedidoBillingLink";
 import { canEditClientes } from "../lib/auth";
 import { isClienteTiendaOnline } from "../lib/clientTienda";
 import { canUserAccessScreen } from "../lib/sgiNavigation";
@@ -18,8 +23,10 @@ import {
   asicPedidoStagesFor,
   confirmAsicPedidoStage,
   createAsicPedido,
+  createAsicPedidoCatalogo,
   deleteAsicPedido,
   formatAsicPedidoFecha,
+  listAsicPedidoCatalogo,
   listAsicPedidos,
   reopenAsicPedidoStage,
   updateAsicPedido,
@@ -31,6 +38,33 @@ import {
 } from "../lib/asicPedidoFlow";
 import "../styles/facturacion.css";
 import "../styles/asic-pedidos.css";
+
+function processorKey(raw: string): string {
+  return raw
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+/** Un solo procesador por máquina, aunque en equipos esté repetido con espacios o mayúsculas distintas. */
+function uniqueProcessorLabels(values: string[]): string[] {
+  const map = new Map<string, string>();
+  for (const raw of values) {
+    const label = raw.trim().replace(/\s+/g, " ");
+    const key = processorKey(label);
+    if (!key) continue;
+    const prev = map.get(key);
+    if (!prev) {
+      map.set(key, label);
+      continue;
+    }
+    const prevReadable = /[\s/]/.test(prev);
+    const nextReadable = /[\s/]/.test(label);
+    if (nextReadable && !prevReadable) map.set(key, label);
+  }
+  return [...map.values()].sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+}
 
 function todayISO(): string {
   const d = new Date();
@@ -211,6 +245,11 @@ function PedidoList({
   const [notas, setNotas] = useState("");
   const [aduanaAplica, setAduanaAplica] = useState(true);
   const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [vendedores, setVendedores] = useState<string[]>([]);
+  const [contratoRefs, setContratoRefs] = useState<string[]>([]);
+  const [nuevoVendedor, setNuevoVendedor] = useState("");
+  const [nuevaReferencia, setNuevaReferencia] = useState("");
+  const [catalogBusy, setCatalogBusy] = useState<"vendedor" | "contrato_ref" | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -229,6 +268,18 @@ function PedidoList({
       })
       .catch(() => {
         if (!cancelled) setEquipos([]);
+      });
+    void listAsicPedidoCatalogo()
+      .then((r) => {
+        if (cancelled) return;
+        setVendedores(Array.isArray(r.vendedores) ? r.vendedores : []);
+        setContratoRefs(Array.isArray(r.contratoRefs) ? r.contratoRefs : []);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setVendedores([]);
+          setContratoRefs([]);
+        }
       });
     return () => {
       cancelled = true;
@@ -257,17 +308,50 @@ function PedidoList({
     if (!modeloSeleccionado) return [];
     const modeloKey = modeloSeleccionado.modelo.toLowerCase();
     const marcaKey = modeloSeleccionado.marca.toLowerCase();
-    const set = new Set<string>();
+    const labels: string[] = [];
     for (const item of equipos) {
       const modelo = String(item.modelo ?? "").trim();
       const marcaItem = String(item.marcaEquipo ?? "").trim();
       const proc = String(item.procesador ?? "").trim();
       if (!proc || modelo.toLowerCase() !== modeloKey) continue;
       if (marcaKey && marcaItem.toLowerCase() !== marcaKey) continue;
-      set.add(proc);
+      labels.push(proc);
     }
-    return [...set].sort((a, b) => a.localeCompare(b, "es"));
+    return uniqueProcessorLabels(labels);
   }, [equipos, modeloSeleccionado]);
+
+  useEffect(() => {
+    if (!procesador) return;
+    const canonical = procesadorOptions.find((item) => processorKey(item) === processorKey(procesador));
+    if (canonical && canonical !== procesador) setProcesador(canonical);
+  }, [procesador, procesadorOptions]);
+
+  const saveCatalogName = async (
+    tipo: "vendedor" | "contrato_ref",
+    raw: string,
+    clearDraft: (value: string) => void,
+    select: (value: string) => void,
+    setOptions: (updater: (prev: string[]) => string[]) => void
+  ) => {
+    const nombre = raw.trim().replace(/\s+/g, " ");
+    if (!nombre) return;
+    setCatalogBusy(tipo);
+    setCatalogError(null);
+    try {
+      const saved = await createAsicPedidoCatalogo(tipo, nombre);
+      const key = saved.nombre.trim().toLocaleLowerCase("es");
+      setOptions((prev) => {
+        const without = prev.filter((item) => item.trim().toLocaleLowerCase("es") !== key);
+        return [...without, saved.nombre].sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+      });
+      select(saved.nombre);
+      clearDraft("");
+    } catch (e) {
+      setCatalogError(errorText(e));
+    } finally {
+      setCatalogBusy(null);
+    }
+  };
 
   return (
     <>
@@ -431,16 +515,16 @@ function PedidoList({
                   setProcesador("");
                   if (!next) return;
                   if (next.marca) setMarca(next.marca);
-                  const procs = equipos
-                    .filter((item) => {
-                      const modelo = String(item.modelo ?? "").trim().toLowerCase();
-                      const marcaItem = String(item.marcaEquipo ?? "").trim().toLowerCase();
-                      return modelo === next.modelo.toLowerCase() && (!next.marca || marcaItem === next.marca.toLowerCase());
-                    })
-                    .map((item) => String(item.procesador ?? "").trim())
-                    .filter(Boolean);
-                  const unicos = [...new Set(procs)];
-                  if (unicos.length === 1) setProcesador(unicos[0] ?? "");
+                  const procs = uniqueProcessorLabels(
+                    equipos
+                      .filter((item) => {
+                        const modelo = String(item.modelo ?? "").trim().toLowerCase();
+                        const marcaItem = String(item.marcaEquipo ?? "").trim().toLowerCase();
+                        return modelo === next.modelo.toLowerCase() && (!next.marca || marcaItem === next.marca.toLowerCase());
+                      })
+                      .map((item) => String(item.procesador ?? "").trim())
+                  );
+                  if (procs.length === 1) setProcesador(procs[0] ?? "");
                 }}
               >
                 <option value="">Seleccionar modelo</option>
@@ -469,8 +553,31 @@ function PedidoList({
               </select>
             </label>
             <label>
-              Vendedor
-              <input value={vendedor} onChange={(e) => setVendedor(e.target.value)} required maxLength={200} />
+              <span className="asic-pedidos-label">Vendedor</span>
+              <select value={vendedor} required onChange={(e) => setVendedor(e.target.value)}>
+                <option value="">Seleccionar vendedor</option>
+                {vendedores.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+              <div className="asic-pedidos-addline">
+                <input
+                  value={nuevoVendedor}
+                  onChange={(e) => setNuevoVendedor(e.target.value)}
+                  maxLength={200}
+                  placeholder="Nuevo vendedor"
+                />
+                <button
+                  type="button"
+                  className="asic-pedidos-ghost"
+                  disabled={catalogBusy === "vendedor" || !nuevoVendedor.trim()}
+                  onClick={() => void saveCatalogName("vendedor", nuevoVendedor, setNuevoVendedor, setVendedor, setVendedores)}
+                >
+                  Agregar
+                </button>
+              </div>
             </label>
             <div>
               <span className="asic-pedidos-label">Comisión</span>
@@ -494,8 +601,33 @@ function PedidoList({
               <input type="date" value={fechaContrato} onChange={(e) => setFechaContrato(e.target.value)} required />
             </label>
             <label>
-              Referencia del contrato
-              <input value={contratoRef} onChange={(e) => setContratoRef(e.target.value)} maxLength={120} />
+              <span className="asic-pedidos-label">Referencia del contrato</span>
+              <select value={contratoRef} onChange={(e) => setContratoRef(e.target.value)}>
+                <option value="">Sin referencia</option>
+                {contratoRefs.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+              <div className="asic-pedidos-addline">
+                <input
+                  value={nuevaReferencia}
+                  onChange={(e) => setNuevaReferencia(e.target.value)}
+                  maxLength={120}
+                  placeholder="Nueva referencia"
+                />
+                <button
+                  type="button"
+                  className="asic-pedidos-ghost"
+                  disabled={catalogBusy === "contrato_ref" || !nuevaReferencia.trim()}
+                  onClick={() =>
+                    void saveCatalogName("contrato_ref", nuevaReferencia, setNuevaReferencia, setContratoRef, setContratoRefs)
+                  }
+                >
+                  Agregar
+                </button>
+              </div>
             </label>
             {origen === "paraguay" ? (
               <label className="span-2" style={{ flexDirection: "row", alignItems: "center", gap: "0.5rem" }}>
@@ -744,6 +876,7 @@ function StageForm({
     numeroFactura?: string;
     numeroRecibo?: string;
     numeroComprobante?: string;
+    titularFactura?: string;
     medioDinero?: AsicPedidoMedioDinero;
     referencia?: string;
     montoUsd?: number;
@@ -756,6 +889,12 @@ function StageForm({
   const [numeroFactura, setNumeroFactura] = useState("");
   const [numeroRecibo, setNumeroRecibo] = useState("");
   const [numeroComprobante, setNumeroComprobante] = useState("");
+  const [titularFactura, setTitularFactura] = useState("");
+  const [billingHits, setBillingHits] = useState<AsicPedidoBillingHit[]>([]);
+  const [billingVouchers, setBillingVouchers] = useState<AsicPedidoBillingHit["invoice"][]>([]);
+  const [billingDetalle, setBillingDetalle] = useState<Record<number, string>>({});
+  const [billingState, setBillingState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const didAutoLink = useRef(false);
   const [medio, setMedio] = useState<AsicPedidoMedioDinero>("banco_py");
   const [referencia, setReferencia] = useState("");
   const [monto, setMonto] = useState("");
@@ -767,10 +906,100 @@ function StageForm({
     setNumeroFactura("");
     setNumeroRecibo("");
     setNumeroComprobante("");
+    setTitularFactura("");
+    setBillingHits([]);
+    setBillingVouchers([]);
+    setBillingDetalle({});
+    setBillingState("idle");
+    didAutoLink.current = false;
     setMedio("banco_py");
     setReferencia("");
     setMonto("");
   }, [stage, pedido.id]);
+
+  const applyCredit = useCallback((hit: AsicPedidoBillingHit) => {
+    setModo("factura_recibo");
+    setNumeroFactura(hit.invoice.number);
+    setNumeroRecibo(hit.receipt?.number ?? "");
+    setTitularFactura(hit.invoice.clientName);
+    const iso = asicBillingDateToIso(hit.invoice.date);
+    if (iso) setFecha(iso);
+  }, []);
+
+  const applyVoucher = useCallback((doc: AsicPedidoBillingHit["invoice"]) => {
+    setModo("comprobante_previo");
+    setNumeroComprobante(doc.number);
+    setTitularFactura(doc.clientName);
+    const iso = asicBillingDateToIso(doc.date);
+    if (iso) setFecha(iso);
+  }, []);
+
+  useEffect(() => {
+    if (stage !== "documentos") return;
+    let cancelled = false;
+    setBillingState("loading");
+    void (async () => {
+      try {
+        const [clientsRes, invoicesRes] = await Promise.all([
+          getClients(),
+          getInvoices({ source: "asic" }),
+        ]);
+        if (cancelled) return;
+        const clients = (clientsRes.clients ?? []).filter((client) => !isClienteTiendaOnline(client));
+        const invoices = (invoicesRes.invoices ?? []).map((row) => ({
+          id: Number(row.id),
+          number: String(row.number ?? ""),
+          type: String(row.type ?? ""),
+          clientName: String(row.clientName ?? ""),
+          date: String(row.date ?? ""),
+          total: Number(row.total) || 0,
+          relatedInvoiceId: row.relatedInvoiceId,
+          relatedInvoiceNumber: row.relatedInvoiceNumber,
+          documentContext: row.documentContext,
+        }));
+        const matched = matchAsicPedidoBilling({
+          cliente: pedido.cliente,
+          clientId: pedido.clientId,
+          clients,
+          invoices,
+        });
+        if (cancelled) return;
+        setBillingHits(matched.credit);
+        setBillingVouchers(matched.vouchers);
+        setBillingState("ready");
+        if (!didAutoLink.current && matched.credit.length === 1) {
+          didAutoLink.current = true;
+          applyCredit(matched.credit[0]!);
+        } else if (!didAutoLink.current && matched.credit.length === 0 && matched.vouchers.length === 1) {
+          didAutoLink.current = true;
+          applyVoucher(matched.vouchers[0]!);
+        }
+        const previewIds = matched.credit.slice(0, 8).map((hit) => hit.invoice.id);
+        if (previewIds.length === 0) return;
+        const details = await Promise.all(
+          previewIds.map(async (id) => {
+            try {
+              const res = await getInvoiceById(id);
+              const lines = (res.invoice.items ?? [])
+                .map((item) => String(item.service ?? "").trim())
+                .filter(Boolean)
+                .slice(0, 3);
+              return [id, lines.join(" · ")] as const;
+            } catch {
+              return [id, ""] as const;
+            }
+          })
+        );
+        if (cancelled) return;
+        setBillingDetalle(Object.fromEntries(details.filter(([, text]) => text)));
+      } catch {
+        if (!cancelled) setBillingState("error");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [stage, pedido.id, pedido.cliente, pedido.clientId, applyCredit, applyVoucher]);
 
   const referenciaLabel =
     stage === "pedido"
@@ -795,7 +1024,9 @@ function StageForm({
     onSubmit({
       fecha,
       notas: notas.trim(),
-      ...(stage === "documentos" ? { modoCobro: modo, numeroFactura, numeroRecibo, numeroComprobante } : {}),
+      ...(stage === "documentos"
+        ? { modoCobro: modo, numeroFactura, numeroRecibo, numeroComprobante, titularFactura }
+        : {}),
       ...(stage === "dinero" ? { medioDinero: medio } : {}),
       ...(referencia.trim() ? { referencia: referencia.trim() } : {}),
       ...(montoUsd != null ? { montoUsd } : {}),
@@ -808,13 +1039,31 @@ function StageForm({
         <div className="asic-pedidos-choice">
           <button type="button" className={modo === "factura_recibo" ? "is-on" : ""} onClick={() => setModo("factura_recibo")}>
             <strong>Factura crédito + recibo</strong>
-            <span>Se emite la factura y el recibo del pago.</span>
+            <span>Se toma la factura ya emitida y el recibo del pago.</span>
           </button>
           <button type="button" className={modo === "comprobante_previo" ? "is-on" : ""} onClick={() => setModo("comprobante_previo")}>
             <strong>Comprobante de pago</strong>
             <span>El cliente paga antes de generar la factura.</span>
           </button>
         </div>
+      ) : null}
+
+      {stage === "documentos" && modo === "factura_recibo" ? (
+        <BillingDocList
+          state={billingState}
+          hits={billingHits}
+          selectedNumber={numeroFactura}
+          detalle={billingDetalle}
+          emptyHint={
+            billingVouchers.length > 0
+              ? "No hay factura crédito de este cliente. Hay un comprobante de pago ya emitido."
+              : "No hay una factura crédito emitida a este cliente ni a su empresa."
+          }
+          onPick={applyCredit}
+          onUseVoucher={
+            billingVouchers.length > 0 ? () => applyVoucher(billingVouchers[0]!) : undefined
+          }
+        />
       ) : null}
 
       {stage === "documentos" && modo === "factura_recibo" ? (
@@ -827,6 +1076,30 @@ function StageForm({
             Número de recibo
             <input value={numeroRecibo} onChange={(e) => setNumeroRecibo(e.target.value)} />
           </label>
+        </div>
+      ) : null}
+      {stage === "documentos" && modo === "factura_recibo" && numeroFactura && !numeroRecibo ? (
+        <p className="asic-pedidos-doc-note">Esta factura todavía no tiene recibo. Cuando se emita, se completa solo.</p>
+      ) : null}
+
+      {stage === "documentos" && modo === "comprobante_previo" ? (
+        <div className="asic-pedidos-docs">
+          {billingState === "loading" ? <p className="asic-pedidos-doc-note">Buscando comprobantes emitidos…</p> : null}
+          {billingVouchers.map((doc) => (
+            <button
+              key={doc.id}
+              type="button"
+              className={numeroComprobante === doc.number ? "is-on" : ""}
+              onClick={() => applyVoucher(doc)}
+            >
+              <strong>
+                {doc.number} · {doc.clientName}
+              </strong>
+              <span>
+                {doc.date} · {formatUsd(doc.total)}
+              </span>
+            </button>
+          ))}
         </div>
       ) : null}
 
@@ -888,6 +1161,75 @@ function StageForm({
           Contrato firmado el {formatAsicPedidoFecha(pedido.etapas.contrato.fecha)}.
         </p>
       ) : null}
+    </div>
+  );
+}
+
+function formatUsd(value: number): string {
+  return `${Math.abs(Number(value) || 0).toLocaleString("es-AR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} USD`;
+}
+
+function BillingDocList({
+  state,
+  hits,
+  selectedNumber,
+  detalle,
+  emptyHint,
+  onPick,
+  onUseVoucher,
+}: {
+  state: "idle" | "loading" | "ready" | "error";
+  hits: AsicPedidoBillingHit[];
+  selectedNumber: string;
+  detalle: Record<number, string>;
+  emptyHint: string;
+  onPick: (hit: AsicPedidoBillingHit) => void;
+  onUseVoucher?: () => void;
+}) {
+  if (state === "loading" || state === "idle") {
+    return <p className="asic-pedidos-doc-note">Buscando la factura crédito ya emitida de este cliente…</p>;
+  }
+  if (state === "error") {
+    return <p className="asic-pedidos-doc-note">No se pudieron leer las facturas. Podés cargar el número a mano.</p>;
+  }
+  if (hits.length === 0) {
+    return (
+      <div className="asic-pedidos-doc-note">
+        <p>{emptyHint}</p>
+        {onUseVoucher ? (
+          <button type="button" className="asic-pedidos-ghost" onClick={onUseVoucher}>
+            Usar el comprobante de pago
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+  return (
+    <div className="asic-pedidos-docs">
+      <p className="asic-pedidos-doc-note">
+        Facturas ya emitidas de este cliente. Si la factura está a nombre de su empresa, también aparece.
+      </p>
+      {hits.map((hit) => (
+        <button
+          key={hit.invoice.id}
+          type="button"
+          className={selectedNumber === hit.invoice.number ? "is-on" : ""}
+          onClick={() => onPick(hit)}
+        >
+          <strong>
+            {hit.invoice.number} · {hit.invoice.clientName}
+          </strong>
+          <span>
+            {hit.invoice.date} · {formatUsd(hit.invoice.total)}
+            {hit.receipt ? ` · Recibo ${hit.receipt.number}` : " · Sin recibo"}
+          </span>
+          <span>{hit.reason}</span>
+          {detalle[hit.invoice.id] ? <span>{detalle[hit.invoice.id]}</span> : null}
+        </button>
+      ))}
     </div>
   );
 }

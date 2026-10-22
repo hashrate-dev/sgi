@@ -106,6 +106,22 @@
   grid-column: 1 / -1;
 }
 
+.asic-pedidos-addline {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+  align-items: center;
+}
+
+.asic-pedidos-addline input {
+  flex: 1;
+  min-width: 0;
+}
+
+.asic-pedidos-addline .asic-pedidos-ghost {
+  flex: 0 0 auto;
+}
+
 .asic-pedidos-label,
 .asic-pedidos-form label,
 .asic-pedidos-stage label {
@@ -287,6 +303,48 @@
 .asic-pedidos-choice button.is-on {
   border-color: #16a34a;
   background: #f0fdf4;
+}
+
+.asic-pedidos-docs {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.asic-pedidos-docs button {
+  text-align: left;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  padding: 0.55rem 0.7rem;
+  cursor: pointer;
+}
+
+.asic-pedidos-docs button strong {
+  display: block;
+  color: #0f172a;
+  font-size: 0.84rem;
+}
+
+.asic-pedidos-docs button span {
+  display: block;
+  margin-top: 0.12rem;
+  color: #64748b;
+  font-size: 0.75rem;
+}
+
+.asic-pedidos-docs button.is-on {
+  border-color: #16a34a;
+  background: #f0fdf4;
+}
+
+.asic-pedidos-doc-note {
+  margin: 0;
+  color: #475569;
+  font-size: 0.78rem;
+}
+
+.asic-pedidos-doc-note .asic-pedidos-ghost {
+  margin-top: 0.4rem;
 }
 
 .asic-pedidos-meta {
