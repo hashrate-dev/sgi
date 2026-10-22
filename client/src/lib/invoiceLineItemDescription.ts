@@ -76,7 +76,11 @@ export function getLineItemDescription(it: LineItem): string {
     return normalizeInvoiceDescriptionForCell(desc);
   }
   if (it.setupId && it.setupNombre) return normalizeInvoiceDescriptionForCell(it.setupNombre);
-  if (it.reparacionTipoId && it.reparacionNombre) return normalizeInvoiceDescriptionForCell(it.reparacionNombre);
+  if (it.reparacionTipoId && it.reparacionNombre) {
+    const machine = [it.marcaEquipo, it.modeloEquipo].filter(Boolean).join(" - ");
+    const text = machine ? `${machine} - ${it.reparacionNombre}` : it.reparacionNombre;
+    return normalizeInvoiceDescriptionForCell(text);
+  }
   if (it.transporteFleteTipoId && it.transporteFleteNombre) return normalizeInvoiceDescriptionForCell(it.transporteFleteNombre);
   if (it.marcaEquipo && it.modeloEquipo && it.procesadorEquipo) {
     const equipoDesc = `${it.marcaEquipo} - ${it.modeloEquipo} - ${it.procesadorEquipo}`;

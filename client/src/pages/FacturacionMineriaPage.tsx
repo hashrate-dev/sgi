@@ -54,7 +54,7 @@ import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
 import { isClienteTiendaOnline } from "../lib/clientTienda";
 import { formatCurrencyNumber, formatUSD } from "../lib/formatCurrency";
 import { asicOperationCostUsd, isAsicEquipmentSaleInvoice, parseAsicMarginUsd } from "../lib/asicDocumentKind";
-import { asicReciboPdfItemToken, buildAsicComprobantePdfFilename } from "../lib/asicPdfFilename";
+import { asicReciboPdfItemToken, buildAsicComprobantePdfFilenameResolved } from "../lib/asicPdfFilename";
 import { invoiceTipoLabel, type InvoiceDocumentContext } from "../lib/invoiceDocumentContext";
 import { emittedDocumentTipoMark } from "../lib/invoiceCollection";
 import { EmittedDocumentTipoIcon } from "../components/EmittedDocumentTipoIcon";
@@ -630,8 +630,6 @@ export function FacturacionMineriaPage() {
             reparacionTipoId: rt.id,
             reparacionNombre: rt.nombre,
             equipoId: undefined,
-            marcaEquipo: undefined,
-            modeloEquipo: undefined,
             procesadorEquipo: undefined,
             setupId: undefined,
             setupNombre: undefined,
@@ -1220,7 +1218,7 @@ export function FacturacionMineriaPage() {
         { logoBase64 }
       );
       doc.save(
-        buildAsicComprobantePdfFilename({
+        await buildAsicComprobantePdfFilenameResolved({
           number: numberToUse,
           clientName: selectedClient.name,
           type,
@@ -1433,7 +1431,7 @@ export function FacturacionMineriaPage() {
       }
     }
     doc.save(
-      buildAsicComprobantePdfFilename({
+      await buildAsicComprobantePdfFilenameResolved({
         number: inv.number,
         clientName: inv.clientName,
         type: inv.type,
@@ -2012,8 +2010,6 @@ export function FacturacionMineriaPage() {
                                           reparacionTipoId: rt.id,
                                           reparacionNombre: rt.nombre,
                                           equipoId: undefined,
-                                          marcaEquipo: undefined,
-                                          modeloEquipo: undefined,
                                           procesadorEquipo: undefined,
                                           setupId: undefined,
                                           setupNombre: undefined,
@@ -2122,6 +2118,59 @@ export function FacturacionMineriaPage() {
                                   </optgroup>
                                 </select>
                                 )}
+                                {it.reparacionTipoId && !showLockedServiceLabel ? (
+                                  <select
+                                    className="fact-select"
+                                    aria-label="Equipo reparado"
+                                    style={{
+                                      padding: "0.4rem 0.5rem",
+                                      fontSize: "0.8125rem",
+                                      width: "100%",
+                                      maxWidth: "100%",
+                                      marginTop: "0.35rem",
+                                      backgroundColor: itemsLocked ? "#f3f4f6" : "white",
+                                      cursor: itemsLocked ? "not-allowed" : "pointer",
+                                      opacity: itemsLocked ? 0.7 : 1,
+                                    }}
+                                    value={
+                                      it.marcaEquipo && it.modeloEquipo
+                                        ? `${it.marcaEquipo}|||${it.modeloEquipo}`
+                                        : ""
+                                    }
+                                    disabled={itemsLocked}
+                                    onChange={(e) => {
+                                      if (itemsLocked) return;
+                                      const value = e.target.value;
+                                      if (!value) {
+                                        updateItem(idx, { marcaEquipo: undefined, modeloEquipo: undefined });
+                                        return;
+                                      }
+                                      const splitAt = value.indexOf("|||");
+                                      if (splitAt < 0) return;
+                                      updateItem(idx, {
+                                        marcaEquipo: value.slice(0, splitAt),
+                                        modeloEquipo: value.slice(splitAt + 3),
+                                        equipoId: undefined,
+                                        procesadorEquipo: undefined,
+                                      });
+                                    }}
+                                  >
+                                    <option value="">Equipo reparado…</option>
+                                    {Array.from(
+                                      equiposAsic.reduce((map, eq) => {
+                                        const key = `${eq.marcaEquipo}|||${eq.modelo}`;
+                                        if (!map.has(key)) {
+                                          map.set(key, { marca: eq.marcaEquipo, modelo: eq.modelo });
+                                        }
+                                        return map;
+                                      }, new Map<string, { marca: string; modelo: string }>())
+                                    ).map(([key, eq]) => (
+                                      <option key={key} value={key}>
+                                        {eq.marca} - {eq.modelo}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : null}
                               </td>
                               <td className="fact-cell-center">
                                 <input

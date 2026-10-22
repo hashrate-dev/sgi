@@ -9,7 +9,7 @@ import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf
 import { prepareLineItemsForPdf } from "../lib/prepareLineItemsForPdf";
 import { invoiceCollectionState } from "../lib/invoiceCollection";
 import { isAsicEquipmentSaleInvoice, resolveAsicInvoiceDocumentContext } from "../lib/asicDocumentKind";
-import { buildAsicComprobantePdfFilename } from "../lib/asicPdfFilename";
+import { buildAsicComprobantePdfFilenameResolved } from "../lib/asicPdfFilename";
 import { sgiHome } from "../lib/marketplacePaths.js";
 import type { Invoice, LineItem } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
@@ -311,7 +311,7 @@ export function CobrosPendientesUnificadosPage() {
       );
       if (row.origen === "asic") {
         doc.save(
-          buildAsicComprobantePdfFilename({
+          await buildAsicComprobantePdfFilenameResolved({
             number: inv.number,
             clientName: client.name,
             type: inv.type as Invoice["type"],

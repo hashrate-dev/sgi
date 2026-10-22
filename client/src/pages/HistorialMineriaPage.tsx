@@ -20,7 +20,7 @@ import {
   isPartialReceiptDocument,
   relatedFacturaForDocument,
 } from "../lib/invoiceCollection";
-import { asicReciboPdfItemToken, buildAsicComprobantePdfFilename } from "../lib/asicPdfFilename";
+import { asicReciboPdfItemToken, buildAsicComprobantePdfFilenameResolved } from "../lib/asicPdfFilename";
 import "../styles/facturacion.css";
 
 /** Normaliza mes a YYYY-MM para filtrar por columna MES */
@@ -817,7 +817,7 @@ export function HistorialMineriaPage() {
         }
       }
       doc.save(
-        buildAsicComprobantePdfFilename({
+        await buildAsicComprobantePdfFilenameResolved({
           number: inv.number,
           clientName: client.name,
           type: inv.type,

@@ -154,8 +154,177 @@ function isAsicBillingRecibo(type: ComprobanteType, documentContext?: InvoiceDoc
   return type === "Recibo" && documentContext !== "garantia-ande";
 }
 
+/** Catálogo mínimo para reconocer una reparación cuando el ítem guardado solo tiene texto. */
+export type AsicPdfFilenameCatalog = {
+  reparacionNombres: string[];
+  equipos: Array<{ marcaEquipo: string; modelo: string }>;
+};
+
+function foldLabel(raw: string): string {
+  return stripInvalidFilenameChars(String(raw ?? ""))
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function commercialLabel(it: LineItem): string {
+  return stripTrailingInvoiceMonth(receiptItemSourceLabel(it)).label.trim();
+}
+
+function dashParts(label: string): string[] {
+  return stripTrailingInvoiceMonth(label).label.split(/\s*-\s*/).map((s) => s.trim()).filter(Boolean);
+}
+
+function repairNameFromLabel(label: string, names: string[]): string | null {
+  const clean = stripTrailingInvoiceMonth(label).label.trim();
+  if (!clean || names.length === 0) return null;
+  const folded = foldLabel(clean);
+  const exact = names.find((name) => foldLabel(name) === folded);
+  if (exact) return exact.trim();
+  const parts = dashParts(clean);
+  if (parts.length >= 2) {
+    const last = foldLabel(parts[parts.length - 1] ?? "");
+    const hit = names.find((name) => foldLabel(name) === last);
+    if (hit) return hit.trim();
+  }
+  return null;
+}
+
+function isEquipmentLine(it: LineItem): boolean {
+  if (it.reparacionTipoId || String(it.reparacionNombre ?? "").trim()) return false;
+  if (it.transporteFleteTipoId || String(it.transporteFleteNombre ?? "").trim()) return false;
+  if (it.equipoId) return true;
+  return Boolean(it.marcaEquipo && it.modeloEquipo);
+}
+
+function isRepairLine(it: LineItem, catalog?: AsicPdfFilenameCatalog): boolean {
+  if (isReceiptPaymentOrAdjustmentLine(it)) return false;
+  if (it.transporteFleteTipoId || String(it.transporteFleteNombre ?? "").trim()) return false;
+  if (it.setupId || String(it.setupNombre ?? "").trim()) return false;
+  if (it.reparacionTipoId || String(it.reparacionNombre ?? "").trim()) return true;
+  if (isEquipmentLine(it)) return false;
+  const label = commercialLabel(it);
+  if (/\breparaci[oó]n\b/i.test(label)) return true;
+  return Boolean(catalog && repairNameFromLabel(label, catalog.reparacionNombres));
+}
+
+function repairDescription(it: LineItem, catalog?: AsicPdfFilenameCatalog): string {
+  const named = String(it.reparacionNombre ?? "").trim();
+  if (named) return named;
+  const label = commercialLabel(it);
+  const afterWord = label.match(/\breparaci[oó]n\b\s*[-:]?\s*(.+)$/i);
+  if (afterWord?.[1]?.trim()) return afterWord[1].trim();
+  const fromCatalog = catalog ? repairNameFromLabel(label, catalog.reparacionNombres) : null;
+  return fromCatalog || label;
+}
+
+function machineFromLine(
+  it: LineItem,
+  catalog?: AsicPdfFilenameCatalog
+): { brand: string; model: string } | null {
+  if (it.marcaEquipo || it.modeloEquipo) {
+    return {
+      brand: underscoreToken(it.marcaEquipo || ""),
+      model: underscoreToken(it.modeloEquipo || ""),
+    };
+  }
+  const label = commercialLabel(it);
+  const namedRepair =
+    String(it.reparacionNombre ?? "").trim() ||
+    (catalog ? repairNameFromLabel(label, catalog.reparacionNombres) : null);
+  if (
+    !it.marcaEquipo &&
+    !it.modeloEquipo &&
+    namedRepair &&
+    foldLabel(label) === foldLabel(namedRepair)
+  ) {
+    return null;
+  }
+  const wordSplit = label.match(/^(.*?)\s+reparaci[oó]n\b/i);
+  const machineSource = wordSplit?.[1]?.trim() || label;
+  const parts = dashParts(machineSource);
+  const descFold = foldLabel(repairDescription(it, catalog));
+  const usable = parts.filter((part) => {
+    const folded = foldLabel(part);
+    return folded !== descFold && folded !== "reparacion";
+  });
+  if (usable.length >= 2) {
+    return { brand: underscoreToken(usable[0] || ""), model: underscoreToken(usable[1] || "") };
+  }
+  if (!wordSplit && parts.length >= 3 && !isRepairLine(it, catalog)) {
+    return { brand: underscoreToken(parts[0] || ""), model: underscoreToken(parts[1] || "") };
+  }
+  const words = machineSource.split(/\s+/).filter(Boolean);
+  if (wordSplit && words.length >= 2) {
+    return {
+      brand: underscoreToken(words[0] || ""),
+      model: underscoreToken(words.slice(1).join(" ")),
+    };
+  }
+  if (catalog) {
+    const folded = foldLabel(label);
+    let best: { brand: string; model: string; score: number } | null = null;
+    for (const eq of catalog.equipos) {
+      const marca = foldLabel(eq.marcaEquipo);
+      const modelo = foldLabel(eq.modelo);
+      if (!marca || !modelo) continue;
+      if (!folded.includes(marca) || !folded.includes(modelo)) continue;
+      const score = marca.length + modelo.length;
+      if (!best || score > best.score) {
+        best = { brand: underscoreToken(eq.marcaEquipo), model: underscoreToken(eq.modelo), score };
+      }
+    }
+    if (best) return { brand: best.brand, model: best.model };
+  }
+  return null;
+}
+
+/**
+ * Cuerpo del archivo de una reparación:
+ * `BITMAIN_S21_REPARACION_HASHBOARD`
+ * Varias reparaciones del mismo equipo se suman después de REPARACION.
+ */
+function asicRepairPdfBody(
+  items: LineItem[] | null | undefined,
+  productItems: LineItem[] | null | undefined,
+  catalog?: AsicPdfFilenameCatalog
+): string {
+  const lines = [...(items ?? []), ...(productItems ?? [])];
+  const repairs = lines.filter((it) => isRepairLine(it, catalog));
+  if (repairs.length === 0) return "";
+
+  const fallback =
+    lines
+      .filter((it) => !isRepairLine(it, catalog))
+      .map((it) => machineFromLine(it, catalog))
+      .find((machine) => machine && (machine.brand || machine.model)) ?? { brand: "", model: "" };
+
+  const groups = new Map<string, { brand: string; model: string; descs: string[] }>();
+  for (const it of repairs) {
+    const own = machineFromLine(it, catalog);
+    const brand = own?.brand || fallback.brand;
+    const model = own?.model || fallback.model;
+    let desc = underscoreToken(repairDescription(it, catalog)).replace(/^REPARACION_/, "");
+    if (desc === "REPARACION") desc = "";
+    const key = `${brand}|${model}`;
+    const group = groups.get(key) ?? { brand, model, descs: [] };
+    if (desc && !group.descs.includes(desc)) group.descs.push(desc);
+    groups.set(key, group);
+  }
+
+  const chunks: string[] = [];
+  for (const group of groups.values()) {
+    const bits = [group.brand, group.model, "REPARACION", ...group.descs].filter(Boolean);
+    if (bits.length) chunks.push(bits.join("_"));
+  }
+  return chunks.join("_");
+}
+
 /**
  * Nombre de archivo al guardar PDF ASIC.
+ * Reparación: `HRS_GROUP_F100353_IRIGOYEN_MARTIN_BITMAIN_S21_REPARACION_HASHBOARD.pdf`
  * Recibos de billing: `HRS_GROUP_RC001161_PIROTTO_PABLO_BITMAIN_S21_FUENTE_DE_PODER_PSU.pdf`
  * Resto: `HRS GROUP S.A - COMPROBANTE PAGO - BITMAIN S21 235 THS - F100324 - GUBBA GONZALEZ IGNACIO.pdf`
  */
@@ -167,7 +336,17 @@ export function buildAsicComprobantePdfFilename(opts: {
   /** Ítems de la factura abonada, cuando el recibo solo guarda la línea de pago. */
   productItems?: LineItem[] | null;
   documentContext?: InvoiceDocumentContext;
+  catalog?: AsicPdfFilenameCatalog;
 }): string {
+  if (opts.documentContext !== "garantia-ande") {
+    const repairBody = asicRepairPdfBody(opts.items, opts.productItems, opts.catalog);
+    if (repairBody) {
+      const number = underscoreToken(opts.number) || "SIN_NUMERO";
+      const client = receiptClientToken(opts.clientName);
+      return `${[ASIC_RECEIPT_PDF_PREFIX, number, client, repairBody].join("_")}.pdf`;
+    }
+  }
+
   if (isAsicBillingRecibo(opts.type, opts.documentContext)) {
     const number = underscoreToken(opts.number) || "SIN_NUMERO";
     const client = receiptClientToken(opts.clientName);
@@ -190,4 +369,40 @@ export function buildAsicComprobantePdfFilename(opts: {
   parts.push(number, client);
 
   return `${parts.join(" - ")}.pdf`;
+}
+
+let repairCatalogCache: { at: number; catalog: AsicPdfFilenameCatalog } | null = null;
+
+async function loadAsicPdfFilenameCatalog(): Promise<AsicPdfFilenameCatalog> {
+  const fresh = repairCatalogCache && Date.now() - repairCatalogCache.at < 60_000;
+  if (fresh && repairCatalogCache) return repairCatalogCache.catalog;
+  const { getEquipos, getReparacionTipos } = await import("./api");
+  const [equiposRes, reparacionesRes] = await Promise.all([getEquipos(), getReparacionTipos()]);
+  const catalog: AsicPdfFilenameCatalog = {
+    reparacionNombres: (reparacionesRes.items ?? []).map((row) => String(row.nombre ?? "").trim()).filter(Boolean),
+    equipos: (equiposRes.items ?? []).map((row) => ({
+      marcaEquipo: String(row.marcaEquipo ?? "").trim(),
+      modelo: String(row.modelo ?? "").trim(),
+    })),
+  };
+  repairCatalogCache = { at: Date.now(), catalog };
+  return catalog;
+}
+
+/** Igual que el nombre síncrono, pero reconoce reparaciones guardadas solo como texto de catálogo. */
+export async function buildAsicComprobantePdfFilenameResolved(opts: {
+  number: string;
+  clientName: string;
+  type: ComprobanteType;
+  items?: LineItem[] | null;
+  productItems?: LineItem[] | null;
+  documentContext?: InvoiceDocumentContext;
+}): Promise<string> {
+  if (opts.documentContext === "garantia-ande") return buildAsicComprobantePdfFilename(opts);
+  try {
+    const catalog = await loadAsicPdfFilenameCatalog();
+    return buildAsicComprobantePdfFilename({ ...opts, catalog });
+  } catch {
+    return buildAsicComprobantePdfFilename(opts);
+  }
 }
