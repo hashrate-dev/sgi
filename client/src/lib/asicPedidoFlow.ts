@@ -119,7 +119,7 @@ export function asicPedidoStageDetail(key: AsicPedidoStageKey): string {
     case "documentos":
       return "Se emite factura crédito y el recibo de pago, o un comprobante de pago si el cliente paga antes de generar la factura. Al recibir el dinero también se suma el comprobante de garantía.";
     case "dinero":
-      return "El dinero entra en el banco de Paraguay, en el banco de Uruguay, o como USDT o USDC en Binance.";
+      return "La transferencia todavía no ingresó. Cuando llegue, confirmá el medio y la etapa pasa sola al pedido.";
     case "pedido":
       return "Se hace el pedido a China o al proveedor de Paraguay, según el origen de las máquinas.";
     case "pago_proveedor":
@@ -206,6 +206,7 @@ export function asicPedidoCobroPendiente(pedido: AsicPedido): { recibo: boolean;
 
 export function asicPedidoEtapaLabel(pedido: AsicPedido): string {
   if (pedido.etapaActual === "completo") return "Instalado en Ayolas";
+  if (pedido.etapaActual === "dinero") return "Esperando la transferencia";
   return asicPedidoStageTitle(pedido.etapaActual, pedido.origen);
 }
 

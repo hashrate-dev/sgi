@@ -384,7 +384,7 @@ function PedidoList({
         {[
           "1. Contrato",
           "2. Factura o comprobante",
-          "3. Dinero recibido",
+          "3. Transferencia",
           "4. Pedido",
           "5. Pago al proveedor",
           "6. Envío",
@@ -697,9 +697,7 @@ function PedidoList({
                       ) : null}
                     </td>
                     <td>
-                      <span className={`asic-pedidos-badge${pedido.etapaActual === "completo" ? " asic-pedidos-badge--done" : ""}`}>
-                        {asicPedidoEtapaLabel(pedido)}
-                      </span>
+                      <EtapaStatus pedido={pedido} />
                     </td>
                   </tr>
                 ))}
@@ -823,7 +821,7 @@ function PedidoTracking({
   const fill = stages.length <= 1 ? 100 : (currentIndex / (stages.length - 1)) * 100;
   const lastDoneKey = [...stages].reverse().find((key) => pedido.etapas[key]?.status === "done");
   const lastDone = lastDoneKey ? pedido.etapas[lastDoneKey] : undefined;
-  const headline = etapaActual === "completo" ? "Instalado en Ayolas" : asicPedidoStageTitle(etapaActual, pedido.origen);
+  const headline = asicPedidoEtapaLabel(pedido);
   const origen = pedido.origen === "china" ? "China" : "Paraguay";
   const doneStages = stages.filter((key) => pedido.etapas[key]?.status === "done");
   const cobroPendiente = asicPedidoCobroPendiente(pedido);
@@ -911,7 +909,7 @@ function PedidoTracking({
       {!completo && currentKey ? (
         <section className="asic-track-card">
           <p className="asic-track-kicker">Etapa en curso</p>
-          <h2>{asicPedidoStageTitle(currentKey, pedido.origen)}</h2>
+          <h2>{asicPedidoEtapaLabel(pedido)}</h2>
           <p className="asic-track-update">{asicPedidoStageDetail(currentKey)}</p>
           {canWrite ? (
             <StageForm
@@ -979,6 +977,26 @@ function PedidoTracking({
         </ol>
       </section>
     </>
+  );
+}
+
+function EtapaStatus({ pedido }: { pedido: AsicPedido }) {
+  const stages = asicPedidoStagesFor(pedido);
+  const etapa = pedido.etapaActual;
+  const done = etapa === "completo";
+  const waiting = etapa === "dinero";
+  const step = etapa === "completo" ? stages.length : Math.max(1, stages.indexOf(etapa) + 1);
+  const icon = etapa === "completo" ? "bi-check-lg" : etapa === "dinero" ? "bi-hourglass-split" : asicPedidoStageIcon(etapa, pedido.origen);
+  return (
+    <span className={`asic-etapa${waiting ? " is-wait" : ""}${done ? " is-done" : ""}`}>
+      <span className="asic-etapa-mark" aria-hidden="true">
+        <i className={`bi ${icon}`} />
+      </span>
+      <span>
+        <strong>{asicPedidoEtapaLabel(pedido)}</strong>
+        <em>{waiting ? `Aún no ingresó · etapa ${step} de ${stages.length}` : done ? "Proceso cerrado" : `Etapa ${step} de ${stages.length}`}</em>
+      </span>
+    </span>
   );
 }
 

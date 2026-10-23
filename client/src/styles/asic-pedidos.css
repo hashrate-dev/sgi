@@ -77,18 +77,53 @@
   background: #f0fdf4;
 }
 
-.asic-pedidos-badge {
+.asic-etapa {
   display: inline-flex;
   align-items: center;
-  border-radius: 999px;
-  padding: 0.18rem 0.55rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-  background: #ecfdf5;
-  color: #166534;
+  gap: 0.6rem;
+  min-width: 13.5rem;
+  text-align: left;
 }
 
-.asic-pedidos-badge--done {
+.asic-etapa-mark {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  font-size: 0.92rem;
+}
+
+.asic-etapa strong {
+  display: block;
+  color: #0f172a;
+  font-size: 0.84rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.asic-etapa em {
+  display: block;
+  margin-top: 0.08rem;
+  color: #64748b;
+  font-style: normal;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.asic-etapa.is-wait .asic-etapa-mark {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.asic-etapa.is-done .asic-etapa-mark {
+  border-color: #14532d;
   background: #14532d;
   color: #fff;
 }
