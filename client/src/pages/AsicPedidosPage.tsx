@@ -14,6 +14,7 @@ import {
 } from "../lib/asicPedidoBillingLink";
 import { canEditClientes } from "../lib/auth";
 import { isClienteTiendaOnline } from "../lib/clientTienda";
+import { defaultAsicShelfImageSrc, normalizeMarketplaceImageSrc, resolveShelfDisplayImageSrc } from "../lib/marketplaceAsicCatalog";
 import { canUserAccessScreen } from "../lib/sgiNavigation";
 import type { Client, EquipoASIC } from "../lib/types";
 import {
@@ -686,15 +687,7 @@ function PedidoList({
                     </td>
                     <td className="asic-pedidos-origin">{asicPedidoOrigenLabel(pedido.origen)}</td>
                     <td>
-                      {[pedido.marca, pedido.equipo, pedido.procesador].filter(Boolean).join(" · ") || pedido.equipo}
-                      {pedido.vendedor ? (
-                        <div className="text-muted small">
-                          {pedido.vendedor}
-                          {pedido.tieneComision
-                            ? ` · comisión ${Number(pedido.comisionUsd ?? 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
-                            : " · sin comisión"}
-                        </div>
-                      ) : null}
+                      <EquipoCell pedido={pedido} equipos={equipos} />
                     </td>
                     <td>
                       <EtapaStatus pedido={pedido} />
@@ -977,6 +970,80 @@ function PedidoTracking({
         </ol>
       </section>
     </>
+  );
+}
+
+function foldEquipoName(raw: string): string {
+  return String(raw ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function pedidoEquipoImage(pedido: AsicPedido, equipos: EquipoASIC[]): string {
+  const marca = foldEquipoName(pedido.marca);
+  const modelo = foldEquipoName(pedido.equipo);
+  const hit =
+    equipos.find((item) => foldEquipoName(item.marcaEquipo) === marca && foldEquipoName(item.modelo) === modelo) ??
+    equipos.find((item) => modelo && foldEquipoName(item.modelo) === modelo) ??
+    equipos.find((item) => modelo && foldEquipoName(`${item.marcaEquipo} ${item.modelo}`).includes(modelo));
+  const explicit = normalizeMarketplaceImageSrc(hit?.marketplaceImageSrc ?? "");
+  if (explicit && !/^data:/i.test(explicit)) return explicit;
+  const local = defaultAsicShelfImageSrc(pedido.marca || hit?.marcaEquipo || "", pedido.equipo || hit?.modelo || "");
+  if (local) return local;
+  if (!hit?.id) return "";
+  return resolveShelfDisplayImageSrc({
+    id: hit.id,
+    imageSrc: "",
+    brand: hit.marcaEquipo,
+    model: hit.modelo,
+  });
+}
+
+function EquipoCell({ pedido, equipos }: { pedido: AsicPedido; equipos: EquipoASIC[] }) {
+  const resolved = pedidoEquipoImage(pedido, equipos);
+  const [src, setSrc] = useState(resolved);
+  useEffect(() => setSrc(resolved), [resolved]);
+  const total = Math.max(1, pedido.cantidad || 1);
+  const shown = Math.min(total, 6);
+  const extra = total - shown;
+  const label = [pedido.marca, pedido.equipo, pedido.procesador].filter(Boolean).join(" · ") || pedido.equipo;
+  return (
+    <div className="asic-equipo">
+      <div className="asic-equipo-photos">
+        {src ? (
+          Array.from({ length: shown }, (_, index) => (
+            <img
+              key={index}
+              src={src}
+              alt={index === 0 ? `${total} ${pedido.equipo || "ASIC"}` : ""}
+              onError={() => {
+                const fallback = defaultAsicShelfImageSrc(pedido.marca, pedido.equipo);
+                setSrc((current) => (fallback && current !== fallback ? fallback : ""));
+              }}
+            />
+          ))
+        ) : (
+          <span className="asic-equipo-fallback" aria-hidden="true">
+            <i className="bi bi-cpu" />
+          </span>
+        )}
+        {extra > 0 ? <span className="asic-equipo-more">+{extra}</span> : null}
+      </div>
+      <div>
+        <strong>{label}</strong>
+        {pedido.vendedor ? (
+          <div className="text-muted small">
+            {pedido.vendedor}
+            {pedido.tieneComision
+              ? ` · comisión ${Number(pedido.comisionUsd ?? 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
+              : " · sin comisión"}
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 

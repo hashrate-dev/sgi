@@ -133,6 +133,55 @@
   color: #0f172a;
 }
 
+.asic-equipo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.asic-equipo-photos {
+  display: flex;
+  align-items: center;
+  gap: 0.28rem;
+  flex: 0 0 auto;
+}
+
+.asic-equipo-photos img,
+.asic-equipo-fallback {
+  width: 2.55rem;
+  height: 2.55rem;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  object-fit: contain;
+}
+
+.asic-equipo-fallback {
+  display: grid;
+  place-items: center;
+  color: #64748b;
+  font-size: 1.05rem;
+}
+
+.asic-equipo-more {
+  display: grid;
+  place-items: center;
+  min-width: 2.55rem;
+  height: 2.55rem;
+  padding: 0 0.35rem;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #0f172a;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.asic-equipo strong {
+  display: block;
+  color: #0f172a;
+  font-size: 0.86rem;
+}
+
 .asic-pedidos-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
