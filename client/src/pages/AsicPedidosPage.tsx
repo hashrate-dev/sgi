@@ -952,9 +952,9 @@ function StageForm({
     };
   }, [stage]);
 
-  const saveContratoRef = async () => {
+  const saveContratoRef = async (): Promise<boolean> => {
     const nombre = nuevaReferencia.trim().replace(/\s+/g, " ");
-    if (!nombre) return;
+    if (!nombre) return false;
     setCatalogBusy(true);
     onError(null);
     try {
@@ -966,8 +966,10 @@ function StageForm({
       });
       setReferencia(saved.nombre);
       setNuevaReferencia("");
+      return true;
     } catch (e) {
       onError(errorText(e));
+      return false;
     } finally {
       setCatalogBusy(false);
     }
@@ -1159,32 +1161,15 @@ function StageForm({
         <label>
           {referenciaLabel}
           {stage === "contrato" ? (
-            <>
-              <select value={referencia} onChange={(e) => setReferencia(e.target.value)}>
-                <option value="">Elegí una referencia</option>
-                {contratoRefs.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-              <div className="asic-pedidos-addline">
-                <input
-                  value={nuevaReferencia}
-                  onChange={(e) => setNuevaReferencia(e.target.value)}
-                  maxLength={200}
-                  placeholder="Nueva referencia"
-                />
-                <button
-                  type="button"
-                  className="asic-pedidos-ghost"
-                  disabled={catalogBusy || !nuevaReferencia.trim()}
-                  onClick={() => void saveContratoRef()}
-                >
-                  Agregar
-                </button>
-              </div>
-            </>
+            <ContratoRefField
+              value={referencia}
+              options={contratoRefs}
+              draft={nuevaReferencia}
+              busy={catalogBusy}
+              onChange={setReferencia}
+              onDraft={setNuevaReferencia}
+              onAdd={saveContratoRef}
+            />
           ) : (
             <input value={referencia} onChange={(e) => setReferencia(e.target.value)} />
           )}
@@ -1259,6 +1244,95 @@ function BillingDocButton({
       <span>{hit.reason}</span>
       {detalle[hit.invoice.id] ? <span>{detalle[hit.invoice.id]}</span> : null}
     </button>
+  );
+}
+
+function ContratoRefField({
+  value,
+  options,
+  draft,
+  busy,
+  onChange,
+  onDraft,
+  onAdd,
+}: {
+  value: string;
+  options: string[];
+  draft: string;
+  busy: boolean;
+  onChange: (value: string) => void;
+  onDraft: (value: string) => void;
+  onAdd: () => Promise<boolean>;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onPointer);
+    return () => document.removeEventListener("mousedown", onPointer);
+  }, [open]);
+
+  return (
+    <div className="asic-pedidos-docmenu" ref={rootRef}>
+      <button
+        type="button"
+        className={`asic-pedidos-docmenu-trigger${value ? " is-on" : " is-empty"}`}
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <strong>{value || "Elegí una referencia"}</strong>
+        <span className="asic-pedidos-docmenu-caret" aria-hidden="true">{open ? "▴" : "▾"}</span>
+      </button>
+      {open ? (
+        <div className="asic-pedidos-docs asic-pedidos-docmenu-panel">
+          {options.map((item) => (
+            <button
+              key={item}
+              type="button"
+              className={value === item ? "is-on" : ""}
+              onClick={() => {
+                onChange(item);
+                setOpen(false);
+              }}
+            >
+              <strong>{item}</strong>
+            </button>
+          ))}
+          {options.length === 0 ? <p className="asic-pedidos-doc-note">Todavía no hay referencias guardadas.</p> : null}
+          <div className="asic-pedidos-addline">
+            <input
+              value={draft}
+              onChange={(e) => onDraft(e.target.value)}
+              maxLength={200}
+              placeholder="Nueva referencia"
+              onKeyDown={(e) => {
+                if (e.key !== "Enter" || busy || !draft.trim()) return;
+                e.preventDefault();
+                void onAdd().then((saved) => {
+                  if (saved) setOpen(false);
+                });
+              }}
+            />
+            <button
+              type="button"
+              className="asic-pedidos-ghost"
+              disabled={busy || !draft.trim()}
+              onClick={() => {
+                void onAdd().then((saved) => {
+                  if (saved) setOpen(false);
+                });
+              }}
+            >
+              Agregar
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

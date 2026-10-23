@@ -343,6 +343,11 @@
   background: #f0fdf4;
 }
 
+.asic-pedidos-docmenu-trigger.is-empty strong {
+  color: #64748b;
+  font-weight: 500;
+}
+
 .asic-pedidos-docmenu-caret {
   color: #64748b;
   font-size: 0.8rem;
