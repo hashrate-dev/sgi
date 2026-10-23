@@ -29,6 +29,8 @@ export type AsicPedidoStageState = {
   numeroRecibo?: string;
   numeroComprobante?: string;
   titularFactura?: string;
+  numeroGarantia?: string;
+  valorGarantiaUsd?: number | null;
   medioDinero?: AsicPedidoMedioDinero;
   referencia?: string;
   firmadoNombre?: string;
@@ -67,6 +69,8 @@ export type AsicPedidoConfirmBody = {
   numeroRecibo?: string;
   numeroComprobante?: string;
   titularFactura?: string;
+  numeroGarantia?: string;
+  valorGarantiaUsd?: number;
   medioDinero?: AsicPedidoMedioDinero;
   referencia?: string;
   firmadoNombre?: string;
@@ -113,7 +117,7 @@ export function asicPedidoStageDetail(key: AsicPedidoStageKey): string {
     case "contrato":
       return "Momento 0. El cliente firma el contrato.";
     case "documentos":
-      return "Se emite factura crédito y el recibo de pago, o un comprobante de pago si el cliente paga antes de generar la factura.";
+      return "Se emite factura crédito y el recibo de pago, o un comprobante de pago si el cliente paga antes de generar la factura. Al recibir el dinero también se suma el comprobante de garantía.";
     case "dinero":
       return "El dinero entra en el banco de Paraguay, en el banco de Uruguay, o como USDT o USDC en Binance.";
     case "pedido":
@@ -161,6 +165,17 @@ export function asicPedidoStageSummary(key: AsicPedidoStageKey, state: AsicPedid
   } else if (state.referencia) {
     bits.push(state.referencia);
   }
+  if (key === "documentos") {
+    if (state.numeroGarantia) {
+      const valor =
+        state.valorGarantiaUsd != null && Number.isFinite(state.valorGarantiaUsd)
+          ? ` ${state.valorGarantiaUsd.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
+          : "";
+      bits.push(`Garantía ${state.numeroGarantia}${valor}`);
+    } else {
+      bits.push("Garantía pendiente");
+    }
+  }
   if (state.montoUsd != null && Number.isFinite(state.montoUsd)) {
     bits.push(
       `${state.montoUsd.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
@@ -178,6 +193,12 @@ export function formatAsicPedidoFecha(iso: string): string {
 export function asicPedidoEtapaLabel(pedido: AsicPedido): string {
   if (pedido.etapaActual === "completo") return "Instalado en Ayolas";
   return asicPedidoStageTitle(pedido.etapaActual, pedido.origen);
+}
+
+export function listAsicPedidoGarantias(): Promise<{
+  garantias: Array<{ number: string; clientName: string; date: string; total: number; detalle?: string }>;
+}> {
+  return api("/api/asic-pedidos/garantias");
 }
 
 export function listAsicPedidoCatalogo(): Promise<{ vendedores: string[]; contratoRefs: string[] }> {

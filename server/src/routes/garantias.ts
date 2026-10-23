@@ -10,6 +10,7 @@ import {
   ensureItemsGarantiaAndePrecioHistorial,
   pricesDiffer,
 } from "../lib/ensureItemsGarantiaAndePrecioHistorial.js";
+import { attachAsicPedidoGarantia } from "./asicPedidos.js";
 
 export const garantiasRouter = Router();
 
@@ -168,6 +169,18 @@ garantiasRouter.post("/garantias/emitted", requireAuth, ...garantiasRw, async (r
       ).run(invoiceJson, String(emittedAt), userId);
       return { number };
     });
+    if (type === "Recibo") {
+      const saved = typeof invoice === "object" && invoice !== null ? (invoice as { clientName?: string; total?: number }) : {};
+      try {
+        await attachAsicPedidoGarantia({
+          number: result.number,
+          clientName: String(saved.clientName ?? ""),
+          total: Number(saved.total) || 0,
+        });
+      } catch (err) {
+        console.error("No se pudo conectar el comprobante de garantía al pedido ASIC", err);
+      }
+    }
     res.status(201).json({ ok: true, number: result.number });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

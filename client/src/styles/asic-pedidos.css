@@ -525,6 +525,17 @@
   position: relative;
 }
 
+.asic-pedidos-docmenu + .asic-pedidos-docmenu {
+  margin-top: 0.85rem;
+}
+
+.asic-pedidos-garantia-valor {
+  margin: 0.4rem 0 0;
+  color: #166534;
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
 .asic-pedidos-docmenu-trigger {
   width: 100%;
   margin-top: 0.35rem;

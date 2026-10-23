@@ -245,3 +245,34 @@ export function matchAsicPedidoBilling(opts: {
     .sort(byDateDesc);
   return { suggested, others, vouchers };
 }
+
+export type AsicPedidoGarantiaDoc = {
+  number: string;
+  clientName: string;
+  date: string;
+  total: number;
+  detalle?: string;
+};
+
+/** Comprobantes de garantía (RG) para sumar el valor del depósito, aunque esté a nombre de la empresa. */
+export function matchAsicPedidoGarantias(opts: {
+  cliente: string;
+  clientId: number | null;
+  clients: Client[];
+  garantias: AsicPedidoGarantiaDoc[];
+  extraLabels?: string[];
+}): { suggested: AsicPedidoGarantiaDoc[]; others: AsicPedidoGarantiaDoc[] } {
+  const names = billingNamesForPedido(opts.clients, opts.clientId, opts.cliente, opts.extraLabels ?? []);
+  const suggested: AsicPedidoGarantiaDoc[] = [];
+  const others: AsicPedidoGarantiaDoc[] = [];
+  for (const doc of opts.garantias) {
+    if (!doc.number.trim()) continue;
+    if (invoiceMatchesNames(doc.clientName, names)) suggested.push(doc);
+    else others.push(doc);
+  }
+  const byDocDate = (a: AsicPedidoGarantiaDoc, b: AsicPedidoGarantiaDoc) =>
+    dateRank(b.date) - dateRank(a.date) || b.number.localeCompare(a.number);
+  suggested.sort(byDocDate);
+  others.sort(byDocDate);
+  return { suggested, others };
+}

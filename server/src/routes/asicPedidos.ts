@@ -40,6 +40,8 @@ type StageState = {
   numeroRecibo?: string;
   numeroComprobante?: string;
   titularFactura?: string;
+  numeroGarantia?: string;
+  valorGarantiaUsd?: number | null;
   medioDinero?: "banco_py" | "banco_uy" | "usdt_binance" | "usdc_binance" | "binance";
   referencia?: string;
   firmadoNombre?: string;
@@ -110,6 +112,8 @@ const ConfirmSchema = z.object({
   numeroRecibo: z.string().trim().max(80).optional().default(""),
   numeroComprobante: z.string().trim().max(80).optional().default(""),
   titularFactura: z.string().trim().max(200).optional().default(""),
+  numeroGarantia: z.string().trim().max(80).optional().default(""),
+  valorGarantiaUsd: z.coerce.number().finite().min(0).max(100_000_000).optional(),
   medioDinero: z.enum(["banco_py", "banco_uy", "usdt_binance", "usdc_binance", "binance"]).optional(),
   referencia: z.string().trim().max(200).optional().default(""),
   firmadoNombre: z.string().trim().max(200).optional().default(""),
@@ -274,6 +278,10 @@ function parseStages(raw: unknown): StagesMap {
         ...(row.numeroRecibo ? { numeroRecibo: String(row.numeroRecibo) } : {}),
         ...(row.numeroComprobante ? { numeroComprobante: String(row.numeroComprobante) } : {}),
         ...(row.titularFactura ? { titularFactura: String(row.titularFactura) } : {}),
+        ...(row.numeroGarantia ? { numeroGarantia: String(row.numeroGarantia) } : {}),
+        ...(row.valorGarantiaUsd != null && row.valorGarantiaUsd !== "" && Number.isFinite(Number(row.valorGarantiaUsd))
+          ? { valorGarantiaUsd: Math.abs(Number(row.valorGarantiaUsd)) }
+          : {}),
         ...(row.medioDinero === "banco_py" ||
         row.medioDinero === "banco_uy" ||
         row.medioDinero === "usdt_binance" ||
@@ -432,6 +440,78 @@ export async function attachAsicPedidoReceipt(opts: {
   }
 }
 
+const GARANTIA_NAME_STOP = new Set(["llc", "sa", "sas", "srl", "spa", "ltd", "ltda", "inc", "de", "del", "la", "los", "las", "y", "and", "the"]);
+
+function foldGarantiaName(raw: string): string {
+  return String(raw ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function garantiaNameTokens(raw: string): string[] {
+  return foldGarantiaName(raw)
+    .split(" ")
+    .filter((word) => word.length >= 3 && !GARANTIA_NAME_STOP.has(word));
+}
+
+function sameGarantiaParty(a: string, b: string): boolean {
+  const fa = foldGarantiaName(a);
+  const fb = foldGarantiaName(b);
+  if (!fa || !fb) return false;
+  if (fa === fb) return true;
+  const ta = garantiaNameTokens(a);
+  const tb = garantiaNameTokens(b);
+  if (ta.length === 0 || tb.length === 0) return false;
+  if ([...ta].sort().join(" ") === [...tb].sort().join(" ")) return true;
+  const [shorter, longer] = ta.length <= tb.length ? [ta, tb] : [tb, ta];
+  return shorter.length >= 2 && shorter.every((token) => longer.includes(token));
+}
+
+function pedidoGarantiaLabels(pedido: PedidoRow): string[] {
+  const strip = (raw: string) => String(raw ?? "").replace(/^[A-Za-z0-9]+\s*[—–-]\s*/, "").trim();
+  return [
+    strip(pedido.cliente),
+    pedido.facturaTitular,
+    pedido.etapas.contrato?.referencia ?? "",
+    strip(pedido.etapas.contrato?.firmadoNombre ?? ""),
+    pedido.etapas.documentos?.titularFactura ?? "",
+  ].filter((value) => value.trim());
+}
+
+/** Cuando se emite el comprobante de garantía, lo suma a la etapa de documentos ya confirmada si hay un solo pedido de ese cliente. */
+export async function attachAsicPedidoGarantia(opts: { number: string; clientName: string; total: number }): Promise<void> {
+  const number = String(opts.number ?? "").trim();
+  const clientName = String(opts.clientName ?? "").trim();
+  if (!number || !clientName) return;
+  const total = Math.abs(Number(opts.total) || 0);
+  await ensureSchema();
+  const rows = (await db
+    .prepare("SELECT * FROM asic_pedidos ORDER BY updated_at DESC, id DESC LIMIT 500")
+    .all()) as Record<string, unknown>[];
+  const matches = rows
+    .map(mapPedido)
+    .filter((pedido) => {
+      const docs = pedido.etapas.documentos;
+      if (docs?.status !== "done" || docs.numeroGarantia) return false;
+      return pedidoGarantiaLabels(pedido).some((label) => sameGarantiaParty(label, clientName));
+    });
+  if (matches.length !== 1) return;
+  const pedido = matches[0];
+  if (!pedido?.etapas.documentos) return;
+  await saveStages(pedido.id, {
+    ...pedido.etapas,
+    documentos: {
+      ...pedido.etapas.documentos,
+      numeroGarantia: number,
+      valorGarantiaUsd: total,
+    },
+  });
+}
+
 async function saveStages(id: number, etapas: StagesMap, aduanaAplica?: boolean): Promise<void> {
   const ts = nowSql();
   if (aduanaAplica == null) {
@@ -460,6 +540,10 @@ function validateStage(key: AsicPedidoStageKey, body: z.infer<typeof ConfirmSche
   }
 
   if (key === "documentos") {
+    if (body.numeroGarantia) {
+      base.numeroGarantia = body.numeroGarantia;
+      if (body.valorGarantiaUsd != null) base.valorGarantiaUsd = body.valorGarantiaUsd;
+    }
     if (body.modoCobro === "factura_recibo") {
       if (!body.numeroFactura) {
         return { ok: false, message: "Elegí la factura crédito de esta operación." };
@@ -537,6 +621,50 @@ async function catalogNames(tipo: CatalogTipo): Promise<string[]> {
   }
   return [...map.values()].sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
 }
+
+asicPedidosRouter.get("/asic-pedidos/garantias", ...readMw, async (_req, res, next) => {
+  try {
+    const rows = (await db
+      .prepare("SELECT invoice_json, emitted_at FROM emitted_garantias ORDER BY emitted_at DESC")
+      .all()) as Array<{ invoice_json?: string }>;
+    const seen = new Set<string>();
+    const garantias: Array<{ number: string; clientName: string; date: string; total: number; detalle: string }> = [];
+    for (const row of rows) {
+      try {
+        const inv = JSON.parse(String(row.invoice_json ?? "")) as {
+          number?: string;
+          type?: string;
+          clientName?: string;
+          date?: string;
+          total?: number;
+          items?: Array<{ service?: string }>;
+        };
+        if (inv.type === "Recibo Devolución") continue;
+        if (inv.type && inv.type !== "Recibo") continue;
+        const number = String(inv.number ?? "").trim();
+        if (!number || seen.has(number.toUpperCase())) continue;
+        seen.add(number.toUpperCase());
+        const detalle = (Array.isArray(inv.items) ? inv.items : [])
+          .map((item) => String(item?.service ?? "").trim())
+          .filter(Boolean)
+          .slice(0, 2)
+          .join(" · ");
+        garantias.push({
+          number,
+          clientName: String(inv.clientName ?? "").trim(),
+          date: String(inv.date ?? "").trim(),
+          total: Math.abs(Number(inv.total) || 0),
+          detalle,
+        });
+      } catch {
+        /* un comprobante mal guardado no bloquea el resto */
+      }
+    }
+    res.json({ garantias });
+  } catch (e) {
+    next(e);
+  }
+});
 
 asicPedidosRouter.get("/asic-pedidos/catalogo", ...readMw, async (_req, res, next) => {
   try {

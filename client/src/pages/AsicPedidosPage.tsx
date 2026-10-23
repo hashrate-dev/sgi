@@ -8,7 +8,9 @@ import { getClients, getEquipos, getInvoiceById, getInvoices } from "../lib/api"
 import {
   asicBillingDateToIso,
   matchAsicPedidoBilling,
+  matchAsicPedidoGarantias,
   type AsicPedidoBillingHit,
+  type AsicPedidoGarantiaDoc,
 } from "../lib/asicPedidoBillingLink";
 import { canEditClientes } from "../lib/auth";
 import { isClienteTiendaOnline } from "../lib/clientTienda";
@@ -28,6 +30,7 @@ import {
   deleteAsicPedido,
   formatAsicPedidoFecha,
   listAsicPedidoCatalogo,
+  listAsicPedidoGarantias,
   listAsicPedidos,
   reopenAsicPedidoStage,
   updateAsicPedido,
@@ -1086,6 +1089,8 @@ function StageForm({
     numeroRecibo?: string;
     numeroComprobante?: string;
     titularFactura?: string;
+    numeroGarantia?: string;
+    valorGarantiaUsd?: number;
     medioDinero?: AsicPedidoMedioDinero;
     referencia?: string;
     firmadoNombre?: string;
@@ -1101,6 +1106,11 @@ function StageForm({
   const [numeroRecibo, setNumeroRecibo] = useState("");
   const [numeroComprobante, setNumeroComprobante] = useState("");
   const [titularFactura, setTitularFactura] = useState("");
+  const [numeroGarantia, setNumeroGarantia] = useState("");
+  const [valorGarantia, setValorGarantia] = useState<number | null>(null);
+  const [garantiaSuggested, setGarantiaSuggested] = useState<AsicPedidoGarantiaDoc[]>([]);
+  const [garantiaOthers, setGarantiaOthers] = useState<AsicPedidoGarantiaDoc[]>([]);
+  const [garantiaState, setGarantiaState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [billingSuggested, setBillingSuggested] = useState<AsicPedidoBillingHit[]>([]);
   const [billingOthers, setBillingOthers] = useState<AsicPedidoBillingHit[]>([]);
   const [billingQuery, setBillingQuery] = useState("");
@@ -1127,6 +1137,11 @@ function StageForm({
     setNumeroRecibo("");
     setNumeroComprobante("");
     setTitularFactura("");
+    setNumeroGarantia("");
+    setValorGarantia(null);
+    setGarantiaSuggested([]);
+    setGarantiaOthers([]);
+    setGarantiaState("idle");
     setBillingSuggested([]);
     setBillingOthers([]);
     setBillingQuery("");
@@ -1228,6 +1243,11 @@ function StageForm({
     if (iso) setFecha(iso);
   }, []);
 
+  const applyGarantia = useCallback((doc: AsicPedidoGarantiaDoc) => {
+    setNumeroGarantia(doc.number);
+    setValorGarantia(Math.abs(Number(doc.total) || 0));
+  }, []);
+
   useEffect(() => {
     if (stage !== "documentos") return;
     let cancelled = false;
@@ -1303,6 +1323,35 @@ function StageForm({
     };
   }, [stage, pedido.id, pedido.cliente, pedido.clientId, pedido.facturaNumero, pedido.etapas.contrato?.referencia, applyCredit, applyVoucher]);
 
+  useEffect(() => {
+    if (stage !== "documentos") return;
+    let cancelled = false;
+    setGarantiaState("loading");
+    void (async () => {
+      try {
+        const [clientsRes, garantiasRes] = await Promise.all([getClients(), listAsicPedidoGarantias()]);
+        if (cancelled) return;
+        const clients = (clientsRes.clients ?? []).filter((client) => !isClienteTiendaOnline(client));
+        const matched = matchAsicPedidoGarantias({
+          cliente: pedido.cliente,
+          clientId: pedido.clientId,
+          clients,
+          garantias: garantiasRes.garantias ?? [],
+          extraLabels: [pedido.etapas.contrato?.referencia ?? "", pedido.facturaTitular ?? ""],
+        });
+        if (cancelled) return;
+        setGarantiaSuggested(matched.suggested);
+        setGarantiaOthers(matched.others);
+        setGarantiaState("ready");
+      } catch {
+        if (!cancelled) setGarantiaState("error");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [stage, pedido.id, pedido.cliente, pedido.clientId, pedido.facturaTitular, pedido.etapas.contrato?.referencia]);
+
   const referenciaLabel =
     stage === "pedido"
       ? pedido.origen === "china"
@@ -1333,7 +1382,16 @@ function StageForm({
       notas: notas.trim(),
       ...(firmado ? { firmadoClientId: firmado.id, firmadoNombre: contratoClientLabel(firmado) } : {}),
       ...(stage === "documentos"
-        ? { modoCobro: modo, numeroFactura, numeroRecibo, numeroComprobante, titularFactura }
+        ? {
+            modoCobro: modo,
+            numeroFactura,
+            numeroRecibo,
+            numeroComprobante,
+            titularFactura,
+            ...(numeroGarantia
+              ? { numeroGarantia, ...(valorGarantia != null ? { valorGarantiaUsd: valorGarantia } : {}) }
+              : {}),
+          }
         : {}),
       ...(stage === "dinero" ? { medioDinero: medio } : {}),
       ...(referencia.trim() ? { referencia: referencia.trim() } : {}),
@@ -1381,6 +1439,16 @@ function StageForm({
           docs={billingVouchers}
           selectedNumber={numeroComprobante}
           onPick={applyVoucher}
+        />
+      ) : null}
+
+      {stage === "documentos" ? (
+        <GarantiaDocMenu
+          state={garantiaState}
+          suggested={garantiaSuggested}
+          others={garantiaOthers}
+          selectedNumber={numeroGarantia}
+          onPick={applyGarantia}
         />
       ) : null}
 
@@ -1686,6 +1754,110 @@ function BillingVoucherMenu({
             </button>
           ))}
           {visible.length === 0 ? <p className="asic-pedidos-doc-note">No hay un comprobante de pago con ese dato.</p> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function GarantiaDocMenu({
+  state,
+  suggested,
+  others,
+  selectedNumber,
+  onPick,
+}: {
+  state: "idle" | "loading" | "ready" | "error";
+  suggested: AsicPedidoGarantiaDoc[];
+  others: AsicPedidoGarantiaDoc[];
+  selectedNumber: string;
+  onPick: (doc: AsicPedidoGarantiaDoc) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onPointer);
+    return () => document.removeEventListener("mousedown", onPointer);
+  }, [open]);
+
+  if (state === "loading" || state === "idle") {
+    return <p className="asic-pedidos-doc-note">Buscando comprobantes de garantía…</p>;
+  }
+  if (state === "error") {
+    return <p className="asic-pedidos-doc-note">No se pudieron leer los comprobantes de garantía.</p>;
+  }
+  const q = query.trim().toLowerCase();
+  const matches = (doc: AsicPedidoGarantiaDoc) => `${doc.number} ${doc.clientName} ${doc.detalle ?? ""}`.toLowerCase().includes(q);
+  const visibleSuggested = q ? suggested.filter(matches) : suggested;
+  const filteredOthers = q ? others.filter(matches) : others;
+  const visibleOthers = q ? filteredOthers : filteredOthers.slice(0, 30);
+  const selected = [...suggested, ...others].find((doc) => doc.number === selectedNumber);
+  return (
+    <div className="asic-pedidos-docmenu" ref={rootRef}>
+      <p className="asic-pedidos-doc-note">
+        Comprobante garantía, aparte del pago. Se emite al recibir el dinero y acá se suma el valor de esa garantía.
+      </p>
+      <button
+        type="button"
+        className={`asic-pedidos-docmenu-trigger${selected ? " is-on" : " is-empty"}`}
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        {selected ? (
+          <span>
+            <strong>
+              {selected.number} · {selected.clientName}
+            </strong>
+            <span>
+              Valor de la garantía: {formatUsd(selected.total)}
+              {selected.date ? ` · ${selected.date}` : ""}
+            </span>
+          </span>
+        ) : (
+          <strong>Elegir comprobante garantía</strong>
+        )}
+        <span className="asic-pedidos-docmenu-caret" aria-hidden="true">{open ? "▴" : "▾"}</span>
+      </button>
+      {selected ? <p className="asic-pedidos-garantia-valor">Valor de la garantía: {formatUsd(selected.total)}</p> : (
+        <p className="asic-pedidos-doc-note">Si el comprobante todavía no se emitió, podés confirmar la etapa. El valor se agrega cuando exista.</p>
+      )}
+      {open ? (
+        <div className="asic-pedidos-docs asic-pedidos-docmenu-panel">
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar por número, cliente o equipo"
+            autoFocus
+          />
+          {[...visibleSuggested, ...visibleOthers].map((doc) => (
+            <button
+              key={doc.number}
+              type="button"
+              className={selectedNumber === doc.number ? "is-on" : ""}
+              onClick={() => {
+                onPick(doc);
+                setOpen(false);
+              }}
+            >
+              <strong>
+                {doc.number} · {doc.clientName}
+              </strong>
+              <span>
+                Valor de la garantía: {formatUsd(doc.total)}
+                {doc.date ? ` · ${doc.date}` : ""}
+              </span>
+              {doc.detalle ? <span>{doc.detalle}</span> : null}
+            </button>
+          ))}
+          {visibleSuggested.length === 0 && visibleOthers.length === 0 ? (
+            <p className="asic-pedidos-doc-note">No hay un comprobante de garantía con ese dato.</p>
+          ) : null}
         </div>
       ) : null}
     </div>
