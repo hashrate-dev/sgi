@@ -951,13 +951,13 @@ function StageForm({
     setBillingState("idle");
     didAutoLink.current = false;
     setMedio("banco_py");
-    setReferencia("");
+    setReferencia(stage === "documentos" ? String(pedido.etapas.contrato?.referencia ?? "").trim() : "");
     setFirmadoClientId(0);
     setMonto("");
-  }, [stage, pedido.id]);
+  }, [stage, pedido.id, pedido.etapas.contrato?.referencia]);
 
   useEffect(() => {
-    if (stage !== "contrato") return;
+    if (stage !== "contrato" && stage !== "documentos") return;
     let cancelled = false;
     void listAsicPedidoCatalogo()
       .then((r) => {
@@ -966,6 +966,11 @@ function StageForm({
       .catch(() => {
         if (!cancelled) setContratoRefs([]);
       });
+    if (stage !== "contrato") {
+      return () => {
+        cancelled = true;
+      };
+    }
     void getClients()
       .then((r) => {
         if (cancelled) return;
@@ -988,6 +993,15 @@ function StageForm({
       cancelled = true;
     };
   }, [stage]);
+
+  const referenciaOptions = useMemo(() => {
+    const extra = String(pedido.etapas.contrato?.referencia ?? "").trim();
+    const items = [...contratoRefs];
+    if (extra && !items.some((item) => item.trim().toLocaleLowerCase("es") === extra.toLocaleLowerCase("es"))) {
+      items.push(extra);
+    }
+    return items.sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+  }, [contratoRefs, pedido.etapas.contrato?.referencia]);
 
   const saveContratoRef = async (): Promise<boolean> => {
     const nombre = nuevaReferencia.trim().replace(/\s+/g, " ");
@@ -1223,10 +1237,10 @@ function StageForm({
         </label>
         <label>
           {referenciaLabel}
-          {stage === "contrato" ? (
+          {stage === "contrato" || stage === "documentos" ? (
             <ContratoRefField
               value={referencia}
-              options={contratoRefs}
+              options={referenciaOptions}
               draft={nuevaReferencia}
               busy={catalogBusy}
               onChange={setReferencia}
