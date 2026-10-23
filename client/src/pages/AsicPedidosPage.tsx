@@ -1087,18 +1087,6 @@ function StageForm({
         />
       ) : null}
 
-      {stage === "documentos" && modo === "factura_recibo" ? (
-        <div className="asic-pedidos-form">
-          <label>
-            Número de factura
-            <input value={numeroFactura} onChange={(e) => setNumeroFactura(e.target.value)} />
-          </label>
-          <label>
-            Número de recibo
-            <input value={numeroRecibo} onChange={(e) => setNumeroRecibo(e.target.value)} />
-          </label>
-        </div>
-      ) : null}
       {stage === "documentos" && modo === "factura_recibo" && numeroFactura && !numeroRecibo ? (
         <p className="asic-pedidos-doc-note">
           {numeroFactura} quedó conectada a este pedido{titularFactura ? ` (${titularFactura})` : ""}. Cuando se emita el recibo del pago, se agrega solo.
@@ -1106,31 +1094,12 @@ function StageForm({
       ) : null}
 
       {stage === "documentos" && modo === "comprobante_previo" ? (
-        <div className="asic-pedidos-docs">
-          {billingState === "loading" ? <p className="asic-pedidos-doc-note">Buscando comprobantes emitidos…</p> : null}
-          {billingVouchers.map((doc) => (
-            <button
-              key={doc.id}
-              type="button"
-              className={numeroComprobante === doc.number ? "is-on" : ""}
-              onClick={() => applyVoucher(doc)}
-            >
-              <strong>
-                {doc.number} · {doc.clientName}
-              </strong>
-              <span>
-                {doc.date} · {formatUsd(doc.total)}
-              </span>
-            </button>
-          ))}
-        </div>
-      ) : null}
-
-      {stage === "documentos" && modo === "comprobante_previo" ? (
-        <label>
-          Número de comprobante
-          <input value={numeroComprobante} onChange={(e) => setNumeroComprobante(e.target.value)} />
-        </label>
+        <BillingVoucherMenu
+          state={billingState}
+          docs={billingVouchers}
+          selectedNumber={numeroComprobante}
+          onPick={applyVoucher}
+        />
       ) : null}
 
       {stage === "dinero" ? (
@@ -1225,6 +1194,95 @@ function BillingDocButton({
   );
 }
 
+function BillingVoucherMenu({
+  state,
+  docs,
+  selectedNumber,
+  onPick,
+}: {
+  state: "idle" | "loading" | "ready" | "error";
+  docs: AsicPedidoBillingHit["invoice"][];
+  selectedNumber: string;
+  onPick: (doc: AsicPedidoBillingHit["invoice"]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onPointer);
+    return () => document.removeEventListener("mousedown", onPointer);
+  }, [open]);
+
+  if (state === "loading" || state === "idle") {
+    return <p className="asic-pedidos-doc-note">Buscando comprobantes de pago…</p>;
+  }
+  if (state === "error") {
+    return <p className="asic-pedidos-doc-note">No se pudieron leer los comprobantes de pago.</p>;
+  }
+  const q = query.trim().toLowerCase();
+  const visible = docs.filter((doc) => `${doc.number} ${doc.clientName}`.toLowerCase().includes(q));
+  const selected = docs.find((doc) => doc.number === selectedNumber);
+  return (
+    <div className="asic-pedidos-docmenu" ref={rootRef}>
+      <p className="asic-pedidos-doc-note">Elegí el comprobante de pago ya emitido para esta operación.</p>
+      <button
+        type="button"
+        className={`asic-pedidos-docmenu-trigger${selected ? " is-on" : ""}`}
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        {selected ? (
+          <span>
+            <strong>
+              {selected.number} · {selected.clientName}
+            </strong>
+            <span>
+              {selected.date} · {formatUsd(selected.total)}
+            </span>
+          </span>
+        ) : (
+          <strong>Elegir comprobante de pago</strong>
+        )}
+        <span className="asic-pedidos-docmenu-caret" aria-hidden="true">{open ? "▴" : "▾"}</span>
+      </button>
+      {open ? (
+        <div className="asic-pedidos-docs asic-pedidos-docmenu-panel">
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar por número o cliente"
+            autoFocus
+          />
+          {visible.map((doc) => (
+            <button
+              key={doc.id}
+              type="button"
+              className={selectedNumber === doc.number ? "is-on" : ""}
+              onClick={() => {
+                onPick(doc);
+                setOpen(false);
+              }}
+            >
+              <strong>
+                {doc.number} · {doc.clientName}
+              </strong>
+              <span>
+                {doc.date} · {formatUsd(doc.total)}
+              </span>
+            </button>
+          ))}
+          {visible.length === 0 ? <p className="asic-pedidos-doc-note">No hay un comprobante de pago con ese dato.</p> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function BillingDocList({
   state,
   suggested,
@@ -1244,6 +1302,18 @@ function BillingDocList({
   detalle: Record<number, string>;
   onPick: (hit: AsicPedidoBillingHit) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onPointer);
+    return () => document.removeEventListener("mousedown", onPointer);
+  }, [open]);
+
   if (state === "loading" || state === "idle") {
     return <p className="asic-pedidos-doc-note">Buscando facturas crédito…</p>;
   }
@@ -1251,29 +1321,74 @@ function BillingDocList({
     return <p className="asic-pedidos-doc-note">No se pudieron leer las facturas. Podés cargar el número a mano.</p>;
   }
   const q = query.trim().toLowerCase();
-  const filteredOthers = others.filter((hit) => {
-    if (!q) return true;
-    return `${hit.invoice.number} ${hit.invoice.clientName}`.toLowerCase().includes(q);
-  });
+  const matches = (hit: AsicPedidoBillingHit) =>
+    `${hit.invoice.number} ${hit.invoice.clientName}`.toLowerCase().includes(q);
+  const visibleSuggested = q ? suggested.filter(matches) : suggested;
+  const filteredOthers = q ? others.filter(matches) : others;
   const visibleOthers = q ? filteredOthers : filteredOthers.slice(0, 30);
+  const selected = [...suggested, ...others].find((hit) => hit.invoice.number === selectedNumber);
   return (
-    <div className="asic-pedidos-docs">
+    <div className="asic-pedidos-docmenu" ref={rootRef}>
       <p className="asic-pedidos-doc-note">
         Elegí la factura crédito de esta operación, aunque esté a nombre de la empresa. El recibo se conecta solo cuando se emite el pago.
       </p>
-      <input
-        value={query}
-        onChange={(e) => onQuery(e.target.value)}
-        placeholder="Buscar por número o cliente, por ejemplo F100352"
-      />
-      {suggested.map((hit) => (
-        <BillingDocButton key={hit.invoice.id} hit={hit} selectedNumber={selectedNumber} detalle={detalle} onPick={onPick} />
-      ))}
-      {visibleOthers.map((hit) => (
-        <BillingDocButton key={hit.invoice.id} hit={hit} selectedNumber={selectedNumber} detalle={detalle} onPick={onPick} />
-      ))}
-      {suggested.length === 0 && visibleOthers.length === 0 ? (
-        <p className="asic-pedidos-doc-note">No hay una factura crédito con ese dato.</p>
+      <button
+        type="button"
+        className={`asic-pedidos-docmenu-trigger${selected ? " is-on" : ""}`}
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        {selected ? (
+          <span>
+            <strong>
+              {selected.invoice.number} · {selected.invoice.clientName}
+            </strong>
+            <span>
+              {selected.invoice.date} · {formatUsd(selected.invoice.total)}
+              {selected.receipt ? ` · Recibo ${selected.receipt.number}` : " · Sin recibo"}
+            </span>
+          </span>
+        ) : (
+          <strong>Elegir factura crédito</strong>
+        )}
+        <span className="asic-pedidos-docmenu-caret" aria-hidden="true">{open ? "▴" : "▾"}</span>
+      </button>
+      {open ? (
+        <div className="asic-pedidos-docs asic-pedidos-docmenu-panel">
+          <input
+            value={query}
+            onChange={(e) => onQuery(e.target.value)}
+            placeholder="Buscar por número o cliente, por ejemplo F100352"
+            autoFocus
+          />
+          {visibleSuggested.map((hit) => (
+            <BillingDocButton
+              key={hit.invoice.id}
+              hit={hit}
+              selectedNumber={selectedNumber}
+              detalle={detalle}
+              onPick={(picked) => {
+                onPick(picked);
+                setOpen(false);
+              }}
+            />
+          ))}
+          {visibleOthers.map((hit) => (
+            <BillingDocButton
+              key={hit.invoice.id}
+              hit={hit}
+              selectedNumber={selectedNumber}
+              detalle={detalle}
+              onPick={(picked) => {
+                onPick(picked);
+                setOpen(false);
+              }}
+            />
+          ))}
+          {visibleSuggested.length === 0 && visibleOthers.length === 0 ? (
+            <p className="asic-pedidos-doc-note">No hay una factura crédito con ese dato.</p>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

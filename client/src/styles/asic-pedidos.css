@@ -305,6 +305,64 @@
   background: #f0fdf4;
 }
 
+.asic-pedidos-docmenu {
+  position: relative;
+}
+
+.asic-pedidos-docmenu-trigger {
+  width: 100%;
+  margin-top: 0.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  text-align: left;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  padding: 0.55rem 0.7rem;
+  cursor: pointer;
+}
+
+.asic-pedidos-docmenu-trigger strong {
+  display: block;
+  color: #0f172a;
+  font-size: 0.84rem;
+}
+
+.asic-pedidos-docmenu-trigger > span span {
+  display: block;
+  margin-top: 0.12rem;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.asic-pedidos-docmenu-trigger.is-on {
+  border-color: #16a34a;
+  background: #f0fdf4;
+}
+
+.asic-pedidos-docmenu-caret {
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.asic-pedidos-docmenu-panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 0.3rem);
+  left: 0;
+  right: 0;
+  max-height: 18rem;
+  overflow: auto;
+  padding: 0.45rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+}
+
 .asic-pedidos-docs {
   display: grid;
   gap: 0.45rem;
