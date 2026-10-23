@@ -42,6 +42,8 @@ type StageState = {
   titularFactura?: string;
   medioDinero?: "banco_py" | "banco_uy" | "binance";
   referencia?: string;
+  firmadoNombre?: string;
+  firmadoClientId?: number;
   montoUsd?: number | null;
 };
 
@@ -110,6 +112,8 @@ const ConfirmSchema = z.object({
   titularFactura: z.string().trim().max(200).optional().default(""),
   medioDinero: z.enum(["banco_py", "banco_uy", "binance"]).optional(),
   referencia: z.string().trim().max(200).optional().default(""),
+  firmadoNombre: z.string().trim().max(200).optional().default(""),
+  firmadoClientId: z.coerce.number().int().positive().optional(),
   montoUsd: z.coerce.number().finite().min(0).max(100_000_000).optional(),
   saltarAduana: z.boolean().optional(),
 });
@@ -274,6 +278,8 @@ function parseStages(raw: unknown): StagesMap {
           ? { medioDinero: row.medioDinero }
           : {}),
         ...(row.referencia ? { referencia: String(row.referencia) } : {}),
+        ...(row.firmadoNombre ? { firmadoNombre: String(row.firmadoNombre) } : {}),
+        ...(Number(row.firmadoClientId) > 0 ? { firmadoClientId: Number(row.firmadoClientId) } : {}),
         ...(monto != null && Number.isFinite(monto) ? { montoUsd: monto } : {}),
       };
     }
@@ -429,6 +435,13 @@ function validateStage(key: AsicPedidoStageKey, body: z.infer<typeof ConfirmSche
   const base: StageState = { status: "done", fecha, notas: body.notas ?? "" };
   if (body.referencia) base.referencia = body.referencia;
   if (body.montoUsd != null) base.montoUsd = body.montoUsd;
+  if (key === "contrato") {
+    if (!body.firmadoNombre || !body.firmadoClientId) {
+      return { ok: false, message: "Indicá a nombre de quién se firmó el contrato." };
+    }
+    base.firmadoNombre = body.firmadoNombre;
+    base.firmadoClientId = body.firmadoClientId;
+  }
 
   if (key === "documentos") {
     if (body.modoCobro === "factura_recibo") {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { AsicCotizadorCatalogSelect } from "../components/AsicCotizadorCatalogSelect";
 import { BillingHostingClientPicker } from "../components/BillingHostingClientPicker";
+import { HostingClientSelect, type HostingClientOption } from "../components/HostingClientSelect";
 import { useAuth } from "../contexts/AuthContext";
 import { getClients, getEquipos, getInvoiceById, getInvoices } from "../lib/api";
 import {
@@ -135,6 +136,7 @@ export function AsicPedidosPage() {
           <PedidoDetail
             pedido={selected}
             canWrite={canWrite}
+            canAddClient={canAddClient}
             busy={busy}
             err={err}
             onBack={backToList}
@@ -709,6 +711,7 @@ function PedidoList({
 function PedidoDetail({
   pedido,
   canWrite,
+  canAddClient,
   busy,
   err,
   onBack,
@@ -718,6 +721,7 @@ function PedidoDetail({
 }: {
   pedido: AsicPedido;
   canWrite: boolean;
+  canAddClient: boolean;
   busy: boolean;
   err: string | null;
   onBack: () => void;
@@ -835,6 +839,7 @@ function PedidoDetail({
                       pedido={pedido}
                       stage={key}
                       busy={busy}
+                      canAddClient={canAddClient}
                       onError={onError}
                       onSubmit={(body) => void onRun(() => confirmAsicPedidoStage(pedido.id, key, body).then((r) => r.pedido))}
                       onLinkInvoice={(hit) =>
@@ -867,10 +872,18 @@ function PedidoDetail({
   );
 }
 
+function contratoClientLabel(client: HostingClientOption): string {
+  const name = `${client.name.trim()}${client.name2?.trim() ? ` ${client.name2.trim()}` : ""}`.trim();
+  const code = client.code.trim();
+  if (code && name) return `${code} — ${name}`;
+  return name || code;
+}
+
 function StageForm({
   pedido,
   stage,
   busy,
+  canAddClient,
   onError,
   onSubmit,
   onLinkInvoice,
@@ -878,6 +891,7 @@ function StageForm({
   pedido: AsicPedido;
   stage: AsicPedidoStageKey;
   busy: boolean;
+  canAddClient: boolean;
   onError: (message: string | null) => void;
   onLinkInvoice?: (hit: AsicPedidoBillingHit) => void;
   onSubmit: (body: {
@@ -890,6 +904,8 @@ function StageForm({
     titularFactura?: string;
     medioDinero?: AsicPedidoMedioDinero;
     referencia?: string;
+    firmadoNombre?: string;
+    firmadoClientId?: number;
     montoUsd?: number;
     saltarAduana?: boolean;
   }) => void;
@@ -915,6 +931,8 @@ function StageForm({
   const [contratoRefs, setContratoRefs] = useState<string[]>([]);
   const [nuevaReferencia, setNuevaReferencia] = useState("");
   const [catalogBusy, setCatalogBusy] = useState(false);
+  const [firmadoClientId, setFirmadoClientId] = useState(0);
+  const [contratoClients, setContratoClients] = useState<HostingClientOption[]>([]);
   const [monto, setMonto] = useState("");
 
   useEffect(() => {
@@ -934,6 +952,7 @@ function StageForm({
     didAutoLink.current = false;
     setMedio("banco_py");
     setReferencia("");
+    setFirmadoClientId(0);
     setMonto("");
   }, [stage, pedido.id]);
 
@@ -946,6 +965,24 @@ function StageForm({
       })
       .catch(() => {
         if (!cancelled) setContratoRefs([]);
+      });
+    void getClients()
+      .then((r) => {
+        if (cancelled) return;
+        const options = ((r.clients ?? []) as Client[])
+          .filter((client) => !isClienteTiendaOnline(client))
+          .map((client) => ({
+            id: Number(client.id),
+            code: String(client.code ?? "").trim(),
+            name: String(client.name ?? "").trim(),
+            name2: String(client.name2 ?? "").trim(),
+          }))
+          .filter((client) => Number.isFinite(client.id) && client.id > 0);
+        options.sort((a, b) => contratoClientLabel(a).localeCompare(contratoClientLabel(b), "es", { sensitivity: "base" }));
+        setContratoClients(options);
+      })
+      .catch(() => {
+        if (!cancelled) setContratoClients([]);
       });
     return () => {
       cancelled = true;
@@ -1088,9 +1125,15 @@ function StageForm({
       onError("El monto tiene que ser un número.");
       return;
     }
+    const firmado = stage === "contrato" ? contratoClients.find((client) => client.id === firmadoClientId) : undefined;
+    if (stage === "contrato" && !firmado) {
+      onError("Indicá a nombre de quién se firmó el contrato.");
+      return;
+    }
     onSubmit({
       fecha,
       notas: notas.trim(),
+      ...(firmado ? { firmadoClientId: firmado.id, firmadoNombre: contratoClientLabel(firmado) } : {}),
       ...(stage === "documentos"
         ? { modoCobro: modo, numeroFactura, numeroRecibo, numeroComprobante, titularFactura }
         : {}),
@@ -1154,6 +1197,26 @@ function StageForm({
       ) : null}
 
       <div className="asic-pedidos-form">
+        {stage === "contrato" ? (
+          <div className="span-2">
+            <span className="asic-pedidos-label">A nombre de quién se firmó</span>
+            <HostingClientSelect
+              value={firmadoClientId}
+              clients={contratoClients}
+              canAdd={canAddClient}
+              placeholder="Elegí un cliente de hosting o ASIC"
+              onChange={setFirmadoClientId}
+              onClientCreated={(created) => {
+                setContratoClients((prev) => {
+                  if (prev.some((client) => client.id === created.id)) return prev;
+                  return [...prev, created].sort((a, b) =>
+                    contratoClientLabel(a).localeCompare(contratoClientLabel(b), "es", { sensitivity: "base" })
+                  );
+                });
+              }}
+            />
+          </div>
+        ) : null}
         <label>
           Fecha
           <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} required />

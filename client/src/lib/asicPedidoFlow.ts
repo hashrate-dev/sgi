@@ -31,6 +31,8 @@ export type AsicPedidoStageState = {
   titularFactura?: string;
   medioDinero?: AsicPedidoMedioDinero;
   referencia?: string;
+  firmadoNombre?: string;
+  firmadoClientId?: number;
   montoUsd?: number | null;
 };
 
@@ -67,6 +69,8 @@ export type AsicPedidoConfirmBody = {
   titularFactura?: string;
   medioDinero?: AsicPedidoMedioDinero;
   referencia?: string;
+  firmadoNombre?: string;
+  firmadoClientId?: number;
   montoUsd?: number;
   saltarAduana?: boolean;
 };
@@ -144,6 +148,7 @@ export function asicPedidoMedioLabel(medio: AsicPedidoMedioDinero): string {
 export function asicPedidoStageSummary(key: AsicPedidoStageKey, state: AsicPedidoStageState): string {
   const bits: string[] = [];
   if (state.fecha) bits.push(formatAsicPedidoFecha(state.fecha));
+  if (key === "contrato" && state.firmadoNombre) bits.push(state.firmadoNombre);
   if (key === "documentos" && state.modoCobro === "factura_recibo") {
     bits.push(`Factura ${state.numeroFactura || "—"}${state.titularFactura ? ` (${state.titularFactura})` : ""}`);
     bits.push(`Recibo ${state.numeroRecibo || "—"}`);
