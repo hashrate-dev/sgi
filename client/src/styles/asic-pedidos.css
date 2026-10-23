@@ -128,9 +128,44 @@
   color: #fff;
 }
 
+.asic-cliente {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.asic-cliente-mark {
+  width: 2.55rem;
+  height: 2.55rem;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #0f172a;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  font-size: 1.2rem;
+}
+
+.asic-cliente strong {
+  display: block;
+  color: #0f172a;
+  font-size: 0.86rem;
+  line-height: 1.2;
+}
+
 .asic-pedidos-origin {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
   font-weight: 700;
   color: #0f172a;
+}
+
+.asic-pedidos-origin .asic-pedidos-flag {
+  width: 1.75rem;
+  height: 1.16rem;
+  border-radius: 3px;
 }
 
 .asic-equipo {
@@ -358,6 +393,18 @@
   font-weight: 800;
   letter-spacing: 0.03em;
   text-transform: uppercase;
+}
+
+.asic-track-origen {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.asic-track-origen .asic-pedidos-flag {
+  width: 1.35rem;
+  height: 0.9rem;
+  border-radius: 2px;
 }
 
 .asic-track-scroll {

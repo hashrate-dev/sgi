@@ -682,10 +682,22 @@ function PedidoList({
                 {pedidos.map((pedido) => (
                   <tr key={pedido.id} onClick={() => onOpen(pedido.id)}>
                     <td>
-                      <strong>{pedido.cliente}</strong>
-                      <div className="text-muted small">{pedido.cantidad} equipo{pedido.cantidad === 1 ? "" : "s"}</div>
+                      <div className="asic-cliente">
+                        <span className="asic-cliente-mark" aria-hidden="true">
+                          <i className="bi bi-person" />
+                        </span>
+                        <div>
+                          <strong>{pedido.cliente}</strong>
+                          <div className="text-muted small">{pedido.cantidad} equipo{pedido.cantidad === 1 ? "" : "s"}</div>
+                        </div>
+                      </div>
                     </td>
-                    <td className="asic-pedidos-origin">{asicPedidoOrigenLabel(pedido.origen)}</td>
+                    <td>
+                      <span className="asic-pedidos-origin">
+                        {pedido.origen === "china" ? <FlagChina /> : <FlagParaguay />}
+                        {asicPedidoOrigenLabel(pedido.origen)}
+                      </span>
+                    </td>
                     <td>
                       <EquipoCell pedido={pedido} equipos={equipos} />
                     </td>
@@ -841,7 +853,10 @@ function PedidoTracking({
           </aside>
         ) : null}
         <div className="asic-track-ends">
-          <span>Origen: {origen}</span>
+          <span className="asic-track-origen">
+            Origen: {pedido.origen === "china" ? <FlagChina /> : <FlagParaguay />}
+            {origen}
+          </span>
           <span>Destino: Ayolas</span>
         </div>
         <div className="asic-track-scroll">
@@ -1119,6 +1134,23 @@ function asicPedidoStageShort(key: AsicPedidoStageKey): string {
     case "instalado":
       return "Instalado";
   }
+}
+
+const CHINA_STAR = "0,-1 0.225,-0.309 0.951,-0.309 0.363,0.118 0.588,0.809 0,0.382 -0.588,0.809 -0.363,0.118 -0.951,-0.309 -0.225,-0.309";
+
+function FlagChina() {
+  return (
+    <svg className="asic-pedidos-flag" viewBox="0 0 30 20" aria-hidden="true">
+      <rect width="30" height="20" fill="#de2910" />
+      <g fill="#ffde00">
+        <polygon points={CHINA_STAR} transform="translate(5 5) scale(3)" />
+        <polygon points={CHINA_STAR} transform="translate(10 2) rotate(23)" />
+        <polygon points={CHINA_STAR} transform="translate(12 4) rotate(46)" />
+        <polygon points={CHINA_STAR} transform="translate(12 7) rotate(-22)" />
+        <polygon points={CHINA_STAR} transform="translate(10 9) rotate(-46)" />
+      </g>
+    </svg>
+  );
 }
 
 function FlagParaguay() {
