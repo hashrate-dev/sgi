@@ -1187,7 +1187,7 @@ function StageForm({
 
       {stage === "documentos" && modo === "factura_recibo" && numeroFactura && !numeroRecibo ? (
         <p className="asic-pedidos-doc-note">
-          {numeroFactura} quedó conectada a este pedido{titularFactura ? ` (${titularFactura})` : ""}. Cuando se emita el recibo del pago, se agrega solo.
+          {numeroFactura} quedó conectada a este pedido{titularFactura ? ` (${titularFactura})` : ""}. Podés confirmar esta etapa: el recibo se agrega solo cuando llegue el dinero y se emita.
         </p>
       ) : null}
 

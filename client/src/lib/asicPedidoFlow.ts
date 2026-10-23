@@ -151,7 +151,7 @@ export function asicPedidoStageSummary(key: AsicPedidoStageKey, state: AsicPedid
   if (key === "contrato" && state.firmadoNombre) bits.push(state.firmadoNombre);
   if (key === "documentos" && state.modoCobro === "factura_recibo") {
     bits.push(`Factura ${state.numeroFactura || "—"}${state.titularFactura ? ` (${state.titularFactura})` : ""}`);
-    bits.push(`Recibo ${state.numeroRecibo || "—"}`);
+    bits.push(state.numeroRecibo ? `Recibo ${state.numeroRecibo}` : "Recibo pendiente");
   } else if (key === "documentos" && state.modoCobro === "comprobante_previo") {
     bits.push(`Comprobante ${state.numeroComprobante || "—"}${state.titularFactura ? ` (${state.titularFactura})` : ""}`);
   } else if (key === "dinero" && state.medioDinero) {

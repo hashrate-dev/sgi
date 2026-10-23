@@ -379,7 +379,7 @@ function isoDate(raw: string): string {
   return `${now.getFullYear()}-${z(now.getMonth() + 1)}-${z(now.getDate())}`;
 }
 
-/** Cuando se emite el recibo de una factura ya conectada al pedido, cierra la etapa de documentos. */
+/** Cuando se emite el recibo de una factura ya conectada, lo agrega a la etapa aunque ya se haya confirmado sin recibo. */
 export async function attachAsicPedidoReceipt(opts: {
   facturaNumber: string;
   reciboNumber: string;
@@ -397,21 +397,33 @@ export async function attachAsicPedidoReceipt(opts: {
     const id = Number(row.id);
     if (!Number.isFinite(id) || id <= 0) continue;
     const pedido = await loadPedido(id);
-    if (!pedido || pedido.etapaActual !== "documentos" || pedido.etapas.documentos?.status === "done") continue;
+    if (!pedido) continue;
+    const docs = pedido.etapas.documentos;
+    if (docs?.numeroRecibo) continue;
+    const titular = pedido.facturaTitular || docs?.titularFactura || opts.titular;
     const etapas: StagesMap = {
       ...pedido.etapas,
-      documentos: {
-        status: "done",
-        fecha: isoDate(opts.reciboDate),
-        notas: "",
-        modoCobro: "factura_recibo",
-        numeroFactura: pedido.facturaNumero || facturaNumber,
-        numeroRecibo: reciboNumber,
-        ...(pedido.facturaTitular || opts.titular
-          ? { titularFactura: pedido.facturaTitular || String(opts.titular ?? "") }
-          : {}),
-      },
+      documentos: docs?.status === "done"
+        ? {
+            ...docs,
+            modoCobro: "factura_recibo",
+            numeroFactura: docs.numeroFactura || pedido.facturaNumero || facturaNumber,
+            numeroRecibo: reciboNumber,
+            ...(titular ? { titularFactura: titular } : {}),
+          }
+        : pedido.etapaActual === "documentos"
+          ? {
+              status: "done",
+              fecha: isoDate(opts.reciboDate),
+              notas: "",
+              modoCobro: "factura_recibo",
+              numeroFactura: pedido.facturaNumero || facturaNumber,
+              numeroRecibo: reciboNumber,
+              ...(titular ? { titularFactura: titular } : {}),
+            }
+          : undefined,
     };
+    if (!etapas.documentos) continue;
     await saveStages(id, etapas);
   }
 }
@@ -445,12 +457,12 @@ function validateStage(key: AsicPedidoStageKey, body: z.infer<typeof ConfirmSche
 
   if (key === "documentos") {
     if (body.modoCobro === "factura_recibo") {
-      if (!body.numeroFactura || !body.numeroRecibo) {
-        return { ok: false, message: "Para factura crédito cargá el número de factura y el número de recibo." };
+      if (!body.numeroFactura) {
+        return { ok: false, message: "Elegí la factura crédito de esta operación." };
       }
       base.modoCobro = "factura_recibo";
       base.numeroFactura = body.numeroFactura;
-      base.numeroRecibo = body.numeroRecibo;
+      if (body.numeroRecibo) base.numeroRecibo = body.numeroRecibo;
       if (body.titularFactura) base.titularFactura = body.titularFactura;
       return { ok: true, state: base };
     }
