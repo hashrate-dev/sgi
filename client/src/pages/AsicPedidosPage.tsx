@@ -812,13 +812,14 @@ function PedidoTracking({
   onError: (message: string | null) => void;
   onRun: (task: () => Promise<AsicPedido>) => Promise<void>;
 }) {
-  const completo = pedido.etapaActual === "completo";
-  const currentKey = completo ? stages[stages.length - 1] : pedido.etapaActual;
-  const currentIndex = Math.max(0, stages.indexOf(currentKey ?? stages[0]!));
+  const etapaActual = pedido.etapaActual;
+  const completo = etapaActual === "completo";
+  const currentKey: AsicPedidoStageKey = etapaActual === "completo" ? (stages[stages.length - 1] ?? "instalado") : etapaActual;
+  const currentIndex = Math.max(0, stages.indexOf(currentKey));
   const fill = stages.length <= 1 ? 100 : (currentIndex / (stages.length - 1)) * 100;
   const lastDoneKey = [...stages].reverse().find((key) => pedido.etapas[key]?.status === "done");
   const lastDone = lastDoneKey ? pedido.etapas[lastDoneKey] : undefined;
-  const headline = completo ? "Instalado en Ayolas" : asicPedidoStageTitle(pedido.etapaActual, pedido.origen);
+  const headline = etapaActual === "completo" ? "Instalado en Ayolas" : asicPedidoStageTitle(etapaActual, pedido.origen);
   const origen = pedido.origen === "china" ? "China" : "Paraguay";
   const doneStages = stages.filter((key) => pedido.etapas[key]?.status === "done");
 
