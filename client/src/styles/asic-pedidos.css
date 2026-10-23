@@ -10,15 +10,17 @@
 .asic-pedidos-page h1 {
   font-size: 1.35rem;
   font-weight: 800;
-  color: #0f172a;
+  color: #fff;
   margin: 0 0 0.35rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
 }
 
 .asic-pedidos-lead {
   margin: 0;
   max-width: 46rem;
-  color: #475569;
+  color: #fff;
   font-size: 0.92rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
 }
 
 .asic-pedidos-flow {
@@ -293,6 +295,27 @@
   font-size: 0.84rem;
 }
 
+.asic-pedidos-choice button strong.asic-pedidos-medio {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.asic-pedidos-flag {
+  width: 1.45rem;
+  height: 0.95rem;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.18);
+  flex: 0 0 auto;
+}
+
+.asic-pedidos-binance {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: 0 0 auto;
+}
+
 .asic-pedidos-choice button span {
   display: block;
   margin-top: 0.15rem;
@@ -419,8 +442,9 @@
   flex-wrap: wrap;
   gap: 0.45rem 1rem;
   margin: 0.35rem 0 1rem;
-  color: #334155;
+  color: #fff;
   font-size: 0.9rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
 }
 
 .asic-pedidos-error {

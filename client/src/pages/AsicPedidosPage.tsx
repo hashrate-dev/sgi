@@ -872,6 +872,62 @@ function PedidoDetail({
   );
 }
 
+function FlagParaguay() {
+  return (
+    <svg className="asic-pedidos-flag" viewBox="0 0 30 18" aria-hidden="true">
+      <rect width="30" height="6" fill="#d52b1e" />
+      <rect y="6" width="30" height="6" fill="#fff" />
+      <rect y="12" width="30" height="6" fill="#0038a8" />
+    </svg>
+  );
+}
+
+function FlagUruguay() {
+  const stripes = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+  return (
+    <svg className="asic-pedidos-flag" viewBox="0 0 30 18" aria-hidden="true">
+      {stripes.map((index) => (
+        <rect key={index} y={index * 2} width="30" height="2" fill={index % 2 === 0 ? "#fff" : "#0038a8"} />
+      ))}
+      <rect width="11" height="10" fill="#fff" />
+      <circle cx="5.5" cy="5" r="2.2" fill="#f5c518" />
+    </svg>
+  );
+}
+
+function BinanceMark() {
+  return (
+    <svg className="asic-pedidos-binance" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="#F3BA2F"
+        d="M12 2.4 14.9 5.3 12 8.2 9.1 5.3 12 2.4zm-6.7 6.7L8.2 12 5.3 14.9 2.4 12l2.9-2.9zM12 15.8l2.9 2.9L12 21.6l-2.9-2.9 2.9-2.9zm6.7-6.7L21.6 12l-2.9 2.9L15.8 12l2.9-2.9zM12 9.1l2.9 2.9L12 14.9 9.1 12 12 9.1z"
+      />
+    </svg>
+  );
+}
+
+function MedioDineroLabel({ medio }: { medio: AsicPedidoMedioDinero }) {
+  if (medio === "banco_py") {
+    return (
+      <strong className="asic-pedidos-medio">
+        Banco en <FlagParaguay />
+      </strong>
+    );
+  }
+  if (medio === "banco_uy") {
+    return (
+      <strong className="asic-pedidos-medio">
+        Banco en <FlagUruguay />
+      </strong>
+    );
+  }
+  return (
+    <strong className="asic-pedidos-medio">
+      Dólar digital por <BinanceMark />
+    </strong>
+  );
+}
+
 function contratoClientLabel(client: HostingClientOption): string {
   const name = `${client.name.trim()}${client.name2?.trim() ? ` ${client.name2.trim()}` : ""}`.trim();
   const code = client.code.trim();
@@ -1203,8 +1259,14 @@ function StageForm({
       {stage === "dinero" ? (
         <div className="asic-pedidos-choice">
           {(["banco_py", "banco_uy", "binance"] as const).map((key) => (
-            <button key={key} type="button" className={medio === key ? "is-on" : ""} onClick={() => setMedio(key)}>
-              <strong>{asicPedidoMedioLabel(key)}</strong>
+            <button
+              key={key}
+              type="button"
+              className={medio === key ? "is-on" : ""}
+              aria-label={asicPedidoMedioLabel(key)}
+              onClick={() => setMedio(key)}
+            >
+              <MedioDineroLabel medio={key} />
             </button>
           ))}
         </div>
