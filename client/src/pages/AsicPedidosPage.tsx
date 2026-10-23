@@ -912,6 +912,9 @@ function StageForm({
   onLinkRef.current = onLinkInvoice;
   const [medio, setMedio] = useState<AsicPedidoMedioDinero>("banco_py");
   const [referencia, setReferencia] = useState("");
+  const [contratoRefs, setContratoRefs] = useState<string[]>([]);
+  const [nuevaReferencia, setNuevaReferencia] = useState("");
+  const [catalogBusy, setCatalogBusy] = useState(false);
   const [monto, setMonto] = useState("");
 
   useEffect(() => {
@@ -933,6 +936,42 @@ function StageForm({
     setReferencia("");
     setMonto("");
   }, [stage, pedido.id]);
+
+  useEffect(() => {
+    if (stage !== "contrato") return;
+    let cancelled = false;
+    void listAsicPedidoCatalogo()
+      .then((r) => {
+        if (!cancelled) setContratoRefs(Array.isArray(r.contratoRefs) ? r.contratoRefs : []);
+      })
+      .catch(() => {
+        if (!cancelled) setContratoRefs([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [stage]);
+
+  const saveContratoRef = async () => {
+    const nombre = nuevaReferencia.trim().replace(/\s+/g, " ");
+    if (!nombre) return;
+    setCatalogBusy(true);
+    onError(null);
+    try {
+      const saved = await createAsicPedidoCatalogo("contrato_ref", nombre);
+      const key = saved.nombre.trim().toLocaleLowerCase("es");
+      setContratoRefs((prev) => {
+        const without = prev.filter((item) => item.trim().toLocaleLowerCase("es") !== key);
+        return [...without, saved.nombre].sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+      });
+      setReferencia(saved.nombre);
+      setNuevaReferencia("");
+    } catch (e) {
+      onError(errorText(e));
+    } finally {
+      setCatalogBusy(false);
+    }
+  };
 
   const applyCredit = useCallback((hit: AsicPedidoBillingHit, persist = false) => {
     setModo("factura_recibo");
@@ -1119,7 +1158,36 @@ function StageForm({
         </label>
         <label>
           {referenciaLabel}
-          <input value={referencia} onChange={(e) => setReferencia(e.target.value)} />
+          {stage === "contrato" ? (
+            <>
+              <select value={referencia} onChange={(e) => setReferencia(e.target.value)}>
+                <option value="">Elegí una referencia</option>
+                {contratoRefs.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+              <div className="asic-pedidos-addline">
+                <input
+                  value={nuevaReferencia}
+                  onChange={(e) => setNuevaReferencia(e.target.value)}
+                  maxLength={200}
+                  placeholder="Nueva referencia"
+                />
+                <button
+                  type="button"
+                  className="asic-pedidos-ghost"
+                  disabled={catalogBusy || !nuevaReferencia.trim()}
+                  onClick={() => void saveContratoRef()}
+                >
+                  Agregar
+                </button>
+              </div>
+            </>
+          ) : (
+            <input value={referencia} onChange={(e) => setReferencia(e.target.value)} />
+          )}
         </label>
         {stage === "dinero" || stage === "pago_proveedor" ? (
           <label>
