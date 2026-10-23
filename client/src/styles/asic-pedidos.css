@@ -236,13 +236,13 @@
 }
 
 .asic-track-scroll {
-  overflow-x: auto;
+  overflow: visible;
 }
 
 .asic-track-rail-wrap {
   position: relative;
-  min-width: 40rem;
-  padding: 0.85rem 0 1.7rem;
+  width: 100%;
+  padding: 0.85rem 0 1.55rem;
 }
 
 .asic-track-rail {
@@ -272,7 +272,8 @@
 
 .asic-track-dots li {
   position: relative;
-  width: 1.35rem;
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   justify-content: center;
 }
@@ -309,13 +310,14 @@
   top: 1.35rem;
   left: 50%;
   transform: translateX(-50%);
-  width: 4.6rem;
+  max-width: 4.4rem;
   text-align: center;
   color: #64748b;
   font-size: 0.68rem;
   font-weight: 700;
   line-height: 1.15;
   visibility: hidden;
+  white-space: nowrap;
 }
 
 .asic-track-dots li:first-child .asic-track-name,
@@ -323,6 +325,19 @@
 .asic-track-dots li:has(.is-current) .asic-track-name {
   visibility: visible;
   color: #0f172a;
+}
+
+.asic-track-dots li:first-child .asic-track-name {
+  left: 0;
+  transform: none;
+  text-align: left;
+}
+
+.asic-track-dots li:last-child .asic-track-name {
+  left: auto;
+  right: 0;
+  transform: none;
+  text-align: right;
 }
 
 .asic-track-facts {
