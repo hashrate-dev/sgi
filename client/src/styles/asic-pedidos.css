@@ -283,14 +283,14 @@
 .asic-track-rail-wrap {
   position: relative;
   width: 100%;
-  padding: 0.85rem 0 2.2rem;
+  padding: 0.85rem 0 2.55rem;
 }
 
 .asic-track-rail {
   position: absolute;
-  left: 0.55rem;
-  right: 0.55rem;
-  top: 1.35rem;
+  left: 0.85rem;
+  right: 0.85rem;
+  top: 1.58rem;
   height: 4px;
   border-radius: 999px;
   background: repeating-linear-gradient(90deg, #cbd5e1 0 5px, transparent 5px 9px);
@@ -320,16 +320,19 @@
 }
 
 .asic-track-dot {
-  width: 0.95rem;
-  height: 0.95rem;
+  width: 1.7rem;
+  height: 1.7rem;
   border-radius: 999px;
-  border: 3px solid #cbd5e1;
+  border: 2px solid #cbd5e1;
   background: #fff;
-  color: transparent;
-  font-size: 0.62rem;
-  font-weight: 800;
+  color: #94a3b8;
+  font-size: 0.78rem;
   display: grid;
   place-items: center;
+}
+
+.asic-track-dot i {
+  line-height: 1;
 }
 
 .asic-track-dot.is-done {
@@ -339,16 +342,15 @@
 }
 
 .asic-track-dot.is-current {
-  width: 1.15rem;
-  height: 1.15rem;
   border-color: #166534;
   background: #fff;
+  color: #166534;
   box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.18);
 }
 
 .asic-track-name {
   position: absolute;
-  top: 1.35rem;
+  top: 1.95rem;
   left: 50%;
   transform: translateX(-50%);
   max-width: 4.4rem;

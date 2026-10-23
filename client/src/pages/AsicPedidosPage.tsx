@@ -869,7 +869,7 @@ function PedidoTracking({
                       className={`asic-track-dot${done ? " is-done" : ""}${current ? " is-current" : ""}`}
                       title={esperaGarantia ? "Garantía pendiente de pago completo" : asicPedidoStageTitle(key, pedido.origen)}
                     >
-                      {done ? "✓" : ""}
+                      <i className={`bi ${asicPedidoStageIcon(key, pedido.origen)}`} aria-hidden="true" />
                     </span>
                     <span className="asic-track-name">
                       {asicPedidoStageShort(key)}
@@ -980,6 +980,33 @@ function PedidoTracking({
       </section>
     </>
   );
+}
+
+function asicPedidoStageIcon(key: AsicPedidoStageKey, origen: AsicPedidoOrigen): string {
+  switch (key) {
+    case "contrato":
+      return "bi-pen";
+    case "documentos":
+      return "bi-receipt";
+    case "dinero":
+      return "bi-cash-coin";
+    case "pedido":
+      return "bi-box-seam";
+    case "pago_proveedor":
+      return "bi-credit-card";
+    case "envio":
+      return origen === "china" ? "bi-airplane" : "bi-truck";
+    case "aduana_llegada":
+      return "bi-building";
+    case "aduana_salida":
+      return "bi-box-arrow-right";
+    case "camino_ayolas":
+      return "bi-geo-alt";
+    case "llegada_dc":
+      return "bi-houses";
+    case "instalado":
+      return "bi-cpu";
+  }
 }
 
 function asicPedidoStageShort(key: AsicPedidoStageKey): string {
