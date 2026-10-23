@@ -772,104 +772,213 @@ function PedidoDetail({
         </div>
       </div>
 
-      <div className="asic-pedidos-meta">
-        <span>
-          Etapa {Math.min(doneCount + (pedido.etapaActual === "completo" ? 0 : 1), stages.length)} de {stages.length}
-        </span>
-        <span>{doneCount} confirmada{doneCount === 1 ? "" : "s"}</span>
-        <span>{pedido.aduanaAplica ? "Pasa por aduana" : "Sin aduana"}</span>
-        {pedido.vendedor ? <span>Vendedor: {pedido.vendedor}</span> : null}
-        <span>
-          {pedido.tieneComision
-            ? `Comisión ${Number(pedido.comisionUsd ?? 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
-            : "Sin comisión"}
-        </span>
-      </div>
-
       {err ? <div className="asic-pedidos-error">{err}</div> : null}
 
       {pedido.notas ? <p className="asic-pedidos-card mb-3">{pedido.notas}</p> : null}
 
-      {canWrite && customsStillOpen ? (
-        <div className="asic-pedidos-actions mb-3">
-          <button
-            type="button"
-            className="asic-pedidos-ghost"
-            disabled={busy}
-            onClick={() => void onRun(() => updateAsicPedido(pedido.id, { aduanaAplica: !pedido.aduanaAplica }).then((r) => r.pedido))}
-          >
-            {pedido.aduanaAplica ? "Marcar que no pasa por aduana" : "Marcar que sí pasa por aduana"}
-          </button>
-        </div>
-      ) : null}
-
-      <div className="asic-pedidos-timeline">
-        {stages.map((key, index) => {
-          const state = pedido.etapas[key];
-          const done = state?.status === "done";
-          const current = pedido.etapaActual === key;
-          return (
-            <div key={key}>
-              <article
-                className={`asic-pedidos-step${done ? " asic-pedidos-step--done" : ""}${current ? " asic-pedidos-step--current" : ""}`}
-              >
-                <div className="asic-pedidos-num">{done ? "✓" : index + 1}</div>
-                <div>
-                  <h3>{asicPedidoStageTitle(key, pedido.origen)}</h3>
-                  <p>{asicPedidoStageDetail(key)}</p>
-                  {done && state ? <div className="asic-pedidos-summary">{asicPedidoStageSummary(key, state)}</div> : null}
-                  {done && state?.notas ? <p>{state.notas}</p> : null}
-                  {canWrite && done ? (
-                    <div className="asic-pedidos-actions mt-2">
-                      <button
-                        type="button"
-                        className="asic-pedidos-ghost"
-                        disabled={busy}
-                        onClick={() => {
-                          if (!window.confirm("Se borran esta etapa y las posteriores. ¿Reabrir?")) return;
-                          void onRun(() => reopenAsicPedidoStage(pedido.id, key).then((r) => r.pedido));
-                        }}
-                      >
-                        Reabrir desde acá
-                      </button>
-                    </div>
-                  ) : null}
-                  {canWrite && current ? (
-                    <StageForm
-                      pedido={pedido}
-                      stage={key}
-                      busy={busy}
-                      canAddClient={canAddClient}
-                      onError={onError}
-                      onSubmit={(body) => void onRun(() => confirmAsicPedidoStage(pedido.id, key, body).then((r) => r.pedido))}
-                      onLinkInvoice={(hit) =>
-                        void onRun(() =>
-                          updateAsicPedido(pedido.id, {
-                            facturaId: hit.invoice.id,
-                            facturaNumero: hit.invoice.number,
-                            facturaTitular: hit.invoice.clientName,
-                          }).then((r) => r.pedido)
-                        )
-                      }
-                    />
-                  ) : null}
-                </div>
-              </article>
-              {!pedido.aduanaAplica && key === "envio" ? (
-                <article className="asic-pedidos-step asic-pedidos-step--skip mt-2">
-                  <div className="asic-pedidos-num">—</div>
-                  <div>
-                    <h3>Aduana</h3>
-                    <p>No aplica. El pedido sale del proveedor de Paraguay y sigue hacia Ayolas.</p>
-                  </div>
-                </article>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
+      <PedidoTracking
+        pedido={pedido}
+        stages={stages}
+        doneCount={doneCount}
+        canWrite={canWrite}
+        canAddClient={canAddClient}
+        busy={busy}
+        customsStillOpen={customsStillOpen}
+        onError={onError}
+        onRun={onRun}
+      />
     </>
   );
+}
+
+function PedidoTracking({
+  pedido,
+  stages,
+  doneCount,
+  canWrite,
+  canAddClient,
+  busy,
+  customsStillOpen,
+  onError,
+  onRun,
+}: {
+  pedido: AsicPedido;
+  stages: AsicPedidoStageKey[];
+  doneCount: number;
+  canWrite: boolean;
+  canAddClient: boolean;
+  busy: boolean;
+  customsStillOpen: boolean;
+  onError: (message: string | null) => void;
+  onRun: (task: () => Promise<AsicPedido>) => Promise<void>;
+}) {
+  const completo = pedido.etapaActual === "completo";
+  const currentKey = completo ? stages[stages.length - 1] : pedido.etapaActual;
+  const currentIndex = Math.max(0, stages.indexOf(currentKey ?? stages[0]!));
+  const fill = stages.length <= 1 ? 100 : (currentIndex / (stages.length - 1)) * 100;
+  const lastDoneKey = [...stages].reverse().find((key) => pedido.etapas[key]?.status === "done");
+  const lastDone = lastDoneKey ? pedido.etapas[lastDoneKey] : undefined;
+  const headline = completo ? "Instalado en Ayolas" : asicPedidoStageTitle(pedido.etapaActual, pedido.origen);
+  const origen = pedido.origen === "china" ? "China" : "Paraguay";
+  const doneStages = stages.filter((key) => pedido.etapas[key]?.status === "done");
+
+  return (
+    <>
+      <section className="asic-track-card">
+        <p className="asic-track-kicker">{completo ? "Pedido instalado" : `Etapa ${currentIndex + 1} de ${stages.length}`}</p>
+        <h2>{headline}</h2>
+        <p className="asic-track-update">
+          {lastDone?.fecha
+            ? `Última actualización: ${formatAsicPedidoFecha(lastDone.fecha)}${lastDoneKey ? ` · ${asicPedidoStageTitle(lastDoneKey, pedido.origen)}` : ""}`
+            : "Todavía no hay una etapa confirmada."}
+        </p>
+        <div className="asic-track-ends">
+          <span>Origen: {origen}</span>
+          <span>Destino: Ayolas</span>
+        </div>
+        <div className="asic-track-scroll">
+          <div className="asic-track-rail-wrap">
+            <div className="asic-track-rail" aria-hidden="true">
+              <div className="asic-track-fill" style={{ width: `${completo ? 100 : fill}%` }} />
+            </div>
+            <ol className="asic-track-dots">
+              {stages.map((key) => {
+                const done = pedido.etapas[key]?.status === "done";
+                const current = !completo && key === pedido.etapaActual;
+                return (
+                  <li key={key}>
+                    <span
+                      className={`asic-track-dot${done ? " is-done" : ""}${current ? " is-current" : ""}`}
+                      title={asicPedidoStageTitle(key, pedido.origen)}
+                    >
+                      {done ? "✓" : ""}
+                    </span>
+                    <span className="asic-track-name">{asicPedidoStageShort(key)}</span>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        </div>
+        <div className="asic-track-facts">
+          <span>{doneCount} confirmada{doneCount === 1 ? "" : "s"}</span>
+          <span>{pedido.aduanaAplica ? "Pasa por aduana" : "Sin aduana"}</span>
+          {pedido.vendedor ? <span>Vendedor: {pedido.vendedor}</span> : null}
+          <span>
+            {pedido.tieneComision
+              ? `Comisión ${Number(pedido.comisionUsd ?? 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
+              : "Sin comisión"}
+          </span>
+        </div>
+        {canWrite && customsStillOpen ? (
+          <div className="asic-pedidos-actions">
+            <button
+              type="button"
+              className="asic-pedidos-ghost"
+              disabled={busy}
+              onClick={() => void onRun(() => updateAsicPedido(pedido.id, { aduanaAplica: !pedido.aduanaAplica }).then((r) => r.pedido))}
+            >
+              {pedido.aduanaAplica ? "Marcar que no pasa por aduana" : "Marcar que sí pasa por aduana"}
+            </button>
+          </div>
+        ) : null}
+        {!pedido.aduanaAplica ? (
+          <p className="asic-track-note">Este pedido no pasa por aduana. Sale del proveedor y sigue hacia Ayolas.</p>
+        ) : null}
+      </section>
+
+      {!completo && currentKey ? (
+        <section className="asic-track-card">
+          <p className="asic-track-kicker">Etapa en curso</p>
+          <h2>{asicPedidoStageTitle(currentKey, pedido.origen)}</h2>
+          <p className="asic-track-update">{asicPedidoStageDetail(currentKey)}</p>
+          {canWrite ? (
+            <StageForm
+              pedido={pedido}
+              stage={currentKey}
+              busy={busy}
+              canAddClient={canAddClient}
+              onError={onError}
+              onSubmit={(body) => void onRun(() => confirmAsicPedidoStage(pedido.id, currentKey, body).then((r) => r.pedido))}
+              onLinkInvoice={(hit) =>
+                void onRun(() =>
+                  updateAsicPedido(pedido.id, {
+                    facturaId: hit.invoice.id,
+                    facturaNumero: hit.invoice.number,
+                    facturaTitular: hit.invoice.clientName,
+                  }).then((r) => r.pedido)
+                )
+              }
+            />
+          ) : (
+            <p className="asic-track-note">Esta etapa está pendiente de confirmación.</p>
+          )}
+        </section>
+      ) : null}
+
+      <section className="asic-track-card">
+        <p className="asic-track-kicker">Cronograma</p>
+        <h2>Etapas confirmadas</h2>
+        {doneStages.length === 0 ? <p className="asic-track-update">Cuando confirmes la primera etapa, queda registrada acá.</p> : null}
+        <ol className="asic-log">
+          {doneStages.map((key) => {
+            const state = pedido.etapas[key];
+            if (!state) return null;
+            return (
+              <li key={key}>
+                <span className="asic-log-date">{state.fecha ? formatAsicPedidoFecha(state.fecha) : "—"}</span>
+                <div>
+                  <strong>{asicPedidoStageTitle(key, pedido.origen)}</strong>
+                  <p>{asicPedidoStageSummary(key, state) || asicPedidoStageDetail(key)}</p>
+                  {state.notas ? <p>{state.notas}</p> : null}
+                  {canWrite ? (
+                    <button
+                      type="button"
+                      className="asic-pedidos-ghost"
+                      disabled={busy}
+                      onClick={() => {
+                        if (!window.confirm("Se borran esta etapa y las posteriores. ¿Reabrir?")) return;
+                        void onRun(() => reopenAsicPedidoStage(pedido.id, key).then((r) => r.pedido));
+                      }}
+                    >
+                      Reabrir desde acá
+                    </button>
+                  ) : null}
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      </section>
+    </>
+  );
+}
+
+function asicPedidoStageShort(key: AsicPedidoStageKey): string {
+  switch (key) {
+    case "contrato":
+      return "Contrato";
+    case "documentos":
+      return "Factura";
+    case "dinero":
+      return "Dinero";
+    case "pedido":
+      return "Pedido";
+    case "pago_proveedor":
+      return "Pago";
+    case "envio":
+      return "Envío";
+    case "aduana_llegada":
+      return "Aduana";
+    case "aduana_salida":
+      return "Salida";
+    case "camino_ayolas":
+      return "Ayolas";
+    case "llegada_dc":
+      return "Llegada";
+    case "instalado":
+      return "Instalado";
+  }
 }
 
 function FlagParaguay() {

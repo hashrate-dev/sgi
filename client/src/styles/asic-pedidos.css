@@ -191,6 +191,184 @@
   border: 1px solid #fecaca;
 }
 
+.asic-track-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  padding: 1.15rem 1.2rem 1.25rem;
+  margin-bottom: 0.85rem;
+}
+
+.asic-track-kicker {
+  margin: 0 0 0.2rem;
+  color: #166534;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.asic-track-card h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.asic-track-update,
+.asic-track-note {
+  margin: 0.35rem 0 0;
+  color: #64748b;
+  font-size: 0.86rem;
+}
+
+.asic-track-ends {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1.15rem 0 0.35rem;
+  color: #0f172a;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.asic-track-scroll {
+  overflow-x: auto;
+}
+
+.asic-track-rail-wrap {
+  position: relative;
+  min-width: 40rem;
+  padding: 0.85rem 0 1.7rem;
+}
+
+.asic-track-rail {
+  position: absolute;
+  left: 0.55rem;
+  right: 0.55rem;
+  top: 1.35rem;
+  height: 4px;
+  border-radius: 999px;
+  background: repeating-linear-gradient(90deg, #cbd5e1 0 5px, transparent 5px 9px);
+}
+
+.asic-track-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #16a34a;
+}
+
+.asic-track-dots {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.asic-track-dots li {
+  position: relative;
+  width: 1.35rem;
+  display: flex;
+  justify-content: center;
+}
+
+.asic-track-dot {
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 999px;
+  border: 3px solid #cbd5e1;
+  background: #fff;
+  color: transparent;
+  font-size: 0.62rem;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+}
+
+.asic-track-dot.is-done {
+  border-color: #16a34a;
+  background: #16a34a;
+  color: #fff;
+}
+
+.asic-track-dot.is-current {
+  width: 1.15rem;
+  height: 1.15rem;
+  border-color: #166534;
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.18);
+}
+
+.asic-track-name {
+  position: absolute;
+  top: 1.35rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4.6rem;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.15;
+  visibility: hidden;
+}
+
+.asic-track-dots li:first-child .asic-track-name,
+.asic-track-dots li:last-child .asic-track-name,
+.asic-track-dots li:has(.is-current) .asic-track-name {
+  visibility: visible;
+  color: #0f172a;
+}
+
+.asic-track-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 1rem;
+  margin-top: 0.85rem;
+  color: #334155;
+  font-size: 0.86rem;
+}
+
+.asic-log {
+  list-style: none;
+  margin: 0.8rem 0 0;
+  padding: 0;
+}
+
+.asic-log li {
+  display: grid;
+  grid-template-columns: 6.2rem 1fr;
+  gap: 0.75rem;
+  padding: 0.8rem 0;
+  border-top: 1px solid #f1f5f9;
+}
+
+.asic-log-date {
+  color: #166534;
+  font-weight: 800;
+  font-size: 0.84rem;
+}
+
+.asic-log strong {
+  display: block;
+  color: #0f172a;
+}
+
+.asic-log p {
+  margin: 0.15rem 0 0;
+  color: #475569;
+  font-size: 0.84rem;
+}
+
+.asic-log .asic-pedidos-ghost {
+  margin-top: 0.45rem;
+}
+
 .asic-pedidos-timeline {
   display: flex;
   flex-direction: column;
