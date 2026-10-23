@@ -60,6 +60,7 @@ type PedidoRow = {
   equipo: string;
   procesador: string;
   cantidad: number;
+  lineas: AsicPedidoLinea[];
   vendedor: string;
   tieneComision: boolean;
   comisionUsd: number | null;
@@ -74,6 +75,20 @@ type PedidoRow = {
   updatedAt: string;
 };
 
+type AsicPedidoLinea = {
+  marca: string;
+  equipo: string;
+  procesador: string;
+  cantidad: number;
+};
+
+const LineaSchema = z.object({
+  marca: z.string().trim().min(1).max(120),
+  equipo: z.string().trim().min(1).max(200),
+  procesador: z.string().trim().min(1).max(120),
+  cantidad: z.coerce.number().int().min(1).max(500),
+});
+
 const fechaSchema = z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida");
 
 const CreateSchema = z.object({
@@ -84,6 +99,7 @@ const CreateSchema = z.object({
   equipo: z.string().trim().min(1).max(200),
   procesador: z.string().trim().min(1).max(120),
   cantidad: z.coerce.number().int().min(1).max(500),
+  lineas: z.array(LineaSchema).max(12).optional().default([]),
   vendedor: z.string().trim().min(1).max(200),
   tieneComision: z.boolean(),
   comisionUsd: z.coerce.number().finite().min(0).max(100_000_000).optional(),
@@ -97,6 +113,7 @@ const PatchSchema = z.object({
   cliente: z.string().trim().min(1).max(200).optional(),
   equipo: z.string().trim().min(1).max(200).optional(),
   cantidad: z.coerce.number().int().min(1).max(500).optional(),
+  lineas: z.array(LineaSchema).max(12).optional(),
   notas: z.string().trim().max(2000).optional(),
   aduanaAplica: z.boolean().optional(),
   facturaNumero: z.string().trim().max(80).optional(),
@@ -179,6 +196,7 @@ async function ensureSchema(): Promise<void> {
         "ALTER TABLE asic_pedidos ADD COLUMN IF NOT EXISTS factura_id BIGINT",
         "ALTER TABLE asic_pedidos ADD COLUMN IF NOT EXISTS factura_numero TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE asic_pedidos ADD COLUMN IF NOT EXISTS factura_titular TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE asic_pedidos ADD COLUMN IF NOT EXISTS lineas_json TEXT NOT NULL DEFAULT '[]'",
       ]
     : [
         "ALTER TABLE asic_pedidos ADD COLUMN client_id INTEGER",
@@ -190,6 +208,7 @@ async function ensureSchema(): Promise<void> {
         "ALTER TABLE asic_pedidos ADD COLUMN factura_id INTEGER",
         "ALTER TABLE asic_pedidos ADD COLUMN factura_numero TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE asic_pedidos ADD COLUMN factura_titular TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE asic_pedidos ADD COLUMN lineas_json TEXT NOT NULL DEFAULT '[]'",
       ];
   for (const sql of alters) {
     try {
@@ -309,6 +328,31 @@ function etapaActual(origenAduana: boolean, etapas: StagesMap): AsicPedidoStageK
   return "completo";
 }
 
+function parseLineas(raw: unknown): AsicPedidoLinea[] {
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw || "[]") : raw;
+    if (!Array.isArray(parsed)) return [];
+    const out: AsicPedidoLinea[] = [];
+    for (const item of parsed) {
+      if (!item || typeof item !== "object") continue;
+      const row = item as Record<string, unknown>;
+      const equipo = String(row.equipo ?? "").trim();
+      const cantidad = Math.floor(Number(row.cantidad ?? 0));
+      if (!equipo || !Number.isFinite(cantidad) || cantidad < 1) continue;
+      out.push({
+        marca: String(row.marca ?? "").trim(),
+        equipo,
+        procesador: String(row.procesador ?? "").trim(),
+        cantidad: Math.min(500, cantidad),
+      });
+      if (out.length >= 12) break;
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 function mapPedido(raw: Record<string, unknown>): PedidoRow {
   const r = rowKeysToLowercase(raw);
   const origen = String(r.origen ?? "") === "paraguay" ? "paraguay" : "china";
@@ -325,6 +369,7 @@ function mapPedido(raw: Record<string, unknown>): PedidoRow {
     equipo: String(r.equipo ?? ""),
     procesador: String(r.procesador ?? ""),
     cantidad: Number(r.cantidad ?? 1) || 1,
+    lineas: parseLineas(r.lineas_json),
     vendedor: String(r.vendedor ?? ""),
     tieneComision: Number(r.tiene_comision ?? 0) === 1,
     comisionUsd: comisionRaw != null && Number.isFinite(comisionRaw) ? comisionRaw : null,
@@ -847,9 +892,9 @@ asicPedidosRouter.post("/asic-pedidos", ...writeMw, async (req, res, next) => {
       .prepare(
         `INSERT INTO asic_pedidos (
            cliente, client_id, origen, marca, equipo, procesador, cantidad, vendedor, tiene_comision, comision_usd,
-           aduana_aplica, notas, etapas_json, created_at, updated_at
+           aduana_aplica, notas, etapas_json, lineas_json, created_at, updated_at
          )
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${ts}, ${ts})`
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${ts}, ${ts})`
       )
       .run(
         data.cliente,
@@ -864,7 +909,8 @@ asicPedidosRouter.post("/asic-pedidos", ...writeMw, async (req, res, next) => {
         data.tieneComision ? data.comisionUsd ?? 0 : null,
         aduanaAplica ? 1 : 0,
         data.notas,
-        JSON.stringify(etapas)
+        JSON.stringify(etapas),
+        JSON.stringify(data.lineas)
       );
     const id = Number(inserted.lastInsertRowid);
     if (!Number.isFinite(id) || id <= 0) {
@@ -919,7 +965,7 @@ asicPedidosRouter.patch("/asic-pedidos/:id", ...writeMw, async (req, res, next) 
       .prepare(
         `UPDATE asic_pedidos
          SET cliente = ?, equipo = ?, cantidad = ?, notas = ?, aduana_aplica = ?,
-             factura_id = ?, factura_numero = ?, factura_titular = ?, updated_at = ${ts}
+             factura_id = ?, factura_numero = ?, factura_titular = ?, lineas_json = ?, updated_at = ${ts}
          WHERE id = ?`
       )
       .run(
@@ -931,6 +977,7 @@ asicPedidosRouter.patch("/asic-pedidos/:id", ...writeMw, async (req, res, next) 
         facturaId,
         facturaNumero,
         facturaTitular,
+        JSON.stringify(data.lineas !== undefined ? data.lineas : pedido.lineas),
         id
       );
     res.json({ pedido: await loadPedido(id) });

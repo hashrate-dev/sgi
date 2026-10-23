@@ -18,8 +18,10 @@ import { defaultAsicShelfImageSrc, normalizeMarketplaceImageSrc, resolveShelfDis
 import { canUserAccessScreen } from "../lib/sgiNavigation";
 import type { Client, EquipoASIC } from "../lib/types";
 import {
+  asicPedidoCantidadTotal,
   asicPedidoCobroPendiente,
   asicPedidoEtapaLabel,
+  asicPedidoLineas,
   asicPedidoMedioLabel,
   asicPedidoOrigenLabel,
   asicPedidoStageDetail,
@@ -37,6 +39,7 @@ import {
   reopenAsicPedidoStage,
   updateAsicPedido,
   type AsicPedido,
+  type AsicPedidoLinea,
   type AsicPedidoMedioDinero,
   type AsicPedidoModoCobro,
   type AsicPedidoOrigen,
@@ -70,6 +73,69 @@ function uniqueProcessorLabels(values: string[]): string[] {
     if (nextReadable && !prevReadable) map.set(key, label);
   }
   return [...map.values()].sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+}
+
+type ModeloOption = { key: string; marca: string; modelo: string };
+
+function modeloOptionsFor(equipos: EquipoASIC[], marca: string): ModeloOption[] {
+  const map = new Map<string, ModeloOption>();
+  for (const item of equipos) {
+    const marcaItem = String(item.marcaEquipo ?? "").trim();
+    const modelo = String(item.modelo ?? "").trim();
+    if (!modelo) continue;
+    const key = `${marcaItem.toLowerCase()}|${modelo.toLowerCase()}`;
+    if (!map.has(key)) map.set(key, { key, marca: marcaItem, modelo });
+  }
+  const marcaKey = marca.trim().toLowerCase();
+  const all = [...map.values()].sort((a, b) => a.modelo.localeCompare(b.modelo, "es"));
+  if (!marcaKey) return all;
+  const matched = all.filter((item) => item.marca.toLowerCase() === marcaKey);
+  return matched.length > 0 ? matched : all;
+}
+
+function procesadorOptionsFor(equipos: EquipoASIC[], modelo: string, marca: string): string[] {
+  const modeloKey = modelo.toLowerCase();
+  const marcaKey = marca.toLowerCase();
+  const labels: string[] = [];
+  for (const item of equipos) {
+    const modeloItem = String(item.modelo ?? "").trim();
+    const marcaItem = String(item.marcaEquipo ?? "").trim();
+    const proc = String(item.procesador ?? "").trim();
+    if (!proc || modeloItem.toLowerCase() !== modeloKey) continue;
+    if (marcaKey && marcaItem.toLowerCase() !== marcaKey) continue;
+    labels.push(proc);
+  }
+  return uniqueProcessorLabels(labels);
+}
+
+type LineaDraft = {
+  uid: string;
+  marca: string;
+  equipoKey: string;
+  procesador: string;
+  cantidad: string;
+};
+
+function emptyLineaDraft(): LineaDraft {
+  return {
+    uid: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    marca: "",
+    equipoKey: "",
+    procesador: "",
+    cantidad: "1",
+  };
+}
+
+function draftToLinea(equipos: EquipoASIC[], draft: LineaDraft): AsicPedidoLinea | null {
+  const selected = modeloOptionsFor(equipos, draft.marca).find((item) => item.key === draft.equipoKey);
+  const qty = Number(draft.cantidad);
+  if (!draft.marca.trim() || !selected || !draft.procesador.trim() || !Number.isFinite(qty) || qty < 1) return null;
+  return {
+    marca: draft.marca.trim(),
+    equipo: selected.modelo.trim(),
+    procesador: draft.procesador.trim(),
+    cantidad: qty,
+  };
 }
 
 function todayISO(): string {
@@ -234,6 +300,7 @@ function PedidoList({
     contratoRef: string;
     notas: string;
     aduanaAplica: boolean;
+    lineas?: AsicPedidoLinea[];
   }) => Promise<void>;
 }) {
   const [clients, setClients] = useState<Client[]>([]);
@@ -251,6 +318,7 @@ function PedidoList({
   const [contratoRef, setContratoRef] = useState("");
   const [notas, setNotas] = useState("");
   const [aduanaAplica, setAduanaAplica] = useState(true);
+  const [extras, setExtras] = useState<LineaDraft[]>([]);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [vendedores, setVendedores] = useState<string[]>([]);
   const [contratoRefs, setContratoRefs] = useState<string[]>([]);
@@ -293,38 +361,13 @@ function PedidoList({
     };
   }, []);
 
-  const modeloOptions = useMemo(() => {
-    const map = new Map<string, { key: string; marca: string; modelo: string }>();
-    for (const item of equipos) {
-      const marcaItem = String(item.marcaEquipo ?? "").trim();
-      const modelo = String(item.modelo ?? "").trim();
-      if (!modelo) continue;
-      const key = `${marcaItem.toLowerCase()}|${modelo.toLowerCase()}`;
-      if (!map.has(key)) map.set(key, { key, marca: marcaItem, modelo });
-    }
-    const marcaKey = marca.trim().toLowerCase();
-    const all = [...map.values()].sort((a, b) => a.modelo.localeCompare(b.modelo, "es"));
-    if (!marcaKey) return all;
-    const matched = all.filter((item) => item.marca.toLowerCase() === marcaKey);
-    return matched.length > 0 ? matched : all;
-  }, [equipos, marca]);
+  const modeloOptions = useMemo(() => modeloOptionsFor(equipos, marca), [equipos, marca]);
 
   const modeloSeleccionado = modeloOptions.find((item) => item.key === equipoKey) ?? null;
 
   const procesadorOptions = useMemo(() => {
     if (!modeloSeleccionado) return [];
-    const modeloKey = modeloSeleccionado.modelo.toLowerCase();
-    const marcaKey = modeloSeleccionado.marca.toLowerCase();
-    const labels: string[] = [];
-    for (const item of equipos) {
-      const modelo = String(item.modelo ?? "").trim();
-      const marcaItem = String(item.marcaEquipo ?? "").trim();
-      const proc = String(item.procesador ?? "").trim();
-      if (!proc || modelo.toLowerCase() !== modeloKey) continue;
-      if (marcaKey && marcaItem.toLowerCase() !== marcaKey) continue;
-      labels.push(proc);
-    }
-    return uniqueProcessorLabels(labels);
+    return procesadorOptionsFor(equipos, modeloSeleccionado.modelo, modeloSeleccionado.marca);
   }, [equipos, modeloSeleccionado]);
 
   useEffect(() => {
@@ -423,6 +466,15 @@ function PedidoList({
               return;
             }
             if (!fechaContrato || !Number.isFinite(qty) || qty < 1) return;
+            const lineas: AsicPedidoLinea[] = [];
+            for (const draft of extras) {
+              const linea = draftToLinea(equipos, draft);
+              if (!linea) {
+                setCatalogError("Completá marca, modelo, procesador y cantidad de cada equipo de la operación.");
+                return;
+              }
+              lineas.push(linea);
+            }
             if (tieneComision && !Number.isFinite(comision)) {
               setCatalogError("Indicá el monto de la comisión en USD.");
               return;
@@ -438,6 +490,7 @@ function PedidoList({
               equipo: modelo,
               procesador: procesador.trim(),
               cantidad: qty,
+              ...(lineas.length > 0 ? { lineas } : {}),
               vendedor: vendedor.trim(),
               tieneComision,
               ...(tieneComision ? { comisionUsd: comision } : {}),
@@ -559,6 +612,22 @@ function PedidoList({
                 ))}
               </select>
             </label>
+            <div className="span-2">
+              {extras.map((draft) => (
+                <ExtraLineaEditor
+                  key={draft.uid}
+                  equipos={equipos}
+                  draft={draft}
+                  canWrite={canWrite}
+                  onChange={(next) => setExtras((prev) => prev.map((item) => (item.uid === draft.uid ? next : item)))}
+                  onRemove={() => setExtras((prev) => prev.filter((item) => item.uid !== draft.uid))}
+                  onError={setCatalogError}
+                />
+              ))}
+              <button type="button" className="asic-pedidos-ghost" onClick={() => setExtras((prev) => [...prev, emptyLineaDraft()])}>
+                Agregar otro equipo a esta operación
+              </button>
+            </div>
             <label>
               <span className="asic-pedidos-label">Vendedor</span>
               <select value={vendedor} required onChange={(e) => setVendedor(e.target.value)}>
@@ -678,38 +747,58 @@ function PedidoList({
                   <th>Etapa</th>
                 </tr>
               </thead>
-              <tbody>
-                {pedidos.map((pedido) => (
-                  <tr key={pedido.id} onClick={() => onOpen(pedido.id)}>
-                    <td>
-                      <div className="asic-cliente">
-                        <span className="asic-cliente-mark" aria-hidden="true">
-                          <i className="bi bi-person" />
-                        </span>
-                        <div>
-                          <strong>{pedido.cliente}</strong>
-                          <div className="text-muted small">{pedido.cantidad} equipo{pedido.cantidad === 1 ? "" : "s"}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="asic-pedidos-origin">
-                        {pedido.origen === "china" ? <FlagChina /> : <FlagParaguay />}
-                        {asicPedidoOrigenLabel(pedido.origen)}
-                      </span>
-                    </td>
-                    <td>
-                      <EquipoCell pedido={pedido} equipos={equipos} />
-                    </td>
-                    <td>
-                      <div className="asic-etapa-row">
-                        <EtapaStatus pedido={pedido} />
-                        <OperacionMark cerrado={pedido.etapaActual === "completo"} />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
+              {pedidos.map((pedido) => {
+                  const lineas = asicPedidoLineas(pedido);
+                  const total = asicPedidoCantidadTotal(pedido);
+                  return (
+                    <tbody key={pedido.id} className="asic-op-group" onClick={() => onOpen(pedido.id)}>
+                      {lineas.map((linea, index) => (
+                        <tr key={`${pedido.id}-${linea.equipo}-${index}`} className={index === 0 ? undefined : "asic-op-cont"}>
+                          {index === 0 ? (
+                            <td rowSpan={lineas.length}>
+                              <div className="asic-cliente">
+                                <span className="asic-cliente-mark" aria-hidden="true">
+                                  <i className="bi bi-person" />
+                                </span>
+                                <div>
+                                  <strong>{pedido.cliente}</strong>
+                                  <div className="text-muted small">
+                                    {total} equipo{total === 1 ? "" : "s"}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                          ) : null}
+                          {index === 0 ? (
+                            <td rowSpan={lineas.length}>
+                              <span className="asic-pedidos-origin">
+                                {pedido.origen === "china" ? <FlagChina /> : <FlagParaguay />}
+                                {asicPedidoOrigenLabel(pedido.origen)}
+                              </span>
+                            </td>
+                          ) : null}
+                          <td>
+                            <EquipoCell
+                              linea={linea}
+                              equipos={equipos}
+                              vendedor={index === 0 ? pedido.vendedor : ""}
+                              tieneComision={pedido.tieneComision}
+                              comisionUsd={pedido.comisionUsd}
+                            />
+                          </td>
+                          {index === 0 ? (
+                            <td rowSpan={lineas.length}>
+                              <div className="asic-etapa-row">
+                                <EtapaStatus pedido={pedido} />
+                                <OperacionMark cerrado={pedido.etapaActual === "completo"} />
+                              </div>
+                            </td>
+                          ) : null}
+                        </tr>
+                      ))}
+                    </tbody>
+                  );
+                })}
             </table>
           </div>
         )}
@@ -753,9 +842,15 @@ function PedidoDetail({
         <div>
           <h1>{pedido.cliente}</h1>
           <p className="asic-pedidos-lead">
-            {[pedido.marca, pedido.equipo, pedido.procesador].filter(Boolean).join(" · ") || pedido.equipo}
-            {" · "}
-            {pedido.cantidad} equipo{pedido.cantidad === 1 ? "" : "s"} · origen {asicPedidoOrigenLabel(pedido.origen)}
+            {asicPedidoLineas(pedido).map((linea, index) => {
+              const name = [linea.marca, linea.equipo, linea.procesador].filter(Boolean).join(" · ") || linea.equipo;
+              return (
+                <span key={`${linea.equipo}-${index}`} className="asic-op-line">
+                  {name} · {linea.cantidad} equipo{linea.cantidad === 1 ? "" : "s"}
+                </span>
+              );
+            })}
+            <span className="asic-op-line">origen {asicPedidoOrigenLabel(pedido.origen)}</span>
           </p>
         </div>
         <div className="asic-pedidos-actions">
@@ -783,6 +878,8 @@ function PedidoDetail({
       </div>
 
       {err ? <div className="asic-pedidos-error">{err}</div> : null}
+
+      {canWrite ? <OperacionMasEquipos pedido={pedido} busy={busy} onRun={onRun} /> : null}
 
       {pedido.notas ? <p className="asic-pedidos-card mb-3">{pedido.notas}</p> : null}
 
@@ -1000,16 +1097,16 @@ function foldEquipoName(raw: string): string {
     .trim();
 }
 
-function pedidoEquipoImage(pedido: AsicPedido, equipos: EquipoASIC[]): string {
-  const marca = foldEquipoName(pedido.marca);
-  const modelo = foldEquipoName(pedido.equipo);
+function pedidoEquipoImage(marca: string, equipo: string, equipos: EquipoASIC[]): string {
+  const marcaKey = foldEquipoName(marca);
+  const modelo = foldEquipoName(equipo);
   const hit =
-    equipos.find((item) => foldEquipoName(item.marcaEquipo) === marca && foldEquipoName(item.modelo) === modelo) ??
+    equipos.find((item) => foldEquipoName(item.marcaEquipo) === marcaKey && foldEquipoName(item.modelo) === modelo) ??
     equipos.find((item) => modelo && foldEquipoName(item.modelo) === modelo) ??
     equipos.find((item) => modelo && foldEquipoName(`${item.marcaEquipo} ${item.modelo}`).includes(modelo));
   const explicit = normalizeMarketplaceImageSrc(hit?.marketplaceImageSrc ?? "");
   if (explicit && !/^data:/i.test(explicit)) return explicit;
-  const local = defaultAsicShelfImageSrc(pedido.marca || hit?.marcaEquipo || "", pedido.equipo || hit?.modelo || "");
+  const local = defaultAsicShelfImageSrc(marca || hit?.marcaEquipo || "", equipo || hit?.modelo || "");
   if (local) return local;
   if (!hit?.id) return "";
   return resolveShelfDisplayImageSrc({
@@ -1020,14 +1117,26 @@ function pedidoEquipoImage(pedido: AsicPedido, equipos: EquipoASIC[]): string {
   });
 }
 
-function EquipoCell({ pedido, equipos }: { pedido: AsicPedido; equipos: EquipoASIC[] }) {
-  const resolved = pedidoEquipoImage(pedido, equipos);
+function EquipoCell({
+  linea,
+  equipos,
+  vendedor,
+  tieneComision,
+  comisionUsd,
+}: {
+  linea: AsicPedidoLinea;
+  equipos: EquipoASIC[];
+  vendedor?: string;
+  tieneComision?: boolean;
+  comisionUsd?: number | null;
+}) {
+  const resolved = pedidoEquipoImage(linea.marca, linea.equipo, equipos);
   const [src, setSrc] = useState(resolved);
   useEffect(() => setSrc(resolved), [resolved]);
-  const total = Math.max(1, pedido.cantidad || 1);
+  const total = Math.max(1, linea.cantidad || 1);
   const shown = Math.min(total, 6);
   const extra = total - shown;
-  const label = [pedido.marca, pedido.equipo, pedido.procesador].filter(Boolean).join(" · ") || pedido.equipo;
+  const label = [linea.marca, linea.equipo, linea.procesador].filter(Boolean).join(" · ") || linea.equipo;
   return (
     <div className="asic-equipo">
       <div className="asic-equipo-photos">
@@ -1036,9 +1145,9 @@ function EquipoCell({ pedido, equipos }: { pedido: AsicPedido; equipos: EquipoAS
             <img
               key={index}
               src={src}
-              alt={index === 0 ? `${total} ${pedido.equipo || "ASIC"}` : ""}
+              alt={index === 0 ? `${total} ${linea.equipo || "ASIC"}` : ""}
               onError={() => {
-                const fallback = defaultAsicShelfImageSrc(pedido.marca, pedido.equipo);
+                const fallback = defaultAsicShelfImageSrc(linea.marca, linea.equipo);
                 setSrc((current) => (fallback && current !== fallback ? fallback : ""));
               }}
             />
@@ -1052,16 +1161,209 @@ function EquipoCell({ pedido, equipos }: { pedido: AsicPedido; equipos: EquipoAS
       </div>
       <div>
         <strong>{label}</strong>
-        {pedido.vendedor ? (
+        {vendedor ? (
           <div className="text-muted small">
-            {pedido.vendedor}
-            {pedido.tieneComision
-              ? ` · comisión ${Number(pedido.comisionUsd ?? 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
+            {vendedor}
+            {tieneComision
+              ? ` · comisión ${Number(comisionUsd ?? 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
               : " · sin comisión"}
           </div>
         ) : null}
       </div>
     </div>
+  );
+}
+
+function ExtraLineaEditor({
+  equipos,
+  draft,
+  canWrite,
+  onChange,
+  onRemove,
+  onError,
+}: {
+  equipos: EquipoASIC[];
+  draft: LineaDraft;
+  canWrite: boolean;
+  onChange: (next: LineaDraft) => void;
+  onRemove: () => void;
+  onError: (message: string | null) => void;
+}) {
+  const modeloOptions = useMemo(() => modeloOptionsFor(equipos, draft.marca), [equipos, draft.marca]);
+  const selected = modeloOptions.find((item) => item.key === draft.equipoKey) ?? null;
+  const procesadorOptions = useMemo(
+    () => (selected ? procesadorOptionsFor(equipos, selected.modelo, selected.marca) : []),
+    [equipos, selected]
+  );
+
+  return (
+    <div className="asic-op-extra">
+      <div className="asic-op-extra-head">
+        <strong>Otro equipo de esta operación</strong>
+        <button type="button" className="asic-pedidos-ghost" onClick={onRemove}>
+          Quitar
+        </button>
+      </div>
+      <div className="asic-pedidos-form">
+        <label>
+          Cantidad
+          <input
+            value={draft.cantidad}
+            onChange={(e) => onChange({ ...draft, cantidad: e.target.value })}
+            required
+            inputMode="numeric"
+            min={1}
+          />
+        </label>
+        <div>
+          <span className="asic-pedidos-label">Marca</span>
+          <AsicCotizadorCatalogSelect
+            tipo="marca"
+            value={draft.marca}
+            labelId={`asic-pedido-extra-marca-${draft.uid}`}
+            onChange={(value) => {
+              const current = modeloOptions.find((item) => item.key === draft.equipoKey);
+              const reset = Boolean(current?.marca && value && current.marca.toLowerCase() !== value.trim().toLowerCase());
+              onChange({
+                ...draft,
+                marca: value,
+                equipoKey: reset ? "" : draft.equipoKey,
+                procesador: reset ? "" : draft.procesador,
+              });
+            }}
+            placeholder="Seleccionar marca"
+            searchPlaceholder="Buscar marca…"
+            addLabel="Agregar nueva marca"
+            newTitle="Nueva marca"
+            allowCreate={canWrite}
+            onError={onError}
+          />
+        </div>
+        <label>
+          Modelo
+          <select
+            value={draft.equipoKey}
+            required
+            onChange={(e) => {
+              const next = modeloOptions.find((item) => item.key === e.target.value);
+              const procs = next ? procesadorOptionsFor(equipos, next.modelo, next.marca) : [];
+              onChange({
+                ...draft,
+                equipoKey: e.target.value,
+                marca: next?.marca || draft.marca,
+                procesador: procs.length === 1 ? (procs[0] ?? "") : "",
+              });
+            }}
+          >
+            <option value="">Seleccionar modelo</option>
+            {modeloOptions.map((item) => (
+              <option key={item.key} value={item.key}>
+                {item.modelo}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Procesador
+          <select
+            value={draft.procesador}
+            required
+            disabled={!selected}
+            onChange={(e) => onChange({ ...draft, procesador: e.target.value })}
+          >
+            <option value="">{selected ? "Seleccionar procesador" : "Seleccionar modelo primero"}</option>
+            {procesadorOptions.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+    </div>
+  );
+}
+
+function OperacionMasEquipos({
+  pedido,
+  busy,
+  onRun,
+}: {
+  pedido: AsicPedido;
+  busy: boolean;
+  onRun: (task: () => Promise<AsicPedido>) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [equipos, setEquipos] = useState<EquipoASIC[]>([]);
+  const [draft, setDraft] = useState<LineaDraft>(() => emptyLineaDraft());
+  const [localErr, setLocalErr] = useState<string | null>(null);
+  const count = pedido.lineas?.length ?? 0;
+  const prevCount = useRef(count);
+
+  useEffect(() => {
+    if (count > prevCount.current) {
+      setOpen(false);
+      setDraft(emptyLineaDraft());
+      setLocalErr(null);
+    }
+    prevCount.current = count;
+  }, [count]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void getEquipos()
+      .then((r) => {
+        if (!cancelled) setEquipos(Array.isArray(r.items) ? r.items : []);
+      })
+      .catch(() => {
+        if (!cancelled) setEquipos([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  if (!open) {
+    return (
+      <div className="mb-3">
+        <button type="button" className="asic-pedidos-ghost" onClick={() => setOpen(true)}>
+          Agregar otro equipo a esta operación
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      className="asic-pedidos-card mb-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const linea = draftToLinea(equipos, draft);
+        if (!linea) {
+          setLocalErr("Completá marca, modelo, procesador y cantidad.");
+          return;
+        }
+        setLocalErr(null);
+        void onRun(() => updateAsicPedido(pedido.id, { lineas: [...(pedido.lineas ?? []), linea] }).then((r) => r.pedido));
+      }}
+    >
+      {localErr ? <div className="asic-pedidos-error">{localErr}</div> : null}
+      <ExtraLineaEditor
+        equipos={equipos}
+        draft={draft}
+        canWrite
+        onChange={setDraft}
+        onRemove={() => {
+          setOpen(false);
+          setLocalErr(null);
+        }}
+        onError={setLocalErr}
+      />
+      <button type="submit" className="asic-pedidos-primary" disabled={busy}>
+        {busy ? "Guardando…" : "Sumar a esta operación"}
+      </button>
+    </form>
   );
 }
 

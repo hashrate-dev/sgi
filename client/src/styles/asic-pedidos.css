@@ -73,8 +73,13 @@
   cursor: pointer;
 }
 
-.asic-pedidos-table tr:hover td {
+.asic-op-group:hover td {
   background: #f0fdf4;
+}
+
+.asic-op-cont td {
+  border-top: 1px solid #f1f5f9;
+  padding-top: 0.35rem;
 }
 
 .asic-etapa-row {
@@ -216,6 +221,31 @@
   width: 1.75rem;
   height: 1.16rem;
   border-radius: 3px;
+}
+
+.asic-pedidos-lead .asic-op-line {
+  display: block;
+}
+
+.asic-op-extra {
+  margin: 0 0 0.75rem;
+  padding: 0.75rem 0.85rem 0.15rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.asic-op-extra-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.asic-op-extra-head strong {
+  color: #0f172a;
+  font-size: 0.84rem;
 }
 
 .asic-equipo {

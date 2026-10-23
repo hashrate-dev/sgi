@@ -38,6 +38,13 @@ export type AsicPedidoStageState = {
   montoUsd?: number | null;
 };
 
+export type AsicPedidoLinea = {
+  marca: string;
+  equipo: string;
+  procesador: string;
+  cantidad: number;
+};
+
 export type AsicPedido = {
   id: number;
   cliente: string;
@@ -47,6 +54,8 @@ export type AsicPedido = {
   equipo: string;
   procesador: string;
   cantidad: number;
+  /** Otros modelos de la misma operación. El primero sigue en marca, equipo, procesador y cantidad. */
+  lineas?: AsicPedidoLinea[];
   vendedor: string;
   tieneComision: boolean;
   comisionUsd: number | null;
@@ -141,6 +150,26 @@ export function asicPedidoStageDetail(key: AsicPedidoStageKey): string {
 
 export function asicPedidoOrigenLabel(origen: AsicPedidoOrigen): string {
   return origen === "china" ? "China" : "Paraguay";
+}
+
+/** Primer modelo más los otros tipos comprados en la misma operación. */
+export function asicPedidoLineas(
+  pedido: Pick<AsicPedido, "marca" | "equipo" | "procesador" | "cantidad" | "lineas">
+): AsicPedidoLinea[] {
+  const first: AsicPedidoLinea = {
+    marca: pedido.marca,
+    equipo: pedido.equipo,
+    procesador: pedido.procesador,
+    cantidad: Math.max(1, Number(pedido.cantidad) || 1),
+  };
+  const rest = (pedido.lineas ?? []).filter((line) => String(line.equipo ?? "").trim() && Number(line.cantidad) > 0);
+  return [first, ...rest];
+}
+
+export function asicPedidoCantidadTotal(
+  pedido: Pick<AsicPedido, "marca" | "equipo" | "procesador" | "cantidad" | "lineas">
+): number {
+  return asicPedidoLineas(pedido).reduce((sum, line) => sum + line.cantidad, 0);
 }
 
 export function asicPedidoMedioLabel(medio: AsicPedidoMedioDinero): string {
@@ -239,6 +268,7 @@ export function createAsicPedido(body: {
   equipo: string;
   procesador: string;
   cantidad: number;
+  lineas?: AsicPedidoLinea[];
   vendedor: string;
   tieneComision: boolean;
   comisionUsd?: number;
@@ -252,7 +282,7 @@ export function createAsicPedido(body: {
 
 export function updateAsicPedido(
   id: number,
-  body: Partial<Pick<AsicPedido, "cliente" | "equipo" | "cantidad" | "notas" | "aduanaAplica" | "facturaId" | "facturaNumero" | "facturaTitular">>
+  body: Partial<Pick<AsicPedido, "cliente" | "equipo" | "cantidad" | "lineas" | "notas" | "aduanaAplica" | "facturaId" | "facturaNumero" | "facturaTitular">>
 ): Promise<{ pedido: AsicPedido }> {
   return api(`/api/asic-pedidos/${id}`, { method: "PATCH", body: JSON.stringify(body) });
 }
