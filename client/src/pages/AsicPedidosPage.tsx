@@ -840,12 +840,13 @@ function PedidoTracking({
         </p>
         {cobroPendiente.garantia ? (
           <aside className="asic-track-alert">
-            <strong>Pendiente</strong>
-            <span>
+            <p className="asic-track-alert-kicker">Garantía</p>
+            <p className="asic-track-alert-title">{cobroPendiente.recibo ? "Pendiente de pago completo" : "Falta el comprobante"}</p>
+            <p className="asic-track-alert-text">
               {cobroPendiente.recibo
-                ? "El comprobante de garantía todavía no se hizo, porque no llegó el dinero. Queda pendiente hasta el pago completo. Cuando se emite el recibo, en ese momento se hace la garantía y se completa en este proceso."
-                : "El recibo ya está. Falta el comprobante de garantía, que se emite al recibir el pago completo."}
-            </span>
+                ? "Se emite junto con el recibo, cuando llegue el dinero."
+                : "El recibo ya está. El comprobante se emite con el pago completo."}
+            </p>
           </aside>
         ) : null}
         <div className="asic-track-ends">
@@ -865,12 +866,15 @@ function PedidoTracking({
                 return (
                   <li key={key} className={esperaGarantia ? "is-alert" : undefined}>
                     <span
-                      className={`asic-track-dot${done ? " is-done" : ""}${current ? " is-current" : ""}${esperaGarantia ? " is-wait" : ""}`}
-                      title={esperaGarantia ? "Garantía pendiente hasta el pago completo" : asicPedidoStageTitle(key, pedido.origen)}
+                      className={`asic-track-dot${done ? " is-done" : ""}${current ? " is-current" : ""}`}
+                      title={esperaGarantia ? "Garantía pendiente de pago completo" : asicPedidoStageTitle(key, pedido.origen)}
                     >
                       {done ? "✓" : ""}
                     </span>
-                    <span className="asic-track-name">{esperaGarantia ? "Pendiente" : asicPedidoStageShort(key)}</span>
+                    <span className="asic-track-name">
+                      {asicPedidoStageShort(key)}
+                      {esperaGarantia ? <em>Garantía</em> : null}
+                    </span>
                   </li>
                 );
               })}
@@ -948,10 +952,11 @@ function PedidoTracking({
                   <strong>{asicPedidoStageTitle(key, pedido.origen)}</strong>
                   <p>{asicPedidoStageSummary(key, state) || asicPedidoStageDetail(key)}</p>
                   {key === "documentos" && cobroPendiente.garantia ? (
-                    <p className="asic-track-alert asic-track-alert--inline">
-                      <strong>Pendiente</strong>
-                      <span>La garantía se completa al emitir el recibo, cuando llegue el pago completo.</span>
-                    </p>
+                    <aside className="asic-track-alert asic-track-alert--inline">
+                      <p className="asic-track-alert-kicker">Garantía</p>
+                      <p className="asic-track-alert-title">Pendiente de pago completo</p>
+                      <p className="asic-track-alert-text">Se completa al emitir el recibo.</p>
+                    </aside>
                   ) : null}
                   {state.notas ? <p>{state.notas}</p> : null}
                   {canWrite ? (
@@ -1448,11 +1453,11 @@ function StageForm({
 
       {stage === "documentos" && modo === "factura_recibo" && numeroFactura && !numeroGarantia ? (
         <aside className="asic-track-alert">
-          <strong>Pendiente</strong>
-          <span>
-            {numeroFactura} quedó conectada{titularFactura ? ` (${titularFactura})` : ""}. Podés confirmar esta etapa. La garantía queda pendiente en el proceso
-            {numeroRecibo ? " y se completa con el comprobante, que se emite al recibir el pago completo." : " hasta que llegue el pago completo y se emita el recibo."}
-          </span>
+          <p className="asic-track-alert-kicker">Garantía</p>
+          <p className="asic-track-alert-title">Pendiente de pago completo</p>
+          <p className="asic-track-alert-text">
+            {numeroFactura} quedó conectada{titularFactura ? ` (${titularFactura})` : ""}. Podés confirmar la etapa. El comprobante se emite con el recibo.
+          </p>
         </aside>
       ) : null}
 

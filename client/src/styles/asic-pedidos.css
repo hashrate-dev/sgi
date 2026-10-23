@@ -224,33 +224,44 @@
 }
 
 .asic-track-alert {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.7rem;
-  margin-top: 0.75rem;
-  padding: 0.7rem 0.8rem;
-  border: 1px solid #fcd34d;
+  display: grid;
+  gap: 0.12rem;
+  margin-top: 0.9rem;
+  padding: 0.72rem 0.9rem 0.78rem 0.95rem;
+  border: 1px solid #e2e8f0;
+  border-left: 3px solid #166534;
   border-radius: 12px;
-  background: #fffbeb;
-  color: #92400e;
-  font-size: 0.86rem;
-  line-height: 1.4;
+  background: #f8fafc;
 }
 
-.asic-track-alert strong {
-  flex: 0 0 auto;
-  margin-top: 0.05rem;
-  padding: 0.12rem 0.45rem;
-  border-radius: 999px;
-  background: #d97706;
-  color: #fff;
+.asic-track-alert-kicker,
+.asic-track-alert-title,
+.asic-track-alert-text {
+  margin: 0;
+}
+
+.asic-track-alert-kicker {
+  color: #166534;
   font-size: 0.68rem;
-  letter-spacing: 0.04em;
+  font-weight: 800;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
+.asic-track-alert-title {
+  color: #0f172a;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.asic-track-alert-text {
+  color: #64748b;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
 .asic-track-alert--inline {
-  margin-top: 0.45rem;
+  margin-top: 0.5rem;
 }
 
 .asic-track-ends {
@@ -272,7 +283,7 @@
 .asic-track-rail-wrap {
   position: relative;
   width: 100%;
-  padding: 0.85rem 0 1.55rem;
+  padding: 0.85rem 0 2.2rem;
 }
 
 .asic-track-rail {
@@ -327,25 +338,12 @@
   color: #fff;
 }
 
-.asic-track-dot.is-done.is-wait {
-  border-color: #d97706;
-  background: #fffbeb;
-  color: #b45309;
-  box-shadow: 0 0 0 4px rgba(217, 119, 6, 0.2);
-}
-
 .asic-track-dot.is-current {
   width: 1.15rem;
   height: 1.15rem;
   border-color: #166534;
   background: #fff;
   box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.18);
-}
-
-.asic-track-dot.is-current.is-wait {
-  border-color: #d97706;
-  background: #fffbeb;
-  box-shadow: 0 0 0 4px rgba(217, 119, 6, 0.2);
 }
 
 .asic-track-name {
@@ -385,7 +383,20 @@
 
 .asic-track-dots li.is-alert .asic-track-name {
   visibility: visible;
-  color: #b45309;
+  max-width: 5.6rem;
+  color: #0f172a;
+  white-space: normal;
+}
+
+.asic-track-dots li.is-alert .asic-track-name em {
+  display: block;
+  margin-top: 0.08rem;
+  color: #166534;
+  font-style: normal;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .asic-track-facts {
