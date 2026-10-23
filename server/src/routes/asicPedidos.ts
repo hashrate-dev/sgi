@@ -402,6 +402,11 @@ export async function attachAsicPedidoReceipt(opts: {
   const reciboNumber = String(opts.reciboNumber ?? "").trim();
   if (!facturaNumber || !reciboNumber) return;
   await ensureSchema();
+  const reciboDay = strictIsoDate(opts.reciboDate);
+  const garantias = await listGarantiasEmitidas();
+  const pedidos = (
+    (await db.prepare("SELECT * FROM asic_pedidos ORDER BY updated_at DESC, id DESC LIMIT 500").all()) as Record<string, unknown>[]
+  ).map(mapPedido);
   const rows = (await db
     .prepare("SELECT id FROM asic_pedidos WHERE upper(factura_numero) = upper(?)")
     .all(facturaNumber)) as Array<{ id?: number }>;
@@ -436,8 +441,83 @@ export async function attachAsicPedidoReceipt(opts: {
           : undefined,
     };
     if (!etapas.documentos) continue;
+    if (!etapas.documentos.numeroGarantia && reciboDay) {
+      const garantia = garantiaEmitidaElDia(pedido, reciboDay, garantias, pedidos);
+      if (garantia) {
+        etapas.documentos = {
+          ...etapas.documentos,
+          numeroGarantia: garantia.number,
+          valorGarantiaUsd: garantia.total,
+        };
+      }
+    }
     await saveStages(id, etapas);
   }
+}
+
+function strictIsoDate(raw: string): string {
+  const text = String(raw ?? "").trim();
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(text);
+  if (iso?.[1] && iso[2] && iso[3]) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const dmy = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(text);
+  if (dmy?.[1] && dmy[2] && dmy[3]) return `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
+  return "";
+}
+
+type GarantiaEmitida = { number: string; clientName: string; date: string; total: number };
+
+async function listGarantiasEmitidas(): Promise<GarantiaEmitida[]> {
+  const rows = (await db
+    .prepare("SELECT invoice_json FROM emitted_garantias ORDER BY emitted_at DESC")
+    .all()) as Array<{ invoice_json?: string }>;
+  const seen = new Set<string>();
+  const out: GarantiaEmitida[] = [];
+  for (const row of rows) {
+    try {
+      const inv = JSON.parse(String(row.invoice_json ?? "")) as {
+        number?: string;
+        type?: string;
+        clientName?: string;
+        date?: string;
+        total?: number;
+      };
+      if (inv.type === "Recibo Devolución") continue;
+      if (inv.type && inv.type !== "Recibo") continue;
+      const number = String(inv.number ?? "").trim();
+      if (!number || seen.has(number.toUpperCase())) continue;
+      seen.add(number.toUpperCase());
+      out.push({
+        number,
+        clientName: String(inv.clientName ?? "").trim(),
+        date: String(inv.date ?? "").trim(),
+        total: Math.abs(Number(inv.total) || 0),
+      });
+    } catch {
+      /* un comprobante mal guardado no bloquea el resto */
+    }
+  }
+  return out;
+}
+
+function garantiaYaUsada(pedidos: PedidoRow[], number: string): boolean {
+  const key = number.toUpperCase();
+  return pedidos.some((pedido) => String(pedido.etapas.documentos?.numeroGarantia ?? "").toUpperCase() === key);
+}
+
+/** Solo el comprobante de garantía emitido el mismo día del recibo, para no tomar un depósito viejo. */
+function garantiaEmitidaElDia(
+  pedido: PedidoRow,
+  day: string,
+  garantias: GarantiaEmitida[],
+  pedidos: PedidoRow[]
+): GarantiaEmitida | null {
+  const labels = pedidoGarantiaLabels(pedido);
+  const matches = garantias.filter((doc) => {
+    if (garantiaYaUsada(pedidos, doc.number)) return false;
+    if (strictIsoDate(doc.date) !== day) return false;
+    return labels.some((label) => sameGarantiaParty(label, doc.clientName));
+  });
+  return matches.length === 1 ? matches[0]! : null;
 }
 
 const GARANTIA_NAME_STOP = new Set(["llc", "sa", "sas", "srl", "spa", "ltd", "ltda", "inc", "de", "del", "la", "los", "las", "y", "and", "the"]);
@@ -492,15 +572,15 @@ export async function attachAsicPedidoGarantia(opts: { number: string; clientNam
   const rows = (await db
     .prepare("SELECT * FROM asic_pedidos ORDER BY updated_at DESC, id DESC LIMIT 500")
     .all()) as Record<string, unknown>[];
-  const matches = rows
+  const waiting = rows
     .map(mapPedido)
     .filter((pedido) => {
       const docs = pedido.etapas.documentos;
       if (docs?.status !== "done" || docs.numeroGarantia) return false;
       return pedidoGarantiaLabels(pedido).some((label) => sameGarantiaParty(label, clientName));
     });
-  if (matches.length !== 1) return;
-  const pedido = matches[0];
+  const conRecibo = waiting.filter((pedido) => pedido.etapas.documentos?.numeroRecibo);
+  const pedido = conRecibo.length === 1 ? conRecibo[0] : waiting.length === 1 ? waiting[0] : undefined;
   if (!pedido?.etapas.documentos) return;
   await saveStages(pedido.id, {
     ...pedido.etapas,

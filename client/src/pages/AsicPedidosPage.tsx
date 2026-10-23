@@ -17,6 +17,7 @@ import { isClienteTiendaOnline } from "../lib/clientTienda";
 import { canUserAccessScreen } from "../lib/sgiNavigation";
 import type { Client, EquipoASIC } from "../lib/types";
 import {
+  asicPedidoCobroPendiente,
   asicPedidoEtapaLabel,
   asicPedidoMedioLabel,
   asicPedidoOrigenLabel,
@@ -825,6 +826,7 @@ function PedidoTracking({
   const headline = etapaActual === "completo" ? "Instalado en Ayolas" : asicPedidoStageTitle(etapaActual, pedido.origen);
   const origen = pedido.origen === "china" ? "China" : "Paraguay";
   const doneStages = stages.filter((key) => pedido.etapas[key]?.status === "done");
+  const cobroPendiente = asicPedidoCobroPendiente(pedido);
 
   return (
     <>
@@ -836,6 +838,16 @@ function PedidoTracking({
             ? `Última actualización: ${formatAsicPedidoFecha(lastDone.fecha)}${lastDoneKey ? ` · ${asicPedidoStageTitle(lastDoneKey, pedido.origen)}` : ""}`
             : "Todavía no hay una etapa confirmada."}
         </p>
+        {cobroPendiente.garantia ? (
+          <aside className="asic-track-alert">
+            <strong>Pendiente</strong>
+            <span>
+              {cobroPendiente.recibo
+                ? "El comprobante de garantía todavía no se hizo, porque no llegó el dinero. Queda pendiente hasta el pago completo. Cuando se emite el recibo, en ese momento se hace la garantía y se completa en este proceso."
+                : "El recibo ya está. Falta el comprobante de garantía, que se emite al recibir el pago completo."}
+            </span>
+          </aside>
+        ) : null}
         <div className="asic-track-ends">
           <span>Origen: {origen}</span>
           <span>Destino: Ayolas</span>
@@ -849,15 +861,16 @@ function PedidoTracking({
               {stages.map((key) => {
                 const done = pedido.etapas[key]?.status === "done";
                 const current = !completo && key === pedido.etapaActual;
+                const esperaGarantia = key === "documentos" && cobroPendiente.garantia;
                 return (
-                  <li key={key}>
+                  <li key={key} className={esperaGarantia ? "is-alert" : undefined}>
                     <span
-                      className={`asic-track-dot${done ? " is-done" : ""}${current ? " is-current" : ""}`}
-                      title={asicPedidoStageTitle(key, pedido.origen)}
+                      className={`asic-track-dot${done ? " is-done" : ""}${current ? " is-current" : ""}${esperaGarantia ? " is-wait" : ""}`}
+                      title={esperaGarantia ? "Garantía pendiente hasta el pago completo" : asicPedidoStageTitle(key, pedido.origen)}
                     >
                       {done ? "✓" : ""}
                     </span>
-                    <span className="asic-track-name">{asicPedidoStageShort(key)}</span>
+                    <span className="asic-track-name">{esperaGarantia ? "Pendiente" : asicPedidoStageShort(key)}</span>
                   </li>
                 );
               })}
@@ -934,6 +947,12 @@ function PedidoTracking({
                 <div>
                   <strong>{asicPedidoStageTitle(key, pedido.origen)}</strong>
                   <p>{asicPedidoStageSummary(key, state) || asicPedidoStageDetail(key)}</p>
+                  {key === "documentos" && cobroPendiente.garantia ? (
+                    <p className="asic-track-alert asic-track-alert--inline">
+                      <strong>Pendiente</strong>
+                      <span>La garantía se completa al emitir el recibo, cuando llegue el pago completo.</span>
+                    </p>
+                  ) : null}
                   {state.notas ? <p>{state.notas}</p> : null}
                   {canWrite ? (
                     <button
@@ -1427,10 +1446,14 @@ function StageForm({
         />
       ) : null}
 
-      {stage === "documentos" && modo === "factura_recibo" && numeroFactura && !numeroRecibo ? (
-        <p className="asic-pedidos-doc-note">
-          {numeroFactura} quedó conectada a este pedido{titularFactura ? ` (${titularFactura})` : ""}. Podés confirmar esta etapa: el recibo se agrega solo cuando llegue el dinero y se emita.
-        </p>
+      {stage === "documentos" && modo === "factura_recibo" && numeroFactura && !numeroGarantia ? (
+        <aside className="asic-track-alert">
+          <strong>Pendiente</strong>
+          <span>
+            {numeroFactura} quedó conectada{titularFactura ? ` (${titularFactura})` : ""}. Podés confirmar esta etapa. La garantía queda pendiente en el proceso
+            {numeroRecibo ? " y se completa con el comprobante, que se emite al recibir el pago completo." : " hasta que llegue el pago completo y se emita el recibo."}
+          </span>
+        </aside>
       ) : null}
 
       {stage === "documentos" && modo === "comprobante_previo" ? (
@@ -1442,7 +1465,7 @@ function StageForm({
         />
       ) : null}
 
-      {stage === "documentos" ? (
+      {stage === "documentos" && (modo !== "factura_recibo" || Boolean(numeroGarantia) || garantiaSuggested.length > 0) ? (
         <GarantiaDocMenu
           state={garantiaState}
           suggested={garantiaSuggested}

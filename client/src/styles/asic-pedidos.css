@@ -223,6 +223,36 @@
   font-size: 0.86rem;
 }
 
+.asic-track-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  margin-top: 0.75rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid #fcd34d;
+  border-radius: 12px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.asic-track-alert strong {
+  flex: 0 0 auto;
+  margin-top: 0.05rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: #d97706;
+  color: #fff;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.asic-track-alert--inline {
+  margin-top: 0.45rem;
+}
+
 .asic-track-ends {
   display: flex;
   justify-content: space-between;
@@ -297,12 +327,25 @@
   color: #fff;
 }
 
+.asic-track-dot.is-done.is-wait {
+  border-color: #d97706;
+  background: #fffbeb;
+  color: #b45309;
+  box-shadow: 0 0 0 4px rgba(217, 119, 6, 0.2);
+}
+
 .asic-track-dot.is-current {
   width: 1.15rem;
   height: 1.15rem;
   border-color: #166534;
   background: #fff;
   box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.18);
+}
+
+.asic-track-dot.is-current.is-wait {
+  border-color: #d97706;
+  background: #fffbeb;
+  box-shadow: 0 0 0 4px rgba(217, 119, 6, 0.2);
 }
 
 .asic-track-name {
@@ -338,6 +381,11 @@
   right: 0;
   transform: none;
   text-align: right;
+}
+
+.asic-track-dots li.is-alert .asic-track-name {
+  visibility: visible;
+  color: #b45309;
 }
 
 .asic-track-facts {

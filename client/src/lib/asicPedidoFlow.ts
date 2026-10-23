@@ -190,6 +190,20 @@ export function formatAsicPedidoFecha(iso: string): string {
   return `${m[3]}/${m[2]}/${m[1]}`;
 }
 
+/** Factura crédito ya conectada, a la espera del recibo y del comprobante de garantía. */
+export function asicPedidoCobroPendiente(pedido: AsicPedido): { recibo: boolean; garantia: boolean } {
+  const docs = pedido.etapas.documentos;
+  if (docs?.modoCobro === "comprobante_previo") return { recibo: false, garantia: false };
+  const credito =
+    docs?.modoCobro === "factura_recibo" ||
+    (Boolean(pedido.facturaNumero) && (pedido.etapaActual === "documentos" || docs?.status === "done"));
+  if (!credito) return { recibo: false, garantia: false };
+  return {
+    recibo: !docs?.numeroRecibo,
+    garantia: !docs?.numeroGarantia,
+  };
+}
+
 export function asicPedidoEtapaLabel(pedido: AsicPedido): string {
   if (pedido.etapaActual === "completo") return "Instalado en Ayolas";
   return asicPedidoStageTitle(pedido.etapaActual, pedido.origen);
