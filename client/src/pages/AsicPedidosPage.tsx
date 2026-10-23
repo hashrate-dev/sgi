@@ -702,7 +702,10 @@ function PedidoList({
                       <EquipoCell pedido={pedido} equipos={equipos} />
                     </td>
                     <td>
-                      <EtapaStatus pedido={pedido} />
+                      <div className="asic-etapa-row">
+                        <EtapaStatus pedido={pedido} />
+                        <OperacionMark cerrado={pedido.etapaActual === "completo"} />
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1059,6 +1062,17 @@ function EquipoCell({ pedido, equipos }: { pedido: AsicPedido; equipos: EquipoAS
         ) : null}
       </div>
     </div>
+  );
+}
+
+function OperacionMark({ cerrado }: { cerrado: boolean }) {
+  return (
+    <span className={`asic-operacion${cerrado ? " is-closed" : " is-open"}`}>
+      <span className="asic-operacion-mark" aria-hidden="true">
+        <i className={`bi ${cerrado ? "bi-check-lg" : "bi-clock"}`} />
+      </span>
+      <em>{cerrado ? "Finalizada" : "Pendiente"}</em>
+    </span>
   );
 }
 

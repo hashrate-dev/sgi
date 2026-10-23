@@ -77,12 +77,62 @@
   background: #f0fdf4;
 }
 
+.asic-etapa-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+}
+
 .asic-etapa {
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;
   min-width: 13.5rem;
   text-align: left;
+}
+
+.asic-operacion {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.12rem;
+  flex: 0 0 auto;
+}
+
+.asic-operacion-mark {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 0.95rem;
+}
+
+.asic-operacion.is-open .asic-operacion-mark {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+}
+
+.asic-operacion.is-closed .asic-operacion-mark {
+  border: 1px solid #166534;
+  background: #166534;
+  color: #fff;
+}
+
+.asic-operacion em {
+  font-style: normal;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+  line-height: 1;
+}
+
+.asic-operacion.is-closed em {
+  color: #166534;
 }
 
 .asic-etapa-mark {
