@@ -40,7 +40,7 @@ type StageState = {
   numeroRecibo?: string;
   numeroComprobante?: string;
   titularFactura?: string;
-  medioDinero?: "banco_py" | "banco_uy" | "binance";
+  medioDinero?: "banco_py" | "banco_uy" | "usdt_binance" | "usdc_binance" | "binance";
   referencia?: string;
   firmadoNombre?: string;
   firmadoClientId?: number;
@@ -110,7 +110,7 @@ const ConfirmSchema = z.object({
   numeroRecibo: z.string().trim().max(80).optional().default(""),
   numeroComprobante: z.string().trim().max(80).optional().default(""),
   titularFactura: z.string().trim().max(200).optional().default(""),
-  medioDinero: z.enum(["banco_py", "banco_uy", "binance"]).optional(),
+  medioDinero: z.enum(["banco_py", "banco_uy", "usdt_binance", "usdc_binance", "binance"]).optional(),
   referencia: z.string().trim().max(200).optional().default(""),
   firmadoNombre: z.string().trim().max(200).optional().default(""),
   firmadoClientId: z.coerce.number().int().positive().optional(),
@@ -274,7 +274,11 @@ function parseStages(raw: unknown): StagesMap {
         ...(row.numeroRecibo ? { numeroRecibo: String(row.numeroRecibo) } : {}),
         ...(row.numeroComprobante ? { numeroComprobante: String(row.numeroComprobante) } : {}),
         ...(row.titularFactura ? { titularFactura: String(row.titularFactura) } : {}),
-        ...(row.medioDinero === "banco_py" || row.medioDinero === "banco_uy" || row.medioDinero === "binance"
+        ...(row.medioDinero === "banco_py" ||
+        row.medioDinero === "banco_uy" ||
+        row.medioDinero === "usdt_binance" ||
+        row.medioDinero === "usdc_binance" ||
+        row.medioDinero === "binance"
           ? { medioDinero: row.medioDinero }
           : {}),
         ...(row.referencia ? { referencia: String(row.referencia) } : {}),

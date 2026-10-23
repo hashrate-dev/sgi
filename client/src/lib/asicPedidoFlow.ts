@@ -18,7 +18,7 @@ export const ASIC_PEDIDO_STAGE_KEYS = [
 export type AsicPedidoStageKey = (typeof ASIC_PEDIDO_STAGE_KEYS)[number];
 export type AsicPedidoOrigen = "china" | "paraguay";
 export type AsicPedidoModoCobro = "factura_recibo" | "comprobante_previo";
-export type AsicPedidoMedioDinero = "banco_py" | "banco_uy" | "binance";
+export type AsicPedidoMedioDinero = "banco_py" | "banco_uy" | "usdt_binance" | "usdc_binance" | "binance";
 
 export type AsicPedidoStageState = {
   status: "done" | "skipped";
@@ -115,7 +115,7 @@ export function asicPedidoStageDetail(key: AsicPedidoStageKey): string {
     case "documentos":
       return "Se emite factura crédito y el recibo de pago, o un comprobante de pago si el cliente paga antes de generar la factura.";
     case "dinero":
-      return "El dinero entra en el banco de Paraguay, en el banco de Uruguay, o como dólar digital por Binance.";
+      return "El dinero entra en el banco de Paraguay, en el banco de Uruguay, o como USDT o USDC en Binance.";
     case "pedido":
       return "Se hace el pedido a China o al proveedor de Paraguay, según el origen de las máquinas.";
     case "pago_proveedor":
@@ -142,6 +142,8 @@ export function asicPedidoOrigenLabel(origen: AsicPedidoOrigen): string {
 export function asicPedidoMedioLabel(medio: AsicPedidoMedioDinero): string {
   if (medio === "banco_py") return "Banco en Paraguay";
   if (medio === "banco_uy") return "Banco en Uruguay";
+  if (medio === "usdt_binance") return "USDT en Binance";
+  if (medio === "usdc_binance") return "USDC en Binance";
   return "Dólar digital por Binance";
 }
 

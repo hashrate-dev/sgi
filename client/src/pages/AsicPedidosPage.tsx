@@ -895,18 +895,29 @@ function FlagUruguay() {
   );
 }
 
-function BinanceMark() {
+function UsdtMark() {
   return (
-    <svg className="asic-pedidos-binance" viewBox="0 0 24 24" aria-hidden="true">
+    <svg className="asic-pedidos-coin" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" fill="#26A17B" />
       <path
-        fill="#F3BA2F"
-        d="M12 2.4 14.9 5.3 12 8.2 9.1 5.3 12 2.4zm-6.7 6.7L8.2 12 5.3 14.9 2.4 12l2.9-2.9zM12 15.8l2.9 2.9L12 21.6l-2.9-2.9 2.9-2.9zm6.7-6.7L21.6 12l-2.9 2.9L15.8 12l2.9-2.9zM12 9.1l2.9 2.9L12 14.9 9.1 12 12 9.1z"
+        fill="#fff"
+        d="M13.2 10.4c2.3.1 3.6.5 3.6.5v1.6s-1.3-.4-3.6-.5v2.4c2.6.1 4.5.7 4.5.7v1.6s-1.9-.6-4.5-.8V18h-2.2v-2.1c-2.6.2-4.5.8-4.5.8v-1.6s1.9-.6 4.5-.7v-2.4c-2.3.1-3.6.5-3.6.5V10.9s1.3-.4 3.6-.5V8.6H7.6V7h8.8v1.6h-3.2v1.8z"
       />
     </svg>
   );
 }
 
-function MedioDineroLabel({ medio }: { medio: AsicPedidoMedioDinero }) {
+function UsdcMark() {
+  return (
+    <svg className="asic-pedidos-coin" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" fill="#2775CA" />
+      <circle cx="12" cy="12" r="6.2" fill="none" stroke="#fff" strokeWidth="1.6" />
+      <path fill="#fff" d="M11.1 6.2h1.8v1.5h1.5v1.6h-1.5v5.4h-1.8V9.3H9.6V7.7h1.5V6.2z" />
+    </svg>
+  );
+}
+
+function MedioDineroLabel({ medio }: { medio: Exclude<AsicPedidoMedioDinero, "binance"> }) {
   if (medio === "banco_py") {
     return (
       <strong className="asic-pedidos-medio">
@@ -921,9 +932,16 @@ function MedioDineroLabel({ medio }: { medio: AsicPedidoMedioDinero }) {
       </strong>
     );
   }
+  if (medio === "usdt_binance") {
+    return (
+      <strong className="asic-pedidos-medio">
+        USDT en Binance <UsdtMark />
+      </strong>
+    );
+  }
   return (
     <strong className="asic-pedidos-medio">
-      Dólar digital por <BinanceMark />
+      USDC en Binance <UsdcMark />
     </strong>
   );
 }
@@ -1258,7 +1276,7 @@ function StageForm({
 
       {stage === "dinero" ? (
         <div className="asic-pedidos-choice">
-          {(["banco_py", "banco_uy", "binance"] as const).map((key) => (
+          {(["banco_py", "banco_uy", "usdt_binance", "usdc_binance"] as const).map((key) => (
             <button
               key={key}
               type="button"
