@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FocusEvent, type MouseEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
@@ -282,14 +282,10 @@ function ResumenCuentasGlobo({
   open,
   anchor,
   cuenta,
-  onEnter,
-  onLeave,
 }: {
   open: boolean;
   anchor: HTMLElement | null;
   cuenta: ResumenCuenta | null;
-  onEnter: () => void;
-  onLeave: () => void;
 }) {
   const [box, setBox] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
 
@@ -328,9 +324,7 @@ function ResumenCuentasGlobo({
       className="asic-resumen-tip"
       role="tooltip"
       style={{ top: box.top, left: box.left, width: box.width, maxHeight: box.maxHeight }}
-      onMouseEnter={onEnter}
-      onMouseLeave={onLeave}
-      onMouseDown={(event) => event.preventDefault()}
+      onPointerDown={(event) => event.stopPropagation()}
     >
       <section className="asic-resumen-tip-cuenta">
         <h3>
@@ -389,25 +383,25 @@ export function HistorialMineriaPage() {
   const canExportData = user ? canExport(user) : false;
   const canEditMargin = Boolean(user && canEditFacturacion(user));
   const [savingMarginId, setSavingMarginId] = useState<string | null>(null);
-  const resumenTipHide = useRef<number | null>(null);
   const [resumenTip, setResumenTip] = useState<{ id: string; anchor: HTMLElement } | null>(null);
-  const keepResumenTip = () => {
-    if (resumenTipHide.current != null) window.clearTimeout(resumenTipHide.current);
+  const toggleResumenTip = (id: string, anchor: HTMLElement) => {
+    setResumenTip((current) => (current?.id === id ? null : { id, anchor }));
   };
-  const openResumenTip = (id: string, anchor: HTMLElement) => {
-    keepResumenTip();
-    setResumenTip({ id, anchor });
-  };
-  const closeResumenTipSoon = () => {
-    if (resumenTipHide.current != null) window.clearTimeout(resumenTipHide.current);
-    resumenTipHide.current = window.setTimeout(() => setResumenTip(null), 180);
-  };
+  const resumenTipClass = (base: string, id: string) =>
+    `${base}${resumenTip?.id === id ? " is-open" : ""}`;
   const resumenTipProps = (id: string) => ({
+    role: "button" as const,
     tabIndex: 0,
-    onMouseEnter: (event: MouseEvent<HTMLElement>) => openResumenTip(id, event.currentTarget),
-    onMouseLeave: closeResumenTipSoon,
-    onFocus: (event: FocusEvent<HTMLElement>) => openResumenTip(id, event.currentTarget),
-    onBlur: closeResumenTipSoon,
+    "aria-expanded": resumenTip?.id === id,
+    onClick: (event: MouseEvent<HTMLElement>) => {
+      event.stopPropagation();
+      toggleResumenTip(id, event.currentTarget);
+    },
+    onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      toggleResumenTip(id, event.currentTarget);
+    },
   });
 
   /** Cargar desde API cuando el backend está disponible (para Lector y todos: ver datos agregados por otros usuarios) */
@@ -428,18 +422,23 @@ export function HistorialMineriaPage() {
   }, []);
 
   useEffect(() => {
-    return () => {
-      if (resumenTipHide.current != null) window.clearTimeout(resumenTipHide.current);
-    };
-  }, []);
-
-  useEffect(() => {
     if (!resumenTip) return;
-    const onKey = (event: KeyboardEvent) => {
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (resumenTip.anchor.contains(target)) return;
+      if (document.getElementById("asic-resumen-tip")?.contains(target)) return;
+      setResumenTip(null);
+    };
+    const onKey = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") setResumenTip(null);
     };
+    document.addEventListener("pointerdown", onPointerDown);
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKey);
+    };
   }, [resumenTip]);
 
   /** Meses que de verdad aparecen en las fechas de emisión (y en MES si la fecha no se puede leer). */
@@ -1465,49 +1464,47 @@ export function HistorialMineriaPage() {
               open={resumenTip != null}
               anchor={resumenTip?.anchor ?? null}
               cuenta={stats.cuentas.find((cuenta) => cuenta.id === resumenTip?.id) ?? null}
-              onEnter={keepResumenTip}
-              onLeave={closeResumenTipSoon}
             />
           </div>
           <div className="usuarios-page-body">
         <div className="row g-3 historial-stats">
           <div className="col-6 col-md-2">
-            <div className="card stat-card p-3 asic-resumen-tip-target" {...resumenTipProps("comprobantes")}>
+            <div className={resumenTipClass("card stat-card p-3 asic-resumen-tip-target", "comprobantes")} {...resumenTipProps("comprobantes")}>
               <div className="stat-accent bg-primary" />
               <div className="stat-label">Total comprobantes</div>
               <div className="stat-value text-primary">{stats.facturas}</div>
             </div>
           </div>
           <div className="col-6 col-md-2">
-            <div className="card stat-card p-3 asic-resumen-tip-target" {...resumenTipProps("recibos")}>
+            <div className={resumenTipClass("card stat-card p-3 asic-resumen-tip-target", "recibos")} {...resumenTipProps("recibos")}>
               <div className="stat-accent bg-success" />
               <div className="stat-label">Total recibos</div>
               <div className="stat-value text-success">{stats.recibos}</div>
             </div>
           </div>
           <div className="col-6 col-md-2">
-            <div className="card stat-card p-3 asic-resumen-tip-target" {...resumenTipProps("notas")}>
+            <div className={resumenTipClass("card stat-card p-3 asic-resumen-tip-target", "notas")} {...resumenTipProps("notas")}>
               <div className="stat-accent bg-warning" />
               <div className="stat-label">Notas de crédito</div>
               <div className="stat-value text-warning">{stats.notasCredito}</div>
             </div>
           </div>
           <div className="col-6 col-md-2">
-            <div className="card stat-card p-3 asic-resumen-tip-target" {...resumenTipProps("facturacion")}>
+            <div className={resumenTipClass("card stat-card p-3 asic-resumen-tip-target", "facturacion")} {...resumenTipProps("facturacion")}>
               <div className="stat-accent bg-dark" />
               <div className="stat-label">Facturación total</div>
               <div className="stat-value text-dark">{formatCurrencyNumber(stats.facturacionTotal)} <span className="currency">USD</span></div>
             </div>
           </div>
           <div className="col-6 col-md-2">
-            <div className="card stat-card p-3 asic-resumen-tip-target" {...resumenTipProps("pendientes")}>
+            <div className={resumenTipClass("card stat-card p-3 asic-resumen-tip-target", "pendientes")} {...resumenTipProps("pendientes")}>
               <div className="stat-accent bg-danger" />
               <div className="stat-label">Cobros pendientes</div>
               <div className="stat-value text-danger">{formatCurrencyNumber(stats.cobrosPendientes)} <span className="currency">USD</span></div>
             </div>
           </div>
           <div className="col-6 col-md-2">
-            <div className="card stat-card p-3 asic-resumen-tip-target" {...resumenTipProps("realizados")}>
+            <div className={resumenTipClass("card stat-card p-3 asic-resumen-tip-target", "realizados")} {...resumenTipProps("realizados")}>
               <div className="stat-accent bg-success" />
               <div className="stat-label">Cobros realizados</div>
               <div className="stat-value text-success">{formatCurrencyNumber(stats.cobrosRealizados)} <span className="currency">USD</span></div>
@@ -1517,19 +1514,19 @@ export function HistorialMineriaPage() {
         <div className="asic-margen-banda mt-3" aria-label="Margen cobrado, margen no cobrado y margen total">
           <div className="asic-margen-banda-kicker">Margen</div>
           <div className="asic-margen-banda-row">
-            <div className="asic-margen-celda is-cobrado asic-resumen-tip-target" {...resumenTipProps("margen-cobrado")}>
+            <div className={resumenTipClass("asic-margen-celda is-cobrado asic-resumen-tip-target", "margen-cobrado")} {...resumenTipProps("margen-cobrado")}>
               <div className="stat-label">Margen cobrado</div>
               <div className="stat-value">{formatCurrencyNumber(stats.margenCobrado)} <span className="currency">USD</span></div>
               <div className="asic-margen-hint">Ya tiene recibo</div>
             </div>
             <div className="asic-margen-op" aria-hidden="true">+</div>
-            <div className="asic-margen-celda is-pendiente asic-resumen-tip-target" {...resumenTipProps("margen-no-cobrado")}>
+            <div className={resumenTipClass("asic-margen-celda is-pendiente asic-resumen-tip-target", "margen-no-cobrado")} {...resumenTipProps("margen-no-cobrado")}>
               <div className="stat-label">Margen no cobrado</div>
               <div className="stat-value">{formatCurrencyNumber(stats.margenNoCobrado)} <span className="currency">USD</span></div>
               <div className="asic-margen-hint">Todavía sin recibo</div>
             </div>
             <div className="asic-margen-op" aria-hidden="true">=</div>
-            <div className="asic-margen-celda is-total asic-resumen-tip-target" {...resumenTipProps("margen-total")}>
+            <div className={resumenTipClass("asic-margen-celda is-total asic-resumen-tip-target", "margen-total")} {...resumenTipProps("margen-total")}>
               <div className="stat-label">Margen total</div>
               <div className="stat-value">{formatCurrencyNumber(stats.margenTotal)} <span className="currency">USD</span></div>
               <div className="asic-margen-hint">Cobrado + no cobrado</div>
