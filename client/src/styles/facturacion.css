@@ -5519,17 +5519,12 @@ button.fact-back {
     font-size: 1.65rem;
   }
 }
-.asic-resumen-head {
+.asic-resumen-tip-target {
   cursor: help;
-  border-radius: 8px;
-  outline: none;
 }
-.asic-resumen-head:focus-visible {
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.75);
-}
-.asic-resumen-head .usuarios-page-subtitle {
-  text-decoration: underline dotted rgba(255, 255, 255, 0.55);
-  text-underline-offset: 3px;
+.asic-resumen-tip-target:focus-visible {
+  outline: 2px solid #166534;
+  outline-offset: 2px;
 }
 .asic-resumen-tip {
   position: fixed;
