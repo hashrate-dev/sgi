@@ -52,6 +52,30 @@ function formatMonthLabel(monthStr: string): string {
   return `${mes}-${y}`;
 }
 
+/** Mes YYYY-MM de una fecha de emisión (DD/MM/YYYY o YYYY-MM-DD). */
+function monthKeyFromEmissionDate(date: string | undefined): string {
+  const text = String(date ?? "").trim();
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(text);
+  if (iso) {
+    const month = Number(iso[2]);
+    if (month >= 1 && month <= 12) return `${iso[1]}-${iso[2]}`;
+  }
+  const dmy = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(text);
+  if (dmy) {
+    const month = Number(dmy[2]);
+    const year = Number(dmy[3]);
+    if (month >= 1 && month <= 12 && year >= 2000) {
+      return `${year}-${String(month).padStart(2, "0")}`;
+    }
+  }
+  return "";
+}
+
+/** Mes con el que se filtra el historial: la fecha que se ve en la tabla, y si no se puede leer, la columna MES. */
+function invoiceHistoryMonthKey(inv: { date?: string; month?: string }): string {
+  return monthKeyFromEmissionDate(inv.date) || normalizeMonth(inv.month);
+}
+
 function getCreditNoteMode(creditNote: Invoice | null | undefined, factura: Invoice | null | undefined): "partial" | "total" {
   if (!creditNote || !factura) return "partial";
   const ncAbs = Math.abs(Number(creditNote.total) || 0);
@@ -247,11 +271,11 @@ export function HistorialMineriaPage() {
     return () => { cancelled = true; document.removeEventListener("visibilitychange", onVisible); };
   }, []);
 
-  /** Opciones de mes (MES) para el filtro: valores distintos de la columna month en los datos */
+  /** Meses que de verdad aparecen en las fechas de emisión (y en MES si la fecha no se puede leer). */
   const opcionesMes = useMemo(() => {
     const set = new Set<string>();
     for (const inv of all) {
-      const mm = normalizeMonth(inv.month);
+      const mm = invoiceHistoryMonthKey(inv);
       if (mm && mm.length >= 7) set.add(mm);
     }
     return Array.from(set).sort().reverse().map((value) => ({ value, label: formatMonthLabel(value) }));
@@ -263,7 +287,7 @@ export function HistorialMineriaPage() {
     return all.filter((inv) => {
       const okClient = !client || inv.clientName.toLowerCase().includes(client);
       const okType = !qType || inv.type === qType;
-      const okMonth = !mesFiltro || normalizeMonth(inv.month) === mesFiltro;
+      const okMonth = !mesFiltro || invoiceHistoryMonthKey(inv) === mesFiltro;
       return okClient && okType && okMonth;
     });
   }, [all, qClient, qType, qMonth]);
@@ -876,7 +900,7 @@ export function HistorialMineriaPage() {
                       value={qMonth}
                       onChange={(e) => setQMonth(e.target.value)}
                       style={{ maxWidth: "10rem" }}
-                      title="Filtro por columna MES (periodo del documento)"
+                      title="Mes de la fecha de emisión del documento"
                     >
                       <option value="">Todos</option>
                       {opcionesMes.map((op) => (

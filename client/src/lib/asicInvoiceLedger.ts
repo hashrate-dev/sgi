@@ -41,9 +41,9 @@ export function mergeInvoiceLists(...sources: Invoice[][]): Invoice[] {
         map.set(key, inv);
         continue;
       }
-      if (!isNumericInvoiceId(prev.id) && isNumericInvoiceId(inv.id)) {
-        map.set(key, inv);
-      }
+      if (!isNumericInvoiceId(inv.id)) continue;
+      const items = inv.items?.length ? inv.items : prev.items;
+      map.set(key, items?.length ? { ...inv, items } : inv);
     }
   }
   return Array.from(map.values());
