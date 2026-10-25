@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { createPortal } from "react-dom";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { fetchAsicInvoiceLedger, mergeInvoiceLists } from "../lib/asicInvoiceLedger";
-import { addEmittedDocument, deleteAllInvoices, deleteEmittedDocumentOne, deleteEmittedDocumentsAll, deleteInvoice, getClients, getInvoiceById, getInvoices, verifyPassword, wakeUpBackend } from "../lib/api";
+import { addEmittedDocument, deleteAllInvoices, deleteEmittedDocumentOne, deleteEmittedDocumentsAll, deleteInvoice, getClients, getHostingMarginSettings, getInvoiceById, getInvoices, verifyPassword, wakeUpBackend, type ContabilidadGasto } from "../lib/api";
 import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
 import { dispatchEmittedChanged } from "../lib/emittedEvents";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
@@ -21,6 +22,9 @@ import {
   isPartialReceiptDocument,
   relatedFacturaForDocument,
 } from "../lib/invoiceCollection";
+import { hostingGastoYm, hostingMarginSettingsToCostGastos, isHostingMarginSupplierGasto } from "../lib/hostingMargenCost";
+import { buildHostingMargenYearSeries } from "../lib/hostingMargenKpi";
+import { cashMonthKeyFromInvoice, type InvoiceMonthNetRow } from "../lib/monitorTripleIngresoKpi";
 import "../styles/facturacion.css";
 
 /** Normaliza mes a YYYY-MM (ej. "2026-1" -> "2026-01") para filtrar por columna MES */
@@ -223,6 +227,98 @@ function isLinkedToInvoice(comp: Invoice, factura: Invoice): boolean {
   return matchId || matchNumber;
 }
 
+type HostingResumenLinea = { key: string; cliente: string; tipo: string; numero: string; usd: number };
+
+type HostingResumenCuenta = { id: string; titulo: string; cifra: string; lineas: HostingResumenLinea[] };
+
+function hostingDocTipo(inv: Invoice): string {
+  if (inv.type === "Nota de Crédito") return "Nota de crédito";
+  if (inv.type === "Recibo" && isPartialReceiptDocument(inv)) return "Recibo parcial";
+  if (inv.type === "Recibo Devolución") return "Recibo devolución";
+  return inv.type;
+}
+
+function hostingResumenLinea(inv: Invoice, usd: number, key: string): HostingResumenLinea {
+  return { key, cliente: inv.clientName || "—", tipo: hostingDocTipo(inv), numero: inv.number || "—", usd };
+}
+
+/** Globo del resumen de hosting: se abre con un clic en el rubro. */
+function HostingResumenGlobo({ open, anchor, cuenta }: { open: boolean; anchor: HTMLElement | null; cuenta: HostingResumenCuenta | null }) {
+  const [box, setBox] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open || !anchor) {
+      setBox(null);
+      return;
+    }
+    const place = () => {
+      const rect = anchor.getBoundingClientRect();
+      const margin = 12;
+      const gap = 8;
+      const width = Math.min(560, window.innerWidth - margin * 2);
+      let left = rect.left;
+      if (left + width > window.innerWidth - margin) left = Math.max(margin, window.innerWidth - margin - width);
+      const spaceBelow = window.innerHeight - rect.bottom - margin - gap;
+      const spaceAbove = rect.top - margin - gap;
+      const openBelow = spaceBelow >= 180 || spaceBelow >= spaceAbove;
+      const maxHeight = Math.max(160, Math.min(460, openBelow ? spaceBelow : spaceAbove));
+      const top = openBelow ? rect.bottom + gap : Math.max(margin, rect.top - gap - maxHeight);
+      setBox({ top, left, width, maxHeight });
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open, anchor]);
+
+  if (!open || !box || !cuenta) return null;
+  return createPortal(
+    <div
+      id="asic-resumen-tip"
+      className="asic-resumen-tip"
+      role="dialog"
+      aria-label={cuenta.titulo}
+      style={{ top: box.top, left: box.left, width: box.width, maxHeight: box.maxHeight }}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      <section className="asic-resumen-tip-cuenta">
+        <h3>
+          <span>{cuenta.titulo}</span>
+          <span>{cuenta.cifra}</span>
+        </h3>
+        {cuenta.lineas.length === 0 ? (
+          <p className="asic-resumen-tip-vacio">Sin movimientos en este filtro.</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Tipo</th>
+                <th>N°</th>
+                <th className="asic-resumen-tip-usd">Total USD</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cuenta.lineas.map((ln) => (
+                <tr key={ln.key}>
+                  <td className="asic-resumen-tip-cliente" title={ln.cliente}>{ln.cliente}</td>
+                  <td>{ln.tipo}</td>
+                  <td className="asic-resumen-tip-num">{ln.numero}</td>
+                  <td className="asic-resumen-tip-usd">{formatCurrencyNumber(ln.usd)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+    </div>,
+    document.body
+  );
+}
+
 function getCreditNoteMode(creditNote: Invoice | null | undefined, factura: Invoice | null | undefined): "partial" | "total" {
   if (!creditNote || !factura) return "partial";
   const ncAbs = Math.abs(Number(creditNote.total) || 0);
@@ -314,6 +410,27 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
   const MAX_PASSWORD_ATTEMPTS = 3;
   const canDelete = user ? canDeleteHistorial(user) : false;
   const canExportData = user ? canExport(user) : false;
+  const hostingMode = sourceFilter === "hosting";
+  const [hostingGastos, setHostingGastos] = useState<ContabilidadGasto[]>([]);
+  const [hostingSupplierNumbers, setHostingSupplierNumbers] = useState<string[]>(["P002", "P003"]);
+  const [resumenTip, setResumenTip] = useState<{ id: string; anchor: HTMLElement } | null>(null);
+
+  useEffect(() => {
+    if (!hostingMode) return;
+    let cancelled = false;
+    getHostingMarginSettings()
+      .then((res) => {
+        if (cancelled) return;
+        setHostingSupplierNumbers(res.supplierNumbers?.length ? res.supplierNumbers : ["P002", "P003"]);
+        setHostingGastos(hostingMarginSettingsToCostGastos(res.gastos));
+      })
+      .catch(() => {
+        if (!cancelled) setHostingGastos([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hostingMode]);
 
   /** Opciones de mes (MES) para el filtro: valores distintos de la columna month en los datos */
   const opcionesMes = useMemo(() => {
@@ -360,26 +477,219 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
     }
   }
 
-  /** Resumen: Facturas, NC y Recibos. Facturación total = facturas - NC. Cobros realizados = recibos. Pendientes = facturación - realizados (≥ 0). */
+  /**
+   * Resumen: Facturas, NC y Recibos. Facturación total = facturas − NC.
+   * En hosting, pendientes y cobrados salen del saldo real de cada factura
+   * (un recibo de otro mes también la cancela). El margen es el de hosting:
+   * cobros del mes menos lo pagado a Digital Assets o Blunode en ese mes.
+   */
   const stats = useMemo(() => {
     const src = filtered as InvoiceWithSource[];
-    const facturas = src.filter((i) => i.type === "Factura").length;
-    const recibos = src.filter((i) => i.type === "Recibo").length;
-    const notasCredito = src.filter((i) => i.type === "Nota de Crédito").length;
-    const sumaFacturas = src.filter((i) => i.type === "Factura").reduce((s, i) => s + Math.abs(Number(i.total) || 0), 0);
-    const sumaNotasCredito = src.filter((i) => i.type === "Nota de Crédito").reduce((s, i) => s + Math.abs(Number(i.total) || 0), 0);
-    const sumaRecibos = src.filter((i) => i.type === "Recibo").reduce((s, i) => s + Math.abs(Number(i.total) || 0), 0);
+    const facturasDocs = src.filter((i) => i.type === "Factura");
+    const recibosDocs = src.filter((i) => i.type === "Recibo" || (hostingMode && i.type === "Recibo Devolución"));
+    const notasDocs = src.filter((i) => i.type === "Nota de Crédito");
+    const facturas = facturasDocs.length;
+    const recibos = recibosDocs.length;
+    const notasCredito = notasDocs.length;
+    const sumaFacturas = facturasDocs.reduce((s, i) => s + Math.abs(Number(i.total) || 0), 0);
+    const sumaNotasCredito = notasDocs.reduce((s, i) => s + Math.abs(Number(i.total) || 0), 0);
+    const sumaRecibos = recibosDocs.reduce((s, i) => s + Math.abs(Number(i.total) || 0), 0);
     const facturacionTotal = sumaFacturas - sumaNotasCredito;
-    const cobrosRealizados = sumaRecibos;
-    const cobrosPendientes = Math.max(0, facturacionTotal - cobrosRealizados);
-    const facturasCobradas = src.filter((i) => {
-      if (i.type !== "Factura") return false;
-      const st = invoiceCollectionState(i, src);
+    const ledger = hostingMode ? allHosting : src;
+    let cobrosRealizados = sumaRecibos;
+    let cobrosPendientes = Math.max(0, facturacionTotal - cobrosRealizados);
+    const pendientesLineas: HostingResumenLinea[] = [];
+    const realizadosLineas: HostingResumenLinea[] = [];
+    if (hostingMode) {
+      cobrosPendientes = 0;
+      cobrosRealizados = 0;
+      for (const fac of facturasDocs) {
+        const st = invoiceCollectionState(fac, ledger);
+        if (st.pendingAmount > 0.0001) {
+          cobrosPendientes += st.pendingAmount;
+          pendientesLineas.push(hostingResumenLinea(fac, st.pendingAmount, `pen-${fac.id}`));
+        }
+        if (st.paidApplied > 0.0001) {
+          cobrosRealizados += st.paidApplied;
+          realizadosLineas.push(hostingResumenLinea(fac, st.paidApplied, `cob-${fac.id}`));
+        }
+      }
+    }
+    const facturasCobradas = facturasDocs.filter((i) => {
+      const st = invoiceCollectionState(i, ledger);
       return st.isFullySettled && st.receipts.length > 0;
     }).length;
     const progressPct = facturacionTotal <= 0 ? 0 : Math.min(100, Math.round((cobrosRealizados / facturacionTotal) * 100));
-    return { facturas, recibos, notasCredito, facturacionTotal, cobrosPendientes, cobrosRealizados, facturasCobradas, progressPct, registros: filtered.length };
-  }, [filtered]);
+
+    const hostingRows: InvoiceMonthNetRow[] = allHosting.map((inv) => ({
+      id: inv.id,
+      type: inv.type,
+      month: inv.month,
+      total: inv.total,
+      number: inv.number,
+      paymentDate: inv.paymentDate,
+      date: inv.date,
+      relatedInvoiceId: inv.relatedInvoiceId,
+      relatedInvoiceNumber: inv.relatedInvoiceNumber,
+      source: "hosting",
+      documentContext: inv.documentContext,
+    }));
+    const selectedYm = normalizeMonth(qMonth);
+    const years = new Set<number>();
+    const takeYear = (ym: string | null | undefined) => {
+      if (!ym || !/^\d{4}-\d{2}$/.test(ym)) return;
+      years.add(Number(ym.slice(0, 4)));
+    };
+    takeYear(selectedYm);
+    for (const inv of hostingRows) {
+      takeYear(cashMonthKeyFromInvoice(inv));
+      takeYear(normalizeMonth(inv.month));
+    }
+    for (const g of hostingGastos) takeYear(hostingGastoYm(g));
+    const series = [...years].flatMap((y) =>
+      buildHostingMargenYearSeries(y, hostingRows, hostingGastos, hostingSupplierNumbers)
+    );
+    const activeMonths = selectedYm
+      ? series.filter((m) => m.ym === selectedYm)
+      : series.filter((m) => Math.abs(m.ingresos) > 0.0001 || Math.abs(m.gastos) > 0.0001);
+    const ymSet = new Set(activeMonths.map((m) => m.ym));
+    const ingresosCobrado = activeMonths.reduce((s, m) => s + m.ingresos, 0);
+    const gastosHosting = activeMonths.reduce((s, m) => s + m.gastos, 0);
+    const margenHosting = ingresosCobrado - gastosHosting;
+
+    const ingresosLineas: HostingResumenLinea[] = [];
+    for (const inv of allHosting) {
+      const ym = cashMonthKeyFromInvoice(inv);
+      if (!ym || !ymSet.has(ym)) continue;
+      const abs = Math.abs(Number(inv.total) || 0);
+      if (abs < 0.0001) continue;
+      if (inv.type === "Recibo") {
+        ingresosLineas.push(hostingResumenLinea(inv, abs, `ing-${inv.id}`));
+      } else if (inv.type === "Nota de Crédito" || inv.type === "Recibo Devolución") {
+        ingresosLineas.push(hostingResumenLinea(inv, -abs, `ing-${inv.id}`));
+      }
+    }
+    const gastosLineas: HostingResumenLinea[] = hostingGastos
+      .filter((g) => isHostingMarginSupplierGasto(g, hostingSupplierNumbers) && ymSet.has(hostingGastoYm(g) ?? ""))
+      .map((g) => ({
+        key: `gas-${g.id}`,
+        cliente: g.supplierName || g.supplierNumber || "Proveedor",
+        tipo: g.descripcion?.trim() ? `Gasto hosting · ${g.descripcion.trim()}` : "Gasto hosting",
+        numero: hostingGastoYm(g) || "—",
+        usd: Number.isFinite(g.monto) ? g.monto : 0,
+      }));
+    const margenLineas: HostingResumenLinea[] = [
+      ...ingresosLineas,
+      ...gastosLineas.map((ln) => ({ ...ln, key: `m-${ln.key}`, usd: -ln.usd })),
+    ];
+
+    const usd = (n: number) => `${formatCurrencyNumber(n)} USD`;
+    const cuentas: HostingResumenCuenta[] = [
+      {
+        id: "facturas",
+        titulo: "Total facturas",
+        cifra: String(facturas),
+        lineas: facturasDocs.map((inv) => hostingResumenLinea(inv, Math.abs(Number(inv.total) || 0), `fac-${inv.id}`)),
+      },
+      {
+        id: "recibos",
+        titulo: "Total recibos",
+        cifra: String(recibos),
+        lineas: recibosDocs.map((inv) => hostingResumenLinea(inv, Math.abs(Number(inv.total) || 0), `rec-${inv.id}`)),
+      },
+      {
+        id: "notas",
+        titulo: "Notas de crédito",
+        cifra: String(notasCredito),
+        lineas: notasDocs.map((inv) => hostingResumenLinea(inv, -Math.abs(Number(inv.total) || 0), `nc-${inv.id}`)),
+      },
+      {
+        id: "facturacion",
+        titulo: "Facturación total",
+        cifra: usd(facturacionTotal),
+        lineas: [
+          ...facturasDocs.map((inv) => hostingResumenLinea(inv, Math.abs(Number(inv.total) || 0), `ft-${inv.id}`)),
+          ...notasDocs.map((inv) => hostingResumenLinea(inv, -Math.abs(Number(inv.total) || 0), `fn-${inv.id}`)),
+        ],
+      },
+      { id: "pendientes", titulo: "Cobros pendientes", cifra: usd(cobrosPendientes), lineas: pendientesLineas },
+      { id: "realizados", titulo: "Cobros realizados", cifra: usd(cobrosRealizados), lineas: realizadosLineas },
+      { id: "ingresos", titulo: "Ingresos cobrados", cifra: usd(ingresosCobrado), lineas: ingresosLineas },
+      { id: "gastos", titulo: "Gastos hosting", cifra: usd(gastosHosting), lineas: gastosLineas },
+      {
+        id: "margen",
+        titulo: "Margen hosting",
+        cifra: usd(margenHosting),
+        lineas: margenLineas,
+      },
+    ];
+
+    return {
+      facturas,
+      recibos,
+      notasCredito,
+      facturacionTotal,
+      cobrosPendientes,
+      cobrosRealizados,
+      facturasCobradas,
+      progressPct,
+      registros: filtered.length,
+      ingresosCobrado,
+      gastosHosting,
+      margenHosting,
+      cuentas,
+    };
+  }, [filtered, hostingMode, allHosting, qMonth, hostingGastos, hostingSupplierNumbers]);
+
+  const resumenCuentaAbierta = resumenTip ? stats.cuentas.find((c) => c.id === resumenTip.id) ?? null : null;
+
+  useEffect(() => {
+    if (!resumenTip) return;
+    const close = () => setResumenTip(null);
+    const onPointer = (ev: Event) => {
+      const node = ev.target;
+      if (!(node instanceof Node)) return;
+      if (resumenTip.anchor.contains(node)) return;
+      if (node instanceof Element && node.closest("#asic-resumen-tip")) return;
+      close();
+    };
+    const onKey = (ev: globalThis.KeyboardEvent) => {
+      if (ev.key === "Escape") close();
+    };
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [resumenTip]);
+
+  function resumenTipProps(id: string) {
+    if (!hostingMode) return {};
+    const open = resumenTip?.id === id;
+    return {
+      role: "button" as const,
+      tabIndex: 0,
+      "aria-expanded": open,
+      "aria-controls": "asic-resumen-tip",
+      onClick: (ev: MouseEvent<HTMLElement>) => {
+        ev.stopPropagation();
+        const anchor = ev.currentTarget;
+        setResumenTip((cur) => (cur?.id === id ? null : { id, anchor }));
+      },
+      onKeyDown: (ev: KeyboardEvent<HTMLElement>) => {
+        if (ev.key !== "Enter" && ev.key !== " ") return;
+        ev.preventDefault();
+        const anchor = ev.currentTarget;
+        setResumenTip((cur) => (cur?.id === id ? null : { id, anchor }));
+      },
+    };
+  }
+
+  function resumenTipClass(base: string, id: string) {
+    if (!hostingMode) return base;
+    return `${base} asic-resumen-tip-target${resumenTip?.id === id ? " is-open" : ""}`;
+  }
 
   function exportExcel() {
     if (all.length === 0) return;
@@ -1266,54 +1576,87 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
                 <span className="usuarios-page-title-icon usuarios-page-title-icon--activity" aria-hidden>📊</span>
                 Resumen
               </h2>
-              <p className="usuarios-page-subtitle">Estadísticas de facturación y cobros.</p>
+              <p className="usuarios-page-subtitle">
+                {hostingMode
+                  ? "Estadísticas de facturación, cobros y margen de hosting. Un clic en cada rubro muestra el detalle."
+                  : "Estadísticas de facturación y cobros."}
+              </p>
             </div>
           </div>
           <div className="usuarios-page-body">
         <div className="row g-3 historial-stats">
           <div className="col-6 col-md-2">
-            <div className="card stat-card p-3">
+            <div className={resumenTipClass("card stat-card p-3", "facturas")} {...resumenTipProps("facturas")}>
               <div className="stat-accent bg-primary" />
               <div className="stat-label">Total facturas</div>
               <div className="stat-value text-primary">{stats.facturas}</div>
             </div>
           </div>
           <div className="col-6 col-md-2">
-            <div className="card stat-card p-3">
+            <div className={resumenTipClass("card stat-card p-3", "recibos")} {...resumenTipProps("recibos")}>
               <div className="stat-accent bg-success" />
               <div className="stat-label">Total recibos</div>
               <div className="stat-value text-success">{stats.recibos}</div>
             </div>
           </div>
           <div className="col-6 col-md-2">
-            <div className="card stat-card p-3">
+            <div className={resumenTipClass("card stat-card p-3", "notas")} {...resumenTipProps("notas")}>
               <div className="stat-accent bg-warning" />
               <div className="stat-label">Notas de crédito</div>
               <div className="stat-value text-warning">{stats.notasCredito}</div>
             </div>
           </div>
           <div className="col-6 col-md-2">
-            <div className="card stat-card p-3">
+            <div className={resumenTipClass("card stat-card p-3", "facturacion")} {...resumenTipProps("facturacion")}>
               <div className="stat-accent bg-dark" />
               <div className="stat-label">Facturación total</div>
               <div className="stat-value text-dark">{formatCurrencyNumber(stats.facturacionTotal)} <span className="currency">USD</span></div>
             </div>
           </div>
           <div className="col-6 col-md-2">
-            <div className="card stat-card p-3">
+            <div className={resumenTipClass("card stat-card p-3", "pendientes")} {...resumenTipProps("pendientes")}>
               <div className="stat-accent bg-danger" />
               <div className="stat-label">Cobros pendientes</div>
               <div className="stat-value text-danger">{formatCurrencyNumber(stats.cobrosPendientes)} <span className="currency">USD</span></div>
             </div>
           </div>
           <div className="col-6 col-md-2">
-            <div className="card stat-card p-3">
+            <div className={resumenTipClass("card stat-card p-3", "realizados")} {...resumenTipProps("realizados")}>
               <div className="stat-accent bg-success" />
               <div className="stat-label">Cobros realizados</div>
               <div className="stat-value text-success">{formatCurrencyNumber(stats.cobrosRealizados)} <span className="currency">USD</span></div>
             </div>
           </div>
         </div>
+        {hostingMode ? (
+          <div className="asic-margen-banda mt-3" aria-label="Margen de hosting">
+            <div className="asic-margen-banda-kicker">Margen de hosting</div>
+            <div className="asic-margen-banda-row">
+              <div className={resumenTipClass("asic-margen-celda is-cobrado", "ingresos")} {...resumenTipProps("ingresos")}>
+                <div className="stat-label">Ingresos cobrados</div>
+                <div className="stat-value">{formatCurrencyNumber(stats.ingresosCobrado)} <span className="currency">USD</span></div>
+                <div className="asic-margen-hint">Recibos del mes, menos notas de crédito</div>
+              </div>
+              <div className="asic-margen-op" aria-hidden="true">−</div>
+              <div className={resumenTipClass("asic-margen-celda is-pendiente", "gastos")} {...resumenTipProps("gastos")}>
+                <div className="stat-label">Gastos hosting</div>
+                <div className="stat-value">{formatCurrencyNumber(stats.gastosHosting)} <span className="currency">USD</span></div>
+                <div className="asic-margen-hint">Digital Assets y Blunode</div>
+              </div>
+              <div className="asic-margen-op" aria-hidden="true">=</div>
+              <div className={resumenTipClass("asic-margen-celda is-total", "margen")} {...resumenTipProps("margen")}>
+                <div className="stat-label">Margen hosting</div>
+                <div className="stat-value">{formatCurrencyNumber(stats.margenHosting)} <span className="currency">USD</span></div>
+                <div className="asic-margen-hint">Ingresos cobrados − gastos</div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+        {hostingMode && (qClient.trim() || qType) ? (
+          <p className="small text-muted mb-0 mt-2">
+            El margen es el del mes de hosting. El filtro de cliente o de tipo no lo parte, porque el gasto de Digital Assets y Blunode corresponde al mes.
+          </p>
+        ) : null}
         <div className="row mt-3 g-3 historial-stats">
           <div className="col-12">
             <div className="card stat-card p-3">
@@ -1342,6 +1685,9 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
         </div>
           </div>
         </div>
+        {hostingMode ? (
+          <HostingResumenGlobo open={Boolean(resumenCuentaAbierta)} anchor={resumenTip?.anchor ?? null} cuenta={resumenCuentaAbierta} />
+        ) : null}
 
         {/* Modal Confirmación eliminar una transacción */}
         {deleteConfirmInv && (
