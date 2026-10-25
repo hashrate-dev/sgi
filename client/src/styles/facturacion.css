@@ -5519,6 +5519,90 @@ button.fact-back {
     font-size: 1.65rem;
   }
 }
+.asic-resumen-head {
+  cursor: help;
+  border-radius: 8px;
+  outline: none;
+}
+.asic-resumen-head:focus-visible {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.75);
+}
+.asic-resumen-head .usuarios-page-subtitle {
+  text-decoration: underline dotted rgba(255, 255, 255, 0.55);
+  text-underline-offset: 3px;
+}
+.asic-resumen-tip {
+  position: fixed;
+  z-index: 4000;
+  overflow: auto;
+  background: #fff;
+  color: #0f172a;
+  border: 1px solid #d6e3da;
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
+  padding: 0.7rem 0.85rem 0.85rem;
+}
+.asic-resumen-tip-cuenta + .asic-resumen-tip-cuenta {
+  margin-top: 0.85rem;
+}
+.asic-resumen-tip-cuenta h3 {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 0 0.35rem;
+  padding: 0.15rem 0 0.25rem;
+  background: #fff;
+  color: #14532d;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.asic-resumen-tip table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.asic-resumen-tip th {
+  padding: 0.15rem 0.4rem 0.3rem 0;
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+.asic-resumen-tip td {
+  padding: 0.28rem 0.4rem 0.28rem 0;
+  border-top: 1px solid #eef2f0;
+  font-size: 0.78rem;
+  vertical-align: top;
+}
+.asic-resumen-tip-cliente {
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.asic-resumen-tip-num {
+  white-space: nowrap;
+  font-weight: 600;
+}
+.asic-resumen-tip th.asic-resumen-tip-usd,
+.asic-resumen-tip-usd {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.asic-resumen-tip td.asic-resumen-tip-usd {
+  font-weight: 600;
+}
+.asic-resumen-tip-vacio {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.75rem;
+}
 .historial-stats .stat-card .stat-value .currency {
   font-size: 0.85em;
   font-weight: 500;

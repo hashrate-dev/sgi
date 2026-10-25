@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { fetchAsicInvoiceLedger, isNumericInvoiceId } from "../lib/asicInvoiceLedger";
@@ -88,6 +89,26 @@ function isLinkedToInvoice(comp: Invoice, factura: Invoice): boolean {
   const matchId = comp.relatedInvoiceId != null && String(comp.relatedInvoiceId) === String(factura.id);
   const matchNumber = comp.relatedInvoiceNumber != null && comp.relatedInvoiceNumber === factura.number;
   return matchId || matchNumber;
+}
+
+function asicHistorialDocTipo(inv: Invoice): string {
+  if (inv.type === "Nota de Crédito") return "Nota de crédito";
+  if (inv.type === "Factura") return isAsicEquipmentSaleInvoice(inv) ? "Comp. pago" : "Factura";
+  if (isPartialReceiptDocument(inv)) return "Recibo parcial";
+  return inv.type;
+}
+
+type ResumenLinea = { key: string; cliente: string; tipo: string; numero: string; usd: number };
+type ResumenCuenta = { id: string; titulo: string; cifra: string; lineas: ResumenLinea[] };
+
+function resumenLinea(inv: Invoice, usd: number): ResumenLinea {
+  return {
+    key: `${inv.type}-${inv.id}-${inv.number}`,
+    cliente: inv.clientName || "—",
+    tipo: asicHistorialDocTipo(inv),
+    numero: inv.number || "—",
+    usd,
+  };
 }
 
 /**
@@ -250,6 +271,97 @@ function formatMarginDraft(n: number | undefined): string {
   return String(Math.abs(n)).replace(".", ",");
 }
 
+function ResumenCuentasGlobo({
+  open,
+  anchor,
+  cuentas,
+  onEnter,
+  onLeave,
+}: {
+  open: boolean;
+  anchor: HTMLElement | null;
+  cuentas: ResumenCuenta[];
+  onEnter: () => void;
+  onLeave: () => void;
+}) {
+  const [box, setBox] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open || !anchor) {
+      setBox(null);
+      return;
+    }
+    const place = () => {
+      const rect = anchor.getBoundingClientRect();
+      const margin = 12;
+      const gap = 8;
+      const width = Math.min(720, window.innerWidth - margin * 2);
+      let left = rect.left;
+      if (left + width > window.innerWidth - margin) left = Math.max(margin, window.innerWidth - margin - width);
+      const spaceBelow = window.innerHeight - rect.bottom - margin - gap;
+      const spaceAbove = rect.top - margin - gap;
+      const openBelow = spaceBelow >= 180 || spaceBelow >= spaceAbove;
+      const maxHeight = Math.max(160, Math.min(460, openBelow ? spaceBelow : spaceAbove));
+      const top = openBelow ? rect.bottom + gap : Math.max(margin, rect.top - gap - maxHeight);
+      setBox({ top, left, width, maxHeight });
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open, anchor]);
+
+  if (!open || !box) return null;
+  return createPortal(
+    <div
+      id="asic-resumen-tip"
+      className="asic-resumen-tip"
+      role="tooltip"
+      style={{ top: box.top, left: box.left, width: box.width, maxHeight: box.maxHeight }}
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
+      onMouseDown={(event) => event.preventDefault()}
+    >
+      {cuentas.map((cuenta) => (
+        <section key={cuenta.id} className="asic-resumen-tip-cuenta">
+          <h3>
+            <span>{cuenta.titulo}</span>
+            <span>{cuenta.cifra}</span>
+          </h3>
+          {cuenta.lineas.length === 0 ? (
+            <p className="asic-resumen-tip-vacio">Sin documentos en este filtro.</p>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Tipo</th>
+                  <th>N°</th>
+                  <th className="asic-resumen-tip-usd">Total USD</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cuenta.lineas.map((linea) => (
+                  <tr key={`${cuenta.id}-${linea.key}`}>
+                    <td className="asic-resumen-tip-cliente" title={linea.cliente}>{linea.cliente}</td>
+                    <td>{linea.tipo}</td>
+                    <td className="asic-resumen-tip-num">{linea.numero}</td>
+                    <td className="asic-resumen-tip-usd">{formatCurrencyNumber(linea.usd)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+      ))}
+    </div>,
+    document.body
+  );
+}
+
 export function HistorialMineriaPage() {
   const { user } = useAuth();
   const [all, setAll] = useState<Invoice[]>(() => loadInvoicesAsic());
@@ -272,6 +384,17 @@ export function HistorialMineriaPage() {
   const canExportData = user ? canExport(user) : false;
   const canEditMargin = Boolean(user && canEditFacturacion(user));
   const [savingMarginId, setSavingMarginId] = useState<string | null>(null);
+  const resumenHeadRef = useRef<HTMLDivElement>(null);
+  const resumenTipHide = useRef<number | null>(null);
+  const [resumenTipOpen, setResumenTipOpen] = useState(false);
+  const openResumenTip = () => {
+    if (resumenTipHide.current != null) window.clearTimeout(resumenTipHide.current);
+    setResumenTipOpen(true);
+  };
+  const closeResumenTipSoon = () => {
+    if (resumenTipHide.current != null) window.clearTimeout(resumenTipHide.current);
+    resumenTipHide.current = window.setTimeout(() => setResumenTipOpen(false), 180);
+  };
 
   /** Cargar desde API cuando el backend está disponible (para Lector y todos: ver datos agregados por otros usuarios) */
   useEffect(() => {
@@ -289,6 +412,21 @@ export function HistorialMineriaPage() {
     document.addEventListener("visibilitychange", onVisible);
     return () => { cancelled = true; document.removeEventListener("visibilitychange", onVisible); };
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (resumenTipHide.current != null) window.clearTimeout(resumenTipHide.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!resumenTipOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setResumenTipOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [resumenTipOpen]);
 
   /** Meses que de verdad aparecen en las fechas de emisión (y en MES si la fecha no se puede leer). */
   const opcionesMes = useMemo(() => {
@@ -432,6 +570,47 @@ export function HistorialMineriaPage() {
       const cost = asicOperationCostUsd(i.total, i.marginUsd);
       return s + (cost ?? 0);
     }, 0);
+    const comprobantes = src.filter((i) => i.type === "Factura");
+    const recibosDocs = src.filter((i) => i.type === "Recibo");
+    const notasDocs = src.filter((i) => i.type === "Nota de Crédito");
+    const pendientesDocs = creditFacturas.flatMap((factura) => {
+      const pending = invoiceCollectionState(factura, all).pendingAmount;
+      return pending > 0.0001 ? [resumenLinea(factura, pending)] : [];
+    });
+    const cobradosDocs = src.flatMap((inv) => {
+      if (inv.type !== "Factura") return [];
+      if (isAsicEquipmentSaleInvoice(inv)) {
+        const usd = Math.abs(Number(inv.total) || 0);
+        return usd > 0.0001 ? [resumenLinea(inv, usd)] : [];
+      }
+      const paid = invoiceCollectionState(inv, all).paidApplied;
+      return paid > 0.0001 ? [resumenLinea(inv, paid)] : [];
+    });
+    const margenDocs = opsConMargen.map((inv) => resumenLinea(inv, Math.abs(Number(inv.marginUsd) || 0)));
+    const costosDocs = opsConMargen.flatMap((inv) => {
+      const cost = asicOperationCostUsd(inv.total, inv.marginUsd);
+      return cost != null ? [resumenLinea(inv, cost)] : [];
+    });
+    const usd = (n: number) => `${formatCurrencyNumber(n)} USD`;
+    const cuentas: ResumenCuenta[] = [
+      { id: "comprobantes", titulo: "Total comprobantes", cifra: String(facturas), lineas: comprobantes.map((inv) => resumenLinea(inv, Math.abs(Number(inv.total) || 0))) },
+      { id: "recibos", titulo: "Total recibos", cifra: String(recibos), lineas: recibosDocs.map((inv) => resumenLinea(inv, Math.abs(Number(inv.total) || 0))) },
+      { id: "notas", titulo: "Notas de crédito", cifra: String(notasCredito), lineas: notasDocs.map((inv) => resumenLinea(inv, Math.abs(Number(inv.total) || 0))) },
+      {
+        id: "facturacion",
+        titulo: "Facturación total",
+        cifra: usd(facturacionTotal),
+        lineas: [
+          ...comprobantes.map((inv) => resumenLinea(inv, Math.abs(Number(inv.total) || 0))),
+          ...notasDocs.map((inv) => resumenLinea(inv, -Math.abs(Number(inv.total) || 0))),
+        ],
+      },
+      { id: "pendientes", titulo: "Cobros pendientes", cifra: usd(cobrosPendientes), lineas: pendientesDocs },
+      { id: "realizados", titulo: "Cobros realizados", cifra: usd(cobrosRealizados), lineas: cobradosDocs },
+      { id: "margen", titulo: "Margen ganado", cifra: usd(margenTotal), lineas: margenDocs },
+      { id: "costos", titulo: "Total costos", cifra: usd(costosTotal), lineas: costosDocs },
+      { id: "registros", titulo: "Registros en historial", cifra: String(filtered.length), lineas: src.map((inv) => resumenLinea(inv, inv.type === "Factura" ? Math.abs(Number(inv.total) || 0) : -Math.abs(Number(inv.total) || 0))) },
+    ];
     return {
       facturas,
       recibos,
@@ -442,6 +621,7 @@ export function HistorialMineriaPage() {
       margenTotal,
       costosTotal,
       registros: filtered.length,
+      cuentas,
     };
   }, [filtered, all]);
 
@@ -1250,13 +1430,29 @@ export function HistorialMineriaPage() {
 
         <div className="usuarios-page-card mt-4">
           <div className="usuarios-page-header usuarios-page-header--activity">
-            <div className="usuarios-page-header-inner">
+            <div
+              className="usuarios-page-header-inner asic-resumen-head"
+              ref={resumenHeadRef}
+              tabIndex={0}
+              aria-describedby="asic-resumen-tip"
+              onMouseEnter={openResumenTip}
+              onMouseLeave={closeResumenTipSoon}
+              onFocus={openResumenTip}
+              onBlur={closeResumenTipSoon}
+            >
               <h2 className="usuarios-page-title">
                 <span className="usuarios-page-title-icon usuarios-page-title-icon--activity" aria-hidden>📊</span>
                 Resumen
               </h2>
               <p className="usuarios-page-subtitle">Estadísticas de facturación, cobros, margen y costos.</p>
             </div>
+            <ResumenCuentasGlobo
+              open={resumenTipOpen}
+              anchor={resumenHeadRef.current}
+              cuentas={stats.cuentas}
+              onEnter={openResumenTip}
+              onLeave={closeResumenTipSoon}
+            />
           </div>
           <div className="usuarios-page-body">
         <div className="row g-3 historial-stats">
