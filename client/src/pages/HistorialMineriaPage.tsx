@@ -90,6 +90,25 @@ function isLinkedToInvoice(comp: Invoice, factura: Invoice): boolean {
   return matchId || matchNumber;
 }
 
+/**
+ * El margen se gana al cobrar.
+ * Comp. de pago: ya está cobrado al emitirse.
+ * Factura a crédito: solo cuando un recibo deja la factura en saldo cero.
+ * El recibo se busca en todo el historial, aunque sea de otro mes.
+ */
+function asicOperationMarginEarned(inv: Invoice, ledger: Invoice[]): boolean {
+  if (!asicInvoiceCarriesOperationMargin(inv) || typeof inv.marginUsd !== "number" || !Number.isFinite(inv.marginUsd)) {
+    return false;
+  }
+  const cancelledByNc = ledger.some(
+    (nc) => nc.type === "Nota de Crédito" && isLinkedToInvoice(nc, inv) && getCreditNoteMode(nc, inv) === "total"
+  );
+  if (cancelledByNc) return false;
+  if (isAsicEquipmentSaleInvoice(inv)) return true;
+  const collection = invoiceCollectionState(inv, ledger);
+  return collection.receipts.length > 0 && collection.isFullySettled;
+}
+
 // Función auxiliar para encontrar columna en Excel por nombres posibles
 function findCol(headerRow: (string | number)[], ...names: string[]): number {
   for (let i = 1; i < headerRow.length; i++) {
@@ -389,7 +408,7 @@ export function HistorialMineriaPage() {
     await saveMarginFromTable(detailInvoice, margin);
   }
 
-  /** Facturación = Facturas + Comp. pago − NC. Pendiente = saldo de Facturas a crédito. Cobrado no cuenta un Recibo encima de un Comp. pago. */
+  /** Facturación = Facturas + Comp. pago − NC. Pendiente = saldo real de facturas a crédito, con el recibo buscado en todo el historial. */
   const stats = useMemo(() => {
     const src = filtered;
     const facturas = src.filter((i) => i.type === "Factura").length;
@@ -400,24 +419,14 @@ export function HistorialMineriaPage() {
     const facturacionTotal = sumaFacturas - sumaNotasCredito;
     const creditFacturas = src.filter((i) => i.type === "Factura" && !isAsicEquipmentSaleInvoice(i));
     const cobrosPendientes = creditFacturas.reduce((sum, factura) => {
-      const creditApplied = src
-        .filter((nc) => nc.type === "Nota de Crédito" && isLinkedToInvoice(nc, factura))
-        .reduce((s, nc) => s + Math.abs(Number(nc.total) || 0), 0);
-      const paidApplied = src
-        .filter((r) => r.type === "Recibo" && isLinkedToInvoice(r, factura))
-        .reduce((s, r) => s + Math.abs(Number(r.total) || 0), 0);
-      return sum + Math.max(0, Math.abs(Number(factura.total) || 0) - creditApplied - paidApplied);
+      return sum + invoiceCollectionState(factura, all).pendingAmount;
     }, 0);
-    const cobrosRealizados = Math.max(0, facturacionTotal - cobrosPendientes);
-    const opsConMargen = src.filter((i) => {
-      if (!asicInvoiceCarriesOperationMargin(i) || typeof i.marginUsd !== "number" || !Number.isFinite(i.marginUsd)) {
-        return false;
-      }
-      const cancelledByNc = src.some(
-        (nc) => nc.type === "Nota de Crédito" && isLinkedToInvoice(nc, i) && getCreditNoteMode(nc, i) === "total"
-      );
-      return !cancelledByNc;
-    });
+    const cobrosRealizados = src.reduce((sum, inv) => {
+      if (inv.type !== "Factura") return sum;
+      if (isAsicEquipmentSaleInvoice(inv)) return sum + Math.abs(Number(inv.total) || 0);
+      return sum + invoiceCollectionState(inv, all).paidApplied;
+    }, 0);
+    const opsConMargen = src.filter((i) => asicOperationMarginEarned(i, all));
     const margenTotal = opsConMargen.reduce((s, i) => s + Math.abs(Number(i.marginUsd) || 0), 0);
     const costosTotal = opsConMargen.reduce((s, i) => {
       const cost = asicOperationCostUsd(i.total, i.marginUsd);
@@ -434,7 +443,7 @@ export function HistorialMineriaPage() {
       costosTotal,
       registros: filtered.length,
     };
-  }, [filtered]);
+  }, [filtered, all]);
 
   function exportExcel() {
     if (all.length === 0) return;
@@ -1074,7 +1083,25 @@ export function HistorialMineriaPage() {
                         <td className="text-start">{formatCurrency(subtotal)}</td>
                         <td className="text-start">{formatCurrency(discounts)}</td>
                         <td className="text-start fw-bold">{formatCurrency(total)}</td>
-                        <td className="text-start">
+                        <td
+                          className="text-start"
+                          style={
+                            asicInvoiceCarriesOperationMargin(inv) &&
+                            inv.marginUsd != null &&
+                            Number.isFinite(inv.marginUsd) &&
+                            !asicOperationMarginEarned(inv, all)
+                              ? { color: "#94a3b8" }
+                              : undefined
+                          }
+                          title={
+                            asicInvoiceCarriesOperationMargin(inv) &&
+                            inv.marginUsd != null &&
+                            Number.isFinite(inv.marginUsd) &&
+                            !asicOperationMarginEarned(inv, all)
+                              ? "Este margen entra al total ganado cuando el recibo deje la factura cobrada."
+                              : undefined
+                          }
+                        >
                           {asicInvoiceCarriesOperationMargin(inv) && inv.marginUsd != null && Number.isFinite(inv.marginUsd)
                             ? formatCurrency(Math.abs(inv.marginUsd))
                             : "—"}
@@ -1264,7 +1291,7 @@ export function HistorialMineriaPage() {
           <div className="col-6 col-md-2">
             <div className="card stat-card p-3">
               <div className="stat-accent bg-danger" />
-              <div className="stat-label">Cobros pendientes</div>
+              <div className="stat-label" title="Saldo que sigue sin recibo. Si la factura ya tiene recibo, ese importe no entra acá. Vale para todos los meses.">Cobros pendientes</div>
               <div className="stat-value text-danger">{formatCurrencyNumber(stats.cobrosPendientes)} <span className="currency">USD</span></div>
             </div>
           </div>
@@ -1280,14 +1307,14 @@ export function HistorialMineriaPage() {
           <div className="col-6 col-md-4">
             <div className="card stat-card p-3">
               <div className="stat-accent bg-success" />
-              <div className="stat-label">Margen total</div>
+              <div className="stat-label" title="Suma el margen de cada factura cuando ya tiene el recibo que la deja cobrada. El comprobante de pago entra al emitirse, porque ese documento ya es el cobro. Vale para todos los meses.">Margen ganado</div>
               <div className="stat-value text-success">{formatCurrencyNumber(stats.margenTotal)} <span className="currency">USD</span></div>
             </div>
           </div>
           <div className="col-6 col-md-4">
             <div className="card stat-card p-3">
               <div className="stat-accent bg-secondary" />
-              <div className="stat-label">Total costos</div>
+              <div className="stat-label" title="Costos de las mismas operaciones cuyo margen ya se cobró.">Total costos</div>
               <div className="stat-value text-secondary">{formatCurrencyNumber(stats.costosTotal)} <span className="currency">USD</span></div>
             </div>
           </div>
