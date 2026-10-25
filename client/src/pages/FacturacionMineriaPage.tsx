@@ -14,6 +14,10 @@ import {
   getReparacionTipos,
   getTransporteFleteTipos,
   getSetups,
+  updateEquipo,
+  updateReparacionTipo,
+  updateSetup,
+  updateTransporteFleteTipo,
   wakeUpBackend,
   type InvoiceCreateBody,
 } from "../lib/api";
@@ -48,6 +52,7 @@ import {
   type AsicBillingCatalogQuickAddForm,
   type AsicBillingCatalogQuickAddKind,
 } from "../components/AsicBillingCatalogQuickAddModal";
+import { AsicBillingItemMenu } from "../components/AsicBillingItemMenu";
 import { useAuth } from "../contexts/AuthContext";
 import { canEditClientes, canEditEquiposInventory, canEditFacturacion, lectorAllowsModule } from "../lib/auth";
 import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
@@ -95,6 +100,32 @@ const NEW_EQUIPO_VALUE = "__new_equipo__";
 const NEW_SETUP_VALUE = "__new_setup__";
 const NEW_REPARACION_VALUE = "__new_reparacion__";
 const NEW_FLETE_VALUE = "__new_flete__";
+
+function equipoCatalogUpdateBody(
+  eq: EquipoASIC,
+  next: { marcaEquipo: string; modelo: string; procesador: string; precioUSD: number }
+) {
+  return {
+    fechaIngreso: eq.fechaIngreso,
+    marcaEquipo: next.marcaEquipo,
+    modelo: next.modelo,
+    procesador: next.procesador,
+    precioUSD: next.precioUSD,
+    observaciones: eq.observaciones,
+    marketplaceVisible: Boolean(eq.marketplaceVisible),
+    marketplaceAlgo: eq.marketplaceAlgo ?? null,
+    marketplaceHashrateDisplay: eq.marketplaceHashrateDisplay ?? null,
+    marketplaceImageSrc: eq.marketplaceImageSrc ?? null,
+    marketplaceGalleryJson: eq.marketplaceGalleryJson ?? null,
+    marketplaceDetailRowsJson: eq.marketplaceDetailRowsJson ?? null,
+    marketplaceYieldJson: eq.marketplaceYieldJson ?? null,
+    marketplaceSortOrder: eq.marketplaceSortOrder ?? 0,
+    marketplaceHashrateSellEnabled: Boolean(eq.marketplaceHashrateSellEnabled),
+    marketplaceHashrateParts: eq.marketplaceHashrateParts ?? null,
+    marketplacePriceLabel: eq.marketplacePriceLabel ?? null,
+    marketplaceListingKind: eq.marketplaceListingKind ?? null,
+  };
+}
 
 function nextNumber(type: ComprobanteType, invoices: Invoice[]) {
   const prefix = 
@@ -325,6 +356,8 @@ export function FacturacionMineriaPage() {
   const [catalogQuickAdd, setCatalogQuickAdd] = useState<{
     kind: AsicBillingCatalogQuickAddKind;
     rowIdx: number;
+    editId?: string;
+    initial?: AsicBillingCatalogQuickAddForm;
   } | null>(null);
   const [catalogQuickAddBusy, setCatalogQuickAddBusy] = useState(false);
 
@@ -559,6 +592,58 @@ export function FacturacionMineriaPage() {
     const rowIdx = catalogQuickAdd.rowIdx;
     setCatalogQuickAddBusy(true);
     try {
+      if (catalogQuickAdd.editId) {
+        const editId = catalogQuickAdd.editId;
+        if (kind === "equipo") {
+          const marcaEquipo = form.marcaEquipo.trim();
+          const modelo = form.modelo.trim();
+          const procesador = form.procesador.trim();
+          if (!marcaEquipo || !modelo || !procesador) {
+            showToast("Completá marca, modelo y procesador del equipo.", "error");
+            return;
+          }
+          const equipo = equiposAsic.find((eq) => eq.id === editId);
+          if (!equipo) {
+            showToast("No se encontró el equipo para editar.", "error");
+            return;
+          }
+          await updateEquipo(editId, equipoCatalogUpdateBody(equipo, { marcaEquipo, modelo, procesador, precioUSD: form.precioUSD }));
+          setItems((prev) =>
+            prev.map((it) =>
+              it.equipoId === editId
+                ? { ...it, marcaEquipo, modeloEquipo: modelo, procesadorEquipo: procesador, price: form.precioUSD }
+                : it
+            )
+          );
+          showToast(`Equipo ${marcaEquipo} ${modelo} actualizado.`, "success");
+        } else {
+          const nombre = form.nombre.trim();
+          if (!nombre) {
+            showToast("Ingresá el nombre del ítem.", "error");
+            return;
+          }
+          if (kind === "setup") {
+            await updateSetup(editId, { nombre, precioUSD: form.precioUSD });
+            setItems((prev) => prev.map((it) => (it.setupId === editId ? { ...it, setupNombre: nombre, price: form.precioUSD } : it)));
+            showToast(`Setup «${nombre}» actualizado.`, "success");
+          } else if (kind === "reparacion") {
+            await updateReparacionTipo(editId, { nombre, precioUSD: form.precioUSD });
+            setItems((prev) =>
+              prev.map((it) => (it.reparacionTipoId === editId ? { ...it, reparacionNombre: nombre, price: form.precioUSD } : it))
+            );
+            showToast(`Reparación «${nombre}» actualizada.`, "success");
+          } else {
+            await updateTransporteFleteTipo(editId, { nombre, precioUSD: form.precioUSD });
+            setItems((prev) =>
+              prev.map((it) => (it.transporteFleteTipoId === editId ? { ...it, transporteFleteNombre: nombre, price: form.precioUSD } : it))
+            );
+            showToast(`Transporte/flete «${nombre}» actualizado.`, "success");
+          }
+        }
+        await reloadAsicCatalogs();
+        setCatalogQuickAdd(null);
+        return;
+      }
       if (kind === "equipo") {
         const marcaEquipo = form.marcaEquipo.trim();
         const modelo = form.modelo.trim();
@@ -671,6 +756,53 @@ export function FacturacionMineriaPage() {
     } finally {
       setCatalogQuickAddBusy(false);
     }
+  }
+
+  function openCatalogEdit(kind: AsicBillingCatalogQuickAddKind, id: string, rowIdx: number) {
+    if (kind === "equipo") {
+      if (!canQuickAddEquipo) {
+        showToast("No tenés permiso para editar equipos ASIC.", "warning");
+        return;
+      }
+      const equipo = equiposAsic.find((item) => item.id === id);
+      if (!equipo) return;
+      setCatalogQuickAdd({
+        kind,
+        rowIdx,
+        editId: id,
+        initial: {
+          marcaEquipo: equipo.marcaEquipo,
+          modelo: equipo.modelo,
+          procesador: equipo.procesador,
+          nombre: "",
+          precioUSD: equipo.precioUSD,
+        },
+      });
+      return;
+    }
+    if (!canQuickAddSetupRepFlete) {
+      showToast("No tenés permiso para editar este ítem.", "warning");
+      return;
+    }
+    const source =
+      kind === "setup"
+        ? setups.find((item) => item.id === id)
+        : kind === "reparacion"
+          ? reparacionTipos.find((item) => item.id === id)
+          : transporteFleteTipos.find((item) => item.id === id);
+    if (!source) return;
+    setCatalogQuickAdd({
+      kind,
+      rowIdx,
+      editId: id,
+      initial: {
+        marcaEquipo: "",
+        modelo: "",
+        procesador: "",
+        nombre: source.nombre,
+        precioUSD: source.precioUSD,
+      },
+    });
   }
 
   const selectedClient = useMemo(
@@ -1919,21 +2051,25 @@ export function FacturacionMineriaPage() {
                                     title="Detalle cargado desde el comprobante"
                                   />
                                 ) : (
-                                <select
-                                  className="fact-select"
-                                  style={{ 
-                                    padding: "0.4rem 0.5rem", 
-                                    fontSize: "0.8125rem",
-                                    width: "100%",
-                                    maxWidth: "100%",
-                                    backgroundColor: itemsLocked ? "#f3f4f6" : "white",
-                                    cursor: itemsLocked ? "not-allowed" : "pointer",
-                                    opacity: itemsLocked ? 0.7 : 1
-                                  }}
+                                <AsicBillingItemMenu
                                   value={selectValue}
-                                  onChange={(e) => {
+                                  placeholder={itemDisplayLabel && !selectValue ? itemDisplayLabel : "Seleccionar..."}
+                                  disabled={itemsLocked}
+                                  equipos={equiposAsic}
+                                  setups={setups}
+                                  reparaciones={reparacionTipos}
+                                  fletes={transporteFleteTipos}
+                                  canAddEquipo={canQuickAddEquipo}
+                                  canAddCatalog={canQuickAddSetupRepFlete}
+                                  canEditEquipo={canQuickAddEquipo}
+                                  canEditCatalog={canQuickAddSetupRepFlete}
+                                  newEquipoValue={NEW_EQUIPO_VALUE}
+                                  newSetupValue={NEW_SETUP_VALUE}
+                                  newReparacionValue={NEW_REPARACION_VALUE}
+                                  newFleteValue={NEW_FLETE_VALUE}
+                                  onEdit={(kind, id) => openCatalogEdit(kind, id, idx)}
+                                  onPick={(value) => {
                                     if (itemsLocked) return;
-                                    const value = e.target.value;
                                     if (value === NEW_EQUIPO_VALUE) {
                                       if (!canQuickAddEquipo) {
                                         showToast("No tenés permiso para agregar equipos ASIC.", "warning");
@@ -2053,70 +2189,7 @@ export function FacturacionMineriaPage() {
                                       });
                                     }
                                   }}
-                                  disabled={itemsLocked}
-                                >
-                                  <option value="">{itemDisplayLabel && !selectValue ? itemDisplayLabel : "Seleccionar..."}</option>
-                                  {(equiposAsic.length > 0 || canQuickAddEquipo) && (
-                                    <optgroup label="Equipos ASIC">
-                                      {equiposAsic.map((eq) => (
-                                        <option key={eq.id} value={`equipo_${eq.id}`}>
-                                          {eq.marcaEquipo} - {eq.modelo} - {eq.procesador}
-                                        </option>
-                                      ))}
-                                      {canQuickAddEquipo && (
-                                        <option value={NEW_EQUIPO_VALUE}>+ Nuevo equipo ASIC…</option>
-                                      )}
-                                    </optgroup>
-                                  )}
-                                  <optgroup label="Setup">
-                                    {setups.length > 0 ? (
-                                      setups.map((s) => (
-                                        <option key={s.id} value={`setup_${s.id}`}>
-                                          {s.nombre} - ${s.precioUSD} USD
-                                        </option>
-                                      ))
-                                    ) : (
-                                      <option value="" disabled>
-                                        No hay Setup disponibles.
-                                      </option>
-                                    )}
-                                    {canQuickAddSetupRepFlete && (
-                                      <option value={NEW_SETUP_VALUE}>+ Nuevo Setup…</option>
-                                    )}
-                                  </optgroup>
-                                  <optgroup label="Reparación">
-                                    {reparacionTipos.length > 0 ? (
-                                      reparacionTipos.map((r) => (
-                                        <option key={r.id} value={`reparacion_${r.id}`}>
-                                          {r.nombre} - ${r.precioUSD} USD
-                                        </option>
-                                      ))
-                                    ) : (
-                                      <option value="" disabled>
-                                        No hay tipos de reparación.
-                                      </option>
-                                    )}
-                                    {canQuickAddSetupRepFlete && (
-                                      <option value={NEW_REPARACION_VALUE}>+ Nuevo tipo de reparación…</option>
-                                    )}
-                                  </optgroup>
-                                  <optgroup label="Transporte y fletes">
-                                    {transporteFleteTipos.length > 0 ? (
-                                      transporteFleteTipos.map((f) => (
-                                        <option key={f.id} value={`flete_${f.id}`}>
-                                          {f.nombre} - ${f.precioUSD} USD
-                                        </option>
-                                      ))
-                                    ) : (
-                                      <option value="" disabled>
-                                        No hay ítems de transporte/flete.
-                                      </option>
-                                    )}
-                                    {canQuickAddSetupRepFlete && (
-                                      <option value={NEW_FLETE_VALUE}>+ Nuevo transporte / flete…</option>
-                                    )}
-                                  </optgroup>
-                                </select>
+                                />
                                 )}
                                 {it.reparacionTipoId && !showLockedServiceLabel ? (
                                   <select
@@ -2514,6 +2587,8 @@ export function FacturacionMineriaPage() {
       </div>
       <AsicBillingCatalogQuickAddModal
         kind={catalogQuickAdd?.kind ?? null}
+        editId={catalogQuickAdd?.editId ?? null}
+        initial={catalogQuickAdd?.initial ?? null}
         busy={catalogQuickAddBusy}
         onClose={() => {
           if (catalogQuickAddBusy) return;

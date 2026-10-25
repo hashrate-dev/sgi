@@ -25,8 +25,17 @@ const TITLES: Record<AsicBillingCatalogQuickAddKind, string> = {
   flete: "Nuevo transporte / flete",
 };
 
+const EDIT_TITLES: Record<AsicBillingCatalogQuickAddKind, string> = {
+  equipo: "Editar equipo ASIC",
+  setup: "Editar Setup",
+  reparacion: "Editar tipo de reparación",
+  flete: "Editar transporte / flete",
+};
+
 type Props = {
   kind: AsicBillingCatalogQuickAddKind | null;
+  editId?: string | null;
+  initial?: AsicBillingCatalogQuickAddForm | null;
   busy?: boolean;
   onClose: () => void;
   onSubmit: (kind: AsicBillingCatalogQuickAddKind, form: AsicBillingCatalogQuickAddForm) => void | Promise<void>;
@@ -39,16 +48,25 @@ function normalizePrecioUsd(raw: string): number {
 }
 
 /** Modal rápido para alta de catálogo desde el select de ítems en ASIC Billing. */
-export function AsicBillingCatalogQuickAddModal({ kind, busy = false, onClose, onSubmit }: Props) {
-  const [form, setForm] = useState<AsicBillingCatalogQuickAddForm>(EMPTY_FORM);
+export function AsicBillingCatalogQuickAddModal({
+  kind,
+  editId = null,
+  initial = null,
+  busy = false,
+  onClose,
+  onSubmit,
+}: Props) {
+  const [form, setForm] = useState<AsicBillingCatalogQuickAddForm>(initial ?? EMPTY_FORM);
+  const isEdit = Boolean(editId);
 
   useEffect(() => {
-    if (kind) setForm(EMPTY_FORM);
-  }, [kind]);
+    if (!kind) return;
+    setForm(initial ?? EMPTY_FORM);
+  }, [kind, editId, initial]);
 
   if (!kind) return null;
 
-  const title = TITLES[kind];
+  const title = isEdit ? EDIT_TITLES[kind] : TITLES[kind];
   const isEquipo = kind === "equipo";
 
   return (
@@ -61,7 +79,9 @@ export function AsicBillingCatalogQuickAddModal({ kind, busy = false, onClose, o
           </div>
           <div className="fact-card-body">
             <p className="small text-muted mb-3">
-              Se guarda en la base y queda disponible en el selector sin salir de este formulario.
+              {isEdit
+                ? "Se actualiza el catálogo. Las líneas de este comprobante que usan este ítem toman el nombre y el precio nuevos."
+                : "Se guarda en la base y queda disponible en el selector sin salir de este formulario."}
             </p>
             {isEquipo ? (
               <>
@@ -143,7 +163,7 @@ export function AsicBillingCatalogQuickAddModal({ kind, busy = false, onClose, o
                 disabled={busy}
                 onClick={() => void onSubmit(kind, form)}
               >
-                {busy ? "Guardando…" : "Guardar y usar"}
+                {busy ? "Guardando…" : isEdit ? "Guardar cambios" : "Guardar y usar"}
               </button>
             </div>
           </div>

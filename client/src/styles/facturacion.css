@@ -1962,6 +1962,122 @@ button.fact-back {
   box-shadow: 0 0 0 2px rgba(45, 93, 70, 0.2);
 }
 
+.asic-bill-menu {
+  position: relative;
+  width: 100%;
+}
+
+.asic-bill-menu-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.8125rem;
+  text-align: left;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #0f172a;
+  cursor: pointer;
+}
+
+.asic-bill-menu-trigger span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asic-bill-menu-trigger:disabled {
+  background: #f3f4f6;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.asic-bill-menu-trigger:focus-visible {
+  outline: none;
+  border-color: #2D5D46;
+  box-shadow: 0 0 0 2px rgba(45, 93, 70, 0.2);
+}
+
+.asic-bill-menu-panel {
+  position: fixed;
+  z-index: 4000;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
+  padding: 0.35rem 0;
+}
+
+.asic-bill-menu-group-label {
+  padding: 0.35rem 0.75rem 0.2rem;
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.asic-bill-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0 0.35rem 0 0.2rem;
+}
+
+.asic-bill-menu-row.is-on {
+  background: #f0fdf4;
+}
+
+.asic-bill-menu-row.is-create .asic-bill-menu-pick {
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.asic-bill-menu-row.is-disabled .asic-bill-menu-pick {
+  color: #94a3b8;
+  cursor: default;
+}
+
+.asic-bill-menu-pick {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 0.38rem 0.45rem;
+  font-size: 0.84rem;
+  color: #0f172a;
+  cursor: pointer;
+}
+
+.asic-bill-menu-row:hover:not(.is-disabled) {
+  background: #f8fafc;
+}
+
+.asic-bill-menu-edit {
+  flex: 0 0 auto;
+  width: 1.7rem;
+  height: 1.7rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #334155;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.asic-bill-menu-edit:hover {
+  border-color: #2D5D46;
+  color: #166534;
+  background: #f0fdf4;
+}
+
 .fact-detail-servicios-table .fact-detail-servicios-input-total {
   width: 100%;
   padding: 0.4rem 0.5rem;
