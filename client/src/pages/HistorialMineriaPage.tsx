@@ -117,14 +117,21 @@ function resumenLinea(inv: Invoice, usd: number): ResumenLinea {
  * Factura a crédito: solo cuando un recibo deja la factura en saldo cero.
  * El recibo se busca en todo el historial, aunque sea de otro mes.
  */
-function asicOperationMarginEarned(inv: Invoice, ledger: Invoice[]): boolean {
+function asicInvoiceMarginUsd(inv: Invoice): number | null {
   if (!asicInvoiceCarriesOperationMargin(inv) || typeof inv.marginUsd !== "number" || !Number.isFinite(inv.marginUsd)) {
-    return false;
+    return null;
   }
-  const cancelledByNc = ledger.some(
+  return Math.abs(inv.marginUsd);
+}
+
+function asicMarginCancelledByCreditNote(inv: Invoice, ledger: Invoice[]): boolean {
+  return ledger.some(
     (nc) => nc.type === "Nota de Crédito" && isLinkedToInvoice(nc, inv) && getCreditNoteMode(nc, inv) === "total"
   );
-  if (cancelledByNc) return false;
+}
+
+function asicOperationMarginEarned(inv: Invoice, ledger: Invoice[]): boolean {
+  if (asicInvoiceMarginUsd(inv) == null || asicMarginCancelledByCreditNote(inv, ledger)) return false;
   if (isAsicEquipmentSaleInvoice(inv)) return true;
   const collection = invoiceCollectionState(inv, ledger);
   return collection.receipts.length > 0 && collection.isFullySettled;
@@ -564,9 +571,13 @@ export function HistorialMineriaPage() {
       if (isAsicEquipmentSaleInvoice(inv)) return sum + Math.abs(Number(inv.total) || 0);
       return sum + invoiceCollectionState(inv, all).paidApplied;
     }, 0);
-    const opsConMargen = src.filter((i) => asicOperationMarginEarned(i, all));
-    const margenTotal = opsConMargen.reduce((s, i) => s + Math.abs(Number(i.marginUsd) || 0), 0);
-    const costosTotal = opsConMargen.reduce((s, i) => {
+    const opsConMargenCargado = src.filter((i) => asicInvoiceMarginUsd(i) != null && !asicMarginCancelledByCreditNote(i, all));
+    const opsCobradas = opsConMargenCargado.filter((i) => asicOperationMarginEarned(i, all));
+    const opsNoCobradas = opsConMargenCargado.filter((i) => !asicOperationMarginEarned(i, all));
+    const margenCobrado = opsCobradas.reduce((s, i) => s + (asicInvoiceMarginUsd(i) ?? 0), 0);
+    const margenNoCobrado = opsNoCobradas.reduce((s, i) => s + (asicInvoiceMarginUsd(i) ?? 0), 0);
+    const margenTotal = margenCobrado + margenNoCobrado;
+    const costosTotal = opsCobradas.reduce((s, i) => {
       const cost = asicOperationCostUsd(i.total, i.marginUsd);
       return s + (cost ?? 0);
     }, 0);
@@ -586,8 +597,10 @@ export function HistorialMineriaPage() {
       const paid = invoiceCollectionState(inv, all).paidApplied;
       return paid > 0.0001 ? [resumenLinea(inv, paid)] : [];
     });
-    const margenDocs = opsConMargen.map((inv) => resumenLinea(inv, Math.abs(Number(inv.marginUsd) || 0)));
-    const costosDocs = opsConMargen.flatMap((inv) => {
+    const margenCobradoDocs = opsCobradas.map((inv) => resumenLinea(inv, asicInvoiceMarginUsd(inv) ?? 0));
+    const margenNoCobradoDocs = opsNoCobradas.map((inv) => resumenLinea(inv, asicInvoiceMarginUsd(inv) ?? 0));
+    const margenTotalDocs = opsConMargenCargado.map((inv) => resumenLinea(inv, asicInvoiceMarginUsd(inv) ?? 0));
+    const costosDocs = opsCobradas.flatMap((inv) => {
       const cost = asicOperationCostUsd(inv.total, inv.marginUsd);
       return cost != null ? [resumenLinea(inv, cost)] : [];
     });
@@ -607,7 +620,9 @@ export function HistorialMineriaPage() {
       },
       { id: "pendientes", titulo: "Cobros pendientes", cifra: usd(cobrosPendientes), lineas: pendientesDocs },
       { id: "realizados", titulo: "Cobros realizados", cifra: usd(cobrosRealizados), lineas: cobradosDocs },
-      { id: "margen", titulo: "Margen ganado", cifra: usd(margenTotal), lineas: margenDocs },
+      { id: "margen-cobrado", titulo: "Margen cobrado", cifra: usd(margenCobrado), lineas: margenCobradoDocs },
+      { id: "margen-no-cobrado", titulo: "Margen no cobrado", cifra: usd(margenNoCobrado), lineas: margenNoCobradoDocs },
+      { id: "margen-total", titulo: "Margen total", cifra: usd(margenTotal), lineas: margenTotalDocs },
       { id: "costos", titulo: "Total costos", cifra: usd(costosTotal), lineas: costosDocs },
       { id: "registros", titulo: "Registros en historial", cifra: String(filtered.length), lineas: src.map((inv) => resumenLinea(inv, inv.type === "Factura" ? Math.abs(Number(inv.total) || 0) : -Math.abs(Number(inv.total) || 0))) },
     ];
@@ -618,6 +633,8 @@ export function HistorialMineriaPage() {
       facturacionTotal,
       cobrosPendientes,
       cobrosRealizados,
+      margenCobrado,
+      margenNoCobrado,
       margenTotal,
       costosTotal,
       registros: filtered.length,
@@ -1499,22 +1516,37 @@ export function HistorialMineriaPage() {
             </div>
           </div>
         </div>
-        <div className="row mt-3 g-3 historial-stats">
-          <div className="col-6 col-md-4">
-            <div className="card stat-card p-3">
-              <div className="stat-accent bg-success" />
-              <div className="stat-label" title="Suma el margen de cada factura cuando ya tiene el recibo que la deja cobrada. El comprobante de pago entra al emitirse, porque ese documento ya es el cobro. Vale para todos los meses.">Margen ganado</div>
-              <div className="stat-value text-success">{formatCurrencyNumber(stats.margenTotal)} <span className="currency">USD</span></div>
+        <div className="asic-margen-banda mt-3" aria-label="Margen cobrado, margen no cobrado y margen total">
+          <div className="asic-margen-banda-kicker">Margen</div>
+          <div className="asic-margen-banda-row">
+            <div className="asic-margen-celda is-cobrado">
+              <div className="stat-label">Margen cobrado</div>
+              <div className="stat-value">{formatCurrencyNumber(stats.margenCobrado)} <span className="currency">USD</span></div>
+              <div className="asic-margen-hint">Ya tiene recibo</div>
+            </div>
+            <div className="asic-margen-op" aria-hidden="true">+</div>
+            <div className="asic-margen-celda is-pendiente">
+              <div className="stat-label">Margen no cobrado</div>
+              <div className="stat-value">{formatCurrencyNumber(stats.margenNoCobrado)} <span className="currency">USD</span></div>
+              <div className="asic-margen-hint">Todavía sin recibo</div>
+            </div>
+            <div className="asic-margen-op" aria-hidden="true">=</div>
+            <div className="asic-margen-celda is-total">
+              <div className="stat-label">Margen total</div>
+              <div className="stat-value">{formatCurrencyNumber(stats.margenTotal)} <span className="currency">USD</span></div>
+              <div className="asic-margen-hint">Cobrado + no cobrado</div>
             </div>
           </div>
-          <div className="col-6 col-md-4">
+        </div>
+        <div className="row mt-3 g-3 historial-stats">
+          <div className="col-6 col-md-6">
             <div className="card stat-card p-3">
               <div className="stat-accent bg-secondary" />
               <div className="stat-label" title="Costos de las mismas operaciones cuyo margen ya se cobró.">Total costos</div>
               <div className="stat-value text-secondary">{formatCurrencyNumber(stats.costosTotal)} <span className="currency">USD</span></div>
             </div>
           </div>
-          <div className="col-12 col-md-4">
+          <div className="col-6 col-md-6">
             <div className="card stat-card p-3">
               <div className="stat-accent bg-info" />
               <div className="d-flex align-items-center justify-content-center gap-2 flex-wrap">

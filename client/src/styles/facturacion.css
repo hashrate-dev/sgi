@@ -5603,6 +5603,86 @@ button.fact-back {
   color: #64748b;
   font-size: 0.75rem;
 }
+.asic-margen-banda {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 0.85rem 1rem 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+.asic-margen-banda-kicker {
+  margin-bottom: 0.55rem;
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.asic-margen-banda-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+.asic-margen-celda {
+  flex: 1 1 10rem;
+  border-radius: 0.85rem;
+  padding: 0.75rem 0.9rem 0.7rem;
+  border: 1px solid transparent;
+}
+.asic-margen-celda .stat-label {
+  margin-bottom: 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.asic-margen-celda .stat-value {
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+.asic-margen-celda .currency {
+  font-size: 0.72rem;
+  font-weight: 600;
+  opacity: 0.8;
+}
+.asic-margen-hint {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.asic-margen-celda.is-cobrado {
+  background: #f0fdf4;
+  border-color: #86efac;
+  color: #166534;
+}
+.asic-margen-celda.is-pendiente {
+  background: #fffbeb;
+  border-color: #fcd34d;
+  color: #92400e;
+}
+.asic-margen-celda.is-total {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+.asic-margen-op {
+  align-self: center;
+  min-width: 1.2rem;
+  color: #94a3b8;
+  font-size: 1.45rem;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+}
+@media (max-width: 767px) {
+  .asic-margen-op {
+    display: none;
+  }
+}
 .historial-stats .stat-card .stat-value .currency {
   font-size: 0.85em;
   font-weight: 500;
