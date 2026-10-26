@@ -1773,7 +1773,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
               <div className={resumenTipClass("asic-margen-celda is-pendiente", "gastos")} {...resumenTipProps("gastos")}>
                 <div className="stat-label">Gastos hosting</div>
                 <div className="stat-value">{formatCurrencyNumber(stats.gastosHosting)} <span className="currency">USD</span></div>
-                <div className="asic-margen-hint">Digital Assets y Blunode</div>
+                <div className="asic-margen-hint">Digital Assets y Blunode, por mes de servicio</div>
               </div>
               <div className="asic-margen-op" aria-hidden="true">=</div>
               <div className={resumenTipClass("asic-margen-celda is-total", "margen")} {...resumenTipProps("margen")}>

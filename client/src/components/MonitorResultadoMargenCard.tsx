@@ -538,7 +538,7 @@ export function MonitorResultadoMargenCard({
         <p className="text-muted small mb-2 mb-0" style={{ fontSize: "0.7rem", lineHeight: 1.35 }}>
           Barras = resultado neto (cobros − costos ASIC − costos hosting + ganancia de cambio − gastos del resto).
           El costo ASIC sale del margen cargado en cada operación. El costo hosting es Digital Assets y
-          Blunode (P002/P003 u otros configurados), en el mes de presupuesto: se resta de los cobros de ese mes.
+          Blunode (P002/P003 u otros configurados), en el mes de servicio: se resta de los cobros de ese mes.
           Esos proveedores no se vuelven a restar en gastos. Línea gris = promedio mensual del resultado.
           Línea azul = margen % sobre ingresos cobrados.
         </p>

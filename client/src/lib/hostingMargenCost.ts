@@ -49,19 +49,16 @@ function yyyyMmFromDate(raw: string | undefined): string | null {
 
 /**
  * Mes del costo de hosting.
- * El margen del mes es cobros menos lo pagado a Digital Assets o Blunode en ese mes.
- * El mes de servicio suele ser el mes anterior (se paga a mes vencido); el descuento
- * va al mes de presupuesto, que es donde queda asignado el pago.
- * Prioridad: mes de presupuesto, después la fecha del pago, después el mes de servicio.
+ * El margen del mes es cobros menos el gasto de Digital Assets o Blunode de ese mes de servicio.
+ * El pago entra al presupuesto del mes siguiente (se paga a mes vencido); esa columna no mueve el costo.
+ * Prioridad: mes de servicio, después el mes de presupuesto, después la fecha del pago.
  */
 export function hostingGastoYm(g: Pick<ContabilidadGasto, "presupuestoMes" | "mesServicio" | "fecha">): string | null {
-  const pm = String(g.presupuestoMes ?? "").trim().slice(0, 7);
-  if (isYm(pm)) return pm;
-  const paid = yyyyMmFromDate(g.fecha);
-  if (paid) return paid;
   const ms = String(g.mesServicio ?? "").trim().slice(0, 7);
   if (isYm(ms)) return ms;
-  return null;
+  const pm = String(g.presupuestoMes ?? "").trim().slice(0, 7);
+  if (isYm(pm)) return pm;
+  return yyyyMmFromDate(g.fecha);
 }
 
 /** Digital Assets y Blunode Paraguay: el costo de hosting aunque el código no sea P002/P003. */
@@ -95,7 +92,7 @@ export function isHostingMarginSupplierGasto(
   return Boolean(code) && codes.includes(code);
 }
 
-/** Costos de proveedores de hosting por mes de presupuesto (índice 0 = enero). */
+/** Costos de proveedores de hosting por mes de servicio (índice 0 = enero). */
 export function monthlyHostingCost12(
   gastos: ContabilidadGasto[] | null | undefined,
   year: number,

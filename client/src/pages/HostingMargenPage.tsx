@@ -322,9 +322,9 @@ export function HostingMargenPage() {
           <p className="text-muted small mb-3">
             Ingresos: cobros de hosting (Recibos menos Notas de Crédito) del historial. Gastos: USD de
             Digital Assets y Blunode Paraguay
-            {supplierSummary ? ` (${supplierSummary})` : ""}, imputados al <strong>mes de presupuesto</strong>{" "}
-            (el mes en que se asignó el pago). El mes de servicio no mueve el costo. El margen es lo que
-            queda: ingresos menos ese costo, en USD.
+            {supplierSummary ? ` (${supplierSummary})` : ""}, imputados al <strong>mes de servicio</strong>.
+            El pago entra al presupuesto del mes siguiente, porque se abona a mes vencido. El margen es
+            ingresos menos ese costo, en USD.
           </p>
 
           {err ? <div className="alert alert-danger py-2">{err}</div> : null}
