@@ -540,7 +540,7 @@ export function CambioGananciasMensualAreaCard({
           <i
             className="bi bi-calendar3 reportes-dash__kpi-foot-calendar"
             aria-hidden
-            title="Ingresos = cobros hosting + ASIC. Margen hosting = cobros hosting − lo pagado a Digital Assets y Blunode en el mes de servicio. Margen = ganancia de cambio + margen ASIC + margen hosting."
+            title="Ingresos = cobros hosting + ASIC. Margen hosting = ganancia cargada en cada factura de hosting, por mes de la factura (igual que el historial). Margen = ganancia de cambio + margen ASIC + margen hosting."
           />
         </div>
       </aside>

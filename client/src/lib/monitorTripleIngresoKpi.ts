@@ -201,6 +201,53 @@ export function monthlyAsicOperationCost12(
   return monthlyAsicMarginAndCost12(invoices, year).cost;
 }
 
+function roundMoney(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/**
+ * Margen de hosting cargado en cada factura, por mes de la factura (índice 0 = enero).
+ * Misma regla que el resumen del historial: solo facturas con margen, prorrateado por lo cobrado.
+ */
+export function monthlyHostingInvoiceMargin12(
+  invoices: InvoiceMonthNetRow[] | null | undefined,
+  year: number
+): number[] {
+  const list = Array.isArray(invoices) ? invoices : [];
+  const yStr = String(year);
+  const keys = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
+  const totals = keys.map(() => 0);
+
+  for (const fac of list) {
+    if (String(fac.type ?? "").trim() !== "Factura") continue;
+    const marginRaw = Number(fac.marginUsd);
+    if (!Number.isFinite(marginRaw)) continue;
+    const mk = normalizeInvoiceMonthKey(fac.month);
+    if (!/^\d{4}-\d{2}$/.test(mk) || mk.slice(0, 4) !== yStr) continue;
+    const mi = keys.indexOf(mk);
+    if (mi < 0) continue;
+
+    let credit = 0;
+    let paid = 0;
+    for (const doc of list) {
+      const t = String(doc.type ?? "").trim();
+      if (t !== "Recibo" && t !== "Nota de Crédito") continue;
+      if (findRelatedFactura(list, doc) !== fac) continue;
+      const abs = Math.abs(Number(doc.total) || 0);
+      if (t === "Nota de Crédito") credit += abs;
+      else paid += abs;
+    }
+    const original = Math.abs(Number(fac.total) || 0);
+    const collectible = roundMoney(Math.max(0, original - roundMoney(credit)));
+    const cobrado = roundMoney(paid);
+    const share = collectible > 0.0001 ? Math.min(1, cobrado / collectible) : 0;
+    const margenParte =
+      share >= 1 - 1e-9 ? roundMoney(Math.abs(marginRaw)) : roundMoney(Math.abs(marginRaw) * share);
+    totals[mi] = roundMoney((totals[mi] ?? 0) + margenParte);
+  }
+  return totals;
+}
+
 /** @deprecated Solo devengado (Factura − NC por MES). El monitor usa `monthlyInvoiceCashCollected12`. */
 export function monthlyInvoiceNetTotals12(invoices: InvoiceMonthNetRow[] | null | undefined, year: number): number[] {
   const list = Array.isArray(invoices) ? invoices : [];
@@ -249,7 +296,8 @@ export function monthlyCambioProfitWithHostingCommission12(
 
 /**
  * Series mensuales alineadas al año (índice 0 = enero).
- * Ingresos = cobros hosting + cobros ASIC (caja). Cambio y margen ASIC van aparte.
+ * Ingresos = cobros hosting + cobros ASIC (caja).
+ * Margen hosting = ganancia cargada en cada factura, por mes de la factura.
  */
 export function monthlyTripleIngresosArrays(
   operations: HostingFxOperation[] | null | undefined,
@@ -280,7 +328,7 @@ export function monthlyTripleIngresosArrays(
   const costSrc =
     Array.isArray(hostingCostItems) && hostingCostItems.length > 0 ? hostingCostItems : gastosItems;
   const hostingCost = monthlyHostingCost12(costSrc, year, hostingSupplierNumbers);
-  const hostingMargin = hosting.map((h, i) => h - (hostingCost[i] ?? 0));
+  const hostingMargin = monthlyHostingInvoiceMargin12(hostingInvoices, year);
   const ingresos = hosting.map((h, i) => h + asic[i]!);
   const margen = cambio.map((c, i) => c + asicMargin[i]! + hostingMargin[i]!);
   const combined = ingresos;

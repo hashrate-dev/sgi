@@ -110,6 +110,7 @@ export function HostingMargenPage() {
         relatedInvoiceNumber: inv.relatedInvoiceNumber,
         source: inv.source ?? "hosting",
         documentContext: inv.documentContext,
+        marginUsd: typeof inv.marginUsd === "number" && Number.isFinite(inv.marginUsd) ? inv.marginUsd : undefined,
       }));
       setInvoices(rows);
       setSupplierNumbers(setRes.supplierNumbers);
@@ -320,11 +321,11 @@ export function HostingMargenPage() {
           </div>
 
           <p className="text-muted small mb-3">
-            Ingresos: cobros de hosting (Recibos menos Notas de Crédito) del historial. Gastos: USD de
-            Digital Assets y Blunode Paraguay
-            {supplierSummary ? ` (${supplierSummary})` : ""}, imputados al <strong>mes de servicio</strong>.
-            El pago entra al presupuesto del mes siguiente, porque se abona a mes vencido. El margen es
-            ingresos menos ese costo, en USD.
+            Margen: ganancia cargada en cada factura de hosting, por mes de la factura (la misma cifra del
+            historial y del monitor). Ingresos: cobros de hosting del mes. Gastos: USD de Digital Assets y
+            Blunode Paraguay
+            {supplierSummary ? ` (${supplierSummary})` : ""}, imputados al <strong>mes de servicio</strong>, para
+            compararlos con lo cobrado.
           </p>
 
           {err ? <div className="alert alert-danger py-2">{err}</div> : null}

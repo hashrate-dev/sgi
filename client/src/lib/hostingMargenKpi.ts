@@ -5,7 +5,11 @@ import {
   isHostingMarginSupplierGasto,
   normalizeHostingSupplierCode,
 } from "./hostingMargenCost";
-import { monthlyInvoiceCashCollected12, type InvoiceMonthNetRow } from "./monitorTripleIngresoKpi";
+import {
+  monthlyHostingInvoiceMargin12,
+  monthlyInvoiceCashCollected12,
+  type InvoiceMonthNetRow,
+} from "./monitorTripleIngresoKpi";
 
 export {
   DEFAULT_HOSTING_MARGIN_SUPPLIERS,
@@ -44,6 +48,7 @@ export function buildHostingMargenYearSeries(
 ): HostingMargenMonth[] {
   const keys = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
   const ingresos12 = monthlyInvoiceCashCollected12(hostingInvoices, year);
+  const margen12 = monthlyHostingInvoiceMargin12(hostingInvoices, year);
   const codes = hostingSupplierCodes(supplierNumbers);
   const gastosByMonth: Array<Record<string, number>> = keys.map(() => {
     const o: Record<string, number> = {};
@@ -66,7 +71,7 @@ export function buildHostingMargenYearSeries(
     const ingresos = ingresos12[i] ?? 0;
     const gastosBySupplier = gastosByMonth[i] ?? {};
     const gastosTotal = Object.values(gastosBySupplier).reduce((acc, n) => acc + (n || 0), 0);
-    const margen = ingresos - gastosTotal;
+    const margen = margen12[i] ?? 0;
     return {
       ym,
       label: MONTH_LABELS_ES[i] ?? ym,
@@ -82,7 +87,7 @@ export function buildHostingMargenYearSeries(
 export function hostingMargenTotals(months: HostingMargenMonth[]): HostingMargenTotals {
   const ingresos = months.reduce((a, m) => a + m.ingresos, 0);
   const gastos = months.reduce((a, m) => a + m.gastos, 0);
-  const margen = ingresos - gastos;
+  const margen = months.reduce((a, m) => a + m.margen, 0);
   return {
     ingresos,
     gastos,
