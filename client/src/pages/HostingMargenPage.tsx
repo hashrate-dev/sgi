@@ -322,7 +322,8 @@ export function HostingMargenPage() {
 
           <p className="text-muted small mb-3">
             Margen: ganancia cargada en cada factura de hosting, por mes de la factura (la misma cifra del
-            historial y del monitor). Ingresos: cobros de hosting del mes. Gastos: USD de Digital Assets y
+            historial y del monitor). Ingresos: lo cobrado de las facturas de ese mes, aunque el cliente pague
+            el mes siguiente. Gastos: USD de Digital Assets y
             Blunode Paraguay
             {supplierSummary ? ` (${supplierSummary})` : ""}, imputados al <strong>mes de servicio</strong>, para
             compararlos con lo cobrado.

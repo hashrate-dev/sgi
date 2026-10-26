@@ -5,11 +5,7 @@ import {
   isHostingMarginSupplierGasto,
   normalizeHostingSupplierCode,
 } from "./hostingMargenCost";
-import {
-  monthlyHostingInvoiceMargin12,
-  monthlyInvoiceCashCollected12,
-  type InvoiceMonthNetRow,
-} from "./monitorTripleIngresoKpi";
+import { monthlyHostingInvoiceEconomics12, type InvoiceMonthNetRow } from "./monitorTripleIngresoKpi";
 
 export {
   DEFAULT_HOSTING_MARGIN_SUPPLIERS,
@@ -47,8 +43,9 @@ export function buildHostingMargenYearSeries(
   supplierNumbers: string[]
 ): HostingMargenMonth[] {
   const keys = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
-  const ingresos12 = monthlyInvoiceCashCollected12(hostingInvoices, year);
-  const margen12 = monthlyHostingInvoiceMargin12(hostingInvoices, year);
+  const hostingEcon = monthlyHostingInvoiceEconomics12(hostingInvoices, year);
+  const ingresos12 = hostingEcon.collected;
+  const margen12 = hostingEcon.margin;
   const codes = hostingSupplierCodes(supplierNumbers);
   const gastosByMonth: Array<Record<string, number>> = keys.map(() => {
     const o: Record<string, number> = {};

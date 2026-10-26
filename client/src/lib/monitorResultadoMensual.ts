@@ -1,6 +1,6 @@
 import type { ContabilidadGasto, HostingFxOperation, HostingInvoiceTransferCommissionRow } from "./api";
 import { monthlyTripleIngresosArrays, type InvoiceMonthNetRow } from "./monitorTripleIngresoKpi";
-import { isHostingMarginSupplierGasto, monthlyHostingCost12 } from "./hostingMargenCost";
+import { isHostingMarginSupplierGasto } from "./hostingMargenCost";
 
 const EPS = 0.0005;
 
@@ -71,7 +71,7 @@ function prevCalendarMonthYm(ym: string): string | null {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-/** Gastos por mes de presupuesto, excluyendo proveedores de hosting (esos ya van en el margen de hosting). */
+/** Gastos por mes de presupuesto, sin Digital Assets ni Blunode (ese costo ya sale de las facturas de hosting). */
 export function monthlyGastosPresupuesto12(
   items: ContabilidadGasto[] | null | undefined,
   year: number,
@@ -112,20 +112,18 @@ export function buildMonitorResultadoYearSeries(
   transferCommissionInvoices?: HostingInvoiceTransferCommissionRow[] | null
 ): MonitorResultadoMonth[] {
   const keys = chartMonthKeys(year);
-  const costSrc =
-    Array.isArray(hostingCostItems) && hostingCostItems.length > 0 ? hostingCostItems : gastosItems;
-  const { hosting, asic, cambio, asicCost } = monthlyTripleIngresosArrays(
+  const { hosting, asic, cambio, asicCost, hostingCost } = monthlyTripleIngresosArrays(
     operations,
     hostingInvoices,
     asicInvoices,
     year,
     gastosItems,
     hostingSupplierNumbers,
-    costSrc,
+    hostingCostItems,
     transferCommissionInvoices
   );
   const gastos = monthlyGastosPresupuesto12(gastosItems, year, hostingSupplierNumbers);
-  const costosHosting = monthlyHostingCost12(costSrc, year, hostingSupplierNumbers);
+  const costosHosting = hostingCost;
   return keys.map((ym, i) => {
     const ing = (hosting[i] ?? 0) + (asic[i] ?? 0);
     const costAsic = asicCost[i] ?? 0;

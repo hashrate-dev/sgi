@@ -247,7 +247,10 @@ export function CambioGananciasMensualAreaCard({
     if (!ctx) return;
 
     const ingresos = chartYearSeries.ingresos;
-    const cap = ingresos.length ? Math.max(...ingresos, ...chartYearSeries.margen, 0) : 0;
+    const cap = ingresos.length ? Math.max(...ingresos, 0) : 0;
+    const marginVals = chartYearSeries.margen;
+    const marginMax = marginVals.length ? Math.max(...marginVals, 0) : 0;
+    const marginMin = marginVals.length ? Math.min(...marginVals, 0) : 0;
     const hi = highlightMonthIndex;
     const radiusTop = { topLeft: 10, topRight: 10, bottomLeft: 4, bottomRight: 4 };
 
@@ -290,8 +293,7 @@ export function CambioGananciasMensualAreaCard({
             type: "line",
             label: "Margen (cambio + ASIC + hosting)",
             data: chartYearSeries.margen,
-            stack: "margen-line",
-            yAxisID: "y",
+            yAxisID: "y1",
             borderColor: ACCENT_MARGEN,
             borderWidth: 2.5,
             tension: 0.35,
@@ -394,6 +396,24 @@ export function CambioGananciasMensualAreaCard({
               },
             },
             grid: { color: "rgba(148, 163, 184, 0.22)" },
+            border: { display: false },
+          },
+          y1: {
+            position: "right",
+            beginAtZero: marginMin >= 0,
+            min: marginMin < 0 ? marginMin * 1.15 : 0,
+            suggestedMax: marginMax > 0 ? marginMax * 1.2 : 1,
+            ticks: {
+              font: { size: 11 },
+              color: ACCENT_MARGEN,
+              callback(value) {
+                const n = Number(value);
+                if (!Number.isFinite(n)) return String(value);
+                if (Math.abs(n) >= 1000) return `${formatCurrencyNumber(n / 1000)}k`;
+                return formatCurrencyNumber(n);
+              },
+            },
+            grid: { drawOnChartArea: false },
             border: { display: false },
           },
         },
@@ -540,7 +560,7 @@ export function CambioGananciasMensualAreaCard({
           <i
             className="bi bi-calendar3 reportes-dash__kpi-foot-calendar"
             aria-hidden
-            title="Ingresos = cobros hosting + ASIC. Margen hosting = ganancia cargada en cada factura de hosting, por mes de la factura (igual que el historial). Margen = ganancia de cambio + margen ASIC + margen hosting."
+            title="Cobros hosting = lo cobrado de las facturas de ese mes (el cliente paga al mes siguiente). Cobros ASIC = caja del mes. Margen hosting = ganancia cargada en cada factura. Margen = ganancia de cambio + margen ASIC + margen hosting."
           />
         </div>
       </aside>

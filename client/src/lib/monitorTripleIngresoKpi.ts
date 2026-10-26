@@ -1,6 +1,5 @@
 import type { ContabilidadGasto, HostingFxOperation, HostingInvoiceTransferCommissionRow } from "./api";
 import { hostingFxOperationProfitUsd } from "./hostingFxOperationProfit";
-import { monthlyHostingCost12 } from "./hostingMargenCost";
 import { monthlyHostingTransferCommission12 } from "./hostingHistorialFilters";
 
 /** Fila de comprobante para el monitor de ingresos. */
@@ -206,22 +205,24 @@ function roundMoney(n: number): number {
 }
 
 /**
- * Margen de hosting cargado en cada factura, por mes de la factura (índice 0 = enero).
- * Misma regla que el resumen del historial: solo facturas con margen, prorrateado por lo cobrado.
+ * Hosting por mes de la factura (índice 0 = enero), igual que el historial.
+ * Cobrado = recibos de esas facturas aunque se paguen al mes siguiente.
+ * Con margen cargado, el costo es cobrado − margen. Sin margen, el cobrado queda como costo
+ * (ganancia 0) hasta que se cargue.
  */
-export function monthlyHostingInvoiceMargin12(
+export function monthlyHostingInvoiceEconomics12(
   invoices: InvoiceMonthNetRow[] | null | undefined,
   year: number
-): number[] {
+): { collected: number[]; cost: number[]; margin: number[] } {
   const list = Array.isArray(invoices) ? invoices : [];
   const yStr = String(year);
   const keys = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
-  const totals = keys.map(() => 0);
+  const collected = keys.map(() => 0);
+  const cost = keys.map(() => 0);
+  const margin = keys.map(() => 0);
 
   for (const fac of list) {
     if (String(fac.type ?? "").trim() !== "Factura") continue;
-    const marginRaw = Number(fac.marginUsd);
-    if (!Number.isFinite(marginRaw)) continue;
     const mk = normalizeInvoiceMonthKey(fac.month);
     if (!/^\d{4}-\d{2}$/.test(mk) || mk.slice(0, 4) !== yStr) continue;
     const mi = keys.indexOf(mk);
@@ -240,12 +241,30 @@ export function monthlyHostingInvoiceMargin12(
     const original = Math.abs(Number(fac.total) || 0);
     const collectible = roundMoney(Math.max(0, original - roundMoney(credit)));
     const cobrado = roundMoney(paid);
+    if (cobrado <= 0.0001) continue;
+
+    const marginRaw = Number(fac.marginUsd);
+    const hasMargin = Number.isFinite(marginRaw);
     const share = collectible > 0.0001 ? Math.min(1, cobrado / collectible) : 0;
-    const margenParte =
-      share >= 1 - 1e-9 ? roundMoney(Math.abs(marginRaw)) : roundMoney(Math.abs(marginRaw) * share);
-    totals[mi] = roundMoney((totals[mi] ?? 0) + margenParte);
+    const margenParte = hasMargin
+      ? share >= 1 - 1e-9
+        ? roundMoney(Math.abs(marginRaw))
+        : roundMoney(Math.abs(marginRaw) * share)
+      : 0;
+    const costoParte = hasMargin ? roundMoney(Math.max(0, cobrado - margenParte)) : cobrado;
+    collected[mi] = roundMoney((collected[mi] ?? 0) + cobrado);
+    cost[mi] = roundMoney((cost[mi] ?? 0) + costoParte);
+    margin[mi] = roundMoney((margin[mi] ?? 0) + margenParte);
   }
-  return totals;
+  return { collected, cost, margin };
+}
+
+/** Margen de hosting cargado en cada factura, por mes de la factura (índice 0 = enero). */
+export function monthlyHostingInvoiceMargin12(
+  invoices: InvoiceMonthNetRow[] | null | undefined,
+  year: number
+): number[] {
+  return monthlyHostingInvoiceEconomics12(invoices, year).margin;
 }
 
 /** @deprecated Solo devengado (Factura − NC por MES). El monitor usa `monthlyInvoiceCashCollected12`. */
@@ -296,18 +315,17 @@ export function monthlyCambioProfitWithHostingCommission12(
 
 /**
  * Series mensuales alineadas al año (índice 0 = enero).
- * Ingresos = cobros hosting + cobros ASIC (caja).
- * Margen hosting = ganancia cargada en cada factura, por mes de la factura.
+ * Hosting: cobrado y margen por mes de la factura. ASIC: caja. Cambio: fecha de la operación.
  */
 export function monthlyTripleIngresosArrays(
   operations: HostingFxOperation[] | null | undefined,
   hostingInvoices: InvoiceMonthNetRow[] | null | undefined,
   asicInvoices: InvoiceMonthNetRow[] | null | undefined,
   year: number,
-  gastosItems?: ContabilidadGasto[] | null,
-  hostingSupplierNumbers?: string[] | null,
-  /** Preferir gastos de margin-settings (misma tabla que /hosting/margen). */
-  hostingCostItems?: ContabilidadGasto[] | null,
+  _gastosItems?: ContabilidadGasto[] | null,
+  _hostingSupplierNumbers?: string[] | null,
+  /** El costo de hosting del monitor sale de las facturas, no de estos pagos contables. */
+  _hostingCostItems?: ContabilidadGasto[] | null,
   transferCommissionInvoices?: HostingInvoiceTransferCommissionRow[] | null
 ): {
   cambio: number[];
@@ -322,13 +340,12 @@ export function monthlyTripleIngresosArrays(
   combined: number[];
 } {
   const cambio = monthlyCambioProfitWithHostingCommission12(operations, transferCommissionInvoices, year);
-  const hosting = monthlyInvoiceCashCollected12(hostingInvoices, year);
+  const hostingEcon = monthlyHostingInvoiceEconomics12(hostingInvoices, year);
+  const hosting = hostingEcon.collected;
   const asic = monthlyInvoiceCashCollected12(asicInvoices, year);
   const { margin: asicMargin, cost: asicCost } = monthlyAsicMarginAndCost12(asicInvoices, year);
-  const costSrc =
-    Array.isArray(hostingCostItems) && hostingCostItems.length > 0 ? hostingCostItems : gastosItems;
-  const hostingCost = monthlyHostingCost12(costSrc, year, hostingSupplierNumbers);
-  const hostingMargin = monthlyHostingInvoiceMargin12(hostingInvoices, year);
+  const hostingCost = hostingEcon.cost;
+  const hostingMargin = hostingEcon.margin;
   const ingresos = hosting.map((h, i) => h + asic[i]!);
   const margen = cambio.map((c, i) => c + asicMargin[i]! + hostingMargin[i]!);
   const combined = ingresos;
