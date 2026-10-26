@@ -363,7 +363,7 @@ function ResumenCuentasGlobo({
 
 export function HistorialMineriaPage() {
   const { user } = useAuth();
-  const [all, setAll] = useState<Invoice[]>(() => loadInvoicesAsic());
+  const [all, setAll] = useState<Invoice[]>([]);
   const [qClient, setQClient] = useState("");
   const [qType, setQType] = useState<"" | ComprobanteType>("");
   const [qMonth, setQMonth] = useState("");

@@ -88,6 +88,7 @@ export type Invoice = {
   documentContext?: import("./invoiceDocumentContext").InvoiceDocumentContext;
   /** Margen USD de la operación, cargado a mano. En ASIC vive en Factura / Comp. pago; en hosting, en cada factura. */
   marginUsd?: number;
+  source?: "hosting" | "asic";
 };
 
 export type EquipoASIC = {

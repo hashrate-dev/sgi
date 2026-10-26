@@ -1,5 +1,4 @@
 import { getInvoices, wakeUpBackend } from "./api";
-import { loadInvoicesAsic } from "./storage";
 import type { ComprobanteType, Invoice } from "./types";
 
 type ApiInvoiceRow = NonNullable<Awaited<ReturnType<typeof getInvoices>>["invoices"]>[number];
@@ -26,6 +25,7 @@ export function mapApiInvoiceToInvoice(inv: ApiInvoiceRow): Invoice {
     dueDate: inv.dueDate,
     documentContext: inv.documentContext,
     marginUsd: typeof inv.marginUsd === "number" && Number.isFinite(inv.marginUsd) ? inv.marginUsd : undefined,
+    source: inv.source === "asic" || inv.source === "hosting" ? inv.source : undefined,
     items: [],
   };
 }
@@ -61,7 +61,8 @@ function collectReferencedFacturaKeys(asicDocs: Invoice[]): { numbers: Set<strin
 }
 
 /**
- * Ledger ASIC para pendientes/historial: API (source=asic + facturas referenciadas) + localStorage.
+ * Ledger ASIC para pendientes e historial: solo la base.
+ * No se mezcla localStorage, para que un documento borrado no vuelva a figurar como pendiente.
  */
 export async function fetchAsicInvoiceLedger(): Promise<Invoice[]> {
   await wakeUpBackend();
@@ -94,5 +95,5 @@ export async function fetchAsicInvoiceLedger(): Promise<Invoice[]> {
     }
   }
 
-  return mergeInvoiceLists(loadInvoicesAsic(), asicFromApi, supplemental);
+  return mergeInvoiceLists(asicFromApi, supplemental);
 }

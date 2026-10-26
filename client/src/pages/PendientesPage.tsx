@@ -5,6 +5,7 @@ import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
 import { getClients, getInvoices, wakeUpBackend } from "../lib/api";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { prepareLineItemsForPdf } from "../lib/prepareLineItemsForPdf";
+import { invoiceCollectionState } from "../lib/invoiceCollection";
 import type { Invoice } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
 import { showToast } from "../components/ToastNotification";
@@ -129,13 +130,16 @@ export function PendientesPage() {
     const facturas = all.filter((inv) => inv.type === "Factura");
     return facturas
       .map((factura) => {
-        const creditNotes = all.filter((nc) => nc.type === "Nota de Crédito" && isLinkedToInvoice(nc, factura));
-        const receipts = all.filter((r) => r.type === "Recibo" && isLinkedToInvoice(r, factura));
-        const originalTotal = Math.abs(Number(factura.total) || 0);
-        const creditApplied = creditNotes.reduce((s, nc) => s + Math.abs(Number(nc.total) || 0), 0);
-        const paidApplied = receipts.reduce((s, r) => s + Math.abs(Number(r.total) || 0), 0);
-        const pendingAmount = Math.max(0, originalTotal - creditApplied - paidApplied);
-        return { invoice: factura, originalTotal, creditApplied, paidApplied, pendingAmount, creditNotes, receipts };
+        const st = invoiceCollectionState(factura, all);
+        return {
+          invoice: factura,
+          originalTotal: st.originalTotal,
+          creditApplied: st.creditApplied,
+          paidApplied: st.paidApplied,
+          pendingAmount: st.pendingAmount,
+          creditNotes: st.creditNotes,
+          receipts: st.receipts,
+        };
       })
       .filter((row) => row.pendingAmount > EPSILON);
   }, [all]);
@@ -144,7 +148,7 @@ export function PendientesPage() {
     const client = qClient.trim().toLowerCase();
     return pendingInvoices.filter((inv) => {
       const okClient = !client || inv.invoice.clientName.toLowerCase().includes(client);
-      const okMonth = !qMonth || inv.invoice.month.startsWith(qMonth);
+      const okMonth = !qMonth || String(inv.invoice.month ?? "").slice(0, 7) === qMonth;
       return okClient && okMonth;
     });
   }, [pendingInvoices, qClient, qMonth]);
@@ -161,10 +165,10 @@ export function PendientesPage() {
   }, [filtered.length]);
 
   const stats = useMemo(() => {
-    const totalPendientes = pendingInvoices.length;
-    const totalMontoPendiente = pendingInvoices.reduce((s, i) => s + i.pendingAmount, 0);
+    const totalPendientes = filtered.length;
+    const totalMontoPendiente = filtered.reduce((s, i) => s + i.pendingAmount, 0);
     return { totalPendientes, totalMontoPendiente };
-  }, [pendingInvoices]);
+  }, [filtered]);
 
   function exportExcel() {
     if (filtered.length === 0) {

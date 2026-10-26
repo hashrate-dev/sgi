@@ -67,9 +67,17 @@ function parseInvoiceDate(dateStr: string): Date {
   return Number.isNaN(d.getTime()) ? new Date() : d;
 }
 
+function invoiceMonthKey(raw: string | undefined): string {
+  const t = String(raw ?? "").trim();
+  const iso = t.match(/^(\d{4})-(\d{1,2})/);
+  if (iso) return `${iso[1]}-${String(iso[2]).padStart(2, "0")}`;
+  return t.slice(0, 7);
+}
+
 function pendingsFromLedger(all: Invoice[], origen: CobroOrigen): UnifiedPending[] {
   const facturas = all.filter((inv) => {
     if (inv.type !== "Factura") return false;
+    if (inv.source && inv.source !== origen) return false;
     if (origen === "asic" && isAsicEquipmentSaleInvoice(inv)) return false;
     return true;
   });
@@ -174,7 +182,7 @@ export function CobrosPendientesUnificadosPage() {
     return pendingAll.filter((row) => {
       const okOrigen = qOrigen === "todos" || row.origen === qOrigen;
       const okClient = !client || row.invoice.clientName.toLowerCase().includes(client);
-      const okMonth = !qMonth || row.invoice.month.startsWith(qMonth);
+      const okMonth = !qMonth || invoiceMonthKey(row.invoice.month) === qMonth;
       return okOrigen && okClient && okMonth;
     });
   }, [pendingAll, qClient, qMonth, qOrigen]);
@@ -189,17 +197,17 @@ export function CobrosPendientesUnificadosPage() {
   }, [filtered.length, qOrigen]);
 
   const stats = useMemo(() => {
-    const hosting = pendingAll.filter((r) => r.origen === "hosting");
-    const asic = pendingAll.filter((r) => r.origen === "asic");
+    const hosting = filtered.filter((r) => r.origen === "hosting");
+    const asic = filtered.filter((r) => r.origen === "asic");
     return {
-      total: pendingAll.length,
-      monto: pendingAll.reduce((s, r) => s + r.pendingAmount, 0),
+      total: filtered.length,
+      monto: filtered.reduce((s, r) => s + r.pendingAmount, 0),
       hostingN: hosting.length,
       hostingMonto: hosting.reduce((s, r) => s + r.pendingAmount, 0),
       asicN: asic.length,
       asicMonto: asic.reduce((s, r) => s + r.pendingAmount, 0),
     };
-  }, [pendingAll]);
+  }, [filtered]);
 
   if (!user || !canSeePage) {
     return <Navigate to={sgiHome()} replace />;
@@ -442,6 +450,7 @@ export function CobrosPendientesUnificadosPage() {
                     <th className="text-start">Origen</th>
                     <th className="text-start">N°</th>
                     <th className="text-start">Cliente</th>
+                    <th className="text-start">Mes</th>
                     <th className="text-start">F. emisión</th>
                     <th className="text-start">Hora</th>
                     <th className="text-start">F. venc.</th>
@@ -456,13 +465,13 @@ export function CobrosPendientesUnificadosPage() {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={12} className="text-center py-5">
+                      <td colSpan={13} className="text-center py-5">
                         <div className="spinner-border text-secondary" role="status" aria-label="Espere un momento" />
                       </td>
                     </tr>
                   ) : filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={12} className="text-center text-muted py-4">
+                      <td colSpan={13} className="text-center text-muted py-4">
                         <small>
                           {pendingAll.length === 0
                             ? "No hay cobros pendientes de Hosting ni ASIC."
@@ -484,6 +493,7 @@ export function CobrosPendientesUnificadosPage() {
                           <td className="text-start" title={row.invoice.clientName}>
                             {row.invoice.clientName}
                           </td>
+                          <td className="text-start">{invoiceMonthKey(row.invoice.month) || "—"}</td>
                           <td className="text-start">{row.invoice.date}</td>
                           <td className="text-start">{row.invoice.emissionTime || "—"}</td>
                           <td className="text-start">{dueDate}</td>

@@ -8,7 +8,7 @@ import { addEmittedDocument, deleteAllInvoices, deleteEmittedDocumentOne, delete
 import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
 import { dispatchEmittedChanged } from "../lib/emittedEvents";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
-import { loadInvoices, loadInvoicesAsic, saveInvoices, saveInvoicesAsic } from "../lib/storage";
+import { loadInvoices, saveInvoices, saveInvoicesAsic } from "../lib/storage";
 import type { ComprobanteType, Invoice } from "../lib/types";
 import { buildReciboConceptLine, getReciboConceptParts } from "../lib/reciboConceptText";
 import { reciboHasSettlementRows, reciboIsPaymentLineSettledTable } from "../lib/receiptSettlementLine";
@@ -333,8 +333,8 @@ function getCreditNoteMode(creditNote: Invoice | null | undefined, factura: Invo
 /** Convierte factura de la API al formato Invoice con _source */
 export function HistorialPage({ sourceFilter }: HistorialPageProps) {
   const { user } = useAuth();
-  const [allHosting, setAllHosting] = useState<Invoice[]>(() => (sourceFilter === "hosting" ? [] : loadInvoices()));
-  const [allAsic, setAllAsic] = useState<Invoice[]>(() => loadInvoicesAsic());
+  const [allHosting, setAllHosting] = useState<Invoice[]>([]);
+  const [allAsic, setAllAsic] = useState<Invoice[]>([]);
 
   /** Cargar desde API cuando el backend está disponible (para Lector y todos: ver datos agregados por otros usuarios) */
   useEffect(() => {
