@@ -49,6 +49,7 @@ import {
 } from "../lib/reciboConceptText";
 import { reciboHasSettlementRows, reciboIsPaymentLineSettledTable } from "../lib/receiptSettlementLine";
 import { invoiceTipoLabel } from "../lib/invoiceDocumentContext";
+import { asicOperationCostUsd, parseAsicMarginUsd } from "../lib/asicDocumentKind";
 import { emittedDocumentTipoMark } from "../lib/invoiceCollection";
 import { EmittedDocumentTipoIcon } from "../components/EmittedDocumentTipoIcon";
 import "../styles/facturacion.css";
@@ -312,6 +313,7 @@ export function FacturacionPage() {
   const [partialReceiptAmount, setPartialReceiptAmount] = useState("");
   /** Días para fecha de vencimiento (5, 6 o 7). Por defecto 6. */
   const [dueDateDays, setDueDateDays] = useState<5 | 6 | 7>(6);
+  const [marginUsdInput, setMarginUsdInput] = useState("");
 
   const [invoices, setInvoices] = useState<Invoice[]>(() => loadInvoices());
   /** Facturas / recibos / NC leídos desde la base de datos (source=hosting) para habilitar recibos/NC sobre facturas de la base */
@@ -562,6 +564,12 @@ export function FacturacionPage() {
       paidApplied: 0,
     };
   }, [reciboLinkedEmit, totals, activeItems]);
+
+  const parsedMarginUsd = useMemo(() => parseAsicMarginUsd(marginUsdInput), [marginUsdInput]);
+  const operationCostUsd = useMemo(
+    () => (type === "Factura" ? asicOperationCostUsd(displaySummary.total, parsedMarginUsd) : undefined),
+    [type, displaySummary.total, parsedMarginUsd]
+  );
 
   /** Texto de concepto del recibo (PDF / vista previa) y aviso si hay NC sobre la factura. */
   const reciboConceptForForm = useMemo(() => {
@@ -993,6 +1001,20 @@ export function FacturacionPage() {
       showToast("Por favor, indique el mes para todos los ítems.", "warning");
       return;
     }
+    if (type === "Factura" && marginUsdInput.trim()) {
+      if (parsedMarginUsd == null) {
+        showToast("El margen tiene que ser un número en USD.", "error");
+        return;
+      }
+      if (parsedMarginUsd < 0) {
+        showToast("El margen no puede ser negativo.", "error");
+        return;
+      }
+      if (parsedMarginUsd > Math.abs(displaySummary.total) + 0.009) {
+        showToast("El margen no puede ser mayor que el total del documento.", "error");
+        return;
+      }
+    }
     setShowEmitPdfConfirm(true);
   }
 
@@ -1068,6 +1090,7 @@ export function FacturacionPage() {
       emissionTime,
       dueDate: dueDateStr,
       documentContext: emitDocumentContext,
+      ...(type === "Factura" && parsedMarginUsd != null ? { marginUsd: parsedMarginUsd } : {}),
     };
 
     let createdInvoice: { number: string };
@@ -1167,6 +1190,7 @@ export function FacturacionPage() {
       relatedInvoiceId: relatedInvoice?.id,
       relatedInvoiceNumber: relatedInvoice?.number,
       documentContext: emitDocumentContext,
+      marginUsd: type === "Factura" ? parsedMarginUsd : undefined,
     };
     if (!isHostingPath) {
       const hist = loadInvoices();
@@ -1187,6 +1211,7 @@ export function FacturacionPage() {
     ]);
     addEmittedDocument("hosting", inv as Record<string, unknown>, emittedAt).catch(() => {});
     setItems([]);
+    setMarginUsdInput("");
     setPartialCreditItems([]);
     setRelatedInvoiceId("");
     setPaymentDate("");
@@ -2132,6 +2157,34 @@ export function FacturacionPage() {
                               <span className="fact-summary-card-value">{formatCurrencyNumber(displaySummary.total)}</span>
                               <span className="fact-summary-card-currency">USD</span>
                             </div>
+                            {type === "Factura" ? (
+                              <div className="fact-op-margin-stack">
+                                <label className="fact-op-margin-row">
+                                  <span className="fact-op-margin-label">Margen</span>
+                                  <span className="fact-op-margin-value">
+                                    <input
+                                      type="text"
+                                      inputMode="decimal"
+                                      className="fact-op-margin-input"
+                                      value={marginUsdInput}
+                                      onChange={(e) => setMarginUsdInput(e.target.value)}
+                                      placeholder="0,00"
+                                      aria-label="Margen de la factura en USD"
+                                    />
+                                    <span className="fact-op-margin-currency">USD</span>
+                                  </span>
+                                </label>
+                                <div className="fact-op-margin-row">
+                                  <span className="fact-op-margin-label">Costos</span>
+                                  <span className="fact-op-margin-value">
+                                    <span className="fact-op-margin-amount">
+                                      {operationCostUsd != null ? formatCurrencyNumber(operationCostUsd) : "—"}
+                                    </span>
+                                    <span className="fact-op-margin-currency">USD</span>
+                                  </span>
+                                </div>
+                              </div>
+                            ) : null}
                           </div>
                           {displaySummary.showPendingNote || reciboLinkedEmit?.isPartial ? (
                             <div

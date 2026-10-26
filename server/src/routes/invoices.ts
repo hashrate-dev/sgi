@@ -337,17 +337,21 @@ invoicesRouter.post(
         : "comprobante-pago"
       : inv.documentContext || null;
   let marginUsdVal: number | null = null;
-  if (sourceVal === "asic" && inv.type === "Factura") {
-    if (inv.marginUsd == null || !Number.isFinite(inv.marginUsd)) {
+  if (inv.type === "Factura" && (sourceVal === "asic" || sourceVal === "hosting")) {
+    const raw = inv.marginUsd;
+    const hasMargin = raw != null && Number.isFinite(raw);
+    if (sourceVal === "asic" && !hasMargin) {
       return res.status(400).json({ error: { message: "El margen en USD es obligatorio al emitir Factura o Comprobante de pago ASIC." } });
     }
-    if (inv.marginUsd < 0) {
-      return res.status(400).json({ error: { message: "El margen no puede ser negativo." } });
+    if (hasMargin && raw != null) {
+      if (raw < 0) {
+        return res.status(400).json({ error: { message: "El margen no puede ser negativo." } });
+      }
+      if (raw > Math.abs(inv.total) + 0.009) {
+        return res.status(400).json({ error: { message: "El margen no puede ser mayor que el total del documento." } });
+      }
+      marginUsdVal = Math.round(raw * 100) / 100;
     }
-    if (inv.marginUsd > Math.abs(inv.total) + 0.009) {
-      return res.status(400).json({ error: { message: "El margen no puede ser mayor que el total del documento." } });
-    }
-    marginUsdVal = Math.round(inv.marginUsd * 100) / 100;
   }
   const subtotalDb = inv.type === "Recibo" || inv.type === "Nota de Crédito" ? -Math.abs(inv.subtotal) : inv.subtotal;
   const discountsDb = inv.type === "Recibo" || inv.type === "Nota de Crédito" ? -Math.abs(inv.discounts) : inv.discounts;
