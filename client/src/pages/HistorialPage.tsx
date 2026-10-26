@@ -4,7 +4,7 @@ import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { fetchAsicInvoiceLedger, isNumericInvoiceId, mergeInvoiceLists } from "../lib/asicInvoiceLedger";
 import { asicInvoiceCarriesOperationMargin, asicOperationCostUsd, parseAsicMarginUsd } from "../lib/asicDocumentKind";
-import { addEmittedDocument, deleteAllInvoices, deleteEmittedDocumentOne, deleteEmittedDocumentsAll, deleteInvoice, getClients, getHostingMarginSettings, getInvoiceById, getInvoices, updateInvoiceMargin, verifyPassword, wakeUpBackend, type ContabilidadGasto } from "../lib/api";
+import { addEmittedDocument, deleteAllInvoices, deleteEmittedDocumentOne, deleteEmittedDocumentsAll, deleteInvoice, getClients, getInvoiceById, getInvoices, updateInvoiceMargin, verifyPassword, wakeUpBackend } from "../lib/api";
 import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
 import { dispatchEmittedChanged } from "../lib/emittedEvents";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
@@ -23,9 +23,6 @@ import {
   isPartialReceiptDocument,
   relatedFacturaForDocument,
 } from "../lib/invoiceCollection";
-import { hostingGastoYm, hostingMarginSettingsToCostGastos, isHostingMarginSupplierGasto } from "../lib/hostingMargenCost";
-import { buildHostingMargenYearSeries } from "../lib/hostingMargenKpi";
-import { cashMonthKeyFromInvoice, type InvoiceMonthNetRow } from "../lib/monitorTripleIngresoKpi";
 import "../styles/facturacion.css";
 
 /** Normaliza mes a YYYY-MM (ej. "2026-1" -> "2026-01") para filtrar por columna MES */
@@ -422,26 +419,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
   const [detailCostDraft, setDetailCostDraft] = useState("");
   const [savingMarginId, setSavingMarginId] = useState<string | null>(null);
   const hostingMode = sourceFilter === "hosting";
-  const [hostingGastos, setHostingGastos] = useState<ContabilidadGasto[]>([]);
-  const [hostingSupplierNumbers, setHostingSupplierNumbers] = useState<string[]>(["P002", "P003"]);
   const [resumenTip, setResumenTip] = useState<{ id: string; anchor: HTMLElement } | null>(null);
-
-  useEffect(() => {
-    if (!hostingMode) return;
-    let cancelled = false;
-    getHostingMarginSettings()
-      .then((res) => {
-        if (cancelled) return;
-        setHostingSupplierNumbers(res.supplierNumbers?.length ? res.supplierNumbers : ["P002", "P003"]);
-        setHostingGastos(hostingMarginSettingsToCostGastos(res.gastos));
-      })
-      .catch(() => {
-        if (!cancelled) setHostingGastos([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [hostingMode]);
 
   /** Opciones de mes (MES) para el filtro: valores distintos de la columna month en los datos */
   const opcionesMes = useMemo(() => {
@@ -489,12 +467,13 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
   }
 
   /**
-   * Resumen: Facturas, NC y Recibos. Facturación total = facturas − NC.
-   * En hosting, pendientes y cobrados salen del saldo real de cada factura
-   * (un recibo de otro mes también la cancela). El margen es el de hosting:
-   * cobros del mes menos lo pagado a Digital Assets o Blunode en ese mes.
+   * Resumen. En hosting el mes es a mes vencido: la factura del mes se cobra
+   * el mes siguiente. Facturación total = lo recibido por esas facturas.
+   * Margen = ganancia cargada en cada factura. Gastos = facturación cobrada − margen,
+   * que es lo que corresponde pagar a Digital Assets o Blunode.
    */
   const stats = useMemo(() => {
+    const roundMoney = (n: number) => Math.round(n * 100) / 100;
     const src = filtered as InvoiceWithSource[];
     const facturasDocs = src.filter((i) => i.type === "Factura");
     const recibosDocs = src.filter((i) => i.type === "Recibo" || (hostingMode && i.type === "Recibo Devolución"));
@@ -505,91 +484,103 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
     const sumaFacturas = facturasDocs.reduce((s, i) => s + Math.abs(Number(i.total) || 0), 0);
     const sumaNotasCredito = notasDocs.reduce((s, i) => s + Math.abs(Number(i.total) || 0), 0);
     const sumaRecibos = recibosDocs.reduce((s, i) => s + Math.abs(Number(i.total) || 0), 0);
-    const facturacionTotal = sumaFacturas - sumaNotasCredito;
     const ledger = hostingMode ? allHosting : src;
+    const mesFiltro = normalizeMonth(qMonth);
+    const clientFiltro = qClient.trim().toLowerCase();
+    const emissionFacturas = hostingMode
+      ? allHosting.filter((inv) => {
+          if (inv.type !== "Factura") return false;
+          if (mesFiltro && normalizeMonth(inv.month) !== mesFiltro) return false;
+          if (clientFiltro && !inv.clientName.toLowerCase().includes(clientFiltro)) return false;
+          return true;
+        })
+      : facturasDocs;
+    let facturacionTotal = sumaFacturas - sumaNotasCredito;
     let cobrosRealizados = sumaRecibos;
     let cobrosPendientes = Math.max(0, facturacionTotal - cobrosRealizados);
     const pendientesLineas: HostingResumenLinea[] = [];
     const realizadosLineas: HostingResumenLinea[] = [];
+    const facturacionLineas: HostingResumenLinea[] = [];
     if (hostingMode) {
       cobrosPendientes = 0;
       cobrosRealizados = 0;
-      for (const fac of facturasDocs) {
+      for (const fac of emissionFacturas) {
         const st = invoiceCollectionState(fac, ledger);
         if (st.pendingAmount > 0.0001) {
-          cobrosPendientes += st.pendingAmount;
+          cobrosPendientes = roundMoney(cobrosPendientes + st.pendingAmount);
           pendientesLineas.push(hostingResumenLinea(fac, st.pendingAmount, `pen-${fac.id}`));
         }
         if (st.paidApplied > 0.0001) {
-          cobrosRealizados += st.paidApplied;
-          realizadosLineas.push(hostingResumenLinea(fac, st.paidApplied, `cob-${fac.id}`));
+          cobrosRealizados = roundMoney(cobrosRealizados + st.paidApplied);
+          facturacionLineas.push(hostingResumenLinea(fac, st.paidApplied, `ft-${fac.id}`));
+          for (const rec of st.receipts) {
+            const abs = Math.abs(Number(rec.total) || 0);
+            if (abs > 0.0001) realizadosLineas.push(hostingResumenLinea(rec, abs, `cobr-${rec.id}`));
+          }
         }
       }
+      facturacionTotal = cobrosRealizados;
     }
-    const facturasCobradas = facturasDocs.filter((i) => {
+    const cobradasDe = hostingMode ? emissionFacturas : facturasDocs;
+    const facturasCobradas = cobradasDe.filter((i) => {
       const st = invoiceCollectionState(i, ledger);
       return st.isFullySettled && st.receipts.length > 0;
     }).length;
-    const progressPct = facturacionTotal <= 0 ? 0 : Math.min(100, Math.round((cobrosRealizados / facturacionTotal) * 100));
+    const progressBase = hostingMode ? cobrosRealizados + cobrosPendientes : facturacionTotal;
+    const progressPct = progressBase <= 0 ? 0 : Math.min(100, Math.round((cobrosRealizados / progressBase) * 100));
 
-    const hostingRows: InvoiceMonthNetRow[] = allHosting.map((inv) => ({
-      id: inv.id,
-      type: inv.type,
-      month: inv.month,
-      total: inv.total,
-      number: inv.number,
-      paymentDate: inv.paymentDate,
-      date: inv.date,
-      relatedInvoiceId: inv.relatedInvoiceId,
-      relatedInvoiceNumber: inv.relatedInvoiceNumber,
-      source: "hosting",
-      documentContext: inv.documentContext,
-    }));
-    const selectedYm = normalizeMonth(qMonth);
-    const years = new Set<number>();
-    const takeYear = (ym: string | null | undefined) => {
-      if (!ym || !/^\d{4}-\d{2}$/.test(ym)) return;
-      years.add(Number(ym.slice(0, 4)));
-    };
-    takeYear(selectedYm);
-    for (const inv of hostingRows) {
-      takeYear(cashMonthKeyFromInvoice(inv));
-      takeYear(normalizeMonth(inv.month));
-    }
-    for (const g of hostingGastos) takeYear(hostingGastoYm(g));
-    const series = [...years].flatMap((y) =>
-      buildHostingMargenYearSeries(y, hostingRows, hostingGastos, hostingSupplierNumbers)
-    );
-    const activeMonths = selectedYm
-      ? series.filter((m) => m.ym === selectedYm)
-      : series.filter((m) => Math.abs(m.ingresos) > 0.0001 || Math.abs(m.gastos) > 0.0001);
-    const ymSet = new Set(activeMonths.map((m) => m.ym));
-    const ingresosCobrado = activeMonths.reduce((s, m) => s + m.ingresos, 0);
-    const gastosHosting = activeMonths.reduce((s, m) => s + m.gastos, 0);
-    const margenHosting = ingresosCobrado - gastosHosting;
-
+    let ingresosCobrado = 0;
+    let gastosHosting = 0;
+    let margenHosting = 0;
+    let facturasSinMargen = 0;
+    let cobradoSinMargen = 0;
     const ingresosLineas: HostingResumenLinea[] = [];
-    for (const inv of allHosting) {
-      const ym = cashMonthKeyFromInvoice(inv);
-      if (!ym || !ymSet.has(ym)) continue;
-      const abs = Math.abs(Number(inv.total) || 0);
-      if (abs < 0.0001) continue;
-      if (inv.type === "Recibo") {
-        ingresosLineas.push(hostingResumenLinea(inv, abs, `ing-${inv.id}`));
-      } else if (inv.type === "Nota de Crédito" || inv.type === "Recibo Devolución") {
-        ingresosLineas.push(hostingResumenLinea(inv, -abs, `ing-${inv.id}`));
+    const gastosLineas: HostingResumenLinea[] = [];
+    const margenLineas: HostingResumenLinea[] = [];
+    if (hostingMode) {
+      for (const fac of emissionFacturas) {
+        const st = invoiceCollectionState(fac, ledger);
+        const cobrado = st.paidApplied;
+        const marginRaw = fac.marginUsd;
+        if (typeof marginRaw !== "number" || !Number.isFinite(marginRaw)) {
+          if (cobrado > 0.0001 || st.pendingAmount > 0.0001) {
+            facturasSinMargen += 1;
+            cobradoSinMargen = roundMoney(cobradoSinMargen + cobrado);
+          }
+          continue;
+        }
+        const collectible = roundMoney(Math.max(0, st.originalTotal - st.creditApplied));
+        const share = collectible > 0.0001 ? Math.min(1, cobrado / collectible) : 0;
+        const margenParte =
+          share >= 1 - 1e-9 ? roundMoney(Math.abs(marginRaw)) : roundMoney(Math.abs(marginRaw) * share);
+        const costoParte = roundMoney(Math.max(0, cobrado - margenParte));
+        ingresosCobrado = roundMoney(ingresosCobrado + cobrado);
+        margenHosting = roundMoney(margenHosting + margenParte);
+        gastosHosting = roundMoney(gastosHosting + costoParte);
+        for (const rec of st.receipts) {
+          const abs = Math.abs(Number(rec.total) || 0);
+          if (abs > 0.0001) ingresosLineas.push(hostingResumenLinea(rec, abs, `ing-${rec.id}`));
+        }
+        if (margenParte > 0.0001) {
+          margenLineas.push({
+            key: `mar-${fac.id}`,
+            cliente: fac.clientName || "—",
+            tipo: "Margen hosting",
+            numero: fac.number || "—",
+            usd: margenParte,
+          });
+        }
+        if (costoParte > 0.0001) {
+          gastosLineas.push({
+            key: `gas-${fac.id}`,
+            cliente: fac.clientName || "—",
+            tipo: "Pago a Digital Assets / Blunode",
+            numero: fac.number || "—",
+            usd: costoParte,
+          });
+        }
       }
     }
-    const gastosLineas: HostingResumenLinea[] = hostingGastos
-      .filter((g) => isHostingMarginSupplierGasto(g, hostingSupplierNumbers) && ymSet.has(hostingGastoYm(g) ?? ""))
-      .map((g) => ({
-        key: `gas-${g.id}`,
-        cliente: g.supplierName || g.supplierNumber || "Proveedor",
-        tipo: g.descripcion?.trim() ? `Gasto hosting · ${g.descripcion.trim()}` : "Gasto hosting",
-        numero: hostingGastoYm(g) || "—",
-        usd: Number.isFinite(g.monto) ? g.monto : 0,
-      }));
-    const margenLineas: HostingResumenLinea[] = ingresosLineas.map((ln) => ({ ...ln, key: `m-${ln.key}` }));
 
     const usd = (n: number) => `${formatCurrencyNumber(n)} USD`;
     const cuentas: HostingResumenCuenta[] = [
@@ -615,14 +606,16 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
         id: "facturacion",
         titulo: "Facturación total",
         cifra: usd(facturacionTotal),
-        lineas: [
-          ...facturasDocs.map((inv) => hostingResumenLinea(inv, Math.abs(Number(inv.total) || 0), `ft-${inv.id}`)),
-          ...notasDocs.map((inv) => hostingResumenLinea(inv, -Math.abs(Number(inv.total) || 0), `fn-${inv.id}`)),
-        ],
+        lineas: hostingMode
+          ? facturacionLineas
+          : [
+              ...facturasDocs.map((inv) => hostingResumenLinea(inv, Math.abs(Number(inv.total) || 0), `ft-${inv.id}`)),
+              ...notasDocs.map((inv) => hostingResumenLinea(inv, -Math.abs(Number(inv.total) || 0), `fn-${inv.id}`)),
+            ],
       },
       { id: "pendientes", titulo: "Cobros pendientes", cifra: usd(cobrosPendientes), lineas: pendientesLineas },
       { id: "realizados", titulo: "Cobros realizados", cifra: usd(cobrosRealizados), lineas: realizadosLineas },
-      { id: "ingresos", titulo: "Ingresos cobrados", cifra: usd(ingresosCobrado), lineas: ingresosLineas },
+      { id: "ingresos", titulo: "Facturación cobrada", cifra: usd(ingresosCobrado), lineas: ingresosLineas },
       { id: "gastos", titulo: "Gastos hosting", cifra: usd(gastosHosting), lineas: gastosLineas },
       {
         id: "margen",
@@ -645,9 +638,11 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
       ingresosCobrado,
       gastosHosting,
       margenHosting,
+      facturasSinMargen,
+      cobradoSinMargen,
       cuentas,
     };
-  }, [filtered, hostingMode, allHosting, qMonth, hostingGastos, hostingSupplierNumbers]);
+  }, [filtered, hostingMode, allHosting, qMonth, qClient]);
 
   const resumenCuentaAbierta = resumenTip ? stats.cuentas.find((c) => c.id === resumenTip.id) ?? null : null;
 
@@ -1765,28 +1760,28 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
             <div className="asic-margen-banda-kicker">Margen de hosting</div>
             <div className="asic-margen-banda-row">
               <div className={resumenTipClass("asic-margen-celda is-cobrado", "ingresos")} {...resumenTipProps("ingresos")}>
-                <div className="stat-label">Ingresos cobrados</div>
+                <div className="stat-label">Facturación cobrada</div>
                 <div className="stat-value">{formatCurrencyNumber(stats.ingresosCobrado)} <span className="currency">USD</span></div>
-                <div className="asic-margen-hint">Recibos del mes, menos notas de crédito</div>
+                <div className="asic-margen-hint">Recibos de las facturas del mes, aunque se paguen el mes siguiente</div>
               </div>
               <div className="asic-margen-op" aria-hidden="true">−</div>
               <div className={resumenTipClass("asic-margen-celda is-pendiente", "gastos")} {...resumenTipProps("gastos")}>
                 <div className="stat-label">Gastos hosting</div>
                 <div className="stat-value">{formatCurrencyNumber(stats.gastosHosting)} <span className="currency">USD</span></div>
-                <div className="asic-margen-hint">Digital Assets y Blunode, por mes de servicio</div>
+                <div className="asic-margen-hint">Facturación cobrada menos el margen. Pago a Digital Assets y Blunode</div>
               </div>
               <div className="asic-margen-op" aria-hidden="true">=</div>
               <div className={resumenTipClass("asic-margen-celda is-total", "margen")} {...resumenTipProps("margen")}>
                 <div className="stat-label">Margen hosting</div>
                 <div className="stat-value">{formatCurrencyNumber(stats.margenHosting)} <span className="currency">USD</span></div>
-                <div className="asic-margen-hint">Recibos y notas del mes. Los pagos a proveedores están en Gastos hosting.</div>
+                <div className="asic-margen-hint">Ganancia de Hashrate cargada en cada factura</div>
               </div>
             </div>
           </div>
         ) : null}
-        {hostingMode && (qClient.trim() || qType) ? (
+        {hostingMode && stats.facturasSinMargen > 0 ? (
           <p className="small text-muted mb-0 mt-2">
-            El margen es el del mes de hosting. El filtro de cliente o de tipo no lo parte, porque el gasto de Digital Assets y Blunode corresponde al mes.
+            Hay {stats.facturasSinMargen} facturas del mes sin margen ({formatCurrencyNumber(stats.cobradoSinMargen)} USD cobrados). Esos cobros no se parten entre la ganancia y el pago al proveedor hasta cargar el margen de cada factura.
           </p>
         ) : null}
         <div className="row mt-3 g-3 historial-stats">
