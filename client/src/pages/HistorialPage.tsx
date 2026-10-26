@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useState, type KeyboardEvent, type
 import { createPortal } from "react-dom";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
-import { fetchAsicInvoiceLedger, isNumericInvoiceId, mergeInvoiceLists } from "../lib/asicInvoiceLedger";
+import { fetchAsicInvoiceLedger, isNumericInvoiceId } from "../lib/asicInvoiceLedger";
 import { asicInvoiceCarriesOperationMargin, asicOperationCostUsd, parseAsicMarginUsd } from "../lib/asicDocumentKind";
 import { addEmittedDocument, deleteAllInvoices, deleteEmittedDocumentOne, deleteEmittedDocumentsAll, deleteInvoice, getClients, getInvoiceById, getInvoices, updateInvoiceMargin, verifyPassword, wakeUpBackend } from "../lib/api";
 import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
@@ -333,7 +333,7 @@ function getCreditNoteMode(creditNote: Invoice | null | undefined, factura: Invo
 /** Convierte factura de la API al formato Invoice con _source */
 export function HistorialPage({ sourceFilter }: HistorialPageProps) {
   const { user } = useAuth();
-  const [allHosting, setAllHosting] = useState<Invoice[]>(() => loadInvoices());
+  const [allHosting, setAllHosting] = useState<Invoice[]>(() => (sourceFilter === "hosting" ? [] : loadInvoices()));
   const [allAsic, setAllAsic] = useState<Invoice[]>(() => loadInvoicesAsic());
 
   /** Cargar desde API cuando el backend está disponible (para Lector y todos: ver datos agregados por otros usuarios) */
@@ -371,7 +371,8 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
                 void _s;
                 return invoice;
               });
-              setAllHosting(mergeInvoiceLists(loadInvoices(), apiList));
+              setAllHosting(apiList);
+              saveInvoices(apiList);
             })
             .catch(() => {});
         const fetchAsic = () =>
