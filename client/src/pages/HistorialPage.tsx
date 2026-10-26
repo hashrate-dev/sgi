@@ -589,10 +589,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
         numero: hostingGastoYm(g) || "—",
         usd: Number.isFinite(g.monto) ? g.monto : 0,
       }));
-    const margenLineas: HostingResumenLinea[] = [
-      ...ingresosLineas,
-      ...gastosLineas.map((ln) => ({ ...ln, key: `m-${ln.key}`, usd: -ln.usd })),
-    ];
+    const margenLineas: HostingResumenLinea[] = ingresosLineas.map((ln) => ({ ...ln, key: `m-${ln.key}` }));
 
     const usd = (n: number) => `${formatCurrencyNumber(n)} USD`;
     const cuentas: HostingResumenCuenta[] = [
@@ -1782,7 +1779,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
               <div className={resumenTipClass("asic-margen-celda is-total", "margen")} {...resumenTipProps("margen")}>
                 <div className="stat-label">Margen hosting</div>
                 <div className="stat-value">{formatCurrencyNumber(stats.margenHosting)} <span className="currency">USD</span></div>
-                <div className="asic-margen-hint">Ingresos cobrados − gastos</div>
+                <div className="asic-margen-hint">Recibos y notas del mes. Los pagos a proveedores están en Gastos hosting.</div>
               </div>
             </div>
           </div>
