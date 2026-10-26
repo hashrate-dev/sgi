@@ -2,8 +2,9 @@ import { useEffect, useLayoutEffect, useMemo, useState, type KeyboardEvent, type
 import { createPortal } from "react-dom";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
-import { fetchAsicInvoiceLedger, mergeInvoiceLists } from "../lib/asicInvoiceLedger";
-import { addEmittedDocument, deleteAllInvoices, deleteEmittedDocumentOne, deleteEmittedDocumentsAll, deleteInvoice, getClients, getHostingMarginSettings, getInvoiceById, getInvoices, verifyPassword, wakeUpBackend, type ContabilidadGasto } from "../lib/api";
+import { fetchAsicInvoiceLedger, isNumericInvoiceId, mergeInvoiceLists } from "../lib/asicInvoiceLedger";
+import { asicInvoiceCarriesOperationMargin, asicOperationCostUsd, parseAsicMarginUsd } from "../lib/asicDocumentKind";
+import { addEmittedDocument, deleteAllInvoices, deleteEmittedDocumentOne, deleteEmittedDocumentsAll, deleteInvoice, getClients, getHostingMarginSettings, getInvoiceById, getInvoices, updateInvoiceMargin, verifyPassword, wakeUpBackend, type ContabilidadGasto } from "../lib/api";
 import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
 import { dispatchEmittedChanged } from "../lib/emittedEvents";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
@@ -15,7 +16,7 @@ import { prepareLineItemsForPdf } from "../lib/prepareLineItemsForPdf";
 import { PageHeader } from "../components/PageHeader";
 import { showToast } from "../components/ToastNotification";
 import { useAuth } from "../contexts/AuthContext";
-import { canDeleteHistorial, canExport } from "../lib/auth";
+import { canDeleteHistorial, canEditFacturacion, canExport } from "../lib/auth";
 import { formatCurrency, formatCurrencyNumber } from "../lib/formatCurrency";
 import {
   invoiceCollectionState,
@@ -238,6 +239,11 @@ function hostingDocTipo(inv: Invoice): string {
   return inv.type;
 }
 
+function formatMarginDraft(n: number | undefined): string {
+  if (n == null || !Number.isFinite(n)) return "";
+  return String(Math.abs(n)).replace(".", ",");
+}
+
 function hostingResumenLinea(inv: Invoice, usd: number, key: string): HostingResumenLinea {
   return { key, cliente: inv.clientName || "—", tipo: hostingDocTipo(inv), numero: inv.number || "—", usd };
 }
@@ -336,7 +342,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
   /** Cargar desde API cuando el backend está disponible (para Lector y todos: ver datos agregados por otros usuarios) */
   useEffect(() => {
     let cancelled = false;
-    const toInvoice = (inv: { id: number; number: string; type: string; clientName: string; date: string; month: string; subtotal: number; discounts: number; total: number; relatedInvoiceId?: number; relatedInvoiceNumber?: string; paymentDate?: string; emissionTime?: string; dueDate?: string; source?: string; documentContext?: Invoice["documentContext"] }, src: "hosting" | "asic"): Invoice & { _source: "hosting" | "asic" } => ({
+    const toInvoice = (inv: { id: number; number: string; type: string; clientName: string; date: string; month: string; subtotal: number; discounts: number; total: number; relatedInvoiceId?: number; relatedInvoiceNumber?: string; paymentDate?: string; emissionTime?: string; dueDate?: string; source?: string; documentContext?: Invoice["documentContext"]; marginUsd?: number }, src: "hosting" | "asic"): Invoice & { _source: "hosting" | "asic" } => ({
       id: String(inv.id),
       number: inv.number,
       type: inv.type as ComprobanteType,
@@ -352,6 +358,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
       emissionTime: inv.emissionTime,
       dueDate: inv.dueDate,
       documentContext: inv.documentContext,
+      marginUsd: typeof inv.marginUsd === "number" && Number.isFinite(inv.marginUsd) ? inv.marginUsd : undefined,
       items: [],
       _source: src
     });
@@ -410,6 +417,10 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
   const MAX_PASSWORD_ATTEMPTS = 3;
   const canDelete = user ? canDeleteHistorial(user) : false;
   const canExportData = user ? canExport(user) : false;
+  const canEditMargin = Boolean(user && canEditFacturacion(user));
+  const [detailMarginDraft, setDetailMarginDraft] = useState("");
+  const [detailCostDraft, setDetailCostDraft] = useState("");
+  const [savingMarginId, setSavingMarginId] = useState<string | null>(null);
   const hostingMode = sourceFilter === "hosting";
   const [hostingGastos, setHostingGastos] = useState<ContabilidadGasto[]>([]);
   const [hostingSupplierNumbers, setHostingSupplierNumbers] = useState<string[]>(["P002", "P003"]);
@@ -691,6 +702,77 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
     return `${base} asic-resumen-tip-target${resumenTip?.id === id ? " is-open" : ""}`;
   }
 
+  function openDetailInvoice(inv: Invoice) {
+    setDetailInvoice(inv);
+    setDetailMarginDraft(formatMarginDraft(inv.marginUsd));
+    setDetailCostDraft(formatMarginDraft(asicOperationCostUsd(inv.total, inv.marginUsd)));
+  }
+
+  async function saveMarginFromDetail(inv: Invoice, marginUsd: number) {
+    setSavingMarginId(inv.id);
+    try {
+      let saved = marginUsd;
+      if (!isNumericInvoiceId(inv.id)) {
+        showToast("Este documento no tiene ID de servidor; no se pudo guardar el margen en la base.", "error");
+        return;
+      }
+      const res = await updateInvoiceMargin(Number(inv.id), marginUsd);
+      saved = res.marginUsd;
+      setAllHosting((prev) => prev.map((i) => (i.id === inv.id ? { ...i, marginUsd: saved } : i)));
+      setDetailInvoice((d) => (d && d.id === inv.id ? { ...d, marginUsd: saved } : d));
+      setDetailMarginDraft(formatMarginDraft(saved));
+      setDetailCostDraft(formatMarginDraft(asicOperationCostUsd(inv.total, saved)));
+      const hist = loadInvoices().map((i) =>
+        i.id === inv.id || (i.number === inv.number && i.type === inv.type) ? { ...i, marginUsd: saved } : i
+      );
+      saveInvoices(hist);
+      showToast("Margen guardado.", "success");
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : "No se pudo guardar el margen.", "error");
+    } finally {
+      setSavingMarginId(null);
+    }
+  }
+
+  function onDetailMarginChange(raw: string) {
+    setDetailMarginDraft(raw);
+    const parsed = parseAsicMarginUsd(raw);
+    if (parsed == null || !detailInvoice) return;
+    const totalAbs = Math.abs(Number(detailInvoice.total) || 0);
+    setDetailCostDraft(formatMarginDraft(Math.max(0, Math.round((totalAbs - parsed) * 100) / 100)));
+  }
+
+  function onDetailCostChange(raw: string) {
+    setDetailCostDraft(raw);
+    const parsed = parseAsicMarginUsd(raw);
+    if (parsed == null || !detailInvoice) return;
+    const totalAbs = Math.abs(Number(detailInvoice.total) || 0);
+    setDetailMarginDraft(formatMarginDraft(Math.max(0, Math.round((totalAbs - parsed) * 100) / 100)));
+  }
+
+  async function saveDetailOperationMargin() {
+    if (!detailInvoice || !asicInvoiceCarriesOperationMargin(detailInvoice)) return;
+    let margin = parseAsicMarginUsd(detailMarginDraft);
+    const cost = parseAsicMarginUsd(detailCostDraft);
+    const totalAbs = Math.abs(Number(detailInvoice.total) || 0);
+    if (margin == null && cost != null) {
+      margin = Math.max(0, Math.round((totalAbs - cost) * 100) / 100);
+    }
+    if (margin == null) {
+      showToast("Ingresá el margen o el costo de la operación en USD.", "error");
+      return;
+    }
+    if (margin < 0) {
+      showToast("El margen no puede ser negativo.", "error");
+      return;
+    }
+    if (margin > totalAbs + 0.009) {
+      showToast("El margen no puede ser mayor que el total del documento.", "error");
+      return;
+    }
+    await saveMarginFromDetail(detailInvoice, margin);
+  }
+
   function exportExcel() {
     if (all.length === 0) return;
     const wb = new ExcelJS.Workbook();
@@ -710,6 +792,12 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
       { header: "Total", key: "total", width: 12 },
       { header: "Total (S/TC)", key: "totalSinCambio", width: 18 },
       { header: "TC", key: "cambio", width: 12 },
+      ...(hostingMode
+        ? [
+            { header: "Margen", key: "marginUsd", width: 12 },
+            { header: "Costos", key: "costos", width: 12 },
+          ]
+        : []),
       { header: "Saldo Pendiente", key: "saldoPendiente", width: 16 },
       { header: "Pagos Parciales", key: "pagosParciales", width: 16 },
       { header: "Estado", key: "status", width: 14 }
@@ -797,7 +885,15 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
         cambio: cambioVal != null ? formatCurrency(cambioVal) : "-",
         saldoPendiente: saldoPendienteExport,
         pagosParciales: pagosParcialesExport,
-        status: status
+        status: status,
+        marginUsd:
+          hostingMode && asicInvoiceCarriesOperationMargin(inv) && inv.marginUsd != null
+            ? Math.abs(Number(inv.marginUsd) || 0)
+            : "",
+        costos:
+          hostingMode && asicInvoiceCarriesOperationMargin(inv)
+            ? asicOperationCostUsd(inv.total, inv.marginUsd) ?? ""
+            : "",
       });
     });
     ws.getRow(1).font = { bold: true };
@@ -1320,6 +1416,8 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
                 <col className="historial-col-total-sdesc" />
                 <col className="historial-col-cambio-header" />
                 <col className="historial-col-total" />
+                {hostingMode ? <col className="historial-col-margen" /> : null}
+                {hostingMode ? <col className="historial-col-costos" /> : null}
                 <col className="historial-col-saldo-pendiente" />
                 <col className="historial-col-pagos-parciales" />
                 <col className="historial-col-estado" />
@@ -1338,6 +1436,8 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
                   <th className="text-end historial-col-total-sdesc" title="Total sin descuento">Total s/d</th>
                   <th className="text-end historial-col-cambio-header" title="4% Gastos Operativos Transferencia (si aplica)">TC</th>
                   <th className="text-end historial-col-total" title="Total">Total</th>
+                  {hostingMode ? <th className="text-end historial-col-margen" title="Margen cargado a mano en la factura">Margen</th> : null}
+                  {hostingMode ? <th className="text-end historial-col-costos" title="Costos = total − margen">Costos</th> : null}
                   <th className="text-end historial-col-saldo-pendiente" title="Saldo que aún debe el cliente sobre la factura">Saldo Pendiente</th>
                   <th className="text-end historial-col-pagos-parciales" title="Pagos parciales aplicados a la factura">Pagos Parciales</th>
                   <th className="text-center historial-col-estado" title="Estado">Est.</th>
@@ -1347,7 +1447,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={15} className="text-center text-muted py-4">
+                    <td colSpan={hostingMode ? 17 : 15} className="text-center text-muted py-4">
                       <small>No hay facturas registradas</small>
                     </td>
                   </tr>
@@ -1432,6 +1532,41 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
                           {getCambio4Pct(inv) != null ? formatCurrencyNumber(getCambio4Pct(inv)!) : "-"}
                         </td>
                         <td className="text-end fw-bold historial-col-total historial-monto-cell">{formatCurrencyNumber(total)}</td>
+                        {hostingMode ? (
+                          <td
+                            className="text-end historial-col-margen historial-monto-cell"
+                            style={
+                              asicInvoiceCarriesOperationMargin(inv) &&
+                              inv.marginUsd != null &&
+                              Number.isFinite(inv.marginUsd) &&
+                              !(collection?.isFullySettled && collection.receipts.length > 0)
+                                ? { color: "#94a3b8" }
+                                : undefined
+                            }
+                            title={
+                              asicInvoiceCarriesOperationMargin(inv) &&
+                              inv.marginUsd != null &&
+                              Number.isFinite(inv.marginUsd) &&
+                              !(collection?.isFullySettled && collection.receipts.length > 0)
+                                ? "Este margen entra cuando el recibo deje la factura cobrada."
+                                : undefined
+                            }
+                          >
+                            {asicInvoiceCarriesOperationMargin(inv) && inv.marginUsd != null && Number.isFinite(inv.marginUsd)
+                              ? formatCurrencyNumber(Math.abs(inv.marginUsd))
+                              : "—"}
+                          </td>
+                        ) : null}
+                        {hostingMode ? (
+                          <td className="text-end historial-col-costos historial-monto-cell" title="Costos = total − margen">
+                            {(() => {
+                              const cost = asicInvoiceCarriesOperationMargin(inv)
+                                ? asicOperationCostUsd(inv.total, inv.marginUsd)
+                                : undefined;
+                              return cost != null ? formatCurrencyNumber(cost) : "—";
+                            })()}
+                          </td>
+                        ) : null}
                         <td
                           className="text-end historial-col-saldo-pendiente historial-monto-cell"
                           title="Saldo pendiente de la factura"
@@ -1489,7 +1624,7 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
                           <button
                             type="button"
                             className="btn btn-sm border historial-accion-btn"
-                            onClick={() => setDetailInvoice(inv)}
+                            onClick={() => openDetailInvoice(inv)}
                             title="Ver detalles"
                           >
                             ℹ️
@@ -1788,6 +1923,65 @@ export function HistorialPage({ sourceFilter }: HistorialPageProps) {
                           <div className="col-md-4 text-end"><strong>Descuento:</strong> {formatCurrency(inv.discounts)}</div>
                           <div className="col-md-4 text-end"><strong>Total:</strong> {formatCurrency(inv.total)}</div>
                         </div>
+                        {hostingMode && asicInvoiceCarriesOperationMargin(inv) ? (
+                          canEditMargin ? (
+                            <div className="historial-detalle-op-box mb-3">
+                              <div className="historial-detalle-op-title">Margen y costos de la operación</div>
+                              <div className="row g-2 align-items-end">
+                                <div className="col-sm-5">
+                                  <label className="form-label small mb-1" htmlFor="hosting-detalle-margen">Margen (USD)</label>
+                                  <input
+                                    id="hosting-detalle-margen"
+                                    type="text"
+                                    inputMode="decimal"
+                                    className="form-control form-control-sm historial-detalle-op-input"
+                                    value={detailMarginDraft}
+                                    disabled={savingMarginId === inv.id}
+                                    placeholder="0,00"
+                                    onChange={(e) => onDetailMarginChange(e.target.value)}
+                                  />
+                                </div>
+                                <div className="col-sm-5">
+                                  <label className="form-label small mb-1" htmlFor="hosting-detalle-costos">Costos (USD)</label>
+                                  <input
+                                    id="hosting-detalle-costos"
+                                    type="text"
+                                    inputMode="decimal"
+                                    className="form-control form-control-sm historial-detalle-op-input"
+                                    value={detailCostDraft}
+                                    disabled={savingMarginId === inv.id}
+                                    placeholder="0,00"
+                                    onChange={(e) => onDetailCostChange(e.target.value)}
+                                  />
+                                </div>
+                                <div className="col-sm-2">
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-success w-100"
+                                    disabled={savingMarginId === inv.id}
+                                    onClick={() => void saveDetailOperationMargin()}
+                                  >
+                                    {savingMarginId === inv.id ? "..." : "Guardar"}
+                                  </button>
+                                </div>
+                              </div>
+                              <p className="text-muted small mb-0 mt-2">Se carga a mano en cada factura. Si cambiás uno, el otro se ajusta para que Margen + Costos = Total.</p>
+                            </div>
+                          ) : (
+                            <div className="row g-2 small mb-3">
+                              <div className="col-md-6 text-end"><strong>Margen:</strong> {inv.marginUsd != null && Number.isFinite(inv.marginUsd) ? formatCurrency(Math.abs(inv.marginUsd)) : "—"}</div>
+                              <div className="col-md-6 text-end"><strong>Costos:</strong> {(() => {
+                                const cost = asicOperationCostUsd(inv.total, inv.marginUsd);
+                                return cost != null ? formatCurrency(cost) : "—";
+                              })()}</div>
+                            </div>
+                          )
+                        ) : hostingMode ? (
+                          <div className="row g-2 small mb-3">
+                            <div className="col-md-6 text-end"><strong>Margen:</strong> —</div>
+                            <div className="col-md-6 text-end"><strong>Costos:</strong> —</div>
+                          </div>
+                        ) : null}
                         {inv.type === "Factura" && relatedRecibo && (
                           <div className="rounded p-3" style={{ backgroundColor: "#d1e7dd", border: "1px solid #0f5132" }}>
                             <strong style={{ color: "#0f5132" }}>✓ Ya fue pagada</strong>

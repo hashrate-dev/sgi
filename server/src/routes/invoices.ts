@@ -268,7 +268,7 @@ invoicesRouter.get(
     res.json({ invoice });
 });
 
-/** PATCH /invoices/:id/margin — ASIC: cargar o corregir margen USD de Factura / Comp. pago. */
+/** PATCH /invoices/:id/margin — cargar o corregir el margen USD de una Factura de hosting o ASIC. */
 invoicesRouter.patch(
   "/invoices/:id/margin",
   requireRole("admin_a", "admin_b", "operador"),
@@ -291,11 +291,11 @@ invoicesRouter.patch(
       return res.status(404).json({ error: { message: "Invoice not found" } });
     }
     const source = String(row.source ?? "hosting");
-    if (source !== "asic") {
-      return res.status(400).json({ error: { message: "El margen solo se edita en documentos ASIC." } });
+    if (source !== "asic" && source !== "hosting") {
+      return res.status(400).json({ error: { message: "El margen solo se edita en facturas de hosting o ASIC." } });
     }
     if (row.type !== "Factura") {
-      return res.status(400).json({ error: { message: "El margen solo aplica a Factura o Comprobante de pago." } });
+      return res.status(400).json({ error: { message: "El margen solo aplica a una factura." } });
     }
     const totalAbs = Math.abs(Number(row.total) || 0);
     if (parsed.data.marginUsd < 0) {

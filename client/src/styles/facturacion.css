@@ -6677,6 +6677,15 @@ button.fact-back {
   width: 6.5%;
   white-space: nowrap;
 }
+.historial-listado-wrap .historial-listado-table col.historial-col-margen,
+.historial-listado-wrap .historial-listado-table th.historial-col-margen,
+.historial-listado-wrap .historial-listado-table td.historial-col-margen,
+.historial-listado-wrap .historial-listado-table col.historial-col-costos,
+.historial-listado-wrap .historial-listado-table th.historial-col-costos,
+.historial-listado-wrap .historial-listado-table td.historial-col-costos {
+  width: 5.5%;
+  white-space: nowrap;
+}
 .historial-listado-wrap .historial-listado-table col.historial-col-saldo-pendiente,
 .historial-listado-wrap .historial-listado-table th.historial-col-saldo-pendiente,
 .historial-listado-wrap .historial-listado-table td.historial-col-saldo-pendiente {
@@ -6720,7 +6729,7 @@ button.fact-back {
     overflow-x: auto;
   }
   .historial-listado-wrap .historial-listado-table {
-    min-width: 1050px;
+    min-width: 1180px;
     table-layout: auto;
   }
   .historial-listado-wrap .historial-listado-table thead.table-dark th.historial-col-acciones,
