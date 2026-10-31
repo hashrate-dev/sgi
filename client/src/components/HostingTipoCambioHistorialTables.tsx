@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { HostingFxOperation, HostingInvoiceTransferCommissionRow } from "../lib/api";
-import { hostingFxTipoDescripcionLarga, hostingFxTipoTableLabel } from "../lib/hostingFxOperationClassification";
+import { hostingFxClientCompraLabel, hostingFxTipoDescripcionLarga, hostingFxTipoTableLabel } from "../lib/hostingFxOperationClassification";
 import { hostingFxOperationProfitUsd } from "../lib/hostingFxOperationProfit";
 import { HASHRATE_SPACE_LOGO } from "../lib/marketplaceWpAssets.js";
 
@@ -139,11 +139,7 @@ export function HostingFxOperationsHistoryCard({
                       {hostingFxTipoTableLabel(op)}
                     </td>
                     <td className="hosting-fx-ops-td hosting-fx-ops-td--compra">
-                      {op.compraFlowHostingCommission
-                        ? "4% Comisión por Hosting"
-                        : op.usdtSide === "buy_usdt"
-                          ? "Compra USDT"
-                          : "Compra USD"}
+                      {hostingFxClientCompraLabel(op, "short")}
                     </td>
                     <td className="hosting-fx-ops-td hosting-fx-ops-td--end hosting-fx-ops-td--ganancia">
                       <span className="hosting-fx-ops-num">{hostingFxOperationProfitUsd(op).toFixed(2)}</span>
@@ -559,12 +555,8 @@ export function HostingFxTicketModal({ ticketOperation, onClose }: HostingFxTick
                     {hostingFxTipoDescripcionLarga(ticketOperation)}
                   </div>
                   <div>
-                    <strong>Cliente (Compra de USDT / Compra de USD / 4% Hosting):</strong>{" "}
-                    {ticketOperation.compraFlowHostingCommission
-                      ? "4% Comisión por Hosting"
-                      : ticketOperation.usdtSide === "buy_usdt"
-                        ? "Compra de USDT"
-                        : "Compra de USD"}
+                    <strong>Cliente (Compra de USDT / Compra de USD / 4% Hosting / 4% Reparaciones):</strong>{" "}
+                    {hostingFxClientCompraLabel(ticketOperation)}
                   </div>
                   <div>
                     <strong>Monto operación:</strong>{" "}

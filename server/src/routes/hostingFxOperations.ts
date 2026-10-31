@@ -20,6 +20,9 @@ async function ensureHostingFxSchema(): Promise<void> {
   await db
     .prepare("ALTER TABLE hosting_fx_operations ADD COLUMN IF NOT EXISTS compra_flow_hosting_commission INTEGER NOT NULL DEFAULT 0")
     .run();
+  await db
+    .prepare("ALTER TABLE hosting_fx_operations ADD COLUMN IF NOT EXISTS compra_flow_commission_kind TEXT NOT NULL DEFAULT ''")
+    .run();
   await db.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_hosting_fx_ticket_code_unique ON hosting_fx_operations(ticket_code)").run();
   await db.prepare("CREATE TABLE IF NOT EXISTS hosting_fx_ticket_seq (id INTEGER PRIMARY KEY, next_num BIGINT NOT NULL)").run();
   await db.prepare("INSERT INTO hosting_fx_ticket_seq (id, next_num) VALUES (1, 100) ON CONFLICT (id) DO NOTHING").run();
@@ -105,8 +108,9 @@ const FxOperationCreateSchema = z
     accountHolderName: z.string().max(200).trim(),
     usdtSide: FxUsdtSideSchema,
     notes: z.string().max(1000).trim().optional(),
-    /** Alta desde el select «4% Comisión por Hosting» */
+    /** Alta desde el select «4% Comisión por Hosting» o «4% Reparaciones» (mismo cálculo). */
     compraFlowHostingCommission: z.boolean().optional(),
+    compraFlowCommissionKind: z.enum(["hosting", "reparaciones"]).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.usdtSide === "buy_usdt" && data.deliveryMethod !== "usdt_to_hrs_binance") {
@@ -136,6 +140,7 @@ const FxOperationUpdateSchema = z
     usdtSide: FxUsdtSideSchema.optional(),
     notes: z.string().max(1000).trim().optional(),
     compraFlowHostingCommission: z.boolean().optional(),
+    compraFlowCommissionKind: z.enum(["hosting", "reparaciones"]).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.usdtSide === "buy_usdt" && data.deliveryMethod != null && data.deliveryMethod !== "usdt_to_hrs_binance") {
@@ -272,6 +277,12 @@ function mapFxRow(raw: Record<string, unknown>): Record<string, unknown> {
     clientName: r.client_name == null ? "" : String(r.client_name),
     clientLastName: r.client_name2 == null ? "" : String(r.client_name2),
     compraFlowHostingCommission: Number(r.compra_flow_hosting_commission ?? 0) === 1,
+    compraFlowCommissionKind:
+      r.compra_flow_commission_kind === "reparaciones"
+        ? "reparaciones"
+        : Number(r.compra_flow_hosting_commission ?? 0) === 1
+          ? "hosting"
+          : "",
   };
 }
 
@@ -288,6 +299,7 @@ hostingFxOperationsRouter.get(
                 o.operation_amount,
                 o.bank_name, o.account_number, o.currency, o.bank_branch, o.account_holder_name, o.usdt_side, o.notes, o.created_at, o.updated_at,
                 COALESCE(o.compra_flow_hosting_commission, 0) AS compra_flow_hosting_commission,
+                COALESCE(o.compra_flow_commission_kind, '') AS compra_flow_commission_kind,
                 c.code AS client_code, c.name AS client_name, c.name2 AS client_name2
          FROM hosting_fx_operations o
          JOIN clients c ON c.id = o.client_id
@@ -355,7 +367,13 @@ hostingFxOperationsRouter.post(
       return res.status(400).json({ error: { message: "Datos inválidos para registrar la operación." } });
     }
     const d = parsed.data;
-    const hostingFlow = Boolean(d.compraFlowHostingCommission);
+    const commissionKind =
+      d.compraFlowCommissionKind === "reparaciones"
+        ? "reparaciones"
+        : Boolean(d.compraFlowHostingCommission)
+          ? "hosting"
+          : "";
+    const hostingFlow = commissionKind === "hosting" || commissionKind === "reparaciones";
     const operationType: "usdt_to_usd" | "usd_to_usdt" = d.usdtSide === "buy_usdt" ? "usd_to_usdt" : "usdt_to_usd";
     const transferAmount = hostingFxClientTotalPayment(d.operationAmount, d.hrsCommissionPct, hostingFlow);
     const client = (await db.prepare("SELECT id FROM clients WHERE id = ?").get(d.clientId)) as { id: number } | undefined;
@@ -368,8 +386,8 @@ hostingFxOperationsRouter.post(
         `INSERT INTO hosting_fx_operations (
           client_id, operation_date, operation_amount, operation_type, hrs_commission_pct, bank_fee_amount, delivery_method, client_total_payment,
           bank_name, account_number, currency, bank_branch, account_holder_name, usdt_side, notes, created_at, updated_at, ticket_code,
-          compra_flow_hosting_commission
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          compra_flow_hosting_commission, compra_flow_commission_kind
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         d.clientId,
@@ -390,7 +408,8 @@ hostingFxOperationsRouter.post(
         now,
         now,
         ticketCode,
-        hostingFlow ? 1 : 0
+        hostingFlow ? 1 : 0,
+        commissionKind
       );
     res.status(201).json({ ok: true });
   }
@@ -438,8 +457,22 @@ hostingFxOperationsRouter.put(
     if (d.usdtSide != null) push("usdt_side = ?", d.usdtSide);
     if (nextOperationType != null) push("operation_type = ?", nextOperationType);
     if (d.notes != null) push("notes = ?", d.notes);
-    if (d.compraFlowHostingCommission != null) push("compra_flow_hosting_commission = ?", d.compraFlowHostingCommission ? 1 : 0);
-    if (d.operationAmount != null || d.hrsCommissionPct != null || d.compraFlowHostingCommission != null) {
+    if (d.compraFlowHostingCommission != null || d.compraFlowCommissionKind != null) {
+      const kind =
+        d.compraFlowCommissionKind === "reparaciones"
+          ? "reparaciones"
+          : d.compraFlowHostingCommission
+            ? "hosting"
+            : "";
+      push("compra_flow_hosting_commission = ?", kind === "" ? 0 : 1);
+      push("compra_flow_commission_kind = ?", kind);
+    }
+    if (
+      d.operationAmount != null ||
+      d.hrsCommissionPct != null ||
+      d.compraFlowHostingCommission != null ||
+      d.compraFlowCommissionKind != null
+    ) {
       const current = (await db
         .prepare(
           "SELECT operation_amount, hrs_commission_pct, compra_flow_hosting_commission FROM hosting_fx_operations WHERE id = ?"
@@ -452,9 +485,11 @@ hostingFxOperationsRouter.put(
       const opAmount = d.operationAmount ?? Number(current?.operation_amount ?? 0);
       const commPct = d.hrsCommissionPct ?? Number(current?.hrs_commission_pct ?? 0);
       const hostingFlow =
-        d.compraFlowHostingCommission != null
-          ? Boolean(d.compraFlowHostingCommission)
-          : Number(current?.compra_flow_hosting_commission ?? 0) === 1;
+        d.compraFlowCommissionKind === "reparaciones" || d.compraFlowHostingCommission === true
+          ? true
+          : d.compraFlowHostingCommission === false
+            ? false
+            : Number(current?.compra_flow_hosting_commission ?? 0) === 1;
       const transferAmount = hostingFxClientTotalPayment(opAmount, commPct, hostingFlow);
       push("client_total_payment = ?", transferAmount);
     }

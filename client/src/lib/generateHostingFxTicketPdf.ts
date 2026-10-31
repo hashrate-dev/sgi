@@ -1,6 +1,6 @@
 import { jsPDF } from "jspdf";
 import type { HostingFxOperation } from "./api";
-import { hostingFxTipoDescripcionLarga } from "./hostingFxOperationClassification";
+import { hostingFxClientCompraLabel, hostingFxTipoDescripcionLarga } from "./hostingFxOperationClassification";
 import { loadImageAsBase64 } from "./generateFacturaPdf";
 
 const PAGE_W = 210;
@@ -85,11 +85,7 @@ export async function downloadHostingFxTicketPdf(op: HostingFxOperation): Promis
 
   const cliente = `${op.clientCode || ""} ${op.clientName || ""} ${op.clientLastName || ""}`.trim();
   const tipo = hostingFxTipoDescripcionLarga(op);
-  const usdt = op.compraFlowHostingCommission
-    ? "4% Comisión por Hosting"
-    : op.usdtSide === "buy_usdt"
-      ? "Compra de USDT"
-      : "Compra de USD";
+  const usdt = hostingFxClientCompraLabel(op);
   const envio = op.deliveryMethod === "usd_to_bank" ? "Envio USD a Banco" : "USDT a Binance";
 
   const GAP = 8;

@@ -1261,8 +1261,10 @@ export type HostingFxOperation = {
   /** Suma de líneas «4% Gastos Operativos Transferencia» en factura hosting vinculada (si existe). */
   invoiceHostingCambioCommissionUsd?: number;
   invoiceHostingCambioNumber?: string;
-  /** Registrado con el flujo «4% Comisión por Hosting» en el formulario de operaciones. */
+  /** Registrado con el flujo «4% Comisión por Hosting» o «4% Reparaciones» (mismo cálculo). */
   compraFlowHostingCommission?: boolean;
+  /** Distingue el nombre del flujo de comisión. Vacío en compras USDT/USD. */
+  compraFlowCommissionKind?: "" | "hosting" | "reparaciones";
 };
 
 export type HostingFxOperationPayload = {
@@ -1281,6 +1283,7 @@ export type HostingFxOperationPayload = {
   usdtSide: HostingFxUsdtSide;
   notes?: string;
   compraFlowHostingCommission?: boolean;
+  compraFlowCommissionKind?: "hosting" | "reparaciones";
 };
 
 export function getHostingFxOperations(): Promise<{ operations: HostingFxOperation[] }> {

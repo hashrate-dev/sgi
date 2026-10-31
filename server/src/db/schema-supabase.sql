@@ -145,6 +145,7 @@ ALTER TABLE hosting_fx_operations ADD COLUMN IF NOT EXISTS delivery_method TEXT 
 ALTER TABLE hosting_fx_operations ADD COLUMN IF NOT EXISTS account_holder_name TEXT NOT NULL DEFAULT '';
 ALTER TABLE hosting_fx_operations ADD COLUMN IF NOT EXISTS ticket_code TEXT;
 ALTER TABLE hosting_fx_operations ADD COLUMN IF NOT EXISTS compra_flow_hosting_commission INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE hosting_fx_operations ADD COLUMN IF NOT EXISTS compra_flow_commission_kind TEXT NOT NULL DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS garantias_ande_clientes (
   id BIGSERIAL PRIMARY KEY,

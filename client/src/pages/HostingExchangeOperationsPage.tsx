@@ -52,8 +52,8 @@ const INITIAL_FORM: FxFormState = {
 const BANK_OPTIONS = ["Banco Santander", "BROU", "Banco Itau", "BBVA", "Prex", "Mi Dinero"] as const;
 const DEFAULT_BANK_HOSTING_COMMISSION = BANK_OPTIONS[0]!;
 
-/** Valores del select «Cliente»: los dos primeros son operaciones FX; el tercero solo enlaza a la tabla de comisión 4% facturas. */
-type ClientCompraSelectValue = FxFormState["usdtSide"] | "hosting_commission";
+/** Compra USDT/USD, o comisión 4% (hosting y reparaciones usan el mismo cálculo). */
+type ClientCompraSelectValue = FxFormState["usdtSide"] | "hosting_commission" | "repair_commission";
 /** Al elegir «Compra de USDT»: envío fijo a Binance. Al elegir «Compra de USD»: envío por defecto a banco. */
 function deliveryWhenClientCompraSideChanges(usdtSide: FxFormState["usdtSide"]): FxFormState["deliveryMethod"] {
   return usdtSide === "buy_usdt" ? "usdt_to_hrs_binance" : "usd_to_bank";
@@ -178,15 +178,15 @@ export function HostingExchangeOperationsPage() {
       setPdfLoadingId(null);
     }
   }, []);
-  const isHostingCommissionFlow = clientCompraSelect === "hosting_commission";
+  const isCommissionFlow = clientCompraSelect === "hosting_commission" || clientCompraSelect === "repair_commission";
   const transferAmount = useMemo(
     () =>
       hostingFxClientTotalPayment(
         form.operationAmount,
         form.hrsCommissionPct,
-        isHostingCommissionFlow
+        isCommissionFlow
       ),
-    [form.operationAmount, form.hrsCommissionPct, isHostingCommissionFlow]
+    [form.operationAmount, form.hrsCommissionPct, isCommissionFlow]
   );
   const profitAmount = useMemo(
     () =>
@@ -194,9 +194,9 @@ export function HostingExchangeOperationsPage() {
         operationAmount: form.operationAmount,
         clientTotalPayment: transferAmount,
         bankFeeAmount: form.bankFeeAmount,
-        compraFlowHostingCommission: isHostingCommissionFlow,
+        compraFlowHostingCommission: isCommissionFlow,
       }),
-    [form.operationAmount, transferAmount, form.bankFeeAmount, isHostingCommissionFlow]
+    [form.operationAmount, transferAmount, form.bankFeeAmount, isCommissionFlow]
   );
   const bankFieldsEnabled = form.deliveryMethod === "usd_to_bank";
 
@@ -282,7 +282,8 @@ export function HostingExchangeOperationsPage() {
         accountHolderName: bankOn ? form.accountHolderName.trim() : "",
         clientTotalPayment: transferAmount,
         notes: form.notes?.trim() || "",
-        compraFlowHostingCommission: clientCompraSelect === "hosting_commission",
+        compraFlowHostingCommission: clientCompraSelect === "hosting_commission" || clientCompraSelect === "repair_commission",
+        compraFlowCommissionKind: clientCompraSelect === "repair_commission" ? "reparaciones" : clientCompraSelect === "hosting_commission" ? "hosting" : undefined,
       };
       if (editingId != null) {
         await updateHostingFxOperation(editingId, payload);
@@ -304,7 +305,13 @@ export function HostingExchangeOperationsPage() {
     if (!canEdit) return;
     setEditingId(op.id);
     setClientCompraSelect(
-      op.compraFlowHostingCommission ? "hosting_commission" : op.usdtSide === "buy_usdt" ? "buy_usdt" : "sell_usdt"
+      op.compraFlowCommissionKind === "reparaciones"
+        ? "repair_commission"
+        : op.compraFlowHostingCommission
+          ? "hosting_commission"
+          : op.usdtSide === "buy_usdt"
+            ? "buy_usdt"
+            : "sell_usdt"
     );
     setForm({
       clientId: op.clientId,
@@ -477,14 +484,14 @@ export function HostingExchangeOperationsPage() {
                 />
               </div>
               <div className="col-12 col-md-6 col-lg-4">
-                <label className="fact-label">Cliente (Compra de USDT / Compra de USD / 4% Hosting)</label>
+                <label className="fact-label">Cliente (Compra de USDT / Compra de USD / 4% Hosting / 4% Reparaciones)</label>
                 <select
                   className="fact-select"
                   value={clientCompraSelect}
                   onChange={(e) => {
                     const v = e.target.value as ClientCompraSelectValue;
                     setClientCompraSelect(v);
-                    if (v === "hosting_commission") {
+                    if (v === "hosting_commission" || v === "repair_commission") {
                       setForm((p) => ({
                         ...p,
                         usdtSide: "sell_usdt",
@@ -504,6 +511,7 @@ export function HostingExchangeOperationsPage() {
                   <option value="buy_usdt">Compra de USDT</option>
                   <option value="sell_usdt">Compra de USD</option>
                   <option value="hosting_commission">4% Comisión por Hosting</option>
+                  <option value="repair_commission">4% Reparaciones</option>
                 </select>
               </div>
               <div className="col-12 col-md-6 col-lg-4">

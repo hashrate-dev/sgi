@@ -137,7 +137,7 @@ export function HostingFxOperationsIndicators({
         </article>
         <article
           className="hosting-fx-ops-metric hosting-fx-ops-metric--sell"
-          aria-label="Monto operación: cliente pagó con USDT (excluye 4% Hosting USD banco)"
+          aria-label="Monto operación: cliente pagó con USDT (excluye 4% Hosting y 4% Reparaciones con pago USD vía banco)"
         >
           <div className="hosting-fx-ops-metric__top">
             <div className="hosting-fx-ops-metric__icon" aria-hidden>
@@ -163,7 +163,7 @@ export function HostingFxOperationsIndicators({
                     <i className="bi bi-info-circle" aria-hidden />
                   </button>
                   <span className="hosting-fx-ops-metric__info-bubble" id="hosting-fx-metric-sell-tip" role="tooltip">
-                    Operaciones donde el cliente pagó en USDT (Binance). No incluye 4% Hosting con pago USD vía banco.
+                    Operaciones donde el cliente pagó en USDT (Binance). No incluye 4% Hosting ni 4% Reparaciones con pago USD vía banco.
                   </span>
                 </span>
               </div>
@@ -199,7 +199,7 @@ export function HostingFxOperationsIndicators({
         </article>
         <article
           className="hosting-fx-ops-metric hosting-fx-ops-metric--buy"
-          aria-label="Monto operación: cliente paga con USD (compra USDT o 4% Hosting vía banco)"
+          aria-label="Monto operación: cliente paga con USD (compra USDT, 4% Hosting o 4% Reparaciones vía banco)"
         >
           <div className="hosting-fx-ops-metric__top">
             <div className="hosting-fx-ops-metric__icon" aria-hidden>
@@ -225,7 +225,7 @@ export function HostingFxOperationsIndicators({
                     <i className="bi bi-info-circle" aria-hidden />
                   </button>
                   <span className="hosting-fx-ops-metric__info-bubble" id="hosting-fx-metric-buy-tip" role="tooltip">
-                    Incluye compra de USDT (cliente paga USD) y operaciones 4% Hosting con pago USD vía banco.
+                    Incluye compra de USDT (cliente paga USD) y operaciones 4% Hosting o 4% Reparaciones con pago USD vía banco.
                   </span>
                 </span>
               </div>
@@ -260,7 +260,7 @@ export function HostingFxOperationsIndicators({
             {!tableLoading && exchangeOpsStats.montoTransferHostingBankUsdt > 0 ? (
               <p
                 className="hosting-fx-ops-metric__figure-sub hosting-fx-ops-metric__figure-sub--transfer-usdt-neg"
-                aria-label="Suma de monto transferencia en USDT, operaciones 4% Hosting con pago vía banco"
+                aria-label="Suma de monto transferencia en USDT, operaciones 4% Hosting o 4% Reparaciones con pago vía banco"
               >
                 −
                 {new Intl.NumberFormat("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
