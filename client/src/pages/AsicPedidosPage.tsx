@@ -1109,35 +1109,6 @@ function PedidoTracking({
         ) : null}
       </section>
 
-      {!completo && currentKey && currentKey !== "rep_precio_cliente" && currentKey !== "rep_aceptacion" ? (
-        <section className="asic-track-card">
-          <p className="asic-track-kicker">Etapa en curso</p>
-          <h2>{asicPedidoEtapaLabel(pedido)}</h2>
-          <p className="asic-track-update">{asicPedidoStageDetail(currentKey)}</p>
-          {canWrite ? (
-            <StageForm
-              pedido={pedido}
-              stage={currentKey}
-              busy={busy}
-              canAddClient={canAddClient}
-              onError={onError}
-              onSubmit={(body) => void onRun(() => confirmAsicPedidoStage(pedido.id, currentKey, body).then((r) => r.pedido))}
-              onLinkInvoice={(hit) =>
-                void onRun(() =>
-                  updateAsicPedido(pedido.id, {
-                    facturaId: hit.invoice.id,
-                    facturaNumero: hit.invoice.number,
-                    facturaTitular: hit.invoice.clientName,
-                  }).then((r) => r.pedido)
-                )
-              }
-            />
-          ) : (
-            <p className="asic-track-note">Esta etapa está pendiente de confirmación.</p>
-          )}
-        </section>
-      ) : null}
-
       <section className="asic-track-card">
         <p className="asic-track-kicker">Cronograma</p>
         <h2>Etapas confirmadas</h2>
@@ -1180,6 +1151,39 @@ function PedidoTracking({
               </li>
             );
           })}
+          {!completo && currentKey && currentKey !== "rep_precio_cliente" && currentKey !== "rep_aceptacion" ? (
+            <li className="is-editing">
+              <span className="asic-log-mark" aria-hidden="true" title={asicPedidoStageTitle(currentKey, pedido.origen)}>
+                <i className={`bi ${asicPedidoStageIcon(currentKey, pedido.origen)}`} />
+              </span>
+              <div className="asic-log-body">
+                <span className="asic-log-date">En curso</span>
+                <strong>{asicPedidoStageTitle(currentKey, pedido.origen)}</strong>
+                <p>{asicPedidoStageDetail(currentKey)}</p>
+                {canWrite ? (
+                  <StageForm
+                    pedido={pedido}
+                    stage={currentKey}
+                    busy={busy}
+                    canAddClient={canAddClient}
+                    onError={onError}
+                    onSubmit={(body) => void onRun(() => confirmAsicPedidoStage(pedido.id, currentKey, body).then((r) => r.pedido))}
+                    onLinkInvoice={(hit) =>
+                      void onRun(() =>
+                        updateAsicPedido(pedido.id, {
+                          facturaId: hit.invoice.id,
+                          facturaNumero: hit.invoice.number,
+                          facturaTitular: hit.invoice.clientName,
+                        }).then((r) => r.pedido)
+                      )
+                    }
+                  />
+                ) : (
+                  <p className="asic-track-note">Esta etapa está pendiente de confirmación.</p>
+                )}
+              </div>
+            </li>
+          ) : null}
         </ol>
       </section>
     </>
