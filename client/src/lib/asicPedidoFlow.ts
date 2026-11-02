@@ -410,7 +410,9 @@ export function createAsicPedido(body: {
 
 export function updateAsicPedido(
   id: number,
-  body: Partial<Pick<AsicPedido, "cliente" | "equipo" | "cantidad" | "lineas" | "notas" | "aduanaAplica" | "facturaId" | "facturaNumero" | "facturaTitular">>
+  body: Partial<Pick<AsicPedido, "cliente" | "equipo" | "cantidad" | "lineas" | "notas" | "aduanaAplica" | "facturaId" | "facturaNumero" | "facturaTitular">> & {
+    numeroRecibo?: string;
+  }
 ): Promise<{ pedido: AsicPedido }> {
   return api(`/api/asic-pedidos/${id}`, { method: "PATCH", body: JSON.stringify(body) });
 }

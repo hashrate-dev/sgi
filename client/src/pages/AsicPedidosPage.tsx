@@ -246,7 +246,6 @@ export function AsicPedidosPage() {
             canAddClient={canAddClient}
             showCreate={showCreate}
             busy={busy}
-            onUpdated={(pedido) => setPedidos((prev) => prev.map((row) => (row.id === pedido.id ? pedido : row)))}
             onToggleCreate={() => {
               setErr(null);
               setShowCreate((v) => !v);
@@ -284,7 +283,6 @@ function PedidoList({
   onToggleCreate,
   onOpen,
   onCreate,
-  onUpdated,
 }: {
   pedidos: AsicPedido[];
   loading: boolean;
@@ -295,7 +293,6 @@ function PedidoList({
   busy: boolean;
   onToggleCreate: () => void;
   onOpen: (id: number) => void;
-  onUpdated: (pedido: AsicPedido) => void;
   onCreate: (body: {
     tipo?: AsicPedidoTipo;
     cliente: string;
@@ -859,29 +856,16 @@ function PedidoList({
                                   {documento ? (
                                     <>
                                       <strong>{formatUsd(documento.invoice.total)}</strong>
-                                      <span>Precio total</span>
+                                      <span>Precio total · {documento.invoice.number}</span>
+                                      {documento.receipt ? (
+                                        <span className="asic-precio-doc">Recibo {documento.receipt.number}</span>
+                                      ) : null}
                                     </>
                                   ) : facturasListas ? (
-                                    <span>Sin factura vinculada</span>
+                                    <span>Sin factura en la etapa</span>
                                   ) : (
                                     <span>Buscando factura…</span>
                                   )}
-                                  {canWrite ? (
-                                    <div onClick={(event) => event.stopPropagation()}>
-                                      <VentaFacturaLink
-                                        pedido={pedido}
-                                        clients={clients}
-                                        invoices={facturas}
-                                        selected={documento}
-                                        onLinked={onUpdated}
-                                      />
-                                    </div>
-                                  ) : documento ? (
-                                    <span className="asic-precio-doc">
-                                      {documento.invoice.number}
-                                      {documento.receipt ? ` · Recibo ${documento.receipt.number}` : ""}
-                                    </span>
-                                  ) : null}
                                   {venta
                                     ? venta.partes.map((parte) => (
                                         <span key={`${parte.nombre}-${parte.unit}`} className="asic-precio-unit">
@@ -1082,6 +1066,48 @@ function PedidoTracking({
   const origen = pedido.origen === "china" ? "China" : "Paraguay";
   const doneStages = stages.filter((key) => pedido.etapas[key]?.status === "done");
   const cobroPendiente = asicPedidoCobroPendiente(pedido);
+  const [facturas, setFacturas] = useState<AsicBillingDoc[]>([]);
+  const receiptSync = useRef<string>("");
+
+  useEffect(() => {
+    if (pedido.tipo === "reparacion") return;
+    let cancelled = false;
+    void getInvoices({ source: "asic" })
+      .then((r) => {
+        if (cancelled) return;
+        setFacturas(
+          (r.invoices ?? []).map((row) => ({
+            id: Number(row.id),
+            number: String(row.number ?? ""),
+            type: String(row.type ?? ""),
+            clientName: String(row.clientName ?? ""),
+            date: String(row.date ?? ""),
+            total: Number(row.total) || 0,
+            relatedInvoiceId: row.relatedInvoiceId,
+            relatedInvoiceNumber: row.relatedInvoiceNumber,
+            documentContext: row.documentContext,
+          }))
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setFacturas([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pedido.id, pedido.tipo]);
+
+  useEffect(() => {
+    const docs = pedido.etapas.documentos;
+    if (!canWrite || pedido.tipo === "reparacion" || docs?.status !== "done" || docs.numeroRecibo) return;
+    const linked = ventaDocumento(pedido, facturas);
+    const receiptNumber = linked?.receipt?.number ?? "";
+    if (!receiptNumber) return;
+    const token = `${pedido.id}:${receiptNumber}`;
+    if (receiptSync.current === token) return;
+    receiptSync.current = token;
+    void onRun(() => updateAsicPedido(pedido.id, { numeroRecibo: receiptNumber }).then((r) => r.pedido));
+  }, [canWrite, facturas, onRun, pedido]);
 
   return (
     <>
@@ -1198,7 +1224,11 @@ function PedidoTracking({
                 <div className="asic-log-body">
                   <span className="asic-log-date">{state.fecha ? formatAsicPedidoFecha(state.fecha) : "—"}</span>
                   <strong>{asicPedidoStageTitle(key, pedido.origen)}</strong>
-                  <p>{asicPedidoStageSummary(key, state) || asicPedidoStageDetail(key)}</p>
+                  {key === "documentos" && state.modoCobro === "factura_recibo" ? (
+                    <DocumentosVinculo pedido={pedido} facturas={facturas} state={state} />
+                  ) : (
+                    <p>{asicPedidoStageSummary(key, state) || asicPedidoStageDetail(key)}</p>
+                  )}
                   {key === "documentos" && cobroPendiente.garantia ? (
                     <aside className="asic-track-alert asic-track-alert--inline">
                       <p className="asic-track-alert-kicker">Garantía</p>
@@ -1329,7 +1359,7 @@ function ventaDocumento(
 ): { invoice: AsicBillingDoc; receipt: AsicBillingDoc | null } | null {
   if (pedido.tipo !== "compra") return null;
   const facturas = invoices.filter(facturaCredito);
-  const numero = String(pedido.facturaNumero || pedido.etapas.documentos?.numeroFactura || "").trim().toUpperCase();
+  const numero = String(pedido.etapas.documentos?.numeroFactura || pedido.facturaNumero || "").trim().toUpperCase();
   const byId = pedido.facturaId ? facturas.find((doc) => doc.id === pedido.facturaId) : undefined;
   const byNumber = numero ? facturas.find((doc) => doc.number.trim().toUpperCase() === numero) : undefined;
   const invoice = numero ? byNumber : byId;
@@ -1345,133 +1375,44 @@ function ventaDocumento(
   return { invoice, receipt };
 }
 
-function VentaFacturaLink({
+function DocumentosVinculo({
   pedido,
-  clients,
-  invoices,
-  selected,
-  onLinked,
+  facturas,
+  state,
 }: {
   pedido: AsicPedido;
-  clients: Client[];
-  invoices: AsicBillingDoc[];
-  selected: { invoice: AsicBillingDoc; receipt: AsicBillingDoc | null } | null;
-  onLinked: (pedido: AsicPedido) => void;
+  facturas: AsicBillingDoc[];
+  state: NonNullable<AsicPedido["etapas"]["documentos"]>;
 }) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [linkError, setLinkError] = useState<string | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const matched = useMemo(
-    () =>
-      matchAsicPedidoBilling({
-        cliente: pedido.cliente,
-        clientId: pedido.clientId,
-        clients,
-        invoices,
-        extraLabels: [pedido.etapas.contrato?.referencia ?? "", pedido.facturaTitular ?? ""],
-      }),
-    [pedido.cliente, pedido.clientId, pedido.etapas.contrato?.referencia, pedido.facturaTitular, clients, invoices]
+  const linked = ventaDocumento(
+    {
+      ...pedido,
+      etapas: { ...pedido.etapas, documentos: state },
+    },
+    facturas
   );
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointer = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onPointer);
-    return () => document.removeEventListener("mousedown", onPointer);
-  }, [open]);
-
-  const q = query.trim().toLowerCase();
-  const matches = (hit: AsicPedidoBillingHit) =>
-    `${hit.invoice.number} ${hit.invoice.clientName} ${hit.receipt?.number ?? ""}`.toLowerCase().includes(q);
-  const suggested = (q ? matched.suggested.filter(matches) : matched.suggested).slice(0, 8);
-  const others = (q ? matched.others.filter(matches) : matched.others).slice(0, q ? 20 : 12);
-
-  const pick = async (hit: AsicPedidoBillingHit) => {
-    setSaving(true);
-    setLinkError(null);
-    try {
-      const saved = await updateAsicPedido(pedido.id, {
-        facturaId: hit.invoice.id,
-        facturaNumero: hit.invoice.number,
-        facturaTitular: hit.invoice.clientName,
-      });
-      onLinked(saved.pedido);
-      setOpen(false);
-      setQuery("");
-    } catch (e) {
-      setLinkError(errorText(e));
-    } finally {
-      setSaving(false);
-    }
-  };
-
+  const factura = linked?.invoice;
+  const recibo = linked?.receipt;
+  const titular = state.titularFactura || factura?.clientName || "";
   return (
-    <div className="asic-pedidos-docmenu" ref={rootRef}>
-      <button
-        type="button"
-        className={`asic-pedidos-docmenu-trigger${selected ? " is-on" : " is-empty"}`}
-        aria-expanded={open}
-        disabled={saving}
-        onClick={() => setOpen((value) => !value)}
-      >
-        {selected ? (
-          <span>
-            <strong>{selected.invoice.number}</strong>
-            <span>
-              {selected.receipt ? `Recibo ${selected.receipt.number}` : "Sin recibo"}
-              {selected.invoice.clientName ? ` · ${selected.invoice.clientName}` : ""}
-            </span>
-          </span>
-        ) : (
-          <strong>{saving ? "Vinculando…" : "Vincular factura"}</strong>
-        )}
-        <span className="asic-pedidos-docmenu-caret" aria-hidden="true">{open ? "▴" : "▾"}</span>
-      </button>
-      {open ? (
-        <div className="asic-pedidos-docs asic-pedidos-docmenu-panel">
-          <p className="asic-pedidos-doc-note">El precio total sale de la factura que elijas. El recibo se muestra si ya está emitido.</p>
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar por número o cliente, por ejemplo F100352"
-            autoFocus
-          />
-          {linkError ? <p className="asic-pedidos-doc-note">{linkError}</p> : null}
-          {[
-            { label: "De este cliente", hits: suggested },
-            { label: "Otras facturas", hits: others },
-          ].map((group) =>
-            group.hits.length ? (
-              <div key={group.label} className="asic-precio-docgroup">
-                <span>{group.label}</span>
-                {group.hits.map((hit) => (
-                  <button
-                    key={hit.invoice.id}
-                    type="button"
-                    className={selected?.invoice.number === hit.invoice.number ? "is-on" : ""}
-                    onClick={() => void pick(hit)}
-                  >
-                    <strong>
-                      {hit.invoice.number} · {formatUsd(hit.invoice.total)}
-                    </strong>
-                    <span>
-                      {hit.invoice.clientName}
-                      {hit.receipt ? ` · Recibo ${hit.receipt.number}` : " · Sin recibo"}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            ) : null
-          )}
-          {suggested.length === 0 && others.length === 0 ? (
-            <p className="asic-pedidos-doc-note">No hay una factura con ese dato.</p>
-          ) : null}
-        </div>
-      ) : null}
+    <div className="asic-stage-docs">
+      <article className="asic-stage-doc">
+        <span>Factura</span>
+        <strong>{state.numeroFactura || factura?.number || "Sin factura"}</strong>
+        <em>
+          {factura ? formatUsd(factura.total) : "Total del documento"}
+          {titular ? ` · ${titular}` : ""}
+        </em>
+      </article>
+      <article className={`asic-stage-doc${recibo || state.numeroRecibo ? "" : " is-pending"}`}>
+        <span>Recibo</span>
+        <strong>{state.numeroRecibo || recibo?.number || "Pendiente"}</strong>
+        <em>
+          {recibo
+            ? `${formatUsd(recibo.total)}${recibo.clientName ? ` · ${recibo.clientName}` : ""}`
+            : "Se vincula el recibo de esta factura"}
+        </em>
+      </article>
     </div>
   );
 }
@@ -2490,6 +2431,20 @@ function StageForm({
         />
       ) : null}
 
+      {stage === "documentos" && modo === "factura_recibo" && numeroFactura ? (
+        <BillingReceiptMenu
+          state={billingState}
+          receipts={billingReceipts}
+          invoiceNumber={numeroFactura}
+          invoiceId={
+            [...billingSuggested, ...billingOthers].find((hit) => hit.invoice.number === numeroFactura)?.invoice.id
+          }
+          cliente={pedido.cliente}
+          selectedNumber={numeroRecibo}
+          onPick={(doc) => setNumeroRecibo(doc.number)}
+        />
+      ) : null}
+
       {stage === "documentos" && modo === "factura_recibo" && numeroFactura && !numeroGarantia ? (
         <aside className="asic-track-alert">
           <p className="asic-track-alert-kicker">Garantía</p>
@@ -3176,6 +3131,110 @@ function GarantiaDocMenu({
   );
 }
 
+function BillingReceiptMenu({
+  state,
+  receipts,
+  invoiceNumber,
+  invoiceId,
+  cliente,
+  selectedNumber,
+  onPick,
+}: {
+  state: "idle" | "loading" | "ready" | "error";
+  receipts: AsicBillingDoc[];
+  invoiceNumber: string;
+  invoiceId?: number;
+  cliente: string;
+  selectedNumber: string;
+  onPick: (doc: AsicBillingDoc) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onPointer);
+    return () => document.removeEventListener("mousedown", onPointer);
+  }, [open]);
+
+  if (state === "loading" || state === "idle") {
+    return <p className="asic-pedidos-doc-note">Buscando el recibo de la factura…</p>;
+  }
+  if (state === "error") {
+    return <p className="asic-pedidos-doc-note">No se pudieron leer los recibos.</p>;
+  }
+  const q = query.trim().toLowerCase();
+  const groups = receiptOptionGroups(receipts, invoiceNumber, invoiceId, cliente, selectedNumber)
+    .map((group) => ({
+      ...group,
+      docs: group.docs.filter((doc) => !q || `${doc.number} ${doc.clientName}`.toLowerCase().includes(q)),
+    }))
+    .filter((group) => group.docs.length > 0);
+  const selected = receipts.find((doc) => doc.number === selectedNumber);
+  return (
+    <div className="asic-pedidos-docmenu" ref={rootRef}>
+      <p className="asic-pedidos-doc-note">
+        Recibo de {invoiceNumber}. Si todavía no está emitido, podés confirmar la etapa y se suma cuando exista.
+      </p>
+      <button
+        type="button"
+        className={`asic-pedidos-docmenu-trigger${selected ? " is-on" : " is-empty"}`}
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        {selected ? (
+          <span>
+            <strong>
+              {selected.number} · {selected.clientName}
+            </strong>
+            <span>
+              {selected.date ? `${selected.date} · ` : ""}
+              {formatUsd(selected.total)}
+            </span>
+          </span>
+        ) : (
+          <strong>Elegir recibo</strong>
+        )}
+        <span className="asic-pedidos-docmenu-caret" aria-hidden="true">{open ? "▴" : "▾"}</span>
+      </button>
+      {open ? (
+        <div className="asic-pedidos-docs asic-pedidos-docmenu-panel">
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar recibo por número o cliente" autoFocus />
+          {groups.map((group) => (
+            <div key={group.label} className="asic-precio-docgroup">
+              <span>{group.label}</span>
+              {group.docs.map((doc) => (
+                <button
+                  key={`${doc.id}-${doc.number}`}
+                  type="button"
+                  className={selectedNumber === doc.number ? "is-on" : ""}
+                  onClick={() => {
+                    onPick(doc);
+                    setOpen(false);
+                  }}
+                >
+                  <strong>
+                    {doc.number} · {formatUsd(doc.total)}
+                  </strong>
+                  <span>
+                    {doc.clientName}
+                    {doc.date ? ` · ${doc.date}` : ""}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ))}
+          {groups.length === 0 ? <p className="asic-pedidos-doc-note">No hay un recibo con ese dato.</p> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function BillingDocList({
   state,
   suggested,
@@ -3223,7 +3282,7 @@ function BillingDocList({
   return (
     <div className="asic-pedidos-docmenu" ref={rootRef}>
       <p className="asic-pedidos-doc-note">
-        Elegí la factura crédito de esta operación, aunque esté a nombre de la empresa. El recibo se conecta solo cuando se emite el pago.
+        Elegí la factura crédito de esta operación, aunque esté a nombre de la empresa. El recibo de esa factura se vincula debajo.
       </p>
       <button
         type="button"

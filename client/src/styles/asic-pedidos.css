@@ -906,6 +906,59 @@
   margin-top: 0.45rem;
 }
 
+.asic-stage-docs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-top: 0.55rem;
+}
+
+.asic-stage-doc {
+  min-width: 0;
+  border: 1px solid #bbf7d0;
+  background: #fff;
+  border-radius: 12px;
+  padding: 0.5rem 0.65rem 0.55rem;
+}
+
+.asic-stage-doc > span {
+  display: block;
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.asic-stage-doc strong {
+  margin-top: 0.12rem;
+  font-size: 0.95rem;
+}
+
+.asic-stage-doc em {
+  display: block;
+  margin-top: 0.15rem;
+  color: #166534;
+  font-style: normal;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.asic-stage-doc.is-pending {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.asic-stage-doc.is-pending em {
+  color: #92400e;
+}
+
+@media (max-width: 640px) {
+  .asic-stage-docs {
+    grid-template-columns: 1fr;
+  }
+}
+
 .asic-log li.is-editing .asic-log-mark {
   background: #fff;
   color: #166534;

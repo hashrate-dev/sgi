@@ -158,6 +158,7 @@ const PatchSchema = z.object({
   facturaNumero: z.string().trim().max(80).optional(),
   facturaId: z.number().int().positive().nullable().optional(),
   facturaTitular: z.string().trim().max(200).optional(),
+  numeroRecibo: z.string().trim().max(80).optional(),
 });
 
 const ConfirmSchema = z.object({
@@ -1114,18 +1115,19 @@ asicPedidosRouter.patch("/asic-pedidos/:id", ...writeMw, async (req, res, next) 
         id
       );
     const docs = pedido.etapas.documentos;
-    if (
-      pedido.tipo !== "reparacion" &&
-      docs?.status === "done" &&
-      docs.modoCobro === "factura_recibo" &&
-      data.facturaNumero
-    ) {
+    if (pedido.tipo !== "reparacion" && docs?.status === "done" && (data.facturaNumero || data.numeroRecibo)) {
       await saveStages(id, {
         ...pedido.etapas,
         documentos: {
           ...docs,
-          numeroFactura: facturaNumero,
-          titularFactura: facturaTitular || docs.titularFactura || "",
+          ...(data.facturaNumero
+            ? {
+                modoCobro: "factura_recibo" as const,
+                numeroFactura: facturaNumero,
+                titularFactura: facturaTitular || docs.titularFactura || "",
+              }
+            : {}),
+          ...(data.numeroRecibo ? { numeroRecibo: data.numeroRecibo } : {}),
         },
       });
     }
