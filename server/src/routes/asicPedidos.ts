@@ -65,6 +65,7 @@ type StageState = {
   firmadoNombre?: string;
   firmadoClientId?: number;
   montoUsd?: number | null;
+  costoUsd?: number | null;
 };
 
 type StagesMap = Partial<Record<AsicPedidoStageKey, StageState>>;
@@ -174,6 +175,7 @@ const ConfirmSchema = z.object({
   firmadoNombre: z.string().trim().max(200).optional().default(""),
   firmadoClientId: z.coerce.number().int().positive().optional(),
   montoUsd: z.coerce.number().finite().min(0).max(100_000_000).optional(),
+  costoUsd: z.coerce.number().finite().min(0).max(100_000_000).optional(),
   saltarAduana: z.boolean().optional(),
 });
 
@@ -346,6 +348,7 @@ function parseStages(raw: unknown): StagesMap {
       const status = row.status === "skipped" ? "skipped" : row.status === "done" ? "done" : null;
       if (!status) continue;
       const monto = row.montoUsd == null || row.montoUsd === "" ? null : Number(row.montoUsd);
+      const costo = row.costoUsd == null || row.costoUsd === "" ? null : Number(row.costoUsd);
       out[key] = {
         status,
         fecha: String(row.fecha ?? ""),
@@ -372,6 +375,7 @@ function parseStages(raw: unknown): StagesMap {
         ...(row.firmadoNombre ? { firmadoNombre: String(row.firmadoNombre) } : {}),
         ...(Number(row.firmadoClientId) > 0 ? { firmadoClientId: Number(row.firmadoClientId) } : {}),
         ...(monto != null && Number.isFinite(monto) ? { montoUsd: monto } : {}),
+        ...(costo != null && Number.isFinite(costo) ? { costoUsd: costo } : {}),
       };
     }
     return out;
@@ -718,6 +722,7 @@ function validateStage(key: AsicPedidoStageKey, body: z.infer<typeof ConfirmSche
   const base: StageState = { status: "done", fecha, notas: body.notas ?? "" };
   if (body.referencia) base.referencia = body.referencia;
   if (body.montoUsd != null) base.montoUsd = body.montoUsd;
+  if (body.costoUsd != null) base.costoUsd = body.costoUsd;
   if (key === "contrato") {
     if (!body.firmadoNombre || !body.firmadoClientId) {
       return { ok: false, message: "Indicá a nombre de quién se firmó el contrato." };

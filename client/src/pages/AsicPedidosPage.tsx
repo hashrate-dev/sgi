@@ -1749,6 +1749,7 @@ function StageForm({
     firmadoNombre?: string;
     firmadoClientId?: number;
     montoUsd?: number;
+    costoUsd?: number;
     saltarAduana?: boolean;
   }) => void;
 }) {
@@ -1784,6 +1785,7 @@ function StageForm({
   const [firmadoClientId, setFirmadoClientId] = useState(0);
   const [contratoClients, setContratoClients] = useState<HostingClientOption[]>([]);
   const [monto, setMonto] = useState("");
+  const [costo, setCosto] = useState("");
 
   useEffect(() => {
     setFecha(todayISO());
@@ -1821,6 +1823,7 @@ function StageForm({
     setNuevoContacto("");
     setFirmadoClientId(0);
     setMonto("");
+    setCosto("");
   }, [stage, pedido.id, pedido.etapas.contrato?.referencia, pedido.etapas.rep_solicitud?.referencia, pedido.etapas.rep_envio_taller?.referencia, pedido.etapas.rep_cotizacion?.referencia]);
 
   useEffect(() => {
@@ -2072,8 +2075,13 @@ function StageForm({
   const submit = () => {
     onError(null);
     const montoUsd = monto.trim() ? Number(monto.replace(",", ".")) : undefined;
+    const costoUsd = costo.trim() ? Number(costo.replace(",", ".")) : undefined;
     if (monto.trim() && !Number.isFinite(montoUsd)) {
-      onError("El monto tiene que ser un número.");
+      onError(stage === "rep_cotizacion" ? "El precio de reparación tiene que ser un número." : "El monto tiene que ser un número.");
+      return;
+    }
+    if (costo.trim() && !Number.isFinite(costoUsd)) {
+      onError("El costo tiene que ser un número.");
       return;
     }
     const firmado = stage === "contrato" ? contratoClients.find((client) => client.id === firmadoClientId) : undefined;
@@ -2124,6 +2132,7 @@ function StageForm({
         ? { referencia: referencia.trim() }
         : {}),
       ...(montoUsd != null ? { montoUsd } : {}),
+      ...(stage === "rep_cotizacion" && costoUsd != null ? { costoUsd } : {}),
     });
   };
 
@@ -2206,7 +2215,7 @@ function StageForm({
         </div>
       ) : null}
 
-      <div className="asic-pedidos-form">
+      <div className={`asic-pedidos-form${stage.startsWith("rep_") ? " is-compact" : ""}`}>
         {stage === "contrato" ? (
           <div className="span-2">
             <span className="asic-pedidos-label">A nombre de quién se firmó</span>
@@ -2227,10 +2236,12 @@ function StageForm({
             />
           </div>
         ) : null}
-        <label>
-          Fecha
-          <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} required />
-        </label>
+        {stage.startsWith("rep_") ? null : (
+          <label>
+            Fecha
+            <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} required />
+          </label>
+        )}
         {stage === "rep_factura" ? (
           <label>
             Número de factura
@@ -2328,11 +2339,6 @@ function StageForm({
               }
             }}
           />
-        ) : stage === "rep_cotizacion" ? (
-          <label>
-            Referencia de la cotización
-            <input value={referencia} onChange={(e) => setReferencia(e.target.value)} />
-          </label>
         ) : stage.startsWith("rep_") ? null : (
         <label>
           {referenciaLabel}
@@ -2351,7 +2357,22 @@ function StageForm({
           )}
         </label>
         )}
-        {stage === "dinero" || stage === "pago_proveedor" || stage === "rep_precio_cliente" || stage === "rep_cotizacion" ? (
+        {stage === "rep_cotizacion" ? (
+          <>
+            <label>
+              Costo de reparación (USD)
+              <input value={costo} onChange={(e) => setCosto(e.target.value)} inputMode="decimal" placeholder="Opcional" />
+            </label>
+            <label>
+              Precio de reparación al cliente (USD)
+              <input value={monto} onChange={(e) => setMonto(e.target.value)} inputMode="decimal" placeholder="Opcional" />
+            </label>
+            <label>
+              Referencia de la cotización
+              <input value={referencia} onChange={(e) => setReferencia(e.target.value)} />
+            </label>
+          </>
+        ) : stage === "dinero" || stage === "pago_proveedor" || stage === "rep_precio_cliente" ? (
           <label>
             {stage === "rep_precio_cliente" ? "Precio de la reparación (USD)" : "Monto USD"}
             <input value={monto} onChange={(e) => setMonto(e.target.value)} inputMode="decimal" placeholder="Opcional" />
@@ -2359,7 +2380,7 @@ function StageForm({
         ) : null}
         <label className="span-2">
           Notas
-          <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={2} />
+          <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={stage.startsWith("rep_") ? 1 : 2} />
         </label>
       </div>
 

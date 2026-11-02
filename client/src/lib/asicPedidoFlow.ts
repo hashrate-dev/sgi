@@ -53,6 +53,7 @@ export type AsicPedidoStageState = {
   firmadoNombre?: string;
   firmadoClientId?: number;
   montoUsd?: number | null;
+  costoUsd?: number | null;
 };
 
 export type AsicPedidoLinea = {
@@ -103,6 +104,7 @@ export type AsicPedidoConfirmBody = {
   firmadoNombre?: string;
   firmadoClientId?: number;
   montoUsd?: number;
+  costoUsd?: number;
   saltarAduana?: boolean;
 };
 
@@ -278,10 +280,13 @@ export function asicPedidoStageSummary(key: AsicPedidoStageKey, state: AsicPedid
       bits.push("Garantía pendiente");
     }
   }
-  if (state.montoUsd != null && Number.isFinite(state.montoUsd)) {
-    bits.push(
-      `${state.montoUsd.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
-    );
+  const usd = (amount: number) =>
+    `${amount.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
+  if (key === "rep_cotizacion") {
+    if (state.costoUsd != null && Number.isFinite(state.costoUsd)) bits.push(`Costo ${usd(state.costoUsd)}`);
+    if (state.montoUsd != null && Number.isFinite(state.montoUsd)) bits.push(`Precio al cliente ${usd(state.montoUsd)}`);
+  } else if (state.montoUsd != null && Number.isFinite(state.montoUsd)) {
+    bits.push(usd(state.montoUsd));
   }
   return bits.join(" · ");
 }
