@@ -2433,35 +2433,89 @@ function ContactoField({
   onDraft: (value: string) => void;
   onAdd: () => Promise<boolean>;
 }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const canonical = options.find((item) => item.trim().toLocaleLowerCase("es") === value.trim().toLocaleLowerCase("es"));
   const selected = canonical || value;
+  const items = value && !canonical ? [value, ...options] : options;
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onPointer);
+    return () => document.removeEventListener("mousedown", onPointer);
+  }, [open]);
+
   return (
     <div className="asic-pedidos-contacto">
       <span className="asic-pedidos-label">{label}</span>
-      <select value={selected} onChange={(e) => onChange(e.target.value)}>
-        <option value="">Elegí un contacto</option>
-        {value && !canonical ? <option value={value}>{value}</option> : null}
-        {options.map((item) => (
-          <option key={item} value={item}>
-            {item}
-          </option>
-        ))}
-      </select>
-      <div className="asic-pedidos-addline">
-        <input
-          value={draft}
-          onChange={(e) => onDraft(e.target.value)}
-          maxLength={200}
-          placeholder="Nuevo contacto"
-          onKeyDown={(e) => {
-            if (e.key !== "Enter" || busy || !draft.trim()) return;
-            e.preventDefault();
-            void onAdd();
-          }}
-        />
-        <button type="button" className="asic-pedidos-ghost" disabled={busy || !draft.trim()} onClick={() => void onAdd()}>
-          Agregar
+      <div className="asic-pedidos-docmenu" ref={rootRef}>
+        <button
+          type="button"
+          className={`asic-pedidos-docmenu-trigger${selected ? " is-on" : " is-empty"}`}
+          aria-expanded={open}
+          onClick={() => setOpen((current) => !current)}
+        >
+          <strong>{selected || "Elegí un contacto"}</strong>
+          <span className="asic-pedidos-docmenu-caret" aria-hidden="true">{open ? "▴" : "▾"}</span>
         </button>
+        {open ? (
+          <div className="asic-pedidos-docs asic-pedidos-docmenu-panel">
+            <button
+              type="button"
+              className={selected ? "" : "is-on"}
+              onClick={() => {
+                onChange("");
+                setOpen(false);
+              }}
+            >
+              <strong>Elegí un contacto</strong>
+            </button>
+            {items.map((item) => (
+              <button
+                key={item}
+                type="button"
+                className={selected === item ? "is-on" : ""}
+                onClick={() => {
+                  onChange(item);
+                  setOpen(false);
+                }}
+              >
+                <strong>{item}</strong>
+              </button>
+            ))}
+            {items.length === 0 ? <p className="asic-pedidos-doc-note">Todavía no hay contactos guardados.</p> : null}
+            <div className="asic-pedidos-addline asic-pedidos-addline--in-menu">
+              <input
+                value={draft}
+                onChange={(e) => onDraft(e.target.value)}
+                maxLength={200}
+                placeholder="Nuevo contacto"
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter" || busy || !draft.trim()) return;
+                  e.preventDefault();
+                  void onAdd().then((saved) => {
+                    if (saved) setOpen(false);
+                  });
+                }}
+              />
+              <button
+                type="button"
+                className="asic-pedidos-ghost"
+                disabled={busy || !draft.trim()}
+                onClick={() => {
+                  void onAdd().then((saved) => {
+                    if (saved) setOpen(false);
+                  });
+                }}
+              >
+                Agregar
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

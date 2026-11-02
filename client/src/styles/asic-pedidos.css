@@ -313,10 +313,6 @@
   gap: 0.28rem;
 }
 
-.asic-pedidos-contacto select {
-  width: 100%;
-}
-
 .asic-pedidos-addline {
   display: flex;
   gap: 0.4rem;
