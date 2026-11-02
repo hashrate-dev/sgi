@@ -1150,7 +1150,10 @@ function PedidoTracking({
                 Origen: {pedido.origen === "china" ? <FlagChina /> : <FlagParaguay />}
                 {origen}
               </span>
-              <span>Destino: Ayolas</span>
+              <span className="asic-track-destino">
+                <i className="bi bi-hdd-rack" aria-hidden="true" />
+                Destino: Ayolas
+              </span>
             </>
           )}
         </div>
