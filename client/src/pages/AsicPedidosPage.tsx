@@ -1121,9 +1121,11 @@ function PedidoTracking({
             if (!state) return null;
             return (
               <li key={key}>
-                <span className="asic-log-rail" aria-hidden="true" />
-                <span className="asic-log-date">{state.fecha ? formatAsicPedidoFecha(state.fecha) : "—"}</span>
-                <div>
+                <span className="asic-log-mark" aria-hidden="true" title={asicPedidoStageTitle(key, pedido.origen)}>
+                  <i className={`bi ${asicPedidoStageIcon(key, pedido.origen)}`} />
+                </span>
+                <div className="asic-log-body">
+                  <span className="asic-log-date">{state.fecha ? formatAsicPedidoFecha(state.fecha) : "—"}</span>
                   <strong>{asicPedidoStageTitle(key, pedido.origen)}</strong>
                   <p>{asicPedidoStageSummary(key, state) || asicPedidoStageDetail(key)}</p>
                   {key === "documentos" && cobroPendiente.garantia ? (
@@ -1492,7 +1494,7 @@ function asicPedidoStageIcon(key: AsicPedidoStageKey, origen: AsicPedidoOrigen):
     case "instalado":
       return "bi-cpu";
     case "rep_solicitud":
-      return "bi-wrench";
+      return "bi-ticket-perforated";
     case "rep_envio_taller":
       return "bi-truck";
     case "rep_diagnostico":
@@ -1500,7 +1502,7 @@ function asicPedidoStageIcon(key: AsicPedidoStageKey, origen: AsicPedidoOrigen):
     case "rep_cotizacion":
       return "bi-file-earmark-text";
     case "rep_precio_cliente":
-      return "bi-send";
+      return "bi-tag";
     case "rep_aceptacion":
       return "bi-check-circle";
     case "rep_factura":
@@ -1512,7 +1514,7 @@ function asicPedidoStageIcon(key: AsicPedidoStageKey, origen: AsicPedidoOrigen):
     case "rep_reparado":
       return "bi-patch-check";
     case "rep_envio_ayolas":
-      return "bi-geo-alt";
+      return "bi-signpost-2";
     case "rep_encendido":
       return "bi-lightning-charge";
   }
