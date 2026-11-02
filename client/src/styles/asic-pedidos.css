@@ -531,23 +531,36 @@
 .asic-track-rail-wrap {
   position: relative;
   width: 100%;
-  padding: 0.85rem 0 3.05rem;
+  padding: 0.45rem 0 3.55rem;
 }
 
 .asic-track-rail {
   position: absolute;
-  left: 1.02rem;
-  right: 1.02rem;
-  top: 1.75rem;
-  height: 4px;
+  left: 1.225rem;
+  right: 1.225rem;
+  top: calc(0.45rem + (2.45rem - 6px) / 2);
+  height: 6px;
   border-radius: 999px;
-  background: repeating-linear-gradient(90deg, #cbd5e1 0 5px, transparent 5px 9px);
+  background: #e2e8f0;
+  overflow: hidden;
 }
 
 .asic-track-fill {
+  position: relative;
   height: 100%;
   border-radius: 999px;
-  background: #16a34a;
+  background: linear-gradient(90deg, #15803d, #22c55e);
+  transition: width 0.7s ease;
+  overflow: hidden;
+}
+
+.asic-track-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
+  transform: translateX(-100%);
+  animation: asic-track-flow 2.4s linear infinite;
 }
 
 .asic-track-dots {
@@ -568,15 +581,16 @@
 }
 
 .asic-track-dot {
-  width: 2.05rem;
-  height: 2.05rem;
-  border-radius: 999px;
-  border: 2px solid #cbd5e1;
+  width: 2.45rem;
+  height: 2.45rem;
+  border-radius: 14px;
+  border: 1px solid #cbd5e1;
   background: #fff;
-  color: #94a3b8;
-  font-size: 0.92rem;
+  color: #64748b;
+  font-size: 1.05rem;
   display: grid;
   place-items: center;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.06);
 }
 
 .asic-track-dot i {
@@ -585,8 +599,9 @@
 
 .asic-track-dot.is-done {
   border-color: #16a34a;
-  background: #16a34a;
+  background: linear-gradient(180deg, #22c55e, #15803d);
   color: #fff;
+  animation: asic-track-pop 0.45s ease both;
 }
 
 .asic-track-dot.is-current {
@@ -607,6 +622,26 @@
   border: 2px solid rgba(22, 163, 74, 0.55);
   pointer-events: none;
   animation: asic-track-ring 1.8s ease-out infinite;
+}
+
+@keyframes asic-track-flow {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes asic-track-pop {
+  from {
+    transform: scale(0.72);
+    opacity: 0.4;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 @keyframes asic-track-current {
@@ -636,31 +671,32 @@
 
 @media (prefers-reduced-motion: reduce) {
   .asic-track-dot.is-current,
-  .asic-track-dot.is-current::after {
+  .asic-track-dot.is-current::after,
+  .asic-track-dot.is-done,
+  .asic-track-fill,
+  .asic-track-fill::after {
     animation: none;
+    transition: none;
   }
 }
 
 .asic-track-name {
   position: absolute;
-  top: 2.35rem;
+  top: 2.7rem;
   left: 50%;
   transform: translateX(-50%);
-  max-width: 4.4rem;
+  width: 100%;
+  max-width: 5.4rem;
   text-align: center;
   color: #64748b;
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   font-weight: 700;
   line-height: 1.15;
-  visibility: hidden;
-  white-space: nowrap;
 }
 
-.asic-track-dots li:first-child .asic-track-name,
-.asic-track-dots li:last-child .asic-track-name,
+.asic-track-dots li:has(.is-done) .asic-track-name,
 .asic-track-dots li:has(.is-current) .asic-track-name {
-  visibility: visible;
-  color: #0f172a;
+  color: #14532d;
 }
 
 .asic-track-dots li:first-child .asic-track-name {
@@ -1076,6 +1112,16 @@
   border-radius: 10px;
   padding: 0.6rem 0.75rem;
   margin-bottom: 0.8rem;
+}
+
+@media (max-width: 1100px) {
+  .asic-track-scroll {
+    overflow-x: auto;
+  }
+
+  .asic-track-rail-wrap {
+    min-width: 54rem;
+  }
 }
 
 @media (max-width: 720px) {

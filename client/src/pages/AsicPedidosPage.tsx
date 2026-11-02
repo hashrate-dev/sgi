@@ -1053,7 +1053,7 @@ function PedidoTracking({
               <div className="asic-track-fill" style={{ width: `${completo ? 100 : fill}%` }} />
             </div>
             <ol className="asic-track-dots">
-              {stages.map((key) => {
+              {stages.map((key, index) => {
                 const done = pedido.etapas[key]?.status === "done";
                 const current = !completo && key === pedido.etapaActual;
                 const esperaGarantia = key === "documentos" && cobroPendiente.garantia;
@@ -1061,6 +1061,7 @@ function PedidoTracking({
                   <li key={key} className={esperaGarantia ? "is-alert" : undefined}>
                     <span
                       className={`asic-track-dot${done ? " is-done" : ""}${current ? " is-current" : ""}`}
+                      style={done ? { animationDelay: `${index * 70}ms` } : undefined}
                       title={esperaGarantia ? "Garantía pendiente de pago completo" : asicPedidoStageTitle(key, pedido.origen)}
                     >
                       <i className={`bi ${asicPedidoStageIcon(key, pedido.origen)}`} aria-hidden="true" />
