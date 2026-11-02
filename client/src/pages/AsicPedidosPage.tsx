@@ -1814,12 +1814,14 @@ function StageForm({
           ? String(pedido.etapas.rep_envio_taller?.referencia || pedido.etapas.rep_solicitud?.referencia || "").trim()
           : stage === "rep_solicitud"
             ? String(pedido.etapas.rep_solicitud?.referencia ?? "").trim()
-            : ""
+            : stage === "rep_diagnostico"
+              ? String(pedido.etapas.rep_diagnostico?.referencia || pedido.etapas.rep_envio_taller?.referencia || "").trim()
+              : ""
     );
     setNuevoContacto("");
     setFirmadoClientId(0);
     setMonto("");
-  }, [stage, pedido.id, pedido.etapas.contrato?.referencia, pedido.etapas.rep_solicitud?.referencia, pedido.etapas.rep_envio_taller?.referencia]);
+  }, [stage, pedido.id, pedido.etapas.contrato?.referencia, pedido.etapas.rep_solicitud?.referencia, pedido.etapas.rep_envio_taller?.referencia, pedido.etapas.rep_diagnostico?.referencia]);
 
   useEffect(() => {
     const needsRefs = stage === "contrato" || stage === "documentos";
