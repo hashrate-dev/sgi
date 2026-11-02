@@ -341,13 +341,12 @@ export const ASIC_REPARACION_FLOW_LABELS = [
   "3. Estado de situación",
   "4. Cotización",
   "5. Precio al cliente",
-  "6. Cliente acepta",
-  "7. Factura crédito",
-  "8. Recibo de pago",
-  "9. Reparación",
-  "10. Equipo reparado",
-  "11. Vuelta a Ayolas",
-  "12. Encendido",
+  "6. Factura crédito",
+  "7. Recibo de pago",
+  "8. Reparación",
+  "9. Equipo reparado",
+  "10. Vuelta a Ayolas",
+  "11. Encendido",
 ] as const;
 
 export function listAsicPedidoGarantias(): Promise<{

@@ -848,7 +848,7 @@ function PedidoDetail({
   onRun: (task: () => Promise<AsicPedido>) => Promise<void>;
   onDeleted: () => void;
 }) {
-  const stages = asicPedidoStagesFor(pedido);
+  const stages = asicPedidoStagesFor(pedido).filter((key) => key !== "rep_aceptacion");
   const doneCount = stages.filter((key) => pedido.etapas[key]?.status === "done").length;
   const autoPrecio = useRef<number | null>(null);
   useEffect(() => {
@@ -866,6 +866,20 @@ function PedidoDetail({
       }).then((r) => r.pedido)
     );
   }, [canWrite, onRun, pedido.id, pedido.etapaActual, pedido.etapas.rep_cotizacion]);
+  const autoAceptacion = useRef<number | null>(null);
+  useEffect(() => {
+    if (!canWrite || pedido.etapaActual !== "rep_aceptacion") return;
+    if (autoAceptacion.current === pedido.id) return;
+    const quote = pedido.etapas.rep_cotizacion;
+    if (quote?.status !== "done") return;
+    autoAceptacion.current = pedido.id;
+    void onRun(() =>
+      confirmAsicPedidoStage(pedido.id, "rep_aceptacion", {
+        fecha: quote.fecha || pedido.etapas.rep_precio_cliente?.fecha || todayISO(),
+        notas: "",
+      }).then((r) => r.pedido)
+    );
+  }, [canWrite, onRun, pedido.id, pedido.etapaActual, pedido.etapas.rep_cotizacion, pedido.etapas.rep_precio_cliente?.fecha]);
   const customsStillOpen =
     pedido.tipo !== "reparacion" &&
     pedido.origen === "paraguay" &&
@@ -1068,7 +1082,7 @@ function PedidoTracking({
         ) : null}
       </section>
 
-      {!completo && currentKey && currentKey !== "rep_precio_cliente" ? (
+      {!completo && currentKey && currentKey !== "rep_precio_cliente" && currentKey !== "rep_aceptacion" ? (
         <section className="asic-track-card">
           <p className="asic-track-kicker">Etapa en curso</p>
           <h2>{asicPedidoEtapaLabel(pedido)}</h2>

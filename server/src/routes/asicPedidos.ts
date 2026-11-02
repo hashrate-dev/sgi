@@ -1162,13 +1162,18 @@ asicPedidosRouter.post("/asic-pedidos/:id/etapas/:key", ...writeMw, async (req, 
       return;
     }
     const etapas: StagesMap = { ...pedido.etapas, [keyRaw]: checked.state };
-    if (keyRaw === "rep_cotizacion") {
-      etapas.rep_precio_cliente = {
-        status: "done",
-        fecha: checked.state.fecha,
-        notas: "",
-        ...(checked.state.montoUsd != null ? { montoUsd: checked.state.montoUsd } : {}),
-      };
+    if (keyRaw === "rep_cotizacion" || keyRaw === "rep_precio_cliente") {
+      const fecha = checked.state.fecha || pedido.etapas.rep_cotizacion?.fecha || "";
+      const monto = keyRaw === "rep_cotizacion" ? checked.state.montoUsd : pedido.etapas.rep_cotizacion?.montoUsd;
+      if (!etapas.rep_precio_cliente || etapas.rep_precio_cliente.status !== "done") {
+        etapas.rep_precio_cliente = {
+          status: "done",
+          fecha,
+          notas: "",
+          ...(monto != null ? { montoUsd: monto } : {}),
+        };
+      }
+      etapas.rep_aceptacion = { status: "done", fecha, notas: "" };
     }
     await saveStages(id, etapas);
     if ((keyRaw === "rep_solicitud" || keyRaw === "rep_envio_taller") && checked.state.referencia) {
