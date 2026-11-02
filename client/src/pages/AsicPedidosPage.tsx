@@ -1067,6 +1067,7 @@ function PedidoTracking({
   const doneStages = stages.filter((key) => pedido.etapas[key]?.status === "done");
   const cobroPendiente = asicPedidoCobroPendiente(pedido);
   const [facturas, setFacturas] = useState<AsicBillingDoc[]>([]);
+  const [garantiasEmitidas, setGarantiasEmitidas] = useState<AsicPedidoGarantiaDoc[]>([]);
   const receiptSync = useRef<string>("");
 
   useEffect(() => {
@@ -1091,6 +1092,13 @@ function PedidoTracking({
       })
       .catch(() => {
         if (!cancelled) setFacturas([]);
+      });
+    void listAsicPedidoGarantias()
+      .then((r) => {
+        if (!cancelled) setGarantiasEmitidas(Array.isArray(r.garantias) ? r.garantias : []);
+      })
+      .catch(() => {
+        if (!cancelled) setGarantiasEmitidas([]);
       });
     return () => {
       cancelled = true;
@@ -1225,7 +1233,7 @@ function PedidoTracking({
                   <span className="asic-log-date">{state.fecha ? formatAsicPedidoFecha(state.fecha) : "—"}</span>
                   <strong>{asicPedidoStageTitle(key, pedido.origen)}</strong>
                   {key === "documentos" && state.modoCobro === "factura_recibo" ? (
-                    <DocumentosVinculo pedido={pedido} facturas={facturas} state={state} />
+                    <DocumentosVinculo pedido={pedido} facturas={facturas} garantias={garantiasEmitidas} state={state} />
                   ) : (
                     <p>{asicPedidoStageSummary(key, state) || asicPedidoStageDetail(key)}</p>
                   )}
@@ -1378,10 +1386,12 @@ function ventaDocumento(
 function DocumentosVinculo({
   pedido,
   facturas,
+  garantias,
   state,
 }: {
   pedido: AsicPedido;
   facturas: AsicBillingDoc[];
+  garantias: AsicPedidoGarantiaDoc[];
   state: NonNullable<AsicPedido["etapas"]["documentos"]>;
 }) {
   const linked = ventaDocumento(
@@ -1394,6 +1404,9 @@ function DocumentosVinculo({
   const factura = linked?.invoice;
   const recibo = linked?.receipt;
   const titular = state.titularFactura || factura?.clientName || "";
+  const garantiaNumero = String(state.numeroGarantia ?? "").trim();
+  const garantia = garantias.find((doc) => doc.number.trim().toUpperCase() === garantiaNumero.toUpperCase());
+  const garantiaTotal = state.valorGarantiaUsd ?? garantia?.total;
   return (
     <div className="asic-stage-docs">
       <article className="asic-stage-doc">
@@ -1411,6 +1424,16 @@ function DocumentosVinculo({
           {recibo
             ? `${formatUsd(recibo.total)}${recibo.clientName ? ` · ${recibo.clientName}` : ""}`
             : "Se vincula el recibo de esta factura"}
+        </em>
+      </article>
+      <article className={`asic-stage-doc${garantiaNumero ? "" : " is-pending"}`}>
+        <span>Garantía</span>
+        <strong>{garantiaNumero || "Pendiente"}</strong>
+        <em>
+          {garantiaTotal != null && Number.isFinite(garantiaTotal)
+            ? formatUsd(garantiaTotal)
+            : "Elegí un recibo de garantía emitido"}
+          {garantia?.clientName ? ` · ${garantia.clientName}` : ""}
         </em>
       </article>
     </div>
@@ -2305,7 +2328,7 @@ function StageForm({
           clientId: pedido.clientId,
           clients,
           garantias: garantiasRes.garantias ?? [],
-          extraLabels: [pedido.etapas.contrato?.referencia ?? "", pedido.facturaTitular ?? ""],
+          extraLabels: [pedido.etapas.contrato?.referencia ?? "", pedido.facturaTitular ?? "", referencia],
         });
         if (cancelled) return;
         setGarantiaSuggested(matched.suggested);
@@ -2318,7 +2341,7 @@ function StageForm({
     return () => {
       cancelled = true;
     };
-  }, [stage, pedido.id, pedido.cliente, pedido.clientId, pedido.facturaTitular, pedido.etapas.contrato?.referencia]);
+  }, [stage, pedido.id, pedido.cliente, pedido.clientId, pedido.facturaTitular, pedido.etapas.contrato?.referencia, referencia]);
 
   const referenciaLabel =
     stage === "pedido"
@@ -2448,9 +2471,9 @@ function StageForm({
       {stage === "documentos" && modo === "factura_recibo" && numeroFactura && !numeroGarantia ? (
         <aside className="asic-track-alert">
           <p className="asic-track-alert-kicker">Garantía</p>
-          <p className="asic-track-alert-title">Pendiente de pago completo</p>
+          <p className="asic-track-alert-title">Elegí el recibo emitido</p>
           <p className="asic-track-alert-text">
-            {numeroFactura} quedó conectada{titularFactura ? ` (${titularFactura})` : ""}. Podés confirmar la etapa. El comprobante se emite con el recibo.
+            {numeroFactura} quedó conectada{titularFactura ? ` (${titularFactura})` : ""}. El total de la garantía sale del recibo que elijas abajo.
           </p>
         </aside>
       ) : null}
@@ -2464,7 +2487,7 @@ function StageForm({
         />
       ) : null}
 
-      {stage === "documentos" && (modo !== "factura_recibo" || Boolean(numeroGarantia) || garantiaSuggested.length > 0) ? (
+      {stage === "documentos" ? (
         <GarantiaDocMenu
           state={garantiaState}
           suggested={garantiaSuggested}
@@ -3063,12 +3086,12 @@ function GarantiaDocMenu({
   const matches = (doc: AsicPedidoGarantiaDoc) => `${doc.number} ${doc.clientName} ${doc.detalle ?? ""}`.toLowerCase().includes(q);
   const visibleSuggested = q ? suggested.filter(matches) : suggested;
   const filteredOthers = q ? others.filter(matches) : others;
-  const visibleOthers = q ? filteredOthers : filteredOthers.slice(0, 30);
+  const visibleOthers = q ? filteredOthers : filteredOthers.slice(0, 40);
   const selected = [...suggested, ...others].find((doc) => doc.number === selectedNumber);
   return (
     <div className="asic-pedidos-docmenu" ref={rootRef}>
       <p className="asic-pedidos-doc-note">
-        Comprobante garantía, aparte del pago. Se emite al recibir el dinero y acá se suma el valor de esa garantía.
+        Recibos ya emitidos en Garantías. Elegí el de esta operación: el total de ese recibo queda vinculado acá.
       </p>
       <button
         type="button"
@@ -3082,48 +3105,58 @@ function GarantiaDocMenu({
               {selected.number} · {selected.clientName}
             </strong>
             <span>
-              Valor de la garantía: {formatUsd(selected.total)}
+              Total {formatUsd(selected.total)}
               {selected.date ? ` · ${selected.date}` : ""}
             </span>
           </span>
         ) : (
-          <strong>Elegir comprobante garantía</strong>
+          <strong>Elegir recibo de garantía</strong>
         )}
         <span className="asic-pedidos-docmenu-caret" aria-hidden="true">{open ? "▴" : "▾"}</span>
       </button>
-      {selected ? <p className="asic-pedidos-garantia-valor">Valor de la garantía: {formatUsd(selected.total)}</p> : (
-        <p className="asic-pedidos-doc-note">Si el comprobante todavía no se emitió, podés confirmar la etapa. El valor se agrega cuando exista.</p>
+      {selected ? <p className="asic-pedidos-garantia-valor">Total vinculado: {formatUsd(selected.total)}</p> : (
+        <p className="asic-pedidos-doc-note">Si el recibo todavía no se emitió, podés confirmar la etapa. El total se agrega cuando lo elijas.</p>
       )}
       {open ? (
         <div className="asic-pedidos-docs asic-pedidos-docmenu-panel">
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar por número, cliente o equipo"
+            placeholder="Buscar recibo por número, cliente o equipo"
             autoFocus
           />
-          {[...visibleSuggested, ...visibleOthers].map((doc) => (
-            <button
-              key={doc.number}
-              type="button"
-              className={selectedNumber === doc.number ? "is-on" : ""}
-              onClick={() => {
-                onPick(doc);
-                setOpen(false);
-              }}
-            >
-              <strong>
-                {doc.number} · {doc.clientName}
-              </strong>
-              <span>
-                Valor de la garantía: {formatUsd(doc.total)}
-                {doc.date ? ` · ${doc.date}` : ""}
-              </span>
-              {doc.detalle ? <span>{doc.detalle}</span> : null}
-            </button>
-          ))}
+          {[
+            { label: "De este cliente", docs: visibleSuggested },
+            { label: "Otros recibos emitidos", docs: visibleOthers },
+          ].map((group) =>
+            group.docs.length ? (
+              <div key={group.label} className="asic-precio-docgroup">
+                <span>{group.label}</span>
+                {group.docs.map((doc) => (
+                  <button
+                    key={doc.number}
+                    type="button"
+                    className={selectedNumber === doc.number ? "is-on" : ""}
+                    onClick={() => {
+                      onPick(doc);
+                      setOpen(false);
+                    }}
+                  >
+                    <strong>
+                      {doc.number} · {formatUsd(doc.total)}
+                    </strong>
+                    <span>
+                      {doc.clientName}
+                      {doc.date ? ` · ${doc.date}` : ""}
+                    </span>
+                    {doc.detalle ? <span>{doc.detalle}</span> : null}
+                  </button>
+                ))}
+              </div>
+            ) : null
+          )}
           {visibleSuggested.length === 0 && visibleOthers.length === 0 ? (
-            <p className="asic-pedidos-doc-note">No hay un comprobante de garantía con ese dato.</p>
+            <p className="asic-pedidos-doc-note">No hay un recibo de garantía emitido con ese dato.</p>
           ) : null}
         </div>
       ) : null}

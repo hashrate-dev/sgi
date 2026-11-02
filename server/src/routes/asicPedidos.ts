@@ -594,9 +594,11 @@ async function listGarantiasEmitidas(): Promise<GarantiaEmitida[]> {
         total?: number;
       };
       if (inv.type === "Recibo Devolución") continue;
-      if (inv.type && inv.type !== "Recibo") continue;
       const number = String(inv.number ?? "").trim();
       if (!number || seen.has(number.toUpperCase())) continue;
+      const type = String(inv.type ?? "").trim().toLowerCase();
+      if (type === "recibo devolución" || type === "recibo devolucion" || /^rd/i.test(number)) continue;
+      if (type && type !== "recibo" && !/^rg/i.test(number)) continue;
       seen.add(number.toUpperCase());
       out.push({
         number,
@@ -873,9 +875,11 @@ asicPedidosRouter.get("/asic-pedidos/garantias", ...readMw, async (_req, res, ne
           items?: Array<{ service?: string }>;
         };
         if (inv.type === "Recibo Devolución") continue;
-        if (inv.type && inv.type !== "Recibo") continue;
         const number = String(inv.number ?? "").trim();
         if (!number || seen.has(number.toUpperCase())) continue;
+        const type = String(inv.type ?? "").trim().toLowerCase();
+        if (type === "recibo devolución" || type === "recibo devolucion" || /^rd/i.test(number)) continue;
+        if (type && type !== "recibo" && !/^rg/i.test(number)) continue;
         seen.add(number.toUpperCase());
         const detalle = (Array.isArray(inv.items) ? inv.items : [])
           .map((item) => String(item?.service ?? "").trim())
