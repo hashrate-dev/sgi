@@ -209,7 +209,7 @@ export function asicPedidoStageDetail(key: AsicPedidoStageKey): string {
     case "rep_reparar":
       return "Con el pago hecho, se manda el equipo a reparar en el taller.";
     case "rep_reparado":
-      return "El taller termina la reparación.";
+      return "Fecha en la que el taller deja la reparación al 100%.";
     case "rep_envio_ayolas":
       return "El equipo reparado vuelve al datacenter de Ayolas.";
     case "rep_encendido":

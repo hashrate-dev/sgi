@@ -2252,9 +2252,9 @@ function StageForm({
             />
           </div>
         ) : null}
-        {stage.startsWith("rep_") && stage !== "rep_solicitud" ? null : (
+        {stage.startsWith("rep_") && stage !== "rep_solicitud" && stage !== "rep_reparado" ? null : (
           <label>
-            Fecha
+            {stage === "rep_reparado" ? "Fecha de reparación 100%" : "Fecha"}
             <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} required />
           </label>
         )}
