@@ -4,7 +4,7 @@ import { AsicCotizadorCatalogSelect } from "../components/AsicCotizadorCatalogSe
 import { BillingHostingClientPicker } from "../components/BillingHostingClientPicker";
 import { HostingClientSelect, type HostingClientOption } from "../components/HostingClientSelect";
 import { useAuth } from "../contexts/AuthContext";
-import { getClients, getEquipos, getInvoiceById, getInvoices } from "../lib/api";
+import { getClients, getEquipos, getInvoiceById, getInvoices, getSetups } from "../lib/api";
 import {
   asicBillingDateToIso,
   matchAsicPedidoBilling,
@@ -317,6 +317,7 @@ function PedidoList({
   const [equipos, setEquipos] = useState<EquipoASIC[]>([]);
   const [facturas, setFacturas] = useState<AsicBillingDoc[]>([]);
   const [facturasListas, setFacturasListas] = useState(false);
+  const [preciosFactura, setPreciosFactura] = useState<Record<number, number>>({});
   const [clientId, setClientId] = useState<number | "">("");
   const [tipoPedido, setTipoPedido] = useState<AsicPedidoTipo>("compra");
   const [origen, setOrigen] = useState<AsicPedidoOrigen>("china");
@@ -396,6 +397,40 @@ function PedidoList({
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!facturasListas) return;
+    const compras = pedidos.filter((pedido) => ventaDocumento(pedido, facturas));
+    if (!compras.length) {
+      setPreciosFactura({});
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const setupRes = await getSetups().catch(() => ({ items: [] as Array<{ nombre: string }> }));
+      if (cancelled) return;
+      const setups = (setupRes.items ?? []).map((item) => item.nombre);
+      const entries = await Promise.all(
+        compras.map(async (pedido) => {
+          try {
+            const amount = await precioVentaDesdeFactura(pedido, facturas, setups);
+            return [pedido.id, amount] as const;
+          } catch {
+            return [pedido.id, null] as const;
+          }
+        })
+      );
+      if (cancelled) return;
+      const next: Record<number, number> = {};
+      for (const [id, amount] of entries) {
+        if (amount != null) next[id] = amount;
+      }
+      setPreciosFactura(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [facturas, facturasListas, pedidos]);
 
   const modeloOptions = useMemo(() => modeloOptionsFor(equipos, marca), [equipos, marca]);
 
@@ -855,8 +890,10 @@ function PedidoList({
                                 <div className="asic-precio-cell">
                                   {documento ? (
                                     <>
-                                      <strong>{formatUsd(documento.invoice.total)}</strong>
-                                      <span>Precio total · {documento.invoice.number}</span>
+                                      <strong>
+                                        {preciosFactura[pedido.id] != null ? formatUsd(preciosFactura[pedido.id]) : "…"}
+                                      </strong>
+                                      <span>Equipos + setup · {documento.invoice.number}</span>
                                       {documento.receipt ? (
                                         <span className="asic-precio-doc">Recibo {documento.receipt.number}</span>
                                       ) : null}
@@ -926,7 +963,42 @@ function PedidoDetail({
 }) {
   const stages = asicPedidoStagesFor(pedido).filter((key) => key !== "rep_aceptacion");
   const doneCount = stages.filter((key) => pedido.etapas[key]?.status === "done").length;
+  const [precioVenta, setPrecioVenta] = useState<number | null>(pedido.tipo === "reparacion" ? asicPedidoPrecioCliente(pedido) : null);
   const autoPrecio = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (pedido.tipo === "reparacion") {
+      setPrecioVenta(asicPedidoPrecioCliente(pedido));
+      return;
+    }
+    let cancelled = false;
+    setPrecioVenta(null);
+    void (async () => {
+      try {
+        const [invRes, setupRes] = await Promise.all([getInvoices({ source: "asic" }), getSetups()]);
+        if (cancelled) return;
+        const invoices = (invRes.invoices ?? []).map((row) => ({
+          id: Number(row.id),
+          number: String(row.number ?? ""),
+          type: String(row.type ?? ""),
+          clientName: String(row.clientName ?? ""),
+          date: String(row.date ?? ""),
+          total: Number(row.total) || 0,
+          relatedInvoiceId: row.relatedInvoiceId,
+          relatedInvoiceNumber: row.relatedInvoiceNumber,
+          documentContext: row.documentContext,
+        }));
+        const setups = (setupRes.items ?? []).map((item) => item.nombre);
+        const amount = await precioVentaDesdeFactura(pedido, invoices, setups);
+        if (!cancelled) setPrecioVenta(amount);
+      } catch {
+        if (!cancelled) setPrecioVenta(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [pedido]);
   useEffect(() => {
     if (!canWrite || pedido.etapaActual !== "rep_precio_cliente") return;
     if (autoPrecio.current === pedido.id) return;
@@ -985,7 +1057,7 @@ function PedidoDetail({
               Ticket {asicPedidoFechaTicket(pedido) ? formatAsicPedidoFecha(asicPedidoFechaTicket(pedido)) : "—"}
             </span>
             <span className="asic-op-line">
-              Precio {asicPedidoPrecioCliente(pedido) != null ? formatUsd(asicPedidoPrecioCliente(pedido) as number) : "—"}
+              Precio {precioVenta != null ? formatUsd(precioVenta) : "—"}
             </span>
           </p>
         </div>
@@ -1384,6 +1456,51 @@ function ventaDocumento(
       return doc.relatedInvoiceId != null && Number(doc.relatedInvoiceId) === invoice.id;
     }) ?? null;
   return { invoice, receipt };
+}
+
+function montoLineaFactura(item: { quantity: number; price: number; discount: number }): number {
+  const qty = Math.max(0, Number(item.quantity) || 0);
+  const price = Number(item.price) || 0;
+  const discount = Number(item.discount) || 0;
+  return Math.max(0, qty * (price - discount));
+}
+
+/** Equipos de la operación más las líneas de setup de la factura que el usuario vinculó. */
+function precioEquiposYSetup(
+  pedido: AsicPedido,
+  items: Array<{ service: string; quantity: number; price: number; discount: number }>,
+  setups: string[]
+): number | null {
+  if (!items.length) return null;
+  const modelos = asicPedidoLineas(pedido).map((linea) => foldEquipoName(linea.equipo)).filter((name) => name.length >= 2);
+  const setupNames = setups.map((name) => foldEquipoName(name)).filter((name) => name.length >= 4);
+  let suma = 0;
+  let counted = 0;
+  for (const item of items) {
+    const label = foldEquipoName(item.service);
+    if (!label) continue;
+    if (/flete|transporte|garantia|deposito|comision|gastos operativos/.test(label)) continue;
+    const esSetup = /\bsetup\b/.test(label) || setupNames.some((name) => label.includes(name));
+    const esEquipo = modelos.some((modelo) => label.includes(modelo));
+    if (!esSetup && !esEquipo) continue;
+    suma += montoLineaFactura(item);
+    counted += 1;
+  }
+  return counted > 0 && Number.isFinite(suma) ? suma : null;
+}
+
+async function precioVentaDesdeFactura(
+  pedido: AsicPedido,
+  invoices: AsicBillingDoc[],
+  setups: string[]
+): Promise<number | null> {
+  const doc = ventaDocumento(pedido, invoices);
+  if (!doc) return null;
+  const full = await getInvoiceById(doc.invoice.id);
+  const parcial = precioEquiposYSetup(pedido, full.invoice.items ?? [], setups);
+  if (parcial != null) return parcial;
+  const total = Number(full.invoice.total);
+  return Number.isFinite(total) ? total : doc.invoice.total;
 }
 
 function DocumentosVinculo({
