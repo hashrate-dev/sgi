@@ -9,6 +9,8 @@ import {
   asicBillingDateToIso,
   matchAsicPedidoBilling,
   matchAsicPedidoGarantias,
+  sameBillingParty,
+  type AsicBillingDoc,
   type AsicPedidoBillingHit,
   type AsicPedidoGarantiaDoc,
 } from "../lib/asicPedidoBillingLink";
@@ -1634,6 +1636,71 @@ function contratoClientLabel(client: HostingClientOption): string {
   return name || code;
 }
 
+function billingDocOptionLabel(doc: Pick<AsicBillingDoc, "number" | "clientName" | "date" | "total">): string {
+  const iso = asicBillingDateToIso(doc.date);
+  const date = iso ? formatAsicPedidoFecha(iso) : "";
+  const money = Number.isFinite(doc.total) && doc.total !== 0 ? formatUsd(doc.total) : "";
+  return [doc.number, doc.clientName, date, money].filter(Boolean).join(" · ");
+}
+
+function receiptMatchesInvoice(doc: AsicBillingDoc, invoiceNumber: string, invoiceId?: number): boolean {
+  const related = String(doc.relatedInvoiceNumber ?? "").trim().toUpperCase();
+  if (invoiceNumber && related === invoiceNumber.trim().toUpperCase()) return true;
+  return invoiceId != null && Number(doc.relatedInvoiceId) === Number(invoiceId);
+}
+
+function billingDocOptions(
+  suggested: AsicPedidoBillingHit[],
+  others: AsicPedidoBillingHit[],
+  selectedNumber: string
+): Array<{ label: string; docs: AsicBillingDoc[] }> {
+  const suggestedDocs = suggested.map((hit) => hit.invoice);
+  const otherDocs = others.slice(0, 80).map((hit) => hit.invoice);
+  const known = new Set([...suggestedDocs, ...otherDocs].map((doc) => doc.number));
+  const selected = selectedNumber.trim();
+  const extra =
+    selected && !known.has(selected)
+      ? [{ id: -1, number: selected, type: "Factura", clientName: "", date: "", total: 0 }]
+      : [];
+  const groups: Array<{ label: string; docs: AsicBillingDoc[] }> = [];
+  if (suggestedDocs.length || extra.length) groups.push({ label: "De este cliente", docs: [...extra, ...suggestedDocs] });
+  if (otherDocs.length) groups.push({ label: "Otras facturas", docs: otherDocs });
+  return groups;
+}
+
+function receiptOptionGroups(
+  receipts: AsicBillingDoc[],
+  invoiceNumber: string,
+  invoiceId: number | undefined,
+  cliente: string,
+  selectedNumber: string
+): Array<{ label: string; docs: AsicBillingDoc[] }> {
+  const party = cliente.replace(/^[A-Za-z0-9]+\s*-\s*/, "").trim() || cliente;
+  const linked = receipts.filter((doc) => receiptMatchesInvoice(doc, invoiceNumber, invoiceId));
+  const linkedNumbers = new Set(linked.map((doc) => doc.number.toUpperCase()));
+  const ofClient = receipts.filter(
+    (doc) => !linkedNumbers.has(doc.number.toUpperCase()) && sameBillingParty(doc.clientName, party)
+  );
+  const clientNumbers = new Set(ofClient.map((doc) => doc.number.toUpperCase()));
+  const rest = receipts
+    .filter((doc) => !linkedNumbers.has(doc.number.toUpperCase()) && !clientNumbers.has(doc.number.toUpperCase()))
+    .slice(0, 40);
+  const known = new Set([...linked, ...ofClient, ...rest].map((doc) => doc.number.toUpperCase()));
+  const selected = selectedNumber.trim();
+  const extra =
+    selected && !known.has(selected.toUpperCase())
+      ? [{ id: -1, number: selected, type: "Recibo", clientName: "", date: "", total: 0 }]
+      : [];
+  const groups: Array<{ label: string; docs: AsicBillingDoc[] }> = [];
+  const factura = invoiceNumber.trim();
+  if (linked.length || extra.length) {
+    groups.push({ label: factura ? `De la factura ${factura}` : "Recibo elegido", docs: [...extra, ...linked] });
+  }
+  if (ofClient.length) groups.push({ label: "Del cliente", docs: ofClient });
+  if (rest.length) groups.push({ label: "Otros recibos", docs: rest });
+  return groups;
+}
+
 function StageForm({
   pedido,
   stage,
@@ -1683,6 +1750,7 @@ function StageForm({
   const [billingOthers, setBillingOthers] = useState<AsicPedidoBillingHit[]>([]);
   const [billingQuery, setBillingQuery] = useState("");
   const [billingVouchers, setBillingVouchers] = useState<AsicPedidoBillingHit["invoice"][]>([]);
+  const [billingReceipts, setBillingReceipts] = useState<AsicBillingDoc[]>([]);
   const [billingDetalle, setBillingDetalle] = useState<Record<number, string>>({});
   const [billingState, setBillingState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const didAutoLink = useRef(false);
@@ -1714,6 +1782,7 @@ function StageForm({
     setBillingOthers([]);
     setBillingQuery("");
     setBillingVouchers([]);
+    setBillingReceipts([]);
     setBillingDetalle({});
     setBillingState("idle");
     didAutoLink.current = false;
@@ -1850,11 +1919,16 @@ function StageForm({
         setBillingSuggested(matched.suggested);
         setBillingOthers(matched.others);
         setBillingVouchers(matched.vouchers);
+        const recibos = invoices
+          .filter((doc) => doc.type === "Recibo")
+          .sort((a, b) => b.date.localeCompare(a.date) || b.number.localeCompare(a.number));
+        setBillingReceipts(recibos);
         setBillingState("ready");
         if (stage === "rep_recibo") {
           const number = String(pedido.etapas.rep_factura?.numeroFactura || pedido.facturaNumero || "").trim().toUpperCase();
           const hit = [...matched.suggested, ...matched.others].find((item) => item.invoice.number.toUpperCase() === number);
-          if (hit?.receipt?.number) setNumeroRecibo(hit.receipt.number);
+          const linked = recibos.filter((doc) => receiptMatchesInvoice(doc, number, hit?.invoice.id));
+          if (linked.length === 1 && linked[0]) setNumeroRecibo(linked[0].number);
           return;
         }
         if (stage === "rep_factura") {
@@ -2070,22 +2144,9 @@ function StageForm({
         />
       ) : null}
 
-      {stage === "rep_factura" ? (
-        <BillingDocList
-          state={billingState}
-          suggested={billingSuggested}
-          others={billingOthers}
-          query={billingQuery}
-          onQuery={setBillingQuery}
-          selectedNumber={numeroFactura}
-          detalle={billingDetalle}
-          onPick={(hit) => applyCredit(hit, true)}
-        />
-      ) : null}
-
       {stage === "rep_recibo" ? (
         <p className="asic-pedidos-doc-note">
-          Factura crédito {pedido.etapas.rep_factura?.numeroFactura || pedido.facturaNumero || "todavía no vinculada"}. Cuando el cliente pague, cargá el recibo.
+          Factura crédito {pedido.etapas.rep_factura?.numeroFactura || pedido.facturaNumero || "todavía no vinculada"}. Elegí el recibo de esa factura.
         </p>
       ) : null}
 
@@ -2130,10 +2191,69 @@ function StageForm({
           Fecha
           <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} required />
         </label>
+        {stage === "rep_factura" ? (
+          <label>
+            Número de factura
+            <select
+              value={numeroFactura}
+              disabled={billingState === "loading" || billingState === "idle"}
+              onChange={(e) => {
+                const hit = [...billingSuggested, ...billingOthers].find((item) => item.invoice.number === e.target.value);
+                if (hit) applyCredit(hit, true);
+                else setNumeroFactura("");
+              }}
+            >
+              <option value="">
+                {billingState === "error" ? "No se pudieron leer las facturas" : billingState === "ready" ? "Elegí la factura crédito" : "Buscando facturas…"}
+              </option>
+              {billingDocOptions(billingSuggested, billingOthers, numeroFactura).map((group) => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.docs.map((doc) => (
+                    <option key={doc.id} value={doc.number}>
+                      {billingDocOptionLabel(doc)}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </label>
+        ) : null}
         {stage === "rep_recibo" ? (
           <label>
             Número de recibo
-            <input value={numeroRecibo} onChange={(e) => setNumeroRecibo(e.target.value)} placeholder="RC…" />
+            <select
+              value={numeroRecibo}
+              disabled={billingState === "loading" || billingState === "idle"}
+              onChange={(e) => {
+                const doc = billingReceipts.find((item) => item.number === e.target.value);
+                setNumeroRecibo(e.target.value);
+                const iso = doc ? asicBillingDateToIso(doc.date) : "";
+                if (iso) setFecha(iso);
+              }}
+            >
+              <option value="">
+                {billingState === "error" ? "No se pudieron leer los recibos" : billingState === "ready" ? "Elegí el recibo" : "Buscando recibos…"}
+              </option>
+              {receiptOptionGroups(
+                billingReceipts,
+                pedido.etapas.rep_factura?.numeroFactura || pedido.facturaNumero || "",
+                [...billingSuggested, ...billingOthers].find(
+                  (item) =>
+                    item.invoice.number.toUpperCase() ===
+                    String(pedido.etapas.rep_factura?.numeroFactura || pedido.facturaNumero || "").trim().toUpperCase()
+                )?.invoice.id,
+                pedido.cliente,
+                numeroRecibo
+              ).map((group) => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.docs.map((doc) => (
+                    <option key={`${doc.id}-${doc.number}`} value={doc.number}>
+                      {billingDocOptionLabel(doc)}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
           </label>
         ) : null}
         {stage === "rep_factura" || stage === "rep_recibo" ? null : (
