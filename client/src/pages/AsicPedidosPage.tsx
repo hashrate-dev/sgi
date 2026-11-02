@@ -1812,18 +1812,16 @@ function StageForm({
         ? String(pedido.etapas.contrato?.referencia ?? "").trim()
         : stage === "rep_envio_taller"
           ? String(pedido.etapas.rep_envio_taller?.referencia || pedido.etapas.rep_solicitud?.referencia || "").trim()
-          : stage === "rep_solicitud"
+            : stage === "rep_solicitud"
             ? String(pedido.etapas.rep_solicitud?.referencia ?? "").trim()
-            : stage === "rep_diagnostico"
-              ? String(pedido.etapas.rep_diagnostico?.referencia || pedido.etapas.rep_envio_taller?.referencia || "").trim()
-              : stage === "rep_cotizacion"
-                ? String(pedido.etapas.rep_cotizacion?.referencia || pedido.etapas.rep_solicitud?.referencia || "").trim()
-                : ""
+            : stage === "rep_cotizacion"
+              ? String(pedido.etapas.rep_cotizacion?.referencia || pedido.etapas.rep_solicitud?.referencia || "").trim()
+              : ""
     );
     setNuevoContacto("");
     setFirmadoClientId(0);
     setMonto("");
-  }, [stage, pedido.id, pedido.etapas.contrato?.referencia, pedido.etapas.rep_solicitud?.referencia, pedido.etapas.rep_envio_taller?.referencia, pedido.etapas.rep_diagnostico?.referencia, pedido.etapas.rep_cotizacion?.referencia]);
+  }, [stage, pedido.id, pedido.etapas.contrato?.referencia, pedido.etapas.rep_solicitud?.referencia, pedido.etapas.rep_envio_taller?.referencia, pedido.etapas.rep_cotizacion?.referencia]);
 
   useEffect(() => {
     const needsRefs = stage === "contrato" || stage === "documentos";
@@ -2121,7 +2119,10 @@ function StageForm({
           }
         : {}),
       ...(stage === "dinero" ? { medioDinero: medio } : {}),
-      ...(referencia.trim() ? { referencia: referencia.trim() } : {}),
+      ...(referencia.trim() &&
+      (!stage.startsWith("rep_") || stage === "rep_solicitud" || stage === "rep_envio_taller" || stage === "rep_cotizacion")
+        ? { referencia: referencia.trim() }
+        : {}),
       ...(montoUsd != null ? { montoUsd } : {}),
     });
   };
@@ -2327,7 +2328,12 @@ function StageForm({
               }
             }}
           />
-        ) : stage === "rep_factura" || stage === "rep_recibo" ? null : (
+        ) : stage === "rep_cotizacion" ? (
+          <label>
+            Referencia de la cotización
+            <input value={referencia} onChange={(e) => setReferencia(e.target.value)} />
+          </label>
+        ) : stage.startsWith("rep_") ? null : (
         <label>
           {referenciaLabel}
           {stage === "contrato" || stage === "documentos" ? (
