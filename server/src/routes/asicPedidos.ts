@@ -844,9 +844,11 @@ async function catalogNames(tipo: CatalogTipo): Promise<string[]> {
     } else {
       try {
         const etapas = JSON.parse(String(row.etapas_json ?? "{}")) as {
+          pedido?: { referencia?: string };
           rep_solicitud?: { referencia?: string };
           rep_envio_taller?: { referencia?: string };
         };
+        add(etapas.pedido?.referencia);
         add(etapas.rep_solicitud?.referencia);
         add(etapas.rep_envio_taller?.referencia);
       } catch {
@@ -1212,7 +1214,7 @@ asicPedidosRouter.post("/asic-pedidos/:id/etapas/:key", ...writeMw, async (req, 
       etapas.rep_aceptacion = { status: "done", fecha, notas: "" };
     }
     await saveStages(id, etapas);
-    if ((keyRaw === "rep_solicitud" || keyRaw === "rep_envio_taller") && checked.state.referencia) {
+    if ((keyRaw === "rep_solicitud" || keyRaw === "rep_envio_taller" || keyRaw === "pedido") && checked.state.referencia) {
       await rememberCatalogName("contacto", checked.state.referencia);
     }
     const facturaNumero =

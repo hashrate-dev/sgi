@@ -2118,7 +2118,7 @@ function StageForm({
 
   useEffect(() => {
     const needsRefs = stage === "contrato" || stage === "documentos";
-    const needsContacto = stage === "rep_envio_taller";
+    const needsContacto = stage === "rep_envio_taller" || stage === "pedido";
     if (!needsRefs && !needsContacto) return;
     let cancelled = false;
     void listAsicPedidoCatalogo()
@@ -2183,6 +2183,29 @@ function StageForm({
       });
       setReferencia(saved.nombre);
       setNuevaReferencia("");
+      return true;
+    } catch (e) {
+      onError(errorText(e));
+      return false;
+    } finally {
+      setCatalogBusy(false);
+    }
+  };
+
+  const saveContacto = async (): Promise<boolean> => {
+    const nombre = nuevoContacto.trim().replace(/\s+/g, " ");
+    if (!nombre) return false;
+    setCatalogBusy(true);
+    onError(null);
+    try {
+      const saved = await createAsicPedidoCatalogo("contacto", nombre);
+      const key = saved.nombre.trim().toLocaleLowerCase("es");
+      setContactos((prev) => {
+        const without = prev.filter((item) => item.trim().toLocaleLowerCase("es") !== key);
+        return [...without, saved.nombre].sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+      });
+      setReferencia(saved.nombre);
+      setNuevoContacto("");
       return true;
     } catch (e) {
       onError(errorText(e));
@@ -2615,37 +2638,19 @@ function StageForm({
             </select>
           </label>
         ) : null}
-        {stage === "rep_envio_taller" ? (
+        {stage === "rep_envio_taller" || stage === "pedido" ? (
           <ContactoField
-            label="Referencia del envío a Asunción"
+            label={stage === "pedido" ? referenciaLabel : "Referencia del envío a Asunción"}
             value={referencia}
             options={contactos}
             draft={nuevoContacto}
             busy={catalogBusy}
+            emptyLabel={stage === "pedido" ? "Elegí una referencia" : "Elegí un contacto"}
+            draftPlaceholder={stage === "pedido" ? "Nueva referencia" : "Nuevo contacto"}
+            emptyList={stage === "pedido" ? "Todavía no hay referencias guardadas." : "Todavía no hay contactos guardados."}
             onChange={setReferencia}
             onDraft={setNuevoContacto}
-            onAdd={async () => {
-              const nombre = nuevoContacto.trim().replace(/\s+/g, " ");
-              if (!nombre) return false;
-              setCatalogBusy(true);
-              onError(null);
-              try {
-                const saved = await createAsicPedidoCatalogo("contacto", nombre);
-                const key = saved.nombre.trim().toLocaleLowerCase("es");
-                setContactos((prev) => {
-                  const without = prev.filter((item) => item.trim().toLocaleLowerCase("es") !== key);
-                  return [...without, saved.nombre].sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
-                });
-                setReferencia(saved.nombre);
-                setNuevoContacto("");
-                return true;
-              } catch (e) {
-                onError(errorText(e));
-                return false;
-              } finally {
-                setCatalogBusy(false);
-              }
-            }}
+            onAdd={saveContacto}
           />
         ) : stage.startsWith("rep_") || stage === "dinero" ? null : (
         <label>
@@ -2759,6 +2764,9 @@ function ContactoField({
   options,
   draft,
   busy,
+  emptyLabel = "Elegí un contacto",
+  draftPlaceholder = "Nuevo contacto",
+  emptyList = "Todavía no hay contactos guardados.",
   onChange,
   onDraft,
   onAdd,
@@ -2768,6 +2776,9 @@ function ContactoField({
   options: string[];
   draft: string;
   busy: boolean;
+  emptyLabel?: string;
+  draftPlaceholder?: string;
+  emptyList?: string;
   onChange: (value: string) => void;
   onDraft: (value: string) => void;
   onAdd: () => Promise<boolean>;
@@ -2797,7 +2808,7 @@ function ContactoField({
           aria-expanded={open}
           onClick={() => setOpen((current) => !current)}
         >
-          <strong>{selected || "Elegí un contacto"}</strong>
+          <strong>{selected || emptyLabel}</strong>
           <span className="asic-pedidos-docmenu-caret" aria-hidden="true">{open ? "▴" : "▾"}</span>
         </button>
         {open ? (
@@ -2810,7 +2821,7 @@ function ContactoField({
                 setOpen(false);
               }}
             >
-              <strong>Elegí un contacto</strong>
+              <strong>{emptyLabel}</strong>
             </button>
             {items.map((item) => (
               <button
@@ -2825,13 +2836,13 @@ function ContactoField({
                 <strong>{item}</strong>
               </button>
             ))}
-            {items.length === 0 ? <p className="asic-pedidos-doc-note">Todavía no hay contactos guardados.</p> : null}
+            {items.length === 0 ? <p className="asic-pedidos-doc-note">{emptyList}</p> : null}
             <div className="asic-pedidos-addline asic-pedidos-addline--in-menu">
               <input
                 value={draft}
                 onChange={(e) => onDraft(e.target.value)}
                 maxLength={200}
-                placeholder="Nuevo contacto"
+                placeholder={draftPlaceholder}
                 onKeyDown={(e) => {
                   if (e.key !== "Enter" || busy || !draft.trim()) return;
                   e.preventDefault();
