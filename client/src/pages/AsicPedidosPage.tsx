@@ -246,6 +246,7 @@ export function AsicPedidosPage() {
             canAddClient={canAddClient}
             showCreate={showCreate}
             busy={busy}
+            onUpdated={(pedido) => setPedidos((prev) => prev.map((row) => (row.id === pedido.id ? pedido : row)))}
             onToggleCreate={() => {
               setErr(null);
               setShowCreate((v) => !v);
@@ -283,6 +284,7 @@ function PedidoList({
   onToggleCreate,
   onOpen,
   onCreate,
+  onUpdated,
 }: {
   pedidos: AsicPedido[];
   loading: boolean;
@@ -293,6 +295,7 @@ function PedidoList({
   busy: boolean;
   onToggleCreate: () => void;
   onOpen: (id: number) => void;
+  onUpdated: (pedido: AsicPedido) => void;
   onCreate: (body: {
     tipo?: AsicPedidoTipo;
     cliente: string;
@@ -315,6 +318,8 @@ function PedidoList({
 }) {
   const [clients, setClients] = useState<Client[]>([]);
   const [equipos, setEquipos] = useState<EquipoASIC[]>([]);
+  const [facturas, setFacturas] = useState<AsicBillingDoc[]>([]);
+  const [facturasListas, setFacturasListas] = useState(false);
   const [clientId, setClientId] = useState<number | "">("");
   const [tipoPedido, setTipoPedido] = useState<AsicPedidoTipo>("compra");
   const [origen, setOrigen] = useState<AsicPedidoOrigen>("china");
@@ -354,6 +359,29 @@ function PedidoList({
       })
       .catch(() => {
         if (!cancelled) setEquipos([]);
+      });
+    void getInvoices({ source: "asic" })
+      .then((r) => {
+        if (cancelled) return;
+        setFacturas(
+          (r.invoices ?? []).map((row) => ({
+            id: Number(row.id),
+            number: String(row.number ?? ""),
+            type: String(row.type ?? ""),
+            clientName: String(row.clientName ?? ""),
+            date: String(row.date ?? ""),
+            total: Number(row.total) || 0,
+            relatedInvoiceId: row.relatedInvoiceId,
+            relatedInvoiceNumber: row.relatedInvoiceNumber,
+            documentContext: row.documentContext,
+          }))
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setFacturas([]);
+      })
+      .finally(() => {
+        if (!cancelled) setFacturasListas(true);
       });
     void listAsicPedidoCatalogo()
       .then((r) => {
@@ -773,6 +801,7 @@ function PedidoList({
                   const ticket = asicPedidoFechaTicket(pedido);
                   const precio = asicPedidoPrecioCliente(pedido);
                   const venta = ventaPrecioOperacion(pedido, equipos);
+                  const documento = ventaDocumento(pedido, facturas);
                   return (
                     <tbody key={pedido.id} className="asic-op-group" onClick={() => onOpen(pedido.id)}>
                       {lineas.map((linea, index) => (
@@ -825,16 +854,42 @@ function PedidoList({
                           </td>
                           {index === 0 ? (
                             <td rowSpan={lineas.length}>
-                              {pedido.tipo === "compra" && venta ? (
+                              {pedido.tipo === "compra" ? (
                                 <div className="asic-precio-cell">
-                                  <strong>{formatUsd(venta.total)}</strong>
-                                  <span>Precio total</span>
-                                  {venta.partes.map((parte) => (
-                                    <span key={`${parte.nombre}-${parte.unit}`} className="asic-precio-unit">
-                                      <strong>{formatUsd(parte.unit)}</strong>
-                                      {venta.partes.length > 1 ? ` ${parte.nombre}` : " Precio por equipo"}
+                                  {documento ? (
+                                    <>
+                                      <strong>{formatUsd(documento.invoice.total)}</strong>
+                                      <span>Precio total</span>
+                                    </>
+                                  ) : facturasListas ? (
+                                    <span>Sin factura vinculada</span>
+                                  ) : (
+                                    <span>Buscando factura…</span>
+                                  )}
+                                  {canWrite ? (
+                                    <div onClick={(event) => event.stopPropagation()}>
+                                      <VentaFacturaLink
+                                        pedido={pedido}
+                                        clients={clients}
+                                        invoices={facturas}
+                                        selected={documento}
+                                        onLinked={onUpdated}
+                                      />
+                                    </div>
+                                  ) : documento ? (
+                                    <span className="asic-precio-doc">
+                                      {documento.invoice.number}
+                                      {documento.receipt ? ` · Recibo ${documento.receipt.number}` : ""}
                                     </span>
-                                  ))}
+                                  ) : null}
+                                  {venta
+                                    ? venta.partes.map((parte) => (
+                                        <span key={`${parte.nombre}-${parte.unit}`} className="asic-precio-unit">
+                                          <strong>{formatUsd(parte.unit)}</strong>
+                                          {venta.partes.length > 1 ? ` ${parte.nombre}` : " Precio por equipo"}
+                                        </span>
+                                      ))
+                                    : null}
                                 </div>
                               ) : precio != null ? (
                                 formatUsd(precio)
@@ -1262,6 +1317,163 @@ function ventaPrecioOperacion(
     }
   }
   return { total, partes };
+}
+
+function facturaCredito(doc: AsicBillingDoc): boolean {
+  return doc.type === "Factura" && doc.documentContext !== "comprobante-pago" && doc.documentContext !== "garantia-ande" && doc.documentContext !== "recibo-parcial";
+}
+
+function ventaDocumento(
+  pedido: AsicPedido,
+  invoices: AsicBillingDoc[]
+): { invoice: AsicBillingDoc; receipt: AsicBillingDoc | null } | null {
+  if (pedido.tipo !== "compra") return null;
+  const facturas = invoices.filter(facturaCredito);
+  const numero = String(pedido.facturaNumero || pedido.etapas.documentos?.numeroFactura || "").trim().toUpperCase();
+  const byId = pedido.facturaId ? facturas.find((doc) => doc.id === pedido.facturaId) : undefined;
+  const byNumber = numero ? facturas.find((doc) => doc.number.trim().toUpperCase() === numero) : undefined;
+  const invoice = numero ? byNumber : byId;
+  if (!invoice) return null;
+  const savedReceipt = String(pedido.etapas.documentos?.numeroRecibo || "").trim().toUpperCase();
+  const receipt =
+    invoices.find((doc) => {
+      if (doc.type !== "Recibo") return false;
+      if (savedReceipt && doc.number.trim().toUpperCase() === savedReceipt) return true;
+      if (doc.relatedInvoiceNumber && doc.relatedInvoiceNumber.trim().toUpperCase() === invoice.number.trim().toUpperCase()) return true;
+      return doc.relatedInvoiceId != null && Number(doc.relatedInvoiceId) === invoice.id;
+    }) ?? null;
+  return { invoice, receipt };
+}
+
+function VentaFacturaLink({
+  pedido,
+  clients,
+  invoices,
+  selected,
+  onLinked,
+}: {
+  pedido: AsicPedido;
+  clients: Client[];
+  invoices: AsicBillingDoc[];
+  selected: { invoice: AsicBillingDoc; receipt: AsicBillingDoc | null } | null;
+  onLinked: (pedido: AsicPedido) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const matched = useMemo(
+    () =>
+      matchAsicPedidoBilling({
+        cliente: pedido.cliente,
+        clientId: pedido.clientId,
+        clients,
+        invoices,
+        extraLabels: [pedido.etapas.contrato?.referencia ?? "", pedido.facturaTitular ?? ""],
+      }),
+    [pedido.cliente, pedido.clientId, pedido.etapas.contrato?.referencia, pedido.facturaTitular, clients, invoices]
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onPointer);
+    return () => document.removeEventListener("mousedown", onPointer);
+  }, [open]);
+
+  const q = query.trim().toLowerCase();
+  const matches = (hit: AsicPedidoBillingHit) =>
+    `${hit.invoice.number} ${hit.invoice.clientName} ${hit.receipt?.number ?? ""}`.toLowerCase().includes(q);
+  const suggested = (q ? matched.suggested.filter(matches) : matched.suggested).slice(0, 8);
+  const others = (q ? matched.others.filter(matches) : matched.others).slice(0, q ? 20 : 12);
+
+  const pick = async (hit: AsicPedidoBillingHit) => {
+    setSaving(true);
+    setLinkError(null);
+    try {
+      const saved = await updateAsicPedido(pedido.id, {
+        facturaId: hit.invoice.id,
+        facturaNumero: hit.invoice.number,
+        facturaTitular: hit.invoice.clientName,
+      });
+      onLinked(saved.pedido);
+      setOpen(false);
+      setQuery("");
+    } catch (e) {
+      setLinkError(errorText(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="asic-pedidos-docmenu" ref={rootRef}>
+      <button
+        type="button"
+        className={`asic-pedidos-docmenu-trigger${selected ? " is-on" : " is-empty"}`}
+        aria-expanded={open}
+        disabled={saving}
+        onClick={() => setOpen((value) => !value)}
+      >
+        {selected ? (
+          <span>
+            <strong>{selected.invoice.number}</strong>
+            <span>
+              {selected.receipt ? `Recibo ${selected.receipt.number}` : "Sin recibo"}
+              {selected.invoice.clientName ? ` · ${selected.invoice.clientName}` : ""}
+            </span>
+          </span>
+        ) : (
+          <strong>{saving ? "Vinculando…" : "Vincular factura"}</strong>
+        )}
+        <span className="asic-pedidos-docmenu-caret" aria-hidden="true">{open ? "▴" : "▾"}</span>
+      </button>
+      {open ? (
+        <div className="asic-pedidos-docs asic-pedidos-docmenu-panel">
+          <p className="asic-pedidos-doc-note">El precio total sale de la factura que elijas. El recibo se muestra si ya está emitido.</p>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar por número o cliente, por ejemplo F100352"
+            autoFocus
+          />
+          {linkError ? <p className="asic-pedidos-doc-note">{linkError}</p> : null}
+          {[
+            { label: "De este cliente", hits: suggested },
+            { label: "Otras facturas", hits: others },
+          ].map((group) =>
+            group.hits.length ? (
+              <div key={group.label} className="asic-precio-docgroup">
+                <span>{group.label}</span>
+                {group.hits.map((hit) => (
+                  <button
+                    key={hit.invoice.id}
+                    type="button"
+                    className={selected?.invoice.number === hit.invoice.number ? "is-on" : ""}
+                    onClick={() => void pick(hit)}
+                  >
+                    <strong>
+                      {hit.invoice.number} · {formatUsd(hit.invoice.total)}
+                    </strong>
+                    <span>
+                      {hit.invoice.clientName}
+                      {hit.receipt ? ` · Recibo ${hit.receipt.number}` : " · Sin recibo"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : null
+          )}
+          {suggested.length === 0 && others.length === 0 ? (
+            <p className="asic-pedidos-doc-note">No hay una factura con ese dato.</p>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function pedidoEquipoImage(marca: string, equipo: string, equipos: EquipoASIC[]): string {

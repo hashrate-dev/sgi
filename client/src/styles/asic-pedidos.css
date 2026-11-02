@@ -109,6 +109,46 @@
   font-size: 0.82rem;
 }
 
+.asic-precio-cell .asic-pedidos-docmenu-trigger {
+  margin-top: 0.15rem;
+  min-width: 12rem;
+  padding: 0.35rem 0.5rem;
+}
+
+.asic-precio-cell .asic-pedidos-docmenu-panel {
+  min-width: 22rem;
+  right: auto;
+}
+
+.asic-precio-doc {
+  display: block;
+  margin-top: 0.15rem;
+  color: #166534;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.asic-precio-docgroup {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.asic-precio-docgroup > span {
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+@media (min-width: 1100px) {
+  .asic-pedidos-card .table-responsive {
+    overflow: visible;
+  }
+}
+
 .asic-op-group:hover td {
   background: #f0fdf4;
 }

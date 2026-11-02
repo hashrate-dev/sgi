@@ -703,6 +703,20 @@ export async function attachAsicPedidoGarantia(opts: { number: string; clientNam
   });
 }
 
+async function rememberPedidoFactura(id: number, numero: string, titular: string): Promise<void> {
+  const row = (await db
+    .prepare(`SELECT id FROM invoices WHERE upper(number) = upper(?) AND type = 'Factura' ORDER BY id DESC LIMIT 1`)
+    .get(numero)) as { id?: number } | undefined;
+  const facturaId = Number(row?.id);
+  if (Number.isFinite(facturaId) && facturaId > 0) {
+    await db
+      .prepare(`UPDATE asic_pedidos SET factura_id = ?, factura_numero = ?, factura_titular = ? WHERE id = ?`)
+      .run(facturaId, numero, titular, id);
+    return;
+  }
+  await db.prepare(`UPDATE asic_pedidos SET factura_numero = ?, factura_titular = ? WHERE id = ?`).run(numero, titular, id);
+}
+
 async function saveStages(id: number, etapas: StagesMap, aduanaAplica?: boolean): Promise<void> {
   const ts = nowSql();
   if (aduanaAplica == null) {
@@ -1099,6 +1113,22 @@ asicPedidosRouter.patch("/asic-pedidos/:id", ...writeMw, async (req, res, next) 
         JSON.stringify(data.lineas !== undefined ? data.lineas : pedido.lineas),
         id
       );
+    const docs = pedido.etapas.documentos;
+    if (
+      pedido.tipo !== "reparacion" &&
+      docs?.status === "done" &&
+      docs.modoCobro === "factura_recibo" &&
+      data.facturaNumero
+    ) {
+      await saveStages(id, {
+        ...pedido.etapas,
+        documentos: {
+          ...docs,
+          numeroFactura: facturaNumero,
+          titularFactura: facturaTitular || docs.titularFactura || "",
+        },
+      });
+    }
     res.json({ pedido: await loadPedido(id) });
   } catch (e) {
     next(e);
@@ -1179,10 +1209,14 @@ asicPedidosRouter.post("/asic-pedidos/:id/etapas/:key", ...writeMw, async (req, 
     if ((keyRaw === "rep_solicitud" || keyRaw === "rep_envio_taller") && checked.state.referencia) {
       await rememberCatalogName("contacto", checked.state.referencia);
     }
-    if (keyRaw === "rep_factura" && checked.state.numeroFactura) {
-      await db
-        .prepare(`UPDATE asic_pedidos SET factura_numero = ?, factura_titular = ? WHERE id = ?`)
-        .run(checked.state.numeroFactura, checked.state.titularFactura || pedido.facturaTitular, id);
+    const facturaNumero =
+      keyRaw === "documentos" && checked.state.modoCobro === "factura_recibo"
+        ? checked.state.numeroFactura
+        : keyRaw === "rep_factura"
+          ? checked.state.numeroFactura
+          : "";
+    if (facturaNumero) {
+      await rememberPedidoFactura(id, facturaNumero, checked.state.titularFactura || pedido.facturaTitular);
     }
     res.json({ pedido: await loadPedido(id) });
   } catch (e) {
