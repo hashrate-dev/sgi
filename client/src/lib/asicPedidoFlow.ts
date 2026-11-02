@@ -299,6 +299,22 @@ export function formatAsicPedidoFecha(iso: string): string {
   return `${m[3]}/${m[2]}/${m[1]}`;
 }
 
+export function asicPedidoNumeroOperacion(id: number): string {
+  const n = Math.max(0, Math.floor(Number(id) || 0));
+  return `OP-${String(n).padStart(4, "0")}`;
+}
+
+export function asicPedidoFechaTicket(pedido: Pick<AsicPedido, "tipo" | "etapas">): string {
+  const fecha = pedido.tipo === "reparacion" ? pedido.etapas.rep_solicitud?.fecha : pedido.etapas.contrato?.fecha;
+  return String(fecha ?? "").trim();
+}
+
+export function asicPedidoPrecioCliente(pedido: Pick<AsicPedido, "tipo" | "etapas">): number | null {
+  if (pedido.tipo !== "reparacion") return null;
+  const monto = pedido.etapas.rep_precio_cliente?.montoUsd ?? pedido.etapas.rep_cotizacion?.montoUsd;
+  return monto != null && Number.isFinite(monto) ? monto : null;
+}
+
 /** Factura crédito ya conectada, a la espera del recibo y del comprobante de garantía. */
 export function asicPedidoCobroPendiente(pedido: AsicPedido): { recibo: boolean; garantia: boolean } {
   const docs = pedido.etapas.documentos;

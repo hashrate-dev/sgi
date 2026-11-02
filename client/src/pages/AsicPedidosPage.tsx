@@ -25,7 +25,10 @@ import {
   asicPedidoCantidadTotal,
   asicPedidoCobroPendiente,
   asicPedidoEtapaLabel,
+  asicPedidoFechaTicket,
   asicPedidoLineas,
+  asicPedidoNumeroOperacion,
+  asicPedidoPrecioCliente,
   asicPedidoMedioLabel,
   asicPedidoOrigenLabel,
   asicPedidoStageDetail,
@@ -755,19 +758,32 @@ function PedidoList({
             <table className="asic-pedidos-table">
               <thead>
                 <tr>
+                  <th>Nº operación</th>
+                  <th>Fecha de ticket</th>
                   <th>Cliente</th>
                   <th>Origen</th>
                   <th>Equipo</th>
+                  <th>Precio</th>
                   <th>Etapa</th>
                 </tr>
               </thead>
               {pedidos.map((pedido) => {
                   const lineas = asicPedidoLineas(pedido);
                   const total = asicPedidoCantidadTotal(pedido);
+                  const ticket = asicPedidoFechaTicket(pedido);
+                  const precio = asicPedidoPrecioCliente(pedido);
                   return (
                     <tbody key={pedido.id} className="asic-op-group" onClick={() => onOpen(pedido.id)}>
                       {lineas.map((linea, index) => (
                         <tr key={`${pedido.id}-${linea.equipo}-${index}`} className={index === 0 ? undefined : "asic-op-cont"}>
+                          {index === 0 ? (
+                            <td rowSpan={lineas.length}>
+                              <strong className="asic-op-num">{asicPedidoNumeroOperacion(pedido.id)}</strong>
+                            </td>
+                          ) : null}
+                          {index === 0 ? (
+                            <td rowSpan={lineas.length}>{ticket ? formatAsicPedidoFecha(ticket) : "—"}</td>
+                          ) : null}
                           {index === 0 ? (
                             <td rowSpan={lineas.length}>
                               <div className="asic-cliente">
@@ -806,6 +822,9 @@ function PedidoList({
                               comisionUsd={pedido.comisionUsd}
                             />
                           </td>
+                          {index === 0 ? (
+                            <td rowSpan={lineas.length}>{precio != null ? formatUsd(precio) : "—"}</td>
+                          ) : null}
                           {index === 0 ? (
                             <td rowSpan={lineas.length}>
                               <div className="asic-etapa-row">
@@ -891,6 +910,7 @@ function PedidoDetail({
     <>
       <div className="asic-pedidos-head">
         <div>
+          <p className="asic-op-num asic-op-num--detail">{asicPedidoNumeroOperacion(pedido.id)}</p>
           <h1>{pedido.cliente}</h1>
           <p className="asic-pedidos-lead">
             {asicPedidoLineas(pedido).map((linea, index) => {
@@ -903,6 +923,12 @@ function PedidoDetail({
             })}
             <span className="asic-op-line">
               {pedido.tipo === "reparacion" ? "Reparación de equipos ASIC" : `origen ${asicPedidoOrigenLabel(pedido.origen)}`}
+            </span>
+            <span className="asic-op-line">
+              Ticket {asicPedidoFechaTicket(pedido) ? formatAsicPedidoFecha(asicPedidoFechaTicket(pedido)) : "—"}
+            </span>
+            <span className="asic-op-line">
+              Precio {asicPedidoPrecioCliente(pedido) != null ? formatUsd(asicPedidoPrecioCliente(pedido) as number) : "—"}
             </span>
           </p>
         </div>
