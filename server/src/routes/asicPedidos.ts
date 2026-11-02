@@ -136,7 +136,7 @@ const CreateSchema = z
       ctx.addIssue({
         code: "custom",
         path: ["fechaContrato"],
-        message: data.tipo === "reparacion" ? "Indicá la fecha de la solicitud." : "Indicá la fecha de firma.",
+        message: data.tipo === "reparacion" ? "Indicá la fecha de apertura." : "Indicá la fecha de firma.",
       });
     }
     if (data.tipo === "reparacion") return;
@@ -973,7 +973,7 @@ asicPedidosRouter.post("/asic-pedidos", ...writeMw, async (req, res, next) => {
     }
     const data = parsed.data;
     if (!data.fechaContrato) {
-      res.status(400).json({ error: { message: data.tipo === "reparacion" ? "Indicá la fecha de la solicitud." : "Indicá la fecha de firma." } });
+      res.status(400).json({ error: { message: data.tipo === "reparacion" ? "Indicá la fecha de apertura." : "Indicá la fecha de firma." } });
       return;
     }
     if (data.tipo === "compra" && data.tieneComision && data.comisionUsd == null) {

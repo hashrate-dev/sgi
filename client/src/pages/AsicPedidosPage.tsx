@@ -332,9 +332,6 @@ function PedidoList({
   const [contratoRefs, setContratoRefs] = useState<string[]>([]);
   const [nuevoVendedor, setNuevoVendedor] = useState("");
   const [nuevaReferencia, setNuevaReferencia] = useState("");
-  const [contactos, setContactos] = useState<string[]>([]);
-  const [contacto, setContacto] = useState("");
-  const [nuevoContacto, setNuevoContacto] = useState("");
   const [catalogBusy, setCatalogBusy] = useState<"vendedor" | "contrato_ref" | "contacto" | null>(null);
 
   useEffect(() => {
@@ -360,13 +357,11 @@ function PedidoList({
         if (cancelled) return;
         setVendedores(Array.isArray(r.vendedores) ? r.vendedores : []);
         setContratoRefs(Array.isArray(r.contratoRefs) ? r.contratoRefs : []);
-        setContactos(Array.isArray(r.contactos) ? r.contactos : []);
       })
       .catch(() => {
         if (!cancelled) {
           setVendedores([]);
           setContratoRefs([]);
-          setContactos([]);
         }
       });
     return () => {
@@ -498,7 +493,7 @@ function PedidoList({
               fechaContrato,
               notas: notas.trim(),
               ...(reparacion
-                ? { ...(contacto.trim() ? { contacto: contacto.trim() } : {}) }
+                ? {}
                 : {
                     origen,
                     vendedor: vendedor.trim(),
@@ -700,7 +695,7 @@ function PedidoList({
               </>
             ) : null}
             <label>
-              {tipoPedido === "reparacion" ? "Fecha de la solicitud" : "Fecha de firma"}
+              {tipoPedido === "reparacion" ? "Fecha de apertura" : "Fecha de firma"}
               <input type="date" value={fechaContrato} onChange={(e) => setFechaContrato(e.target.value)} required />
             </label>
             {tipoPedido === "compra" ? (
@@ -733,21 +728,9 @@ function PedidoList({
             )}
               </>
             ) : (
-              <>
-              <ContactoField
-                label="Contacto de la solicitud"
-                value={contacto}
-                options={contactos}
-                draft={nuevoContacto}
-                busy={catalogBusy === "contacto"}
-                onChange={setContacto}
-                onDraft={setNuevoContacto}
-                onAdd={() => saveCatalogName("contacto", nuevoContacto, setNuevoContacto, setContacto, setContactos)}
-              />
               <p className="span-2 text-muted small mb-0">
-                El equipo sale del datacenter de Ayolas, se revisa en el taller de Asunción y vuelve para encenderse de nuevo.
+                Se abre el ticket y el equipo sale del datacenter de Ayolas, se revisa en el taller de Asunción y vuelve para encenderse de nuevo.
               </p>
-              </>
             )}
             <label className="span-2">
               Notas
@@ -1546,7 +1529,7 @@ function asicPedidoStageShort(key: AsicPedidoStageKey): string {
     case "instalado":
       return "Instalado";
     case "rep_solicitud":
-      return "Solicitud";
+      return "Apertura";
     case "rep_envio_taller":
       return "Taller";
     case "rep_diagnostico":
@@ -1830,10 +1813,13 @@ function StageForm({
         ? String(pedido.etapas.contrato?.referencia ?? "").trim()
         : stage === "rep_envio_taller"
           ? String(pedido.etapas.rep_envio_taller?.referencia || pedido.etapas.rep_solicitud?.referencia || "").trim()
-            : stage === "rep_solicitud"
-            ? String(pedido.etapas.rep_solicitud?.referencia ?? "").trim()
             : stage === "rep_cotizacion"
-              ? String(pedido.etapas.rep_cotizacion?.referencia || pedido.etapas.rep_solicitud?.referencia || "").trim()
+              ? String(
+                  pedido.etapas.rep_cotizacion?.referencia ||
+                    pedido.etapas.rep_envio_taller?.referencia ||
+                    pedido.etapas.rep_solicitud?.referencia ||
+                    ""
+                ).trim()
               : ""
     );
     setNuevoContacto("");
@@ -1844,7 +1830,7 @@ function StageForm({
 
   useEffect(() => {
     const needsRefs = stage === "contrato" || stage === "documentos";
-    const needsContacto = stage === "rep_solicitud" || stage === "rep_envio_taller";
+    const needsContacto = stage === "rep_envio_taller";
     if (!needsRefs && !needsContacto) return;
     let cancelled = false;
     void listAsicPedidoCatalogo()
@@ -2144,7 +2130,7 @@ function StageForm({
         : {}),
       ...(stage === "dinero" ? { medioDinero: medio } : {}),
       ...(referencia.trim() &&
-      (!stage.startsWith("rep_") || stage === "rep_solicitud" || stage === "rep_envio_taller" || stage === "rep_cotizacion")
+      (!stage.startsWith("rep_") || stage === "rep_envio_taller" || stage === "rep_cotizacion")
         ? { referencia: referencia.trim() }
         : {}),
       ...(montoUsd != null ? { montoUsd } : {}),
@@ -2252,7 +2238,7 @@ function StageForm({
             />
           </div>
         ) : null}
-        {stage.startsWith("rep_") ? null : (
+        {stage.startsWith("rep_") && stage !== "rep_solicitud" ? null : (
           <label>
             Fecha
             <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} required />
@@ -2323,9 +2309,9 @@ function StageForm({
             </select>
           </label>
         ) : null}
-        {stage === "rep_solicitud" || stage === "rep_envio_taller" ? (
+        {stage === "rep_envio_taller" ? (
           <ContactoField
-            label={stage === "rep_envio_taller" ? "Referencia del envío a Asunción" : "Contacto"}
+            label="Referencia del envío a Asunción"
             value={referencia}
             options={contactos}
             draft={nuevoContacto}

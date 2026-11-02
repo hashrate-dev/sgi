@@ -140,7 +140,7 @@ export function asicPedidoStageTitle(key: AsicPedidoStageKey, origen: AsicPedido
     case "instalado":
       return "Instalado";
     case "rep_solicitud":
-      return "Solicitud de reparación";
+      return "Apertura de Ticket de Reparación";
     case "rep_envio_taller":
       return "Envío al taller en Asunción";
     case "rep_diagnostico":
@@ -191,7 +191,7 @@ export function asicPedidoStageDetail(key: AsicPedidoStageKey): string {
     case "instalado":
       return "Se instala todo en el datacenter.";
     case "rep_solicitud":
-      return "El cliente solicita la reparación del equipo que está en el datacenter.";
+      return "Se abre el ticket de reparación del equipo que está en el datacenter.";
     case "rep_envio_taller":
       return "El equipo sale del datacenter de Ayolas y se envía al taller en Asunción.";
     case "rep_diagnostico":
@@ -336,7 +336,7 @@ export const ASIC_COMPRA_FLOW_LABELS = [
 ] as const;
 
 export const ASIC_REPARACION_FLOW_LABELS = [
-  "1. Solicitud",
+  "1. Apertura de ticket",
   "2. Envío al taller",
   "3. Estado de situación",
   "4. Cotización",
