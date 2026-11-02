@@ -15,7 +15,24 @@ export const ASIC_PEDIDO_STAGE_KEYS = [
   "instalado",
 ] as const;
 
-export type AsicPedidoStageKey = (typeof ASIC_PEDIDO_STAGE_KEYS)[number];
+/** Reparación: datacenter → taller en Asunción → diagnóstico → cobro → vuelta a Ayolas. */
+export const ASIC_REPARACION_STAGE_KEYS = [
+  "rep_solicitud",
+  "rep_envio_taller",
+  "rep_diagnostico",
+  "rep_cotizacion",
+  "rep_precio_cliente",
+  "rep_aceptacion",
+  "rep_factura",
+  "rep_recibo",
+  "rep_reparar",
+  "rep_reparado",
+  "rep_envio_ayolas",
+  "rep_encendido",
+] as const;
+
+export type AsicPedidoStageKey = (typeof ASIC_PEDIDO_STAGE_KEYS)[number] | (typeof ASIC_REPARACION_STAGE_KEYS)[number];
+export type AsicPedidoTipo = "compra" | "reparacion";
 export type AsicPedidoOrigen = "china" | "paraguay";
 export type AsicPedidoModoCobro = "factura_recibo" | "comprobante_previo";
 export type AsicPedidoMedioDinero = "banco_py" | "banco_uy" | "usdt_binance" | "usdc_binance" | "binance";
@@ -49,6 +66,7 @@ export type AsicPedido = {
   id: number;
   cliente: string;
   clientId: number | null;
+  tipo: AsicPedidoTipo;
   origen: AsicPedidoOrigen;
   marca: string;
   equipo: string;
@@ -90,7 +108,8 @@ export type AsicPedidoConfirmBody = {
 
 const ADUANA = new Set<AsicPedidoStageKey>(["aduana_llegada", "aduana_salida"]);
 
-export function asicPedidoStagesFor(pedido: Pick<AsicPedido, "aduanaAplica">): AsicPedidoStageKey[] {
+export function asicPedidoStagesFor(pedido: Pick<AsicPedido, "aduanaAplica" | "tipo">): AsicPedidoStageKey[] {
+  if (pedido.tipo === "reparacion") return [...ASIC_REPARACION_STAGE_KEYS];
   return ASIC_PEDIDO_STAGE_KEYS.filter((key) => pedido.aduanaAplica || !ADUANA.has(key));
 }
 
@@ -118,6 +137,30 @@ export function asicPedidoStageTitle(key: AsicPedidoStageKey, origen: AsicPedido
       return "Llegada al datacenter";
     case "instalado":
       return "Instalado";
+    case "rep_solicitud":
+      return "Solicitud de reparación";
+    case "rep_envio_taller":
+      return "Envío al taller en Asunción";
+    case "rep_diagnostico":
+      return "Estado de situación";
+    case "rep_cotizacion":
+      return "Cotización de la reparación";
+    case "rep_precio_cliente":
+      return "Precio y estado al cliente";
+    case "rep_aceptacion":
+      return "Cliente acepta";
+    case "rep_factura":
+      return "Factura crédito";
+    case "rep_recibo":
+      return "Recibo de pago";
+    case "rep_reparar":
+      return "Se manda a reparar";
+    case "rep_reparado":
+      return "Equipo reparado";
+    case "rep_envio_ayolas":
+      return "Envío al datacenter de Ayolas";
+    case "rep_encendido":
+      return "Encendido en el datacenter";
   }
 }
 
@@ -145,6 +188,30 @@ export function asicPedidoStageDetail(key: AsicPedidoStageKey): string {
       return "El equipo llega al datacenter de Ayolas.";
     case "instalado":
       return "Se instala todo en el datacenter.";
+    case "rep_solicitud":
+      return "El cliente solicita la reparación del equipo que está en el datacenter.";
+    case "rep_envio_taller":
+      return "El equipo sale del datacenter de Ayolas y se envía al taller en Asunción.";
+    case "rep_diagnostico":
+      return "En el taller se hace el estado de situación y queda asentado que el equipo está roto.";
+    case "rep_cotizacion":
+      return "Se solicita la cotización de la reparación.";
+    case "rep_precio_cliente":
+      return "Se envían al cliente el precio de la reparación y el estado de situación.";
+    case "rep_aceptacion":
+      return "El cliente confirma que sigue adelante con la reparación.";
+    case "rep_factura":
+      return "Se emite la factura crédito de la reparación.";
+    case "rep_recibo":
+      return "El cliente paga y se emite el recibo.";
+    case "rep_reparar":
+      return "Con el pago hecho, se manda el equipo a reparar en el taller.";
+    case "rep_reparado":
+      return "El taller termina la reparación.";
+    case "rep_envio_ayolas":
+      return "El equipo reparado vuelve al datacenter de Ayolas.";
+    case "rep_encendido":
+      return "El equipo se prende de nuevo en el datacenter.";
   }
 }
 
@@ -194,6 +261,12 @@ export function asicPedidoStageSummary(key: AsicPedidoStageKey, state: AsicPedid
   } else if (state.referencia) {
     bits.push(state.referencia);
   }
+  if (key === "rep_factura") {
+    bits.push(`Factura ${state.numeroFactura || "—"}${state.titularFactura ? ` (${state.titularFactura})` : ""}`);
+  }
+  if (key === "rep_recibo") {
+    bits.push(`Recibo ${state.numeroRecibo || "—"}`);
+  }
   if (key === "documentos") {
     if (state.numeroGarantia) {
       const valor =
@@ -234,10 +307,41 @@ export function asicPedidoCobroPendiente(pedido: AsicPedido): { recibo: boolean;
 }
 
 export function asicPedidoEtapaLabel(pedido: AsicPedido): string {
-  if (pedido.etapaActual === "completo") return "Instalado en Ayolas";
+  if (pedido.etapaActual === "completo") {
+    return pedido.tipo === "reparacion" ? "Encendido en el datacenter" : "Instalado en Ayolas";
+  }
   if (pedido.etapaActual === "dinero") return "Esperando la transferencia";
   return asicPedidoStageTitle(pedido.etapaActual, pedido.origen);
 }
+
+export const ASIC_COMPRA_FLOW_LABELS = [
+  "1. Contrato",
+  "2. Factura o comprobante",
+  "3. Transferencia",
+  "4. Pedido",
+  "5. Pago al proveedor",
+  "6. Envío",
+  "7. Llegada a aduana",
+  "8. Salida de aduana",
+  "9. Camino a Ayolas",
+  "10. Llegada al DC",
+  "11. Instalación",
+] as const;
+
+export const ASIC_REPARACION_FLOW_LABELS = [
+  "1. Solicitud",
+  "2. Envío al taller",
+  "3. Estado de situación",
+  "4. Cotización",
+  "5. Precio al cliente",
+  "6. Cliente acepta",
+  "7. Factura crédito",
+  "8. Recibo de pago",
+  "9. Reparación",
+  "10. Equipo reparado",
+  "11. Vuelta a Ayolas",
+  "12. Encendido",
+] as const;
 
 export function listAsicPedidoGarantias(): Promise<{
   garantias: Array<{ number: string; clientName: string; date: string; total: number; detalle?: string }>;
@@ -261,16 +365,17 @@ export function listAsicPedidos(): Promise<{ pedidos: AsicPedido[] }> {
 }
 
 export function createAsicPedido(body: {
+  tipo?: AsicPedidoTipo;
   cliente: string;
   clientId?: number;
-  origen: AsicPedidoOrigen;
+  origen?: AsicPedidoOrigen;
   marca: string;
   equipo: string;
   procesador: string;
   cantidad: number;
   lineas?: AsicPedidoLinea[];
-  vendedor: string;
-  tieneComision: boolean;
+  vendedor?: string;
+  tieneComision?: boolean;
   comisionUsd?: number;
   fechaContrato: string;
   contratoRef?: string;

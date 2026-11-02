@@ -25,7 +25,25 @@ export const ASIC_PEDIDO_STAGE_KEYS = [
   "instalado",
 ] as const;
 
-export type AsicPedidoStageKey = (typeof ASIC_PEDIDO_STAGE_KEYS)[number];
+export const ASIC_REPARACION_STAGE_KEYS = [
+  "rep_solicitud",
+  "rep_envio_taller",
+  "rep_diagnostico",
+  "rep_cotizacion",
+  "rep_precio_cliente",
+  "rep_aceptacion",
+  "rep_factura",
+  "rep_recibo",
+  "rep_reparar",
+  "rep_reparado",
+  "rep_envio_ayolas",
+  "rep_encendido",
+] as const;
+
+const ALL_STAGE_KEYS = [...ASIC_PEDIDO_STAGE_KEYS, ...ASIC_REPARACION_STAGE_KEYS] as const;
+
+export type AsicPedidoStageKey = (typeof ALL_STAGE_KEYS)[number];
+export type AsicPedidoTipo = "compra" | "reparacion";
 
 const ADUANA_KEYS = new Set<AsicPedidoStageKey>(["aduana_llegada", "aduana_salida"]);
 
@@ -55,6 +73,7 @@ type PedidoRow = {
   id: number;
   cliente: string;
   clientId: number | null;
+  tipo: AsicPedidoTipo;
   origen: "china" | "paraguay";
   marca: string;
   equipo: string;
@@ -91,23 +110,41 @@ const LineaSchema = z.object({
 
 const fechaSchema = z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida");
 
-const CreateSchema = z.object({
-  cliente: z.string().trim().min(1).max(200),
-  clientId: z.coerce.number().int().positive().optional(),
-  origen: z.enum(["china", "paraguay"]),
-  marca: z.string().trim().min(1).max(120),
-  equipo: z.string().trim().min(1).max(200),
-  procesador: z.string().trim().min(1).max(120),
-  cantidad: z.coerce.number().int().min(1).max(500),
-  lineas: z.array(LineaSchema).max(12).optional().default([]),
-  vendedor: z.string().trim().min(1).max(200),
-  tieneComision: z.boolean(),
-  comisionUsd: z.coerce.number().finite().min(0).max(100_000_000).optional(),
-  fechaContrato: fechaSchema,
-  contratoRef: z.string().trim().max(120).optional().default(""),
-  notas: z.string().trim().max(2000).optional().default(""),
-  aduanaAplica: z.boolean().optional(),
-});
+const CreateSchema = z
+  .object({
+    tipo: z.enum(["compra", "reparacion"]).optional().default("compra"),
+    cliente: z.string().trim().min(1).max(200),
+    clientId: z.coerce.number().int().positive().optional(),
+    origen: z.enum(["china", "paraguay"]).optional(),
+    marca: z.string().trim().min(1).max(120),
+    equipo: z.string().trim().min(1).max(200),
+    procesador: z.string().trim().min(1).max(120),
+    cantidad: z.coerce.number().int().min(1).max(500),
+    lineas: z.array(LineaSchema).max(12).optional().default([]),
+    vendedor: z.string().trim().max(200).optional().default(""),
+    tieneComision: z.boolean().optional().default(false),
+    comisionUsd: z.coerce.number().finite().min(0).max(100_000_000).optional(),
+    fechaContrato: fechaSchema.optional(),
+    contratoRef: z.string().trim().max(120).optional().default(""),
+    notas: z.string().trim().max(2000).optional().default(""),
+    aduanaAplica: z.boolean().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.fechaContrato) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["fechaContrato"],
+        message: data.tipo === "reparacion" ? "Indicá la fecha de la solicitud." : "Indicá la fecha de firma.",
+      });
+    }
+    if (data.tipo === "reparacion") return;
+    if (!data.origen) {
+      ctx.addIssue({ code: "custom", path: ["origen"], message: "Indicá si el equipo viene de China o de Paraguay." });
+    }
+    if (!data.vendedor.trim()) {
+      ctx.addIssue({ code: "custom", path: ["vendedor"], message: "Indicá el vendedor." });
+    }
+  });
 
 const PatchSchema = z.object({
   cliente: z.string().trim().min(1).max(200).optional(),
@@ -197,6 +234,7 @@ async function ensureSchema(): Promise<void> {
         "ALTER TABLE asic_pedidos ADD COLUMN IF NOT EXISTS factura_numero TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE asic_pedidos ADD COLUMN IF NOT EXISTS factura_titular TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE asic_pedidos ADD COLUMN IF NOT EXISTS lineas_json TEXT NOT NULL DEFAULT '[]'",
+        "ALTER TABLE asic_pedidos ADD COLUMN IF NOT EXISTS tipo TEXT NOT NULL DEFAULT 'compra'",
       ]
     : [
         "ALTER TABLE asic_pedidos ADD COLUMN client_id INTEGER",
@@ -209,6 +247,7 @@ async function ensureSchema(): Promise<void> {
         "ALTER TABLE asic_pedidos ADD COLUMN factura_numero TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE asic_pedidos ADD COLUMN factura_titular TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE asic_pedidos ADD COLUMN lineas_json TEXT NOT NULL DEFAULT '[]'",
+        "ALTER TABLE asic_pedidos ADD COLUMN tipo TEXT NOT NULL DEFAULT 'compra'",
       ];
   for (const sql of alters) {
     try {
@@ -270,7 +309,11 @@ function isCatalogTipo(value: string): value is CatalogTipo {
 }
 
 function isStageKey(value: string): value is AsicPedidoStageKey {
-  return (ASIC_PEDIDO_STAGE_KEYS as readonly string[]).includes(value);
+  return (ALL_STAGE_KEYS as readonly string[]).includes(value);
+}
+
+function isReparacionStage(value: AsicPedidoStageKey): boolean {
+  return (ASIC_REPARACION_STAGE_KEYS as readonly string[]).includes(value);
 }
 
 function parseStages(raw: unknown): StagesMap {
@@ -279,7 +322,7 @@ function parseStages(raw: unknown): StagesMap {
     const parsed = JSON.parse(raw) as unknown;
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
     const out: StagesMap = {};
-    for (const key of ASIC_PEDIDO_STAGE_KEYS) {
+    for (const key of ALL_STAGE_KEYS) {
       const item = (parsed as Record<string, unknown>)[key];
       if (!item || typeof item !== "object") continue;
       const row = item as Record<string, unknown>;
@@ -320,9 +363,13 @@ function parseStages(raw: unknown): StagesMap {
   }
 }
 
-function etapaActual(origenAduana: boolean, etapas: StagesMap): AsicPedidoStageKey | "completo" {
-  for (const key of ASIC_PEDIDO_STAGE_KEYS) {
-    if (!origenAduana && ADUANA_KEYS.has(key)) continue;
+function stageKeysFor(tipo: AsicPedidoTipo, aduanaAplica: boolean): AsicPedidoStageKey[] {
+  if (tipo === "reparacion") return [...ASIC_REPARACION_STAGE_KEYS];
+  return ASIC_PEDIDO_STAGE_KEYS.filter((key) => aduanaAplica || !ADUANA_KEYS.has(key));
+}
+
+function etapaActual(tipo: AsicPedidoTipo, origenAduana: boolean, etapas: StagesMap): AsicPedidoStageKey | "completo" {
+  for (const key of stageKeysFor(tipo, origenAduana)) {
     if (etapas[key]?.status !== "done") return key;
   }
   return "completo";
@@ -356,7 +403,8 @@ function parseLineas(raw: unknown): AsicPedidoLinea[] {
 function mapPedido(raw: Record<string, unknown>): PedidoRow {
   const r = rowKeysToLowercase(raw);
   const origen = String(r.origen ?? "") === "paraguay" ? "paraguay" : "china";
-  const aduanaAplica = Number(r.aduana_aplica ?? 1) !== 0;
+  const tipo: AsicPedidoTipo = String(r.tipo ?? "") === "reparacion" ? "reparacion" : "compra";
+  const aduanaAplica = tipo === "reparacion" ? false : Number(r.aduana_aplica ?? 1) !== 0;
   const etapas = parseStages(r.etapas_json);
   const clientIdRaw = Number(r.client_id ?? 0);
   const comisionRaw = r.comision_usd == null || r.comision_usd === "" ? null : Number(r.comision_usd);
@@ -364,6 +412,7 @@ function mapPedido(raw: Record<string, unknown>): PedidoRow {
     id: Number(r.id ?? 0),
     cliente: String(r.cliente ?? ""),
     clientId: Number.isFinite(clientIdRaw) && clientIdRaw > 0 ? clientIdRaw : null,
+    tipo,
     origen,
     marca: String(r.marca ?? ""),
     equipo: String(r.equipo ?? ""),
@@ -379,14 +428,10 @@ function mapPedido(raw: Record<string, unknown>): PedidoRow {
     facturaNumero: String(r.factura_numero ?? ""),
     facturaTitular: String(r.factura_titular ?? ""),
     etapas,
-    etapaActual: etapaActual(aduanaAplica, etapas),
+    etapaActual: etapaActual(tipo, aduanaAplica, etapas),
     createdAt: String(r.created_at ?? ""),
     updatedAt: String(r.updated_at ?? ""),
   };
-}
-
-function applicableKeys(aduanaAplica: boolean): AsicPedidoStageKey[] {
-  return ASIC_PEDIDO_STAGE_KEYS.filter((key) => aduanaAplica || !ADUANA_KEYS.has(key));
 }
 
 function requireAsicPedido(write: boolean) {
@@ -697,6 +742,21 @@ function validateStage(key: AsicPedidoStageKey, body: z.infer<typeof ConfirmSche
     return { ok: true, state: base };
   }
 
+  if (key === "rep_factura") {
+    if (!body.numeroFactura) return { ok: false, message: "Elegí la factura crédito de la reparación." };
+    base.modoCobro = "factura_recibo";
+    base.numeroFactura = body.numeroFactura;
+    if (body.titularFactura) base.titularFactura = body.titularFactura;
+    return { ok: true, state: base };
+  }
+
+  if (key === "rep_recibo") {
+    if (!body.numeroRecibo) return { ok: false, message: "Indicá el número del recibo de pago." };
+    base.numeroRecibo = body.numeroRecibo;
+    if (body.numeroFactura) base.numeroFactura = body.numeroFactura;
+    return { ok: true, state: base };
+  }
+
   if (key === "pedido" || key === "pago_proveedor") {
     if (!body.referencia) return { ok: false, message: "Cargá la referencia de esta etapa." };
     return { ok: true, state: base };
@@ -870,47 +930,63 @@ asicPedidosRouter.post("/asic-pedidos", ...writeMw, async (req, res, next) => {
     await ensureSchema();
     const parsed = CreateSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: { message: "Completá cliente, marca, equipo, procesador, vendedor, cantidad y la fecha de firma." } });
+      const message = parsed.error.issues[0]?.message || "Completá cliente, marca, equipo, procesador y la fecha.";
+      res.status(400).json({ error: { message } });
       return;
     }
     const data = parsed.data;
-    if (data.tieneComision && data.comisionUsd == null) {
+    if (!data.fechaContrato) {
+      res.status(400).json({ error: { message: data.tipo === "reparacion" ? "Indicá la fecha de la solicitud." : "Indicá la fecha de firma." } });
+      return;
+    }
+    if (data.tipo === "compra" && data.tieneComision && data.comisionUsd == null) {
       res.status(400).json({ error: { message: "Indicá el monto de la comisión en USD." } });
       return;
     }
-    const aduanaAplica = data.origen === "china" ? true : data.aduanaAplica !== false;
-    const etapas: StagesMap = {
-      contrato: {
-        status: "done",
-        fecha: data.fechaContrato,
-        notas: "",
-        ...(data.contratoRef ? { referencia: data.contratoRef } : {}),
-      },
-    };
+    const reparacion = data.tipo === "reparacion";
+    const origen = reparacion ? "paraguay" : data.origen === "paraguay" ? "paraguay" : "china";
+    const aduanaAplica = reparacion ? false : origen === "china" ? true : data.aduanaAplica !== false;
+    const etapas: StagesMap = reparacion
+      ? {
+          rep_solicitud: {
+            status: "done",
+            fecha: data.fechaContrato,
+            notas: "",
+          },
+        }
+      : {
+          contrato: {
+            status: "done",
+            fecha: data.fechaContrato,
+            notas: "",
+            ...(data.contratoRef ? { referencia: data.contratoRef } : {}),
+          },
+        };
     const ts = nowSql();
     const inserted = await db
       .prepare(
         `INSERT INTO asic_pedidos (
            cliente, client_id, origen, marca, equipo, procesador, cantidad, vendedor, tiene_comision, comision_usd,
-           aduana_aplica, notas, etapas_json, lineas_json, created_at, updated_at
+           aduana_aplica, notas, etapas_json, lineas_json, tipo, created_at, updated_at
          )
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${ts}, ${ts})`
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${ts}, ${ts})`
       )
       .run(
         data.cliente,
         data.clientId ?? null,
-        data.origen,
+        origen,
         data.marca,
         data.equipo,
         data.procesador,
         data.cantidad,
-        data.vendedor,
-        data.tieneComision ? 1 : 0,
-        data.tieneComision ? data.comisionUsd ?? 0 : null,
+        reparacion ? "" : data.vendedor,
+        !reparacion && data.tieneComision ? 1 : 0,
+        !reparacion && data.tieneComision ? data.comisionUsd ?? 0 : null,
         aduanaAplica ? 1 : 0,
         data.notas,
         JSON.stringify(etapas),
-        JSON.stringify(data.lineas)
+        JSON.stringify(data.lineas),
+        reparacion ? "reparacion" : "compra"
       );
     const id = Number(inserted.lastInsertRowid);
     if (!Number.isFinite(id) || id <= 0) {
@@ -941,12 +1017,16 @@ asicPedidosRouter.patch("/asic-pedidos/:id", ...writeMw, async (req, res, next) 
     const data = parsed.data;
     let aduanaAplica = pedido.aduanaAplica;
     if (data.aduanaAplica != null) {
+      if (pedido.tipo === "reparacion") {
+        res.status(400).json({ error: { message: "Una reparación no pasa por aduana." } });
+        return;
+      }
       if (pedido.origen !== "paraguay") {
         res.status(400).json({ error: { message: "Un pedido desde China siempre pasa por aduana." } });
         return;
       }
       const customsTouched = ADUANA_KEYS.size > 0 && (pedido.etapas.aduana_llegada?.status === "done" || pedido.etapas.aduana_salida?.status === "done");
-      const laterStarted = applicableKeys(true).some((key) => {
+      const laterStarted = ASIC_PEDIDO_STAGE_KEYS.some((key) => {
         const idx = ASIC_PEDIDO_STAGE_KEYS.indexOf(key);
         const ayolas = ASIC_PEDIDO_STAGE_KEYS.indexOf("camino_ayolas");
         return idx >= ayolas && pedido.etapas[key]?.status === "done";
@@ -1001,7 +1081,18 @@ asicPedidosRouter.post("/asic-pedidos/:id/etapas/:key", ...writeMw, async (req, 
       return;
     }
     if (pedido.etapaActual === "completo") {
-      res.status(400).json({ error: { message: "Este pedido ya está instalado. Reabrí una etapa si hay que corregir algo." } });
+      res.status(400).json({
+        error: {
+          message:
+            pedido.tipo === "reparacion"
+              ? "Esta reparación ya está encendida en el datacenter. Reabrí una etapa si hay que corregir algo."
+              : "Este pedido ya está instalado. Reabrí una etapa si hay que corregir algo.",
+        },
+      });
+      return;
+    }
+    if ((pedido.tipo === "reparacion") !== isReparacionStage(keyRaw)) {
+      res.status(400).json({ error: { message: "Esa etapa no corresponde a este seguimiento." } });
       return;
     }
     if (keyRaw !== pedido.etapaActual) {
@@ -1033,6 +1124,11 @@ asicPedidosRouter.post("/asic-pedidos/:id/etapas/:key", ...writeMw, async (req, 
     }
     const etapas: StagesMap = { ...pedido.etapas, [keyRaw]: checked.state };
     await saveStages(id, etapas);
+    if (keyRaw === "rep_factura" && checked.state.numeroFactura) {
+      await db
+        .prepare(`UPDATE asic_pedidos SET factura_numero = ?, factura_titular = ? WHERE id = ?`)
+        .run(checked.state.numeroFactura, checked.state.titularFactura || pedido.facturaTitular, id);
+    }
     res.json({ pedido: await loadPedido(id) });
   } catch (e) {
     next(e);
@@ -1053,7 +1149,8 @@ asicPedidosRouter.post("/asic-pedidos/:id/etapas/:key/reabrir", ...writeMw, asyn
       res.status(404).json({ error: { message: "No se encontró el pedido." } });
       return;
     }
-    if (!pedido.aduanaAplica && ADUANA_KEYS.has(keyRaw)) {
+    const keys = stageKeysFor(pedido.tipo, pedido.aduanaAplica);
+    if (!keys.includes(keyRaw)) {
       res.status(400).json({ error: { message: "Esa etapa no aplica a este pedido." } });
       return;
     }
@@ -1061,10 +1158,10 @@ asicPedidosRouter.post("/asic-pedidos/:id/etapas/:key/reabrir", ...writeMw, asyn
       res.status(400).json({ error: { message: "Esa etapa todavía no está confirmada." } });
       return;
     }
-    const from = ASIC_PEDIDO_STAGE_KEYS.indexOf(keyRaw);
+    const from = keys.indexOf(keyRaw);
     const etapas: StagesMap = {};
-    for (const key of ASIC_PEDIDO_STAGE_KEYS) {
-      if (ASIC_PEDIDO_STAGE_KEYS.indexOf(key) < from && pedido.etapas[key]) etapas[key] = pedido.etapas[key];
+    for (const key of keys) {
+      if (keys.indexOf(key) < from && pedido.etapas[key]) etapas[key] = pedido.etapas[key];
     }
     await saveStages(id, etapas);
     res.json({ pedido: await loadPedido(id) });

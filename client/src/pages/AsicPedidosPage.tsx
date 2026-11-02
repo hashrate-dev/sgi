@@ -18,6 +18,8 @@ import { defaultAsicShelfImageSrc, normalizeMarketplaceImageSrc, resolveShelfDis
 import { canUserAccessScreen } from "../lib/sgiNavigation";
 import type { Client, EquipoASIC } from "../lib/types";
 import {
+  ASIC_COMPRA_FLOW_LABELS,
+  ASIC_REPARACION_FLOW_LABELS,
   asicPedidoCantidadTotal,
   asicPedidoCobroPendiente,
   asicPedidoEtapaLabel,
@@ -44,6 +46,7 @@ import {
   type AsicPedidoModoCobro,
   type AsicPedidoOrigen,
   type AsicPedidoStageKey,
+  type AsicPedidoTipo,
 } from "../lib/asicPedidoFlow";
 import "../styles/facturacion.css";
 import "../styles/asic-pedidos.css";
@@ -286,26 +289,28 @@ function PedidoList({
   onToggleCreate: () => void;
   onOpen: (id: number) => void;
   onCreate: (body: {
+    tipo?: AsicPedidoTipo;
     cliente: string;
     clientId?: number;
-    origen: AsicPedidoOrigen;
+    origen?: AsicPedidoOrigen;
     marca: string;
     equipo: string;
     procesador: string;
     cantidad: number;
-    vendedor: string;
-    tieneComision: boolean;
+    vendedor?: string;
+    tieneComision?: boolean;
     comisionUsd?: number;
     fechaContrato: string;
-    contratoRef: string;
+    contratoRef?: string;
     notas: string;
-    aduanaAplica: boolean;
+    aduanaAplica?: boolean;
     lineas?: AsicPedidoLinea[];
   }) => Promise<void>;
 }) {
   const [clients, setClients] = useState<Client[]>([]);
   const [equipos, setEquipos] = useState<EquipoASIC[]>([]);
   const [clientId, setClientId] = useState<number | "">("");
+  const [tipoPedido, setTipoPedido] = useState<AsicPedidoTipo>("compra");
   const [origen, setOrigen] = useState<AsicPedidoOrigen>("china");
   const [marca, setMarca] = useState("");
   const [equipoKey, setEquipoKey] = useState("");
@@ -384,7 +389,7 @@ function PedidoList({
     setOptions: (updater: (prev: string[]) => string[]) => void
   ) => {
     const nombre = raw.trim().replace(/\s+/g, " ");
-    if (!nombre) return;
+    if (!nombre) return false;
     setCatalogBusy(tipo);
     setCatalogError(null);
     try {
@@ -396,8 +401,10 @@ function PedidoList({
       });
       select(saved.nombre);
       clearDraft("");
+      return true;
     } catch (e) {
       setCatalogError(errorText(e));
+      return false;
     } finally {
       setCatalogBusy(null);
     }
@@ -409,7 +416,7 @@ function PedidoList({
         <div>
           <h1>Seguimiento de pedidos ASIC</h1>
           <p className="asic-pedidos-lead">
-            Cada pedido arranca cuando el cliente firma el contrato y sigue hasta que las máquinas quedan instaladas en el datacenter de Ayolas.
+            La compra arranca con el contrato y llega hasta la instalación en Ayolas. La reparación sigue el equipo desde el datacenter al taller en Asunción y de vuelta, hasta que se prende de nuevo.
           </p>
         </div>
         <div className="asic-pedidos-actions">
@@ -425,19 +432,7 @@ function PedidoList({
       </div>
 
       <div className="asic-pedidos-flow" aria-label="Etapas del proceso">
-        {[
-          "1. Contrato",
-          "2. Factura o comprobante",
-          "3. Transferencia",
-          "4. Pedido",
-          "5. Pago al proveedor",
-          "6. Envío",
-          "7. Llegada a aduana",
-          "8. Salida de aduana",
-          "9. Camino a Ayolas",
-          "10. Llegada al DC",
-          "11. Instalación",
-        ].map((label) => (
+        {(showCreate && tipoPedido === "reparacion" ? ASIC_REPARACION_FLOW_LABELS : ASIC_COMPRA_FLOW_LABELS).map((label) => (
           <span key={label}>{label}</span>
         ))}
       </div>
@@ -461,7 +456,8 @@ function PedidoList({
               setCatalogError("Elegí marca, modelo y procesador.");
               return;
             }
-            if (!vendedor.trim()) {
+            const reparacion = tipoPedido === "reparacion";
+            if (!reparacion && !vendedor.trim()) {
               setCatalogError("Indicá el vendedor.");
               return;
             }
@@ -475,7 +471,7 @@ function PedidoList({
               }
               lineas.push(linea);
             }
-            if (tieneComision && !Number.isFinite(comision)) {
+            if (!reparacion && tieneComision && !Number.isFinite(comision)) {
               setCatalogError("Indicá el monto de la comisión en USD.");
               return;
             }
@@ -483,25 +479,42 @@ function PedidoList({
             const name = `${String(selected.name ?? "").trim()}${selected.name2?.trim() ? ` ${selected.name2.trim()}` : ""}`.trim();
             const code = String(selected.code ?? "").trim();
             void onCreate({
+              tipo: tipoPedido,
               cliente: code && name ? `${code} - ${name}` : name || code,
               clientId: Number(selected.id),
-              origen,
               marca: marca.trim(),
               equipo: modelo,
               procesador: procesador.trim(),
               cantidad: qty,
               ...(lineas.length > 0 ? { lineas } : {}),
-              vendedor: vendedor.trim(),
-              tieneComision,
-              ...(tieneComision ? { comisionUsd: comision } : {}),
               fechaContrato,
-              contratoRef: contratoRef.trim(),
               notas: notas.trim(),
-              aduanaAplica: origen === "china" ? true : aduanaAplica,
+              ...(reparacion
+                ? {}
+                : {
+                    origen,
+                    vendedor: vendedor.trim(),
+                    tieneComision,
+                    ...(tieneComision ? { comisionUsd: comision } : {}),
+                    contratoRef: contratoRef.trim(),
+                    aduanaAplica: origen === "china" ? true : aduanaAplica,
+                  }),
             });
           }}
         >
-          <h2 className="h6 fw-bold mb-3">Momento 0 — el cliente firma el contrato</h2>
+          <h2 className="h6 fw-bold mb-3">
+            {tipoPedido === "reparacion" ? "Reparación de equipos ASIC" : "Compra de equipos ASIC"}
+          </h2>
+          <div className="asic-pedidos-choice mb-3">
+            <button type="button" className={tipoPedido === "compra" ? "is-on" : ""} onClick={() => setTipoPedido("compra")}>
+              <strong>Compra de equipos</strong>
+              <span>Contrato, cobro, proveedor e instalación en Ayolas.</span>
+            </button>
+            <button type="button" className={tipoPedido === "reparacion" ? "is-on" : ""} onClick={() => setTipoPedido("reparacion")}>
+              <strong>Reparación de equipos</strong>
+              <span>Del datacenter al taller en Asunción y de vuelta a Ayolas.</span>
+            </button>
+          </div>
           {catalogError ? <div className="asic-pedidos-error">{catalogError}</div> : null}
           <div className="asic-pedidos-form">
             <div className="span-2">
@@ -521,6 +534,7 @@ function PedidoList({
                 emptyHint="No hay clientes de hosting ni ASIC. Agregá uno con el botón de abajo."
               />
             </div>
+            {tipoPedido === "compra" ? (
             <label>
               Origen de las máquinas
               <select
@@ -535,6 +549,7 @@ function PedidoList({
                 <option value="paraguay">Paraguay</option>
               </select>
             </label>
+            ) : null}
             <label>
               Cantidad
               <input value={cantidad} onChange={(e) => setCantidad(e.target.value)} required inputMode="numeric" min={1} />
@@ -628,6 +643,8 @@ function PedidoList({
                 Agregar otro equipo a esta operación
               </button>
             </div>
+            {tipoPedido === "compra" ? (
+              <>
             <label>
               <span className="asic-pedidos-label">Vendedor</span>
               <select value={vendedor} required onChange={(e) => setVendedor(e.target.value)}>
@@ -672,39 +689,27 @@ function PedidoList({
                 <input value={comisionUsd} onChange={(e) => setComisionUsd(e.target.value)} inputMode="decimal" required placeholder="0,00" />
               </label>
             ) : null}
+              </>
+            ) : null}
             <label>
-              Fecha de firma
+              {tipoPedido === "reparacion" ? "Fecha de la solicitud" : "Fecha de firma"}
               <input type="date" value={fechaContrato} onChange={(e) => setFechaContrato(e.target.value)} required />
             </label>
-            <label>
+            {tipoPedido === "compra" ? (
+              <>
+            <div>
               <span className="asic-pedidos-label">Referencia del contrato</span>
-              <select value={contratoRef} onChange={(e) => setContratoRef(e.target.value)}>
-                <option value="">Sin referencia</option>
-                {contratoRefs.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-              <div className="asic-pedidos-addline">
-                <input
-                  value={nuevaReferencia}
-                  onChange={(e) => setNuevaReferencia(e.target.value)}
-                  maxLength={120}
-                  placeholder="Nueva referencia"
-                />
-                <button
-                  type="button"
-                  className="asic-pedidos-ghost"
-                  disabled={catalogBusy === "contrato_ref" || !nuevaReferencia.trim()}
-                  onClick={() =>
-                    void saveCatalogName("contrato_ref", nuevaReferencia, setNuevaReferencia, setContratoRef, setContratoRefs)
-                  }
-                >
-                  Agregar
-                </button>
-              </div>
-            </label>
+              <ContratoRefField
+                value={contratoRef}
+                options={contratoRefs}
+                draft={nuevaReferencia}
+                busy={catalogBusy === "contrato_ref"}
+                emptyLabel="Sin referencia"
+                onChange={setContratoRef}
+                onDraft={setNuevaReferencia}
+                onAdd={() => saveCatalogName("contrato_ref", nuevaReferencia, setNuevaReferencia, setContratoRef, setContratoRefs)}
+              />
+            </div>
             {origen === "paraguay" ? (
               <label className="span-2" style={{ flexDirection: "row", alignItems: "center", gap: "0.5rem" }}>
                 <input
@@ -718,6 +723,12 @@ function PedidoList({
             ) : (
               <p className="span-2 text-muted small mb-0">Un pedido desde China pasa por aduana antes de ir a Ayolas.</p>
             )}
+              </>
+            ) : (
+              <p className="span-2 text-muted small mb-0">
+                El equipo sale del datacenter de Ayolas, se revisa en el taller de Asunción y vuelve para encenderse de nuevo.
+              </p>
+            )}
             <label className="span-2">
               Notas
               <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={2} maxLength={2000} />
@@ -725,7 +736,7 @@ function PedidoList({
           </div>
           <div className="asic-pedidos-actions mt-3">
             <button type="submit" className="asic-pedidos-primary" disabled={busy}>
-              {busy ? "Guardando…" : "Crear pedido y seguir"}
+              {busy ? "Guardando…" : tipoPedido === "reparacion" ? "Crear reparación y seguir" : "Crear pedido y seguir"}
             </button>
           </div>
         </form>
@@ -772,8 +783,14 @@ function PedidoList({
                           {index === 0 ? (
                             <td rowSpan={lineas.length}>
                               <span className="asic-pedidos-origin">
-                                {pedido.origen === "china" ? <FlagChina /> : <FlagParaguay />}
-                                {asicPedidoOrigenLabel(pedido.origen)}
+                                {pedido.tipo === "reparacion" ? (
+                                  "Reparación"
+                                ) : (
+                                  <>
+                                    {pedido.origen === "china" ? <FlagChina /> : <FlagParaguay />}
+                                    {asicPedidoOrigenLabel(pedido.origen)}
+                                  </>
+                                )}
                               </span>
                             </td>
                           ) : null}
@@ -831,6 +848,7 @@ function PedidoDetail({
   const stages = asicPedidoStagesFor(pedido);
   const doneCount = stages.filter((key) => pedido.etapas[key]?.status === "done").length;
   const customsStillOpen =
+    pedido.tipo !== "reparacion" &&
     pedido.origen === "paraguay" &&
     pedido.etapas.aduana_llegada?.status !== "done" &&
     pedido.etapas.aduana_salida?.status !== "done" &&
@@ -850,7 +868,9 @@ function PedidoDetail({
                 </span>
               );
             })}
-            <span className="asic-op-line">origen {asicPedidoOrigenLabel(pedido.origen)}</span>
+            <span className="asic-op-line">
+              {pedido.tipo === "reparacion" ? "Reparación de equipos ASIC" : `origen ${asicPedidoOrigenLabel(pedido.origen)}`}
+            </span>
           </p>
         </div>
         <div className="asic-pedidos-actions">
@@ -953,11 +973,20 @@ function PedidoTracking({
           </aside>
         ) : null}
         <div className="asic-track-ends">
-          <span className="asic-track-origen">
-            Origen: {pedido.origen === "china" ? <FlagChina /> : <FlagParaguay />}
-            {origen}
-          </span>
-          <span>Destino: Ayolas</span>
+          {pedido.tipo === "reparacion" ? (
+            <>
+              <span>Sale de Ayolas</span>
+              <span>Vuelve a Ayolas</span>
+            </>
+          ) : (
+            <>
+              <span className="asic-track-origen">
+                Origen: {pedido.origen === "china" ? <FlagChina /> : <FlagParaguay />}
+                {origen}
+              </span>
+              <span>Destino: Ayolas</span>
+            </>
+          )}
         </div>
         <div className="asic-track-scroll">
           <div className="asic-track-rail-wrap">
@@ -989,6 +1018,10 @@ function PedidoTracking({
         </div>
         <div className="asic-track-facts">
           <span>{doneCount} confirmada{doneCount === 1 ? "" : "s"}</span>
+          {pedido.tipo === "reparacion" ? (
+            <span>Taller en Asunción</span>
+          ) : (
+            <>
           <span>{pedido.aduanaAplica ? "Pasa por aduana" : "Sin aduana"}</span>
           {pedido.vendedor ? <span>Vendedor: {pedido.vendedor}</span> : null}
           <span>
@@ -996,6 +1029,8 @@ function PedidoTracking({
               ? `Comisión ${Number(pedido.comisionUsd ?? 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
               : "Sin comisión"}
           </span>
+            </>
+          )}
         </div>
         {canWrite && customsStillOpen ? (
           <div className="asic-pedidos-actions">
@@ -1009,7 +1044,7 @@ function PedidoTracking({
             </button>
           </div>
         ) : null}
-        {!pedido.aduanaAplica ? (
+        {!pedido.aduanaAplica && pedido.tipo !== "reparacion" ? (
           <p className="asic-track-note">Este pedido no pasa por aduana. Sale del proveedor y sigue hacia Ayolas.</p>
         ) : null}
       </section>
@@ -1053,6 +1088,7 @@ function PedidoTracking({
             if (!state) return null;
             return (
               <li key={key}>
+                <span className="asic-log-rail" aria-hidden="true" />
                 <span className="asic-log-date">{state.fecha ? formatAsicPedidoFecha(state.fecha) : "—"}</span>
                 <div>
                   <strong>{asicPedidoStageTitle(key, pedido.origen)}</strong>
@@ -1422,6 +1458,30 @@ function asicPedidoStageIcon(key: AsicPedidoStageKey, origen: AsicPedidoOrigen):
       return "bi-houses";
     case "instalado":
       return "bi-cpu";
+    case "rep_solicitud":
+      return "bi-wrench";
+    case "rep_envio_taller":
+      return "bi-truck";
+    case "rep_diagnostico":
+      return "bi-clipboard2-pulse";
+    case "rep_cotizacion":
+      return "bi-file-earmark-text";
+    case "rep_precio_cliente":
+      return "bi-send";
+    case "rep_aceptacion":
+      return "bi-check-circle";
+    case "rep_factura":
+      return "bi-receipt";
+    case "rep_recibo":
+      return "bi-cash-coin";
+    case "rep_reparar":
+      return "bi-tools";
+    case "rep_reparado":
+      return "bi-patch-check";
+    case "rep_envio_ayolas":
+      return "bi-geo-alt";
+    case "rep_encendido":
+      return "bi-lightning-charge";
   }
 }
 
@@ -1449,6 +1509,30 @@ function asicPedidoStageShort(key: AsicPedidoStageKey): string {
       return "Llegada";
     case "instalado":
       return "Instalado";
+    case "rep_solicitud":
+      return "Solicitud";
+    case "rep_envio_taller":
+      return "Taller";
+    case "rep_diagnostico":
+      return "Diagnóstico";
+    case "rep_cotizacion":
+      return "Cotización";
+    case "rep_precio_cliente":
+      return "Precio";
+    case "rep_aceptacion":
+      return "Acepta";
+    case "rep_factura":
+      return "Factura";
+    case "rep_recibo":
+      return "Recibo";
+    case "rep_reparar":
+      return "Reparar";
+    case "rep_reparado":
+      return "Reparado";
+    case "rep_envio_ayolas":
+      return "Ayolas";
+    case "rep_encendido":
+      return "Encendido";
   }
 }
 
@@ -1733,7 +1817,7 @@ function StageForm({
   }, []);
 
   useEffect(() => {
-    if (stage !== "documentos") return;
+    if (stage !== "documentos" && stage !== "rep_factura" && stage !== "rep_recibo") return;
     let cancelled = false;
     setBillingState("loading");
     void (async () => {
@@ -1767,6 +1851,25 @@ function StageForm({
         setBillingOthers(matched.others);
         setBillingVouchers(matched.vouchers);
         setBillingState("ready");
+        if (stage === "rep_recibo") {
+          const number = String(pedido.etapas.rep_factura?.numeroFactura || pedido.facturaNumero || "").trim().toUpperCase();
+          const hit = [...matched.suggested, ...matched.others].find((item) => item.invoice.number.toUpperCase() === number);
+          if (hit?.receipt?.number) setNumeroRecibo(hit.receipt.number);
+          return;
+        }
+        if (stage === "rep_factura") {
+          const savedInvoice = [...matched.suggested, ...matched.others].find(
+            (hit) => hit.invoice.number.toUpperCase() === String(pedido.facturaNumero ?? "").trim().toUpperCase()
+          );
+          if (!didAutoLink.current && savedInvoice) {
+            didAutoLink.current = true;
+            applyCredit(savedInvoice, false);
+          } else if (!didAutoLink.current && matched.suggested.length === 1) {
+            didAutoLink.current = true;
+            applyCredit(matched.suggested[0]!, true);
+          }
+          return;
+        }
         const saved = [...matched.suggested, ...matched.others].find(
           (hit) => hit.invoice.number.toUpperCase() === String(pedido.facturaNumero ?? "").trim().toUpperCase()
         );
@@ -1847,7 +1950,13 @@ function StageForm({
           ? "Tracking o referencia de envío"
           : stage === "aduana_salida"
             ? "Referencia del despacho"
-            : "Referencia";
+            : stage === "rep_envio_taller"
+              ? "Referencia del envío a Asunción"
+              : stage === "rep_envio_ayolas"
+                ? "Referencia del envío a Ayolas"
+                : stage === "rep_cotizacion"
+                  ? "Referencia de la cotización"
+                  : "Referencia";
 
   const submit = () => {
     onError(null);
@@ -1859,6 +1968,14 @@ function StageForm({
     const firmado = stage === "contrato" ? contratoClients.find((client) => client.id === firmadoClientId) : undefined;
     if (stage === "contrato" && !firmado) {
       onError("Indicá a nombre de quién se firmó el contrato.");
+      return;
+    }
+    if (stage === "rep_factura" && !numeroFactura.trim()) {
+      onError("Elegí la factura crédito de la reparación.");
+      return;
+    }
+    if (stage === "rep_recibo" && !numeroRecibo.trim()) {
+      onError("Indicá el número del recibo de pago.");
       return;
     }
     onSubmit({
@@ -1875,6 +1992,19 @@ function StageForm({
             ...(numeroGarantia
               ? { numeroGarantia, ...(valorGarantia != null ? { valorGarantiaUsd: valorGarantia } : {}) }
               : {}),
+          }
+        : {}),
+      ...(stage === "rep_factura"
+        ? {
+            modoCobro: "factura_recibo" as const,
+            numeroFactura,
+            titularFactura,
+          }
+        : {}),
+      ...(stage === "rep_recibo"
+        ? {
+            numeroRecibo,
+            numeroFactura: pedido.etapas.rep_factura?.numeroFactura || pedido.facturaNumero || "",
           }
         : {}),
       ...(stage === "dinero" ? { medioDinero: medio } : {}),
@@ -1940,6 +2070,25 @@ function StageForm({
         />
       ) : null}
 
+      {stage === "rep_factura" ? (
+        <BillingDocList
+          state={billingState}
+          suggested={billingSuggested}
+          others={billingOthers}
+          query={billingQuery}
+          onQuery={setBillingQuery}
+          selectedNumber={numeroFactura}
+          detalle={billingDetalle}
+          onPick={(hit) => applyCredit(hit, true)}
+        />
+      ) : null}
+
+      {stage === "rep_recibo" ? (
+        <p className="asic-pedidos-doc-note">
+          Factura crédito {pedido.etapas.rep_factura?.numeroFactura || pedido.facturaNumero || "todavía no vinculada"}. Cuando el cliente pague, cargá el recibo.
+        </p>
+      ) : null}
+
       {stage === "dinero" ? (
         <div className="asic-pedidos-choice">
           {(["banco_py", "banco_uy", "usdt_binance", "usdc_binance"] as const).map((key) => (
@@ -1981,6 +2130,13 @@ function StageForm({
           Fecha
           <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} required />
         </label>
+        {stage === "rep_recibo" ? (
+          <label>
+            Número de recibo
+            <input value={numeroRecibo} onChange={(e) => setNumeroRecibo(e.target.value)} placeholder="RC…" />
+          </label>
+        ) : null}
+        {stage === "rep_factura" || stage === "rep_recibo" ? null : (
         <label>
           {referenciaLabel}
           {stage === "contrato" || stage === "documentos" ? (
@@ -1997,9 +2153,10 @@ function StageForm({
             <input value={referencia} onChange={(e) => setReferencia(e.target.value)} />
           )}
         </label>
-        {stage === "dinero" || stage === "pago_proveedor" ? (
+        )}
+        {stage === "dinero" || stage === "pago_proveedor" || stage === "rep_precio_cliente" || stage === "rep_cotizacion" ? (
           <label>
-            Monto USD
+            {stage === "rep_precio_cliente" ? "Precio de la reparación (USD)" : "Monto USD"}
             <input value={monto} onChange={(e) => setMonto(e.target.value)} inputMode="decimal" placeholder="Opcional" />
           </label>
         ) : null}
@@ -2075,6 +2232,7 @@ function ContratoRefField({
   options,
   draft,
   busy,
+  emptyLabel = "Elegí una referencia",
   onChange,
   onDraft,
   onAdd,
@@ -2083,6 +2241,7 @@ function ContratoRefField({
   options: string[];
   draft: string;
   busy: boolean;
+  emptyLabel?: string;
   onChange: (value: string) => void;
   onDraft: (value: string) => void;
   onAdd: () => Promise<boolean>;
@@ -2107,11 +2266,21 @@ function ContratoRefField({
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >
-        <strong>{value || "Elegí una referencia"}</strong>
+        <strong>{value || emptyLabel}</strong>
         <span className="asic-pedidos-docmenu-caret" aria-hidden="true">{open ? "▴" : "▾"}</span>
       </button>
       {open ? (
         <div className="asic-pedidos-docs asic-pedidos-docmenu-panel">
+          <button
+            type="button"
+            className={value ? "" : "is-on"}
+            onClick={() => {
+              onChange("");
+              setOpen(false);
+            }}
+          >
+            <strong>{emptyLabel}</strong>
+          </button>
           {options.map((item) => (
             <button
               key={item}
@@ -2126,12 +2295,12 @@ function ContratoRefField({
             </button>
           ))}
           {options.length === 0 ? <p className="asic-pedidos-doc-note">Todavía no hay referencias guardadas.</p> : null}
-          <div className="asic-pedidos-addline">
+          <div className="asic-pedidos-addline asic-pedidos-addline--in-menu">
             <input
               value={draft}
               onChange={(e) => onDraft(e.target.value)}
               maxLength={200}
-              placeholder="Nueva referencia"
+              placeholder="Agregar nueva referencia"
               onKeyDown={(e) => {
                 if (e.key !== "Enter" || busy || !draft.trim()) return;
                 e.preventDefault();
