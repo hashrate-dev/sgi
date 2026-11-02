@@ -2540,7 +2540,7 @@ function StageForm({
             />
           </div>
         ) : null}
-        {stage.startsWith("rep_") && stage !== "rep_solicitud" && stage !== "rep_reparado" && stage !== "rep_encendido" ? null : (
+        {stage === "dinero" || (stage.startsWith("rep_") && stage !== "rep_solicitud" && stage !== "rep_reparado" && stage !== "rep_encendido") ? null : (
           <label>
             {stage === "rep_reparado"
               ? "Fecha de reparación 100%"
@@ -2647,7 +2647,7 @@ function StageForm({
               }
             }}
           />
-        ) : stage.startsWith("rep_") ? null : (
+        ) : stage.startsWith("rep_") || stage === "dinero" ? null : (
         <label>
           {referenciaLabel}
           {stage === "contrato" || stage === "documentos" ? (
@@ -2680,7 +2680,7 @@ function StageForm({
               <input value={referencia} onChange={(e) => setReferencia(e.target.value)} />
             </label>
           </>
-        ) : stage === "dinero" || stage === "pago_proveedor" ? (
+        ) : stage === "pago_proveedor" ? (
           <label>
             Monto USD
             <input value={monto} onChange={(e) => setMonto(e.target.value)} inputMode="decimal" placeholder="Opcional" />
