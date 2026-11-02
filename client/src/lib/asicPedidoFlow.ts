@@ -213,7 +213,7 @@ export function asicPedidoStageDetail(key: AsicPedidoStageKey): string {
     case "rep_envio_ayolas":
       return "El equipo reparado vuelve al datacenter de Ayolas.";
     case "rep_encendido":
-      return "El equipo se prende de nuevo en el datacenter.";
+      return "Fecha en la que el equipo se prende de nuevo en el datacenter.";
   }
 }
 
