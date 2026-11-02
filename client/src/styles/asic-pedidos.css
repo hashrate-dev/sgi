@@ -73,6 +73,42 @@
   cursor: pointer;
 }
 
+.asic-precio-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.asic-precio-cell strong {
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
+.asic-precio-cell strong + span {
+  margin-bottom: 0.35rem;
+}
+
+.asic-precio-cell span {
+  color: #64748b;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.asic-precio-cell .asic-precio-unit {
+  display: block;
+  color: #334155;
+  font-size: 0.78rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.asic-precio-cell .asic-precio-unit strong {
+  font-size: 0.82rem;
+}
+
 .asic-op-group:hover td {
   background: #f0fdf4;
 }

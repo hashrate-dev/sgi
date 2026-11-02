@@ -772,6 +772,7 @@ function PedidoList({
                   const total = asicPedidoCantidadTotal(pedido);
                   const ticket = asicPedidoFechaTicket(pedido);
                   const precio = asicPedidoPrecioCliente(pedido);
+                  const venta = ventaPrecioOperacion(pedido, equipos);
                   return (
                     <tbody key={pedido.id} className="asic-op-group" onClick={() => onOpen(pedido.id)}>
                       {lineas.map((linea, index) => (
@@ -823,7 +824,24 @@ function PedidoList({
                             />
                           </td>
                           {index === 0 ? (
-                            <td rowSpan={lineas.length}>{precio != null ? formatUsd(precio) : "—"}</td>
+                            <td rowSpan={lineas.length}>
+                              {pedido.tipo === "compra" && venta ? (
+                                <div className="asic-precio-cell">
+                                  <strong>{formatUsd(venta.total)}</strong>
+                                  <span>Precio total</span>
+                                  {venta.partes.map((parte) => (
+                                    <span key={`${parte.nombre}-${parte.unit}`} className="asic-precio-unit">
+                                      <strong>{formatUsd(parte.unit)}</strong>
+                                      {venta.partes.length > 1 ? ` ${parte.nombre}` : " Precio por equipo"}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : precio != null ? (
+                                formatUsd(precio)
+                              ) : (
+                                "—"
+                              )}
+                            </td>
                           ) : null}
                           {index === 0 ? (
                             <td rowSpan={lineas.length}>
@@ -1197,6 +1215,53 @@ function foldEquipoName(raw: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+}
+
+function equipoCatalogoPrecio(equipos: EquipoASIC[], linea: AsicPedidoLinea): number | null {
+  const marcaKey = foldEquipoName(linea.marca);
+  const modelo = foldEquipoName(linea.equipo);
+  const priceOf = (item: EquipoASIC): number | null => {
+    const n = Number(item.precioUSD);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  const exact = equipos.filter(
+    (item) => foldEquipoName(item.marcaEquipo) === marcaKey && foldEquipoName(item.modelo) === modelo
+  );
+  const ranked = [...exact].sort(
+    (a, b) => Number(Boolean(b.marketplaceVisible)) - Number(Boolean(a.marketplaceVisible))
+  );
+  for (const item of ranked) {
+    const price = priceOf(item);
+    if (price != null) return price;
+  }
+  if (!modelo) return null;
+  for (const item of equipos) {
+    if (foldEquipoName(item.modelo) !== modelo) continue;
+    const price = priceOf(item);
+    if (price != null) return price;
+  }
+  return null;
+}
+
+function ventaPrecioOperacion(
+  pedido: AsicPedido,
+  equipos: EquipoASIC[]
+): { total: number; partes: Array<{ unit: number; nombre: string }> } | null {
+  if (pedido.tipo !== "compra") return null;
+  const lineas = asicPedidoLineas(pedido);
+  let total = 0;
+  const partes: Array<{ unit: number; nombre: string }> = [];
+  for (const linea of lineas) {
+    const unit = equipoCatalogoPrecio(equipos, linea);
+    if (unit == null) return null;
+    const qty = Math.max(1, Number(linea.cantidad) || 1);
+    total += unit * qty;
+    const nombre = [linea.marca, linea.equipo].filter(Boolean).join(" · ") || linea.equipo;
+    if (!partes.some((parte) => parte.unit === unit && parte.nombre === nombre)) {
+      partes.push({ unit, nombre });
+    }
+  }
+  return { total, partes };
 }
 
 function pedidoEquipoImage(marca: string, equipo: string, equipos: EquipoASIC[]): string {
