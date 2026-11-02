@@ -126,6 +126,7 @@ const CreateSchema = z
     comisionUsd: z.coerce.number().finite().min(0).max(100_000_000).optional(),
     fechaContrato: fechaSchema.optional(),
     contratoRef: z.string().trim().max(120).optional().default(""),
+    contacto: z.string().trim().max(200).optional().default(""),
     notas: z.string().trim().max(2000).optional().default(""),
     aduanaAplica: z.boolean().optional(),
   })
@@ -288,7 +289,7 @@ async function ensureSchema(): Promise<void> {
   schemaEnsured = true;
 }
 
-type CatalogTipo = "vendedor" | "contrato_ref";
+type CatalogTipo = "vendedor" | "contrato_ref" | "contacto";
 
 function catalogKey(raw: string): string {
   return String(raw ?? "")
@@ -305,7 +306,23 @@ function cleanCatalogName(raw: string): string {
 }
 
 function isCatalogTipo(value: string): value is CatalogTipo {
-  return value === "vendedor" || value === "contrato_ref";
+  return value === "vendedor" || value === "contrato_ref" || value === "contacto";
+}
+
+async function rememberCatalogName(tipo: CatalogTipo, raw: unknown): Promise<void> {
+  const nombre = cleanCatalogName(String(raw ?? ""));
+  const key = catalogKey(nombre);
+  if (!key) return;
+  const existing = await db.prepare("SELECT nombre FROM asic_pedido_catalogo WHERE tipo = ? AND nombre_key = ?").get(tipo, key);
+  if (existing) return;
+  try {
+    await db
+      .prepare(`INSERT INTO asic_pedido_catalogo (tipo, nombre, nombre_key, created_at) VALUES (?, ?, ?, ${nowSql()})`)
+      .run(tipo, nombre, key);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!/unique/i.test(msg)) throw e;
+  }
 }
 
 function isStageKey(value: string): value is AsicPedidoStageKey {
@@ -795,10 +812,21 @@ async function catalogNames(tipo: CatalogTipo): Promise<string[]> {
   for (const row of saved) add(row.nombre);
   for (const row of rows) {
     if (tipo === "vendedor") add(row.vendedor);
-    else {
+    else if (tipo === "contrato_ref") {
       try {
         const etapas = JSON.parse(String(row.etapas_json ?? "{}")) as { contrato?: { referencia?: string } };
         add(etapas.contrato?.referencia);
+      } catch {
+        /* el pedido sigue aunque la etapa no se pueda leer */
+      }
+    } else {
+      try {
+        const etapas = JSON.parse(String(row.etapas_json ?? "{}")) as {
+          rep_solicitud?: { referencia?: string };
+          rep_envio_taller?: { referencia?: string };
+        };
+        add(etapas.rep_solicitud?.referencia);
+        add(etapas.rep_envio_taller?.referencia);
       } catch {
         /* el pedido sigue aunque la etapa no se pueda leer */
       }
@@ -854,8 +882,12 @@ asicPedidosRouter.get("/asic-pedidos/garantias", ...readMw, async (_req, res, ne
 asicPedidosRouter.get("/asic-pedidos/catalogo", ...readMw, async (_req, res, next) => {
   try {
     await ensureSchema();
-    const [vendedores, contratoRefs] = await Promise.all([catalogNames("vendedor"), catalogNames("contrato_ref")]);
-    res.json({ vendedores, contratoRefs });
+    const [vendedores, contratoRefs, contactos] = await Promise.all([
+      catalogNames("vendedor"),
+      catalogNames("contrato_ref"),
+      catalogNames("contacto"),
+    ]);
+    res.json({ vendedores, contratoRefs, contactos });
   } catch (e) {
     next(e);
   }
@@ -866,7 +898,7 @@ asicPedidosRouter.post("/asic-pedidos/catalogo", ...writeMw, async (req, res, ne
     await ensureSchema();
     const parsed = z
       .object({
-        tipo: z.enum(["vendedor", "contrato_ref"]),
+        tipo: z.enum(["vendedor", "contrato_ref", "contacto"]),
         nombre: z.string().trim().min(1).max(200),
       })
       .safeParse(req.body);
@@ -952,6 +984,7 @@ asicPedidosRouter.post("/asic-pedidos", ...writeMw, async (req, res, next) => {
             status: "done",
             fecha: data.fechaContrato,
             notas: "",
+            ...(data.contacto ? { referencia: data.contacto } : {}),
           },
         }
       : {
@@ -993,6 +1026,7 @@ asicPedidosRouter.post("/asic-pedidos", ...writeMw, async (req, res, next) => {
       res.status(500).json({ error: { message: "No se pudo crear el pedido." } });
       return;
     }
+    if (reparacion && data.contacto) await rememberCatalogName("contacto", data.contacto);
     const pedido = await loadPedido(id);
     res.status(201).json({ pedido });
   } catch (e) {
@@ -1124,6 +1158,9 @@ asicPedidosRouter.post("/asic-pedidos/:id/etapas/:key", ...writeMw, async (req, 
     }
     const etapas: StagesMap = { ...pedido.etapas, [keyRaw]: checked.state };
     await saveStages(id, etapas);
+    if ((keyRaw === "rep_solicitud" || keyRaw === "rep_envio_taller") && checked.state.referencia) {
+      await rememberCatalogName("contacto", checked.state.referencia);
+    }
     if (keyRaw === "rep_factura" && checked.state.numeroFactura) {
       await db
         .prepare(`UPDATE asic_pedidos SET factura_numero = ?, factura_titular = ? WHERE id = ?`)

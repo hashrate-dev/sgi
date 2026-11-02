@@ -349,12 +349,12 @@ export function listAsicPedidoGarantias(): Promise<{
   return api("/api/asic-pedidos/garantias");
 }
 
-export function listAsicPedidoCatalogo(): Promise<{ vendedores: string[]; contratoRefs: string[] }> {
+export function listAsicPedidoCatalogo(): Promise<{ vendedores: string[]; contratoRefs: string[]; contactos: string[] }> {
   return api("/api/asic-pedidos/catalogo");
 }
 
 export function createAsicPedidoCatalogo(
-  tipo: "vendedor" | "contrato_ref",
+  tipo: "vendedor" | "contrato_ref" | "contacto",
   nombre: string
 ): Promise<{ nombre: string; alreadyExists: boolean }> {
   return api("/api/asic-pedidos/catalogo", { method: "POST", body: JSON.stringify({ tipo, nombre }) });
@@ -379,6 +379,7 @@ export function createAsicPedido(body: {
   comisionUsd?: number;
   fechaContrato: string;
   contratoRef?: string;
+  contacto?: string;
   notas?: string;
   aduanaAplica?: boolean;
 }): Promise<{ pedido: AsicPedido }> {

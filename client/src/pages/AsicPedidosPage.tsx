@@ -304,6 +304,7 @@ function PedidoList({
     comisionUsd?: number;
     fechaContrato: string;
     contratoRef?: string;
+    contacto?: string;
     notas: string;
     aduanaAplica?: boolean;
     lineas?: AsicPedidoLinea[];
@@ -331,7 +332,10 @@ function PedidoList({
   const [contratoRefs, setContratoRefs] = useState<string[]>([]);
   const [nuevoVendedor, setNuevoVendedor] = useState("");
   const [nuevaReferencia, setNuevaReferencia] = useState("");
-  const [catalogBusy, setCatalogBusy] = useState<"vendedor" | "contrato_ref" | null>(null);
+  const [contactos, setContactos] = useState<string[]>([]);
+  const [contacto, setContacto] = useState("");
+  const [nuevoContacto, setNuevoContacto] = useState("");
+  const [catalogBusy, setCatalogBusy] = useState<"vendedor" | "contrato_ref" | "contacto" | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -356,11 +360,13 @@ function PedidoList({
         if (cancelled) return;
         setVendedores(Array.isArray(r.vendedores) ? r.vendedores : []);
         setContratoRefs(Array.isArray(r.contratoRefs) ? r.contratoRefs : []);
+        setContactos(Array.isArray(r.contactos) ? r.contactos : []);
       })
       .catch(() => {
         if (!cancelled) {
           setVendedores([]);
           setContratoRefs([]);
+          setContactos([]);
         }
       });
     return () => {
@@ -384,7 +390,7 @@ function PedidoList({
   }, [procesador, procesadorOptions]);
 
   const saveCatalogName = async (
-    tipo: "vendedor" | "contrato_ref",
+    tipo: "vendedor" | "contrato_ref" | "contacto",
     raw: string,
     clearDraft: (value: string) => void,
     select: (value: string) => void,
@@ -492,7 +498,7 @@ function PedidoList({
               fechaContrato,
               notas: notas.trim(),
               ...(reparacion
-                ? {}
+                ? { ...(contacto.trim() ? { contacto: contacto.trim() } : {}) }
                 : {
                     origen,
                     vendedor: vendedor.trim(),
@@ -727,9 +733,21 @@ function PedidoList({
             )}
               </>
             ) : (
+              <>
+              <ContactoField
+                label="Contacto de la solicitud"
+                value={contacto}
+                options={contactos}
+                draft={nuevoContacto}
+                busy={catalogBusy === "contacto"}
+                onChange={setContacto}
+                onDraft={setNuevoContacto}
+                onAdd={() => saveCatalogName("contacto", nuevoContacto, setNuevoContacto, setContacto, setContactos)}
+              />
               <p className="span-2 text-muted small mb-0">
                 El equipo sale del datacenter de Ayolas, se revisa en el taller de Asunción y vuelve para encenderse de nuevo.
               </p>
+              </>
             )}
             <label className="span-2">
               Notas
@@ -1759,6 +1777,8 @@ function StageForm({
   const [medio, setMedio] = useState<AsicPedidoMedioDinero>("banco_py");
   const [referencia, setReferencia] = useState("");
   const [contratoRefs, setContratoRefs] = useState<string[]>([]);
+  const [contactos, setContactos] = useState<string[]>([]);
+  const [nuevoContacto, setNuevoContacto] = useState("");
   const [nuevaReferencia, setNuevaReferencia] = useState("");
   const [catalogBusy, setCatalogBusy] = useState(false);
   const [firmadoClientId, setFirmadoClientId] = useState(0);
@@ -1787,20 +1807,35 @@ function StageForm({
     setBillingState("idle");
     didAutoLink.current = false;
     setMedio("banco_py");
-    setReferencia(stage === "documentos" ? String(pedido.etapas.contrato?.referencia ?? "").trim() : "");
+    setReferencia(
+      stage === "documentos"
+        ? String(pedido.etapas.contrato?.referencia ?? "").trim()
+        : stage === "rep_envio_taller"
+          ? String(pedido.etapas.rep_envio_taller?.referencia || pedido.etapas.rep_solicitud?.referencia || "").trim()
+          : stage === "rep_solicitud"
+            ? String(pedido.etapas.rep_solicitud?.referencia ?? "").trim()
+            : ""
+    );
+    setNuevoContacto("");
     setFirmadoClientId(0);
     setMonto("");
-  }, [stage, pedido.id, pedido.etapas.contrato?.referencia]);
+  }, [stage, pedido.id, pedido.etapas.contrato?.referencia, pedido.etapas.rep_solicitud?.referencia, pedido.etapas.rep_envio_taller?.referencia]);
 
   useEffect(() => {
-    if (stage !== "contrato" && stage !== "documentos") return;
+    const needsRefs = stage === "contrato" || stage === "documentos";
+    const needsContacto = stage === "rep_solicitud" || stage === "rep_envio_taller";
+    if (!needsRefs && !needsContacto) return;
     let cancelled = false;
     void listAsicPedidoCatalogo()
       .then((r) => {
-        if (!cancelled) setContratoRefs(Array.isArray(r.contratoRefs) ? r.contratoRefs : []);
+        if (cancelled) return;
+        if (needsRefs) setContratoRefs(Array.isArray(r.contratoRefs) ? r.contratoRefs : []);
+        if (needsContacto) setContactos(Array.isArray(r.contactos) ? r.contactos : []);
       })
       .catch(() => {
-        if (!cancelled) setContratoRefs([]);
+        if (cancelled) return;
+        if (needsRefs) setContratoRefs([]);
+        if (needsContacto) setContactos([]);
       });
     if (stage !== "contrato") {
       return () => {
@@ -2256,7 +2291,39 @@ function StageForm({
             </select>
           </label>
         ) : null}
-        {stage === "rep_factura" || stage === "rep_recibo" ? null : (
+        {stage === "rep_solicitud" || stage === "rep_envio_taller" ? (
+          <ContactoField
+            label={stage === "rep_envio_taller" ? "Referencia del envío a Asunción" : "Contacto"}
+            value={referencia}
+            options={contactos}
+            draft={nuevoContacto}
+            busy={catalogBusy}
+            onChange={setReferencia}
+            onDraft={setNuevoContacto}
+            onAdd={async () => {
+              const nombre = nuevoContacto.trim().replace(/\s+/g, " ");
+              if (!nombre) return false;
+              setCatalogBusy(true);
+              onError(null);
+              try {
+                const saved = await createAsicPedidoCatalogo("contacto", nombre);
+                const key = saved.nombre.trim().toLocaleLowerCase("es");
+                setContactos((prev) => {
+                  const without = prev.filter((item) => item.trim().toLocaleLowerCase("es") !== key);
+                  return [...without, saved.nombre].sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+                });
+                setReferencia(saved.nombre);
+                setNuevoContacto("");
+                return true;
+              } catch (e) {
+                onError(errorText(e));
+                return false;
+              } finally {
+                setCatalogBusy(false);
+              }
+            }}
+          />
+        ) : stage === "rep_factura" || stage === "rep_recibo" ? null : (
         <label>
           {referenciaLabel}
           {stage === "contrato" || stage === "documentos" ? (
@@ -2344,6 +2411,59 @@ function BillingDocButton({
       <span>{hit.reason}</span>
       {detalle[hit.invoice.id] ? <span>{detalle[hit.invoice.id]}</span> : null}
     </button>
+  );
+}
+
+function ContactoField({
+  label,
+  value,
+  options,
+  draft,
+  busy,
+  onChange,
+  onDraft,
+  onAdd,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  draft: string;
+  busy: boolean;
+  onChange: (value: string) => void;
+  onDraft: (value: string) => void;
+  onAdd: () => Promise<boolean>;
+}) {
+  const canonical = options.find((item) => item.trim().toLocaleLowerCase("es") === value.trim().toLocaleLowerCase("es"));
+  const selected = canonical || value;
+  return (
+    <div className="asic-pedidos-contacto">
+      <span className="asic-pedidos-label">{label}</span>
+      <select value={selected} onChange={(e) => onChange(e.target.value)}>
+        <option value="">Elegí un contacto</option>
+        {value && !canonical ? <option value={value}>{value}</option> : null}
+        {options.map((item) => (
+          <option key={item} value={item}>
+            {item}
+          </option>
+        ))}
+      </select>
+      <div className="asic-pedidos-addline">
+        <input
+          value={draft}
+          onChange={(e) => onDraft(e.target.value)}
+          maxLength={200}
+          placeholder="Nuevo contacto"
+          onKeyDown={(e) => {
+            if (e.key !== "Enter" || busy || !draft.trim()) return;
+            e.preventDefault();
+            void onAdd();
+          }}
+        />
+        <button type="button" className="asic-pedidos-ghost" disabled={busy || !draft.trim()} onClick={() => void onAdd()}>
+          Agregar
+        </button>
+      </div>
+    </div>
   );
 }
 
