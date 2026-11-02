@@ -110,9 +110,13 @@ export type AsicPedidoConfirmBody = {
 
 const ADUANA = new Set<AsicPedidoStageKey>(["aduana_llegada", "aduana_salida"]);
 
-export function asicPedidoStagesFor(pedido: Pick<AsicPedido, "aduanaAplica" | "tipo">): AsicPedidoStageKey[] {
+export function asicPedidoStagesFor(pedido: Pick<AsicPedido, "aduanaAplica" | "tipo" | "origen">): AsicPedidoStageKey[] {
   if (pedido.tipo === "reparacion") return [...ASIC_REPARACION_STAGE_KEYS];
-  return ASIC_PEDIDO_STAGE_KEYS.filter((key) => pedido.aduanaAplica || !ADUANA.has(key));
+  return ASIC_PEDIDO_STAGE_KEYS.filter((key) => {
+    if (!pedido.aduanaAplica && ADUANA.has(key)) return false;
+    if (pedido.origen === "china" && key === "pago_proveedor") return false;
+    return true;
+  });
 }
 
 export function asicPedidoStageTitle(key: AsicPedidoStageKey, origen: AsicPedidoOrigen): string {
@@ -175,7 +179,7 @@ export function asicPedidoStageDetail(key: AsicPedidoStageKey): string {
     case "dinero":
       return "La transferencia todavía no ingresó. Cuando llegue, confirmá el medio y la etapa pasa sola al pedido.";
     case "pedido":
-      return "Se hace el pedido a China o al proveedor de Paraguay, según el origen de las máquinas.";
+      return "Se hace el pedido a China o al proveedor de Paraguay. En un pedido desde China, acá se carga el monto que se paga.";
     case "pago_proveedor":
       return "Se paga al proveedor de Paraguay o a China.";
     case "envio":

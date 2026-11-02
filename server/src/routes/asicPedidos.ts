@@ -385,13 +385,17 @@ function parseStages(raw: unknown): StagesMap {
   }
 }
 
-function stageKeysFor(tipo: AsicPedidoTipo, aduanaAplica: boolean): AsicPedidoStageKey[] {
+function stageKeysFor(tipo: AsicPedidoTipo, aduanaAplica: boolean, origen: "china" | "paraguay" = "paraguay"): AsicPedidoStageKey[] {
   if (tipo === "reparacion") return [...ASIC_REPARACION_STAGE_KEYS];
-  return ASIC_PEDIDO_STAGE_KEYS.filter((key) => aduanaAplica || !ADUANA_KEYS.has(key));
+  return ASIC_PEDIDO_STAGE_KEYS.filter((key) => {
+    if (!aduanaAplica && ADUANA_KEYS.has(key)) return false;
+    if (origen === "china" && key === "pago_proveedor") return false;
+    return true;
+  });
 }
 
-function etapaActual(tipo: AsicPedidoTipo, origenAduana: boolean, etapas: StagesMap): AsicPedidoStageKey | "completo" {
-  for (const key of stageKeysFor(tipo, origenAduana)) {
+function etapaActual(tipo: AsicPedidoTipo, origenAduana: boolean, etapas: StagesMap, origen: "china" | "paraguay" = "paraguay"): AsicPedidoStageKey | "completo" {
+  for (const key of stageKeysFor(tipo, origenAduana, origen)) {
     if (etapas[key]?.status !== "done") return key;
   }
   return "completo";
@@ -450,7 +454,7 @@ function mapPedido(raw: Record<string, unknown>): PedidoRow {
     facturaNumero: String(r.factura_numero ?? ""),
     facturaTitular: String(r.factura_titular ?? ""),
     etapas,
-    etapaActual: etapaActual(tipo, aduanaAplica, etapas),
+    etapaActual: etapaActual(tipo, aduanaAplica, etapas, origen),
     createdAt: String(r.created_at ?? ""),
     updatedAt: String(r.updated_at ?? ""),
   };
@@ -1199,6 +1203,10 @@ asicPedidosRouter.post("/asic-pedidos/:id/etapas/:key", ...writeMw, async (req, 
       res.status(400).json({ error: { message: checked.message } });
       return;
     }
+    if (keyRaw === "pedido" && pedido.origen === "china" && checked.state.montoUsd == null) {
+      res.status(400).json({ error: { message: "Indicá el monto que se paga a China." } });
+      return;
+    }
     const etapas: StagesMap = { ...pedido.etapas, [keyRaw]: checked.state };
     if (keyRaw === "rep_cotizacion" || keyRaw === "rep_precio_cliente") {
       const fecha = checked.state.fecha || pedido.etapas.rep_cotizacion?.fecha || "";
@@ -1246,7 +1254,7 @@ asicPedidosRouter.post("/asic-pedidos/:id/etapas/:key/reabrir", ...writeMw, asyn
       res.status(404).json({ error: { message: "No se encontró el pedido." } });
       return;
     }
-    const keys = stageKeysFor(pedido.tipo, pedido.aduanaAplica);
+    const keys = stageKeysFor(pedido.tipo, pedido.aduanaAplica, pedido.origen);
     if (!keys.includes(keyRaw)) {
       res.status(400).json({ error: { message: "Esa etapa no aplica a este pedido." } });
       return;

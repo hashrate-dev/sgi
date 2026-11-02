@@ -2393,6 +2393,10 @@ function StageForm({
       onError(stage === "rep_cotizacion" ? "El precio de reparación tiene que ser un número." : "El monto tiene que ser un número.");
       return;
     }
+    if (stage === "pedido" && pedido.origen === "china" && (montoUsd == null || !Number.isFinite(montoUsd))) {
+      onError("Indicá el monto que se paga a China.");
+      return;
+    }
     if (costo.trim() && !Number.isFinite(costoUsd)) {
       onError("El costo tiene que ser un número.");
       return;
@@ -2685,6 +2689,11 @@ function StageForm({
               <input value={referencia} onChange={(e) => setReferencia(e.target.value)} />
             </label>
           </>
+        ) : stage === "pedido" && pedido.origen === "china" ? (
+          <label>
+            Monto del pago (USD)
+            <input value={monto} onChange={(e) => setMonto(e.target.value)} inputMode="decimal" required />
+          </label>
         ) : stage === "pago_proveedor" ? (
           <label>
             Monto USD
