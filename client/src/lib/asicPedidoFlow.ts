@@ -285,6 +285,8 @@ export function asicPedidoStageSummary(key: AsicPedidoStageKey, state: AsicPedid
   if (key === "rep_cotizacion") {
     if (state.costoUsd != null && Number.isFinite(state.costoUsd)) bits.push(`Costo ${usd(state.costoUsd)}`);
     if (state.montoUsd != null && Number.isFinite(state.montoUsd)) bits.push(`Precio al cliente ${usd(state.montoUsd)}`);
+  } else if (key === "rep_precio_cliente" && state.montoUsd != null && Number.isFinite(state.montoUsd)) {
+    bits.push(`Precio al cliente ${usd(state.montoUsd)}`);
   } else if (state.montoUsd != null && Number.isFinite(state.montoUsd)) {
     bits.push(usd(state.montoUsd));
   }

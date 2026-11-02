@@ -867,6 +867,22 @@ function PedidoDetail({
 }) {
   const stages = asicPedidoStagesFor(pedido);
   const doneCount = stages.filter((key) => pedido.etapas[key]?.status === "done").length;
+  const autoPrecio = useRef<number | null>(null);
+  useEffect(() => {
+    if (!canWrite || pedido.etapaActual !== "rep_precio_cliente") return;
+    if (autoPrecio.current === pedido.id) return;
+    const quote = pedido.etapas.rep_cotizacion;
+    if (quote?.status !== "done") return;
+    autoPrecio.current = pedido.id;
+    const monto = quote.montoUsd;
+    void onRun(() =>
+      confirmAsicPedidoStage(pedido.id, "rep_precio_cliente", {
+        fecha: quote.fecha || todayISO(),
+        notas: "",
+        ...(monto != null && Number.isFinite(monto) ? { montoUsd: monto } : {}),
+      }).then((r) => r.pedido)
+    );
+  }, [canWrite, onRun, pedido.id, pedido.etapaActual, pedido.etapas.rep_cotizacion]);
   const customsStillOpen =
     pedido.tipo !== "reparacion" &&
     pedido.origen === "paraguay" &&
@@ -1069,7 +1085,7 @@ function PedidoTracking({
         ) : null}
       </section>
 
-      {!completo && currentKey ? (
+      {!completo && currentKey && currentKey !== "rep_precio_cliente" ? (
         <section className="asic-track-card">
           <p className="asic-track-kicker">Etapa en curso</p>
           <h2>{asicPedidoEtapaLabel(pedido)}</h2>
@@ -2372,9 +2388,9 @@ function StageForm({
               <input value={referencia} onChange={(e) => setReferencia(e.target.value)} />
             </label>
           </>
-        ) : stage === "dinero" || stage === "pago_proveedor" || stage === "rep_precio_cliente" ? (
+        ) : stage === "dinero" || stage === "pago_proveedor" ? (
           <label>
-            {stage === "rep_precio_cliente" ? "Precio de la reparación (USD)" : "Monto USD"}
+            Monto USD
             <input value={monto} onChange={(e) => setMonto(e.target.value)} inputMode="decimal" placeholder="Opcional" />
           </label>
         ) : null}
