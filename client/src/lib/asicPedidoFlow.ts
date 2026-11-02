@@ -313,6 +313,29 @@ export function asicPedidoFechaTicket(pedido: Pick<AsicPedido, "tipo" | "etapas"
   return String(fecha ?? "").trim();
 }
 
+function isoDayUtc(iso: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso ?? "").trim());
+  if (!m) return null;
+  return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+
+/** Días corridos desde el contrato (o la apertura del ticket) hasta hoy, o hasta el cierre si ya terminó. */
+export function asicPedidoDiasAcumulados(
+  pedido: Pick<AsicPedido, "tipo" | "etapas" | "etapaActual">,
+  hoyIso: string
+): number | null {
+  const inicio = isoDayUtc(asicPedidoFechaTicket(pedido));
+  if (inicio == null) return null;
+  let finIso = hoyIso;
+  if (pedido.etapaActual === "completo") {
+    const cierre = pedido.tipo === "reparacion" ? pedido.etapas.rep_encendido?.fecha : pedido.etapas.instalado?.fecha;
+    if (cierre) finIso = cierre;
+  }
+  const fin = isoDayUtc(finIso);
+  if (fin == null) return null;
+  return Math.max(0, Math.round((fin - inicio) / 86_400_000));
+}
+
 export function asicPedidoPrecioCliente(pedido: Pick<AsicPedido, "tipo" | "etapas">): number | null {
   if (pedido.tipo !== "reparacion") return null;
   const monto = pedido.etapas.rep_precio_cliente?.montoUsd ?? pedido.etapas.rep_cotizacion?.montoUsd;

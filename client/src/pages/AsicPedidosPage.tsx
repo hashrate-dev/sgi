@@ -25,6 +25,7 @@ import {
   asicPedidoCantidadTotal,
   asicPedidoCobroPendiente,
   asicPedidoEtapaLabel,
+  asicPedidoDiasAcumulados,
   asicPedidoFechaTicket,
   asicPedidoLineas,
   asicPedidoNumeroOperacion,
@@ -1032,6 +1033,7 @@ function PedidoDetail({
     pedido.etapas.aduana_llegada?.status !== "done" &&
     pedido.etapas.aduana_salida?.status !== "done" &&
     pedido.etapas.camino_ayolas?.status !== "done";
+  const diasAcumulados = asicPedidoDiasAcumulados(pedido, todayISO());
 
   return (
     <>
@@ -1049,10 +1051,17 @@ function PedidoDetail({
               );
             })}
             <span className="asic-op-line">
-              {pedido.tipo === "reparacion" ? "Reparación de equipos ASIC" : `origen ${asicPedidoOrigenLabel(pedido.origen)}`}
+              {pedido.tipo === "reparacion" ? "Reparación de equipos ASIC" : `Origen ${asicPedidoOrigenLabel(pedido.origen)}`}
             </span>
             <span className="asic-op-line">
               Ticket {asicPedidoFechaTicket(pedido) ? formatAsicPedidoFecha(asicPedidoFechaTicket(pedido)) : "—"}
+            </span>
+            <span className="asic-op-line">
+              {diasAcumulados == null
+                ? "Días acumulados —"
+                : diasAcumulados === 1
+                  ? "1 día acumulado"
+                  : `${diasAcumulados} días acumulados`}
             </span>
             <span className="asic-op-line">
               Precio {precioVenta != null ? formatUsd(precioVenta) : "—"}
