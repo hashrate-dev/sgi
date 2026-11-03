@@ -724,6 +724,73 @@ async function rememberPedidoFactura(id: number, numero: string, titular: string
   await db.prepare(`UPDATE asic_pedidos SET factura_numero = ?, factura_titular = ? WHERE id = ?`).run(numero, titular, id);
 }
 
+function roundRepairUsd(value: number): number {
+  return Math.round(Math.abs(value) * 100) / 100;
+}
+
+function repairInvoiceNumber(pedido: PedidoRow): string {
+  return String(pedido.etapas.rep_factura?.numeroFactura || pedido.facturaNumero || "").trim();
+}
+
+function sameRepairUsd(a: number | null | undefined, b: number | null | undefined): boolean {
+  if (a == null && b == null) return true;
+  if (a == null || b == null) return false;
+  return Math.abs(a - b) < 0.001;
+}
+
+/** En una reparación, la cotización copia el costo y el total de la factura que el usuario vinculó. */
+async function syncRepairCotizaciones(pedidos: PedidoRow[]): Promise<PedidoRow[]> {
+  const targets = pedidos.filter(
+    (pedido) => pedido.tipo === "reparacion" && pedido.etapas.rep_cotizacion?.status === "done" && repairInvoiceNumber(pedido)
+  );
+  if (!targets.length) return pedidos;
+  const numbers = [...new Set(targets.map((pedido) => repairInvoiceNumber(pedido).toUpperCase()))];
+  const invoices = (await db
+    .prepare(
+      `SELECT number, total, margin_usd as marginUsd
+       FROM invoices
+       WHERE type = 'Factura' AND upper(number) IN (${numbers.map(() => "?").join(", ")})
+       ORDER BY id DESC`
+    )
+    .all(...numbers)) as Array<{ number?: string; total?: number; marginUsd?: number | null }>;
+  const byNumber = new Map<string, { total: number; costo: number | null }>();
+  for (const row of invoices) {
+    const number = String(row.number ?? "").trim().toUpperCase();
+    if (!number || byNumber.has(number)) continue;
+    const total = roundRepairUsd(Number(row.total) || 0);
+    const marginRaw = row.marginUsd;
+    const marginNum = Number(marginRaw);
+    const margin = marginRaw == null || !Number.isFinite(marginNum) ? null : roundRepairUsd(marginNum);
+    byNumber.set(number, { total, costo: margin == null ? null : roundRepairUsd(Math.max(0, total - margin)) });
+  }
+  const updated = new Map<number, PedidoRow>();
+  for (const pedido of targets) {
+    const invoice = byNumber.get(repairInvoiceNumber(pedido).toUpperCase());
+    const quote = pedido.etapas.rep_cotizacion;
+    if (!invoice || !quote || !(invoice.total > 0)) continue;
+    const nextQuote: StageState = {
+      ...quote,
+      montoUsd: invoice.total,
+      ...(invoice.costo != null ? { costoUsd: invoice.costo } : {}),
+    };
+    const price = pedido.etapas.rep_precio_cliente;
+    const nextPrice = price?.status === "done" ? { ...price, montoUsd: invoice.total } : price;
+    const quoteSame =
+      sameRepairUsd(quote.montoUsd, invoice.total) && (invoice.costo == null || sameRepairUsd(quote.costoUsd, invoice.costo));
+    const priceSame = nextPrice == null || sameRepairUsd(price?.montoUsd, invoice.total);
+    if (quoteSame && priceSame) continue;
+    const etapas: StagesMap = {
+      ...pedido.etapas,
+      rep_cotizacion: nextQuote,
+      ...(nextPrice ? { rep_precio_cliente: nextPrice } : {}),
+    };
+    await saveStages(pedido.id, etapas);
+    updated.set(pedido.id, { ...pedido, etapas });
+  }
+  if (!updated.size) return pedidos;
+  return pedidos.map((pedido) => updated.get(pedido.id) ?? pedido);
+}
+
 async function saveStages(id: number, etapas: StagesMap, aduanaAplica?: boolean): Promise<void> {
   const ts = nowSql();
   if (aduanaAplica == null) {
@@ -814,7 +881,8 @@ asicPedidosRouter.get("/asic-pedidos", ...readMw, async (_req, res, next) => {
     const rows = (await db
       .prepare("SELECT * FROM asic_pedidos ORDER BY updated_at DESC, id DESC LIMIT 500")
       .all()) as Record<string, unknown>[];
-    res.json({ pedidos: rows.map(mapPedido) });
+    const pedidos = await syncRepairCotizaciones(rows.map(mapPedido));
+    res.json({ pedidos });
   } catch (e) {
     next(e);
   }
@@ -981,7 +1049,8 @@ asicPedidosRouter.get("/asic-pedidos/:id", ...readMw, async (req, res, next) => 
       res.status(404).json({ error: { message: "No se encontró el pedido." } });
       return;
     }
-    res.json({ pedido });
+    const [synced] = await syncRepairCotizaciones([pedido]);
+    res.json({ pedido: synced ?? pedido });
   } catch (e) {
     next(e);
   }
@@ -1233,6 +1302,10 @@ asicPedidosRouter.post("/asic-pedidos/:id/etapas/:key", ...writeMw, async (req, 
           : "";
     if (facturaNumero) {
       await rememberPedidoFactura(id, facturaNumero, checked.state.titularFactura || pedido.facturaTitular);
+    }
+    if (pedido.tipo === "reparacion" && keyRaw === "rep_factura") {
+      const current = await loadPedido(id);
+      if (current) await syncRepairCotizaciones([current]);
     }
     res.json({ pedido: await loadPedido(id) });
   } catch (e) {
