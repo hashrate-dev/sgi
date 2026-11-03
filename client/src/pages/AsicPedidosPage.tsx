@@ -317,7 +317,6 @@ function PedidoList({
   const [clients, setClients] = useState<Client[]>([]);
   const [equipos, setEquipos] = useState<EquipoASIC[]>([]);
   const [facturas, setFacturas] = useState<AsicBillingDoc[]>([]);
-  const [facturasListas, setFacturasListas] = useState(false);
   const [clientId, setClientId] = useState<number | "">("");
   const [tipoPedido, setTipoPedido] = useState<AsicPedidoTipo>("compra");
   const [origen, setOrigen] = useState<AsicPedidoOrigen>("china");
@@ -377,9 +376,6 @@ function PedidoList({
       })
       .catch(() => {
         if (!cancelled) setFacturas([]);
-      })
-      .finally(() => {
-        if (!cancelled) setFacturasListas(true);
       });
     void listAsicPedidoCatalogo()
       .then((r) => {
@@ -800,6 +796,8 @@ function PedidoList({
                   const precio = asicPedidoPrecioCliente(pedido);
                   const venta = ventaPrecioOperacion(pedido, equipos);
                   const documento = ventaDocumento(pedido, facturas);
+                  const facturaSel = String(pedido.etapas.documentos?.numeroFactura || pedido.facturaNumero || "").trim();
+                  const reciboSel = String(pedido.etapas.documentos?.numeroRecibo || "").trim();
                   return (
                     <tbody key={pedido.id} className="asic-op-group" onClick={() => onOpen(pedido.id)}>
                       {lineas.map((linea, index) => (
@@ -854,19 +852,9 @@ function PedidoList({
                             <td rowSpan={lineas.length}>
                               {pedido.tipo === "compra" ? (
                                 <div className="asic-precio-cell">
-                                  {documento ? (
-                                    <>
-                                      <strong>{formatUsd(documento.invoice.total)}</strong>
-                                      <span>Factura {documento.invoice.number}</span>
-                                      {documento.receipt ? (
-                                        <span className="asic-precio-doc">Recibo {documento.receipt.number}</span>
-                                      ) : null}
-                                    </>
-                                  ) : facturasListas ? (
-                                    <span>Sin factura en la etapa</span>
-                                  ) : (
-                                    <span>Buscando factura…</span>
-                                  )}
+                                  {documento ? <strong>{formatUsd(documento.invoice.total)}</strong> : <span>Precio —</span>}
+                                  <span className="asic-precio-doc">Factura {facturaSel || "pendiente"}</span>
+                                  <span className="asic-precio-doc">Recibo {reciboSel || "pendiente"}</span>
                                   {venta
                                     ? venta.partes.map((parte) => (
                                         <span key={`${parte.nombre}-${parte.unit}`} className="asic-precio-unit">
@@ -1147,7 +1135,6 @@ function PedidoTracking({
   const cobroPendiente = asicPedidoCobroPendiente(pedido);
   const [facturas, setFacturas] = useState<AsicBillingDoc[]>([]);
   const [garantiasEmitidas, setGarantiasEmitidas] = useState<AsicPedidoGarantiaDoc[]>([]);
-  const receiptSync = useRef<string>("");
 
   useEffect(() => {
     if (pedido.tipo === "reparacion") return;
@@ -1183,18 +1170,6 @@ function PedidoTracking({
       cancelled = true;
     };
   }, [pedido.id, pedido.tipo]);
-
-  useEffect(() => {
-    const docs = pedido.etapas.documentos;
-    if (!canWrite || pedido.tipo === "reparacion" || docs?.status !== "done" || docs.numeroRecibo) return;
-    const linked = ventaDocumento(pedido, facturas);
-    const receiptNumber = linked?.receipt?.number ?? "";
-    if (!receiptNumber) return;
-    const token = `${pedido.id}:${receiptNumber}`;
-    if (receiptSync.current === token) return;
-    receiptSync.current = token;
-    void onRun(() => updateAsicPedido(pedido.id, { numeroRecibo: receiptNumber }).then((r) => r.pedido));
-  }, [canWrite, facturas, onRun, pedido]);
 
   return (
     <>
