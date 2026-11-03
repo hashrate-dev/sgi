@@ -452,6 +452,14 @@ export function confirmAsicPedidoStage(
   return api(`/api/asic-pedidos/${id}/etapas/${key}`, { method: "POST", body: JSON.stringify(body) });
 }
 
+export function editAsicPedidoStage(
+  id: number,
+  key: AsicPedidoStageKey,
+  body: AsicPedidoConfirmBody
+): Promise<{ pedido: AsicPedido }> {
+  return api(`/api/asic-pedidos/${id}/etapas/${key}/editar`, { method: "POST", body: JSON.stringify(body) });
+}
+
 export function reopenAsicPedidoStage(id: number, key: AsicPedidoStageKey): Promise<{ pedido: AsicPedido }> {
   return api(`/api/asic-pedidos/${id}/etapas/${key}/reabrir`, { method: "POST", body: "{}" });
 }

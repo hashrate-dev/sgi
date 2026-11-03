@@ -881,8 +881,7 @@ asicPedidosRouter.get("/asic-pedidos", ...readMw, async (_req, res, next) => {
     const rows = (await db
       .prepare("SELECT * FROM asic_pedidos ORDER BY updated_at DESC, id DESC LIMIT 500")
       .all()) as Record<string, unknown>[];
-    const pedidos = await syncRepairCotizaciones(rows.map(mapPedido));
-    res.json({ pedidos });
+    res.json({ pedidos: rows.map(mapPedido) });
   } catch (e) {
     next(e);
   }
@@ -1049,8 +1048,7 @@ asicPedidosRouter.get("/asic-pedidos/:id", ...readMw, async (req, res, next) => 
       res.status(404).json({ error: { message: "No se encontró el pedido." } });
       return;
     }
-    const [synced] = await syncRepairCotizaciones([pedido]);
-    res.json({ pedido: synced ?? pedido });
+    res.json({ pedido });
   } catch (e) {
     next(e);
   }
@@ -1290,6 +1288,71 @@ asicPedidosRouter.post("/asic-pedidos/:id/etapas/:key", ...writeMw, async (req, 
       }
       etapas.rep_aceptacion = { status: "done", fecha, notas: "" };
     }
+    await saveStages(id, etapas);
+    if ((keyRaw === "rep_solicitud" || keyRaw === "rep_envio_taller" || keyRaw === "pedido") && checked.state.referencia) {
+      await rememberCatalogName("contacto", checked.state.referencia);
+    }
+    const facturaNumero =
+      keyRaw === "documentos" && checked.state.modoCobro === "factura_recibo"
+        ? checked.state.numeroFactura
+        : keyRaw === "rep_factura"
+          ? checked.state.numeroFactura
+          : "";
+    if (facturaNumero) {
+      await rememberPedidoFactura(id, facturaNumero, checked.state.titularFactura || pedido.facturaTitular);
+    }
+    if (pedido.tipo === "reparacion" && keyRaw === "rep_factura") {
+      const current = await loadPedido(id);
+      if (current) await syncRepairCotizaciones([current]);
+    }
+    res.json({ pedido: await loadPedido(id) });
+  } catch (e) {
+    next(e);
+  }
+});
+
+asicPedidosRouter.post("/asic-pedidos/:id/etapas/:key/editar", ...writeMw, async (req, res, next) => {
+  try {
+    await ensureSchema();
+    const id = Number(req.params.id);
+    const keyRaw = String(req.params.key || "");
+    if (!isStageKey(keyRaw)) {
+      res.status(400).json({ error: { message: "Etapa desconocida." } });
+      return;
+    }
+    const pedido = await loadPedido(id);
+    if (!pedido) {
+      res.status(404).json({ error: { message: "No se encontró el pedido." } });
+      return;
+    }
+    if ((pedido.tipo === "reparacion") !== isReparacionStage(keyRaw)) {
+      res.status(400).json({ error: { message: "Esa etapa no corresponde a este seguimiento." } });
+      return;
+    }
+    const keys = stageKeysFor(pedido.tipo, pedido.aduanaAplica, pedido.origen);
+    if (!keys.includes(keyRaw)) {
+      res.status(400).json({ error: { message: "Esa etapa no aplica a este pedido." } });
+      return;
+    }
+    if (pedido.etapas[keyRaw]?.status !== "done") {
+      res.status(400).json({ error: { message: "Esa etapa todavía no está confirmada." } });
+      return;
+    }
+    const parsed = ConfirmSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: { message: "Revisá los datos de la etapa." } });
+      return;
+    }
+    const checked = validateStage(keyRaw, parsed.data);
+    if (!checked.ok) {
+      res.status(400).json({ error: { message: checked.message } });
+      return;
+    }
+    if (keyRaw === "pedido" && pedido.origen === "china" && checked.state.montoUsd == null) {
+      res.status(400).json({ error: { message: "Indicá el monto que se paga a China." } });
+      return;
+    }
+    const etapas: StagesMap = { ...pedido.etapas, [keyRaw]: { ...checked.state, status: "done" } };
     await saveStages(id, etapas);
     if ((keyRaw === "rep_solicitud" || keyRaw === "rep_envio_taller" || keyRaw === "pedido") && checked.state.referencia) {
       await rememberCatalogName("contacto", checked.state.referencia);

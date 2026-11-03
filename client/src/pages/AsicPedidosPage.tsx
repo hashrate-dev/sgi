@@ -44,6 +44,7 @@ import {
   listAsicPedidoCatalogo,
   listAsicPedidoGarantias,
   listAsicPedidos,
+  editAsicPedidoStage,
   reopenAsicPedidoStage,
   updateAsicPedido,
   type AsicPedido,
@@ -52,6 +53,7 @@ import {
   type AsicPedidoModoCobro,
   type AsicPedidoOrigen,
   type AsicPedidoStageKey,
+  type AsicPedidoStageState,
   type AsicPedidoTipo,
 } from "../lib/asicPedidoFlow";
 import "../styles/facturacion.css";
@@ -1135,6 +1137,11 @@ function PedidoTracking({
   const cobroPendiente = asicPedidoCobroPendiente(pedido);
   const [facturas, setFacturas] = useState<AsicBillingDoc[]>([]);
   const [garantiasEmitidas, setGarantiasEmitidas] = useState<AsicPedidoGarantiaDoc[]>([]);
+  const [editingKey, setEditingKey] = useState<AsicPedidoStageKey | null>(null);
+
+  useEffect(() => {
+    setEditingKey(null);
+  }, [pedido.id]);
 
   useEffect(() => {
     if (pedido.tipo === "reparacion") return;
@@ -1282,39 +1289,66 @@ function PedidoTracking({
             const state = pedido.etapas[key];
             if (!state) return null;
             return (
-              <li key={key}>
+              <li key={key} className={editingKey === key ? "is-editing" : undefined}>
                 <span className="asic-log-mark" aria-hidden="true" title={asicPedidoStageTitle(key, pedido.origen)}>
                   <i className={`bi ${asicPedidoStageIcon(key, pedido.origen)}`} />
                 </span>
                 <div className="asic-log-body">
                   <span className="asic-log-date">{state.fecha ? formatAsicPedidoFecha(state.fecha) : "—"}</span>
                   <strong>{asicPedidoStageTitle(key, pedido.origen)}</strong>
-                  {key === "documentos" && state.modoCobro === "factura_recibo" ? (
-                    <DocumentosVinculo pedido={pedido} facturas={facturas} garantias={garantiasEmitidas} state={state} />
+                  {editingKey === key && canWrite ? (
+                    <StageForm
+                      pedido={pedido}
+                      stage={key}
+                      saved={state}
+                      busy={busy}
+                      canAddClient={canAddClient}
+                      onError={onError}
+                      onCancel={() => setEditingKey(null)}
+                      onSubmit={(body) =>
+                        void onRun(async () => {
+                          const res = await editAsicPedidoStage(pedido.id, key, body);
+                          setEditingKey(null);
+                          return res.pedido;
+                        })
+                      }
+                    />
                   ) : (
-                    <p>{asicPedidoStageSummary(key, state) || asicPedidoStageDetail(key)}</p>
+                    <>
+                      {key === "documentos" && state.modoCobro === "factura_recibo" ? (
+                        <DocumentosVinculo pedido={pedido} facturas={facturas} garantias={garantiasEmitidas} state={state} />
+                      ) : (
+                        <p>{asicPedidoStageSummary(key, state) || asicPedidoStageDetail(key)}</p>
+                      )}
+                      {key === "documentos" && cobroPendiente.garantia ? (
+                        <aside className="asic-track-alert asic-track-alert--inline">
+                          <p className="asic-track-alert-kicker">Garantía</p>
+                          <p className="asic-track-alert-title">Pendiente de pago completo</p>
+                          <p className="asic-track-alert-text">Se completa al emitir el recibo.</p>
+                        </aside>
+                      ) : null}
+                      {state.notas ? <p>{state.notas}</p> : null}
+                      {canWrite ? (
+                        <div className="asic-pedidos-actions">
+                          <button type="button" className="asic-pedidos-ghost" disabled={busy} onClick={() => setEditingKey(key)}>
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            className="asic-pedidos-ghost"
+                            disabled={busy}
+                            onClick={() => {
+                              if (!window.confirm("Se borran esta etapa y las posteriores. ¿Reabrir?")) return;
+                              setEditingKey(null);
+                              void onRun(() => reopenAsicPedidoStage(pedido.id, key).then((r) => r.pedido));
+                            }}
+                          >
+                            Reabrir desde acá
+                          </button>
+                        </div>
+                      ) : null}
+                    </>
                   )}
-                  {key === "documentos" && cobroPendiente.garantia ? (
-                    <aside className="asic-track-alert asic-track-alert--inline">
-                      <p className="asic-track-alert-kicker">Garantía</p>
-                      <p className="asic-track-alert-title">Pendiente de pago completo</p>
-                      <p className="asic-track-alert-text">Se completa al emitir el recibo.</p>
-                    </aside>
-                  ) : null}
-                  {state.notas ? <p>{state.notas}</p> : null}
-                  {canWrite ? (
-                    <button
-                      type="button"
-                      className="asic-pedidos-ghost"
-                      disabled={busy}
-                      onClick={() => {
-                        if (!window.confirm("Se borran esta etapa y las posteriores. ¿Reabrir?")) return;
-                        void onRun(() => reopenAsicPedidoStage(pedido.id, key).then((r) => r.pedido));
-                      }}
-                    >
-                      Reabrir desde acá
-                    </button>
-                  ) : null}
                 </div>
               </li>
             );
@@ -2069,17 +2103,21 @@ function receiptOptionGroups(
 function StageForm({
   pedido,
   stage,
+  saved,
   busy,
   canAddClient,
   onError,
   onSubmit,
+  onCancel,
   onLinkInvoice,
 }: {
   pedido: AsicPedido;
   stage: AsicPedidoStageKey;
+  saved?: AsicPedidoStageState;
   busy: boolean;
   canAddClient: boolean;
   onError: (message: string | null) => void;
+  onCancel?: () => void;
   onLinkInvoice?: (hit: AsicPedidoBillingHit) => void;
   onSubmit: (body: {
     fecha: string;
@@ -2135,15 +2173,15 @@ function StageForm({
   const [costo, setCosto] = useState("");
 
   useEffect(() => {
-    setFecha(todayISO());
-    setNotas("");
-    setModo("factura_recibo");
-    setNumeroFactura("");
-    setNumeroRecibo("");
-    setNumeroComprobante("");
-    setTitularFactura("");
-    setNumeroGarantia("");
-    setValorGarantia(null);
+    setFecha(saved?.fecha || todayISO());
+    setNotas(saved?.notas ?? "");
+    setModo(saved?.modoCobro ?? "factura_recibo");
+    setNumeroFactura(saved?.numeroFactura ?? "");
+    setNumeroRecibo(saved?.numeroRecibo ?? "");
+    setNumeroComprobante(saved?.numeroComprobante ?? "");
+    setTitularFactura(saved?.titularFactura ?? "");
+    setNumeroGarantia(saved?.numeroGarantia ?? "");
+    setValorGarantia(saved?.valorGarantiaUsd ?? null);
     setGarantiaSuggested([]);
     setGarantiaOthers([]);
     setGarantiaState("idle");
@@ -2155,12 +2193,13 @@ function StageForm({
     setBillingDetalle({});
     setBillingState("idle");
     didAutoLink.current = false;
-    setMedio("banco_py");
+    setMedio(saved?.medioDinero ?? "banco_py");
     setReferencia(
-      stage === "documentos"
-        ? String(pedido.etapas.contrato?.referencia ?? "").trim()
-        : stage === "rep_envio_taller"
-          ? String(pedido.etapas.rep_envio_taller?.referencia || pedido.etapas.rep_solicitud?.referencia || "").trim()
+      saved?.referencia ??
+        (stage === "documentos"
+          ? String(pedido.etapas.contrato?.referencia ?? "").trim()
+          : stage === "rep_envio_taller"
+            ? String(pedido.etapas.rep_envio_taller?.referencia || pedido.etapas.rep_solicitud?.referencia || "").trim()
             : stage === "rep_cotizacion"
               ? String(
                   pedido.etapas.rep_cotizacion?.referencia ||
@@ -2168,13 +2207,13 @@ function StageForm({
                     pedido.etapas.rep_solicitud?.referencia ||
                     ""
                 ).trim()
-              : ""
+              : "")
     );
     setNuevoContacto("");
-    setFirmadoClientId(0);
-    setMonto("");
-    setCosto("");
-  }, [stage, pedido.id, pedido.etapas.contrato?.referencia, pedido.etapas.rep_solicitud?.referencia, pedido.etapas.rep_envio_taller?.referencia, pedido.etapas.rep_cotizacion?.referencia]);
+    setFirmadoClientId(saved?.firmadoClientId ?? 0);
+    setMonto(saved?.montoUsd != null ? String(saved.montoUsd) : "");
+    setCosto(saved?.costoUsd != null ? String(saved.costoUsd) : "");
+  }, [stage, pedido.id, saved, pedido.etapas.contrato?.referencia, pedido.etapas.rep_solicitud?.referencia, pedido.etapas.rep_envio_taller?.referencia, pedido.etapas.rep_cotizacion?.referencia]);
 
   useEffect(() => {
     const needsRefs = stage === "contrato" || stage === "documentos";
@@ -2337,6 +2376,7 @@ function StageForm({
           .sort((a, b) => b.date.localeCompare(a.date) || b.number.localeCompare(a.number));
         setBillingReceipts(recibos);
         setBillingState("ready");
+        if (saved) return;
         if (stage === "rep_recibo") {
           const number = String(pedido.etapas.rep_factura?.numeroFactura || pedido.facturaNumero || "").trim().toUpperCase();
           const hit = [...matched.suggested, ...matched.others].find((item) => item.invoice.number.toUpperCase() === number);
@@ -2357,12 +2397,12 @@ function StageForm({
           }
           return;
         }
-        const saved = [...matched.suggested, ...matched.others].find(
+        const linkedInvoice = [...matched.suggested, ...matched.others].find(
           (hit) => hit.invoice.number.toUpperCase() === String(pedido.facturaNumero ?? "").trim().toUpperCase()
         );
-        if (!didAutoLink.current && saved) {
+        if (!didAutoLink.current && linkedInvoice) {
           didAutoLink.current = true;
-          applyCredit(saved, false);
+          applyCredit(linkedInvoice, false);
         } else if (!didAutoLink.current && matched.suggested.length === 1) {
           didAutoLink.current = true;
           applyCredit(matched.suggested[0]!, true);
@@ -2627,7 +2667,7 @@ function StageForm({
             />
           </div>
         ) : null}
-        {stage === "dinero" || (stage.startsWith("rep_") && stage !== "rep_solicitud" && stage !== "rep_reparado" && stage !== "rep_encendido") ? null : (
+        {!saved && (stage === "dinero" || (stage.startsWith("rep_") && stage !== "rep_solicitud" && stage !== "rep_reparado" && stage !== "rep_encendido")) ? null : (
           <label>
             {stage === "rep_reparado"
               ? "Fecha de reparación 100%"
@@ -2749,6 +2789,11 @@ function StageForm({
               <input value={referencia} onChange={(e) => setReferencia(e.target.value)} />
             </label>
           </>
+        ) : stage === "rep_precio_cliente" ? (
+          <label>
+            Precio al cliente (USD)
+            <input value={monto} onChange={(e) => setMonto(e.target.value)} inputMode="decimal" />
+          </label>
         ) : stage === "pedido" && pedido.origen === "china" ? (
           <label>
             Monto del pago (USD)
@@ -2768,9 +2813,14 @@ function StageForm({
 
       <div className="asic-pedidos-actions">
         <button type="button" className="asic-pedidos-primary" disabled={busy || !fecha} onClick={submit}>
-          {busy ? "Guardando…" : "Confirmar etapa"}
+          {busy ? "Guardando…" : saved ? "Guardar cambios" : "Confirmar etapa"}
         </button>
-        {stage === "aduana_llegada" && pedido.origen === "paraguay" ? (
+        {saved && onCancel ? (
+          <button type="button" className="asic-pedidos-ghost" disabled={busy} onClick={onCancel}>
+            Cancelar
+          </button>
+        ) : null}
+        {!saved && stage === "aduana_llegada" && pedido.origen === "paraguay" ? (
           <button
             type="button"
             className="asic-pedidos-ghost"
