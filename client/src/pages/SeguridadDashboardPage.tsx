@@ -56,14 +56,14 @@ export function SeguridadDashboardPage() {
     return <Navigate to={sgiHome()} replace />;
   }
 
-  const alerts = (data?.multiIpAccounts.length ?? 0) + (data?.sharedIpAccounts.length ?? 0) + (data?.pendingResets ?? 0);
+  const watchCount = (data?.multiIpAccounts.length ?? 0) + (data?.sharedIpAccounts.length ?? 0);
 
   return (
     <div className="fact-page">
       <div className="container sec-dash">
         <PageHeader title="Seguridad del sitio" showBackButton backTo="/gestion-administrativa" backText="Volver a Gestión Administrativa" />
         <p className="sec-dash-lead">
-          Vigilancia de lo que el sistema ya registra: cuentas, entradas y salidas, y cambios del catálogo. No muestra contraseñas ni tokens.
+          Avisa cuando hay un intento de entrada sospechoso o una falla de protección que el servidor puede comprobar. No muestra contraseñas ni tokens, y no reemplaza una auditoría externa.
         </p>
         <div className="sec-dash-toolbar">
           <span>{data ? `Actualizado ${formatWhen(data.generatedAt)}` : "Leyendo el sistema…"}</span>
@@ -74,6 +74,45 @@ export function SeguridadDashboardPage() {
         {err ? <p className="sec-dash-error">{err}</p> : null}
         {data ? (
           <>
+            <section className={`sec-dash-banner is-${data.status}`}>
+              <strong>
+                {data.status === "alerta"
+                  ? "Hay algo para revisar ahora"
+                  : data.status === "aviso"
+                    ? "Hay avisos de seguridad"
+                    : "Sin señales de ataque en lo registrado"}
+              </strong>
+              {data.alerts.length === 0 ? (
+                <p>
+                  En las últimas 24 horas no hay ráfagas de contraseñas incorrectas ni administradores entrando desde varias redes. Los intentos fallidos se empiezan a contar desde este control.
+                </p>
+              ) : (
+                <ul>
+                  {data.alerts.map((alert) => (
+                    <li key={`${alert.level}-${alert.title}-${alert.detail}`}>
+                      <em>{alert.level === "alto" ? "Alerta" : "Aviso"}</em>
+                      <span>
+                        <strong>{alert.title}</strong>
+                        {alert.detail}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className="sec-dash-panel">
+              <h2>Protecciones activas</h2>
+              <div className="sec-dash-protections">
+                {data.protections.map((item) => (
+                  <p key={item.name} className={item.ok ? "is-ok" : "is-watch"}>
+                    <strong>{item.ok ? "Activa" : "Revisar"} · {item.name}</strong>
+                    {item.detail}
+                  </p>
+                ))}
+              </div>
+            </section>
+
             <div className="sec-dash-kpis">
               <article>
                 <span>Cuentas</span>
@@ -95,18 +134,44 @@ export function SeguridadDashboardPage() {
                 <strong>{data.audit24h}</strong>
                 <em>{data.auditReady ? "Catálogo y tienda" : "El libro de cambios no está disponible"}</em>
               </article>
-              <article className={alerts > 0 ? "is-watch" : ""}>
-                <span>Para mirar</span>
-                <strong>{alerts}</strong>
-                <em>
-                  {data.pendingResets} restablecimientos de clave abiertos
-                </em>
+              <article className={data.failedLogins24h > 0 ? "is-watch" : ""}>
+                <span>Intentos fallidos 24 h</span>
+                <strong>{data.failedLogins24h}</strong>
+                <em>{data.failedLogins15m} en los últimos 15 minutos</em>
               </article>
             </div>
 
             <section className="sec-dash-panel">
+              <h2>Intentos de entrada rechazados</h2>
+              {data.recentFailures.length === 0 ? (
+                <p>Todavía no hay contraseñas incorrectas registradas por este control.</p>
+              ) : (
+                <div className="table-responsive">
+                  <table className="sec-dash-table">
+                    <thead>
+                      <tr>
+                        <th>Cuándo</th>
+                        <th>Cuenta probada</th>
+                        <th>IP</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.recentFailures.map((row, index) => (
+                        <tr key={`${row.at}-${row.account}-${index}`}>
+                          <td>{formatWhen(row.at)}</td>
+                          <td>{row.account || "—"}</td>
+                          <td>{row.ip || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            <section className="sec-dash-panel">
               <h2>Señales de los últimos 7 días</h2>
-              {data.multiIpAccounts.length === 0 && data.sharedIpAccounts.length === 0 ? (
+              {watchCount === 0 ? (
                 <p>Ninguna cuenta entró desde más de una IP, y ninguna IP agrupó cuentas distintas.</p>
               ) : (
                 <div className="sec-dash-signals">

@@ -106,6 +106,14 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 CREATE INDEX IF NOT EXISTS idx_pwd_reset_user_created ON password_reset_tokens(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_pwd_reset_email_created ON password_reset_tokens(email, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS auth_failures (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  ip_address TEXT,
+  account_hint TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_auth_failures_created ON auth_failures(created_at DESC);
+
 CREATE TABLE IF NOT EXISTS invoice_sequences (
   type TEXT PRIMARY KEY CHECK (type IN ('Factura', 'Recibo', 'Nota de Crédito')),
   last_number INTEGER NOT NULL DEFAULT 1000

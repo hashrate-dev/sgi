@@ -1097,6 +1097,12 @@ export function getUsersActivity(limit?: number): Promise<UsersActivityResponse>
 
 export type SecurityOverview = {
   generatedAt: string;
+  status: "alerta" | "aviso" | "tranquilo";
+  alerts: Array<{ level: "alto" | "aviso"; title: string; detail: string }>;
+  protections: Array<{ name: string; ok: boolean; detail: string }>;
+  failedLogins15m: number;
+  failedLogins24h: number;
+  recentFailures: Array<{ at: string; account: string; ip: string }>;
   accounts: Array<{ role: string; count: number }>;
   openSessions: number;
   logins24h: number;

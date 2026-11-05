@@ -17,7 +17,7 @@ const hubItems: readonly HubItem[] = [
     to: "/gestion-administrativa/seguridad",
     icon: "bi-shield-lock",
     label: "Seguridad del sitio",
-    desc: "Dashboard para vigilar cuentas, accesos y cambios del sistema",
+    desc: "Avisa intentos de intrusión y fallas de protección del sitio",
   },
   {
     to: "/gestion-administrativa/cobros-pendientes",

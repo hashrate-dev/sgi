@@ -24,6 +24,7 @@ import { parseLectorGrantsJson } from "../lib/lectorPermissions.js";
 import { lectorHasKryptexPoolAssigned } from "../lib/kryptexLectorPool.js";
 import { fetchUserRowForLogin } from "../lib/dbUserColumnFallback.js";
 import { appendAuthCookie, appendClearAuthCookie } from "../lib/authSessionCookie.js";
+import { recordAuthFailure } from "../lib/authFailureLog.js";
 import { resolvePublicAppOrigin } from "../lib/publicAppOrigin.js";
 import {
   parseMarketplaceWelcomeLang,
@@ -1073,24 +1074,28 @@ authRouter.post("/auth/login", loginRateLimit, async (req, res) => {
     console.error("login db error:", e2);
     return res.status(500).json({ error: { message: "Error al consultar usuario. Revisá la base de datos." } });
   }
-  if (!row) {
+  const rejectLogin = () => {
+    recordAuthFailure(req, loginName);
     return res.status(401).json({ error: { message: "Usuario o contraseña incorrectos" } });
+  };
+  if (!row) {
+    return rejectLogin();
   }
   const hashRaw = row.password_hash;
   const hash = typeof hashRaw === "string" ? hashRaw.trim() : "";
   if (!hash || !/^\$2[aby]\$\d{2}\$/.test(hash)) {
     console.warn("login: usuario sin password_hash bcrypt válido (id=%s)", row.id);
-    return res.status(401).json({ error: { message: "Usuario o contraseña incorrectos" } });
+    return rejectLogin();
   }
   let passwordOk = false;
   try {
     passwordOk = bcrypt.compareSync(password, hash);
   } catch (e) {
     console.error("login bcrypt compare:", e);
-    return res.status(401).json({ error: { message: "Usuario o contraseña incorrectos" } });
+    return rejectLogin();
   }
   if (!passwordOk) {
-    return res.status(401).json({ error: { message: "Usuario o contraseña incorrectos" } });
+    return rejectLogin();
   }
   const roleEarly = row.role as AuthUser["role"];
   if (roleEarly === "cliente") {

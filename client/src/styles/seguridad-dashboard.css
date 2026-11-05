@@ -26,10 +26,81 @@
 .sec-dash-refresh:disabled {
   opacity: 0.6;
 }
+
+.sec-dash-error {
   color: #991b1b;
   background: #fef2f2;
   border-radius: 0.6rem;
   padding: 0.75rem 1rem;
+}
+
+.sec-dash-banner {
+  border-radius: 0.9rem;
+  padding: 1rem 1.1rem;
+  margin-bottom: 0.9rem;
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+}
+
+.sec-dash-banner.is-aviso {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.sec-dash-banner.is-alerta {
+  border-color: #dc2626;
+  background: #fef2f2;
+}
+
+.sec-dash-banner strong {
+  display: block;
+  margin-bottom: 0.45rem;
+}
+
+.sec-dash-banner p,
+.sec-dash-banner ul {
+  margin: 0;
+}
+
+.sec-dash-banner li {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  margin: 0.45rem 0;
+}
+
+.sec-dash-banner li em {
+  flex: 0 0 auto;
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #991b1b;
+}
+
+.sec-dash-banner li span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.sec-dash-protections p {
+  margin: 0.45rem 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.65rem;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.sec-dash-protections .is-ok {
+  background: #f0fdf4;
+}
+
+.sec-dash-protections .is-watch {
+  background: #fffbeb;
 }
 
 .sec-dash-kpis {
