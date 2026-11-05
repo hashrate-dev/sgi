@@ -280,6 +280,7 @@ export function HostingBillingAgentPage() {
       clientEmail?: string;
       clientAddress?: string;
       clientCity?: string;
+      clientCountry?: string;
       clientName2?: string;
       clientPhone2?: string;
       clientEmail2?: string;
@@ -323,6 +324,7 @@ export function HostingBillingAgentPage() {
         clientEmail: inv.clientEmail,
         clientAddress: inv.clientAddress,
         clientCity: inv.clientCity,
+        clientCountry: inv.clientCountry,
         clientName2: clientName2ForComprobante(inv.clientName, inv.clientName2),
         clientPhone2: inv.clientPhone2,
         clientEmail2: inv.clientEmail2,
@@ -352,6 +354,7 @@ export function HostingBillingAgentPage() {
         clientEmail: enrolledClient?.email,
         clientAddress: enrolledClient?.address,
         clientCity: enrolledClient?.city,
+        clientCountry: enrolledClient?.country,
         clientName2: enrolledClient?.name2,
         date: new Date().toLocaleDateString(),
         month: d.serviceMonth,

@@ -1804,6 +1804,7 @@ export type HostingBillingAgentClient = {
   email: string;
   address: string;
   city: string;
+  country?: string;
   name2: string;
   units: HostingBillingAgentUnit[];
 };
@@ -1836,6 +1837,7 @@ export type HostingBillingAgentInvoice = {
   clientEmail?: string;
   clientAddress?: string;
   clientCity?: string;
+  clientCountry?: string;
   clientName2?: string;
   clientPhone2?: string;
   clientEmail2?: string;

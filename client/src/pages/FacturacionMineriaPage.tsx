@@ -1331,6 +1331,7 @@ export function FacturacionMineriaPage() {
           clientEmail: selectedClient.email,
           clientAddress: selectedClient.address,
           clientCity: selectedClient.city,
+          clientCountry: selectedClient.country,
           clientName2: clientName2ForComprobante(selectedClient.name, selectedClient.name2),
           clientPhone2: selectedClient.phone2,
           clientEmail2: selectedClient.email2,
@@ -1389,6 +1390,7 @@ export function FacturacionMineriaPage() {
       clientEmail: selectedClient.email,
       clientAddress: selectedClient.address,
       clientCity: selectedClient.city,
+      clientCountry: selectedClient.country,
       clientName2: clientName2ForComprobante(selectedClient.name, selectedClient.name2),
       clientPhone2: selectedClient.phone2,
       clientEmail2: selectedClient.email2,
@@ -1519,6 +1521,7 @@ export function FacturacionMineriaPage() {
         clientEmail: inv.clientEmail,
         clientAddress: inv.clientAddress,
         clientCity: inv.clientCity,
+        clientCountry: inv.clientCountry,
         clientName2: clientName2ForComprobante(inv.clientName, inv.clientName2),
         clientPhone2: inv.clientPhone2,
         clientEmail2: inv.clientEmail2,
@@ -2497,7 +2500,8 @@ export function FacturacionMineriaPage() {
                         address: previewEmitted.invoice.clientAddress,
                         address2: previewEmitted.invoice.clientAddress2,
                         city: previewEmitted.invoice.clientCity,
-                        city2: previewEmitted.invoice.clientCity2
+                        city2: previewEmitted.invoice.clientCity2,
+                        country: previewEmitted.invoice.clientCountry
                       }}
                       date={new Date(previewEmitted.emittedAt)}
                       items={previewEmitted.invoice.items}

@@ -342,6 +342,7 @@ export function HistorialGarantiasPage() {
         clientEmail: inv.clientEmail,
         clientAddress: inv.clientAddress,
         clientCity: inv.clientCity,
+        clientCountry: inv.clientCountry,
         clientName2: clientName2ForComprobante(inv.clientName, inv.clientName2),
         clientPhone2: inv.clientPhone2,
         clientEmail2: inv.clientEmail2,

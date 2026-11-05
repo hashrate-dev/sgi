@@ -463,7 +463,7 @@ function mapDraft(raw: Record<string, unknown>) {
 async function listEnrolled() {
   const rows = (await db
     .prepare(
-      `SELECT a.client_id, a.active, a.usd_per_kwh, a.notes, a.include_4pct, c.code, c.name, c.phone, c.email, c.address, c.city, c.name2
+      `SELECT a.client_id, a.active, a.usd_per_kwh, a.notes, a.include_4pct, c.code, c.name, c.phone, c.email, c.address, c.city, c.country, c.name2
        FROM hosting_billing_agent_clients a
        JOIN clients c ON c.id = a.client_id
        WHERE ${HOSTING_ONLY_C}
@@ -498,6 +498,7 @@ async function listEnrolled() {
       email: String(r.email || ""),
       address: String(r.address || ""),
       city: String(r.city || ""),
+      country: String(r.country || ""),
       name2: String(r.name2 || ""),
       units,
     });
@@ -1196,7 +1197,7 @@ hostingBillingAgentRouter.post("/hosting/billing-agent/drafts/:id/authorize", ..
     });
 
     const clientRow = (await db
-      .prepare("SELECT name, name2, phone, email, address, city, phone2, email2, address2, city2 FROM clients WHERE id = ?")
+      .prepare("SELECT name, name2, phone, email, address, city, country, phone2, email2, address2, city2 FROM clients WHERE id = ?")
       .get(draft.clientId)) as Record<string, unknown> | undefined;
     const cr = clientRow ? rowKeysToLowercase(clientRow) : {};
     const invoiceJson = {
@@ -1208,6 +1209,7 @@ hostingBillingAgentRouter.post("/hosting/billing-agent/drafts/:id/authorize", ..
       clientEmail: String(cr.email || ""),
       clientAddress: String(cr.address || ""),
       clientCity: String(cr.city || ""),
+      clientCountry: String(cr.country || ""),
       clientName2: String(cr.name2 || ""),
       clientPhone2: String(cr.phone2 || ""),
       clientEmail2: String(cr.email2 || ""),

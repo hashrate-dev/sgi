@@ -269,6 +269,7 @@ export function PendientesPage() {
           clientEmail: client.email,
           clientAddress: client.address,
           clientCity: client.city,
+          clientCountry: client.country,
           clientName2: clientName2ForComprobante(client.name, client.name2),
           clientPhone2: client.phone2,
           clientEmail2: client.email2,

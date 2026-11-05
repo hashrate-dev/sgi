@@ -68,6 +68,7 @@ export type Invoice = {
   clientEmail?: string;
   clientAddress?: string;
   clientCity?: string;
+  clientCountry?: string;
   clientName2?: string;
   clientPhone2?: string;
   clientEmail2?: string;

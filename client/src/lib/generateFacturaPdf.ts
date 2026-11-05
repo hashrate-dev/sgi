@@ -51,6 +51,7 @@ export type FacturaPdfData = {
   clientEmail?: string;
   clientAddress?: string;
   clientCity?: string;
+  clientCountry?: string;
   clientName2?: string;
   clientPhone2?: string;
   clientEmail2?: string;
@@ -294,14 +295,15 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
     x: number,
     yStart: number,
     colW: number,
-    block: { name?: string; phone?: string; email?: string; address?: string; city?: string }
+    block: { name?: string; phone?: string; email?: string; address?: string; city?: string; country?: string }
   ): number => {
     const any =
       hasText(block.name) ||
       hasText(block.phone) ||
       hasText(block.email) ||
       hasText(block.address) ||
-      hasText(block.city);
+      hasText(block.city) ||
+      hasText(block.country);
     if (!any) return 0; // deja la columna en blanco
 
     let yy = yStart;
@@ -358,7 +360,8 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
     add(block.phone);
     add(block.email);
     add(block.address);
-    add(block.city, true);
+    add(block.city);
+    add(block.country);
 
     return yy - yStart;
   };
@@ -417,7 +420,8 @@ export function generateFacturaPdf(data: FacturaPdfData, images?: FacturaPdfImag
     phone: data.clientPhone,
     email: data.clientEmail,
     address: data.clientAddress,
-    city: data.clientCity
+    city: data.clientCity,
+    country: data.clientCountry
   });
   
   const h2 = drawClientColumn(tableLeft + colW + colGap, yClient2Start, colW, {

@@ -188,7 +188,10 @@ export function InvoicePreview({
                 <div className="invoice-preview-client-detail">{client.address}</div>
               )}
               {hasText(client.city) && (
-                <div className="invoice-preview-client-detail">{client.city?.toUpperCase() ?? ""}</div>
+                <div className="invoice-preview-client-detail">{client.city}</div>
+              )}
+              {hasText(client.country) && (
+                <div className="invoice-preview-client-detail">{client.country}</div>
               )}
             </div>
             {hasSecondaryClientColumn(
@@ -213,7 +216,7 @@ export function InvoicePreview({
                   <div className="invoice-preview-client-detail">{client.address2}</div>
                 )}
                 {hasText(client.city2) && (
-                  <div className="invoice-preview-client-detail">{client.city2?.toUpperCase() ?? ""}</div>
+                  <div className="invoice-preview-client-detail">{client.city2}</div>
                 )}
               </div>
             )}

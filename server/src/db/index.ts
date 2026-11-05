@@ -246,6 +246,14 @@ export async function initDb() {
     // eslint-disable-next-line no-console
     console.warn("[DB] migrateAsicInvoiceSource:", msg);
   }
+  try {
+    const { restoreKhodtsevClient } = await import("../lib/restoreKhodtsevClient.js");
+    await restoreKhodtsevClient();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // eslint-disable-next-line no-console
+    console.warn("[DB] restoreKhodtsevClient:", msg);
+  }
   return _db;
 }
 
