@@ -14,6 +14,12 @@ type HubItem = {
 
 const hubItems: readonly HubItem[] = [
   {
+    to: "/gestion-administrativa/seguridad",
+    icon: "bi-shield-lock",
+    label: "Seguridad del sitio",
+    desc: "Dashboard para vigilar cuentas, accesos y cambios del sistema",
+  },
+  {
     to: "/gestion-administrativa/cobros-pendientes",
     icon: "bi-cash-coin",
     label: "Todos los Cobros Pendientes",

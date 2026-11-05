@@ -192,7 +192,8 @@ export function collectPathPrefixesFromScreenGrants(grants: readonly string[]): 
     grantsIncludeScreen(g, "ga-mercados") ||
     grantsIncludeScreen(g, "ga-comunicacion") ||
     grantsIncludeScreen(g, "ga-agentes-facturacion-hosting") ||
-    grantsIncludeScreen(g, "ga-cobros-pendientes");
+    grantsIncludeScreen(g, "ga-cobros-pendientes") ||
+    grantsIncludeScreen(g, "ga-seguridad");
   const seesFin =
     grantsIncludeScreen(g, "fin-proveedores") ||
     grantsIncludeScreen(g, "fin-contabilidad") ||

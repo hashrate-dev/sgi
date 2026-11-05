@@ -49,6 +49,7 @@ export const SGI_SCREEN_GRANT_IDS = [
   "sgi-usuarios-clientes-cuentas",
   "sgi-usuarios-actividad",
   "sgi-usuarios-auditoria",
+  "ga-seguridad",
   "exec-reportes",
   "exec-exportar",
 ] as const;
@@ -100,6 +101,7 @@ const SCREEN_TO_LEGACY: Record<string, AdminBPermissionKey> = {
   "sgi-usuarios-clientes-cuentas": "usuarios",
   "sgi-usuarios-actividad": "usuarios",
   "sgi-usuarios-auditoria": "usuarios",
+  "ga-seguridad": "usuarios",
   "exec-reportes": "reportes",
   "exec-exportar": "exportar",
 };

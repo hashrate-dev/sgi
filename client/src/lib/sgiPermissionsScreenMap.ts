@@ -68,6 +68,16 @@ export const SGI_PERMISSION_SCREEN_MAP: readonly SgiPermissionScreenRow[] = [
     infoOnly: true,
   },
   {
+    id: "ga-seguridad",
+    zoneOrder: 10,
+    zone: "Gestión Administrativa",
+    legacyModule: "usuarios",
+    title: "Dashboard de seguridad",
+    routes: ["/gestion-administrativa/seguridad"],
+    accessNote: "Vigilancia de cuentas, accesos y cambios del sitio. Usa el permiso de usuarios.",
+    audience: ["staff"],
+  },
+  {
     id: "ga-nuevos-leads",
     zoneOrder: 10,
     zone: "Gestión Administrativa",

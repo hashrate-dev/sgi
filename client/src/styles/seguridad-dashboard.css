@@ -1,0 +1,126 @@
+.sec-dash-lead {
+  max-width: 46rem;
+  color: #475569;
+  margin: 0 0 1rem;
+}
+
+.sec-dash-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.sec-dash-refresh {
+  border: 1px solid #166534;
+  background: #fff;
+  color: #166534;
+  border-radius: 999px;
+  padding: 0.35rem 0.85rem;
+  font-weight: 600;
+}
+
+.sec-dash-refresh:disabled {
+  opacity: 0.6;
+}
+  color: #991b1b;
+  background: #fef2f2;
+  border-radius: 0.6rem;
+  padding: 0.75rem 1rem;
+}
+
+.sec-dash-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.sec-dash-kpis article {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.85rem;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.sec-dash-kpis span {
+  color: #64748b;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sec-dash-kpis strong {
+  font-size: 1.7rem;
+  color: #14532d;
+  line-height: 1.1;
+}
+
+.sec-dash-kpis em {
+  color: #475569;
+  font-style: normal;
+  font-size: 0.78rem;
+}
+
+.sec-dash-kpis .is-watch {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.sec-dash-panel {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.9rem;
+  padding: 1rem 1.1rem;
+  margin-bottom: 0.9rem;
+}
+
+.sec-dash-panel h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.sec-dash-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.sec-dash-panel-head a {
+  color: #166534;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.sec-dash-signals p {
+  margin: 0.35rem 0;
+}
+
+.sec-dash-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.sec-dash-table th,
+.sec-dash-table td {
+  text-align: left;
+  padding: 0.45rem 0.4rem;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: top;
+}
+
+.sec-dash-table th {
+  color: #64748b;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}

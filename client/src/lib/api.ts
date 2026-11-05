@@ -1095,6 +1095,25 @@ export function getUsersActivity(limit?: number): Promise<UsersActivityResponse>
   return apiNoRetry<UsersActivityResponse>(`/api/users/activity${q}`, 12000);
 }
 
+export type SecurityOverview = {
+  generatedAt: string;
+  accounts: Array<{ role: string; count: number }>;
+  openSessions: number;
+  logins24h: number;
+  logouts24h: number;
+  audit24h: number;
+  pendingResets: number;
+  auditReady: boolean;
+  multiIpAccounts: Array<{ account: string; ips: string[] }>;
+  sharedIpAccounts: Array<{ ip: string; accounts: string[] }>;
+  recentAccess: Array<{ at: string; account: string; role: string; event: string; ip: string }>;
+  recentChanges: Array<{ at: string; account: string; action: string; summary: string }>;
+};
+
+export function getSecurityOverview(): Promise<SecurityOverview> {
+  return api<SecurityOverview>("/api/security/overview");
+}
+
 export type EquipoAsicAuditDelta = { label: string; before: string; after: string };
 export type EquipoAsicAuditEntry = {
   id: number;

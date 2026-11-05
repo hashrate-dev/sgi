@@ -7,6 +7,7 @@ import { env } from "./config/env.js";
 import { healthRouter } from "./routes/health.js";
 import { authRouter } from "./routes/auth.js";
 import { usersRouter } from "./routes/users.js";
+import { securityOverviewRouter } from "./routes/securityOverview.js";
 import { clientsRouter } from "./routes/clients.js";
 import { invoicesRouter } from "./routes/invoices.js";
 import { renderRouter } from "./routes/render.js";
@@ -148,6 +149,7 @@ export function createApp() {
   app.use("/api", marketplaceRouter);
   app.use("/api", marketplaceQuoteTicketsRouter);
   app.use("/api", requireAuth, usersRouter);
+  app.use("/api", requireAuth, securityOverviewRouter);
   app.use("/api", requireAuth, clientsRouter);
   app.use("/api", requireAuth, invoicesRouter);
   app.use("/api", requireAuth, commercialInvoicesRouter);
