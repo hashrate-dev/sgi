@@ -1,8 +1,14 @@
+function roundUsd(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
 /**
- * Monto que el cliente paga / se transfiere al banco (client_total_payment).
+ * Monto transferencia.
  *
- * - Cambio USDT/USD: HRS retiene el % → transferencia = operación − comisión.
- * - 4% hosting (envío a banco): el cliente paga hosting + % → transferencia = operación + comisión.
+ * - Compra o venta de USDT/USD: el % ya está incluido en lo que paga el cliente.
+ *   transferencia = monto operación / (1 + %/100). Ej.: 206 / 1,03 = 200.
+ * - 4% hosting o reparaciones: el cliente paga el monto más el %.
+ *   transferencia = monto operación × (1 + %/100).
  */
 export function hostingFxClientTotalPayment(
   operationAmount: number,
@@ -11,9 +17,10 @@ export function hostingFxClientTotalPayment(
 ): number {
   const op = Number.isFinite(operationAmount) ? operationAmount : 0;
   const pct = Number.isFinite(hrsCommissionPct) ? hrsCommissionPct : 0;
-  const commission = (op * pct) / 100;
+  const factor = 1 + pct / 100;
   if (compraFlowHostingCommission) {
-    return Math.max(0, op + commission);
+    return Math.max(0, roundUsd(op * factor));
   }
-  return Math.max(0, op - commission);
+  if (factor <= 0) return 0;
+  return Math.max(0, roundUsd(op / factor));
 }
