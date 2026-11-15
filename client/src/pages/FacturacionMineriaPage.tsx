@@ -370,10 +370,13 @@ export function FacturacionMineriaPage() {
     }
   }, []);
 
-  /** Local + BD (prioriza id numérico de base, igual que Hosting). */
+  /**
+   * Local + BD. Si el mismo comprobante está en las dos, gana la base
+   * (tipo de factura, saldo, vínculos). Se conservan los ítems locales si la base no los trae.
+   */
   const invoicesAll = useMemo<Invoice[]>(() => {
     const map = new Map<string, Invoice>();
-    const addAll = (src: Invoice[]) => {
+    const addAll = (src: Invoice[], fromDb: boolean) => {
       for (const inv of src) {
         const key = `${inv.type}-${inv.number}`;
         const prev = map.get(key);
@@ -383,11 +386,13 @@ export function FacturacionMineriaPage() {
         }
         const prevIsDb = isNumericId(prev.id);
         const invIsDb = isNumericId(inv.id);
-        if (!prevIsDb && invIsDb) map.set(key, inv);
+        if (!(fromDb || (!prevIsDb && invIsDb))) continue;
+        const items = inv.items?.length ? inv.items : prev.items;
+        map.set(key, items?.length ? { ...inv, items } : inv);
       }
     };
-    addAll(invoices);
-    addAll(dbInvoices);
+    addAll(invoices, false);
+    addAll(dbInvoices, true);
     return Array.from(map.values());
   }, [invoices, dbInvoices]);
 
