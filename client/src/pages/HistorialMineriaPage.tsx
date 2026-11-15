@@ -927,10 +927,35 @@ export function HistorialMineriaPage() {
 
   async function generatePdfFromHistory(inv: Invoice) {
     try {
-      // Validar que el invoice tenga items
-      if (!inv.items || inv.items.length === 0) {
-        showToast("Esta factura no tiene ítems cargados. No se puede generar el PDF.", "error");
-        return;
+      let sourceInv = inv;
+      if (!sourceInv.items || sourceInv.items.length === 0) {
+        const invId = sourceInv.id != null && sourceInv.id !== "" ? Number(sourceInv.id) : NaN;
+        if (!Number.isFinite(invId)) {
+          showToast("Esta factura no tiene ítems cargados. No se puede generar el PDF.", "error");
+          return;
+        }
+        try {
+          const res = await getInvoiceById(invId);
+          const apiItems = res.invoice?.items ?? [];
+          if (apiItems.length === 0) {
+            showToast("Esta factura no tiene ítems en la base de datos. No se puede generar el PDF.", "error");
+            return;
+          }
+          sourceInv = {
+            ...inv,
+            items: apiItems.map((item) => ({
+              service: item.service,
+              serviceName: item.service,
+              month: item.month || inv.month,
+              quantity: item.quantity || 1,
+              price: item.price || 0,
+              discount: item.discount || 0,
+            })),
+          };
+        } catch {
+          showToast("No se pudo cargar el detalle de la factura. No se puede generar el PDF.", "error");
+          return;
+        }
       }
 
       // Buscar el cliente completo por nombre
@@ -976,7 +1001,7 @@ export function HistorialMineriaPage() {
         invoiceDate = new Date();
       }
 
-      const validItems = prepareLineItemsForPdf(inv.items, inv.month);
+      const validItems = prepareLineItemsForPdf(sourceInv.items, sourceInv.month);
 
       const relatedForNc =
         inv.type === "Nota de Crédito"
