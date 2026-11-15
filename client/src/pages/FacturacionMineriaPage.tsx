@@ -1447,10 +1447,29 @@ export function FacturacionMineriaPage() {
     return undefined;
   }
 
+  /** La fecha impresa es la del documento (dd/mm/aaaa), no el instante en que se guardó. */
+  function parseStoredInvoiceDate(raw: string | undefined, fallbackIso: string): Date {
+    const text = String(raw ?? "").trim();
+    const parts = text.split("/");
+    if (parts.length === 3 && parts[0].length <= 2) {
+      const day = Number(parts[0]);
+      const month = Number(parts[1]);
+      const year = Number(parts[2]);
+      if (Number.isFinite(day) && Number.isFinite(month) && Number.isFinite(year)) {
+        const date = new Date(year, month - 1, day);
+        if (!Number.isNaN(date.getTime())) return date;
+      }
+    }
+    const parsed = new Date(text);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+    const fallback = new Date(fallbackIso);
+    return Number.isNaN(fallback.getTime()) ? new Date() : fallback;
+  }
+
   /** Descargar PDF de un documento emitido en esta sesión */
   async function downloadEmittedPdf(item: { invoice: Invoice; emittedAt: string }) {
     const inv = item.invoice;
-    const date = new Date(item.emittedAt);
+    const date = parseStoredInvoiceDate(inv.date, item.emittedAt);
     const subtotal = Math.abs(inv.subtotal);
     const discounts = Math.abs(inv.discounts);
     const total = Math.abs(inv.total);
@@ -2503,7 +2522,7 @@ export function FacturacionMineriaPage() {
                         city2: previewEmitted.invoice.clientCity2,
                         country: previewEmitted.invoice.clientCountry
                       }}
-                      date={new Date(previewEmitted.emittedAt)}
+                      date={parseStoredInvoiceDate(previewEmitted.invoice.date, previewEmitted.emittedAt)}
                       items={previewEmitted.invoice.items}
                       subtotal={previewEmitted.invoice.subtotal}
                       discounts={previewEmitted.invoice.discounts}
