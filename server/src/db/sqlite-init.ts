@@ -423,6 +423,12 @@ CREATE INDEX IF NOT EXISTS idx_garantias_ande_clientes_client ON garantias_ande_
     const msg = e instanceof Error ? e.message : String(e);
     if (!msg.includes("duplicate column")) throw e;
   }
+  try {
+    db.exec("ALTER TABLE garantias_ande_clientes ADD COLUMN devolucion_documento TEXT NOT NULL DEFAULT ''");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
 
   db.exec(`
 CREATE TABLE IF NOT EXISTS valores_garantias_asic (

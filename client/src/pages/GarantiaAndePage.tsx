@@ -9,10 +9,13 @@ import {
   getClients,
   getSetups,
   getEquipos,
+  getGarantiasAndeClientes,
+  connectGarantiaAndeDevolucion,
   wakeUpBackend,
   type GarantiasEmittedResponse,
   type GarantiasItemsResponse,
   type ClientsResponse,
+  type GarantiaAndeClienteItem,
 } from "../lib/api";
 import { clientName2ForComprobante } from "../lib/clientInvoiceDisplay";
 import { formatAmount, formatUSD } from "../lib/formatCurrency.js";
@@ -30,6 +33,13 @@ import { useAuth } from "../contexts/AuthContext";
 import { canEditClientes, canEditFacturacion } from "../lib/auth";
 import { buildAsicComprobantePdfFilename } from "../lib/asicPdfFilename";
 import "../styles/facturacion.css";
+
+function sameClientName(a: string | undefined, b: string | undefined): boolean {
+  const norm = (value: string | undefined) => String(value ?? "").replace(/\s+/g, " ").trim().toUpperCase();
+  const left = norm(a);
+  const right = norm(b);
+  return left.length > 0 && left === right;
+}
 
 function todayLocale() {
   return new Date().toLocaleDateString();
@@ -103,6 +113,8 @@ export function GarantiaAndePage() {
   const [setups, setSetups] = useState<Setup[]>([]);
   const [itemsGarantia, setItemsGarantia] = useState<ItemGarantiaAnde[]>([]);
   const [emittedVales, setEmittedVales] = useState<{ invoice: Invoice; emittedAt: string }[]>([]);
+  const [warrantyRows, setWarrantyRows] = useState<GarantiaAndeClienteItem[]>([]);
+  const [linkingDoc, setLinkingDoc] = useState("");
   const [showConfirmPdf, setShowConfirmPdf] = useState(false);
   type GarantiaTipo = "Recibo" | "Recibo Devolución";
   const [tipoGarantia, setTipoGarantia] = useState<GarantiaTipo>("Recibo");
@@ -213,6 +225,12 @@ export function GarantiaAndePage() {
     getGarantiasEmitted()
       .then((r: GarantiasEmittedResponse) => setEmittedVales(r.items as { invoice: Invoice; emittedAt: string }[]))
       .catch(() => setEmittedVales([]));
+  }, []);
+
+  useEffect(() => {
+    getGarantiasAndeClientes()
+      .then((r) => setWarrantyRows(r.items || []))
+      .catch(() => setWarrantyRows([]));
   }, []);
 
   /** Vista previa: pedir siguiente número sin consumir (peek) */
@@ -467,6 +485,21 @@ export function GarantiaAndePage() {
   }
 
   const canEdit = !user || canEditFacturacion(user);
+
+  const linkReturnToWarranty = async (documentNumber: string, garantiaId: number) => {
+    if (!canEdit || !documentNumber || !garantiaId) return;
+    setLinkingDoc(documentNumber);
+    try {
+      await connectGarantiaAndeDevolucion(garantiaId, documentNumber);
+      const refreshed = await getGarantiasAndeClientes();
+      setWarrantyRows(refreshed.items || []);
+      showToast(`Devolución ${documentNumber} conectada al registro de garantías.`, "success");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "No se pudo conectar la devolución.", "error");
+    } finally {
+      setLinkingDoc("");
+    }
+  };
   const canQuickAddGarantia = Boolean(user && canEditClientes(user));
   const nextGarantiaCodigo = useMemo(() => getNextCodigoGarantia(itemsGarantia), [itemsGarantia]);
 
@@ -944,14 +977,25 @@ export function GarantiaAndePage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {[...emittedInLast5Days].reverse().map((item) => (
-                            <tr key={item.invoice.id}>
-                              <td>{item.invoice.type}</td>
-                              <td className="fw-bold">{item.invoice.number}</td>
-                              <td>{item.invoice.clientName}</td>
-                              <td>{item.invoice.date}</td>
-                              <td>{item.invoice.emissionTime ?? "-"}</td>
-                              <td className="text-start">{formatUSD(item.invoice.total)}</td>
+                          {[...emittedInLast5Days].reverse().map((item) => {
+                            const inv = item.invoice;
+                            const linked = warrantyRows.find(
+                              (row) => String(row.devolucionDocumento ?? "").toUpperCase() === String(inv.number ?? "").toUpperCase()
+                            );
+                            const linkOptions =
+                              inv.type === "Recibo Devolución"
+                                ? warrantyRows.filter(
+                                    (row) => row.estado !== "devuelta" && sameClientName(row.clientName, inv.clientName)
+                                  )
+                                : [];
+                            return (
+                            <tr key={inv.id}>
+                              <td>{inv.type}</td>
+                              <td className="fw-bold">{inv.number}</td>
+                              <td>{inv.clientName}</td>
+                              <td>{inv.date}</td>
+                              <td>{inv.emissionTime ?? "-"}</td>
+                              <td className="text-start">{formatUSD(inv.total)}</td>
                               <td className="text-center">
                                 <div className="d-flex gap-1 justify-content-center flex-wrap">
                                   <button
@@ -972,10 +1016,42 @@ export function GarantiaAndePage() {
                                   >
                                     📄
                                   </button>
+                                  {inv.type === "Recibo Devolución" && linked ? (
+                                    <Link
+                                      to="/gestion-administrativa/garantias-ande-clientes"
+                                      title="Esta devolución ya está conectada a un registro"
+                                      style={{ fontSize: "0.72rem", alignSelf: "center" }}
+                                    >
+                                      Vinculado
+                                    </Link>
+                                  ) : null}
+                                  {inv.type === "Recibo Devolución" && !linked && canEdit && linkOptions.length > 0 ? (
+                                    <select
+                                      aria-label={`Conectar ${inv.number} con un registro de garantía`}
+                                      disabled={linkingDoc === inv.number}
+                                      defaultValue=""
+                                      title="Conectar con un registro de garantía activo de este cliente"
+                                      style={{ fontSize: "0.72rem", maxWidth: "9.5rem" }}
+                                      onChange={(e) => {
+                                        const id = Number(e.target.value);
+                                        e.currentTarget.value = "";
+                                        if (id) void linkReturnToWarranty(inv.number, id);
+                                      }}
+                                    >
+                                      <option value="">Vincular…</option>
+                                      {linkOptions.map((row) => (
+                                        <option key={row.id} value={row.id}>
+                                          {row.nombreEquipo || "Equipo"}
+                                          {row.numeroSerie ? ` · ${row.numeroSerie}` : ""}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  ) : null}
                                 </div>
                               </td>
                             </tr>
-                          ))}
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

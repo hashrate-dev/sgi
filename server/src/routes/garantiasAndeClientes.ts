@@ -4,6 +4,7 @@ import { db } from "../db.js";
 import { requireRole } from "../middleware/auth.js";
 import { requireAnyModuleGrant, requireModuleGrant } from "../middleware/moduleGrant.js";
 import { rowKeysToLowercase } from "../lib/pgRowLowercase.js";
+import { insertGarantiaAndeDevolucionHist } from "../lib/garantiasAndeDevolucionesHist.js";
 
 export const garantiasAndeClientesRouter = Router();
 
@@ -48,6 +49,7 @@ async function ensureGarantiasAndeClientesSchema(): Promise<void> {
     await db.prepare("ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS monto_devuelto_usd DOUBLE PRECISION").run();
     await db.prepare("ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS baja_equipo_id TEXT").run();
     await db.prepare("ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS devolucion_nota TEXT NOT NULL DEFAULT ''").run();
+    await db.prepare("ALTER TABLE garantias_ande_clientes ADD COLUMN IF NOT EXISTS devolucion_documento TEXT NOT NULL DEFAULT ''").run();
   } else {
     await db
       .prepare(
@@ -81,6 +83,7 @@ async function ensureGarantiasAndeClientesSchema(): Promise<void> {
       "monto_devuelto_usd REAL",
       "baja_equipo_id TEXT",
       "devolucion_nota TEXT NOT NULL DEFAULT ''",
+      "devolucion_documento TEXT NOT NULL DEFAULT ''",
     ]) {
       try {
         await db.prepare(`ALTER TABLE garantias_ande_clientes ADD COLUMN ${col}`).run();
@@ -185,6 +188,7 @@ function mapRow(raw: Row) {
         : Number(r.monto_devuelto_usd),
     bajaEquipoId: r.baja_equipo_id == null ? "" : String(r.baja_equipo_id),
     devolucionNota: r.devolucion_nota == null ? "" : String(r.devolucion_nota),
+    devolucionDocumento: r.devolucion_documento == null ? "" : String(r.devolucion_documento),
     createdAt: String(r.created_at ?? ""),
     updatedAt: String(r.updated_at ?? ""),
     clientCode: r.client_code == null ? "" : String(r.client_code),
@@ -195,14 +199,14 @@ function mapRow(raw: Row) {
 
 const LIST_SELECT_FULL = `SELECT g.id, g.client_id, g.marca, g.modelo, g.procesador, g.numero_serie, g.nombre_equipo,
                 g.monto_usd, g.monto_cliente_usd, g.fecha_inicio, g.estado, g.fecha_devolucion, g.monto_devuelto_usd,
-                g.baja_equipo_id, g.devolucion_nota, g.created_at, g.updated_at,
+                g.baja_equipo_id, g.devolucion_nota, g.devolucion_documento, g.created_at, g.updated_at,
                 c.code AS client_code, c.name AS client_name, c.name2 AS client_name2
          FROM garantias_ande_clientes g
          JOIN clients c ON c.id = g.client_id`;
 
 const LIST_SELECT_LEGACY = `SELECT g.id, g.client_id, g.marca, g.modelo, g.procesador, g.numero_serie, g.nombre_equipo,
                 g.monto_usd, g.fecha_inicio, g.estado, g.fecha_devolucion, g.monto_devuelto_usd,
-                g.baja_equipo_id, g.devolucion_nota, g.created_at, g.updated_at,
+                g.baja_equipo_id, g.devolucion_nota, g.devolucion_documento, g.created_at, g.updated_at,
                 c.code AS client_code, c.name AS client_name, c.name2 AS client_name2
          FROM garantias_ande_clientes g
          JOIN clients c ON c.id = g.client_id`;
@@ -260,6 +264,62 @@ garantiasAndeClientesRouter.get("/garantias-ande-clientes/match", ...matchMw, as
   }
 });
 
+function sameClientName(a: string, b: string): boolean {
+  const norm = (value: string) => value.replace(/\s+/g, " ").trim().toUpperCase();
+  const left = norm(a);
+  const right = norm(b);
+  return left.length > 0 && left === right;
+}
+
+function invoiceDateToIso(raw: unknown): string {
+  const text = String(raw ?? "").trim();
+  const slash = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slash) {
+    const day = slash[1] ?? "";
+    const month = slash[2] ?? "";
+    const year = slash[3] ?? "";
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+  if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
+  return new Date().toISOString().slice(0, 10);
+}
+
+type ReturnDocument = { number: string; clientName: string; date: string; total: number };
+
+async function listReturnDocuments(): Promise<ReturnDocument[]> {
+  let rows: Array<{ invoice_json?: string }> = [];
+  try {
+    rows = (await db.prepare("SELECT invoice_json FROM emitted_garantias").all()) as typeof rows;
+  } catch {
+    return [];
+  }
+  const documents: ReturnDocument[] = [];
+  for (const row of rows) {
+    try {
+      const inv = JSON.parse(String(row.invoice_json ?? "")) as {
+        type?: string;
+        number?: string;
+        clientName?: string;
+        date?: string;
+        total?: number;
+      };
+      if (String(inv.type ?? "") !== "Recibo Devolución") continue;
+      const number = String(inv.number ?? "").trim();
+      if (!number) continue;
+      documents.push({
+        number,
+        clientName: String(inv.clientName ?? "").trim(),
+        date: String(inv.date ?? "").trim(),
+        total: Math.abs(Number(inv.total) || 0),
+      });
+    } catch {
+      /* un recibo mal guardado no bloquea el listado */
+    }
+  }
+  documents.sort((a, b) => b.number.localeCompare(a.number));
+  return documents;
+}
+
 garantiasAndeClientesRouter.get("/garantias-ande-clientes/hosting-clients", ...readMw, async (_req, res, next) => {
   try {
     const rows = (await db
@@ -279,6 +339,115 @@ garantiasAndeClientesRouter.get("/garantias-ande-clientes/hosting-clients", ...r
     next(e);
   }
 });
+
+garantiasAndeClientesRouter.get(
+  "/garantias-ande-clientes/devoluciones-documentos",
+  ...readMw,
+  async (_req, res, next) => {
+    try {
+      await ensureGarantiasAndeClientesSchema();
+      const [documents, rows] = await Promise.all([listReturnDocuments(), listGarantiaRows()]);
+      const linked = new Map<string, { id: number; label: string }>();
+      for (const raw of rows) {
+        const row = mapRow(raw);
+        const number = row.devolucionDocumento.trim();
+        if (!number) continue;
+        const label = [row.nombreEquipo, row.numeroSerie].filter(Boolean).join(" · ") || `Registro ${row.id}`;
+        linked.set(number.toUpperCase(), { id: row.id, label });
+      }
+      res.json({
+        documents: documents.map((doc) => {
+          const hit = linked.get(doc.number.toUpperCase());
+          return { ...doc, linkedGarantiaId: hit?.id ?? null, linkedLabel: hit?.label ?? "" };
+        }),
+      });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+garantiasAndeClientesRouter.post(
+  "/garantias-ande-clientes/:id/conectar-devolucion",
+  ...writeMw,
+  async (req, res, next) => {
+    try {
+      await ensureGarantiasAndeClientesSchema();
+      const id = Number(req.params.id);
+      const documentNumber = String((req.body as { documentNumber?: unknown })?.documentNumber ?? "").trim();
+      if (!Number.isFinite(id) || id <= 0 || !documentNumber) {
+        return res.status(400).json({ error: { message: "Elegí la garantía y el recibo de devolución." } });
+      }
+      const rows = await listGarantiaRows();
+      const current = rows.map((raw) => mapRow(raw)).find((row) => row.id === id);
+      if (!current) return res.status(404).json({ error: { message: "Garantía no encontrada." } });
+      if (current.estado === "devuelta") {
+        return res.status(409).json({
+          error: {
+            message: current.devolucionDocumento
+              ? `Esta garantía ya está conectada con ${current.devolucionDocumento}.`
+              : "Esta garantía ya está marcada como devuelta.",
+          },
+        });
+      }
+      const taken = rows
+        .map((raw) => mapRow(raw))
+        .find((row) => row.id !== id && row.devolucionDocumento.toUpperCase() === documentNumber.toUpperCase());
+      if (taken) {
+        return res.status(409).json({ error: { message: `${documentNumber} ya está conectado a otra garantía.` } });
+      }
+      const document = (await listReturnDocuments()).find(
+        (doc) => doc.number.toUpperCase() === documentNumber.toUpperCase()
+      );
+      if (!document) {
+        return res.status(404).json({ error: { message: "No se encontró ese recibo de devolución." } });
+      }
+      if (!sameClientName(document.clientName, current.clientName)) {
+        return res.status(400).json({
+          error: { message: "Ese recibo es de otro cliente. Elegí un recibo de devolución del mismo cliente." },
+        });
+      }
+      const fecha = invoiceDateToIso(document.date);
+      const monto = document.total > 0 ? document.total : current.montoUsd;
+      const nota = `Recibo de devolución ${document.number}`;
+      const nowSql = db.isPostgres ? "NOW()" : "datetime('now')";
+      await db
+        .prepare(
+          `UPDATE garantias_ande_clientes
+           SET estado = 'devuelta',
+               fecha_devolucion = ?,
+               monto_devuelto_usd = ?,
+               devolucion_nota = ?,
+               devolucion_documento = ?,
+               updated_at = ${nowSql}
+           WHERE id = ? AND LOWER(TRIM(COALESCE(estado, 'activa'))) <> 'devuelta'`
+        )
+        .run(fecha, monto, nota, document.number, id);
+      const actor = (req as { user?: { id?: number; email?: string } }).user;
+      await insertGarantiaAndeDevolucionHist({
+        garantiaAndeClienteId: id,
+        clientId: current.clientId,
+        clientCode: current.clientCode,
+        clientName: current.clientName,
+        clientName2: current.clientName2,
+        marca: current.marca,
+        modelo: current.modelo,
+        procesador: current.procesador,
+        numeroSerie: current.numeroSerie,
+        nombreEquipo: current.nombreEquipo,
+        montoGarantiaUsd: current.montoUsd,
+        montoDevueltoUsd: monto,
+        fechaDevolucion: fecha,
+        nota,
+        createdByUserId: actor?.id ?? null,
+        createdByEmail: actor?.email ?? "",
+      });
+      res.json({ ok: true, documentNumber: document.number, fechaDevolucion: fecha, montoDevueltoUsd: monto });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
 
 garantiasAndeClientesRouter.post("/garantias-ande-clientes", ...writeMw, async (req, res, next) => {
   try {

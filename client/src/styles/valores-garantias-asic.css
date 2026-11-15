@@ -629,3 +629,35 @@
   color: #6a7c73;
   font-size: 0.74rem;
 }
+
+.vga-link-panel {
+  margin-top: 0.75rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid #c9ddd2;
+  border-radius: 10px;
+  background: #f4faf6;
+}
+
+.vga-link-panel p {
+  margin: 0 0 0.55rem;
+}
+
+.vga-link-panel__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.vga-link-panel__row select {
+  min-width: 16rem;
+  flex: 1 1 16rem;
+}
+
+.vga-link-panel__go {
+  background: #146c3a;
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  padding: 0.4rem 0.75rem;
+}

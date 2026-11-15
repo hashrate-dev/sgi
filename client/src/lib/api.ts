@@ -2458,6 +2458,7 @@ export type GarantiaAndeClienteItem = {
   montoDevueltoUsd?: number | null;
   bajaEquipoId?: string;
   devolucionNota?: string;
+  devolucionDocumento?: string;
   createdAt: string;
   updatedAt: string;
   clientCode?: string;
@@ -2479,6 +2480,29 @@ export type GarantiaAndeClientePayload = {
 
 export function getGarantiasAndeClientes(): Promise<{ items: GarantiaAndeClienteItem[] }> {
   return api<{ items: GarantiaAndeClienteItem[] }>("/api/garantias-ande-clientes");
+}
+
+export type GarantiaDevolucionDocumento = {
+  number: string;
+  clientName: string;
+  date: string;
+  total: number;
+  linkedGarantiaId: number | null;
+  linkedLabel: string;
+};
+
+export function getGarantiaDevolucionDocumentos(): Promise<{ documents: GarantiaDevolucionDocumento[] }> {
+  return api<{ documents: GarantiaDevolucionDocumento[] }>("/api/garantias-ande-clientes/devoluciones-documentos");
+}
+
+export function connectGarantiaAndeDevolucion(
+  id: number,
+  documentNumber: string
+): Promise<{ ok: boolean; documentNumber: string; fechaDevolucion: string; montoDevueltoUsd: number }> {
+  return api(`/api/garantias-ande-clientes/${id}/conectar-devolucion`, {
+    method: "POST",
+    body: JSON.stringify({ documentNumber }),
+  });
 }
 
 export function matchGarantiasAndeClientes(params: {

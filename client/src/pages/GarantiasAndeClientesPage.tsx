@@ -1,17 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, Link } from "react-router-dom";
 import { AsicCotizadorCatalogSelect } from "../components/AsicCotizadorCatalogSelect";
 import { HostingClientSelect } from "../components/HostingClientSelect";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
 import {
   createGarantiaAndeCliente,
+  connectGarantiaAndeDevolucion,
   deleteGarantiaAndeCliente,
+  getGarantiaDevolucionDocumentos,
   getGarantiasAndeClientes,
   getGarantiasAndeHostingClients,
   updateGarantiaAndeCliente,
   type GarantiaAndeClienteItem,
   type GarantiaAndeClientePayload,
+  type GarantiaDevolucionDocumento,
 } from "../lib/api";
 import { canAccessGarantiasModule, canEditGarantiasModule } from "../lib/auth";
 import { sgiHome } from "../lib/marketplacePaths.js";
@@ -48,6 +51,13 @@ function formatDateShort(ymd: string): string {
   return `${day}/${m}/${y}`;
 }
 
+function sameClientName(a: string | undefined, b: string | undefined): boolean {
+  const norm = (value: string | undefined) => String(value ?? "").replace(/\s+/g, " ").trim().toUpperCase();
+  const left = norm(a);
+  const right = norm(b);
+  return left.length > 0 && left === right;
+}
+
 function clientFullName(c: {
   code?: string;
   clientCode?: string;
@@ -76,6 +86,9 @@ export function GarantiasAndeClientesPage() {
   const [ok, setOk] = useState("");
   const [search, setSearch] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState<"todas" | "activas" | "devueltas">("todas");
+  const [linkFor, setLinkFor] = useState<GarantiaAndeClienteItem | null>(null);
+  const [linkDocs, setLinkDocs] = useState<GarantiaDevolucionDocumento[]>([]);
+  const [linkNumber, setLinkNumber] = useState("");
 
   const canEdit = Boolean(user && canEditGarantiasModule(user));
 
@@ -314,6 +327,48 @@ export function GarantiasAndeClientesPage() {
     }
   };
 
+  const openLink = async (row: GarantiaAndeClienteItem) => {
+    if (!canEdit || row.estado === "devuelta") return;
+    setErr("");
+    setOk("");
+    setBusy(true);
+    try {
+      const res = await getGarantiaDevolucionDocumentos();
+      const options = (res.documents || []).filter(
+        (doc) => !doc.linkedGarantiaId && sameClientName(doc.clientName, row.clientName)
+      );
+      setLinkDocs(options);
+      setLinkNumber(options[0]?.number ?? "");
+      setLinkFor(row);
+      if (options.length === 0) {
+        setErr("Este cliente no tiene un recibo de devolución pendiente de conectar. Emitilo primero en Garantías ANDE.");
+      }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "No se pudieron leer los recibos de devolución.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmLink = async () => {
+    if (!canEdit || !linkFor || !linkNumber) return;
+    setErr("");
+    setOk("");
+    setBusy(true);
+    try {
+      await connectGarantiaAndeDevolucion(linkFor.id, linkNumber);
+      setOk(`La garantía quedó conectada con ${linkNumber} y marcada como devuelta.`);
+      setLinkFor(null);
+      const refreshed = await getGarantiasAndeClientes();
+      setItems(refreshed.items || []);
+      if (editingId === linkFor.id) resetForm();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "No se pudo conectar la devolución.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="fact-page">
       <div className="container vga-page">
@@ -513,6 +568,19 @@ export function GarantiasAndeClientesPage() {
                     Cancelar edición
                   </button>
                 ) : null}
+                {editingId != null && items.find((row) => row.id === editingId)?.estado !== "devuelta" ? (
+                  <button
+                    type="button"
+                    className="btn btn-outline-success"
+                    disabled={!canEdit || busy}
+                    onClick={() => {
+                      const row = items.find((item) => item.id === editingId);
+                      if (row) void openLink(row);
+                    }}
+                  >
+                    Conectar devolución
+                  </button>
+                ) : null}
                 <button type="submit" className="btn btn-success" disabled={!canEdit || busy}>
                   {editingId != null ? "Guardar cambios" : "Registrar garantía"}
                 </button>
@@ -558,9 +626,44 @@ export function GarantiasAndeClientesPage() {
             </div>
           </div>
           <p>
-            Cuando un equipo se da de baja con devolución de garantía, el registro queda marcado como{" "}
-            <strong>ya devuelta</strong> y también figura en el historial debajo.
+            Cuando un equipo se da de baja con devolución, o conectás un recibo de devolución ya emitido, el registro queda marcado como{" "}
+            <strong>ya devuelta</strong>.
           </p>
+          {linkFor ? (
+            <div className="vga-link-panel">
+              <p>
+                Conectar la garantía de <strong>{clientFullName(linkFor)}</strong>
+                {linkFor.nombreEquipo ? ` · ${linkFor.nombreEquipo}` : ""} con un recibo de devolución.
+              </p>
+              {linkDocs.length > 0 ? (
+                <div className="vga-link-panel__row">
+                  <select
+                    className="fact-select"
+                    value={linkNumber}
+                    onChange={(e) => setLinkNumber(e.target.value)}
+                    disabled={busy}
+                  >
+                    {linkDocs.map((doc) => (
+                      <option key={doc.number} value={doc.number}>
+                        {doc.number} · {doc.date || "sin fecha"} · {formatUsd(doc.total)}
+                      </option>
+                    ))}
+                  </select>
+                  <button type="button" className="vga-link-panel__go" disabled={busy || !linkNumber} onClick={() => void confirmLink()}>
+                    Conectar
+                  </button>
+                  <button type="button" disabled={busy} onClick={() => setLinkFor(null)}>
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <p>
+                  No hay recibos de devolución de este cliente sin conectar.{" "}
+                  <Link to="/asic/ande-warranty">Emitir uno en Garantías ANDE</Link>
+                </p>
+              )}
+            </div>
+          ) : null}
           <div className="vga-frame">
             <table className="vga-gridtable">
               <thead>
@@ -629,6 +732,11 @@ export function GarantiasAndeClientesPage() {
                               <span className="vga-sub">
                                 Devuelto {formatUsd(Number(row.montoDevueltoUsd ?? row.montoUsd))}
                               </span>
+                              {row.devolucionDocumento ? (
+                                <span className="vga-sub">
+                                  <Link to="/asic/ande-warranty">{row.devolucionDocumento}</Link>
+                                </span>
+                              ) : null}
                               {row.devolucionNota ? <span className="vga-sub">{row.devolucionNota}</span> : null}
                             </>
                           ) : (
@@ -646,6 +754,16 @@ export function GarantiasAndeClientesPage() {
                               >
                                 Editar
                               </button>
+                              {!isDevuelta ? (
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  title="Conectar con un recibo de devolución ya emitido"
+                                  onClick={() => void openLink(row)}
+                                >
+                                  Conectar
+                                </button>
+                              ) : null}
                               <button
                                 type="button"
                                 className="is-danger"
@@ -675,8 +793,7 @@ export function GarantiasAndeClientesPage() {
             <span className="vga-count">{historialDevoluciones.length} movimientos</span>
           </div>
           <p>
-            Registro histórico de garantías ANDE ya devueltas al cliente (ajuste al dar de baja el equipo en el
-            monitor).
+            Registro histórico de garantías ANDE ya devueltas al cliente, por baja de equipo o por un recibo de devolución conectado.
           </p>
           <div className="vga-frame">
             <table className="vga-gridtable">
