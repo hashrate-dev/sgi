@@ -735,7 +735,7 @@ export function AsicCotizadorChinaPyPage() {
                     }}
                   />
                   {proveedorModo === "pct" ? (
-                    <p className="asic-cotizador-prov-hint">5% del precio ASIC en origen (China).</p>
+                    <p className="asic-cotizador-prov-hint"></p>
                   ) : null}
                 </div>
                 <div className="col-12 col-sm-6 col-xl asic-cotizador-field-wrap asic-cotizador-field-wrap--margen-amarillo">

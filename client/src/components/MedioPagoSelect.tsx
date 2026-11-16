@@ -553,18 +553,18 @@ export function MedioPagoSelect({ value, onChange, disabled, buttonId }: Props) 
                       manage && item.id > 0 ? " contabilidad-medio-pago-dd-row-inner--admin" : ""
                     }${v === value ? " contabilidad-medio-pago-dd-row-inner--active" : ""}`}
                   >
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={v === value}
+              <button
+                type="button"
+                role="option"
+                aria-selected={v === value}
                       className={`btn btn-light border-0 text-start d-flex align-items-center gap-2 py-2 px-3 rounded-0 text-body contabilidad-medio-pago-dd-item${
-                        v === value ? " active fw-semibold" : ""
-                      }`}
-                      onClick={() => {
-                        onChange(v);
-                        setOpen(false);
-                      }}
-                    >
+                  v === value ? " active fw-semibold" : ""
+                }`}
+                onClick={() => {
+                  onChange(v);
+                  setOpen(false);
+                }}
+              >
                       <MedioPagoIcon code={v} logoUrl={item.logoUrl} />
                       <span className="flex-grow-1 min-w-0 text-truncate">{v}</span>
                     </button>
@@ -682,7 +682,7 @@ export function MedioPagoSelect({ value, onChange, disabled, buttonId }: Props) 
                   }}
                 >
                   + Agregar medio de pago
-                </button>
+              </button>
               )}
             </li>
           ) : null}

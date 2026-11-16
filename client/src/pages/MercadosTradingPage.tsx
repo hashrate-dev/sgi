@@ -1133,8 +1133,8 @@ export function MercadosTradingPage() {
                         const q = tapeQuotes[s.binance];
                         const up = (q?.changePct ?? 0) >= 0;
                         return (
-                          <button
-                            key={s.id}
+              <button
+                key={s.id}
                             type="button"
                             role="option"
                             aria-selected={s.id === symbol}
@@ -1348,9 +1348,9 @@ export function MercadosTradingPage() {
                         onChange={(e) => setDrawColor(e.target.value)}
                       />
                     </label>
-                  </div>
+          </div>
                 ) : null}
-              </div>
+        </div>
               <span className="tv-markets-dock__sep" aria-hidden />
               <button
                 type="button"
@@ -1416,8 +1416,8 @@ export function MercadosTradingPage() {
                   <span className="tv-desk-signal__icon" title={copy.title} aria-hidden>
                     <BiasGlyph bias={signal?.bias ?? "wait"} size={26} />
                   </span>
-                </div>
-              </div>
+          </div>
+        </div>
 
               {signalErr ? (
                 <p className="tv-desk-signal__hint">{signalErr}</p>
