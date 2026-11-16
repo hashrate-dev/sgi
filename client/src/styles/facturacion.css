@@ -3306,6 +3306,36 @@ button.fact-back {
   opacity: 0.45;
 }
 
+.fact-panel-nuevo-documento .asic-cotizador-prov-mode {
+  display: flex;
+  gap: 0.3rem;
+  margin-bottom: 0.35rem;
+}
+
+.fact-panel-nuevo-documento .asic-cotizador-prov-mode button {
+  flex: 1 1 0;
+  border: 1px solid #fb7185;
+  background: rgba(255, 255, 255, 0.85);
+  color: #7f1d1d;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  padding: 0.22rem 0.35rem;
+}
+
+.fact-panel-nuevo-documento .asic-cotizador-prov-mode button.is-on {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  color: #fff;
+}
+
+.fact-panel-nuevo-documento .asic-cotizador-prov-hint {
+  margin: 0.28rem 0 0;
+  color: #9f1239;
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
 /* Margen USD: solo este campo resaltado en ambar (resto de Parámetros queda blanco) */
 .fact-panel-nuevo-documento .asic-cotizador-field-wrap--margen-amarillo {
   background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 55%, #fffbeb 100%);

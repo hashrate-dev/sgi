@@ -18,11 +18,14 @@ import {
 import { showToast } from "../components/ToastNotification";
 import "../styles/facturacion.css";
 
-/** Valores por defecto de la fórmula: ((PRECIO ORIGEN + 220 USD) × 1,23) + 300 */
+/** Valores por defecto de la fórmula: ((PRECIO ORIGEN + 220 USD) × 1,23) + proveedor PY */
 const DEFAULT_BLOQUE_USD = 220;
 /** Coeficiente fijo de nacionalización (no editable). */
 const COEFICIENTE_FIJO = 1.23;
 const DEFAULT_PROVEEDOR_USD = 300;
+/** Proveedor PY: monto escrito en el formulario, o 5% del precio ASIC en origen (China). */
+const PROVEEDOR_PY_PCT = 0.05;
+type ProveedorPyModo = "usd" | "pct";
 import { HASHRATE_SPACE_LOGO } from "../lib/marketplaceWpAssets.js";
 const HASHRATE_LOGO = HASHRATE_SPACE_LOGO;
 
@@ -149,6 +152,7 @@ export function AsicCotizadorChinaPyPage() {
   const [precioOrigen, setPrecioOrigen] = useState("");
   const [bloqueUsd, setBloqueUsd] = useState(String(DEFAULT_BLOQUE_USD));
   const [proveedorPy, setProveedorPy] = useState(String(DEFAULT_PROVEEDOR_USD));
+  const [proveedorModo, setProveedorModo] = useState<ProveedorPyModo>("usd");
   const [margen, setMargen] = useState("");
   const [marca, setMarca] = useState("");
   const [modelo, setModelo] = useState("");
@@ -200,13 +204,16 @@ export function AsicCotizadorChinaPyPage() {
     };
   }, []);
 
-  const { precioNum, totalNacionalizado } = useMemo(() => {
+  const { precioNum, proveedorUsd, totalNacionalizado } = useMemo(() => {
     const p = parseMoney(precioOrigen);
     const montoUsd = Math.max(0, parseMoney(bloqueUsd));
-    const prov = Math.max(0, parseMoney(proveedorPy));
+    const prov =
+      proveedorModo === "pct"
+        ? Math.max(0, Math.round(p * PROVEEDOR_PY_PCT))
+        : Math.max(0, parseMoney(proveedorPy));
     const totalSinMargen = (p + montoUsd) * COEFICIENTE_FIJO + prov;
-    return { precioNum: p, totalNacionalizado: Math.round(totalSinMargen) };
-  }, [precioOrigen, bloqueUsd, proveedorPy]);
+    return { precioNum: p, proveedorUsd: prov, totalNacionalizado: Math.round(totalSinMargen) };
+  }, [precioOrigen, bloqueUsd, proveedorPy, proveedorModo]);
 
   const precioVenta = useMemo(
     () => Math.round(totalNacionalizado + parseMoney(margen)),
@@ -255,7 +262,7 @@ export function AsicCotizadorChinaPyPage() {
       precioOrigen: parseMoney(precioOrigen),
       montoUsd: parseMoney(bloqueUsd),
       coeficiente: COEFICIENTE_FIJO,
-      proveedorPy: parseMoney(proveedorPy),
+      proveedorPy: proveedorUsd,
       margenUsd: parseMoney(margen),
       totalNacionalizado,
       precioVenta,
@@ -310,6 +317,7 @@ export function AsicCotizadorChinaPyPage() {
     setObservaciones(item.observaciones || "");
     setPrecioOrigen(moneyToInput(item.precioOrigen));
     setBloqueUsd(moneyToInput(item.montoUsd) || String(DEFAULT_BLOQUE_USD));
+    setProveedorModo("usd");
     setProveedorPy(moneyToInput(item.proveedorPy) || String(DEFAULT_PROVEEDOR_USD));
     setMargen(moneyToInput(item.margenUsd));
     setRegistrosError("");
@@ -689,16 +697,46 @@ export function AsicCotizadorChinaPyPage() {
                   <label className="fact-label" htmlFor="cot-proveedor">
                     Proveedor PY <span className="text-muted">USD</span>
                   </label>
+                  <div className="asic-cotizador-prov-mode" role="group" aria-label="Cómo calcular el proveedor PY">
+                    <button
+                      type="button"
+                      className={proveedorModo === "usd" ? "is-on" : ""}
+                      aria-pressed={proveedorModo === "usd"}
+                      onClick={() => setProveedorModo("usd")}
+                    >
+                      Monto USD
+                    </button>
+                    <button
+                      type="button"
+                      className={proveedorModo === "pct" ? "is-on" : ""}
+                      aria-pressed={proveedorModo === "pct"}
+                      onClick={() => setProveedorModo("pct")}
+                    >
+                      5% origen
+                    </button>
+                  </div>
                   <input
                     id="cot-proveedor"
                     className="fact-input"
                     type="text"
                     inputMode="decimal"
                     autoComplete="off"
+                    readOnly={proveedorModo === "pct"}
+                    aria-readonly={proveedorModo === "pct"}
                     placeholder={String(DEFAULT_PROVEEDOR_USD)}
-                    value={displayAsPositive(proveedorPy)}
-                    onChange={(e) => setProveedorPy(sanitizeNumberInput(removeMinus(e.target.value)))}
+                    value={
+                      proveedorModo === "pct"
+                        ? displayAsPositive(String(proveedorUsd))
+                        : displayAsPositive(proveedorPy)
+                    }
+                    onChange={(e) => {
+                      if (proveedorModo === "pct") return;
+                      setProveedorPy(sanitizeNumberInput(removeMinus(e.target.value)));
+                    }}
                   />
+                  {proveedorModo === "pct" ? (
+                    <p className="asic-cotizador-prov-hint">5% del precio ASIC en origen (China).</p>
+                  ) : null}
                 </div>
                 <div className="col-12 col-sm-6 col-xl asic-cotizador-field-wrap asic-cotizador-field-wrap--margen-amarillo">
                   <label className="fact-label" htmlFor="cot-margen-param">
