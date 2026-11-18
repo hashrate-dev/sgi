@@ -23,7 +23,7 @@ const DEFAULT_BLOQUE_USD = 220;
 /** Coeficiente fijo de nacionalización (no editable). */
 const COEFICIENTE_FIJO = 1.23;
 const DEFAULT_PROVEEDOR_USD = 300;
-/** Proveedor PY: monto escrito en el formulario, o 5% del precio ASIC en origen (China). */
+/** Proveedor PY: monto escrito, o 5% de (precio ASIC en origen + monto USD). */
 const PROVEEDOR_PY_PCT = 0.05;
 type ProveedorPyModo = "usd" | "pct";
 import { HASHRATE_SPACE_LOGO } from "../lib/marketplaceWpAssets.js";
@@ -209,7 +209,7 @@ export function AsicCotizadorChinaPyPage() {
     const montoUsd = Math.max(0, parseMoney(bloqueUsd));
     const prov =
       proveedorModo === "pct"
-        ? Math.max(0, Math.round(p * PROVEEDOR_PY_PCT))
+        ? Math.max(0, Math.round((p + montoUsd) * PROVEEDOR_PY_PCT))
         : Math.max(0, parseMoney(proveedorPy));
     const totalSinMargen = (p + montoUsd) * COEFICIENTE_FIJO + prov;
     return { precioNum: p, proveedorUsd: prov, totalNacionalizado: Math.round(totalSinMargen) };
@@ -712,7 +712,7 @@ export function AsicCotizadorChinaPyPage() {
                       aria-pressed={proveedorModo === "pct"}
                       onClick={() => setProveedorModo("pct")}
                     >
-                      5% origen
+                      5% origen + monto
                     </button>
                   </div>
                   <input
@@ -735,7 +735,7 @@ export function AsicCotizadorChinaPyPage() {
                     }}
                   />
                   {proveedorModo === "pct" ? (
-                    <p className="asic-cotizador-prov-hint"></p>
+                    <p className="asic-cotizador-prov-hint">5% de precio China + monto USD.</p>
                   ) : null}
                 </div>
                 <div className="col-12 col-sm-6 col-xl asic-cotizador-field-wrap asic-cotizador-field-wrap--margen-amarillo">
