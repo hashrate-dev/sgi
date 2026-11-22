@@ -381,12 +381,13 @@ export function HomePage() {
             const isKryptexCard = item.to === "/kryptex";
             const openMercado = isKryptexCard && user?.role !== "lector";
             const cardTo = openMercado ? "/kryptex/mercado" : item.to;
+            const cardLabel = openMercado ? "Monitor de Mercado" : item.label;
             const cardDesc = openMercado ? "Seguimiento del mercado cripto y BTC" : item.desc;
             return (
             <RouterLink key={cardTo + item.label} to={cardTo} style={DASHBOARD_CARD_LINK_STYLE}>
               <AppCard {...dashboardCardProps}>
                 <DashboardCardIconSlot item={item} />
-                <Heading {...cardTitleProps}>{item.label}</Heading>
+                <Heading {...cardTitleProps}>{cardLabel}</Heading>
                 <Text {...cardDescProps}>{cardDesc}</Text>
               </AppCard>
             </RouterLink>
