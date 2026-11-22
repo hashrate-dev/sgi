@@ -556,7 +556,7 @@ footer{border-top:1px solid var(--line);padding-top:14px}
   </section>
 
   <section class="card c4" id="sec-global">
-    <h2>Estructura del mercado cripto <span class="tag">CoinGecko</span></h2>
+    <h2>Estructura del mercado cripto <span class="tag">en vivo</span></h2>
     <table class="kv" id="global"></table>
   </section>
 
@@ -955,11 +955,53 @@ async function loadFng(){
     setSt("st-fng","ok"); renderSignal();
   }catch(e){ setSt("st-fng","err"); }
 }
+const PAPRIKA_ID={"btc-bitcoin":"bitcoin","eth-ethereum":"ethereum","usdt-tether":"tether","usdc-usd-coin":"usd-coin"};
+async function loadGlobalStats(){
+  try{
+    const g=await j("https://api.coingecko.com/api/v3/global");
+    return g.data;
+  }catch{
+    const p=await j("https://api.coinpaprika.com/v1/global");
+    return {
+      total_market_cap:{usd:p.market_cap_usd},
+      total_volume:{usd:p.volume_24h_usd},
+      market_cap_change_percentage_24h_usd:p.market_cap_change_24h,
+      market_cap_percentage:{btc:p.bitcoin_dominance_percentage,eth:null,usdt:null,usdc:null},
+      active_cryptocurrencies:p.cryptocurrencies_number,
+    };
+  }
+}
+async function loadMarketRows(){
+  try{
+    return await j("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&price_change_percentage=24h,7d,30d");
+  }catch{
+    const rows=await j("https://api.coinpaprika.com/v1/tickers?quotes=USD");
+    return rows.slice(0,100).map(x=>{
+      const q=(x.quotes&&x.quotes.USD)||{};
+      return {
+        id:PAPRIKA_ID[x.id]||x.id, symbol:x.symbol, name:x.name,
+        current_price:q.price, market_cap:q.market_cap,
+        price_change_percentage_24h_in_currency:q.percent_change_24h,
+        price_change_percentage_7d_in_currency:q.percent_change_7d,
+        price_change_percentage_30d_in_currency:q.percent_change_30d,
+      };
+    });
+  }
+}
+function fillDominance(d,m){
+  const pc=d.market_cap_percentage, total=d.total_market_cap&&d.total_market_cap.usd;
+  if(!pc||!total) return;
+  const cap=id=>{ const x=m.find(r=>r.id===id); return x&&x.market_cap||0; };
+  if(pc.eth==null) pc.eth=cap("ethereum")/total*100;
+  if(pc.usdt==null) pc.usdt=cap("tether")/total*100;
+  if(pc.usdc==null) pc.usdc=cap("usd-coin")/total*100;
+}
 async function loadGlobal(){
   try{
-    const [g,m]=await Promise.all([ j("https://api.coingecko.com/api/v3/global"), j("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&price_change_percentage=24h,7d,30d") ]);
-    S.global=g.data; S.markets=m;
-    const d=g.data, pc=d.market_cap_percentage; const stab=(pc.usdt||0)+(pc.usdc||0);
+    const [d,m]=await Promise.all([ loadGlobalStats(), loadMarketRows() ]);
+    fillDominance(d,m);
+    S.global=d; S.markets=m;
+    const pc=d.market_cap_percentage; const stab=(pc.usdt||0)+(pc.usdc||0);
     const btc=m.find(x=>x.id==="bitcoin"), eth=m.find(x=>x.id==="ethereum");
     $("global").innerHTML=[
       ["Capitalización total", "$"+fmtBig(d.total_market_cap.usd), `<span class="${cls(d.market_cap_change_percentage_24h_usd)}">${fmtPct(d.market_cap_change_percentage_24h_usd)}</span>`],
@@ -972,7 +1014,7 @@ async function loadGlobal(){
       ["Criptos activas", fmtN(d.active_cryptocurrencies,0), ""],
     ].map(r=>`<tr><td>${r[0]}</td><td class="v">${r[1]}</td><td class="n">${r[2]}</td></tr>`).join("");
     renderAlts(); setSt("st-cg","ok"); renderSignal();
-  }catch(e){ console.warn(e); setSt("st-cg","err","CoinGecko limitó las consultas; se reintenta"); }
+  }catch(e){ console.warn(e); setSt("st-cg","err","Mercado global no respondió; se reintenta"); }
 }
 let altPeriod="7d";
 function renderAlts(){
