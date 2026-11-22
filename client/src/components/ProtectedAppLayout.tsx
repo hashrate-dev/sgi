@@ -20,7 +20,9 @@ export function ProtectedAppLayout({ children }: { children?: ReactNode }) {
   const location = useLocation();
   const showAdminFooter = Boolean(user && canAccessSgiFromMarketplaceFooter(user));
   const isHomePage = isSgiDashboardPath(location.pathname);
-  const isMarketsPage = location.pathname.includes("/gestion-administrativa/mercados");
+  const isMarketsPage =
+    location.pathname.includes("/gestion-administrativa/mercados") ||
+    location.pathname.startsWith("/kryptex/mercado");
   const [sgiTopBarH, setSgiTopBarH] = useState(80);
   const onSgiTopBarHeight = useCallback((h: number) => {
     setSgiTopBarH((prev) => (Math.abs(prev - h) < 1 ? prev : h));

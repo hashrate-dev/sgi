@@ -377,15 +377,21 @@ export function HomePage() {
           gap={3}
           alignItems="stretch"
         >
-          {visibleMenuItems.map((item) => (
-            <RouterLink key={item.to + item.label} to={item.to} style={DASHBOARD_CARD_LINK_STYLE}>
+          {visibleMenuItems.map((item) => {
+            const isKryptexCard = item.to === "/kryptex";
+            const openMercado = isKryptexCard && user?.role !== "lector";
+            const cardTo = openMercado ? "/kryptex/mercado" : item.to;
+            const cardDesc = openMercado ? "Seguimiento del mercado cripto y BTC" : item.desc;
+            return (
+            <RouterLink key={cardTo + item.label} to={cardTo} style={DASHBOARD_CARD_LINK_STYLE}>
               <AppCard {...dashboardCardProps}>
                 <DashboardCardIconSlot item={item} />
                 <Heading {...cardTitleProps}>{item.label}</Heading>
-                <Text {...cardDescProps}>{item.desc}</Text>
+                <Text {...cardDescProps}>{cardDesc}</Text>
               </AppCard>
             </RouterLink>
-          ))}
+            );
+          })}
 
           {canSeeMarketplaceOrdersCard ? (
             <RouterLink to="/marketplace/orders" style={DASHBOARD_CARD_LINK_STYLE}>

@@ -63,6 +63,7 @@ import { GarantiaAndeItemNewPage } from "./pages/GarantiaAndeItemNewPage";
 import { HistorialGarantiasPage } from "./pages/HistorialGarantiasPage";
 import { KryptexPage } from "./pages/KryptexPage";
 import { KryptexDetallePage } from "./pages/KryptexDetallePage";
+import { KryptexMercadoPage } from "./pages/KryptexMercadoPage";
 import { MarketplacePage } from "./pages/MarketplacePage";
 import { MarketplaceCorporateHomePage } from "./pages/MarketplaceCorporateHomePage";
 import { MarketplaceServicesPage } from "./pages/MarketplaceServicesPage";
@@ -451,6 +452,7 @@ function App() {
           <Route element={<ProtectedRoute><ProtectedAppLayout /></ProtectedRoute>}>
             <Route path={SGI_DASHBOARD_PATH} element={<HomePage />} />
             <Route path="/kryptex" element={<KryptexPage />} />
+            <Route path="/kryptex/mercado" element={<KryptexMercadoPage />} />
             <Route path="/kryptex/detalle" element={<KryptexDetallePage />} />
             <Route path="/asic/equipment" element={<EquiposAsicPage />} />
             <Route path="/marketplace/home-banners" element={<TiendaOnlineBannersHomePage />} />

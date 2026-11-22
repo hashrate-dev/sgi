@@ -39,7 +39,7 @@ export const SGI_PERMISSION_SCREEN_MAP: readonly SgiPermissionScreenRow[] = [
     zone: "Inicio del SGI",
     legacyModule: "reportes",
     title: "Kryptex (minería en pool)",
-    routes: ["/kryptex", "/kryptex/detalle"],
+    routes: ["/kryptex", "/kryptex/mercado", "/kryptex/detalle"],
     accessNote:
       "No es un permiso de módulo: se habilita si el usuario Lector tiene pool asignado (campo Usuario = Mariri, Jlsoler, etc.). Staff Admin A/B/Operador según rol.",
     audience: ["staff", "lector"],
