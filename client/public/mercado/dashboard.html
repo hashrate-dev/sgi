@@ -971,11 +971,20 @@ function connectWS(){
   try{ ws=new WebSocket(`${WS_HOSTS[wsIdx]}/stream?streams=${streams}`); }catch(e){ wsIdx=(wsIdx+1)%WS_HOSTS.length; return setTimeout(connectWS,2000); }
   ws.onopen=()=>{ setSt("st-ws","ok","Conectado a "+WS_HOSTS[wsIdx]); wsRetry=0; };
   ws.onmessage=ev=>{ const m=JSON.parse(ev.data).data; if(!m) return; const c=m.s.replace("USDT","");
-    const p=+m.c, o=+m.o; S.px[c]=p; S.chg[c]=(p-o)/o*100; S.vol[c]=+m.q; renderCoin(c); checkAlerts(c,p);
-    if(c===SEL){ updateLivePrice(); } else if(c==="BTC"){ renderRadar(); } };
+    const p=+m.c, o=+m.o; S.px[c]=p; S.chg[c]=(p-o)/o*100; S.vol[c]=+m.q; renderCoin(c); checkAlerts(c,p); queueLive(c); };
   ws.onclose=ws.onerror=()=>{ setSt("st-ws","err","Reconectando…"); try{ws.close();}catch(e){} wsRetry++; if(wsRetry>2){ wsIdx=(wsIdx+1)%WS_HOSTS.length; wsRetry=0; } clearTimeout(connectWS._t); connectWS._t=setTimeout(connectWS,3000); };
 }
 function updateLivePrice(){ const now=Date.now(); if(now-lastSignalAt>5000){ lastSignalAt=now; renderLevels(); renderSignal(); } }
+const liveAt={};
+function queueLive(c){
+  if(document.hidden) return;
+  const now=Date.now();
+  if(curTab==="analisis" && c===SEL && now-(liveAt.an||0)>800 && S.tech[SEL]){ liveAt.an=now; renderTech(); renderLevels(); renderSignal(); }
+  if(curTab==="resumen" && c==="BTC" && now-(liveAt.ra||0)>1000){ liveAt.ra=now; renderRadar(); }
+  if(curTab==="ciclo" && c==="BTC" && S.cyc && now-(liveAt.cy||0)>8000){ liveAt.cy=now; renderCycle(); }
+  if(curTab==="etf" && ((c==="BTC"&&treasCoin==="bitcoin")||(c==="ETH"&&treasCoin==="ethereum")) && now-(liveAt.tr||0)>8000){ liveAt.tr=now; loadTreasury(); }
+  if(curTab==="cartera" && PF.acc && c===PF.coin && now-(liveAt.pf||0)>700){ liveAt.pf=now; pfRenderHead(); pfTools(); }
+}
 
 /* ================= TECHNICALS ================= */
 async function loadTech(c){
@@ -1103,7 +1112,7 @@ async function loadDeriv(){
     lineChart($("ls-chart"), ls.map(x=>({y:+x.longShortRatio,l:hhmm(x.timestamp),t:ddmm(x.timestamp)+" "+hhmm(x.timestamp)})), {color:"var(--info)",ref:1,fmt:v=>fmtN(v,2)});
     $("deriv-sym").textContent=sym; $("deriv-upd").textContent="actualizado "+hhmm(Date.now());
     setSt("st-fut","ok");
-  }catch(e){ console.warn("deriv",e); setSt("st-fut","err","Futuros de Binance no disponibles desde tu red"); $("deriv-stats").innerHTML='<div class="sub">No se pudo leer futuros de Binance (puede estar bloqueado en tu región o red). Se reintenta cada minuto.</div>'; }
+  }catch(e){ console.warn("deriv",e); setSt("st-fut","err","Futuros de Binance no disponibles desde tu red"); $("deriv-stats").innerHTML='<div class="sub">No se pudo leer futuros de Binance (puede estar bloqueado en tu región o red). Se reintenta en unos segundos.</div>'; }
   renderSignal();
 }
 
@@ -1863,7 +1872,7 @@ function drawCycleProj(m){
 }
 
 async function initCycle(){
-  try{ await loadCycleHist(); if(!S.tech.BTC) await loadTech("BTC"); renderCycle(); setInterval(()=>{ if(curTab==="ciclo") renderCycle(); },60e3); }
+  try{ await loadCycleHist(); if(!S.tech.BTC) await loadTech("BTC"); renderCycle(); setInterval(()=>{ if(!document.hidden&&curTab==="ciclo") renderCycle(); },15e3); }
   catch(e){ console.warn("ciclo",e); $("cyc-phase").innerHTML='<div class="sub">No se pudo cargar la historia de precios de Binance. Reintentá en un momento.</div>'; }
 }
 
@@ -1946,7 +1955,8 @@ function pfRenderHead(){
   $("pf-empty").hidden=PF.ops.length>0;
   if(!PF.ops.length){ $("pf-empty-t").textContent="Todavía no cargaste operaciones"; $("pf-empty-d").textContent="Esta cartera es solo de "+PF.acc+". Cargá compras y ventas de BTC u otra moneda; otro usuario no las ve."; }
   const coins=[...new Set(PF.ops.map(o=>o.coin))]; if(!coins.includes(PF.coin)) coins.unshift(PF.coin);
-  $("pf-coins").innerHTML=coins.map(c=>`<button data-c="${c}" class="${c===PF.coin?"on":""}">${c}</button>`).join("");
+  const sig=coins.join(",")+"|"+PF.coin;
+  if(sig!==pfRenderHead.sig){ pfRenderHead.sig=sig; $("pf-coins").innerHTML=coins.map(c=>`<button data-c="${c}" class="${c===PF.coin?"on":""}">${c}</button>`).join(""); }
   if(!PF.acc){ $("pf-stats").innerHTML=""; return; }
   const k=pfCalc(PF.coin), p=pfPrice(PF.coin), val=p?k.q*p:null, un=val!=null?val-k.cost:null, unPct=k.cost>0&&un!=null?un/k.cost*100:null;
   const st=(l,v,d,cl)=>`<div class="stat"><div class="l">${l}</div><div class="v ${cl||""}">${v}</div><div class="d">${d}</div></div>`;
@@ -1956,7 +1966,7 @@ function pfRenderHead(){
     st("Precio actual",p?"$"+fmtP(p):"—",p&&k.avg?`${fmtPct((p/k.avg-1)*100,1)} contra tu promedio`:"esperando precio en vivo"),
     st("Valor de la cartera",val!=null?"$"+fmtN(val,2):"—",`total comprado ${fmtN(k.inv,2)}`),
     st("Ganancia / pérdida",un!=null?`${un>=0?"+":"−"}${fmtN(Math.abs(un),2)}`:"—",unPct!=null?`${fmtPct(unPct,2)} sin vender`:"",un>0?"up":un<0?"down":""),
-    st("Para recuperar",p&&k.avg>p?fmtPct((k.avg/p-1)*100,1):"ya en ganancia",p&&k.avg>p?`BTC tiene que subir a ${fmtP(k.avg)}`:`ganancia realizada ${fmtN(k.real,2)}`,p&&k.avg>p?"down":"up"),
+    st("Para recuperar",p&&k.avg>p?fmtPct((k.avg/p-1)*100,1):"ya en ganancia",p&&k.avg>p?`${PF.coin} tiene que subir a ${fmtP(k.avg)}`:`ganancia realizada ${fmtN(k.real,2)}`,p&&k.avg>p?"down":"up"),
   ].join("");
 }
 
@@ -2021,6 +2031,11 @@ function pfSeries(k,hist,p){
   return out;
 }
 async function pfRenderCharts(){
+  if(pfRenderCharts.busy) return;
+  pfRenderCharts.busy=true;
+  try{ await pfDrawCharts(); } finally { pfRenderCharts.busy=false; }
+}
+async function pfDrawCharts(){
   const el=$("pf-chart"), k=pfCalc(PF.coin); $("pf-chart-tag").textContent=PF.coin+" · diario";
   if(!k.ops.length){ el.innerHTML='<div class="sub" style="padding:40px 0;text-align:center">Cargá operaciones para ver el gráfico.</div>'; $("pf-pnl").innerHTML='<div class="sub">Sin datos todavía.</div>'; return; }
   let hist; try{ hist=await pfHistory(PF.coin,k.ops[0].date); }catch(e){ el.innerHTML='<div class="sub">No se pudo cargar el historial de precios de Binance.</div>'; return; }
@@ -2200,8 +2215,26 @@ function initPf(){
   ["pf-target","pf-sell"].forEach(id=>$(id).addEventListener("input",pfTools));
   ["dca-amt","dca-freq","dca-n","dca-mode","dca-man"].forEach(id=>$(id).addEventListener("input",()=>pfDca()));
   pfBoot();
-  setInterval(()=>{ if(curTab==="cartera"){ pfRenderHead(); pfTools(); } },5000);
-  setInterval(()=>{ if(curTab==="cartera") pfRender(true); },5*60e3);
+  setInterval(()=>{
+    if(document.hidden||curTab!=="cartera"||!PF.acc) return;
+    pfRenderHead(); pfTools();
+    if(PF.coin && !COINS.includes(PF.coin)) pfPollExtra(PF.coin);
+  },1000);
+  setInterval(()=>{
+    if(document.hidden||curTab!=="cartera"||!PF.acc) return;
+    const tt=$("tt"); if(tt&&tt.style.display==="block") return;
+    pfRenderCharts();
+  },3000);
+}
+const pfPxAt={};
+function pfPollExtra(c){
+  if(Date.now()-(pfPxAt[c]||0)<4000) return;
+  pfPxAt[c]=Date.now();
+  spot(`/api/v3/ticker/price?symbol=${encodeURIComponent(c)}USDT`).then(t=>{
+    if(!t||!t.price) return;
+    S.px[c]=+t.price;
+    if(curTab==="cartera"&&PF.coin===c){ pfRenderHead(); pfTools(); }
+  }).catch(()=>{});
 }
 
 
@@ -2230,7 +2263,7 @@ function initEtf(){
   tabs("treas-coin",d=>{ treasCoin=d.c; loadTreasury(); });
   const sa=store.get("mtc-etf-asset","btc"); if(ETF_ASSETS.some(x=>x[0]===sa)) etfAsset=sa;
   renderEtfAll(); renderEtfFunds(); loadTreasury();
-  setInterval(()=>{ if(curTab==="etf") loadTreasury(); },30*60e3);
+  setInterval(()=>{ if(!document.hidden&&curTab==="etf") loadTreasury(); },10e3);
 }
 let treasCoin="bitcoin", treasRetry=0;
 async function loadTreasury(){
@@ -2339,18 +2372,30 @@ async function selectCoin(c){
   loadTickers().then(()=>{ connectWS(); loadSparks(); });
   selectCoin(SEL);
   connectLiq(); loadFng(); loadGlobal(); loadChain();
-  setInterval(loadSparks, 5*60e3);
-  setInterval(()=>loadDeriv(), 60e3);
-  setInterval(()=>loadBook(), 15e3);
-  setInterval(async()=>{ try{ await loadTech(SEL); if(SEL!=="BTC") await loadTech("BTC"); S.radarBT=null; renderTech(); renderLevels(); renderSignal(); }catch(e){} }, 5*60e3);
+  setInterval(()=>{ if(!document.hidden) loadSparks(); }, 60e3);
+  setInterval(()=>{ if(document.hidden) return; if(curTab==="derivados"||curTab==="analisis"||curTab==="resumen") loadDeriv(); }, 15e3);
+  setInterval(()=>{ if(document.hidden) return; if(curTab==="analisis") loadBook(); }, 5e3);
+  setInterval(async()=>{ if(document.hidden) return; try{ await loadTech(SEL); if(SEL!=="BTC") await loadTech("BTC"); S.radarBT=null; renderTech(); renderLevels(); renderSignal(); }catch(e){} }, 60e3);
   // El radar siempre sigue a BTC, aunque estés mirando otra moneda
   loadTech("BTC").then(()=>{ S.radarBT=null; renderRadar(); }).catch(()=>{});
   if(SEL!=="BTC") loadFutBTC();
-  setInterval(()=>{ if(SEL!=="BTC") loadFutBTC(); }, 60e3);
-  setInterval(loadGlobal, 3*60e3);
-  setInterval(loadChain, 2*60e3);
-  setInterval(loadFng, 30*60e3);
-  setInterval(renderLiq, 30e3);
+  setInterval(()=>{ if(!document.hidden && SEL!=="BTC") loadFutBTC(); }, 30e3);
+  setInterval(()=>{ if(!document.hidden) loadGlobal(); }, 60e3);
+  setInterval(()=>{ if(!document.hidden) loadChain(); }, 30e3);
+  setInterval(()=>{ if(!document.hidden) loadFng(); }, 10*60e3);
+  setInterval(()=>{ if(!document.hidden && (!ws||ws.readyState!==1)) loadTickers(); }, 4e3);
+  setInterval(renderLiq, 15e3);
+  document.addEventListener("visibilitychange",()=>{
+    if(document.hidden) return;
+    loadTickers();
+    if(curTab==="cartera"&&PF.acc){ pfRenderHead(); pfTools(); pfRenderCharts(); }
+    if(curTab==="resumen") renderRadar(true);
+    if(curTab==="analisis"&&S.tech[SEL]){ renderTech(); renderLevels(); renderSignal(); loadBook(); loadDeriv(); }
+    if(curTab==="ciclo"&&S.cyc) renderCycle();
+    if(curTab==="mercado"){ loadGlobal(); loadChain(); loadFng(); }
+    if(curTab==="derivados") loadDeriv();
+    if(curTab==="etf") loadTreasury();
+  });
   let rz; addEventListener("resize",()=>{ clearTimeout(rz); rz=setTimeout(()=>{ renderAlts(); loadDeriv(); loadFng(); renderMap(); if(curTab==="ciclo"&&S.cyc) renderCycle(); },300); });
 })();
 </script>
