@@ -76,6 +76,23 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding:
 #cyc-proj svg text{font-size:11px}
 .proj-t td.b{color:var(--accent);font-weight:700}
 .proj-t tr.top td{background:rgba(47,214,143,.06)}
+/* ETF */
+.etf-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.etf-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:12px}
+@media (max-width:1100px){.etf-row,.etf-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:700px){.etf-row,.etf-grid{grid-template-columns:1fr}}
+.etf-w{border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;background:#0d1117;min-width:0}
+.etf-w iframe{display:block;width:100%;border:0;color-scheme:dark}
+.etf-assets{display:flex;flex-wrap:wrap;gap:6px}
+.etf-assets button{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.035);border:1px solid var(--line);color:#cdd7e4;border-radius:99px;padding:6px 12px 6px 6px;font:600 12.5px var(--f-display);cursor:pointer;transition:all .2s}
+.etf-assets button i{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font:800 9.5px var(--f-display);font-style:normal;color:#0b0f16;background:var(--cc,#f7931a)}
+.etf-assets button:hover{border-color:var(--line2)}
+.etf-assets button.on{background:rgba(247,147,26,.16);border-color:rgba(247,147,26,.6);color:#fff;box-shadow:0 0 18px -6px rgba(247,147,26,.8)}
+.treas-t td.v{text-align:right} .treas-t th.r{text-align:right}
+.treas-t .co{display:flex;align-items:center;gap:10px} .treas-t .co b{font-weight:600}
+.treas-t .flag{font-size:11px;color:var(--muted);border:1px solid var(--line2);border-radius:5px;padding:0 5px}
+.treas-t .hb{height:5px;margin:5px 0 0;background:rgba(255,255,255,.06);border-radius:99px;max-width:220px}
+.treas-t .hb span{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent2))}
 /* mapa de compra y venta */
 .map{width:100%;min-height:200px}
 .map svg text{font-size:11px}
@@ -396,6 +413,41 @@ footer{border-top:1px solid var(--line);padding-top:14px}
       <div><div class="sub" style="margin-bottom:8px">Contribución por factor</div><div class="factors" id="sig-factors"></div></div>
       <div><div class="sub" style="margin-bottom:8px">Lectura de la mesa</div><ul class="reads" id="sig-reads"><li>Esperando datos…</li></ul></div>
     </div>
+  </section>
+
+  <!-- ETF E INSTITUCIONES -->
+  <section class="card c12" id="sec-etf-all">
+    <h2>Flujos de ETF · todas las monedas <span class="tag">datos del día hábil anterior (T+1)</span>
+      <span class="right tabs" id="etf-all-per"><button data-p="1d">Ayer</button><button data-p="1w" class="on">Semana</button><button data-p="1m">Mes</button><button data-p="3m">3 meses</button></span></h2>
+    <div class="etf-row">
+      <div class="etf-w" id="etf-w-assets" data-h="430"></div>
+      <div class="etf-w" id="etf-w-heat" data-h="430"></div>
+      <div class="etf-w" id="etf-w-cefi" data-h="430"></div>
+    </div>
+    <div class="hint"><b>Cómo leerlo.</b> Entrada (verde) = el fondo emitió acciones nuevas y tuvo que <b>comprar</b> la moneda. Salida (rojo) = rescató acciones y <b>vendió</b>. Varios días seguidos de entradas grandes suelen sostener el precio, y las salidas fuertes suelen coincidir con caídas. El índice CEFI (0–100) resume el sentimiento de todos los flujos.</div>
+  </section>
+
+  <section class="card c12" id="sec-etf-funds">
+    <h2>Quién compra y quién vende <span class="tag">fondo por fondo · BlackRock, Fidelity, Grayscale, ARK…</span>
+      <span class="right tabs" id="etf-per"><button data-p="1d">Ayer</button><button data-p="1w" class="on">Semana</button><button data-p="1m">Mes</button><button data-p="3m">3 meses</button></span></h2>
+    <div class="etf-assets" id="etf-assets" role="tablist" aria-label="Moneda"></div>
+    <div class="etf-grid">
+      <div class="etf-w big" id="etf-w-funds" data-h="420"></div>
+      <div class="etf-w" id="etf-w-flow" data-h="420"></div>
+      <div class="etf-w" id="etf-w-price" data-h="420"></div>
+      <div class="etf-w" id="etf-w-streak" data-h="330"></div>
+      <div class="etf-w" id="etf-w-cum" data-h="330"></div>
+      <div class="etf-w" id="etf-w-aum" data-h="330"></div>
+    </div>
+    <div class="hint">Fuente: <a href="https://cryptoetf.today/" target="_blank" rel="noopener">CryptoETF</a>, a partir de reportes de los emisores y publicaciones de los fondos. Son los ETF spot de EE.UU.: muestran lo que compran o venden los inversores grandes (asesores financieros, fondos de pensión, family offices) a través de cada emisor.</div>
+  </section>
+
+  <section class="card c12" id="sec-treas">
+    <h2>Tesorerías de empresas · quién acumula <span class="tag">empresas que cotizan en bolsa</span>
+      <span class="right tabs" id="treas-coin"><button data-c="bitcoin" class="on">Bitcoin</button><button data-c="ethereum">Ethereum</button></span></h2>
+    <div class="stats" id="treas-stats" style="margin-bottom:14px"></div>
+    <div style="overflow-x:auto"><table class="cyc-t treas-t" id="treas-table"><tbody><tr><td class="sub">Cargando tenencias…</td></tr></tbody></table></div>
+    <div class="hint" id="treas-hint">Se guarda una foto por día en este navegador y se compara: la columna "Movimiento" se va completando a medida que lo abrís en días distintos.</div>
   </section>
 
   <!-- CICLO DE BITCOIN -->
@@ -1686,10 +1738,73 @@ async function initCycle(){
   catch(e){ console.warn("ciclo",e); $("cyc-phase").innerHTML='<div class="sub">No se pudo cargar la historia de precios de Binance. Reintentá en un momento.</div>'; }
 }
 
+/* ================= ETF E INSTITUCIONES ================= */
+const ETF_ASSETS=[["btc","Bitcoin","#f7931a"],["eth","Ethereum","#8b93ff"],["sol","Solana","#19e6a1"],["xrp","XRP","#b6c2d3"],["hyp","Hyperliquid","#5ef2c8"],["doge","Dogecoin","#d4b44a"],["link","Chainlink","#4a7dff"],["avax","Avalanche","#ff5a5f"],["hbar","Hedera","#9aa4b2"],["ltc","Litecoin","#c0c4cc"],["bnb","BNB","#f3ba2f"],["dot","Polkadot","#ff4fa3"],["sui","Sui","#5bb6ff"],["near","NEAR","#7ef0a6"],["trx","TRON","#ff4d4d"],["zec","Zcash","#f4b728"]];
+let etfAsset="btc", etfPer="1w", etfAllPer="1w";
+function etfFrame(id,type,assets,period){
+  const el=$(id); if(!el) return; const h=el.dataset.h||380;
+  const src=`https://cryptoetf.today/embed/widget?type=${type}&assets=${assets}&period=${period}&theme=dark`;
+  const f=el.querySelector("iframe");
+  if(f){ if(f.src!==src) f.src=src; return; }
+  el.innerHTML=`<iframe src="${src}" height="${h}" loading="lazy" title="Flujos de ETF · ${type}"></iframe>`;
+}
+function renderEtfAll(){ etfFrame("etf-w-assets","assets","all",etfAllPer); etfFrame("etf-w-heat","heatmap","all",etfAllPer); etfFrame("etf-w-cefi","cefi","all",etfAllPer); }
+function renderEtfFunds(){
+  $("etf-assets").querySelectorAll("button").forEach(b=>{ b.classList.toggle("on",b.dataset.a===etfAsset); b.setAttribute("aria-selected",b.dataset.a===etfAsset); });
+  etfFrame("etf-w-funds","funds",etfAsset,etfPer); etfFrame("etf-w-flow","flow",etfAsset,etfPer==="1d"?"1w":etfPer);
+  etfFrame("etf-w-price","price",etfAsset,etfPer==="1d"?"1m":etfPer); etfFrame("etf-w-streak","streak",etfAsset,"1m");
+  etfFrame("etf-w-cum","cumulative",etfAsset,etfPer==="1d"?"1m":etfPer); etfFrame("etf-w-aum","aum",etfAsset,"1m");
+}
+function initEtf(){
+  $("etf-assets").innerHTML=ETF_ASSETS.map(([a,n,c])=>`<button data-a="${a}" role="tab" title="${n}" style="--cc:${c}"><i>${a.slice(0,1).toUpperCase()}</i>${a==="hyp"?"HYPE":a.toUpperCase()}</button>`).join("");
+  $("etf-assets").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; etfAsset=b.dataset.a; store.set("mtc-etf-asset",etfAsset); renderEtfFunds(); });
+  tabs("etf-per",d=>{ etfPer=d.p; renderEtfFunds(); });
+  tabs("etf-all-per",d=>{ etfAllPer=d.p; renderEtfAll(); });
+  tabs("treas-coin",d=>{ treasCoin=d.c; loadTreasury(); });
+  const sa=store.get("mtc-etf-asset","btc"); if(ETF_ASSETS.some(x=>x[0]===sa)) etfAsset=sa;
+  renderEtfAll(); renderEtfFunds(); loadTreasury();
+  setInterval(()=>{ if(curTab==="etf") loadTreasury(); },30*60e3);
+}
+let treasCoin="bitcoin", treasRetry=0;
+async function loadTreasury(){
+  const coin=treasCoin, key="mtc-treas-"+coin, sym=coin==="bitcoin"?"BTC":"ETH";
+  let d=null; const cache=store.get(key+"-cache",null);
+  if(cache && Date.now()-cache.t<20*60e3) d=cache.d;
+  else { try{ d=await j(`https://api.coingecko.com/api/v3/companies/public_treasury/${coin}`); store.set(key+"-cache",{t:Date.now(),d}); treasRetry=0; }
+    catch(e){ if(cache) d=cache.d; else { $("treas-table").innerHTML=`<tbody><tr><td class="sub">No se pudieron cargar las tenencias. Reintento en un minuto…</td></tr></tbody>`; if(treasRetry++<5) setTimeout(()=>{ if(treasCoin===coin) loadTreasury(); },60e3); return; } } }
+  if(coin!==treasCoin) return;
+  const today=new Date().toISOString().slice(0,10), hist=store.get(key+"-hist",{});
+  hist[today]=Object.fromEntries(d.companies.map(c=>[c.name,c.total_holdings]));
+  const days=Object.keys(hist).sort(); while(days.length>60) delete hist[days.shift()]; store.set(key+"-hist",hist);
+  const baseDay=days.find(x=>x<today)||null, base=baseDay?hist[baseDay]:null;
+  const px=coin==="bitcoin"?S.px.BTC:S.px.ETH;
+  const cos=d.companies.slice().sort((a,b)=>b.total_holdings-a.total_holdings);
+  const top=cos[0]?.total_holdings||1;
+  let buyers=0,sellers=0,net=0;
+  const rows=cos.slice(0,25).map((c,i)=>{ const prev=base?base[c.name]:undefined; const ch= prev==null? null : c.total_holdings-prev;
+    if(ch>0){buyers++;net+=ch;} else if(ch<0){sellers++;net+=ch;}
+    const val=px? c.total_holdings*px : c.total_current_value_usd;
+    const pnl= c.total_entry_value_usd>0 ? (c.total_current_value_usd/c.total_entry_value_usd-1)*100 : null;
+    const mv= base==null? '<span class="sub">registrando</span>' : prev==null? '<span class="pill w">nueva</span>' : ch===0? '<span class="sub">sin cambios</span>' : `<span class="${ch>0?"up":"down"}"><b>${ch>0?"▲ compró":"▼ vendió"}</b> ${fmtN(Math.abs(ch),0)} ${sym}</span>`;
+    return `<tr><td class="sub">${i+1}</td><td><div class="co"><b>${esc(c.name)}</b><span class="flag">${esc(c.country||"—")}</span></div><div class="sub" style="font-size:11px">${esc(c.symbol||"")}</div><div class="hb"><span style="width:${c.total_holdings/top*100}%"></span></div></td>
+      <td class="v">${fmtN(c.total_holdings,0)} ${sym}</td><td class="v">$${fmtBig(val)}</td><td class="v">${fmtN(c.percentage_of_total_supply,3)}%</td>
+      <td class="v ${pnl==null?"":pnl>=0?"up":"down"}">${pnl==null?"—":fmtPct(pnl,0)}</td><td class="v">${mv}</td></tr>`; }).join("");
+  $("treas-table").innerHTML=`<thead><tr><th>#</th><th>Empresa</th><th class="r">Tenencia</th><th class="r">Valor hoy</th><th class="r">% del total</th><th class="r">Ganancia vs compra</th><th class="r">Movimiento${baseDay?` desde ${fD(Date.parse(baseDay+"T00:00:00Z"))}`:""}</th></tr></thead><tbody>${rows}</tbody>`;
+  const st=(l,v,dd,k)=>`<div class="stat"><div class="l">${l}</div><div class="v ${k||""}">${v}</div><div class="d">${dd}</div></div>`;
+  $("treas-stats").innerHTML=[
+    st(`${sym} en empresas`,fmtN(d.total_holdings,0),`${fmtN(d.market_cap_dominance,2)}% de la capitalización de ${sym}`),
+    st("Valor total","$"+fmtBig(px?d.total_holdings*px:d.total_value_usd),`${d.companies.length} empresas que cotizan en bolsa`),
+    st("Mayor tenedor",esc(cos[0]?.name||"—"),cos[0]?`${fmtN(cos[0].total_holdings,0)} ${sym} · ${fmtN(cos[0].total_holdings/d.total_holdings*100,0)}% del total en empresas`:""),
+    base? st(`Movimiento desde ${fD(Date.parse(baseDay+"T00:00:00Z"))}`,`${net>=0?"+":""}${fmtN(net,0)} ${sym}`,`${buyers} compraron · ${sellers} vendieron (top 25)`,net>0?"up":net<0?"down":"")
+        : st("Movimiento","Registrando","vuelve mañana para ver quién compró o vendió",""),
+  ].join("");
+}
+
 /* ================= PESTAÑAS ================= */
 const TABS={
   resumen:{n:"Resumen",ids:["sec-hero","sec-map","sec-radar","sec-coins"],intro:""},
   ciclo:{n:"Ciclo Bitcoin",ids:["sec-cyc","sec-cyc-proj","sec-cyc-chart","sec-cyc-read","sec-cyc-table"],intro:"En qué etapa del ciclo de 4 años estamos: días desde el halving, días de bear market, cuánto falta para el próximo halving y el próximo bull market."},
+  etf:{n:"ETF e instituciones",ids:["sec-etf-all","sec-etf-funds","sec-treas"],intro:"Quién compra y quién vende: los flujos de cada ETF de Bitcoin y altcoins (BlackRock, Fidelity, Grayscale, ARK y el resto) y las empresas que acumulan BTC y ETH en su tesorería."},
   analisis:{n:"Análisis",ids:["sec-signal","sec-chart","sec-tech","sec-levels","sec-proj","sec-ob"],intro:"Detalle técnico de la moneda elegida: gráfico, indicadores, niveles de soporte y resistencia, y hasta dónde podría moverse el precio."},
   derivados:{n:"Derivados",ids:["sec-deriv","sec-liq"],intro:"Qué están haciendo los traders apalancados en futuros. Sirve para detectar excesos que suelen terminar en movimientos bruscos."},
   mercado:{n:"Mercado cripto",ids:["sec-fng","sec-global","sec-alts","sec-dom","sec-chain"],intro:"El panorama general: ánimo del mercado, si la plata va a Bitcoin o a altcoins, y la salud de la red Bitcoin."},
@@ -1744,6 +1859,7 @@ async function selectCoin(c){
   // Los widgets de TradingView se cargan recién cuando abrís su pestaña
   TABINIT.analisis=()=>drawChart();
   TABINIT.ciclo=()=>initCycle();
+  TABINIT.etf=()=>initEtf();
   TABINIT.mercado=()=>symChart("tv-dom","CRYPTOCAP:BTC.D");
   TABINIT.macro=()=>{ drawMacro(); symChart("tv-mac","CAPITALCOM:DXY"); ta("BINANCE:BTCUSDT"); tv("tv-cal","events",{importanceFilter:"0,1",countryFilter:"us"}); };
   buildNav();
