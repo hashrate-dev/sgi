@@ -76,6 +76,46 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding:
 #cyc-proj svg text{font-size:11px}
 .proj-t td.b{color:var(--accent);font-weight:700}
 .proj-t tr.top td{background:rgba(47,214,143,.06)}
+/* Mi cartera */
+.pf-bar{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:center;margin-bottom:14px}
+.pf-acc{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.pf-acc strong{font:600 14px var(--f-mono);color:var(--fg)}
+.pf-empty{padding:18px;border:1px dashed var(--line2);border-radius:var(--r-md);margin-bottom:12px}
+.pf-empty .ph{font:700 18px var(--f-display);margin-bottom:4px}
+.pf-form{display:grid;gap:12px}
+.pf-form label{display:grid;gap:5px;font:600 11px var(--f-display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.pf-form label .sub{text-transform:none;letter-spacing:0;font:400 11.5px var(--f-body)}
+.pf-form input,.pf-form select{width:100%;font-size:14px;text-transform:none;letter-spacing:0}
+.pf-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:rgba(0,0,0,.3);border:1px solid var(--line);border-radius:12px;padding:4px;gap:4px}
+.seg button{border:0;border-radius:9px;padding:9px;background:none;color:var(--muted);font:700 13px var(--f-display);cursor:pointer}
+.seg button.on[data-t=buy]{background:linear-gradient(180deg,#3be59c,#1fb877);color:#04140c;box-shadow:0 6px 18px -6px rgba(47,214,143,.7)}
+.seg button.on[data-t=sell]{background:linear-gradient(180deg,#ff7884,#e8434f);color:#1a0306;box-shadow:0 6px 18px -6px rgba(255,92,106,.7)}
+.lnk{background:none;border:0;color:var(--accent);font:600 11px var(--f-body);cursor:pointer;padding:0;text-transform:none;letter-spacing:0}
+.pf-now{float:right}
+.pf-preview{font-size:12.5px;color:var(--muted);background:rgba(0,0,0,.22);border:1px solid var(--line);border-radius:10px;padding:9px 11px;min-height:20px}
+.pf-preview:empty{display:none}
+.pf-actions{display:flex;flex-wrap:wrap;gap:8px}
+.pf-msg{font-size:12.5px;min-height:1em}
+.pf-msg.ok{color:var(--up)} .pf-msg.err{color:var(--down)}
+.pf-io{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+.pf-io summary{cursor:pointer;font:600 13px var(--f-display);color:#cdd7e4}
+.pf-io textarea{width:100%;background:rgba(0,0,0,.3);color:var(--fg);border:1px solid var(--line2);border-radius:10px;padding:9px;font:12px var(--f-mono);margin:8px 0;resize:vertical}
+.pf-io label.btn{display:inline-flex;align-items:center}
+.pf-chart{min-height:220px}
+.pf-tool{padding:14px 0;border-bottom:1px solid var(--line)} .pf-tool:last-child{border-bottom:0}
+.pf-tool .l{font:700 14px var(--f-display);margin-bottom:8px}
+.pf-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center} .pf-row input{width:160px}
+.pf-out{margin-top:10px;font-size:13.5px;line-height:1.55}
+.pf-out b{font-family:var(--f-mono)}
+.pf-dca{display:grid;grid-template-columns:minmax(0,280px) minmax(0,1fr);gap:20px}
+@media (max-width:900px){.pf-dca{grid-template-columns:1fr}}
+.pf-t td.v,.pf-t th.r{text-align:right}
+.pf-t td .act{display:flex;gap:6px;justify-content:flex-end}
+.pf-t td .act button{background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--muted);border-radius:7px;padding:3px 8px;cursor:pointer;font-size:12px}
+.pf-t td .act button:hover{color:var(--fg);border-color:var(--line2)}
+.pf-t td .act button.warn{color:var(--down);border-color:rgba(255,92,106,.5)}
+.pf-t tr.sell td{background:rgba(255,92,106,.05)}
 /* ETF */
 .etf-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .etf-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:12px}
@@ -413,6 +453,95 @@ footer{border-top:1px solid var(--line);padding-top:14px}
       <div><div class="sub" style="margin-bottom:8px">Contribución por factor</div><div class="factors" id="sig-factors"></div></div>
       <div><div class="sub" style="margin-bottom:8px">Lectura de la mesa</div><ul class="reads" id="sig-reads"><li>Esperando datos…</li></ul></div>
     </div>
+  </section>
+
+  <!-- MI CARTERA -->
+  <section class="card c12" id="sec-pf-acc">
+    <h2>Mi cartera · precio promedio y DCA <span class="tag" id="pf-acc-tag">tu cuenta</span></h2>
+    <div class="pf-bar">
+      <div class="pf-acc"><span class="sub">Cuenta</span><strong id="pf-acc-name">Cargando tu usuario…</strong></div>
+      <div class="tabs" id="pf-coins" aria-label="Moneda de la cartera"></div>
+    </div>
+    <div class="pf-empty" id="pf-empty" hidden>
+      <div class="ph" id="pf-empty-t">Todavía no cargaste operaciones</div>
+      <div class="sub" id="pf-empty-d">Esta cartera es solo de tu usuario. Cargá compras y ventas de BTC u otra moneda; otro usuario no las ve.</div>
+    </div>
+    <div class="stats" id="pf-stats"></div>
+  </section>
+  <section class="card c4" id="sec-pf-form">
+    <h2>Cargar operación</h2>
+    <form id="pf-form" class="pf-form" autocomplete="off">
+      <div class="seg" id="pf-type" role="radiogroup" aria-label="Tipo de operación"><button type="button" data-t="buy" class="on">Compra</button><button type="button" data-t="sell">Venta</button></div>
+      <div class="pf-2">
+        <label>Fecha<input id="pf-date" type="date" required></label>
+        <label>Moneda<select id="pf-coin"></select></label>
+      </div>
+      <label id="pf-coin-other-l" hidden>Otra moneda<input id="pf-coin-other" maxlength="12" placeholder="PEPE" autocomplete="off"></label>
+      <label>Monto en USD<input id="pf-usd" type="number" min="0" step="any" placeholder="100" inputmode="decimal"></label>
+      <label>Precio de la moneda <span class="pf-now"><button type="button" class="lnk" id="pf-px-now">usar precio actual</button></span><input id="pf-price" type="number" min="0" step="any" placeholder="61500" inputmode="decimal"></label>
+      <label>Cantidad recibida <span class="sub" id="pf-qty-hint">se calcula sola · editala si tu exchange te dio otra (comisión)</span><input id="pf-qty" type="number" min="0" step="any" placeholder="0.00164" inputmode="decimal"></label>
+      <div class="pf-preview" id="pf-preview"></div>
+      <div class="pf-actions"><button class="btn on" type="submit" id="pf-submit">Agregar compra</button><button class="btn" type="button" id="pf-cancel" hidden>Cancelar edición</button></div>
+      <div class="pf-msg" id="pf-msg" role="status"></div>
+    </form>
+    <details class="pf-io">
+      <summary>Importar desde Excel o exportar</summary>
+      <p class="sub">Copiá en tu Excel las columnas <b>Fecha, Moneda, Tipo, Cant Monedas, Monto USD, Precio</b> (con los títulos) y pegalas acá. También sirve un archivo .csv. Si ya las tenías en el archivo local, exportalas desde ahí e importalas acá: quedan en tu usuario.</p>
+      <textarea id="pf-paste" rows="5" placeholder="Fecha&#9;Moneda&#9;Tipo&#9;Cant Monedas&#9;Monto USD&#9;Precio&#10;28/10/2025&#9;BTC&#9;Compra&#9;0,00043&#9;-$ 49,01&#9;113.981"></textarea>
+      <div class="pf-actions"><button class="btn on" type="button" id="pf-import">Importar pegado</button><label class="btn" for="pf-file">Importar .csv</label><input type="file" id="pf-file" accept=".csv,.txt,.tsv" hidden></div>
+      <div class="pf-actions"><button class="btn" type="button" id="pf-export">Exportar CSV</button><button class="btn" type="button" id="pf-wipe">Borrar operaciones de esta cuenta</button></div>
+      <div class="pf-msg" id="pf-io-msg" role="status"></div>
+    </details>
+  </section>
+  <section class="card c8" id="sec-pf-chart">
+    <h2>Tu precio promedio contra el precio de mercado <span class="tag" id="pf-chart-tag">BTC · diario</span></h2>
+    <div id="pf-chart" class="pf-chart"><div class="sub" style="padding:40px 0;text-align:center">Cargá operaciones para ver el gráfico.</div></div>
+    <div class="legend" style="margin-top:8px">
+      <span><i style="border-color:#e8eef6"></i>Precio de mercado</span>
+      <span><i style="border-color:var(--accent);border-top-width:3px"></i>Tu precio promedio</span>
+      <span><b class="up">●</b> Compras (el tamaño es el monto)</span>
+      <span><b class="down">●</b> Ventas</span>
+      <span><i style="border-top-width:8px;border-color:rgba(47,214,143,.3)"></i>Ganando</span>
+      <span><i style="border-top-width:8px;border-color:rgba(255,92,106,.3)"></i>Perdiendo</span>
+    </div>
+  </section>
+  <section class="card c6" id="sec-pf-pnl">
+    <h2>Ganancia o pérdida en el tiempo <span class="tag">USD · incluye lo ya realizado</span></h2>
+    <div id="pf-pnl"></div>
+  </section>
+  <section class="card c6" id="sec-pf-tools">
+    <h2>Calculadoras</h2>
+    <div class="pf-tool">
+      <div class="l">¿Cuánto tengo que comprar para bajar mi promedio?</div>
+      <div class="pf-row"><span class="sub">Quiero llegar a un promedio de</span><input id="pf-target" type="number" step="any" min="0" placeholder="75000"></div>
+      <div class="pf-out" id="pf-target-out"></div>
+    </div>
+    <div class="pf-tool">
+      <div class="l">Si vendo todo a…</div>
+      <div class="pf-row"><span class="sub">Precio de venta</span><input id="pf-sell" type="number" step="any" min="0" placeholder="83000"></div>
+      <div class="pf-out" id="pf-sell-out"></div>
+    </div>
+  </section>
+  <section class="card c12" id="sec-pf-dca">
+    <h2>Plan de DCA · cómo queda tu promedio si seguís comprando</h2>
+    <div class="pf-dca">
+      <div class="pf-form">
+        <label>Monto por compra (USD)<input id="dca-amt" type="number" min="0" step="any" value="100"></label>
+        <label>Frecuencia<select id="dca-freq"><option value="7">Semanal</option><option value="14">Cada 2 semanas</option><option value="30" selected>Mensual</option></select></label>
+        <label>Cantidad de compras<input id="dca-n" type="number" min="1" max="120" step="1" value="12"></label>
+        <label>Precio supuesto de cada compra<select id="dca-mode"><option value="base">Escenario base del ciclo (pestaña Ciclo)</option><option value="now">Precio actual, sin cambios</option><option value="manual">Un precio fijo que elijo</option></select></label>
+        <label id="dca-man-l" hidden>Precio fijo<input id="dca-man" type="number" min="0" step="any" placeholder="55000"></label>
+      </div>
+      <div style="min-width:0">
+        <div class="stats" id="dca-stats"></div>
+        <div id="dca-chart" style="margin-top:12px"></div>
+      </div>
+    </div>
+    <div class="hint">El escenario base usa la proyección de la pestaña Ciclo Bitcoin, que es una estimación y no una predicción. Sirve para ver cómo cambiaría tu promedio y tu resultado; no garantiza precios.</div>
+  </section>
+  <section class="card c12" id="sec-pf-ops">
+    <h2>Operaciones <span class="tag" id="pf-ops-tag"></span></h2>
+    <div style="overflow-x:auto"><table class="cyc-t pf-t" id="pf-ops"></table></div>
   </section>
 
   <!-- ETF E INSTITUCIONES -->
@@ -1738,6 +1867,344 @@ async function initCycle(){
   catch(e){ console.warn("ciclo",e); $("cyc-phase").innerHTML='<div class="sub">No se pudo cargar la historia de precios de Binance. Reintentá en un momento.</div>'; }
 }
 
+/* ================= MI CARTERA ================= */
+// Cada cuenta (email) guarda sus operaciones en este navegador: { id, date:"AAAA-MM-DD", coin, type:"buy"|"sell", qty, usd, price, ts }
+// Método de costo promedio: comprar suma cantidad y costo; vender saca cantidad al costo promedio y deja el resultado como ganancia realizada.
+const PF={acc:null, coin:"BTC", ops:[], hist:{}, editId:null, type:"buy", qtyManual:false};
+const pfKey=e=>"mtc-pf-"+e.toLowerCase();
+const pfAccounts=()=>store.get("mtc-pf-accounts",[]);
+const validEmail=e=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+const todayISO=()=>{ const d=new Date(); return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10); };
+const fDia=iso=>{ const [y,m,d]=iso.split("-"); return `${+d}/${+m}/${y}`; };
+function pfOpen(email){
+  email=email.trim().toLowerCase(); const accs=pfAccounts(); if(!accs.includes(email)){ accs.push(email); store.set("mtc-pf-accounts",accs); }
+  PF.acc=email; PF.ops=store.get(pfKey(email),[]); store.set("mtc-pf-current",email);
+  const coins=[...new Set(PF.ops.map(o=>o.coin))]; if(coins.length&&!coins.includes(PF.coin)) PF.coin=coins[0];
+  pfRender(true);
+}
+let pfSaveTimer=null;
+function pfSave(){
+  if(!PF.acc) return;
+  store.set(pfKey(PF.acc), PF.ops);
+  clearTimeout(pfSaveTimer);
+  pfSaveTimer=setTimeout(pfPush, 350);
+}
+async function pfPush(){
+  if(!PF.acc) return;
+  try{
+    const r=await fetch("/api/me/ui-prefs/mercado_cartera",{method:"PUT",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({prefs:{coin:PF.coin,ops:PF.ops}})});
+    if(!r.ok) console.warn("cartera", r.status);
+  }catch(e){ console.warn("cartera", e); }
+}
+async function pfBoot(){
+  let email="";
+  try{
+    const r=await fetch("/api/auth/me",{credentials:"include"});
+    if(r.ok){ const body=await r.json(); email=String(body.user&&(body.user.email||body.user.username)||"").trim().toLowerCase(); }
+  }catch(e){ console.warn(e); }
+  if(!validEmail(email)){ PF.acc=null; PF.ops=[]; pfRender(false); return; }
+  PF.acc=email;
+  let remote=null;
+  try{
+    const r=await fetch("/api/me/ui-prefs/mercado_cartera",{credentials:"include"});
+    if(r.ok){ const body=await r.json(); remote=body.prefs; }
+  }catch(e){ console.warn(e); }
+  const local=store.get(pfKey(email),[]);
+  if(remote && Array.isArray(remote.ops)){ PF.ops=remote.ops; if(remote.coin) PF.coin=remote.coin; }
+  else if(Array.isArray(local) && local.length){ PF.ops=local; pfPush(); }
+  else PF.ops=[];
+  const coins=[...new Set(PF.ops.map(o=>o.coin))]; if(coins.length && !coins.includes(PF.coin)) PF.coin=coins[0];
+  pfFillCoins(); pfRender(true);
+}
+function pfFillCoins(){
+  const extra=[...new Set(PF.ops.map(o=>o.coin))].filter(c=>c && !COINS.includes(c));
+  const cur=$("pf-coin").value==="OTRA"?"OTRA":(PF.coin||"BTC");
+  $("pf-coin").innerHTML=[...COINS,...extra,"OTRA"].map(c=>`<option${c===cur?" selected":""}>${c}</option>`).join("");
+  $("pf-coin-other-l").hidden=$("pf-coin").value!=="OTRA";
+}
+function pfCoinListHas(c){ return [...$("pf-coin").options].some(o=>o.value===c); }
+function pfSelectedCoin(){
+  if($("pf-coin").value!=="OTRA") return $("pf-coin").value;
+  return ($("pf-coin-other").value||"").trim().toUpperCase().replace(/[^A-Z0-9]/g,"");
+}
+function pfCalc(coin){
+  const ops=PF.ops.filter(o=>o.coin===coin).slice().sort((a,b)=>a.date.localeCompare(b.date)||a.ts-b.ts);
+  let q=0,cost=0,real=0,inv=0; const rows=[];
+  ops.forEach(o=>{
+    if(o.type==="buy"){ q+=o.qty; cost+=o.usd; inv+=o.usd; rows.push({o,avg:cost/q,q,real:null}); }
+    else { const avg=q>0?cost/q:0, sq=Math.min(o.qty,q), r=(o.usd*(sq/o.qty))-sq*avg; real+=r; cost-=sq*avg; q-=sq; if(q<1e-12){ q=0; cost=0; } rows.push({o,avg:q>0?cost/q:avg,q,real:r}); }
+  });
+  return {ops,rows,q,cost,avg:q>0?cost/q:0,real,inv};
+}
+function pfPrice(coin){ return S.px[coin]||null; }
+
+/* --- encabezado: cuentas, monedas y resumen --- */
+function pfRenderHead(){
+  const name=$("pf-acc-name"); if(name) name.textContent=PF.acc||"Sin sesión";
+  const tag=$("pf-acc-tag"); if(tag&&PF.acc) tag.textContent=PF.acc;
+  if(!PF.acc){ $("pf-empty").hidden=false; $("pf-empty-t").textContent="Iniciá sesión"; $("pf-empty-d").textContent="La cartera se guarda en el usuario con el que entraste."; $("pf-stats").innerHTML=""; return; }
+  $("pf-empty").hidden=PF.ops.length>0;
+  if(!PF.ops.length){ $("pf-empty-t").textContent="Todavía no cargaste operaciones"; $("pf-empty-d").textContent="Esta cartera es solo de "+PF.acc+". Cargá compras y ventas de BTC u otra moneda; otro usuario no las ve."; }
+  const coins=[...new Set(PF.ops.map(o=>o.coin))]; if(!coins.includes(PF.coin)) coins.unshift(PF.coin);
+  $("pf-coins").innerHTML=coins.map(c=>`<button data-c="${c}" class="${c===PF.coin?"on":""}">${c}</button>`).join("");
+  if(!PF.acc){ $("pf-stats").innerHTML=""; return; }
+  const k=pfCalc(PF.coin), p=pfPrice(PF.coin), val=p?k.q*p:null, un=val!=null?val-k.cost:null, unPct=k.cost>0&&un!=null?un/k.cost*100:null;
+  const st=(l,v,d,cl)=>`<div class="stat"><div class="l">${l}</div><div class="v ${cl||""}">${v}</div><div class="d">${d}</div></div>`;
+  $("pf-stats").innerHTML= !k.ops.length? st("Cuenta",esc(PF.acc),"todavía no cargaste operaciones de "+PF.coin) : [
+    st("Tenencia",`${fmtN(k.q,k.q<1?6:4)} ${PF.coin}`,`${k.rows.filter(r=>r.o.type==="buy").length} compras · ${k.rows.filter(r=>r.o.type==="sell").length} ventas`),
+    st("Precio promedio","$"+fmtP(k.avg),`invertido neto ${fmtN(k.cost,2)}`,"warn"),
+    st("Precio actual",p?"$"+fmtP(p):"—",p&&k.avg?`${fmtPct((p/k.avg-1)*100,1)} contra tu promedio`:"esperando precio en vivo"),
+    st("Valor de la cartera",val!=null?"$"+fmtN(val,2):"—",`total comprado ${fmtN(k.inv,2)}`),
+    st("Ganancia / pérdida",un!=null?`${un>=0?"+":"−"}${fmtN(Math.abs(un),2)}`:"—",unPct!=null?`${fmtPct(unPct,2)} sin vender`:"",un>0?"up":un<0?"down":""),
+    st("Para recuperar",p&&k.avg>p?fmtPct((k.avg/p-1)*100,1):"ya en ganancia",p&&k.avg>p?`BTC tiene que subir a ${fmtP(k.avg)}`:`ganancia realizada ${fmtN(k.real,2)}`,p&&k.avg>p?"down":"up"),
+  ].join("");
+}
+
+/* --- formulario --- */
+function pfFormCalc(src){
+  const u=parseFloat($("pf-usd").value), p=parseFloat($("pf-price").value), q=parseFloat($("pf-qty").value);
+  if(src==="qty") PF.qtyManual=$("pf-qty").value!=="";
+  if(!PF.qtyManual && u>0 && p>0) $("pf-qty").value=+(u/p).toFixed(8);
+  const qq=parseFloat($("pf-qty").value);
+  let msg="";
+  if(u>0&&qq>0){ const eff=u/qq; const k=pfCalc(pfSelectedCoin());
+    if(PF.type==="buy"){ const na=(k.cost+u)/(k.q+qq); msg=`Precio efectivo <b>${fmtP(eff)}</b>${p>0&&Math.abs(eff/p-1)>.003?` (${fmtPct((eff/p-1)*100,2)} de comisión o diferencia)`:""}. Tu promedio pasa de <b>${fmtP(k.avg||eff)}</b> a <b class="${na<k.avg?"up":"down"}">${fmtP(na)}</b>.`; }
+    else { const r=u-qq*k.avg; msg= qq>k.q+1e-12? `<span class="down">Tenés ${fmtN(k.q,6)} ${pfSelectedCoin()}: no podés vender ${fmtN(qq,6)}.</span>` : `Resultado de esta venta: <b class="${r>=0?"up":"down"}">${r>=0?"+":"−"}${fmtN(Math.abs(r),2)}</b> (vendés a ${fmtP(eff)} con promedio ${fmtP(k.avg)}).`; } }
+  $("pf-preview").innerHTML=msg;
+}
+function pfSetType(t){ PF.type=t; $("pf-type").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.t===t)); $("pf-submit").textContent=PF.editId?"Guardar cambios":t==="buy"?"Agregar compra":"Agregar venta"; pfFormCalc(); }
+function pfResetForm(){ PF.editId=null; PF.qtyManual=false; $("pf-usd").value=""; $("pf-price").value=""; $("pf-qty").value=""; $("pf-date").value=todayISO(); $("pf-cancel").hidden=true; pfSetType(PF.type); $("pf-preview").innerHTML=""; }
+function pfSubmit(e){
+  e.preventDefault(); const msg=$("pf-msg"); msg.className="pf-msg err";
+  if(!PF.acc){ msg.textContent="Tu sesión no está disponible. Volvé a entrar al sistema."; return; }
+  const date=$("pf-date").value, coin=pfSelectedCoin(), u=parseFloat($("pf-usd").value), p=parseFloat($("pf-price").value); let q=parseFloat($("pf-qty").value);
+  if(!date){ msg.textContent="Falta la fecha."; return; }
+  if(!(u>0)){ msg.textContent="Escribí el monto en USD."; $("pf-usd").focus(); return; }
+  if(!(q>0) && p>0) q=u/p;
+  if(!(q>0)){ msg.textContent="Escribí el precio o la cantidad recibida."; $("pf-price").focus(); return; }
+  const op={id:PF.editId||uid()+Date.now(),date,coin,type:PF.type,qty:q,usd:u,price:p>0?p:u/q,ts:Date.now()};
+  if(PF.type==="sell"){ const k=pfCalc(coin); const had=PF.editId?k.q+(PF.ops.find(o=>o.id===PF.editId)?.type==="sell"?PF.ops.find(o=>o.id===PF.editId).qty:0):k.q; if(q>had+1e-9){ msg.textContent=`Tenés ${fmtN(had,6)} ${coin}: no alcanza para vender ${fmtN(q,6)}.`; return; } }
+  if(PF.editId){ const i=PF.ops.findIndex(o=>o.id===PF.editId); if(i>=0){ op.ts=PF.ops[i].ts; PF.ops[i]=op; } } else PF.ops.push(op);
+  pfSave(); PF.coin=coin; msg.className="pf-msg ok"; msg.textContent=PF.editId?"Operación actualizada.":`${PF.type==="buy"?"Compra":"Venta"} agregada: ${fmtN(q,6)} ${coin} por ${fmtN(u,2)}.`;
+  pfResetForm(); pfRender(true);
+}
+function pfEdit(id){ const o=PF.ops.find(x=>x.id===id); if(!o) return; PF.editId=id; PF.qtyManual=true;
+  $("pf-date").value=o.date; $("pf-coin").value=pfCoinListHas(o.coin)?o.coin:"OTRA"; if($("pf-coin").value==="OTRA"){ $("pf-coin-other").value=o.coin; $("pf-coin-other-l").hidden=false; } $("pf-usd").value=+o.usd.toFixed(2); $("pf-price").value=+o.price.toFixed(2); $("pf-qty").value=+o.qty.toFixed(8);
+  $("pf-cancel").hidden=false; pfSetType(o.type); $("sec-pf-form").scrollIntoView({behavior:"smooth",block:"start"}); }
+
+/* --- tabla de operaciones --- */
+function pfRenderOps(){
+  const k=pfCalc(PF.coin); $("pf-ops-tag").textContent=PF.acc?`${PF.acc} · ${PF.coin} · ${k.ops.length} operaciones`:"";
+  if(!k.ops.length){ $("pf-ops").innerHTML=`<tbody><tr><td class="sub">${PF.acc?"Todavía no hay operaciones. Cargalas con el formulario o pegalas desde tu Excel.":"Entrá al sistema para ver tu cartera."}</td></tr></tbody>`; return; }
+  $("pf-ops").innerHTML=`<thead><tr><th>Fecha</th><th>Tipo</th><th class="r">Cantidad</th><th class="r">Monto USD</th><th class="r">Precio</th><th class="r">Promedio después</th><th class="r">Tenencia</th><th class="r">Resultado venta</th><th></th></tr></thead><tbody>`+
+    k.rows.slice().reverse().map(r=>{ const o=r.o, eff=o.usd/o.qty;
+      return `<tr class="${o.type}"><td>${fDia(o.date)}</td><td><span class="pill ${o.type==="buy"?"b":"s"}">${o.type==="buy"?"Compra":"Venta"}</span></td><td class="v">${fmtN(o.qty,6)}</td><td class="v">${fmtN(o.usd,2)}</td>
+      <td class="v">${fmtP(o.price)}${Math.abs(eff/o.price-1)>.003?`<br><span class="sub">efectivo ${fmtP(eff)}</span>`:""}</td><td class="v" style="color:var(--accent)">${fmtP(r.avg)}</td><td class="v">${fmtN(r.q,6)}</td>
+      <td class="v ${r.real==null?"":r.real>=0?"up":"down"}">${r.real==null?"":(r.real>=0?"+":"−")+"$"+fmtN(Math.abs(r.real),2)}</td>
+      <td><div class="act"><button data-e="${o.id}" title="Editar">Editar</button><button data-d="${o.id}" title="Borrar">Borrar</button></div></td></tr>`; }).join("")+`</tbody>`;
+}
+
+/* --- historia de precios de la moneda desde la primera operación --- */
+async function pfHistory(coin,fromISO){
+  const from=Date.parse(fromISO+"T00:00:00Z")-5*DAY, c=PF.hist[coin];
+  if(c && c.from<=from && Date.now()-c.t<10*60e3) return c.data;
+  let start=from, out=[];
+  for(let k=0;k<4;k++){ const kk=await spot(`/api/v3/klines?symbol=${coin}USDT&interval=1d&startTime=${start}&limit=1000`); if(!kk.length) break; out=out.concat(kk.map(x=>({t:+x[0],c:+x[4]}))); start=+kk[kk.length-1][0]+DAY; if(kk.length<1000) break; }
+  PF.hist[coin]={from,t:Date.now(),data:out}; return out;
+}
+// serie diaria: precio, promedio vigente, costo, tenencia y resultado de cada día
+function pfSeries(k,hist,p){
+  const ops=k.ops; let i=0,q=0,cost=0,real=0; const out=[];
+  hist.forEach((h,ix)=>{ const day=new Date(h.t).toISOString().slice(0,10);
+    while(i<ops.length && ops[i].date<=day){ const o=ops[i++]; if(o.type==="buy"){ q+=o.qty; cost+=o.usd; } else { const a=q>0?cost/q:0, sq=Math.min(o.qty,q); real+=o.usd*(sq/o.qty)-sq*a; cost-=sq*a; q-=sq; } }
+    const px= ix===hist.length-1&&p? p : h.c; if(q>0||real) out.push({t:h.t,day,px,avg:q>0?cost/q:null,q,cost,pnl:q*px-cost+real}); });
+  return out;
+}
+async function pfRenderCharts(){
+  const el=$("pf-chart"), k=pfCalc(PF.coin); $("pf-chart-tag").textContent=PF.coin+" · diario";
+  if(!k.ops.length){ el.innerHTML='<div class="sub" style="padding:40px 0;text-align:center">Cargá operaciones para ver el gráfico.</div>'; $("pf-pnl").innerHTML='<div class="sub">Sin datos todavía.</div>'; return; }
+  let hist; try{ hist=await pfHistory(PF.coin,k.ops[0].date); }catch(e){ el.innerHTML='<div class="sub">No se pudo cargar el historial de precios de Binance.</div>'; return; }
+  const ser=pfSeries(k,hist,pfPrice(PF.coin)); if(ser.length<2){ el.innerHTML='<div class="sub">Necesito al menos 2 días de historia para dibujar.</div>'; return; }
+  // --- gráfico de precio contra promedio ---
+  const W=Math.max(300,el.clientWidth), mob=W<640, H=mob?300:380, pl=6, pr=mob?64:74, pt=14, pb=26;
+  const vals=ser.flatMap(s=>[s.px,s.avg].filter(v=>v!=null)); let lo=Math.min(...vals), hi=Math.max(...vals); const pd=(hi-lo)*.08; lo-=pd; hi+=pd;
+  const t0=ser[0].t, t1=ser[ser.length-1].t, X=t=>pl+(t-t0)/(t1-t0||1)*(W-pl-pr), Y=v=>pt+(hi-v)/(hi-lo)*(H-pt-pb);
+  let g=`<defs>${gradDef("pfg","var(--up)",.28,.04)}${gradDef("pfr","var(--down)",.04,.28)}</defs>`;
+  for(let i=0;i<=4;i++){ const v=lo+(hi-lo)*i/4, y=Y(v); g+=`<line x1="${pl}" x2="${W-pr}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,.05)" stroke-dasharray="2 4"/><text x="${W-pr+6}" y="${y+4}">${fmtN(v/1000,v<1e4?2:1)}k</text>`; }
+  const step=Math.max(1,Math.round(ser.length/(mob?4:7)));
+  for(let i=0;i<ser.length;i+=step) g+=`<text x="${X(ser[i].t)}" y="${H-8}" text-anchor="middle">${new Date(ser[i].t).toLocaleDateString("es-AR",{day:"2-digit",month:"short",year:"2-digit",timeZone:"UTC"})}</text>`;
+  // relleno entre precio y promedio: verde cuando ganás, rojo cuando perdés
+  let run=[], sign=null; const flush=()=>{ if(run.length>1){ const top=run.map(s=>[X(s.t),Y(s.px)]), bot=run.map(s=>[X(s.t),Y(s.avg)]).reverse(); g+=`<path d="M${top.map(p=>p.join(" ")).join("L")}L${bot.map(p=>p.join(" ")).join("L")}Z" fill="url(#${sign?"pfg":"pfr"})"/>`; } run=[]; };
+  ser.forEach(s=>{ if(s.avg==null){ flush(); sign=null; return; } const sg=s.px>=s.avg; if(sign!==null&&sg!==sign){ run.push(s); flush(); } sign=sg; run.push(s); }); flush();
+  g+=`<path d="${smoothPath(ser.map(s=>[X(s.t),Y(s.px)]),.1)}" fill="none" stroke="#e8eef6" stroke-width="1.7" opacity=".92"/>`;
+  // promedio en escalones (cambia solo cuando operás)
+  let dA=""; ser.forEach((s,i)=>{ if(s.avg==null) return; const x=X(s.t), y=Y(s.avg); dA+= (dA&&ser[i-1]&&ser[i-1].avg!=null)? `H${x}V${y}` : `M${x} ${y}`; });
+  g+=`<path d="${dA}" fill="none" stroke="var(--accent)" stroke-width="2.4" style="filter:drop-shadow(0 0 6px rgba(247,147,26,.6))"/>`;
+  // compras y ventas
+  const maxU=Math.max(...k.ops.map(o=>o.usd));
+  k.ops.forEach(o=>{ const t=Date.parse(o.date+"T00:00:00Z"); if(t<t0) return; const r=3+Math.sqrt(o.usd/maxU)*8, col=o.type==="buy"?"var(--up)":"var(--down)";
+    g+=`<circle cx="${X(Math.min(t,t1))}" cy="${Y(o.usd/o.qty)}" r="${r}" fill="${col}" fill-opacity=".35" stroke="${col}" stroke-width="1.5"><title>${o.type==="buy"?"Compra":"Venta"} ${fDia(o.date)}: ${fmtN(o.usd,2)} a ${fmtP(o.usd/o.qty)}</title></circle>`; });
+  const last=ser[ser.length-1], halo="paint-order:stroke;stroke:var(--panel);stroke-width:4px";
+  if(last.avg!=null){ g+=`<text x="${W-pr-4}" y="${Y(last.avg)+(last.avg>last.px?-8:16)}" text-anchor="end" style="fill:var(--accent);font-weight:700;${halo}">promedio ${fmtP(last.avg)}</text>`; }
+  g+=glowDot(X(last.t),Y(last.px),"#fff",3.5)+`<text x="${W-pr-4}" y="${Y(last.px)+(last.avg!=null&&last.avg>last.px?16:-8)}" text-anchor="end" style="fill:#fff;font-weight:700;${halo}">hoy ${fmtP(last.px)}</text>`;
+  g+=`<line id="pf-x" y1="${pt}" y2="${H-pb}" stroke="rgba(255,255,255,.35)" stroke-dasharray="3 3" visibility="hidden"/>`;
+  el.innerHTML=`<svg class="chart" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Precio promedio contra precio de mercado">${g}<rect id="pf-hit" x="${pl}" y="${pt}" width="${W-pl-pr}" height="${H-pt-pb}" fill="transparent"/></svg>`;
+  const svg=el.querySelector("svg"), tt=$("tt"), cx=svg.querySelector("#pf-x");
+  svg.querySelector("#pf-hit").addEventListener("mousemove",ev=>{ const r=svg.getBoundingClientRect(); const x=(ev.clientX-r.left)*W/r.width; const t=t0+(x-pl)/(W-pl-pr)*(t1-t0);
+    const s=ser.reduce((b,q)=>Math.abs(q.t-t)<Math.abs(b.t-t)?q:b); cx.setAttribute("x1",X(s.t)); cx.setAttribute("x2",X(s.t)); cx.setAttribute("visibility","visible");
+    tt.style.display="block"; tt.textContent=`${fDia(s.day)}\nPrecio ${fmtP(s.px)}${s.avg!=null?`  ·  tu promedio ${fmtP(s.avg)}`:""}\nResultado ${s.pnl>=0?"+":"−"}${fmtN(Math.abs(s.pnl),2)}`;
+    tt.style.left=Math.min(ev.clientX+14,innerWidth-300)+"px"; tt.style.top=(ev.clientY-56)+"px"; });
+  svg.addEventListener("mouseleave",()=>{ tt.style.display="none"; cx.setAttribute("visibility","hidden"); });
+  // --- ganancia o pérdida en el tiempo ---
+  pfPnlChart(ser);
+}
+function pfPnlChart(ser){
+  const el=$("pf-pnl"), W=Math.max(280,el.clientWidth), H=240, pl=6, pr=68, pt=12, pb=24;
+  const v=ser.map(s=>s.pnl); let lo=Math.min(0,...v), hi=Math.max(0,...v); const pd=(hi-lo)*.1||1; lo-=pd; hi+=pd;
+  const t0=ser[0].t, t1=ser[ser.length-1].t, X=t=>pl+(t-t0)/(t1-t0||1)*(W-pl-pr), Y=x=>pt+(hi-x)/(hi-lo)*(H-pt-pb), y0=Y(0);
+  const pts=ser.map(s=>[X(s.t),Y(s.pnl)]), d=smoothPath(pts,.1), id=uid();
+  let g=`<defs><clipPath id="${id}a"><rect x="0" y="0" width="${W}" height="${y0}"/></clipPath><clipPath id="${id}b"><rect x="0" y="${y0}" width="${W}" height="${H}"/></clipPath>${gradDef(id+"g","var(--up)",.45,.05)}${gradDef(id+"r","var(--down)",.05,.45)}</defs>`;
+  for(let i=0;i<=3;i++){ const val=lo+(hi-lo)*i/3, y=Y(val); g+=`<line x1="${pl}" x2="${W-pr}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,.05)" stroke-dasharray="2 4"/><text x="${W-pr+6}" y="${y+4}">${val>=0?"+":"−"}${fmtN(Math.abs(val),0)}</text>`; }
+  g+=`<line x1="${pl}" x2="${W-pr}" y1="${y0}" y2="${y0}" stroke="rgba(255,255,255,.3)" stroke-dasharray="4 4"/>`;
+  const area=`${d} L${pts[pts.length-1][0]} ${y0} L${pts[0][0]} ${y0}Z`;
+  g+=`<path d="${area}" fill="url(#${id}g)" clip-path="url(#${id}a)"/><path d="${area}" fill="url(#${id}r)" clip-path="url(#${id}b)"/>`;
+  g+=`<path d="${d}" fill="none" stroke="var(--up)" stroke-width="2" clip-path="url(#${id}a)"/><path d="${d}" fill="none" stroke="var(--down)" stroke-width="2" clip-path="url(#${id}b)"/>`;
+  const L=ser[ser.length-1]; g+=glowDot(X(L.t),Y(L.pnl),L.pnl>=0?"var(--up)":"var(--down)",3.5);
+  const best=ser.reduce((b,s)=>s.pnl>b.pnl?s:b), worst=ser.reduce((b,s)=>s.pnl<b.pnl?s:b);
+  g+=`<text x="${pl+4}" y="${H-8}">${fDia(ser[0].day)}</text><text x="${W-pr}" y="${H-8}" text-anchor="end">hoy</text>`;
+  el.innerHTML=`<svg class="chart" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Ganancia o pérdida en el tiempo">${g}</svg>
+    <div class="stats" style="margin-top:10px">
+      <div class="stat"><div class="l">Hoy</div><div class="v ${L.pnl>=0?"up":"down"}">${L.pnl>=0?"+":"−"}${fmtN(Math.abs(L.pnl),2)}</div><div class="d">${fmtPct(L.cost>0?L.pnl/L.cost*100:0,1)}</div></div>
+      <div class="stat"><div class="l">Mejor momento</div><div class="v up">${best.pnl>=0?"+":"−"}${fmtN(Math.abs(best.pnl),2)}</div><div class="d">${fDia(best.day)}</div></div>
+      <div class="stat"><div class="l">Peor momento</div><div class="v down">${worst.pnl>=0?"+":"−"}${fmtN(Math.abs(worst.pnl),2)}</div><div class="d">${fDia(worst.day)}</div></div>
+    </div>`;
+}
+
+/* --- calculadoras --- */
+function pfTools(){
+  const k=pfCalc(PF.coin), p=pfPrice(PF.coin), c=PF.coin;
+  const T=parseFloat($("pf-target").value), out=$("pf-target-out");
+  if(!k.q||!p){ out.innerHTML='<span class="sub">Necesito al menos una compra y el precio en vivo.</span>'; }
+  else if(!(T>0)){ out.innerHTML=`<span class="sub">Tu promedio es ${fmtP(k.avg)} y ${c} está a ${fmtP(p)}. Escribí el promedio al que querés llegar.</span>`; }
+  else if(p>=k.avg){ out.innerHTML=`<span class="sub">Hoy ${c} (${fmtP(p)}) está arriba de tu promedio: comprar ahora lo <b>sube</b>, no lo baja.</span>`; }
+  else if(T<=p){ out.innerHTML=`<span class="down">No se puede: comprando a ${fmtP(p)} tu promedio nunca baja de ese precio. Elegí un objetivo entre ${fmtP(p)} y ${fmtP(k.avg)}.</span>`; }
+  else if(T>=k.avg){ out.innerHTML=`<span class="sub">Tu promedio ya es ${fmtP(k.avg)}, menor o igual a ese objetivo.</span>`; }
+  else { const A=(T*k.q-k.cost)/(1-T/p); out.innerHTML=`Comprando <b class="up">${fmtN(A,2)}</b> a precio actual (${fmtP(p)}) recibís ${fmtN(A/p,6)} ${c} y tu promedio baja de <b>${fmtP(k.avg)}</b> a <b class="up">${fmtP(T)}</b>. Necesitarías que ${c} suba ${fmtPct((T/p-1)*100,1)} para salir hecho, en lugar de ${fmtPct((k.avg/p-1)*100,1)}.`; }
+  const sp=parseFloat($("pf-sell").value), so=$("pf-sell-out");
+  if(!k.q){ so.innerHTML='<span class="sub">Sin tenencia.</span>'; }
+  else { const px=sp>0?sp:p; if(!px){ so.innerHTML=""; } else { const g=k.q*px-k.cost+k.real, gu=k.q*px-k.cost;
+    so.innerHTML=`Vendiendo ${fmtN(k.q,6)} ${c} a <b>${fmtP(px)}</b>${sp>0?"":" (precio actual)"} recibís <b>${fmtN(k.q*px,2)}</b>. Resultado: <b class="${gu>=0?"up":"down"}">${gu>=0?"+":"−"}${fmtN(Math.abs(gu),2)}</b> (${fmtPct(k.cost?gu/k.cost*100:0,2)})${k.real?`, más ${fmtN(k.real,2)} ya realizados en ventas anteriores (total ${g>=0?"+":"−"}${fmtN(Math.abs(g),2)})`:""}.`; } }
+}
+
+/* --- plan de DCA --- */
+async function pfDca(){
+  const k=pfCalc(PF.coin), p=pfPrice(PF.coin), A=parseFloat($("dca-amt").value)||0, f=+$("dca-freq").value, n=Math.min(120,Math.max(1,parseInt($("dca-n").value)||1)), mode=$("dca-mode").value;
+  $("dca-man-l").hidden=mode!=="manual";
+  if(!p){ $("dca-stats").innerHTML='<div class="sub">Esperando el precio en vivo…</div>'; return; }
+  let priceAt=()=>p, note="precio actual";
+  if(mode==="manual"){ const m=parseFloat($("dca-man").value); if(m>0){ priceAt=()=>m; note="precio fijo $"+fmtP(m); } }
+  if(mode==="base"){
+    if(PF.coin!=="BTC"){ note="el escenario del ciclo es solo para BTC: uso el precio actual"; }
+    else { try{ if(!S.cyc) await loadCycleHist(); const m=cycleModel(); const P=cycleProjection(m).ms.map(x=>({t:x.t,v:x.p.base}));
+      priceAt=t=>{ if(t<=P[0].t) return p; for(let i=1;i<P.length;i++) if(t<=P[i].t){ const a=P[i-1],b=P[i],r=(t-a.t)/(b.t-a.t); return Math.exp(Math.log(a.v)+r*(Math.log(b.v)-Math.log(a.v))); } return P[P.length-1].v; };
+      note="escenario base del ciclo"; }catch(e){ note="no pude cargar el ciclo: uso el precio actual"; } }
+  }
+  let q=k.q, cost=k.cost; const pts=[{t:Date.now(),avg:k.q?k.avg:null,px:p}];
+  for(let i=1;i<=n;i++){ const t=Date.now()+i*f*DAY, px=priceAt(t); q+=A/px; cost+=A; pts.push({t,avg:cost/q,px}); }
+  const L=pts[pts.length-1], val=q*L.px, res=val-cost;
+  const st=(l,v,d,cl)=>`<div class="stat"><div class="l">${l}</div><div class="v ${cl||""}">${v}</div><div class="d">${d}</div></div>`;
+  $("dca-stats").innerHTML=[
+    st("Promedio al terminar","$"+fmtP(L.avg),k.q?`hoy ${fmtP(k.avg)} · ${fmtPct((L.avg/k.avg-1)*100,1)}`:"","warn"),
+    st("Tenencia final",`${fmtN(q,6)} ${PF.coin}`,`+${fmtN(q-k.q,6)} con ${n} compras`),
+    st("Total invertido","$"+fmtN(cost,0),`${fmtN(A*n,0)} nuevos · ${f===7?"semanal":f===14?"cada 2 semanas":"mensual"} hasta ${new Date(L.t).toLocaleDateString("es-AR",{month:"short",year:"numeric"})}`),
+    st("Resultado al final",`${res>=0?"+":"−"}${fmtN(Math.abs(res),0)}`,`con ${PF.coin} a ${fmtP(L.px)} (${note})`,res>=0?"up":"down"),
+  ].join("");
+  // gráfico: precio supuesto contra tu promedio
+  const el=$("dca-chart"), W=Math.max(280,el.clientWidth), H=220, pl=6, pr=70, pt=12, pb=24;
+  const vs=pts.flatMap(x=>[x.px,x.avg].filter(Boolean)); let lo=Math.min(...vs), hi=Math.max(...vs); const pd=(hi-lo)*.1||hi*.05; lo-=pd; hi+=pd;
+  const X=i=>pl+i/(pts.length-1)*(W-pl-pr), Y=v=>pt+(hi-v)/(hi-lo)*(H-pt-pb);
+  let g=""; for(let i=0;i<=3;i++){ const v=lo+(hi-lo)*i/3, y=Y(v); g+=`<line x1="${pl}" x2="${W-pr}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,.05)" stroke-dasharray="2 4"/><text x="${W-pr+6}" y="${y+4}">${fmtN(v/1000,1)}k</text>`; }
+  g+=`<path d="${smoothPath(pts.map((x,i)=>[X(i),Y(x.px)]))}" fill="none" stroke="#e8eef6" stroke-width="1.8" stroke-dasharray="5 4"/>`;
+  const av=pts.map((x,i)=>x.avg?[X(i),Y(x.avg)]:null).filter(Boolean); g+=`<path d="${smoothPath(av)}" fill="none" stroke="var(--accent)" stroke-width="2.6" style="filter:drop-shadow(0 0 6px rgba(247,147,26,.6))"/>`;
+  pts.forEach((x,i)=>{ if(i) g+=`<circle cx="${X(i)}" cy="${Y(x.px)}" r="3" fill="var(--up)"><title>Compra ${i}: ${fmtN(A,0)} a ${fmtP(x.px)} → promedio ${fmtP(x.avg)}</title></circle>`; });
+  g+=`<text x="${pl+4}" y="${H-8}">hoy</text><text x="${W-pr}" y="${H-8}" text-anchor="end">compra ${n}</text>`;
+  el.innerHTML=`<svg class="chart" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Plan de DCA">${g}</svg><div class="legend" style="margin-top:6px"><span><i style="border-color:#e8eef6;border-top-style:dashed"></i>Precio supuesto de cada compra</span><span><i style="border-color:var(--accent);border-top-width:3px"></i>Tu promedio</span></div>`;
+}
+
+/* --- importar y exportar --- */
+function pfNum(s){ s=String(s??"").replace(/[^\d,.\-]/g,""); if(!s) return NaN; s=s.replace(/-/g,"");
+  if(s.includes(",")&&s.includes(".")){ s= s.lastIndexOf(",")>s.lastIndexOf(".")? s.replace(/\./g,"").replace(",",".") : s.replace(/,/g,""); }
+  else if(s.includes(",")) s=s.replace(",",".");
+  else if(/^\d{1,3}(\.\d{3})+$/.test(s)) s=s.replace(/\./g,"");
+  return parseFloat(s); }
+function pfDec(s){ const m=String(s??"").match(/[.,](\d+)\s*$/); return m?m[1].length:0; }
+function pfDateParse(s){ s=String(s??"").trim(); let m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/); if(m){ let y=+m[3]; if(y<100) y+=2000; return `${y}-${String(+m[2]).padStart(2,"0")}-${String(+m[1]).padStart(2,"0")}`; }
+  m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); return m?m[0]:null; }
+function pfParse(text){
+  const lines=text.split(/\r?\n/).filter(l=>l.trim()); if(!lines.length) return {out:[],skip:0};
+  const sep=lines.some(l=>l.includes("\t"))?"\t":(lines[0].split(";").length>=lines[0].split(",").length?";":",");
+  const head=lines[0].split(sep).map(h=>h.trim().toLowerCase()); const has=head.some(h=>/fecha|date/.test(h));
+  const fi=re=>head.findIndex(h=>re.test(h));
+  const ix= has? {f:fi(/fecha|date/),m:fi(/moneda|coin|activo|asset/),t:fi(/^tipo|type|side|operaci/),q:fi(/cant|qty|cantidad/),u:fi(/monto|usd|total|importe/),p:fi(/^precio|^price/)} : {f:0,m:1,t:2,q:3,u:4,p:5};
+  if(has) lines.shift();
+  const out=[]; let skip=0;
+  lines.forEach((l,i)=>{ const c=l.split(sep); const date=pfDateParse(c[ix.f]); if(!date){ skip++; return; }
+    const tipo=String(ix.t>=0?c[ix.t]:"compra").toLowerCase(); const type=/vent|sell/.test(tipo)?"sell":"buy";
+    const coin=(String(ix.m>=0?c[ix.m]:"")||"BTC").trim().toUpperCase()||"BTC";
+    let q=Math.abs(pfNum(c[ix.q])), u=Math.abs(pfNum(c[ix.u])), p=Math.abs(pfNum(c[ix.p]));
+    // Excel copia la cantidad redondeada: si coincide con monto/precio dentro del redondeo, uso el valor exacto
+    if(u>0&&p>0){ const ex=u/p, d=pfDec(c[ix.q]); if(!(q>0)) q=ex; else if(d && Math.abs(q-ex)<=0.5*Math.pow(10,-d)+1e-12) q=ex; }
+    if(!(u>0)&&q>0&&p>0) u=q*p;
+    if(!(q>0&&u>0)){ skip++; return; }
+    out.push({id:uid()+Date.now()+"_"+i,date,coin,type,qty:q,usd:u,price:p>0?p:u/q,ts:Date.now()+i}); });
+  return {out,skip};
+}
+function pfImport(text){
+  const m=$("pf-io-msg"); m.className="pf-msg err";
+  if(!PF.acc){ m.textContent="Tu sesión no está disponible. Volvé a entrar al sistema."; return; }
+  const {out,skip}=pfParse(text); if(!out.length){ m.textContent="No encontré operaciones. Revisá que tenga Fecha, Tipo, Cantidad, Monto y Precio."; return; }
+  const key=o=>`${o.date}|${o.coin}|${o.type}|${o.usd.toFixed(2)}`, have=new Set(PF.ops.map(key)); const nw=out.filter(o=>!have.has(key(o)));
+  PF.ops.push(...nw); pfSave(); PF.coin=nw[0]?.coin||PF.coin;
+  m.className="pf-msg ok"; m.textContent=`Importé ${nw.length} operaciones${out.length-nw.length?` (${out.length-nw.length} ya estaban)`:""}${skip?` · salteé ${skip} filas vacías o incompletas`:""}.`;
+  $("pf-paste").value=""; pfRender(true);
+}
+function pfExport(){
+  if(!PF.acc||!PF.ops.length) return;
+  const rows=["fecha;moneda;tipo;cantidad;monto_usd;precio"].concat(PF.ops.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(o=>[o.date,o.coin,o.type==="buy"?"Compra":"Venta",o.qty.toFixed(8),o.usd.toFixed(2),o.price.toFixed(2)].join(";")));
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([rows.join("\n")],{type:"text/csv"})); a.download=`cartera-${PF.acc.replace(/[^a-z0-9.@_-]/gi,"_")}.csv`; document.body.appendChild(a); a.click(); a.remove();
+  const m=$("pf-io-msg"); m.className="pf-msg ok"; m.textContent="Descargué el archivo CSV con tus operaciones.";
+}
+
+/* --- render general --- */
+function pfRender(full){ pfRenderHead(); pfRenderOps(); pfTools(); if(full){ pfRenderCharts(); pfDca(); } }
+function initPf(){
+  pfFillCoins(); $("pf-date").value=todayISO();
+  $("pf-coins").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; PF.coin=b.dataset.c; pfFillCoins(); $("pf-coin").value=PF.coin; pfRender(true); });
+  $("pf-type").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b) pfSetType(b.dataset.t); });
+  ["pf-usd","pf-price"].forEach(id=>$(id).addEventListener("input",()=>pfFormCalc(id)));
+  $("pf-qty").addEventListener("input",()=>pfFormCalc("qty"));
+  $("pf-coin").addEventListener("change",()=>{ $("pf-coin-other-l").hidden=$("pf-coin").value!=="OTRA"; pfFormCalc(); });
+  $("pf-coin-other").addEventListener("input",()=>pfFormCalc());
+  $("pf-px-now").addEventListener("click",()=>{ const p=pfPrice(pfSelectedCoin()); if(p){ $("pf-price").value=+p.toFixed(2); pfFormCalc("pf-price"); } });
+  $("pf-form").addEventListener("submit",pfSubmit);
+  $("pf-cancel").addEventListener("click",pfResetForm);
+  $("pf-ops").addEventListener("click",e=>{ const ed=e.target.closest("button[data-e]"), de=e.target.closest("button[data-d]");
+    if(ed) pfEdit(ed.dataset.e);
+    if(de){ if(de.classList.contains("warn")){ PF.ops=PF.ops.filter(o=>o.id!==de.dataset.d); pfSave(); pfRender(true); } else { de.classList.add("warn"); de.textContent="¿Seguro?"; setTimeout(()=>{ if(de.isConnected){ de.classList.remove("warn"); de.textContent="Borrar"; } },4000); } } });
+  $("pf-import").addEventListener("click",()=>pfImport($("pf-paste").value));
+  $("pf-file").addEventListener("change",e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>pfImport(String(r.result)); r.readAsText(f); e.target.value=""; });
+  $("pf-export").addEventListener("click",pfExport);
+  $("pf-wipe").addEventListener("click",e=>{ const b=e.currentTarget; if(!PF.acc) return;
+    if(b.classList.contains("warn")){ PF.ops=[]; pfSave(); pfPush(); b.classList.remove("warn"); b.textContent="Borrar operaciones de esta cuenta"; pfRender(true); $("pf-io-msg").className="pf-msg ok"; $("pf-io-msg").textContent="Borré todas las operaciones de "+PF.acc+"."; }
+    else { b.classList.add("warn"); b.textContent=`¿Borrar las ${PF.ops.length} operaciones? Tocá de nuevo`; setTimeout(()=>{ b.classList.remove("warn"); b.textContent="Borrar operaciones de esta cuenta"; },5000); } });
+  ["pf-target","pf-sell"].forEach(id=>$(id).addEventListener("input",pfTools));
+  ["dca-amt","dca-freq","dca-n","dca-mode","dca-man"].forEach(id=>$(id).addEventListener("input",()=>pfDca()));
+  pfBoot();
+  setInterval(()=>{ if(curTab==="cartera"){ pfRenderHead(); pfTools(); } },5000);
+  setInterval(()=>{ if(curTab==="cartera") pfRender(true); },5*60e3);
+}
+
+
 /* ================= ETF E INSTITUCIONES ================= */
 const ETF_ASSETS=[["btc","Bitcoin","#f7931a"],["eth","Ethereum","#8b93ff"],["sol","Solana","#19e6a1"],["xrp","XRP","#b6c2d3"],["hyp","Hyperliquid","#5ef2c8"],["doge","Dogecoin","#d4b44a"],["link","Chainlink","#4a7dff"],["avax","Avalanche","#ff5a5f"],["hbar","Hedera","#9aa4b2"],["ltc","Litecoin","#c0c4cc"],["bnb","BNB","#f3ba2f"],["dot","Polkadot","#ff4fa3"],["sui","Sui","#5bb6ff"],["near","NEAR","#7ef0a6"],["trx","TRON","#ff4d4d"],["zec","Zcash","#f4b728"]];
 let etfAsset="btc", etfPer="1w", etfAllPer="1w";
@@ -1803,6 +2270,7 @@ async function loadTreasury(){
 /* ================= PESTAÑAS ================= */
 const TABS={
   resumen:{n:"Resumen",ids:["sec-hero","sec-map","sec-radar","sec-coins"],intro:""},
+  cartera:{n:"Mi cartera",ids:["sec-pf-acc","sec-pf-form","sec-pf-chart","sec-pf-pnl","sec-pf-tools","sec-pf-dca","sec-pf-ops"],intro:"Cargá tus compras y ventas: calcula solo tu precio promedio, tu ganancia o pérdida y cuánto comprar para promediar. Cada usuario tiene su propia cartera."},
   ciclo:{n:"Ciclo Bitcoin",ids:["sec-cyc","sec-cyc-proj","sec-cyc-chart","sec-cyc-read","sec-cyc-table"],intro:"En qué etapa del ciclo de 4 años estamos: días desde el halving, días de bear market, cuánto falta para el próximo halving y el próximo bull market."},
   etf:{n:"ETF e instituciones",ids:["sec-etf-all","sec-etf-funds","sec-treas"],intro:"Quién compra y quién vende: los flujos de cada ETF de Bitcoin y altcoins (BlackRock, Fidelity, Grayscale, ARK y el resto) y las empresas que acumulan BTC y ETH en su tesorería."},
   analisis:{n:"Análisis",ids:["sec-signal","sec-chart","sec-tech","sec-levels","sec-proj","sec-ob"],intro:"Detalle técnico de la moneda elegida: gráfico, indicadores, niveles de soporte y resistencia, y hasta dónde podría moverse el precio."},
@@ -1828,7 +2296,7 @@ function showTab(k,user){
   $("tab-intro").textContent=TABS[k].intro; $("tab-intro").hidden=!TABS[k].intro;
   if(!TABDONE.has(k)){ TABDONE.add(k); if(TABINIT[k]) TABINIT[k](); }
   // los gráficos propios se redibujan al tamaño visible
-  setTimeout(()=>{ if(k==="mercado"){ renderAlts(); loadFng(); } if(k==="derivados") loadDeriv(); if(k==="resumen") renderMap(); if(k==="ciclo"&&S.cyc) renderCycle(); },30);
+  setTimeout(()=>{ if(k==="mercado"){ renderAlts(); loadFng(); } if(k==="derivados") loadDeriv(); if(k==="resumen") renderMap(); if(k==="ciclo"&&S.cyc) renderCycle(); if(k==="cartera"&&TABDONE.has("cartera")&&PF.acc) pfRender(true); },30);
   if(user) window.scrollTo({top:0});
 }
 
@@ -1858,6 +2326,7 @@ async function selectCoin(c){
   tabs("alt-tabs",d=>{ altPeriod=d.p; renderAlts(); });
   // Los widgets de TradingView se cargan recién cuando abrís su pestaña
   TABINIT.analisis=()=>drawChart();
+  TABINIT.cartera=()=>initPf();
   TABINIT.ciclo=()=>initCycle();
   TABINIT.etf=()=>initEtf();
   TABINIT.mercado=()=>symChart("tv-dom","CRYPTOCAP:BTC.D");

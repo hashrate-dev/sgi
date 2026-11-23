@@ -6,6 +6,7 @@ import morgan from "morgan";
 import { env } from "./config/env.js";
 import { healthRouter } from "./routes/health.js";
 import { authRouter } from "./routes/auth.js";
+import { userUiPrefsRouter } from "./routes/userUiPrefs.js";
 import { usersRouter } from "./routes/users.js";
 import { securityOverviewRouter } from "./routes/securityOverview.js";
 import { clientsRouter } from "./routes/clients.js";
@@ -142,6 +143,7 @@ export function createApp() {
 
   app.use("/api", healthRouter);
   app.use("/api", authRouter);
+  app.use("/api", userUiPrefsRouter);
   // Kryptex: público (datos de pool, sin info sensible). Sin auth para que funcione en localhost sin login.
   app.use("/api", kryptexRouter);
   // Vitrina, precios carrito, POST asic-yields: públicos. Debe ir ANTES de cualquier `requireAuth` en /api
