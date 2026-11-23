@@ -380,7 +380,7 @@ export function HomePage() {
           {visibleMenuItems.map((item) => {
             const isKryptexCard = item.to === "/kryptex";
             const openMercado = isKryptexCard && user?.role !== "lector";
-            const cardTo = openMercado ? "/kryptex/mercado" : item.to;
+            const cardTo = openMercado ? "/monitor/mercado" : item.to;
             const cardLabel = openMercado ? "Monitor de Mercado" : item.label;
             const cardDesc = openMercado ? "Seguimiento del mercado cripto y BTC" : item.desc;
             return (

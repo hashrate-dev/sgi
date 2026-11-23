@@ -452,7 +452,8 @@ function App() {
           <Route element={<ProtectedRoute><ProtectedAppLayout /></ProtectedRoute>}>
             <Route path={SGI_DASHBOARD_PATH} element={<HomePage />} />
             <Route path="/kryptex" element={<KryptexPage />} />
-            <Route path="/kryptex/mercado" element={<KryptexMercadoPage />} />
+            <Route path="/kryptex/mercado" element={<Navigate to="/monitor/mercado" replace />} />
+            <Route path="/monitor/mercado" element={<KryptexMercadoPage />} />
             <Route path="/kryptex/detalle" element={<KryptexDetallePage />} />
             <Route path="/asic/equipment" element={<EquiposAsicPage />} />
             <Route path="/marketplace/home-banners" element={<TiendaOnlineBannersHomePage />} />

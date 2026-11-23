@@ -90,6 +90,7 @@ export function isStaffPathAllowedInSpa(
   if (pathRaw === "/reuniones" || pathRaw.startsWith("/reuniones/")) {
     return user.role === "admin_a" || user.role === "admin_b";
   }
+  if (pathRaw === "/monitor" || pathRaw.startsWith("/monitor/")) return true;
   if (user.role !== "admin_b" && user.role !== "operador") return true;
   const g = user.admin_b_grants;
   if (g == null) return true;

@@ -155,7 +155,7 @@ export function canUserAccessNavPath(user: SgiNavUser | null | undefined, to: st
     return true;
   }
 
-  if (path === "/kryptex" || path.startsWith("/kryptex/")) {
+  if (path === "/monitor" || path.startsWith("/monitor/") || path === "/kryptex" || path.startsWith("/kryptex/")) {
     if (user.role === "lector") return user.kryptex_asignado === true;
     return user.role === "admin_b" || user.role === "operador" || user.role === "lector";
   }
