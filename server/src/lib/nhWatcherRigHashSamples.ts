@@ -1,5 +1,6 @@
 import { db } from "../db.js";
-import { nhAcceptedSpeedLooksLikeTh, nhRigSpeedAcceptedFromStats } from "./nhSpeedAccepted.js";
+import { nhSpeedLogRigKey, upsertNhSpeedLog } from "./nhWatcherSpeedLog.js";
+import { nhAcceptedSpeedLooksLikeTh, nhPickPrimaryMiningStat, nhRigSpeedAcceptedFromStats } from "./nhSpeedAccepted.js";
 
 /** Misma ventana que el cliente (~7 días × 1 muestra/min). */
 export const NH_WATCHER_RIG_HASH_MAX_POINTS = 60 * 24 * 7;
@@ -134,6 +135,30 @@ export async function persistNhWatcherRigHashSamplesFromPayload(
 
   await pushToolbar(NH_WATCHER_TOOLBAR_TH_KEY, sumTh);
   await pushToolbar(NH_WATCHER_TOOLBAR_MH_KEY, sumMh);
+
+  const logSamples: { rigKey: string; label: string; t: number; speed: number; algorithm: string }[] = [];
+  for (let i = 0; i < rawRigs.length; i++) {
+    const rig = rawRigs[i];
+    if (!rig || typeof rig !== "object") continue;
+    const o = rig as { rigId?: string; name?: string; stats?: unknown[] };
+    const rigId = typeof o.rigId === "string" ? o.rigId.trim() : "";
+    if (!rigId) continue;
+    const sp = nhRigSpeedAcceptedFromStats(o.stats);
+    const speed = sp == null || !Number.isFinite(sp) ? 0 : sp;
+    const st = nhPickPrimaryMiningStat(o.stats);
+    const algoField = st?.algorithm;
+    const algorithm =
+      algoField && typeof algoField === "object" && typeof (algoField as { enumName?: unknown }).enumName === "string"
+        ? String((algoField as { enumName: string }).enumName)
+        : "";
+    const label = typeof o.name === "string" && o.name.trim() ? o.name.trim() : rigId;
+    logSamples.push({ rigKey: nhSpeedLogRigKey(rigId), label, t: now, speed, algorithm });
+  }
+  if (logSamples.length > 0) {
+    void upsertNhSpeedLog(userId, wid, logSamples).catch((e) =>
+      console.error("nh_watcher_rig_speed_log:", e instanceof Error ? e.message : e)
+    );
+  }
 
   await nhRigHashPruneOld(userId, wid);
   await nhRigHashTrimPerRig(userId, wid);

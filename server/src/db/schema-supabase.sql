@@ -754,6 +754,21 @@ CREATE TABLE IF NOT EXISTS nh_watcher_rig_hash_samples (
 
 CREATE INDEX IF NOT EXISTS idx_nh_watcher_rig_hash_user_watcher ON nh_watcher_rig_hash_samples(user_id, watcher_id, sample_t);
 
+-- Archivo de velocidad aceptada por equipo (bucket 5 min). El gráfico y el mapa de calor leen de acá. Se conserva 6 meses.
+CREATE TABLE IF NOT EXISTS nh_watcher_rig_speed_log (
+  id BIGSERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  watcher_id TEXT NOT NULL,
+  rig_key TEXT NOT NULL,
+  rig_label TEXT NOT NULL DEFAULT '',
+  sample_t BIGINT NOT NULL,
+  speed DOUBLE PRECISION NOT NULL,
+  algorithm TEXT NOT NULL DEFAULT '',
+  UNIQUE (user_id, watcher_id, rig_key, sample_t)
+);
+
+CREATE INDEX IF NOT EXISTS idx_nh_speed_log_user_watcher_t ON nh_watcher_rig_speed_log(user_id, watcher_id, sample_t);
+
 -- Agregados TH/MH por intervalo (15 / 30 / 60 min), materializados desde muestras 1 min
 CREATE TABLE IF NOT EXISTS nh_watcher_rig_hash_agg_samples (
   id BIGSERIAL PRIMARY KEY,

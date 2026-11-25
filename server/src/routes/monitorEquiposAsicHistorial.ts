@@ -1,9 +1,10 @@
-import type { Request, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 import { z } from "zod";
 import { db } from "../db.js";
 import { requireRole } from "../middleware/auth.js";
 import { requireAdminBGrant } from "../middleware/adminBGrant.js";
+import { cronSyncKnownWatcherSpeedLogs, syncNhSpeedLogFromNiceHash } from "../lib/nhWatcherSpeedLog.js";
 import { proxyNiceHashRigs2WithExtras } from "../lib/nicehashExternalRigsMerge.js";
 import {
   aggregate1MinDbRowsToAggSeries,
@@ -676,6 +677,58 @@ monitorEquiposAsicHistorialRouter.post(
     res.json(r.data);
   }
 );
+
+const postNhExternalHash24Body = z.object({
+  watcherId: equipoIdParam,
+  rigs: z
+    .array(
+      z.object({
+        rigId: z.string().trim().min(1).max(80).regex(/^[A-Za-z0-9_.:-]+$/),
+        algorithm: z.string().trim().min(1).max(40).regex(/^[A-Za-z0-9_]+$/),
+      })
+    )
+    .max(80),
+});
+
+/** Velocidad aceptada de las últimas 24 h, por equipo, desde el historial público de NiceHash. */
+monitorEquiposAsicHistorialRouter.post(
+  "/monitor-equipos-asic/nicehash-external-hash-24h",
+  requireRole("admin_a", "admin_b"),
+  requireAdminBGrant("equipos"),
+  async (req: Request, res: Response) => {
+    const parsed = postNhExternalHash24Body.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: { message: "Payload inválido (watcherId y rigs con algoritmo)." } });
+      return;
+    }
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ error: { message: "No autenticado." } });
+      return;
+    }
+    const rigs = await syncNhSpeedLogFromNiceHash(user.id, parsed.data.watcherId, parsed.data.rigs);
+    res.json({ rigs });
+  }
+);
+
+export async function nhSpeedLogCronHandler(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const auth = String(req.headers.authorization ?? "");
+    const cronHeader = String(req.headers["x-vercel-cron"] ?? "").trim().toLowerCase();
+    const ua = String(req.headers["user-agent"] ?? "").toLowerCase();
+    const secret = String(process.env.CRON_SECRET ?? "").trim();
+    const okBearer = Boolean(secret) && auth === `Bearer ${secret}`;
+    const okVercel = cronHeader === "1" || cronHeader === "true" || ua.includes("vercel-cron");
+    if (!okBearer && !okVercel) {
+      res.status(401).json({ error: { message: "No autorizado." } });
+      return;
+    }
+    const result = await cronSyncKnownWatcherSpeedLogs();
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    next(e);
+  }
+}
 
 monitorEquiposAsicHistorialRouter.get(
   "/monitor-equipos-asic/nicehash-watcher-rig-hash-history/:watcherId",

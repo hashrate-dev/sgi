@@ -37,7 +37,7 @@ import { proveedoresHrsRouter } from "./routes/proveedoresHrs.js";
 import { contabilidadGastosRouter } from "./routes/contabilidadGastos.js";
 import { contabilidadMediosPagoRouter } from "./routes/contabilidadMediosPago.js";
 import { luxorRouter } from "./routes/luxor.js";
-import { monitorEquiposAsicHistorialRouter } from "./routes/monitorEquiposAsicHistorial.js";
+import { monitorEquiposAsicHistorialRouter, nhSpeedLogCronHandler } from "./routes/monitorEquiposAsicHistorial.js";
 import { potencialesClientesRouter } from "./routes/potencialesClientes.js";
 import { reunionesRouter } from "./routes/reuniones.js";
 import { requireAuth } from "./middleware/auth.js";
@@ -169,6 +169,8 @@ export function createApp() {
   app.post("/api/paper/cron-tick", paperAgentCronHandler);
   app.get("/api/hosting/billing-agent/cron-generate", hostingBillingAgentCronHandler);
   app.post("/api/hosting/billing-agent/cron-generate", hostingBillingAgentCronHandler);
+  app.get("/api/monitor-equipos-asic/cron-speed-log", nhSpeedLogCronHandler);
+  app.post("/api/monitor-equipos-asic/cron-speed-log", nhSpeedLogCronHandler);
   app.use("/api", paperAgentRouter);
   app.use("/api", requireAuth, opsComunicacionRouter);
   app.use("/api", requireAuth, setupsRouter);

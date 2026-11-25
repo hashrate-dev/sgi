@@ -1116,6 +1116,23 @@ CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_visitor ON marketplace_presence_
     `CREATE INDEX IF NOT EXISTS idx_nh_watcher_rig_hash_user_watcher ON nh_watcher_rig_hash_samples(user_id, watcher_id, sample_t)`
   );
 
+  /** Velocidad aceptada por equipo, una fila cada 5 min. Gráfico y mapa de calor. Retención 6 meses. */
+  native.exec(`CREATE TABLE IF NOT EXISTS nh_watcher_rig_speed_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    watcher_id TEXT NOT NULL,
+    rig_key TEXT NOT NULL,
+    rig_label TEXT NOT NULL DEFAULT '',
+    sample_t INTEGER NOT NULL,
+    speed REAL NOT NULL,
+    algorithm TEXT NOT NULL DEFAULT '',
+    UNIQUE (user_id, watcher_id, rig_key, sample_t),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`);
+  native.exec(
+    `CREATE INDEX IF NOT EXISTS idx_nh_speed_log_user_watcher_t ON nh_watcher_rig_speed_log(user_id, watcher_id, sample_t)`
+  );
+
   /** Agregados 15 / 30 / 60 min derivados de muestras 1 min (misma ventana de retención). */
   native.exec(`CREATE TABLE IF NOT EXISTS nh_watcher_rig_hash_agg_samples (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

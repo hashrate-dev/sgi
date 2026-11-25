@@ -37,6 +37,7 @@ async function loadDb() {
           await ensureSupabaseHostingBillingServices(pool);
           await ensureSupabaseMarketplacePresenceCity(pool);
           await ensureSupabaseHostingBillingAgent(pool);
+          await ensureSupabaseNhSpeedLog(pool);
           await pool.query("SELECT 1");
         })(),
         new Promise((_, rej) =>
@@ -214,6 +215,30 @@ async function ensureSupabaseHostingMarginSettings(pool: Pool) {
     const msg = e instanceof Error ? e.message : String(e);
     // eslint-disable-next-line no-console
     console.warn("[DB] ensureSupabaseHostingMarginSettings:", msg);
+  }
+}
+
+async function ensureSupabaseNhSpeedLog(pool: Pool) {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS nh_watcher_rig_speed_log (
+        id BIGSERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        watcher_id TEXT NOT NULL,
+        rig_key TEXT NOT NULL,
+        rig_label TEXT NOT NULL DEFAULT '',
+        sample_t BIGINT NOT NULL,
+        speed DOUBLE PRECISION NOT NULL,
+        algorithm TEXT NOT NULL DEFAULT '',
+        UNIQUE (user_id, watcher_id, rig_key, sample_t)
+      )
+    `);
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_nh_speed_log_user_watcher_t ON nh_watcher_rig_speed_log(user_id, watcher_id, sample_t)`
+    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn("[DB] ensureSupabaseNhSpeedLog:", msg);
   }
 }
 

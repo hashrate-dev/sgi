@@ -846,6 +846,22 @@ export function getNiceHashWatcherRigHashHistory(
   return api<NhWatcherRigHashHistoryResponse>(`/api/monitor-equipos-asic/nicehash-watcher-rig-hash-history/${id}${q}`);
 }
 
+export type NhExternalHash24Response = {
+  rigs: { rigId: string; points: { t: number; v: number }[] }[];
+};
+
+/** Historial público de NiceHash: velocidad aceptada de cada equipo en las últimas 24 h. */
+export function postNiceHashExternalHash24h(
+  watcherId: string,
+  rigs: { rigId: string; algorithm: string }[]
+): Promise<NhExternalHash24Response> {
+  return api<NhExternalHash24Response>("/api/monitor-equipos-asic/nicehash-external-hash-24h", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ watcherId, rigs }),
+  });
+}
+
 export function postNiceHashWatcherRigHashHistorySamples(
   watcherId: string,
   samples: NhWatcherRigHashSample[],

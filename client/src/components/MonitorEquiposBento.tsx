@@ -31,6 +31,9 @@ export type MonitorEquiposBentoProps = {
   walletPct: number;
   payouts: { label: string; when: string; color: string }[];
   heat: { label: string; hours: number[] }[];
+  heatTitle?: string;
+  heatLabels?: string[];
+  speedNote?: string;
   onOpenSpeed?: () => void;
 };
 
@@ -128,6 +131,7 @@ export function MonitorEquiposBento(props: MonitorEquiposBentoProps) {
                 ))}
               </div>
               <LiveChart series={speed.series} color={algo === 0 ? "#2ee6a6" : "#a78bfa"} />
+              {props.speedNote ? <p className="meq-usd">{props.speedNote}</p> : null}
             </>
           ) : (
             <p className="meq-usd">Sin velocidad reportada.</p>
@@ -239,15 +243,17 @@ export function MonitorEquiposBento(props: MonitorEquiposBentoProps) {
         {props.heat.length > 0 ? (
           <article className="meq-card meq-s12">
             <div className="meq-h">
-              <div className="meq-t">Hashrate reciente · últimas 24 muestras por equipo</div>
+              <div className="meq-t">{props.heatTitle ?? "Hashrate 24 h · velocidad aceptada de cada equipo"}</div>
             </div>
             <div className="meq-heat">
               <span />
               {Array.from({ length: 24 }, (_, i) => (
-                <span key={i} style={{ textAlign: "center", color: "var(--dim)" }}>{i % 4 === 0 ? i : ""}</span>
+                <span key={i} style={{ textAlign: "center", color: "var(--dim)" }}>
+                  {(props.heatLabels?.[i] ?? (i % 4 === 0 ? String(i) : ""))}
+                </span>
               ))}
-              {props.heat.slice(0, 18).map((row) => (
-                <span key={row.label} style={{ display: "contents" }}>
+              {props.heat.slice(0, 40).map((row, rowIndex) => (
+                <span key={`${row.label}-${rowIndex}`} style={{ display: "contents" }}>
                   <span className="lbl">{row.label}</span>
                   {Array.from({ length: 24 }, (_, i) => {
                     const v = row.hours[i] ?? 0;

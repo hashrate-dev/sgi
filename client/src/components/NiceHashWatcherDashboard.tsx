@@ -4,6 +4,7 @@ import {
   getNiceHashExternalRigs2,
   getNiceHashWatcherEarningsSummary,
   getNiceHashWatcherRigHashHistory,
+  postNiceHashExternalHash24h,
   postNiceHashWatcherEarningsSync,
   postNiceHashWatcherRigHashHistorySamples,
   wakeUpBackend,
@@ -212,6 +213,62 @@ function formatNiceHashRelativeAge(statusTimeMs?: number): string {
   if (h < 72) return `hace ${h}h`;
   const d = Math.floor(h / 24);
   return `hace ${d}d`;
+}
+
+type NhSpeedPoint = { t: number; v: number };
+
+function nhPrimaryAlgoEnum(stats: unknown[] | undefined): string {
+  const st = nhPickPrimaryMiningStat(stats);
+  const algo = st?.algorithm;
+  if (!algo || typeof algo !== "object") return "";
+  const name = (algo as { enumName?: unknown }).enumName;
+  return typeof name === "string" ? name.trim() : "";
+}
+
+/** SHA-256 se grafica en TH/s; Scrypt en MH/s. El resto usa la magnitud que ya muestra el tablero. */
+function nhAlgoSeriesIsTh(algorithm: string, speed: number): boolean {
+  const a = algorithm.trim().toUpperCase();
+  if (a.startsWith("SHA256")) return true;
+  if (a.includes("SCRYPT")) return false;
+  return nhAcceptedSpeedLooksLikeTh(speed);
+}
+
+function sumSpeedPointsBy5Min(lists: NhSpeedPoint[][]): NhSpeedPoint[] {
+  const buckets = new Map<number, number>();
+  for (const list of lists) {
+    for (const p of list) {
+      if (!Number.isFinite(p.t) || !Number.isFinite(p.v)) continue;
+      const b = Math.floor(p.t / 300_000) * 300_000;
+      buckets.set(b, (buckets.get(b) ?? 0) + p.v);
+    }
+  }
+  return [...buckets.entries()].sort((a, b) => a[0] - b[0]).map(([t, v]) => ({ t, v }));
+}
+
+/** 24 celdas = última hora hacia atrás, cada una el promedio de velocidad de esa hora, relativo al máximo del equipo. */
+function nhHourlyHeat(points: NhSpeedPoint[], now: number): number[] {
+  const hours = Array.from({ length: 24 }, (_, i) => {
+    const start = now - (24 - i) * 3_600_000;
+    const end = start + 3_600_000;
+    let sum = 0;
+    let n = 0;
+    for (const p of points) {
+      if (p.t < start || p.t >= end) continue;
+      sum += p.v;
+      n += 1;
+    }
+    return n > 0 ? sum / n : 0;
+  });
+  const mx = Math.max(...hours, 0.0001);
+  return hours.map((v) => Math.max(0, Math.min(1, v / mx)));
+}
+
+function nhHeatHourLabels(now: number): string[] {
+  return Array.from({ length: 24 }, (_, i) => {
+    if (i % 4 !== 0) return "";
+    const t = now - (23 - i) * 3_600_000;
+    return new Date(t).toLocaleTimeString("es-AR", { hour: "2-digit", hourCycle: "h23" });
+  });
 }
 
 function nhWatcherAlgoLine(rigs: NiceHashExternalRigs2Payload["miningRigs"]): string {
@@ -785,6 +842,7 @@ export function NiceHashWatcherDashboard({
   const [fetchedAt, setFetchedAt] = useState<number | null>(null);
   const [rigNicknames, setRigNicknames] = useState<Record<string, string>>({});
   const [rigHashSeriesMap, setRigHashSeriesMap] = useState<Record<string, number[]>>({});
+  const [nh24ByRig, setNh24ByRig] = useState<Record<string, NhSpeedPoint[]>>({});
   /** Historial local ~1 min: suma TH/s y MH/s del toolbar (un watcher o vista TOTAL). */
   const [toolbarSparkSeries, setToolbarSparkSeries] = useState<{ th: number[]; mh: number[] }>({ th: [], mh: [] });
   const [fleetQ, setFleetQ] = useState("");
@@ -1491,15 +1549,11 @@ export function NiceHashWatcherDashboard({
         ],
       };
     };
+    const thLists: NhSpeedPoint[][] = [];
+    const mhLists: NhSpeedPoint[][] = [];
     const speeds: MonitorEquiposSpeed[] = [];
-    if (nhAgg.sumTh > 0) {
-      const b = bits(toolbarSparkSeries.th, nhAgg.rigs.length);
-      speeds.push({ key: "th", label: "TH/s · BTC", value: nf(nhAgg.sumTh), unit: "TH/s", series: toolbarSparkSeries.th, ...b });
-    }
-    if (nhAgg.sumMh > 0) {
-      const b = bits(toolbarSparkSeries.mh, nhAgg.rigs.length);
-      speeds.push({ key: "mh", label: "MH/s · LTC+DOGE", value: nf(nhAgg.sumMh), unit: "MH/s", series: toolbarSparkSeries.mh, ...b });
-    }
+    const heatFromNh: { label: string; hours: number[] }[] = [];
+    const heatNow = Date.now();
     const by = new Map<string, number>();
     const cells: { key: string; color: string; title: string }[] = [];
     const heat: { label: string; hours: number[] }[] = [];
@@ -1517,8 +1571,16 @@ export function NiceHashWatcherDashboard({
       const color = !mining ? "#fb7185" : Number.isFinite(rejN) && rejN > 1 ? "#fbbf24" : "#2ee6a6";
       cells.push({ key: `${row.watcherId}-${row.rigIndex}`, color, title: `${label} · ${nick} · ${status || "—"}` });
       const seriesKey = isTotal ? nhCompositeRigKey(row.watcherId, nhWatcherRigStorageKey(row.rig, row.rigIndex)) : nhWatcherRigStorageKey(row.rig, row.rigIndex);
+      const rigId = (row.rig.rigId ?? "").trim();
+      const algo = nhPrimaryAlgoEnum(row.rig.stats as unknown[]);
+      const livePts = rigId ? nh24ByRig[`${row.watcherId.trim().toLowerCase()}|${rigId}`] ?? [] : [];
+      if (livePts.length >= 2) {
+        const list = nhAlgoSeriesIsTh(algo, spd) ? thLists : mhLists;
+        list.push(livePts);
+        heatFromNh.push({ label, hours: nhHourlyHeat(livePts, heatNow) });
+      }
       const spark = rigHashSeriesMap[seriesKey] ?? [];
-      if (spark.length >= 4) {
+      if (livePts.length < 2 && spark.length >= 4) {
         const window = spark.slice(-24);
         const mx = Math.max(...window, 0.0001);
         const hours = Array.from({ length: 24 }, (_, i) => {
@@ -1528,12 +1590,89 @@ export function NiceHashWatcherDashboard({
         heat.push({ label, hours });
       }
     }
+    const th24 = sumSpeedPointsBy5Min(thLists);
+    const mh24 = sumSpeedPointsBy5Min(mhLists);
+    const with24h = (b: { delta: string | null; deltaUp: boolean; stats: { label: string; value: string }[] }) =>
+      b.delta ? { ...b, delta: b.delta.replace("vs prom.", "vs prom. 24 h") } : b;
+    if (nhAgg.sumTh > 0) {
+      const series = th24.length >= 2 ? th24.map((p) => p.v) : toolbarSparkSeries.th;
+      const b = th24.length >= 2 ? with24h(bits(series, nhAgg.rigs.length)) : bits(series, nhAgg.rigs.length);
+      speeds.push({ key: "th", label: "TH/s · BTC", value: nf(nhAgg.sumTh), unit: "TH/s", series, ...b });
+    }
+    if (nhAgg.sumMh > 0) {
+      const series = mh24.length >= 2 ? mh24.map((p) => p.v) : toolbarSparkSeries.mh;
+      const b = mh24.length >= 2 ? with24h(bits(series, nhAgg.rigs.length)) : bits(series, nhAgg.rigs.length);
+      speeds.push({ key: "mh", label: "MH/s · LTC+DOGE", value: nf(nhAgg.sumMh), unit: "MH/s", series, ...b });
+    }
     const slices = [...by.entries()]
       .filter(([, v]) => v > 0)
       .sort((a, b) => b[1] - a[1])
       .map(([label, value], i) => ({ label, value, color: MEQ_PAL[i % MEQ_PAL.length]! }));
-    return { speeds, cells, slices, heat, down };
-  }, [nhAgg, toolbarSparkSeries, rigRowsForList, slotRows, rigHashSeriesMap, isTotal]);
+    const heatRows = heatFromNh.length > 0 ? heatFromNh : heat;
+    return {
+      speeds,
+      cells,
+      slices,
+      heat: heatRows,
+      heatTitle:
+        heatFromNh.length > 0
+          ? "Hashrate 24 h · guardado de cada equipo"
+          : "Hashrate reciente · últimas muestras guardadas",
+      heatLabels: heatFromNh.length > 0 ? nhHeatHourLabels(heatNow) : undefined,
+      down,
+    };
+  }, [nhAgg, toolbarSparkSeries, rigRowsForList, slotRows, rigHashSeriesMap, nh24ByRig, isTotal]);
+
+  const hash24Sig = useMemo(() => {
+    const parts: string[] = [];
+    for (const row of rigRowsForList) {
+      const rigId = (row.rig.rigId ?? "").trim();
+      const algo = nhPrimaryAlgoEnum(row.rig.stats as unknown[]);
+      if (!rigId || !algo) continue;
+      parts.push(`${row.watcherId.trim().toLowerCase()}|${rigId}|${algo}`);
+    }
+    parts.sort();
+    return parts.join(",");
+  }, [rigRowsForList]);
+
+  const hash24ReqRef = useRef(hash24Sig);
+  hash24ReqRef.current = hash24Sig;
+
+  useEffect(() => {
+    if (!active || layout !== "fullscreen" || !hash24Sig) return;
+    let cancelled = false;
+    const load = async () => {
+      const groups = new Map<string, { rigId: string; algorithm: string }[]>();
+      for (const part of hash24ReqRef.current.split(",")) {
+        const [wid, rigId, algorithm] = part.split("|");
+        if (!wid || !rigId || !algorithm) continue;
+        const arr = groups.get(wid) ?? [];
+        arr.push({ rigId, algorithm });
+        groups.set(wid, arr);
+      }
+      const merged: Record<string, NhSpeedPoint[]> = {};
+      await Promise.all(
+        [...groups.entries()].map(async ([wid, rigs]) => {
+          try {
+            const res = await postNiceHashExternalHash24h(wid, rigs);
+            for (const row of res.rigs) {
+              const points = (row.points ?? []).filter((p) => Number.isFinite(p.t) && Number.isFinite(p.v));
+              if (points.length > 0) merged[`${wid}|${row.rigId}`] = points;
+            }
+          } catch {
+            /* se reintenta en el próximo ciclo */
+          }
+        })
+      );
+      if (!cancelled && Object.keys(merged).length > 0) setNh24ByRig(merged);
+    };
+    void load();
+    const id = window.setInterval(() => void load(), 5 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [active, layout, hash24Sig]);
 
   /** Detecta apagones / hashrate bajo y alimenta el tablero de mando (+ sonido en alertas nuevas). */
   useEffect(() => {
@@ -1709,6 +1848,9 @@ export function NiceHashWatcherDashboard({
                 return { label: label.trim(), when: rest.join(":").trim(), color: MEQ_PAL[i % MEQ_PAL.length]! };
               })}
               heat={meqFront.heat}
+              heatTitle={meqFront.heatTitle}
+              heatLabels={meqFront.heatLabels}
+              speedNote="Cada lectura de los equipos queda en la base. Se conserva 6 meses; el gráfico y el mapa muestran las últimas 24 h."
               onOpenSpeed={() => setFleetHashDetailOpen(true)}
             />
           ) : null}
