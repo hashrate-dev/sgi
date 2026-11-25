@@ -69,8 +69,10 @@ import {
   NH_WATCHER_TOOLBAR_TH_KEY,
   replaceNiceHashRigHashrateHistoryMap,
 } from "../lib/nicehashWatcherRigHashrateHistory";
+import { MonitorEquiposBento, type MonitorEquiposSpeed } from "./MonitorEquiposBento";
 import "../styles/facturacion.css";
 import "../styles/nicehash-watcher-pro.css";
+import "../styles/monitor-equipos-front.css";
 
 /** Referencia estable para sparklines sin serie (evita re-renders por `?? []` nuevo cada vez). */
 const NH_SPARKLINE_VALUES_EMPTY: number[] = [];
@@ -785,6 +787,7 @@ export function NiceHashWatcherDashboard({
   const [rigHashSeriesMap, setRigHashSeriesMap] = useState<Record<string, number[]>>({});
   /** Historial local ~1 min: suma TH/s y MH/s del toolbar (un watcher o vista TOTAL). */
   const [toolbarSparkSeries, setToolbarSparkSeries] = useState<{ th: number[]; mh: number[] }>({ th: [], mh: [] });
+  const [fleetQ, setFleetQ] = useState("");
   /** Spot BTC/USD si el backend no pudo traer `_sgi.btcSpotUsd` (p. ej. CoinGecko bloqueado en el servidor). */
   const [clientBtcSpotUsd, setClientBtcSpotUsd] = useState<number | null>(null);
   /** Evita registrar hashrate de un payload obsoleto si cambió el watcher antes de terminar el fetch. */
@@ -1468,6 +1471,70 @@ export function NiceHashWatcherDashboard({
     }));
   }, [nhAgg, isTotal, flatRigs, payload, activeSlot, effectiveWatcherId]);
 
+  const MEQ_PAL = ["#2ee6a6", "#0ea5e9", "#a78bfa", "#f472b6", "#fbbf24", "#34d399", "#60a5fa", "#fb923c", "#c084fc", "#22d3ee"];
+  const meqFront = useMemo(() => {
+    if (!nhAgg) return null;
+    const nf = (n: number) => n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const bits = (series: number[], count: number) => {
+      if (series.length < 2) return { delta: null as string | null, deltaUp: true, stats: [{ label: "Equipos", value: String(count) }] };
+      const cur = series[series.length - 1] ?? 0;
+      const avg = series.reduce((s, v) => s + v, 0) / series.length;
+      const diff = avg > 0 ? ((cur - avg) / avg) * 100 : 0;
+      return {
+        delta: `${diff >= 0 ? "▲" : "▼"} ${Math.abs(diff).toLocaleString("es-AR", { maximumFractionDigits: 1 })}% vs prom.`,
+        deltaUp: diff >= 0,
+        stats: [
+          { label: "Máximo", value: nf(Math.max(...series)) },
+          { label: "Mínimo", value: nf(Math.min(...series)) },
+          { label: "Promedio", value: nf(avg) },
+          { label: "Equipos", value: String(count) },
+        ],
+      };
+    };
+    const speeds: MonitorEquiposSpeed[] = [];
+    if (nhAgg.sumTh > 0) {
+      const b = bits(toolbarSparkSeries.th, nhAgg.rigs.length);
+      speeds.push({ key: "th", label: "TH/s · BTC", value: nf(nhAgg.sumTh), unit: "TH/s", series: toolbarSparkSeries.th, ...b });
+    }
+    if (nhAgg.sumMh > 0) {
+      const b = bits(toolbarSparkSeries.mh, nhAgg.rigs.length);
+      speeds.push({ key: "mh", label: "MH/s · LTC+DOGE", value: nf(nhAgg.sumMh), unit: "MH/s", series: toolbarSparkSeries.mh, ...b });
+    }
+    const by = new Map<string, number>();
+    const cells: { key: string; color: string; title: string }[] = [];
+    const heat: { label: string; hours: number[] }[] = [];
+    let down = 0;
+    for (const row of rigRowsForList) {
+      const label = (row.rig.name ?? row.rig.rigId ?? "equipo").trim() || "equipo";
+      const nick = watcherSlotNicknameTrimmed(slotRows, row.slotIndex) || `W${row.slotIndex + 1}`;
+      const spd = nhRigSpeedAcceptedFromStats(row.rig.stats as unknown[]) ?? 0;
+      by.set(nick, (by.get(nick) ?? 0) + spd);
+      const status = (row.rig.minerStatus ?? "").toUpperCase();
+      const mining = status === "MINING";
+      if (!mining) down += 1;
+      const rej = nhRejectPctLabel(row.rig.stats);
+      const rejN = Number(rej.replace("%", "").replace(",", "."));
+      const color = !mining ? "#fb7185" : Number.isFinite(rejN) && rejN > 1 ? "#fbbf24" : "#2ee6a6";
+      cells.push({ key: `${row.watcherId}-${row.rigIndex}`, color, title: `${label} · ${nick} · ${status || "—"}` });
+      const seriesKey = isTotal ? nhCompositeRigKey(row.watcherId, nhWatcherRigStorageKey(row.rig, row.rigIndex)) : nhWatcherRigStorageKey(row.rig, row.rigIndex);
+      const spark = rigHashSeriesMap[seriesKey] ?? [];
+      if (spark.length >= 4) {
+        const window = spark.slice(-24);
+        const mx = Math.max(...window, 0.0001);
+        const hours = Array.from({ length: 24 }, (_, i) => {
+          const v = window[window.length - 24 + i];
+          return v == null ? 0 : Math.max(0, Math.min(1, v / mx));
+        });
+        heat.push({ label, hours });
+      }
+    }
+    const slices = [...by.entries()]
+      .filter(([, v]) => v > 0)
+      .sort((a, b) => b[1] - a[1])
+      .map(([label, value], i) => ({ label, value, color: MEQ_PAL[i % MEQ_PAL.length]! }));
+    return { speeds, cells, slices, heat, down };
+  }, [nhAgg, toolbarSparkSeries, rigRowsForList, slotRows, rigHashSeriesMap, isTotal]);
+
   /** Detecta apagones / hashrate bajo y alimenta el tablero de mando (+ sonido en alertas nuevas). */
   useEffect(() => {
     if (!active || rigRowsForList.length === 0) {
@@ -1600,48 +1667,50 @@ export function NiceHashWatcherDashboard({
             layout === "fullscreen" ? " nh-watcher-inner--pro" : ""
           }`}
         >
-          {layout === "fullscreen" ? (
-            <header className="nh-watcher-hero">
-              <div className="nh-watcher-hero__top">
-                <div className="min-w-0">
-                  <div className="nh-watcher-kicker">
-                    <span
-                      className={`nh-watcher-live-pulse${loading || fetchedAt ? " is-on" : ""}`}
-                      aria-hidden
-                    />
-                    NiceHash · Flota ASIC
-                  </div>
-                  <h2 className="nh-watcher-hero__title">
-                    {isTotal ? "Monitor total de minería" : "Monitor de flota"}
-                  </h2>
-
-                </div>
-                <div className="nh-watcher-hero__stats" aria-label="Resumen de flota">
-                  <div className="nh-watcher-hero-stat">
-                    <span className="nh-watcher-hero-stat__label">En marcha</span>
-                    <span className="nh-watcher-hero-stat__value">
-                      {nhAgg.miningN}/{nhAgg.totalRigs || nhAgg.rigs.length}
-                    </span>
-                  </div>
-                  {nhAgg.sumTh > 0 ? (
-                    <div className="nh-watcher-hero-stat">
-                      <span className="nh-watcher-hero-stat__label">Hashrate</span>
-                      <span className="nh-watcher-hero-stat__value nh-watcher-hero-stat__value--sm">
-                        {nhAgg.sumTh.toFixed(2)} TH/s
-                      </span>
-                    </div>
-                  ) : null}
-                  {nhAgg.btc24 != null ? (
-                    <div className="nh-watcher-hero-stat">
-                      <span className="nh-watcher-hero-stat__label">Rent. 24 h</span>
-                      <span className="nh-watcher-hero-stat__value nh-watcher-hero-stat__value--sm mono">
-                        {formatNiceHashBtc8(nhAgg.btc24)} BTC
-                      </span>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            </header>
+          {layout === "fullscreen" && meqFront ? (
+            <MonitorEquiposBento
+              titleBefore={isTotal ? "Tu flota," : "Cuenta"}
+              titleGrad={isTotal ? "en tiempo real" : "en vivo"}
+              lead={`${nhAgg.totalRigs || nhAgg.rigs.length} equipos ASIC · ${isTotal ? "todas las cuentas" : "esta cuenta"} NiceHash · los números salen del watcher, no de un ejemplo`}
+              syncedAt={fetchedAt ? new Date(fetchedAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : null}
+              speeds={meqFront.speeds}
+              earnBtc={earningsSummary ? formatNiceHashBtc8(earningsSummary.dayBtc) : "—"}
+              earnUsd={
+                earningsSummary
+                  ? formatRent24hUsdApprox(displayPayload, earningsSummary.dayBtc, effectiveBtcSpotUsd) ?? "—"
+                  : "—"
+              }
+              earnDelta={null}
+              earnGrid={[
+                { label: "Este mes", value: earningsSummary ? formatNiceHashBtc8(earningsSummary.monthBtc) : "—" },
+                { label: "Acumulado", value: earningsSummary ? formatNiceHashBtc8(earningsSummary.lifetimeBtc) : "—" },
+                { label: "Rentab. 24 h", value: nhAgg.btc24 != null ? formatNiceHashBtc8(nhAgg.btc24) : "—" },
+                {
+                  label: "Último retiro",
+                  value: earningsSummary?.lastWithdrawal ? formatNiceHashBtc8(earningsSummary.lastWithdrawal.amountBtc) : "—",
+                },
+              ]}
+              healthOn={nhAgg.miningN}
+              healthTotal={nhAgg.totalRigs || nhAgg.rigs.length}
+              healthNote={meqFront.down ? `${meqFront.down} fuera de minado` : "Sin equipos caídos"}
+              cells={meqFront.cells}
+              slices={meqFront.slices}
+              walletAmt={paraRetirarBtc == null ? "—" : formatNiceHashBtc8(paraRetirarBtc)}
+              walletNote={
+                paraRetirarBtc == null
+                  ? "Sin dato de saldo"
+                  : formatUnpaidMiningUsdApprox(displayPayload, nhAgg.unpaid, effectiveBtcSpotUsd) ??
+                    formatRent24hUsdApprox(displayPayload, paraRetirarBtc, effectiveBtcSpotUsd) ??
+                    "Saldo pendiente de NiceHash"
+              }
+              walletPct={paraRetirarBtc == null ? 0 : Math.min(100, (paraRetirarBtc / 0.0001) * 100)}
+              payouts={(lastPayoutFootnoteLines ?? []).map((line, i) => {
+                const [label, ...rest] = line.split(":");
+                return { label: label.trim(), when: rest.join(":").trim(), color: MEQ_PAL[i % MEQ_PAL.length]! };
+              })}
+              heat={meqFront.heat}
+              onOpenSpeed={() => setFleetHashDetailOpen(true)}
+            />
           ) : null}
           {layout === "fullscreen" && visibleFleetAlerts.length > 0 ? (
             <NiceHashWatcherAlertBoard
@@ -1670,6 +1739,8 @@ export function NiceHashWatcherDashboard({
               }}
             />
           ) : null}
+          {layout !== "fullscreen" ? (
+          <>
           <div className="nh-watcher-kpi-grid nh-watcher-kpi-grid--pro nh-watcher-kpi-grid--hrs mb-3" role="list">
             <article className="nh-watcher-kpi nh-watcher-kpi--pro nh-watcher-kpi--pro-hero" role="listitem">
               <header className="nh-watcher-kpi__head">
@@ -1927,10 +1998,19 @@ export function NiceHashWatcherDashboard({
               ) : null}
             </div>
           </div>
+          </>
+          ) : null}
 
-          <h3 className="nh-watcher-section-title nh-watcher-section-title--pro">
-            {isTotal ? "Todos los ASICs · TOTAL" : "Mis ASICs"}
-          </h3>
+          <h3 className="nh-watcher-section-title nh-watcher-section-title--pro">Equipos</h3>
+          {layout === "fullscreen" ? (
+            <input
+              className="meq-search"
+              value={fleetQ}
+              onChange={(e) => setFleetQ(e.target.value)}
+              placeholder="Filtrar equipos…"
+              aria-label="Filtrar equipos"
+            />
+          ) : null}
           <div
             className={`nh-watcher-rig-list${
               layout === "fullscreen" ? ` nh-watcher-rig-list--pro${rigRowsForList.length >= 4 ? " is-dense" : ""}` : ""
@@ -1959,6 +2039,8 @@ export function NiceHashWatcherDashboard({
                 const nhTypeLabel = (rig.type ?? "UNMANAGED").toString().replace(/_/g, " ");
                 const slotNick = watcherSlotNicknameTrimmed(slotRows, slotIndex);
                 const resolvedNick = rigNicknames[seriesKey] ?? (slotNick || NH_WATCHER_DEFAULT_RIG_NICKNAME);
+                const fleetQuery = fleetQ.trim().toLowerCase();
+                if (fleetQuery && !`${label} ${resolvedNick} ${slotNick}`.toLowerCase().includes(fleetQuery)) return null;
                 const nickSourceHint = rigNicknames[seriesKey]
                   ? "Apodo por equipo (guardado antes en este navegador)"
                   : slotNick
@@ -2311,7 +2393,12 @@ export function NiceHashWatcherDashboard({
   if (layout === "fullscreen") {
     return (
       <>
-        <div className="fact-page mineria-page nh-watcher-fullpage">
+        <div className="fact-page mineria-page nh-watcher-fullpage meq">
+          <div className="aurora" aria-hidden>
+            <i />
+            <i />
+            <i />
+          </div>
           <div className="container nh-watcher-fullpage__container">
             <main className="nh-watcher-fullpage-main">
               <h1 className="visually-hidden">
