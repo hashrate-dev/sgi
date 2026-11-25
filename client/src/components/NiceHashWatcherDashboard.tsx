@@ -843,6 +843,7 @@ export function NiceHashWatcherDashboard({
   const [rigNicknames, setRigNicknames] = useState<Record<string, string>>({});
   const [rigHashSeriesMap, setRigHashSeriesMap] = useState<Record<string, number[]>>({});
   const [nh24ByRig, setNh24ByRig] = useState<Record<string, NhSpeedPoint[]>>({});
+  const [nh24Fleet, setNh24Fleet] = useState<Record<string, { algorithm: string; points: NhSpeedPoint[] }[]>>({});
   /** Historial local ~1 min: suma TH/s y MH/s del toolbar (un watcher o vista TOTAL). */
   const [toolbarSparkSeries, setToolbarSparkSeries] = useState<{ th: number[]; mh: number[] }>({ th: [], mh: [] });
   const [fleetQ, setFleetQ] = useState("");
@@ -1574,9 +1575,11 @@ export function NiceHashWatcherDashboard({
       const rigId = (row.rig.rigId ?? "").trim();
       const algo = nhPrimaryAlgoEnum(row.rig.stats as unknown[]);
       const livePts = rigId ? nh24ByRig[`${row.watcherId.trim().toLowerCase()}|${rigId}`] ?? [] : [];
-      if (livePts.length >= 2) {
+      const lastLive = [...livePts].reverse().find((p) => p.v > 0)?.v ?? 0;
+      const seriesIsThisRig = spd <= 0 || lastLive <= 0 || lastLive < spd * 1.8;
+      if (livePts.length >= 2 && seriesIsThisRig) {
         const list = nhAlgoSeriesIsTh(algo, spd) ? thLists : mhLists;
-        list.push(livePts);
+        list.push(livePts.filter((p) => p.v > 0));
         heatFromNh.push({ label, hours: nhHourlyHeat(livePts, heatNow) });
       }
       const spark = rigHashSeriesMap[seriesKey] ?? [];
@@ -1590,8 +1593,21 @@ export function NiceHashWatcherDashboard({
         heat.push({ label, hours });
       }
     }
-    const th24 = sumSpeedPointsBy5Min(thLists);
-    const mh24 = sumSpeedPointsBy5Min(mhLists);
+    const fleetTh: NhSpeedPoint[][] = [];
+    const fleetMh: NhSpeedPoint[][] = [];
+    const seenFleet = new Set<string>();
+    for (const row of rigRowsForList) {
+      const wid = row.watcherId.trim().toLowerCase();
+      if (seenFleet.has(wid)) continue;
+      seenFleet.add(wid);
+      for (const series of nh24Fleet[wid] ?? []) {
+        const last = [...series.points].reverse().find((p) => p.v > 0)?.v ?? 0;
+        const list = nhAlgoSeriesIsTh(series.algorithm, last) ? fleetTh : fleetMh;
+        list.push(series.points.filter((p) => p.v > 0));
+      }
+    }
+    const th24 = sumSpeedPointsBy5Min(fleetTh.length > 0 ? fleetTh : thLists);
+    const mh24 = sumSpeedPointsBy5Min(fleetMh.length > 0 ? fleetMh : mhLists);
     const with24h = (b: { delta: string | null; deltaUp: boolean; stats: { label: string; value: string }[] }) =>
       b.delta ? { ...b, delta: b.delta.replace("vs prom.", "vs prom. 24 h") } : b;
     if (nhAgg.sumTh > 0) {
@@ -1603,6 +1619,14 @@ export function NiceHashWatcherDashboard({
       const series = mh24.length >= 2 ? mh24.map((p) => p.v) : toolbarSparkSeries.mh;
       const b = mh24.length >= 2 ? with24h(bits(series, nhAgg.rigs.length)) : bits(series, nhAgg.rigs.length);
       speeds.push({ key: "mh", label: "MH/s · LTC+DOGE", value: nf(nhAgg.sumMh), unit: "MH/s", series, ...b });
+    }
+    if (!isTotal) {
+      by.clear();
+      for (const row of rigRowsForList) {
+        const name = (row.rig.name ?? row.rig.rigId ?? "equipo").trim() || "equipo";
+        const spd = nhRigSpeedAcceptedFromStats(row.rig.stats as unknown[]) ?? 0;
+        if (spd > 0) by.set(name, (by.get(name) ?? 0) + spd);
+      }
     }
     const slices = [...by.entries()]
       .filter(([, v]) => v > 0)
@@ -1619,9 +1643,10 @@ export function NiceHashWatcherDashboard({
           ? "Hashrate 24 h · guardado de cada equipo"
           : "Hashrate reciente · últimas muestras guardadas",
       heatLabels: heatFromNh.length > 0 ? nhHeatHourLabels(heatNow) : undefined,
+      sliceTitle: isTotal ? "Velocidad por cuenta" : "Velocidad por equipo",
       down,
     };
-  }, [nhAgg, toolbarSparkSeries, rigRowsForList, slotRows, rigHashSeriesMap, nh24ByRig, isTotal]);
+  }, [nhAgg, toolbarSparkSeries, rigRowsForList, slotRows, rigHashSeriesMap, nh24ByRig, nh24Fleet, isTotal]);
 
   const hash24Sig = useMemo(() => {
     const parts: string[] = [];
@@ -1651,20 +1676,29 @@ export function NiceHashWatcherDashboard({
         groups.set(wid, arr);
       }
       const merged: Record<string, NhSpeedPoint[]> = {};
+      const fleets: Record<string, { algorithm: string; points: NhSpeedPoint[] }[]> = {};
       await Promise.all(
         [...groups.entries()].map(async ([wid, rigs]) => {
           try {
             const res = await postNiceHashExternalHash24h(wid, rigs);
             for (const row of res.rigs) {
-              const points = (row.points ?? []).filter((p) => Number.isFinite(p.t) && Number.isFinite(p.v));
+              const points = (row.points ?? []).filter((p) => Number.isFinite(p.t) && Number.isFinite(p.v) && p.v > 0);
               if (points.length > 0) merged[`${wid}|${row.rigId}`] = points;
             }
+            const fleet = (res.fleet ?? [])
+              .map((row) => ({
+                algorithm: row.algorithm,
+                points: (row.points ?? []).filter((p) => Number.isFinite(p.t) && Number.isFinite(p.v) && p.v > 0),
+              }))
+              .filter((row) => row.points.length > 0);
+            if (fleet.length > 0) fleets[wid] = fleet;
           } catch {
             /* se reintenta en el próximo ciclo */
           }
         })
       );
       if (!cancelled && Object.keys(merged).length > 0) setNh24ByRig(merged);
+      if (!cancelled && Object.keys(fleets).length > 0) setNh24Fleet(fleets);
     };
     void load();
     const id = window.setInterval(() => void load(), 5 * 60 * 1000);
@@ -1834,6 +1868,7 @@ export function NiceHashWatcherDashboard({
               healthNote={meqFront.down ? `${meqFront.down} fuera de minado` : "Sin equipos caídos"}
               cells={meqFront.cells}
               slices={meqFront.slices}
+              sliceTitle={meqFront.sliceTitle}
               walletAmt={paraRetirarBtc == null ? "—" : formatNiceHashBtc8(paraRetirarBtc)}
               walletNote={
                 paraRetirarBtc == null
@@ -1850,7 +1885,6 @@ export function NiceHashWatcherDashboard({
               heat={meqFront.heat}
               heatTitle={meqFront.heatTitle}
               heatLabels={meqFront.heatLabels}
-              speedNote="Cada lectura de los equipos queda en la base. Se conserva 6 meses; el gráfico y el mapa muestran las últimas 24 h."
               onOpenSpeed={() => setFleetHashDetailOpen(true)}
             />
           ) : null}

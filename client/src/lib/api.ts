@@ -848,6 +848,7 @@ export function getNiceHashWatcherRigHashHistory(
 
 export type NhExternalHash24Response = {
   rigs: { rigId: string; points: { t: number; v: number }[] }[];
+  fleet?: { algorithm: string; points: { t: number; v: number }[] }[];
 };
 
 /** Historial público de NiceHash: velocidad aceptada de cada equipo en las últimas 24 h. */

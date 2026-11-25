@@ -132,3 +132,28 @@ export async function fetchNhRigSpeedHistory(
   await Promise.all(Array.from({ length: Math.min(6, Math.max(1, jobs.length)) }, () => worker()));
   return results;
 }
+
+/** Velocidad de toda la cuenta (no por equipo). Es la curva que NiceHash muestra para el watcher. */
+export async function fetchNhFleetSpeedHistory(
+  watcherId: string,
+  algorithms: string[],
+  sinceMs: number
+): Promise<{ algorithm: string; points: NhSpeedPoint[] }[]> {
+  const orders = await algorithmOrderByEnum();
+  const after = Number.isFinite(sinceMs) ? sinceMs : Date.now() - WINDOW_MS;
+  const out: { algorithm: string; points: NhSpeedPoint[] }[] = [];
+  const seen = new Set<string>();
+  for (const raw of algorithms) {
+    const algorithm = raw.trim().toUpperCase();
+    if (!algorithm || seen.has(algorithm)) continue;
+    const order = orders.get(algorithm);
+    if (order == null) continue;
+    seen.add(algorithm);
+    const url =
+      `${NH_HOST}/main/api/v2/mining/external/${encodeURIComponent(watcherId)}` +
+      `/rigs/stats/algo?algorithm=${order}&afterTimestamp=${after}`;
+    const points = await fetchStream(url, after);
+    if (points.length > 0) out.push({ algorithm, points });
+  }
+  return out;
+}

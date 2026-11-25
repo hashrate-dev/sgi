@@ -706,8 +706,8 @@ monitorEquiposAsicHistorialRouter.post(
       res.status(401).json({ error: { message: "No autenticado." } });
       return;
     }
-    const rigs = await syncNhSpeedLogFromNiceHash(user.id, parsed.data.watcherId, parsed.data.rigs);
-    res.json({ rigs });
+    const history = await syncNhSpeedLogFromNiceHash(user.id, parsed.data.watcherId, parsed.data.rigs);
+    res.json(history);
   }
 );
 

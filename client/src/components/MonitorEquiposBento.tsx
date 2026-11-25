@@ -33,7 +33,7 @@ export type MonitorEquiposBentoProps = {
   heat: { label: string; hours: number[] }[];
   heatTitle?: string;
   heatLabels?: string[];
-  speedNote?: string;
+  sliceTitle?: string;
   onOpenSpeed?: () => void;
 };
 
@@ -131,7 +131,6 @@ export function MonitorEquiposBento(props: MonitorEquiposBentoProps) {
                 ))}
               </div>
               <LiveChart series={speed.series} color={algo === 0 ? "#2ee6a6" : "#a78bfa"} />
-              {props.speedNote ? <p className="meq-usd">{props.speedNote}</p> : null}
             </>
           ) : (
             <p className="meq-usd">Sin velocidad reportada.</p>
@@ -186,15 +185,15 @@ export function MonitorEquiposBento(props: MonitorEquiposBentoProps) {
 
         <article className="meq-card meq-s4">
           <div className="meq-h">
-            <div className="meq-t">Velocidad por cuenta</div>
+            <div className="meq-t">{props.sliceTitle ?? "Velocidad por cuenta"}</div>
           </div>
           <div style={{ display: "flex", justifyContent: "center" }}>
-            <svg viewBox="0 0 100 100" width="130" height="130" style={{ transform: "rotate(-90deg)" }}>
-              <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,.06)" strokeWidth="12" />
+            <svg className="meq-donut" viewBox="0 0 100 100" width="148" height="148">
+              <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="14" />
               {props.slices.map((s) => {
                 const len = (s.value / tot) * C;
                 const el = (
-                  <circle key={s.label} cx="50" cy="50" r="40" fill="none" stroke={s.color} strokeWidth="12" strokeDasharray={`${Math.max(0, len - 1.2)} ${C}`} strokeDashoffset={-off}>
+                  <circle key={s.label} cx="50" cy="50" r="40" fill="none" stroke={s.color} strokeWidth="14" strokeDasharray={`${Math.max(0, len - 1.5)} ${C}`} strokeDashoffset={-off}>
                     <title>{s.label}</title>
                   </circle>
                 );

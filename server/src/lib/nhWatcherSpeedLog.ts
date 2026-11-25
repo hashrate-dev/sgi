@@ -1,5 +1,5 @@
 import { db } from "../db.js";
-import { fetchNhRigSpeedHistory } from "./nicehashExternalHashHistory.js";
+import { fetchNhFleetSpeedHistory, fetchNhRigSpeedHistory } from "./nicehashExternalHashHistory.js";
 import { proxyNiceHashRigs2WithExtras } from "./nicehashExternalRigsMerge.js";
 import { nhPickPrimaryMiningStat, nhRigSpeedAcceptedFromStats } from "./nhSpeedAccepted.js";
 
@@ -74,7 +74,10 @@ export async function upsertNhSpeedLog(userId: number, watcherId: string, sample
         `INSERT INTO nh_watcher_rig_speed_log (user_id, watcher_id, rig_key, rig_label, sample_t, speed, algorithm)
          VALUES ${values}
          ON CONFLICT (user_id, watcher_id, rig_key, sample_t)
-         DO UPDATE SET speed = excluded.speed, rig_label = excluded.rig_label, algorithm = excluded.algorithm`
+         DO UPDATE SET
+           speed = CASE WHEN excluded.speed > 0 THEN excluded.speed ELSE nh_watcher_rig_speed_log.speed END,
+           rig_label = CASE WHEN excluded.rig_label <> '' THEN excluded.rig_label ELSE nh_watcher_rig_speed_log.rig_label END,
+           algorithm = CASE WHEN excluded.algorithm <> '' THEN excluded.algorithm ELSE nh_watcher_rig_speed_log.algorithm END`
       )
       .run(...params);
     written += r.changes;
@@ -137,12 +140,19 @@ export async function syncNhSpeedLogFromNiceHash(
   userId: number,
   watcherId: string,
   rigs: { rigId: string; algorithm: string; label?: string }[]
-): Promise<{ rigId: string; points: NhSpeedLogPoint[] }[]> {
+): Promise<{
+  rigs: { rigId: string; points: NhSpeedLogPoint[] }[];
+  fleet: { algorithm: string; points: NhSpeedLogPoint[] }[];
+}> {
   const wid = watcherId.trim().toLowerCase();
   const now = Date.now();
   const newest = await newestSampleMs(userId, wid);
   const since = newest == null ? now - BACKFILL_MS : Math.min(newest - 30 * 60 * 1000, now - 6 * 60 * 60 * 1000);
-  const fetched = await fetchNhRigSpeedHistory(wid, rigs, Math.max(since, now - BACKFILL_MS));
+  const windowStart = Math.max(since, now - BACKFILL_MS);
+  const [fetched, fleetFetched] = await Promise.all([
+    fetchNhRigSpeedHistory(wid, rigs, windowStart),
+    fetchNhFleetSpeedHistory(wid, rigs.map((r) => r.algorithm), windowStart),
+  ]);
   const labels = new Map(rigs.map((r) => [r.rigId.trim(), (r.label ?? r.rigId).trim()]));
   const algos = new Map(rigs.map((r) => [r.rigId.trim(), r.algorithm.trim().toUpperCase()]));
   const samples: NhSpeedLogSample[] = [];
@@ -158,11 +168,32 @@ export async function syncNhSpeedLogFromNiceHash(
       });
     }
   }
+  for (const fleet of fleetFetched) {
+    for (const p of fleet.points) {
+      samples.push({
+        rigKey: `__fleet:${fleet.algorithm}`,
+        label: fleet.algorithm,
+        t: p.t,
+        speed: p.v,
+        algorithm: fleet.algorithm,
+      });
+    }
+  }
   if (samples.length > 0) await upsertNhSpeedLog(userId, wid, samples);
   const stored = await readNhSpeedLogSince(userId, wid, now - CHART_WINDOW_MS);
-  if (stored.length > 0) return stored.map((r) => ({ rigId: r.rigId, points: r.points }));
   const cutoff = now - CHART_WINDOW_MS;
-  return fetched.map((r) => ({ rigId: r.rigId, points: r.points.filter((p) => p.t >= cutoff) }));
+  const rigRows = stored.filter((r) => !r.rigId.startsWith("__fleet:"));
+  const fleetRows = stored.filter((r) => r.rigId.startsWith("__fleet:"));
+  return {
+    rigs:
+      rigRows.length > 0
+        ? rigRows.map((r) => ({ rigId: r.rigId, points: r.points }))
+        : fetched.map((r) => ({ rigId: r.rigId, points: r.points.filter((p) => p.t >= cutoff) })),
+    fleet:
+      fleetRows.length > 0
+        ? fleetRows.map((r) => ({ algorithm: r.algorithm || r.label, points: r.points }))
+        : fleetFetched.map((r) => ({ algorithm: r.algorithm, points: r.points.filter((p) => p.t >= cutoff) })),
+  };
 }
 
 function rigsFromPayload(payload: Record<string, unknown>): { rigId: string; algorithm: string; label: string; speed: number }[] {
@@ -242,7 +273,7 @@ export async function cronSyncKnownWatcherSpeedLogs(): Promise<{ watchers: numbe
       }))
     );
     const synced = await syncNhSpeedLogFromNiceHash(job.userId, job.watcherId, rigs);
-    written += synced.reduce((n, r) => n + r.points.length, 0);
+    written += synced.rigs.reduce((n, r) => n + r.points.length, 0);
   }
   return { watchers: jobs.length, written };
 }

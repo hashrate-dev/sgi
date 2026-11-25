@@ -2,7 +2,7 @@
 
 .meq {
   --bg: #07090a;
-  --panel: rgba(20, 26, 25, 0.62);
+  --panel: rgba(12, 18, 17, 0.94);
   --panel-solid: #111716;
   --panel2: rgba(255, 255, 255, 0.035);
   --line: rgba(255, 255, 255, 0.07);
@@ -174,8 +174,50 @@
 .meq-search { height: 38px; width: min(280px, 100%); border-radius: 12px; background: var(--panel); border: 1px solid var(--line); color: var(--text); padding: 0 12px; outline: none; margin: 0 0 14px; }
 .meq-search:focus { border-color: var(--sha); }
 
+.meq-donut { display: block; transform: rotate(-90deg); }
+.meq-donut circle { fill: none; }
+
+html:has(.meq),
+body:has(.meq) {
+  background: #07090a !important;
+  background-image: none !important;
+}
+.sgi-protected-root:has(.meq) {
+  background: #07090a !important;
+}
+.sgi-protected-root:has(.meq) .sgi-farm-bg-overlay {
+  display: none !important;
+}
+.fact-page.mineria-page.nh-watcher-fullpage.meq {
+  width: 100%;
+  max-width: none;
+  min-height: calc(100dvh - 56px);
+  background: #07090a !important;
+}
+.sgi-protected-root .meq .nh-watcher-fullpage__container {
+  max-width: none !important;
+  width: 100% !important;
+  padding-left: 28px !important;
+  padding-right: 28px !important;
+}
+.fact-page.mineria-page.nh-watcher-fullpage.meq .nh-watcher-page-footer--sgi {
+  left: 28px !important;
+  right: 28px !important;
+  width: auto !important;
+  max-width: none !important;
+  transform: none !important;
+}
+
 @media (max-width: 1100px) {
   .meq-s8, .meq-s6, .meq-s4, .meq-s3 { grid-column: span 12; }
+  .sgi-protected-root .meq .nh-watcher-fullpage__container {
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+  }
+  .fact-page.mineria-page.nh-watcher-fullpage.meq .nh-watcher-page-footer--sgi {
+    left: 14px !important;
+    right: 14px !important;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .meq .aurora i { animation: none; }
