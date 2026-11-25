@@ -189,35 +189,12 @@ body:has(.meq) {
   display: none !important;
 }
 .fact-page.mineria-page.nh-watcher-fullpage.meq {
-  width: 100%;
-  max-width: none;
   min-height: calc(100dvh - 56px);
   background: #07090a !important;
-}
-.sgi-protected-root .meq .nh-watcher-fullpage__container {
-  max-width: none !important;
-  width: 100% !important;
-  padding-left: 28px !important;
-  padding-right: 28px !important;
-}
-.fact-page.mineria-page.nh-watcher-fullpage.meq .nh-watcher-page-footer--sgi {
-  left: 28px !important;
-  right: 28px !important;
-  width: auto !important;
-  max-width: none !important;
-  transform: none !important;
 }
 
 @media (max-width: 1100px) {
   .meq-s8, .meq-s6, .meq-s4, .meq-s3 { grid-column: span 12; }
-  .sgi-protected-root .meq .nh-watcher-fullpage__container {
-    padding-left: 14px !important;
-    padding-right: 14px !important;
-  }
-  .fact-page.mineria-page.nh-watcher-fullpage.meq .nh-watcher-page-footer--sgi {
-    left: 14px !important;
-    right: 14px !important;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   .meq .aurora i { animation: none; }
