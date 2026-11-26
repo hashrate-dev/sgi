@@ -15,6 +15,25 @@
   display: block;
 }
 
+html.hrs-protected-green-bg:has(.asic-monitor-zip),
+html:has(.asic-monitor-zip) {
+  overflow: hidden !important;
+  scrollbar-gutter: auto !important;
+  background-image: none !important;
+  background-color: #07090a !important;
+}
+
+body.hrs-protected-green-bg:has(.asic-monitor-zip),
+body:has(.asic-monitor-zip) {
+  overflow: hidden !important;
+  scrollbar-gutter: auto !important;
+  background: #07090a !important;
+}
+
+html.hrs-protected-green-bg:has(.asic-monitor-zip) #root {
+  background: #07090a !important;
+}
+
 .sgi-protected-root:has(.asic-monitor-zip) {
   background-image: none !important;
   background-color: #07090a !important;
