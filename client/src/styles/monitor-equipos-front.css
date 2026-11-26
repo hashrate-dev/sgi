@@ -155,14 +155,35 @@
 .meq-hc.bad { background: color-mix(in srgb, var(--bad) 70%, transparent); }
 
 .meq .nh-watcher-section-title--pro { font: 600 22px var(--disp); letter-spacing: -0.02em; color: var(--text); margin: 28px 0 6px; }
-.meq .nh-watcher-rig-list--pro { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.meq .nh-watcher-rig-list--pro,
+.meq .nh-watcher-rig-list--pro.is-dense {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 640px), 1fr));
+  gap: 16px;
+}
 .meq .nh-watcher-rig-card--pro {
   background: var(--panel) !important;
   border: 0 !important;
   border-radius: 20px !important;
   box-shadow: var(--glow) !important;
-  padding: 18px !important;
+  padding: 18px 20px !important;
   color: var(--text);
+  width: 100%;
+  min-width: 0;
+}
+.meq .nh-watcher-rig-card__metrics {
+  gap: 10px;
+}
+.meq .nh-watcher-rig-metric {
+  padding: 10px 12px 12px;
+}
+.meq .nh-watcher-rig-metric__kicker {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+.meq .nh-watcher-rig-metric__value,
+.meq .nh-watcher-rig-metric__value-main {
+  font-size: 15px;
 }
 .meq .nh-watcher-rig-card--pro:hover { transform: translateY(-3px); }
 .meq .nh-watcher-rig-metric__value,
