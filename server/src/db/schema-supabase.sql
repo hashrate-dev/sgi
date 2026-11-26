@@ -790,6 +790,14 @@ CREATE TABLE IF NOT EXISTS nh_watcher_credit_days (
   PRIMARY KEY (user_id, watcher_id, day_key)
 );
 
+-- Cuentas NiceHash y ViaBTC del monitor. Una sola lista para Administrador A y Administrador B.
+CREATE TABLE IF NOT EXISTS monitor_pool_accounts (
+  id INTEGER PRIMARY KEY,
+  body_json TEXT NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_by INTEGER
+);
+
 -- Agregados TH/MH por intervalo (15 / 30 / 60 min), materializados desde muestras 1 min
 CREATE TABLE IF NOT EXISTS nh_watcher_rig_hash_agg_samples (
   id BIGSERIAL PRIMARY KEY,

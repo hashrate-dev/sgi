@@ -91,6 +91,7 @@ export function isStaffPathAllowedInSpa(
     return user.role === "admin_a" || user.role === "admin_b";
   }
   if (pathRaw === "/monitor" || pathRaw.startsWith("/monitor/")) return true;
+  if (pathRaw === "/asic/monitor-equipos" && user.role === "admin_b") return true;
   if (user.role !== "admin_b" && user.role !== "operador") return true;
   const g = user.admin_b_grants;
   if (g == null) return true;
@@ -135,11 +136,11 @@ function lectorGrantsList(user: PermUser): string[] | null | undefined {
   return user.lector_grants;
 }
 
-/** Monitor ASIC corporativo (no vitrina): Administrador A, o B/Operador con permiso `equipos`. */
+/** Monitor ASIC corporativo: Administrador A y Administrador B siempre. Operador y lector, si tienen la pantalla. */
 export function canAccessMonitorEquiposAsic(user: PermUser): boolean {
   if (!user) return false;
-  if (user.role === "admin_a") return true;
-  if (user.role === "operador" || user.role === "admin_b" || user.role === "lector") {
+  if (user.role === "admin_a" || user.role === "admin_b") return true;
+  if (user.role === "operador" || user.role === "lector") {
     return canUserAccessScreen(user, "asic-monitor");
   }
   return false;

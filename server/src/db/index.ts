@@ -258,6 +258,14 @@ async function ensureSupabaseNhSpeedLog(pool: Pool) {
         PRIMARY KEY (user_id, watcher_id, day_key)
       )
     `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS monitor_pool_accounts (
+        id INTEGER PRIMARY KEY,
+        body_json TEXT NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_by INTEGER
+      )
+    `);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.warn("[DB] ensureSupabaseNhSpeedLog:", msg);

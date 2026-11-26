@@ -441,22 +441,50 @@ const FALLBACK=[
   ['f3a8455b-37ea-4ca8-945b-ca0fb42343b2','W7'],['f6c6afe8-a98b-482b-a695-471c3609ea75','W8'],
   ['8fb9a56e-1afc-4909-b302-94ba1fcc5c6f','W9'],['170b192a-cb0f-4983-a050-fb5d2daf8f83','W10']
 ].map(([id,name])=>({id,name}));
-function loadSlots(){
+function loadSlotsStored(){
   try{
     const raw=JSON.parse(ls.get(SLOTS_KEY)||'null');
-    if(Array.isArray(raw)){
-      const out=[];
-      for(const item of raw){
-        const link=typeof item==='string'?item:String(item?.link||'');
-        const m=link.match(UUID); if(!m) continue;
-        const name=String(item?.nickname||'').trim()||`W${out.length+1}`;
-        out.push({id:m[0].toLowerCase(),name});
-      }
-      if(out.length) return out;
+    if(!Array.isArray(raw)) return [];
+    const out=[];
+    for(const item of raw){
+      const link=typeof item==='string'?item:String(item?.link||item?.id||'');
+      const m=link.match(UUID); if(!m) continue;
+      const name=String(item?.nickname||item?.name||'').trim()||`W${out.length+1}`;
+      out.push({id:m[0].toLowerCase(),name});
     }
-  }catch{}
+    return out;
+  }catch{return []}
+}
+function loadSlots(){
+  const out=loadSlotsStored();
+  if(out.length) return out;
   if(loadVia().length) return [];
   return FALLBACK.slice();
+}
+let accountsReady=false;
+async function syncAccounts(){
+  if(accountsReady) return;
+  try{
+    const remote=await api(API+'/accounts');
+    const nh=Array.isArray(remote.nicehash)?remote.nicehash:[];
+    const via=Array.isArray(remote.viabtc)?remote.viabtc:[];
+    if(nh.length||via.length){
+      saveSlots(nh);
+      saveVia(via);
+    }else{
+      const localNh=loadSlotsStored();
+      const localVia=loadVia();
+      if(localNh.length||localVia.length) await pushAccounts(localNh,localVia);
+    }
+  }catch{}
+  accountsReady=true;
+}
+async function pushAccounts(nh,via){
+  await api(API+'/accounts',{method:'PUT',body:JSON.stringify({
+    nicehash:(nh||[]).map(w=>({id:w.id,name:w.name})),
+    viabtc:(via||[]).map(v=>({name:v.name,link:v.link||v.accessKey||''}))
+  })});
+  accountsReady=true;
 }
 const VIA_KEY='viaObserverLinks:v1';
 function viaKey(raw){
@@ -526,6 +554,7 @@ function normRig(r,i,w,p){
 /* ======================= Carga de datos ======================= */
 async function loadAll(manual){
   if(D.syncing)return;D.syncing=true;setPill('load','Sincronizando…');$('#refresh').classList.add('spin');
+  await syncAccounts();
   let retry=false;
   try{
     const watchers=loadSlots();
@@ -590,7 +619,7 @@ async function saveCfg(){
     return accessKey?{name:String(r.querySelector('.cfg-n').value||'').trim().slice(0,40)||'ViaBTC',link,accessKey}:null;
   }).filter(Boolean);
   $('#cfgSave').textContent='Guardando…';
-  try{saveSlots(watchers);saveVia(via);$('#cfg').classList.remove('open');toast('Cuentas guardadas');await loadAll(true)}
+  try{saveSlots(watchers);saveVia(via);await pushAccounts(watchers,via);$('#cfg').classList.remove('open');toast('Cuentas guardadas');await loadAll(true)}
   catch(e){toast('No se pudo guardar: '+e.message,true)}finally{$('#cfgSave').textContent='Guardar'}
 }
 

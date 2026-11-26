@@ -1153,6 +1153,12 @@ CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_visitor ON marketplace_presence_
     PRIMARY KEY (user_id, watcher_id, day_key),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   )`);
+  native.exec(`CREATE TABLE IF NOT EXISTS monitor_pool_accounts (
+    id INTEGER PRIMARY KEY,
+    body_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_by INTEGER
+  )`);
 
   /** Agregados 15 / 30 / 60 min derivados de muestras 1 min (misma ventana de retención). */
   native.exec(`CREATE TABLE IF NOT EXISTS nh_watcher_rig_hash_agg_samples (

@@ -681,6 +681,96 @@ monitorEquiposAsicHistorialRouter.post(
   }
 );
 
+const poolAccountsBody = z.object({
+  nicehash: z
+    .array(
+      z.object({
+        id: z.string().uuid(),
+        name: z.string().trim().max(48).optional(),
+      })
+    )
+    .max(16),
+  viabtc: z
+    .array(
+      z.object({
+        name: z.string().trim().max(48).optional(),
+        link: z.string().trim().max(300),
+      })
+    )
+    .max(8)
+    .optional(),
+});
+
+function readPoolAccounts(raw: unknown): { nicehash: { id: string; name: string }[]; viabtc: { name: string; link: string }[] } {
+  let body = raw;
+  if (typeof body === "string") {
+    try {
+      body = JSON.parse(body);
+    } catch {
+      body = {};
+    }
+  }
+  const parsed = poolAccountsBody.safeParse(body ?? { nicehash: [] });
+  if (!parsed.success) return { nicehash: [], viabtc: [] };
+  const seen = new Set<string>();
+  const nicehash: { id: string; name: string }[] = [];
+  for (const row of parsed.data.nicehash) {
+    const id = row.id.toLowerCase();
+    if (seen.has(id)) continue;
+    seen.add(id);
+    nicehash.push({ id, name: (row.name || "").trim().slice(0, 48) || `W${nicehash.length + 1}` });
+  }
+  const viabtc = (parsed.data.viabtc ?? [])
+    .map((row, i) => ({
+      name: (row.name || "").trim().slice(0, 48) || `ViaBTC ${i + 1}`,
+      link: row.link.trim(),
+    }))
+    .filter((row) => /[?&]access_key=[a-f0-9]{16,64}/i.test(row.link) || /^[a-f0-9]{16,64}$/i.test(row.link));
+  return { nicehash, viabtc };
+}
+
+/** Lista compartida de cuentas del monitor. La ven Administrador A y Administrador B. */
+monitorEquiposAsicHistorialRouter.get(
+  "/monitor-equipos-asic/accounts",
+  requireRole("admin_a", "admin_b"),
+  async (req: Request, res: Response) => {
+    if (!req.user) {
+      res.status(401).json({ error: { message: "No autenticado." } });
+      return;
+    }
+    const row = (await db.prepare(`SELECT body_json FROM monitor_pool_accounts WHERE id = 1`).get()) as
+      | { body_json?: unknown }
+      | undefined;
+    res.json(readPoolAccounts(row?.body_json));
+  }
+);
+
+monitorEquiposAsicHistorialRouter.put(
+  "/monitor-equipos-asic/accounts",
+  requireRole("admin_a", "admin_b"),
+  async (req: Request, res: Response) => {
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ error: { message: "No autenticado." } });
+      return;
+    }
+    const saved = readPoolAccounts(req.body);
+    const json = JSON.stringify(saved);
+    const now = new Date().toISOString();
+    await db
+      .prepare(
+        `INSERT INTO monitor_pool_accounts (id, body_json, updated_at, updated_by)
+         VALUES (1, ?, ?, ?)
+         ON CONFLICT (id) DO UPDATE SET
+           body_json = excluded.body_json,
+           updated_at = excluded.updated_at,
+           updated_by = excluded.updated_by`
+      )
+      .run(json, now, user.id);
+    res.json(saved);
+  }
+);
+
 const postMonitorBoardBody = z.object({
   refresh: z.boolean().optional(),
   watchers: z
@@ -706,7 +796,6 @@ const postMonitorBoardBody = z.object({
 monitorEquiposAsicHistorialRouter.post(
   "/monitor-equipos-asic/board",
   requireRole("admin_a", "admin_b"),
-  requireAdminBGrant("equipos"),
   async (req: Request, res: Response) => {
     const parsed = postMonitorBoardBody.safeParse(req.body);
     if (!parsed.success) {
