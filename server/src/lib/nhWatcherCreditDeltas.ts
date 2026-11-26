@@ -24,6 +24,21 @@ export function artDayStartMs(now = Date.now()): number {
   return Date.UTC(artPart(now, "year"), artPart(now, "month") - 1, artPart(now, "day"), 3, 0, 0, 0);
 }
 
+export function artDayKey(ms: number): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: ART,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(ms));
+}
+
+export function artDayStartFromKey(key: string): number {
+  const [y, m, d] = key.split("-").map(Number);
+  if (!y || !m || !d) return 0;
+  return Date.UTC(y, m - 1, d, 3, 0, 0, 0);
+}
+
 export function artMonthStartMs(now = Date.now()): number {
   return Date.UTC(artPart(now, "year"), artPart(now, "month") - 1, 1, 3, 0, 0, 0);
 }
@@ -102,7 +117,59 @@ export async function syncNhCreditDeltas(userId: number, watcherId: string): Pro
       .run(...params);
     written += r.changes;
   }
+  const days = rows.map(([t]) => artDayKey(t));
+  await rebuildCreditDays(userId, wid, days);
   return written;
+}
+
+const CREDIT_DAY_KEEP_MS = 183 * 24 * 60 * 60 * 1000;
+
+async function rebuildCreditDays(userId: number, watcherId: string, dayKeys: string[]): Promise<void> {
+  const keys = [...new Set(dayKeys)].filter((k) => artDayStartFromKey(k) > 0);
+  for (const key of keys) {
+    const start = artDayStartFromKey(key);
+    const row = (await db
+      .prepare(
+        `SELECT COALESCE(SUM(delta_btc), 0) AS s
+         FROM nh_watcher_credit_deltas
+         WHERE user_id = ? AND watcher_id = ? AND sample_t >= ? AND sample_t < ? AND delta_btc > 0`
+      )
+      .get(userId, watcherId, start, start + 86_400_000)) as { s?: unknown } | undefined;
+    const btc = Number(row?.s);
+    await db
+      .prepare(
+        `INSERT INTO nh_watcher_credit_days (user_id, watcher_id, day_key, btc)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT (user_id, watcher_id, day_key) DO UPDATE SET btc = excluded.btc`
+      )
+      .run(userId, watcherId, key, Number.isFinite(btc) ? btc : 0);
+  }
+  const cut = artDayKey(Date.now() - CREDIT_DAY_KEEP_MS);
+  await db
+    .prepare(`DELETE FROM nh_watcher_credit_days WHERE user_id = ? AND watcher_id = ? AND day_key < ?`)
+    .run(userId, watcherId, cut);
+}
+
+const creditDaysChecked = new Map<string, number>();
+
+/** Completa los días de BTC acreditado que todavía no están resumidos. */
+export async function ensureCreditDays(userId: number, watcherId: string): Promise<void> {
+  const cacheKey = `${userId}|${watcherId}`;
+  if (Date.now() - (creditDaysChecked.get(cacheKey) ?? 0) < 10 * 60 * 1000) return;
+  const rows = (await db
+    .prepare(
+      `SELECT sample_t FROM nh_watcher_credit_deltas
+       WHERE user_id = ? AND watcher_id = ? AND delta_btc > 0`
+    )
+    .all(userId, watcherId)) as Array<{ sample_t?: unknown }>;
+  const keys = [...new Set(rows.map((r) => artDayKey(Number(r.sample_t))).filter(Boolean))];
+  const haveRows = (await db
+    .prepare(`SELECT day_key FROM nh_watcher_credit_days WHERE user_id = ? AND watcher_id = ?`)
+    .all(userId, watcherId)) as Array<{ day_key?: unknown }>;
+  const have = new Set(haveRows.map((r) => String(r.day_key ?? "")));
+  const missing = keys.filter((k) => !have.has(k));
+  if (missing.length) await rebuildCreditDays(userId, watcherId, missing);
+  creditDaysChecked.set(cacheKey, Date.now());
 }
 
 export async function sumNhCredits(

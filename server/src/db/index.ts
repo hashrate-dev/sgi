@@ -249,6 +249,15 @@ async function ensureSupabaseNhSpeedLog(pool: Pool) {
     await pool.query(
       `CREATE INDEX IF NOT EXISTS idx_nh_credit_deltas_user_t ON nh_watcher_credit_deltas(user_id, sample_t)`
     );
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS nh_watcher_credit_days (
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        watcher_id TEXT NOT NULL,
+        day_key TEXT NOT NULL,
+        btc DOUBLE PRECISION NOT NULL,
+        PRIMARY KEY (user_id, watcher_id, day_key)
+      )
+    `);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.warn("[DB] ensureSupabaseNhSpeedLog:", msg);

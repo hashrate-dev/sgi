@@ -1,0 +1,26 @@
+.asic-monitor-zip {
+  width: 100%;
+  max-width: var(--sgi-layout-max, 1400px);
+  margin: 0 auto;
+  height: calc(100dvh - var(--sgi-topbar-h, 80px) - var(--sgi-footer-h, 52px));
+  min-height: 640px;
+  background: #07090a;
+}
+
+.asic-monitor-zip-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #07090a;
+  display: block;
+}
+
+.sgi-protected-root:has(.asic-monitor-zip) {
+  background-image: none !important;
+  background-color: #07090a !important;
+}
+
+.sgi-protected-root:has(.asic-monitor-zip) .sgi-farm-bg-overlay,
+.sgi-protected-root:has(.asic-monitor-zip) .sgi-hashrate-brand-logo {
+  display: none !important;
+}

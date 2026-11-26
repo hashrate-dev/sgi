@@ -781,6 +781,15 @@ CREATE TABLE IF NOT EXISTS nh_watcher_credit_deltas (
 
 CREATE INDEX IF NOT EXISTS idx_nh_credit_deltas_user_t ON nh_watcher_credit_deltas(user_id, sample_t);
 
+-- Suma diaria del BTC acreditado (día de Argentina). Sirve para las barras de 14 días y el mes. Se conserva 6 meses.
+CREATE TABLE IF NOT EXISTS nh_watcher_credit_days (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  watcher_id TEXT NOT NULL,
+  day_key TEXT NOT NULL,
+  btc DOUBLE PRECISION NOT NULL,
+  PRIMARY KEY (user_id, watcher_id, day_key)
+);
+
 -- Agregados TH/MH por intervalo (15 / 30 / 60 min), materializados desde muestras 1 min
 CREATE TABLE IF NOT EXISTS nh_watcher_rig_hash_agg_samples (
   id BIGSERIAL PRIMARY KEY,

@@ -1145,6 +1145,14 @@ CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_visitor ON marketplace_presence_
   native.exec(
     `CREATE INDEX IF NOT EXISTS idx_nh_credit_deltas_user_t ON nh_watcher_credit_deltas(user_id, sample_t)`
   );
+  native.exec(`CREATE TABLE IF NOT EXISTS nh_watcher_credit_days (
+    user_id INTEGER NOT NULL,
+    watcher_id TEXT NOT NULL,
+    day_key TEXT NOT NULL,
+    btc REAL NOT NULL,
+    PRIMARY KEY (user_id, watcher_id, day_key),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`);
 
   /** Agregados 15 / 30 / 60 min derivados de muestras 1 min (misma ventana de retención). */
   native.exec(`CREATE TABLE IF NOT EXISTS nh_watcher_rig_hash_agg_samples (

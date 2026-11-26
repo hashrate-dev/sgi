@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "../db.js";
 import { requireRole } from "../middleware/auth.js";
 import { requireAdminBGrant } from "../middleware/adminBGrant.js";
+import { buildNhMonitorBoard } from "../lib/nhMonitorBoard.js";
 import { cronSyncNhCredits, listCreditWatcherIds, sumNhCredits, syncNhCreditDeltas } from "../lib/nhWatcherCreditDeltas.js";
 import { cronSyncKnownWatcherSpeedLogs, syncNhSpeedLogFromNiceHash } from "../lib/nhWatcherSpeedLog.js";
 import { proxyNiceHashRigs2WithExtras } from "../lib/nicehashExternalRigsMerge.js";
@@ -676,6 +677,59 @@ monitorEquiposAsicHistorialRouter.post(
       );
     }
     res.json(r.data);
+  }
+);
+
+const postMonitorBoardBody = z.object({
+  refresh: z.boolean().optional(),
+  watchers: z
+    .array(
+      z.object({
+        id: z.string().uuid(),
+        name: z.string().trim().max(48).optional(),
+      })
+    )
+    .max(16),
+});
+
+/** Tablero del monitor: rigs en vivo, historial de 7 días (archivo de 6 meses) y BTC acreditado. */
+monitorEquiposAsicHistorialRouter.post(
+  "/monitor-equipos-asic/board",
+  requireRole("admin_a", "admin_b"),
+  requireAdminBGrant("equipos"),
+  async (req: Request, res: Response) => {
+    const parsed = postMonitorBoardBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: { message: "Body inválido (watchers)." } });
+      return;
+    }
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ error: { message: "No autenticado." } });
+      return;
+    }
+    const seen = new Set<string>();
+    const watchers: { id: string; name: string }[] = [];
+    for (const w of parsed.data.watchers) {
+      const id = w.id.trim().toLowerCase();
+      if (seen.has(id)) continue;
+      seen.add(id);
+      watchers.push({ id, name: (w.name || "").trim().slice(0, 48) || `W${watchers.length + 1}` });
+    }
+    if (watchers.length === 0) {
+      res.json({
+        watchers: [],
+        payload: {},
+        err: {},
+        btcUsd: null,
+        lastPoll: null,
+        history: {},
+        earnings: { since: Date.now(), days: {}, byWatcher: {} },
+      });
+      return;
+    }
+    const body = await buildNhMonitorBoard(user.id, watchers, Boolean(parsed.data.refresh));
+    res.json(body);
   }
 );
 

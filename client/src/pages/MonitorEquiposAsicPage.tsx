@@ -2,7 +2,6 @@ import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useSta
 import { createPortal } from "react-dom";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { Flex } from "@chakra-ui/react";
-import NiceHashWatcherDashboard from "../components/NiceHashWatcherDashboard";
 import { PageHeader } from "../components/PageHeader";
 import { showToast } from "../components/ToastNotification";
 import { AppButton, AppModal } from "../components/ui";
@@ -40,6 +39,7 @@ import {
 import { canAccessMonitorEquiposAsic } from "../lib/auth";
 import { loadMonitorEquiposAsicRows, saveMonitorEquiposAsicRows } from "../lib/monitorEquiposAsicStorage";
 import "../styles/facturacion.css";
+import "../styles/asic-monitor-zip.css";
 
 /** Solo UUID (el POST de resumen rechaza el body si mezcla ids viejos). */
 const MONITOR_EQUIPO_UUID_RE =
@@ -1697,19 +1697,6 @@ function isRegistroLegacyRouteParam(raw: string | null): boolean {
   return v === "1" || v === "true" || v === "yes" || v === "legacy";
 }
 
-/** Activa el tablero NiceHash a pantalla completa (no es el índice de slot; el slot viene de `?slot=` o de localStorage). */
-function isWatcherOnlyRouteParam(raw: string | null): boolean {
-  if (raw == null) return false;
-  const v = raw.trim().toLowerCase();
-  return v === "1" || v === "true" || v === "yes";
-}
-
-function isWatcherTotalRouteParam(raw: string | null): boolean {
-  if (raw == null) return false;
-  const v = raw.trim().toLowerCase();
-  return v === "total" || v === "all";
-}
-
 /** Administrador A, o Administrador B con permiso inventario equipos ASIC (`equipos`), no solo tienda. */
 export function MonitorEquiposAsicPage() {
   const { user } = useAuth();
@@ -1720,12 +1707,12 @@ export function MonitorEquiposAsicPage() {
   if (isRegistroLegacyRouteParam(searchParams.get("registro"))) {
     return <MonitorEquiposAsicPageContent />;
   }
-  if (isWatcherTotalRouteParam(searchParams.get("watcher"))) {
-    return <NiceHashWatcherDashboard active layout="fullscreen" viewMode="allConfiguredSlots" />;
-  }
-  if (isWatcherOnlyRouteParam(searchParams.get("watcher"))) {
-    return <NiceHashWatcherDashboard active layout="fullscreen" />;
-  }
-  /** Por defecto: mismo tablero que `?watcher=total` (todos los enlaces W1…WN → NiceHash `rigs2` por cuenta). */
-  return <NiceHashWatcherDashboard active layout="fullscreen" viewMode="allConfiguredSlots" />;
+  const watcher = searchParams.get("watcher") || "total";
+  const slot = searchParams.get("slot") || "";
+  const src = `/asic/monitor-front.html?watcher=${encodeURIComponent(watcher)}&slot=${encodeURIComponent(slot)}`;
+  return (
+    <div className="asic-monitor-zip">
+      <iframe className="asic-monitor-zip-frame" title="Monitor de equipos ASIC" src={src} />
+    </div>
+  );
 }
