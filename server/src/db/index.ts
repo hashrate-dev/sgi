@@ -274,9 +274,13 @@ async function ensureSupabaseNhSpeedLog(pool: Pool) {
         sample_t BIGINT NOT NULL,
         btc DOUBLE PRECISION NOT NULL,
         source TEXT NOT NULL DEFAULT '',
+        coin TEXT NOT NULL DEFAULT 'BTC',
         PRIMARY KEY (user_id, watcher_id, rig_key, sample_t)
       )
     `);
+    await pool.query(
+      `ALTER TABLE nh_watcher_rig_btc_ledger ADD COLUMN IF NOT EXISTS coin TEXT NOT NULL DEFAULT 'BTC'`
+    );
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.warn("[DB] ensureSupabaseNhSpeedLog:", msg);

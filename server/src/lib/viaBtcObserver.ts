@@ -1,5 +1,5 @@
 import { readNhSpeedLogSince, upsertNhSpeedLog } from "./nhWatcherSpeedLog.js";
-import { allocateViaRigBtc } from "./rigBtcLedger.js";
+import { allocateViaRigBtc, shareBySpeed } from "./rigBtcLedger.js";
 
 const HOST = "https://www.viabtc.com";
 const UA = "HashrateSGI-MonitorEquiposAsic/1.0";
@@ -113,6 +113,7 @@ export async function buildViaBtcBoard(
   payload: Record<string, Record<string, unknown>>;
   err: Record<string, string>;
   history: Record<string, Record<string, [number, number][]>>;
+  coin24: Record<string, Record<string, number>>;
 }> {
   const key = accounts
     .map((a) => `${a.name}|${a.accessKey.trim().toLowerCase()}`)
@@ -130,11 +131,13 @@ async function buildViaBtcBoardFresh(accounts: ViaAccountIn[], userId: number): 
   payload: Record<string, Record<string, unknown>>;
   err: Record<string, string>;
   history: Record<string, Record<string, [number, number][]>>;
+  coin24: Record<string, Record<string, number>>;
 }> {
   const watchers: { id: string; name: string }[] = [];
   const payload: Record<string, Record<string, unknown>> = {};
   const err: Record<string, string> = {};
   const history: Record<string, Record<string, [number, number][]>> = {};
+  const coin24: Record<string, Record<string, number>> = {};
   const total = new Map<number, number>();
 
   for (const account of accounts) {
@@ -200,6 +203,8 @@ async function buildViaBtcBoardFresh(accounts: ViaAccountIn[], userId: number): 
         }))
         .filter((s) => s.rigKey !== "id:" && s.speed > 0);
       await allocateViaRigBtc(userId, id, key, coin, shares).catch(() => undefined);
+      const profit24 = num(home.profit_24hour);
+      if (profit24 > 0) coin24[id] = shareBySpeed(profit24, shares, coin);
       payload[id] = {
         pool: "viabtc",
         coin,
@@ -255,5 +260,5 @@ async function buildViaBtcBoardFresh(accounts: ViaAccountIn[], userId: number): 
   history["00000000-0000-0000-0000-000000000001"] = {
     __nhToolbarSumZec: [...total.entries()].sort((a, b) => a[0] - b[0]),
   };
-  return { watchers, payload, err, history };
+  return { watchers, payload, err, history, coin24 };
 }

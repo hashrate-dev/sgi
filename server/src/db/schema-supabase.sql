@@ -808,6 +808,7 @@ CREATE TABLE IF NOT EXISTS nh_watcher_rig_btc_ledger (
   sample_t BIGINT NOT NULL,
   btc DOUBLE PRECISION NOT NULL,
   source TEXT NOT NULL DEFAULT '',
+  coin TEXT NOT NULL DEFAULT 'BTC',
   PRIMARY KEY (user_id, watcher_id, rig_key, sample_t)
 );
 

@@ -843,8 +843,10 @@ monitorEquiposAsicHistorialRouter.post(
           history: {} as Record<string, Record<string, [number, number][]>>,
           earnings: { since: Date.now(), days: {}, byWatcher: {} },
         };
+    let coin24: Record<string, Record<string, number>> = {};
     if (viaAccounts.length) {
       const via = await buildViaBtcBoard(viaAccounts, user.id, Boolean(parsed.data.refresh));
+      coin24 = via.coin24 ?? {};
       const merged = body as {
         watchers: { id: string; name: string }[];
         payload: Record<string, unknown>;
@@ -864,8 +866,30 @@ monitorEquiposAsicHistorialRouter.post(
         merged.history[wid] = series;
       }
     }
-    const board = body as { watchers?: { id: string }[]; earnings?: { rigBtc?: Record<string, { h24: number; life: number }> } };
-    const rigBtc = await readRigBtcTotals(user.id, (board.watchers ?? []).map((w) => w.id)).catch(() => ({}));
+    const board = body as {
+      watchers?: { id: string }[];
+      payload?: Record<string, { coin?: unknown }>;
+      earnings?: { rigBtc?: Record<string, { h24: number; life: number; coin?: string }> };
+    };
+    const rigBtc = await readRigBtcTotals(user.id, (board.watchers ?? []).map((w) => w.id)).catch(
+      (): Record<string, { h24: number; life: number; coin: string }> => ({})
+    );
+    for (const [wid, byRig] of Object.entries(coin24)) {
+      const coin = String(board.payload?.[wid]?.coin ?? "").trim().toUpperCase();
+      if (!coin || coin === "BTC") continue;
+      for (const [rigKey, h24] of Object.entries(byRig)) {
+        if (!(h24 > 0)) continue;
+        const key = `${wid}|${rigKey}`;
+        const prev = rigBtc[key];
+        if (prev && prev.h24 > 0) continue;
+        const booked = prev?.life ?? 0;
+        rigBtc[key] = {
+          h24,
+          life: Math.max(booked, h24),
+          coin: prev?.coin && prev.coin !== "BTC" ? prev.coin : coin,
+        };
+      }
+    }
     if (board.earnings) board.earnings.rigBtc = rigBtc;
     res.json(body);
   }

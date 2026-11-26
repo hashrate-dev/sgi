@@ -12,24 +12,31 @@ export type RigShare = {
   profit: number;
 };
 
-type LedgerRow = { rigKey: string; t: number; btc: number; source: string };
+type LedgerRow = { rigKey: string; t: number; btc: number; source: string; coin: string };
 
 function finite(v: unknown): number {
   const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
   return Number.isFinite(n) ? n : 0;
 }
 
+function amountOk(row: LedgerRow): boolean {
+  if (!row.rigKey.startsWith("id:") || !(row.btc > 0) || !Number.isFinite(row.t)) return false;
+  const coin = row.coin.toUpperCase();
+  if (coin === "BTC") return row.btc < 5;
+  return row.btc < 1e8;
+}
+
 async function insertLedger(userId: number, watcherId: string, rows: LedgerRow[]): Promise<void> {
   const wid = watcherId.trim();
-  const clean = rows.filter((r) => r.rigKey.startsWith("id:") && r.btc > 0 && r.btc < 5 && Number.isFinite(r.t));
+  const clean = rows.filter(amountOk);
   for (let i = 0; i < clean.length; i += 60) {
     const chunk = clean.slice(i, i + 60);
-    const values = chunk.map(() => "(?, ?, ?, ?, ?, ?)").join(", ");
+    const values = chunk.map(() => "(?, ?, ?, ?, ?, ?, ?)").join(", ");
     const params: unknown[] = [];
-    for (const row of chunk) params.push(userId, wid, row.rigKey, row.t, row.btc, row.source);
+    for (const row of chunk) params.push(userId, wid, row.rigKey, row.t, row.btc, row.source, row.coin);
     await db
       .prepare(
-        `INSERT INTO nh_watcher_rig_btc_ledger (user_id, watcher_id, rig_key, sample_t, btc, source)
+        `INSERT INTO nh_watcher_rig_btc_ledger (user_id, watcher_id, rig_key, sample_t, btc, source, coin)
          VALUES ${values}
          ON CONFLICT (user_id, watcher_id, rig_key, sample_t) DO NOTHING`
       )
@@ -37,15 +44,41 @@ async function insertLedger(userId: number, watcherId: string, rows: LedgerRow[]
   }
 }
 
-function split(total: number, weights: Map<string, number>, t: number, source: string): LedgerRow[] {
+function split(total: number, weights: Map<string, number>, t: number, source: string, coin: string): LedgerRow[] {
   let sum = 0;
   for (const w of weights.values()) if (w > 0) sum += w;
   if (!(total > 0) || !(sum > 0)) return [];
   const out: LedgerRow[] = [];
+  let assigned = 0;
+  let top: LedgerRow | null = null;
+  let topW = -1;
   for (const [rigKey, w] of weights) {
     if (!(w > 0)) continue;
-    out.push({ rigKey, t, btc: (total * w) / sum, source });
+    const row: LedgerRow = { rigKey, t, btc: (total * w) / sum, source, coin };
+    out.push(row);
+    assigned += row.btc;
+    if (w > topW) {
+      topW = w;
+      top = row;
+    }
   }
+  if (top) {
+    const drift = total - assigned;
+    if (Number.isFinite(drift) && Math.abs(drift) <= Math.abs(total) * 1e-6 + 1e-12) top.btc += drift;
+  }
+  return out;
+}
+
+/** Reparte un total del pool con la misma cuenta que el libro. Las partes suman el total. */
+export function shareBySpeed(
+  total: number,
+  shares: { rigKey: string; speed: number }[],
+  coin: string
+): Record<string, number> {
+  const weights = new Map<string, number>();
+  for (const s of shares) if (s.rigKey.startsWith("id:") && s.speed > 0) weights.set(s.rigKey, s.speed);
+  const out: Record<string, number> = {};
+  for (const row of split(total, weights, 0, "viabtc", coin)) out[row.rigKey] = row.btc;
   return out;
 }
 
@@ -124,49 +157,12 @@ export async function allocateNiceHashRigBtc(userId: number, watcherId: string, 
     const delta = finite(p.delta_btc);
     const w = weightsAt(samples, t, live);
     if (!w) continue;
-    rows.push(...split(delta, w, t, "nicehash"));
+    rows.push(...split(delta, w, t, "nicehash", "BTC"));
   }
   await insertLedger(userId, wid, rows);
 }
 
-let btcDaysAt = 0;
-let btcDays = new Map<string, number>();
-
-async function btcUsdByDay(): Promise<Map<string, number>> {
-  if (btcDays.size && Date.now() - btcDaysAt < 15 * 60 * 1000) return btcDays;
-  const ac = new AbortController();
-  const tid = setTimeout(() => ac.abort(), 12000);
-  try {
-    const r = await fetch("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=200", {
-      headers: { Accept: "application/json", "User-Agent": UA },
-      signal: ac.signal,
-    });
-    if (!r.ok) return btcDays;
-    const body = (await r.json()) as unknown[];
-    const next = new Map<string, number>();
-    if (Array.isArray(body)) {
-      for (const row of body) {
-        if (!Array.isArray(row)) continue;
-        const open = finite(row[0]);
-        const close = finite(row[4]);
-        if (!(open > 0) || !(close > 0)) continue;
-        const day = new Intl.DateTimeFormat("en-CA", { timeZone: "UTC", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(open));
-        next.set(day, close);
-      }
-    }
-    if (next.size) {
-      btcDays = next;
-      btcDaysAt = Date.now();
-    }
-    return btcDays;
-  } catch {
-    return btcDays;
-  } finally {
-    clearTimeout(tid);
-  }
-}
-
-type ViaDay = { day: string; usd: number };
+type ViaDay = { day: string; amount: number };
 
 async function viaProfitDays(accessKey: string, coin: string, pages: number): Promise<ViaDay[]> {
   const out: ViaDay[] = [];
@@ -184,11 +180,12 @@ async function viaProfitDays(accessKey: string, coin: string, pages: number): Pr
       const rows = Array.isArray(body.data.data) ? body.data.data : [];
       for (const row of rows) {
         if (!row || typeof row !== "object") continue;
-        const o = row as { date?: unknown; total_money?: unknown; total_profit?: unknown; price?: unknown };
+        const o = row as { date?: unknown; total_profit?: unknown; coin?: unknown };
         const day = String(o.date ?? "");
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
-        const usd = finite(o.total_money) || finite(o.total_profit) * finite(o.price);
-        if (usd > 0) out.push({ day, usd });
+        const rowCoin = String(o.coin ?? coin).trim().toUpperCase();
+        if (rowCoin !== coin || !/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+        const amount = finite(o.total_profit);
+        if (amount > 0) out.push({ day, amount });
       }
       if (body.data.has_next !== true) break;
     } catch {
@@ -200,7 +197,7 @@ async function viaProfitDays(accessKey: string, coin: string, pages: number): Pr
   return out;
 }
 
-/** Pasa el crédito diario de ViaBTC (ZEC u otra moneda) a BTC y lo reparte entre sus workers. */
+/** Guarda el crédito diario de ViaBTC en la moneda del pool (ZEC, LTC, DOGE, …) y lo reparte por hashrate. */
 export async function allocateViaRigBtc(
   userId: number,
   watcherId: string,
@@ -208,25 +205,31 @@ export async function allocateViaRigBtc(
   coin: string,
   shares: { rigKey: string; speed: number }[]
 ): Promise<void> {
+  const unit = coin.trim().toUpperCase();
+  if (!/^[A-Z0-9]{2,8}$/.test(unit)) return;
   const weights = new Map<string, number>();
   for (const s of shares) if (s.rigKey.startsWith("id:") && s.speed > 0) weights.set(s.rigKey, s.speed);
   if (weights.size === 0) return;
   const wid = watcherId.trim();
+  await db
+    .prepare(
+      `DELETE FROM nh_watcher_rig_btc_ledger
+       WHERE user_id = ? AND watcher_id = ? AND source = 'viabtc' AND coin = 'BTC'`
+    )
+    .run(userId, wid);
   const countRow = (await db
     .prepare(
-      `SELECT COUNT(*) AS n FROM nh_watcher_rig_btc_ledger WHERE user_id = ? AND watcher_id = ? AND source = 'viabtc'`
+      `SELECT COUNT(*) AS n FROM nh_watcher_rig_btc_ledger
+       WHERE user_id = ? AND watcher_id = ? AND source = 'viabtc' AND coin = ?`
     )
-    .get(userId, wid)) as { n?: unknown } | undefined;
+    .get(userId, wid, unit)) as { n?: unknown } | undefined;
   const pages = finite(countRow?.n) > 0 ? 1 : 8;
-  const [days, prices] = await Promise.all([viaProfitDays(accessKey, coin, pages), btcUsdByDay()]);
+  const days = await viaProfitDays(accessKey, unit, pages);
   const rows: LedgerRow[] = [];
   for (const day of days) {
-    const btcUsd = prices.get(day.day) ?? 0;
-    if (!(btcUsd > 0)) continue;
-    const btc = day.usd / btcUsd;
     const t = artDayStartFromKey(day.day);
-    if (!(t > 0) || !(btc > 0) || btc >= 5) continue;
-    rows.push(...split(btc, weights, t, "viabtc"));
+    if (!(t > 0) || !(day.amount > 0)) continue;
+    rows.push(...split(day.amount, weights, t, "viabtc", unit));
   }
   await insertLedger(userId, wid, rows);
 }
@@ -234,25 +237,28 @@ export async function allocateViaRigBtc(
 export async function readRigBtcTotals(
   userId: number,
   watcherIds: string[]
-): Promise<Record<string, { h24: number; life: number }>> {
+): Promise<Record<string, { h24: number; life: number; coin: string }>> {
   const ids = [...new Set(watcherIds.map((id) => id.trim()).filter(Boolean))].slice(0, 24);
   if (ids.length === 0) return {};
   const since = Date.now() - DAY_MS;
   const marks = ids.map(() => "?").join(", ");
   const rows = (await db
     .prepare(
-      `SELECT watcher_id, rig_key,
+      `SELECT watcher_id, rig_key, coin,
               SUM(btc) AS life,
               SUM(CASE WHEN sample_t >= ? THEN btc ELSE 0 END) AS h24
        FROM nh_watcher_rig_btc_ledger
        WHERE user_id = ? AND watcher_id IN (${marks}) AND btc > 0
-       GROUP BY watcher_id, rig_key`
+       GROUP BY watcher_id, rig_key, coin`
     )
     .all(since, userId, ...ids)) as Array<Record<string, unknown>>;
-  const out: Record<string, { h24: number; life: number }> = {};
+  const out: Record<string, { h24: number; life: number; coin: string }> = {};
   for (const row of rows) {
     const key = `${String(row.watcher_id ?? "")}|${String(row.rig_key ?? "")}`;
-    out[key] = { h24: finite(row.h24), life: finite(row.life) };
+    const coin = String(row.coin ?? "BTC").toUpperCase() || "BTC";
+    const prev = out[key];
+    if (prev && prev.coin !== "BTC" && coin === "BTC") continue;
+    out[key] = { h24: finite(row.h24), life: finite(row.life), coin };
   }
   return out;
 }

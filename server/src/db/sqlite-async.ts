@@ -1166,9 +1166,15 @@ CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_visitor ON marketplace_presence_
     sample_t INTEGER NOT NULL,
     btc REAL NOT NULL,
     source TEXT NOT NULL DEFAULT '',
+    coin TEXT NOT NULL DEFAULT 'BTC',
     PRIMARY KEY (user_id, watcher_id, rig_key, sample_t),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   )`);
+  try {
+    native.exec(`ALTER TABLE nh_watcher_rig_btc_ledger ADD COLUMN coin TEXT NOT NULL DEFAULT 'BTC'`);
+  } catch {
+    /* la columna ya está */
+  }
 
   /** Agregados 15 / 30 / 60 min derivados de muestras 1 min (misma ventana de retención). */
   native.exec(`CREATE TABLE IF NOT EXISTS nh_watcher_rig_hash_agg_samples (
