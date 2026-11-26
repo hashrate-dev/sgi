@@ -185,7 +185,7 @@ h1 .grad{background:linear-gradient(90deg,var(--sha),var(--sha2) 50%,var(--scr))
 .legend div.on span{color:var(--text);font-weight:600}
 .legend i{width:8px;height:8px;border-radius:3px;flex-shrink:0}
 .legend span{color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.legend b{font:500 11.5px var(--mono)}
+.legend b{font:500 11.5px var(--mono);flex-shrink:0;white-space:nowrap}
 
 .wallet .amt{font:600 26px var(--mono);letter-spacing:-.02em}
 .wallet .amt small{font:600 12px Inter;color:var(--btc);margin-left:5px}
@@ -938,13 +938,13 @@ function renderDonut(){
   const rings=[...byCoin.entries()];
   const ring=(items,radius,width)=>{const C=2*Math.PI*radius,sum=items.reduce((s,a)=>s+a.day,0);let off=0;return items.map(a=>{const w=wById(a.id),len=sum?a.day/sum*C:0,gap=items.length>1?0.8:0,s=`<circle cx="50" cy="50" r="${radius}" fill="none" stroke="${coinColor(a.coin)}" stroke-width="${width}" stroke-dasharray="${Math.max(0,len-gap)} ${C}" stroke-dashoffset="${-off}" data-w="${a.id}"><title>${esc(w?.name||a.name)} · ${a.day.toFixed(8)} ${esc(a.coin)}</title></circle>`;off+=len;return s}).join('')};
   const C=2*Math.PI*40;let off=0;
-  const btcRing=tot?pos.map(([id,v])=>{const w=wById(id),len=v/tot*C,gap=pos.length>1?0.8:0,s=`<circle cx="50" cy="50" r="40" fill="none" stroke="${w.color}" stroke-width="${rings.length?8:12}" stroke-dasharray="${Math.max(0,len-gap)} ${C}" stroke-dashoffset="${-off}" data-w="${id}"><title>${esc(w.name)} · ${(v/tot*100).toFixed(1)}%</title></circle>`;off+=len;return s}).join(''):'';
+  const btcRing=tot?pos.map(([id,v])=>{const w=wById(id),len=v/tot*C,gap=pos.length>1?0.8:0,s=`<circle cx="50" cy="50" r="40" fill="none" stroke="${w.color}" stroke-width="${rings.length?8:12}" stroke-dasharray="${Math.max(0,len-gap)} ${C}" stroke-dashoffset="${-off}" data-w="${id}"><title>${esc(w.name)} · ${v.toFixed(8)} BTC</title></circle>`;off+=len;return s}).join(''):'';
   const viaRings=rings.map(([coin,items],i)=>ring(items,rings.length&&tot?30-i*8:40,6)).join('');
   const viaSums=[...byCoin.entries()].map(([coin,items])=>({coin,day:items.reduce((a,x)=>a+x.day,0)}));
   const head=tot?`<b>${tot.toFixed(6)}</b><span>BTC / 24 h</span>`:(viaSums[0]?`<b>${viaSums[0].day.toFixed(4)}</b><span>${esc(viaSums[0].coin)} / 24 h</span>`:'<b>—</b>');
   $('#donut').innerHTML=`<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="none" stroke="var(--panel2)" stroke-width="${rings.length?8:12}"/>${btcRing}${viaRings}</svg><div class="center"><div>${head}</div></div>`;
   $('#coinPills').innerHTML=(tot?viaSums:viaSums.slice(1)).map(x=>`<span><i style="--c:${coinColor(x.coin)}"></i>${x.day.toFixed(4)} ${esc(x.coin)} / 24 h</span>`).join('');
-  const btcLegend=ent.map(([id,v])=>{const w=wById(id);return `<div data-w="${id}" class="${S.w===id?'on':''}"><i style="background:${w.color}"></i><span>${esc(w.name)}</span><b>${tot?(v/tot*100).toFixed(1):'0.0'}%</b></div>`}).join('');
+  const btcLegend=ent.map(([id,v])=>{const w=wById(id);return `<div data-w="${id}" class="${S.w===id?'on':''}"><i style="background:${w.color}"></i><span>${esc(w.name)}</span><b>${v.toFixed(8)} BTC</b></div>`}).join('');
   const viaLegend=via.map(a=>`<div data-w="${a.id}" class="${S.w===a.id?'on':''}"><i style="background:${coinColor(a.coin)}"></i><span>${esc(a.name)}</span><b>${a.day.toFixed(4)} ${esc(a.coin)}</b></div>`).join('');
   $('#legend').innerHTML=btcLegend+viaLegend+(!ent.length&&!via.length?'<div style="color:var(--muted)">Sin rentabilidad activa</div>':'');
 }
