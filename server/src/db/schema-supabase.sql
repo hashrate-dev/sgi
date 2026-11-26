@@ -769,6 +769,20 @@ CREATE TABLE IF NOT EXISTS nh_watcher_rig_speed_log (
 
 CREATE INDEX IF NOT EXISTS idx_nh_speed_log_user_watcher_t ON nh_watcher_rig_speed_log(user_id, watcher_id, sample_t);
 
+-- Uptime diario por equipo (día de Argentina). El mes en curso suma estos días; al cambiar de mes, ese mes queda como el anterior.
+CREATE TABLE IF NOT EXISTS nh_uptime_day (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  day_key TEXT NOT NULL,
+  watcher_id TEXT NOT NULL,
+  rig_key TEXT NOT NULL,
+  on_ms BIGINT NOT NULL,
+  off_ms BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL,
+  PRIMARY KEY (user_id, day_key, watcher_id, rig_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_nh_uptime_day_user_day ON nh_uptime_day(user_id, day_key);
+
 -- BTC que NiceHash acredita (delta_amount del stream unpaid). No se borra: el acumulado sale de acá.
 CREATE TABLE IF NOT EXISTS nh_watcher_credit_deltas (
   id BIGSERIAL PRIMARY KEY,

@@ -1132,6 +1132,18 @@ CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_visitor ON marketplace_presence_
   native.exec(
     `CREATE INDEX IF NOT EXISTS idx_nh_speed_log_user_watcher_t ON nh_watcher_rig_speed_log(user_id, watcher_id, sample_t)`
   );
+  native.exec(`CREATE TABLE IF NOT EXISTS nh_uptime_day (
+    user_id INTEGER NOT NULL,
+    day_key TEXT NOT NULL,
+    watcher_id TEXT NOT NULL,
+    rig_key TEXT NOT NULL,
+    on_ms INTEGER NOT NULL,
+    off_ms INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, day_key, watcher_id, rig_key),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`);
+  native.exec(`CREATE INDEX IF NOT EXISTS idx_nh_uptime_day_user_day ON nh_uptime_day(user_id, day_key)`);
 
   native.exec(`CREATE TABLE IF NOT EXISTS nh_watcher_credit_deltas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
