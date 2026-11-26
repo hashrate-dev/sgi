@@ -266,6 +266,17 @@ async function ensureSupabaseNhSpeedLog(pool: Pool) {
         updated_by INTEGER
       )
     `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS nh_watcher_rig_btc_ledger (
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        watcher_id TEXT NOT NULL,
+        rig_key TEXT NOT NULL,
+        sample_t BIGINT NOT NULL,
+        btc DOUBLE PRECISION NOT NULL,
+        source TEXT NOT NULL DEFAULT '',
+        PRIMARY KEY (user_id, watcher_id, rig_key, sample_t)
+      )
+    `);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.warn("[DB] ensureSupabaseNhSpeedLog:", msg);

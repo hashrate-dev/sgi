@@ -1159,6 +1159,16 @@ CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_visitor ON marketplace_presence_
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_by INTEGER
   )`);
+  native.exec(`CREATE TABLE IF NOT EXISTS nh_watcher_rig_btc_ledger (
+    user_id INTEGER NOT NULL,
+    watcher_id TEXT NOT NULL,
+    rig_key TEXT NOT NULL,
+    sample_t INTEGER NOT NULL,
+    btc REAL NOT NULL,
+    source TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (user_id, watcher_id, rig_key, sample_t),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`);
 
   /** Agregados 15 / 30 / 60 min derivados de muestras 1 min (misma ventana de retención). */
   native.exec(`CREATE TABLE IF NOT EXISTS nh_watcher_rig_hash_agg_samples (

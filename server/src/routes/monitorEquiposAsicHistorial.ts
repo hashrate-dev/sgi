@@ -6,6 +6,7 @@ import { requireRole } from "../middleware/auth.js";
 import { requireAdminBGrant } from "../middleware/adminBGrant.js";
 import { buildNhMonitorBoard } from "../lib/nhMonitorBoard.js";
 import { buildViaBtcBoard } from "../lib/viaBtcObserver.js";
+import { readRigBtcTotals } from "../lib/rigBtcLedger.js";
 import { cronSyncNhCredits, listCreditWatcherIds, sumNhCredits, syncNhCreditDeltas } from "../lib/nhWatcherCreditDeltas.js";
 import { cronSyncKnownWatcherSpeedLogs, syncNhSpeedLogFromNiceHash } from "../lib/nhWatcherSpeedLog.js";
 import { proxyNiceHashRigs2WithExtras } from "../lib/nicehashExternalRigsMerge.js";
@@ -863,6 +864,9 @@ monitorEquiposAsicHistorialRouter.post(
         merged.history[wid] = series;
       }
     }
+    const board = body as { watchers?: { id: string }[]; earnings?: { rigBtc?: Record<string, { h24: number; life: number }> } };
+    const rigBtc = await readRigBtcTotals(user.id, (board.watchers ?? []).map((w) => w.id)).catch(() => ({}));
+    if (board.earnings) board.earnings.rigBtc = rigBtc;
     res.json(body);
   }
 );

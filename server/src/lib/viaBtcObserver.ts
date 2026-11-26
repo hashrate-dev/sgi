@@ -1,4 +1,5 @@
 import { readNhSpeedLogSince, upsertNhSpeedLog } from "./nhWatcherSpeedLog.js";
+import { allocateViaRigBtc } from "./rigBtcLedger.js";
 
 const HOST = "https://www.viabtc.com";
 const UA = "HashrateSGI-MonitorEquiposAsic/1.0";
@@ -13,6 +14,7 @@ type ViaWorker = {
   last_active?: unknown;
   recent_hashrate?: unknown;
   hashrate_1hour?: unknown;
+  hashrate_1day?: unknown;
   reject_rate?: unknown;
 };
 
@@ -191,6 +193,13 @@ async function buildViaBtcBoardFresh(accounts: ViaAccountIn[], userId: number): 
           ],
         };
       });
+      const shares = workers
+        .map((w) => ({
+          rigKey: `id:${String(w.id ?? w.name ?? "").trim()}`,
+          speed: num(w.hashrate_1day) || num(w.recent_hashrate),
+        }))
+        .filter((s) => s.rigKey !== "id:" && s.speed > 0);
+      await allocateViaRigBtc(userId, id, key, coin, shares).catch(() => undefined);
       payload[id] = {
         pool: "viabtc",
         coin,

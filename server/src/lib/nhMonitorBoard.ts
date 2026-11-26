@@ -14,6 +14,7 @@ import {
   syncNhSpeedLogFromNiceHash,
   upsertNhSpeedLog,
 } from "./nhWatcherSpeedLog.js";
+import { allocateNiceHashRigBtc, type RigShare } from "./rigBtcLedger.js";
 
 const TOTAL_ID = "00000000-0000-0000-0000-000000000001";
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -36,6 +37,32 @@ function spotOf(data: Record<string, unknown>): number | null {
   if (!sgi || typeof sgi !== "object") return null;
   const n = Number((sgi as { btcSpotUsd?: unknown }).btcSpotUsd);
   return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function rigShares(payload: Record<string, unknown>): RigShare[] {
+  const list = payload.miningRigs;
+  if (!Array.isArray(list)) return [];
+  const out: RigShare[] = [];
+  for (const rig of list) {
+    if (!rig || typeof rig !== "object") continue;
+    const o = rig as { rigId?: unknown; stats?: unknown[]; profitability?: unknown };
+    const rigId = typeof o.rigId === "string" ? o.rigId.trim() : "";
+    if (!rigId) continue;
+    const st = nhPickPrimaryMiningStat(o.stats);
+    const algoField = st?.algorithm;
+    const algorithm =
+      algoField && typeof algoField === "object" && typeof (algoField as { enumName?: unknown }).enumName === "string"
+        ? String((algoField as { enumName: string }).enumName).trim().toUpperCase()
+        : "";
+    const profit = Number(o.profitability);
+    out.push({
+      rigKey: nhSpeedLogRigKey(rigId),
+      speed: nhRigSpeedAcceptedFromStats(o.stats) ?? 0,
+      algorithm,
+      profit: Number.isFinite(profit) && profit > 0 ? profit : 0,
+    });
+  }
+  return out;
 }
 
 function liveRigs(payload: Record<string, unknown>): { rigId: string; algorithm: string; label: string; speed: number }[] {
@@ -217,6 +244,7 @@ export async function buildNhMonitorBoard(
       }))
     );
     await syncNhCreditDeltas(userId, w.id);
+    await allocateNiceHashRigBtc(userId, w.id, rigShares(res.data)).catch(() => undefined);
   });
 
   const dayAgo = Date.now() - DAY_MS;

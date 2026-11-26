@@ -798,6 +798,19 @@ CREATE TABLE IF NOT EXISTS monitor_pool_accounts (
   updated_by INTEGER
 );
 
+-- BTC acreditado por equipo. NiceHash reparte el delta de la cuenta según el hashrate.
+-- ViaBTC convierte el crédito del día (en la moneda del pool) a BTC y lo reparte igual.
+-- No se borra: el acumulado es la suma de estas filas. Repetir la lectura no suma dos veces.
+CREATE TABLE IF NOT EXISTS nh_watcher_rig_btc_ledger (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  watcher_id TEXT NOT NULL,
+  rig_key TEXT NOT NULL,
+  sample_t BIGINT NOT NULL,
+  btc DOUBLE PRECISION NOT NULL,
+  source TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (user_id, watcher_id, rig_key, sample_t)
+);
+
 -- Agregados TH/MH por intervalo (15 / 30 / 60 min), materializados desde muestras 1 min
 CREATE TABLE IF NOT EXISTS nh_watcher_rig_hash_agg_samples (
   id BIGSERIAL PRIMARY KEY,
