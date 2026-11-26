@@ -869,10 +869,10 @@ monitorEquiposAsicHistorialRouter.post(
     const board = body as {
       watchers?: { id: string }[];
       payload?: Record<string, { coin?: unknown }>;
-      earnings?: { rigBtc?: Record<string, { h24: number; life: number; coin?: string }> };
+      earnings?: { rigBtc?: Record<string, { h24: number; life: number; month?: number; coin?: string }> };
     };
     const rigBtc = await readRigBtcTotals(user.id, (board.watchers ?? []).map((w) => w.id)).catch(
-      (): Record<string, { h24: number; life: number; coin: string }> => ({})
+      (): Record<string, { h24: number; life: number; month: number; coin: string }> => ({})
     );
     for (const [wid, byRig] of Object.entries(coin24)) {
       const coin = String(board.payload?.[wid]?.coin ?? "").trim().toUpperCase();
@@ -886,6 +886,7 @@ monitorEquiposAsicHistorialRouter.post(
         rigBtc[key] = {
           h24,
           life: Math.max(booked, h24),
+          month: prev?.month ?? 0,
           coin: prev?.coin && prev.coin !== "BTC" ? prev.coin : coin,
         };
       }

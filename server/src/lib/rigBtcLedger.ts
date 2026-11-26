@@ -1,5 +1,5 @@
 import { db } from "../db.js";
-import { artDayStartFromKey } from "./nhWatcherCreditDeltas.js";
+import { artDayStartFromKey, artMonthStartMs } from "./nhWatcherCreditDeltas.js";
 
 const VIA_HOST = "https://www.viabtc.com";
 const UA = "HashrateSGI-MonitorEquiposAsic/1.0";
@@ -237,28 +237,30 @@ export async function allocateViaRigBtc(
 export async function readRigBtcTotals(
   userId: number,
   watcherIds: string[]
-): Promise<Record<string, { h24: number; life: number; coin: string }>> {
+): Promise<Record<string, { h24: number; life: number; month: number; coin: string }>> {
   const ids = [...new Set(watcherIds.map((id) => id.trim()).filter(Boolean))].slice(0, 24);
   if (ids.length === 0) return {};
   const since = Date.now() - DAY_MS;
+  const monthStart = artMonthStartMs();
   const marks = ids.map(() => "?").join(", ");
   const rows = (await db
     .prepare(
       `SELECT watcher_id, rig_key, coin,
               SUM(btc) AS life,
-              SUM(CASE WHEN sample_t >= ? THEN btc ELSE 0 END) AS h24
+              SUM(CASE WHEN sample_t >= ? THEN btc ELSE 0 END) AS h24,
+              SUM(CASE WHEN sample_t >= ? THEN btc ELSE 0 END) AS month
        FROM nh_watcher_rig_btc_ledger
        WHERE user_id = ? AND watcher_id IN (${marks}) AND btc > 0
        GROUP BY watcher_id, rig_key, coin`
     )
-    .all(since, userId, ...ids)) as Array<Record<string, unknown>>;
-  const out: Record<string, { h24: number; life: number; coin: string }> = {};
+    .all(since, monthStart, userId, ...ids)) as Array<Record<string, unknown>>;
+  const out: Record<string, { h24: number; life: number; month: number; coin: string }> = {};
   for (const row of rows) {
     const key = `${String(row.watcher_id ?? "")}|${String(row.rig_key ?? "")}`;
     const coin = String(row.coin ?? "BTC").toUpperCase() || "BTC";
     const prev = out[key];
     if (prev && prev.coin !== "BTC" && coin === "BTC") continue;
-    out[key] = { h24: finite(row.h24), life: finite(row.life), coin };
+    out[key] = { h24: finite(row.h24), life: finite(row.life), month: finite(row.month), coin };
   }
   return out;
 }

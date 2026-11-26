@@ -146,9 +146,9 @@ h1 .grad{background:linear-gradient(90deg,var(--sha),var(--sha2) 50%,var(--scr))
 
 .bars-card{display:flex;flex-direction:column}
 .bars{display:flex;align-items:flex-end;justify-content:center;gap:6px;flex:1;min-height:150px;padding-top:10px}
-.bar{flex:1;max-width:56px;height:var(--h);min-height:3px;border-radius:7px 7px 3px 3px;background:linear-gradient(to top,color-mix(in srgb,var(--btc) 25%,transparent),color-mix(in srgb,var(--btc) 75%,transparent));transition:filter .2s;transform-origin:bottom;animation:grow .8s cubic-bezier(.2,.8,.2,1) both}
+.bar{flex:1;max-width:56px;height:var(--h);min-height:3px;border-radius:7px 7px 3px 3px;background:linear-gradient(to top,color-mix(in srgb,var(--c,var(--btc)) 25%,transparent),color-mix(in srgb,var(--c,var(--btc)) 75%,transparent));transition:filter .2s;transform-origin:bottom;animation:grow .8s cubic-bezier(.2,.8,.2,1) both}
 .bar:hover{filter:brightness(1.3)}
-.bar.top{background:linear-gradient(to top,var(--btc),#fde68a);box-shadow:0 0 18px -2px color-mix(in srgb,var(--btc) 60%,transparent)}
+.bar.top{background:linear-gradient(to top,var(--c,var(--btc)),color-mix(in srgb,var(--c,var(--btc)) 55%,#fff));box-shadow:0 0 18px -2px color-mix(in srgb,var(--c,var(--btc)) 60%,transparent)}
 @keyframes grow{from{transform:scaleY(0)}}
 .bar-x{display:flex;justify-content:center;gap:6px;margin-top:8px}
 .bar-x span{flex:1;max-width:56px;text-align:center;font:10px var(--mono);color:var(--dim);overflow:hidden;white-space:nowrap}
@@ -781,27 +781,41 @@ function renderHealth(){
   $('#matrix').innerHTML=l.map(r=>`<div class="cell" style="--c:${!r.mining?css('--bad'):r.rejPct>1?css('--warn'):(r.a==='zec'?css('--btc'):r.a==='sha'?css('--sha'):css('--scr'))}" title="${esc(r.name)} · ${esc(r.wname)} · ${r.mining?nf(r.hr)+' '+unitOf(r):r.status||'OFFLINE'}" data-k="${esc(r.wid+'|'+r.key)}"></div>`).join('');
 }
 function renderBars(){
-  if(viaOnly()){
-    $('#barsTitle').textContent='Crédito de ViaBTC';
-    $('#barsTotal').textContent='';
-    $('#bars').innerHTML='<div class="blank" style="padding:20px">El crédito de esta cuenta está en la moneda del pool, en la tarjeta de generado.</div>';
-    $('#barsX').innerHTML='';
-    return;
-  }
   $$('#barsSeg button').forEach(x=>x.classList.toggle('on',x.dataset.m===S.bars));
-  $('#barsTitle').textContent=S.bars==='days'?'BTC acreditado · últimos 14 días':'BTC acreditado este mes · por cuenta';
-  if(S.bars==='days')return renderDays();
+  if(S.bars==='days'){
+    if(viaOnly()){
+      $('#barsTitle').textContent='Crédito de ViaBTC';
+      $('#barsTotal').textContent='';
+      $('#bars').innerHTML='<div class="blank" style="padding:20px">El crédito diario de esta cuenta está en la moneda del pool. El mes por cuenta sí lo incluye.</div>';
+      $('#barsX').innerHTML='';
+      return;
+    }
+    $('#barsTitle').textContent='BTC acreditado · últimos 14 días';
+    return renderDays();
+  }
+  const via=viaAccounts().filter(a=>a.month>0);
+  const hasVia=via.length>0;
+  $('#barsTitle').textContent=hasVia?'Acreditado este mes · por cuenta':'BTC acreditado este mes · por cuenta';
   const by=new Map(),ws=new Set(scopeWatchers().map(w=>w.id));
-  for(const x of D.summary?.byRig||[]){if(!ws.has(String(x.watcherId).toLowerCase()))continue;const v=num(x.monthBtc)||0;if(v<=0)continue;const k=String(x.rigName).toUpperCase();by.set(k,(by.get(k)||0)+v)}
-  const arr=[...by.entries()].sort((a,b)=>b[1]-a[1]).slice(0,16);
-  const tot=arr.reduce((s,e)=>s+e[1],0);$('#barsTotal').textContent=arr.length?'Σ '+tot.toFixed(8)+' BTC':'';
-  if(!arr.length){$('#bars').innerHTML='<div class="blank" style="padding:20px">Sin datos de ganancias para este mes.</div>';$('#barsX').innerHTML='';return}
-  const mx=arr[0][1];
-  $('#bars').innerHTML=arr.map(([k,v],i)=>`<div class="bar ${i===0?'top':''}" style="--h:${v/mx*100}%;animation-delay:${i*35}ms" data-i="${i}"></div>`).join('');
-  $('#barsX').innerHTML=arr.map(([k])=>`<span title="${esc(k)}">${esc(k.replace(/^HASHR2/i,''))}</span>`).join('');
-  const tip=$('#barTip'),card=$('#bars').closest('.card'),px=D.btcUsd;
-  $('#bars').onmousemove=e=>{const b=e.target.closest('.bar');if(!b){tip.style.opacity=0;return}const[k,v]=arr[+b.dataset.i],r=b.getBoundingClientRect(),cr=card.getBoundingClientRect();
-    tip.innerHTML=`<span>${esc(k)}</span>${v.toFixed(8)} BTC${px?` · US$ ${nf(v*px)}`:''}`;tip.style.left=(r.left-cr.left+r.width/2)+'px';tip.style.top=(r.top-cr.top)+'px';tip.style.opacity=1};
+  if(!viaOnly())for(const x of D.summary?.byRig||[]){if(!ws.has(String(x.watcherId).toLowerCase()))continue;const v=num(x.monthBtc)||0;if(v<=0)continue;const k=String(x.rigName).toUpperCase();by.set(k,(by.get(k)||0)+v)}
+  const btc=[...by.entries()].sort((a,b)=>b[1]-a[1]);
+  const mxBtc=btc[0]?.[1]||0;
+  const mxCoin={};
+  for(const a of via) mxCoin[a.coin]=Math.max(mxCoin[a.coin]||0,a.month);
+  const bars=[
+    ...btc.map(([name,v])=>({name,v,coin:'BTC',h:mxBtc?v/mxBtc:0,color:'var(--btc)'})),
+    ...via.map(a=>({name:a.name,v:a.month,coin:a.coin,h:mxCoin[a.coin]?a.month/mxCoin[a.coin]:0,color:coinColor(a.coin)}))
+  ].slice(0,16);
+  const sums=new Map();
+  for(const b of bars) sums.set(b.coin,(sums.get(b.coin)||0)+b.v);
+  $('#barsTotal').textContent=bars.length?'Σ '+[...sums.entries()].map(([c,v])=>v.toFixed(8)+' '+c).join(' · '):'';
+  if(!bars.length){$('#bars').innerHTML='<div class="blank" style="padding:20px">Sin datos de ganancias para este mes.</div>';$('#barsX').innerHTML='';return}
+  const px=D.btcUsd;
+  $('#bars').innerHTML=bars.map((b,i)=>`<div class="bar ${i===0&&b.coin==='BTC'?'top':''}" style="--h:${Math.max(3,b.h*100)}%;--c:${b.color};animation-delay:${i*35}ms" data-i="${i}"></div>`).join('');
+  $('#barsX').innerHTML=bars.map(b=>`<span title="${esc(b.name)} · ${b.coin}">${esc(b.name.replace(/^HASHR2/i,'').replace(/\s*·\s*[A-Z0-9]+$/,''))}</span>`).join('');
+  const tip=$('#barTip'),card=$('#bars').closest('.card');
+  $('#bars').onmousemove=e=>{const el=e.target.closest('.bar');if(!el){tip.style.opacity=0;return}const b=bars[+el.dataset.i],r=el.getBoundingClientRect(),cr=card.getBoundingClientRect();
+    tip.innerHTML=`<span>${esc(b.name)}</span>${b.v.toFixed(8)} ${esc(b.coin)}${b.coin==='BTC'&&px?` · US$ ${nf(b.v*px)}`:''}`;tip.style.left=(r.left-cr.left+r.width/2)+'px';tip.style.top=(r.top-cr.top)+'px';tip.style.opacity=1};
   $('#bars').onmouseleave=()=>tip.style.opacity=0;
 }
 function renderDays(){
@@ -817,10 +831,21 @@ function renderDays(){
   $('#bars').onmouseleave=()=>tip.style.opacity=0;
 }
 function renderDonut(){
-  const by={};scopeRigs().filter(r=>r.mining).forEach(r=>by[r.wid]=(by[r.wid]||0)+r.prof);
-  const ent=Object.entries(by).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]),tot=ent.reduce((s,e)=>s+e[1],0),C=2*Math.PI*40;let off=0;
-  $('#donut').innerHTML=`<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="none" stroke="var(--panel2)" stroke-width="12"/>${ent.map(([id,v])=>{const w=wById(id),len=v/tot*C,gap=ent.length>1?1.2:0,s=`<circle cx="50" cy="50" r="40" fill="none" stroke="${w.color}" stroke-width="12" stroke-dasharray="${Math.max(0,len-gap)} ${C}" stroke-dashoffset="${-off}" data-w="${id}"><title>${esc(w.name)} · ${(v/tot*100).toFixed(1)}%</title></circle>`;off+=len;return s}).join('')}</svg><div class="center"><div><b>${tot?tot.toFixed(6):'—'}</b><span>BTC / 24 h</span></div></div>`;
-  $('#legend').innerHTML=ent.slice(0,6).map(([id,v])=>{const w=wById(id);return`<div data-w="${id}"><i style="background:${w.color}"></i><span>${esc(w.name)}</span><b>${(v/tot*100).toFixed(1)}%</b></div>`}).join('')+(ent.length>6?`<div style="color:var(--dim);font-size:11px">+${ent.length-6} más</div>`:'')+(!ent.length?'<div style="color:var(--muted)">Sin rentabilidad activa</div>':'');
+  const by={};scopeRigs().filter(r=>r.mining&&paidBtc(r)).forEach(r=>by[r.wid]=(by[r.wid]||0)+r.prof);
+  const ent=Object.entries(by).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]),tot=ent.reduce((s,e)=>s+e[1],0);
+  const via=viaAccounts().filter(a=>a.day>0);
+  const byCoin=new Map();
+  for(const a of via){const g=byCoin.get(a.coin)||[];g.push(a);byCoin.set(a.coin,g)}
+  const rings=[...byCoin.entries()];
+  const ring=(items,radius,width)=>{const C=2*Math.PI*radius,sum=items.reduce((s,a)=>s+a.day,0);let off=0;return items.map(a=>{const w=wById(a.id),len=sum?a.day/sum*C:0,gap=items.length>1?1:0,s=`<circle cx="50" cy="50" r="${radius}" fill="none" stroke="${coinColor(a.coin)}" stroke-width="${width}" stroke-dasharray="${Math.max(0,len-gap)} ${C}" stroke-dashoffset="${-off}" data-w="${a.id}"><title>${esc(w?.name||a.name)} · ${a.day.toFixed(8)} ${esc(a.coin)}</title></circle>`;off+=len;return s}).join('')};
+  const C=2*Math.PI*40;let off=0;
+  const btcRing=tot?ent.map(([id,v])=>{const w=wById(id),len=v/tot*C,gap=ent.length>1?1.2:0,s=`<circle cx="50" cy="50" r="40" fill="none" stroke="${w.color}" stroke-width="${rings.length?8:12}" stroke-dasharray="${Math.max(0,len-gap)} ${C}" stroke-dashoffset="${-off}" data-w="${id}"><title>${esc(w.name)} · ${(v/tot*100).toFixed(1)}%</title></circle>`;off+=len;return s}).join(''):'';
+  const viaRings=rings.map(([coin,items],i)=>ring(items,rings.length&&tot?28-i*10:40,8)).join('');
+  const viaLines=[...byCoin.entries()].map(([coin,items])=>{const s=items.reduce((a,x)=>a+x.day,0);return `<b style="font-size:13px;margin-top:3px">${s.toFixed(4)}</b><span>${esc(coin)} / 24 h</span>`}).join('');
+  $('#donut').innerHTML=`<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="none" stroke="var(--panel2)" stroke-width="${rings.length?8:12}"/>${btcRing}${viaRings}</svg><div class="center"><div><b>${tot?tot.toFixed(6):via.length?'': '—'}</b>${tot?'<span>BTC / 24 h</span>':''}${viaLines}</div></div>`;
+  const btcLegend=ent.slice(0,6).map(([id,v])=>{const w=wById(id);return `<div data-w="${id}"><i style="background:${w.color}"></i><span>${esc(w.name)}</span><b>${(v/tot*100).toFixed(1)}%</b></div>`}).join('');
+  const viaLegend=via.map(a=>`<div data-w="${a.id}"><i style="background:${coinColor(a.coin)}"></i><span>${esc(a.name)}</span><b>${a.day.toFixed(4)} ${esc(a.coin)}</b></div>`).join('');
+  $('#legend').innerHTML=btcLegend+(ent.length>6?`<div style="color:var(--dim);font-size:11px">+${ent.length-6} más</div>`:'')+viaLegend+(!ent.length&&!via.length?'<div style="color:var(--muted)">Sin rentabilidad activa</div>':'');
 }
 function renderWallet(){
   const via=viaOnly();
@@ -853,7 +878,20 @@ function spark(data,c1,c2,W=300,H=54){
 function rigEarn(r){const x=(D.summary?.byRig||[]).filter(e=>String(e.watcherId).toLowerCase()===r.wid&&String(e.rigName).toUpperCase()===r.name.toUpperCase());return x.length?x.reduce((s,e)=>s+(num(e.dayBtc)||0),0):null}
 function coinOf(r){if(r.a==='zec')return'ZEC';if(String(r.a).startsWith('v:'))return String(r.a).slice(2).toUpperCase();return'BTC'}
 function fmtAmt(n,coin){if(n==null||!Number.isFinite(n))return'—';return n.toFixed(8)+' '+(coin||'BTC')}
-function rigBtc(r){const row=RAW?.earnings?.rigBtc?.[r.wid+'|'+r.key];const coin=row?.coin||coinOf(r);if(!row)return{h24:null,life:null,coin};return{h24:num(row.h24),life:num(row.life),coin}}
+function rigBtc(r){const row=RAW?.earnings?.rigBtc?.[r.wid+'|'+r.key];const coin=row?.coin||coinOf(r);if(!row)return{h24:null,life:null,month:null,coin};return{h24:num(row.h24),life:num(row.life),month:num(row.month),coin}}
+function coinColor(coin){return coin==='ZEC'?'#2dd4bf':coin==='LTC'?'#a78bfa':coin==='DOGE'?'#fb923c':'var(--btc)'}
+function viaAccounts(){
+  const by=new Map();
+  for(const r of scopeRigs()){
+    const p=D.payload[r.wid]; if(p?.pool!=='viabtc') continue;
+    const row=rigBtc(r), coin=row.coin&&row.coin!=='BTC'?row.coin:coinOf(r);
+    if(coin==='BTC') continue;
+    const cur=by.get(r.wid)||{id:r.wid,name:r.wname,coin,month:0,day:num(p.profit24)||0};
+    if(row.month>0) cur.month+=row.month;
+    by.set(r.wid,cur);
+  }
+  return [...by.values()];
+}
 function paidBtc(r){return r.a==='sha'||r.a==='scr'}
 function renderFleet(){
   let l=scopeRigs().filter(r=>(!S.fAlgo||r.a===S.fAlgo)&&(!S.q||(r.name+' '+r.wname).toLowerCase().includes(S.q)));
