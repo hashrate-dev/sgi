@@ -156,17 +156,17 @@ h1 .grad{background:linear-gradient(90deg,var(--sha),var(--sha2) 50%,var(--scr))
 .cell::before{content:"";position:absolute;inset:30%;border-radius:3px;background:var(--c);box-shadow:0 0 10px var(--c)}
 
 .bars-card{display:flex;flex-direction:column}
-.bars-scroll{flex:1;display:flex;flex-direction:column;min-height:248px;overflow-x:auto;scrollbar-width:thin}
-.bars{flex:1;min-height:200px;display:flex;align-items:stretch;justify-content:flex-start;gap:8px;width:max-content;min-width:100%;padding-top:8px}
-.bar-col{flex:1 0 46px;max-width:68px;position:relative;min-height:200px}
+.bars-scroll{flex:1;display:flex;flex-direction:column;min-height:248px;overflow:hidden}
+.bars{flex:1;min-height:200px;display:flex;align-items:stretch;justify-content:flex-start;gap:8px;width:100%;min-width:0;padding-top:8px}
+.bar-col{flex:1 1 0;min-width:0;position:relative;min-height:200px}
 .bar{position:absolute;left:0;right:0;bottom:0;height:var(--h);min-height:4px;border-radius:8px 8px 3px 3px;background:linear-gradient(to top,color-mix(in srgb,var(--c,var(--btc)) 28%,transparent),color-mix(in srgb,var(--c,var(--btc)) 82%,transparent));transform-origin:bottom;animation:grow .8s cubic-bezier(.2,.8,.2,1) both;cursor:pointer}
 .bar:hover{filter:brightness(1.15)}
 .bar.top{background:linear-gradient(to top,var(--c,var(--btc)),color-mix(in srgb,var(--c,var(--btc)) 55%,#fff));box-shadow:0 0 22px -4px color-mix(in srgb,var(--c,var(--btc)) 70%,transparent)}
 .bar.empty{height:6px;min-height:6px;background:var(--line2);box-shadow:none}
 .bar.on{outline:2px solid var(--text);outline-offset:2px}
 @keyframes grow{from{transform:scaleY(0)}}
-.bar-x{display:flex;justify-content:flex-start;gap:8px;margin-top:8px;width:max-content;min-width:100%}
-.bar-x span{flex:1 0 46px;max-width:68px;text-align:center;font:10px var(--mono);color:var(--dim);overflow:hidden;white-space:nowrap}
+.bar-x{display:flex;justify-content:flex-start;gap:8px;margin-top:8px;width:100%;min-width:0}
+.bar-x span{flex:1 1 0;min-width:0;text-align:center;font:10px var(--mono);color:var(--dim);overflow:hidden;white-space:nowrap}
 
 .donut-wrap{display:flex;align-items:center;justify-content:center}
 .donut{width:168px;height:168px;flex-shrink:0;position:relative;margin:0 auto}
