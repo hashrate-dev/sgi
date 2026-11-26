@@ -126,20 +126,22 @@ h1 .grad{background:linear-gradient(90deg,var(--sha),var(--sha2) 50%,var(--scr))
 .tip{position:absolute;pointer-events:none;z-index:4;background:var(--panel-solid);border:1px solid var(--line2);border-radius:10px;padding:7px 10px;font:600 12px var(--mono);white-space:nowrap;opacity:0;transform:translate(-50%,calc(-100% - 12px));transition:opacity .12s;box-shadow:0 10px 30px -10px rgba(0,0,0,.5)}
 .tip span{display:block;font:500 10.5px Inter;color:var(--muted)}
 
-.earn .btc{font:600 30px/1.1 var(--mono);letter-spacing:-.02em}
-.earn .btc .z{color:var(--dim)}
-.earn .btc small{font:600 12px Inter;color:var(--btc);margin-left:6px}
-.earn .usd{color:var(--muted);margin-top:4px}
-.earn-coins{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-.earn-coins:empty{display:none}
-.earn-coins span{display:inline-flex;align-items:baseline;gap:6px;padding:7px 10px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);font:600 13px var(--mono)}
-.earn-coins b{color:var(--c,var(--btc))}
-.earn-coins small{font:600 11px Inter;color:var(--muted)}
-.earn-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
-.mini-stat{padding:11px 12px;border-radius:14px;background:var(--panel2);border:1px solid var(--line)}
-.mini-stat label{display:block;font-size:11px;color:var(--muted);margin-bottom:3px}
-.mini-stat b{font:600 13px var(--mono)}
-.mini-stat small{display:block;font-size:10.5px;color:var(--dim);margin-top:1px}
+.earn-stack{display:flex;flex-direction:column;gap:10px;position:relative;z-index:1}
+.coin-card{padding:12px 14px 11px;border-radius:16px;background:color-mix(in srgb,var(--c,var(--btc)) 9%,var(--panel2));border:1px solid color-mix(in srgb,var(--c,var(--btc)) 32%,var(--line))}
+.coin-card-h{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.coin-card-h i{width:8px;height:8px;border-radius:3px;background:var(--c,var(--btc));box-shadow:0 0 10px var(--c,var(--btc))}
+.coin-card-h b{color:var(--text);font:600 12px Inter;letter-spacing:.04em}
+.coin-card-n{font:600 26px/1.05 var(--mono);letter-spacing:-.03em}
+.coin-card-n .z{color:var(--dim)}
+.coin-card-n small{font:600 12px Inter;color:var(--c,var(--btc));margin-left:6px;letter-spacing:0}
+.coin-card-sub{color:var(--muted);font-size:12px;margin-top:3px;min-height:16px}
+.coin-card-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.coin-card-meta label{display:block;font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.07em;margin-bottom:2px}
+.coin-card-meta b{font:600 12.5px var(--mono)}
+.coin-card-meta small{display:block;font-size:10.5px;color:var(--dim);margin-top:1px}
+.health-up{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;padding:10px 12px;border-radius:12px;background:var(--panel2);border:1px solid var(--line)}
+.health-up span{font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.health-up b{font:600 16px var(--mono);color:var(--ok)}
 .coin{position:absolute;right:-30px;top:-30px;width:140px;height:140px;border-radius:50%;background:radial-gradient(circle at 35% 35%,color-mix(in srgb,var(--btc) 45%,transparent),transparent 65%);opacity:.5;pointer-events:none}
 
 .health-top{display:flex;align-items:center;gap:16px}
@@ -374,11 +376,8 @@ footer{color:var(--dim);font-size:12px;text-align:center;margin-top:44px}
 
         <article class="card s4 earn">
           <div class="coin"></div>
-          <div class="c-h"><div class="c-t"><span class="ic" style="color:var(--btc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 8h5a2 2 0 0 1 0 4H9V6v12h6a2 2 0 0 0 0-4M11 4v2M13 4v2M11 18v2M13 18v2"/></svg></span>Generado hoy</div><span class="delta neu" id="earnDelta" hidden></span></div>
-          <div class="btc" id="earnBtc"><span class="skel">0.00000000</span></div>
-          <div class="usd" id="earnUsd">&nbsp;</div>
-          <div class="earn-coins" id="earnCoins"></div>
-          <div class="earn-grid" id="earnGrid"></div>
+          <div class="c-h"><div class="c-t"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v18M7 8h7a3 3 0 0 1 0 6H7"/></svg></span>Generado hoy</div><span class="delta neu" id="earnDelta" hidden></span></div>
+          <div class="earn-stack" id="earnStack"><div class="coin-card"><div class="coin-card-n"><span class="skel">0.00000000</span></div></div></div>
         </article>
 
         <article class="card s4">
@@ -387,6 +386,7 @@ footer{color:var(--dim);font-size:12px;text-align:center;margin-top:44px}
             <div class="ring"><svg viewBox="0 0 36 36"><defs><linearGradient id="gRing"><stop offset="0" stop-color="var(--sha)"/><stop offset="1" stop-color="var(--sha2)"/></linearGradient></defs><circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--panel2)" stroke-width="3.5"/><circle id="hRing" cx="18" cy="18" r="15.5" fill="none" stroke="url(#gRing)" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="97.4" stroke-dashoffset="97.4" style="transition:stroke-dashoffset 1.2s cubic-bezier(.2,.8,.2,1)"/></svg><b id="hNum">–</b></div>
             <p id="hTxt"></p>
           </div>
+          <div class="health-up" id="healthUp"><span>Uptime hoy</span><b>—</b></div>
           <div class="matrix" id="matrix"></div>
         </article>
 
@@ -473,8 +473,14 @@ const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim
 function ago(ts){if(!ts)return'—';const s=Math.max(0,Math.round((Date.now()-ts)/1000));return s<60?`${s}s`:s<3600?`${Math.round(s/60)}m`:s<86400?`${Math.floor(s/3600)}h ${Math.round(s%3600/60)}m`:`${Math.floor(s/86400)}d ${Math.floor(s%86400/3600)}h`}
 function dur(ts){if(!ts)return'—';const s=Math.max(0,(Date.now()-ts)/1000);const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return d?`${d}d ${h}h`:h?`${h}h ${m}m`:`${m}m`}
 function fmtBill(ms){const s=Math.max(0,Math.round(Number(ms)/1000));const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60),sec=s%60;if(d)return h?`${d}d ${h}h`:`${d}d`;if(h)return m?`${h}h ${m}m`:`${h}h`;if(m)return sec?`${m}m ${sec}s`:`${m}m`;return `${sec}s`}
-function uptimeBill(rigs,mode,now){
-  const step=300000,slots=mode==='live'?12:288,end=Math.floor(now/step)*step;
+function artTodayStart(now=Date.now()){
+  const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Argentina/Buenos_Aires',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(now));
+  const g=t=>Number(parts.find(p=>p.type===t)?.value);
+  return Date.UTC(g('year'),g('month')-1,g('day'),3,0,0,0);
+}
+function uptimeBill(rigs,mode,now,fromMs){
+  const step=300000,end=Math.floor(now/step)*step;
+  const slots=fromMs!=null?Math.max(1,Math.floor((end-Math.floor(fromMs/step)*step)/step)+1):(mode==='live'?12:288);
   const starts=Array.from({length:slots},(_,i)=>end-(slots-1-i)*step);
   const cnt=rigs.map(r=>{const c=new Array(slots).fill(0);for(const p of (D.hist[r.wid]?.[r.key]||[])){if(!(p.v>0))continue;const i=Math.floor((p.t-starts[0])/step);if(i>=0&&i<slots)c[i]++}return c});
   const last=slots-1,elapsed=Math.min(step,Math.max(0,now-starts[last])),dur=i=>i===last?elapsed:step;
@@ -723,8 +729,9 @@ function renderHead(){
   const l=scopeRigs(),w=wById(S.w);
   const h1=$('#h1');
   const back=$('#exitScope');
-  if(S.w==='TOTAL'){h1.hidden=true;h1.textContent='';back.hidden=true}
-  else{h1.hidden=false;back.hidden=false;h1.innerHTML=`Cuenta <span class="grad">${esc(w?.name)}</span>`}
+  h1.hidden=false;
+  if(S.w==='TOTAL'){back.hidden=true;h1.innerHTML=`Todos los <span class="grad">equipos</span>`}
+  else{back.hidden=false;h1.innerHTML=`Cuenta <span class="grad">${esc(w?.name)}</span>`}
   const n=scopeWatchers().length;
   $('#lead').textContent=`${l.length} equipo${l.length!==1?'s':''} ASIC · ${n} cuenta${n!==1?'s':''} NiceHash · SHA-256 mina BTC, Scrypt mina LTC + DOGE · todo se paga en BTC`+(NO_SYNC?' · modo solo lectura':'');
 }
@@ -793,44 +800,24 @@ function scopedCoins(){
   }
   return [...by.values()].sort((a,b)=>b.day-a.day);
 }
-function statGrid(rows){return rows.map(([l,v,sub])=>`<div class="mini-stat"><label>${esc(l)}</label><b>${typeof v==='string'?esc(v):b8(v)}</b>${sub?`<small>${esc(sub)}</small>`:''}</div>`).join('')}
+function coinCard(coin,dayHtml,sub,month,monthSub,life,lifeSub){
+  return `<article class="coin-card" style="--c:${coinColor(coin)}"><div class="coin-card-h"><i></i><b>${esc(coin)}</b><span>hoy</span></div><div class="coin-card-n">${dayHtml}<small>${esc(coin)}</small></div><div class="coin-card-sub">${sub}</div><div class="coin-card-meta"><div><label>Este mes</label><b>${esc(month)}</b>${monthSub?`<small>${esc(monthSub)}</small>`:''}</div><div><label>Acumulado</label><b>${esc(life)}</b>${lifeSub?`<small>${esc(lifeSub)}</small>`:''}</div></div></article>`;
+}
 function renderEarn(){
-  const coins=scopedCoins();
-  const ws=scopeWatchers();
+  const coins=scopedCoins(),s=D.summary,px=D.btcUsd,ws=scopeWatchers();
   const onlyVia=ws.length>0&&ws.every(w=>D.payload[w.id]?.pool==='viabtc');
-  if(onlyVia){
-    $('#earnDelta').hidden=true;
-    $('#earnUsd').textContent='Acreditado por ViaBTC en las últimas 24 h';
-    $('#earnCoins').innerHTML='';
-    if(coins.length===1){
-      const c=coins[0];
-      tween($('#earnBtc'),c.day,v=>v.toFixed(8)+'<small style="color:'+coinColor(c.coin)+'">'+esc(c.coin)+'</small>');
-      $('#earnGrid').innerHTML=statGrid([
-        [c.coin+' este mes',c.month.toFixed(8)+' '+c.coin,''],
-        ['Acumulado',c.life.toFixed(8)+' '+c.coin,''],
-        ['Saldo en pool',c.bal.toFixed(8)+' '+c.coin,''],
-        ['Último pago','—','']
-      ]);
-    }else{
-      $('#earnBtc').dataset.v=0;
-      $('#earnBtc').innerHTML=coins.length?coins.map(c=>`<span style="display:block;font-size:22px">${c.day.toFixed(8)} <small style="color:${coinColor(c.coin)}">${esc(c.coin)}</small></span>`).join(''):'—';
-      $('#earnGrid').innerHTML=statGrid(coins.flatMap(c=>[[c.coin+' este mes',c.month.toFixed(8)+' '+c.coin,''],[c.coin+' acumulado',c.life.toFixed(8)+' '+c.coin,'']]));
-    }
-    return;
+  const est=scopeRigs().filter(r=>r.mining&&paidBtc(r)).reduce((a,r)=>a+r.prof,0);
+  const hoy=onlyVia?null:num(s?.dayBtc);
+  const d=$('#earnDelta');
+  if(hoy!=null&&est>0&&hoy/est<=1.5){d.hidden=false;d.textContent=`${nf(hoy/est*100,0)}% del estimado 24 h`}else d.hidden=true;
+  const cards=[];
+  if(!onlyVia){
+    const month=num(s?.monthBtc),life=num(s?.lifetimeBtc);
+    const lifeNote=[s?.since?`desde ${fdt(s.since)}`:'',s?.lastPayout?`pago ${fdt(s.lastPayout)}`:''].filter(Boolean).join(' · ');
+    cards.push(coinCard('BTC',hoy!=null?btcH(hoy):'—',hoy!=null&&px?`≈ US$ ${nf(hoy*px)} · 1 BTC = US$ ${nf(px,0)}`:'NiceHash',b8(month),px&&month!=null?`≈ US$ ${nf(month*px)}`:(est?`est. 24 h ${b8(est)}`:''),b8(life),lifeNote));
   }
-  const s=D.summary,px=D.btcUsd,est=scopeRigs().filter(r=>r.mining&&paidBtc(r)).reduce((a,r)=>a+r.prof,0);
-  const hoy=num(s?.dayBtc);
-  if(hoy!=null)tween($('#earnBtc'),hoy,v=>btcH(v)+'<small>BTC</small>');else $('#earnBtc').innerHTML='—';
-  $('#earnUsd').textContent=hoy!=null&&px?`≈ US$ ${nf(hoy*px)} · 1 BTC = US$ ${nf(px,0)}`:'';
-  const d=$('#earnDelta');if(hoy!=null&&est>0&&hoy/est<=1.5){d.hidden=false;d.textContent=`${nf(hoy/est*100,0)}% del estimado 24 h`}else d.hidden=true;
-  $('#earnCoins').innerHTML=coins.map(c=>`<span style="--c:${coinColor(c.coin)}"><b>${c.day.toFixed(8)}</b><small>${esc(c.coin)} · hoy</small></span>`).join('');
-  $('#earnGrid').innerHTML=statGrid([
-    ['Este mes',num(s?.monthBtc),px&&num(s?.monthBtc)!=null?'≈ US$ '+nf(s.monthBtc*px):''],
-    ['Acumulado',num(s?.lifetimeBtc),s?.since?'desde '+fdt(s.since):''],
-    ['Rentab. estimada 24 h',est,px?'≈ US$ '+nf(est*px):''],
-    ['Último pago NiceHash',s?.lastPayout?fdt(s.lastPayout):'—',''],
-    ...coins.flatMap(c=>[[c.coin+' este mes',c.month.toFixed(8)+' '+c.coin,'ViaBTC'],[c.coin+' acumulado',c.life.toFixed(8)+' '+c.coin,c.bal?'saldo '+c.bal.toFixed(8):'']])
-  ]);
+  for(const c of coins) cards.push(coinCard(c.coin,c.day.toFixed(8),'ViaBTC · últimas 24 h',c.month.toFixed(8),'',c.life.toFixed(8),c.bal?`saldo ${c.bal.toFixed(8)}`:''));
+  $('#earnStack').innerHTML=cards.join('')||'<div class="coin-card"><div class="coin-card-n">—</div></div>';
 }
 function renderHealth(){
   const l=scopeRigs(),on=l.filter(r=>r.mining).length;
@@ -839,6 +826,9 @@ function renderHealth(){
   const off=l.length-on,hi=l.filter(r=>r.mining&&r.rejPct>1).length,errs=scopeWatchers().filter(w=>D.err[w.id]).length;
   const alerts=[off&&`${off} equipo${off>1?'s':''} sin minar`,hi&&`${hi} con rechazo > 1%`,errs&&`${errs} cuenta${errs>1?'s':''} sin datos`].filter(Boolean);
   $('#hTxt').innerHTML=`<strong>${!l.length?'Sin equipos':off?'Atención':'Todo minando'}</strong>${alerts.length?esc(alerts.join(' · ')):'Sin alertas activas'}`;
+  const dayBill=l.length?uptimeBill(l,'hour',Date.now(),artTodayStart()):null;
+  const dayKnown=dayBill?dayBill.dcOn+dayBill.dcOff:0;
+  $('#healthUp').innerHTML=`<span>Uptime hoy</span><b>${dayKnown?fmtBill(dayBill.dcOn):'Sin registro'}</b>`;
   const mode=S.heat==='live'?'live':'hour';
   const bill=l.length?uptimeBill(l,mode,Date.now()):{rows:[]};
   const win=mode==='live'?'última hora':'últimas 24 h';
