@@ -6,7 +6,7 @@ import { requireRole } from "../middleware/auth.js";
 import { requireAdminBGrant } from "../middleware/adminBGrant.js";
 import { buildNhMonitorBoard } from "../lib/nhMonitorBoard.js";
 import { buildViaBtcBoard } from "../lib/viaBtcObserver.js";
-import { readRigBtcTotals } from "../lib/rigBtcLedger.js";
+import { readCoinDayTotals, readRigBtcTotals } from "../lib/rigBtcLedger.js";
 import { readUptimeMonths } from "../lib/farmUptime.js";
 import { readRigHistory } from "../lib/rigHistory.js";
 import { cronSyncNhCredits, listCreditWatcherIds, sumNhCredits, syncNhCreditDeltas } from "../lib/nhWatcherCreditDeltas.js";
@@ -896,7 +896,10 @@ monitorEquiposAsicHistorialRouter.post(
     const board = body as {
       watchers?: { id: string }[];
       payload?: Record<string, { coin?: unknown }>;
-      earnings?: { rigBtc?: Record<string, { h24: number; life: number; month?: number; coin?: string }> };
+      earnings?: {
+        rigBtc?: Record<string, { h24: number; life: number; month?: number; coin?: string }>;
+        coinDays?: Record<string, Record<string, number>>;
+      };
     };
     const rigBtc = await readRigBtcTotals(user.id, (board.watchers ?? []).map((w) => w.id)).catch(
       (): Record<string, { h24: number; life: number; month: number; coin: string }> => ({})
@@ -918,7 +921,12 @@ monitorEquiposAsicHistorialRouter.post(
         };
       }
     }
-    if (board.earnings) board.earnings.rigBtc = rigBtc;
+    if (board.earnings) {
+      board.earnings.rigBtc = rigBtc;
+      board.earnings.coinDays = await readCoinDayTotals(user.id, (board.watchers ?? []).map((w) => w.id)).catch(
+        (): Record<string, Record<string, number>> => ({})
+      );
+    }
     res.json(body);
   }
 );

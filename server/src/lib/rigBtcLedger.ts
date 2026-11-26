@@ -1,5 +1,5 @@
 import { db } from "../db.js";
-import { artDayStartFromKey, artMonthStartMs } from "./nhWatcherCreditDeltas.js";
+import { artDayKey, artDayStartFromKey, artMonthStartMs } from "./nhWatcherCreditDeltas.js";
 
 const VIA_HOST = "https://www.viabtc.com";
 const UA = "HashrateSGI-MonitorEquiposAsic/1.0";
@@ -261,6 +261,37 @@ export async function readRigBtcTotals(
     const prev = out[key];
     if (prev && prev.coin !== "BTC" && coin === "BTC") continue;
     out[key] = { h24: finite(row.h24), life: finite(row.life), month: finite(row.month), coin };
+  }
+  return out;
+}
+
+/** Crédito diario guardado en la moneda del pool (ZEC, LTC, DOGE…), sin pasarlo a BTC. */
+export async function readCoinDayTotals(
+  userId: number,
+  watcherIds: string[]
+): Promise<Record<string, Record<string, number>>> {
+  const ids = [...new Set(watcherIds.map((id) => id.trim().toLowerCase()).filter(Boolean))].slice(0, 40);
+  if (ids.length === 0) return {};
+  const from = Date.now() - 16 * DAY_MS;
+  const marks = ids.map(() => "?").join(", ");
+  const rows = (await db
+    .prepare(
+      `SELECT sample_t, UPPER(coin) AS coin, SUM(btc) AS amount
+       FROM nh_watcher_rig_btc_ledger
+       WHERE user_id = ? AND sample_t >= ? AND btc > 0
+         AND UPPER(coin) <> 'BTC' AND watcher_id IN (${marks})
+       GROUP BY sample_t, UPPER(coin)`
+    )
+    .all(userId, from, ...ids)) as Array<Record<string, unknown>>;
+  const out: Record<string, Record<string, number>> = {};
+  for (const row of rows) {
+    const t = finite(row.sample_t);
+    const coin = String(row.coin ?? "").toUpperCase();
+    const amount = finite(row.amount);
+    if (!(t > 0) || !coin || coin === "BTC" || !(amount > 0)) continue;
+    const day = artDayKey(t);
+    const bucket = out[day] || (out[day] = {});
+    bucket[coin] = (bucket[coin] || 0) + amount;
   }
   return out;
 }
