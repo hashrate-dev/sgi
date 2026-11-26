@@ -79,6 +79,85 @@ async function saveDays(userId: number, rows: DayRow[], todayKey: string, now: n
   }
 }
 
+const KEEP_MS = 183 * 24 * 60 * 60 * 1000;
+
+/**
+ * Completa días ya cerrados que todavía no están guardados.
+ * Solo entran equipos con alguna muestra ese día: el registro no guarda los ceros,
+ * así que un día entero sin muestras queda sin fila y no se cuenta como corte.
+ * El día de hoy lo sigue actualizando el mes en curso.
+ */
+export async function fillMissingUptimeDays(userId: number, watchers: string[], fromMs: number, toMs: number): Promise<void> {
+  const ids = [...new Set(watchers.map((id) => id.trim().toLowerCase()).filter(Boolean))].slice(0, 40);
+  if (!ids.length || !(fromMs > 0) || !(toMs >= fromMs)) return;
+  const now = Date.now();
+  const todayKey = artDayKey(now);
+  const fromKey = artDayKey(fromMs);
+  const toKey = artDayKey(Math.min(toMs, now));
+  const marks = ids.map(() => "?").join(", ");
+  const have = (await db
+    .prepare(
+      `SELECT DISTINCT day_key FROM nh_uptime_day
+       WHERE user_id = ? AND day_key >= ? AND day_key <= ? AND watcher_id IN (${marks})`
+    )
+    .all(userId, fromKey, toKey, ...ids)) as Array<{ day_key?: unknown }>;
+  const stored = new Set(have.map((row) => String(row.day_key ?? "")));
+  const missing: number[] = [];
+  const end = artDayStartFromKey(toKey);
+  for (let day = artDayStartFromKey(fromKey); day > 0 && day <= end && day <= now; day = nextDayStart(day)) {
+    const key = artDayKey(day);
+    if (!key || key === todayKey || stored.has(key)) continue;
+    missing.push(day);
+    if (missing.length > 183) break;
+  }
+  const spans: Array<[number, number]> = [];
+  for (const day of missing) {
+    const prev = spans[spans.length - 1];
+    if (prev && day <= nextDayStart(prev[1])) prev[1] = day;
+    else spans.push([day, day]);
+  }
+  for (const [start, last] of spans) {
+    const samples = (await db
+      .prepare(
+        `SELECT watcher_id, rig_key, sample_t
+         FROM nh_watcher_rig_speed_log
+         WHERE user_id = ? AND sample_t >= ? AND sample_t < ?
+           AND speed > 0 AND rig_key LIKE 'id:%'
+           AND watcher_id IN (${marks})`
+      )
+      .all(userId, start, nextDayStart(last), ...ids)) as Array<Record<string, unknown>>;
+    const hits: Hit[] = [];
+    const rigsByDay = new Map<string, string[]>();
+    const seenRig = new Map<string, Set<string>>();
+    for (const row of samples) {
+      const t = Number(row.sample_t);
+      const rigKey = String(row.rig_key ?? "").trim();
+      const id = `${String(row.watcher_id ?? "").trim().toLowerCase()}|${rigKey}`;
+      if (!Number.isFinite(t) || !rigKey.startsWith("id:")) continue;
+      hits.push({ t, id });
+      const day = artDayKey(t);
+      let set = seenRig.get(day);
+      if (!set) seenRig.set(day, (set = new Set()));
+      if (!set.has(id)) {
+        set.add(id);
+        const list = rigsByDay.get(day) ?? [];
+        list.push(id);
+        rigsByDay.set(day, list);
+      }
+    }
+    const toSave: DayRow[] = [];
+    for (let day = start; day <= last; day = nextDayStart(day)) {
+      const rigs = rigsByDay.get(artDayKey(day)) ?? [];
+      if (!rigs.length) continue;
+      toSave.push(...splitDay(hits, rigs, day, nextDayStart(day), now));
+    }
+    if (toSave.length) await saveDays(userId, toSave, todayKey, now);
+  }
+  await db
+    .prepare(`DELETE FROM nh_uptime_day WHERE user_id = ? AND day_key < ?`)
+    .run(userId, artDayKey(now - KEEP_MS));
+}
+
 function pctOf(on: number, off: number): number | null {
   const known = on + off;
   return known > 0 ? Math.round((on / known) * 1000) / 10 : null;

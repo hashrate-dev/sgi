@@ -8,6 +8,7 @@ import { buildNhMonitorBoard } from "../lib/nhMonitorBoard.js";
 import { buildViaBtcBoard } from "../lib/viaBtcObserver.js";
 import { readRigBtcTotals } from "../lib/rigBtcLedger.js";
 import { readUptimeMonths } from "../lib/farmUptime.js";
+import { readRigHistory } from "../lib/rigHistory.js";
 import { cronSyncNhCredits, listCreditWatcherIds, sumNhCredits, syncNhCreditDeltas } from "../lib/nhWatcherCreditDeltas.js";
 import { cronSyncKnownWatcherSpeedLogs, syncNhSpeedLogFromNiceHash } from "../lib/nhWatcherSpeedLog.js";
 import { proxyNiceHashRigs2WithExtras } from "../lib/nicehashExternalRigsMerge.js";
@@ -395,6 +396,31 @@ monitorEquiposAsicHistorialRouter.get(
     const entries = raw.map((row) => normHistorialRow(row));
 
     res.json({ entries });
+  }
+);
+
+const postFleetHistoryBody = z.object({
+  watchers: z.array(z.string().trim().min(8).max(180)).max(40),
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
+monitorEquiposAsicHistorialRouter.post(
+  "/monitor-equipos-asic/historial-flota",
+  requireRole("admin_a", "admin_b"),
+  async (req: Request, res: Response) => {
+    const parsed = postFleetHistoryBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: { message: "Body inválido." } });
+      return;
+    }
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ error: { message: "No autenticado." } });
+      return;
+    }
+    const body = await readRigHistory(user.id, parsed.data.watchers, parsed.data.from, parsed.data.to);
+    res.json(body);
   }
 );
 

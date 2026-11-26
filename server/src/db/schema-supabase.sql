@@ -826,6 +826,8 @@ CREATE TABLE IF NOT EXISTS nh_watcher_rig_btc_ledger (
   PRIMARY KEY (user_id, watcher_id, rig_key, sample_t)
 );
 
+CREATE INDEX IF NOT EXISTS idx_nh_rig_btc_ledger_user_t ON nh_watcher_rig_btc_ledger(user_id, sample_t);
+
 -- Agregados TH/MH por intervalo (15 / 30 / 60 min), materializados desde muestras 1 min
 CREATE TABLE IF NOT EXISTS nh_watcher_rig_hash_agg_samples (
   id BIGSERIAL PRIMARY KEY,

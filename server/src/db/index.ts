@@ -294,6 +294,9 @@ async function ensureSupabaseNhSpeedLog(pool: Pool) {
     await pool.query(
       `ALTER TABLE nh_watcher_rig_btc_ledger ADD COLUMN IF NOT EXISTS coin TEXT NOT NULL DEFAULT 'BTC'`
     );
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_nh_rig_btc_ledger_user_t ON nh_watcher_rig_btc_ledger(user_id, sample_t)`
+    );
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.warn("[DB] ensureSupabaseNhSpeedLog:", msg);

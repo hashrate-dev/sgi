@@ -1187,6 +1187,9 @@ CREATE INDEX IF NOT EXISTS idx_mp_presence_hist_visitor ON marketplace_presence_
   } catch {
     /* la columna ya está */
   }
+  native.exec(
+    `CREATE INDEX IF NOT EXISTS idx_nh_rig_btc_ledger_user_t ON nh_watcher_rig_btc_ledger(user_id, sample_t)`
+  );
 
   /** Agregados 15 / 30 / 60 min derivados de muestras 1 min (misma ventana de retención). */
   native.exec(`CREATE TABLE IF NOT EXISTS nh_watcher_rig_hash_agg_samples (
