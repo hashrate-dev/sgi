@@ -769,6 +769,18 @@ CREATE TABLE IF NOT EXISTS nh_watcher_rig_speed_log (
 
 CREATE INDEX IF NOT EXISTS idx_nh_speed_log_user_watcher_t ON nh_watcher_rig_speed_log(user_id, watcher_id, sample_t);
 
+-- BTC que NiceHash acredita (delta_amount del stream unpaid). No se borra: el acumulado sale de acá.
+CREATE TABLE IF NOT EXISTS nh_watcher_credit_deltas (
+  id BIGSERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  watcher_id TEXT NOT NULL,
+  sample_t BIGINT NOT NULL,
+  delta_btc DOUBLE PRECISION NOT NULL,
+  UNIQUE (user_id, watcher_id, sample_t)
+);
+
+CREATE INDEX IF NOT EXISTS idx_nh_credit_deltas_user_t ON nh_watcher_credit_deltas(user_id, sample_t);
+
 -- Agregados TH/MH por intervalo (15 / 30 / 60 min), materializados desde muestras 1 min
 CREATE TABLE IF NOT EXISTS nh_watcher_rig_hash_agg_samples (
   id BIGSERIAL PRIMARY KEY,

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "../db.js";
 import { requireRole } from "../middleware/auth.js";
 import { requireAdminBGrant } from "../middleware/adminBGrant.js";
+import { cronSyncNhCredits, listCreditWatcherIds, sumNhCredits, syncNhCreditDeltas } from "../lib/nhWatcherCreditDeltas.js";
 import { cronSyncKnownWatcherSpeedLogs, syncNhSpeedLogFromNiceHash } from "../lib/nhWatcherSpeedLog.js";
 import { proxyNiceHashRigs2WithExtras } from "../lib/nicehashExternalRigsMerge.js";
 import {
@@ -724,7 +725,8 @@ export async function nhSpeedLogCronHandler(req: Request, res: Response, next: N
       return;
     }
     const result = await cronSyncKnownWatcherSpeedLogs();
-    res.json({ ok: true, ...result });
+    const credits = await cronSyncNhCredits();
+    res.json({ ok: true, ...result, credits });
   } catch (e) {
     next(e);
   }
@@ -1122,6 +1124,13 @@ monitorEquiposAsicHistorialRouter.post(
       updated += 1;
     }
 
+    const watchers = new Set<string>();
+    for (const s of parsed.data.samples) {
+      const wid = normalizeNhWatcherStorageId(s.watcherId);
+      if (wid) watchers.add(wid);
+    }
+    await Promise.all([...watchers].map((wid) => syncNhCreditDeltas(user.id, wid)));
+
     res.json({ ok: true, updated, withdrawals, contextKey: ck });
   }
 );
@@ -1166,12 +1175,13 @@ monitorEquiposAsicHistorialRouter.get(
           )
           .all(user.id)) as Array<Record<string, unknown>>);
 
+    const creditWatchers = watcherFilter ? [watcherFilter] : await listCreditWatcherIds(user.id);
+    await Promise.all(creditWatchers.map((wid) => syncNhCreditDeltas(user.id, wid)));
+    const credited = await sumNhCredits(user.id, watcherFilter);
+
     const now = Date.now();
     const today = utcDayKey(now);
     const month = utcMonthKey(now);
-    let dayBtc = 0;
-    let monthBtc = 0;
-    let lifetimeBtc = 0;
     let unpaidBtc = 0;
     const byRig: Array<{
       watcherId: string;
@@ -1194,9 +1204,6 @@ monitorEquiposAsicHistorialRouter.get(
       const dayOk = String(r.day_utc) === today ? Number(r.day_btc) || 0 : 0;
       const monthOk = String(r.month_ym) === month ? Number(r.month_btc) || 0 : 0;
       const life = Number(r.lifetime_btc) || 0;
-      dayBtc += dayOk;
-      monthBtc += monthOk;
-      lifetimeBtc += life;
       byRig.push({
         watcherId: String(r.watcher_id),
         rigName,
@@ -1233,9 +1240,9 @@ monitorEquiposAsicHistorialRouter.get(
 
     res.json({
       contextKey: ck,
-      dayBtc,
-      monthBtc,
-      lifetimeBtc,
+      dayBtc: credited.dayBtc,
+      monthBtc: credited.monthBtc,
+      lifetimeBtc: credited.lifetimeBtc,
       unpaidBtc: normalizeUnpaidDisplay(unpaidBtc),
       lastWithdrawal,
       rigCount: byRig.length,
