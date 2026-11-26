@@ -1,7 +1,7 @@
 .asic-monitor-zip {
   width: 100%;
-  max-width: var(--sgi-layout-max, 1400px);
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
   height: calc(100dvh - var(--sgi-topbar-h, 80px) - var(--sgi-footer-h, 52px));
   min-height: 640px;
   background: #07090a;
