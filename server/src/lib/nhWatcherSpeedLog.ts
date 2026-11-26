@@ -139,7 +139,8 @@ async function newestSampleMs(userId: number, watcherId: string): Promise<number
 export async function syncNhSpeedLogFromNiceHash(
   userId: number,
   watcherId: string,
-  rigs: { rigId: string; algorithm: string; label?: string }[]
+  rigs: { rigId: string; algorithm: string; label?: string }[],
+  sinceOverride?: number
 ): Promise<{
   rigs: { rigId: string; points: NhSpeedLogPoint[] }[];
   fleet: { algorithm: string; points: NhSpeedLogPoint[] }[];
@@ -147,7 +148,12 @@ export async function syncNhSpeedLogFromNiceHash(
   const wid = watcherId.trim().toLowerCase();
   const now = Date.now();
   const newest = await newestSampleMs(userId, wid);
-  const since = newest == null ? now - BACKFILL_MS : Math.min(newest - 30 * 60 * 1000, now - 6 * 60 * 60 * 1000);
+  const since =
+    sinceOverride != null && Number.isFinite(sinceOverride)
+      ? sinceOverride
+      : newest == null
+        ? now - BACKFILL_MS
+        : Math.min(newest - 30 * 60 * 1000, now - 6 * 60 * 60 * 1000);
   const windowStart = Math.max(since, now - BACKFILL_MS);
   const [fetched, fleetFetched] = await Promise.all([
     fetchNhRigSpeedHistory(wid, rigs, windowStart),

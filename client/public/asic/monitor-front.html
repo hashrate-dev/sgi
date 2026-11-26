@@ -511,7 +511,7 @@ async function loadAll(manual){
     if(S.w!=='TOTAL'&&!wById(S.w))S.w='TOTAL';
     D.payload=RAW.payload||{};D.err=RAW.err||{};D.btcUsd=num(RAW.btcUsd);
     const rigs=[];D.watchers.forEach(w=>{const p=D.payload[w.id];if(p)(p.miningRigs||[]).forEach((rig,j)=>rigs.push(normRig(rig,j,w,p)))});D.rigs=rigs;
-    D.hist={};for(const[wid,m]of Object.entries(RAW.history||{})){D.hist[wid]={};for(const[k,arr]of Object.entries(m||{}))D.hist[wid][k]=(arr||[]).map(([t,v])=>({t,v}))}
+    D.hist={};for(const[wid,m]of Object.entries(RAW.history||{})){D.hist[wid]={};for(const[k,arr]of Object.entries(m||{}))D.hist[wid][k]=(Array.isArray(arr)?arr:[]).map(p=>Array.isArray(p)?{t:+p[0],v:+p[1]}:{t:+p.t,v:+p.v}).filter(p=>p.t>0)}
     loadSummary();
     restoreBento();
     D.loaded=true;D.lastSync=RAW.lastPoll;
@@ -742,9 +742,14 @@ function renderFleet(){
   }
 }
 function renderHeat(){
-  const l=scopeRigs(),H=36e5,end=Math.floor(Date.now()/H)*H,starts=Array.from({length:24},(_,i)=>end-(23-i)*H);
-  // minutos con hashrate > 0 por equipo y por hora (1 muestra por minuto)
-  const cnt=l.map(r=>{const c=new Array(24).fill(0);for(const p of (D.hist[r.wid]?.[r.key]||[])){if(!(p.v>0))continue;const i=Math.floor((p.t-starts[0])/H);if(i>=0&&i<24)c[i]++}return c});
+  const l=scopeRigs(),H=36e5,now=Date.now(),end=Math.floor(now/H)*H,starts=Array.from({length:24},(_,i)=>end-(23-i)*H);
+  const cnt=l.map(r=>{
+    const c=new Array(24).fill(0);
+    const pts=(D.hist[r.wid]?.[r.key]||[]).slice();
+    if(r.hr>0)pts.push({t:now,v:r.hr});
+    for(const p of pts){if(!(p.v>0))continue;const i=Math.floor((p.t-starts[0])/H);if(i>=0&&i<24)c[i]++}
+    return c;
+  });
   const ref=starts.map((_,i)=>Math.max(0,...cnt.map(c=>c[i])));   // minutos registrados esa hora (el mejor equipo)
   const lab=t=>String(new Date(t).getHours()).padStart(2,'0');
   let sum=0,n=0;

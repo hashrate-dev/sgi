@@ -111,6 +111,25 @@ async function readWatcherHistory(userId: number, watcherId: string): Promise<{
     arr.push([t, v]);
     rigBuf.set(key, arr);
   }
+
+  const samples = (await db
+    .prepare(
+      `SELECT rig_key, sample_t, value
+       FROM nh_watcher_rig_hash_samples
+       WHERE user_id = ? AND watcher_id = ? AND sample_t >= ? AND rig_key LIKE 'id:%' AND value > 0
+       ORDER BY sample_t ASC`
+    )
+    .all(userId, watcherId, now - DAY_MS)) as Array<Record<string, unknown>>;
+  for (const row of samples) {
+    const key = String(row.rig_key ?? "");
+    const t = Number(row.sample_t);
+    const v = Number(row.value);
+    if (!key.startsWith("id:") || !Number.isFinite(t) || !(v > 0)) continue;
+    const arr = rigBuf.get(key) || [];
+    arr.push([t, v]);
+    rigBuf.set(key, arr);
+  }
+
   for (const [key, arr] of rigBuf) rigs[key] = arr;
   return { rigs, sha, scr };
 }
@@ -200,12 +219,16 @@ export async function buildNhMonitorBoard(
     await syncNhCreditDeltas(userId, w.id);
   });
 
+  const dayAgo = Date.now() - DAY_MS;
   const thin: typeof live = [];
   for (const row of live) {
     const hist = await readWatcherHistory(userId, row.id);
-    if (hist.sha.size + hist.scr.size < 2) thin.push(row);
+    const rigPoints = Object.values(hist.rigs).reduce((n, pts) => n + pts.length, 0);
+    if (rigPoints < 8 || hist.sha.size + hist.scr.size < 2) thin.push(row);
   }
-  await mapPool(thin.slice(0, 4), 4, (row) => syncNhSpeedLogFromNiceHash(userId, row.id, row.rigs).catch(() => undefined));
+  await mapPool(thin, 3, (row) =>
+    syncNhSpeedLogFromNiceHash(userId, row.id, row.rigs, dayAgo).catch(() => undefined)
+  );
 
   const history: Record<string, Record<string, Pair[]>> = {};
   const totalSha = new Map<number, number>();
