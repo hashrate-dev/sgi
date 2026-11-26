@@ -185,9 +185,13 @@ h1 .grad{background:linear-gradient(90deg,var(--sha),var(--sha2) 50%,var(--scr))
 .heat.dense .hc.nodata{background:color-mix(in srgb,var(--line) 55%,transparent);outline:none}
 .heat.dense .hx{min-width:0;max-width:18px;overflow:visible;white-space:nowrap;text-align:left;font-size:10px;line-height:1}
 .heat.dense .lbl{min-width:0}
-.heat .lbl{color:var(--muted);font:500 11.5px Inter;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:8px;position:sticky;left:0;background:var(--panel);z-index:1}
-.hc{height:16px;border-radius:4px;background:color-mix(in srgb,var(--sha) calc(var(--v)*85%),var(--panel2))}
-.hc.bad{background:color-mix(in srgb,var(--bad) 70%,transparent)}
+.heat > span:first-child,.heat .lbl{position:sticky;left:0;z-index:4;background:var(--panel-solid);box-shadow:4px 0 0 var(--panel-solid),5px 0 0 var(--line),0 8px 0 var(--panel-solid)}
+.heat .lbl{color:var(--text);font:500 12px Inter;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:10px;align-self:stretch;display:flex;align-items:center}
+.hc{height:16px;border-radius:4px;background:var(--sha)}
+.hc.y{background:#eab308}
+.hc.o{background:#f97316}
+.hc.p{background:#a78bfa}
+.hc.bad{background:#fb7185}
 .hc.nodata{background:repeating-linear-gradient(45deg,var(--panel2),var(--panel2) 3px,transparent 3px,transparent 6px);outline:1px solid var(--line)}
 .hc:hover{outline:1.5px solid var(--text)}
 .heat .hx{text-align:center}
@@ -386,7 +390,7 @@ footer{color:var(--dim);font-size:12px;text-align:center;margin-top:44px}
         <article class="card s12" id="uptime">
           <div class="c-h"><div class="c-t"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span><span id="heatTitle">Disponibilidad · últimas 24 h</span></div><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end"><span class="mono" style="font-size:12px;color:var(--muted)" id="upAvg"></span><div class="seg" id="heatSeg"><button data-h="hour" class="on">1 h</button><button data-h="5min">5 min</button><button data-h="live">Live</button></div></div></div>
           <div class="heat-scroll" id="heatScroll"><div class="heat" id="heat"></div></div>
-          <div class="heat-legend"><span><i style="background:var(--sha)"></i>Minando</span><span><i style="background:color-mix(in srgb,var(--bad) 70%,transparent)"></i>Caído / sin hashrate</span><span><i class="hc nodata" style="height:12px"></i>Sin registro en la base</span></div>
+          <div class="heat-legend"><span><i style="background:var(--sha)"></i>100%</span><span><i style="background:#eab308"></i>75–99%</span><span><i style="background:#f97316"></i>50–74%</span><span><i style="background:#a78bfa"></i>1–49%</span><span><i style="background:#fb7185"></i>Offline</span><span><i class="hc nodata" style="height:12px"></i>Sin registro</span></div>
           <div class="heat-bill" id="heatBill"></div>
         </article>
       </div>
@@ -910,8 +914,10 @@ function renderHeat(){
     if(!ref[i])return`<span class="hc nodata" title="${esc(r.name)} · ${when(t)} · sin registro"></span>`;
     const v=mode==='hour'?Math.min(1,cnt[k][i]/ref[i]):(cnt[k][i]>0?1:0);
     sum+=v;n++;
-    const txt=mode==='hour'?`${Math.round(v*100)}% activo`:v?'minando':'sin hashrate';
-    return`<span class="hc ${v<.5?'bad':''}" style="--v:${v.toFixed(2)}" title="${esc(r.name)} · ${when(t)} · ${txt}"></span>`}).join('')).join('');
+    const pct=Math.round(v*100);
+    const band=pct>=100?'':pct>=75?'y':pct>=50?'o':pct>0?'p':'bad';
+    const txt=pct>=100?'100% online':pct>0?`${pct}% online`:'offline';
+    return`<span class="hc ${band}" title="${esc(r.name)} · ${when(t)} · ${txt}"></span>`}).join('')).join('');
   const el=$('#heat');
   el.classList.toggle('dense',mode==='5min');
   el.style.setProperty('--n',String(slots));
