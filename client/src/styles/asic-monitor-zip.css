@@ -18,6 +18,14 @@
 .sgi-protected-root:has(.asic-monitor-zip) {
   background-image: none !important;
   background-color: #07090a !important;
+  overflow: hidden !important;
+  scrollbar-width: none;
+}
+
+.sgi-protected-root:has(.asic-monitor-zip)::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 .sgi-protected-root:has(.asic-monitor-zip) .sgi-farm-bg-overlay,
