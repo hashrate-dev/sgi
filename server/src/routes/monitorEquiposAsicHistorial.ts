@@ -7,6 +7,7 @@ import { requireAdminBGrant } from "../middleware/adminBGrant.js";
 import { buildNhMonitorBoard } from "../lib/nhMonitorBoard.js";
 import { buildViaBtcBoard } from "../lib/viaBtcObserver.js";
 import { readRigBtcTotals } from "../lib/rigBtcLedger.js";
+import { readUptimeMonths } from "../lib/farmUptime.js";
 import { cronSyncNhCredits, listCreditWatcherIds, sumNhCredits, syncNhCreditDeltas } from "../lib/nhWatcherCreditDeltas.js";
 import { cronSyncKnownWatcherSpeedLogs, syncNhSpeedLogFromNiceHash } from "../lib/nhWatcherSpeedLog.js";
 import { proxyNiceHashRigs2WithExtras } from "../lib/nicehashExternalRigsMerge.js";
@@ -892,6 +893,30 @@ monitorEquiposAsicHistorialRouter.post(
       }
     }
     if (board.earnings) board.earnings.rigBtc = rigBtc;
+    res.json(body);
+  }
+);
+
+const postUptimeMonthsBody = z.object({
+  watchers: z.array(z.string().trim().min(8).max(180)).max(40),
+  rigs: z.array(z.object({ id: z.string().trim().min(8).max(180), key: z.string().trim().min(3).max(140) })).max(800),
+});
+
+monitorEquiposAsicHistorialRouter.post(
+  "/monitor-equipos-asic/uptime-months",
+  requireRole("admin_a", "admin_b"),
+  async (req: Request, res: Response) => {
+    const parsed = postUptimeMonthsBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: { message: "Body inválido." } });
+      return;
+    }
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ error: { message: "No autenticado." } });
+      return;
+    }
+    const body = await readUptimeMonths(user.id, parsed.data.watchers, parsed.data.rigs);
     res.json(body);
   }
 );

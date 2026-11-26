@@ -78,9 +78,25 @@ async function workersOf(accessKey: string, coin: string): Promise<ViaWorker[]> 
     );
     const rows = Array.isArray(data?.data) ? (data.data as ViaWorker[]) : [];
     out.push(...rows);
-    if (!data || data.has_next !== true) break;
+    if (!data || data.has_next !== true || rows.length === 0) break;
   }
-  return out;
+  return dedupeWorkers(out);
+}
+
+/** ViaBTC a veces repite el mismo worker en otra página. Un nombre por moneda. */
+function dedupeWorkers(rows: ViaWorker[]): ViaWorker[] {
+  const by = new Map<string, ViaWorker>();
+  const rank = (w: ViaWorker) =>
+    (String(w.status || "").toLowerCase() === "active" ? 2 : 0) + (num(w.recent_hashrate) > 0 ? 1 : 0);
+  for (const w of rows) {
+    const name = String(w.name || "").trim().toLowerCase();
+    const id = String(w.id || "").trim().toLowerCase();
+    const key = name || id;
+    if (!key) continue;
+    const prev = by.get(key);
+    if (!prev || rank(w) > rank(prev)) by.set(key, w);
+  }
+  return [...by.values()];
 }
 
 async function hourSeries(accessKey: string, coin: string): Promise<[number, number][]> {
@@ -140,8 +156,11 @@ async function buildViaBtcBoardFresh(accounts: ViaAccountIn[], userId: number): 
   const coin24: Record<string, Record<string, number>> = {};
   const total = new Map<number, number>();
 
+  const seenKeys = new Set<string>();
   for (const account of accounts) {
     const key = account.accessKey.trim().toLowerCase();
+    if (!key || seenKeys.has(key)) continue;
+    seenKeys.add(key);
     const info = okData(await getJson(`/res/observer/info?access_key=${encodeURIComponent(key)}`));
     if (!info) {
       const id = `via:${key}:ZEC`;
@@ -149,9 +168,13 @@ async function buildViaBtcBoardFresh(accounts: ViaAccountIn[], userId: number): 
       err[id] = "ViaBTC no respondió";
       continue;
     }
-    const coins = Array.isArray(info.open_coins)
-      ? info.open_coins.map((c) => String(c).trim().toUpperCase()).filter(Boolean).slice(0, 8)
-      : [];
+    const coins = [
+      ...new Set(
+        (Array.isArray(info.open_coins) ? info.open_coins : [])
+          .map((c) => String(c).trim().toUpperCase())
+          .filter(Boolean)
+      ),
+    ].slice(0, 8);
     if (coins.length === 0 && typeof info.default_coin === "string") coins.push(info.default_coin.toUpperCase());
 
     let any = false;
