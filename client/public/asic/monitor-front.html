@@ -219,6 +219,7 @@ select option{background:var(--panel-solid)}
 .tag{white-space:nowrap;font:600 10px/1 Inter;padding:4px 7px;border-radius:6px;letter-spacing:.03em}
 .tag.sha{color:var(--sha);background:color-mix(in srgb,var(--sha) 13%,transparent)}
 .tag.scr{color:var(--scr);background:color-mix(in srgb,var(--scr) 15%,transparent)}
+.tag.zec{color:var(--btc);background:color-mix(in srgb,var(--btc) 15%,transparent)}
 .state{margin-left:auto;align-self:flex-start;display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:var(--ok);padding:5px 9px;border-radius:99px;background:color-mix(in srgb,var(--ok) 11%,transparent);white-space:nowrap}
 .state.off{color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent)}
 .state.off .dot{animation:none}
@@ -291,7 +292,7 @@ footer{color:var(--dim);font-size:12px;text-align:center;margin-top:44px}
     <a href="#uptime" data-tip="Disponibilidad"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></a>
     <a href="#pagos" data-tip="Pagos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 12V8H6a2 2 0 0 1 0-4h12v4"/><path d="M4 6v12a2 2 0 0 0 2 2h14v-4"/><circle cx="17" cy="14" r="1"/></svg></a>
     <div class="sp"></div>
-    <a href="#" id="openCfg" data-tip="Cuentas NiceHash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></a>
+    <a href="#" id="openCfg" data-tip="Cuentas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></a>
     <a href="https://hashrate.space/" target="_blank" rel="noopener" data-tip="Abrir el SGI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg></a>
   </aside>
 
@@ -318,7 +319,7 @@ footer{color:var(--dim);font-size:12px;text-align:center;margin-top:44px}
         <article class="card s8 live-card">
           <div class="c-h">
             <div class="c-t"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg></span>Velocidad aceptada</div>
-            <div class="seg" id="algoSeg"><button data-a="sha" class="on">SHA-256 · BTC</button><button data-a="scr">Scrypt · LTC+DOGE</button></div>
+            <div class="seg" id="algoSeg"><button data-a="sha" class="on">SHA-256 · BTC</button><button data-a="scr">Scrypt · LTC+DOGE</button><button data-a="zec" hidden>Equihash · ZEC</button></div>
           </div>
           <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
             <div class="big"><span id="liveVal" class="skel">0000</span><small id="liveUnit">TH/s</small></div>
@@ -379,7 +380,7 @@ footer{color:var(--dim);font-size:12px;text-align:center;margin-top:44px}
         <div><h2>Equipos</h2><p id="fleetSub"></p></div>
         <div class="tools">
           <label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Filtrar equipos…"></label>
-          <div class="seg" id="algoF"><button data-v="" class="on">Todos</button><button data-v="sha">SHA-256</button><button data-v="scr">Scrypt</button></div>
+          <div class="seg" id="algoF"><button data-v="" class="on">Todos</button><button data-v="sha">SHA-256</button><button data-v="scr">Scrypt</button><button data-v="zec" hidden>ZEC</button></div>
           <select id="sort"><option value="hr">Hashrate</option><option value="rent">Rentabilidad</option><option value="rej">Rechazo</option><option value="name">Nombre</option><option value="status">Estado</option></select>
           <div class="seg" id="view"><button data-v="grid" class="on">Tarjetas</button><button data-v="table">Tabla</button></div>
           <button class="btn-p" id="refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v6h-6"/></svg>Actualizar</button>
@@ -393,9 +394,12 @@ footer{color:var(--dim);font-size:12px;text-align:center;margin-top:44px}
 </div>
 
 <div class="pal-bg" id="cfg"><div class="pal cfg">
-  <div style="padding:18px 20px 6px"><h3 style="font:600 18px var(--disp)">Cuentas NiceHash</h3><p style="color:var(--muted);font-size:12.5px;margin-top:4px">Pegá el link del watcher (nicehash.com/my/miner/…) o solo su ID, y ponele un nombre.</p></div>
-  <div id="cfgRows" style="padding:8px 20px;max-height:50vh;overflow:auto"></div>
-  <div style="display:flex;gap:8px;justify-content:space-between;padding:12px 20px 18px"><button class="icon-btn" id="cfgAdd">+ Agregar cuenta</button><div style="display:flex;gap:8px"><button class="icon-btn" id="cfgCancel">Cancelar</button><button class="btn-p" id="cfgSave">Guardar</button></div></div>
+  <div style="padding:18px 20px 6px"><h3 style="font:600 18px var(--disp)">Cuentas</h3><p style="color:var(--muted);font-size:12.5px;margin-top:4px">NiceHash: link del watcher o su ID. ViaBTC: link de observador (viabtc.com/observer/dashboard?access_key=…).</p></div>
+  <div id="cfgRows" style="padding:8px 20px 0;max-height:34vh;overflow:auto"></div>
+  <div style="padding:0 20px 8px"><button class="icon-btn" id="cfgAdd">+ Cuenta NiceHash</button></div>
+  <div style="padding:0 20px 4px;font-size:12px;color:var(--muted)">ViaBTC</div>
+  <div id="cfgVia" style="padding:0 20px;max-height:28vh;overflow:auto"></div>
+  <div style="display:flex;gap:8px;justify-content:space-between;padding:12px 20px 18px"><button class="icon-btn" id="cfgViaAdd">+ Cuenta ViaBTC</button><div style="display:flex;gap:8px"><button class="icon-btn" id="cfgCancel">Cancelar</button><button class="btn-p" id="cfgSave">Guardar</button></div></div>
 </div></div>
 <div class="pal-bg" id="pal"><div class="pal"><input id="palIn" placeholder="Ir a un equipo o cuenta…" autocomplete="off"><ul id="palList"></ul></div></div>
 <div class="toasts" id="toasts"></div>
@@ -417,7 +421,8 @@ const num=v=>{const n=typeof v==='string'?parseFloat(v):v;return typeof n==='num
 const nf=(n,d=2)=>(n??0).toLocaleString('es-AR',{minimumFractionDigits:d,maximumFractionDigits:d});
 const b8=n=>n==null?'—':n.toFixed(8);
 const btcH=n=>{if(n==null)return '—';const s=n.toFixed(8),m=s.match(/^(0\.0*)(.*)$/);return m?`<span class="z">${m[1]}</span>${m[2]||'0'}`:s};
-const unit=a=>a==='sha'?'TH/s':'MH/s';
+const unit=a=>a==='sha'?'TH/s':a==='zec'?'KSol/s':String(a).startsWith('v:')?'H/s':'MH/s';
+const unitOf=r=>r&&r.hrUnit?r.hrUnit:unit(r&&r.a!=null?r.a:r);
 const ls={get(k){try{return localStorage.getItem(k)}catch{return null}},set(k,v){try{localStorage.setItem(k,v)}catch{}}};
 const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 function ago(ts){if(!ts)return'—';const s=Math.max(0,Math.round((Date.now()-ts)/1000));return s<60?`${s}s`:s<3600?`${Math.round(s/60)}m`:s<86400?`${Math.floor(s/3600)}h ${Math.round(s%3600/60)}m`:`${Math.floor(s/86400)}d ${Math.floor(s%86400/3600)}h`}
@@ -450,7 +455,27 @@ function loadSlots(){
       if(out.length) return out;
     }
   }catch{}
+  if(loadVia().length) return [];
   return FALLBACK.slice();
+}
+const VIA_KEY='viaObserverLinks:v1';
+function viaKey(raw){
+  const s=String(raw||'').trim();
+  const q=s.match(/[?&]access_key=([a-f0-9]{16,64})/i);
+  if(q) return q[1].toLowerCase();
+  return /^[a-f0-9]{16,64}$/i.test(s)?s.toLowerCase():'';
+}
+function loadVia(){
+  try{
+    const arr=JSON.parse(ls.get(VIA_KEY)||'[]');
+    return (Array.isArray(arr)?arr:[]).map(r=>{
+      const accessKey=viaKey(r.link||r.accessKey||'');
+      return accessKey?{name:String(r.name||'').slice(0,40),accessKey,link:String(r.link||accessKey)}:null;
+    }).filter(Boolean).slice(0,8);
+  }catch{return []}
+}
+function saveVia(list){
+  ls.set(VIA_KEY,JSON.stringify(list.slice(0,8).map(v=>({name:String(v.name||'').slice(0,40),link:String(v.link||v.accessKey||'')}))));
 }
 function saveSlots(list){
   let prev=[];
@@ -489,9 +514,10 @@ function rigKey(r,i){const id=String(r.rigId||'').trim();if(id)return`id:${id}`;
 function normRig(r,i,w,p){
   const st=bestStat(r.stats),speed=num(st?.speedAccepted)??0,rej=num(st?.speedRejectedTotal)??0;
   const en=String(st?.algorithm?.enumName||'');
-  const a=/SHA256/i.test(en)?'sha':/SCRYPT/i.test(en)?'scr':(speed>=100?'sha':'scr');
+  const coin=String(r.coin||'');
+  const a=coin==='ZEC'?'zec':coin?('v:'+coin.toLowerCase()):(/SHA256/i.test(en)?'sha':/SCRYPT/i.test(en)?'scr':/EQUIHASH|ZEC/i.test(en)?'zec':(speed>=100?'sha':'scr'));
   const status=String(r.minerStatus||'').toUpperCase();
-  return{key:rigKey(r,i),name:String(r.name||r.rigId||`Equipo ${i+1}`).trim(),wid:w.id,wname:w.name,color:w.color,a,
+  return{key:rigKey(r,i),name:String(r.name||r.rigId||`Equipo ${i+1}`).trim(),wid:w.id,wname:w.name,color:w.color,a,hrUnit:String(r.hrUnit||''),
     hr:status==='MINING'?speed:0,rejPct:speed+rej>0?rej/(speed+rej)*100:0,
     status,mining:status==='MINING',prof:num(r.profitability)??num(st?.profitability)??0,unpaid:num(r.unpaidAmount)??0,
     statusTime:num(r.statusTime)||num(st?.statsTime),since:num(st?.timeConnected),lastPayout:p.lastPayoutTimestamp||null};
@@ -503,7 +529,7 @@ async function loadAll(manual){
   let retry=false;
   try{
     const watchers=loadSlots();
-    RAW=await api('/api/monitor-equipos-asic/board',{method:'POST',body:JSON.stringify({watchers,refresh:!!manual})});
+    RAW=await api('/api/monitor-equipos-asic/board',{method:'POST',body:JSON.stringify({watchers,viabtc:loadVia(),refresh:!!manual})});
     D.watchers=(RAW.watchers||[]).map((w,i)=>({id:w.id,name:w.name,color:COLORS[i%COLORS.length]}));
     if(!D.watchers.length){renderBlank('nowatchers');return}
     if(!RAW.lastPoll){setPill('load','Leyendo NiceHash…');retry=true;return}
@@ -548,20 +574,29 @@ function loadSummary(){
 
 /* ======================= Configuración de cuentas ======================= */
 function openCfg(){
-  const rows=(D.watchers.length?D.watchers:[{id:'',name:''}]).map(w=>cfgRow(w.name,w.id)).join('');
-  $('#cfgRows').innerHTML=rows;$('#cfg').classList.add('open');
+  const nh=loadSlots();
+  $('#cfgRows').innerHTML=(nh.length?nh:[{name:'',id:''}]).map(w=>cfgRow(w.name,w.id)).join('');
+  const via=loadVia();
+  $('#cfgVia').innerHTML=(via.length?via:[{name:'',link:''}]).map(w=>cfgViaRow(w.name,w.link)).join('');
+  $('#cfg').classList.add('open');
 }
 const cfgRow=(n='',id='')=>`<div class="cfg-row"><input class="cfg-n" placeholder="Nombre (ej. HASHRATE)" value="${esc(n)}"><input class="cfg-i mono" placeholder="Link o ID del watcher de NiceHash" value="${esc(id)}"><button class="icon-btn cfg-del" title="Quitar">✕</button></div>`;
+const cfgViaRow=(n='',link='')=>`<div class="cfg-row"><input class="cfg-n" placeholder="Nombre (ej. ZEC)" value="${esc(n)}"><input class="cfg-i mono" placeholder="Link de observador de ViaBTC" value="${esc(link)}"><button class="icon-btn cfg-del" title="Quitar">✕</button></div>`;
 async function saveCfg(){
   const watchers=[...$$('#cfgRows .cfg-row')].map(r=>{const m=String(r.querySelector('.cfg-i').value||'').match(UUID);return m?{name:String(r.querySelector('.cfg-n').value||'').trim().slice(0,40)||`W`,id:m[0].toLowerCase()}:null}).filter(Boolean);
+  const via=[...$$('#cfgVia .cfg-row')].map(r=>{
+    const link=String(r.querySelector('.cfg-i').value||'').trim();
+    const accessKey=viaKey(link);
+    return accessKey?{name:String(r.querySelector('.cfg-n').value||'').trim().slice(0,40)||'ViaBTC',link,accessKey}:null;
+  }).filter(Boolean);
   $('#cfgSave').textContent='Guardando…';
-  try{saveSlots(watchers);$('#cfg').classList.remove('open');toast('Cuentas guardadas');await loadAll(true)}
+  try{saveSlots(watchers);saveVia(via);$('#cfg').classList.remove('open');toast('Cuentas guardadas');await loadAll(true)}
   catch(e){toast('No se pudo guardar: '+e.message,true)}finally{$('#cfgSave').textContent='Guardar'}
 }
 
 /* ======================= Series ======================= */
 function liveSeries(a){
-  const key=a==='sha'?'__nhToolbarSumTh':'__nhToolbarSumMh';
+  const key=a==='sha'?'__nhToolbarSumTh':a==='zec'?'__nhToolbarSumZec':'__nhToolbarSumMh';
   const src=D.hist[S.w==='TOTAL'?TOTAL_ID:S.w]||{};
   let pts=(src[key]||[]).map(p=>({t:p.t,v:p.v}));
   if(pts.length<2){ // respaldo: sumar las series de cada equipo
@@ -615,7 +650,7 @@ function renderLive(animate=true){
 
   const W=el.clientWidth||800,H=el.clientHeight||240,t0=pts[0].t,t1=pts[pts.length-1].t||t0+1,top=mx*1.12||1;
   const X=t=>(t-t0)/Math.max(1,t1-t0)*W,Y=v=>H-(v/top)*H;
-  const c1=a==='sha'?css('--sha'):css('--scr'),c2=a==='sha'?css('--sha2'):css('--scr2');
+  const c1=a==='zec'?css('--btc'):a==='sha'?css('--sha'):css('--scr'),c2=a==='zec'?css('--btc'):a==='sha'?css('--sha2'):css('--scr2');
   // cortar la línea en huecos de más de 5 minutos (página cerrada)
   const segs=[];let cur2=[];pts.forEach((p,i)=>{if(i&&p.t-pts[i-1].t>5*60000){segs.push(cur2);cur2=[]}cur2.push([X(p.t),Y(p.v)])});segs.push(cur2);
   const smooth=ps=>{let d=`M${ps[0][0]},${ps[0][1]}`;for(let i=1;i<ps.length;i++){const[x0,y0]=ps[i-1],[x1,y1]=ps[i],c=(x0+x1)/2;d+=` C${c},${y0} ${c},${y1} ${x1},${y1}`}return d};
@@ -634,7 +669,27 @@ function renderLive(animate=true){
     tip.innerHTML=`<span>${fdt(p.t)}</span>${nf(p.v)} ${unit(a)}`;tip.style.left=x+'px';tip.style.top=y+'px';tip.style.opacity=1};
   el.onmouseleave=()=>{tip.style.opacity=0;svg.querySelector('#cross')?.setAttribute('opacity',0);svg.querySelector('#crossDot')?.setAttribute('opacity',0)};
 }
+function viaOnly(){
+  const ws=scopeWatchers();
+  if(!ws.length||ws.some(w=>D.payload[w.id]?.pool!=='viabtc')) return null;
+  let day=0,life=0,bal=0,coin='ZEC';
+  for(const w of ws){const p=D.payload[w.id]||{};day+=num(p.profit24)||0;life+=num(p.profitTotal)||0;bal+=num(p.coinBalance)||0;if(p.coin)coin=String(p.coin)}
+  return {day,life,bal,coin};
+}
 function renderEarn(){
+  const via=viaOnly();
+  if(via){
+    tween($('#earnBtc'),via.day,v=>v.toFixed(8)+'<small>'+esc(via.coin)+'</small>');
+    $('#earnUsd').textContent='Acreditado por ViaBTC en las últimas 24 h';
+    $('#earnDelta').hidden=true;
+    $('#earnGrid').innerHTML=[
+      ['Acumulado',via.life.toFixed(8)+' '+via.coin,''],
+      ['Saldo en pool',via.bal.toFixed(8)+' '+via.coin,''],
+      ['Rentab. estimada 24 h','—','El pool informa el crédito, no una tasa en BTC'],
+      ['Último pago','—','']
+    ].map(([l,v,sub])=>`<div class="mini-stat"><label>${l}</label><b>${esc(v)}</b>${sub?`<small>${esc(sub)}</small>`:''}</div>`).join('');
+    return;
+  }
   const s=D.summary,px=D.btcUsd,est=scopeRigs().filter(r=>r.mining).reduce((a,r)=>a+r.prof,0);
   const hoy=num(s?.dayBtc);
   if(hoy!=null)tween($('#earnBtc'),hoy,v=>btcH(v)+'<small>BTC</small>');else $('#earnBtc').innerHTML='—';
@@ -654,9 +709,16 @@ function renderHealth(){
   const off=l.length-on,hi=l.filter(r=>r.mining&&r.rejPct>1).length,errs=scopeWatchers().filter(w=>D.err[w.id]).length;
   const alerts=[off&&`${off} equipo${off>1?'s':''} sin minar`,hi&&`${hi} con rechazo > 1%`,errs&&`${errs} cuenta${errs>1?'s':''} sin datos`].filter(Boolean);
   $('#hTxt').innerHTML=`<strong>${!l.length?'Sin equipos':off?'Atención':'Todo minando'}</strong>${alerts.length?esc(alerts.join(' · ')):'Sin alertas activas'}`;
-  $('#matrix').innerHTML=l.map(r=>`<div class="cell" style="--c:${!r.mining?css('--bad'):r.rejPct>1?css('--warn'):(r.a==='sha'?css('--sha'):css('--scr'))}" title="${esc(r.name)} · ${esc(r.wname)} · ${r.mining?nf(r.hr)+' '+unit(r.a):r.status||'OFFLINE'}" data-k="${esc(r.wid+'|'+r.key)}"></div>`).join('');
+  $('#matrix').innerHTML=l.map(r=>`<div class="cell" style="--c:${!r.mining?css('--bad'):r.rejPct>1?css('--warn'):(r.a==='zec'?css('--btc'):r.a==='sha'?css('--sha'):css('--scr'))}" title="${esc(r.name)} · ${esc(r.wname)} · ${r.mining?nf(r.hr)+' '+unitOf(r):r.status||'OFFLINE'}" data-k="${esc(r.wid+'|'+r.key)}"></div>`).join('');
 }
 function renderBars(){
+  if(viaOnly()){
+    $('#barsTitle').textContent='Crédito de ViaBTC';
+    $('#barsTotal').textContent='';
+    $('#bars').innerHTML='<div class="blank" style="padding:20px">El crédito de esta cuenta está en la moneda del pool, en la tarjeta de generado.</div>';
+    $('#barsX').innerHTML='';
+    return;
+  }
   $$('#barsSeg button').forEach(x=>x.classList.toggle('on',x.dataset.m===S.bars));
   $('#barsTitle').textContent=S.bars==='days'?'BTC acreditado · últimos 14 días':'BTC acreditado este mes · por cuenta';
   if(S.bars==='days')return renderDays();
@@ -692,6 +754,14 @@ function renderDonut(){
   $('#legend').innerHTML=ent.slice(0,6).map(([id,v])=>{const w=wById(id);return`<div data-w="${id}"><i style="background:${w.color}"></i><span>${esc(w.name)}</span><b>${(v/tot*100).toFixed(1)}%</b></div>`}).join('')+(ent.length>6?`<div style="color:var(--dim);font-size:11px">+${ent.length-6} más</div>`:'')+(!ent.length?'<div style="color:var(--muted)">Sin rentabilidad activa</div>':'');
 }
 function renderWallet(){
+  const via=viaOnly();
+  if(via){
+    tween($('#wAmt'),via.bal,x=>x.toFixed(8)+'<small>'+esc(via.coin)+'</small>');
+    $('#wUsd').textContent='Saldo de la cuenta en ViaBTC';
+    $('#payList').innerHTML=scopeWatchers().map(w=>{const p=D.payload[w.id]||{};return`<div><i style="background:${w.color}"></i><span>${esc(w.name)}</span><small>${esc((num(p.coinBalance)||0).toFixed(8)+' '+(p.coin||via.coin))}</small></div>`}).join('');
+    $('#wNext').textContent='—';
+    return;
+  }
   const ws=scopeWatchers(),px=D.btcUsd;
   const unpaid=num(D.summary?.unpaidBtc)??ws.reduce((s,w)=>s+(num(D.payload[w.id]?.unpaidAmount)||0),0);
   tween($('#wAmt'),unpaid,x=>x.toFixed(8)+'<small>BTC</small>');
@@ -717,9 +787,9 @@ function renderFleet(){
   l.sort((x,y)=>S.sort==='name'?x.name.localeCompare(y.name):S.sort==='rej'?y.rejPct-x.rejPct:S.sort==='rent'?y.prof-x.prof:S.sort==='status'?(x.mining-y.mining):(x.a===y.a?y.hr-x.hr:x.a==='sha'?-1:1));
   $('#fleetSub').textContent=`${l.length} de ${scopeRigs().length} equipos · ${S.w==='TOTAL'?'toda la flota':wById(S.w)?.name}`;
   if(!l.length){$('#fleet').innerHTML=`<div class="card blank">${scopeRigs().length?'Ningún equipo coincide con el filtro.':'No hay equipos en esta cuenta.'}</div>`;return}
-  const col=a=>a==='sha'?[css('--sha'),css('--sha2')]:[css('--scr'),css('--scr2')];
+  const col=a=>a==='zec'||String(a).startsWith('v:')?[css('--btc'),css('--btc')]:a==='sha'?[css('--sha'),css('--sha2')]:[css('--scr'),css('--scr2')];
   const stateHtml=r=>`<span class="state ${r.mining?'':'off'}"><span class="dot"></span>${r.mining?'Minando':esc(r.status?r.status[0]+r.status.slice(1).toLowerCase():'Offline')}</span>`;
-  const tag=r=>`<span class="tag ${r.a}">${r.a==='sha'?'SHA-256':'SCRYPT'}</span>`;
+  const tag=r=>`<span class="tag ${r.a==='zec'||String(r.a).startsWith('v:')?'zec':r.a}">${r.a==='sha'?'SHA-256':r.a==='zec'?'ZEC':String(r.a).startsWith('v:')?String(r.a).slice(2).toUpperCase():'SCRYPT'}</span>`;
   if(S.view==='grid'){
     $('#fleet').innerHTML='<div class="fleet">'+l.map((r,i)=>{const[c1,c2]=col(r.a),ser=rigSeries(r),mx=Math.max(...ser,r.hr,0),pct=mx>0?Math.min(100,r.hr/mx*100):0,arc=56.55,dayE=rigEarn(r);
       return`<article class="card rig ${r.mining?'':'off'}" id="rig-${esc(r.wid+'|'+r.key)}" style="animation-delay:${Math.min(i,12)*40}ms">
@@ -728,7 +798,7 @@ function renderFleet(){
         <div style="min-width:0"><h3>${esc(r.name)}</h3><div class="own">${tag(r)}<i style="width:6px;height:6px;border-radius:2px;background:${r.color}"></i>${esc(r.wname)}</div></div>
         ${stateHtml(r)}
       </div>
-      <div class="rig-hr"><b>${nf(r.hr)}</b><small>${unit(r.a)}</small><span class="rj ${r.rejPct>1?'w':''}">rechazo ${nf(r.rejPct)}%</span></div>
+      <div class="rig-hr"><b>${nf(r.hr)}</b><small>${unitOf(r)}</small><span class="rj ${r.rejPct>1?'w':''}">rechazo ${nf(r.rejPct)}%</span></div>
       <div class="spark">${spark(ser,r.mining?c1:css('--bad'),r.mining?c2:css('--bad'))}</div>
       <div class="kv">
         <div title="Rentabilidad estimada 24 h (BTC)"><label>Rentab. 24h</label><span class="gold">${r.prof.toFixed(6)}</span></div>
@@ -738,7 +808,7 @@ function renderFleet(){
       </div></article>`}).join('')+'</div>';
   }else{
     $('#fleet').innerHTML=`<div class="card tbl"><table><thead><tr><th>Equipo</th><th>Cuenta</th><th>Algoritmo</th><th>Estado</th><th>Últimas 24 h</th><th class="num">Hashrate</th><th class="num">Rechazo</th><th class="num">Rentab. 24h</th><th class="num">Hoy</th><th class="num">Impago</th><th>Señal</th><th>Sesión</th></tr></thead><tbody>`+
-    l.map(r=>{const[c1,c2]=col(r.a),dayE=rigEarn(r);return`<tr id="rig-${esc(r.wid+'|'+r.key)}"><td><b>${esc(r.name)}</b></td><td><span style="display:inline-flex;align-items:center;gap:7px"><i style="width:7px;height:7px;border-radius:2px;background:${r.color}"></i>${esc(r.wname)}</span></td><td>${tag(r)}</td><td>${stateHtml(r)}</td><td><div style="width:120px;height:28px">${spark(rigSeries(r),c1,c2,120,28)}</div></td><td class="num"><b>${nf(r.hr)}</b> <span style="color:var(--muted)">${unit(r.a)}</span></td><td class="num" style="color:${r.rejPct>1?'var(--warn)':'inherit'}">${nf(r.rejPct)}%</td><td class="num" style="color:var(--btc)">${b8(r.prof)}</td><td class="num">${dayE==null?'—':b8(dayE)}</td><td class="num">${b8(r.unpaid)}</td><td style="color:var(--muted)">${ago(r.statusTime)}</td><td class="mono" style="font-size:12px">${dur(r.since)}</td></tr>`}).join('')+'</tbody></table></div>';
+    l.map(r=>{const[c1,c2]=col(r.a),dayE=rigEarn(r);return`<tr id="rig-${esc(r.wid+'|'+r.key)}"><td><b>${esc(r.name)}</b></td><td><span style="display:inline-flex;align-items:center;gap:7px"><i style="width:7px;height:7px;border-radius:2px;background:${r.color}"></i>${esc(r.wname)}</span></td><td>${tag(r)}</td><td>${stateHtml(r)}</td><td><div style="width:120px;height:28px">${spark(rigSeries(r),c1,c2,120,28)}</div></td><td class="num"><b>${nf(r.hr)}</b> <span style="color:var(--muted)">${unitOf(r)}</span></td><td class="num" style="color:${r.rejPct>1?'var(--warn)':'inherit'}">${nf(r.rejPct)}%</td><td class="num" style="color:var(--btc)">${b8(r.prof)}</td><td class="num">${dayE==null?'—':b8(dayE)}</td><td class="num">${b8(r.unpaid)}</td><td style="color:var(--muted)">${ago(r.statusTime)}</td><td class="mono" style="font-size:12px">${dur(r.since)}</td></tr>`}).join('')+'</tbody></table></div>';
   }
 }
 function renderHeat(){
@@ -761,7 +831,17 @@ function renderHeat(){
   const cov=ref.filter(Boolean).length;
   $('#upAvg').textContent=n?`Promedio ${nf(sum/n*100,1)}% · ${cov}/24 h con registro`:'Sin registro en las últimas 24 h';
 }
-function pickAlgo(){const has=a=>scopeRigs().some(r=>r.a===a);if(!has(S.algo)&&has(S.algo==='sha'?'scr':'sha')){S.algo=S.algo==='sha'?'scr':'sha';$$('#algoSeg button').forEach(x=>x.classList.toggle('on',x.dataset.a===S.algo))}}
+function pickAlgo(){
+  const has=a=>scopeRigs().some(r=>r.a===a);
+  const show=D.rigs.some(r=>r.a==='zec');
+  const zb=$('#algoSeg button[data-a="zec"]'),zf=$('#algoF button[data-v="zec"]');
+  if(zb) zb.hidden=!show;
+  if(zf) zf.hidden=!show;
+  if(!has(S.algo)){
+    const next=['zec','sha','scr'].find(has);
+    if(next){S.algo=next;$$('#algoSeg button').forEach(x=>x.classList.toggle('on',x.dataset.a===S.algo))}
+  }
+}
 function renderAll(){if(!D.loaded)return;pickAlgo();renderAccts();renderHead();renderLive();renderEarn();renderHealth();renderBars();renderDonut();renderWallet();renderHeat();renderFleet()}
 
 /* ======================= Interacción ======================= */
@@ -795,7 +875,7 @@ function closePal(){$('#pal').classList.remove('open')}
 function renderPal(){
   const q=$('#palIn').value.toLowerCase();
   const acc=[{t:'acct',w:'TOTAL',label:'Toda la flota',sub:D.rigs.length+' equipos',color:'var(--sha)'}].concat(D.watchers.map(w=>({t:'acct',w:w.id,label:w.name,sub:D.rigs.filter(r=>r.wid===w.id).length+' equipos',color:w.color}))).filter(x=>x.label.toLowerCase().includes(q));
-  const rig=D.rigs.map(r=>({t:'rig',k:r.wid+'|'+r.key,label:r.name,sub:`${r.wname} · ${nf(r.hr)} ${unit(r.a)}`,color:r.color})).filter(x=>(x.label+' '+x.sub).toLowerCase().includes(q));
+  const rig=D.rigs.map(r=>({t:'rig',k:r.wid+'|'+r.key,label:r.name,sub:`${r.wname} · ${nf(r.hr)} ${unitOf(r)}`,color:r.color})).filter(x=>(x.label+' '+x.sub).toLowerCase().includes(q));
   palItems=[...acc,...rig];palSel=Math.min(palSel,Math.max(0,palItems.length-1));
   let i=0;const li=x=>`<li class="${i===palSel?'sel':''}" data-i="${i++}"><i style="width:8px;height:8px;border-radius:3px;background:${x.color}"></i>${esc(x.label)}<small>${esc(x.sub)}</small></li>`;
   $('#palList').innerHTML=(acc.length?'<div class="grp">Cuentas</div>'+acc.map(li).join(''):'')+(rig.length?'<div class="grp">Equipos</div>'+rig.map(li).join(''):'')+(!palItems.length?'<div class="grp">Sin resultados</div>':'');
@@ -804,7 +884,9 @@ function pickPal(i){const x=palItems[i];if(!x)return;closePal();x.t==='acct'?set
 $('#openPal').onclick=openPal;
 $('#openCfg').onclick=e=>{e.preventDefault();openCfg()};
 $('#cfgAdd').onclick=()=>$('#cfgRows').insertAdjacentHTML('beforeend',cfgRow());
+$('#cfgViaAdd').onclick=()=>$('#cfgVia').insertAdjacentHTML('beforeend',cfgViaRow());
 $('#cfgRows').onclick=e=>{const b=e.target.closest('.cfg-del');if(b)b.closest('.cfg-row').remove()};
+$('#cfgVia').onclick=e=>{const b=e.target.closest('.cfg-del');if(b)b.closest('.cfg-row').remove()};
 $('#cfgCancel').onclick=()=>$('#cfg').classList.remove('open');
 $('#cfg').onclick=e=>{if(e.target.id==='cfg')$('#cfg').classList.remove('open')};
 $('#cfgSave').onclick=saveCfg;

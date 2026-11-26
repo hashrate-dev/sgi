@@ -5,6 +5,7 @@ import { db } from "../db.js";
 import { requireRole } from "../middleware/auth.js";
 import { requireAdminBGrant } from "../middleware/adminBGrant.js";
 import { buildNhMonitorBoard } from "../lib/nhMonitorBoard.js";
+import { buildViaBtcBoard } from "../lib/viaBtcObserver.js";
 import { cronSyncNhCredits, listCreditWatcherIds, sumNhCredits, syncNhCreditDeltas } from "../lib/nhWatcherCreditDeltas.js";
 import { cronSyncKnownWatcherSpeedLogs, syncNhSpeedLogFromNiceHash } from "../lib/nhWatcherSpeedLog.js";
 import { proxyNiceHashRigs2WithExtras } from "../lib/nicehashExternalRigsMerge.js";
@@ -690,6 +691,15 @@ const postMonitorBoardBody = z.object({
       })
     )
     .max(16),
+  viabtc: z
+    .array(
+      z.object({
+        name: z.string().trim().max(48).optional(),
+        accessKey: z.string().trim().regex(/^[a-f0-9]{16,64}$/i),
+      })
+    )
+    .max(8)
+    .optional(),
 });
 
 /** Tablero del monitor: rigs en vivo, historial de 7 días (archivo de 6 meses) y BTC acreditado. */
@@ -716,7 +726,11 @@ monitorEquiposAsicHistorialRouter.post(
       seen.add(id);
       watchers.push({ id, name: (w.name || "").trim().slice(0, 48) || `W${watchers.length + 1}` });
     }
-    if (watchers.length === 0) {
+    const viaAccounts = (parsed.data.viabtc ?? []).map((v, i) => ({
+      accessKey: v.accessKey.trim().toLowerCase(),
+      name: (v.name || "").trim().slice(0, 48) || `ViaBTC ${i + 1}`,
+    }));
+    if (watchers.length === 0 && viaAccounts.length === 0) {
       res.json({
         watchers: [],
         payload: {},
@@ -728,7 +742,38 @@ monitorEquiposAsicHistorialRouter.post(
       });
       return;
     }
-    const body = await buildNhMonitorBoard(user.id, watchers, Boolean(parsed.data.refresh));
+    const body = watchers.length
+      ? await buildNhMonitorBoard(user.id, watchers, Boolean(parsed.data.refresh))
+      : {
+          watchers: [] as { id: string; name: string }[],
+          payload: {} as Record<string, Record<string, unknown>>,
+          err: {} as Record<string, string>,
+          btcUsd: null as number | null,
+          lastPoll: Date.now(),
+          history: {} as Record<string, Record<string, [number, number][]>>,
+          earnings: { since: Date.now(), days: {}, byWatcher: {} },
+        };
+    if (viaAccounts.length) {
+      const via = await buildViaBtcBoard(viaAccounts, user.id, Boolean(parsed.data.refresh));
+      const merged = body as {
+        watchers: { id: string; name: string }[];
+        payload: Record<string, unknown>;
+        err: Record<string, string>;
+        history: Record<string, Record<string, [number, number][]>>;
+      };
+      merged.watchers.push(...via.watchers);
+      Object.assign(merged.payload, via.payload);
+      Object.assign(merged.err, via.err);
+      const totalId = "00000000-0000-0000-0000-000000000001";
+      const total = merged.history[totalId] || (merged.history[totalId] = {});
+      for (const [wid, series] of Object.entries(via.history)) {
+        if (wid === totalId) {
+          if (series.__nhToolbarSumZec?.length) total.__nhToolbarSumZec = series.__nhToolbarSumZec;
+          continue;
+        }
+        merged.history[wid] = series;
+      }
+    }
     res.json(body);
   }
 );
