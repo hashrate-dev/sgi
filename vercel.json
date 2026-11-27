@@ -67,7 +67,7 @@
     },
     {
       "path": "/api/monitor-equipos-asic/cron-speed-log",
-      "schedule": "*/15 * * * *"
+      "schedule": "* * * * *"
     }
   ]
 }

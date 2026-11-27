@@ -62,12 +62,16 @@ export async function readRigHistory(userId: number, watchers: string[], fromKey
     db
       .prepare(
         `SELECT watcher_id, rig_key, AVG(speed) AS avg_speed, COUNT(*) AS samples
-         FROM nh_watcher_rig_speed_log
-         WHERE user_id = ? AND sample_t >= ? AND sample_t < ? AND speed > 0
-           AND rig_key LIKE 'id:%' AND watcher_id IN (${marks})
+         FROM (
+           SELECT watcher_id, rig_key, sample_t, MAX(speed) AS speed
+           FROM nh_watcher_rig_speed_log
+           WHERE sample_t >= ? AND sample_t < ? AND speed > 0
+             AND rig_key LIKE 'id:%' AND watcher_id IN (${marks})
+           GROUP BY watcher_id, rig_key, sample_t
+         ) grouped
          GROUP BY watcher_id, rig_key`
       )
-      .all(userId, range.fromMs, endMs, ...ids) as Promise<Array<Record<string, unknown>>>,
+      .all(range.fromMs, endMs, ...ids) as Promise<Array<Record<string, unknown>>>,
     db
       .prepare(
         `SELECT watcher_id, rig_key, UPPER(coin) AS coin, SUM(btc) AS amount

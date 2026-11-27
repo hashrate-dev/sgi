@@ -143,7 +143,13 @@ export async function buildViaBtcBoard(
   return body;
 }
 
-async function buildViaBtcBoardFresh(accounts: ViaAccountIn[], userId: number): Promise<{
+/** Guarda el minuto actual de ViaBTC sin el historial de ganancias. Lo usa el cron, con o sin nadie en el sitio. */
+export async function snapshotViaAccounts(accounts: ViaAccountIn[], userId: number): Promise<number> {
+  const body = await buildViaBtcBoardFresh(accounts, userId, true);
+  return body.watchers.length;
+}
+
+async function buildViaBtcBoardFresh(accounts: ViaAccountIn[], userId: number, liveOnly = false): Promise<{
   watchers: { id: string; name: string }[];
   payload: Record<string, Record<string, unknown>>;
   err: Record<string, string>;
@@ -229,7 +235,7 @@ async function buildViaBtcBoardFresh(accounts: ViaAccountIn[], userId: number): 
           speed: num(w.hashrate_1day) || num(w.recent_hashrate),
         }))
         .filter((s) => s.rigKey !== "id:" && s.speed > 0);
-      await allocateViaRigBtc(userId, id, key, coin, shares).catch(() => undefined);
+      if (!liveOnly) await allocateViaRigBtc(userId, id, key, coin, shares).catch(() => undefined);
       const profit24 = num(home.profit_24hour);
       if (profit24 > 0) coin24[id] = shareBySpeed(profit24, shares, coin);
       payload[id] = {
@@ -244,6 +250,10 @@ async function buildViaBtcBoardFresh(accounts: ViaAccountIn[], userId: number): 
         lastPayoutTimestamp: null,
         nextPayoutTimestamp: null,
       };
+      if (liveOnly) {
+        await persistNhWatcherRigHashSamplesFromPayload(userId, id, payload[id]).catch(() => undefined);
+        continue;
+      }
       const series = coin === "ZEC" ? await hourSeries(key, coin) : [];
       const samples = [
         ...series.map(([t, v]) => ({

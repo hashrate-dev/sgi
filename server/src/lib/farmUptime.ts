@@ -130,11 +130,12 @@ export async function fillMissingUptimeDays(userId: number, watchers: string[], 
       .prepare(
         `SELECT watcher_id, rig_key, sample_t
          FROM nh_watcher_rig_speed_log
-         WHERE user_id = ? AND sample_t >= ? AND sample_t < ?
+         WHERE sample_t >= ? AND sample_t < ?
            AND speed > 0 AND rig_key LIKE 'id:%'
-           AND watcher_id IN (${marks})`
+           AND watcher_id IN (${marks})
+         GROUP BY watcher_id, rig_key, sample_t`
       )
-      .all(userId, start, nextDayStart(last), ...ids)) as Array<Record<string, unknown>>;
+      .all(start, nextDayStart(last), ...ids)) as Array<Record<string, unknown>>;
     const hits: Hit[] = [];
     const rigsByDay = new Map<string, string[]>();
     const seenRig = new Map<string, Set<string>>();
@@ -189,10 +190,10 @@ async function minuteDayRows(userId: number, watchers: string[], fromMs: number,
     .prepare(
       `SELECT watcher_id, rig_key, sample_t, value
        FROM nh_watcher_rig_hash_samples
-       WHERE user_id = ? AND sample_t >= ? AND sample_t < ?
+       WHERE sample_t >= ? AND sample_t < ?
          AND rig_key LIKE 'id:%' AND watcher_id IN (${marks})`
     )
-    .all(userId, fromMs, toMs, ...watchers)) as Array<Record<string, unknown>>;
+    .all(fromMs, toMs, ...watchers)) as Array<Record<string, unknown>>;
   const byMinute = new Map<number, Map<string, number>>();
   for (const row of rows) {
     const t = Math.floor(Number(row.sample_t) / MINUTE) * MINUTE;
@@ -255,11 +256,12 @@ export async function readUptimeMonths(userId: number, watchers: string[], rigsI
     .prepare(
       `SELECT watcher_id, rig_key, sample_t
        FROM nh_watcher_rig_speed_log
-       WHERE user_id = ? AND sample_t >= ? AND sample_t < ?
+       WHERE sample_t >= ? AND sample_t < ?
          AND speed > 0 AND rig_key LIKE 'id:%'
-         AND watcher_id IN (${marks})`
+         AND watcher_id IN (${marks})
+       GROUP BY watcher_id, rig_key, sample_t`
     )
-    .all(userId, currentStart, now + STEP, ...ids)) as Array<Record<string, unknown>>;
+    .all(currentStart, now + STEP, ...ids)) as Array<Record<string, unknown>>;
 
   const hits: Hit[] = [];
   const seen = new Set<string>(clientRigs);

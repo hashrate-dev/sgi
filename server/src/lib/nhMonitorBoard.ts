@@ -110,13 +110,14 @@ async function readWatcherHistory(userId: number, watcherId: string): Promise<{
   const now = Date.now();
   const rows = (await db
     .prepare(
-      `SELECT rig_key, sample_t, speed, algorithm
+      `SELECT rig_key, sample_t, MAX(speed) AS speed, MAX(algorithm) AS algorithm
        FROM nh_watcher_rig_speed_log
-       WHERE user_id = ? AND watcher_id = ? AND sample_t >= ?
+       WHERE watcher_id = ? AND sample_t >= ?
          AND (rig_key LIKE '__fleet:%' OR (rig_key LIKE 'id:%' AND sample_t >= ?))
+       GROUP BY rig_key, sample_t
        ORDER BY sample_t ASC`
     )
-    .all(userId, watcherId, now - WEEK_MS, now - DAY_MS)) as Array<Record<string, unknown>>;
+    .all(watcherId, now - WEEK_MS, now - DAY_MS)) as Array<Record<string, unknown>>;
 
   const rigs: Record<string, Pair[]> = {};
   const sha = new Map<number, number>();

@@ -176,12 +176,13 @@ export async function readNhRigMinuteSamples(
   const wid = watcherId.trim().toLowerCase();
   const rows = (await db
     .prepare(
-      `SELECT rig_key, sample_t, value
+      `SELECT rig_key, sample_t, MAX(value) AS value
        FROM nh_watcher_rig_hash_samples
-       WHERE user_id = ? AND watcher_id = ? AND sample_t >= ? AND rig_key LIKE 'id:%' AND value >= 0
+       WHERE watcher_id = ? AND sample_t >= ? AND rig_key LIKE 'id:%' AND value >= 0
+       GROUP BY rig_key, sample_t
        ORDER BY sample_t ASC`
     )
-    .all(userId, wid, sinceMs)) as Array<Record<string, unknown>>;
+    .all(wid, sinceMs)) as Array<Record<string, unknown>>;
   const out: Array<{ rigKey: string; t: number; v: number }> = [];
   for (const row of rows) {
     const rigKey = String(row.rig_key ?? "");

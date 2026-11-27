@@ -1,7 +1,7 @@
 import { db } from "../db.js";
 import { fetchNhFleetSpeedHistory, fetchNhRigSpeedHistory } from "./nicehashExternalHashHistory.js";
+import { monitorFleetUserId } from "./monitorFleetUser.js";
 import { proxyNiceHashRigs2WithExtras } from "./nicehashExternalRigsMerge.js";
-import { nhPickPrimaryMiningStat, nhRigSpeedAcceptedFromStats } from "./nhSpeedAccepted.js";
 
 /** Una fila cada 5 minutos: es el paso del historial público de NiceHash. */
 export const NH_SPEED_LOG_BUCKET_MS = 5 * 60 * 1000;
@@ -9,7 +9,6 @@ export const NH_SPEED_LOG_BUCKET_MS = 5 * 60 * 1000;
 export const NH_SPEED_LOG_RETENTION_MS = 183 * 24 * 60 * 60 * 1000;
 const CHART_WINDOW_MS = 24 * 60 * 60 * 1000;
 const BACKFILL_MS = 7 * 24 * 60 * 60 * 1000;
-const TOOLBAR_WATCHER = "00000000-0000-0000-0000-000000000001";
 
 export type NhSpeedLogPoint = { t: number; v: number };
 
@@ -96,12 +95,13 @@ export async function readNhSpeedLogSince(
   const wid = watcherId.trim().toLowerCase();
   const rows = (await db
     .prepare(
-      `SELECT rig_key, rig_label, algorithm, sample_t, speed
+      `SELECT rig_key, MAX(rig_label) AS rig_label, MAX(algorithm) AS algorithm, sample_t, MAX(speed) AS speed
        FROM nh_watcher_rig_speed_log
-       WHERE user_id = ? AND watcher_id = ? AND sample_t >= ?
+       WHERE watcher_id = ? AND sample_t >= ?
+       GROUP BY rig_key, sample_t
        ORDER BY rig_key ASC, sample_t ASC`
     )
-    .all(userId, wid, sinceMs)) as Record<string, unknown>[];
+    .all(wid, sinceMs)) as Record<string, unknown>[];
 
   const grouped = new Map<string, { rigId: string; label: string; algorithm: string; points: NhSpeedLogPoint[] }>();
   for (const row of rows) {
@@ -202,86 +202,85 @@ export async function syncNhSpeedLogFromNiceHash(
   };
 }
 
-function rigsFromPayload(payload: Record<string, unknown>): { rigId: string; algorithm: string; label: string; speed: number }[] {
-  const list = payload.miningRigs;
-  if (!Array.isArray(list)) return [];
-  const out: { rigId: string; algorithm: string; label: string; speed: number }[] = [];
-  for (const rig of list) {
-    if (!rig || typeof rig !== "object") continue;
-    const o = rig as { rigId?: unknown; name?: unknown; stats?: unknown[] };
-    const rigId = typeof o.rigId === "string" ? o.rigId.trim() : "";
-    if (!rigId) continue;
-    const st = nhPickPrimaryMiningStat(o.stats);
-    const algoField = st?.algorithm;
-    const algorithm =
-      algoField && typeof algoField === "object" && typeof (algoField as { enumName?: unknown }).enumName === "string"
-        ? String((algoField as { enumName: string }).enumName).trim()
-        : "";
-    const name = typeof o.name === "string" && o.name.trim() ? o.name.trim() : rigId;
-    const speed = nhRigSpeedAcceptedFromStats(o.stats) ?? 0;
-    out.push({ rigId, algorithm, label: name, speed });
-  }
-  return out;
+function viaAccessKey(link: string): string {
+  const q = link.match(/[?&]access_key=([a-f0-9]{16,64})/i);
+  if (q?.[1]) return q[1].toLowerCase();
+  return /^[a-f0-9]{16,64}$/i.test(link) ? link.toLowerCase() : "";
 }
 
-/** Sigue el archivo aunque nadie tenga el monitor abierto: snapshot actual + huecos de las últimas horas. */
+async function storedFleetAccounts(): Promise<{
+  nicehash: { id: string }[];
+  viabtc: { name: string; accessKey: string }[];
+}> {
+  const row = (await db.prepare(`SELECT body_json FROM monitor_pool_accounts WHERE id = 1`).get()) as
+    | { body_json?: unknown }
+    | undefined;
+  let body: unknown = row?.body_json;
+  if (typeof body === "string") {
+    try {
+      body = JSON.parse(body);
+    } catch {
+      body = {};
+    }
+  }
+  const src = body && typeof body === "object" ? (body as { nicehash?: unknown; viabtc?: unknown }) : {};
+  const nicehash: { id: string }[] = [];
+  const seen = new Set<string>();
+  if (Array.isArray(src.nicehash)) {
+    for (const item of src.nicehash) {
+      if (!item || typeof item !== "object") continue;
+      const id = String((item as { id?: unknown }).id ?? "").trim().toLowerCase();
+      if (!/^[0-9a-f-]{36}$/.test(id) || seen.has(id)) continue;
+      seen.add(id);
+      nicehash.push({ id });
+    }
+  }
+  const viabtc: { name: string; accessKey: string }[] = [];
+  const seenKey = new Set<string>();
+  const seenName = new Set<string>();
+  if (Array.isArray(src.viabtc)) {
+    for (const item of src.viabtc) {
+      if (!item || typeof item !== "object") continue;
+      const rec = item as { name?: unknown; link?: unknown };
+      const accessKey = viaAccessKey(String(rec.link ?? ""));
+      const name = String(rec.name ?? "").trim().slice(0, 48) || "ViaBTC";
+      const nameKey = name.toUpperCase().replace(/\s*·\s*[A-Z0-9]+$/, "");
+      if (!accessKey || seenKey.has(accessKey) || (nameKey && seenName.has(nameKey))) continue;
+      seenKey.add(accessKey);
+      if (nameKey) seenName.add(nameKey);
+      viabtc.push({ name, accessKey });
+    }
+  }
+  return { nicehash, viabtc };
+}
+
+/** Cada minuto, con o sin nadie en el sitio: guarda el estado de todas las cuentas del monitor. */
 export async function cronSyncKnownWatcherSpeedLogs(): Promise<{ watchers: number; written: number }> {
   const cutoff = Date.now() - NH_SPEED_LOG_RETENTION_MS;
   await db.prepare(`DELETE FROM nh_watcher_rig_speed_log WHERE sample_t < ?`).run(cutoff);
 
-  const fromLog = (await db
-    .prepare(
-      `SELECT user_id, watcher_id, MAX(sample_t) AS mx
-       FROM nh_watcher_rig_speed_log
-       GROUP BY user_id, watcher_id`
-    )
-    .all()) as Record<string, unknown>[];
-  const fromLive = (await db
-    .prepare(
-      `SELECT DISTINCT user_id, watcher_id
-       FROM nh_watcher_rig_hash_samples
-       WHERE watcher_id <> ?`
-    )
-    .all(TOOLBAR_WATCHER)) as Record<string, unknown>[];
+  const fleetId = await monitorFleetUserId(0);
+  if (!(fleetId > 0)) return { watchers: 0, written: 0 };
+  const accounts = await storedFleetAccounts();
+  const { persistNhWatcherRigHashSamplesFromPayload } = await import("./nhWatcherRigHashSamples.js");
 
-  const ranked = new Map<string, { userId: number; watcherId: string; mx: number }>();
-  for (const row of fromLog) {
-    const userId = Number(row.user_id);
-    const watcherId = String(row.watcher_id ?? "").trim().toLowerCase();
-    if (!Number.isFinite(userId) || !/^[0-9a-f-]{36}$/.test(watcherId) || watcherId === TOOLBAR_WATCHER) continue;
-    ranked.set(`${userId}|${watcherId}`, { userId, watcherId, mx: Number(row.mx) || 0 });
-  }
-  for (const row of fromLive) {
-    const userId = Number(row.user_id);
-    const watcherId = String(row.watcher_id ?? "").trim().toLowerCase();
-    if (!Number.isFinite(userId) || !/^[0-9a-f-]{36}$/.test(watcherId)) continue;
-    const key = `${userId}|${watcherId}`;
-    if (!ranked.has(key)) ranked.set(key, { userId, watcherId, mx: 0 });
-  }
-
-  const jobs = [...ranked.values()].sort((a, b) => a.mx - b.mx).slice(0, 4);
   let written = 0;
-  for (const job of jobs) {
-    const proxied = await proxyNiceHashRigs2WithExtras(job.watcherId, null);
-    if (!proxied.ok) continue;
-    const { persistNhWatcherRigHashSamplesFromPayload } = await import("./nhWatcherRigHashSamples.js");
-    await persistNhWatcherRigHashSamplesFromPayload(job.userId, job.watcherId, proxied.data).catch(() => undefined);
-    const rigs = rigsFromPayload(proxied.data);
-    if (rigs.length === 0) continue;
-    const now = Date.now();
-    written += await upsertNhSpeedLog(
-      job.userId,
-      job.watcherId,
-      rigs.map((r) => ({
-        rigKey: nhSpeedLogRigKey(r.rigId),
-        label: r.label,
-        t: now,
-        speed: r.speed,
-        algorithm: r.algorithm,
-      }))
-    );
-    const synced = await syncNhSpeedLogFromNiceHash(job.userId, job.watcherId, rigs);
-    written += synced.rigs.reduce((n, r) => n + r.points.length, 0);
+  let next = 0;
+  const jobs = accounts.nicehash;
+  const workers = Array.from({ length: Math.min(4, jobs.length) }, async () => {
+    while (next < jobs.length) {
+      const job = jobs[next++];
+      if (!job) continue;
+      const proxied = await proxyNiceHashRigs2WithExtras(job.id, null);
+      if (!proxied.ok) continue;
+      written += await persistNhWatcherRigHashSamplesFromPayload(fleetId, job.id, proxied.data).catch(() => 0);
+    }
+  });
+  await Promise.all(workers);
+
+  if (accounts.viabtc.length) {
+    const { snapshotViaAccounts } = await import("./viaBtcObserver.js");
+    written += await snapshotViaAccounts(accounts.viabtc, fleetId).catch(() => 0);
   }
-  return { watchers: jobs.length, written };
+  return { watchers: jobs.length + accounts.viabtc.length, written };
 }
