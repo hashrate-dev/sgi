@@ -780,6 +780,21 @@ function liveSeries(a){
   if(cur>0&&(!pts.length||pts[pts.length-1].t<now))pts.push({t:now,v:cur});
   return{pts:pts.filter(p=>p.t>=Date.now()-S.range),cur};
 }
+/** % del tramo dibujado con velocidad. Un hueco mayor a 5 min (donde la línea se corta) es apagado. Antes de la primera muestra no entra. */
+function seriesUptimePct(pts,cur){
+  const seq=pts.filter(p=>Number.isFinite(p.t)).slice().sort((a,b)=>a.t-b.t);
+  if(seq.length<2) return null;
+  const gapMax=5*60000;
+  let on=0;
+  for(let i=1;i<seq.length;i++){
+    const gap=seq[i].t-seq[i-1].t;
+    if(gap>0&&gap<=gapMax&&seq[i-1].v>0&&seq[i].v>0) on+=gap;
+  }
+  const end=cur>0?seq[seq.length-1].t:Math.max(seq[seq.length-1].t,Date.now());
+  const span=end-seq[0].t;
+  if(!(span>0)) return null;
+  return Math.max(0,Math.min(100,on/span*100));
+}
 function rigSeries(r){const s=(D.hist[r.wid]?.[r.key]||[]).filter(p=>p.t>=Date.now()-864e5).map(p=>p.v);if(r.hr>0)s.push(r.hr);return s.slice(-90)}
 
 /* ======================= Render ======================= */
@@ -820,7 +835,9 @@ function renderLive(animate=true){
   const vals=pts.map(p=>p.v),avg=vals.length?vals.reduce((s,v)=>s+v,0)/vals.length:cur,mx=vals.length?Math.max(...vals):cur,mn=vals.length?Math.min(...vals):cur;
   const diff=avg?(cur-avg)/avg*100:0,dl=$('#liveDelta');dl.hidden=vals.length<3;dl.className='delta '+(diff>=0?'up':'down');dl.textContent=(diff>=0?'▲ ':'▼ ')+nf(Math.abs(diff),1)+'% vs prom.';
   const mining=cnt.filter(r=>r.mining).length;
-  $('#liveStats').innerHTML=[['Máximo',nf(mx)],['Mínimo',nf(mn)],['Promedio',nf(avg)],['Minando',`${mining}/${cnt.length}`]].map(([l,v])=>`<div><label>${l}</label><b>${v}</b></div>`).join('');
+  const up=seriesUptimePct(pts,cur);
+  const upTip='Parte del gráfico con velocidad. Un hueco de más de 5 minutos cuenta como apagado. Lo anterior a la primera muestra no entra.';
+  $('#liveStats').innerHTML=[['Máximo',nf(mx)],['Mínimo',nf(mn)],['Promedio',nf(avg)],['Minando',`${mining}/${cnt.length}`],['Uptime',up==null?'—':nf(up,1)+'%',upTip]].map(([l,v,tip])=>`<div${tip?` title="${esc(tip)}"`:''}><label>${l}</label><b>${v}</b></div>`).join('');
   if(pts.length<2){svg.innerHTML='';el.insertAdjacentHTML('beforeend','<div class="note">Todavía no hay historial suficiente en este rango.<br>Queda guardado en la base durante 6 meses.</div>');$('#chartRange').textContent='';return}
 
   const W=el.clientWidth||800,H=el.clientHeight||240,t0=pts[0].t,t1=pts[pts.length-1].t||t0+1,top=mx*1.12||1;
