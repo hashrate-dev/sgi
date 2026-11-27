@@ -223,7 +223,19 @@ h1 .grad{background:linear-gradient(90deg,var(--sha),var(--sha2) 50%,var(--scr))
 .heat-legend{display:flex;gap:14px;align-items:center;font-size:11px;color:var(--muted);margin-top:12px;flex-wrap:wrap}
 .heat-legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:5px}
 .heat-bill{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
-.heat-bill .dc{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.heat-bill .bill-top{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:10px}
+.heat-bill .dc{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:0;flex:1 1 auto}
+.heat-bill .alerts{flex:0 1 440px;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;align-content:flex-start;max-height:156px;overflow:auto;scrollbar-width:thin;scrollbar-color:#3d4c47 transparent}
+.heat-bill .heat-alert{display:inline-flex;align-items:center;gap:8px;max-width:214px;padding:7px 10px 7px 8px;border-radius:12px;background:color-mix(in srgb,var(--bad) 14%,var(--panel2));border:1px solid color-mix(in srgb,var(--bad) 42%,transparent);color:var(--text);text-align:left}
+.heat-bill .heat-alert:hover{filter:brightness(1.08)}
+.heat-bill .heat-alert i{width:22px;height:22px;border-radius:7px;flex-shrink:0;display:grid;place-items:center;background:var(--bad);color:#2a0a10;font:700 13px var(--disp);font-style:normal}
+.heat-bill .heat-alert i::before{content:"!"}
+.heat-bill .heat-alert.warn{background:color-mix(in srgb,var(--warn) 14%,var(--panel2));border-color:color-mix(in srgb,var(--warn) 45%,transparent)}
+.heat-bill .heat-alert.warn i{background:var(--warn);color:#2a1c05}
+.heat-bill .heat-alert span{min-width:0}
+.heat-bill .heat-alert b{display:block;font:600 12.5px Inter;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.heat-bill .heat-alert small{display:block;margin-top:1px;font-size:10.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:800px){.heat-bill .alerts{flex-basis:100%;justify-content:flex-start;max-height:none}}
 .heat-bill .dc b{display:block;font:600 14px var(--mono);color:var(--text);margin-top:2px}
 .heat-bill .dc span{font-size:11px;color:var(--muted)}
 .heat-bill .pill{padding:8px 10px;border-radius:10px;background:var(--panel2);min-width:140px}
@@ -1197,12 +1209,15 @@ function renderHeat(){
   const known=up.dcOn+up.dcOff;
   const upPct=known?nf(up.dcOn/known*100,1)+'%':'Sin registro';
   const upWin=mode==='live'?'última hora':'24 h';
-  $('#heatBill').innerHTML=l.length?`<div class="dc">
+  const flags=l.flatMap(r=>!r.mining?[{r,warn:false,why:'Sin minar'}]:r.rejPct>1?[{r,warn:true,why:`Rechazo ${nf(r.rejPct,1)}%`}]:[]);
+  flags.sort((a,b)=>(a.warn-b.warn)||String(a.r.name).localeCompare(String(b.r.name),'es'));
+  const alerts=flags.length?`<div class="alerts" aria-label="Equipos para revisar">${flags.map(({r,warn,why})=>`<button type="button" class="heat-alert${warn?' warn':''}" data-k="${esc(r.wid+'|'+r.key)}" title="${esc(r.name+' · '+r.wname+' · '+why+' · tocar para ver el equipo')}"><i></i><span><b>${esc(r.name)}</b><small>${esc(r.wname)} · ${esc(why)}</small></span></button>`).join('')}</div>`:'';
+  $('#heatBill').innerHTML=l.length?`<div class="bill-top"><div class="dc">
       <div class="pill on" title="Prendido sobre el tiempo con registro de la ${upWin}. El gris no entra."><span>Uptime ${upWin}</span><b>${upPct}</b></div>
       <div class="pill on"><span>Data center prendido</span><b>${fmtBill(up.dcOn)}</b></div>
       <div class="pill off"><span>Corte · todos offline</span><b>${fmtBill(up.dcOff)}</b></div>
       <div class="pill"><span>Data center sin registro</span><b>${fmtBill(up.dcUnk)}</b></div>
-    </div>
+    </div>${alerts}</div>
     <p class="note">El prendido y el apagado de cada equipo están en la tabla Equipos. El gris no se cobra y no se cuenta como corte.</p>${monthUpHtml()}`:'';
   if(heatJump&&mode==='5min'){heatJump=false;const sc=$('#heatScroll');requestAnimationFrame(()=>{if(sc)sc.scrollLeft=sc.scrollWidth})}
 }
@@ -1240,6 +1255,7 @@ $('#algoSeg').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.algo
 $('#rangeSeg').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.range=+b.dataset.r;$$('#rangeSeg button').forEach(x=>x.classList.toggle('on',x===b));renderLive(false)};
 $('#barsSeg').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.bars=b.dataset.m;ls.set('hrsMonitorV2:bars',S.bars);renderBars()};
 $('#heatSeg').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.heat=b.dataset.h;ls.set('hrsMonitorV2:heat',S.heat);heatJump=S.heat==='5min';renderHeat();renderFleet()};
+$('#heatBill').onclick=e=>{const b=e.target.closest('.heat-alert');if(!b)return;const el=document.getElementById('rig-'+b.dataset.k);if(!el)return;el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.add('flash');setTimeout(()=>el.classList.remove('flash'),1600)};
 $('#algoF').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.fAlgo=b.dataset.v;$$('#algoF button').forEach(x=>x.classList.toggle('on',x===b));renderFleet()};
 $('#view').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.view=b.dataset.v;$$('#view button').forEach(x=>x.classList.toggle('on',x===b));ls.set('hrsMonitorV2:view',S.view);renderFleet()};
 $('#q').oninput=e=>{S.q=e.target.value.trim().toLowerCase();renderFleet()};
