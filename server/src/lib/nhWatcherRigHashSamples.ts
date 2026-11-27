@@ -59,9 +59,8 @@ export async function nhRigHashTrimPerRig(userId: number, watcherId: string): Pr
 }
 
 /**
- * Tras cada lectura exitosa al proxy NiceHash: guarda en BD una muestra por minuto por rig
- * (misma clave y heurística TH/MH que el cliente), para que el sparkline siga alimentándose
- * aunque falle el POST desde el navegador.
+ * Tras cada lectura del pool: guarda el minuto actual de cada equipo.
+ * 0 = se vio apagado. Un hashrate positivo no se pisa con un 0 del mismo minuto.
  */
 export async function persistNhWatcherRigHashSamplesFromPayload(
   userId: number,
@@ -98,7 +97,11 @@ export async function persistNhWatcherRigHashSamplesFromPayload(
 
   const ins = db.prepare(
     `INSERT INTO nh_watcher_rig_hash_samples (user_id, watcher_id, rig_key, sample_t, value) VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT (user_id, watcher_id, rig_key, sample_t) DO NOTHING`
+     ON CONFLICT (user_id, watcher_id, rig_key, sample_t) DO UPDATE SET
+       value = CASE
+         WHEN excluded.value > nh_watcher_rig_hash_samples.value THEN excluded.value
+         ELSE nh_watcher_rig_hash_samples.value
+       END`
   );
 
   let inserted = 0;
@@ -108,12 +111,10 @@ export async function persistNhWatcherRigHashSamplesFromPayload(
     if (!rig || typeof rig !== "object") continue;
     const rk = nhWatcherRigStorageKey(rig as { rigId?: string; name?: string }, i);
     const sp = nhRigSpeedAcceptedFromStats((rig as { stats?: unknown[] }).stats);
-    if (sp == null || !Number.isFinite(sp) || sp <= 0 || sp > 1e20) continue;
+    const speed = sp == null || !Number.isFinite(sp) ? 0 : sp;
+    if (speed < 0 || speed > 1e20) continue;
 
-    const lb = lastBucketFor(rk);
-    if (lb !== null && bucketNow <= lb) continue;
-
-    const r = await ins.run(userId, wid, rk, bucketNow, sp);
+    const r = await ins.run(userId, wid, rk, bucketNow, speed);
     if (r.changes > 0) {
       inserted += 1;
       lastRawByKey.set(rk, bucketNow);
@@ -164,6 +165,32 @@ export async function persistNhWatcherRigHashSamplesFromPayload(
   await nhRigHashTrimPerRig(userId, wid);
 
   return inserted;
+}
+
+/** Minutos guardados de cada equipo, incluido el 0 (apagado observado). */
+export async function readNhRigMinuteSamples(
+  userId: number,
+  watcherId: string,
+  sinceMs: number
+): Promise<Array<{ rigKey: string; t: number; v: number }>> {
+  const wid = watcherId.trim().toLowerCase();
+  const rows = (await db
+    .prepare(
+      `SELECT rig_key, sample_t, value
+       FROM nh_watcher_rig_hash_samples
+       WHERE user_id = ? AND watcher_id = ? AND sample_t >= ? AND rig_key LIKE 'id:%' AND value >= 0
+       ORDER BY sample_t ASC`
+    )
+    .all(userId, wid, sinceMs)) as Array<Record<string, unknown>>;
+  const out: Array<{ rigKey: string; t: number; v: number }> = [];
+  for (const row of rows) {
+    const rigKey = String(row.rig_key ?? "");
+    const t = Number(row.sample_t);
+    const v = Number(row.value);
+    if (!rigKey.startsWith("id:") || !Number.isFinite(t) || !Number.isFinite(v) || v < 0) continue;
+    out.push({ rigKey, t, v });
+  }
+  return out;
 }
 
 /** Resoluciones de gráfico mayores a 1 min (materializadas en `nh_watcher_rig_hash_agg_samples`). */

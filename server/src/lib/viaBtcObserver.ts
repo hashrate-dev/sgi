@@ -1,3 +1,4 @@
+import { persistNhWatcherRigHashSamplesFromPayload, readNhRigMinuteSamples } from "./nhWatcherRigHashSamples.js";
 import { readNhSpeedLogSince, upsertNhSpeedLog } from "./nhWatcherSpeedLog.js";
 import { allocateViaRigBtc, shareBySpeed } from "./rigBtcLedger.js";
 
@@ -261,11 +262,17 @@ async function buildViaBtcBoardFresh(accounts: ViaAccountIn[], userId: number): 
       ];
       try {
         await upsertNhSpeedLog(userId, id, samples);
+        await persistNhWatcherRigHashSamplesFromPayload(userId, id, payload[id]).catch(() => undefined);
         const stored = await readNhSpeedLogSince(userId, id, Date.now() - 24 * 60 * 60 * 1000);
         const byRig: Record<string, [number, number][]> = { __nhToolbarSumZec: series };
         for (const row of stored) {
           if (!row.rigId || row.rigId.startsWith("__")) continue;
           byRig[`id:${row.rigId}`] = row.points.filter((p) => p.v > 0).map((p) => [p.t, p.v]);
+        }
+        const minutes = await readNhRigMinuteSamples(userId, id, Date.now() - 24 * 60 * 60 * 1000).catch(() => []);
+        for (const row of minutes) {
+          const arr = byRig[row.rigKey] || (byRig[row.rigKey] = []);
+          arr.push([row.t, row.v]);
         }
         history[id] = byRig;
       } catch {

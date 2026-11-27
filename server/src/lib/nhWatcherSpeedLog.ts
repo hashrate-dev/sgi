@@ -264,6 +264,8 @@ export async function cronSyncKnownWatcherSpeedLogs(): Promise<{ watchers: numbe
   for (const job of jobs) {
     const proxied = await proxyNiceHashRigs2WithExtras(job.watcherId, null);
     if (!proxied.ok) continue;
+    const { persistNhWatcherRigHashSamplesFromPayload } = await import("./nhWatcherRigHashSamples.js");
+    await persistNhWatcherRigHashSamplesFromPayload(job.userId, job.watcherId, proxied.data).catch(() => undefined);
     const rigs = rigsFromPayload(proxied.data);
     if (rigs.length === 0) continue;
     const now = Date.now();

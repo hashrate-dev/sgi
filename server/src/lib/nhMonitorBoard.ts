@@ -8,7 +8,7 @@ import {
   sumNhCredits,
   syncNhCreditDeltas,
 } from "./nhWatcherCreditDeltas.js";
-import { persistNhWatcherRigHashSamplesFromPayload } from "./nhWatcherRigHashSamples.js";
+import { persistNhWatcherRigHashSamplesFromPayload, readNhRigMinuteSamples } from "./nhWatcherRigHashSamples.js";
 import {
   nhSpeedLogRigKey,
   syncNhSpeedLogFromNiceHash,
@@ -139,22 +139,11 @@ async function readWatcherHistory(userId: number, watcherId: string): Promise<{
     rigBuf.set(key, arr);
   }
 
-  const samples = (await db
-    .prepare(
-      `SELECT rig_key, sample_t, value
-       FROM nh_watcher_rig_hash_samples
-       WHERE user_id = ? AND watcher_id = ? AND sample_t >= ? AND rig_key LIKE 'id:%' AND value > 0
-       ORDER BY sample_t ASC`
-    )
-    .all(userId, watcherId, now - DAY_MS)) as Array<Record<string, unknown>>;
+  const samples = await readNhRigMinuteSamples(userId, watcherId, now - DAY_MS);
   for (const row of samples) {
-    const key = String(row.rig_key ?? "");
-    const t = Number(row.sample_t);
-    const v = Number(row.value);
-    if (!key.startsWith("id:") || !Number.isFinite(t) || !(v > 0)) continue;
-    const arr = rigBuf.get(key) || [];
-    arr.push([t, v]);
-    rigBuf.set(key, arr);
+    const arr = rigBuf.get(row.rigKey) || [];
+    arr.push([row.t, row.v]);
+    rigBuf.set(row.rigKey, arr);
   }
 
   for (const [key, arr] of rigBuf) rigs[key] = arr;
@@ -231,7 +220,7 @@ export async function buildNhMonitorBoard(
     payload[w.id] = stripPayload(res.data);
     const rigs = liveRigs(res.data);
     live.push({ id: w.id, rigs });
-    void persistNhWatcherRigHashSamplesFromPayload(userId, w.id, res.data).catch(() => undefined);
+    await persistNhWatcherRigHashSamplesFromPayload(userId, w.id, res.data).catch(() => undefined);
     await upsertNhSpeedLog(
       userId,
       w.id,
@@ -251,7 +240,7 @@ export async function buildNhMonitorBoard(
   const thin: typeof live = [];
   for (const row of live) {
     const hist = await readWatcherHistory(userId, row.id);
-    const rigPoints = Object.values(hist.rigs).reduce((n, pts) => n + pts.length, 0);
+    const rigPoints = Object.values(hist.rigs).reduce((n, pts) => n + pts.filter((p) => p[1] > 0).length, 0);
     if (rigPoints < 8 || hist.sha.size + hist.scr.size < 2) thin.push(row);
   }
   await mapPool(thin, 3, (row) =>
