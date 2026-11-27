@@ -5,7 +5,7 @@ const STEP = 5 * 60 * 1000;
 const ART = "America/Argentina/Buenos_Aires";
 
 export type UptimeRig = { id: string; key: string };
-export type UptimeSide = { label: string; pct: number | null; closed: boolean };
+export type UptimeSide = { label: string; pct: number | null; onMs: number | null; closed: boolean };
 export type UptimeMonths = {
   current: UptimeSide;
   previous: UptimeSide;
@@ -81,11 +81,20 @@ async function saveDays(userId: number, rows: DayRow[], todayKey: string, now: n
 
 const KEEP_MS = 183 * 24 * 60 * 60 * 1000;
 
+function preferCoverage(speedRows: DayRow[], minuteRows: DayRow[]): DayRow[] {
+  const pick = new Map<string, DayRow>();
+  for (const row of minuteRows) pick.set(`${row.day}|${row.wid}|${row.key}`, row);
+  for (const row of speedRows) {
+    const id = `${row.day}|${row.wid}|${row.key}`;
+    const prev = pick.get(id);
+    if (!prev || prev.on + prev.off < row.on + row.off) pick.set(id, row);
+  }
+  return [...pick.values()];
+}
+
 /**
- * Completa días ya cerrados que todavía no están guardados.
- * Solo entran equipos con alguna muestra ese día: el registro no guarda los ceros,
- * así que un día entero sin muestras queda sin fila y no se cuenta como corte.
- * El día de hoy lo sigue actualizando el mes en curso.
+ * Completa días del rango que todavía no están guardados, y vuelve a calcular el día de hoy.
+ * Usa el archivo de 5 minutos y los minutos por equipo. Un día sin muestras no se inventa.
  */
 export async function fillMissingUptimeDays(userId: number, watchers: string[], fromMs: number, toMs: number): Promise<void> {
   const ids = [...new Set(watchers.map((id) => id.trim().toLowerCase()).filter(Boolean))].slice(0, 40);
@@ -106,7 +115,7 @@ export async function fillMissingUptimeDays(userId: number, watchers: string[], 
   const end = artDayStartFromKey(toKey);
   for (let day = artDayStartFromKey(fromKey); day > 0 && day <= end && day <= now; day = nextDayStart(day)) {
     const key = artDayKey(day);
-    if (!key || key === todayKey || stored.has(key)) continue;
+    if (!key || (stored.has(key) && key !== todayKey)) continue;
     missing.push(day);
     if (missing.length > 183) break;
   }
@@ -145,12 +154,14 @@ export async function fillMissingUptimeDays(userId: number, watchers: string[], 
         rigsByDay.set(day, list);
       }
     }
-    const toSave: DayRow[] = [];
+    const speedRows: DayRow[] = [];
     for (let day = start; day <= last; day = nextDayStart(day)) {
       const rigs = rigsByDay.get(artDayKey(day)) ?? [];
       if (!rigs.length) continue;
-      toSave.push(...splitDay(hits, rigs, day, nextDayStart(day), now));
+      speedRows.push(...splitDay(hits, rigs, day, nextDayStart(day), now));
     }
+    const minuteRows = await minuteDayRows(userId, ids, start, nextDayStart(last)).catch(() => [] as DayRow[]);
+    const toSave = preferCoverage(speedRows, minuteRows);
     if (toSave.length) await saveDays(userId, toSave, todayKey, now);
   }
   await db
@@ -163,6 +174,57 @@ function pctOf(on: number, off: number): number | null {
   return known > 0 ? Math.round((on / known) * 1000) / 10 : null;
 }
 
+function sideOf(label: string, on: number, off: number, closed: boolean): UptimeSide {
+  const known = on + off > 0;
+  return { label, pct: pctOf(on, off), onMs: known ? Math.round(on) : null, closed };
+}
+
+const MINUTE = 60 * 1000;
+
+/** Minutos ya guardados por equipo. Un minuto solo cuenta si alguien del grupo estuvo prendido. */
+async function minuteDayRows(userId: number, watchers: string[], fromMs: number, toMs: number): Promise<DayRow[]> {
+  if (!watchers.length || !(toMs > fromMs)) return [];
+  const marks = watchers.map(() => "?").join(", ");
+  const rows = (await db
+    .prepare(
+      `SELECT watcher_id, rig_key, sample_t, value
+       FROM nh_watcher_rig_hash_samples
+       WHERE user_id = ? AND sample_t >= ? AND sample_t < ?
+         AND rig_key LIKE 'id:%' AND watcher_id IN (${marks})`
+    )
+    .all(userId, fromMs, toMs, ...watchers)) as Array<Record<string, unknown>>;
+  const byMinute = new Map<number, Map<string, number>>();
+  for (const row of rows) {
+    const t = Math.floor(Number(row.sample_t) / MINUTE) * MINUTE;
+    const rigKey = String(row.rig_key ?? "").trim();
+    const id = `${String(row.watcher_id ?? "").trim().toLowerCase()}|${rigKey}`;
+    const v = Number(row.value);
+    if (!Number.isFinite(t) || !rigKey.startsWith("id:") || !Number.isFinite(v) || v < 0) continue;
+    let slot = byMinute.get(t);
+    if (!slot) byMinute.set(t, (slot = new Map()));
+    const prev = slot.get(id) ?? 0;
+    if (v > prev) slot.set(id, v);
+  }
+  const per = new Map<string, { day: string; wid: string; key: string; on: number; off: number }>();
+  for (const [t, slot] of byMinute) {
+    let any = false;
+    for (const v of slot.values()) if (v > 0) any = true;
+    if (!any) continue;
+    const day = artDayKey(t);
+    for (const [id, v] of slot) {
+      const bar = id.indexOf("|");
+      const wid = id.slice(0, bar);
+      const key = id.slice(bar + 1);
+      const pk = `${day}|${wid}|${key}`;
+      const row = per.get(pk) ?? { day, wid, key, on: 0, off: 0 };
+      if (v > 0) row.on += MINUTE;
+      else row.off += MINUTE;
+      per.set(pk, row);
+    }
+  }
+  return [...per.values()];
+}
+
 export async function readUptimeMonths(userId: number, watchers: string[], rigsIn: UptimeRig[]): Promise<UptimeMonths> {
   const now = Date.now();
   const currentStart = artMonthStartMs(now);
@@ -171,7 +233,7 @@ export async function readUptimeMonths(userId: number, watchers: string[], rigsI
   const ids = [...new Set(watchers.map((id) => id.trim().toLowerCase()).filter(Boolean))].slice(0, 40);
   const currentLabel = monthLabel(currentStart);
   const previousLabel = monthLabel(previousStart);
-  const empty = (label: string, closed: boolean): UptimeSide => ({ label, pct: null, closed });
+  const empty = (label: string, closed: boolean): UptimeSide => ({ label, pct: null, onMs: null, closed });
   const blank = (): UptimeMonths => ({
     current: empty(currentLabel, false),
     previous: empty(previousLabel, true),
@@ -215,7 +277,12 @@ export async function readUptimeMonths(userId: number, watchers: string[], rigsI
     const end = Math.min(nextDayStart(day), nextMonth);
     toSave.push(...splitDay(hits, rigIds, day, end, now));
   }
-  if (toSave.length) await saveDays(userId, toSave, todayKey, now).catch(() => undefined);
+  const minuteRows = await minuteDayRows(userId, ids, currentStart, now + MINUTE).catch(() => [] as DayRow[]);
+  const merged = new Map<string, DayRow>();
+  for (const row of minuteRows) merged.set(`${row.day}|${row.wid}|${row.key}`, row);
+  for (const row of toSave) merged.set(`${row.day}|${row.wid}|${row.key}`, row);
+  const saving = [...merged.values()];
+  if (saving.length) await saveDays(userId, saving, todayKey, now).catch(() => undefined);
 
   const fromKey = artDayKey(previousStart);
   const toKey = artDayKey(nextMonth);
@@ -241,22 +308,24 @@ export async function readUptimeMonths(userId: number, watchers: string[], rigsI
       on += Number(row.on_ms) || 0;
       off += Number(row.off_ms) || 0;
     }
-    return pctOf(on, off);
+    return { on, off };
   };
 
   const byWatcher: UptimeMonths["byWatcher"] = {};
   for (const wid of ids) {
     const current = sum("current", wid);
     const previous = sum("previous", wid);
-    if (current == null && previous == null) continue;
+    if (!(current.on + current.off > 0) && !(previous.on + previous.off > 0)) continue;
     byWatcher[wid] = {
-      current: { label: currentLabel, pct: current, closed: false },
-      previous: { label: previousLabel, pct: previous, closed: true },
+      current: sideOf(currentLabel, current.on, current.off, false),
+      previous: sideOf(previousLabel, previous.on, previous.off, true),
     };
   }
+  const current = sum("current");
+  const previous = sum("previous");
   return {
-    current: { label: currentLabel, pct: sum("current"), closed: false },
-    previous: { label: previousLabel, pct: sum("previous"), closed: true },
+    current: sideOf(currentLabel, current.on, current.off, false),
+    previous: sideOf(previousLabel, previous.on, previous.off, true),
     byWatcher,
   };
 }

@@ -1099,14 +1099,16 @@ function renderFleet(){
 let heatJump=S.heat==='5min',monthUp=null,upGen=0;
 function monthUpHtml(){
   const pick=side=>{
-    if(!monthUp) return {label:side==='current'?'Este mes':'Mes anterior',pct:null,closed:side!=='current',pending:true};
+    if(!monthUp) return {label:side==='current'?'Este mes':'Mes anterior',pct:null,onMs:null,closed:side!=='current',pending:true};
     const src=S.w==='TOTAL'?monthUp[side]:monthUp.byWatcher?.[S.w]?.[side];
-    return src||{label:side==='current'?'Este mes':'Mes anterior',pct:null,closed:side!=='current'};
+    return src||{label:side==='current'?'Este mes':'Mes anterior',pct:null,onMs:null,closed:side!=='current'};
   };
   const cell=side=>{
     const x=pick(side);
-    const v=x.pending?'…':x.pct==null?'Sin registro':Number(x.pct).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
-    return `<div class="pill on"><span>Uptime ${esc(x.label||'')}</span><b>${esc(v)}</b><small>${x.closed?'Mes cerrado':'Mes en curso'}</small></div>`;
+    const v=x.pending?'…':x.onMs==null?'Sin registro':fmtBill(x.onMs);
+    const pct=x.pct==null?'':` · ${Number(x.pct).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})}%`;
+    const note=x.closed?'Mes cerrado':'Mes en curso';
+    return `<div class="pill on" title="Suma del tiempo prendido de cada equipo, leída de la base. El gris no entra."><span>Uptime ${esc(x.label||'')}</span><b>${esc(v)}</b><small>${esc(note+pct)}</small></div>`;
   };
   return `<div class="month-up">${cell('current')}${cell('previous')}</div>`;
 }
