@@ -279,7 +279,7 @@ export async function readCoinDayTotals(
       `SELECT sample_t, UPPER(coin) AS coin, SUM(btc) AS amount
        FROM nh_watcher_rig_btc_ledger
        WHERE user_id = ? AND sample_t >= ? AND btc > 0
-         AND UPPER(coin) <> 'BTC' AND watcher_id IN (${marks})
+         AND UPPER(coin) <> 'BTC' AND LOWER(watcher_id) IN (${marks})
        GROUP BY sample_t, UPPER(coin)`
     )
     .all(userId, from, ...ids)) as Array<Record<string, unknown>>;
