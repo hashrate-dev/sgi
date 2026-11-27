@@ -748,12 +748,23 @@ function readPoolAccounts(raw: unknown): { nicehash: { id: string; name: string 
     seen.add(id);
     nicehash.push({ id, name: (row.name || "").trim().slice(0, 48) || `W${nicehash.length + 1}` });
   }
+  const viaSeen = new Set<string>();
+  const viaNames = new Set<string>();
   const viabtc = (parsed.data.viabtc ?? [])
     .map((row, i) => ({
       name: (row.name || "").trim().slice(0, 48) || `ViaBTC ${i + 1}`,
       link: row.link.trim(),
     }))
-    .filter((row) => /[?&]access_key=[a-f0-9]{16,64}/i.test(row.link) || /^[a-f0-9]{16,64}$/i.test(row.link));
+    .filter((row) => {
+      const keyMatch = row.link.match(/[?&]access_key=([a-f0-9]{16,64})/i);
+      const key = (keyMatch?.[1] || (/^[a-f0-9]{16,64}$/i.test(row.link) ? row.link : "")).toLowerCase();
+      if (!key || viaSeen.has(key)) return false;
+      const nameKey = row.name.toUpperCase().replace(/\s*·\s*[A-Z0-9]+$/, "");
+      if (nameKey && viaNames.has(nameKey)) return false;
+      viaSeen.add(key);
+      if (nameKey) viaNames.add(nameKey);
+      return true;
+    });
   return { nicehash, viabtc };
 }
 
@@ -843,10 +854,18 @@ monitorEquiposAsicHistorialRouter.post(
       seen.add(id);
       watchers.push({ id, name: (w.name || "").trim().slice(0, 48) || `W${watchers.length + 1}` });
     }
-    const viaAccounts = (parsed.data.viabtc ?? []).map((v, i) => ({
-      accessKey: v.accessKey.trim().toLowerCase(),
-      name: (v.name || "").trim().slice(0, 48) || `ViaBTC ${i + 1}`,
-    }));
+    const viaSeen = new Set<string>();
+    const viaNames = new Set<string>();
+    const viaAccounts: { accessKey: string; name: string }[] = [];
+    for (const v of parsed.data.viabtc ?? []) {
+      const accessKey = v.accessKey.trim().toLowerCase();
+      const name = (v.name || "").trim().slice(0, 48) || `ViaBTC ${viaAccounts.length + 1}`;
+      const nameKey = name.toUpperCase().replace(/\s*·\s*[A-Z0-9]+$/, "");
+      if (!accessKey || viaSeen.has(accessKey) || (nameKey && viaNames.has(nameKey))) continue;
+      viaSeen.add(accessKey);
+      if (nameKey) viaNames.add(nameKey);
+      viaAccounts.push({ accessKey, name });
+    }
     if (watchers.length === 0 && viaAccounts.length === 0) {
       res.json({
         watchers: [],

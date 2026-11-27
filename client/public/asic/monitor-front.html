@@ -635,10 +635,18 @@ function viaKey(raw){
 function loadVia(){
   try{
     const arr=JSON.parse(ls.get(VIA_KEY)||'[]');
+    const seenKey=new Set(),seenName=new Set();
     return (Array.isArray(arr)?arr:[]).map(r=>{
       const accessKey=viaKey(r.link||r.accessKey||'');
       return accessKey?{name:String(r.name||'').slice(0,40),accessKey,link:String(r.link||accessKey)}:null;
-    }).filter(Boolean).slice(0,8);
+    }).filter(Boolean).filter(v=>{
+      if(seenKey.has(v.accessKey)) return false;
+      seenKey.add(v.accessKey);
+      const name=String(v.name||'').trim().toUpperCase().replace(/\s*·\s*[A-Z0-9]+$/,'');
+      if(name&&seenName.has(name)) return false;
+      if(name) seenName.add(name);
+      return true;
+    }).slice(0,8);
   }catch{return []}
 }
 function saveVia(list){
@@ -701,7 +709,17 @@ async function loadAll(manual){
   try{
     const watchers=loadSlots();
     RAW=await api('/api/monitor-equipos-asic/board',{method:'POST',body:JSON.stringify({watchers,viabtc:loadVia(),refresh:!!manual})});
-    D.watchers=(RAW.watchers||[]).map((w,i)=>({id:w.id,name:w.name,color:COLORS[i%COLORS.length]}));
+    const picked=[],viaAt=new Map();
+    for(const w of (RAW.watchers||[])){
+      const via=String(w.id||'').startsWith('via:')||RAW.payload?.[w.id]?.pool==='viabtc';
+      const name=String(w.name||'').trim().toUpperCase();
+      if(!via||!name){picked.push(w);continue}
+      if(!viaAt.has(name)){viaAt.set(name,picked.length);picked.push(w);continue}
+      const i=viaAt.get(name);
+      const n=(RAW.payload?.[w.id]?.miningRigs||[]).length, pn=(RAW.payload?.[picked[i].id]?.miningRigs||[]).length;
+      if(n>pn) picked[i]=w;
+    }
+    D.watchers=picked.map((w,i)=>({id:w.id,name:w.name,color:COLORS[i%COLORS.length]}));
     if(!D.watchers.length){renderBlank('nowatchers');return}
     if(!RAW.lastPoll){setPill('load','Leyendo NiceHash…');retry=true;return}
     if(pendingSlot!=null&&D.watchers[pendingSlot]){S.w=D.watchers[pendingSlot].id;pendingSlot=null}

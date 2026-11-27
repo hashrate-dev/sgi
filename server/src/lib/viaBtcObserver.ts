@@ -158,10 +158,13 @@ async function buildViaBtcBoardFresh(accounts: ViaAccountIn[], userId: number): 
   const total = new Map<number, number>();
 
   const seenKeys = new Set<string>();
+  const seenNames = new Set<string>();
   for (const account of accounts) {
     const key = account.accessKey.trim().toLowerCase();
-    if (!key || seenKeys.has(key)) continue;
+    const nameKey = account.name.trim().toUpperCase().replace(/\s*·\s*[A-Z0-9]+$/, "");
+    if (!key || seenKeys.has(key) || (nameKey && seenNames.has(nameKey))) continue;
     seenKeys.add(key);
+    if (nameKey) seenNames.add(nameKey);
     const info = okData(await getJson(`/res/observer/info?access_key=${encodeURIComponent(key)}`));
     if (!info) {
       const id = `via:${key}:ZEC`;
